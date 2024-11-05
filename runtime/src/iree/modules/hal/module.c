@@ -1198,6 +1198,77 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_dealloca,  //
       iree_hal_fence_semaphore_list(signal_fence), buffer);
 }
 
+IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_fill,  //
+                   iree_hal_module_state_t,            //
+                   rIrrrIIIiI, v) {
+  iree_hal_device_t* device = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
+  iree_hal_queue_affinity_t queue_affinity =
+      (iree_hal_queue_affinity_t)args->i1;
+  iree_hal_fence_t* wait_fence = iree_hal_fence_deref(args->r2);
+  iree_hal_fence_t* signal_fence = iree_hal_fence_deref(args->r3);
+  iree_hal_buffer_t* target_buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r4, &target_buffer));
+  iree_device_size_t target_offset = iree_hal_cast_device_size(args->i5);
+  iree_device_size_t length = iree_hal_cast_device_size(args->i6);
+  uint64_t pattern = args->i7;
+  iree_host_size_t pattern_length = iree_hal_cast_host_size(args->i8);
+  iree_hal_fill_flags_t flags = (iree_hal_fill_flags_t)args->i9;
+  return iree_hal_device_queue_fill(
+      device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
+      iree_hal_fence_semaphore_list(signal_fence), target_buffer, target_offset,
+      length, &pattern, pattern_length, flags);
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_update,  //
+                   iree_hal_module_state_t,              //
+                   rIrrrIrIII, v) {
+  iree_hal_device_t* device = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
+  iree_hal_queue_affinity_t queue_affinity =
+      (iree_hal_queue_affinity_t)args->i1;
+  iree_hal_fence_t* wait_fence = iree_hal_fence_deref(args->r2);
+  iree_hal_fence_t* signal_fence = iree_hal_fence_deref(args->r3);
+  iree_vm_buffer_t* source_buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r4, &source_buffer));
+  iree_host_size_t source_offset = iree_hal_cast_host_size(args->i5);
+  iree_hal_buffer_t* target_buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r6, &target_buffer));
+  iree_device_size_t target_offset = iree_hal_cast_device_size(args->i7);
+  iree_device_size_t length = iree_hal_cast_device_size(args->i8);
+  iree_hal_copy_flags_t flags = (iree_hal_copy_flags_t)args->i9;
+  iree_const_byte_span_t source_span = iree_const_byte_span_empty();
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_map_ro(source_buffer, source_offset,
+                                             length, 1, &source_span));
+  return iree_hal_device_queue_update(
+      device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
+      iree_hal_fence_semaphore_list(signal_fence), source_span.data, 0,
+      target_buffer, target_offset, length, flags);
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_copy,  //
+                   iree_hal_module_state_t,            //
+                   rIrrrIrIII, v) {
+  iree_hal_device_t* device = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
+  iree_hal_queue_affinity_t queue_affinity =
+      (iree_hal_queue_affinity_t)args->i1;
+  iree_hal_fence_t* wait_fence = iree_hal_fence_deref(args->r2);
+  iree_hal_fence_t* signal_fence = iree_hal_fence_deref(args->r3);
+  iree_hal_buffer_t* source_buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r4, &source_buffer));
+  iree_device_size_t source_offset = iree_hal_cast_device_size(args->i5);
+  iree_hal_buffer_t* target_buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r6, &target_buffer));
+  iree_device_size_t target_offset = iree_hal_cast_device_size(args->i7);
+  iree_device_size_t length = iree_hal_cast_device_size(args->i8);
+  iree_hal_copy_flags_t flags = (iree_hal_copy_flags_t)args->i9;
+  return iree_hal_device_queue_copy(
+      device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
+      iree_hal_fence_semaphore_list(signal_fence), source_buffer, source_offset,
+      target_buffer, target_offset, length, flags);
+}
+
 IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_read,  //
                    iree_hal_module_state_t,            //
                    rIrrrIrIIi, v) {

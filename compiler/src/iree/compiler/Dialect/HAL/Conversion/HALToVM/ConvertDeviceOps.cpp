@@ -115,6 +115,50 @@ private:
   mutable IREE::VM::ImportOp importOp;
 };
 
+class DeviceQueueFillOpConversion
+    : public OpConversionPattern<IREE::HAL::DeviceQueueFillOp> {
+public:
+  DeviceQueueFillOpConversion(MLIRContext *context, SymbolTable &importSymbols,
+                              TypeConverter &typeConverter,
+                              StringRef importName)
+      : OpConversionPattern(context) {
+    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
+    assert(importOp);
+  }
+
+  LogicalResult
+  matchAndRewrite(IREE::HAL::DeviceQueueFillOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto importType = importOp.getFunctionType();
+    auto i64Type = rewriter.getI64Type();
+    auto patternLength = rewriter.create<IREE::VM::ConstI32Op>(
+        op.getLoc(),
+        llvm::divideCeil(op.getPattern().getType().getIntOrFloatBitWidth(), 8));
+    auto flags =
+        rewriter.create<IREE::VM::ConstI64Op>(op.getLoc(), op.getFlags());
+    std::array<Value, 10> callOperands = {
+        adaptor.getDevice(),
+        castToImportType(adaptor.getQueueAffinity(), i64Type, rewriter),
+        adaptor.getWaitFence(),
+        adaptor.getSignalFence(),
+        adaptor.getTargetBuffer(),
+        castToImportType(adaptor.getTargetOffset(), i64Type, rewriter),
+        castToImportType(adaptor.getLength(), i64Type, rewriter),
+        castToImportType(adaptor.getPattern(), i64Type, rewriter),
+        patternLength,
+        flags,
+    };
+    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
+        op, SymbolRefAttr::get(importOp), importType.getResults(),
+        callOperands);
+    copyImportAttrs(importOp, callOp);
+    return success();
+  }
+
+private:
+  mutable IREE::VM::ImportOp importOp;
+};
+
 class DeviceQueueExecuteIndirectOpConversion
     : public OpConversionPattern<IREE::HAL::DeviceQueueExecuteIndirectOp> {
 public:
@@ -185,6 +229,12 @@ void populateHALDeviceToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.device.queue.alloca");
   patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueDeallocaOp>>(
       context, importSymbols, typeConverter, "hal.device.queue.dealloca");
+  patterns.insert<DeviceQueueFillOpConversion>(
+      context, importSymbols, typeConverter, "hal.device.queue.fill");
+  patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueUpdateOp>>(
+      context, importSymbols, typeConverter, "hal.device.queue.update");
+  patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueCopyOp>>(
+      context, importSymbols, typeConverter, "hal.device.queue.copy");
   patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueReadOp>>(
       context, importSymbols, typeConverter, "hal.device.queue.read");
   patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueWriteOp>>(
