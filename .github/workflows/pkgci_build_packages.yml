@@ -30,6 +30,15 @@ jobs:
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           submodules: true
+      - name: Setup Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.3
+        with:
+          python-version: 3.12
+          cache: "pip"
+      - name: Install Python packages
+        run: |
+          pip install packaging
+          pip freeze
       - name: Write version info
         shell: bash
         run: |
