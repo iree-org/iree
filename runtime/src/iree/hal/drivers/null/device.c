@@ -357,13 +357,64 @@ static iree_status_t iree_hal_null_device_queue_dealloca(
   return status;
 }
 
+static iree_status_t iree_hal_null_device_queue_fill(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, const void* pattern,
+    iree_host_size_t pattern_length, iree_hal_fill_flags_t flags) {
+  // TODO(null): if a native queue fill operation is available use that instead.
+  // The emulated fill creates a command buffer and executes it and it's best if
+  // the extra recording/upload/allocation time can be avoided.
+  return iree_hal_device_queue_emulated_fill(
+      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+      target_buffer, target_offset, length, pattern, pattern_length, flags);
+}
+
+static iree_status_t iree_hal_null_device_queue_update(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    const void* source_buffer, iree_host_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, iree_hal_update_flags_t flags) {
+  // TODO(null): if a native queue update operation is available use that
+  // instead. The emulated update creates a command buffer and executes it and
+  // it's best if the extra recording/upload/allocation time can be avoided.
+  // Since command buffers have a limited capacity for embedded data the
+  // emulated version may need to allocate buffers, split the update into
+  // multiple commands, or commit other sins a native implementation would be
+  // able to avoid.
+  return iree_hal_device_queue_emulated_update(
+      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+      source_buffer, source_offset, target_buffer, target_offset, length,
+      flags);
+}
+
+static iree_status_t iree_hal_null_device_queue_copy(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, iree_hal_copy_flags_t flags) {
+  // TODO(null): if a native queue copy operation is available use that instead.
+  // The emulated copy creates a command buffer and executes it and it's best if
+  // the extra recording/upload/allocation time can be avoided.
+  return iree_hal_device_queue_emulated_copy(
+      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+      source_buffer, source_offset, target_buffer, target_offset, length,
+      flags);
+}
+
 static iree_status_t iree_hal_null_device_queue_read(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_file_t* source_file, uint64_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length, uint32_t flags) {
+    iree_device_size_t length, iree_hal_read_flags_t flags) {
   // TODO(null): if native support for file operations are available then
   // definitely prefer those over the emulated implementation provided here by
   // default. The implementation performs allocations, creates semaphores, and
@@ -389,7 +440,7 @@ static iree_status_t iree_hal_null_device_queue_write(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_file_t* target_file, uint64_t target_offset,
-    iree_device_size_t length, uint32_t flags) {
+    iree_device_size_t length, iree_hal_write_flags_t flags) {
   // TODO(null): if native support for file operations are available then
   // definitely prefer those over the emulated implementation provided here by
   // default. The implementation performs allocations, creates semaphores, and
@@ -413,9 +464,8 @@ static iree_status_t iree_hal_null_device_queue_execute(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers,
-    iree_hal_buffer_binding_table_t const* binding_tables) {
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_binding_table_t binding_table) {
   iree_hal_null_device_t* device = iree_hal_null_device_cast(base_device);
 
   // TODO(null): implement a wait, execute, and signal queue operation. The
@@ -423,14 +473,11 @@ static iree_status_t iree_hal_null_device_queue_execute(
   // are to be used when executing and it can be assumed that all resources
   // required for execution are accessible on those queues. If more than one
   // queue is specified the implementation may use any it prefers from the set.
-  // If more than one command buffer is provided it is expected that they are
-  // executed in order on the same queue.
 
-  // TODO(null): optional binding tables matching 1:1 with the command buffers
-  // are provided for any indirect command buffers (those who have a
-  // binding_capacity > 0). The binding tables must be captured by the
-  // implementation as they may be mutated or freed by the caller immediately
-  // after this call returns.
+  // TODO(null): an optional binding table is provided for indirect command
+  // buffers (those who have a binding_capacity > 0). The binding table must be
+  // captured by the implementation as they may be mutated or freed by the
+  // caller immediately after this call returns.
 
   // TODO(null): do this async - callers may be submitting work to multiple
   // devices or queues on the same device from the same thread and blocking here
@@ -552,6 +599,9 @@ static const iree_hal_device_vtable_t iree_hal_null_device_vtable = {
         iree_hal_null_device_query_semaphore_compatibility,
     .queue_alloca = iree_hal_null_device_queue_alloca,
     .queue_dealloca = iree_hal_null_device_queue_dealloca,
+    .queue_fill = iree_hal_null_device_queue_fill,
+    .queue_update = iree_hal_null_device_queue_update,
+    .queue_copy = iree_hal_null_device_queue_copy,
     .queue_read = iree_hal_null_device_queue_read,
     .queue_write = iree_hal_null_device_queue_write,
     .queue_execute = iree_hal_null_device_queue_execute,

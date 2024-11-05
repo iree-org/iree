@@ -512,7 +512,7 @@ static iree_status_t iree_io_parameter_op_batch_enqueue_splat(
       z0, iree_hal_command_buffer_fill_buffer(
               batch->transfer_command_buffer,
               iree_hal_make_buffer_ref(buffer, buffer_offset, length), pattern,
-              pattern_length));
+              pattern_length, IREE_HAL_FILL_FLAG_NONE));
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -523,7 +523,7 @@ static iree_status_t iree_io_parameter_op_batch_enqueue_file_read(
     iree_io_parameter_op_batch_t* batch, iree_hal_file_t* source_file,
     uint64_t source_file_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_buffer_offset, iree_device_size_t length,
-    uint32_t flags) {
+    iree_hal_read_flags_t flags) {
   IREE_ASSERT_ARGUMENT(batch);
   IREE_ASSERT_ARGUMENT(source_file);
   IREE_ASSERT_ARGUMENT(target_buffer);
@@ -546,7 +546,8 @@ static iree_status_t iree_io_parameter_op_batch_enqueue_file_read(
 static iree_status_t iree_io_parameter_op_batch_enqueue_file_write(
     iree_io_parameter_op_batch_t* batch, iree_hal_buffer_t* source_buffer,
     iree_device_size_t source_buffer_offset, iree_hal_file_t* target_file,
-    uint64_t target_file_offset, iree_device_size_t length, uint32_t flags) {
+    uint64_t target_file_offset, iree_device_size_t length,
+    iree_hal_write_flags_t flags) {
   IREE_ASSERT_ARGUMENT(batch);
   IREE_ASSERT_ARGUMENT(source_buffer);
   IREE_ASSERT_ARGUMENT(target_file);
@@ -591,8 +592,8 @@ static iree_status_t iree_io_parameter_op_batch_flush(
     if (iree_status_is_ok(status)) {
       status = iree_hal_device_queue_execute(
           batch->device, batch->queue_affinity, step.wait_semaphore_list,
-          step.signal_semaphore_list, 1, &batch->transfer_command_buffer,
-          /*binding_tables=*/NULL);
+          step.signal_semaphore_list, batch->transfer_command_buffer,
+          iree_hal_buffer_binding_table_empty());
     }
     IREE_TRACE_ZONE_END(z_transfer);
   }

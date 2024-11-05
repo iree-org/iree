@@ -78,7 +78,7 @@ static iree_status_t iree_hal_device_transfer_and_wait(
     };
     status = iree_hal_device_queue_execute(
         device, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphores, signal_semaphores,
-        1, &command_buffer, /*binding_tables=*/NULL);
+        command_buffer, iree_hal_buffer_binding_table_empty());
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_semaphore_wait(fence_semaphore, signal_value, timeout);

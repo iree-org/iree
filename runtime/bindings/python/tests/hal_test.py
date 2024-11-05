@@ -463,7 +463,7 @@ class DeviceHalTest(unittest.TestCase):
 
         sem = self.device.create_semaphore(0)
         self.device.queue_execute(
-            [cb], wait_semaphores=[(sem, 0)], signal_semaphores=[(sem, 1)]
+            cb, wait_semaphores=[(sem, 0)], signal_semaphores=[(sem, 1)]
         )
         iree.runtime.HalFence.create_at(sem, 1).wait()
 
@@ -479,7 +479,7 @@ class DeviceHalTest(unittest.TestCase):
 
         sem = self.device.create_semaphore(0)
         self.device.queue_execute(
-            [cb],
+            cb,
             wait_semaphores=iree.runtime.HalFence.create_at(sem, 0),
             signal_semaphores=iree.runtime.HalFence.create_at(sem, 1),
         )

@@ -185,7 +185,7 @@ class HalDevice:
     ) -> None: ...
     def queue_execute(
         self,
-        command_buffers: Sequence[HalCommandBuffer],
+        command_buffer: HalCommandBuffer,
         wait_semaphores: HalSemaphoreList,
         signal_semaphores: HalSemaphoreList,
     ) -> None: ...

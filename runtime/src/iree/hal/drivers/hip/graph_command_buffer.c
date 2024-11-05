@@ -486,9 +486,10 @@ static iree_status_t iree_hal_hip_graph_command_buffer_wait_events(
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "event not yet supported");
 }
 
-static iree_status_t iree_hal_hip_graph_command_buffer_discard_buffer(
+static iree_status_t iree_hal_hip_graph_command_buffer_advise_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_buffer_ref_t buffer_ref) {
+    iree_hal_buffer_ref_t buffer_ref, iree_hal_memory_advise_flags_t flags,
+    uint64_t arg0, uint64_t arg1) {
   // We could mark the memory as invalidated so that if this is a managed buffer
   // HIP does not try to copy it back to the host.
   return iree_ok_status();
@@ -519,7 +520,7 @@ static uint32_t iree_hal_hip_splat_pattern(const void* pattern,
 static iree_status_t iree_hal_hip_graph_command_buffer_fill_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_buffer_ref_t target_ref, const void* pattern,
-    iree_host_size_t pattern_length) {
+    iree_host_size_t pattern_length, iree_hal_fill_flags_t flags) {
   iree_hal_hip_graph_command_buffer_t* command_buffer =
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -570,7 +571,8 @@ static iree_status_t iree_hal_hip_graph_command_buffer_fill_buffer(
 
 static iree_status_t iree_hal_hip_graph_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
-    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref) {
+    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref,
+    iree_hal_update_flags_t flags) {
   iree_hal_hip_graph_command_buffer_t* command_buffer =
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
   if (command_buffer->symbols->hipDrvGraphAddMemcpyNode == NULL) {
@@ -640,7 +642,8 @@ static iree_status_t iree_hal_hip_graph_command_buffer_update_buffer(
 
 static iree_status_t iree_hal_hip_graph_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref) {
+    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref,
+    iree_hal_copy_flags_t flags) {
   iree_hal_hip_graph_command_buffer_t* command_buffer =
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
   if (command_buffer->symbols->hipDrvGraphAddMemcpyNode == NULL) {
@@ -856,7 +859,7 @@ static const iree_hal_command_buffer_vtable_t
         .signal_event = iree_hal_hip_graph_command_buffer_signal_event,
         .reset_event = iree_hal_hip_graph_command_buffer_reset_event,
         .wait_events = iree_hal_hip_graph_command_buffer_wait_events,
-        .discard_buffer = iree_hal_hip_graph_command_buffer_discard_buffer,
+        .advise_buffer = iree_hal_hip_graph_command_buffer_advise_buffer,
         .fill_buffer = iree_hal_hip_graph_command_buffer_fill_buffer,
         .update_buffer = iree_hal_hip_graph_command_buffer_update_buffer,
         .copy_buffer = iree_hal_hip_graph_command_buffer_copy_buffer,
