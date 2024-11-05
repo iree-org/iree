@@ -99,7 +99,7 @@ LogicalResult UnsetEncodingOp::reifyResultShapes(
   builder.setInsertionPoint(getOperation());
   reifiedReturnShapes.resize(1);
   reifiedReturnShapes[0] =
-      tensor::getMixedSizes(builder, getLoc(), getSource());
+      getMixedValues(getResultType().getShape(), getResultDims(), builder);
   return success();
 }
 

@@ -1871,7 +1871,7 @@ util.func public @unset_encoding_op(%arg0 : tensor<?x?xf32, #encoding>, %d0 : in
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
-//      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups[%[[ARG1]], %[[ARG2]], %[[D0]], %[[D1]]](%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[D0]], %[[D1]])
+//      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups[%[[D0]], %[[D1]], %[[ARG1]], %[[ARG2]]](%[[ARG0]], %[[D0]], %[[D1]], %[[ARG1]], %[[ARG2]])
 // CHECK-NEXT:       %[[INARG:.+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>>>
 // CHECK-SAME:       %[[ARG1_INDEX:[a-zA-Z0-9]+]]
 // CHECK-SAME:       %[[ARG2_INDEX:[a-zA-Z0-9]+]]
@@ -1883,9 +1883,9 @@ util.func public @unset_encoding_op(%arg0 : tensor<?x?xf32, #encoding>, %d0 : in
 //  CHECK-DAG:     %[[D2_W:.+]] = flow.dispatch.workload.ordinal %[[INARG_INDEX0]], 2
 //  CHECK-DAG:     %[[D3_W:.+]] = flow.dispatch.workload.ordinal %[[INARG_INDEX1]], 3
 //      CHECK:     %[[LOAD:.+]] = flow.dispatch.tensor.load %[[INARG]]
-// CHECK-SAME:         sizes = [%[[D2_W]], %[[D3_W]]]
-// CHECK-SAME:         !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>>>{%[[D2_W]], %[[D3_W]]}
-//      CHECK:     %[[ENCODING:.+]] = iree_encoding.unset_encoding %[[LOAD]]{{.+}}{%[[D0_W]], %[[D1_W]]
+// CHECK-SAME:         sizes = [%[[D0_W]], %[[D1_W]]]
+// CHECK-SAME:         !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>>>{%[[D0_W]], %[[D1_W]]}
+//      CHECK:     %[[ENCODING:.+]] = iree_encoding.unset_encoding %[[LOAD]]{{.+}}{%[[D2_W]], %[[D3_W]]
 //      CHECK:     flow.dispatch.tensor.store %[[ENCODING]], %[[OUTARG]]
 // CHECK-SAME:         !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%[[D2_W]], %[[D3_W]]}
 //      CHECK:     flow.return
