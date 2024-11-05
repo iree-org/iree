@@ -61,11 +61,11 @@ struct CollapseDimensionsPass final
 
 /// Searches the same sequence in all the affine maps and collapses these
 /// dimensions. It only applies these to "parallel" loops without mixing them
-/// with "reduction" types. It is expected that the `genericOp` has projected
+/// with "reduction" types. It is expected that the `op` has projected
 /// permutations only as indexing maps. (Checked using `isEligibleForCollapse`).
 static SmallVector<ReassociationIndices> getCollapsibleLoops(Operation *op) {
   auto fusionInterfaceOp = llvm::cast<LinalgFusionOpInterface>(op);
-  TilingInterface tilingInterfaceOp = llvm::cast<TilingInterface>(op);
+  auto tilingInterfaceOp = llvm::cast<TilingInterface>(op);
 
   SmallVector<ReassociationIndices> contiguousLoops;
   SmallVector<unsigned> pDims, rDims;
@@ -78,7 +78,7 @@ static SmallVector<ReassociationIndices> getCollapsibleLoops(Operation *op) {
   rDimsSet.insert(rDims.begin(), rDims.end());
 
   auto hasAllMapsSameSequence = [&](AffineExpr preExpr, AffineExpr nextExpr) {
-    // Check that all indexing maps of the `genericOp`
+    // Check that all indexing maps of the `op`
     // - Either both `preExpr` and `nextExpr` contiguous, or
     // - are missing in
     // Then `preExpr` and `nextExpr` can be collapsed.
@@ -206,8 +206,7 @@ static bool isEligibleForCollapse(Operation *op) {
   return true;
 }
 
-// For the `operand` with producers and consumers of type `genericOp`, get
-// of producer loop -> consumer loop.
+// For the `operand`, get of producer loop -> consumer loop.
 static FailureOr<AffineMap>
 getProducerLoopToConsumerLoopsMap(OpOperand &operand) {
   auto consumer =
@@ -569,11 +568,11 @@ void CollapseInfo::print(raw_ostream &os) const {
 
 void CollapseInfo::dump() const { print(llvm::dbgs()); }
 
-/// Traverses all the the Ops in DispatchRegionOps and finds a linalg.generic Op
+/// Traverses all the the Ops in DispatchRegionOps and finds a Op
 /// which is the sole producer of the flow.return's operand.
 static FailureOr<Operation *>
 findRootOp(IREE::Flow::DispatchRegionOp regionOp) {
-  // Check the yielded value is from a single `linalg.generic`.
+  // Check the yielded value is from a single op.
   auto returnOp =
       cast<IREE::Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
   if (!returnOp->getOperands().size()) {
@@ -581,8 +580,7 @@ findRootOp(IREE::Flow::DispatchRegionOp regionOp) {
   }
 
   Operation *collapsibleOp = returnOp->getOperand(0).getDefiningOp();
-  if (!isa_and_nonnull<linalg::GenericOp, IREE::LinalgExt::AttentionOp>(
-          collapsibleOp)) {
+  if (!isEligibleForCollapse(collapsibleOp)) {
     return failure();
   }
   for (auto returnVal : returnOp->getOperands().drop_front()) {
@@ -790,7 +788,7 @@ updateConsumersFromProducers(ArrayRef<Operation *> slice,
       FailureOr<AffineMap> mapping =
           getProducerLoopToConsumerLoopsMap(*operand);
 
-      // If the producer is not a generic or there is no mapping, the tensor is
+      // If there is no mapping or we can't find the op, the tensor is
       // not collapsable. So, all dimensions of the producer are uncollapsable.
       if (!opMap.contains(producerOp) || failed(mapping)) {
         didChange |=
@@ -842,7 +840,7 @@ updateProducersFromConsumers(ArrayRef<Operation *> slice,
   return didChange;
 }
 
-// Construct a DAG of `linalg.generic` operations with 1 root op. Find
+// Construct a DAG of operations with 1 root op. Find
 // dimensions that can be collapsed all the way from the root to the leaves,
 // ensuring that all `collapse_shape` ops can be hoisted out of the dispatch.
 static bool
@@ -853,12 +851,12 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
   if (!llvm::hasSingleElement(regionOp.getBody())) {
     return false;
   }
-  // Step 1. Find the root linalg.generic Op
-  std::optional<Operation *> rootGenericOp = findRootOp(regionOp);
-  if (!rootGenericOp.has_value())
+  // Step 1. Find the root Op
+  std::optional<Operation *> rootOp = findRootOp(regionOp);
+  if (!rootOp.has_value())
     return false;
 
-  // Step 2. Get slice of all linalg.generic ops in the dispatch
+  // Step 2. Get slice of all ops in the dispatch
   BackwardSliceOptions sliceOptions;
   sliceOptions.inclusive = true;
   sliceOptions.omitBlockArguments = true;
@@ -867,7 +865,7 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
     return isEligibleForCollapse(op) && parentOp == regionOp;
   };
   SetVector<Operation *> slice;
-  getBackwardSlice(rootGenericOp.value(), &slice, sliceOptions);
+  getBackwardSlice(rootOp.value(), &slice, sliceOptions);
 
   // Step 3. Populate each op's info with a maximally collapsable reassociation
   // indicies
@@ -935,13 +933,13 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
   bool didCollapse = false;
 
   // Step 6. Collapse dimensions based on each op's CollapseInfo
-  for (auto &[genericOp, info] : opMap) {
+  for (auto &[opToCollapse, info] : opMap) {
     OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(genericOp);
+    rewriter.setInsertionPoint(opToCollapse);
 
     using ResultsType = FailureOr<SmallVector<Value>>;
     auto maybeReplacements =
-        llvm::TypeSwitch<Operation *, ResultsType>(genericOp)
+        llvm::TypeSwitch<Operation *, ResultsType>(opToCollapse)
             .Case<linalg::GenericOp>(
                 [&, &info = info](auto genericOp) -> ResultsType {
                   FailureOr<linalg::CollapseResult> maybeReplacements =
@@ -967,7 +965,7 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
     if (failed(maybeReplacements))
       continue;
     didCollapse = true;
-    rewriter.replaceOp(genericOp, maybeReplacements.value());
+    rewriter.replaceOp(opToCollapse, maybeReplacements.value());
   }
   return didCollapse;
 }
@@ -989,7 +987,7 @@ void CollapseDimensionsPass::runOnOperation() {
   });
 
   LLVM_DEBUG({
-    llvm::dbgs() << "[CollapseDims] : After collapsing generic ops: \n";
+    llvm::dbgs() << "[CollapseDims] : After collapsing ops: \n";
     funcOp.print(llvm::dbgs());
     llvm::dbgs() << "\n";
   });
