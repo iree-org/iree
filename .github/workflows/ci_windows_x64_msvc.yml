@@ -32,7 +32,7 @@ jobs:
           submodules: true
       - name: "Create build dir"
         run: |
-          $currentTime = (Get-Date).ToString('ddHHmmss')
+          $currentTime = (Get-Date).ToString('HHmmss')
           $buildDir = "$env:BASE_BUILD_DIR_POWERSHELL\$currentTime"
           echo "BUILD_DIR_POWERSHELL=$buildDir" >> $env:GITHUB_ENV
           mkdir "$buildDir"
