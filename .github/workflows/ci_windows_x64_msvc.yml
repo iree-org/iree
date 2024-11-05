@@ -33,9 +33,9 @@ jobs:
       - name: "Create build dir" # build directory is currently persistent and stored in C:\mnt\azure\build-windows
         run: |
           $currentTime = (Get-Date).ToString('yyyyMMddHHmmss')
-          $buildDir = "$env:BASE_BUILD_DIR_POWERSHELL\$currestTime"
+          $buildDir = "$env:BASE_BUILD_DIR_POWERSHELL\$currentTime"
           echo "BUILD_DIR_POWERSHELL=$buildDir" >> $env:GITHUB_ENV
-          mkdir "$Env:BUILD_DIR_POWERSHELL"
+          mkdir "$buildDir"
           $bashBuildDir = $buildDir -replace '\\', '/' -replace '^C:', '/c'
           echo  "BUILD_DIR_BASH=$bashBuildDir" >> $env:GITHUB_ENV
       - name: "Setting up Python"
