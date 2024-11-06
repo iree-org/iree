@@ -302,6 +302,6 @@ module {
 
 // CHECK-LABEL: func @simple_nd_write(
 //       CHECK:   %[[RD:.+]] = vector.transfer_read {{.*}} vector<1x128xf32>
-//       CHECK:   %[[IDS:.+]]:2 = affine.delinearize_index %{{.*}} into (%c4, %c8) : index, index
+//       CHECK:   %[[IDS:.+]]:2 = affine.delinearize_index %{{.*}} into (4, 8) : index, index
 //       CHECK:   %[[INNER_ID:.+]] = affine.apply #[[$MAP]]()[%[[IDS]]#1]
 //       CHECK:   vector.transfer_write %[[RD]], %{{.*}}[%[[IDS]]#0, %[[INNER_ID]]] {{.*}} : vector<1x128xf32>

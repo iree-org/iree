@@ -553,7 +553,7 @@ hal.executable public @main {
 //   CHECK-DAG:   %[[IDY:.+]] = gpu.thread_id  y
 //   CHECK-DAG:   %[[IDZ:.+]] = gpu.thread_id  z
 //       CHECK:   %[[LINID0:.+]] = affine.apply #[[$MAP]]()[%[[IDX]], %[[IDY]], %[[IDZ]]]
-//       CHECK:   %[[IDS:.+]]:2 = affine.delinearize_index %[[LINID0:.+]] into (%c4, %c8) : index, index
+//       CHECK:   %[[IDS:.+]]:2 = affine.delinearize_index %[[LINID0:.+]] into (4, 8) : index, index
 //       CHECK:   %[[LINID1:.+]] = affine.apply #[[$MAP1]]()[%[[IDS]]#0, %[[IDS]]#1]
 //       CHECK:   scf.forall ({{.*}}) in (32, 98) {
 //       CHECK:     scf.for %{{.*}} = %c0 to %c256 step %c4 {{.*}} -> (vector<1x4xf32>)

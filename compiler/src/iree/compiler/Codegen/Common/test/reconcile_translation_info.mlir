@@ -377,14 +377,11 @@ hal.executable private @scf_forall_4D_static_interchange {
 //  CHECK-DAG:   %[[C160:.+]] = arith.constant 160 : index
 //      CHECK:   hal.return %[[C6]], %[[C7]], %[[C160]]
 //      CHECK: func @scf_forall_4D_static_interchange()
-//  CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
-//  CHECK-DAG:   %[[C8:.+]] = arith.constant 8 : index
-//  CHECK-DAG:   %[[C5:.+]] = arith.constant 5 : index
 //  CHECK-DAG:   %[[WG_ID_X:.+]] = hal.interface.workgroup.id[0]
 //  CHECK-DAG:   %[[WG_ID_Y:.+]] = hal.interface.workgroup.id[1]
 //  CHECK-DAG:   %[[WG_ID_Z:.+]] = hal.interface.workgroup.id[2]
 //  CHECK-NOT:   scf.forall
-//      CHECK:   %[[DELINEARIZE:.+]]:3 = affine.delinearize_index %[[WG_ID_Z]] into (%[[C5]], %[[C8]], %[[C4]])
+//      CHECK:   %[[DELINEARIZE:.+]]:3 = affine.delinearize_index %[[WG_ID_Z]] into (5, 8, 4)
 //      CHECK:   %[[I:.+]] = affine.apply #[[MAP0]]()[%[[DELINEARIZE]]#0]
 //      CHECK:   %[[J:.+]] = affine.apply #[[MAP1]]()[%[[WG_ID_X]]]
 //      CHECK:   %[[K:.+]] = affine.apply #[[MAP2]]()[%[[WG_ID_Y]]]
