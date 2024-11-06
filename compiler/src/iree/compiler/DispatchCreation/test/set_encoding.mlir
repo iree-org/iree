@@ -51,8 +51,7 @@ util.func public @matmul_f32f32f32_dynamic(%arg0 : tensor<?x?xf32>, %arg1 : tens
 // CHECK-SAME:       outs(%[[OUTS]] :
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG2]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG2]], %[[C1]]
-//      CHECK:   %[[RESULT_PADDED:.+]] = iree_encoding.unset_encoding %[[MATMUL]]{{.+}} -> tensor<?x?xf32>{%[[D0]], %[[D1]]}
-//      CHECK:   %[[RESULT:.+]] = tensor.extract_slice %[[RESULT_PADDED]][0, 0] [%[[D0]], %[[D1]]] [1, 1]
+//      CHECK:   %[[RESULT:.+]] = iree_encoding.unset_encoding %[[MATMUL]]{{.+}} -> tensor<?x?xf32>{%[[D0]], %[[D1]]}
 //      CHECK:   util.return %[[RESULT]]
 
 // -----
@@ -245,8 +244,7 @@ util.func public @batch_matmul_f32f32f32_dynamic(%arg0 : tensor<?x?x?xf32>, %arg
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG2]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG2]], %[[C1]]
 //  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG2]], %[[C2]]
-//      CHECK:   %[[RESULT_PADDED:.+]] = iree_encoding.unset_encoding %[[BATCH_MATMUL]]{{.+}} -> tensor<?x?x?xf32>{%[[D0]], %[[D1]], %[[D2]]}
-//      CHECK:   %[[RESULT:.+]] = tensor.extract_slice %[[RESULT_PADDED]][0, 0, 0] [%[[D0]], %[[D1]], %[[D2]]] [1, 1, 1]
+//      CHECK:   %[[RESULT:.+]] = iree_encoding.unset_encoding %[[BATCH_MATMUL]]{{.+}} -> tensor<?x?x?xf32>{%[[D0]], %[[D1]], %[[D2]]}
 //      CHECK:   util.return %[[RESULT]]
 
 // -----
@@ -491,8 +489,7 @@ util.func public @batch_matvec_f32f32f32_dynamic(%arg0 : tensor<?x?x?xf32>, %arg
 // CHECK-SAME:       outs(%[[OUTS]] :
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG2]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG2]], %[[C1]]
-//      CHECK:   %[[RESULT_PADDED:.+]] = iree_encoding.unset_encoding %[[BATCH_MATVEC]]{{.+}} -> tensor<?x?xf32>{%[[D0]], %[[D1]]}
-//      CHECK:   %[[RESULT:.+]] = tensor.extract_slice %[[RESULT_PADDED]][0, 0] [%[[D0]], %[[D1]]] [1, 1]
+//      CHECK:   %[[RESULT:.+]] = iree_encoding.unset_encoding %[[BATCH_MATVEC]]{{.+}} -> tensor<?x?xf32>{%[[D0]], %[[D1]]}
 //      CHECK:   util.return %[[RESULT]]
 
 // -----
@@ -990,5 +987,4 @@ util.func public @broadcasting_dequant_op(%arg0: !hal.buffer_view, %arg1: !hal.b
 // CHECK-SAME:     ins(%[[LHS]], %[[RHS]]
 // CHECK-SAME:    outs(%[[FILL]]
 // CHECK:        %[[UNSET:.+]] = iree_encoding.unset_encoding %[[GEMM]]{{.+}} -> tensor<?x?x?xi32>{%[[ARG1_D0]], %[[ARG0_D0]], %[[ARG1_D1]]}
-// CHECK:        %[[SLICE:.+]] = tensor.extract_slice %[[UNSET]]
-// CHECK:        flow.return %[[SLICE]]
+// CHECK:        flow.return %[[UNSET]]
