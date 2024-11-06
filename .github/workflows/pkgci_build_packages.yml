@@ -51,6 +51,7 @@ jobs:
           EOF
           realpath version_info.json
           cat version_info.json
+          echo
 
           compiler_package_version="$(python3 build_tools/scripts/compute_local_version.py compiler --custom-string=${{ inputs.package_version }})"
           cat << EOF > compiler/version_local.json
@@ -60,6 +61,9 @@ jobs:
             "iree-revision": "$(cd ../iree && git rev-parse HEAD)"
           }
           EOF
+          realpath compiler/version_local.json
+          cat compiler/version_local.json
+          echo
 
           runtime_package_version="$(python3 build_tools/scripts/compute_local_version.py runtime --custom-string=${{ inputs.package_version }})"
           cat << EOF > runtime/version_local.json
@@ -69,6 +73,8 @@ jobs:
             "iree-revision": "$(cd ../iree && git rev-parse HEAD)"
           }
           EOF
+          realpath runtime/version_local.json
+          cat runtime/version_local.json
 
       - name: Enable cache
         uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # v3.3.1
