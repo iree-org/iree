@@ -1,8 +1,9 @@
 name: Schedule candidate release
 
 on:
+  # Scheduled for 10:00 PM PST
   schedule:
-    - cron: "0 10 * * *"
+    - cron: "0 5 * * *"
 
   workflow_dispatch:
     inputs:
