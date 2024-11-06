@@ -38,6 +38,7 @@ moveOperandDefs(RewriterBase &rewriter, ArrayRef<T> operations,
                 Operation *insertionPoint, const DominanceInfo &dominanceInfo,
                 ArrayRef<linalg::LinalgOp> ignoreOperations = {}) {
   BackwardSliceOptions options;
+  options.omitUsesFromAbove = false;
   llvm::DenseSet<Operation *> ignoreOperationsSet;
   ignoreOperationsSet.insert(ignoreOperations.begin(), ignoreOperations.end());
   options.filter = [&](Operation *op) {

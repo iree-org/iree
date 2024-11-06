@@ -107,24 +107,13 @@ bool isHorizontalToGroup(Operation *op, ArrayRef<Operation *> currGroup,
   assert(dominanceInfo.properlyDominates(seedOp, op) &&
          op->getParentRegion() == seedOp->getParentRegion());
   BackwardSliceOptions options;
+  options.omitUsesFromAbove = false;
   // Limit the slice to the seed to make sure the slice is small.
   options.filter = [&](Operation *op) {
     return !dominanceInfo.properlyDominates(op, seedOp);
   };
   llvm::SetVector<Operation *> slice;
   getBackwardSlice(op, &slice, options);
-
-  // `getBackwardSlice` doesnt track uses from within an ops region, so make
-  // sure there are no values defined above.
-  for (Operation *sliceOp : slice) {
-    bool usesValuesFromAbove = false;
-    mlir::visitUsedValuesDefinedAbove(
-        sliceOp->getRegions(), [&](void *) { usesValuesFromAbove = true; });
-    if (usesValuesFromAbove) {
-      return false;
-    }
-  }
-
   return !llvm::any_of(currGroup, [&](Operation *groupedOp) {
     return slice.contains(groupedOp);
   });
