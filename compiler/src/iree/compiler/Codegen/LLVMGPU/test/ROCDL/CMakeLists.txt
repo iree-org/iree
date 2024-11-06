@@ -26,6 +26,7 @@ iree_lit_test_suite(
     "pipeline_vector_distribute_gfx1100.mlir"
     "pipeline_vector_distribute_gfx940.mlir"
     "pipeline_warp_reduction.mlir"
+    "reduction_vector_distribute.mlir"
   TOOLS
     FileCheck
     iree-opt
