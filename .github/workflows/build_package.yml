@@ -39,9 +39,10 @@ on:
         default: ""
 
 jobs:
-  # Note: metadata generation could happen in a separate trigger/schedule
-  # workflow. For cross platform builds, it's useful to just generate the
-  # metadata on Linux and pass that to later jobs using artifacts.
+  # Note: For cross platform builds, it's useful to just generate the
+  # metadata on Linux and pass that to later jobs using artifacts. The
+  # metadata generation could also happen in a separate workflow and
+  # might be moved.
   setup_metadata:
     runs-on: ubuntu-24.04
     steps:
