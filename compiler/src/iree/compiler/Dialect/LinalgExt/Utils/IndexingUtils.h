@@ -41,7 +41,7 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 class AttentionOpDetail {
 public:
   static FailureOr<AttentionOpDetail> get(AffineMap qMap, AffineMap kMap,
-                                          AffineMap vMap);
+                                          AffineMap vMap, AffineMap oMap);
 
   int64_t getDomainRank() const { return domainRank; }
   ArrayRef<int64_t> getBatchDims() const { return batch; }
@@ -52,7 +52,8 @@ public:
   AffineMap getSMap() const;
 
 private:
-  void inferFromIndexingMaps(AffineMap qMap, AffineMap kMap, AffineMap vMap);
+  void inferFromIndexingMaps(AffineMap qMap, AffineMap kMap, AffineMap vMap,
+                             AffineMap oMap);
   MLIRContext *getContext() const { return context; }
   SmallVector<int64_t> batch;
   SmallVector<int64_t> m;

@@ -409,8 +409,8 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   }
   Value output = getOutput();
 
-  FailureOr<AttentionOpDetail> maybeOpInfo =
-      AttentionOpDetail::get(getQueryMap(), getKeyMap(), getValueMap());
+  FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
+      getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
   assert(succeeded(maybeOpInfo) && "Invalid attention indexing maps");
   AttentionOpDetail opInfo = maybeOpInfo.value();
 
@@ -527,8 +527,8 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
     pvAttrs = config.getAs<DictionaryAttr>(getPVAttrStr());
   }
 
-  FailureOr<AttentionOpDetail> maybeOpInfo =
-      AttentionOpDetail::get(getQueryMap(), getKeyMap(), getValueMap());
+  FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
+      getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
   assert(succeeded(maybeOpInfo) && "Invalid attention indexing maps");
   AttentionOpDetail opInfo = maybeOpInfo.value();
 
