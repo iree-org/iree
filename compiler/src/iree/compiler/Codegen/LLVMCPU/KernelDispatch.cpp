@@ -2508,13 +2508,14 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(op, DistributionHeuristicConfig{});
   TileSizesListType tileSizes = {distTileSizes};
+  SmallVector<int64_t> vecTileSizes = distTileSizes;
 
   // Add an extra level of tiling.
+  // TODO: Add multiple levels of tiling if necessary.
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(*op)) {
-    SmallVector<int64_t> vecTileSizes = distTileSizes;
     limitVectorTileSizes(linalgOp, vecTileSizes);
-    tileSizes.push_back(vecTileSizes);
   }
+  tileSizes.push_back(vecTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes, DispatchLoweringPassPipeline::CPUDefault);
 }
