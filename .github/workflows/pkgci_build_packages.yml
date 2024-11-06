@@ -7,10 +7,6 @@
 name: PkgCI Build Packages
 on:
   workflow_call:
-    inputs:
-      package_version:
-        type: string
-        required: true
 
 jobs:
   linux_x86_64_release_packages:
@@ -42,10 +38,11 @@ jobs:
       - name: Write version info
         shell: bash
         run: |
+          package_version="$(python3 build_tools/python_deploy/compute_common_version.py -dev)"
           cat << EOF > version_info.json
           {
             "package-suffix": "${PACKAGE_SUFFIX}",
-            "package-version": "${{ inputs.package_version }}",
+            "package-version": "${package_version}",
             "iree-revision": "$(cd ../iree && git rev-parse HEAD)"
           }
           EOF
@@ -53,7 +50,7 @@ jobs:
           cat version_info.json
           echo
 
-          compiler_package_version="$(python3 build_tools/python_deploy/compute_local_version.py compiler --custom-string=${{ inputs.package_version }})"
+          compiler_package_version="$(python3 build_tools/python_deploy/compute_local_version.py compiler -dev)"
           cat << EOF > compiler/version_local.json
           {
             "package-suffix": "${PACKAGE_SUFFIX}",
@@ -65,7 +62,7 @@ jobs:
           cat compiler/version_local.json
           echo
 
-          runtime_package_version="$(python3 build_tools/python_deploy/compute_local_version.py runtime --custom-string=${{ inputs.package_version }})"
+          runtime_package_version="$(python3 build_tools/python_deploy/compute_local_version.py runtime -dev)"
           cat << EOF > runtime/version_local.json
           {
             "package-suffix": "${PACKAGE_SUFFIX}",
