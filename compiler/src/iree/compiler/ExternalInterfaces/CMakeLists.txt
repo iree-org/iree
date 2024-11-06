@@ -16,11 +16,13 @@ iree_cc_library(
   HDRS
     "FlowExternalModels.h"
     "Interfaces.h"
+    "LinalgExtExternalModels.h"
     "StreamExternalModels.h"
     "UtilExternalModels.h"
   SRCS
     "FlowExternalModels.cpp"
     "Interfaces.cpp"
+    "LinalgExtExternalModels.cpp"
     "StreamExternalModels.cpp"
     "UtilExternalModels.cpp"
   DEPS
