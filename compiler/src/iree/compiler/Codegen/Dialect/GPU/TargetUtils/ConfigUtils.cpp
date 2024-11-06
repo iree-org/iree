@@ -748,12 +748,6 @@ getPipelineOptions(FunctionOpInterface funcOp,
     if (reorderWorkgroupsStrategy) {
       pipelineOptions.reorderStrategy = reorderWorkgroupsStrategy.getValue();
     }
-  } else {
-    // The key difference in distributing the reduction is that MMA instructions
-    // are not required, so the configuration is left empty.
-    // This is a temporary solution for now, and a more refined approach may be
-    // introduced later.
-    pipelineOptions.generateContract = false;
   }
 
   pipelineOptions.enableUkernels = targetAttr && hasUkernel(targetAttr);
@@ -787,8 +781,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
             << ", prefetchSharedMemory = " << options.prefetchSharedMemory
             << ", useIgemmConvolution = " << options.useIgemmConvolution
             << ", reorderWorkgroupsStrategy = " << reorderStr
-            << ", enableUkernels = " << options.enableUkernels
-            << ", generateContract = " << options.generateContract << "}";
+            << ", enableUkernels = " << options.enableUkernels << "}";
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU
