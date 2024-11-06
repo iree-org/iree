@@ -25,9 +25,10 @@ release_type.add_argument("--custom-string", action="store", type=str)
 args = parser.parse_args()
 
 THIS_DIR = Path(__file__).parent.resolve()
+REPO_ROOT = THIS_DIR.parent.parent
 
-VERSION_FILE_COMPILER = THIS_DIR / "../../compiler/version.json"
-VERSION_FILE_RUNTIME = THIS_DIR / "../../runtime/version.json"
+VERSION_FILE_COMPILER = REPO_ROOT / "compiler/version.json"
+VERSION_FILE_RUNTIME = REPO_ROOT / "runtime/version.json"
 
 
 def load_version_info(version_file):

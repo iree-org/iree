@@ -18,7 +18,7 @@ jobs:
           git fetch --depth=1 origin +refs/tags/*:refs/tags/*
 
           # common version + tag
-          package_version="$(python3 build_tools/scripts/compute_common_version.py -rc)"
+          package_version="$(python3 build_tools/python_deploy/compute_common_version.py -rc)"
           tag_name="iree-${package_version}"
           echo "package_version=${package_version}" >> $GITHUB_ENV
           echo "tag_name=${tag_name}" >> $GITHUB_ENV
