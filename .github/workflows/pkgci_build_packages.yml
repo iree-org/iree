@@ -53,7 +53,7 @@ jobs:
           cat version_info.json
           echo
 
-          compiler_package_version="$(python3 build_tools/scripts/compute_local_version.py compiler --custom-string=${{ inputs.package_version }})"
+          compiler_package_version="$(python3 build_tools/python_deploy/compute_local_version.py compiler --custom-string=${{ inputs.package_version }})"
           cat << EOF > compiler/version_local.json
           {
             "package-suffix": "${PACKAGE_SUFFIX}",
@@ -65,7 +65,7 @@ jobs:
           cat compiler/version_local.json
           echo
 
-          runtime_package_version="$(python3 build_tools/scripts/compute_local_version.py runtime --custom-string=${{ inputs.package_version }})"
+          runtime_package_version="$(python3 build_tools/python_deploy/compute_local_version.py runtime --custom-string=${{ inputs.package_version }})"
           cat << EOF > runtime/version_local.json
           {
             "package-suffix": "${PACKAGE_SUFFIX}",
