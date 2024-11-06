@@ -26,7 +26,6 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
       py::enum_<ireeGPUReorderWorkgroupsStrategyEnum>(
           iree_gpu_module, "ReorderWorkgroupsStrategy", py::module_local())
           .value("None_", ireeGPUReorderWorkgroupsStrategyEnumNone)
-          .value("Swizzle", ireeGPUReorderWorkgroupsStrategyEnumSwizzle)
           .value("Transpose", ireeGPUReorderWorkgroupsStrategyEnumTranspose)
           .def(
               "__str__",
@@ -34,8 +33,6 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
                 switch (self) {
                 case ireeGPUReorderWorkgroupsStrategyEnumNone:
                   return "None";
-                case ireeGPUReorderWorkgroupsStrategyEnumSwizzle:
-                  return "Swizzle";
                 case ireeGPUReorderWorkgroupsStrategyEnumTranspose:
                   return "Transpose";
                 default:

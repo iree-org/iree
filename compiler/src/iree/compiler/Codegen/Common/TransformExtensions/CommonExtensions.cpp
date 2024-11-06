@@ -1187,24 +1187,6 @@ void transform_dialect::TestVectorLayoutAnalysisOp::getEffects(
 }
 
 //===----------------------------------------------------------------------===//
-// WorkgroupSwizzleOp
-//===----------------------------------------------------------------------===//
-
-DiagnosedSilenceableFailure transform_dialect::WorkgroupSwizzleOp::applyToOne(
-    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
-    transform::ApplyToEachResultList &results,
-    transform::TransformState &state) {
-  (void)swizzleWorkgroupsInFunc(target, getLogTile());
-  return DiagnosedSilenceableFailure::success();
-}
-
-void transform_dialect::WorkgroupSwizzleOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTargetMutable(), effects);
-  transform::modifiesPayload(effects);
-}
-
-//===----------------------------------------------------------------------===//
 // FuseConsumerOp
 //===----------------------------------------------------------------------===//
 

@@ -1,6 +1,3 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=swizzle logTile=3}))" \
-// RUN:   --split-input-file %s | FileCheck --check-prefix=SWIZZLE %s
-
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=transpose}))" \
 // RUN:   --split-input-file %s | FileCheck --check-prefix=TRANSPOSE %s
 
@@ -36,29 +33,6 @@ func.func @matmul() {
   }
   return
 }
-
-// SWIZZLE-LABEL: func.func @matmul
-// SWIZZLE:         %[[WG_X:.*]] = hal.interface.workgroup.id[0] : index
-// SWIZZLE:         %[[WG_Y:.*]] = hal.interface.workgroup.id[1] : index
-// SWIZZLE:         %[[WG_CNT_X:.*]] = hal.interface.workgroup.count[0] : index
-// SWIZZLE:         %[[WG_CNT_Y:.*]] = hal.interface.workgroup.count[1] : index
-// SWIZZLE:         %[[CST0:.*]] = arith.constant 0 : index
-// SWIZZLE:         %[[CST8:.*]] = arith.constant 8 : index
-// SWIZZLE:         %[[S0:.*]] = arith.remui %[[WG_Y]], %[[CST8]] : index
-// SWIZZLE:         %[[S1:.*]] = arith.divui %[[WG_Y]], %[[CST8]] : index
-// SWIZZLE:         %[[S2:.*]] = arith.muli %[[S0]], %[[WG_CNT_X]] : index
-// SWIZZLE:         %[[S3:.*]] = arith.addi %[[WG_X]], %[[S2]] : index
-// SWIZZLE:         %[[S4:.*]] = arith.remui %[[S3]], %[[CST8]] : index
-// SWIZZLE:         %[[S5:.*]] = arith.muli %[[S1]], %[[CST8]] : index
-// SWIZZLE:         %[[S6:.*]] = arith.divui %[[S3]], %[[CST8]] : index
-// SWIZZLE:         %[[S7:.*]] = arith.addi %[[S4]], %[[S5]] : index
-// SWIZZLE:         %[[S8:.*]] = arith.remui %[[WG_CNT_Y]], %[[CST8]] : index
-// SWIZZLE:         %[[S9:.*]] = arith.addi %[[S5]], %[[CST8]] : index
-// SWIZZLE:         %[[S10:.*]] = arith.cmpi ne, %[[S8]], %[[CST0]] : index
-// SWIZZLE:         %[[S11:.*]] = arith.cmpi ugt, %[[S9]], %[[WG_CNT_Y]] : index
-// SWIZZLE:         %[[S12:.*]] = arith.andi %[[S10]], %[[S11]] : i1
-// SWIZZLE:         %[[S13:.*]] = arith.select %[[S12]], %[[WG_X]], %[[S6]] : index
-// SWIZZLE:         %[[S14:.*]] = arith.select %[[S12]], %[[WG_Y]], %[[S7]] : index
 
 // TRANSPOSE-LABEL: func.func @matmul
 // TRANSPOSE:         %[[WG_X:.*]] = hal.interface.workgroup.id[0] : index

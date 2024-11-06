@@ -26,48 +26,6 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
 namespace {
-/// Implements the following swizzling logic:
-/// void getTiledId2(unsigned x, unsigned y, unsigned* tiledx,
-///                  unsigned* tiledy) {
-///  unsigned t_tiledx = (x + (y % tile) * grid_size_x) / tile;
-///  unsigned t_tiledy = (y / tile) * tile +
-///      (x + (y % tile) * grid_size_x) % tile;
-///  bool c = grid_size_y % tile != 0 &&
-///      ((y / tile) * tile + tile) > grid_size_y;
-///  *tiledx = c ? x : t_tiledx;
-///  *tiledy = c ? y : t_tiledy;
-/// }
-static std::pair<Value, Value>
-makeSwizzledIds(Location loc, OpBuilder b, Value workgroupIdX,
-                Value workgroupIdY, Value workgroupCountX,
-                Value workgroupCountY, unsigned swizzleTile) {
-  Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
-  Value tile = b.create<arith::ConstantIndexOp>(loc, swizzleTile);
-  Value yModTile = b.create<arith::RemUIOp>(loc, workgroupIdY, tile);
-  Value yDivTile = b.create<arith::DivUIOp>(loc, workgroupIdY, tile);
-  Value swizzleParam = b.create<arith::MulIOp>(loc, yModTile, workgroupCountX);
-  Value swizzleParam2 =
-      b.create<arith::AddIOp>(loc, workgroupIdX, swizzleParam);
-  Value swizzleParam3 = b.create<arith::RemUIOp>(loc, swizzleParam2, tile);
-  Value swizzleParam4 = b.create<arith::MulIOp>(loc, yDivTile, tile);
-  Value unboundedSwizzledIdX =
-      b.create<arith::DivUIOp>(loc, swizzleParam2, tile);
-  Value unboundedSwizzledIdY =
-      b.create<arith::AddIOp>(loc, swizzleParam3, swizzleParam4);
-  Value gyModTile = b.create<arith::RemUIOp>(loc, workgroupCountY, tile);
-  Value gyAddTile = b.create<arith::AddIOp>(loc, swizzleParam4, tile);
-  Value condition1 =
-      b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ne, gyModTile, zero);
-  Value condition2 = b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ugt,
-                                             gyAddTile, workgroupCountY);
-  Value condition3 = b.create<arith::AndIOp>(loc, condition1, condition2);
-  Value swizzledIdX = b.create<arith::SelectOp>(loc, condition3, workgroupIdX,
-                                                unboundedSwizzledIdX);
-  Value swizzledIdY = b.create<arith::SelectOp>(loc, condition3, workgroupIdY,
-                                                unboundedSwizzledIdY);
-  return {swizzledIdX, swizzledIdY};
-}
-
 /// Transpose IDs, i.e., changes the traversal order from left -> right then
 /// top -> bottom to top -> bottom then left -> right.
 static std::pair<Value, Value> makeTransposedIds(Location loc, OpBuilder b,
@@ -110,13 +68,12 @@ getWorkgroupCountsXY(OpBuilder &builder, FunctionOpInterface funcOp) {
   return {dynamicCountX, dynamicCountY};
 }
 
-static LogicalResult reorderWorkgroupsInFunc(FunctionOpInterface funcOp,
-                                             ReorderWorkgroupsStrategy strategy,
-                                             unsigned swizzleLogTile) {
+static LogicalResult
+reorderWorkgroupsInFunc(FunctionOpInterface funcOp,
+                        ReorderWorkgroupsStrategy strategy) {
   assert(strategy != ReorderWorkgroupsStrategy::None &&
          "Expected a concrete strategy");
 
-  unsigned swizzleTile = 1u << swizzleLogTile;
   IREE::HAL::InterfaceWorkgroupIDOp oldXId;
   IREE::HAL::InterfaceWorkgroupIDOp oldYId;
   unsigned numXIdOps = 0;
@@ -150,18 +107,11 @@ static LogicalResult reorderWorkgroupsInFunc(FunctionOpInterface funcOp,
   auto [workgroupCntX, workgroupCntY] = getWorkgroupCountsXY(builder, funcOp);
   Value newWorkgroupIdX;
   Value newWorkgroupIdY;
-  if (strategy == ReorderWorkgroupsStrategy::Swizzle) {
-    std::tie(newWorkgroupIdX, newWorkgroupIdY) =
-        makeSwizzledIds(funcOp.getLoc(), builder, workgroupIdX, workgroupIdY,
-                        workgroupCntX, workgroupCntY, swizzleTile);
-  } else {
-    assert(strategy == ReorderWorkgroupsStrategy::Transpose &&
-           "Unhandled strategy");
-    std::tie(newWorkgroupIdX, newWorkgroupIdY) =
-        makeTransposedIds(funcOp.getLoc(), builder, workgroupIdX, workgroupIdY,
-                          workgroupCntX, workgroupCntY);
-  }
-
+  assert(strategy == ReorderWorkgroupsStrategy::Transpose &&
+         "Unhandled strategy");
+  std::tie(newWorkgroupIdX, newWorkgroupIdY) =
+      makeTransposedIds(funcOp.getLoc(), builder, workgroupIdX, workgroupIdY,
+                        workgroupCntX, workgroupCntY);
   oldXId.replaceAllUsesWith(newWorkgroupIdX);
   oldYId.replaceAllUsesWith(newWorkgroupIdY);
   oldXId->erase();
@@ -169,27 +119,12 @@ static LogicalResult reorderWorkgroupsInFunc(FunctionOpInterface funcOp,
   return success();
 }
 
-} // namespace
-
-LogicalResult swizzleWorkgroupsInFunc(FunctionOpInterface funcOp,
-                                      unsigned swizzleLogTile) {
-  // We have the same early exit in the pass but we need to duplicate it here
-  // for the transform op.
-  if (swizzleLogTile == 0)
-    return success();
-
-  return reorderWorkgroupsInFunc(funcOp, ReorderWorkgroupsStrategy::Swizzle,
-                                 swizzleLogTile);
-}
-
-namespace {
 struct ReorderWorkgroupsPass final
     : impl::ReorderWorkgroupsPassBase<ReorderWorkgroupsPass> {
   ReorderWorkgroupsPass(
-      ReorderWorkgroupsStrategy strategy, unsigned logSwizzleTile,
+      ReorderWorkgroupsStrategy strategy,
       std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn)
-      : reorderingStrategy(strategy), logSwizzleTile(logSwizzleTile),
-        filterFn(std::move(filterFn)) {}
+      : reorderingStrategy(strategy), filterFn(std::move(filterFn)) {}
 
   LogicalResult initializeOptions(
       StringRef options,
@@ -197,11 +132,9 @@ struct ReorderWorkgroupsPass final
     if (failed(Pass::initializeOptions(options, errorHandler))) {
       return failure();
     }
-    logSwizzleTile = logTile;
     auto selectedStrategy =
         llvm::StringSwitch<FailureOr<ReorderWorkgroupsStrategy>>(strategy)
             .Case("", ReorderWorkgroupsStrategy::None)
-            .Case("swizzle", ReorderWorkgroupsStrategy::Swizzle)
             .Case("transpose", ReorderWorkgroupsStrategy::Transpose)
             .Default(failure());
     if (failed(selectedStrategy))
@@ -215,10 +148,6 @@ struct ReorderWorkgroupsPass final
     if (reorderingStrategy == ReorderWorkgroupsStrategy::None)
       return;
 
-    if (reorderingStrategy == ReorderWorkgroupsStrategy::Swizzle &&
-        logSwizzleTile == 0)
-      return;
-
     FunctionOpInterface funcOp = getOperation();
     if (filterFn && failed(filterFn(funcOp)))
       return;
@@ -229,7 +158,7 @@ struct ReorderWorkgroupsPass final
       llvm::dbgs() << "\n\n";
     });
 
-    if (failed(reorderWorkgroupsInFunc(funcOp, reorderingStrategy, logTile))) {
+    if (failed(reorderWorkgroupsInFunc(funcOp, reorderingStrategy))) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to reorder workgroups\n");
       return;
     }
@@ -244,17 +173,15 @@ struct ReorderWorkgroupsPass final
 private:
   ReorderWorkgroupsStrategy reorderingStrategy =
       ReorderWorkgroupsStrategy::None;
-  unsigned logSwizzleTile = 0;
   std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn;
 };
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createReorderWorkgroups(
-    ReorderWorkgroupsStrategy strategy, unsigned swizzleLogTile,
+    ReorderWorkgroupsStrategy strategy,
     std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn) {
-  return std::make_unique<ReorderWorkgroupsPass>(strategy, swizzleLogTile,
-                                                 filterFn);
+  return std::make_unique<ReorderWorkgroupsPass>(strategy, filterFn);
 }
 
 } // namespace mlir::iree_compiler

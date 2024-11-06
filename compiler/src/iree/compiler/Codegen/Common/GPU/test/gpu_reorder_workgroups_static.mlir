@@ -1,22 +1,8 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=swizzle logTile=3})))))" \
-// RUN:   %s | FileCheck --check-prefix=SWIZZLE %s
-
 // RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=transpose})))))" \
 // RUN:   %s | FileCheck --check-prefix=TRANSPOSE %s
 
 // Make sure we use static workgroup counts instead of introducting
 // `hal.interface.workgroup.count` ops. These are currently not supported on ROCm.
-
-// SWIZZLE-LABEL: hal.executable private @main_dispatch_0 {
-// SWIZZLE-LABEL: func.func @main_dispatch_0_matmul_transpose_b_32000x32000x4096_f16
-// SWIZZLE-DAG:               %[[WG_X:.+]] = hal.interface.workgroup.id[0] : index
-// SWIZZLE-DAG:               %[[WG_Y:.+]] = hal.interface.workgroup.id[1] : index
-// SWIZZLE-NOT:               hal.interface.workgroup.count
-// SWIZZLE-DAG:               %[[SEL_X:.+]] = arith.select %{{.+}}, %[[WG_X]]
-// SWIZZLE-DAG:               %[[SEL_Y:.+]] = arith.select %{{.+}}, %[[WG_Y]]
-// SWIZZLE-DAG:               affine.apply #{{.+}}()[%[[SEL_X]]]
-// SWIZZLE-DAG:               affine.apply #{{.+}}()[%[[SEL_Y]]]
-// SWIZZLE:                   return
 
 // TRANSPOSE-LABEL: hal.executable private @main_dispatch_0 {
 // TRANSPOSE-LABEL: func.func @main_dispatch_0_matmul_transpose_b_32000x32000x4096_f16
