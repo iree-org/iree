@@ -796,10 +796,10 @@ hal.executable public @main {
 // CHECK-DAG:  %[[C_71_2:.+]] = amdgpu.mfma %[[A_EXTRACT71]] * %[[B_EXTRACT11]] + %[[C_71_1]]
 // CHECK-DAG:  %[[C_71_3:.+]] = amdgpu.mfma %[[A_EXTRACT72]] * %[[B_EXTRACT12]] + %[[C_71_2]]
 // CHECK-DAG:  %[[C_71_4:.+]] = amdgpu.mfma %[[A_EXTRACT73]] * %[[B_EXTRACT13]] + %[[C_71_3]]
-// CHECK:  vector.insert_strided_slice %[[C_00_4]], {{.*}}offsets = [0, 0, 0, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x1x2x1x1x4xf32>
-// CHECK:  vector.insert_strided_slice %[[C_01_4]], {{.*}}offsets = [0, 0, 1, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x1x2x1x1x4xf32>
-// CHECK:  vector.insert_strided_slice %[[C_70_4]], {{.*}}offsets = [7, 0, 0, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x1x2x1x1x4xf32>
-// CHECK:  vector.insert_strided_slice %[[C_71_4]], {{.*}}offsets = [7, 0, 1, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x1x2x1x1x4xf32>
+// CHECK:  vector.insert_strided_slice %[[C_00_4]], {{.*}}offsets = [0, 0, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
+// CHECK:  vector.insert_strided_slice %[[C_01_4]], {{.*}}offsets = [0, 1, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
+// CHECK:  vector.insert_strided_slice %[[C_70_4]], {{.*}}offsets = [7, 0, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
+// CHECK:  vector.insert_strided_slice %[[C_71_4]], {{.*}}offsets = [7, 1, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
 // CHECK:  vector.transfer_write
 
 // -----
