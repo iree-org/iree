@@ -1123,7 +1123,6 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     reductionTileSizes[dim] = 1;
   }
 
-  // SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 1);
   int lastDim = reductionDims.back();
   int numElements = bounds[lastDim];
 
