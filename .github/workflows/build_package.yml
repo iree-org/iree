@@ -109,6 +109,7 @@ jobs:
 
   build_packages:
     name: "${{ matrix.build-family }} :: Build ${{ matrix.build-package }} Package"
+    needs: setup_metadata
     runs-on: ${{ matrix.runs-on }}
     continue-on-error: ${{ matrix.experimental }}
     strategy:
