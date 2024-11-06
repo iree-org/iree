@@ -52,11 +52,11 @@ static SmallVector<IREE::HAL::ExecutableOp>
 gatherExecutablesForSPIRVCodegen(mlir::ModuleOp moduleOp) {
   SmallVector<IREE::HAL::ExecutableOp> result;
   for (auto executableOp : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
-    if (llvm::count_if(executableOp.getOps<IREE::HAL::ExecutableVariantOp>(),
-                       [&](IREE::HAL::ExecutableVariantOp variantOp) {
-                         return usesSPIRVCodeGen(variantOp) &&
-                                !variantOp.getObjects().has_value();
-                       }) > 0) {
+    if (llvm::any_of(executableOp.getOps<IREE::HAL::ExecutableVariantOp>(),
+                     [&](IREE::HAL::ExecutableVariantOp variantOp) {
+                       return usesSPIRVCodeGen(variantOp) &&
+                              !variantOp.getObjects().has_value();
+                     })) {
       result.push_back(executableOp);
     }
   }
