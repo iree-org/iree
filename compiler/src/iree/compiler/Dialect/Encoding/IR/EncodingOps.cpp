@@ -73,6 +73,13 @@ LogicalResult UnsetEncodingOp::verify() {
   if (failed(verifyCompatibleShape(getResultType(), getSourceType()))) {
     return emitOpError("expected to preserve the logical shape of the tensor");
   }
+  unsigned requiredDynCount = getResultType().getNumDynamicDims();
+  if (getResultDims().size() != requiredDynCount) {
+    return emitOpError() << "result type set has " << requiredDynCount
+                         << " dynamic dimensions but only "
+                         << getResultDims().size()
+                         << " dimension values are attached";
+  }
   return success();
 }
 
@@ -82,7 +89,7 @@ LogicalResult UnsetEncodingOp::reifyResultShapes(
   builder.setInsertionPoint(getOperation());
   reifiedReturnShapes.resize(1);
   reifiedReturnShapes[0] =
-      tensor::getMixedSizes(builder, getLoc(), getSource());
+      getMixedValues(getResultType().getShape(), getResultDims(), builder);
   return success();
 }
 

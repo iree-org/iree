@@ -37,19 +37,32 @@ func.func @set_encoding_with_batch_matmul_user(%arg0: tensor<?x?x?xf32>) {
 
 // -----
 
-// CHECK: @unset_encoding_ops(%[[ARG0:.+]]: tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1 : i64, op_type = matmul, element_types = [f32, f32, f32]>>)
-func.func @unset_encoding_ops(%arg0: tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32]>>) -> tensor<?x?xf32> {
-  // CHECK: iree_encoding.unset_encoding %[[ARG0]] : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1 : i64, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>
-  %0 = iree_encoding.unset_encoding %arg0 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>
+// CHECK: @unset_encoding_fully_static(%[[ARG0:.+]]: tensor<3x5xf32, #iree_encoding.encoding<operand_index = 1 : i64, op_type = matmul, element_types = [f32, f32, f32]>>)
+func.func @unset_encoding_fully_static(%arg0: tensor<3x5xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32]>>) -> tensor<3x5xf32> {
+  // CHECK: iree_encoding.unset_encoding %[[ARG0]] : tensor<3x5xf32, #iree_encoding.encoding<operand_index = 1 : i64, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<3x5xf32>
+  %0 = iree_encoding.unset_encoding %arg0 : tensor<3x5xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<3x5xf32>
+  return %0 : tensor<3x5xf32>
+}
+// -----
+
+// CHECK: @unset_encoding_fully_dynamic(%[[ARG0:.+]]: tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1 : i64, op_type = matmul, element_types = [f32, f32, f32]>>
+// CHECK-SAME: %[[D0:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[D1:[a-zA-Z0-9]+]]
+func.func @unset_encoding_fully_dynamic(%arg0: tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1 : i64, op_type = matmul, element_types = [f32, f32, f32]>>,
+    %d0 : index, %d1 : index) -> tensor<?x?xf32> {
+  // CHECK: iree_encoding.unset_encoding %[[ARG0]] : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1 : i64, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>{%[[D0]], %[[D1]]}
+  %0 = iree_encoding.unset_encoding %arg0 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1 : i64, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>{%d0, %d1}
   return %0 : tensor<?x?xf32>
 }
 
 // -----
 
-// CHECK: @unset_encoding_ops_mixed_dynamic_static(%[[ARG0:.+]]: tensor<10x?xf32, #iree_encoding.encoding<operand_index = 1 : i64, op_type = matmul, element_types = [f32, f32, f32]>>)
-func.func @unset_encoding_ops_mixed_dynamic_static(%arg0: tensor<10x?xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32]>>) -> tensor<?x20xf32> {
-  // CHECK: iree_encoding.unset_encoding %[[ARG0]] : tensor<10x?xf32, #iree_encoding.encoding<operand_index = 1 : i64, op_type = matmul, element_types = [f32, f32, f32]>>
-  %0 = iree_encoding.unset_encoding %arg0 : tensor<10x?xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<?x20xf32>
+// CHECK: @unset_encoding_ops_mixed_dynamic_static(%[[ARG0:.+]]: tensor<10x?xf32, #iree_encoding.encoding<operand_index = 1 : i64, op_type = matmul, element_types = [f32, f32, f32]>>
+// CHECK-SAME: %[[D0:[a-zA-Z0-9]+]]
+func.func @unset_encoding_ops_mixed_dynamic_static(%arg0: tensor<10x?xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32]>>,
+    %d0 : index) -> tensor<?x20xf32> {
+  // CHECK: iree_encoding.unset_encoding %[[ARG0]] : tensor<10x?xf32, #iree_encoding.encoding<operand_index = 1 : i64, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<?x20xf32>{%[[D0]]}
+  %0 = iree_encoding.unset_encoding %arg0 : tensor<10x?xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<?x20xf32>{%d0}
   return %0 : tensor<?x20xf32>
 }
 
@@ -57,6 +70,10 @@ func.func @unset_encoding_ops_mixed_dynamic_static(%arg0: tensor<10x?xf32, #iree
 
 func.func @encoding_tensors_with_ops(%arg0 : tensor<?x?xf32>,
     %arg1 : tensor<?x?xf32>, %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %M = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+  %N = tensor.dim %arg1, %c1 : tensor<?x?xf32>
   %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>
   %1 = iree_encoding.set_encoding %arg1 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32]>>
   %2 = iree_encoding.set_encoding %arg2 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32]>>
@@ -64,13 +81,17 @@ func.func @encoding_tensors_with_ops(%arg0 : tensor<?x?xf32>,
       ins(%0, %1 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>, tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32]>>)
       outs(%2 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32]>>)
       -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32]>>
-  %4 = iree_encoding.unset_encoding %3 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>
+  %4 = iree_encoding.unset_encoding %3 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>{%M, %N}
   return %4 : tensor<?x?xf32>
 }
 // CHECK-LABEL: func.func @encoding_tensors_with_ops
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 //  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+//  CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:    %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:    %[[N:.+]] = tensor.dim %[[ARG1]], %[[C1]]
 //       CHECK:   %[[LHS:.+]] = iree_encoding.set_encoding %[[ARG0]]
 //  CHECK-SAME:       tensor<?x?xf32> -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>>
 //       CHECK:   %[[RHS:.+]] = iree_encoding.set_encoding %[[ARG1]]
@@ -80,7 +101,7 @@ func.func @encoding_tensors_with_ops(%arg0 : tensor<?x?xf32>,
 //       CHECK:   %[[GEMM:.+]] = linalg.matmul
 //  CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
 //  CHECK-SAME:       outs(%[[OUT]] :
-//       CHECK:   %[[RESULT:.+]] = iree_encoding.unset_encoding %[[GEMM]]
+//       CHECK:   %[[RESULT:.+]] = iree_encoding.unset_encoding %[[GEMM]] {{.+}} -> tensor<?x?xf32>{%[[M]], %[[N]]}
 //       CHECK:   return %[[RESULT]]
 
 // -----

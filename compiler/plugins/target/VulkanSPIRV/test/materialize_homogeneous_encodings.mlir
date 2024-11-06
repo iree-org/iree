@@ -8,8 +8,12 @@
 #device_target_vulkan = #hal.device.target<"vulkan", [#executable_target_vulkan_spirv_fb]> : !hal.device
 module attributes {hal.device.targets = [#device_target_vulkan]} {
   util.func public @lhs_encoding(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32> {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+    %d1 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
     %3 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
-    %4 = iree_encoding.unset_encoding %3 : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>
+    %4 = iree_encoding.unset_encoding %3 : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%d0, %d1}
     util.return %4 : tensor<?x?xf32>
   }
 }
@@ -31,8 +35,12 @@ module attributes {hal.device.targets = [#device_target_vulkan]} {
 #device_target_vulkan = #hal.device.target<"vulkan", [#executable_target_vulkan_spirv_fb]> : !hal.device
 module attributes {hal.device.targets = [#hal.device.select<[#device_target_vulkan, #device_target_llvm_cpu]> : !hal.device]} {
   util.func public @lhs_encoding(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32> {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+    %d1 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
     %3 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
-    %4 = iree_encoding.unset_encoding %3 : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>
+    %4 = iree_encoding.unset_encoding %3 : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%d0, %d1}
     util.return %4 : tensor<?x?xf32>
   }
 }
