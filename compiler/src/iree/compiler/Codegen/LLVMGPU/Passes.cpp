@@ -888,12 +888,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
 
   // Linalg -> Vector
-  if (options.generateContract) {
-    addGPUVectorizationPasses(funcPassManager);
-  } else {
-    // disable conversion from reductions ops to contraction ops.
-    addGPUVectorizationPasses(funcPassManager, options.generateContract);
-  }
+  addGPUVectorizationPasses(funcPassManager);
 
   // Allocate tensors for copies to shared memory.
   funcPassManager.addPass(createGPUVectorAllocPass());
