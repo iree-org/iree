@@ -1225,7 +1225,7 @@ LogicalResult AttentionOp::verify() {
     return attnOp->emitOpError("expected an indexing map for each operand");
   }
   FailureOr<AttentionOpDetail> maybeOpInfo =
-      AttentionOpDetail::get(indexingMaps);
+      AttentionOpDetail::get(getQueryMap(), getKeyMap(), getValueMap());
   if (failed(maybeOpInfo)) {
     return attnOp->emitOpError("failed to verify op's indexing maps");
   }
@@ -1398,7 +1398,7 @@ LogicalResult OnlineAttentionOp::verify() {
 
   // Check if indexing maps can represent attention.
   FailureOr<AttentionOpDetail> maybeOpInfo =
-      AttentionOpDetail::get(indexingMaps);
+      AttentionOpDetail::get(getQueryMap(), getKeyMap(), getValueMap());
 
   // Check shape compatibility based on indexing maps.
   SmallVector<int64_t> shape(getIterationDomainRank());

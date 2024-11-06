@@ -733,9 +733,9 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   ArrayRef<int64_t> bounds = maybeBounds.value();
 
-  auto opInfo =
-      IREE::LinalgExt::AttentionOpDetail::get(op.getIndexingMapsArray())
-          .value();
+  auto opInfo = IREE::LinalgExt::AttentionOpDetail::get(
+                    op.getQueryMap(), op.getKeyMap(), op.getValueMap())
+                    .value();
 
   int64_t mDim = opInfo.getMDims().back();
   int64_t k1Dim = opInfo.getK1Dims().back();
