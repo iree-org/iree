@@ -13,6 +13,10 @@ Steps 1-2 are performed in Python via the
 [`tensorflow_dynamic_shapes.ipynb`](./tensorflow_dynamic_shapes.ipynb)
 [Colab](https://colab.google/) notebooks:
 
+> [!WARNING]
+> The PyTorch sample code below is outdated, as the `@aot.jittable` API is
+> unstable.
+
 | Framework | Notebook |
 | --------- | -------- |
 PyTorch | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/dynamic_shapes/pytorch_dynamic_shapes.ipynb)
@@ -27,7 +31,7 @@ dynamic shapes:
 
 ```python
 import torch
-import shark_turbine.aot as aot
+import iree.turbine.aot as aot
 
 class DynamicShapesModule(aot.CompiledModule, export_name="module"):
   # reduce_sum_1d (dynamic input size, static output size)
