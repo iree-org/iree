@@ -68,17 +68,6 @@ func.func @unset_encoding_ops_mixed_dynamic_static(%arg0: tensor<10x?xf32, #iree
 
 // -----
 
-// CHECK: @unset_encoding_op_with_extract_slice_change(
-// CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]
-#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>
-func.func @unset_encoding_op_with_extract_slice_change(%arg0 : tensor<20x30xf32, #encoding>) -> tensor<10x20xf32> {
-  // CHECK: iree_encoding.unset_encoding %[[ARG0]] : tensor<20x30xf32, #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<10x20xf32>
-  %0 = iree_encoding.unset_encoding %arg0: tensor<20x30xf32, #encoding> -> tensor<10x20xf32>
-  return %0 : tensor<10x20xf32>
-}
-
-// -----
-
 func.func @encoding_tensors_with_ops(%arg0 : tensor<?x?xf32>,
     %arg1 : tensor<?x?xf32>, %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index

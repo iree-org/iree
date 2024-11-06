@@ -78,8 +78,8 @@ func.func @illegal_unset_encoding_op_with_rank_change(%arg0 : tensor<?x?xf32, #e
 // -----
 
 #encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>
-func.func @illegal_unset_encoding_op_with_shape_change(%arg0 : tensor<20x30xf32, #encoding>) -> tensor<20x50xf32> {
-  // expected-error @+1 {{expected to preserve the logical shape of the tensor: the 1-th dimension has source shape 30, which is less than the result shape 50}}
-  %0 = iree_encoding.unset_encoding %arg0: tensor<20x30xf32, #encoding> -> tensor<20x50xf32>
-  return %0 : tensor<20x50xf32>
+func.func @illegal_unset_encoding_op_with_shape_change(%arg0 : tensor<20x30xf32, #encoding>) -> tensor<10x20xf32> {
+  // expected-error @+1 {{expected to preserve the logical shape of the tensor}}
+  %0 = iree_encoding.unset_encoding %arg0: tensor<20x30xf32, #encoding> -> tensor<10x20xf32>
+  return %0 : tensor<10x20xf32>
 }
