@@ -88,9 +88,6 @@ static_assert(
     static_cast<uint32_t>(ireeGPUReorderWorkgroupsStrategyEnumNone) ==
             static_cast<uint32_t>(mlir::iree_compiler::IREE::GPU::
                                       ReorderWorkgroupsStrategy::None) &&
-        static_cast<uint32_t>(ireeGPUReorderWorkgroupsStrategyEnumSwizzle) ==
-            static_cast<uint32_t>(mlir::iree_compiler::IREE::GPU::
-                                      ReorderWorkgroupsStrategy::Swizzle) &&
         static_cast<uint32_t>(ireeGPUReorderWorkgroupsStrategyEnumTranspose) ==
             static_cast<uint32_t>(mlir::iree_compiler::IREE::GPU::
                                       ReorderWorkgroupsStrategy::Transpose) &&

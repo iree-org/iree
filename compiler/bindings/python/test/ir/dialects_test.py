@@ -16,7 +16,7 @@ def gpu_pipeline_options_attr():
         module = ir.Module.create()
         with ir.InsertionPoint(module.body):
             reorder_attr = iree_gpu.ReorderWorkgroupsStrategyAttr.get(
-                iree_gpu.ReorderWorkgroupsStrategy.Swizzle, ctx
+                iree_gpu.ReorderWorkgroupsStrategy.Transpose, ctx
             )
             gpu_attr = iree_gpu.PipelineOptionsAttr.get(
                 True,
@@ -84,5 +84,5 @@ def gpu_pipeline_options_attr():
             assert (
                 gpu_attr.reorder_workgroups_strategy.value
                 # unfortunately not `is`
-                == iree_gpu.ReorderWorkgroupsStrategy.Swizzle
+                == iree_gpu.ReorderWorkgroupsStrategy.Transpose
             )
