@@ -17,7 +17,7 @@
        use_igemm_convolution = true>
   }>
 #config = #iree_gpu.lowering_config<{
-  workgroup = [1, 4, 1, 16, 0],
+  workgroup = [1, 4, 16, 256, 0],
   reduction = [0, 0, 0, 0, 2],
   subgroup = [1, 4, 1, 4, 0],
   mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,

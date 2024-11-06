@@ -26,7 +26,7 @@ func.func @nhwc_conv_mfma() {
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
 //  CHECK-SAME:     subgroup = [1, 2, 2, 1, 0]
-//  CHECK-SAME:     workgroup = [1, 2, 2, 4, 0]
+//  CHECK-SAME:     workgroup = [1, 2, 32, 64, 0]
 
 // -----
 
@@ -55,7 +55,7 @@ func.func @nchw_conv_mfma() {
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
 //  CHECK-SAME:     subgroup = [1, 2, 2, 1, 0]
-//  CHECK-SAME:     workgroup = [1, 4, 2, 2, 0]
+//  CHECK-SAME:     workgroup = [1, 64, 2, 32, 0]
 
 // -----
 
