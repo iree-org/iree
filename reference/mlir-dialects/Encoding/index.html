@@ -3773,7 +3773,7 @@ a change in layout.</p>
 <h3 id="iree_encodingunset_encoding-encodingunsetencodingop"><code>iree_encoding.unset_encoding</code> (Encoding::UnsetEncodingOp)<a class="headerlink" href="#iree_encodingunset_encoding-encodingunsetencodingop" title="Permanent link">link</a></h3>
 <p><em>Perfom unpack and extract operation on source</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_encoding.unset_encoding` attr-dict $source `:` type($source) `-&gt;` type($result)
+<div class="highlight"><pre><span></span><code>operation ::= `iree_encoding.unset_encoding` attr-dict $source `:` type($source) `-&gt;` type($result) (`` `{` $result_dims^ `}`)?
 </code></pre></div>
 <p>Operation to convert an tensor with encoding that represents
 its data layout into a tensor with default layout (i.e. no encoding).
@@ -3793,6 +3793,10 @@ For now in IREE the default layout is row-major.</p>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
 <td>ranked tensor of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>result_dims</code></td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
