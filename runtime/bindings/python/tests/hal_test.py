@@ -739,14 +739,18 @@ class HalModuleDebugSinkTest(unittest.TestCase):
         """Check that if we hold the HAL module in the callback object, when we
         delete everything no memory is leaked.
 
-        The circular reference is
-        hal_module -> debug_sink -> callback -> hal_module_holder
-             ↑                                          |
-             --------------------------------------------
+        The reference relation is
+                   ------------------------------------
+                   ↓                                  |
+               vm_context                             |
+               ↓        ↓                             |
+        hal_module -> debug_sink -> callback -> object_holder
+             ↑                                        |
+             ------------------------------------------
         """
         is_destructor_called: bool = False
 
-        class HalModuleHolder:
+        class ObjectHolder:
             def __del__(self):
                 nonlocal is_destructor_called
                 is_destructor_called = True
@@ -754,13 +758,16 @@ class HalModuleDebugSinkTest(unittest.TestCase):
             def hold_hal_module(self, hal_module: iree.runtime.VmModule):
                 self.hal_module = hal_module
 
-        hal_module_holder = HalModuleHolder()
+            def hold_vm_context(self, vm_context: iree.runtime.VmContext):
+                self.vm_context = vm_context
+
+        object_holder = ObjectHolder()
 
         device = iree.runtime.get_device(iree.compiler.core.DEFAULT_TESTING_DRIVER)
 
         class Callback:
-            def __init__(self, hal_module_holder: HalModuleHolder):
-                self.hal_module_holder = hal_module_holder
+            def __init__(self, object_holder: ObjectHolder):
+                self.object_holder = object_holder
 
             def __call__(
                 self, key: str, buffer_views: List[iree.runtime.HalBufferView]
@@ -771,19 +778,45 @@ class HalModuleDebugSinkTest(unittest.TestCase):
         hal_module = iree.runtime.create_hal_module(
             instance,
             device,
-            debug_sink=iree.runtime.HalModuleDebugSink(Callback(hal_module_holder)),
+            debug_sink=iree.runtime.HalModuleDebugSink(Callback(object_holder)),
         )
-        hal_module_holder.hold_hal_module(hal_module)
+        vm_context = iree.runtime.VmContext(instance)
+        vm_context.register_modules([hal_module])
+        object_holder.hold_hal_module(hal_module)
+        object_holder.hold_vm_context(vm_context)
         assert not is_destructor_called
 
-        del hal_module_holder
+        del object_holder
         gc.collect()
         assert not is_destructor_called
 
         del hal_module
         del instance
         gc.collect()
+        assert not is_destructor_called
+
+        del vm_context
+        gc.collect()
         assert is_destructor_called
+
+    def testHalModuleRegistrationThroughVmContextInit(self):
+        """The execution path for the registration after the VmContext is create and
+        at during init are different"""
+
+        device = iree.runtime.get_device(iree.compiler.core.DEFAULT_TESTING_DRIVER)
+
+        class TestException(Exception):
+            def __init__(self, msg: str):
+                super().__init__(msg)
+
+        def callback(key: str, buffer_views: List[iree.runtime.HalBufferView]):
+            pass
+
+        instance = iree.runtime.VmInstance()
+        hal_module = iree.runtime.create_hal_module(
+            instance, device, debug_sink=iree.runtime.HalModuleDebugSink(callback)
+        )
+        context = iree.runtime.VmContext(instance, modules=[hal_module])
 
 
 if __name__ == "__main__":

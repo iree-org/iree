@@ -177,6 +177,7 @@ VmInstance VmInstance::Create() {
 VmContext VmContext::Create(VmInstance* instance,
                             std::optional<std::vector<VmModule*>>& modules) {
   IREE_TRACE_SCOPE_NAMED("VmContext::Create");
+  VmModule* hal_module = nullptr;
   iree_vm_context_t* context;
   if (!modules) {
     // Simple create with open allowed modules.
@@ -189,7 +190,11 @@ VmContext VmContext::Create(VmInstance* instance,
     std::vector<iree_vm_module_t*> module_handles;
     module_handles.resize(modules->size());
     for (size_t i = 0, e = module_handles.size(); i < e; ++i) {
-      module_handles[i] = (*modules)[i]->raw_ptr();
+      VmModule* module = (*modules)[i];
+      module_handles[i] = module->raw_ptr();
+      if (module->GetHalModuleDebugSink().get()) {
+        hal_module = module;
+      }
     }
     auto status = iree_vm_context_create_with_modules(
         instance->raw_ptr(), IREE_VM_CONTEXT_FLAG_NONE, module_handles.size(),
@@ -198,7 +203,12 @@ VmContext VmContext::Create(VmInstance* instance,
   }
 
   IREE_ASSERT(context);
-  return VmContext::StealFromRawPtr(context);
+  VmContext vm_context = VmContext::StealFromRawPtr(context);
+
+  if (hal_module)
+    vm_context.SetHalModuleDebugSink(hal_module->GetHalModuleDebugSink());
+
+  return vm_context;
 }
 
 void VmContext::RegisterModules(std::vector<VmModule*> modules) {
@@ -206,6 +216,9 @@ void VmContext::RegisterModules(std::vector<VmModule*> modules) {
   module_handles.resize(modules.size());
   for (size_t i = 0, e = module_handles.size(); i < e; ++i) {
     module_handles[i] = modules[i]->raw_ptr();
+    if (modules[i]->GetHalModuleDebugSink().get()) {
+      this->SetHalModuleDebugSink(modules[i]->GetHalModuleDebugSink());
+    }
   }
   auto status = iree_vm_context_register_modules(
       raw_ptr(), module_handles.size(), &module_handles[0]);
@@ -460,12 +473,12 @@ std::optional<iree_vm_function_t> VmModule::LookupFunction(
 }
 
 void VmModule::SetHalModuleDebugSink(
-    const py::ref<HalModuleDebugSink>& debugSink) {
-  this->debug_sink = debugSink;
+    const py::ref<HalModuleDebugSink>& debug_sink) {
+  this->hal_module_debug_sink = debug_sink;
 }
 
 const py::ref<HalModuleDebugSink>& VmModule::GetHalModuleDebugSink() const {
-  return this->debug_sink;
+  return this->hal_module_debug_sink;
 }
 
 static int VmModuleTpTraverse(PyObject* self, visitproc visit, void* arg) {
@@ -477,10 +490,11 @@ static int VmModuleTpTraverse(PyObject* self, visitproc visit, void* arg) {
 
   // If the debug sink has an associated CPython object, return it.
   // If not, debug_sink.ptr() will equal NULL, which is also fine.
-  py::handle debug_sink = py::find(vm_module->GetHalModuleDebugSink().get());
+  py::handle hal_module_debug_sink =
+      py::find(vm_module->GetHalModuleDebugSink().get());
 
   // Inform the Python GC about the instance.
-  Py_VISIT(debug_sink.ptr());
+  Py_VISIT(hal_module_debug_sink.ptr());
 
   return 0;
 }
@@ -490,6 +504,46 @@ int VmModuleTpClear(PyObject* self) {
   // (never fails)
   VmModule* vm_module = py::inst_ptr<VmModule>(self);
   vm_module->SetHalModuleDebugSink(nullptr);
+
+  return 0;
+}
+
+//------------------------------------------------------------------------------
+// VmContext
+//------------------------------------------------------------------------------
+
+void VmContext::SetHalModuleDebugSink(
+    const py::ref<HalModuleDebugSink>& debug_sink) {
+  this->hal_module_debug_sink = debug_sink;
+}
+
+const py::ref<HalModuleDebugSink>& VmContext::GetHalModuleDebugSink() const {
+  return this->hal_module_debug_sink;
+}
+
+static int VmContextTpTraverse(PyObject* self, visitproc visit, void* arg) {
+  // Inform Python's garbage collector about the references we hold.
+
+  // Retrieve a pointer to the C++ instance associated with 'self'
+  // (never fails)
+  VmContext* vm_context = py::inst_ptr<VmContext>(self);
+
+  // If the debug sink has an associated CPython object, return it.
+  // If not, debug_sink.ptr() will equal NULL, which is also fine.
+  py::handle hal_module_debug_sink =
+      py::find(vm_context->GetHalModuleDebugSink().get());
+
+  // Inform the Python GC about the instance.
+  Py_VISIT(hal_module_debug_sink.ptr());
+
+  return 0;
+}
+
+int VmContextTpClear(PyObject* self) {
+  // Retrieve a pointer to the C++ instance associated with 'self'
+  // (never fails)
+  VmContext* vm_context = py::inst_ptr<VmContext>(self);
+  vm_context->SetHalModuleDebugSink(nullptr);
 
   return 0;
 }
@@ -954,7 +1008,11 @@ void SetupVmBindings(nanobind::module_ m) {
     new (self) VmInstance();
     *self = VmInstance::Create();
   });
-  py::class_<VmContext>(m, "VmContext")
+  PyType_Slot vm_context_slots[] = {
+      {Py_tp_traverse, (void*)VmContextTpTraverse},
+      {Py_tp_clear, (void*)VmContextTpClear},
+      {0, nullptr}};
+  py::class_<VmContext>(m, "VmContext", py::type_slots(vm_context_slots))
       .def(
           "__init__",
           [](VmContext* self, VmInstance* instance,
