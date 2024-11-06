@@ -107,7 +107,7 @@ else:
 
 # Setup and get version information.
 VERSION_FILE = os.path.join(IREE_SOURCE_DIR, "compiler/version.json")
-VERSION_FILE_LOCAL = os.path.join(IREE_SOURCE_DIR, "compiler/version-local.json")
+VERSION_FILE_LOCAL = os.path.join(IREE_SOURCE_DIR, "compiler/version_local.json")
 
 
 def load_version_info(version_file):
@@ -151,7 +151,7 @@ is_dev_build = False
 try:
     version_info = load_version_info(VERSION_FILE_LOCAL)
 except FileNotFoundError:
-    print("version-local.json not found. Using version.json defaults")
+    print("version_local.json not found. Using version.json defaults")
     version_info = load_version_info(VERSION_FILE)
     is_dev_build = True
 git_versions = find_git_versions()

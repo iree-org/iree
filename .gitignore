@@ -36,7 +36,7 @@ Testing/
 configured.bazelrc
 user.bazelrc
 version_info.json
-version-local.json
+version_local.json
 CMakeUserPresets.json
 
 # Dear ImGui Ini files

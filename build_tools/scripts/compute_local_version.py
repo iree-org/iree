@@ -41,7 +41,7 @@ if not (
     sys.exit(1)
 
 VERSION_FILE = args.path / "version.json"
-VERSION_FILE_LOCAL = args.path / "version-local.json"
+VERSION_FILE_LOCAL = args.path / "version_local.json"
 
 
 def load_version_info():
