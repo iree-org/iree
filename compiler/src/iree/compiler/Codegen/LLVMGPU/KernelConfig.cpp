@@ -1050,6 +1050,8 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     return failure();
 
   MLIRContext *context = op.getContext();
+  IREE::GPU::TargetWgpAttr wgp = target.getWgp();
+
   SmallVector<unsigned> parallelDims;
   SmallVector<unsigned> reductionDims;
   op.getParallelDims(parallelDims);
@@ -1062,7 +1064,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     reductionSize *= bounds[dim];
 
   int64_t subgroupSize = 0;
-  for (int s : target.getWgp().getSubgroupSizeChoices().asArrayRef()) {
+  for (int s : wgp.getSubgroupSizeChoices().asArrayRef()) {
     if (reductionSize % s == 0) {
       subgroupSize = s;
       break;
@@ -1098,8 +1100,9 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
 
+  const std::optional<int32_t> maxLoadBits = wgp.getMaxLoadInstructionBits();
   const unsigned largestLoadSizeInBits =
-      *target.getWgp().getMaxLoadInstructionBits();
+      maxLoadBits.has_value() ? *maxLoadBits : 128;
   unsigned vectorSize = largestLoadSizeInBits / bitWidth;
   if (reductionSize % vectorSize != 0)
     return failure();
