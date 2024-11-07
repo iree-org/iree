@@ -231,6 +231,38 @@ struct RemUIDivisibilityByConstant : public OpRewritePattern<arith::RemUIOp> {
   DataFlowSolver &solver;
 };
 
+struct DivUIDivisibilityByConstant : public OpRewritePattern<arith::DivUIOp> {
+  DivUIDivisibilityByConstant(MLIRContext *context, DataFlowSolver &solver)
+      : OpRewritePattern(context), solver(solver) {}
+
+  LogicalResult matchAndRewrite(arith::DivUIOp op,
+                                PatternRewriter &rewriter) const override {
+    APInt rhsConstant;
+    if (!matchPattern(op.getRhs(), m_ConstantInt(&rhsConstant)))
+      return rewriter.notifyMatchFailure(op, "rhs is not constant");
+
+    ConstantIntDivisibility lhsDiv;
+    if (failed(getDivisibility(solver, op, op.getLhs(), rewriter, lhsDiv)))
+      return failure();
+
+    uint64_t rhsValue = rhsConstant.getZExtValue();
+    if (rhsValue > 0 && lhsDiv.udiv() > 0) {
+      if (lhsDiv.udiv() % rhsValue != 0)
+        return rewriter.notifyMatchFailure(op, "rhs does not divide lhs");
+
+      uint64_t divValue = lhsDiv.udiv() / rhsValue;
+      rewriter.replaceOpWithNewOp<arith::ConstantOp>(
+          op, rewriter.getIntegerAttr(op.getResult().getType(),
+                                      static_cast<int64_t>(divValue)));
+      return success();
+    }
+
+    return failure();
+  }
+
+  DataFlowSolver &solver;
+};
+
 //===----------------------------------------------------------------------===//
 // Affine expansion
 // affine.apply expansion can fail after producing a lot of IR. Since this is
@@ -377,7 +409,8 @@ class OptimizeIntArithmeticPass
                                                                       solver);
 
     // Populate divisibility patterns.
-    patterns.add<RemUIDivisibilityByConstant>(ctx, solver);
+    patterns.add<DivUIDivisibilityByConstant, RemUIDivisibilityByConstant>(
+        ctx, solver);
 
     GreedyRewriteConfig config;
     // Results in fewer recursive data flow flushes/cycles on modification.

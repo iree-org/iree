@@ -132,3 +132,65 @@ func.func @no_unit_blocking(%arg0 : index) -> tensor<?xf32> {
 // CHECK-LABEL: func @no_unit_blocking(
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty(%{{.+}}) : tensor<?xf32>
 //       CHECK:   return %[[EMPTY]]
+
+
+// -----
+
+func.func @contract_op_interface_op(%rhs : tensor<2048x4096xf16>, %m : index)
+    -> tensor<?x2048xf32> {
+  %0 = util.assume.int %m<udiv = 16> : index
+  %lhs = tensor.empty(%0) : tensor<?x4096xf16>
+  %init = tensor.empty(%0) : tensor<?x2048xf32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                       affine_map<(d0, d1, d2) -> (d1, d2)>,
+                       affine_map<(d0, d1, d2) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel", "reduction"]}
+      ins(%lhs, %rhs : tensor<?x4096xf16>, tensor<2048x4096xf16>)
+      outs(%init : tensor<?x2048xf32>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f32):
+    %17 = arith.extf %in : f16 to f32
+    %18 = arith.extf %in_0 : f16 to f32
+    %19 = arith.mulf %17, %18 : f32
+    %20 = arith.addf %out, %19 : f32
+    linalg.yield %20 : f32
+  } -> tensor<?x2048xf32>
+  return %1 : tensor<?x2048xf32>
+}
+// CHECK-LABEL: func @contract_op_interface_op(
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<2048x4096xf16>
+//  CHECK-SAME:     %[[ARG1:.+]]: index)
+//       CHECK:   %[[DIM:.+]] = util.assume.int %[[ARG1]]
+//       CHECK:   %[[EXPANDED_DIM:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 16)>()[%[[DIM]]]
+//   CHECK-DAG:   %[[LHS:.+]] = tensor.empty(%[[EXPANDED_DIM:.+]]) : tensor<?x16x4096xf16>
+//   CHECK-DAG:   %[[INIT:.+]] = tensor.empty(%[[EXPANDED_DIM:.+]]) : tensor<?x16x2048xf32>
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[LHS]], %[[ARG0]] :
+//  CHECK-SAME:       outs(%[[INIT]] :
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[GENERIC]] {{\[}}[0, 1], [2]{{\]}}
+//       CHECK:   return %[[COLLAPSED]]
+
+// -----
+
+func.func @matmul_transpose_b(%lhs : tensor<2048x4096xf16>, %m : index)
+    -> tensor<2048x?xf32> {
+  %0 = util.assume.int %m<udiv = 16> : index
+  %rhs = tensor.empty(%0) : tensor<?x4096xf16>
+  %init = tensor.empty(%0) : tensor<2048x?xf32>
+  %1 = linalg.matmul_transpose_b
+      ins(%lhs, %rhs : tensor<2048x4096xf16>, tensor<?x4096xf16>)
+      outs(%init : tensor<2048x?xf32>) -> tensor<2048x?xf32>
+  return %1 : tensor<2048x?xf32>
+}
+// CHECK-LABEL: func @matmul_transpose_b(
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<2048x4096xf16>
+//  CHECK-SAME:     %[[ARG1:.+]]: index)
+//       CHECK:   %[[DIM:.+]] = util.assume.int %[[ARG1]]
+//       CHECK:   %[[EXPANDED_DIM:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 16)>()[%[[DIM]]]
+//   CHECK-DAG:   %[[LHS:.+]] = tensor.empty(%[[EXPANDED_DIM:.+]]) : tensor<?x16x4096xf16>
+//   CHECK-DAG:   %[[INIT:.+]] = tensor.empty(%[[EXPANDED_DIM:.+]]) : tensor<2048x?x16xf32>
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[ARG0]], %[[LHS]] :
+//  CHECK-SAME:       outs(%[[INIT]] :
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[GENERIC]] {{\[}}[0], [1, 2]{{\]}}
+//       CHECK:   return %[[COLLAPSED]]
