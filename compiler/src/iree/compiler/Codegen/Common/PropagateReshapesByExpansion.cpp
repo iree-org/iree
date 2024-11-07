@@ -107,7 +107,9 @@ static void expandVerifiedUsers(PatternRewriter &rewriter, Location loc,
   }
   // compute the offsets,sizes,strides in the expanded dimensions.
   auto computeExpandedAccess = [&](ArrayRef<OpFoldResult> mixedOffsets,
-                                   ShapedType resultType) {
+                                   ShapedType resultType)
+      -> std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
+                    SmallVector<OpFoldResult>> {
     SmallVector<OpFoldResult> expandedOffsets;
     auto expandedOffsetsIter = expandedOffsets.begin();
 
@@ -137,7 +139,7 @@ static void expandVerifiedUsers(PatternRewriter &rewriter, Location loc,
     }
     SmallVector<OpFoldResult> expandedStrides(resultType.getRank(),
                                               rewriter.getIndexAttr(1));
-    return std::make_tuple(expandedOffsets, expandedSizes, expandedStrides);
+    return {expandedOffsets, expandedSizes, expandedStrides};
   };
   for (Operation *user : expandableUsers) {
     rewriter.setInsertionPointToStart(forallOp.getBody());
