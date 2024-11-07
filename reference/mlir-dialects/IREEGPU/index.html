@@ -1927,6 +1927,24 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#virtualmmaattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      VirtualMMAAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#virtualmmaintrinsicattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      VirtualMMAIntrinsicAttr
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2159,6 +2177,30 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#virtualmmaintrinsic" class="md-nav__link">
+    <span class="md-ellipsis">
+      VirtualMMAIntrinsic
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="VirtualMMAIntrinsic">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cases:
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iteratortype" class="md-nav__link">
     <span class="md-ellipsis">
       IteratorType
@@ -2169,7 +2211,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#cases_9" class="md-nav__link">
+  <a href="#cases_10" class="md-nav__link">
     <span class="md-ellipsis">
       Cases:
     </span>
@@ -4357,6 +4399,24 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#virtualmmaattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      VirtualMMAAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#virtualmmaintrinsicattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      VirtualMMAIntrinsicAttr
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4589,6 +4649,30 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#virtualmmaintrinsic" class="md-nav__link">
+    <span class="md-ellipsis">
+      VirtualMMAIntrinsic
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="VirtualMMAIntrinsic">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cases:
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iteratortype" class="md-nav__link">
     <span class="md-ellipsis">
       IteratorType
@@ -4599,7 +4683,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#cases_9" class="md-nav__link">
+  <a href="#cases_10" class="md-nav__link">
     <span class="md-ellipsis">
       Cases:
     </span>
@@ -4679,6 +4763,8 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#targetattr">TargetAttr</a></li>
 <li><a href="#targetchipattr">TargetChipAttr</a></li>
 <li><a href="#targetwgpattr">TargetWgpAttr</a></li>
+<li><a href="#virtualmmaattr">VirtualMMAAttr</a></li>
+<li><a href="#virtualmmaintrinsicattr">VirtualMMAIntrinsicAttr</a></li>
 </ul>
 </li>
 <li><a href="#enums">Enums</a><ul>
@@ -4718,8 +4804,12 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#cases_8">Cases:</a></li>
 </ul>
 </li>
-<li><a href="#iteratortype">IteratorType</a><ul>
+<li><a href="#virtualmmaintrinsic">VirtualMMAIntrinsic</a><ul>
 <li><a href="#cases_9">Cases:</a></li>
+</ul>
+</li>
+<li><a href="#iteratortype">IteratorType</a><ul>
+<li><a href="#cases_10">Cases:</a></li>
 </ul>
 </li>
 </ul>
@@ -5393,13 +5483,10 @@ See IREEGPUEnums.td for the definition of the intrinsics.</p>
 * MFMA_F32_16x16x4_F32 (<code>MFMA_F32_16x16x4_F32</code>)
 * MFMA_F32_16x16x16_F16 (<code>MFMA_F32_16x16x16_F16</code>)
 * MFMA_F32_32x32x8_F16 (<code>MFMA_F32_32x32x8_F16</code>)
-* VMFMA_F32_16x16x32_F16 (<code>VMFMA_F32_16x16x32_F16</code>)
-* VMFMA_F32_32x32x16_F16 (<code>VMFMA_F32_32x32x16_F16</code>)
 * MFMA_F32_16x16x16_BF16 (<code>MFMA_F32_16x16x16_BF16</code>)
 * MFMA_F32_32x32x8_BF16 (<code>MFMA_F32_32x32x8_BF16</code>)
 * MFMA_F32_16x16x32_F8E4M3FNUZ (<code>MFMA_F32_16x16x32_F8E4M3FNUZ</code>)
 * MFMA_F32_16x16x32_F8E5M2FNUZ (<code>MFMA_F32_16x16x32_F8E5M2FNUZ</code>)
-* VMFMA_F32_16x16x32_F8E4M3FNUZ (<code>VMFMA_F32_16x16x32_F8E4M3FNUZ</code>)
 * MFMA_I32_16x16x32_I8 (<code>MFMA_I32_16x16x32_I8</code>)
 * MFMA_I32_32x32x16_I8 (<code>MFMA_I32_32x32x16_I8</code>)
 * MFMA_I32_16x16x16_I8 (<code>MFMA_I32_16x16x16_I8</code>)
@@ -5760,6 +5847,63 @@ NVIDIA GPUs.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="virtualmmaattr">VirtualMMAAttr<a class="headerlink" href="#virtualmmaattr" title="Permanent link">link</a></h3>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_gpu.virtual_mma_layout&lt;
+  ::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr   # intrinsic
+&gt;
+</code></pre></div>
+<p>This mma variant represents "virtual" MMA ops that has modification to
+its native layouts by unrollK and/or interleave reads. The |intrinsic|
+field represents different kinds of "Virtual" MMA Ops we found helpful.</p>
+<p>These interleaving and/or unrolling changes in the layout is especially
+useful to coalesce reads from shared memory to register or align layouts
+in a chained-matmul operation.</p>
+<h5 id="parameters_17">Parameters:<a class="headerlink" href="#parameters_17" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">intrinsic</td>
+<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="virtualmmaintrinsicattr">VirtualMMAIntrinsicAttr<a class="headerlink" href="#virtualmmaintrinsicattr" title="Permanent link">link</a></h3>
+<p>Descriptor for different Virtual MMA intrinsics</p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_gpu.virtual_mma_intrinsic&lt;
+  ::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic   # value
+&gt;
+</code></pre></div>
+<p>Enum cases:
+* VMFMA_F32_16x16x32_F16 (<code>VMFMA_F32_16x16x32_F16</code>)
+* VMFMA_F32_32x32x16_F16 (<code>VMFMA_F32_32x32x16_F16</code>)
+* VMFMA_F32_16x16x32_F8E4M3FNUZ (<code>VMFMA_F32_16x16x32_F8E4M3FNUZ</code>)</p>
+<h5 id="parameters_18">Parameters:<a class="headerlink" href="#parameters_18" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">value</td>
+<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic</code></td>
+<td>an enum of type VirtualMMAIntrinsic</td>
+</tr>
+</tbody>
+</table>
 <h2 id="enums">Enums<a class="headerlink" href="#enums" title="Permanent link">link</a></h2>
 <h3 id="computebitwidths">ComputeBitwidths<a class="headerlink" href="#computebitwidths" title="Permanent link">link</a></h3>
 <p>Supported bitwidths for compute</p>
@@ -5891,16 +6035,6 @@ NVIDIA GPUs.</p>
 <td>MFMA_F32_32x32x8_F16</td>
 </tr>
 <tr>
-<td style="text-align: center;">VMFMA_F32_16x16x32_F16</td>
-<td style="text-align: center;"><code>2322</code></td>
-<td>VMFMA_F32_16x16x32_F16</td>
-</tr>
-<tr>
-<td style="text-align: center;">VMFMA_F32_32x32x16_F16</td>
-<td style="text-align: center;"><code>2323</code></td>
-<td>VMFMA_F32_32x32x16_F16</td>
-</tr>
-<tr>
 <td style="text-align: center;">MFMA_F32_16x16x16_BF16</td>
 <td style="text-align: center;"><code>2336</code></td>
 <td>MFMA_F32_16x16x16_BF16</td>
@@ -5919,11 +6053,6 @@ NVIDIA GPUs.</p>
 <td style="text-align: center;">MFMA_F32_16x16x32_F8E5M2FNUZ</td>
 <td style="text-align: center;"><code>2352</code></td>
 <td>MFMA_F32_16x16x32_F8E5M2FNUZ</td>
-</tr>
-<tr>
-<td style="text-align: center;">VMFMA_F32_16x16x32_F8E4M3FNUZ</td>
-<td style="text-align: center;"><code>2369</code></td>
-<td>VMFMA_F32_16x16x32_F8E4M3FNUZ</td>
 </tr>
 <tr>
 <td style="text-align: center;">MFMA_I32_16x16x32_I8</td>
@@ -6122,9 +6251,38 @@ NVIDIA GPUs.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="virtualmmaintrinsic">VirtualMMAIntrinsic<a class="headerlink" href="#virtualmmaintrinsic" title="Permanent link">link</a></h3>
+<p>Descriptor for different Virtual MMA intrinsics</p>
+<h4 id="cases_9">Cases:<a class="headerlink" href="#cases_9" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Symbol</th>
+<th style="text-align: center;">Value</th>
+<th>String</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">VMFMA_F32_16x16x32_F16</td>
+<td style="text-align: center;"><code>2322</code></td>
+<td>VMFMA_F32_16x16x32_F16</td>
+</tr>
+<tr>
+<td style="text-align: center;">VMFMA_F32_32x32x16_F16</td>
+<td style="text-align: center;"><code>2323</code></td>
+<td>VMFMA_F32_32x32x16_F16</td>
+</tr>
+<tr>
+<td style="text-align: center;">VMFMA_F32_16x16x32_F8E4M3FNUZ</td>
+<td style="text-align: center;"><code>2369</code></td>
+<td>VMFMA_F32_16x16x32_F8E4M3FNUZ</td>
+</tr>
+</tbody>
+</table>
 <h3 id="iteratortype">IteratorType<a class="headerlink" href="#iteratortype" title="Permanent link">link</a></h3>
 <p>Iterator type</p>
-<h4 id="cases_9">Cases:<a class="headerlink" href="#cases_9" title="Permanent link">link</a></h4>
+<h4 id="cases_10">Cases:<a class="headerlink" href="#cases_10" title="Permanent link">link</a></h4>
 <table>
 <thead>
 <tr>
