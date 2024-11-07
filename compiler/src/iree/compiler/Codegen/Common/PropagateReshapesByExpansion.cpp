@@ -25,8 +25,8 @@ namespace {
 static LogicalResult
 getExpandedShape(SmallVector<ReassociationIndices> reIndices,
                  ArrayRef<int64_t> sliceStaticSizes, Value dest,
-                 SmallVector<int64_t> &expandedShape,
-                 SmallVector<int64_t> &totalInnerSizes) {
+                 SmallVectorImpl<int64_t> &expandedShape,
+                 SmallVectorImpl<int64_t> &totalInnerSizes) {
   auto destType = dyn_cast<ShapedType>(dest.getType());
   if (!destType)
     return failure();
@@ -35,7 +35,7 @@ getExpandedShape(SmallVector<ReassociationIndices> reIndices,
   for (auto [reassociations, destSize] :
        llvm::zip_equal(reIndices, destType.getShape())) {
     int64_t totalInnerSize = 1;
-    for (int i = 1; i < reassociations.size(); i++) {
+    for (size_t i = 1, e = reassociations.size(); i < e; ++i) {
       int64_t expandedInnerSize = sliceStaticSizes[reassociations[i]];
       if (ShapedType::isDynamic(expandedInnerSize)) {
         return failure();
@@ -63,13 +63,14 @@ static LogicalResult
 verifyandCollectExpandableUsers(Value insertDest,
                                 SmallVector<ReassociationIndices> reIndices,
                                 SmallVector<Operation *> &expandableUsers) {
-  for (auto user : insertDest.getUsers()) {
+  for (Operation *user : insertDest.getUsers()) {
     if (auto extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(user)) {
       auto expandShapeOp =
           dyn_cast<tensor::ExpandShapeOp>(*extractSliceOp->getUsers().begin());
       if (!expandShapeOp)
         return failure();
-      auto expandReIndices = expandShapeOp.getReassociationIndices();
+      SmallVector<ReassociationIndices> expandReIndices =
+          expandShapeOp.getReassociationIndices();
       if (reIndices != expandReIndices) {
         return failure();
       }
@@ -77,8 +78,9 @@ verifyandCollectExpandableUsers(Value insertDest,
     } else if (auto parallelInsertOp =
                    dyn_cast<tensor::ParallelInsertSliceOp>(user)) {
       expandableUsers.push_back(user);
-    } else
+    } else {
       return failure();
+    }
   }
   return success();
 }
@@ -98,8 +100,8 @@ static void expandVerifiedUsers(PatternRewriter &rewriter, Location loc,
   // tensor<8x16x8x16xf32> into tensor<8x16x8x16xf32> and then is consumed by
   // the expanded parallel_insert_slice_op.
   SmallVector<ReassociationIndices> unFlattenReassociations;
-  for (auto inds : reIndices) {
-    for (auto i : inds) {
+  for (ReassociationIndices inds : reIndices) {
+    for (int64_t i : inds) {
       unFlattenReassociations.push_back({i});
     }
   }
@@ -111,7 +113,7 @@ static void expandVerifiedUsers(PatternRewriter &rewriter, Location loc,
 
     for (auto [index, offset] : llvm::enumerate(mixedOffsets)) {
       // Add zero offsets for the extra dimensions from reIndices.
-      for (int i = 1; i < reIndices[index].size(); i++) {
+      for (size_t i = 1, e = reIndices[index].size(); i < e; ++i) {
         expandedOffsets.push_back(getAsIndexOpFoldResult(ctx, 0));
       }
       // Compute the outer dimension expression.
