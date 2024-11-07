@@ -521,7 +521,7 @@ populate_built_package(
 )
 
 setup(
-    name=f"{custom_package_prefix}iree-runtime{custom_package_suffix}{PACKAGE_SUFFIX}",
+    name=f"{custom_package_prefix}iree-base-runtime{custom_package_suffix}{PACKAGE_SUFFIX}",
     version=f"{PACKAGE_VERSION}",
     author="IREE Authors",
     author_email="iree-technical-discussion@lists.lfaidata.foundation",

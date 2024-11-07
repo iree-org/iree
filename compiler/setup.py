@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build/install the iree-compiler python package.
+# Build/install the iree-base-compiler python package.
 # Note that this includes a relatively large build of LLVM (~2400 C++ files)
 # and can take a considerable amount of time, especially with defaults.
 # To install:
@@ -418,7 +418,7 @@ custom_package_suffix = os.getenv("IREE_COMPILER_CUSTOM_PACKAGE_SUFFIX", "")
 custom_package_prefix = os.getenv("IREE_COMPILER_CUSTOM_PACKAGE_PREFIX", "")
 
 setup(
-    name=f"{custom_package_prefix}iree-compiler{custom_package_suffix}{PACKAGE_SUFFIX}",
+    name=f"{custom_package_prefix}iree-base-compiler{custom_package_suffix}{PACKAGE_SUFFIX}",
     version=f"{PACKAGE_VERSION}",
     author="IREE Authors",
     author_email="iree-technical-discussion@lists.lfaidata.foundation",
