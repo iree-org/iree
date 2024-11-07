@@ -67,7 +67,7 @@ jobs:
         run: |
           echo "Building in ${{ env.BUILD_DIR_BASH }}"
           bash ./build_tools/cmake/build_all.sh ${{ env.BUILD_DIR_BASH }}
-          bash sccache --show-stats
+          sccache --show-stats
       - name: "Testing IREE"
         run: bash ./build_tools/cmake/ctest_all.sh ${{ env.BUILD_DIR_BASH }}
       - name: "Clean up build dir"
