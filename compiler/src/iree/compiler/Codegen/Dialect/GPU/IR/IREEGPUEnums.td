@@ -156,13 +156,10 @@ def IREEGPU_MMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MMAIntrinsic",
       MFMA_F32_16x16x4_F32,
       MFMA_F32_16x16x16_F16,
       MFMA_F32_32x32x8_F16,
-      VMFMA_F32_16x16x32_F16,
-      VMFMA_F32_32x32x16_F16,
       MFMA_F32_16x16x16_BF16,
       MFMA_F32_32x32x8_BF16,
       MFMA_F32_16x16x32_F8E4M3FNUZ,
       MFMA_F32_16x16x32_F8E5M2FNUZ,
-      VMFMA_F32_16x16x32_F8E4M3FNUZ,
       MFMA_I32_16x16x32_I8,
       MFMA_I32_32x32x16_I8,
       MFMA_I32_16x16x16_I8,
@@ -170,6 +167,13 @@ def IREEGPU_MMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MMAIntrinsic",
       WMMA_F32_16x16x16_F16,
       WMMA_F16_16x16x16_F16,
       WMMA_I32_16x16x16_I8
+    ]>;
+
+def IREEGPU_VirtualMMAIntrinsic : IREEGPU_I32MmaEnumAttr<"VirtualMMAIntrinsic",
+    "Descriptor for different Virtual MMA intrinsics", [
+      VMFMA_F32_16x16x32_F16,
+      VMFMA_F32_32x32x16_F16,
+      VMFMA_F32_16x16x32_F8E4M3FNUZ,
     ]>;
 
 def MMA_LHS : I32EnumAttrCase<"Lhs", 0>;

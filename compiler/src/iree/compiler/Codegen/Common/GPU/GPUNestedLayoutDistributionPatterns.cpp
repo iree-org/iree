@@ -593,8 +593,8 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     }
     // If mmaAttr exists, defer the lowering to use MMA.
     // Notify failure if the "iree.amdgpu.mma" intrinsic attribute is present.
-    auto mmaAttr =
-        contractOp->getAttrOfType<IREE::GPU::MMAAttr>("iree.amdgpu.mma");
+    auto mmaAttr = contractOp->getAttrOfType<IREE::GPU::MmaInterfaceAttr>(
+        "iree.amdgpu.mma");
     if (mmaAttr) {
       return rewriter.notifyMatchFailure(
           contractOp, "iree.amdgpu.mma intrinsic attribute exists");

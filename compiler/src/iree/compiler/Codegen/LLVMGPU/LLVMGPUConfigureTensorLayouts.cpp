@@ -308,14 +308,16 @@ static LogicalResult setAttentionMatmulAnchor(RewriterBase &rewriter,
   bool reuseIntrinsicOutput = false;
   bool transposeIntrinsic = false;
 
-  auto qkIntrinsic = cast<IREE::GPU::MMAAttr>(qkSchedule.getIntrinsic());
-  auto pvIntrinsic = cast<IREE::GPU::MMAAttr>(pvSchedule.getIntrinsic());
+  auto qkIntrinsic =
+      cast<IREE::GPU::MmaInterfaceAttr>(qkSchedule.getIntrinsic());
+  auto pvIntrinsic =
+      cast<IREE::GPU::MmaInterfaceAttr>(pvSchedule.getIntrinsic());
   IREE::GPU::MMASingleSubgroupLayout lhsLayout =
-      pvIntrinsic.getASingleSubgroupLayout();
+      getASingleSubgroupLayout(pvIntrinsic);
   IREE::GPU::MMASingleSubgroupLayout rhsLayout =
-      pvIntrinsic.getBSingleSubgroupLayout();
+      getBSingleSubgroupLayout(pvIntrinsic);
   IREE::GPU::MMASingleSubgroupLayout outLayout =
-      qkIntrinsic.getCSingleSubgroupLayout();
+      getCSingleSubgroupLayout(qkIntrinsic);
 
   auto matchLayout = [](IREE::GPU::MMASingleSubgroupLayout layoutA,
                         IREE::GPU::MMASingleSubgroupLayout layoutB) -> bool {
