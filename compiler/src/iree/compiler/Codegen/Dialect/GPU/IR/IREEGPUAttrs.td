@@ -301,7 +301,7 @@ def IREEGPU_VirtualMMAAttr :
 
   let description = [{
     This mma variant represents "virtual" MMA ops that has modification to
-    it's native layouts by unrollK and/or interleave reads. The |intrinsic|
+    its native layouts by unrollK and/or interleave reads. The |intrinsic|
     field represents different kinds of "Virtual" MMA Ops we found helpful.
 
     These interleaving and/or unrolling changes in the layout is especially

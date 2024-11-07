@@ -1144,7 +1144,7 @@ static OpaqueMmaLayout getOpaqueVMMALayout(MLIRContext *context,
     return OpaqueMmaLayout{32, 32, 16, f16, f16, f32};
   }
   }
-  llvm_unreachable("unhandled mfma layout type");
+  assert(false && "unhandled virtual mma layout type.");
   return OpaqueMmaLayout{};
 }
 
@@ -1167,17 +1167,18 @@ VirtualMMAAttr::getABCVectorTypes() const {
     auto aType = VectorType::get({8}, A);
     auto bType = VectorType::get({8}, B);
     auto cType = VectorType::get({4}, C);
-    return std::make_tuple(aType, bType, cType);
+    return {aType, bType, cType};
   }
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16: {
     auto aType = VectorType::get({8}, A);
     auto bType = VectorType::get({8}, B);
     auto cType = VectorType::get({16}, C);
-    return std::make_tuple(aType, bType, cType);
+    return {aType, bType, cType};
   }
   }
   // This should not happen but just to make GCC happy.
-  return std::make_tuple(VectorType{}, VectorType{}, VectorType{});
+  assert(false && "unhandled virtual mma layout type.");
+  return {VectorType{}, VectorType{}, VectorType{}};
 }
 
 std::tuple<int64_t, int64_t, int64_t> VirtualMMAAttr::getMNKShape() const {
@@ -1195,6 +1196,7 @@ int64_t VirtualMMAAttr::getSubgroupSize() const {
   }
   }
   // This should not happen but just to make GCC happy.
+  assert(false && "unhandled virtual mma layout type.");
   return 0;
 }
 
@@ -1248,6 +1250,7 @@ int64_t VirtualMMAAttr::getUnrollK() const {
   }
   }
   // This should not happen but just to make GCC happy.
+  assert(false && "unhandled virtual mma layout type.");
   return 0;
 }
 
@@ -1313,6 +1316,7 @@ int64_t VirtualMMAAttr::getBlockSize() const {
   }
   }
   // This should not happen but just to make GCC happy.
+  assert(false && "unhandled virtual mma layout type.");
   return 0;
 }
 
@@ -1356,6 +1360,7 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
               /*element=*/{4, 1}};
     }
   }
+  assert(false && "unhandled virtual mma layout type.");
   return {};
 }
 
