@@ -75,7 +75,7 @@ llvm::cl::opt<bool> clGPUTestVectorDistributionReduction(
     "iree-codegen-llvmgpu-test-vector-distribution-reduction",
     llvm::cl::desc(
         "test the vector distribution pipeline for reduction operations"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 /// Flag to force using WMMA tensorcore operations.
 llvm::cl::opt<bool>
