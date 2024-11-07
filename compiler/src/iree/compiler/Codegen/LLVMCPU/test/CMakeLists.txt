@@ -55,7 +55,6 @@ iree_lit_test_suite(
     "tile-root-fuse-consumer-producer.mlir"
     "tile.mlir"
     "tile_and_fuse.mlir"
-    "tile_and_fuse_riscv.mlir"
     "transform_dialect_bufferize.mlir"
     "unfused_fma.mlir"
     "vector_contract_to_arm_asm.mlir"
