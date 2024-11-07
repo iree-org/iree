@@ -222,7 +222,6 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wall"
     "$<$<BOOL:${IREE_ENABLE_WERROR_FLAG}>:-Werror>"
     "-Wno-error=deprecated-declarations"  # Want to see them but defaults to error.
-    "-Wno-error=parentheses"  # Not useful enough to enable, and some deps aren't clean on this.
 
     "-Wno-address"  # https://github.com/iree-org/iree/issues/16016
     "-Wno-address-of-packed-member"
