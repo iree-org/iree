@@ -7,8 +7,7 @@
 
 This script runs as the CIBW_BEFORE_BUILD command within cibuildwheel:
   - Main distribution .tar.bz2 file (the result of `ninja install`).
-  - The python_packages/iree_compiler wheel, which is python version
-    independent but platform specific.
+  - The python_packages/iree_base_compiler wheel.
   - Installable tests.
 
 It uses cibuildwheel for all of this as a convenience since it already knows

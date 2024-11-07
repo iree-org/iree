@@ -1,9 +1,9 @@
 # Builds release packages on supported platforms:
 #   * main-dist-linux (CMake 'install')
-#   * py-compiler-pkg (`iree-compiler` Python package)
+#   * py-compiler-pkg (`iree-base-compiler` Python package)
 #     * Linux, macOS, Windows
 #     * All supported Python versions (e.g. 3.9, 3.10, 3.11)
-#   * py-runtime-pkg (`iree-runtime` Python package)
+#   * py-runtime-pkg (`iree-base-runtime` Python package)
 #     * Linux, macOS, Windows
 #     * All supported Python versions (e.g. 3.9, 3.10, 3.11)
 #   * py-tf-compiler-tools-pkg (`iree-tools-[tf, tflite]`, pure Python packages)
@@ -187,7 +187,7 @@ jobs:
 
       ##########################################################################
       # py-runtime-pkg
-      # Builds the iree-runtime wheels.
+      # Builds the iree-base-runtime wheels.
       # One step per OS.
       ##########################################################################
 
@@ -196,7 +196,7 @@ jobs:
         shell: bash
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
-          packages: "iree-runtime"
+          packages: "iree-base-runtime"
           output_dir: "${{ github.workspace }}/bindist"
         run: |
           [ -e ./bindist/* ] && rm ./bindist/*
@@ -207,7 +207,7 @@ jobs:
         shell: bash
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
-          packages: "iree-runtime"
+          packages: "iree-base-runtime"
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11 3.12 3.13"
         run: |
@@ -219,7 +219,7 @@ jobs:
         shell: powershell
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
-          packages: "iree-runtime"
+          packages: "iree-base-runtime"
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11 3.12 3.13"
         run: |
@@ -230,7 +230,7 @@ jobs:
 
       ##########################################################################
       # py-compiler-pkg
-      # Builds the iree-compiler wheel.
+      # Builds the iree-base-compiler wheel.
       # One step per OS.
       ##########################################################################
       - name: Build compiler wheels (Linux, x86_64 and Arm64)
@@ -238,7 +238,7 @@ jobs:
         shell: bash
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
-          packages: "iree-compiler"
+          packages: "iree-base-compiler"
           output_dir: "${{ github.workspace }}/bindist"
         run: |
           [ -e ./bindist/* ] && rm ./bindist/*
@@ -249,7 +249,7 @@ jobs:
         shell: bash
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
-          packages: "iree-compiler"
+          packages: "iree-base-compiler"
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11 3.12 3.13"
         run: |
@@ -261,7 +261,7 @@ jobs:
         shell: powershell
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
-          packages: "iree-compiler"
+          packages: "iree-base-compiler"
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11 3.12 3.13"
         run: |
