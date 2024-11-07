@@ -971,10 +971,18 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
 
   // Most of the rest of this function is the computation of the offsets.
   // The basic idea is to delinearize the threadId over the basis of
-  // cross-thread dimensions. The main subtlety is that the TileSwizzles refer
-  // only to the layout dims, and do not reflect a possible additional
-  // thread-distribution-only dimension present on some architectures (RDNA3).
-  // When such an extra dim exists, multiple threads are reading the same data.
+  // cross-thread dimensions. These cross-thread dimensions may be either
+  // the intrinsic's own, or they may come from expansion to multiple subgroups.
+  // Normally, that distinction is irrelevant here: we just delinearize the
+  // thread-id over all cross-thread dimensions.
+  //
+  // There is one case that makes things more complicated, encountered so far
+  // only on RDNA3. That is when some intrinsic has multiple (so far, 2) threads
+  // reading the same data. This redundancy is not encoded in the TileSwizzle
+  // structures that we are using here. Instead, in that case, the thread grid
+  // (as encoded in the TileSwizzle) is smaller than the subgroup size. In that
+  // case, there is an implied thread-distribution-only dimension along which
+  // multiple threads read exactly the same data.
   // So we need to distinguish layoutThreadSizes vs. distributionThreadSizes.
   SmallVector<int64_t> layoutThreadSizes =
       sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
@@ -1022,7 +1030,9 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
 
   if (hasDistributionOnlyDim) {
     // Erase the delinearized index that corresponds to the extra distribution
-    // dimension that we had inserted above.
+    // dimension that we had inserted above. This is what causes multiple
+    // threads (which only differed in the index being discarded here) to read
+    // exactly the same data.
     tileOffsets.erase(tileOffsets.begin() + distributionOnlyDimIdx);
   }
 
