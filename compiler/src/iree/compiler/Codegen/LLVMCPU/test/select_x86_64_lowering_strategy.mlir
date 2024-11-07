@@ -1943,3 +1943,41 @@ module {
 //      CHECK:   iree_linalg_ext.custom_op
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 //  CHECK-NOT:   lowering_config
+
+// -----
+
+#executable_target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64",
+    {cpu_features = "+avx512f",
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>
+func.func @test_tiling_cpu_default() attributes {hal.executable.target = #executable_target} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<1x2x48x30x30xf32>>
+  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<2x128x48x5x5xf32>>
+  %2 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<1x2x128xf32>>
+  %3 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(3) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<1x2x128x26x26xf32>>
+  %4 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0, 0], sizes = [1, 2, 48, 30, 30], strides = [1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x2x48x30x30xf32>> -> tensor<1x2x48x30x30xf32>
+  %5 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0, 0], sizes = [2, 128, 48, 5, 5], strides = [1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x128x48x5x5xf32>> -> tensor<2x128x48x5x5xf32>
+  %6 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [1, 2, 128], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x2x128xf32>> -> tensor<1x2x128xf32>
+  %7 = tensor.empty() : tensor<1x2x128x26x26xf32>
+  %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<1x2x128x26x26xf32>) -> tensor<1x2x128x26x26xf32>
+  %9 = linalg.conv_2d_ngchw_gfchw {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%4, %5 : tensor<1x2x48x30x30xf32>, tensor<2x128x48x5x5xf32>) outs(%8 : tensor<1x2x128x26x26xf32>) -> tensor<1x2x128x26x26xf32>
+  %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} ins(%9, %6 : tensor<1x2x128x26x26xf32>, tensor<1x2x128xf32>) outs(%7 : tensor<1x2x128x26x26xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %11 = arith.addf %in, %in_0 : f32
+    %12 = arith.cmpf ugt, %11, %cst : f32
+    %13 = arith.select %12, %11, %cst : f32
+    linalg.yield %13 : f32
+  } -> tensor<1x2x128x26x26xf32>
+  flow.dispatch.tensor.store %10, %3, offsets = [0, 0, 0, 0, 0], sizes = [1, 2, 128, 26, 26], strides = [1, 1, 1, 1, 1] : tensor<1x2x128x26x26xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x2x128x26x26xf32>>
+  return
+}
+
+// CHECK-DAG:  #[[CONFIG0:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 16, 13, 26, 0, 0, 0], [0, 0, 1, 8, 26, 0, 0, 0]]>
+// CHECK-DAG:  #[[TRANSLATION_INFO]] = #iree_codegen.translation_info<CPUDefault>
+//      CHECK: func @test_tiling_cpu_default(
+// CHECK-SAME:     translation_info = #[[TRANSLATION_INFO]]
+//      CHECK:    linalg.conv_2d_ngchw_gfchw {dilations = dense<1> : vector<2xi64>,
+// CHECK-SAME:                                lowering_config = #[[CONFIG0]],
+// CHECK-SAME:                                strides = dense<1> : vector<2xi64>}
