@@ -11,8 +11,7 @@ IREE development is primarily driven via automated nightly release snapshots.
 These are scheduled automatically each day by the
 `schedule_candidate_release.yml` workflow, which selects a green commit from
 main (for non optional CI tasks), created a tag of the format
-`candidate-{YYYYMMDD}.{BUILDNUM}` and schedules automation to populate the
-release.
+`iree-{X.Y.ZrcYYYYMMDD}` and schedules automation to populate the release.
 
 The `build_package.yml` workflow then runs jobs to do builds for all
 platforms and packages, finally triggering the
