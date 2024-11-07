@@ -10,6 +10,9 @@
 if(MSVC)
   add_compile_options(/wd4996)
 else()
+  if(GCC)
+    add_compile_options(-Wno-error=parentheses)
+  endif()
   add_compile_options(-Wno-deprecated-declarations)
 endif()
 
