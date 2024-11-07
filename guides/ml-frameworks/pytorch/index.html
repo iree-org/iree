@@ -3970,8 +3970,8 @@ with us.</p>
 <a href="https://discord.gg/wEWh6Z9nMU">Discord server</a>'s <code>#pytorch</code> channel.</p>
 </div>
 <h2 id="overview"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/></svg></span> Overview<a class="headerlink" href="#overview" title="Permanent link">link</a></h2>
-<p><a href="https://pypi.org/project/iree-turbine/">iree-turbine</a> (rebrand pending from
-"shark-turbine") offers a tight integration between compatible versions of IREE,
+<p><a href="https://pypi.org/project/iree-turbine/">iree-turbine</a> offers a tight
+integration between compatible versions of IREE,
 <a href="https://github.com/llvm/torch-mlir">torch-mlir</a>, and
 <a href="https://pytorch.org/">PyTorch</a>.</p>
 <ul class="task-list">
@@ -4124,7 +4124,7 @@ Python and then export deployment-ready artifacts that can be used in IREE's
   export -. "compile()" .-&gt; binary</code></pre>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">iree.runtime</span> <span class="k">as</span> <span class="nn">ireert</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">import</span> <span class="nn">shark_turbine.aot</span> <span class="k">as</span> <span class="nn">aot</span>
+<span class="kn">import</span> <span class="nn">iree.turbine.aot</span> <span class="k">as</span> <span class="nn">aot</span>
 <span class="kn">import</span> <span class="nn">torch</span>
 
 <span class="c1"># Define the `nn.Module` to export.</span>
@@ -4204,13 +4204,13 @@ access to more features.</p>
 
   export -. "compile()" .-&gt; binary</code></pre>
 <p>Advanced export workflows can use the
-<a href="https://github.com/iree-org/iree-turbine/tree/main/shark_turbine/aot/compiled_module.py"><code>aot.CompiledModule</code></a>
+<a href="https://github.com/iree-org/iree-turbine/blob/main/iree/turbine/aot/compiled_module.py"><code>aot.CompiledModule</code></a>
 class to define and constrain the structure of a program prior to compiling it.</p>
 <!-- TODO(scotttodd): API reference pages for aot.CompiledModule etc.?
                       https://github.com/iree-org/iree-turbine/issues/77
 -->
 
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">shark_turbine.aot</span> <span class="k">as</span> <span class="nn">aot</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">iree.turbine.aot</span> <span class="k">as</span> <span class="nn">aot</span>
 
 <span class="c1"># A minimal program, with no functions or variables.</span>
 <span class="k">class</span> <span class="nc">BasicModule</span><span class="p">(</span><span class="n">aot</span><span class="o">.</span><span class="n">CompiledModule</span><span class="p">):</span>
@@ -4266,7 +4266,7 @@ models parameters on disk, so that they can be loaded later during runtime.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">safetensors.torch</span> <span class="kn">import</span> <span class="n">save_file</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">import</span> <span class="nn">shark_turbine.aot</span> <span class="k">as</span> <span class="nn">aot</span>
+<span class="kn">import</span> <span class="nn">iree.turbine.aot</span> <span class="k">as</span> <span class="nn">aot</span>
 
 <span class="k">class</span> <span class="nc">LinearModule</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">in_features</span><span class="p">,</span> <span class="n">out_features</span><span class="p">):</span>
