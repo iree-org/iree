@@ -10,6 +10,10 @@
 include "iree/compiler/Dialect/Encoding/IR/EncodingBase.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
 
+//===----------------------------------------------------------------------===//
+// Attribute Interfaces
+//===----------------------------------------------------------------------===//
+
 def IREEEncoding_EncodingSolverInterfaceAttr :
   AttrInterface<"EncodingSolverInterfaceAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
@@ -51,5 +55,35 @@ def IREEEncoding_EncodingSolverInterfaceAttr :
     >
   ];
 }
+
+//===----------------------------------------------------------------------===//
+// Type Interfaces
+//===----------------------------------------------------------------------===//
+
+def IREEEncoding_EncodingTypeInterface :
+  TypeInterface<"EncodingTypeInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
+
+  let description = [{
+    Interface used to access/update tensor types with encodings.
+  }];
+
+
+  let methods = [
+    InterfaceMethod<
+      [{
+        Returns the tensor type with the updated encoding.
+      }],
+      /*retTy=*/"::mlir::Type",
+      /*methodName=*/"updateEncoding",
+      /*args=*/(ins
+        "::mlir::iree_compiler::IREE::Encoding::EncodingAttr":$encoding),
+      /*defaultImplementation=*/[{
+        return {};
+      }]
+    >,
+  ];
+}
+
 
 #endif // IREE_DIALECT_ENCODING_INTERFACES

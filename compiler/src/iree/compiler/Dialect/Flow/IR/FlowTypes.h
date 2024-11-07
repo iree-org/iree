@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_FLOW_IR_FLOWTYPES_H_
 #define IREE_COMPILER_DIALECT_FLOW_IR_FLOWTYPES_H_
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/DenseMapInfo.h"
@@ -45,9 +46,12 @@ enum class TensorAccess : uint32_t {
 
 // Blatantly ripped from ShapedType, because the closed type system means that
 // we can't extend it and reuse all of this.
+// TODO(hanchung): I'm not sure if I attach TypeInterface correct or not. It
+// adds traits; it declares and implements the method itself.
 class DispatchTensorType
     : public Type::TypeBase<DispatchTensorType, Type,
-                            detail::DispatchTensorTypeStorage> {
+                            detail::DispatchTensorTypeStorage,
+                            IREE::Encoding::EncodingTypeInterface::Trait> {
 public:
   using ImplType = detail::DispatchTensorTypeStorage;
 
@@ -132,6 +136,8 @@ public:
     }
     return llvm::cast<RankedTensorType>(boundType);
   }
+
+  Type updateEncoding(IREE::Encoding::EncodingAttr encoding) const;
 };
 
 void printType(DispatchTensorType &type, DialectAsmPrinter &p);

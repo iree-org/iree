@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.h"
@@ -16,6 +17,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/IR/Attributes.h"
@@ -27,7 +29,10 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
+#include "mlir/IR/Value.h"
 #include "mlir/IR/Visitors.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -82,6 +87,71 @@ getOperandsResourceAffinities(AffinityAnalysis &affinityAnalysis,
     }
   }
   return operandAttrs;
+}
+
+static void updateExecutableOpEncodings(
+    ModuleOp moduleOp, Stream::ExecutableOp executableOp,
+    ArrayRef<Attribute> operandAttrs, AffinityAttr resultAffinity,
+    SymbolTable symbolTable,
+    std::function<LogicalResult(AffinityAttr, Operation *,
+                                SetVector<Attribute> &)>
+        resolver) {
+  LLVM_DEBUG(llvm::dbgs() << "Update ExecutableOp: "
+                          << executableOp.getSymName() << "\n");
+  LLVM_DEBUG({
+    llvm::dbgs() << "  operand affinities: [";
+    llvm::interleaveComma(operandAttrs, llvm::dbgs());
+    llvm::dbgs() << "]\n";
+  });
+
+  MLIRContext *ctx = executableOp.getContext();
+  for (auto exportOp :
+       executableOp.getOps<IREE::Stream::ExecutableExportOp>()) {
+    exportOp.getSymName();
+    auto funcOp = cast<mlir::FunctionOpInterface>(symbolTable.lookupSymbolIn(
+        executableOp.getInnerModule(), exportOp.getSymName()));
+    Region &region = funcOp.getFunctionBody();
+    auto argsAffinities = llvm::map_to_vector(
+        operandAttrs, [](Attribute attr) { return cast<ArrayAttr>(attr); });
+    auto resAffinityAttr =
+        ArrayAttr::get(ctx, {cast<Attribute>(resultAffinity)});
+    argsAffinities.resize(region.getNumArguments(), resAffinityAttr);
+    int idx = 0;
+    for (auto arg : region.getArguments()) {
+      if (!isa<IREE::Stream::BindingType>(arg.getType())) {
+        continue;
+      }
+      ArrayRef<Attribute> affinities = argsAffinities[idx++].getValue();
+      assert(affinities.size() == 1);
+      SetVector<Attribute> resolvedTargets;
+      if (failed(resolver(cast<Stream::AffinityAttr>(affinities[0]), moduleOp,
+                          resolvedTargets))) {
+        LLVM_DEBUG(llvm::dbgs() << "failed on getting target resolvers\n");
+        continue;
+      }
+
+      for (auto user : arg.getUsers()) {
+        // TODO(hanchung): Is it the only case?
+        auto subspanOp = cast<IREE::Stream::BindingSubspanOp>(user);
+        auto resType =
+            dyn_cast<IREE::Flow::DispatchTensorType>(subspanOp.getType());
+        if (!resType) {
+          continue;
+        }
+        auto tensorType = dyn_cast<RankedTensorType>(resType.getBoundType());
+        if (!tensorType || !tensorType.getEncoding()) {
+          continue;
+        }
+        auto encoding =
+            dyn_cast<Encoding::EncodingAttr>(tensorType.getEncoding());
+
+        SmallVector<Attribute> targets(resolvedTargets.begin(),
+                                       resolvedTargets.end());
+        subspanOp.getResult().setType(
+            resType.updateEncoding(encoding.cloneWithTargets(targets)));
+      }
+    }
+  }
 }
 
 } // namespace
@@ -208,6 +278,7 @@ struct MakeEncodingSolvablePass
         }
       });
 
+      // Duplicate executables for each unqiue resource affinities.
       IRRewriter rewriter(ctx);
       DenseMap<std::tuple<AffinityAttr, ArrayAttr, Stream::ExecutableExportOp>,
                Stream::ExecutableOp>
@@ -237,6 +308,7 @@ struct MakeEncodingSolvablePass
         }
       }
 
+      // Update dispatch sites.
       for (auto dispatchOp : candidates) {
         SmallVector<IREE::Stream::AffinityAttr> affinities;
         assert(affinityAnalysis.tryLookupExecutionAffinity(dispatchOp,
@@ -253,7 +325,8 @@ struct MakeEncodingSolvablePass
             affinities[0], ArrayAttr::get(ctx, operandAttrs), exportOp);
 
         if (!dispatchSiteToExecutable.count(info)) {
-          LLVM_DEBUG(llvm::dbgs() << "not found, skip\n");
+          LLVM_DEBUG(llvm::dbgs() << "not found, skip\n  "
+                                  << dispatchOp.getEntryPoints() << "\n");
           continue;
         }
 
@@ -269,6 +342,22 @@ struct MakeEncodingSolvablePass
         });
       }
 
+      // Attach encoding targets to all the executables.
+      for (auto dispatchOp : candidates) {
+        SmallVector<IREE::Stream::AffinityAttr> affinities;
+        assert(affinityAnalysis.tryLookupExecutionAffinity(dispatchOp,
+                                                           affinities));
+        SymbolRefAttr entryPoint =
+            *dispatchOp.getEntryPoints().getAsRange<SymbolRefAttr>().begin();
+        auto exportOp = cast<IREE::Stream::ExecutableExportOp>(
+            symbolTable.lookupSymbolIn(moduleOp, entryPoint));
+        auto executableOp =
+            exportOp->getParentOfType<IREE::Stream::ExecutableOp>();
+        SmallVector<Attribute> operandAttrs =
+            operandsResourceAffinities[dispatchOp];
+        updateExecutableOpEncodings(moduleOp, executableOp, operandAttrs,
+                                    affinities[0], symbolTable, resolver);
+        }
     }
   }
 };

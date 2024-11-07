@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -114,6 +115,12 @@ bool DispatchTensorType::hasStaticShape() const {
 
 bool DispatchTensorType::hasStaticShape(ArrayRef<int64_t> shape) const {
   return hasStaticShape() && getShape() == shape;
+}
+
+Type DispatchTensorType::updateEncoding(
+    IREE::Encoding::EncodingAttr encoding) const {
+  return DispatchTensorType::get(getAccess(), getShape(), getBoundElementType(),
+                                 encoding);
 }
 
 LogicalResult
