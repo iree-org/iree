@@ -49,11 +49,11 @@ util.func @missing_udiv_skipped(%arg0 : index) -> index {
 // -----
 
 util.func @muli_divisibility(%arg0 : index) -> (index, index) {
-  %cst16 = arith.constant 16 : index
-  %cst32 = arith.constant 32 : index
-  %0 = arith.muli %arg0, %cst16 : index
-  %1 = arith.remui %0, %cst16 : index
-  %2 = arith.remui %0, %cst32 : index
+  %c16 = arith.constant 16 : index
+  %c32 = arith.constant 32 : index
+  %0 = arith.muli %arg0, %c16 : index
+  %1 = arith.remui %0, %c16 : index
+  %2 = arith.remui %0, %c32 : index
   util.return %1, %2 : index, index
 }
 // CHECK-LABEL: @muli_divisibility
@@ -66,13 +66,13 @@ util.func @muli_divisibility(%arg0 : index) -> (index, index) {
 // -----
 
 util.func @muli_compounded_divisibility(%arg0 : index) -> (index, index) {
-  %cst16 = arith.constant 16 : index
-  %cst64 = arith.constant 64 : index
-  %cst128 = arith.constant 128 : index
+  %c16 = arith.constant 16 : index
+  %c64 = arith.constant 64 : index
+  %c128 = arith.constant 128 : index
   %0 = util.assume.int %arg0<udiv = 4> : index
-  %1 = arith.muli %0, %cst16 : index
-  %2 = arith.remui %1, %cst64 : index
-  %3 = arith.remui %1, %cst128 : index
+  %1 = arith.muli %0, %c16 : index
+  %2 = arith.remui %1, %c64 : index
+  %3 = arith.remui %1, %c128 : index
   util.return %2, %3 : index, index
 }
 // CHECK-LABEL: @muli_compounded_divisibility
@@ -80,4 +80,23 @@ util.func @muli_compounded_divisibility(%arg0 : index) -> (index, index) {
 //   CHECK-DAG:   %[[C128:.+]] = arith.constant 128 : index
 //       CHECK:   %[[V:.+]] = arith.muli
 //       CHECK:   %[[REM:.+]] = arith.remui %[[V]], %[[C128]]
+//       CHECK:   return %[[C0]], %[[REM]]
+
+// -----
+
+util.func @divui_divisibility(%arg0 : index) -> (index, index) {
+  %c4 = arith.constant 4 : index
+  %c16 = arith.constant 16 : index
+  %c32 = arith.constant 32 : index
+  %0 = util.assume.int %arg0<udiv = 64> : index
+  %1 = arith.divui %0, %c4 : index
+  %2 = arith.remui %1, %c16 : index
+  %3 = arith.remui %1, %c32 : index
+  util.return %2, %3 : index, index
+}
+// CHECK-LABEL: @divui_divisibility
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C32:.+]] = arith.constant 32 : index
+//       CHECK:   %[[V:.+]] = arith.divui
+//       CHECK:   %[[REM:.+]] = arith.remui %[[V]], %[[C32]]
 //       CHECK:   return %[[C0]], %[[REM]]

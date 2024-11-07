@@ -81,6 +81,29 @@ struct ArithMulIInferIntDivisibilityOpInterface
   }
 };
 
+struct ArithDivUIInferIntDivisibilityOpInterface
+    : public IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+          ArithDivUIInferIntDivisibilityOpInterface, arith::DivUIOp> {
+
+  void inferResultDivisibility(
+      Operation *op, ArrayRef<IREE::Util::IntegerDivisibility> argDivs,
+      IREE::Util::SetIntDivisibilityFn setResultDivs) const {
+    auto divOp = cast<arith::DivUIOp>(op);
+
+    APInt intVal;
+    if (!matchPattern(divOp.getRhs(), m_ConstantInt(&intVal))) {
+      return;
+    }
+
+    auto lhsDivisibility = getDivisibilityOfOperand(divOp.getLhs(), argDivs[0]);
+
+    uint64_t divUDiv = lhsDivisibility.udiv() / intVal.getZExtValue();
+    uint64_t divSDiv = lhsDivisibility.sdiv() / std::abs(intVal.getSExtValue());
+
+    setResultDivs(divOp, IREE::Util::ConstantIntDivisibility(divUDiv, divSDiv));
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // GlobalOpInterface
 //===----------------------------------------------------------------------===//
@@ -365,6 +388,8 @@ void registerUtilExternalModels(DialectRegistry &registry) {
     arith::ConstantOp::attachInterface<
         ArithConstantInferIntDivisibilityOpInterface>(*context);
     arith::MulIOp::attachInterface<ArithMulIInferIntDivisibilityOpInterface>(
+        *context);
+    arith::DivUIOp::attachInterface<ArithDivUIInferIntDivisibilityOpInterface>(
         *context);
   });
 

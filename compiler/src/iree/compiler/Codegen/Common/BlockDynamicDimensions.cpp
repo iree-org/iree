@@ -262,8 +262,7 @@ blockDynamicDimensions(RewriterBase &rewriter,
                                       attentionOp);
       })
       .Case<linalg::LinalgOp>([&](auto linalgOp) {
-        return blockDynamicDimensionsOfAllTensorOperands(
-            rewriter, dynamicDimAnalysis, linalgOp);
+        return blockDynamicDimensions(rewriter, dynamicDimAnalysis, linalgOp);
       })
       .Default([&](Operation *op) {
         if (!test) {
@@ -302,7 +301,11 @@ void BlockDynamicDimensionsPass::runOnOperation() {
     // Add patterns to "push down" the `tensor.collapse_shape` patterns (which
     // are the dual of the patterns to "bubble up" `tensor.expand_shape`
     // patterns)
-    linalg::ControlFusionFn controlFn = [](OpOperand *) { return true; };
+    linalg::ControlFusionFn controlFn = [](OpOperand *opOperand) {
+      // Avoid fusion with fills/empty using the propagation patterns.
+      return !isa_and_nonnull<linalg::FillOp, tensor::EmptyOp>(
+          opOperand->get().getDefiningOp());
+    };
     linalg::populateFoldReshapeOpsByExpansionPatterns(bubbleExpandShapePatterns,
                                                       controlFn);
     IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(
@@ -312,6 +315,8 @@ void BlockDynamicDimensionsPass::runOnOperation() {
     // bindings or `tensor.empty` operations.
     populateReshapeToInterfaceTensorPatterns(bubbleExpandShapePatterns);
     tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
+    linalg::FillOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
+                                                context);
     // Add some additional patterns that can simplify the IR and remove dead
     // operations.
     memref::populateResolveRankedShapedTypeResultDimsPatterns(
@@ -340,6 +345,8 @@ void BlockDynamicDimensionsPass::runOnOperation() {
     tensor::CollapseShapeOp::getCanonicalizationPatterns(
         removeBarrierOpsPatterns, context);
     tensor::populateFoldTensorEmptyPatterns(removeBarrierOpsPatterns);
+    linalg::FillOp::getCanonicalizationPatterns(removeBarrierOpsPatterns,
+                                                context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(
         removeBarrierOpsPatterns);
     if (failed(applyPatternsAndFoldGreedily(
