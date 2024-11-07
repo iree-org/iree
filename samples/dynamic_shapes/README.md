@@ -98,7 +98,7 @@ them.
     [installing from pip](https://iree.dev/reference/bindings/python/#installing-iree-packages).
 
     ```
-    python -m pip install iree-compiler
+    python -m pip install iree-base-compiler
     ```
 
 3. Compile the `dynamic_shapes.mlir` file using `iree-compile`. The

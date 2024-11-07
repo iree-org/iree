@@ -44,7 +44,7 @@ At runtime, CPU executables can be loaded using one of IREE's CPU HAL drivers:
 Python packages are regularly published to
 [PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
 [Python Bindings](../../reference/bindings/python.md) page for more details.
-The core `iree-compiler` package includes the LLVM-based CPU compiler:
+The core `iree-base-compiler` package includes the LLVM-based CPU compiler:
 
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-compiler-from-release.md"
 
@@ -82,7 +82,7 @@ drivers:
 Python packages are regularly published to
 [PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
 [Python Bindings](../../reference/bindings/python.md) page for more details.
-The core `iree-runtime` package includes the local CPU HAL drivers:
+The core `iree-base-runtime` package includes the local CPU HAL drivers:
 
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-runtime-from-release.md"
 
