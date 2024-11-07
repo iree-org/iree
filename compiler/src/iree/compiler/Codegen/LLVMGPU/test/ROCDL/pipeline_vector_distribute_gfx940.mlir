@@ -208,7 +208,7 @@ hal.executable @matmul_multiple_k {
 
 // CHECK-LABEL: func.func @matmul_multiple_k
 // CHECK:          scf.for %[[IV:.+]] = %c0 to %c2048 step %c1
-// CHECK:            affine.delinearize_index %[[IV]] into (%c128, %c16)
+// CHECK:            affine.delinearize_index %[[IV]] into (128, 16)
 // CHECK-COUNT-32:   amdgpu.mfma
 // CHECK:            scf.yield
 // CHECK-COUNT-4:  vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf16>, memref<2x10x64x64xf16, #hal.descriptor_type<storage_buffer>>
