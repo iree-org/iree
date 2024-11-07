@@ -48,25 +48,36 @@ util.func @missing_udiv_skipped(%arg0 : index) -> index {
 
 // -----
 
-util.func @muli_divisibility(%arg0 : index) -> index {
-  %cst = arith.constant 16 : index
-  %0 = arith.muli %arg0, %cst : index
-  %1 = arith.divui %0, %cst : index
-  util.return %1 : index
+util.func @muli_divisibility(%arg0 : index) -> (index, index) {
+  %cst16 = arith.constant 16 : index
+  %cst32 = arith.constant 32 : index
+  %0 = arith.muli %arg0, %cst16 : index
+  %1 = arith.remui %0, %cst16 : index
+  %2 = arith.remui %0, %cst32 : index
+  util.return %1, %2 : index, index
 }
 // CHECK-LABEL: @muli_divisibility
-//       CHECK:   %[[C1:.+]] = arith.constant 1 : index
-//       CHECK:   return %[[C1]]
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C32:.+]] = arith.constant 32 : index
+//       CHECK:   %[[V:.+]] = arith.muli
+//       CHECK:   %[[REM:.+]] = arith.remui %[[V]], %[[C32]]
+//       CHECK:   return %[[C0]], %[[REM]]
 
 // -----
 
-util.func @muli_compounded_divisibility(%arg0 : index) -> index {
-  %cst = arith.constant 16 : index
+util.func @muli_compounded_divisibility(%arg0 : index) -> (index, index) {
+  %cst16 = arith.constant 16 : index
+  %cst64 = arith.constant 64 : index
+  %cst128 = arith.constant 128 : index
   %0 = util.assume.int %arg0<udiv = 4> : index
-  %1 = arith.muli %0, %cst : index
-  %2 = arith.divui %1, %cst : index
-  util.return %2 : index
+  %1 = arith.muli %0, %cst16 : index
+  %2 = arith.remui %1, %cst64 : index
+  %3 = arith.remui %1, %cst128 : index
+  util.return %2, %3 : index, index
 }
 // CHECK-LABEL: @muli_compounded_divisibility
-//       CHECK:   %[[C4:.+]] = arith.constant 4 : index
-//       CHECK:   return %[[C4]]
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C128:.+]] = arith.constant 128 : index
+//       CHECK:   %[[V:.+]] = arith.muli
+//       CHECK:   %[[REM:.+]] = arith.remui %[[V]], %[[C128]]
+//       CHECK:   return %[[C0]], %[[REM]]
