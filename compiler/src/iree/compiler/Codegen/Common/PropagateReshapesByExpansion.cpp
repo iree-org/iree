@@ -35,8 +35,8 @@ getExpandedShape(SmallVector<ReassociationIndices> reIndices,
   for (auto [reassociations, destSize] :
        llvm::zip_equal(reIndices, destType.getShape())) {
     int64_t totalInnerSize = 1;
-    for (size_t i = 1, e = reassociations.size(); i < e; ++i) {
-      int64_t expandedInnerSize = sliceStaticSizes[reassociations[i]];
+    for (int64_t reasociation : llvm::drop_begin(reassociations)) {
+      int64_t expandedInnerSize = sliceStaticSizes[reasociation];
       if (ShapedType::isDynamic(expandedInnerSize)) {
         return failure();
       }
@@ -60,7 +60,7 @@ getExpandedShape(SmallVector<ReassociationIndices> reIndices,
 /// which are extract_slice -> expand_shape with the same exact reassociation
 /// map as the collapse op to be hoisted out or a parallel_insert_slice.
 static LogicalResult
-verifyandCollectExpandableUsers(Value insertDest,
+verifyAndCollectExpandableUsers(Value insertDest,
                                 SmallVector<ReassociationIndices> reIndices,
                                 SmallVector<Operation *> &expandableUsers) {
   for (Operation *user : insertDest.getUsers()) {
@@ -132,19 +132,19 @@ static void expandVerifiedUsers(PatternRewriter &rewriter, Location loc,
     }
     ArrayRef<int64_t> expandedShape = resultType.getShape();
     SmallVector<OpFoldResult> expandedSizes;
-    for (auto size : expandedShape) {
+    for (int64_t size : expandedShape) {
       expandedSizes.push_back(getAsIndexOpFoldResult(ctx, size));
     }
     SmallVector<OpFoldResult> expandedStrides(resultType.getRank(),
                                               rewriter.getIndexAttr(1));
     return std::make_tuple(expandedOffsets, expandedSizes, expandedStrides);
   };
-  for (auto user : expandableUsers) {
+  for (Operation *user : expandableUsers) {
     rewriter.setInsertionPointToStart(forallOp.getBody());
     if (auto extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(user)) {
       auto expandShapeOp =
           dyn_cast<tensor::ExpandShapeOp>(*extractSliceOp->getUsers().begin());
-      auto resultType = expandShapeOp.getResultType();
+      RankedTensorType resultType = expandShapeOp.getResultType();
       auto [expandedOffsets, expandedSizes, expandedStrides] =
           computeExpandedAccess(extractSliceOp.getMixedOffsets(), resultType);
       rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
@@ -158,7 +158,7 @@ static void expandVerifiedUsers(PatternRewriter &rewriter, Location loc,
                    dyn_cast<tensor::ParallelInsertSliceOp>(user)) {
       auto collapseShapeOp =
           parallelInsertOp.getSource().getDefiningOp<tensor::CollapseShapeOp>();
-      auto resultType = collapseShapeOp.getSrcType();
+      RankedTensorType resultType = collapseShapeOp.getSrcType();
       auto [expandedOffsets, expandedSizes, expandedStrides] =
           computeExpandedAccess(parallelInsertOp.getMixedOffsets(), resultType);
 
@@ -236,7 +236,7 @@ struct ExpandDestinationForallOp final
     // Verify that the users of destination are valid to expand and collect all
     // such users.
     SmallVector<Operation *> expandableUsers;
-    if (failed(verifyandCollectExpandableUsers(
+    if (failed(verifyAndCollectExpandableUsers(
             insertDest, collapseOp.getReassociationIndices(),
             expandableUsers))) {
       return failure();
@@ -248,7 +248,7 @@ struct ExpandDestinationForallOp final
                         reIndices, forallOp);
     rewriter.setInsertionPoint(forallOp);
 
-    auto outOp = forallOutputs[0].getDefiningOp();
+    Operation *outOp = forallOutputs[0].getDefiningOp();
     if (!outOp) {
       return failure();
     }
