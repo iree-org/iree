@@ -955,9 +955,6 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
     Value threadId, ArrayRef<int64_t> permutation,
     SmallVector<OpFoldResult> &offsets, SmallVector<OpFoldResult> &sizes,
     SmallVector<OpFoldResult> &strides) const {
-  // TODO(bjacob): Support WMMA intrinsics.
-
-  // Get the swizzle describing the internal layout of this fragment.
   TileSwizzle swizzle = getSwizzle(*this, fragment);
 
   LLVM_DEBUG({
@@ -966,35 +963,78 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
     DBGS() << "    swizzle: " << swizzle << "\n";
   });
 
-  // Populate tile sizes.
   MLIRContext *ctx = builder.getContext();
   SmallVector<OpFoldResult> tileSizes = getAsIndexOpFoldResult(
       ctx, sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
         return d.kind != TileSwizzle::Dim::Kind::CrossThread;
       }));
 
-  // Populate tile offsets by delinearizing threadId over the CrossThread dims.
-  // Since the AffineDelinearizeIndexOp does not bound the input index, we
-  // must bound the threadId by the product of the offset ranges.
-  SmallVector<int64_t> tileOffsetsBasis =
+  // Most of the rest of this function is the computation of the offsets.
+  // The basic idea is to delinearize the threadId over the basis of
+  // cross-thread dimensions. These cross-thread dimensions may be either
+  // the intrinsic's own, or they may come from expansion to multiple subgroups.
+  // Normally, that distinction is irrelevant here: we just delinearize the
+  // thread-id over all cross-thread dimensions.
+  //
+  // There is one case that makes things more complicated, encountered so far
+  // only on RDNA3. That is when some intrinsic has multiple (so far, 2) threads
+  // reading the same data. This redundancy is not encoded in the TileSwizzle
+  // structures that we are using here. Instead, in that case, the thread grid
+  // (as encoded in the TileSwizzle) is smaller than the subgroup size. In that
+  // case, there is an implied thread-distribution-only dimension along which
+  // multiple threads read exactly the same data.
+  // So we need to distinguish layoutThreadSizes vs. distributionThreadSizes.
+  SmallVector<int64_t> layoutThreadSizes =
       sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
         return d.kind == TileSwizzle::Dim::Kind::CrossThread;
       });
+  // In layoutThreadSizes, intrinsic level dimensions are mixed with expansion
+  // to multiple subgroups, so in order to tell if there are additional
+  // distribution-only thread dimensions, we need to get back to the intrinsic.
+  TileSwizzle intrinsicSwizzle =
+      getIntrinsicSwizzle(getIntrinsic().getValue(), fragment);
+  SmallVector<int64_t> intrinsicLayoutThreadSizes =
+      sliceSwizzledShape(intrinsicSwizzle, [](TileSwizzle::Dim d) {
+        return d.kind == TileSwizzle::Dim::Kind::CrossThread;
+      });
+  int64_t intrinsicLayoutThreadBound =
+      ShapedType::getNumElements(intrinsicLayoutThreadSizes);
+  SmallVector<int64_t> distributionThreadSizes = layoutThreadSizes;
+  int distributionOnlyDimIdx =
+      distributionThreadSizes.size() - intrinsicLayoutThreadSizes.size();
+  // Now we are able to tell if there is an extra distribution-only dimension.
+  bool hasDistributionOnlyDim = intrinsicLayoutThreadBound < getSubgroupSize();
+  if (hasDistributionOnlyDim) {
+    // Insert the extra distribution-only dimension. This will need to be paired
+    // below with erasing the corresponding dim out of the delinearized indices.
+    distributionThreadSizes.insert(
+        distributionThreadSizes.begin() + distributionOnlyDimIdx,
+        getSubgroupSize() / intrinsicLayoutThreadBound);
+  }
 
-  // Bound for threadId is the product of tileOffsetsBasis.
+  // AffineDelinearizeIndexOp requires an in-bounds input index, so we bound it.
   OpFoldResult threadIdBound =
-      builder.getIndexAttr(ShapedType::getNumElements(tileOffsetsBasis));
+      builder.getIndexAttr(ShapedType::getNumElements(distributionThreadSizes));
   AffineExpr d0 = builder.getAffineDimExpr(0), d1 = builder.getAffineDimExpr(1);
   OpFoldResult boundedThreadId = affine::makeComposedFoldedAffineApply(
       builder, loc, {d0 % d1}, {threadId, threadIdBound});
 
+  // Obtain the offsets from delinearization along the distributionThreadSizes.
   SmallVector<OpFoldResult> tileOffsets =
       builder
           .create<affine::AffineDelinearizeIndexOp>(
               loc,
               getValueOrCreateConstantIndexOp(builder, loc, boundedThreadId),
-              getAsIndexOpFoldResult(ctx, tileOffsetsBasis))
+              getAsIndexOpFoldResult(ctx, distributionThreadSizes))
           ->getResults();
+
+  if (hasDistributionOnlyDim) {
+    // Erase the delinearized index that corresponds to the extra distribution
+    // dimension that we had inserted above. This is what causes multiple
+    // threads (which only differed in the index being discarded here) to read
+    // exactly the same data.
+    tileOffsets.erase(tileOffsets.begin() + distributionOnlyDimIdx);
+  }
 
   // Strides are trivial: each slice is contiguous along the *expanded* dims
   // even if it may not be contiguous in the flattened layout.
@@ -1071,8 +1111,6 @@ FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
                                                      Type resultType, Value lhs,
                                                      Value rhs,
                                                      Value acc) const {
-  // TODO(bjacob): Support WMMA intrinsics.
-
   // Validation. Similar to MMAAttr::buildMmaOperation.
   auto [aType, bType, cType] = getABCVectorTypes();
   if (aType != lhs.getType() || bType != rhs.getType() ||
@@ -1137,15 +1175,27 @@ FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
       sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
         return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
+  SmallVector<int64_t> accInternalShape =
+      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind == TileSwizzle::Dim::Kind::Internal;
+      });
+
   LLVM_DEBUG({
     DBGS() << "accCrossIntrinsicShape: ";
     llvm::interleaveComma(accCrossIntrinsicShape, llvm::dbgs());
     llvm::dbgs() << "\n";
+    DBGS() << "accInternalShape: ";
+    llvm::interleaveComma(accInternalShape, llvm::dbgs());
+    llvm::dbgs() << "\n";
   });
-  SmallVector<int64_t> strides(intrinsicCType.getRank(), 1);
-  SmallVector<int64_t> indices(accCrossIntrinsicShape.size(), 0);
+  int dstRank = accCrossIntrinsicShape.size();
+  SmallVector<int64_t> strides(dstRank, 1);
+  SmallVector<int64_t> indices(dstRank, 0);
   for (Value intrAcc : intrinsicsAcc) {
-    acc = builder.create<vector::InsertStridedSliceOp>(loc, intrAcc, acc,
+    auto expandedAcc = builder.create<vector::ShapeCastOp>(
+        loc, VectorType::get(accInternalShape, cType.getElementType()),
+        intrAcc);
+    acc = builder.create<vector::InsertStridedSliceOp>(loc, expandedAcc, acc,
                                                        indices, strides);
     incrementIndices(indices, accCrossIntrinsicShape);
   }
