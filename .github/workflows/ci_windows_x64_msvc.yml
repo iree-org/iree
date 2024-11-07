@@ -65,6 +65,7 @@ jobs:
           refreshenv
       - name: "Building IREE"
         run: |
+          bash source build_tools/cmake/setup_sccache.sh
           echo "Building in ${{ env.BUILD_DIR_BASH }}"
           bash ./build_tools/cmake/build_all.sh ${{ env.BUILD_DIR_BASH }}
           sccache --show-stats
