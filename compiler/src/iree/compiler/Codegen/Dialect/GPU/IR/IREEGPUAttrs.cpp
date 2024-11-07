@@ -337,6 +337,40 @@ static ConcreteMmaLayout getConcreteMFMALayout(MLIRContext *context,
 }
 
 //===----------------------------------------------------------------------===//
+// MmaInterface Attribute Helper Functions
+//===----------------------------------------------------------------------===//
+
+MMASingleSubgroupLayout getASingleSubgroupLayout(MmaInterfaceAttr mmaKind) {
+  if (auto mmaAttr = llvm::dyn_cast<MMAAttr>(mmaKind)) {
+    return mmaAttr.getASingleSubgroupLayout();
+  } else if (auto vmmaAttr = llvm::dyn_cast<VirtualMMAAttr>(mmaKind)) {
+    return vmmaAttr.getASingleSubgroupLayout();
+  }
+  assert(false && "unhandled MMA Interface type.");
+  return {};
+}
+
+MMASingleSubgroupLayout getBSingleSubgroupLayout(MmaInterfaceAttr mmaKind) {
+  if (auto mmaAttr = llvm::dyn_cast<MMAAttr>(mmaKind)) {
+    return mmaAttr.getBSingleSubgroupLayout();
+  } else if (auto vmmaAttr = llvm::dyn_cast<VirtualMMAAttr>(mmaKind)) {
+    return vmmaAttr.getBSingleSubgroupLayout();
+  }
+  assert(false && "unhandled MMA Interface type.");
+  return {};
+}
+
+MMASingleSubgroupLayout getCSingleSubgroupLayout(MmaInterfaceAttr mmaKind) {
+  if (auto mmaAttr = llvm::dyn_cast<MMAAttr>(mmaKind)) {
+    return mmaAttr.getCSingleSubgroupLayout();
+  } else if (auto vmmaAttr = llvm::dyn_cast<VirtualMMAAttr>(mmaKind)) {
+    return vmmaAttr.getCSingleSubgroupLayout();
+  }
+  assert(false && "unhandled MMA Interface type.");
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
 // MFMA Attributes
 //===----------------------------------------------------------------------===//
 
@@ -1657,7 +1691,7 @@ MMAScheduleAttr::getContractionLayout(VectorContractOpInfo &opInfo,
                                     /*subgroupCount=*/cSubgroupSizes,
                                     /*subgroupStrides=*/cSubgroupStrides,
                                     /*batchCount=*/cBatchSizes,
-                                    mmaAttr.getCSingleSubgroupLayout());
+                                    getCSingleSubgroupLayout(mmaAttr));
   LLVM_DEBUG({ llvm::errs() << "C layout: " << cLayout << "\n"; });
 
   // A matrix layout
@@ -1685,7 +1719,7 @@ MMAScheduleAttr::getContractionLayout(VectorContractOpInfo &opInfo,
                                     /*subgroupCount=*/aSubgroupSizes,
                                     /*subgroupStrides=*/aSubgroupStrides,
                                     /*batchCount=*/aBatchSizes,
-                                    mmaAttr.getASingleSubgroupLayout());
+                                    getASingleSubgroupLayout(mmaAttr));
   LLVM_DEBUG({ llvm::errs() << "A layout: " << aLayout << "\n"; });
 
   int64_t bRank = opInfo.getBRank();
@@ -1709,7 +1743,7 @@ MMAScheduleAttr::getContractionLayout(VectorContractOpInfo &opInfo,
                                     /*subgroupCount=*/bSubgroupSizes,
                                     /*subgroupStrides=*/bSubgroupStrides,
                                     /*batchCount=*/bBatchSizes,
-                                    mmaAttr.getBSingleSubgroupLayout());
+                                    getBSingleSubgroupLayout(mmaAttr));
   LLVM_DEBUG({ llvm::errs() << "B layout: " << bLayout << "\n"; });
 
   std::tuple<VectorLayoutInterface, VectorLayoutInterface,

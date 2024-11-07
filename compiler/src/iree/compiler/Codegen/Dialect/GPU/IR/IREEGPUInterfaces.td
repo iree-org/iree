@@ -62,48 +62,6 @@ def IREEGPU_MmaInterfaceAttr : AttrInterface<"MmaInterfaceAttr"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Returns the A matrix's partial nested layout shape inside a single
-        subgroup. Shape at each outer/thread/element level is a 2-D value,
-        following canonical matmul order--(M, K) for A.
-      }],
-      /*retTy=*/"::mlir::iree_compiler::IREE::GPU::MMASingleSubgroupLayout",
-      /*methodName=*/"getASingleSubgroupLayout",
-      /*args=*/(ins),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        return {};
-      }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Returns the B matrix's partial nested layout shape inside a single
-        subgroup. Shape at each outer/thread/element level is a 2-D value,
-        following canonical matmul order--(K, N) for B.
-      }],
-      /*retTy=*/"::mlir::iree_compiler::IREE::GPU::MMASingleSubgroupLayout",
-      /*methodName=*/"getBSingleSubgroupLayout",
-      /*args=*/(ins),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        return {};
-      }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Returns the C matrix's partial nested layout shape inside a single
-        subgroup. Shape at each outer/thread/element level is a 2-D value,
-        following canonical matmul order--(M, N) for C.
-      }],
-      /*retTy=*/"::mlir::iree_compiler::IREE::GPU::MMASingleSubgroupLayout",
-      /*methodName=*/"getCSingleSubgroupLayout",
-      /*args=*/(ins),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        return {};
-      }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
         Returns the vector layout for the A/B/C matrix of the MMA operation:
         ```
           C += A * B

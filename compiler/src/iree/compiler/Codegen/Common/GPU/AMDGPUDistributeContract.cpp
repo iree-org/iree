@@ -57,15 +57,15 @@ static LogicalResult isIntrinsicLayoutCompatible(
   auto [lhsM, rhsN] = opInfo.getOperandMNIndex();
   auto [lhsK, rhsK] = opInfo.getOperandKIndex();
   auto [accM, accN] = opInfo.getResultMNIndex();
-  if (failed(isSubgroupLayoutCompatible(intrinsic.getASingleSubgroupLayout(),
+  if (failed(isSubgroupLayoutCompatible(getASingleSubgroupLayout(intrinsic),
                                         lhsLayout, lhsM, lhsK))) {
     return failure();
   }
-  if (failed(isSubgroupLayoutCompatible(intrinsic.getBSingleSubgroupLayout(),
+  if (failed(isSubgroupLayoutCompatible(getBSingleSubgroupLayout(intrinsic),
                                         rhsLayout, rhsK, rhsN))) {
     return failure();
   }
-  if (failed(isSubgroupLayoutCompatible(intrinsic.getCSingleSubgroupLayout(),
+  if (failed(isSubgroupLayoutCompatible(getCSingleSubgroupLayout(intrinsic),
                                         accLayout, accM, accN))) {
     return failure();
   }
