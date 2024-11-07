@@ -60,3 +60,44 @@ module @broadcast_treated_as_leaf {
     util.return %1 : tensor<5x6xf32>
   }
 }
+
+// -----
+
+// Checks that a constantOp which only has a consumer within a nest gets hoisted
+module @nested_consumer {
+  // CHECK: util.global private @[[HOISTED:.*]] : tensor<2xf32>
+  // CHECK: util.initializer
+  // CHECK: util.func public @main
+  util.func @main(%arg0: tensor<2xindex>) -> tensor<1x2xf32> {
+    %const_t = arith.constant dense<[0.0, 1.0]> : tensor<2xf32>
+    %one = arith.constant 1.0 : f32
+    %empty = tensor.empty() : tensor<2xf32>
+    %add_one = linalg.generic { //constOp
+      indexing_maps = [
+        affine_map<(d0) -> (d0)>,
+        affine_map<(d0) -> (d0)>
+      ],
+      iterator_types = ["parallel"]
+    } ins(%const_t : tensor<2xf32>) outs(%empty: tensor<2xf32>) {
+      ^bb0(%in : f32, %out : f32):
+        %added = arith.addf %in, %one : f32
+        linalg.yield %added : f32
+    } -> tensor<2xf32>
+    // CHECK: %[[CONST:.*]] = util.global.load immutable @[[HOISTED]] : tensor<2xf32>
+    %empty2 = tensor.empty() : tensor<2xf32>
+    %loaded = linalg.generic {
+      indexing_maps = [
+        affine_map<(d0) -> (d0)>,
+        affine_map<(d0) -> (d0)>
+      ],
+      iterator_types = ["parallel"]
+    } ins(%arg0 : tensor<2xindex>) outs(%empty2 : tensor<2xf32>) {
+      ^bb0(%in: index, %out: f32):
+        //CHECK %[[.*]] = tensor.extract %[[CONST]][%in] : tensor<2xf32>
+        %extracted = tensor.extract %add_one[%in] : tensor<2xf32> // consumer
+        linalg.yield %extracted : f32
+    } -> tensor<2xf32>
+    %reshaped = tensor.expand_shape %loaded [[0, 1]] output_shape[1, 2]: tensor<2xf32> into tensor<1x2xf32>
+    util.return %reshaped : tensor<1x2xf32>
+  }
+}
