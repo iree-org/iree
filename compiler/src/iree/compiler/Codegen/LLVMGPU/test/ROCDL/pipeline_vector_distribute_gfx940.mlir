@@ -994,3 +994,82 @@ hal.executable private @attention_mfma_32x32x8 {
 // MEMORY-LABEL: func.func @attention_mfma_32x32x8()
 // MEMORY-COUNT-3: memref.alloc
 // MEMORY-NOT: memref.alloc
+
+// -----
+
+!Q = tensor<1x16x64xf16>
+!K_SK     = tensor<1x4x256x64xf16>
+!V_SK     = tensor<1x4x256x64xf16>
+!O_SK     = tensor<1x4x16x64xf32>
+!ROWRED_SK= tensor<1x4x16xf32>
+
+#config = #iree_gpu.lowering_config<{ workgroup = [1, 1, 16, 0, 0, 0], reduction = [0, 0, 0, 0, 0, 32],promote_operands = [0, 1, 2] }>
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [64] subgroup_size = 64>
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable private @online_attention_split_k2 {
+  hal.executable.variant public @rocm target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @online_attention_split_k2 ordinal(0) layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @online_attention_split_k2() attributes {translation_info = #translation} {
+        %cst = arith.constant 1.0 : f16
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:!Q>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:!K_SK>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:!V_SK>
+        %out_arg = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:!O_SK>
+        %max_arg = hal.interface.binding.subspan layout(#pipeline_layout) binding(4) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:!ROWRED_SK>
+        %sum_arg = hal.interface.binding.subspan layout(#pipeline_layout) binding(5) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:!ROWRED_SK>
+        %4 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [1, 16, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:!Q> -> !Q
+        %5 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [1, 4, 256, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:!K_SK> -> !K_SK
+        %6 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0, 0], sizes = [1, 4, 256, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:!V_SK> -> !V_SK
+        %empty_o = tensor.empty() : !O_SK
+        %empty_rowmax = tensor.empty() : !ROWRED_SK
+        %empty_rowsum = tensor.empty() : !ROWRED_SK
+        %out:3 = iree_linalg_ext.online_attention {indexing_maps = [affine_map<(b1, b2, m, n, k1, k2) -> (b1, m, k1)>,
+                                                                    affine_map<(b1, b2, m, n, k1, k2) -> (b1, b2, k2, k1)>,
+                                                                    affine_map<(b1, b2, m, n, k1, k2) -> (b1, b2, k2, n)>,
+                                                                    affine_map<(b1, b2, m, n, k1, k2) -> ()>,
+                                                                    affine_map<(b1, b2, m, n, k1, k2) -> (b1, b2, m, n)>,
+                                                                    affine_map<(b1, b2, m, n, k1, k2) -> (b1, b2, m)>,
+                                                                    affine_map<(b1, b2, m, n, k1, k2) -> (b1, b2, m)>],
+                                                                  lowering_config = #config,
+                                                                  decomposition_config = {
+                                                                    qk_attrs = {attention_qk_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 1, subgroup_n_count = 1, promote_operands = [0, 1]}>},
+                                                                    pv_attrs = {attention_pv_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 1, subgroup_n_count = 1, promote_operands = [1]}>}
+                                                                  }}
+        ins(%4, %5, %6, %cst : !Q, !K_SK, !V_SK, f16) outs(%empty_o, %empty_rowmax, %empty_rowsum: !O_SK, !ROWRED_SK, !ROWRED_SK) {
+              ^bb0(%score: f32):
+                iree_linalg_ext.yield %score : f32
+             } -> !O_SK, !ROWRED_SK, !ROWRED_SK
+        flow.dispatch.tensor.store %out#0, %out_arg, offsets = [0, 0, 0, 0], sizes = [1, 4, 16, 64], strides = [1, 1, 1, 1] : !O_SK -> !flow.dispatch.tensor<writeonly:!O_SK>
+        flow.dispatch.tensor.store %out#1, %max_arg, offsets = [0, 0, 0], sizes = [1, 4, 16], strides = [1, 1, 1] : !ROWRED_SK -> !flow.dispatch.tensor<writeonly:!ROWRED_SK>
+        flow.dispatch.tensor.store %out#2, %sum_arg, offsets = [0, 0, 0], sizes = [1, 4, 16], strides = [1, 1, 1] : !ROWRED_SK -> !flow.dispatch.tensor<writeonly:!ROWRED_SK>
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: func.func @online_attention_split_k2()
+// CHECK: scf.for %{{.*}} = %c0 to %c256 step %c32
+// CHECK-SAME: -> (vector<1x1x1xf32>, vector<1x1x1xf32>, vector<1x4x1x1x1x4xf32>)
+// CHECK-COUNT-16:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
+// CHECK: scf.yield
+
+// Check that we only use alloc for Q, K, and V. No shared memory for S is
+// needed because the intrinsic layout mathes.
+// MEMORY-LABEL: func.func @online_attention_split_k2()
+// MEMORY-COUNT-3: memref.alloc
+// MEMORY-NOT: memref.alloc

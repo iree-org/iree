@@ -1751,7 +1751,8 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    IREE::LinalgExt::AttentionOp attnOp) {
   FailureOr<IREE::LinalgExt::AttentionOpDetail> maybeOpInfo =
       IREE::LinalgExt::AttentionOpDetail::get(
-          attnOp.getQueryMap(), attnOp.getKeyMap(), attnOp.getValueMap());
+          attnOp.getQueryMap(), attnOp.getKeyMap(), attnOp.getValueMap(),
+          attnOp.getOutputMap());
   assert(succeeded(maybeOpInfo) && "failed to infer attention dims");
   auto opInfo = maybeOpInfo.value();
 

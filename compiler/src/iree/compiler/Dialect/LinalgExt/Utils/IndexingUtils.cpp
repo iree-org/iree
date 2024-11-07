@@ -27,18 +27,25 @@ findPermutationsIndexingOperand(AffineMap indexingMap) {
 }; // namespace
 
 void AttentionOpDetail::inferFromIndexingMaps(AffineMap qMap, AffineMap kMap,
-                                              AffineMap vMap) {
+                                              AffineMap vMap, AffineMap oMap) {
   // Q   = B x M x K1
   // K   = B x K2 x K1
   // V   = B x K2 x N
+  // O   = B x M x N
   llvm::SmallDenseSet<int64_t> qSet = findPermutationsIndexingOperand(qMap);
   llvm::SmallDenseSet<int64_t> kSet = findPermutationsIndexingOperand(kMap);
   llvm::SmallDenseSet<int64_t> vSet = findPermutationsIndexingOperand(vMap);
+  llvm::SmallDenseSet<int64_t> oSet = findPermutationsIndexingOperand(oMap);
 
-  // B = Q & K & V
-  llvm::SmallDenseSet<int64_t> bSet = qSet;
-  llvm::set_intersect(bSet, vSet);
-  llvm::set_intersect(bSet, kSet);
+  // B = (Q & K & O) U (K & V & O)
+  llvm::SmallDenseSet<int64_t> b1Set = qSet;
+  llvm::set_intersect(b1Set, kSet);
+  llvm::set_intersect(b1Set, oSet);
+  llvm::SmallDenseSet<int64_t> b2Set = kSet;
+  llvm::set_intersect(b2Set, vSet);
+  llvm::set_intersect(b2Set, oSet);
+  llvm::SmallDenseSet<int64_t> bSet = b1Set;
+  llvm::set_union(bSet, b2Set);
 
   // K1 = Q & K - B
   llvm::SmallDenseSet<int64_t> k1Set = qSet;
@@ -74,10 +81,12 @@ void AttentionOpDetail::inferFromIndexingMaps(AffineMap qMap, AffineMap kMap,
   llvm::sort(n);
 }
 
-FailureOr<AttentionOpDetail>
-AttentionOpDetail::get(AffineMap qMap, AffineMap kMap, AffineMap vMap) {
+FailureOr<AttentionOpDetail> AttentionOpDetail::get(AffineMap qMap,
+                                                    AffineMap kMap,
+                                                    AffineMap vMap,
+                                                    AffineMap oMap) {
   AttentionOpDetail opInfo;
-  opInfo.inferFromIndexingMaps(qMap, kMap, vMap);
+  opInfo.inferFromIndexingMaps(qMap, kMap, vMap, oMap);
   opInfo.context = qMap.getContext();
   opInfo.domainRank = qMap.getNumDims();
   return opInfo;
