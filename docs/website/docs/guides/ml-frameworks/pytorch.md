@@ -22,8 +22,8 @@ status: new
 
 ## :octicons-book-16: Overview
 
-[iree-turbine](https://pypi.org/project/iree-turbine/) (rebrand pending from
-"shark-turbine") offers a tight integration between compatible versions of IREE,
+[iree-turbine](https://pypi.org/project/iree-turbine/) offers a tight
+integration between compatible versions of IREE,
 [torch-mlir](https://github.com/llvm/torch-mlir), and
 [PyTorch](https://pytorch.org/).
 
@@ -193,7 +193,7 @@ graph LR
 ```python
 import iree.runtime as ireert
 import numpy as np
-import shark_turbine.aot as aot
+import iree.turbine.aot as aot
 import torch
 
 # Define the `nn.Module` to export.
@@ -264,7 +264,7 @@ graph LR
 ```
 
 Advanced export workflows can use the
-[`aot.CompiledModule`](https://github.com/iree-org/iree-turbine/tree/main/shark_turbine/aot/compiled_module.py)
+[`aot.CompiledModule`](https://github.com/iree-org/iree-turbine/blob/main/iree/turbine/aot/compiled_module.py)
 class to define and constrain the structure of a program prior to compiling it.
 
 <!-- TODO(scotttodd): API reference pages for aot.CompiledModule etc.?
@@ -272,7 +272,7 @@ class to define and constrain the structure of a program prior to compiling it.
 -->
 
 ```python
-import shark_turbine.aot as aot
+import iree.turbine.aot as aot
 
 # A minimal program, with no functions or variables.
 class BasicModule(aot.CompiledModule):
@@ -339,7 +339,7 @@ models parameters on disk, so that they can be loaded later during runtime.
 import torch
 from safetensors.torch import save_file
 import numpy as np
-import shark_turbine.aot as aot
+import iree.turbine.aot as aot
 
 class LinearModule(torch.nn.Module):
     def __init__(self, in_features, out_features):
