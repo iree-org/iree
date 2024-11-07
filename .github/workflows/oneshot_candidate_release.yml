@@ -16,10 +16,24 @@ jobs:
       - name: Compute version
         run: |
           git fetch --depth=1 origin +refs/tags/*:refs/tags/*
-          package_version="$(printf '%(%Y%m%d)T.${{ github.run_number }}')"
-          tag_name="candidate-${package_version}"
+
+          # common version + tag
+          package_version="$(python3 build_tools/python_deploy/compute_common_version.py -rc)"
+          tag_name="iree-${package_version}"
           echo "package_version=${package_version}" >> $GITHUB_ENV
           echo "tag_name=${tag_name}" >> $GITHUB_ENV
+
+          # legacy package version (for iree-tools-{tf,tflite})
+          legacy_package_version="$(printf '%(%Y%m%d)T.${{ github.run_number }}')"
+          echo "legacy_package_version=${legacy_package_version}" >> $GITHUB_ENV
+
+          # iree-compiler version
+          compiler_package_version="$(python3 build_tools/python_deploy/compute_local_version.py compiler -rc)"
+          echo "compiler_package_version=${compiler_package_version}" >> $GITHUB_ENV
+
+          # iree-runtime version
+          runtime_package_version="$(python3 build_tools/python_deploy/compute_local_version.py runtime -rc)"
+          echo "runtime_package_version=${runtime_package_version}" >> $GITHUB_ENV
 
       - name: Updating candidate tag
         run: |
@@ -51,4 +65,12 @@ jobs:
           workflow: Build Release Packages
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           ref: "${{ env.tag_name }}"
-          inputs: '{"package_suffix": "", "package_version": "${{ env.package_version }}", "release_id": "${{ steps.create_release.outputs.id }}"}'
+          inputs: |
+            {
+              "package_suffix": "",
+              "legacy_package_version": "${{ env.legacy_package_version }}",
+              "package_version": "${{ env.package_version }}",
+              "compiler_package_version": "${{ env.compiler_package_version }}",
+              "runtime_package_version": "${{ env.runtime_package_version }}",
+              "release_id": "${{ steps.create_release.outputs.id }}"
+            }

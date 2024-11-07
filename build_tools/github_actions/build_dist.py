@@ -19,7 +19,8 @@ This is expected to be run from the project directory, containing the
 following sub-directories:
   - c/ : Main IREE repository checkout.
   - bindist/ : Directory where binary distribution artifacts are written.
-  - c/version_info.json : Version config information.
+  - c/version_info.json : Version config information (legacy).
+  - c/version_local.json : Version config information.
 
 Within the build environment (which may be the naked runner or a docker image):
   - iree-build/ : The build tree.
@@ -80,14 +81,14 @@ CONFIGURE_BAZEL_PY = os.path.join(IREESRC_DIR, "configure_bazel.py")
 
 # Load version info.
 def load_version_info():
-    with open(os.path.join(IREESRC_DIR, "version_info.json"), "rt") as f:
+    with open(os.path.join(IREESRC_DIR, "version_local.json"), "rt") as f:
         return json.load(f)
 
 
 try:
     version_info = load_version_info()
 except FileNotFoundError:
-    print("version_info.json not found. Using defaults")
+    print("version_local.json not found. Using version.json defaults")
     version_info = {
         "package-version": "0.1dev1",
         "package-suffix": "-dev",
