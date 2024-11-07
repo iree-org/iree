@@ -26,13 +26,8 @@ findPermutationsIndexingOperand(AffineMap indexingMap) {
 
 }; // namespace
 
-void AttentionOpDetail::inferFromIndexingMaps(
-    ArrayRef<AffineMap> indexingMaps) {
-  assert(indexingMaps.size() >= 4);
-  AffineMap qMap = indexingMaps[0];
-  AffineMap kMap = indexingMaps[1];
-  AffineMap vMap = indexingMaps[2];
-
+void AttentionOpDetail::inferFromIndexingMaps(AffineMap qMap, AffineMap kMap,
+                                              AffineMap vMap) {
   // Q   = B x M x K1
   // K   = B x K2 x K1
   // V   = B x K2 x N
@@ -80,10 +75,11 @@ void AttentionOpDetail::inferFromIndexingMaps(
 }
 
 FailureOr<AttentionOpDetail>
-AttentionOpDetail::get(ArrayRef<AffineMap> indexingMaps) {
+AttentionOpDetail::get(AffineMap qMap, AffineMap kMap, AffineMap vMap) {
   AttentionOpDetail opInfo;
-  opInfo.inferFromIndexingMaps(indexingMaps);
-  opInfo.maps = SmallVector<AffineMap>(indexingMaps);
+  opInfo.inferFromIndexingMaps(qMap, kMap, vMap);
+  opInfo.context = qMap.getContext();
+  opInfo.domainRank = qMap.getNumDims();
   return opInfo;
 }
 
