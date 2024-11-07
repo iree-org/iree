@@ -63,7 +63,7 @@ module @broadcast_treated_as_leaf {
 
 // -----
 
-// Checks that a constantOp which only has a consumer within a nest gets hoisted
+// Checks that a ConstantOp which only has a consumer within a nest gets hoisted.
 module @nested_consumer {
   // CHECK: util.global private @[[HOISTED:.*]] : tensor<2xf32>
   // CHECK: util.initializer
