@@ -339,6 +339,9 @@ void BlockDynamicDimensionsPass::runOnOperation() {
                                                        context);
     tensor::CollapseShapeOp::getCanonicalizationPatterns(
         removeBarrierOpsPatterns, context);
+    tensor::populateFoldTensorEmptyPatterns(removeBarrierOpsPatterns);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(
+        removeBarrierOpsPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             operation, std::move(removeBarrierOpsPatterns)))) {
       operation->emitOpError("failed in cleanup patterns");
