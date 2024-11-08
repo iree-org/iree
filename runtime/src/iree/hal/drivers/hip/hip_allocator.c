@@ -100,10 +100,6 @@ iree_status_t iree_hal_hip_allocator_create(
   return iree_ok_status();
 }
 
-bool iree_hal_hip_allocator_isa(iree_hal_allocator_t* base_value) {
-  return iree_hal_resource_is(base_value, &iree_hal_hip_allocator_vtable);
-}
-
 static void iree_hal_hip_allocator_destroy(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator) {
   iree_hal_hip_allocator_t* allocator =
@@ -113,6 +109,10 @@ static void iree_hal_hip_allocator_destroy(
   iree_allocator_free(allocator->host_allocator, allocator);
 
   IREE_TRACE_ZONE_END(z0);
+}
+
+bool iree_hal_hip_allocator_isa(iree_hal_allocator_t* base_value) {
+  return iree_hal_resource_is(base_value, &iree_hal_hip_allocator_vtable);
 }
 
 static iree_allocator_t iree_hal_hip_allocator_host_allocator(

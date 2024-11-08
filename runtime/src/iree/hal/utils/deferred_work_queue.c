@@ -19,6 +19,7 @@
 
 // The maximal number of events a command buffer can wait on.
 #define IREE_HAL_MAX_WAIT_EVENT_COUNT 32
+#define IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS 0
 
 //===----------------------------------------------------------------------===//
 // Queue action
@@ -1257,8 +1258,15 @@ iree_status_t iree_hal_deferred_work_queue_issue(
   }
 
   IREE_TRACE_ZONE_BEGIN(z1);
-  IREE_TRACE(uint32_t num_pending = 0; uint32_t num_pending_alloc = 0;
-             uint32_t num_pending_dealloc = 0; uint32_t num_ready = 0;);
+#if IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
+  IREE_TRACE({
+    uint32_t num_pending = 0;
+    uint32_t num_pending_alloc = 0;
+    uint32_t num_pending_dealloc = 0;
+    uint32_t num_ready = 0;
+  });
+#endif  //  IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
+
   iree_status_t status = iree_ok_status();
   // Scan through the list and categorize actions into pending and ready lists.
   while (!iree_hal_deferred_work_queue_action_list_is_empty(
@@ -1350,6 +1358,7 @@ iree_status_t iree_hal_deferred_work_queue_issue(
     }
 
     if (action->is_pending) {
+#if IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
       IREE_TRACE({
         ++num_pending;
         switch (action->kind) {
@@ -1363,18 +1372,23 @@ iree_status_t iree_hal_deferred_work_queue_issue(
             break;
         }
       });
+#endif  //  IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
       iree_hal_deferred_work_queue_action_list_push_back(&pending_list, action);
     } else {
+#if IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
       IREE_TRACE(++num_ready;);
+#endif  //  IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
       iree_hal_deferred_work_queue_action_list_push_back(&ready_list, action);
     }
   }
 
   IREE_TRACE_ZONE_END(z1);
+#if IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
   IREE_TRACE_PLOT_VALUE_I64("num_pending_actions", num_pending);
   IREE_TRACE_PLOT_VALUE_I64("num_ready_actions", num_ready);
   IREE_TRACE_PLOT_VALUE_I64("num_pending_alloc_actions", num_pending_alloc);
   IREE_TRACE_PLOT_VALUE_I64("num_pending_dealloc_actions", num_pending_dealloc);
+#endif
 
   // Preserve pending timepoints.
   actions->action_list = pending_list;
