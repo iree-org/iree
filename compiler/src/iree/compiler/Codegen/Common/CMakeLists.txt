@@ -138,6 +138,7 @@ iree_cc_library(
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TileDispatchUsingForall.cpp"
     "TileDispatchUsingInterface.cpp"
+    "TileLargeTensors.cpp"
     "TileSizeSelection.cpp"
     "TypePropagationPass.cpp"
     "UnrollAnnotatedLoops.cpp"

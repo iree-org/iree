@@ -67,6 +67,7 @@ iree_lit_test_suite(
     "tile_and_distribute_to_workgroups.mlir"
     "tile_and_distribute_to_workgroups_func_scope.mlir"
     "tile_and_distribute_workgroups_using_forall.mlir"
+    "tile_large_tensors.mlir"
     "transform_buffer_opt.mlir"
     "transform_copy_operand.mlir"
     "transform_flatten_forall.mlir"
