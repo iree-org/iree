@@ -41,7 +41,7 @@ namespace mlir::iree_compiler::IREE::Stream {
 
 #define DEBUG_TYPE "iree-stream-specialize-encodings"
 
-#define GEN_PASS_DEF_MAKEENCODINGSOLVABLEPASS
+#define GEN_PASS_DEF_SPECIALIZEENCODINGSPASS
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
 
 namespace {
@@ -156,8 +156,8 @@ static void updateExecutableOpEncodings(
 
 } // namespace
 
-struct MakeEncodingSolvablePass
-    : public impl::MakeEncodingSolvablePassBase<MakeEncodingSolvablePass> {
+struct SpecializeEncodingsPass
+    : public impl::SpecializeEncodingsPassBase<SpecializeEncodingsPass> {
   void runOnOperation() override {
     MLIRContext *ctx = &getContext();
     ModuleOp moduleOp = getOperation();

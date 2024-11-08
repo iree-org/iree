@@ -13,8 +13,8 @@ include "mlir/Pass/PassBase.td"
 // Tensor lowering and resource management
 //===----------------------------------------------------------------------===//
 
-def MakeEncodingSolvablePass :
-    Pass<"iree-stream-make-encoding-solvable", "mlir::ModuleOp"> {
+def SpecializeEncodingsPass :
+    Pass<"iree-stream-specialize-encodings", "mlir::ModuleOp"> {
   let summary = "Attach optional array of targets to encodings.";
 }
 
