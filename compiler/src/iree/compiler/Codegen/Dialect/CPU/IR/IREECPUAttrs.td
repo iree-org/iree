@@ -15,6 +15,24 @@ include "mlir/IR/AttrTypeBase.td"
 // iree_cpu.encoding_solver
 //===----------------------------------------------------------------------===//
 
+def IREECPU_CPUEncodingSolverAttr :
+    AttrDef<IREECPU_Dialect, "CPUEncodingSolver", [
+  DeclareAttrInterfaceMethods<IREEEncoding_EncodingSolverInterfaceAttr, [
+    "calculateStorageElementCountInBytes",
+    "cloneWithConfig",
+    "getConfig"
+  ]>
+]> {
+  let mnemonic = "cpu_encoding_solver";
+  let summary = "The encoding solver for CPU backend";
+
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let parameters = (ins
+    OptionalParameter<"DictionaryAttr", "">:$target_configuration
+  );
+}
+
 def IREECPU_VMVXEncodingSolverAttr :
     AttrDef<IREECPU_Dialect, "VMVXEncodingSolver", [
   DeclareAttrInterfaceMethods<IREEEncoding_EncodingSolverInterfaceAttr, [

@@ -648,7 +648,6 @@ struct CPUMaterializeDeviceEncodingPass
       encodingSolvers.insert(encoding.getTargets());
     });
 
-    for (auto s: encodingSolvers) s.dump();
     if (!unsupported && encodingSolvers.size() != 1) {
       LLVM_DEBUG(llvm::dbgs()
                  << "unsupported: encodings are not from the same device\n");
