@@ -61,9 +61,15 @@ iree_status_t iree_hal_hip_memory_pools_trim(
     iree_hal_hip_memory_pools_t* pools,
     const iree_hal_hip_memory_pooling_params_t* pooling_params);
 
-// Asynchronously allocates a buffer from an appropriate pool.
-// The allocation will be stream-ordered on |stream|.
-iree_status_t iree_hal_hip_memory_pools_allocate(
+iree_status_t iree_hal_hip_memory_pools_allocate_pointer(
+    iree_hal_hip_memory_pools_t* pools, iree_hal_buffer_t* buffer,
+    hipStream_t stream, iree_device_size_t allocation_size);
+
+// Prepares a buffer to be allocated from the given pool.
+// It does no actual allocations, they must happen on another thread.
+// Any calls to get the device_ptr from the buffer will
+// result in a wait until the allocation is available.
+iree_status_t iree_hal_hip_memory_pools_prepare_buffer(
     iree_hal_hip_memory_pools_t* pools, hipStream_t stream,
     iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size,
