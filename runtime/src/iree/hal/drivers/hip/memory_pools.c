@@ -202,13 +202,41 @@ static void iree_hal_hip_async_buffer_release_callback(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   hipDeviceptr_t device_ptr = iree_hal_hip_buffer_device_pointer(buffer);
-  IREE_HIP_IGNORE_ERROR(pools->hip_symbols, hipFree(device_ptr));
+  if (device_ptr) {
+    IREE_HIP_IGNORE_ERROR(pools->hip_symbols, hipFree(device_ptr));
+  }
   iree_hal_hip_memory_pool_track_free(pools, buffer);
 
   IREE_TRACE_ZONE_END(z0);
 }
 
-iree_status_t iree_hal_hip_memory_pools_allocate(
+iree_status_t iree_hal_hip_memory_pools_allocate_pointer(
+    iree_hal_hip_memory_pools_t* pools, iree_hal_buffer_t* buffer,
+    hipStream_t stream, iree_device_size_t allocation_size) {
+  // TODO: more pools and better selection; this is coarsely deciding between
+  // only device local (variables, constants, transients) and other (staging,
+  // external) but could use more buffer properties (including usage/export
+  // flags) to better isolate the different usage patterns and keep the pools
+  // operating with reasonable limits. We should be using the |pool| arg.
+  hipMemPool_t memory_pool =
+      iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
+                        IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)
+          ? pools->device_local
+          : pools->other;
+
+  hipDeviceptr_t device_ptr = NULL;
+  IREE_RETURN_IF_ERROR(IREE_HIP_RESULT_TO_STATUS(
+      pools->hip_symbols,
+      hipMallocFromPoolAsync(&device_ptr, (size_t)allocation_size, memory_pool,
+                             stream),
+      "hipMallocFromPoolAsync"));
+
+  iree_hal_hip_buffer_set_device_pointer(buffer, device_ptr);
+  iree_hal_hip_memory_pool_track_alloc(pools, buffer);
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_hip_memory_pools_prepare_buffer(
     iree_hal_hip_memory_pools_t* pools, hipStream_t stream,
     iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size,
@@ -218,49 +246,27 @@ iree_status_t iree_hal_hip_memory_pools_allocate(
 
   iree_hal_buffer_params_canonicalize(&params);
 
-  // TODO: more pools and better selection; this is coarsely deciding between
-  // only device local (variables, constants, transients) and other (staging,
-  // external) but could use more buffer properties (including usage/export
-  // flags) to better isolate the different usage patterns and keep the pools
-  // operating with reasonable limits. We should be using the |pool| arg.
-  hipMemPool_t memory_pool =
-      iree_all_bits_set(params.type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)
-          ? pools->device_local
-          : pools->other;
-
-  hipDeviceptr_t device_ptr = NULL;
-  iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
-      pools->hip_symbols,
-      hipMallocFromPoolAsync(&device_ptr, (size_t)allocation_size, memory_pool,
-                             stream),
-      "hipMallocFromPoolAsync");
-
-  // Wrap the allocated HIP buffer in a HAL buffer.
   // NOTE: we don't provide a device allocator because we didn't allocate from
   // one and instead we use a release callback to perform the free if the user
   // doesn't dealloca the buffer.
   iree_hal_buffer_t* buffer = NULL;
-  if (iree_status_is_ok(status)) {
-    iree_hal_buffer_release_callback_t release_callback = {
-        .fn = iree_hal_hip_async_buffer_release_callback,
-        .user_data = pools,
-    };
-    status = iree_hal_hip_buffer_wrap(
-        /*device_allocator=*/NULL, params.type, params.access, params.usage,
-        allocation_size, /*byte_offset=*/0,
-        /*byte_length=*/allocation_size, IREE_HAL_HIP_BUFFER_TYPE_ASYNC,
-        device_ptr, /*host_ptr=*/NULL, release_callback, pools->host_allocator,
-        &buffer);
-  }
+  iree_hal_buffer_release_callback_t release_callback = {
+      .fn = iree_hal_hip_async_buffer_release_callback,
+      .user_data = pools,
+  };
+  iree_status_t status = iree_hal_hip_buffer_wrap(
+      /*device_allocator=*/NULL, params.type, params.access, params.usage,
+      allocation_size, /*byte_offset=*/0,
+      /*byte_length=*/allocation_size, IREE_HAL_HIP_BUFFER_TYPE_ASYNC,
+      /*device_ptr*/ NULL, /*host_ptr=*/NULL, release_callback,
+      pools->host_allocator, &buffer);
 
   if (iree_status_is_ok(status)) {
     // Update statistics (note that it may not yet be accurate).
-    iree_hal_hip_memory_pool_track_alloc(pools, buffer);
     *out_buffer = buffer;
   } else if (buffer) {
+    iree_hal_hip_buffer_allocation_failed(buffer);
     iree_hal_buffer_release(buffer);
-  } else {
-    IREE_HIP_IGNORE_ERROR(pools->hip_symbols, hipFreeAsync(device_ptr, stream));
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -282,8 +288,10 @@ iree_status_t iree_hal_hip_memory_pools_deallocate(
   if (iree_hal_hip_buffer_type(buffer) == IREE_HAL_HIP_BUFFER_TYPE_ASYNC) {
     // Try to schedule the buffer for freeing.
     hipDeviceptr_t device_ptr = iree_hal_hip_buffer_device_pointer(buffer);
-    status = IREE_HIP_RESULT_TO_STATUS(
-        pools->hip_symbols, hipFreeAsync(device_ptr, stream), "hipFreeAsync");
+    if (device_ptr) {
+      status = IREE_HIP_RESULT_TO_STATUS(
+          pools->hip_symbols, hipFreeAsync(device_ptr, stream), "hipFreeAsync");
+    }
     if (iree_status_is_ok(status)) {
       // Drop the release callback so that we don't try to double-free the
       // buffer. Note that we only do this if the HIP free succeeded as

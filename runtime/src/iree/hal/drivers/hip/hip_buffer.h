@@ -49,8 +49,16 @@ iree_hal_hip_buffer_type_t iree_hal_hip_buffer_type(
 // Returns the HIP base pointer for the given |buffer|.
 // This is the entire allocated_buffer and must be offset by the buffer
 // byte_offset and byte_length when used.
-hipDeviceptr_t iree_hal_hip_buffer_device_pointer(
-    const iree_hal_buffer_t* buffer);
+hipDeviceptr_t iree_hal_hip_buffer_device_pointer(iree_hal_buffer_t* buffer);
+
+// Sets the HIP base pointer for the given |buffer|.
+// This is the entire allocated_buffer and must be offset by the buffer
+// byte_offset and byte_length when used.
+void iree_hal_hip_buffer_set_device_pointer(iree_hal_buffer_t* buffer,
+                                            hipDeviceptr_t pointer);
+
+// Marks the buffer as having a failed allocation.
+void iree_hal_hip_buffer_allocation_failed(iree_hal_buffer_t* buffer);
 
 // Returns the HIP host pointer for the given |buffer|, if available.
 void* iree_hal_hip_buffer_host_pointer(const iree_hal_buffer_t* buffer);
