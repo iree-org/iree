@@ -147,6 +147,7 @@ static llvm::cl::opt<bool> clLinkExecutables{
         "of each executable in isolation and will dump a single binary per "
         "executable when used in conjunction with "
         "`--iree-hal-dump-executable-binaries-to`."),
+    llvm::cl::init(true),
 };
 
 } // namespace
