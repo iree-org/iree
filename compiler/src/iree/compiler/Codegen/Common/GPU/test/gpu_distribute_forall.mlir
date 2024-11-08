@@ -15,11 +15,9 @@ func.func @distribute_thread_forall(%out : memref<?xi32>)
 // CHECK-LABEL: func @distribute_thread_forall
 //   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
 //   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
-//   CHECK-DAG:   %[[TZ:.+]] = gpu.thread_id z
-//       CHECK:   scf.for %[[I:.+]] = %c0 to %c1024 step %c128 {
-//       CHECK:     %[[LINID:.+]] = affine.apply
-//  CHECK-SAME:       affine_map<(d0)[s0, s1, s2] -> (d0 + s0 + s1 * 64 + s2 * 128)>(%[[I]])
-//  CHECK-SAME:       [%[[TX]], %[[TY]], %[[TZ]]]
+//       CHECK:   %[[TFLAT:.+]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (2, 64)
+//       CHECK:   scf.for %[[I:.+]] = %c0 to %c8 step %c1 {
+//       CHECK:     %[[LINID:.+]] = affine.linearize_index disjoint [%[[I]], %[[TFLAT]]] by (8, 128)
 //       CHECK:     memref.store {{.*}}[%[[LINID]]]
 
 // -----
@@ -38,11 +36,10 @@ func.func @distribute_warp_forall(%out : memref<?xi32>)
 // CHECK-LABEL: func @distribute_warp_forall
 //   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
 //   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
-//   CHECK-DAG:   %[[TZ:.+]] = gpu.thread_id z
-//       CHECK:   scf.for %[[I:.+]] = %c0 to %c32 step %c4 {
-//       CHECK:     %[[LINID:.+]] = affine.apply
-//  CHECK-SAME:       affine_map<(d0)[s0, s1, s2] -> (d0 + s1 * 2 + s2 * 4 + s0 floordiv 32)>(%[[I]])
-//  CHECK-SAME:       [%[[TX]], %[[TY]], %[[TZ]]]
+//       CHECK:   %[[TFLAT:.+]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (2, 64)
+//       CHECK:   %[[WARPSPLIT:.+]]:2 = affine.delinearize_index %[[TFLAT]] into (4, 32)
+//       CHECK:   scf.for %[[I:.+]] = %c0 to %c8 step %c1 {
+//       CHECK:     %[[LINID:.+]] = affine.linearize_index disjoint [%[[I]], %[[WARPSPLIT]]#0] by (8, 4)
 //       CHECK:     memref.store {{.*}}[%[[LINID]]]
 
 // -----
@@ -78,11 +75,7 @@ func.func @distribute_thread_forall_drop_for_loop(%out : memref<?xi32>)
 // CHECK-LABEL: func @distribute_thread_forall_drop_for_loop
 //   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
 //   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
-//   CHECK-DAG:   %[[TZ:.+]] = gpu.thread_id z
-//   CHECK-NOT:   scf.for
-//       CHECK:   %[[LINID:.+]] = affine.apply
-//  CHECK-SAME:     affine_map<()[s0, s1, s2] -> (s0 + s1 * 64 + s2 * 128)>
-//  CHECK-SAME:     [%[[TX]], %[[TY]], %[[TZ]]]
+//       CHECK:   %[[LINID:.+]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (2, 64)
 //       CHECK:   memref.store {{.*}}[%[[LINID]]]
 
 // -----
@@ -99,14 +92,41 @@ func.func @distribute_thread_forall_single_thread(%out : memref<?xi32>)
 }
 
 // CHECK-LABEL: func @distribute_thread_forall_single_thread
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
 //   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
-//   CHECK-DAG:   %[[TZ:.+]] = gpu.thread_id z
-//       CHECK:   %[[LINID:.+]] = affine.apply
-//  CHECK-SAME:     affine_map<()[s0, s1, s2] -> (s0 + s1 * 64 + s2 * 128)>
-//  CHECK-SAME:     [%[[TX]], %[[TY]], %[[TZ]]]
-//       CHECK:   scf.for %[[I:.+]] = %[[LINID]] to %c1 step %c128 {
-//       CHECK:     memref.store {{.*}}[%[[I]]]
+//       CHECK:   %[[LINID:.+]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (2, 64)
+//   CHECK-NOT:  scf.for
+//       CHECK:   %[[TIDGUARD:.+]] = arith.cmpi slt, %[[TFLAT]], %[[C1]]
+//       CHECK:   scf.if %[[TIDGUARD]] {
+//       CHECK:     memref.store {{.*}}[%[[LINID]]]
+
+// -----
+
+#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
+
+func.func @distribute_thread_forall_overhang(%out : memref<?xi32>)
+    attributes {translation_info = #translation_info} {
+  %c0 = arith.constant 0 : i32
+  scf.forall (%arg0) in (513) {
+    memref.store %c0, %out[%arg0] : memref<?xi32>
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  return
+}
+
+// CHECK-LABEL: func @distribute_thread_forall_overhang
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
+//   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
+//       CHECK:   %[[TFLAT:.+]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (2, 64)
+//       CHECK:   scf.for %[[I:.+]] = %c0 to %[[C4]] step %[[C1]] {
+//       CHECK:     %[[LINID:.+]] = affine.linearize_index disjoint [%[[I]], %[[TFLAT]]] by (5, 128)
+//       CHECK:     memref.store {{.*}}[%[[LINID]]]
+//       CHECK:   %[[TIDGUARD:.+]] = arith.cmpi slt, %[[TFLAT]], %[[C1]]
+//       CHECK:   scf.if %[[TIDGUARD]] {
+//       CHECK:     %[[LINID_IF:.+]] = affine.linearize_index disjoint [%[[C4]], %[[TFLAT]]]
+//       CHECK:     memref.store {{.*}}[%[[LINID_IF]]]
 
 // -----
 
@@ -124,11 +144,9 @@ func.func @distribute_thread_forall_multi_dim(%out : memref<?x?x?xi32>)
 // CHECK-LABEL: func @distribute_thread_forall_multi_dim
 //   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
 //   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
-//   CHECK-DAG:   %[[TZ:.+]] = gpu.thread_id z
-//       CHECK:   scf.for %[[I:.+]] = %c0 to %c512 step %c128 {
-//       CHECK:     %[[LINID:.+]] = affine.apply
-//  CHECK-SAME:       affine_map<(d0)[s0, s1, s2] -> (d0 + s0 + s1 * 64 + s2 * 128)>(%[[I]])
-//  CHECK-SAME:       [%[[TX]], %[[TY]], %[[TZ]]]
+//       CHECK:   %[[TFLAT:.+]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (2, 64)
+//       CHECK:   scf.for %[[I:.+]] = %c0 to %c4 step %c1 {
+//       CHECK:     %[[LINID:.+]] = affine.linearize_index disjoint [%[[I]], %[[TFLAT]]] by (4, 128)
 //       CHECK:     %[[DELIN:.+]]:3 = affine.delinearize_index %[[LINID]] into (16, 8, 4) : index
 //       CHECK:     memref.store {{.*}}[%[[DELIN]]#0, %[[DELIN]]#1, %[[DELIN]]#2]
 
@@ -147,10 +165,5 @@ func.func @distribute_thread_forall_small_workgroup(%out : memref<?xi32>)
 }
 
 // CHECK-LABEL: func @distribute_thread_forall_small_workgroup
-//   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
-//   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
-//   CHECK-DAG:   %[[TZ:.+]] = gpu.thread_id z
-//       CHECK:   %[[LINID:.+]] = affine.apply
-//  CHECK-SAME:     affine_map<()[s0, s1, s2] -> (s0 + s1 * 7 + s2 * 7)>
-//  CHECK-SAME:     [%[[TX]], %[[TY]], %[[TZ]]]
-//       CHECK:   memref.store {{.*}}[%[[LINID]]]
+//   CHECK:   %[[TX:.+]] = gpu.thread_id x
+//   CHECK:   memref.store {{.*}}[%[[TX]]]

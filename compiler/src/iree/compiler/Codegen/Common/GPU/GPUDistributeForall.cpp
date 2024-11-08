@@ -17,6 +17,7 @@
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/DeviceMappingInterface.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 
 namespace mlir::iree_compiler {
 
@@ -87,48 +88,57 @@ LogicalResult resolveGPUMappedForallOp(RewriterBase &rewriter,
   assert(!(hasThreadMapping && hasWarpMapping));
   Value flatId = linearThreadId;
   if (hasWarpMapping) {
-    OpFoldResult subgroupSizeVal = rewriter.getIndexAttr(subgroupSize);
-    flatId = affine::makeComposedAffineApply(rewriter, loc, d0.floorDiv(d1),
-                                             {flatId, subgroupSizeVal});
+    flatId = rewriter
+                 .create<affine::AffineDelinearizeIndexOp>(
+                     loc, flatId,
+                     ArrayRef<int64_t>{flatWorkgroupSize / subgroupSize,
+                                       subgroupSize})
+                 .getResult(0);
   }
 
-  SmallVector<Value> delinSizes;
-  OpFoldResult totalLoopTripCount = rewriter.getIndexAttr(1);
+  SmallVector<OpFoldResult> delinSizes;
+  OpFoldResult producerCount = rewriter.getIndexAttr(1);
   for (auto workerCount : forallOp.getMixedUpperBound()) {
-    delinSizes.push_back(
-        getValueOrCreateConstantIndexOp(rewriter, loc, workerCount));
-    totalLoopTripCount = affine::makeComposedFoldedAffineApply(
-        rewriter, loc, d0 * d1, {totalLoopTripCount, workerCount});
+    delinSizes.push_back(workerCount);
+    producerCount = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, d0 * d1, {producerCount, workerCount});
   }
 
+  // If the total number of producers doesn't evenly divide into
   int64_t flatTotalNumWorkers =
       hasWarpMapping ? flatWorkgroupSize / subgroupSize : flatWorkgroupSize;
-  std::optional<int64_t> staticProducerCount =
-      getConstantIntValue(totalLoopTripCount);
-  bool perfectlyDivides =
-      staticProducerCount &&
-      staticProducerCount.value() % flatTotalNumWorkers == 0;
+  OpFoldResult newLoopTripCount = affine::makeComposedFoldedAffineApply(
+      rewriter, loc, d0.floorDiv(flatTotalNumWorkers), producerCount);
+  OpFoldResult remainingLanes = affine::makeComposedFoldedAffineApply(
+      rewriter, loc, d0 % flatTotalNumWorkers, {producerCount});
+
+  // If the loop isn't guaranteed to perfectly tile onto the workers,
+  // we will run one more iteration of the loop on the workitems where it
+  // needs to execute.
+  std::optional<int64_t> remainingLanesCount =
+      getConstantIntValue(remainingLanes);
+  bool hasPostLoopTail =
+      !remainingLanesCount || remainingLanesCount.value() != 0;
+  OpFoldResult maxIteration =
+      hasPostLoopTail
+          ? affine::makeComposedFoldedAffineApply(
+                rewriter, loc, d0.ceilDiv(flatTotalNumWorkers), {producerCount})
+          : newLoopTripCount;
 
   // Step 3. Create the `scf.for` loop for the loop.
-  // If the workgroup count perfectly divides the loop's worker count, then we
-  // can use a lower bound of 0 and keep the loop bounds static. This helps
-  // simplify later loop folding patterns without an `affine.linearize_index` op
-  // to help with inferring int ranges.
-  Value lb = perfectlyDivides ? rewriter.create<arith::ConstantIndexOp>(loc, 0)
-                              : flatId;
-  Value ub = getValueOrCreateConstantIndexOp(rewriter, loc, totalLoopTripCount);
-  Value step =
-      rewriter.create<arith::ConstantIndexOp>(loc, flatTotalNumWorkers);
+  Value lb = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  Value ub = getValueOrCreateConstantIndexOp(rewriter, loc, newLoopTripCount);
+  Value step = rewriter.create<arith::ConstantIndexOp>(loc, 1);
   auto forLoop = rewriter.create<scf::ForOp>(loc, lb, ub, step, ValueRange{});
   Block *loopBody = forLoop.getBody();
 
   // Get the replacement IDs for the forall iterator ids.
   rewriter.setInsertionPointToStart(loopBody);
-  Value newFlatProducerId =
-      perfectlyDivides
-          ? affine::makeComposedAffineApply(rewriter, loc, d0 + d1,
-                                            {forLoop.getInductionVar(), flatId})
-          : forLoop.getInductionVar();
+  Value newFlatProducerId = rewriter.create<affine::AffineLinearizeIndexOp>(
+      loc, ValueRange{forLoop.getInductionVar(), flatId},
+      ArrayRef<OpFoldResult>{maxIteration,
+                             rewriter.getIndexAttr(flatTotalNumWorkers)},
+      /*disjoint=*/true);
 
   // We require a descending relative mapping, so we can reuse the upper bound
   // sizes directly.
@@ -143,6 +153,22 @@ LogicalResult resolveGPUMappedForallOp(RewriterBase &rewriter,
                              newBlockArgs);
   rewriter.eraseOp(forallTerminator);
   rewriter.eraseOp(forallOp);
+
+  // Step 5. Create the post-loop code that only executes on some workitems.
+  if (hasPostLoopTail) {
+    rewriter.setInsertionPointAfter(forLoop);
+    IRMapping cloneMap;
+    Value willExecuteTail = rewriter.create<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::slt, flatId,
+        getValueOrCreateConstantIndexOp(rewriter, loc, remainingLanes));
+    auto tailIfOp = rewriter.create<scf::IfOp>(
+        loc, TypeRange{}, willExecuteTail, /*addThenBlock=*/false,
+        /*addElseBlock=*/false);
+    cloneMap.map(forLoop.getInductionVar(), ub);
+    // We're relying on the fact that `scf.for` and `scf.if` share the same
+    // terminator.
+    forLoop.getRegion().cloneInto(&tailIfOp.getThenRegion(), cloneMap);
+  }
   return success();
 }
 
@@ -190,23 +216,18 @@ void GPUDistributeForallPass::runOnOperation() {
     return signalPassFailure();
   }
 
-  AffineExpr x, y, z;
-  bindSymbols(funcOp.getContext(), x, y, z);
-  // Compute the linearized thread id.
-  AffineExpr linearId =
-      x + workgroupSize[0] * y + workgroupSize[1] * workgroupSize[0] * z;
-
   rewriter.setInsertionPointToStart(&funcOp.getFunctionBody().front());
-  SmallVector<OpFoldResult> threadGrid = {
-      rewriter.createOrFold<gpu::ThreadIdOp>(funcOp.getLoc(),
-                                             gpu::Dimension::x),
-      rewriter.createOrFold<gpu::ThreadIdOp>(funcOp.getLoc(),
-                                             gpu::Dimension::y),
-      rewriter.createOrFold<gpu::ThreadIdOp>(funcOp.getLoc(),
-                                             gpu::Dimension::z)};
+  SmallVector<Value> threadGrid = {rewriter.createOrFold<gpu::ThreadIdOp>(
+                                       funcOp.getLoc(), gpu::Dimension::z),
+                                   rewriter.createOrFold<gpu::ThreadIdOp>(
+                                       funcOp.getLoc(), gpu::Dimension::y),
+                                   rewriter.createOrFold<gpu::ThreadIdOp>(
+                                       funcOp.getLoc(), gpu::Dimension::x)};
+  SmallVector<int64_t> threadGridBasis = {workgroupSize[2], workgroupSize[1],
+                                          workgroupSize[0]};
 
-  Value linearThreadIdVal = affine::makeComposedAffineApply(
-      rewriter, funcOp.getLoc(), linearId, threadGrid);
+  Value linearThreadIdVal = rewriter.create<affine::AffineLinearizeIndexOp>(
+      funcOp.getLoc(), threadGrid, threadGridBasis, /*disjoint=*/true);
   for (auto forall : forallOps) {
     rewriter.setInsertionPoint(forall);
     if (failed(resolveGPUMappedForallOp(rewriter, forall, linearThreadIdVal,

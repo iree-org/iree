@@ -940,9 +940,6 @@ struct DistributeLayoutConflictToSharedMemory final
 
     // Offset and indexing computation such that subgroups can
     // write and read to shared memory correctly and without conflicts.
-    AffineExpr d0, d1, d2, s0;
-    bindDims(rewriter.getContext(), d0, d1, d2);
-    bindSymbols(rewriter.getContext(), s0);
     auto indexType = rewriter.getIndexType();
     Value threadX =
         rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::x);
@@ -950,16 +947,21 @@ struct DistributeLayoutConflictToSharedMemory final
         rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::y);
     Value threadZ =
         rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::z);
-    Value flatThreadId = affine::makeComposedAffineApply(
-        rewriter, loc,
-        (d0 + workgroupSize.value()[0] * d1 +
-         (workgroupSize.value()[0] * workgroupSize.value()[1]) * d2),
-        {threadX, threadY, threadZ});
-    Value subgroupOffset = affine::makeComposedAffineApply(
-        rewriter, loc,
-        s0.floorDiv(subgroupSize.value()) *
-            resolutionType.getShape()[vectorRank - 1],
-        {flatThreadId});
+    Value flatThreadId = rewriter.create<affine::AffineLinearizeIndexOp>(
+        loc, ValueRange{threadZ, threadY, threadX},
+        ArrayRef<int64_t>{workgroupSize.value()[2], workgroupSize.value()[1],
+                          workgroupSize.value()[0]},
+        /*disjoint=*/true);
+
+    Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    auto splitBySubgroups = rewriter.create<affine::AffineDelinearizeIndexOp>(
+        loc, flatThreadId,
+        ArrayRef<int64_t>{numSubgroups, subgroupSize.value()});
+    Value subgroupOffset = rewriter.create<affine::AffineLinearizeIndexOp>(
+        loc, ValueRange{splitBySubgroups.getResult(0), c0},
+        ArrayRef<int64_t>{numSubgroups,
+                          resolutionType.getShape()[vectorRank - 1]},
+        /*disjoint=*/true);
 
     // Create shared memory to store the intermediate from src layout.
     auto workgroupMemoryAddressSpace = Attribute(gpu::AddressSpaceAttr::get(
@@ -980,7 +982,6 @@ struct DistributeLayoutConflictToSharedMemory final
                                                       shapes, strides);
 
     // Creating write/trip to shared memory using src layout.
-    Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     SmallVector<Value> indices(resolutionType.getRank(), c0);
     SmallVector<bool> inBounds(vectorRank, true);
     auto write = rewriter.create<vector::TransferWriteOp>(loc, vector, subview,
