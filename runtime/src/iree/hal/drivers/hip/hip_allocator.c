@@ -100,6 +100,10 @@ iree_status_t iree_hal_hip_allocator_create(
   return iree_ok_status();
 }
 
+bool iree_hal_hip_allocator_isa(iree_hal_allocator_t* base_value) {
+  return iree_hal_resource_is(base_value, &iree_hal_hip_allocator_vtable);
+}
+
 static void iree_hal_hip_allocator_destroy(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator) {
   iree_hal_hip_allocator_t* allocator =
@@ -610,7 +614,7 @@ iree_status_t iree_hal_hip_allocator_alloc_async(
         &allocator->statistics, iree_hal_buffer_memory_type(buffer),
         iree_hal_buffer_allocation_size(buffer)));
   } else {
-    iree_hal_hip_buffer_allocation_failed(buffer);
+    iree_hal_hip_buffer_set_allocation_empty(buffer);
   }
 
   return status;
@@ -628,16 +632,13 @@ iree_status_t iree_hal_hip_allocator_free_async(
 
   IREE_RETURN_IF_ERROR(IREE_HIP_RESULT_TO_STATUS(
       allocator->symbols, hipFreeAsync(device_ptr, stream), "hipFreeAsync"));
+  iree_hal_hip_buffer_set_allocation_empty(buffer);
 
   IREE_TRACE_FREE_NAMED(IREE_HAL_HIP_ALLOCATOR_ID, (void*)device_ptr);
   IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
       &allocator->statistics, iree_hal_buffer_memory_type(buffer),
       iree_hal_buffer_allocation_size(buffer)));
   return iree_ok_status();
-}
-
-bool iree_hal_hip_allocator_isa(iree_hal_allocator_t* base_value) {
-  return iree_hal_resource_is(base_value, &iree_hal_hip_allocator_vtable);
 }
 
 static const iree_hal_allocator_vtable_t iree_hal_hip_allocator_vtable = {

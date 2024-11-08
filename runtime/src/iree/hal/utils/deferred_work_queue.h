@@ -152,7 +152,7 @@ iree_status_t iree_hal_deferred_work_queue_enqueue(
     iree_hal_command_buffer_t* const* command_buffers,
     iree_hal_buffer_binding_table_t const* binding_tables);
 
-// Enqueues command buffer submissions into the work queue to be executed
+// Enqueues allocations into the work queue to be executed
 // once all semaphores have been satisfied.
 iree_status_t iree_hal_deferred_work_queue_enqueue_alloc(
     iree_hal_deferred_work_queue_t* deferred_work_queue,
@@ -160,6 +160,8 @@ iree_status_t iree_hal_deferred_work_queue_enqueue_alloc(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* buffer);
 
+// Enqueues deallocations into the work queue to be executed
+// once all semaphores have been satisfied.
 iree_status_t iree_hal_deferred_work_queue_enqueue_dealloc(
     iree_hal_deferred_work_queue_t* deferred_work_queue,
     const iree_hal_semaphore_list_t wait_semaphore_list,

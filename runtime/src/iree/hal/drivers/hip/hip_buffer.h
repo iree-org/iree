@@ -57,8 +57,8 @@ hipDeviceptr_t iree_hal_hip_buffer_device_pointer(iree_hal_buffer_t* buffer);
 void iree_hal_hip_buffer_set_device_pointer(iree_hal_buffer_t* buffer,
                                             hipDeviceptr_t pointer);
 
-// Marks the buffer as having a failed allocation.
-void iree_hal_hip_buffer_allocation_failed(iree_hal_buffer_t* buffer);
+// Marks the buffer as having an intentionally empty allocation.
+void iree_hal_hip_buffer_set_allocation_empty(iree_hal_buffer_t* buffer);
 
 // Returns the HIP host pointer for the given |buffer|, if available.
 void* iree_hal_hip_buffer_host_pointer(const iree_hal_buffer_t* buffer);

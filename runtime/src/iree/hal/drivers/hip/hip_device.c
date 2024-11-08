@@ -86,8 +86,8 @@ typedef struct iree_hal_hip_device_t {
 
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
-
 } iree_hal_hip_device_t;
+
 static iree_hal_hip_device_t* iree_hal_hip_device_cast(
     iree_hal_device_t* base_value);
 
@@ -170,6 +170,7 @@ iree_hal_hip_deferred_work_queue_device_interface_synchronize_native_event(
   return IREE_HIP_RESULT_TO_STATUS(device_interface->hip_symbols,
                                    hipEventSynchronize((hipEvent_t)event));
 }
+
 static iree_status_t
 iree_hal_hip_deferred_work_queue_device_interface_destroy_native_event(
     iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
@@ -260,7 +261,6 @@ iree_hal_hip_deferred_work_queue_device_interface_submit_command_buffer(
   return status;
 }
 
-// Asynchronously allocates a pointer and assigns it to the given buffer.
 static iree_status_t
 iree_hal_hip_deferred_work_queue_device_interface_async_alloc(
     iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
@@ -967,7 +967,7 @@ iree_hal_hip_device_query_semaphore_compatibility(
 }
 
 static iree_status_t iree_hal_hip_device_pepare_async_alloc(
-    iree_hal_hip_device_t* base_device, iree_hal_buffer_params_t params,
+    iree_hal_hip_device_t* device, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -975,23 +975,18 @@ static iree_status_t iree_hal_hip_device_pepare_async_alloc(
 
   iree_hal_buffer_params_canonicalize(&params);
 
-  // NOTE: we don't provide a device allocator because we didn't allocate from
-  // one and instead we use a release callback to perform the free if the user
-  // doesn't dealloca the buffer.
   iree_hal_buffer_t* buffer = NULL;
   iree_status_t status = iree_hal_hip_buffer_wrap(
-      /*device_allocator=*/NULL, params.type, params.access, params.usage,
+      device->device_allocator, params.type, params.access, params.usage,
       allocation_size, /*byte_offset=*/0,
       /*byte_length=*/allocation_size, IREE_HAL_HIP_BUFFER_TYPE_ASYNC,
-      /*device_ptr*/ NULL, /*host_ptr=*/NULL,
-      iree_hal_buffer_release_callback_null(), base_device->host_allocator,
-      &buffer);
+      /*device_ptr=*/NULL, /*host_ptr=*/NULL,
+      iree_hal_buffer_release_callback_null(), device->host_allocator, &buffer);
 
   if (iree_status_is_ok(status)) {
-    // Update statistics (note that it may not yet be accurate).
     *out_buffer = buffer;
   } else if (buffer) {
-    iree_hal_hip_buffer_allocation_failed(buffer);
+    iree_hal_hip_buffer_set_allocation_empty(buffer);
     iree_hal_buffer_release(buffer);
   }
 
@@ -1012,7 +1007,6 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
 
-  iree_status_t status = iree_ok_status();
   if (device->supports_memory_pools &&
       !iree_all_bits_set(params.type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
     iree_hal_buffer_t* buffer = NULL;
@@ -1023,13 +1017,13 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
 
     iree_status_t status = iree_hal_deferred_work_queue_enqueue_alloc(
         device->work_queue, wait_semaphore_list, signal_semaphore_list, buffer);
-    if (!iree_status_is_ok(status)) {
-      iree_hal_hip_buffer_allocation_failed(buffer);
+    if (iree_status_is_ok(status)) {
+      *out_buffer = buffer;
+    } else {
+      iree_hal_hip_buffer_set_allocation_empty(buffer);
       iree_hal_resource_release(&buffer->resource);
-      return status;
     }
-    *out_buffer = buffer;
-    return iree_ok_status();
+    return status;
   } else if (!iree_all_bits_set(params.type,
                                 IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) &&
              iree_hal_hip_allocator_isa(
@@ -1044,12 +1038,12 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
     if (iree_status_is_ok(status)) {
       status = iree_hal_deferred_work_queue_issue(device->work_queue);
     }
-    if (!iree_status_is_ok(status)) {
-      iree_hal_hip_buffer_allocation_failed(buffer);
+    if (iree_status_is_ok(status)) {
+      *out_buffer = buffer;
+    } else {
+      iree_hal_hip_buffer_set_allocation_empty(buffer);
       iree_hal_resource_release(&buffer->resource);
-      return status;
     }
-    *out_buffer = buffer;
     return status;
   }
 
@@ -1063,7 +1057,7 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
   // exhaustion but the error may be deferred until a later synchronization.
   // If pools are not supported we allocate a buffer as normal from whatever
   // allocator is set on the device.
-  status =
+  iree_status_t status =
       iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
                                          params, allocation_size, out_buffer);
 

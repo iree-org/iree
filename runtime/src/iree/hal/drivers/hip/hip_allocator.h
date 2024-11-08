@@ -25,6 +25,8 @@ iree_status_t iree_hal_hip_allocator_create(
     hipStream_t stream, iree_hal_hip_memory_pools_t* pools,
     iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator);
 
+bool iree_hal_hip_allocator_isa(iree_hal_allocator_t* base_value);
+
 iree_status_t iree_hal_hip_allocator_alloc_async(
     iree_hal_allocator_t* base_allocator, hipStream_t stream,
     iree_hal_buffer_t* buffer);
@@ -32,8 +34,6 @@ iree_status_t iree_hal_hip_allocator_alloc_async(
 iree_status_t iree_hal_hip_allocator_free_async(iree_hal_allocator_t* allocator,
                                                 hipStream_t stream,
                                                 iree_hal_buffer_t* buffer);
-
-bool iree_hal_hip_allocator_isa(iree_hal_allocator_t* base_value);
 
 #ifdef __cplusplus
 }  // extern "C"

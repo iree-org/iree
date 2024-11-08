@@ -265,7 +265,7 @@ iree_status_t iree_hal_hip_memory_pools_prepare_buffer(
     // Update statistics (note that it may not yet be accurate).
     *out_buffer = buffer;
   } else if (buffer) {
-    iree_hal_hip_buffer_allocation_failed(buffer);
+    iree_hal_hip_buffer_set_allocation_empty(buffer);
     iree_hal_buffer_release(buffer);
   }
 

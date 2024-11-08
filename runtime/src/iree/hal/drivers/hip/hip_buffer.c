@@ -22,7 +22,7 @@ typedef struct iree_hal_hip_buffer_t {
   iree_hal_buffer_release_callback_t release_callback;
   iree_slim_mutex_t device_ptr_lock;
   iree_notification_t device_ptr_notification;
-  bool failed;
+  bool empty;
 } iree_hal_hip_buffer_t;
 
 static const iree_hal_buffer_vtable_t iree_hal_hip_buffer_vtable;
@@ -69,7 +69,7 @@ iree_status_t iree_hal_hip_buffer_wrap(
     buffer->host_ptr = host_ptr;
     buffer->device_ptr = device_ptr;
     buffer->release_callback = release_callback;
-    buffer->failed = false;
+    buffer->empty = false;
     iree_slim_mutex_initialize(&buffer->device_ptr_lock);
     iree_notification_initialize(&buffer->device_ptr_notification);
     *out_buffer = &buffer->base;
@@ -90,11 +90,11 @@ void iree_hal_hip_buffer_set_device_pointer(iree_hal_buffer_t* base_buffer,
   iree_notification_post(&buffer->device_ptr_notification, IREE_ALL_WAITERS);
 }
 
-// Marks the buffer as having a failed allocation.
-void iree_hal_hip_buffer_allocation_failed(iree_hal_buffer_t* base_buffer) {
+void iree_hal_hip_buffer_set_allocation_empty(iree_hal_buffer_t* base_buffer) {
   iree_hal_hip_buffer_t* buffer = iree_hal_hip_buffer_cast(base_buffer);
   iree_slim_mutex_lock(&buffer->device_ptr_lock);
-  buffer->failed = true;
+  buffer->empty = true;
+  buffer->device_ptr = NULL;
   iree_slim_mutex_unlock(&buffer->device_ptr_lock);
   iree_notification_post(&buffer->device_ptr_notification, IREE_ALL_WAITERS);
 }
@@ -173,9 +173,9 @@ iree_hal_hip_buffer_type_t iree_hal_hip_buffer_type(
 }
 
 static bool iree_hal_hip_buffer_has_device_ptr(void* arg) {
-  iree_hal_hip_buffer_t* buffer = (iree_hal_hip_buffer_t*)(arg);
+  iree_hal_hip_buffer_t* buffer = (iree_hal_hip_buffer_t*)arg;
   iree_slim_mutex_lock(&buffer->device_ptr_lock);
-  bool has_ptr_or_error = buffer->device_ptr || buffer->failed;
+  bool has_ptr_or_error = buffer->device_ptr || buffer->empty;
   iree_slim_mutex_unlock(&buffer->device_ptr_lock);
   return has_ptr_or_error;
 }
