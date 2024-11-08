@@ -13,6 +13,7 @@ from pathlib import Path
 
 vmfb_dir = os.getenv("TEST_OUTPUT_ARTIFACTS", default=Path.cwd())
 rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
+iree_test_path_extension = os.getenv("IREE_TEST_PATH_EXTENSION", default=Path.cwd())
 
 ###############################################################################
 # Fixtures
@@ -194,7 +195,6 @@ ROCM_COMPILE_FLAGS = [
     f"--iree-hip-target={rocm_chip}",
     "--iree-opt-const-eval=false",
     "--iree-global-opt-propagate-transposes=true",
-    "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
     "--iree-dispatch-creation-enable-aggressive-fusion=true",
     "--iree-opt-aggressively-propagate-transposes=true",
     "--iree-opt-outer-dim-concat=true",
@@ -214,6 +214,7 @@ FP16_UNET_FLAGS = [
 ]
 
 INT8_PUNET_FLAGS = [
+    f"--iree-codegen-transform-dialect-library={iree_test_path_extension}/attention_and_matmul_spec_punet.mlir",
     "--iree-preprocessing-pass-pipeline=builtin.module(util.func(iree-global-opt-raise-special-ops, iree-flow-canonicalize), iree-preprocessing-transpose-convolution-pipeline, iree-preprocessing-pad-to-intrinsics, util.func(iree-preprocessing-generalize-linalg-matmul-experimental))",
 ]
 
