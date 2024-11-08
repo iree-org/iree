@@ -6,10 +6,13 @@
 
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
@@ -17,14 +20,18 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/Passes.h"
 
 #define DEBUG_TYPE "cpu-materialize-encoding"
 
@@ -609,8 +616,81 @@ struct CPUMaterializeDeviceEncodingPass
 
   void runOnOperation() override {
     auto funcOp = getOperation();
+    bool unsupported = false;
+    SetVector<ArrayAttr> encodingSolvers;
+    funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp op) {
+      auto resType = dyn_cast<IREE::Flow::DispatchTensorType>(op.getType());
+      if (!resType) {
+        return;
+      }
+      auto rankedTensorType =
+          dyn_cast<RankedTensorType>(resType.getBoundType());
+      if (!rankedTensorType) {
+        return;
+      }
+      auto encoding = dyn_cast_or_null<IREE::Encoding::EncodingAttr>(
+          rankedTensorType.getEncoding());
+      if (!encoding) {
+        return;
+      }
+
+      bool areAllSolvable =
+          llvm::all_of(encoding.getTargets().getValue(), [](Attribute attr) {
+            return isa<IREE::Encoding::EncodingSolverInterfaceAttr>(attr);
+          });
+      if (!areAllSolvable) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "unsupported: one of potential targets does not "
+                      "implement EncodingSolverInterfaceAttr\n");
+        unsupported = true;
+        return;
+      }
+      encodingSolvers.insert(encoding.getTargets());
+    });
+
+    for (auto s: encodingSolvers) s.dump();
+    if (!unsupported && encodingSolvers.size() != 1) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "unsupported: encodings are not from the same device\n");
+      unsupported = true;
+    }
+
+#if 1
+    if (!unsupported && !encodingSolvers.empty() &&
+        encodingSolvers[0].getValue().size() != 1) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "unsupported: only single target is supported atm\n");
+      unsupported = true;
+    }
+#endif
+
+    if (unsupported) {
+      LLVM_DEBUG(llvm::dbgs() << "drop encodings\n");
+      OpPassManager pipeline(func::FuncOp::getOperationName());
+      pipeline.addPass(createMaterializeEncodingIntoNopPass());
+      pipeline.addPass(createCanonicalizerPass());
+      if (failed(runPipeline(pipeline, funcOp))) {
+        return signalPassFailure();
+      }
+      return;
+    }
+
+    auto solver =
+        *encodingSolvers[0]
+             .getAsRange<IREE::Encoding::EncodingSolverInterfaceAttr>()
+             .begin();
     auto executableTargetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
-    if (failed(materializeFuncOpEncodings(funcOp, executableTargetAttr))) {
+    // TODO: The fake target attribute is not needed. This is only correct when
+    // the encoding target is as same as the execution device. These
+    // materialization implementations should be moved into interface methods,
+    // and we query all the needed information from the solver.
+    // Note: perhaps a new Codegen attribute interface, not
+    // IREE::Encoding::EncodingSolverInterfaceAttr.
+    auto fakeTargetAttr = IREE::HAL::ExecutableTargetAttr::get(
+        &getContext(), executableTargetAttr.getBackend(),
+        executableTargetAttr.getFormat(), solver.getConfig());
+
+    if (failed(materializeFuncOpEncodings(funcOp, fakeTargetAttr))) {
       return signalPassFailure();
     }
   }

@@ -98,6 +98,10 @@ VMVXEncodingSolverAttr::cloneWithConfig(DictionaryAttr attr) const {
       VMVXEncodingSolverAttr::get(getContext(), attr));
 }
 
+DictionaryAttr VMVXEncodingSolverAttr::getConfig() const {
+  return getTargetConfiguration();
+}
+
 //===----------------------------------------------------------------------===//
 // Attribute Registration
 //===----------------------------------------------------------------------===//
