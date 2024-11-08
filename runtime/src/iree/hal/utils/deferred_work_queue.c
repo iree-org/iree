@@ -19,30 +19,14 @@
 
 // The maximal number of events a command buffer can wait on.
 #define IREE_HAL_MAX_WAIT_EVENT_COUNT 32
-#define IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS 0
 
-#if IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
-IREE_TRACE(static const char* IREE_HAL_DEFERRED_WORKER_QUEUE_PENDING_PLOT_NAME =
-               "iree_hal_work_queue_pending");
-IREE_TRACE(static const char* IREE_HAL_DEFERRED_WORKER_QUEUE_READY_PLOT_NAME =
-               "iree_hal_work_queue_ready");
-IREE_TRACE(
-    static const char* IREE_HAL_DEFERRED_WORKER_QUEUE_PENDING_ALLOC_PLOT_NAME =
-        "iree_hal_work_queue_pending_alloc");
-IREE_TRACE(static const char*
-               IREE_HAL_DEFERRED_WORKER_QUEUE_PENDING_DEALLOC_PLOT_NAME =
-                   "iree_hal_work_queue_pending_dealloc");
-#endif  // IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
 //===----------------------------------------------------------------------===//
 // Queue action
 //===----------------------------------------------------------------------===//
 
 typedef enum iree_hal_deferred_work_queue_action_kind_e {
   IREE_HAL_QUEUE_ACTION_TYPE_EXECUTION,
-  IREE_HAL_QUEUE_ACTION_TYPE_QUEUE_ALLOC,
-  IREE_HAL_QUEUE_ACTION_TYPE_QUEUE_DEALLOC,
-  IREE_HAL_QUEUE_ACTION_TYPE_QUEUE_MAX =
-      IREE_HAL_QUEUE_ACTION_TYPE_QUEUE_DEALLOC,
+  // TODO: Add support for queue alloca and dealloca.
 } iree_hal_deferred_work_queue_action_kind_t;
 
 typedef enum iree_hal_deferred_work_queue_action_state_e {
@@ -83,12 +67,6 @@ typedef struct iree_hal_deferred_work_queue_action_t {
       iree_hal_command_buffer_t** command_buffers;
       iree_hal_buffer_binding_table_t* binding_tables;
     } execution;
-    struct {
-      iree_hal_buffer_t* buffer;
-    } alloc;
-    struct {
-      iree_hal_buffer_t* buffer;
-    } dealloc;
   } payload;
 
   // Resource set to retain all associated resources by the payload.
@@ -523,21 +501,6 @@ iree_status_t iree_hal_deferred_work_queue_create(
   IREE_ASSERT_ARGUMENT(out_actions);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-#if IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
-  IREE_TRACE_SET_PLOT_TYPE(IREE_HAL_DEFERRED_WORKER_QUEUE_PENDING_PLOT_NAME,
-                           IREE_TRACING_PLOT_TYPE_NUMBER, /*step=*/true,
-                           /*fill=*/true, /*color=*/0);
-  IREE_TRACE_SET_PLOT_TYPE(IREE_HAL_DEFERRED_WORKER_QUEUE_READY_PLOT_NAME,
-                           IREE_TRACING_PLOT_TYPE_NUMBER, /*step=*/true,
-                           /*fill=*/true, /*color=*/0);
-  IREE_TRACE_SET_PLOT_TYPE(
-      IREE_HAL_DEFERRED_WORKER_QUEUE_PENDING_ALLOC_PLOT_NAME,
-      IREE_TRACING_PLOT_TYPE_NUMBER, /*step=*/true, /*fill=*/true, /*color=*/0);
-  IREE_TRACE_SET_PLOT_TYPE(
-      IREE_HAL_DEFERRED_WORKER_QUEUE_PENDING_DEALLOC_PLOT_NAME,
-      IREE_TRACING_PLOT_TYPE_NUMBER, /*step=*/true, /*fill=*/true, /*color=*/0);
-#endif  //  IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
-
   iree_hal_deferred_work_queue_t* actions = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, sizeof(*actions),
@@ -849,140 +812,6 @@ iree_status_t iree_hal_deferred_work_queue_enqueue(
   return status;
 }
 
-static iree_status_t iree_hal_deferred_work_queue_enqueue_buffer_operation(
-    iree_hal_deferred_work_queue_t* actions,
-    iree_hal_deferred_work_queue_action_kind_t kind,
-    const iree_hal_semaphore_list_t wait_semaphore_list,
-    const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_buffer_t* buffer) {
-  IREE_ASSERT_ARGUMENT(actions);
-  IREE_ASSERT_ARGUMENT(buffer);
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Embed captured tables in the action allocation.
-  iree_hal_deferred_work_queue_action_t* action = NULL;
-  const iree_host_size_t wait_semaphore_list_size =
-      wait_semaphore_list.count * sizeof(*wait_semaphore_list.semaphores) +
-      wait_semaphore_list.count * sizeof(*wait_semaphore_list.payload_values);
-  const iree_host_size_t signal_semaphore_list_size =
-      signal_semaphore_list.count * sizeof(*signal_semaphore_list.semaphores) +
-      signal_semaphore_list.count *
-          sizeof(*signal_semaphore_list.payload_values);
-
-  const iree_host_size_t total_action_size =
-      sizeof(*action) + wait_semaphore_list_size + signal_semaphore_list_size;
-
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(actions->host_allocator, total_action_size,
-                                (void**)&action));
-  uint8_t* action_ptr = (uint8_t*)action + sizeof(*action);
-
-  action->owning_actions = actions;
-  action->device_interface = actions->device_interface;
-  action->state = IREE_HAL_QUEUE_ACTION_STATE_ALIVE;
-  action->cleanup_callback = NULL;
-  action->callback_user_data = NULL;
-  action->kind = kind;
-
-  // Initialize scratch fields.
-  action->event_count = 0;
-  action->is_pending = true;
-
-  // Copy wait list for later access.
-  action->wait_semaphore_list.count = wait_semaphore_list.count;
-  action->wait_semaphore_list.semaphores = (iree_hal_semaphore_t**)action_ptr;
-  memcpy(action->wait_semaphore_list.semaphores, wait_semaphore_list.semaphores,
-         wait_semaphore_list.count * sizeof(*wait_semaphore_list.semaphores));
-  action->wait_semaphore_list.payload_values =
-      (uint64_t*)(action_ptr + wait_semaphore_list.count *
-                                   sizeof(*wait_semaphore_list.semaphores));
-  memcpy(
-      action->wait_semaphore_list.payload_values,
-      wait_semaphore_list.payload_values,
-      wait_semaphore_list.count * sizeof(*wait_semaphore_list.payload_values));
-  action_ptr += wait_semaphore_list_size;
-
-  // Copy signal list for later access.
-  action->signal_semaphore_list.count = signal_semaphore_list.count;
-  action->signal_semaphore_list.semaphores = (iree_hal_semaphore_t**)action_ptr;
-  memcpy(
-      action->signal_semaphore_list.semaphores,
-      signal_semaphore_list.semaphores,
-      signal_semaphore_list.count * sizeof(*signal_semaphore_list.semaphores));
-  action->signal_semaphore_list.payload_values =
-      (uint64_t*)(action_ptr + signal_semaphore_list.count *
-                                   sizeof(*signal_semaphore_list.semaphores));
-  memcpy(action->signal_semaphore_list.payload_values,
-         signal_semaphore_list.payload_values,
-         signal_semaphore_list.count *
-             sizeof(*signal_semaphore_list.payload_values));
-  action_ptr += signal_semaphore_list_size;
-
-  // Copy the execution resources for later access.
-  action->payload.alloc.buffer = buffer;
-
-  // Retain all command buffers and semaphores.
-  iree_status_t status = iree_hal_resource_set_allocate(actions->block_pool,
-                                                        &action->resource_set);
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_resource_set_insert(action->resource_set,
-                                          wait_semaphore_list.count,
-                                          wait_semaphore_list.semaphores);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_resource_set_insert(action->resource_set,
-                                          signal_semaphore_list.count,
-                                          signal_semaphore_list.semaphores);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_resource_set_insert(action->resource_set, 1, &buffer);
-  }
-
-  if (iree_status_is_ok(status)) {
-    // Now everything is okay and we can enqueue the action.
-    iree_slim_mutex_lock(&actions->action_mutex);
-    if (actions->exit_requested) {
-      status = iree_make_status(
-          IREE_STATUS_ABORTED,
-          "can not issue more executions, exit already requested");
-      iree_hal_deferred_work_queue_action_fail_locked(action, status);
-    } else {
-      iree_hal_deferred_work_queue_action_list_push_back(&actions->action_list,
-                                                         action);
-      // One work item is the callback that makes it across from the
-      // completion thread.
-      actions->pending_work_items_count += 1;
-    }
-    iree_slim_mutex_unlock(&actions->action_mutex);
-  } else {
-    iree_hal_resource_set_free(action->resource_set);
-    iree_allocator_free(actions->host_allocator, action);
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
-iree_status_t iree_hal_deferred_work_queue_enqueue_alloc(
-    iree_hal_deferred_work_queue_t* actions,
-    const iree_hal_semaphore_list_t wait_semaphore_list,
-    const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_buffer_t* buffer) {
-  return iree_hal_deferred_work_queue_enqueue_buffer_operation(
-      actions, IREE_HAL_QUEUE_ACTION_TYPE_QUEUE_ALLOC, wait_semaphore_list,
-      signal_semaphore_list, buffer);
-}
-
-iree_status_t iree_hal_deferred_work_queue_enqueue_dealloc(
-    iree_hal_deferred_work_queue_t* actions,
-    const iree_hal_semaphore_list_t wait_semaphore_list,
-    const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_buffer_t* buffer) {
-  return iree_hal_deferred_work_queue_enqueue_buffer_operation(
-      actions, IREE_HAL_QUEUE_ACTION_TYPE_QUEUE_DEALLOC, wait_semaphore_list,
-      signal_semaphore_list, buffer);
-}
-
 // Does not consume |status|.
 static void iree_hal_deferred_work_queue_fail_status_locked(
     iree_hal_deferred_work_queue_t* actions, iree_status_t status) {
@@ -1084,7 +913,7 @@ iree_hal_deferred_work_queue_execution_device_signal_host_callback(
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_deferred_work_queue_action_t* action =
       (iree_hal_deferred_work_queue_action_t*)user_data;
-  IREE_ASSERT_LE(action->kind, IREE_HAL_QUEUE_ACTION_TYPE_QUEUE_MAX);
+  IREE_ASSERT_EQ(action->kind, IREE_HAL_QUEUE_ACTION_TYPE_EXECUTION);
   IREE_ASSERT_EQ(action->state, IREE_HAL_QUEUE_ACTION_STATE_ALIVE);
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
     iree_hal_deferred_work_queue_action_fail(action, status);
@@ -1112,7 +941,7 @@ iree_hal_deferred_work_queue_execution_device_signal_host_callback(
 // Issues the given kernel dispatch |action| to the GPU.
 static iree_status_t iree_hal_deferred_work_queue_issue_execution(
     iree_hal_deferred_work_queue_action_t* action) {
-  IREE_ASSERT_LE(action->kind, IREE_HAL_QUEUE_ACTION_TYPE_QUEUE_MAX);
+  IREE_ASSERT_EQ(action->kind, IREE_HAL_QUEUE_ACTION_TYPE_EXECUTION);
   IREE_ASSERT_EQ(action->is_pending, false);
   iree_hal_deferred_work_queue_t* actions = action->owning_actions;
   iree_hal_deferred_work_queue_device_interface_t* device_interface =
@@ -1129,74 +958,55 @@ static iree_status_t iree_hal_deferred_work_queue_issue_execution(
                 device_interface, action->wait_events[i]));
   }
 
-  switch (action->kind) {
-    case IREE_HAL_QUEUE_ACTION_TYPE_EXECUTION: {
-      // Then launch all command buffers to the dispatch stream.
-      IREE_TRACE_ZONE_BEGIN(z_dispatch_command_buffers);
-      IREE_TRACE_ZONE_APPEND_TEXT(z_dispatch_command_buffers,
-                                  "dispatch_command_buffers");
+  // Then launch all command buffers to the dispatch stream.
+  IREE_TRACE_ZONE_BEGIN(z_dispatch_command_buffers);
+  IREE_TRACE_ZONE_APPEND_TEXT(z_dispatch_command_buffers,
+                              "dispatch_command_buffers");
 
-      for (iree_host_size_t i = 0; i < action->payload.execution.count; ++i) {
-        iree_hal_command_buffer_t* command_buffer =
-            action->payload.execution.command_buffers[i];
-        iree_hal_buffer_binding_table_t binding_table =
-            action->payload.execution.binding_tables
-                ? action->payload.execution.binding_tables[i]
-                : iree_hal_buffer_binding_table_empty();
-        if (iree_hal_deferred_command_buffer_isa(command_buffer)) {
-          iree_hal_command_buffer_t* stream_command_buffer = NULL;
-          iree_hal_command_buffer_mode_t mode =
-              iree_hal_command_buffer_mode(command_buffer) |
-              IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT |
-              // NOTE: we need to validate if a binding table is provided as the
-              // bindings were not known when it was originally recorded.
-              (iree_hal_buffer_binding_table_is_empty(binding_table)
-                   ? IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED
-                   : 0);
-          IREE_RETURN_AND_END_ZONE_IF_ERROR(
-              z0, device_interface->vtable->create_stream_command_buffer(
-                      device_interface, mode, IREE_HAL_COMMAND_CATEGORY_ANY,
-                      &stream_command_buffer))
-          IREE_RETURN_AND_END_ZONE_IF_ERROR(
-              z0, iree_hal_resource_set_insert(action->resource_set, 1,
-                                               &stream_command_buffer));
-
-          IREE_RETURN_AND_END_ZONE_IF_ERROR(
-              z0, iree_hal_deferred_command_buffer_apply(
-                      command_buffer, stream_command_buffer, binding_table));
-          command_buffer = stream_command_buffer;
-        } else {
-          iree_hal_resource_retain(command_buffer);
-        }
-
-        IREE_RETURN_AND_END_ZONE_IF_ERROR(
-            z0, device_interface->vtable->submit_command_buffer(
-                    device_interface, command_buffer));
-
-        // The stream_command_buffer is going to be retained by
-        // the action->resource_set and deleted after the action
-        // completes.
-        iree_hal_resource_release(command_buffer);
-      }
-
-      IREE_TRACE_ZONE_END(z_dispatch_command_buffers);
-      break;
-    }
-    case IREE_HAL_QUEUE_ACTION_TYPE_QUEUE_ALLOC: {
-      IREE_TRACE_ZONE_APPEND_TEXT(z0, "queue_alloc");
+  for (iree_host_size_t i = 0; i < action->payload.execution.count; ++i) {
+    iree_hal_command_buffer_t* command_buffer =
+        action->payload.execution.command_buffers[i];
+    iree_hal_buffer_binding_table_t binding_table =
+        action->payload.execution.binding_tables
+            ? action->payload.execution.binding_tables[i]
+            : iree_hal_buffer_binding_table_empty();
+    if (iree_hal_deferred_command_buffer_isa(command_buffer)) {
+      iree_hal_command_buffer_t* stream_command_buffer = NULL;
+      iree_hal_command_buffer_mode_t mode =
+          iree_hal_command_buffer_mode(command_buffer) |
+          IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT |
+          // NOTE: we need to validate if a binding table is provided as the
+          // bindings were not known when it was originally recorded.
+          (iree_hal_buffer_binding_table_is_empty(binding_table)
+               ? IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED
+               : 0);
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, device_interface->vtable->async_alloc(
-                  device_interface, action->payload.alloc.buffer));
-      break;
-    }
-    case IREE_HAL_QUEUE_ACTION_TYPE_QUEUE_DEALLOC: {
-      IREE_TRACE_ZONE_APPEND_TEXT(z0, "queue_dealloc");
+          z0, device_interface->vtable->create_stream_command_buffer(
+                  device_interface, mode, IREE_HAL_COMMAND_CATEGORY_ANY,
+                  &stream_command_buffer))
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, device_interface->vtable->async_dealloc(
-                  device_interface, action->payload.dealloc.buffer));
-      break;
+          z0, iree_hal_resource_set_insert(action->resource_set, 1,
+                                           &stream_command_buffer));
+
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0, iree_hal_deferred_command_buffer_apply(
+                  command_buffer, stream_command_buffer, binding_table));
+      command_buffer = stream_command_buffer;
+    } else {
+      iree_hal_resource_retain(command_buffer);
     }
+
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, device_interface->vtable->submit_command_buffer(device_interface,
+                                                            command_buffer));
+
+    // The stream_command_buffer is going to be retained by
+    // the action->resource_set and deleted after the action
+    // completes.
+    iree_hal_resource_release(command_buffer);
   }
+
+  IREE_TRACE_ZONE_END(z_dispatch_command_buffers);
 
   iree_hal_deferred_work_queue_native_event_t completion_event = NULL;
   // Last record event signals in the dispatch stream.
@@ -1283,12 +1093,6 @@ iree_status_t iree_hal_deferred_work_queue_issue(
     IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
   }
-
-  IREE_TRACE_ZONE_BEGIN(z1);
-#if IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
-  IREE_TRACE(uint32_t num_pending = 0; uint32_t num_pending_alloc = 0;
-             uint32_t num_pending_dealloc = 0; uint32_t num_ready = 0;);
-#endif  //  IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
 
   iree_status_t status = iree_ok_status();
   // Scan through the list and categorize actions into pending and ready lists.
@@ -1381,43 +1185,11 @@ iree_status_t iree_hal_deferred_work_queue_issue(
     }
 
     if (action->is_pending) {
-#if IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
-      IREE_TRACE({
-        ++num_pending;
-        switch (action->kind) {
-          case IREE_HAL_QUEUE_ACTION_TYPE_QUEUE_ALLOC:
-            ++num_pending_alloc;
-            break;
-          case IREE_HAL_QUEUE_ACTION_TYPE_QUEUE_DEALLOC:
-            ++num_pending_dealloc;
-            break;
-          default:
-            break;
-        }
-      });
-#endif  //  IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
       iree_hal_deferred_work_queue_action_list_push_back(&pending_list, action);
     } else {
-#if IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
-      IREE_TRACE(++num_ready;);
-#endif  //  IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
       iree_hal_deferred_work_queue_action_list_push_back(&ready_list, action);
     }
   }
-
-  IREE_TRACE_ZONE_END(z1);
-#if IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
-  IREE_TRACE_PLOT_VALUE_I64(IREE_HAL_DEFERRED_WORKER_QUEUE_PENDING_PLOT_NAME,
-                            num_pending);
-  IREE_TRACE_PLOT_VALUE_I64(IREE_HAL_DEFERRED_WORKER_QUEUE_READY_PLOT_NAME,
-                            num_ready);
-  IREE_TRACE_PLOT_VALUE_I64(
-      IREE_HAL_DEFERRED_WORKER_QUEUE_PENDING_ALLOC_PLOT_NAME,
-      num_pending_alloc);
-  IREE_TRACE_PLOT_VALUE_I64(
-      IREE_HAL_DEFERRED_WORKER_QUEUE_PENDING_DEALLOC_PLOT_NAME,
-      num_pending_dealloc);
-#endif
 
   // Preserve pending timepoints.
   actions->action_list = pending_list;
@@ -1553,10 +1325,8 @@ static void iree_hal_deferred_work_queue_worker_process_completion(
       IREE_TRACE_ZONE_END(z1);
     }
 
-    if (entry->callback) {
-      status =
-          iree_status_join(status, entry->callback(status, entry->user_data));
-    }
+    status =
+        iree_status_join(status, entry->callback(status, entry->user_data));
 
     if (IREE_UNLIKELY(entry->created_event)) {
       status = iree_status_join(

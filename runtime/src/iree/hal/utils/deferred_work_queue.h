@@ -109,24 +109,6 @@ typedef struct iree_hal_deferred_work_queue_device_interface_vtable_t {
   iree_status_t(IREE_API_PTR* submit_command_buffer)(
       iree_hal_deferred_work_queue_device_interface_t* device_interface,
       iree_hal_command_buffer_t* command_buffer);
-
-  // Asynchronously allocates a pointer and assigns it to the given buffer.
-  //
-  // This is optional, and is only required to be valid if
-  // iree_hal_deferred_work_queue_enqueue_alloc is ever called on the work
-  // queue.
-  iree_status_t(IREE_API_PTR* async_alloc)(
-      iree_hal_deferred_work_queue_device_interface_t* device_interface,
-      iree_hal_buffer_t* buffer);
-
-  // Asynchronously frees a buffer.
-  //
-  // This is optional, and is only required to be valid if
-  // iree_hal_deferred_work_queue_enqueue_dealloc is ever called on the work
-  // queue.
-  iree_status_t(IREE_API_PTR* async_dealloc)(
-      iree_hal_deferred_work_queue_device_interface_t* device_interface,
-      iree_hal_buffer_t* buffer);
 } iree_hal_deferred_work_queue_device_interface_vtable_t;
 
 iree_status_t iree_hal_deferred_work_queue_create(
@@ -151,22 +133,6 @@ iree_status_t iree_hal_deferred_work_queue_enqueue(
     iree_host_size_t command_buffer_count,
     iree_hal_command_buffer_t* const* command_buffers,
     iree_hal_buffer_binding_table_t const* binding_tables);
-
-// Enqueues allocations into the work queue to be executed
-// once all semaphores have been satisfied.
-iree_status_t iree_hal_deferred_work_queue_enqueue_alloc(
-    iree_hal_deferred_work_queue_t* deferred_work_queue,
-    const iree_hal_semaphore_list_t wait_semaphore_list,
-    const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_buffer_t* buffer);
-
-// Enqueues deallocations into the work queue to be executed
-// once all semaphores have been satisfied.
-iree_status_t iree_hal_deferred_work_queue_enqueue_dealloc(
-    iree_hal_deferred_work_queue_t* deferred_work_queue,
-    const iree_hal_semaphore_list_t wait_semaphore_list,
-    const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_buffer_t* buffer);
 
 // Attempts to advance the work queue by processing using
 // the current thread, rather than the worker thread.

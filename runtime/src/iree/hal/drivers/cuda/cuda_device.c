@@ -1171,8 +1171,6 @@ static const iree_hal_deferred_work_queue_device_interface_vtable_t
             iree_hal_cuda_deferred_work_queue_device_interface_create_stream_command_buffer,
         .submit_command_buffer =
             iree_hal_cuda_deferred_work_queue_device_interface_submit_command_buffer,
-        .async_alloc = NULL,
-        .async_dealloc = NULL,
 };
 
 static const iree_hal_stream_tracing_device_interface_vtable_t
