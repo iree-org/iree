@@ -2511,7 +2511,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> vecTileSizes = distTileSizes;
 
   // Add an extra level of tiling.
-  // TODO: Add multiple levels of tiling if necessary.
+  // TODO: Limit vector tile sizes for other TilingInterface ops.
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(*op)) {
     limitVectorTileSizes(linalgOp, vecTileSizes);
   }
