@@ -58,11 +58,29 @@ function check_requirements() {
 
 function download_wheels() {
   echo ""
-  echo "Downloading wheels from '${RELEASE}'"
+  echo "Downloading wheels from '${RELEASE}'..."
   gh release download "${RELEASE}" --repo iree-org/iree --pattern "*.whl"
+
+  echo ""
+  echo "Downloaded wheels:"
+  ls
+}
+
+function edit_release_versions() {
+  echo ""
+  echo "Editing release versions..."
+  for file in *
+  do
+    ${SCRIPT_DIR}/promote_whl_from_rc_to_final.py ${file} --delete-old-wheel
+  done
+
+  echo "Edited wheels:"
+  ls
 }
 
 function upload_wheels() {
+  echo ""
+  echo "Uploading wheels..."
   twine upload --verbose *
 }
 
@@ -79,6 +97,7 @@ function main() {
   fi
 
   download_wheels
+  edit_release_versions
   upload_wheels
 }
 
