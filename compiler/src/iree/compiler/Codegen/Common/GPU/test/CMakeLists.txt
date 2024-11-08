@@ -30,6 +30,7 @@ iree_lit_test_suite(
     "gpu_materialize_encoding_gfx942.mlir"
     "gpu_nested_layout_contract_amdgpu.mlir"
     "gpu_nested_layout_vector_distribution.mlir"
+    "gpu_nested_layout_vector_distribution_step.mlir"
     "gpu_pipeline.mlir"
     "gpu_promote_matmul_operands.mlir"
     "gpu_reorder_workgroups.mlir"
