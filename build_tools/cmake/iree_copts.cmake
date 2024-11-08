@@ -68,11 +68,21 @@ set(IREE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(IREE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(IREE_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
-# Key compilation options
+# By default we apply visibility control explicitly. However, this is available
+# as an option for users who need to control this explicitly (i.e. if
+# re-exporting, etc). Defaulting this to on with explicit API control macros
+# makes Linux and Windows behave similarly with respect to shared libraries
+# and DLLs.
+if(IREE_VISIBILITY_HIDDEN)
 iree_select_compiler_opts(IREE_DEFAULT_COPTS
   CLANG_OR_GCC
     "-fvisibility=hidden"
+)
+endif()
 
+# Key compilation options
+iree_select_compiler_opts(IREE_DEFAULT_COPTS
+  CLANG_OR_GCC
     # NOTE: The RTTI setting must match what LLVM was compiled with (defaults
     # to RTTI disabled).
     "$<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>"
