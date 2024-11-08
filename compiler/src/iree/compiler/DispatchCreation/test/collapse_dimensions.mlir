@@ -578,7 +578,10 @@ util.func public @collapse_attention(%arg0: tensor<20x4096x16xf16>, %arg1: tenso
 }
 
 // CHECK-LABEL: util.func public @collapse_attention
-//       CHECK:   flow.return {{.*}} : tensor<20x4096x64xf16>
+//       CHECK:   %[[ATTN:.*]] = iree_linalg_ext.attention
+//  CHECK-SAME:      tensor<20x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16
+//  CHECK-SAME:      tensor<20x4096x64xf16>
+//       CHECK:   flow.return %[[ATTN]] : tensor<20x4096x64xf16>
 
 // -----
 
@@ -610,4 +613,9 @@ util.func public @collapse_attention_with_truncf(%arg0: tensor<20x4096x16xf32>, 
 }
 
 // CHECK-LABEL: util.func public @collapse_attention_with_truncf
-//       CHECK:   flow.return {{.*}} : tensor<20x4096x64xf16>
+//       CHECK:   %[[ATTN:.*]] = iree_linalg_ext.attention
+//  CHECK-SAME:      tensor<20x4096x16xf32>, tensor<20x1024x16xf32>, tensor<20x1024x64xf32>, f32
+//  CHECK-SAME:      tensor<20x4096x64xf32>
+//       CHECK:   %[[TRUNC:.*]] = linalg.generic
+//  CHECK-SAME:      ins(%[[ATTN]] : tensor<20x4096x64xf32>
+//       CHECK:   flow.return %[[TRUNC]] : tensor<20x4096x64xf16>
