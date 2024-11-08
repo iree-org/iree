@@ -25,6 +25,7 @@ iree_cc_library(
     MLIRCAPITransformDialect
     MLIRCAPITransformDialectTransforms
     MLIRCAPITransforms
+    StablehloCAPI
     iree::compiler::API::Internal::CompilerDriver
     iree::compiler::API::Internal::IREECompileToolEntryPoint
     iree::compiler::API::Internal::IREEMLIRLSPServerToolEntryPoint
@@ -76,6 +77,8 @@ set(_EXPORT_OBJECT_LIBS
   obj.MLIRCAPITransforms
   obj.MLIRCAPITransformDialect
   obj.MLIRCAPITransformDialectTransforms
+  obj.StablehloCAPI
+  StablehloCAPI
   iree_compiler_API_Internal_CompilerDriver.objects
   iree_compiler_API_Internal_IREECompileToolEntryPoint.objects
   iree_compiler_API_Internal_IREEGPUDialectCAPI.objects
@@ -136,7 +139,13 @@ foreach(_object_lib ${_EXPORT_OBJECT_LIBS})
   # that show like generator expressions are showing up in link lines, this is
   # the culprit. Look at the export_objects_debug.txt to confirm. Then, add
   # another level of fix upstream if you like pain.
-  list(APPEND _EXPORT_OBJECT_DEPS "$<GENEX_EVAL:$<GENEX_EVAL:$<GENEX_EVAL:$<GENEX_EVAL:$<TARGET_PROPERTY:${_object_lib},LINK_LIBRARIES>>>>>")
+  get_target_property(type "${_object_lib}" TYPE)
+  if (${type} STREQUAL "OBJECT_LIBRARY")
+    list(APPEND _EXPORT_OBJECT_DEPS "$<GENEX_EVAL:$<GENEX_EVAL:$<GENEX_EVAL:$<GENEX_EVAL:$<TARGET_PROPERTY:${_object_lib},LINK_LIBRARIES>>>>>")
+  elseif (${type} STREQUAL "STATIC_LIBRARY")
+    get_target_property(_libs "${_object_lib}" INTERFACE_LINK_LIBRARIES)
+    list(APPEND _EXPORT_OBJECT_DEPS "${_libs}")
+  endif()
 endforeach()
 
 # UNCOMMENT TO DEBUG WHAT IS GOING ON.

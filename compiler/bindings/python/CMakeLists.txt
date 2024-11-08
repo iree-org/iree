@@ -185,6 +185,107 @@ declare_mlir_python_extension(IREECompilerPythonExtensions.CompilerDialects
     LLVMSupport
 )
 
+if (IREE_INPUT_STABLEHLO)
+  set(STABLEHLO_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../third_party/stablehlo")
+  set(STABLEHLO_PYTHON_SOURCE_DIR "${STABLEHLO_SOURCE_DIR}/stablehlo/integrations/python")
+  include_directories(${STABLEHLO_SOURCE_DIR})
+
+  declare_mlir_python_sources(CheckPythonSources.Dialects
+    ADD_TO_PARENT IREEPythonSources
+  )
+
+  declare_mlir_dialect_python_bindings(
+    ADD_TO_PARENT CheckPythonSources.Dialects
+    ROOT_DIR "${STABLEHLO_PYTHON_SOURCE_DIR}/mlir"
+    TD_FILE dialects/CheckOps.td
+    SOURCES dialects/check.py
+    DIALECT_NAME check)
+
+  declare_mlir_python_sources(ChloPythonSources.Dialects
+    ADD_TO_PARENT IREEPythonSources
+  )
+
+  declare_mlir_dialect_python_bindings(
+    ADD_TO_PARENT ChloPythonSources.Dialects
+    ROOT_DIR "${STABLEHLO_PYTHON_SOURCE_DIR}/mlir"
+    TD_FILE dialects/ChloOps.td
+    SOURCES dialects/chlo.py
+    DIALECT_NAME chlo)
+
+  declare_mlir_python_sources(StablehloPythonSources.Dialects
+    ADD_TO_PARENT IREEPythonSources
+  )
+
+  declare_mlir_dialect_python_bindings(
+    ADD_TO_PARENT StablehloPythonSources.Dialects
+    ROOT_DIR "${STABLEHLO_PYTHON_SOURCE_DIR}/mlir"
+    TD_FILE dialects/StablehloOps.td
+    SOURCES dialects/stablehlo.py
+    DIALECT_NAME stablehlo)
+
+  declare_mlir_python_sources(VhloPythonSources.Dialects
+    ADD_TO_PARENT IREEPythonSources
+  )
+
+  declare_mlir_dialect_python_bindings(
+    ADD_TO_PARENT VhloPythonSources.Dialects
+    ROOT_DIR "${STABLEHLO_PYTHON_SOURCE_DIR}/mlir"
+    TD_FILE dialects/VhloOps.td
+    SOURCES dialects/vhlo.py
+    DIALECT_NAME vhlo)
+
+  ################################################################################
+  # Extensions
+  ################################################################################
+
+  set(STABLEHLO_PYTHON_SOURCE_DIR "/../../../third_party/stablehlo/stablehlo/integrations/python")
+
+  declare_mlir_python_extension(CheckPythonExtensions.Main
+    MODULE_NAME _check
+    ADD_TO_PARENT IREECompilerPythonExtensions.CompilerDialects
+    SOURCES
+      "${STABLEHLO_PYTHON_SOURCE_DIR}/CheckModule.cpp"
+    EMBED_CAPI_LINK_LIBS
+      CheckCAPI
+    PRIVATE_LINK_LIBS
+      LLVMSupport
+  )
+
+  declare_mlir_python_extension(ChloPythonExtensions.Main
+    MODULE_NAME _chlo
+    ADD_TO_PARENT IREECompilerPythonExtensions.CompilerDialects
+    SOURCES
+      "${STABLEHLO_PYTHON_SOURCE_DIR}/ChloModule.cpp"
+    EMBED_CAPI_LINK_LIBS
+      ChloCAPI
+    PRIVATE_LINK_LIBS
+      LLVMSupport
+  )
+
+  declare_mlir_python_extension(StablehloPythonExtensions.Main
+    MODULE_NAME _stablehlo
+    ADD_TO_PARENT IREECompilerPythonExtensions.CompilerDialects
+    SOURCES
+      "${STABLEHLO_PYTHON_SOURCE_DIR}/StablehloApi.cpp"
+      "${STABLEHLO_PYTHON_SOURCE_DIR}/StablehloModule.cpp"
+    EMBED_CAPI_LINK_LIBS
+      StablehloCAPI
+    PRIVATE_LINK_LIBS
+      LLVMSupport
+  )
+
+  declare_mlir_python_extension(VhloPythonExtensions.Main
+    MODULE_NAME _vhlo
+    ADD_TO_PARENT IREECompilerPythonExtensions.CompilerDialects
+    SOURCES
+      "${STABLEHLO_PYTHON_SOURCE_DIR}/VhloModule.cpp"
+    EMBED_CAPI_LINK_LIBS
+      VhloCAPI
+    PRIVATE_LINK_LIBS
+      LLVMSupport
+  )
+endif()
+
 ################################################################################
 # Generate packages and shared library
 ################################################################################
