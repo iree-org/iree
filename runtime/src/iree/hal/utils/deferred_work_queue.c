@@ -1384,10 +1384,12 @@ iree_status_t iree_hal_deferred_work_queue_issue(
 
   IREE_TRACE_ZONE_END(z1);
 #if IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
-  IREE_TRACE_PLOT_VALUE_I64("num_pending_actions", num_pending);
-  IREE_TRACE_PLOT_VALUE_I64("num_ready_actions", num_ready);
-  IREE_TRACE_PLOT_VALUE_I64("num_pending_alloc_actions", num_pending_alloc);
-  IREE_TRACE_PLOT_VALUE_I64("num_pending_dealloc_actions", num_pending_dealloc);
+  IREE_TRACE_PLOT_VALUE_I64("iree_hal_work_queue_pending", num_pending);
+  IREE_TRACE_PLOT_VALUE_I64("iree_hal_work_queue_ready", num_ready);
+  IREE_TRACE_PLOT_VALUE_I64("iree_hal_work_queue_pending_alloc",
+                            num_pending_alloc);
+  IREE_TRACE_PLOT_VALUE_I64("iree_hal_work_queue_pending_dealloc",
+                            num_pending_dealloc);
 #endif
 
   // Preserve pending timepoints.
