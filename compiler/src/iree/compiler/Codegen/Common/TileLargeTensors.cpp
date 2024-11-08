@@ -54,18 +54,24 @@ static void tileToMaxVectorSize(RewriterBase &rewriter,
                                 int64_t maxVectorSize) {
   assert(maxVectorSize >= 1 && "maximum vector size must be at least 1");
   SmallVector<int64_t> staticTileSizes = linalgOp.getStaticLoopRanges();
+  SmallVector<utils::IteratorType> iteratorTypes =
+      linalgOp.getIteratorTypesArray();
 
   // Collect the total statically known parallel iterations of the linalg op.
-  // We are expected this to be the minimum required vector size for the op
+  // We expect this to be the minimum required vector size for the op
   // because outputs should reflect the full parallel iteration space.
   int64_t staticNumTrips = 1;
-  for (auto [size, type] :
-       llvm::zip_equal(staticTileSizes, linalgOp.getIteratorTypesArray())) {
+  for (auto [size, type] : llvm::zip_equal(staticTileSizes, iteratorTypes)) {
     // Skip reduction iterators.
     if (type == utils::IteratorType::reduction) {
       continue;
     }
     if (ShapedType::isDynamic(size)) {
+      // Tile all dynamic dims to 1 as well to enable new vectorization
+      // opportunities. This also ensures all entries in staticTileSizes are
+      // static.
+      // TODO: This may want to be a pass option in case strategies like
+      // masked vectorization are employed for dynamic shapes.
       size = 1;
     } else {
       staticNumTrips *= size;
@@ -73,23 +79,32 @@ static void tileToMaxVectorSize(RewriterBase &rewriter,
   }
 
   int64_t expectedMinVectorSize = staticNumTrips;
+  int64_t lastParallelDim = 0;
   for (int64_t i = 0, e = staticTileSizes.size() - 1; i < e; ++i) {
+    if (iteratorTypes[i] == utils::IteratorType::reduction) {
+      continue;
+    }
+    lastParallelDim = i;
     // While we exceed the maximum vector size, set the tile size for all
     // loops except the inner most to 1. This assumes that the only dimension
     // that can be meaningfully vectorized is the inner most which is not always
     // true. Considering this is fallback logic, this is fine.
     if (expectedMinVectorSize > maxVectorSize) {
-      // These two quantities are always divisible.
+      // These two quantities are always divisible. Also staticTileSizes[i] is
+      // always static since we set all dynamic entries to 1.
       expectedMinVectorSize /= staticTileSizes[i];
       staticTileSizes[i] = 1;
     }
+  }
+  if (iteratorTypes.back() == utils::IteratorType::parallel) {
+    lastParallelDim = staticTileSizes.size() - 1;
   }
 
   // For the inner most loop, pick the largest static integer factor that is
   // less than the maximum vector size. This might not be a great approximation
   // and we may opt for a smaller default in the future.
   if (expectedMinVectorSize > maxVectorSize) {
-    staticTileSizes.back() =
+    staticTileSizes[lastParallelDim] =
         getLargestFactorLessThan(expectedMinVectorSize, maxVectorSize);
   }
 
@@ -115,7 +130,7 @@ static void tileToMaxVectorSize(RewriterBase &rewriter,
       -> std::optional<scf::SCFTileAndFuseOptions::ControlFnResult> {
     // Always fuse tilable ops but never yield a replacement.
     if (!isa<TilingInterface>(originalProducer.getOwner())) {
-      return {};
+      return std::nullopt;
     }
     return scf::SCFTileAndFuseOptions::ControlFnResult{
         /*yieldProducerReplacement=*/false};
