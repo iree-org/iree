@@ -149,26 +149,30 @@ static SmallVector<ReassociationIndices> getCollapsibleLoops(Operation *op) {
     range.push_back(position);
     preExpr = nextExpr;
   }
-  if (range.size() > 1)
+  if (range.size() > 1) {
     contiguousLoops.push_back(range);
+  }
 
   return contiguousLoops;
 }
 
 /// Returns true if the given op is collapsable.
 static bool isEligibleForCollapse(Operation *op) {
-  if (isa<IREE::LinalgExt::AttentionOp>(op))
+  if (isa<IREE::LinalgExt::AttentionOp>(op)) {
     return true;
+  }
 
   auto genericOp = dyn_cast<linalg::GenericOp>(op);
-  if (!genericOp)
+  if (!genericOp) {
     return false;
+  }
 
   // TODO(guray) There is no mechanism to tell the collapsed indexes to
   // `tensor.expand_shape`. Once we have this support in MLIR, we can enable
   // dynamic tensor shapes.
-  if (genericOp.hasDynamicShape())
+  if (genericOp.hasDynamicShape()) {
     return false;
+  }
 
   // TODO(guray) Currently we can only collapse when result of all the
   // AffineMaps are dimensions. Possible to collapse cases like
@@ -183,19 +187,22 @@ static bool isEligibleForCollapse(Operation *op) {
 
   // TODO(guray) Collapsing caused performance regression in a cpu
   // benchmark, so we disable it.
-  if (genericOp.hasIndexSemantics())
+  if (genericOp.hasIndexSemantics()) {
     return false;
+  }
 
   // TODO(#17948) GPU codegen fails when we collapse the dimensions of softmax.
   if (llvm::any_of(genericOp.getDpsInputOperands(),
                    [&](OpOperand *operand) -> bool {
                      auto genericOperand =
                          operand->get().getDefiningOp<linalg::GenericOp>();
-                     if (!genericOperand)
+                     if (!genericOperand) {
                        return false;
+                     }
 
-                     if (genericOperand.getNumReductionLoops() == 0)
+                     if (genericOperand.getNumReductionLoops() == 0) {
                        return false;
+                     }
 
                      return genericOp.getMatchingIndexingMap(operand)
                          .isProjectedPermutation();
@@ -853,8 +860,9 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
   }
   // Step 1. Find the root Op
   std::optional<Operation *> rootOp = findRootOp(regionOp);
-  if (!rootOp.has_value())
+  if (!rootOp.has_value()) {
     return false;
+  }
 
   // Step 2. Get slice of all ops in the dispatch
   BackwardSliceOptions sliceOptions;
@@ -945,8 +953,9 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
                   FailureOr<linalg::CollapseResult> maybeReplacements =
                       mlir::linalg::collapseOpIterationDims(
                           genericOp, info.getReassocation(), rewriter);
-                  if (failed(maybeReplacements))
+                  if (failed(maybeReplacements)) {
                     return failure();
+                  }
                   return maybeReplacements->results;
                 })
             .Case<IREE::LinalgExt::AttentionOp>(
@@ -954,16 +963,18 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
                   FailureOr<IREE::LinalgExt::CollapseResult> maybeReplacements =
                       IREE::LinalgExt::collapseOpIterationDims(
                           attentionOp, info.getReassocation(), rewriter);
-                  if (failed(maybeReplacements))
+                  if (failed(maybeReplacements)) {
                     return failure();
+                  }
                   return maybeReplacements->results;
                 })
             .Default([&](void *) -> ResultsType {
               llvm_unreachable("no type matched");
               return failure();
             });
-    if (failed(maybeReplacements))
+    if (failed(maybeReplacements)) {
       continue;
+    }
     didCollapse = true;
     rewriter.replaceOp(opToCollapse, maybeReplacements.value());
   }
