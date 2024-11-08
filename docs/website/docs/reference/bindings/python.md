@@ -24,6 +24,13 @@ components:
 Collectively, these packages allow for importing from frontends, compiling
 towards various targets, and executing compiled code on IREE's backends.
 
+???+ Note "Note - `iree-compiler` and `iree-runtime` are deprecated"
+    The Python packages `iree-compiler` and `iree-runtime` have been
+    renamed to `iree-base-compiler` and `iree-base-runtime`
+    respectively, thus effectively deprecating the old packages.
+    This name change only affects the names of the packages but not
+    the modules.
+
 ## :octicons-download-16: Prerequisites
 
 To use IREE's Python bindings, you will first need to install
