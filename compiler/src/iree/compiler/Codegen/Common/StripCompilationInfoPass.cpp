@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/WalkPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-strip-compilation-info"
 
@@ -66,9 +66,7 @@ struct StripCompilationInfoPass final
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns.add<StripCompilationInfo>(&getContext());
-    if (failed(
-            applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
-      signalPassFailure();
+    walkAndApplyPatterns(getOperation(), std::move(patterns));
   }
 };
 } // namespace
