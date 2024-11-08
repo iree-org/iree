@@ -57,6 +57,11 @@ llvm::cl::opt<bool> clGPUTestTileAndFuseVectorize(
         "test the tile and fuse pipeline for all supported operations"),
     llvm::cl::init(false));
 
+llvm::cl::opt<bool> clLLVMGPUVectorizePipeline(
+    "iree-codegen-llvmgpu-vectorize-pipeline",
+    llvm::cl::desc("forces use of the legacy LLVMGPU vectorize pipeline"),
+    llvm::cl::init(false));
+
 llvm::cl::opt<bool> clGPUEnableVectorDistribution(
     "iree-codegen-llvmgpu-use-vector-distribution",
     llvm::cl::desc("enable the usage of the vector distribution pipeline"),
@@ -2175,6 +2180,13 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       })
       .Default([&](auto op) {
         LDBG("Default Config");
+        if (!clLLVMGPUVectorizePipeline) {
+          if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(
+                  target, entryPointFn, computeOp))) {
+            LDBG("Tile and fuse default config");
+            return success();
+          }
+        }
         return setRootDefaultConfig(target, entryPointFn, computeOp);
       });
 }
