@@ -18,6 +18,14 @@ struct TorchToIREELoweringPipelineOptions
   Option<bool> strictSymbolicShapes{
       *this, "strict-symbolic-shapes",
       llvm::cl::desc("Use strict symbolic shapes."), llvm::cl::init(true)};
+  Option<bool> decompose{*this, "torch-use-decompose-complex-ops",
+                         llvm::cl::desc("Decompose complex torch operations."),
+                         llvm::cl::init(true)};
+  ListOption<std::string> backendLegalOps{
+      *this, "backend-legal-ops",
+      llvm::cl::desc("List of ops to be considered legal by "
+                     "torch-decompose-complex-ops. Use this for ops that have "
+                     "disadvantageous decompositions for our backend.")};
 };
 
 // Creates a pipeline that lowers from the torch backend contract to IREE.
