@@ -1,0 +1,2 @@
+iree-base-compiler==2.9.*
+iree-base-runtime==2.9.*
