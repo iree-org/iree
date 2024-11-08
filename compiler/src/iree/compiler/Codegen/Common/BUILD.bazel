@@ -139,6 +139,7 @@ iree_compiler_cc_library(
         "RemoveSingleIterationLoop.cpp",
         "ReplaceSlowMinMaxOps.cpp",
         "SplitFullPartialTransferPass.cpp",
+        "StripConfigInfoPass.cpp",
         "TensorDynamicDimAnalysis.cpp",
         "TensorToVectorVectorizePad.cpp",
         "TestExecutablePreprocessing.cpp",

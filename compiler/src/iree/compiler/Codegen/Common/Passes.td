@@ -490,6 +490,11 @@ def RemoveSingleIterationLoopPass :
   let summary = "Remove distributed loop with single iteration.";
 }
 
+def StripConfigInfoPass :
+    InterfacePass<"iree-codegen-strip-config-info", "mlir::FunctionOpInterface">{
+   let summary = "Remove all the the lowering configuration and translation info.";
+}
+
 // TODO: Replace with upstream: https://github.com/iree-org/iree/issues/18759
 def IREELoopInvariantCodeMotionPass :
   Pass<"iree-loop-invariant-code-motion", ""> {
