@@ -20,6 +20,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
@@ -140,11 +141,22 @@ public:
       // TODO(hanchung): Populate the EncodingSolverAttr when it is ready.
       for (auto target : resultSet) {
         if (target.hasConfigurationAttr("encoding_solver")) {
-          Attribute attr =
-              target.getConfiguration()
-                  .getAs<IREE::Encoding::EncodingSolverInterfaceAttr>(
-                      "encoding_solver");
-          targetAttrs.insert(attr ? attr : target);
+          auto configAttr = target.getConfiguration();
+          SmallVector<NamedAttribute> newConfigAttr(
+              configAttr.getValue().begin(), configAttr.getValue().end());
+          for (auto [idx, val] : llvm::enumerate(newConfigAttr)) {
+            if (val.getName() == "encoding_solver") {
+              std::swap(newConfigAttr[idx], newConfigAttr.back());
+              newConfigAttr.pop_back();
+              break;
+            }
+          }
+          auto attr =
+              llvm::dyn_cast<IREE::Encoding::EncodingSolverInterfaceAttr>(
+                  configAttr.getNamed("encoding_solver")->getValue());
+          attr = attr.cloneWithConfig(
+              DictionaryAttr::get(attr.getContext(), newConfigAttr));
+          targetAttrs.insert(attr);
         } else {
           targetAttrs.insert(target);
         }
