@@ -102,7 +102,11 @@ getTensorDivisibilityInfo(const TensorDynamicDimAnalysis &dynamicDimAnalysis,
 /// inverses of each other. The `util.optimization.barrier` avoid these from
 /// getting folded away during reshape propagation. Return the result of the
 /// `tensor.collapse_shape generated.
-static std::optional<Value>
+struct ReshapeOps {
+  tensor::ExpandShapeOp expandShapeOp;
+  tensor::CollapseShapeOp collapseShapeOp;
+};
+static std::optional<ReshapeOps>
 blockDynamicDimensionsOfValue(RewriterBase &rewriter,
                               const TensorDivisibilityInfo &divisibilityInfo,
                               Value v) {
@@ -154,14 +158,15 @@ blockDynamicDimensionsOfValue(RewriterBase &rewriter,
   auto outputType = RankedTensorType::get(
       staticOutputShape, tensorType.getElementType(), tensorType.getEncoding());
 
-  Value expandShape = rewriter.create<tensor::ExpandShapeOp>(
+  auto expandShapeOp = rewriter.create<tensor::ExpandShapeOp>(
       loc, outputType, v, reassociation, outputShape);
-  Value barrier =
-      rewriter.create<IREE::Util::OptimizationBarrierOp>(loc, expandShape)
-          .getResult(0);
-  Value collapseShape = rewriter.create<tensor::CollapseShapeOp>(
+  Value barrier = rewriter
+                      .create<IREE::Util::OptimizationBarrierOp>(
+                          loc, expandShapeOp.getResult())
+                      .getResult(0);
+  auto collapseShapeOp = rewriter.create<tensor::CollapseShapeOp>(
       loc, tensorType, barrier, reassociation);
-  return collapseShape;
+  return ReshapeOps{expandShapeOp, collapseShapeOp};
 }
 
 //===---------------------------------------------------------------------===//
@@ -169,7 +174,7 @@ blockDynamicDimensionsOfValue(RewriterBase &rewriter,
 //===---------------------------------------------------------------------===//
 
 /// For an operation, replace the operands at indices specified in
-/// `limitToOperandIndices` with the result of
+/// `limitToOperandNumbers` with the result of
 /// `tensor.expand_shape`/`tensor.collapse_shape` pair to materialize the
 /// information about dynamic dimensions that are known to be a multiple of a
 /// compile-time static value. For example,
@@ -190,11 +195,10 @@ blockDynamicDimensionsOfValue(RewriterBase &rewriter,
 /// ```
 static LogicalResult blockDynamicDimensions(
     RewriterBase &rewriter, const TensorDynamicDimAnalysis &dynamicDimAnalysis,
-    Operation *operation, llvm::SmallDenseSet<int64_t> limitToOperandIndices) {
-  OpBuilder::InsertionGuard g(rewriter);
-
+    Operation *operation, llvm::SmallDenseSet<int64_t> limitToOperandNumbers,
+    llvm::SmallDenseSet<int64_t> limitToResultNumbers) {
   for (OpOperand &operand : operation->getOpOperands()) {
-    if (!limitToOperandIndices.contains(operand.getOperandNumber()))
+    if (!limitToOperandNumbers.contains(operand.getOperandNumber()))
       continue;
     if (operand.get().getDefiningOp<tensor::CollapseShapeOp>())
       continue;
@@ -202,28 +206,52 @@ static LogicalResult blockDynamicDimensions(
         getTensorDivisibilityInfo(dynamicDimAnalysis, operand.get());
     if (operandDivisibilityInfo.empty())
       continue;
-    std::optional<Value> newOperand = blockDynamicDimensionsOfValue(
+    std::optional<ReshapeOps> reshapes = blockDynamicDimensionsOfValue(
         rewriter, operandDivisibilityInfo, operand.get());
-    if (newOperand) {
-      rewriter.modifyOpInPlace(operation,
-                               [&]() { operand.set(newOperand.value()); });
+    if (reshapes) {
+      rewriter.modifyOpInPlace(
+          operation, [&]() { operand.set(reshapes->collapseShapeOp); });
+    }
+  }
+
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPointAfter(operation);
+  for (OpResult result : operation->getResults()) {
+    if (!limitToResultNumbers.contains(result.getResultNumber()))
+      continue;
+    TensorDivisibilityInfo resultDivisibilityInfo =
+        getTensorDivisibilityInfo(dynamicDimAnalysis, result);
+    if (resultDivisibilityInfo.empty())
+      continue;
+    std::optional<ReshapeOps> reshapes =
+        blockDynamicDimensionsOfValue(rewriter, resultDivisibilityInfo, result);
+    if (reshapes) {
+      llvm::SmallPtrSet<Operation *, 1> ignoreUses;
+      ignoreUses.insert(reshapes->expandShapeOp);
+      rewriter.replaceAllUsesExcept(
+          result, reshapes->collapseShapeOp.getResult(), ignoreUses);
     }
   }
   return success();
 }
 
 /// Generic method for blocking all operands of an operation.
-static LogicalResult blockDynamicDimensionsOfAllTensorOperands(
+static LogicalResult blockDynamicDimensionsOfAllTensorOperandsAndResults(
     RewriterBase &rewriter, const TensorDynamicDimAnalysis &dynamicDimAnalysis,
     Operation *op) {
-  llvm::SmallDenseSet<int64_t> tensorOperandsList;
+  llvm::SmallDenseSet<int64_t> tensorOperandsList, tensorResultsList;
   for (OpOperand &opOperand : op->getOpOperands()) {
     if (isa<RankedTensorType>(opOperand.get().getType())) {
       tensorOperandsList.insert(opOperand.getOperandNumber());
     }
   }
+  for (OpResult result : op->getResults()) {
+    if (isa<RankedTensorType>(result.getType())) {
+      tensorResultsList.insert(result.getResultNumber());
+    }
+  }
   return blockDynamicDimensions(rewriter, dynamicDimAnalysis, op,
-                                tensorOperandsList);
+                                tensorOperandsList, tensorResultsList);
 }
 
 /// Block dynamic dimensions in operands of `LinalgOp`.
@@ -232,7 +260,7 @@ blockDynamicDimensions(RewriterBase &rewriter,
                        const TensorDynamicDimAnalysis &dynamicDimAnalysis,
                        linalg::LinalgOp linalgOp) {
   if (linalg::isaContractionOpInterface(linalgOp)) {
-    return blockDynamicDimensionsOfAllTensorOperands(
+    return blockDynamicDimensionsOfAllTensorOperandsAndResults(
         rewriter, dynamicDimAnalysis, linalgOp);
   }
   return success();
@@ -244,18 +272,18 @@ blockDynamicDimensions(RewriterBase &rewriter,
                        const TensorDynamicDimAnalysis &dynamicDimAnalysis,
                        IREE::LinalgExt::AttentionOp attentionOp) {
   // Only block the q and k values.
-  llvm::SmallDenseSet<int64_t> prunedOperandsList;
+  llvm::SmallDenseSet<int64_t> prunedOperandsList, prunedResultsList;
   prunedOperandsList.insert(attentionOp.getQueryMutable().getOperandNumber());
   prunedOperandsList.insert(attentionOp.getKeyMutable().getOperandNumber());
   return blockDynamicDimensions(rewriter, dynamicDimAnalysis, attentionOp,
-                                prunedOperandsList);
+                                prunedOperandsList, prunedResultsList);
 }
 
 /// Dispatch to methods that block dynamic dimensions of operations.
 static LogicalResult
 blockDynamicDimensions(RewriterBase &rewriter,
                        const TensorDynamicDimAnalysis &dynamicDimAnalysis,
-                       Operation *operation, bool test) {
+                       Operation *operation) {
   return TypeSwitch<Operation *, LogicalResult>(operation)
       .Case<IREE::LinalgExt::AttentionOp>([&](auto attentionOp) {
         return blockDynamicDimensions(rewriter, dynamicDimAnalysis,
@@ -264,13 +292,7 @@ blockDynamicDimensions(RewriterBase &rewriter,
       .Case<linalg::LinalgOp>([&](auto linalgOp) {
         return blockDynamicDimensions(rewriter, dynamicDimAnalysis, linalgOp);
       })
-      .Default([&](Operation *op) {
-        if (!test) {
-          return success();
-        }
-        return blockDynamicDimensionsOfAllTensorOperands(
-            rewriter, dynamicDimAnalysis, op);
-      });
+      .Default([&](Operation *op) { return success(); });
 }
 
 void BlockDynamicDimensionsPass::runOnOperation() {
@@ -284,7 +306,7 @@ void BlockDynamicDimensionsPass::runOnOperation() {
   IRRewriter rewriter(context);
   auto walkResult = operation->walk([&](Operation *op) -> WalkResult {
     rewriter.setInsertionPoint(op);
-    return blockDynamicDimensions(rewriter, dynamicDimAnalysis, op, test);
+    return blockDynamicDimensions(rewriter, dynamicDimAnalysis, op);
   });
   if (walkResult.wasInterrupted()) {
     return signalPassFailure();
