@@ -1003,7 +1003,7 @@ IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context) {
 }
 
 IREE::GPU::TargetAttr getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr target) {
-  if (auto config = getTargetConfig(target)) {
+  if (auto config = target.getConfiguration()) {
     if (auto attr = config.getAs<IREE::GPU::TargetAttr>("iree.gpu.target"))
       return attr;
   }

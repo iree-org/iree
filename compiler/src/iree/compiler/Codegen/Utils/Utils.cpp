@@ -9,7 +9,6 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
-#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -43,20 +42,6 @@ namespace mlir::iree_compiler {
 // Utility functions to get entry points
 //===----------------------------------------------------------------------===//
 
-DictionaryAttr getTargetConfig(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  if (!targetAttr)
-    return {};
-  auto configAttr = targetAttr.getConfiguration();
-  if (!configAttr)
-    return {};
-  if (auto encodingAttr = configAttr.getNamed("encoding_solver")) {
-    auto attr = llvm::dyn_cast<IREE::Encoding::EncodingSolverInterfaceAttr>(
-        encodingAttr->getValue());
-    return attr ? attr.getTargetConfig() : configAttr;
-  }
-  return configAttr;
-}
-
 std::optional<IREE::HAL::ExecutableExportOp>
 getEntryPoint(mlir::FunctionOpInterface funcOp) {
   auto variantOp = funcOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
@@ -81,7 +66,7 @@ getConfigStringAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
                     StringRef stringAttr) {
   if (!targetAttr)
     return std::nullopt;
-  auto config = getTargetConfig(targetAttr);
+  auto config = targetAttr.getConfiguration();
   if (!config)
     return std::nullopt;
   auto attr = config.getAs<StringAttr>(stringAttr);
@@ -95,7 +80,7 @@ getConfigIntegerAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
                      StringRef integerAttr) {
   if (!targetAttr)
     return std::nullopt;
-  auto config = getTargetConfig(targetAttr);
+  auto config = targetAttr.getConfiguration();
   if (!config)
     return std::nullopt;
   auto attr = config.getAs<IntegerAttr>(integerAttr);
@@ -109,7 +94,7 @@ getConfigBoolAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
                   StringRef integerAttr) {
   if (!targetAttr)
     return std::nullopt;
-  auto config = getTargetConfig(targetAttr);
+  auto config = targetAttr.getConfiguration();
   if (!config)
     return std::nullopt;
   auto attr = config.getAs<BoolAttr>(integerAttr);

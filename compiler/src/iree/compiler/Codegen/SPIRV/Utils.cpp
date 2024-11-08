@@ -24,7 +24,7 @@ bool usesSPIRVCodeGen(IREE::HAL::ExecutableVariantOp variantOp) {
     return false;
   }
 
-  DictionaryAttr configuration = getTargetConfig(variantOp.getTargetAttr());
+  DictionaryAttr configuration = variantOp.getTargetAttr().getConfiguration();
   // The spirv.target_env attribute is attached if going down SPIR-V CodeGen
   // pipelines. Later we turn spirv.target_env into iree.spirv.features after
   // materializing device queries.
@@ -38,7 +38,7 @@ DictionaryAttr getTargetConfigAttr(Operation *op) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   if (!targetAttr)
     return nullptr;
-  return getTargetConfig(targetAttr);
+  return targetAttr.getConfiguration();
 }
 
 bool usesIndirectBindingsAttr(Operation *op) {

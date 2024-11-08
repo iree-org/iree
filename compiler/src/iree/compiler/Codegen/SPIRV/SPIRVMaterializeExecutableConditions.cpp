@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -280,7 +279,7 @@ struct SPIRVMaterializeExecutableConditionsPass final
       return;
 
     IREE::HAL::ExecutableTargetAttr executableTarget = variantOp.getTarget();
-    DictionaryAttr configuration = getTargetConfig(executableTarget);
+    DictionaryAttr configuration = executableTarget.getConfiguration();
     auto spirvTarget = configuration.getAs<spirv::TargetEnvAttr>(
         spirv::getTargetEnvAttrName());
 

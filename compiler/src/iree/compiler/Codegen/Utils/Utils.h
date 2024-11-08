@@ -16,7 +16,6 @@
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Vector/IR/ScalableValueBoundsConstraintSet.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
-#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
@@ -29,12 +28,6 @@ static constexpr unsigned kNumMaxParallelDims = 3;
 //===----------------------------------------------------------------------===//
 // Utility functions to get entry points
 //===----------------------------------------------------------------------===//
-
-/// Returns the dictionary config that attached in targetAttr. Note that it is
-/// possible that a `targetAttr` has `encoding_solver` and the actual
-/// configuration is stored in the `encoding_solver`. It is intended. Otherwise
-/// the config is duplicated in the attributes.
-DictionaryAttr getTargetConfig(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 /// Returns true if the given `func` is a kernel dispatch entry point.
 bool isEntryPoint(mlir::FunctionOpInterface func);
