@@ -7,10 +7,12 @@
 #include "iree/compiler/Utils/ElementPackingUtils.h"
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/IR/BuiltinTypes.h"
 
 namespace mlir::iree_compiler {
@@ -62,52 +64,50 @@ Value calculateStorageElementCountInBytes(Location loc,
     staticCount *= IREE::Util::getRoundedElementByteWidth(alignedElementType);
   }
 
-  // TODO: Do we use makeComposedFoldedAffineApply here, so the index
-  // computation an be much simpler.
-  SmallVector<int64_t> paddedShape(shapedType.getShape());
-  SmallVector<Value> paddedDynamicDims(dynamicDims.begin(), dynamicDims.end());
+  // TODO(hanchung): Support subtypes. It should be supported, but the host
+  // could want to do something more (e.g., alignment).
   auto encoding = IREE::Encoding::getEncodingAttr(shapedType);
-  if (encoding && !encoding.getRoundDimsToArray().empty()) {
-    auto roundDimsTo = encoding.getRoundDimsToArray();
-    FailureOr<linalg::ContractionDimensions> cDims =
-        IREE::Encoding::getEncodingContractionDims(encoding);
-    auto pad = [&](int dim, int value) {
-      std::optional<unsigned> maybeMappedDim =
-          encoding.mapDimToOperandIndex(dim);
-      if (!maybeMappedDim) {
-        return;
+  if (encoding && encoding.getTargets()) {
+    auto targetsAttr = encoding.getTargets();
+    bool areAllSolvable =
+        llvm::all_of(targetsAttr.getValue(), [](Attribute attr) {
+          return isa<IREE::Encoding::EncodingSolverInterfaceAttr>(attr);
+        });
+    if (areAllSolvable && !encoding.getTargets().empty()) {
+      auto targets =
+          llvm::to_vector_of<IREE::Encoding::EncodingSolverInterfaceAttr>(
+              targetsAttr.getValue());
+      Value res;
+      for (auto encodingSolver : targets) {
+        Value requiredSize = getValueOrCreateConstantIndexOp(
+            builder, loc,
+            encodingSolver.calculateStorageElementCountInBytes(
+                builder, shapedType, dynamicDims));
+        if (!res) {
+          res = requiredSize;
+          continue;
+        }
+        res = builder.create<arith::MaxUIOp>(loc, res, requiredSize);
       }
-      unsigned mappedDim = maybeMappedDim.value();
-      if (shapedType.isDynamicDim(mappedDim)) {
-        auto alignment = builder.create<arith::ConstantIndexOp>(loc, value);
-        paddedDynamicDims[mappedDim] = builder.create<arith::CeilDivUIOp>(
-            loc, paddedDynamicDims[mappedDim], alignment);
-        paddedDynamicDims[mappedDim] = builder.create<arith::MulIOp>(
-            loc, paddedDynamicDims[mappedDim], alignment);
-      } else {
-        paddedShape[mappedDim] = llvm::alignTo(paddedShape[mappedDim], value);
+      if (staticCount == 1) {
+        return res;
       }
-    };
-    for (auto m : cDims->m) {
-      pad(m, roundDimsTo[0]);
-    }
-    for (auto n : cDims->n) {
-      pad(n, roundDimsTo[1]);
-    }
-    for (auto k : cDims->k) {
-      pad(k, roundDimsTo[2]);
+      // TODO: Make it work with subbytes. This is just prototype.
+      Value staticCountValue =
+          builder.create<arith::ConstantIndexOp>(loc, staticCount);
+      return builder.create<arith::MulIOp>(loc, res, staticCountValue);
     }
   }
 
   for (unsigned i = 0; i < shapedType.getRank(); ++i) {
     if (!shapedType.isDynamicDim(i))
-      staticCount *= paddedShape[i];
+      staticCount *= shapedType.getDimSize(i);
   }
 
   // Scale by dynamic dims, if present.
   auto value =
       builder.create<arith::ConstantIndexOp>(loc, staticCount).getResult();
-  for (auto dim : paddedDynamicDims) {
+  for (auto dim : dynamicDims) {
     value = builder.createOrFold<arith::MulIOp>(loc, value, dim);
   }
   // Sub-byte packing requires putting multiple elements in the same byte.
@@ -116,7 +116,7 @@ Value calculateStorageElementCountInBytes(Location loc,
     unsigned byteElements = 8 / elementBits;
     // Perform some basic sanity check to make sure the total count is byte
     // aligned for fully static shapes.
-    if (paddedDynamicDims.empty() && (staticCount * elementBits) % 8 != 0) {
+    if (dynamicDims.empty() && (staticCount * elementBits) % 8 != 0) {
       return nullptr;
     }
     auto divisor = builder.create<arith::ConstantIndexOp>(loc, byteElements);

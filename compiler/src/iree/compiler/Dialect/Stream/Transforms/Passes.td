@@ -73,6 +73,7 @@ def EncodeHostTensorsPass :
     to preserve behavior while lowering into the type-erased forms.
   }];
   let dependentDialects = [
+    "mlir::affine::AffineDialect",
     "mlir::arith::ArithDialect",
     "mlir::complex::ComplexDialect",
     "IREE::Stream::StreamDialect",
