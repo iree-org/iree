@@ -722,10 +722,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       targetSubgroupSize, pipelineConfig);
 }
 
-static LogicalResult
-setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
-                                     mlir::FunctionOpInterface entryPoint,
-                                     IREE::LinalgExt::AttentionOp op) {
+static LogicalResult setOnlineAttentionVectorDistributionConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
+    IREE::LinalgExt::OnlineAttentionOp op) {
   if (target.getWgp().getMma().empty())
     return failure();
 
@@ -1014,9 +1013,10 @@ setVectorDistributionConfig(IREE::GPU::TargetAttr target,
     }
   }
 
-  if (auto attnOp = dyn_cast<IREE::LinalgExt::AttentionOp>(computeOp)) {
+  if (auto attnOp = dyn_cast<IREE::LinalgExt::OnlineAttentionOp>(computeOp)) {
     LDBG("VectorDistribution: trying to find a suitable attention config");
-    return setAttentionVectorDistributionConfig(target, entryPoint, attnOp);
+    return setOnlineAttentionVectorDistributionConfig(target, entryPoint,
+                                                      attnOp);
   }
 
   LDBG("VectorDistribution: failed to find a suitable config");

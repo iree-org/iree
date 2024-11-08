@@ -2136,6 +2136,37 @@ LogicalResult OnlineAttentionOp::getResultTilePosition(
   return success();
 }
 
+FailureOr<TilingResult> OnlineAttentionOp::generateResultTileValue(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) {
+  // Input offsets and sizes here are from the POV of the outputMap. We need to
+  // normalize these offsets and size for it to be useful.
+
+  // Initialize normalized offsets with 0s and normalized sizes with original
+  // size.
+  SmallVector<Range> iterationDomain(getIterationDomain(builder));
+  SmallVector<OpFoldResult> normalizedSizes =
+      llvm::map_to_vector(iterationDomain, [](Range x) { return x.size; });
+  SmallVector<OpFoldResult> normalizedOffsets(getIterationDomainRank(),
+                                              builder.getIndexAttr(0));
+  AffineMap outMap = getIndexingMapsArray()[getNumDpsInputs() + resultNumber];
+  ArrayRef<AffineExpr> outputDims = outMap.getResults();
+  for (auto [idx, dimExpr] : llvm::enumerate(outputDims)) {
+    int dim = cast<AffineDimExpr>(dimExpr).getPosition();
+    normalizedOffsets[dim] = offsets[idx];
+    normalizedSizes[dim] = sizes[idx];
+  }
+  FailureOr<TilingResult> tilingResult =
+      getTiledImplementation(builder, normalizedOffsets, normalizedSizes);
+  if (failed(tilingResult)) {
+    return failure();
+  }
+  Value requestedResultValue = tilingResult->tiledValues[resultNumber];
+  Operation *requestedResultSlice = tilingResult->generatedSlices[resultNumber];
+  return TilingResult{
+      tilingResult->tiledOps, {requestedResultValue}, {requestedResultSlice}};
+}
+
 //===---------------------------------------------------------------------===//
 // CustomOp
 //===---------------------------------------------------------------------===//

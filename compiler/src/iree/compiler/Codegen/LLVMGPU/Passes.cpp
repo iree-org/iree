@@ -841,9 +841,6 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createLLVMGPUPromoteMatmulToFitMMAPass());
   }
 
-  funcPassManager.addPass(
-      IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass());
-
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
@@ -1167,6 +1164,8 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
     funcPassManager.addPass(createBlockDynamicDimensionsPass);
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass);
     funcPassManager.addPass(createCSEPass);
+    funcPassManager.addPass(
+        IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass);
   }
   modulePassManager.addPass(createMaterializeUserConfigsPass());
   modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());

@@ -1340,17 +1340,11 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsArray() {
       getIndexingMaps().getAsValueRange<AffineMapAttr>());
 }
 
-FailureOr<SmallVector<int64_t>> AttentionOp::getStaticLoopRanges() {
-  SmallVector<int64_t> bounds(getIterationDomainRank());
-  SmallVector<bool> dimsFound(getIterationDomainRank(), false);
-
-  // batch(s), m, k1
-  ArrayRef<int64_t> queryShape = getQuery().getType().getShape();
-  ArrayRef<AffineExpr> queryDims = getQueryMap().getResults();
-  // batch(s), k2, n
-  ArrayRef<int64_t> valueShape = getValue().getType().getShape();
-  ArrayRef<AffineExpr> valueDims = getValueMap().getResults();
-
+static SmallVector<int64_t> getStaticLoopRangesForAttnLikeOps(
+    ArrayRef<int64_t> qShape, ArrayRef<AffineExpr> qDims,
+    ArrayRef<int64_t> vShape, ArrayRef<AffineExpr> vDims, int64_t iterDomRank) {
+  SmallVector<int64_t> bounds(iterDomRank);
+  SmallVector<bool> dimsFound(iterDomRank, false);
   auto fillSizes = [&](ArrayRef<int64_t> sizes, ArrayRef<AffineExpr> dims) {
     for (auto [size, dim] : llvm::zip_equal(sizes, dims)) {
       int pos = cast<AffineDimExpr>(dim).getPosition();
@@ -1361,9 +1355,21 @@ FailureOr<SmallVector<int64_t>> AttentionOp::getStaticLoopRanges() {
       dimsFound[pos] = true;
     }
   };
-  fillSizes(queryShape, queryDims);
-  fillSizes(valueShape, valueDims);
+  fillSizes(qShape, qDims);
+  fillSizes(vShape, vDims);
   return bounds;
+}
+
+FailureOr<SmallVector<int64_t>> AttentionOp::getStaticLoopRanges() {
+  // batch(s), m, k1
+  ArrayRef<int64_t> queryShape = getQuery().getType().getShape();
+  ArrayRef<AffineExpr> queryDims = getQueryMap().getResults();
+  // batch(s), k2, n
+  ArrayRef<int64_t> valueShape = getValue().getType().getShape();
+  ArrayRef<AffineExpr> valueDims = getValueMap().getResults();
+  int64_t iterDomRank = getIterationDomainRank();
+  return getStaticLoopRangesForAttnLikeOps(queryShape, queryDims, valueShape,
+                                           valueDims, iterDomRank);
 }
 
 SmallVector<AffineMap> AttentionOp::getIndexingMapsForOperands() {
@@ -1512,6 +1518,29 @@ LogicalResult OnlineAttentionOp::reifyResultShapes(
 SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsArray() {
   return SmallVector<AffineMap>(
       getIndexingMaps().getAsValueRange<AffineMapAttr>());
+}
+
+FailureOr<SmallVector<int64_t>> OnlineAttentionOp::getStaticLoopRanges() {
+  // batch(s), m, k1
+  ArrayRef<int64_t> queryShape = getQuery().getType().getShape();
+  ArrayRef<AffineExpr> queryDims = getQueryMap().getResults();
+  // batch(s), k2, n
+  ArrayRef<int64_t> valueShape = getValue().getType().getShape();
+  ArrayRef<AffineExpr> valueDims = getValueMap().getResults();
+  int64_t iterDomRank = getIterationDomainRank();
+  return getStaticLoopRangesForAttnLikeOps(queryShape, queryDims, valueShape,
+                                           valueDims, iterDomRank);
+}
+
+SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsForOperands() {
+  auto maps = getIndexingMapsArray();
+  maps.resize(getNumDpsInputs());
+  return maps;
+}
+
+SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsForResults() {
+  auto maps = getIndexingMapsArray();
+  return SmallVector<AffineMap>(maps.begin() + getNumDpsInputs(), maps.end());
 }
 
 //===----------------------------------------------------------------------===//

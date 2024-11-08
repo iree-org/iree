@@ -331,24 +331,35 @@ func.func @matmul_dynamic_dim() {
 func.func @attention_20x4096x64x4096x64() {
   %cst = arith.constant 1.250000e-01 : f16
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<20x4096x64xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<20x4096x64xf16>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<20x4096x64xf16>>
-  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<20x4096x64xf16>>
+  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<20x4096x64xf16>>
+  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<20x4096x64xf16>>
+  %2 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<20x4096x64xf16>>
+  %3 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>) binding(3) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<20x4096x64xf16>>
   %4 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<20x4096x64xf16>> -> tensor<20x4096x64xf16>
   %5 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<20x4096x64xf16>> -> tensor<20x4096x64xf16>
   %6 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<20x4096x64xf16>> -> tensor<20x4096x64xf16>
   %7 = tensor.empty() : tensor<20x4096x64xf16>
-  %8 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
-                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
-                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
-                     affine_map<(d0, d1, d2, d3, d4) -> ()>,
-                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
-                     ins(%4, %5, %6, %cst : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%7 : tensor<20x4096x64xf16>) {
-                      ^bb0(%score: f32):
-                        iree_linalg_ext.yield %score : f32
-                     } -> tensor<20x4096x64xf16>
-  flow.dispatch.tensor.store %8, %3, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : tensor<20x4096x64xf16> -> !flow.dispatch.tensor<writeonly:tensor<20x4096x64xf16>>
+  %8 = tensor.empty() : tensor<20x4096x64xf32>
+  %9 = tensor.empty() : tensor<20x4096xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %cst_1 = arith.constant -3.40282347E+38 : f32
+  %cst_2 = arith.constant 0.000000e+00 : f32
+  %10 = linalg.fill ins(%cst_0 : f32) outs(%8 : tensor<20x4096x64xf32>) -> tensor<20x4096x64xf32>
+  %11 = linalg.fill ins(%cst_1 : f32) outs(%9 : tensor<20x4096xf32>) -> tensor<20x4096xf32>
+  %12 = linalg.fill ins(%cst_2 : f32) outs(%9 : tensor<20x4096xf32>) -> tensor<20x4096xf32>
+  %13:3 = iree_linalg_ext.online_attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> ()>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>]} ins(%4, %5, %6, %cst : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%10, %11, %12 : tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>) {
+  ^bb0(%arg0: f32):
+    iree_linalg_ext.yield %arg0 : f32
+  } -> tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>
+  %14 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%13#2, %13#0 : tensor<20x4096xf32>, tensor<20x4096x64xf32>) outs(%7 : tensor<20x4096x64xf16>) {
+  ^bb0(%in: f32, %in_3: f32, %out: f16):
+    %cst_4 = arith.constant 1.000000e+00 : f32
+    %15 = arith.divf %cst_4, %in : f32
+    %16 = arith.mulf %15, %in_3 : f32
+    %17 = arith.truncf %16 : f32 to f16
+    linalg.yield %17 : f16
+  } -> tensor<20x4096x64xf16>
+  flow.dispatch.tensor.store %14, %3, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : tensor<20x4096x64xf16> -> !flow.dispatch.tensor<writeonly:tensor<20x4096x64xf16>>
   return
 }
 
@@ -377,24 +388,35 @@ func.func @attention_20x4096x64x4096x64() {
 func.func @attention_large_head_dim_shared_mem() {
   %cst = arith.constant 1.250000e-01 : f16
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1024x512xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128x512xf16>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128x512xf16>>
-  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1024x512xf16>>
+  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1024x512xf16>>
+  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128x512xf16>>
+  %2 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128x512xf16>>
+  %3 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>) binding(3) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1024x512xf16>>
   %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1024x512xf16>> -> tensor<1024x512xf16>
   %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [128, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x512xf16>> -> tensor<128x512xf16>
   %6 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [128, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x512xf16>> -> tensor<128x512xf16>
   %7 = tensor.empty() : tensor<1024x512xf16>
-  %8 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d1, d2, d3, d4) -> (d1, d2)>,
-                     affine_map<(d1, d2, d3, d4) -> (d3, d2)>,
-                     affine_map<(d1, d2, d3, d4) -> (d3, d4)>,
-                     affine_map<(d1, d2, d3, d4) -> ()>,
-                     affine_map<(d1, d2, d3, d4) -> (d1, d4)>]}
-                     ins(%4, %5, %6, %cst : tensor<1024x512xf16>, tensor<128x512xf16>, tensor<128x512xf16>, f16) outs(%7 : tensor<1024x512xf16>) {
-                      ^bb0(%score: f32):
-                        iree_linalg_ext.yield %score : f32
-                     } -> tensor<1024x512xf16>
-  flow.dispatch.tensor.store %8, %3, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1] : tensor<1024x512xf16> -> !flow.dispatch.tensor<writeonly:tensor<1024x512xf16>>
+  %8 = tensor.empty() : tensor<1024x512xf32>
+  %9 = tensor.empty() : tensor<1024xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %cst_1 = arith.constant -3.40282347E+38 : f32
+  %cst_2 = arith.constant 0.000000e+00 : f32
+  %10 = linalg.fill ins(%cst_0 : f32) outs(%8 : tensor<1024x512xf32>) -> tensor<1024x512xf32>
+  %11 = linalg.fill ins(%cst_1 : f32) outs(%9 : tensor<1024xf32>) -> tensor<1024xf32>
+  %12 = linalg.fill ins(%cst_2 : f32) outs(%9 : tensor<1024xf32>) -> tensor<1024xf32>
+  %13:3 = iree_linalg_ext.online_attention {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1)>, affine_map<(d0, d1, d2, d3) -> (d2, d1)>, affine_map<(d0, d1, d2, d3) -> (d2, d3)>, affine_map<(d0, d1, d2, d3) -> ()>, affine_map<(d0, d1, d2, d3) -> (d0, d3)>, affine_map<(d0, d1, d2, d3) -> (d0)>, affine_map<(d0, d1, d2, d3) -> (d0)>]} ins(%4, %5, %6, %cst : tensor<1024x512xf16>, tensor<128x512xf16>, tensor<128x512xf16>, f16) outs(%10, %11, %12 : tensor<1024x512xf32>, tensor<1024xf32>, tensor<1024xf32>) {
+  ^bb0(%arg0: f32):
+    iree_linalg_ext.yield %arg0 : f32
+  } -> tensor<1024x512xf32>, tensor<1024xf32>, tensor<1024xf32>
+  %14 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%13#2, %13#0 : tensor<1024xf32>, tensor<1024x512xf32>) outs(%7 : tensor<1024x512xf16>) {
+  ^bb0(%in: f32, %in_3: f32, %out: f16):
+    %cst_4 = arith.constant 1.000000e+00 : f32
+    %15 = arith.divf %cst_4, %in : f32
+    %16 = arith.mulf %15, %in_3 : f32
+    %17 = arith.truncf %16 : f32 to f16
+    linalg.yield %17 : f16
+  } -> tensor<1024x512xf16>
+  flow.dispatch.tensor.store %14, %3, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1] : tensor<1024x512xf16> -> !flow.dispatch.tensor<writeonly:tensor<1024x512xf16>>
   return
 }
 

@@ -577,13 +577,17 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
      DestinationStyleOpInterface, LinalgExtInterface,
+     DeclareOpInterfaceMethods<LinalgFusionInterface,
+      ["getIndexingMapsForResults", "getIndexingMapsForOperands",
+       "getStaticLoopRanges"]>,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
        "getLoopIteratorTypes",
        "getResultTilePosition",
-       "getTiledImplementation"]>]> {
+       "getTiledImplementation",
+       "generateResultTileValue"]>]> {
   let summary = "Online Attention operator";
   let description = [{
     Traditional scaled dot product attention computes:
