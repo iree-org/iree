@@ -17,9 +17,9 @@ namespace mlir::iree_compiler {
 namespace {
 
 // Checks whether the funcOp has any compilation info.
-LogicalResult hasCompilationInfo(func::FuncOp funcOp) {
+bool hasCompilationInfo(func::FuncOp funcOp) {
   if (getTranslationInfo(funcOp))
-    return success();
+    return true;
 
   bool hasAttrConfig = false;
   funcOp.walk([&](Operation *op) {
@@ -30,26 +30,22 @@ LogicalResult hasCompilationInfo(func::FuncOp funcOp) {
   });
 
   // Return success if any relevant attributes were found.
-  return hasAttrConfig ? success() : failure();
+  return hasAttrConfig;
 }
 
-class StripCompilationInfo : public OpRewritePattern<func::FuncOp> {
-public:
+struct StripCompilationInfo : public OpRewritePattern<func::FuncOp> {
   using OpRewritePattern<func::FuncOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(func::FuncOp funcOp,
                                 PatternRewriter &rewriter) const final {
-    if (failed(hasCompilationInfo(funcOp)))
+    if (!hasCompilationInfo(funcOp))
       return failure();
 
-    func::FuncOp newFuncOp =
-        dyn_cast<func::FuncOp>(rewriter.clone(*funcOp.getOperation()));
-
-    // if the cloned function has translation info, erase it
-    if (getTranslationInfo(newFuncOp)) {
-      eraseTranslationInfo(newFuncOp);
+    // if the function has translation info, erase it
+    if (getTranslationInfo(funcOp)) {
+      eraseTranslationInfo(funcOp);
     }
 
-    newFuncOp->walk([&](Operation *op) {
+    funcOp->walk([&](Operation *op) {
       if (getCompilationInfo(op)) {
         // Erase the compilation info configuration if it exists
         eraseCompilationInfo(op);
@@ -61,7 +57,6 @@ public:
       }
     });
 
-    rewriter.replaceOp(funcOp, newFuncOp);
     return success();
   }
 };
