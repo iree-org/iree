@@ -22,7 +22,7 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
-#define GEN_PASS_DEF_LINKEXECUTABLESPASS
+#define GEN_PASS_DEF_LINKALLEXECUTABLESPASS
 #define GEN_PASS_DEF_LINKTARGETEXECUTABLESPASS
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
 
@@ -66,13 +66,14 @@ struct LinkTargetExecutablesPass
 };
 
 //===----------------------------------------------------------------------===//
-// --iree-hal-link-executables
+// --iree-hal-link-all-executables
 //===----------------------------------------------------------------------===//
 
-struct LinkExecutablesPass
-    : public IREE::HAL::impl::LinkExecutablesPassBase<LinkExecutablesPass> {
-  using IREE::HAL::impl::LinkExecutablesPassBase<
-      LinkExecutablesPass>::LinkExecutablesPassBase;
+struct LinkAllExecutablesPass
+    : public IREE::HAL::impl::LinkAllExecutablesPassBase<
+          LinkAllExecutablesPass> {
+  using IREE::HAL::impl::LinkAllExecutablesPassBase<
+      LinkAllExecutablesPass>::LinkAllExecutablesPassBase;
   void runOnOperation() override {
     auto moduleOp = getOperation();
 

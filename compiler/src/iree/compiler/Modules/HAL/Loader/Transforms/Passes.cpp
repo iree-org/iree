@@ -77,7 +77,7 @@ void buildHALInlineDynamicTransformPassPipeline(
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
       IREE::HAL::createConfigureExecutablesPass({targetRegistry}));
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
-      IREE::HAL::createTranslateExecutablesPass({targetRegistry}));
+      IREE::HAL::createTranslateAllExecutablesPass({targetRegistry}));
 
   //----------------------------------------------------------------------------
   // Conversion
@@ -91,7 +91,8 @@ void buildHALInlineDynamicTransformPassPipeline(
   //----------------------------------------------------------------------------
 
   // Link executables together.
-  passManager.addPass(IREE::HAL::createLinkExecutablesPass({targetRegistry}));
+  passManager.addPass(
+      IREE::HAL::createLinkAllExecutablesPass({targetRegistry}));
 
   // Resolve export ordinals from nested symbol references prior to
   // serialization.
@@ -99,7 +100,7 @@ void buildHALInlineDynamicTransformPassPipeline(
 
   // Serialize executables to their binary forms.
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
-      IREE::HAL::createSerializeExecutablesPass(
+      IREE::HAL::createSerializeAllExecutablesPass(
           {&targetRegistry, targetOptions.debugLevel,
            targetOptions.executableIntermediatesPath,
            targetOptions.executableBinariesPath}));

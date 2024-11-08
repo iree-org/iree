@@ -139,10 +139,11 @@ static llvm::cl::list<std::string> clPreprocessExecutablesWith{
         "will fail compilation."),
 };
 
-static llvm::cl::opt<bool> clDebugDisableLinkExecutables{
-    "iree-hal-debug-disable-link-executables",
+static llvm::cl::opt<bool> clLinkExecutables{
+    "iree-hal-link-executables",
     llvm::cl::desc(
-        "Disables linking of executables. This allows inspecting serialization "
+        "Controls linking of executables. The default is to always link, "
+        "however disabling linking allows inspecting serialization "
         "of each executable in isolation and will dump a single binary per "
         "executable when used in conjunction with "
         "`--iree-hal-dump-executable-binaries-to`."),
@@ -419,7 +420,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
   if (compileFrom < PipelinePhase::ExecutableTargets) {
     passManager.addNestedPass<IREE::HAL::ExecutableOp>(
-        IREE::HAL::createTranslateExecutablesPass({targetRegistry}));
+        IREE::HAL::createTranslateAllExecutablesPass({targetRegistry}));
   }
 
   // If debug information is requested capture the translated MLIR source text
@@ -484,8 +485,9 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // example, the LLVM AOT backend may combine all executable targets for the
   // same architecture into a single executable and link it as a shared
   // library.
-  if (transformOptions.linkExecutables && !clDebugDisableLinkExecutables) {
-    passManager.addPass(IREE::HAL::createLinkExecutablesPass({targetRegistry}));
+  if (transformOptions.linkExecutables && clLinkExecutables) {
+    passManager.addPass(
+        IREE::HAL::createLinkAllExecutablesPass({targetRegistry}));
   }
 
   // Resolve export ordinals from nested symbol references prior to
@@ -546,7 +548,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // contents not turned into a big base64 string.
   if (transformOptions.serializeExecutables) {
     passManager.addNestedPass<IREE::HAL::ExecutableOp>(
-        IREE::HAL::createSerializeExecutablesPass(
+        IREE::HAL::createSerializeAllExecutablesPass(
             {&targetRegistry, targetOptions.debugLevel,
              targetOptions.executableIntermediatesPath,
              targetOptions.executableBinariesPath}));

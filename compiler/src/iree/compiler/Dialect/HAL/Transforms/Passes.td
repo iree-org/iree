@@ -376,8 +376,8 @@ def ConfigureTargetExecutableVariantsPass :
   ];
 }
 
-def TranslateExecutablesPass :
-    Pass<"iree-hal-translate-executables", "IREE::HAL::ExecutableOp"> {
+def TranslateAllExecutablesPass :
+    Pass<"iree-hal-translate-all-executables", "IREE::HAL::ExecutableOp"> {
   let summary = "Translates hal.executable ops via a nested translation pipeline.";
   let description = [{
     Runs a nested pipeline on each executable to translate its variants from
@@ -426,8 +426,8 @@ def PruneExecutablesPass :
   }];
 }
 
-def LinkExecutablesPass :
-    Pass<"iree-hal-link-executables", "mlir::ModuleOp"> {
+def LinkAllExecutablesPass :
+    Pass<"iree-hal-link-all-executables", "mlir::ModuleOp"> {
   let summary = "Links hal.executable ops into one or more hal.executable ops.";
   let description = [{
     Runs a nested pipeline to link multiple `hal.executable` ops together if the
@@ -479,8 +479,8 @@ def ResolveExportOrdinalsPass :
   ];
 }
 
-def SerializeExecutablesPass :
-    Pass<"iree-hal-serialize-executables", "IREE::HAL::ExecutableOp"> {
+def SerializeAllExecutablesPass :
+    Pass<"iree-hal-serialize-all-executables", "IREE::HAL::ExecutableOp"> {
   let summary = "Converts hal.executable.variants to one or more hal.executable.binary ops.";
   let description = [{
     Runs a nested pipeline on each executable to serialize its variants from
