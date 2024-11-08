@@ -21,6 +21,18 @@
 #define IREE_HAL_MAX_WAIT_EVENT_COUNT 32
 #define IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS 0
 
+#if IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
+IREE_TRACE(static const char* IREE_HAL_DEFERRED_WORKER_QUEUE_PENDING_PLOT_NAME =
+               "iree_hal_work_queue_pending");
+IREE_TRACE(static const char* IREE_HAL_DEFERRED_WORKER_QUEUE_READY_PLOT_NAME =
+               "iree_hal_work_queue_ready");
+IREE_TRACE(
+    static const char* IREE_HAL_DEFERRED_WORKER_QUEUE_PENDING_ALLOC_PLOT_NAME =
+        "iree_hal_work_queue_pending_alloc");
+IREE_TRACE(static const char*
+               IREE_HAL_DEFERRED_WORKER_QUEUE_PENDING_DEALLOC_PLOT_NAME =
+                   "iree_hal_work_queue_pending_dealloc");
+#endif  // IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
 //===----------------------------------------------------------------------===//
 // Queue action
 //===----------------------------------------------------------------------===//
@@ -510,6 +522,21 @@ iree_status_t iree_hal_deferred_work_queue_create(
   IREE_ASSERT_ARGUMENT(block_pool);
   IREE_ASSERT_ARGUMENT(out_actions);
   IREE_TRACE_ZONE_BEGIN(z0);
+
+#if IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
+  IREE_TRACE_SET_PLOT_TYPE(IREE_HAL_DEFERRED_WORKER_QUEUE_PENDING_PLOT_NAME,
+                           IREE_TRACING_PLOT_TYPE_NUMBER, /*step=*/true,
+                           /*fill=*/true, /*color=*/0);
+  IREE_TRACE_SET_PLOT_TYPE(IREE_HAL_DEFERRED_WORKER_QUEUE_READY_PLOT_NAME,
+                           IREE_TRACING_PLOT_TYPE_NUMBER, /*step=*/true,
+                           /*fill=*/true, /*color=*/0);
+  IREE_TRACE_SET_PLOT_TYPE(
+      IREE_HAL_DEFERRED_WORKER_QUEUE_PENDING_ALLOC_PLOT_NAME,
+      IREE_TRACING_PLOT_TYPE_NUMBER, /*step=*/true, /*fill=*/true, /*color=*/0);
+  IREE_TRACE_SET_PLOT_TYPE(
+      IREE_HAL_DEFERRED_WORKER_QUEUE_PENDING_DEALLOC_PLOT_NAME,
+      IREE_TRACING_PLOT_TYPE_NUMBER, /*step=*/true, /*fill=*/true, /*color=*/0);
+#endif  //  IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
 
   iree_hal_deferred_work_queue_t* actions = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -1259,12 +1286,8 @@ iree_status_t iree_hal_deferred_work_queue_issue(
 
   IREE_TRACE_ZONE_BEGIN(z1);
 #if IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
-  IREE_TRACE({
-    uint32_t num_pending = 0;
-    uint32_t num_pending_alloc = 0;
-    uint32_t num_pending_dealloc = 0;
-    uint32_t num_ready = 0;
-  });
+  IREE_TRACE(uint32_t num_pending = 0; uint32_t num_pending_alloc = 0;
+             uint32_t num_pending_dealloc = 0; uint32_t num_ready = 0;);
 #endif  //  IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
 
   iree_status_t status = iree_ok_status();
@@ -1384,12 +1407,16 @@ iree_status_t iree_hal_deferred_work_queue_issue(
 
   IREE_TRACE_ZONE_END(z1);
 #if IREE_HAL_DEFERRED_WORKER_QUEUE_VERBOSE_PLOTS
-  IREE_TRACE_PLOT_VALUE_I64("iree_hal_work_queue_pending", num_pending);
-  IREE_TRACE_PLOT_VALUE_I64("iree_hal_work_queue_ready", num_ready);
-  IREE_TRACE_PLOT_VALUE_I64("iree_hal_work_queue_pending_alloc",
-                            num_pending_alloc);
-  IREE_TRACE_PLOT_VALUE_I64("iree_hal_work_queue_pending_dealloc",
-                            num_pending_dealloc);
+  IREE_TRACE_PLOT_VALUE_I64(IREE_HAL_DEFERRED_WORKER_QUEUE_PENDING_PLOT_NAME,
+                            num_pending);
+  IREE_TRACE_PLOT_VALUE_I64(IREE_HAL_DEFERRED_WORKER_QUEUE_READY_PLOT_NAME,
+                            num_ready);
+  IREE_TRACE_PLOT_VALUE_I64(
+      IREE_HAL_DEFERRED_WORKER_QUEUE_PENDING_ALLOC_PLOT_NAME,
+      num_pending_alloc);
+  IREE_TRACE_PLOT_VALUE_I64(
+      IREE_HAL_DEFERRED_WORKER_QUEUE_PENDING_DEALLOC_PLOT_NAME,
+      num_pending_dealloc);
 #endif
 
   // Preserve pending timepoints.
