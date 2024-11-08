@@ -639,15 +639,15 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # "Bootstrapping" by first looking for the optional Development component
   # seems to be robust generally.
   # See: https://reviews.llvm.org/D118148
-  # If building Python packages, we have a hard requirement on 3.9+.
-  find_package(Python3 3.9 COMPONENTS Interpreter Development NumPy)
-  find_package(Python3 3.9 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
+  # If building Python packages, we have a hard requirement on 3.10+.
+  find_package(Python3 3.10 COMPONENTS Interpreter Development NumPy)
+  find_package(Python3 3.10 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
   # Some parts of the build use FindPython instead of FindPython3. Why? No
   # one knows, but they are different. So make sure to bootstrap this one too.
   # Not doing this here risks them diverging, which on multi-Python systems,
   # can be troublesome. Note that pybind11 and nanobind require FindPython.
   set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
-  find_package(Python 3.9 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
+  find_package(Python 3.10 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
 elseif(IREE_BUILD_COMPILER OR IREE_BUILD_TESTS)
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
   set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
