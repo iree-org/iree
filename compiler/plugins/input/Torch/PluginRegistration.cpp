@@ -43,12 +43,6 @@ struct TorchOptions {
     binder.opt<bool>("torch-use-decompose-complex-ops", decompose,
                      llvm::cl::cat(category),
                      llvm::cl::desc("Decompose complex torch operations."));
-    // A list of ops that should be considered legal for the torch backend.
-    binder.list<std::string>(
-        "backend-legal-ops", backendLegalOps, llvm::cl::cat(category),
-        llvm::cl::desc("List of ops to be considered legal by "
-                       "torch-decompose-complex-ops. Use this for ops that "
-                       "have disadvantageous decompositions for our backend."));
   }
 };
 
