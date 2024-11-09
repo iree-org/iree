@@ -316,6 +316,13 @@ def test_run_unet_fp16_rocm(
 
 
 def test_compile_punet_int8_fp16_rocm(sdxl_punet_int8_fp16_mlir):
+    if rocm_chip == "gfx90a":
+        request.node.add_marker(
+            pytest.mark.xfail(
+                reason="Expected punet_int8_fp8 compilation on mi250 to fail",
+                strict=True,
+            )
+        )
     VmfbManager.sdxl_punet_int8_fp16_rocm_vmfb = iree_compile(
         sdxl_punet_int8_fp16_mlir,
         ROCM_COMPILE_FLAGS + INT8_PUNET_FLAGS,

@@ -122,7 +122,7 @@ def run_sdxl_punet_int8_fp16_rocm_benchmark(rocm_chip):
         "iree-benchmark-module",
         f"--device=hip",
         "--device_allocator=caching",
-        f"--module={punet_int8_fp16_dir_compile}/punet.rocm_{rocm_chip}.vmfb",
+        f"--module={punet_int8_fp16_dir_compile}/punet_fp16.rocm_{rocm_chip}.vmfb",
         f"--parameters=model={punet_int8_fp16_dir}/punet_weights.irpa",
         "--function=main",
         f"--input=1x4x128x128xf16",
@@ -292,7 +292,7 @@ def test_sdxl_rocm_benchmark(
         )
         logging.getLogger().info(compilation_line)
 
-        module_path = f"{punet_int8_fp16_dir_compile}/punet.rocm_{rocm_chip}.vmfb"
+        module_path = f"{punet_int8_fp16_dir_compile}/punet_fp16.rocm_{rocm_chip}.vmfb"
         punet_int8_fp16_binary_size = Path(module_path).stat().st_size
         compilation_line = (
             f"Punet F16 Binary Size: {punet_int8_fp16_binary_size} bytes"
