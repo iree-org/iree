@@ -95,11 +95,11 @@ func.func @distribute_thread_forall_single_thread(%out : memref<?xi32>)
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
 //   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
-//       CHECK:   %[[LINID:.+]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (2, 64)
+//       CHECK:   %[[TFLAT:.+]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (2, 64)
 //   CHECK-NOT:  scf.for
 //       CHECK:   %[[TIDGUARD:.+]] = arith.cmpi slt, %[[TFLAT]], %[[C1]]
 //       CHECK:   scf.if %[[TIDGUARD]] {
-//       CHECK:     memref.store {{.*}}[%[[LINID]]]
+//       CHECK:     memref.store {{.*}}[%[[TFLAT]]]
 
 // -----
 
