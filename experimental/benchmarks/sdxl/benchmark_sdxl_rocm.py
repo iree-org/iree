@@ -116,6 +116,7 @@ def run_sdxl_unet_rocm_benchmark(rocm_chip):
     # iree benchmark command for full sdxl pipeline
     return run_iree_command(exec_args)
 
+
 def run_sdxl_punet_int8_fp16_rocm_benchmark(rocm_chip):
     exec_args = [
         "iree-benchmark-module",
@@ -135,6 +136,7 @@ def run_sdxl_punet_int8_fp16_rocm_benchmark(rocm_chip):
     ]
     # iree benchmark command for full sdxl pipeline
     return run_iree_command(exec_args)
+
 
 def run_sdxl_prompt_encoder_rocm_benchmark(rocm_chip):
     exec_args = [
@@ -366,7 +368,11 @@ def test_sdxl_rocm_benchmark(
     ]
     if rocm_chip == "gfx942":
         mean_time_rows.append(
-            ["Punet F16", f"{benchmark_punet_int8_fp16_mean_time}", f"{goldentime_rocm_punet_int8_fp16}"]
+            [
+                "Punet F16",
+                f"{benchmark_punet_int8_fp16_mean_time}",
+                f"{goldentime_rocm_punet_int8_fp16}",
+            ]
         )
 
     # Create dispatch count table's header and rows
@@ -382,7 +388,11 @@ def test_sdxl_rocm_benchmark(
     ]
     if rocm_chip == "gfx942":
         dispatch_count_rows.append(
-            ["Punet F16", f"{punet_int8_fp16_dispatch_count}", f"{goldendispatch_rocm_punet_int8_fp16}"]
+            [
+                "Punet F16",
+                f"{punet_int8_fp16_dispatch_count}",
+                f"{goldendispatch_rocm_punet_int8_fp16}",
+            ]
         )
 
     # Create binary size table's header and rows
@@ -398,7 +408,11 @@ def test_sdxl_rocm_benchmark(
     ]
     if rocm_chip == "gfx942":
         binary_size_rows.append(
-            ["Punet F16", f"{punet_int8_fp16_binary_size}", f"{goldensize_rocm_punet_int8_fp16}"]
+            [
+                "Punet F16",
+                f"{punet_int8_fp16_binary_size}",
+                f"{goldensize_rocm_punet_int8_fp16}",
+            ]
         )
 
     # Create mean time table using tabulate

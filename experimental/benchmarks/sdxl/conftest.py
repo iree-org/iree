@@ -106,9 +106,11 @@ def goldentime_rocm_e2e(request):
 def goldentime_rocm_unet(request):
     return request.config.getoption("--goldentime-rocm-unet-ms")
 
+
 @pytest.fixture
 def goldentime_rocm_punet_int8_fp16(request):
     return request.config.getoption("--goldentime-rocm-punet-int8-fp16-ms")
+
 
 @pytest.fixture
 def goldentime_rocm_clip(request):
@@ -124,9 +126,11 @@ def goldentime_rocm_vae(request):
 def goldendispatch_rocm_unet(request):
     return request.config.getoption("--goldendispatch-rocm-unet")
 
+
 @pytest.fixture
 def goldendispatch_rocm_punet_int8_fp16(request):
     return request.config.getoption("--goldendispatch-rocm-punet-int8-fp16")
+
 
 @pytest.fixture
 def goldendispatch_rocm_clip(request):
@@ -142,9 +146,11 @@ def goldendispatch_rocm_vae(request):
 def goldensize_rocm_unet(request):
     return request.config.getoption("--goldensize-rocm-unet-bytes")
 
+
 @pytest.fixture
 def goldensize_rocm_punet_int8_fp16(request):
     return request.config.getoption("--goldensize-rocm-punet-int8-fp16-bytes")
+
 
 @pytest.fixture
 def goldensize_rocm_clip(request):
