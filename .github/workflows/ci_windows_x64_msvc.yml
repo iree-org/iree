@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   windows_x64_msvc:
-    runs-on: arc-runner-set
+    runs-on: arc-runner-set-1
     env:
       BASE_BUILD_DIR_POWERSHELL: C:\mnt\azure\b
       SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
