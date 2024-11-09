@@ -12,7 +12,7 @@ from conftest import VmfbManager
 from pathlib import Path
 
 vmfb_dir = os.getenv("TEST_OUTPUT_ARTIFACTS", default=Path.cwd())
-rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
+rocm_chip = os.getenv("ROCM_CHIP", default="gfx942")
 iree_test_path_extension = os.getenv("IREE_TEST_PATH_EXTENSION", default=Path.cwd())
 
 ###############################################################################
@@ -195,6 +195,7 @@ ROCM_COMPILE_FLAGS = [
     f"--iree-hip-target={rocm_chip}",
     "--iree-opt-const-eval=false",
     "--iree-global-opt-propagate-transposes=true",
+    "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
     "--iree-dispatch-creation-enable-aggressive-fusion=true",
     "--iree-opt-aggressively-propagate-transposes=true",
     "--iree-opt-outer-dim-concat=true",
@@ -315,7 +316,7 @@ def test_run_unet_fp16_rocm(
     )
 
 
-def test_compile_punet_int8_fp16_rocm(sdxl_punet_int8_fp16_mlir):
+def test_compile_punet_int8_fp16_rocm(request, sdxl_punet_int8_fp16_mlir):
     if rocm_chip == "gfx90a":
         request.node.add_marker(
             pytest.mark.xfail(
