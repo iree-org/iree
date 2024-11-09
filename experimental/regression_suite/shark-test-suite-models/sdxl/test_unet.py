@@ -94,7 +94,7 @@ sdxl_punet_int8_inference_input_5 = fetch_source_fixture(
 )
 
 sdxl_punet_int8_fp16_inference_output_0 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/new_punet_out.0.bin",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/11-8-2024/punet_fp16_out.0.bin",
     group="sdxl_punet_int8_fp16",
 )
 
@@ -104,14 +104,14 @@ sdxl_punet_int8_fp16_real_weights = fetch_source_fixture(
 )
 
 sdxl_punet_int8_fp16_mlir = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/punet.mlir",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/11-8-2024/punet_fp16.mlir",
     group="sdxl_punet_int8_fp16",
 )
 
 # INT8 Punet + FP8 Attention
 
 sdxl_punet_int8_fp8_inference_output_0 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/new_punet_fp8_out.0.bin",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/11-8-2024/punet_fp8_out.0.bin",
     group="sdxl_punet_int8_fp8",
 )
 
@@ -121,7 +121,7 @@ sdxl_punet_int8_fp8_real_weights = fetch_source_fixture(
 )
 
 sdxl_punet_int8_fp8_mlir = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/rob/sdxl-punet/punet_fp8.mlir",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/11-8-2024/punet_fp8.mlir",
     group="sdxl_punet_int8_fp8",
 )
 
