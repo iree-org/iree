@@ -6,8 +6,10 @@ func.func @main() attributes {translation_info = #translation_info} {
 }
 
 // CHECK-LABEL: func.func @main
-// CHECK-NOT:   #translation_info =
+// CHECK-NOT:   iree_codegen.translation_info
 // CHECK-NOT:   LLVMGPUVectorDistribute
+
+// -----
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
@@ -28,16 +30,13 @@ hal.executable private @strip_main {
 
 // CHECK-LABEL: hal.executable private @strip_main
 // CHECK: @fn1
-// CHECK-NOT:   #translation_info =
+// CHECK-NOT:   translation_info =
 // CHECK: @fn2
-// CHECK-NOT:   #translation_info =
+// CHECK-NOT:   translation_info =
 // CHECK: return
 
-#layout = #hal.pipeline.layout<bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
+// -----
+
 #config = #iree_codegen.lowering_config<tile_sizes = [[128, 256], [16, 16]]>
 #translation = #iree_codegen.translation_info<None workgroup_size = [16, 8, 1] subgroup_size = 64>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
@@ -47,6 +46,17 @@ func.func @matmul_128x1024x256(%lhs : tensor<128x256xf32>, %rhs: tensor<256x1024
 }
 
 // CHECK-LABEL: func.func @matmul_128x1024x256
-// CHECK-NOT:   #translation_info =
-// CHECK-NOT:   #config =
-// CHECK-NOT:   #compilation
+// CHECK-NOT:   iree_codegen.translation_info
+// CHECK-NOT:   iree_codegen.lowering_config
+// CHECK-NOT:   iree_codegen.compilation_info
+
+// -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[128, 256], [16, 16]]>
+func.func @matmul_128x1024x256_1(%lhs : tensor<128x256xf32>, %rhs: tensor<256x1024xf32>, %init: tensor<128x1024xf32>) -> tensor<128x1024xf32> {
+    %result =  linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[128, 256], [16, 16]]>} ins(%lhs, %rhs : tensor<128x256xf32>, tensor<256x1024xf32>) outs(%init : tensor<128x1024xf32>) -> tensor<128x1024xf32>
+    return %result : tensor<128x1024xf32>
+}
+
+// CHECK-LABEL: func.func @matmul_128x1024x256_1
+// CHECK-NOT:   iree_codegen.lowering_config

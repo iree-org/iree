@@ -492,7 +492,7 @@ def RemoveSingleIterationLoopPass :
 
 def StripCompilationInfoPass :
     Pass<"iree-codegen-strip-compilation-info", "">{
-   let summary = "Remove all the the lowering configuration and translation info.";
+   let summary = "Remove all the the lowering configuration and translation info attributes.";
 }
 
 // TODO: Replace with upstream: https://github.com/iree-org/iree/issues/18759

@@ -16,45 +16,29 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-// Checks whether the funcOp has any compilation info.
-bool hasCompilationInfo(func::FuncOp funcOp) {
-  if (getTranslationInfo(funcOp))
-    return true;
-
-  bool hasAttrConfig = false;
-  funcOp.walk([&](Operation *op) {
-    if (getCompilationInfo(op) || getLoweringConfig(op)) {
-      hasAttrConfig = true;
-      return;
-    }
-  });
-
-  // Return success if any relevant attributes were found.
-  return hasAttrConfig;
-}
-
-struct StripCompilationInfo : public OpRewritePattern<func::FuncOp> {
-  using OpRewritePattern<func::FuncOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(func::FuncOp funcOp,
+struct StripCompilationInfo final
+    : OpInterfaceRewritePattern<mlir::FunctionOpInterface> {
+  using OpInterfaceRewritePattern<
+      mlir::FunctionOpInterface>::OpInterfaceRewritePattern;
+  LogicalResult matchAndRewrite(mlir::FunctionOpInterface funcOp,
                                 PatternRewriter &rewriter) const final {
-    if (!hasCompilationInfo(funcOp))
-      return failure();
-
-    // if the function has translation info, erase it
-    if (getTranslationInfo(funcOp)) {
-      eraseTranslationInfo(funcOp);
-    }
-
-    funcOp->walk([&](Operation *op) {
-      if (getCompilationInfo(op)) {
-        // Erase the compilation info configuration if it exists
-        eraseCompilationInfo(op);
+    rewriter.modifyOpInPlace(funcOp, [&]() {
+      // If the function has translation info, erase it.
+      if (getTranslationInfo(funcOp)) {
+        eraseTranslationInfo(funcOp);
       }
-      if (getLoweringConfig(op)) {
-        // Erase the lowering configuration from root operation if it
-        // exists.
-        eraseLoweringConfig(op);
-      }
+
+      funcOp->walk([&](Operation *op) {
+        if (getCompilationInfo(op)) {
+          // Erase the compilation info configuration if it exists
+          eraseCompilationInfo(op);
+        }
+        if (getLoweringConfig(op)) {
+          // Erase the lowering configuration from root operation if it
+          // exists.
+          eraseLoweringConfig(op);
+        }
+      });
     });
 
     return success();
