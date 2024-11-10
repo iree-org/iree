@@ -113,6 +113,7 @@ iree_cc_library(
     "IREEGPUDialectCAPI.cpp"
   DEPS
     IREELLVMIncludeSetup
+    LLVMSupport
     MLIRCAPIIR
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::bindings::c::headers

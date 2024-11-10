@@ -10,6 +10,8 @@
 
 #include <stdint.h>
 
+extern void ireeAttributeIsAGPUMMAAttr();
+extern void ireeAttributeIsAGPUMMAIntrinsicAttr();
 extern void ireeAttributeIsAGPUPipelineOptionsAttr();
 extern void ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr();
 extern void ireeCompilerEnumeratePlugins();
@@ -63,6 +65,12 @@ extern void ireeCompilerSourceDestroy();
 extern void ireeCompilerSourceOpenFile();
 extern void ireeCompilerSourceSplit();
 extern void ireeCompilerSourceWrapBuffer();
+extern void ireeGPUMMAAttrGet();
+extern void ireeGPUMMAAttrGetInfo();
+extern void ireeGPUMMAAttrGetTypeID();
+extern void ireeGPUMMAIntrinsicAttrGet();
+extern void ireeGPUMMAIntrinsicAttrGetTypeID();
+extern void ireeGPUMMAIntrinsicAttrGetValue();
 extern void ireeGPUPipelineOptionsAttrGet();
 extern void ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts();
 extern void ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory();
@@ -848,6 +856,8 @@ extern void mlirVectorTypeIsScalable();
 
 uintptr_t __iree_compiler_hidden_force_extern() {
   uintptr_t x = 0;
+  x += (uintptr_t)&ireeAttributeIsAGPUMMAAttr;
+  x += (uintptr_t)&ireeAttributeIsAGPUMMAIntrinsicAttr;
   x += (uintptr_t)&ireeAttributeIsAGPUPipelineOptionsAttr;
   x += (uintptr_t)&ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr;
   x += (uintptr_t)&ireeCompilerEnumeratePlugins;
@@ -901,6 +911,12 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCompilerSourceOpenFile;
   x += (uintptr_t)&ireeCompilerSourceSplit;
   x += (uintptr_t)&ireeCompilerSourceWrapBuffer;
+  x += (uintptr_t)&ireeGPUMMAAttrGet;
+  x += (uintptr_t)&ireeGPUMMAAttrGetInfo;
+  x += (uintptr_t)&ireeGPUMMAAttrGetTypeID;
+  x += (uintptr_t)&ireeGPUMMAIntrinsicAttrGet;
+  x += (uintptr_t)&ireeGPUMMAIntrinsicAttrGetTypeID;
+  x += (uintptr_t)&ireeGPUMMAIntrinsicAttrGetValue;
   x += (uintptr_t)&ireeGPUPipelineOptionsAttrGet;
   x += (uintptr_t)&ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts;
   x += (uintptr_t)&ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory;

@@ -56,11 +56,8 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
           },
           "cls"_a, "value"_a, "ctx"_a = py::none(),
           "Gets a gpu.reorder_workgroups_strategy from parameters.")
-      .def_property_readonly(
-          "value",
-          [](MlirAttribute self) -> ireeGPUReorderWorkgroupsStrategyEnum {
-            return ireeGPUReorderWorkgroupsStrategyAttrGetValue(self);
-          });
+      .def_property_readonly("value",
+                             ireeGPUReorderWorkgroupsStrategyAttrGetValue);
 
   //===-------------------------------------------------------------------===//
   // GPUPipelineOptionsAttr
@@ -129,4 +126,79 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
               return attr;
             return std::nullopt;
           });
+
+  //===-------------------------------------------------------------------===//
+  // GPUMMAIntrinsicAttr
+  //===-------------------------------------------------------------------===//
+  auto mmaIntrinsicEnum =
+      py::enum_<ireeGPUMMAIntrinsicEnum>(iree_gpu_module, "MMAIntrinsic",
+                                         py::module_local())
+
+#define X_DO(EnumName, EnumValue)                                              \
+  .value(#EnumName, ireeGPUMMAIntrinsicEnum##EnumName)
+
+          IREE_GPU_FOR_ALL_MMA_INTRINSIC_VALUES
+
+#undef X_DO
+
+              .def(
+                  "__str__",
+                  [](ireeGPUMMAIntrinsicEnum &self) {
+                    switch (self) {
+#define X_DO(EnumName, EnumValue)                                              \
+  case ireeGPUMMAIntrinsicEnum##EnumName:                                      \
+    return #EnumName;
+
+                      IREE_GPU_FOR_ALL_MMA_INTRINSIC_VALUES
+
+#undef X_DO
+                    default:
+                      llvm::report_fatal_error("unknown MMAIntrinsic variant");
+                    }
+                  },
+                  py::prepend());
+
+  mlir_attribute_subclass(iree_gpu_module, "MMAIntrinsicAttr",
+                          ireeAttributeIsAGPUMMAIntrinsicAttr,
+                          ireeGPUMMAIntrinsicAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, ireeGPUMMAIntrinsicEnum value,
+             MlirContext ctx) {
+            return ireeGPUMMAIntrinsicAttrGet(ctx, value);
+          },
+          "cls"_a, "value"_a, "ctx"_a = py::none(),
+          "Gets a gpu.mma_intrinsic from parameters.")
+      .def_property_readonly("value", ireeGPUMMAIntrinsicAttrGetValue)
+      .def_property_readonly("mma", [](MlirAttribute self) -> MlirAttribute {
+        ireeGPUMMAIntrinsicEnum value = ireeGPUMMAIntrinsicAttrGetValue(self);
+        return ireeGPUMMAAttrGet(mlirAttributeGetContext(self), value);
+      });
+
+  mlir_attribute_subclass(iree_gpu_module, "MMAAttr",
+                          ireeAttributeIsAGPUMMAAttr, ireeGPUMMAAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, ireeGPUMMAIntrinsicEnum value,
+             MlirContext ctx) { return ireeGPUMMAAttrGet(ctx, value); },
+          "cls"_a, "value"_a, "ctx"_a = py::none(),
+          "Gets a gpu.mma from parameters.")
+      .def_property_readonly(
+          "abc_element_types",
+          [](MlirAttribute self) -> py::tuple {
+            ireeGPUMMAInfo info = ireeGPUMMAAttrGetInfo(self);
+            return py::make_tuple(info.aElementType, info.bElementType,
+                                  info.cElementType);
+          })
+      .def_property_readonly(
+          "abc_vector_types",
+          [](MlirAttribute self) -> py::tuple {
+            ireeGPUMMAInfo info = ireeGPUMMAAttrGetInfo(self);
+            return py::make_tuple(info.aVectorType, info.bVectorType,
+                                  info.cVectorType);
+          })
+      .def_property_readonly("mnk_shape", [](MlirAttribute self) -> py::tuple {
+        ireeGPUMMAInfo info = ireeGPUMMAAttrGetInfo(self);
+        return py::make_tuple(info.mElements, info.nElements, info.kElements);
+      });
 }
