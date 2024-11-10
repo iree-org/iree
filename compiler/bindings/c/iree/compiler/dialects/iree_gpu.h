@@ -16,8 +16,7 @@ extern "C" {
 
 enum ireeGPUReorderWorkgroupsStrategyEnum {
   ireeGPUReorderWorkgroupsStrategyEnumNone = 0,
-  ireeGPUReorderWorkgroupsStrategyEnumSwizzle = 1,
-  ireeGPUReorderWorkgroupsStrategyEnumTranspose = 2,
+  ireeGPUReorderWorkgroupsStrategyEnumTranspose = 1,
 };
 
 MLIR_CAPI_EXPORTED bool

@@ -232,14 +232,12 @@ class IREEGPU_I32PipelineEnumAttr<string name, string summary, list<I32EnumAttrC
 
 // ReorderWorkgroups EnumAttrCases.
 def ReorderWorkgroupsNone : I32EnumAttrCase<"None", 0>;
-def ReorderWorkgroupsSwizzle : I32EnumAttrCase<"Swizzle", 1>;
-def ReorderWorkgroupsTranspose : I32EnumAttrCase<"Transpose", 2>;
+def ReorderWorkgroupsTranspose : I32EnumAttrCase<"Transpose", 1>;
 
 // EnumAttr for workgroup reordering strategy enums.
 def IREEGPU_ReorderWorkgroupsStrategy : IREEGPU_I32PipelineEnumAttr<"ReorderWorkgroupsStrategy",
     "Strategy for workgroup reordering", [
       ReorderWorkgroupsNone,
-      ReorderWorkgroupsSwizzle,
       ReorderWorkgroupsTranspose
     ]> {
 }
