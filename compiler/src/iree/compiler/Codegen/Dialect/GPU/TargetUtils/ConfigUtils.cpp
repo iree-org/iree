@@ -750,9 +750,6 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
     case ReorderWorkgroupsStrategy::Transpose:
       reorderStr = "transpose";
       break;
-    case ReorderWorkgroupsStrategy::Swizzle:
-      reorderStr = "swizzle";
-      break;
     case ReorderWorkgroupsStrategy::None:
       reorderStr = "none";
       break;
