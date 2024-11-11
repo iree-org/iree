@@ -4,7 +4,7 @@
     [published to PyPI](https://pypi.org/user/google-iree-pypi-deploy/).
 
     ``` shell
-    python -m pip install iree-runtime
+    python -m pip install iree-base-runtime
     ```
 
 === ":material-alert: Nightly releases"
@@ -15,5 +15,5 @@
     ``` shell
     python -m pip install \
       --find-links https://iree.dev/pip-release-links.html \
-      --upgrade iree-runtime
+      --upgrade iree-base-runtime
     ```

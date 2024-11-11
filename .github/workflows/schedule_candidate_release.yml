@@ -48,11 +48,11 @@ jobs:
           legacy_package_version="$(printf '%(%Y%m%d)T.${{ github.run_number }}')"
           echo "legacy_package_version=${legacy_package_version}" >> $GITHUB_ENV
 
-          # iree-compiler version
+          # iree-base-compiler version
           compiler_package_version="$(python3 build_tools/python_deploy/compute_local_version.py compiler -rc)"
           echo "compiler_package_version=${compiler_package_version}" >> $GITHUB_ENV
 
-          # iree-runtime version
+          # iree-base-runtime version
           runtime_package_version="$(python3 build_tools/python_deploy/compute_local_version.py runtime -rc)"
           echo "runtime_package_version=${runtime_package_version}" >> $GITHUB_ENV
 

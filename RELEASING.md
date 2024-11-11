@@ -31,8 +31,8 @@ A number of packages are produced automatically:
 * `iree-dist-*.tar.xz` (manylinux x86_64 and aarch64): Install image of the
   binaries and development assets needed to use or depend on the C/C++ parts
   of the project.
-* `iree-compiler`: Binary Python wheels
-* `iree-runtime`: Binary Python wheels
+* `iree-base-compiler`: Binary Python wheels
+* `iree-base-runtime`: Binary Python wheels
 * `iree-tools-tf` and `iree-tools-tflite`: Pure Python wheels
 
 #### Linux Builds
@@ -51,8 +51,8 @@ Windows builds are built using GitHub-hosted runners. Due to the cost, the
 project aims to target the most recent version of Python only while building
 version N-1 for the first year of the lifecycle of the next version.
 
-Only the Python `iree-compiler` and `iree-runtime` packages are built for
-Windows.
+Only the Python `iree-base-compiler` and `iree-base-runtime` packages are
+built for Windows.
 
 The release is published even if the Windows build fails. When this happens, it
 is fixed forward for the next snapshot.
@@ -63,8 +63,8 @@ MacOS builds are performed using GitHub-hosted runners. Due to the cost, the
 project aims to target the most recent version of Python only while building
 version N-1 for the first year of the lifecycle of the next version.
 
-Only the Python `iree-compiler` and `iree-runtime` packages are built for
-MacOS.
+Only the Python `iree-base-compiler` and `iree-base-runtime` packages are
+built for MacOS.
 
 The release is published even if the MacOS build fails. When this happens, it
 is fixed forward for the next snapshot.
@@ -81,14 +81,16 @@ release process:
 
 ### PyPI
 
-* https://pypi.org/project/iree-compiler/
-* https://pypi.org/project/iree-runtime/
+* https://pypi.org/project/iree-base-compiler/
+* https://pypi.org/project/iree-base-runtime/
 * https://pypi.org/project/iree-turbine/
 * https://pypi.org/project/iree-tools-tf/
 * https://pypi.org/project/iree-tools-tflite/
 
 Deprecated projects no longer updated:
 
+* https://pypi.org/project/iree-compiler/ (replaced by iree-base-compiler)
+* https://pypi.org/project/iree-runtime/ (replaced by iree-base-runtime)
 * https://pypi.org/project/iree-runtime-instrumented/ (functionality is
   included in the main iree-runtime package)
 * https://pypi.org/project/iree-tools-xla/ (functionality is no longer needed)

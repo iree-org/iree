@@ -26,10 +26,10 @@ on:
         description: "Version of the package"
         required: true
       compiler_package_version:
-        description: "Version of the iree-compiler package"
+        description: "Version of the iree-base-compiler package"
         required: true
       runtime_package_version:
-        description: "Version of the iree-runtime package"
+        description: "Version of the iree-base-runtime package"
         required: true
       release_id:
         description: "Release id to upload artifacts to"
@@ -78,7 +78,7 @@ jobs:
           EOF
           cat ./c/version_local.json
 
-          echo "iree-compiler"
+          echo "iree-base-compiler"
           cat << EOF > ./c/compiler/version_local.json
           {
             "package-suffix": "${{ github.event.inputs.package_suffix }}",
@@ -88,7 +88,7 @@ jobs:
           EOF
           cat ./c/compiler/version_local.json
 
-          echo "iree-runtime"
+          echo "iree-base-runtime"
           cat << EOF > ./c/runtime/version_local.json
           {
             "package-suffix": "${{ github.event.inputs.package_suffix }}",
