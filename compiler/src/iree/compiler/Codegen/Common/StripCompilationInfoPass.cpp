@@ -16,16 +16,17 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct StripFuncOpCompilationInfo final
+struct StripFuncOpTranslationInfo final
     : OpInterfaceRewritePattern<mlir::FunctionOpInterface> {
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
   LogicalResult matchAndRewrite(mlir::FunctionOpInterface funcOp,
                                 PatternRewriter &rewriter) const final {
+    if (!getTranslationInfo(funcOp))
+      return failure();
+
     rewriter.modifyOpInPlace(funcOp, [&]() {
       // If the function has translation info, erase it.
-      if (getTranslationInfo(funcOp)) {
-        eraseTranslationInfo(funcOp);
-      }
+      eraseTranslationInfo(funcOp);
     });
 
     return success();
@@ -37,6 +38,9 @@ struct StripLinalgOpCompilationInfo final
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
   LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const final {
+    if (!getCompilationInfo(linalgOp) && !getLoweringConfig(linalgOp))
+      return failure();
+
     rewriter.modifyOpInPlace(linalgOp, [&]() {
       if (getCompilationInfo(linalgOp)) {
         // Erase the compilation info configuration if it exists.
@@ -56,9 +60,10 @@ struct StripLinalgOpCompilationInfo final
 struct StripCompilationInfoPass final
     : impl::StripCompilationInfoPassBase<StripCompilationInfoPass> {
   void runOnOperation() override {
-    RewritePatternSet patterns(&getContext());
-    patterns.add<StripFuncOpCompilationInfo>(&getContext());
-    patterns.add<StripLinalgOpCompilationInfo>(&getContext());
+    MLIRContext *ctx = &getContext();
+    RewritePatternSet patterns(ctx);
+    patterns.add<StripFuncOpTranslationInfo>(ctx);
+    patterns.add<StripLinalgOpCompilationInfo>(ctx);
     walkAndApplyPatterns(getOperation(), std::move(patterns));
   }
 };
