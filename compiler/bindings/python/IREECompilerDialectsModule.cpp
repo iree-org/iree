@@ -4,10 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <pybind11/pytypes.h>
+#include <cstdint>
 #include "iree/compiler/dialects/iree_gpu.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/IR.h"
 #include "mlir/Bindings/Python/PybindAdaptors.h"
+
+static const char *kGpuModuleImportPath =
+    MAKE_MLIR_PYTHON_QUALNAME("dialects.iree_gpu");
 
 namespace py = pybind11;
 using namespace mlir::python::adaptors;
@@ -22,42 +27,23 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
   // GPUReorderWorkgroupsStrategyAttr
   //===-------------------------------------------------------------------===//
 
-  auto strategyEnum =
-      py::enum_<ireeGPUReorderWorkgroupsStrategyEnum>(
-          iree_gpu_module, "ReorderWorkgroupsStrategy", py::module_local())
-          .value("None_", ireeGPUReorderWorkgroupsStrategyEnumNone)
-          .value("Transpose", ireeGPUReorderWorkgroupsStrategyEnumTranspose)
-          .def(
-              "__str__",
-              [](ireeGPUReorderWorkgroupsStrategyEnum &self) {
-                switch (self) {
-                case ireeGPUReorderWorkgroupsStrategyEnumNone:
-                  return "None";
-                case ireeGPUReorderWorkgroupsStrategyEnumTranspose:
-                  return "Transpose";
-                default:
-                  llvm::report_fatal_error(
-                      "unknown ReorderWorkgroupsStrategy variant");
-                }
-              },
-              // pybind overloads are tried in the order they were registered.
-              // As a result, enums used the default __str__ method instead of
-              // the custom one. Adding py::prepend() fixes this issue.
-              py::prepend());
-
   mlir_attribute_subclass(iree_gpu_module, "ReorderWorkgroupsStrategyAttr",
                           ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr,
                           ireeGPUReorderWorkgroupsStrategyAttrGetTypeID)
       .def_classmethod(
           "get",
-          [](const py::object &, ireeGPUReorderWorkgroupsStrategyEnum value,
-             MlirContext ctx) {
+          [](const py::object &, uint32_t value, MlirContext ctx) {
             return ireeGPUReorderWorkgroupsStrategyAttrGet(ctx, value);
           },
           "cls"_a, "value"_a, "ctx"_a = py::none(),
           "Gets a gpu.reorder_workgroups_strategy from parameters.")
-      .def_property_readonly("value",
-                             ireeGPUReorderWorkgroupsStrategyAttrGetValue);
+      .def_property_readonly("raw_value",
+                             ireeGPUReorderWorkgroupsStrategyAttrGetValue)
+      .def_property_readonly("value", [](MlirAttribute self) -> py::object {
+        uint32_t rawValue = ireeGPUReorderWorkgroupsStrategyAttrGetValue(self);
+        return py::module_::import(kGpuModuleImportPath)
+            .attr("ReorderWorkgroupsStrategy")(rawValue);
+      });
 
   //===-------------------------------------------------------------------===//
   // GPUPipelineOptionsAttr
@@ -130,48 +116,26 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
   //===-------------------------------------------------------------------===//
   // GPUMMAIntrinsicAttr
   //===-------------------------------------------------------------------===//
-  auto mmaIntrinsicEnum =
-      py::enum_<ireeGPUMMAIntrinsicEnum>(iree_gpu_module, "MMAIntrinsic",
-                                         py::module_local())
-
-#define X_DO(EnumName, EnumValue)                                              \
-  .value(#EnumName, ireeGPUMMAIntrinsicEnum##EnumName)
-
-          IREE_GPU_FOR_ALL_MMA_INTRINSIC_VALUES
-
-#undef X_DO
-
-              .def(
-                  "__str__",
-                  [](ireeGPUMMAIntrinsicEnum &self) {
-                    switch (self) {
-#define X_DO(EnumName, EnumValue)                                              \
-  case ireeGPUMMAIntrinsicEnum##EnumName:                                      \
-    return #EnumName;
-
-                      IREE_GPU_FOR_ALL_MMA_INTRINSIC_VALUES
-
-#undef X_DO
-                    default:
-                      llvm::report_fatal_error("unknown MMAIntrinsic variant");
-                    }
-                  },
-                  py::prepend());
-
   mlir_attribute_subclass(iree_gpu_module, "MMAIntrinsicAttr",
                           ireeAttributeIsAGPUMMAIntrinsicAttr,
                           ireeGPUMMAIntrinsicAttrGetTypeID)
       .def_classmethod(
           "get",
-          [](const py::object &, ireeGPUMMAIntrinsicEnum value,
-             MlirContext ctx) {
+          [](const py::object &, uint32_t value, MlirContext ctx) {
             return ireeGPUMMAIntrinsicAttrGet(ctx, value);
           },
           "cls"_a, "value"_a, "ctx"_a = py::none(),
           "Gets a gpu.mma_intrinsic from parameters.")
-      .def_property_readonly("value", ireeGPUMMAIntrinsicAttrGetValue)
+      .def_property_readonly("raw_value", ireeGPUMMAIntrinsicAttrGetValue)
+      .def_property_readonly("value",
+                             [](MlirAttribute self) -> py::object {
+                               uint32_t rawValue =
+                                   ireeGPUMMAIntrinsicAttrGetValue(self);
+                               return py::module_::import(kGpuModuleImportPath)
+                                   .attr("MMAIntrinsic")(rawValue);
+                             })
       .def_property_readonly("mma", [](MlirAttribute self) -> MlirAttribute {
-        ireeGPUMMAIntrinsicEnum value = ireeGPUMMAIntrinsicAttrGetValue(self);
+        uint32_t value = ireeGPUMMAIntrinsicAttrGetValue(self);
         return ireeGPUMMAAttrGet(mlirAttributeGetContext(self), value);
       });
 
@@ -179,8 +143,9 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
                           ireeAttributeIsAGPUMMAAttr, ireeGPUMMAAttrGetTypeID)
       .def_classmethod(
           "get",
-          [](const py::object &, ireeGPUMMAIntrinsicEnum value,
-             MlirContext ctx) { return ireeGPUMMAAttrGet(ctx, value); },
+          [](const py::object &, uint32_t value, MlirContext ctx) {
+            return ireeGPUMMAAttrGet(ctx, value);
+          },
           "cls"_a, "value"_a, "ctx"_a = py::none(),
           "Gets a gpu.mma from parameters.")
       .def_property_readonly(

@@ -4,20 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cstdint>
+#include <type_traits>
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/dialects/iree_gpu.h"
-#include "llvm/ADT/STLExtras.h"
 #include "mlir-c/IR.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Support.h"
-
-// Macro to check that enum values match across C++ and C API.
-#define ASSERT_ENUM_VALS_MATCH(CppEnumName, CAPIEnumName, ValueName)           \
-  static_assert(llvm::to_underlying(CppEnumName ::ValueName) ==                \
-                    llvm::to_underlying(CAPIEnumName##ValueName),              \
-                #CppEnumName " and " #CAPIEnumName " have diverged")
 
 bool ireeAttributeIsAGPUPipelineOptionsAttr(MlirAttribute attr) {
   return llvm::isa<mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr>(
@@ -93,17 +87,6 @@ MlirTypeID ireeGPUPipelineOptionsAttrGetTypeID() {
       mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr::getTypeID());
 }
 
-#define X_DO(EnumName, EnumValue)                                              \
-  ASSERT_ENUM_VALS_MATCH(                                                      \
-      mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategy,               \
-      ireeGPUReorderWorkgroupsStrategyEnum, EnumName);
-
-IREE_GPU_FOR_ALL_REORDER_WORKGROUP_VALUES
-
-#undef X_DO
-
-#undef FOR_ALL_REORDER_WORKGROUP_VALUES
-
 bool ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr(MlirAttribute attr) {
   return llvm::isa<
       mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategyAttr>(
@@ -115,8 +98,15 @@ MlirTypeID ireeGPUReorderWorkgroupsStrategyAttrGetTypeID() {
                   getTypeID());
 }
 
-MlirAttribute ireeGPUReorderWorkgroupsStrategyAttrGet(
-    MlirContext mlirCtx, ireeGPUReorderWorkgroupsStrategyEnum value) {
+static_assert(
+    std::is_same_v<
+        uint32_t,
+        std::underlying_type_t<
+            mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategy>>,
+    "Enum type changed");
+
+MlirAttribute ireeGPUReorderWorkgroupsStrategyAttrGet(MlirContext mlirCtx,
+                                                      uint32_t value) {
   mlir::MLIRContext *ctx = unwrap(mlirCtx);
   return wrap(
       mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategyAttr::get(
@@ -125,23 +115,14 @@ MlirAttribute ireeGPUReorderWorkgroupsStrategyAttrGet(
                    value)));
 }
 
-ireeGPUReorderWorkgroupsStrategyEnum
-ireeGPUReorderWorkgroupsStrategyAttrGetValue(MlirAttribute attr) {
+uint32_t ireeGPUReorderWorkgroupsStrategyAttrGetValue(MlirAttribute attr) {
   assert(ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr(attr) &&
          "attr is not a GPUReorderWorkgroupsStrategyAttr");
-  return static_cast<ireeGPUReorderWorkgroupsStrategyEnum>(
+  return static_cast<uint32_t>(
       llvm::cast<mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategyAttr>(
           unwrap(attr))
           .getValue());
 }
-
-#define X_DO(EnumName, EnumVal)                                                \
-  ASSERT_ENUM_VALS_MATCH(mlir::iree_compiler::IREE::GPU::MMAIntrinsic,         \
-                         ireeGPUMMAIntrinsicEnum, EnumName);
-
-IREE_GPU_FOR_ALL_MMA_INTRINSIC_VALUES
-
-#undef X_DO
 
 bool ireeAttributeIsAGPUMMAIntrinsicAttr(MlirAttribute attr) {
   return llvm::isa<mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr>(
@@ -152,17 +133,21 @@ MlirTypeID ireeGPUMMAIntrinsicAttrGetTypeID() {
   return wrap(mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr::getTypeID());
 }
 
-MlirAttribute ireeGPUMMAIntrinsicAttrGet(MlirContext mlirCtx,
-                                         ireeGPUMMAIntrinsicEnum value) {
+static_assert(
+    std::is_same_v<uint32_t, std::underlying_type_t<
+                                 mlir::iree_compiler::IREE::GPU::MMAIntrinsic>>,
+    "Enum type changed");
+
+MlirAttribute ireeGPUMMAIntrinsicAttrGet(MlirContext mlirCtx, uint32_t value) {
   mlir::MLIRContext *ctx = unwrap(mlirCtx);
   return wrap(mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr::get(
       ctx, static_cast<mlir::iree_compiler::IREE::GPU::MMAIntrinsic>(value)));
 }
 
-ireeGPUMMAIntrinsicEnum ireeGPUMMAIntrinsicAttrGetValue(MlirAttribute attr) {
+uint32_t ireeGPUMMAIntrinsicAttrGetValue(MlirAttribute attr) {
   assert(ireeAttributeIsAGPUMMAIntrinsicAttr(attr) &&
          "attr is not a GPUMMAIntrinsicAttr");
-  return static_cast<ireeGPUMMAIntrinsicEnum>(
+  return static_cast<uint32_t>(
       llvm::cast<mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr>(unwrap(attr))
           .getValue());
 }
@@ -175,8 +160,7 @@ MlirTypeID ireeGPUMMAAttrGetTypeID() {
   return wrap(mlir::iree_compiler::IREE::GPU::MMAAttr::getTypeID());
 }
 
-MlirAttribute ireeGPUMMAAttrGet(MlirContext mlirCtx,
-                                ireeGPUMMAIntrinsicEnum value) {
+MlirAttribute ireeGPUMMAAttrGet(MlirContext mlirCtx, uint32_t value) {
   mlir::MLIRContext *ctx = unwrap(mlirCtx);
   return wrap(mlir::iree_compiler::IREE::GPU::MMAAttr::get(
       ctx, static_cast<mlir::iree_compiler::IREE::GPU::MMAIntrinsic>(value)));
@@ -200,5 +184,3 @@ ireeGPUMMAInfo ireeGPUMMAAttrGetInfo(MlirAttribute attr) {
   std::tie(info.mElements, info.nElements, info.kElements) = mma.getMNKShape();
   return info;
 }
-
-#undef ASSERT_ENUM_VALS_MATCH

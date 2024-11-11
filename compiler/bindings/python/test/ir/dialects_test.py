@@ -18,6 +18,8 @@ def gpu_pipeline_options_attr():
             reorder_attr = iree_gpu.ReorderWorkgroupsStrategyAttr.get(
                 iree_gpu.ReorderWorkgroupsStrategy.Transpose, ctx
             )
+            assert reorder_attr.value == iree_gpu.ReorderWorkgroupsStrategy.Transpose
+
             gpu_attr = iree_gpu.PipelineOptionsAttr.get(
                 True,
                 False,
@@ -98,15 +100,17 @@ def mma_intrinsic_attr():
             )
             assert mma_intrinsic_attr is not None
             assert (
-                mma_intrinsic_attr.value == iree_gpu.MMAIntrinsic.MFMA_F32_32x32x8_F16
-            )
-            assert (
                 str(mma_intrinsic_attr)
                 == "#iree_gpu<mma_intrinsic MFMA_F32_32x32x8_F16>"
             )
-            assert str(mma_intrinsic_attr.value) == "MFMA_F32_32x32x8_F16"
 
-            mma_attr = iree_gpu.MMAAttr.get(mma_intrinsic_attr.value, ctx)
+            raw_value = mma_intrinsic_attr.raw_value
+            assert raw_value == iree_gpu.MMAIntrinsic.MFMA_F32_32x32x8_F16
+            value = mma_intrinsic_attr.value
+            assert str(value) == "MFMA_F32_32x32x8_F16"
+            assert int(value) == raw_value
+
+            mma_attr = iree_gpu.MMAAttr.get(raw_value, ctx)
             assert mma_attr is not None
 
             f16 = ir.F16Type.get()
