@@ -735,7 +735,7 @@ hal.executable public @main {
             intrinsic = MFMA_F32_16x16x4_F32,
             unroll_m = 8,
             unroll_n = 2,
-            unroll_n_to_subgroups = 4,
+            subgroups_n = 4,
             unroll_k = 4>}
           : tensor<4x1x8x4x16x4xf32>, tensor<4x1x4x2x4x16x4xf32> into tensor<4x4x8x4x2x4x16x4xf32>
         flow.dispatch.tensor.store %6, %2, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [4, 4, 8, 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : tensor<4x4x8x4x2x4x16x4xf32> -> !flow.dispatch.tensor<readwrite:tensor<4x4x8x4x2x4x16x4xf32>>

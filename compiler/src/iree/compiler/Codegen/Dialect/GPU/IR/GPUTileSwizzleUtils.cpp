@@ -152,8 +152,8 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
     if (mma.getUnrollM() > 1) {
       expand(swizzle, 0, {Kind::CrossIntrinsic, mma.getUnrollM()});
     }
-    if (mma.getUnrollMToSubgroups() > 1) {
-      expand(swizzle, 0, {Kind::CrossThread, mma.getUnrollMToSubgroups()});
+    if (mma.getSubgroupsM() > 1) {
+      expand(swizzle, 0, {Kind::CrossThread, mma.getSubgroupsM()});
     }
     break;
   case IREE::GPU::MMAFragment::Rhs:
@@ -169,8 +169,8 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
     if (mma.getUnrollN() > 1) {
       expand(swizzle, 0, {Kind::CrossIntrinsic, mma.getUnrollN()});
     }
-    if (mma.getUnrollNToSubgroups() > 1) {
-      expand(swizzle, 0, {Kind::CrossThread, mma.getUnrollNToSubgroups()});
+    if (mma.getSubgroupsN() > 1) {
+      expand(swizzle, 0, {Kind::CrossThread, mma.getSubgroupsN()});
     }
     break;
   case IREE::GPU::MMAFragment::Acc:
@@ -179,14 +179,14 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
     if (mma.getUnrollN() > 1) {
       expand(swizzle, 1, {Kind::CrossIntrinsic, mma.getUnrollN()});
     }
-    if (mma.getUnrollNToSubgroups() > 1) {
-      expand(swizzle, 1, {Kind::CrossThread, mma.getUnrollNToSubgroups()});
+    if (mma.getSubgroupsN() > 1) {
+      expand(swizzle, 1, {Kind::CrossThread, mma.getSubgroupsN()});
     }
     if (mma.getUnrollM() > 1) {
       expand(swizzle, 0, {Kind::CrossIntrinsic, mma.getUnrollM()});
     }
-    if (mma.getUnrollMToSubgroups() > 1) {
-      expand(swizzle, 0, {Kind::CrossThread, mma.getUnrollMToSubgroups()});
+    if (mma.getSubgroupsM() > 1) {
+      expand(swizzle, 0, {Kind::CrossThread, mma.getSubgroupsM()});
     }
     break;
   }
