@@ -114,6 +114,7 @@ iree_cc_library(
   DEPS
     IREELLVMIncludeSetup
     MLIRCAPIIR
+    MLIRIR
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::bindings::c::headers
   PUBLIC

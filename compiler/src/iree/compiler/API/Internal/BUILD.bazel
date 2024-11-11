@@ -139,5 +139,6 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Dialect/GPU/IR:IREEGPUDialect",
         "@llvm-project//mlir:CAPIIR",
         "@llvm-project//mlir:CAPIIRHeaders",
+        "@llvm-project//mlir:IR",
     ],
 )

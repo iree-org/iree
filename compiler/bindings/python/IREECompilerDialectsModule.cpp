@@ -166,7 +166,6 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
         return py::make_tuple(info.mElements, info.nElements, info.kElements);
       });
 
-
   //===-------------------------------------------------------------------===//
   // GPULoweringConfigAttr
   //===-------------------------------------------------------------------===//
