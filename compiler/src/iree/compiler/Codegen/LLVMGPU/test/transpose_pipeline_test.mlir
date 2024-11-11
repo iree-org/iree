@@ -53,7 +53,7 @@ hal.executable @transpose_dispatch_0 {
 //       CHECK:  %[[D11:.*]] = affine.apply #{{.*}}()[%[[D0]]]
 //       CHECK:  %[[D12:.*]] = vector.transfer_read %[[D3]][%[[D11]], %[[D1]]], %[[CST]] {in_bounds = [true, true]} : memref<32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
 //       CHECK:  %[[D13:.*]] = vector.shape_cast %[[D12]] : vector<4x1xf32> to vector<4xf32>
-//       CHECK:  %[[D15:.*]] = affine.apply #{{.*}}()[%[[D1]], %{{.*}}]
+//       CHECK:  %[[D15:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D1]]]
 //       CHECK:  %[[D16:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]]]
 //       CHECK:  vector.transfer_write %[[D13]], %[[D5]][%[[D15]], %[[D16]]] {in_bounds = [true]} : vector<4xf32>, memref<4096x4096xf32, #hal.descriptor_type<storage_buffer>>
 
@@ -116,11 +116,13 @@ hal.executable @transpose_single_operand_dispatch_0_generic_768x2048 {
 //       CHECK:  gpu.barrier
 //       CHECK:  %[[D12:.*]] = affine.apply #{{.*}}()[%[[D0]]]
 //       CHECK:  %[[D13:.*]] = vector.transfer_read %[[D3]][%[[D12]], %[[D1]]], %[[CST]] {in_bounds = [true, true]} : memref<32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
-//       CHECK:  %[[D15:.*]] = affine.apply #{{.*}}()[%[[D1]], %{{.*}}]
-//       CHECK:  %[[D16:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]]]
-//       CHECK:  %[[D17:.*]] = vector.transfer_read %[[D5]][%[[D15]], %[[D16]]], %[[CST]] {in_bounds = [true]} : memref<768x2048xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
+//       CHECK: %[[DUP_D15:.*]] = arith.addi %[[D1]], %{{.*}} : index
+//       CHECK: %[[DUP_D16:.*]] = arith.addi %[[D12]], %{{.*}} : index
+//       CHECK:  %[[D17:.*]] = vector.transfer_read %[[D5]][%[[DUP_D15]], %[[DUP_D16]]], %[[CST]] {in_bounds = [true]} : memref<768x2048xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //       CHECK:  %[[D14:.*]] = vector.shape_cast %[[D13]] : vector<4x1xf32> to vector<4xf32>
 //       CHECK:  %[[D19:.*]] = arith.addf %[[D14]], %[[D17]] : vector<4xf32>
+//       CHECK:  %[[D15:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D1]]]
+//       CHECK:  %[[D16:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]]]
 //       CHECK:  vector.transfer_write %[[D19]], %[[D6]][%[[D15]], %[[D16]]] {in_bounds = [true]} : vector<4xf32>, memref<768x2048xf32, #hal.descriptor_type<storage_buffer>>
 
 // -----
@@ -223,11 +225,13 @@ hal.executable @transpose_3d_yes_dispatch_0_generic_10x768x2048 {
 //       CHECK:   gpu.barrier
 //       CHECK:   %[[D12:.*]] = affine.apply #{{.*}}()[%[[D0]]]
 //       CHECK:   %[[D13:.*]] = vector.transfer_read %[[D3]][%[[C0]], %[[D12]], %[[D1]]], %[[CST]] {in_bounds = [true, true]} : memref<1x32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
-//       CHECK:   %[[D16:.*]] = affine.apply #{{.*}}()[%[[D1]], %{{.*}}]
-//       CHECK:   %[[D17:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]]]
-//       CHECK:   %[[D18:.*]] = vector.transfer_read %[[D5]][%{{.*}}, %[[D16]], %[[D17]]], %[[CST]] {in_bounds = [true]} : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
+//       CHECK:   %[[DUP_D16:.*]] = arith.addi %[[D1]], %{{.*}} : index
+//       CHECK:   %[[DUP_D17:.*]] = arith.addi %[[D12]], %{{.*}} : index
+//       CHECK:   %[[D18:.*]] = vector.transfer_read %[[D5]][%{{.*}}, %[[DUP_D16]], %[[DUP_D17]]], %[[CST]] {in_bounds = [true]} : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //       CHECK:   %[[D15:.*]] = vector.shape_cast %[[D13]] : vector<4x1xf32> to vector<4xf32>
 //       CHECK:   %[[D20:.*]] = arith.addf %[[D15]], %[[D18]] : vector<4xf32>
+//       CHECK:   %[[D16:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D1]]]
+//       CHECK:   %[[D17:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]]]
 //       CHECK:   vector.transfer_write %[[D20]], %[[D6]][%{{.*}}, %[[D16]], %[[D17]]] {in_bounds = [true]} : vector<4xf32>, memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
 
 // -----
@@ -295,7 +299,7 @@ hal.executable @transpose_3d_trans_out_dispatch_0_generic_10x2048x768 {
 //       CHECK:   %[[D16:.*]] = vector.transfer_read %[[D3]][%[[C0]], %[[D14]], %[[D1]]], %[[CST]] {in_bounds = [true, true]} : memref<1x32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
 //       CHECK:   %[[D17:.*]] = arith.addf %[[D15]], %[[D16]] : vector<4x1xf32>
 //       CHECK:   %[[D19:.*]] = vector.shape_cast %[[D17]] : vector<4x1xf32> to vector<4xf32>
-//       CHECK:   %[[D21:.*]] = affine.apply #{{.*}}()[%[[D1]], %{{.*}}]
+//       CHECK:   %[[D21:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D1]]]
 //       CHECK:   %[[D22:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]]]
 //       CHECK:   vector.transfer_write %[[D19]], %[[D7]][%{{.*}}, %[[D21]], %[[D22]]] {in_bounds = [true]} : vector<4xf32>, memref<10x2048x768xf32, #hal.descriptor_type<storage_buffer>>
 
