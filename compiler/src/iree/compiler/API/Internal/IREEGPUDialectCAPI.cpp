@@ -4,12 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-<<<<<<< HEAD
+#include <cassert>
 #include <cstdint>
 #include <type_traits>
-=======
-#include <cassert>
-    >>>>>>> edb68a0bd9 ([python][tuner] Add bindings for lowering config)
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/dialects/iree_gpu.h"
@@ -19,8 +16,7 @@
 #include "mlir/CAPI/Support.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
-    bool
-    ireeAttributeIsAGPUPipelineOptionsAttr(MlirAttribute attr) {
+bool ireeAttributeIsAGPUPipelineOptionsAttr(MlirAttribute attr) {
   return llvm::isa<mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr>(
       unwrap(attr));
 }
