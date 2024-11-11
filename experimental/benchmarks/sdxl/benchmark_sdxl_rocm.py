@@ -139,6 +139,7 @@ def run_sdxl_punet_int8_fp16_rocm_benchmark(rocm_chip):
     # iree benchmark command for full sdxl pipeline
     return run_iree_command(exec_args)
 
+
 def run_sdxl_punet_int8_fp8_rocm_benchmark(rocm_chip):
     exec_args = [
         "iree-benchmark-module",
@@ -158,6 +159,7 @@ def run_sdxl_punet_int8_fp8_rocm_benchmark(rocm_chip):
     ]
     # iree benchmark command for full sdxl pipeline
     return run_iree_command(exec_args)
+
 
 def run_sdxl_prompt_encoder_rocm_benchmark(rocm_chip):
     exec_args = [
