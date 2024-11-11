@@ -115,6 +115,7 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
   //===-------------------------------------------------------------------===//
   // GPUMMAIntrinsicAttr
   //===-------------------------------------------------------------------===//
+
   mlir_attribute_subclass(iree_gpu_module, "MMAIntrinsicAttr",
                           ireeAttributeIsAGPUMMAIntrinsicAttr,
                           ireeGPUMMAIntrinsicAttrGetTypeID)
@@ -137,6 +138,10 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
         uint32_t value = ireeGPUMMAIntrinsicAttrGetValue(self);
         return ireeGPUMMAAttrGet(mlirAttributeGetContext(self), value);
       });
+
+  //===-------------------------------------------------------------------===//
+  // GPUMMAAttr
+  //===-------------------------------------------------------------------===//
 
   mlir_attribute_subclass(iree_gpu_module, "MMAAttr",
                           ireeAttributeIsAGPUMMAAttr, ireeGPUMMAAttrGetTypeID)
@@ -165,4 +170,22 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
         ireeGPUMMAInfo info = ireeGPUMMAAttrGetInfo(self);
         return py::make_tuple(info.mElements, info.nElements, info.kElements);
       });
+
+  //===-------------------------------------------------------------------===//
+  // GPULoweringConfigAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_gpu_module, "LoweringConfigAttr",
+                          ireeAttributeIsAGPULoweringConfigAttr,
+                          ireeGPULoweringConfigAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, MlirAttribute attributeDictionary,
+             MlirContext ctx) {
+            return ireeGPULoweringConfigAttrGet(ctx, attributeDictionary);
+          },
+          "cls"_a, "value"_a, "ctx"_a = py::none(),
+          "Gets a gpu.lowering_config from parameters.")
+      .def_property_readonly("attributes",
+                             ireeGPULoweringConfigAttrGetAttributes);
 }
