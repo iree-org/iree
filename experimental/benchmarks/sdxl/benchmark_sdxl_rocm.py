@@ -16,15 +16,17 @@ from pytest_check import check
 
 vmfb_dir = os.getenv("TEST_OUTPUT_ARTIFACTS", default=Path.cwd())
 benchmark_dir = os.path.dirname(os.path.realpath(__file__))
-artifacts_dir = os.getenv("IREE_TEST_FILES", default=Path.cwd()) + "/artifacts"
+artifacts_dir = f"{os.getenv('IREE_TEST_FILES', default=Path.cwd())}/artifacts"
 artifacts_dir = Path(os.path.expanduser(artifacts_dir)).resolve()
 prompt_encoder_dir = f"{artifacts_dir}/sdxl_clip"
 scheduled_unet_dir = f"{artifacts_dir}/sdxl_unet_fp16"
 punet_int8_fp16_dir = f"{artifacts_dir}/sdxl_punet_int8_fp16"
+punet_int8_fp8_dir = f"{artifacts_dir}/sdxl_punet_int8_fp8"
 vae_decode_dir = f"{artifacts_dir}/sdxl_vae"
 prompt_encoder_dir_compile = f"{vmfb_dir}/sdxl_clip_vmfbs"
 scheduled_unet_dir_compile = f"{vmfb_dir}/sdxl_unet_fp16_vmfbs"
 punet_int8_fp16_dir_compile = f"{vmfb_dir}/sdxl_punet_int8_fp16_vmfbs"
+punet_int8_fp8_dir_compile = f"{vmfb_dir}/sdxl_punet_int8_fp8_vmfbs"
 vae_decode_dir_compile = f"{vmfb_dir}/sdxl_vae_vmfbs"
 
 
@@ -137,6 +139,25 @@ def run_sdxl_punet_int8_fp16_rocm_benchmark(rocm_chip):
     # iree benchmark command for full sdxl pipeline
     return run_iree_command(exec_args)
 
+def run_sdxl_punet_int8_fp8_rocm_benchmark(rocm_chip):
+    exec_args = [
+        "iree-benchmark-module",
+        f"--device=hip",
+        "--device_allocator=caching",
+        f"--module={punet_int8_fp8_dir_compile}/punet_fp8.rocm_{rocm_chip}.vmfb",
+        f"--parameters=model={punet_int8_fp8_dir}/punet_fp8_weights.irpa",
+        "--function=main",
+        f"--input=1x4x128x128xf16",
+        f"--input=1xf16",
+        f"--input=2x64x2048xf16",
+        f"--input=2x1280xf16",
+        f"--input=2x6xf16",
+        f"--input=1xf16",
+        "--benchmark_repetitions=10",
+        "--benchmark_min_warmup_time=3.0",
+    ]
+    # iree benchmark command for full sdxl pipeline
+    return run_iree_command(exec_args)
 
 def run_sdxl_prompt_encoder_rocm_benchmark(rocm_chip):
     exec_args = [
@@ -220,15 +241,18 @@ def test_sdxl_rocm_benchmark(
     goldentime_rocm_e2e,
     goldentime_rocm_unet,
     goldentime_rocm_punet_int8_fp16,
+    goldentime_rocm_punet_int8_fp8,
     goldentime_rocm_clip,
     goldentime_rocm_vae,
     rocm_chip,
     goldendispatch_rocm_unet,
     goldendispatch_rocm_punet_int8_fp16,
+    goldendispatch_rocm_punet_int8_fp8,
     goldendispatch_rocm_clip,
     goldendispatch_rocm_vae,
     goldensize_rocm_unet,
     goldensize_rocm_punet_int8_fp16,
+    goldensize_rocm_punet_int8_fp8,
     goldensize_rocm_clip,
     goldensize_rocm_vae,
 ):
@@ -297,6 +321,35 @@ def test_sdxl_rocm_benchmark(
         compilation_line = (
             f"Punet F16 Binary Size: {punet_int8_fp16_binary_size} bytes"
             f" (golden binary size {goldensize_rocm_punet_int8_fp16} bytes)"
+        )
+        logging.getLogger().info(compilation_line)
+
+        # punet int8 f8 attention benchmark
+        ret_value, output = run_sdxl_punet_int8_fp8_rocm_benchmark(rocm_chip)
+        benchmark_punet_int8_fp8_mean_time = job_summary_process(ret_value, output)
+        mean_line = (
+            f"Punet F8 Benchmark Time: {str(benchmark_punet_int8_fp8_mean_time)} ms"
+            f" (golden time {goldentime_rocm_punet_int8_fp8} ms)"
+        )
+        logging.getLogger().info(mean_line)
+
+        # punet int8 f8 compilation stats check
+        with open(f"{punet_int8_fp8_dir_compile}/compilation_info.json", "r") as file:
+            comp_stats = json.load(file)
+        punet_int8_fp8_dispatch_count = int(
+            comp_stats["stream-aggregate"]["execution"]["dispatch-count"]
+        )
+        compilation_line = (
+            f"Punet F8 Dispatch Count: {punet_int8_fp8_dispatch_count}"
+            f" (golden dispatch count {goldendispatch_rocm_punet_int8_fp8})"
+        )
+        logging.getLogger().info(compilation_line)
+
+        module_path = f"{punet_int8_fp8_dir_compile}/punet_fp8.rocm_{rocm_chip}.vmfb"
+        punet_int8_fp8_binary_size = Path(module_path).stat().st_size
+        compilation_line = (
+            f"Punet F8 Binary Size: {punet_int8_fp8_binary_size} bytes"
+            f" (golden binary size {goldensize_rocm_punet_int8_fp8} bytes)"
         )
         logging.getLogger().info(compilation_line)
 
@@ -374,6 +427,13 @@ def test_sdxl_rocm_benchmark(
                 f"{goldentime_rocm_punet_int8_fp16}",
             ]
         )
+        mean_time_rows.append(
+            [
+                "Punet F8",
+                f"{benchmark_punet_int8_fp8_mean_time}",
+                f"{goldentime_rocm_punet_int8_fp8}",
+            ]
+        )
 
     # Create dispatch count table's header and rows
     dispatch_count_header = [
@@ -394,6 +454,13 @@ def test_sdxl_rocm_benchmark(
                 f"{goldendispatch_rocm_punet_int8_fp16}",
             ]
         )
+        dispatch_count_rows.append(
+            [
+                "Punet F8",
+                f"{punet_int8_fp8_dispatch_count}",
+                f"{goldendispatch_rocm_punet_int8_fp8}",
+            ]
+        )
 
     # Create binary size table's header and rows
     binary_size_header = [
@@ -412,6 +479,13 @@ def test_sdxl_rocm_benchmark(
                 "Punet F16",
                 f"{punet_int8_fp16_binary_size}",
                 f"{goldensize_rocm_punet_int8_fp16}",
+            ]
+        )
+        binary_size_rows.append(
+            [
+                "Punet F8",
+                f"{punet_int8_fp8_binary_size}",
+                f"{goldensize_rocm_punet_int8_fp8}",
             ]
         )
 
@@ -479,6 +553,21 @@ def test_sdxl_rocm_benchmark(
             punet_int8_fp16_binary_size,
             goldensize_rocm_punet_int8_fp16,
             "SDXL punet f16 binary size should not get bigger",
+        )
+        check.less_equal(
+            benchmark_punet_int8_fp8_mean_time,
+            goldentime_rocm_punet_int8_fp8,
+            "SDXL punet f8 benchmark time should not regress",
+        )
+        check.equal(
+            punet_int8_fp8_dispatch_count,
+            goldendispatch_rocm_punet_int8_fp8,
+            "SDXL punet f8 dispatch count should not regress",
+        )
+        check.less_equal(
+            punet_int8_fp8_binary_size,
+            goldensize_rocm_punet_int8_fp8,
+            "SDXL punet f8 binary size should not get bigger",
         )
     check.less_equal(
         benchmark_clip_mean_time,
