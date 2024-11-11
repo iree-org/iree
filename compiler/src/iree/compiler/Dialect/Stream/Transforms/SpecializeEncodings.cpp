@@ -237,9 +237,7 @@ struct SpecializeEncodingsPass
       (void)affinityAnalysis.run();
       SmallVector<AsyncDispatchOp> candidates;
       for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-        funcOp.walk([&](AsyncDispatchOp op) {
-          candidates.push_back(op);
-        });
+        funcOp.walk([&](AsyncDispatchOp op) { candidates.push_back(op); });
       }
       // export -> [affinity -> array per resource of affinities PVS]
       DenseMap<Stream::ExecutableExportOp,
@@ -357,7 +355,7 @@ struct SpecializeEncodingsPass
             operandsResourceAffinities[dispatchOp];
         updateExecutableOpEncodings(moduleOp, executableOp, operandAttrs,
                                     affinities[0], symbolTable, resolver);
-        }
+      }
     }
   }
 };

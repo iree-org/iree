@@ -60,8 +60,8 @@ iree_compiler_cc_library(
         "EncodingInterfaces.h.inc",
         "EncodingOps.h",
         "EncodingOps.h.inc",
-        "EncodingTypes.h",
         "EncodingTypeInterfaces.h.inc",
+        "EncodingTypes.h",
         "EncodingTypes.h.inc",
     ],
     deps = [
@@ -144,7 +144,6 @@ iree_gentbl_cc_library(
     td_file = "EncodingOps.td",
     deps = [":td_files"],
 )
-
 
 iree_gentbl_cc_library(
     name = "EncodingInterfacesGen",
