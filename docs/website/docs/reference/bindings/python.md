@@ -29,7 +29,9 @@ towards various targets, and executing compiled code on IREE's backends.
     renamed to `iree-base-compiler` and `iree-base-runtime`
     respectively, thus effectively deprecating the old packages.
     This name change only affects the names of the packages but not
-    the modules.
+    the modules. To make sure the new packages are used, run
+    `pip uninstall iree-compiler iree-runtime` before installing the
+    new packages.
 
 ## :octicons-download-16: Prerequisites
 
