@@ -1,3 +1,9 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 import copy
 import random
 import string
@@ -49,7 +55,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         context_cache: "onnx_importer.ContextCache",
         module_op: Operation,
         module_cache: "onnx_importer.ModuleCache",
-        numel_threshold: int,
+        num_elements_threshold: int,
         params_scope: str,
     ):
         super().__init__(
@@ -63,7 +69,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         self.last_global_op = None
         self.symbol_table = SymbolTable(module_op)
         self.symbol_table.insert(parent_op)
-        self.numel_threshold = numel_threshold
+        self.num_elements_threshold = num_elements_threshold
         self.param_archive = rt.ParameterIndex()
         self.params_scope = params_scope
 
@@ -132,17 +138,23 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         cls,
         graph_info: onnx_importer.GraphInfo,
         module_op: Operation,
-        numel_threshold: int,
+        num_elements_threshold: int,
         params_scope: str,
         context_cache: Optional["onnx_importer.ContextCache"] = None,
         module_cache: Optional["onnx_importer.ModuleCache"] = None,
         private: bool = False,
     ) -> "IREENodeImporter":
+        # Recover per-context caches of various attributes.
+        # Allows modifications in the same context without
+        # loss of current state.
         cc = (
             context_cache
             if context_cache is not None
             else onnx_importer.ContextCache(module_op.context)
         )
+        # Recover per-module caches of various attributes.
+        # Allows modification in the same module_op without
+        # loss of current state.
         mc = (
             module_cache
             if module_cache is not None
@@ -175,7 +187,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
             context_cache=cc,
             module_op=module_op,
             module_cache=mc,
-            numel_threshold=numel_threshold,
+            num_elements_threshold=num_elements_threshold,
             params_scope=params_scope,
         )
         for node_name, input_value in zip(graph_info.input_map.keys(), block.arguments):
@@ -188,32 +200,32 @@ class IREENodeImporter(onnx_importer.NodeImporter):
     ) -> Value:
         # If an explicitly specified name is given, use that; otherwise, pick
         # up the name from the tensor proto itself
-        iname = extern_name if extern_name else initializer.name
+        initializer_name = extern_name if extern_name else initializer.name
         dims = list(initializer.dims)
-        numel = 1
+        num_elements = 1
         for d in dims:
-            numel = numel * d
-        if numel < self.numel_threshold:
+            num_elements = num_elements * d
+        if num_elements < self.num_elements_threshold:
             imported_tensor = super().import_initializer(initializer)
-            self._nv_map[iname] = imported_tensor
+            self._nv_map[initializer_name] = imported_tensor
             return imported_tensor
 
-        x, t = self.create_tensor_global(initializer)
+        actual_symbol_name, tensor_type = self.create_tensor_global(initializer)
         vtensor_type = self._cc.get_vtensor_type(
             tuple(initializer.dims), self._cc.tensor_element_type(initializer.data_type)
         )
 
-        with InsertionPoint(self._b), Location.name(iname):
-            old_op = util.GlobalLoadOp(t, x)
+        with InsertionPoint(self._b), Location.name(initializer_name):
+            old_op = util.GlobalLoadOp(tensor_type, actual_symbol_name)
             converted_value = Operation.create(
                 "torch_c.from_builtin_tensor",
                 results=[vtensor_type],
                 operands=[old_op.result],
             ).result
 
-        self._nv_map[iname] = converted_value
+        self._nv_map[initializer_name] = converted_value
         tensor_as_array = numpy_helper.to_array(initializer)
-        self.param_archive.add_buffer(x, tensor_as_array)
+        self.param_archive.add_buffer(actual_symbol_name, tensor_as_array)
         return converted_value
 
 
