@@ -112,7 +112,7 @@ jobs:
             --no-skip-tests-missing-files \
             --capture=no \
             --log-cli-level=info \
-            --timeout=1200 \
+            --timeout=240 \
             --durations=0 \
             --config-files=${MODELS_CONFIG_FILE_PATH}
 
@@ -189,7 +189,7 @@ jobs:
             -rpfE \
             --capture=no \
             --log-cli-level=info \
-            --timeout=1200 \
+            --timeout=240 \
             --durations=0
         env:
           ROCM_CHIP: ${{ matrix.rocm-chip }}
@@ -203,7 +203,7 @@ jobs:
             -rpfE \
             --capture=no \
             --log-cli-level=info \
-            --timeout=1200 \
+            --timeout=240 \
             --durations=0
         env:
           ROCM_CHIP: ${{ matrix.rocm-chip }}
@@ -227,7 +227,7 @@ jobs:
             --goldensize-rocm-clip-bytes 860000 \
             --goldensize-rocm-vae-bytes 840000 \
             --rocm-chip gfx90a \
-            --timeout=1200 \
+            --timeout=240 \
             --log-cli-level=info \
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
@@ -256,6 +256,6 @@ jobs:
             --goldensize-rocm-punet-int8-fp8-bytes 2800000 \
             --rocm-chip gfx942 \
             --log-cli-level=info \
-            --timeout=1200 \
+            --timeout=240 \
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
