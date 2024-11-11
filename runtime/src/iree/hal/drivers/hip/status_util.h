@@ -56,6 +56,9 @@ extern "C" {
   IREE_IGNORE_ERROR(iree_hal_hip_result_to_status((syms), ((syms)->expr), \
                                                   __FILE__, __LINE__))
 
+#define HIP_SET_CONTEXT(syms, ctx) \
+  IREE_HIP_RESULT_TO_STATUS(syms, hipCtxSetCurrent(ctx))
+
 // Converts a hipError_t to an iree_status_t object.
 iree_status_t iree_hal_hip_result_to_status(
     const iree_hal_hip_dynamic_symbols_t* syms, hipError_t result,

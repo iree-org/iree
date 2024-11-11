@@ -49,7 +49,7 @@ typedef struct iree_hal_hip_kernel_params_t {
 // several kernels that can be extracted along with the associated block size.
 iree_status_t iree_hal_hip_native_executable_create(
     const iree_hal_hip_dynamic_symbols_t* symbols, hipDevice_t device,
-    const iree_hal_executable_params_t* executable_params,
+    hipCtx_t context, const iree_hal_executable_params_t* executable_params,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable);
 
 // Returns the kernel launch parameters for the given |entry_point| in the

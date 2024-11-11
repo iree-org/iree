@@ -10,6 +10,7 @@
 #include "iree/base/internal/wait_handle.h"
 #include "iree/base/status.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
+#include "iree/hal/drivers/hip/status_util.h"
 #include "iree/hal/drivers/hip/timepoint_pool.h"
 #include "iree/hal/utils/semaphore_base.h"
 
@@ -29,6 +30,8 @@ typedef struct iree_hal_hip_semaphore_t {
   // The list of actions that this semaphore may need to advance on
   // new signaled values.
   iree_hal_deferred_work_queue_t* work_queue;
+
+  hipCtx_t hip_context;
 
   // Guards value and status. We expect low contention on semaphores and since
   // iree_slim_mutex_t is (effectively) just a CAS this keeps things simpler
@@ -56,9 +59,11 @@ static iree_hal_hip_semaphore_t* iree_hal_hip_semaphore_cast(
 
 iree_status_t iree_hal_hip_event_semaphore_create(
     uint64_t initial_value, const iree_hal_hip_dynamic_symbols_t* symbols,
-    iree_hal_hip_timepoint_pool_t* timepoint_pool,
+    hipCtx_t hip_context, iree_hal_hip_timepoint_pool_t* timepoint_pool,
     iree_hal_deferred_work_queue_t* work_queue, iree_allocator_t host_allocator,
     iree_hal_semaphore_t** out_semaphore) {
+  IREE_RETURN_IF_ERROR(HIP_SET_CONTEXT(symbols, hip_context));
+
   IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(timepoint_pool);
   IREE_ASSERT_ARGUMENT(work_queue);
@@ -79,6 +84,7 @@ iree_status_t iree_hal_hip_event_semaphore_create(
   iree_slim_mutex_initialize(&semaphore->mutex);
   semaphore->current_value = initial_value;
   semaphore->failure_status = iree_ok_status();
+  semaphore->hip_context = hip_context;
 
   *out_semaphore = &semaphore->base;
 
@@ -90,6 +96,8 @@ static void iree_hal_hip_semaphore_destroy(
     iree_hal_semaphore_t* base_semaphore) {
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
+  IREE_IGNORE_ERROR(
+      HIP_SET_CONTEXT(semaphore->symbols, semaphore->hip_context));
   iree_allocator_t host_allocator = semaphore->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 

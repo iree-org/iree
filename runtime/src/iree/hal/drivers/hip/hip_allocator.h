@@ -17,13 +17,14 @@ extern "C" {
 #endif  // __cplusplus
 
 // Creates a HIP memory allocator.
-// |device| and |stream| will be used for management operations.
+// |device| |hip_context| and |stream| will be used for management operations.
 // |pools| provides memory pools that may be shared across multiple allocators
 // and the pointer must remain valid for the lifetime of the allocator.
 iree_status_t iree_hal_hip_allocator_create(
     const iree_hal_hip_dynamic_symbols_t* hip_symbols, hipDevice_t device,
-    hipStream_t stream, iree_hal_hip_memory_pools_t* pools,
-    iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator);
+    hipCtx_t hip_context, hipStream_t stream,
+    iree_hal_hip_memory_pools_t* pools, iree_allocator_t host_allocator,
+    iree_hal_allocator_t** out_allocator);
 
 bool iree_hal_hip_allocator_isa(iree_hal_allocator_t* base_value);
 

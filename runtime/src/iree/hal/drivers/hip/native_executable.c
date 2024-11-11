@@ -207,8 +207,10 @@ static iree_status_t iree_hal_hip_native_executable_flatbuffer_verify(
 
 iree_status_t iree_hal_hip_native_executable_create(
     const iree_hal_hip_dynamic_symbols_t* symbols, hipDevice_t device,
-    const iree_hal_executable_params_t* executable_params,
+    hipCtx_t context, const iree_hal_executable_params_t* executable_params,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
+  IREE_RETURN_IF_ERROR(HIP_SET_CONTEXT(symbols, context));
+
   IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(executable_params);
   IREE_ASSERT_ARGUMENT(out_executable);

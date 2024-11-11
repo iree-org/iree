@@ -29,6 +29,8 @@ typedef struct iree_hal_hip_allocator_t {
   // The HIP stream that allocations should be used in.
   hipStream_t stream;
 
+  hipCtx_t hip_context;
+
   // NOTE: optional depending on device support.
   iree_hal_hip_memory_pools_t* pools;
 
@@ -54,8 +56,11 @@ static iree_hal_hip_allocator_t* iree_hal_hip_allocator_cast(
 
 iree_status_t iree_hal_hip_allocator_create(
     const iree_hal_hip_dynamic_symbols_t* hip_symbols, hipDevice_t device,
-    hipStream_t stream, iree_hal_hip_memory_pools_t* pools,
-    iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator) {
+    hipCtx_t hip_context, hipStream_t stream,
+    iree_hal_hip_memory_pools_t* pools, iree_allocator_t host_allocator,
+    iree_hal_allocator_t** out_allocator) {
+  IREE_RETURN_IF_ERROR(HIP_SET_CONTEXT(hip_symbols, hip_context));
+
   IREE_ASSERT_ARGUMENT(hip_symbols);
   IREE_ASSERT_ARGUMENT(out_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -94,6 +99,7 @@ iree_status_t iree_hal_hip_allocator_create(
   allocator->host_allocator = host_allocator;
   allocator->supports_concurrent_managed_access =
       supports_concurrent_managed_access != 0;
+  allocator->hip_context = hip_context;
   *out_allocator = (iree_hal_allocator_t*)allocator;
 
   IREE_TRACE_ZONE_END(z0);
@@ -319,6 +325,9 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
 
+  IREE_RETURN_IF_ERROR(
+      HIP_SET_CONTEXT(allocator->symbols, allocator->hip_context));
+
   // Coerce options into those required by the current device.
   iree_hal_buffer_params_t compat_params = *params;
   iree_hal_buffer_compatibility_t compatibility =
@@ -431,6 +440,9 @@ static void iree_hal_hip_allocator_deallocate_buffer(
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
 
+  IREE_IGNORE_ERROR(
+      HIP_SET_CONTEXT(allocator->symbols, allocator->hip_context));
+
   const iree_hal_hip_buffer_type_t buffer_type =
       iree_hal_hip_buffer_type(base_buffer);
 
@@ -465,6 +477,9 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
+
+  IREE_RETURN_IF_ERROR(
+      HIP_SET_CONTEXT(allocator->symbols, allocator->hip_context));
 
   // Coerce options into those required by the current device.
   iree_hal_buffer_params_t compat_params = *params;
@@ -600,6 +615,9 @@ iree_status_t iree_hal_hip_allocator_alloc_async(
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
 
+  IREE_RETURN_IF_ERROR(
+      HIP_SET_CONTEXT(allocator->symbols, allocator->hip_context));
+
   hipDeviceptr_t ptr = NULL;
   iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
       allocator->symbols,
@@ -625,6 +643,9 @@ iree_status_t iree_hal_hip_allocator_free_async(
     iree_hal_buffer_t* buffer) {
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
+  IREE_RETURN_IF_ERROR(
+      HIP_SET_CONTEXT(allocator->symbols, allocator->hip_context));
+
   hipDeviceptr_t device_ptr = iree_hal_hip_buffer_device_pointer(buffer);
   if (!device_ptr) {
     return iree_ok_status();
