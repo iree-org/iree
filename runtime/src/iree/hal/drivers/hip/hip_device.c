@@ -1199,10 +1199,10 @@ static iree_status_t iree_hal_hip_device_queue_execute(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_buffer_binding_table_t binding_table) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
-  IREE_RETURN_IF_ERROR(
-      HIP_SET_CONTEXT(device->hip_symbols, device->hip_context));
 
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, HIP_SET_CONTEXT(device->hip_symbols, device->hip_context));
 
   iree_status_t status = iree_hal_deferred_work_queue_enqueue(
       device->work_queue, iree_hal_hip_device_collect_tracing_context,

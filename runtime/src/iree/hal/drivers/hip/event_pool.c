@@ -49,11 +49,10 @@ hipEvent_t iree_hal_hip_event_handle(const iree_hal_hip_event_t* event) {
 }
 
 static inline void iree_hal_hip_event_destroy(iree_hal_hip_event_t* event) {
-  IREE_IGNORE_ERROR(HIP_SET_CONTEXT(event->symbols, event->hip_context));
-
   iree_allocator_t host_allocator = event->host_allocator;
   const iree_hal_hip_dynamic_symbols_t* symbols = event->symbols;
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_IGNORE_ERROR(HIP_SET_CONTEXT(event->symbols, event->hip_context));
 
   IREE_ASSERT_REF_COUNT_ZERO(&event->ref_count);
   IREE_HIP_IGNORE_ERROR(symbols, hipEventDestroy(event->hip_event));

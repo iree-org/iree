@@ -61,8 +61,6 @@ iree_status_t iree_hal_hip_stream_command_buffer_create(
     iree_host_size_t binding_capacity, hipStream_t stream,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
-  IREE_RETURN_IF_ERROR(HIP_SET_CONTEXT(hip_symbols, hip_context));
-
   IREE_ASSERT_ARGUMENT(device_allocator);
   IREE_ASSERT_ARGUMENT(hip_symbols);
   IREE_ASSERT_ARGUMENT(nccl_symbols);
@@ -76,6 +74,8 @@ iree_status_t iree_hal_hip_stream_command_buffer_create(
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0,
+                                    HIP_SET_CONTEXT(hip_symbols, hip_context));
 
   iree_hal_hip_stream_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -118,10 +118,10 @@ static void iree_hal_hip_stream_command_buffer_destroy(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_hip_stream_command_buffer_t* command_buffer =
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
-  IREE_IGNORE_ERROR(HIP_SET_CONTEXT(command_buffer->hip_symbols,
-                                    command_buffer->hip_context));
   iree_allocator_t host_allocator = command_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_IGNORE_ERROR(HIP_SET_CONTEXT(command_buffer->hip_symbols,
+                                    command_buffer->hip_context));
 
   iree_hal_stream_tracing_free(command_buffer->tracing_context,
                                &command_buffer->tracing_event_list);
@@ -194,9 +194,10 @@ static iree_status_t iree_hal_hip_stream_command_buffer_end(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_hip_stream_command_buffer_t* command_buffer =
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(HIP_SET_CONTEXT(command_buffer->hip_symbols,
-                                       command_buffer->hip_context));
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, HIP_SET_CONTEXT(command_buffer->hip_symbols,
+                          command_buffer->hip_context));
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_stream_command_buffer_flush_collectives(command_buffer));
@@ -331,10 +332,10 @@ static iree_status_t iree_hal_hip_stream_command_buffer_fill_buffer(
     iree_host_size_t pattern_length, iree_hal_fill_flags_t flags) {
   iree_hal_hip_stream_command_buffer_t* command_buffer =
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(HIP_SET_CONTEXT(command_buffer->hip_symbols,
-                                       command_buffer->hip_context));
-
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, HIP_SET_CONTEXT(command_buffer->hip_symbols,
+                          command_buffer->hip_context));
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_stream_command_buffer_flush_collectives(command_buffer));
@@ -387,10 +388,10 @@ static iree_status_t iree_hal_hip_stream_command_buffer_update_buffer(
     iree_hal_update_flags_t flags) {
   iree_hal_hip_stream_command_buffer_t* command_buffer =
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(HIP_SET_CONTEXT(command_buffer->hip_symbols,
-                                       command_buffer->hip_context));
-
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, HIP_SET_CONTEXT(command_buffer->hip_symbols,
+                          command_buffer->hip_context));
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_stream_command_buffer_flush_collectives(command_buffer));
@@ -433,10 +434,10 @@ static iree_status_t iree_hal_hip_stream_command_buffer_copy_buffer(
     iree_hal_copy_flags_t flags) {
   iree_hal_hip_stream_command_buffer_t* command_buffer =
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(HIP_SET_CONTEXT(command_buffer->hip_symbols,
-                                       command_buffer->hip_context));
-
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, HIP_SET_CONTEXT(command_buffer->hip_symbols,
+                          command_buffer->hip_context));
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_stream_command_buffer_flush_collectives(command_buffer));
@@ -468,10 +469,10 @@ static iree_status_t iree_hal_hip_stream_command_buffer_collective(
     iree_hal_buffer_ref_t recv_ref, iree_device_size_t element_count) {
   iree_hal_hip_stream_command_buffer_t* command_buffer =
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(HIP_SET_CONTEXT(command_buffer->hip_symbols,
-                                       command_buffer->hip_context));
-
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, HIP_SET_CONTEXT(command_buffer->hip_symbols,
+                          command_buffer->hip_context));
 
   iree_hal_buffer_binding_t send_binding = {
       .buffer = send_ref.buffer,
@@ -498,10 +499,10 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_hip_stream_command_buffer_t* command_buffer =
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(HIP_SET_CONTEXT(command_buffer->hip_symbols,
-                                       command_buffer->hip_context));
-
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, HIP_SET_CONTEXT(command_buffer->hip_symbols,
+                          command_buffer->hip_context));
 
   // If any of the workgroup counts are zero, we can skip execution
   // of the kernel. This prevents a 'hipErrorInvalidConfiguration' error when

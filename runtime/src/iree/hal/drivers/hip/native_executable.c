@@ -209,12 +209,11 @@ iree_status_t iree_hal_hip_native_executable_create(
     const iree_hal_hip_dynamic_symbols_t* symbols, hipDevice_t device,
     hipCtx_t context, const iree_hal_executable_params_t* executable_params,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
-  IREE_RETURN_IF_ERROR(HIP_SET_CONTEXT(symbols, context));
-
   IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(executable_params);
   IREE_ASSERT_ARGUMENT(out_executable);
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, HIP_SET_CONTEXT(symbols, context));
 
   *out_executable = NULL;
 

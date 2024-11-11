@@ -62,14 +62,13 @@ iree_status_t iree_hal_hip_event_semaphore_create(
     hipCtx_t hip_context, iree_hal_hip_timepoint_pool_t* timepoint_pool,
     iree_hal_deferred_work_queue_t* work_queue, iree_allocator_t host_allocator,
     iree_hal_semaphore_t** out_semaphore) {
-  IREE_RETURN_IF_ERROR(HIP_SET_CONTEXT(symbols, hip_context));
-
   IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(timepoint_pool);
   IREE_ASSERT_ARGUMENT(work_queue);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, HIP_SET_CONTEXT(symbols, hip_context));
   iree_hal_hip_semaphore_t* semaphore = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, sizeof(*semaphore),
@@ -96,10 +95,10 @@ static void iree_hal_hip_semaphore_destroy(
     iree_hal_semaphore_t* base_semaphore) {
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
-  IREE_IGNORE_ERROR(
-      HIP_SET_CONTEXT(semaphore->symbols, semaphore->hip_context));
   iree_allocator_t host_allocator = semaphore->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_IGNORE_ERROR(
+      HIP_SET_CONTEXT(semaphore->symbols, semaphore->hip_context));
 
   iree_status_ignore(semaphore->failure_status);
   iree_slim_mutex_deinitialize(&semaphore->mutex);

@@ -59,11 +59,11 @@ iree_status_t iree_hal_hip_allocator_create(
     hipCtx_t hip_context, hipStream_t stream,
     iree_hal_hip_memory_pools_t* pools, iree_allocator_t host_allocator,
     iree_hal_allocator_t** out_allocator) {
-  IREE_RETURN_IF_ERROR(HIP_SET_CONTEXT(hip_symbols, hip_context));
-
   IREE_ASSERT_ARGUMENT(hip_symbols);
   IREE_ASSERT_ARGUMENT(out_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0,
+                                    HIP_SET_CONTEXT(hip_symbols, hip_context));
 
   // To support device-local + host-visible memory we need concurrent managed
   // access indicating that the host and devices can concurrently access the
@@ -325,9 +325,6 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
 
-  IREE_RETURN_IF_ERROR(
-      HIP_SET_CONTEXT(allocator->symbols, allocator->hip_context));
-
   // Coerce options into those required by the current device.
   iree_hal_buffer_params_t compat_params = *params;
   iree_hal_buffer_compatibility_t compatibility =
@@ -361,6 +358,9 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
   void* host_ptr = NULL;
   hipDeviceptr_t device_ptr = NULL;
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_hal_hip_buffer_allocate");
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, HIP_SET_CONTEXT(allocator->symbols, allocator->hip_context));
+
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, allocation_size);
   if (iree_all_bits_set(compat_params.type,
                         IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
