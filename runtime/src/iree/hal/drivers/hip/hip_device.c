@@ -1018,6 +1018,9 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
     iree_status_t status = iree_hal_deferred_work_queue_enqueue_alloc(
         device->work_queue, wait_semaphore_list, signal_semaphore_list, buffer);
     if (iree_status_is_ok(status)) {
+      status = iree_hal_deferred_work_queue_issue(device->work_queue);
+    }
+    if (iree_status_is_ok(status)) {
       *out_buffer = buffer;
     } else {
       iree_hal_hip_buffer_set_allocation_empty(buffer);
@@ -1081,8 +1084,12 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
     iree_hal_buffer_t* buffer) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
   if (iree_hal_hip_allocator_isa(iree_hal_device_allocator(base_device))) {
-    return iree_hal_deferred_work_queue_enqueue_dealloc(
+    iree_status_t status = iree_hal_deferred_work_queue_enqueue_dealloc(
         device->work_queue, wait_semaphore_list, signal_semaphore_list, buffer);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_deferred_work_queue_issue(device->work_queue);
+    }
+    return status;
   }
 
   // NOTE: block on the semaphores here; we could avoid this by properly
