@@ -133,13 +133,19 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
 
 const WgpDetails *getCDNA3WgpDetails() {
   static const MMAIntrinsic cdna3MMAOps[] = {
+      // Introduced in CDNA1, still present in CDNA3
       MMAIntrinsic::MFMA_F32_16x16x4_F32,
       MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_F32_32x32x8_F16,
+      // Introduced in CDNA2, still present in CDNA3
+      MMAIntrinsic::MFMA_F64_16x16x4_F64,
+      // Introduced in CDNA3
       MMAIntrinsic::MFMA_F32_16x16x16_BF16,
       MMAIntrinsic::MFMA_F32_32x32x8_BF16,
-      MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ,
       MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ,
+      MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ,
+      MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ,
+      MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ_F8E5M2FNUZ,
       MMAIntrinsic::MFMA_I32_16x16x32_I8,
       MMAIntrinsic::MFMA_I32_32x32x16_I8,
   };
@@ -162,10 +168,16 @@ const WgpDetails *getCDNA3WgpDetails() {
 
 const WgpDetails *getCDNA2WgpDetails() {
   static const MMAIntrinsic cdna2MMAOps[] = {
+      // Introduced in CDNA1
+      MMAIntrinsic::MFMA_F32_16x16x4_F32,
       MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_F32_32x32x8_F16,
       MMAIntrinsic::MFMA_I32_16x16x16_I8,
       MMAIntrinsic::MFMA_I32_32x32x8_I8,
+      // Introduced in CDNA2
+      MMAIntrinsic::MFMA_F32_16x16x8_BF16,
+      MMAIntrinsic::MFMA_F32_32x32x4_BF16,
+      MMAIntrinsic::MFMA_F64_16x16x4_F64,
   };
   static const WgpDetails cdna2Wgp = {allComputeBits,
                                       allStorageBits,
@@ -183,8 +195,9 @@ const WgpDetails *getCDNA2WgpDetails() {
 
 const WgpDetails *getCDNA1WgpDetails() {
   static const MMAIntrinsic cdna1MMAOps[] = {
-      MMAIntrinsic::MFMA_F32_16x16x16_F16,
-      MMAIntrinsic::MFMA_F32_32x32x8_F16,
+      MMAIntrinsic::MFMA_F32_16x16x4_F32, MMAIntrinsic::MFMA_F32_16x16x16_F16,
+      MMAIntrinsic::MFMA_F32_32x32x8_F16, MMAIntrinsic::MFMA_I32_16x16x16_I8,
+      MMAIntrinsic::MFMA_I32_32x32x8_I8,
   };
   static const WgpDetails cdna1Wgp = {allComputeBits,
                                       allStorageBits,
@@ -202,9 +215,10 @@ const WgpDetails *getCDNA1WgpDetails() {
 
 const WgpDetails *getRDNA3WgpDetails() {
   static const MMAIntrinsic rdna3MMAOps[] = {
-      MMAIntrinsic::WMMA_F32_16x16x16_F16,
-      MMAIntrinsic::WMMA_F16_16x16x16_F16,
+      MMAIntrinsic::WMMA_F32_16x16x16_F16, MMAIntrinsic::WMMA_F16_16x16x16_F16,
+      MMAIntrinsic::WMMA_I32_16x16x16_I8,  MMAIntrinsic::WMMA_I32_16x16x16_I8,
       MMAIntrinsic::WMMA_I32_16x16x16_I8,
+
   };
   static const WgpDetails rdna3Wgp = {allComputeBits,
                                       allStorageBits,
