@@ -189,7 +189,10 @@ const WgpDetails *getCDNA2WgpDetails() {
                                       {1024, 1024, 1024},
                                       1024,
                                       64 * 1024,
-                                      {0x7fffffff, 0x7fffffff, 0x7fffffff}};
+                                      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+                                      /*maxLoadInstructionBits=*/128,
+                                      /*simdsPerWgp=*/4,
+                                      /*vgprSpaceBits=*/256 * 32};
   return &cdna2Wgp;
 }
 
@@ -209,7 +212,10 @@ const WgpDetails *getCDNA1WgpDetails() {
                                       {1024, 1024, 1024},
                                       1024,
                                       64 * 1024,
-                                      {0x7fffffff, 0x7fffffff, 0x7fffffff}};
+                                      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+                                      /*maxLoadInstructionBits=*/128,
+                                      /*simdsPerWgp=*/4,
+                                      /*vgprSpaceBits=*/256 * 32};
   return &cdna1Wgp;
 }
 

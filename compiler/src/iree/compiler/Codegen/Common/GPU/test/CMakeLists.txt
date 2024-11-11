@@ -27,6 +27,8 @@ iree_lit_test_suite(
     "gpu_infer_memory_space.mlir"
     "gpu_lower_to_ukernels.mlir"
     "gpu_materialize_encoding_gfx1100.mlir"
+    "gpu_materialize_encoding_gfx908.mlir"
+    "gpu_materialize_encoding_gfx90a.mlir"
     "gpu_materialize_encoding_gfx942.mlir"
     "gpu_nested_layout_contract_amdgpu.mlir"
     "gpu_nested_layout_vector_distribution.mlir"
