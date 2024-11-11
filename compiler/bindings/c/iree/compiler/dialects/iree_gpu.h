@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_DIALECTS_IREE_GPU_H
 #define IREE_COMPILER_DIALECTS_IREE_GPU_H
 
-#include <cstdint>
 #include "mlir-c/IR.h"
 #include "mlir-c/Support.h"
 
