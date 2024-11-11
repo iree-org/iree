@@ -14,6 +14,7 @@
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/hip/context_util.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/status_util.h"
 
@@ -52,7 +53,8 @@ static inline void iree_hal_hip_event_destroy(iree_hal_hip_event_t* event) {
   iree_allocator_t host_allocator = event->host_allocator;
   const iree_hal_hip_dynamic_symbols_t* symbols = event->symbols;
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_IGNORE_ERROR(HIP_SET_CONTEXT(event->symbols, event->hip_context));
+  IREE_IGNORE_ERROR(
+      iree_hal_hip_set_context(event->symbols, event->hip_context));
 
   IREE_ASSERT_REF_COUNT_ZERO(&event->ref_count);
   IREE_HIP_IGNORE_ERROR(symbols, hipEventDestroy(event->hip_event));

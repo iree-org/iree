@@ -10,6 +10,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/drivers/hip/context_util.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/hip_buffer.h"
 #include "iree/hal/drivers/hip/status_util.h"
@@ -62,8 +63,8 @@ iree_status_t iree_hal_hip_allocator_create(
   IREE_ASSERT_ARGUMENT(hip_symbols);
   IREE_ASSERT_ARGUMENT(out_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0,
-                                    HIP_SET_CONTEXT(hip_symbols, hip_context));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_set_context(hip_symbols, hip_context));
 
   // To support device-local + host-visible memory we need concurrent managed
   // access indicating that the host and devices can concurrently access the
@@ -359,7 +360,7 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
   hipDeviceptr_t device_ptr = NULL;
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_hal_hip_buffer_allocate");
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, HIP_SET_CONTEXT(allocator->symbols, allocator->hip_context));
+      z0, iree_hal_hip_set_context(allocator->symbols, allocator->hip_context));
 
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, allocation_size);
   if (iree_all_bits_set(compat_params.type,
@@ -441,7 +442,7 @@ static void iree_hal_hip_allocator_deallocate_buffer(
       iree_hal_hip_allocator_cast(base_allocator);
 
   IREE_IGNORE_ERROR(
-      HIP_SET_CONTEXT(allocator->symbols, allocator->hip_context));
+      iree_hal_hip_set_context(allocator->symbols, allocator->hip_context));
 
   const iree_hal_hip_buffer_type_t buffer_type =
       iree_hal_hip_buffer_type(base_buffer);
@@ -479,7 +480,7 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
       iree_hal_hip_allocator_cast(base_allocator);
 
   IREE_RETURN_IF_ERROR(
-      HIP_SET_CONTEXT(allocator->symbols, allocator->hip_context));
+      iree_hal_hip_set_context(allocator->symbols, allocator->hip_context));
 
   // Coerce options into those required by the current device.
   iree_hal_buffer_params_t compat_params = *params;
@@ -616,7 +617,7 @@ iree_status_t iree_hal_hip_allocator_alloc_async(
       iree_hal_hip_allocator_cast(base_allocator);
 
   IREE_RETURN_IF_ERROR(
-      HIP_SET_CONTEXT(allocator->symbols, allocator->hip_context));
+      iree_hal_hip_set_context(allocator->symbols, allocator->hip_context));
 
   hipDeviceptr_t ptr = NULL;
   iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
@@ -644,7 +645,7 @@ iree_status_t iree_hal_hip_allocator_free_async(
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
   IREE_RETURN_IF_ERROR(
-      HIP_SET_CONTEXT(allocator->symbols, allocator->hip_context));
+      iree_hal_hip_set_context(allocator->symbols, allocator->hip_context));
 
   hipDeviceptr_t device_ptr = iree_hal_hip_buffer_device_pointer(buffer);
   if (!device_ptr) {

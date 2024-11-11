@@ -9,6 +9,7 @@
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/wait_handle.h"
 #include "iree/base/status.h"
+#include "iree/hal/drivers/hip/context_util.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/status_util.h"
 #include "iree/hal/drivers/hip/timepoint_pool.h"
@@ -68,7 +69,8 @@ iree_status_t iree_hal_hip_event_semaphore_create(
   IREE_ASSERT_ARGUMENT(out_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, HIP_SET_CONTEXT(symbols, hip_context));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_set_context(symbols, hip_context));
   iree_hal_hip_semaphore_t* semaphore = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, sizeof(*semaphore),
@@ -98,7 +100,7 @@ static void iree_hal_hip_semaphore_destroy(
   iree_allocator_t host_allocator = semaphore->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_IGNORE_ERROR(
-      HIP_SET_CONTEXT(semaphore->symbols, semaphore->hip_context));
+      iree_hal_hip_set_context(semaphore->symbols, semaphore->hip_context));
 
   iree_status_ignore(semaphore->failure_status);
   iree_slim_mutex_deinitialize(&semaphore->mutex);

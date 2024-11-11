@@ -21,6 +21,7 @@ iree_cc_library(
     "api.h"
   SRCS
     "api.h"
+    "context_util.h"
     "event_pool.c"
     "event_pool.h"
     "event_semaphore.c"
