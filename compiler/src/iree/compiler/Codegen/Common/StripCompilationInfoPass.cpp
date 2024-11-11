@@ -16,10 +16,9 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct StripCompilationInfo final
+struct StripFuncOpCompilationInfo final
     : OpInterfaceRewritePattern<mlir::FunctionOpInterface> {
-  using OpInterfaceRewritePattern<
-      mlir::FunctionOpInterface>::OpInterfaceRewritePattern;
+  using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
   LogicalResult matchAndRewrite(mlir::FunctionOpInterface funcOp,
                                 PatternRewriter &rewriter) const final {
     rewriter.modifyOpInPlace(funcOp, [&]() {
@@ -27,18 +26,27 @@ struct StripCompilationInfo final
       if (getTranslationInfo(funcOp)) {
         eraseTranslationInfo(funcOp);
       }
+    });
 
-      funcOp->walk([&](Operation *op) {
-        if (getCompilationInfo(op)) {
-          // Erase the compilation info configuration if it exists
-          eraseCompilationInfo(op);
-        }
-        if (getLoweringConfig(op)) {
-          // Erase the lowering configuration from root operation if it
-          // exists.
-          eraseLoweringConfig(op);
-        }
-      });
+    return success();
+  }
+};
+
+struct StripLinalgOpCompilationInfo final
+    : OpInterfaceRewritePattern<linalg::LinalgOp> {
+  using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
+  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
+                                PatternRewriter &rewriter) const final {
+    rewriter.modifyOpInPlace(linalgOp, [&]() {
+      if (getCompilationInfo(linalgOp)) {
+        // Erase the compilation info configuration if it exists.
+        eraseCompilationInfo(linalgOp);
+      }
+      if (getLoweringConfig(linalgOp)) {
+        // Erase the lowering configuration from root operation if it
+        // exists.
+        eraseLoweringConfig(linalgOp);
+      }
     });
 
     return success();
@@ -49,7 +57,8 @@ struct StripCompilationInfoPass final
     : impl::StripCompilationInfoPassBase<StripCompilationInfoPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    patterns.add<StripCompilationInfo>(&getContext());
+    patterns.add<StripFuncOpCompilationInfo>(&getContext());
+    patterns.add<StripLinalgOpCompilationInfo>(&getContext());
     walkAndApplyPatterns(getOperation(), std::move(patterns));
   }
 };
