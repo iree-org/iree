@@ -4,14 +4,20 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+<<<<<<< HEAD
 #include <cstdint>
 #include <type_traits>
+=======
+#include <cassert>
+>>>>>>> edb68a0bd9 ([python][tuner] Add bindings for lowering config)
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/dialects/iree_gpu.h"
+#include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/IR.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Support.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 bool ireeAttributeIsAGPUPipelineOptionsAttr(MlirAttribute attr) {
   return llvm::isa<mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr>(
@@ -183,4 +189,30 @@ ireeGPUMMAInfo ireeGPUMMAAttrGetInfo(MlirAttribute attr) {
 
   std::tie(info.mElements, info.nElements, info.kElements) = mma.getMNKShape();
   return info;
+}
+
+bool ireeAttributeIsAGPULoweringConfigAttr(MlirAttribute attr) {
+  return llvm::isa<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
+      unwrap(attr));
+}
+
+MlirTypeID ireeGPULoweringConfigAttrGetTypeID() {
+  return wrap(mlir::iree_compiler::IREE::GPU::LoweringConfigAttr::getTypeID());
+}
+
+MlirAttribute ireeGPULoweringConfigAttrGet(MlirContext mlirCtx,
+                                           MlirAttribute attributesDictionary) {
+  assert(mlirAttributeIsADictionary(attributesDictionary));
+  auto attributes =
+      llvm::cast<mlir::DictionaryAttr>(unwrap(attributesDictionary));
+  mlir::MLIRContext *ctx = unwrap(mlirCtx);
+  return wrap(
+      mlir::iree_compiler::IREE::GPU::LoweringConfigAttr::get(ctx, attributes));
+}
+
+MlirAttribute ireeGPULoweringConfigAttrGetAttributes(MlirAttribute attr) {
+  assert(ireeAttributeIsAGPULoweringConfigAttr(attr));
+  return wrap(llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
+                  unwrap(attr))
+                  .getAttributes());
 }

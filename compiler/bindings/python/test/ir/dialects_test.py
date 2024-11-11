@@ -131,3 +131,15 @@ def mma_intrinsic_attr():
             assert K == 8
 
             assert mma_intrinsic_attr.mma == mma_attr
+
+
+@lambda _: _()
+def lowering_config_attr():
+    with ir.Context() as ctx, ir.Location.unknown():
+        module = ir.Module.create()
+        with ir.InsertionPoint(module.body):
+            attributes = ir.DictAttr.get({"reduction": ir.ArrayAttr.get([])}, ctx)
+            lowering_config = iree_gpu.LoweringConfigAttr.get(attributes, ctx)
+            assert lowering_config is not None
+
+            assert lowering_config.attributes == attributes

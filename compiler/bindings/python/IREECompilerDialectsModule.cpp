@@ -165,4 +165,22 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
         ireeGPUMMAInfo info = ireeGPUMMAAttrGetInfo(self);
         return py::make_tuple(info.mElements, info.nElements, info.kElements);
       });
+
+
+  //===-------------------------------------------------------------------===//
+  // GPULoweringConfigAttr
+  //===-------------------------------------------------------------------===//
+  mlir_attribute_subclass(iree_gpu_module, "LoweringConfigAttr",
+                          ireeAttributeIsAGPULoweringConfigAttr,
+                          ireeGPULoweringConfigAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, MlirAttribute attributeDictionary,
+             MlirContext ctx) {
+            return ireeGPULoweringConfigAttrGet(ctx, attributeDictionary);
+          },
+          "cls"_a, "value"_a, "ctx"_a = py::none(),
+          "Gets a gpu.lowering config from parameters.")
+      .def_property_readonly("attributes",
+                             ireeGPULoweringConfigAttrGetAttributes);
 }

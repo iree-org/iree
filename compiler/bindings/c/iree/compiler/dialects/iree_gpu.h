@@ -82,6 +82,17 @@ struct ireeGPUMMAInfo {
 
 MLIR_CAPI_EXPORTED ireeGPUMMAInfo ireeGPUMMAAttrGetInfo(MlirAttribute attr);
 
+MLIR_CAPI_EXPORTED bool
+ireeAttributeIsAGPULoweringConfigAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeGPULoweringConfigAttrGetTypeID(void);
+
+MLIR_CAPI_EXPORTED MlirAttribute ireeGPULoweringConfigAttrGet(
+    MlirContext mlirCtx, MlirAttribute attributesDictionary);
+
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeGPULoweringConfigAttrGetAttributes(MlirAttribute attr);
+
 #ifdef __cplusplus
 }
 #endif
