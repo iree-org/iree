@@ -18,7 +18,11 @@ static inline iree_status_t iree_hal_hip_set_context(
     IREE_HIP_RETURN_IF_ERROR(syms, hipCtxGetCurrent(&current_context),
                              "hipCtxGetCurrent");
     if (current_context != hip_context) {
-      IREE_TRACE_MESSAGE(INFO, "Hip Context Switch");
+      IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_hal_hip_set_context_switch");
+      iree_status_t status =
+          IREE_HIP_RESULT_TO_STATUS(syms, hipCtxSetCurrent(hip_context));
+      IREE_TRACE_ZONE_END(z0);
+      return status;
     }
   });
   return IREE_HIP_RESULT_TO_STATUS(syms, hipCtxSetCurrent(hip_context));
