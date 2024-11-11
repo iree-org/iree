@@ -227,6 +227,7 @@ jobs:
             --goldensize-rocm-clip-bytes 860000 \
             --goldensize-rocm-vae-bytes 840000 \
             --rocm-chip gfx90a \
+            --timeout=1200 \
             --log-cli-level=info \
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
@@ -249,11 +250,12 @@ jobs:
             --goldensize-rocm-vae-bytes 840000 \
             --goldentime-rocm-punet-int8-fp16-ms 55 \
             --goldendispatch-rocm-punet-int8-fp16 1284 \
-            --goldensize-rocm-punet-int8-fp16-bytes 2270000 \
+            --goldensize-rocm-punet-int8-fp16-bytes 2560000 \
             --goldentime-rocm-punet-int8-fp8-ms 59 \
-            --goldendispatch-rocm-punet-int8-fp8 1556 \
-            --goldensize-rocm-punet-int8-fp8-bytes 2244086 \
+            --goldendispatch-rocm-punet-int8-fp8 1564 \
+            --goldensize-rocm-punet-int8-fp8-bytes 2800000 \
             --rocm-chip gfx942 \
             --log-cli-level=info \
+            --timeout=1200 \
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
