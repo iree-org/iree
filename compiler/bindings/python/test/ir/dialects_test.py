@@ -18,6 +18,8 @@ def gpu_pipeline_options_attr():
             reorder_attr = iree_gpu.ReorderWorkgroupsStrategyAttr.get(
                 iree_gpu.ReorderWorkgroupsStrategy.Transpose, ctx
             )
+            assert reorder_attr.value == iree_gpu.ReorderWorkgroupsStrategy.Transpose
+
             gpu_attr = iree_gpu.PipelineOptionsAttr.get(
                 True,
                 False,
@@ -86,3 +88,46 @@ def gpu_pipeline_options_attr():
                 # unfortunately not `is`
                 == iree_gpu.ReorderWorkgroupsStrategy.Transpose
             )
+
+
+@lambda _: _()
+def mma_intrinsic_attr():
+    with ir.Context() as ctx, ir.Location.unknown():
+        module = ir.Module.create()
+        with ir.InsertionPoint(module.body):
+            mma_intrinsic_attr = iree_gpu.MMAIntrinsicAttr.get(
+                iree_gpu.MMAIntrinsic.MFMA_F32_32x32x8_F16, ctx
+            )
+            assert mma_intrinsic_attr is not None
+            assert (
+                str(mma_intrinsic_attr)
+                == "#iree_gpu<mma_intrinsic MFMA_F32_32x32x8_F16>"
+            )
+
+            raw_value = mma_intrinsic_attr.raw_value
+            assert raw_value == iree_gpu.MMAIntrinsic.MFMA_F32_32x32x8_F16
+            value = mma_intrinsic_attr.value
+            assert str(value) == "MFMA_F32_32x32x8_F16"
+            assert int(value) == raw_value
+
+            mma_attr = iree_gpu.MMAAttr.get(raw_value, ctx)
+            assert mma_attr is not None
+
+            f16 = ir.F16Type.get()
+            f32 = ir.F32Type.get()
+            a_type, b_type, c_type = mma_attr.abc_element_types
+            assert a_type == f16
+            assert b_type == f16
+            assert c_type == f32
+
+            vec_4xf16 = ir.VectorType.get((4,), f16)
+            a_vec_type, b_vec_type, _c_vec_type = mma_attr.abc_vector_types
+            assert a_vec_type == vec_4xf16
+            assert b_vec_type == vec_4xf16
+
+            M, N, K = mma_attr.mnk_shape
+            assert M == 32
+            assert N == 32
+            assert K == 8
+
+            assert mma_intrinsic_attr.mma == mma_attr
