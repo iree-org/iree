@@ -649,21 +649,16 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
         getSubgroupSize() / intrinsicLayoutThreadBound);
   }
 
-  // AffineDelinearizeIndexOp requires an in-bounds input index, so we bound it.
-  OpFoldResult threadIdBound =
-      builder.getIndexAttr(ShapedType::getNumElements(distributionThreadSizes));
-  AffineExpr d0 = builder.getAffineDimExpr(0), d1 = builder.getAffineDimExpr(1);
-  OpFoldResult boundedThreadId = affine::makeComposedFoldedAffineApply(
-      builder, loc, {d0 % d1}, {threadId, threadIdBound});
-
   // Obtain the offsets from delinearization along the distributionThreadSizes.
+  // Use a delinearize without outer bound and throw away its initial result
+  // to get clamping behavior.
   SmallVector<OpFoldResult> tileOffsets =
       builder
           .create<affine::AffineDelinearizeIndexOp>(
-              loc,
-              getValueOrCreateConstantIndexOp(builder, loc, boundedThreadId),
-              getAsIndexOpFoldResult(ctx, distributionThreadSizes))
-          ->getResults();
+              loc, getValueOrCreateConstantIndexOp(builder, loc, threadId),
+              distributionThreadSizes, /*hasOuterBound=*/false)
+          ->getResults()
+          .drop_front();
 
   if (hasDistributionOnlyDim) {
     // Erase the delinearized index that corresponds to the extra distribution
