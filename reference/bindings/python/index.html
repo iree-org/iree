@@ -3898,11 +3898,11 @@ components:</p>
 </thead>
 <tbody>
 <tr>
-<td><code>iree-base-compiler</code></td>
+<td><code>iree-compiler</code></td>
 <td>IREE's generic compiler tools and helpers</td>
 </tr>
 <tr>
-<td><code>iree-base-runtime</code></td>
+<td><code>iree-runtime</code></td>
 <td>IREE's runtime, including CPU and GPU backends</td>
 </tr>
 <tr>
@@ -3921,16 +3921,6 @@ components:</p>
 </table>
 <p>Collectively, these packages allow for importing from frontends, compiling
 towards various targets, and executing compiled code on IREE's backends.</p>
-<details class="note" open="open">
-<summary>Note - <code>iree-compiler</code> and <code>iree-runtime</code> are deprecated</summary>
-<p>The Python packages <code>iree-compiler</code> and <code>iree-runtime</code> have been
-renamed to <code>iree-base-compiler</code> and <code>iree-base-runtime</code>
-respectively, thus effectively deprecating the old packages.
-This name change only affects the names of the packages but not
-the modules. To make sure the new packages are used, run
-<code>pip uninstall iree-compiler iree-runtime</code> before installing the
-new packages.</p>
-</details>
 <h2 id="prerequisites"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg></span> Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
 <p>To use IREE's Python bindings, you will first need to install
 <a href="https://www.python.org/downloads/">Python 3</a> and
@@ -3970,8 +3960,8 @@ through <code>venv</code>
 <p>Stable release packages are
 <a href="https://pypi.org/user/google-iree-pypi-deploy/">published to PyPI</a>.</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>iree-base-compiler<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>iree-base-runtime
+<span class="w">  </span>iree-compiler<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-runtime
 </code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -3980,8 +3970,8 @@ through <code>venv</code>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--find-links<span class="w"> </span>https://iree.dev/pip-release-links.html<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--upgrade<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>iree-base-compiler<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>iree-base-runtime
+<span class="w">  </span>iree-compiler<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-runtime
 </code></pre></div>
 </div>
 </div>
@@ -4046,13 +4036,13 @@ for examples using the Python APIs.</p>
 <p>The Python packages include console scripts for most of IREE's native tools
 like <code>iree-compile</code> and <code>iree-run-module</code>.  After installing a package from
 pip, these should be added to your path automatically:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-base-runtime
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-runtime
 <span class="gp">$ </span>which<span class="w"> </span>iree-run-module
 
 <span class="go">/projects/.venv/Scripts/iree-run-module</span>
 </code></pre></div>
 <h2 id="profiling"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg></span> Profiling<a class="headerlink" href="#profiling" title="Permanent link">link</a></h2>
-<p>The tools in the <code>iree-base-runtime</code> package support variants:</p>
+<p>The tools in the <code>iree-runtime</code> package support variants:</p>
 <table>
 <thead>
 <tr>

@@ -4014,8 +4014,8 @@ installed package from pip and <em>not</em> your source build with ASan!</p>
 </code></pre></div>
 <p>To fix this, uninstall the packages and ensure that you have your
 <code>PYTHONPATH</code> pointing at your build directory:</p>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>uninstall<span class="w"> </span>iree-base-runtime
-python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>uninstall<span class="w"> </span>iree-base-compiler
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>uninstall<span class="w"> </span>iree-runtime
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>uninstall<span class="w"> </span>iree-compiler
 <span class="nb">source</span><span class="w"> </span>iree-build/.env<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">export</span><span class="w"> </span>PYTHONPATH
 
 <span class="nv">LD_PRELOAD</span><span class="o">=</span>/usr/lib/llvm-12/lib/clang/12.0.0/lib/linux/libclang_rt.asan-x86_64.so<span class="w"> </span><span class="se">\</span>
