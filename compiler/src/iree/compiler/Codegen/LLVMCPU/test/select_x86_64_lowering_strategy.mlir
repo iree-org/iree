@@ -1943,3 +1943,18 @@ module {
 //      CHECK:   iree_linalg_ext.custom_op
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 //  CHECK-NOT:   lowering_config
+
+// -----
+
+// Test additional level of tiling in the CPUDefault pipeline. linalg.quantized_matmul doesn't have specialized pipeline
+// since, it gets decomposed to matmul that has specialized pipeline.
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>
+func.func @test_tiling_cpu_default(%arg0: tensor<256x256xi8>, %arg1: tensor<256x256xi8>, %arg2: i32, %arg3: i32, %arg4: tensor<256x256xi32>) -> tensor<256x256xi32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+    %0 = linalg.quantized_matmul ins(%arg0, %arg1, %arg2, %arg3 : tensor<256x256xi8>, tensor<256x256xi8>, i32, i32) outs(%arg4 : tensor<256x256xi32>) -> tensor<256x256xi32>
+    return %0 : tensor<256x256xi32>
+}
+// CHECK-DAG:  #[[CONFIG0:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [4, 64, 0]]>
+// CHECK-DAG:  #[[TRANSLATION_INFO]] = #iree_codegen.translation_info<CPUDefault>
+//      CHECK: func @test_tiling_cpu_default(
+// CHECK-SAME:     translation_info = #[[TRANSLATION_INFO]]
+//      CHECK:    linalg.quantized_matmul {lowering_config = #[[CONFIG0]]}

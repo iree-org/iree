@@ -653,8 +653,14 @@ void addCPULinalgExtTileAndVectorizePipeline(
   }
 }
 
-void addCPUDefaultPassPipeline(OpPassManager &funcPassManager) {
-  addTileAndDistributePasses(funcPassManager);
+void addCPUDefaultPassPipeline(OpPassManager &funcPassManager,
+                               FailureOr<TilingConfig> &tilingConfig) {
+  if (succeeded(tilingConfig) &&
+      tilingConfig.value().getNumTilingLevels() > 1) {
+    addTileAndDistributePasses(funcPassManager);
+    funcPassManager.addPass(createLLVMCPUTileAndFusePass(
+        tilingConfig.value().getVectorCommonParallelLevel()));
+  }
   addCPUBufferizePasses(funcPassManager);
 }
 
