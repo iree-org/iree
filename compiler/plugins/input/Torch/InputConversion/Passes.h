@@ -32,7 +32,7 @@ struct TorchToIREELoweringPipelineOptions
   Option<bool> strictSymbolicShapes{
       *this, "strict-symbolic-shapes",
       llvm::cl::desc("Use strict symbolic shapes."), llvm::cl::init(true)};
-  Option<bool> decompose{*this, "torch-use-decompose-complex-ops",
+  Option<bool> decompose{*this, "decompose",
                          llvm::cl::desc("Decompose complex torch operations."),
                          llvm::cl::init(true)};
 };
