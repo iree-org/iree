@@ -631,7 +631,8 @@ def TestGpuVectorDistribution :
     }];
 
     let arguments = (ins TransformHandleTypeInterface:$target,
-                         DefaultValuedOptionalAttr<BoolAttr, "false">:$experimental);
+                         DefaultValuedOptionalAttr<BoolAttr, "false">:$experimental,
+                         DefaultValuedOptionalAttr<I64Attr, "64">:$subgroup_size);
     let results = (outs);
 
     let assemblyFormat = [{ $target attr-dict `:` type($target)}];

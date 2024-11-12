@@ -197,9 +197,6 @@ builtin.module attributes { transform.with_named_sequence } {
 #layout_row_major = #iree_vector_ext.layout<<[BATCHX, LANEY], [2, 8]>, <[BATCHY, LANEX, VECTORX], [2, 1, 8]>>
 #layout_col_major = #iree_vector_ext.layout<<[BATCHX, LANEY, VECTORX], [1, 4, 4]>, <[BATCHY, LANEX], [2, 8]>>
 
-// TODO: Use affine min tricks based on the grid size to elide the mod.
-// Note that this IR is invalid if subgroup size != 8.
-
 func.func @distribute_transfer_write_row_major(%root: vector<16x16xf16>, %alloc: memref<64x64xf16>) {
   %c0 = arith.constant 0 : index
   %rootl = iree_vector_ext.to_layout %root to layout(#layout_row_major) : vector<16x16xf16>
@@ -208,24 +205,23 @@ func.func @distribute_transfer_write_row_major(%root: vector<16x16xf16>, %alloc:
                   : vector<16x16xf16>, memref<64x64xf16>
   func.return
 }
-// CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 mod 8)>
-// CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0] -> (s0 mod 8 + 8)>
 
 // CHECK-LABEL: @distribute_transfer_write_row_major
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
 // CHECK-DAG: %[[LANEID:.+]] = gpu.thread_id  x
-// CHECK: %[[VEC_LANE_Y:.+]] = affine.apply #[[$MAP0]]()[%[[LANEID]]]
+// CHECK: %[[SPLIT_ID:.+]]:2 = affine.delinearize_index %[[LANEID]] into (8, 8)
 // CHECK: %[[DIST_SRC_VEC:.+]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xf16> -> vector<2x2x8xf16>
 // CHECK: %[[BATCH_0_0:.+]] = vector.extract %[[DIST_SRC_VEC]][0, 0] : vector<8xf16> from vector<2x2x8xf16>
-// CHECK: vector.store %[[BATCH_0_0]], %{{.*}}[%[[VEC_LANE_Y]], %[[C0]]] : memref<64x64xf16>, vector<8xf16>
+// CHECK: vector.store %[[BATCH_0_0]], %{{.*}}[%[[SPLIT_ID]]#1, %[[C0]]] : memref<64x64xf16>, vector<8xf16>
 
-// CHECK: %[[NEXT_VEC_LANE_Y:.+]] = affine.apply #[[$MAP1]]()[%[[LANEID]]]
+// CHECK: %[[NEXT_VEC_LANE_Y:.+]] = affine.linearize_index disjoint [%[[C1]], %[[SPLIT_ID]]#1] by (2, 8) : index
 // CHECK: %[[BATCH_1_0:.+]] = vector.extract %[[DIST_SRC_VEC]][1, 0] : vector<8xf16> from vector<2x2x8xf16>
 // CHECK: vector.store %[[BATCH_1_0]], %{{.*}}[%[[NEXT_VEC_LANE_Y]], %[[C0]]] : memref<64x64xf16>, vector<8xf16>
 
 // CHECK: %[[BATCH_0_1:.+]] = vector.extract %[[DIST_SRC_VEC]][0, 1] : vector<8xf16> from vector<2x2x8xf16>
-// CHECK: vector.store %[[BATCH_0_1]], %{{.*}}[%[[VEC_LANE_Y]], %[[C8]]] : memref<64x64xf16>, vector<8xf16>
+// CHECK: vector.store %[[BATCH_0_1]], %{{.*}}[%[[SPLIT_ID]]#1, %[[C8]]] : memref<64x64xf16>, vector<8xf16>
 
 // CHECK: %[[BATCH_1_1:.+]] = vector.extract %[[DIST_SRC_VEC]][1, 1] : vector<8xf16> from vector<2x2x8xf16>
 // CHECK: vector.store %[[BATCH_1_1]], %{{.*}}[%[[NEXT_VEC_LANE_Y]], %[[C8]]] : memref<64x64xf16>, vector<8xf16>
@@ -560,8 +556,6 @@ builtin.module attributes { transform.with_named_sequence } {
 #layoutB2 = #iree_vector_ext.layout<<[ BATCHX,  LANEY,  VECTORX], [1, 1, 16]>, <[ BATCHY,  LANEX], [1, 16]>>
 #layoutC2 = #iree_vector_ext.layout<<[ BATCHX,  VECTORY,  LANEY,  VECTORX], [1, 8, 2, 1]>, <[ BATCHY,  LANEX], [1, 16]>>
 
-// CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0, s1, s2] -> (s1 * 16 + s2 * 32 + (s0 floordiv 32) * 16)>
-// CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0] -> (s0 mod 16)>
 // CHECK-LABEL: func.func @resolve_wmma_layout_conflict_with_shared_memory
 func.func @resolve_wmma_layout_conflict_with_shared_memory(%15 : vector<16x16xf16>,
                                                            %14 : vector<16x16xf16>,
@@ -607,19 +601,18 @@ func.func @resolve_wmma_layout_conflict_with_shared_memory(%15 : vector<16x16xf1
 // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
 // CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
 // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+// CHECK-DAG: %[[VEC_INIT:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x16xf16
 
-// CHECK: %[[VEC_INIT:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x16xf16
-// CHECK: %[[TID_X:.+]] = gpu.thread_id  x
-// CHECK: %[[TID_Y:.+]] = gpu.thread_id  y
-// CHECK: %[[TID_Z:.+]] = gpu.thread_id  z
-// CHECK: %[[SUBGROUP_OFFSET:.+]] = affine.apply #[[$MAP0]]()[%[[TID_X]], %[[TID_Y]], %[[TID_Z]]]
+// CHECK: %[[TIDX:.+]] = gpu.thread_id  x
+// CHECK: %[[TIDY:.+]] = gpu.thread_id  y
+// CHECK: %[[SUBGROUP_OFFSET:.+]] = affine.linearize_index disjoint [%[[TIDY]], %[[C0]]] by (2, 16)
 // CHECK: %[[ALLOC:.+]] = memref.alloc() : memref<16x32xf16, #gpu.address_space<workgroup>>
 // CHECK: %[[SUBVIEW:.+]] = memref.subview %[[ALLOC]][0, %[[SUBGROUP_OFFSET]]] [16, 16] [1, 1]
-// CHECK: %[[HALF_LANE_ID:.+]] = affine.apply #[[$MAP1]]()[%[[TID_X]]]
-// CHECK-COUNT-8: vector.store %{{.+}}, %[[SUBVIEW]][%{{.+}}, %[[HALF_LANE_ID]]]
+// CHECK: %[[SPLIT_LANE_ID:.+]]:2 = affine.delinearize_index %[[TIDX]] into (2, 16)
+// CHECK-COUNT-8: vector.store %{{.+}}, %[[SUBVIEW]][%{{.+}}, %[[SPLIT_LANE_ID]]#1]
 // CHECK-AFTER: gpu.barrier
 
-// CHECK: %[[LANE_OFFSET:.+]] = arith.addi %[[SUBGROUP_OFFSET]], %[[HALF_LANE_ID]]
+// CHECK: %[[LANE_OFFSET:.+]] = arith.addi %[[SUBGROUP_OFFSET]], %[[SPLIT_LANE_ID]]#1
 // CHECK: %[[LOAD0:.+]] = vector.load %[[ALLOC]][%[[C0]], %[[LANE_OFFSET]]]
 // CHECK: %[[INSERT0:.+]] = vector.insert_strided_slice %[[LOAD0]], %[[VEC_INIT]] {offsets = [0, 0, 0], strides = [1]} : vector<1xf16> into vector<1x1x16xf16>
 // CHECK: %[[LOAD1:.+]] = vector.load %[[ALLOC]][%[[C1]], %[[LANE_OFFSET]]]
@@ -636,7 +629,7 @@ func.func @resolve_wmma_layout_conflict_with_shared_memory(%15 : vector<16x16xf1
 builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.test_gpu_vector_distribution %top_level_func {experimental = true} : !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func {experimental = true, subgroup_size = 32 : i64} : !transform.any_op
     transform.yield
   }
 }

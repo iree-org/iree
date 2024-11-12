@@ -32,6 +32,7 @@ void populateDropSharedMemoryDeallocOpPatterns(RewritePatternSet &patterns);
 void populateGPUDistributionPatterns(RewritePatternSet &patterns);
 
 void populateGPUDistributionLayoutAttrPatterns(Value laneId,
+                                               int64_t subgroupSize,
                                                RewritePatternSet &patterns);
 
 void populateGPUReductionDistributionPatterns(RewritePatternSet &patterns,

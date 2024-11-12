@@ -32,54 +32,55 @@ namespace {
 /// parameterized by the thread grid.
 static SmallVector<Value> computeSIMDIndex(const LayoutIterator::State &state,
                                            LayoutAttr layout, Value laneId,
+                                           int64_t subgroupSize,
                                            RewriterBase &rewriter) {
-  MLIRContext *ctx = layout.getContext();
-  AffineExpr threadX, threadY, threadZ;
-  bindSymbols(ctx, threadX, threadY, threadZ);
+  Location loc = laneId.getLoc();
+
+  auto [laneDimX, laneDimY, laneDimZ] = layout.getLaneGrid();
+  int64_t gridsPerSubgroup =
+      llvm::divideCeil(subgroupSize, laneDimX * laneDimY * laneDimZ);
+  // Note: we add an extra entry to the delinearization here so that, if the
+  // vector layout requires fewer lanes than are present in the subgroup.
+  // Otherwise, we'd, for example, construct delinearizations with the basis (1,
+  // 1, 16) when there are 32 lanes, which would simplify to no delinearization
+  // at all. To resolve this, we add an extra term to the grid to capture the
+  // overflow.
+  auto reversedLaneGrid = rewriter.create<affine::AffineDelinearizeIndexOp>(
+      loc, laneId,
+      ArrayRef<int64_t>{gridsPerSubgroup, laneDimZ, laneDimY, laneDimX});
 
   SmallVector<Value> simdIndex;
+
   // Calculate the index for each dim separately.
   for (PerDimLayoutAttr dimLayout : layout.getLayouts()) {
-    AffineExpr offset = getAffineConstantExpr(0, ctx);
-    AffineExpr stride = getAffineConstantExpr(1, ctx);
-    for (auto [label, shape] : llvm::reverse(
-             llvm::zip(dimLayout.getLabels(), dimLayout.getShapes()))) {
+    SmallVector<Value> linearizeVals;
+    for (LayoutDimensionAttr label : dimLayout.getLabels()) {
       int64_t position = state.lookup(label.getValue()).getPosition();
 
+      // Note: indices are into a reversed lane grid that has an extra leading
+      // term we must ignore (so the X coordinate is result #3 and the Z
+      // coordinate is result #1).
       switch (label.getValue()) {
       case LayoutDimension::LANEX:
-        offset = offset + stride * threadX;
+        linearizeVals.push_back(reversedLaneGrid.getResult(3));
         break;
       case LayoutDimension::LANEY:
-        offset = offset + stride * threadY;
+        linearizeVals.push_back(reversedLaneGrid.getResult(2));
         break;
       case LayoutDimension::LANEZ:
-        offset = offset + stride * threadZ;
+        linearizeVals.push_back(reversedLaneGrid.getResult(1));
         break;
       default:
-        offset = offset + stride * getAffineConstantExpr(position, ctx);
+        linearizeVals.push_back(
+            rewriter.createOrFold<arith::ConstantIndexOp>(loc, position));
         break;
       }
-      stride = stride * getAffineConstantExpr(shape, ctx);
     }
 
-    auto [laneDimX, laneDimY, laneDimZ] = layout.getLaneGrid();
-    SmallVector<Value> laneGrid = {
-        rewriter.create<arith::ConstantIndexOp>(laneId.getLoc(), laneDimZ),
-        rewriter.create<arith::ConstantIndexOp>(laneId.getLoc(), laneDimY),
-        rewriter.create<arith::ConstantIndexOp>(laneId.getLoc(), laneDimX)};
-    FailureOr<SmallVector<Value>> maybeReversedLaneGridVals =
-        affine::delinearizeIndex(rewriter, laneId.getLoc(), laneId, laneGrid);
-    assert(succeeded(maybeReversedLaneGridVals) &&
-           "Failed to delinearize lane index");
-    SmallVector<Value> laneGridVals = {(*maybeReversedLaneGridVals)[2],
-                                       (*maybeReversedLaneGridVals)[1],
-                                       (*maybeReversedLaneGridVals)[0]};
-
     // Compute the index for the dim.
-    AffineMap indexMap = AffineMap::get(0, 3, offset);
-    Value index = rewriter.create<affine::AffineApplyOp>(
-        rewriter.getUnknownLoc(), indexMap, laneGridVals);
+    Value index = rewriter.create<affine::AffineLinearizeIndexOp>(
+        rewriter.getUnknownLoc(), linearizeVals, dimLayout.getShapes(),
+        /*disjoint=*/true);
     simdIndex.push_back(index);
   }
 
@@ -199,8 +200,9 @@ struct DistributeXferLayoutAttr : OpDistributionPattern<OpTy> {
                 "expected vector::TransferReadOp or vector::TransferWriteOp");
 
   DistributeXferLayoutAttr(MLIRContext *context, Value laneId,
-                           PatternBenefit benefit = 1)
-      : OpDistributionPattern<OpTy>(context, benefit), laneId(laneId) {}
+                           int64_t subgroupSize, PatternBenefit benefit = 1)
+      : OpDistributionPattern<OpTy>(context, benefit), laneId(laneId),
+        subgroupSize(subgroupSize) {}
 
   VectorValue accessMemory(OpTy xferOp, VectorValue accumulator,
                            LayoutAttr vectorLayout,
@@ -237,7 +239,7 @@ struct DistributeXferLayoutAttr : OpDistributionPattern<OpTy> {
                                       llvm::SmallBitVector &projectedDims,
                                       RewriterBase &rewriter) const {
     SmallVector<Value> simdIndices =
-        computeSIMDIndex(state, memoryLayout, laneId, rewriter);
+        computeSIMDIndex(state, memoryLayout, laneId, subgroupSize, rewriter);
     SmallVector<Value> memoryIndices(indices);
 
     // The memory layout has some projected leading dims that indices doesn't.
@@ -272,6 +274,7 @@ struct DistributeXferLayoutAttr : OpDistributionPattern<OpTy> {
   }
 
   Value laneId;
+  int64_t subgroupSize;
 };
 
 struct DistributeTransferReadLayoutAttr final
@@ -1118,10 +1121,11 @@ void populateGPUDistributionPatterns(RewritePatternSet &patterns) {
 }
 
 void populateGPUDistributionLayoutAttrPatterns(Value laneId,
+                                               int64_t subgroupSize,
                                                RewritePatternSet &patterns) {
   patterns
       .add<DistributeTransferReadLayoutAttr, DistributeTransferWriteLayoutAttr>(
-          patterns.getContext(), laneId);
+          patterns.getContext(), laneId, subgroupSize);
   patterns.add<DistributeBroadcastLayoutAttr, DistributeTransposeLayoutAttr>(
       patterns.getContext());
 }
