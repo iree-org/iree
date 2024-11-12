@@ -22,6 +22,84 @@ def run_tool(*argv: str):
 
 
 ONNX_FILE_PATH = os.path.join(os.path.dirname(__file__), "testdata", "LeakyReLU.onnx")
+LARGE_WEIGHTS_ONNX_FILE_PATH = os.path.join(
+    os.path.dirname(__file__), "testdata", "conv.onnx"
+)
+
+
+class ImportOnnxwithExternalizationTest(unittest.TestCase):
+    def setUp(self):
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            self.outputPath = f.name
+
+    def tearDown(self) -> None:
+        if os.path.exists(self.outputPath):
+            os.unlink(self.outputPath)
+        if os.path.exists("custom_params_file.irpa"):
+            os.unlink("custom_params_file.irpa")
+        if os.path.exists(str(self.outputPath) + "_params.irpa"):
+            os.unlink(str(self.outputPath) + "_params.irpa")
+
+    def testExternalizeWeightsDefaultThreshold(self):
+        run_tool(
+            LARGE_WEIGHTS_ONNX_FILE_PATH, "--externalize-params", "-o", self.outputPath
+        )
+        with open(self.outputPath, "rt") as f:
+            contents = f.read()
+            self.assertIn("util.global", contents)
+            self.assertIn("util.global.load", contents)
+            # The bias is smaller in volume than the default 100 elements,
+            # so it should still be inlined.
+            self.assertIn("onnx.Constant", contents)
+        assert os.path.isfile(str(self.outputPath) + "_params.irpa")
+
+    def testExternalizeParamsSaveCustomPath(self):
+        run_tool(
+            LARGE_WEIGHTS_ONNX_FILE_PATH,
+            "--externalize-params",
+            "--save-params-to",
+            "custom_params_file.irpa",
+            "-o",
+            self.outputPath,
+        )
+        with open(self.outputPath, "rt") as f:
+            contents = f.read()
+            self.assertIn("util.global", contents)
+            self.assertIn("util.global.load", contents)
+        assert os.path.isfile("custom_params_file.irpa")
+
+    def testExternalizeTooHighThreshold(self):
+        num_elements_weights = 1 * 256 * 100 * 100 + 1
+        run_tool(
+            LARGE_WEIGHTS_ONNX_FILE_PATH,
+            "--externalize-params",
+            "--num-elements-threshold",
+            str(num_elements_weights),
+            "-o",
+            self.outputPath,
+        )
+        with open(self.outputPath, "rt") as f:
+            contents = f.read()
+            self.assertNotIn("util.global", contents)
+            self.assertNotIn("util.global.load", contents)
+            self.assertIn("onnx.Constant", contents)
+
+    def testExternalizeMinimumThreshold(self):
+        run_tool(
+            LARGE_WEIGHTS_ONNX_FILE_PATH,
+            "--externalize-params",
+            "--num-elements-threshold",
+            "0",
+            "-o",
+            self.outputPath,
+        )
+        with open(self.outputPath, "rt") as f:
+            contents = f.read()
+            self.assertIn("util.global", contents)
+            self.assertIn("util.global.load", contents)
+            # As the max allowed number of elements for inlining is 0 elements,
+            # there should be no inlined constants.
+            self.assertNotIn("onnx.Constant", contents)
 
 
 class ImportOnnxTest(unittest.TestCase):
