@@ -691,6 +691,8 @@ SmallVector<VirtualMMAIntrinsic> MMAAttr::getVirtualIntrinsics() const {
     return {VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16};
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
     return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ};
+  case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ:
+    return {VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ};
   default:
     return {};
   }
@@ -1234,6 +1236,9 @@ static OpaqueMmaLayout getOpaqueVMMALayout(MLIRContext *context,
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ: {
     return OpaqueMmaLayout{16, 16, 32, f8E4M3FNUZ, f8E4M3FNUZ, f32};
   }
+  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ: {
+    return OpaqueMmaLayout{32, 32, 16, f8E4M3FNUZ, f8E4M3FNUZ, f32};
+  }
   // V(Virtual)MFMA instructions which have 2 mfma instructions interleaved
   // along the k dimension.
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16: {
@@ -1268,6 +1273,7 @@ VirtualMMAAttr::getABCVectorTypes() const {
     auto cType = VectorType::get({4}, C);
     return {aType, bType, cType};
   }
+  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16: {
     auto aType = VectorType::get({8}, A);
     auto bType = VectorType::get({8}, B);
@@ -1290,6 +1296,7 @@ int64_t VirtualMMAAttr::getSubgroupSize() const {
   switch (getIntrinsic().getValue()) {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
+  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16: {
     return 64;
   }
@@ -1344,7 +1351,8 @@ int64_t VirtualMMAAttr::getUnrollK() const {
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16: {
     return 2;
   }
-  case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ: {
+  case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ: {
     return 1;
   }
   }
@@ -1372,6 +1380,7 @@ FailureOr<Value> VirtualMMAAttr::buildMmaOperation(OpBuilder &builder,
   switch (getIntrinsic().getValue()) {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
+  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16: {
     // Generate mfma's for K with unrolled kernels.
     const int64_t unrollKFactor = getUnrollK();
@@ -1410,6 +1419,7 @@ int64_t VirtualMMAAttr::getBlockSize() const {
   switch (getIntrinsic().getValue()) {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
+  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16: {
     return 1;
   }
@@ -1454,6 +1464,18 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
     case MMAFragment::Rhs:
       return {/*outer=*/{1, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
               /*element=*/{8, 1}};
+    case MMAFragment::Acc:
+      return {/*outer=*/{4, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
+              /*element=*/{4, 1}};
+    }
+  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ:
+    switch (fragment) {
+    case MMAFragment::Lhs:
+      return {/*outer=*/{1, 2}, /*thread=*/{32, 2}, /*tstrides=*/{1, 32},
+              /*element=*/{1, 4}};
+    case MMAFragment::Rhs:
+      return {/*outer=*/{2, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
+              /*element=*/{4, 1}};
     case MMAFragment::Acc:
       return {/*outer=*/{4, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
               /*element=*/{4, 1}};

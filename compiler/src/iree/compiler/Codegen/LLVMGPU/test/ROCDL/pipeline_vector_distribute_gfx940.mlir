@@ -215,7 +215,7 @@ hal.executable @matmul_multiple_k {
 
 // -----
 
-// Basic f8, f8 -> f32 matmul.
+// Basic f8, f8 -> f32 matmul. (intrinsic with shape, m = 16, n = 16, k = 32)
 
 #config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 256], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F8E4M3FNUZ>, subgroup_m_count = 2, subgroup_n_count = 2}>
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>}>
@@ -225,15 +225,15 @@ hal.executable @matmul_multiple_k {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-hal.executable @matmul_256x256x256_f8_f32 {
+hal.executable @matmul_256x256x256_16x16x32_f8_f32 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export @matmul_256x256x256_f8_f32 layout(#pipeline_layout) {
+  hal.executable.export @matmul_256x256x256_16x16x32_f8_f32 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
-    func.func @matmul_256x256x256_f8_f32() attributes {translation_info = #translation} {
+    func.func @matmul_256x256x256_16x16x32_f8_f32() attributes {translation_info = #translation} {
       %cst = arith.constant 0.000000e+00 : f32
       %c0 = arith.constant 0 : index
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<256x256xf8E4M3FNUZ>>
@@ -253,7 +253,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 
 // Make sure it generates the mfma instructions we expect for f8 inputs.
 
-//    CHECK-LABEL: func.func @matmul_256x256x256_f8_f32()
+//    CHECK-LABEL: func.func @matmul_256x256x256_16x16x32_f8_f32()
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 8 times
 // along the K dimension. So in total 32 mfma ops.
 // CHECK-COUNT-32:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 32 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<8xf8E4M3FNUZ>, vector<8xf8E4M3FNUZ>, vector<4xf32>
@@ -304,6 +304,52 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 // along the K dimension. So in total 32 mfma ops.
 // CHECK-COUNT-32:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 32 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<8xi8>, vector<8xi8>, vector<4xi32>
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xi32>, memref<256x256xi32, #hal.descriptor_type<storage_buffer>>
+
+// -----
+
+// Basic f8, f8 -> f32 matmul. (intrinsic with shape, m = 32, n = 32, k = 16)
+
+#config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 256], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F8E4M3FNUZ>, subgroup_m_count = 2, subgroup_n_count = 2}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>}>
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable @matmul_256x256x256_32x32x16_f8_f32 {
+hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
+  hal.executable.export @matmul_256x256x256_32x32x16_f8_f32 layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+  builtin.module {
+    func.func @matmul_256x256x256_32x32x16_f8_f32() attributes {translation_info = #translation} {
+      %cst = arith.constant 0.000000e+00 : f32
+      %c0 = arith.constant 0 : index
+      %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<256x256xf8E4M3FNUZ>>
+      %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<256x256xf8E4M3FNUZ>>
+      %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<256x256xf32>>
+      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x256xf8E4M3FNUZ>> -> tensor<256x256xf8E4M3FNUZ>
+      %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x256xf8E4M3FNUZ>> -> tensor<256x256xf8E4M3FNUZ>
+      %5 = tensor.empty() : tensor<256x256xf32>
+      %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<256x256xf32>) -> tensor<256x256xf32>
+      %7 = linalg.matmul {lowering_config = #config} ins(%3, %4 : tensor<256x256xf8E4M3FNUZ>, tensor<256x256xf8E4M3FNUZ>) outs(%6 : tensor<256x256xf32>) -> tensor<256x256xf32>
+      flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : tensor<256x256xf32> -> !flow.dispatch.tensor<writeonly:tensor<256x256xf32>>
+      return
+    }
+  }
+}
+}
+
+// Make sure it generates the mfma instructions we expect for f8 inputs.
+
+//    CHECK-LABEL: func.func @matmul_256x256x256_32x32x16_f8_f32()
+// Each subgroup handles 1 * 1 tiles, and for each tile we accumulate (256/16) = 16 times
+// along the K dimension. So in total 16 mfma ops.
+//  CHECK-COUNT-16:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 32 : i32, n = 32 : i32} blgp =  none : vector<8xf8E4M3FNUZ>, vector<8xf8E4M3FNUZ>, vector<16xf32>
+//  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf32>, memref<256x256xf32, #hal.descriptor_type<storage_buffer>>
 
 // -----
 
@@ -656,6 +702,7 @@ hal.executable public @contract_schedule_considering_read_layout {
 // -----
 
 // This test ensures that we can generate and decompose the right instructions from V(Virtual) MFMAs.
+// (intrinsic with shape, m = 32, n = 32, k = 16)
 
 #config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 128], promote_operands = [0, 1], mma_kind = #iree_gpu.virtual_mma_layout<intrinsic = VMFMA_F32_32x32x16_F16>, subgroup_m_count = 2, subgroup_n_count = 2}>
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>}>
@@ -665,15 +712,15 @@ hal.executable public @contract_schedule_considering_read_layout {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-hal.executable @virtual_intrinsic_256x256x256_f16_f32 {
+hal.executable @virtual_intrinsic_256x256x256_16x16x32xf8E4M3FNUZ_f32 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export @virtual_intrinsic_256x256x256_f16_f32 layout(#pipeline_layout) {
+  hal.executable.export @virtual_intrinsic_256x256x256_16x16x32xf8E4M3FNUZ_f32 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
-    func.func @virtual_intrinsic_256x256x256_f16_f32() attributes {translation_info = #translation} {
+    func.func @virtual_intrinsic_256x256x256_16x16x32xf8E4M3FNUZ_f32() attributes {translation_info = #translation} {
       %cst = arith.constant 0.000000e+00 : f32
       %c0 = arith.constant 0 : index
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<256x256xf16>>
@@ -691,7 +738,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 }
 }
 
-// CHECK-LABEL: func @virtual_intrinsic_256x256x256_f16_f32
+// CHECK-LABEL: func @virtual_intrinsic_256x256x256_16x16x32xf8E4M3FNUZ_f32
 // CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<1x1x4x1x4x1xf32>)
 
 // Validate that VMFMA is decomposed into coalesced read and 2 MFMAs:
@@ -719,8 +766,9 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 // -----
 
 // This test ensures we can generate correct instructions from V(Virtual) MFMAs that has only different read layouts.
+// (intrinsic with shape m = 16, n = 16, k = 32)
 
-#config = #iree_gpu.lowering_config<{workgroup = [32, 32, 0], reduction = [0, 0, 128], promote_operands = [0, 1], mma_kind = #iree_gpu.virtual_mma_layout<intrinsic = VMFMA_F32_16x16x32_F8E4M3FNUZ>, subgroup_m_count = 2, subgroup_n_count = 2}>
+#config = #iree_gpu.lowering_config<{workgroup = [32, 32, 0], reduction = [0, 0, 128], promote_operands = [0, 1], mma_kind = #iree_gpu.virtual_mma_layout<intrinsic = VMFMA_F32_32x32x16_F8E4M3FNUZ>, subgroup_m_count = 1, subgroup_n_count = 1}>
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>}>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -728,15 +776,15 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-hal.executable @virtual_intrinsic_256x256x256_f8E4M3FNUZ_f32 {
+hal.executable @virtual_intrinsic_256x256x256_32x32x16_f8E4M3FNUZ_f32 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export @virtual_intrinsic_256x256x256_f8E4M3FNUZ_f32 layout(#pipeline_layout) {
+  hal.executable.export @virtual_intrinsic_256x256x256_32x32x16_f8E4M3FNUZ_f32 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
-    func.func @virtual_intrinsic_256x256x256_f8E4M3FNUZ_f32() attributes {translation_info = #translation} {
+    func.func @virtual_intrinsic_256x256x256_32x32x16_f8E4M3FNUZ_f32() attributes {translation_info = #translation} {
       %cst = arith.constant 0.000000e+00 : f32
       %c0 = arith.constant 0 : index
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<256x256xf8E4M3FNUZ>>
@@ -754,7 +802,55 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 }
 }
 
-// CHECK-LABEL: func @virtual_intrinsic_256x256x256_f8E4M3FNUZ_f32
+// Basic pipeline test to make sure it generates the instructions we expect.
+
+//    CHECK-LABEL: func.func @virtual_intrinsic_256x256x256_32x32x16_f8E4M3FNUZ_f32()
+//          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) ->  (vector<1x1x4x1x4x1xf32>)
+// Each subgroup handles 1 * 1 tiles, and for each tile we accumulate (128 / 16) = 8 times
+// along the K dimension. So in total 8 mfma ops.
+// CHECK-COUNT-8:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 32 : i32, n = 32 : i32} blgp =  none : vector<8xf8E4M3FNUZ>, vector<8xf8E4M3FNUZ>, vector<16xf32>
+//          CHECK:     scf.yield %{{.+}} : vector<1x1x4x1x4x1xf32>
+//  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf32>, memref<256x256xf32, #hal.descriptor_type<storage_buffer>>
+
+// -----
+
+// This test ensures we can generate correct instructions from V(Virtual) MFMAs that has only different read layouts.
+
+#config = #iree_gpu.lowering_config<{workgroup = [32, 32, 0], reduction = [0, 0, 128], promote_operands = [0, 1], mma_kind = #iree_gpu.virtual_mma_layout<intrinsic = VMFMA_F32_16x16x32_F8E4M3FNUZ>, subgroup_m_count = 2, subgroup_n_count = 2}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>}>
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable @virtual_intrinsic_256x256x256_16x16x32xf8E4M3FNUZ_f32 {
+hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
+  hal.executable.export @virtual_intrinsic_256x256x256_16x16x32xf8E4M3FNUZ_f32 layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+  builtin.module {
+    func.func @virtual_intrinsic_256x256x256_16x16x32xf8E4M3FNUZ_f32() attributes {translation_info = #translation} {
+      %cst = arith.constant 0.000000e+00 : f32
+      %c0 = arith.constant 0 : index
+      %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<256x256xf8E4M3FNUZ>>
+      %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<256x256xf8E4M3FNUZ>>
+      %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<256x256xf32>>
+      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x256xf8E4M3FNUZ>> -> tensor<256x256xf8E4M3FNUZ>
+      %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x256xf8E4M3FNUZ>> -> tensor<256x256xf8E4M3FNUZ>
+      %5 = tensor.empty() : tensor<256x256xf32>
+      %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<256x256xf32>) -> tensor<256x256xf32>
+      %7 = linalg.matmul {lowering_config = #config} ins(%3, %4 : tensor<256x256xf8E4M3FNUZ>, tensor<256x256xf8E4M3FNUZ>) outs(%6 : tensor<256x256xf32>) -> tensor<256x256xf32>
+      flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : tensor<256x256xf32> -> !flow.dispatch.tensor<writeonly:tensor<256x256xf32>>
+      return
+    }
+  }
+}
+}
+
+// CHECK-LABEL: func @virtual_intrinsic_256x256x256_16x16x32xf8E4M3FNUZ_f32
 // CHECK-DAG:     %[[ALLOC_LHS:.+]] = memref.alloc() : memref<32x136xf8E4M3FNUZ, #gpu.address_space<workgroup>>
 // CHECK-DAG:     %[[ALLOC_RHS:.+]] = memref.alloc() : memref<128x40xf8E4M3FNUZ, #gpu.address_space<workgroup>>
 // CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<1x1x1x1x4x1xf32>)
