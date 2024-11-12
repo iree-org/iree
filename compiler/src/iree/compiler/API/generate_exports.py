@@ -72,6 +72,7 @@ IREE_DIALECTS_HEADER_FILES = [
 ]
 
 IREE_COMPILER_DIALECTS_HEADER_FILES = [
+    "iree_codegen.h",
     "iree_gpu.h",
 ]
 

@@ -10,10 +10,15 @@
 
 #include <stdint.h>
 
+extern void ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr();
+extern void ireeAttributeIsAGPULoweringConfigAttr();
 extern void ireeAttributeIsAGPUMMAAttr();
 extern void ireeAttributeIsAGPUMMAIntrinsicAttr();
 extern void ireeAttributeIsAGPUPipelineOptionsAttr();
 extern void ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr();
+extern void ireeCodegenDispatchLoweringPassPipelineAttrGet();
+extern void ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID();
+extern void ireeCodegenDispatchLoweringPassPipelineAttrGetValue();
 extern void ireeCompilerEnumeratePlugins();
 extern void ireeCompilerEnumerateRegisteredHALTargetBackends();
 extern void ireeCompilerErrorDestroy();
@@ -65,6 +70,9 @@ extern void ireeCompilerSourceDestroy();
 extern void ireeCompilerSourceOpenFile();
 extern void ireeCompilerSourceSplit();
 extern void ireeCompilerSourceWrapBuffer();
+extern void ireeGPULoweringConfigAttrGet();
+extern void ireeGPULoweringConfigAttrGetAttributes();
+extern void ireeGPULoweringConfigAttrGetTypeID();
 extern void ireeGPUMMAAttrGet();
 extern void ireeGPUMMAAttrGetInfo();
 extern void ireeGPUMMAAttrGetTypeID();
@@ -856,10 +864,15 @@ extern void mlirVectorTypeIsScalable();
 
 uintptr_t __iree_compiler_hidden_force_extern() {
   uintptr_t x = 0;
+  x += (uintptr_t)&ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr;
+  x += (uintptr_t)&ireeAttributeIsAGPULoweringConfigAttr;
   x += (uintptr_t)&ireeAttributeIsAGPUMMAAttr;
   x += (uintptr_t)&ireeAttributeIsAGPUMMAIntrinsicAttr;
   x += (uintptr_t)&ireeAttributeIsAGPUPipelineOptionsAttr;
   x += (uintptr_t)&ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr;
+  x += (uintptr_t)&ireeCodegenDispatchLoweringPassPipelineAttrGet;
+  x += (uintptr_t)&ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID;
+  x += (uintptr_t)&ireeCodegenDispatchLoweringPassPipelineAttrGetValue;
   x += (uintptr_t)&ireeCompilerEnumeratePlugins;
   x += (uintptr_t)&ireeCompilerEnumerateRegisteredHALTargetBackends;
   x += (uintptr_t)&ireeCompilerErrorDestroy;
@@ -911,6 +924,9 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCompilerSourceOpenFile;
   x += (uintptr_t)&ireeCompilerSourceSplit;
   x += (uintptr_t)&ireeCompilerSourceWrapBuffer;
+  x += (uintptr_t)&ireeGPULoweringConfigAttrGet;
+  x += (uintptr_t)&ireeGPULoweringConfigAttrGetAttributes;
+  x += (uintptr_t)&ireeGPULoweringConfigAttrGetTypeID;
   x += (uintptr_t)&ireeGPUMMAAttrGet;
   x += (uintptr_t)&ireeGPUMMAAttrGetInfo;
   x += (uintptr_t)&ireeGPUMMAAttrGetTypeID;
