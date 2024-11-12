@@ -439,7 +439,6 @@ setup(
     description="IREE Python Compiler API",
     long_description=README,
     long_description_content_type="text/markdown",
-    long_description="",
     license="Apache-2.0",
     classifiers=[
         "Development Status :: 3 - Alpha",
