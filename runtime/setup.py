@@ -539,7 +539,11 @@ setup(
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
     ],
-    url="https://github.com/iree-org/iree",
+    project_urls={
+        "homepage": "https://iree.dev/",
+        "repository": "https://github.com/iree-org/iree",
+        "documentation": "https://iree.dev/reference/bindings/python/",
+    },
     python_requires=">=3.9",
     ext_modules=(
         [
