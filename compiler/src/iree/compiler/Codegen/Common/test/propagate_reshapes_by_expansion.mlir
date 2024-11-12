@@ -302,3 +302,38 @@ func.func @noexpand_dest_forall_nomapping() {
 //       CHECK:   flow.dispatch.tensor.store %[[SCFFORALL]], %[[SUBSPAN]]
 //  CHECK-SAME:   offsets = [0], sizes = [32], strides = [1] : tensor<32xf32>
 //  CHECK-SAME:   !flow.dispatch.tensor<writeonly:tensor<32xf32>>
+
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @noexpand_dest_forall_notfullslicestore() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+      flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<34xf32>>
+  %2 = tensor.empty() : tensor<32xf32>
+  %4 = scf.forall (%arg0) = (0) to (32) step (16)
+       shared_outs(%arg2 = %2) -> (tensor<32xf32>) {
+    %extracted_slice = tensor.extract_slice %arg2[%arg0] [16] [1] : tensor<32xf32> to tensor<16xf32>
+    %expanded = tensor.expand_shape %extracted_slice [[0, 1]] output_shape [2, 8]
+                : tensor<16xf32> into tensor<2x8xf32>
+    %5 = util.optimization_barrier %expanded : tensor<2x8xf32>
+    %collapsed = tensor.collapse_shape %5 [[0, 1]] : tensor<2x8xf32> into tensor<16xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %collapsed into %arg2[%arg0] [16] [1]
+          : tensor<16xf32> into tensor<32xf32>
+    }
+  } {mapping = [#iree_codegen.workgroup_mapping<y>]}
+  flow.dispatch.tensor.store %4, %0, offsets = [1], sizes = [32], strides = [1] : tensor<32xf32> -> !flow.dispatch.tensor<writeonly:tensor<34xf32>>
+  return
+}
+
+// CHECK-LABEL: func @noexpand_dest_forall_notfullslicestore(
+//       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<32xf32>
+//       CHECK:   %[[SCFFORALL:.+]] = scf.forall (%[[ARG0:.+]]) = (0) to (32) step (16)
+//  CHECK-SAME:       shared_outs(%[[ARG2:.+]] = %[[EMPTY]]) -> (tensor<32xf32>) {
+//       CHECK:   flow.dispatch.tensor.store %[[SCFFORALL]], %[[SUBSPAN]]
+//  CHECK-SAME:   offsets = [1], sizes = [32], strides = [1] : tensor<32xf32>
+//  CHECK-SAME:   !flow.dispatch.tensor<writeonly:tensor<34xf32>>

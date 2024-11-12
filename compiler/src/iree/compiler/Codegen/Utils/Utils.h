@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 #define IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/TargetParser/Triple.h"
@@ -250,6 +251,12 @@ FailureOr<DimBoundSize>
 computeDimUpperBound(Value shapedValue, unsigned dimNum,
                      std::optional<vector::VscaleRange> vscaleRange,
                      RoundUpVscaleMultiple = RoundUpVscaleMultiple::No);
+
+// Utility to make sure we are storing the full incoming subspan. Otherwise we
+// cannot simply adjust the subspan's resultant type later.
+bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
+                 IREE::Flow::DispatchTensorType tensorType,
+                 ValueRange dynamicDims);
 
 } // namespace mlir::iree_compiler
 

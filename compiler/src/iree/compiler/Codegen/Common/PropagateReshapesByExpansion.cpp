@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -203,6 +204,18 @@ struct ExpandDestinationForallOp final
     auto forallOp = dyn_cast<scf::ForallOp>(tiedResult.getOwner());
     if (!forallOp)
       return failure();
+
+    // We only want this pattern if the forall op result is being written to a
+    // full slice. Otherwise the hoisted collapse op is not foldable.
+    for (Operation *foralluser : tiedResult.getUsers()) {
+      auto storeOp = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(foralluser);
+      if (!storeOp)
+        return failure();
+      if (!isFullSlice(storeOp, storeOp.getTargetType(),
+                       storeOp.getTargetDims())) {
+        return failure();
+      }
+    }
 
     // This allows us to assume that the extract/inserts in the loop are
     // disjoint and makes the application of this pattern safe.
