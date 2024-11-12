@@ -256,6 +256,18 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ: {
     return {f8E5M2FNUZ, f8E4M3FNUZ, f32};
   }
+  case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ: {
+    return {f8E4M3FNUZ, f8E4M3FNUZ, f32};
+  }
+  case MMAIntrinsic::MFMA_F32_32x32x16_F8E5M2FNUZ: {
+    return {f8E5M2FNUZ, f8E5M2FNUZ, f32};
+  }
+  case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ: {
+    return {f8E4M3FNUZ, f8E5M2FNUZ, f32};
+  }
+  case MMAIntrinsic::MFMA_F32_32x32x16_F8E5M2FNUZ_F8E4M3FNUZ: {
+    return {f8E5M2FNUZ, f8E4M3FNUZ, f32};
+  }
   case MMAIntrinsic::MFMA_I32_16x16x32_I8: {
     return {i8, i8, i32};
   }
@@ -608,6 +620,10 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
       return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
               /*element=*/{4, 1}};
     }
+  case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ:
+  case MMAIntrinsic::MFMA_F32_32x32x16_F8E5M2FNUZ:
+  case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ:
+  case MMAIntrinsic::MFMA_F32_32x32x16_F8E5M2FNUZ_F8E4M3FNUZ:
   case MMAIntrinsic::MFMA_I32_32x32x16_I8:
     switch (fragment) {
     case MMAFragment::Lhs:
