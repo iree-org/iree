@@ -1954,7 +1954,7 @@ func.func @test_tiling_cpu_default(%arg0: tensor<256x256xi8>, %arg1: tensor<256x
     return %0 : tensor<256x256xi32>
 }
 // CHECK-DAG:  #[[CONFIG0:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [4, 64, 0]]>
-// CHECK-DAG:  #[[TRANSLATION_INFO]] = #iree_codegen.translation_info<CPUDefault>
+// CHECK-DAG:  #[[TRANSLATION_INFO]] = #iree_codegen.translation_info<pipeline = CPUDefault>
 //      CHECK: func @test_tiling_cpu_default(
 // CHECK-SAME:     translation_info = #[[TRANSLATION_INFO]]
 //      CHECK:    linalg.quantized_matmul {lowering_config = #[[CONFIG0]]}
