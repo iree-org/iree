@@ -197,6 +197,7 @@ nav:
           - "developers/general/developer-tips.md"
           - "developers/general/github-actions.md"
           - "developers/general/release-management.md"
+          - "developers/general/versioning-scheme.md"
           - "developers/general/testing-guide.md"
       - "Building":
           - "developers/building/bazel.md"
