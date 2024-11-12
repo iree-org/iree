@@ -24,16 +24,6 @@ namespace {
 struct TorchOptions {
   bool strictSymbolicShapes = true;
   bool decompose = true;
-  // A few ops are added to this list by default, since they have
-  // disadvantageous decompositons for the torch-to-linalg path. For example,
-  // decomposing `aten.flatten.using_ints` to `aten.view` simply destroys useful
-  // information about what kind of reshape is being performed, and hinders our
-  // ability, in some cases, to lower this to a collapse instead of a generic
-  // reshape.
-  SmallVector<std::string> backendLegalOps = {
-      "aten.flatten.using_ints", "aten.unflatten.int",
-      "aten.adaptive_avg_pool1d", "aten.adaptive_avg_pool2d",
-      "aten.adaptive_max_pool1d"};
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("Torch Input");
     binder.opt<bool>(
@@ -73,7 +63,8 @@ struct TorchSession
       // ONNX input is a pre-processing step to torch.
       mlir::torch::Torch::TorchLoweringPipelineOptions torchOnnxPipelineOptions;
       torchOnnxPipelineOptions.decompose = options.decompose;
-      torchOnnxPipelineOptions.backendLegalOps = options.backendLegalOps;
+      torchOnnxPipelineOptions.backendLegalOps =
+          TorchInput::BackendLegalOps::get();
       mlir::torch::Torch::createTorchOnnxToTorchBackendPipeline(
           passManager, torchOnnxPipelineOptions);
     }
@@ -82,7 +73,6 @@ struct TorchSession
       TorchInput::TorchToIREELoweringPipelineOptions torchOptions;
       torchOptions.strictSymbolicShapes = options.strictSymbolicShapes;
       torchOptions.decompose = options.decompose;
-      torchOptions.backendLegalOps = options.backendLegalOps;
       TorchInput::createTorchToIREEPipeline(passManager, torchOptions);
       return true;
     }
