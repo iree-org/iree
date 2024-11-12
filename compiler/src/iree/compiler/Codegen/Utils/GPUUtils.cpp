@@ -18,6 +18,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -1026,6 +1027,29 @@ std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func) {
   if (IREE::GPU::TargetAttr target = getGPUTargetAttr(func))
     return target.getPreferredSubgroupSize();
   return std::nullopt;
+}
+
+void QueryMMAIntrinsics(mlir::ModuleOp moduleOp,
+                        SmallVector<IREE::GPU::MMAAttr> &mmaAttrs) {
+  IREE::GPU::TargetAttr target;
+
+  // Walk through all `func::FuncOp` operations in `moduleOp`.
+  moduleOp.walk([&](func::FuncOp funcOp) {
+    if (auto attr = getGPUTargetAttr(funcOp)) {
+      // Store the target attribute if found.
+      target = attr;
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+
+  if (target) {
+    // Append each MMA attribute from the target's `Wgp` configuration to
+    // `mmaAttrs`.
+    for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
+      mmaAttrs.emplace_back(mma);
+    }
+  }
 }
 
 } // namespace mlir::iree_compiler

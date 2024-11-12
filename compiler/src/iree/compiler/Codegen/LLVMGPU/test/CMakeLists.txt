@@ -52,6 +52,7 @@ iree_lit_test_suite(
     "rocdl_pipeline_test.mlir"
     "tensor_pad.mlir"
     "tensorcore_vectorization.mlir"
+    "test_query_mma.mlir"
     "transform_dialect_bufferize.mlir"
     "transform_dialect_eliminate_gpu_barriers.mlir"
     "transform_dialect_hoist_allocs.mlir"

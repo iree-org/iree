@@ -97,6 +97,7 @@ iree_cc_library(
     "ROCDLKernelConfig.cpp"
     "ROCDLLowerExecutableTarget.cpp"
     "ROCDLSelectLoweringStrategy.cpp"
+    "TestLLVMGPUQueryMMAPass.cpp"
     "Verifiers.cpp"
   DEPS
     ::PassHeaders
