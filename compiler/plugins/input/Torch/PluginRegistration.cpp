@@ -30,7 +30,7 @@ struct TorchOptions {
         "iree-torch-use-strict-symbolic-shapes", strictSymbolicShapes,
         llvm::cl::cat(category),
         llvm::cl::desc("Forces dynamic shapes to be treated as strict"));
-    binder.opt<bool>("torch-use-decompose-complex-ops", decompose,
+    binder.opt<bool>("iree-torch-decompose-complex-ops", decompose,
                      llvm::cl::cat(category),
                      llvm::cl::desc("Decompose complex torch operations."));
   }
