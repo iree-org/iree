@@ -103,7 +103,7 @@ func.func @distribute_thread_forall_single_thread(%out : memref<?xi32>)
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
 
 func.func @distribute_thread_forall_overhang(%out : memref<?xi32>)
     attributes {translation_info = #translation_info} {
