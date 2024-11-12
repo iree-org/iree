@@ -20,7 +20,7 @@ func.func @transpose_f32() attributes {hal.executable.target = #executable_targe
 }
 
 //   CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 16], {{\[}}[4], [4]], [0, 0], [0, 0]]>
-//   CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+//   CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 //       CHECK: func.func @transpose_f32()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.generic
@@ -48,7 +48,7 @@ func.func @transpose_output_indexing_map_f32() attributes {hal.executable.target
 }
 
 //   CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 16], {{\[}}[4], [4]], [0, 0], [0, 0]]>
-//   CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+//   CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 //       CHECK: func.func @transpose_output_indexing_map_f32()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.generic
@@ -76,7 +76,7 @@ func.func @transpose_f64() attributes {hal.executable.target = #executable_targe
 }
 
 //   CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 16], {{\[}}[2], [2]], [0, 0], [0, 0]]>
-//   CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+//   CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 //       CHECK: func.func @transpose_f64()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.generic
@@ -104,7 +104,7 @@ func.func @transpose_unsupported_not_rank_2() attributes {hal.executable.target 
 }
 
 //   CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[2, 8, 4], [1, 4, 4], [0, 0, 0], [0, 0, 0]]>
-//   CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+//   CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 //       CHECK: func.func @transpose_unsupported_not_rank_2
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.generic
@@ -132,7 +132,7 @@ func.func @transpose_unsupported_not_simple_transpose() attributes {hal.executab
 }
 
 //   CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 32], {{\[}}4, 4], [0, 0], [0, 0]]>
-//   CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+//   CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 //       CHECK: func.func @transpose_unsupported_not_simple_transpose()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.generic

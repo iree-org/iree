@@ -257,7 +257,7 @@ hal.executable private @ex {
       hal.return %selected : i1
     }
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
       %c1 = arith.constant 1 : index
@@ -270,7 +270,7 @@ hal.executable private @ex {
   }
   hal.executable.variant public @x86_64 target(#executable_target_x86_64) {
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
       %c1 = arith.constant 1 : index

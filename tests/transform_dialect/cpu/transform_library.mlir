@@ -28,7 +28,7 @@ module attributes { transform.with_named_sequence } {
 
     // CSE is needed on the workgroup_count region to pass this particular test.
     transform.apply_cse to %memref_func : !transform.any_op
-    %none_attr = transform.param.constant #iree_codegen.translation_info<None> -> !transform.any_param
+    %none_attr = transform.param.constant #iree_codegen.translation_info<pipeline = None> -> !transform.any_param
     transform.annotate %memref_func "translation_info" = %none_attr : !transform.any_op, !transform.any_param
     transform.yield
   }

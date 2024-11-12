@@ -25,7 +25,7 @@ util.global private @device = #hal.device.target<"local", [
 hal.executable private @ex0 {
   hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64) {
     hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout_0) attributes {
-      translation_info = #iree_codegen.translation_info<CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
@@ -38,7 +38,7 @@ hal.executable private @ex0 {
     }
 
     hal.executable.export public @dispatch1 ordinal(1) layout(#pipeline_layout_1) attributes {
-      translation_info = #iree_codegen.translation_info<CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index):
       %c1 = arith.constant 1 : index
@@ -185,7 +185,7 @@ util.global private @device_b = #hal.device.target<"local", [
 hal.executable private @ex_0 {
   hal.executable.variant public @variant_a target(#executable_target_embedded_elf_aarch64) {
     hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
@@ -197,7 +197,7 @@ hal.executable private @ex_0 {
       }
     }
     hal.executable.export public @dispatch1 ordinal(1) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
@@ -211,7 +211,7 @@ hal.executable private @ex_0 {
   }
   hal.executable.variant public @variant_b target(#executable_target_embedded_elf_x86_64) {
     hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
@@ -223,7 +223,7 @@ hal.executable private @ex_0 {
       }
     }
     hal.executable.export public @dispatch1 ordinal(1) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
@@ -239,7 +239,7 @@ hal.executable private @ex_0 {
 hal.executable private @ex_1 {
   hal.executable.variant public @variant_b target(#executable_target_embedded_elf_x86_64) {
     hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0

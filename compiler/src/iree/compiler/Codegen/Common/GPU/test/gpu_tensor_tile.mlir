@@ -8,7 +8,7 @@
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 256]]>
 #map = affine_map<()[s0] -> (s0 * 256)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
-#translation = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [64, 1, 1]>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorize workgroup_size = [64, 1, 1]>
 module {
   func.func @add_tensor() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
@@ -64,7 +64,7 @@ module {
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 #map2 = affine_map<(d0, d1) -> (d0)>
-#translation = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [64, 1, 1]>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorize workgroup_size = [64, 1, 1]>
 module {
   func.func @reduction() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
@@ -120,7 +120,7 @@ module {
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
-#translation = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [64, 1, 1]>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorize workgroup_size = [64, 1, 1]>
 module {
   func.func @reduction_broadcast() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index

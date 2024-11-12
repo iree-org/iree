@@ -5,7 +5,7 @@
 // to be migrated to the rocdl heuristics, but for now is just physically
 // located here.
 
-// WMMA:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
+// WMMA:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
 // WMMA-SAME: workgroup_size = [128, 1, 1]
 // WMMA-SAME: subgroup_size = 32
 

@@ -15,7 +15,7 @@
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
 }>
-#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
@@ -42,7 +42,7 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
 }>
-#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 // expected-error @+1 {{expected workgroup size to have three dimensions for SPIR-V pipelines}}
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
@@ -69,7 +69,7 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
 }>
-#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 128], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 128], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
@@ -96,7 +96,7 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
 }>
-#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
@@ -123,7 +123,7 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
 }>
-#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [8, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [8, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
@@ -150,7 +150,7 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
 }>
-#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [15, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [15, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
@@ -177,7 +177,7 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
 }>
-#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
@@ -204,7 +204,7 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
 }>
-#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
@@ -232,7 +232,7 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [65535, 65535, 65535]>>
 }>
-#translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [128, 2, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size = [128, 2, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @matmul_tensor() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
@@ -266,7 +266,7 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [65535, 65535, 65535]>>
 }>
-#translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [128, 2, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size = [128, 2, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @matmul_tensor() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
@@ -300,7 +300,7 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [65535, 65535, 65535]>>
 }>
-#translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [256, 4, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size = [256, 4, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @matmul_tensor() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
@@ -334,7 +334,7 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [65535, 65535, 65535]>>
 }>
-#translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [64, 2, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size = [64, 2, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @matmul_tensor() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
@@ -368,7 +368,7 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [65535, 65535, 65535]>>
 }>
-#translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [128, 4, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size = [128, 4, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @matmul_tensor() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
@@ -404,7 +404,7 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
 #map = affine_map<()[s0] -> (s0 * 4)>
 #map1 = affine_map<()[s0] -> (s0 * 16)>
 #map2 = affine_map<(d0) -> (d0 * 2)>
-#translation = #iree_codegen.translation_info<SPIRVBaseVectorize workgroup_size = [8, 2, 2]>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [8, 2, 2]>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c112 = arith.constant 112 : index
@@ -462,7 +462,7 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 #map = affine_map<()[s0] -> (s0 * 4)>
 #map1 = affine_map<()[s0] -> (s0 * 16)>
 #map2 = affine_map<(d0) -> (d0 * 2)>
-#translation = #iree_codegen.translation_info<SPIRVBaseVectorize workgroup_size = [8, 2, 2]>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [8, 2, 2]>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c112 = arith.constant 112 : index
@@ -520,7 +520,7 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 #map = affine_map<()[s0] -> (s0 * 4)>
 #map1 = affine_map<()[s0] -> (s0 * 16)>
 #map2 = affine_map<(d0) -> (d0 * 2)>
-#translation = #iree_codegen.translation_info<SPIRVBaseVectorize workgroup_size = [8, 2, 2]>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [8, 2, 2]>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c112 = arith.constant 112 : index
@@ -575,7 +575,7 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
 }>
-#translation = #iree_codegen.translation_info<SPIRVBaseVectorize workgroup_size = [32, 1, 1]>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [32, 1, 1]>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
@@ -602,7 +602,7 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
 }>
-#translation = #iree_codegen.translation_info<SPIRVBaseVectorize workgroup_size = [32, 1, 1]>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [32, 1, 1]>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index

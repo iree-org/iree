@@ -7,10 +7,10 @@ hal.executable private @reconcile_workgroup_size {
   hal.executable.variant public @reconcile_workgroup_size target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<None workgroup_size = [4]>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4]>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<None workgroup_size = [4]>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4]>} {
         return
       }
     }
@@ -29,7 +29,7 @@ hal.executable private @single_translation_info {
   hal.executable.variant public @single_translation_info target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<None workgroup_size = [4]>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4]>}  {
         return
       }
       func.func @fn2()  {
@@ -52,10 +52,10 @@ hal.executable private @err_mistmatched_workgroup_size {
     // expected-error @+1 {{failed to reconcile workgroup sizes}}
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<None workgroup_size = [4]>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4]>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<None workgroup_size = [4, 2]>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4, 2]>} {
         return
       }
     }
@@ -72,10 +72,10 @@ hal.executable private @err_mistmatched_workgroup_size2 {
     // expected-error @+1 {{failed to reconcile workgroup sizes}}
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<None workgroup_size = [4]>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4]>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<None>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None>} {
         return
       }
     }
@@ -91,10 +91,10 @@ hal.executable private @reconcile_subgroup_size {
   hal.executable.variant public @reconcile_subgroup_size target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<None subgroup_size = 32>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None subgroup_size = 32>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<None subgroup_size = 32>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None subgroup_size = 32>} {
         return
       }
     }
@@ -113,10 +113,10 @@ hal.executable private @err_reconcile_subgroup_size {
   hal.executable.variant public @err_reconcile_subgroup_size target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<None subgroup_size = 32>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None subgroup_size = 32>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<None subgroup_size = 32>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None subgroup_size = 32>} {
         return
       }
     }
@@ -135,10 +135,10 @@ hal.executable private @llvm_func_attrs {
   hal.executable.variant public @llvm_func_attrs target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<None, {llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None, {llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<None, {llvm_func_attrs = {"amdgpu-waves-per-eu" = "4"}}>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None, {llvm_func_attrs = {"amdgpu-waves-per-eu" = "4"}}>} {
         return
       }
     }
