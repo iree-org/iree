@@ -66,7 +66,7 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
             return ireeGPUReorderWorkgroupsStrategyAttrGet(ctx, value);
           },
           "cls"_a, "value"_a, "ctx"_a = py::none(),
-          "gets an #iree_gpu.reorder_workgroups_strategy from parameters.")
+          "Gets an #iree_gpu.reorder_workgroups_strategy from parameters.")
       .def_property_readonly("raw_value",
                              ireeGPUReorderWorkgroupsStrategyAttrGetValue)
       .def_property_readonly("value", [](MlirAttribute self) -> py::object {
@@ -107,7 +107,7 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
           "use_igemm_convolution"_a = py::none(),
           "reorder_workgroups_strategy"_a = py::none(), py::kw_only(),
           "ctx"_a = py::none(),
-          "gets an #iree_gpu.pipeline_options from parameters.")
+          "Gets an #iree_gpu.pipeline_options from parameters.")
       .def_property_readonly(
           "prefetch_shared_memory",
           [](MlirAttribute self) -> std::optional<bool> {
@@ -157,7 +157,7 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
             return ireeGPUMMAIntrinsicAttrGet(ctx, value);
           },
           "cls"_a, "value"_a, "ctx"_a = py::none(),
-          "gets an #iree_gpu.mma_intrinsic from parameters.")
+          "Gets an #iree_gpu.mma_intrinsic from parameters.")
       .def_property_readonly("raw_value", ireeGPUMMAIntrinsicAttrGetValue)
       .def_property_readonly("value",
                              [](MlirAttribute self) -> py::object {
@@ -183,7 +183,7 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
             return ireeGPUMMAAttrGet(ctx, value);
           },
           "cls"_a, "value"_a, "ctx"_a = py::none(),
-          "gets an #iree_gpu.mma from parameters.")
+          "Gets an #iree_gpu.mma from parameters.")
       .def_property_readonly(
           "abc_element_types",
           [](MlirAttribute self) -> py::tuple {
@@ -217,7 +217,7 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
             return ireeGPULoweringConfigAttrGet(ctx, attributeDictionary);
           },
           "cls"_a, "value"_a, "ctx"_a = py::none(),
-          "gets an #iree_gpu.lowering_config from parameters.")
+          "Gets an #iree_gpu.lowering_config from parameters.")
       .def_property_readonly("attributes",
                              ireeGPULoweringConfigAttrGetAttributes);
 }
