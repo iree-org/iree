@@ -5485,14 +5485,21 @@ See IREEGPUEnums.td for the definition of the intrinsics.</p>
 * MFMA_F32_32x32x8_F16 (<code>MFMA_F32_32x32x8_F16</code>)
 * MFMA_I32_16x16x16_I8 (<code>MFMA_I32_16x16x16_I8</code>)
 * MFMA_I32_32x32x8_I8 (<code>MFMA_I32_32x32x8_I8</code>)
+* MFMA_F32_16x16x8_BF16 (<code>MFMA_F32_16x16x8_BF16</code>)
+* MFMA_F32_32x32x4_BF16 (<code>MFMA_F32_32x32x4_BF16</code>)
+* MFMA_F64_16x16x4_F64 (<code>MFMA_F64_16x16x4_F64</code>)
 * MFMA_F32_16x16x16_BF16 (<code>MFMA_F32_16x16x16_BF16</code>)
 * MFMA_F32_32x32x8_BF16 (<code>MFMA_F32_32x32x8_BF16</code>)
 * MFMA_F32_16x16x32_F8E5M2FNUZ (<code>MFMA_F32_16x16x32_F8E5M2FNUZ</code>)
+* MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ (<code>MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ</code>)
 * MFMA_F32_16x16x32_F8E4M3FNUZ (<code>MFMA_F32_16x16x32_F8E4M3FNUZ</code>)
+* MFMA_F32_16x16x32_F8E4M3FNUZ_F8E5M2FNUZ (<code>MFMA_F32_16x16x32_F8E4M3FNUZ_F8E5M2FNUZ</code>)
 * MFMA_I32_16x16x32_I8 (<code>MFMA_I32_16x16x32_I8</code>)
 * MFMA_I32_32x32x16_I8 (<code>MFMA_I32_32x32x16_I8</code>)
 * WMMA_F32_16x16x16_F16 (<code>WMMA_F32_16x16x16_F16</code>)
 * WMMA_F16_16x16x16_F16 (<code>WMMA_F16_16x16x16_F16</code>)
+* WMMA_F32_16x16x16_BF16 (<code>WMMA_F32_16x16x16_BF16</code>)
+* WMMA_BF16_16x16x16_BF16 (<code>WMMA_BF16_16x16x16_BF16</code>)
 * WMMA_I32_16x16x16_I8 (<code>WMMA_I32_16x16x16_I8</code>)
 * NV_WMMA_F32_16x16x16_F16 (<code>NV_WMMA_F32_16x16x16_F16</code>)
 * NV_WMMA_F16_16x16x16_F16 (<code>NV_WMMA_F16_16x16x16_F16</code>)</p>
@@ -6046,6 +6053,21 @@ in a chained-matmul operation.</p>
 <td>MFMA_I32_32x32x8_I8</td>
 </tr>
 <tr>
+<td style="text-align: center;">MFMA_F32_16x16x8_BF16</td>
+<td style="text-align: center;"><code>4384</code></td>
+<td>MFMA_F32_16x16x8_BF16</td>
+</tr>
+<tr>
+<td style="text-align: center;">MFMA_F32_32x32x4_BF16</td>
+<td style="text-align: center;"><code>4385</code></td>
+<td>MFMA_F32_32x32x4_BF16</td>
+</tr>
+<tr>
+<td style="text-align: center;">MFMA_F64_16x16x4_F64</td>
+<td style="text-align: center;"><code>4352</code></td>
+<td>MFMA_F64_16x16x4_F64</td>
+</tr>
+<tr>
 <td style="text-align: center;">MFMA_F32_16x16x16_BF16</td>
 <td style="text-align: center;"><code>4640</code></td>
 <td>MFMA_F32_16x16x16_BF16</td>
@@ -6061,9 +6083,19 @@ in a chained-matmul operation.</p>
 <td>MFMA_F32_16x16x32_F8E5M2FNUZ</td>
 </tr>
 <tr>
+<td style="text-align: center;">MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ</td>
+<td style="text-align: center;"><code>4657</code></td>
+<td>MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ</td>
+</tr>
+<tr>
 <td style="text-align: center;">MFMA_F32_16x16x32_F8E4M3FNUZ</td>
 <td style="text-align: center;"><code>4658</code></td>
 <td>MFMA_F32_16x16x32_F8E4M3FNUZ</td>
+</tr>
+<tr>
+<td style="text-align: center;">MFMA_F32_16x16x32_F8E4M3FNUZ_F8E5M2FNUZ</td>
+<td style="text-align: center;"><code>4659</code></td>
+<td>MFMA_F32_16x16x32_F8E4M3FNUZ_F8E5M2FNUZ</td>
 </tr>
 <tr>
 <td style="text-align: center;">MFMA_I32_16x16x32_I8</td>
@@ -6084,6 +6116,16 @@ in a chained-matmul operation.</p>
 <td style="text-align: center;">WMMA_F16_16x16x16_F16</td>
 <td style="text-align: center;"><code>6177</code></td>
 <td>WMMA_F16_16x16x16_F16</td>
+</tr>
+<tr>
+<td style="text-align: center;">WMMA_F32_16x16x16_BF16</td>
+<td style="text-align: center;"><code>6178</code></td>
+<td>WMMA_F32_16x16x16_BF16</td>
+</tr>
+<tr>
+<td style="text-align: center;">WMMA_BF16_16x16x16_BF16</td>
+<td style="text-align: center;"><code>6179</code></td>
+<td>WMMA_BF16_16x16x16_BF16</td>
 </tr>
 <tr>
 <td style="text-align: center;">WMMA_I32_16x16x16_I8</td>
