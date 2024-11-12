@@ -48,7 +48,7 @@ def main():
             "|       Model        |      Status        |\n"
             "| ------------------ | ------------------ |\n"
         )
-        tflite_model_documentation.write(create_markdown_table(models))
+        tflite_model_documentation.write(create_markdown_table(models) + "\n")
 
     new_lines = read_file(readme_file_path)
     if new_lines == old_lines:
