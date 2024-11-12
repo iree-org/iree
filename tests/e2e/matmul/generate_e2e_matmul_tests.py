@@ -25,6 +25,7 @@ class MatrixElemTypeId(enum.Enum):
     NONE = ""
     I8 = "i8"
     I32 = "i32"
+    F64 = "f64"
     F32 = "f32"
     F16 = "f16"
     BF16 = "bf16"
@@ -896,6 +897,7 @@ def parse_arguments():
         choices=[
             "i32",
             "i8",
+            "f64",
             "f32",
             "f16",
             "bf16",
@@ -910,7 +912,7 @@ def parse_arguments():
     parser.add_argument(
         "--acc_type",
         type=str,
-        choices=["i32", "f32", "f16", "bf16"],
+        choices=["i32", "f64", "f32", "f16", "bf16"],
         help="Numeric type of the accumulator and result matrices",
         required=True,
     )

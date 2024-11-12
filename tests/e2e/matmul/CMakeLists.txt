@@ -175,6 +175,33 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
+    e2e_matmul_cpu_dt_f64_f64
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f64"
+    "--acc_type=f64"
+    "--shapes=small"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-ukernels=none"
+    "--iree-input-demote-f64-to-f32=false"
+  LABELS
+
+  TARGET_CPU_FEATURES_VARIANTS
+    "generic"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
     e2e_matmul_cpu_dt_f16_f16
   TEST_TYPE
     matmul
@@ -344,6 +371,33 @@ iree_generated_e2e_runner_test(
     "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cpu_dt_uk_f64_f64
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f64"
+    "--acc_type=f64"
+    "--shapes=small"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-ukernels=all"
+    "--iree-input-demote-f64-to-f32=false"
+  LABELS
+
+  TARGET_CPU_FEATURES_VARIANTS
+    "generic"
 )
 
 iree_generated_e2e_runner_test(

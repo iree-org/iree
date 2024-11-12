@@ -94,7 +94,10 @@ PREPROCESSING_PEEL = "--iree-llvmcpu-vector-pproc-strategy=peel"
     test_type = "matmul",
 ) for dtype in [
     "f32",
-    # "f64" (also supported for ArmSME, but not by the test generator)
+    # f64 disabled because it wasn't supported by the test generator at the time
+    # this was added. When adding it in the future, consider passing
+    # --iree-input-demote-f64-to-f32=false to the compiler.
+    # "f64"
 ] for transpose_lhs in [
     True,
     False,
@@ -135,12 +138,14 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     ),
     compiler_flags = [
         "--iree-opt-data-tiling",
-    ] + ["--iree-llvmcpu-enable-ukernels=%s" % ("all" if use_uk else "none")],
+    ] + [
+        "--iree-llvmcpu-enable-ukernels=%s" % ("all" if use_uk else "none"),
+    ] + (["--iree-input-demote-f64-to-f32=false"] if acc_type == "f64" else []),
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--acc_type=%s" % acc_type,
-    ],
+    ] + (["--shapes=small"] if acc_type == "f64" else []),
     tags = ([
         # f16/bf16 trigger internal LLVM assertion errors on riscv and wasm.
         "noriscv",
@@ -185,6 +190,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     [
         ("i8", "i32"),
         ("f32", "f32"),
+        ("f64", "f64"),
         ("f16", "f16"),
         ("f16", "f32"),
         ("bf16", "bf16"),
