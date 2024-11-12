@@ -147,7 +147,7 @@ class IREEGPUCompilationInfo(CompilationInfo):
             f"  subgroup_n_count = {self.mma_schedule.n_count}, "
             f"  workgroup = {self.workgroup_tile}, "
             f"  reduction = {self.reduction_tile} }}>,\n"
-            f"  translation_info = <{compiler_pipeline} {self.workgroup_size_str()}\n"
+            f"  translation_info = #iree_codegen.translation_info<pipeline = {compiler_pipeline} {self.workgroup_size_str()}\n"
             f"  {subgroup_size_str}>>\n"
         )
 
@@ -177,7 +177,7 @@ class LegacyCompilationInfo(CompilationInfo):
         return (
             "#iree_codegen.compilation_info<\n"
             f"  lowering_config = #iree_codegen.lowering_config<tile_sizes = {self.tile_sizes}>,\n"
-            f"  translation_info = <{compiler_pipeline} {self.workgroup_size_str()}\n"
+            f"  translation_info = #iree_codegen.translation_info<pipeline = {compiler_pipeline} {self.workgroup_size_str()}\n"
             f"  {subgroup_size_str},\n"
             f"  {{ pipeline_depth = {self.software_pipeline_depth}, store_stage = 1}}>>"
         )

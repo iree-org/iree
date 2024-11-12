@@ -231,7 +231,7 @@ func.func @batch_matmul_with_padding_strategy(%arg0: tensor<1x?x1280xf16>, %arg1
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-func.func @_batch_matmul_narrow_n_2_dispatch_4_unpack_i32() attributes {translation_info = #iree_codegen.translation_info<CPUDataTiling>} {
+func.func @_batch_matmul_narrow_n_2_dispatch_4_unpack_i32() attributes {translation_info = #iree_codegen.translation_info<pipeline = CPUDataTiling>} {
   %c0_i32 = arith.constant 0 : i32
   %c2 = arith.constant 2 : index
   %c128 = arith.constant 128 : index

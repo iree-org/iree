@@ -22,6 +22,6 @@ func.func @forward_dispatch_0_generic_320x320x3x3() {
   flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [320, 320, 3, 3], strides = [1, 1, 1, 1] : tensor<320x320x3x3xf32> -> !flow.dispatch.tensor<writeonly:tensor<320x320x3x3xf32>>
   return
 }
-//      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+//      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
 //      CHECK: func.func @forward_dispatch_0_generic_320x320x3x3()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]

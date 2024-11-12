@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-llvmgpu-configure-tensor-layouts, canonicalize, cse))' %s | FileCheck %s
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -50,7 +50,7 @@ func.func @matmul_96x64x16_mfma(%lhs: tensor<96x16xf16>,
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -100,7 +100,7 @@ func.func @matmul_96x64x16_wmma(%lhs: tensor<96x16xf16>,
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64,
       {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
@@ -153,7 +153,7 @@ func.func @matmul_128x64x16_multi_subgroup(%lhs: tensor<128x16xf16>,
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -204,7 +204,7 @@ func.func @packed_matmul_128x128x128(%lhs: tensor<8x16x16xf16>,
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -226,7 +226,7 @@ func.func @linalg_copy(%in : tensor<16x16x16xf16>) -> tensor<16x16x16xf16>
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 

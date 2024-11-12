@@ -6,7 +6,7 @@ module attributes { transform.with_named_sequence } {
     %memref_func = transform.iree.bufferize %tensor_func : (!transform.any_op) -> !transform.any_op
 
     // Annotate the exported function as already translated.
-    %none = transform.param.constant #iree_codegen.translation_info<None> -> !transform.any_param
+    %none = transform.param.constant #iree_codegen.translation_info<pipeline = None> -> !transform.any_param
     transform.annotate %memref_func "translation_info" = %none : !transform.any_op, !transform.any_param
     transform.yield
   }

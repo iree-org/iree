@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-distribute)))))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 16], [1, 1]]>
-#translation = #iree_codegen.translation_info<SPIRVBaseDistribute>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,

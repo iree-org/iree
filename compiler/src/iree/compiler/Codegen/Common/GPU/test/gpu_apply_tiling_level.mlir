@@ -210,7 +210,7 @@ func.func @matmul_cleanup(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>, %5: tens
 module {
   func.func @inferred_add_tensor(%3: tensor<64x256xf32>, %4: tensor<64x256xf32>, %5: tensor<64x256xf32>) -> tensor<64x256xf32>
       attributes {
-        translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [16, 32, 1] subgroup_size = 64, {}>
+        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [16, 32, 1] subgroup_size = 64, {}>
       } {
     %6 = linalg.generic {
       indexing_maps = [#map, #map, #map],
@@ -241,7 +241,7 @@ module {
 module {
   func.func @inferred_dynamic(%3: tensor<?x?xf32>, %4: tensor<?x?xf32>, %5: tensor<?x?xf32>) -> tensor<?x?xf32>
       attributes {
-        translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [16, 32, 1] subgroup_size = 64, {}>
+        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [16, 32, 1] subgroup_size = 64, {}>
       } {
     %6 = linalg.generic {
       indexing_maps = [#map, #map, #map],
@@ -271,7 +271,7 @@ module {
 module {
   func.func @inferred_small_inner_dim(%3: tensor<8x2xf32>, %4: tensor<8x2xf32>, %5: tensor<8x2xf32>) -> tensor<8x2xf32>
       attributes {
-        translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [16, 32, 1] subgroup_size = 64, {}>
+        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [16, 32, 1] subgroup_size = 64, {}>
       } {
     %6 = linalg.generic {
       indexing_maps = [#map, #map, #map],
@@ -298,7 +298,7 @@ module {
 module {
   func.func @inferred_small_inner_dim_fill_vector_sizes(%0: tensor<4x16x8x4x16x2x4xf16>, %1: tensor<4x16x8x4x16x2x4xf16>) -> tensor<4x16x8x4x16x2x4xf16>
       attributes {
-        translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64, {}>
+        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64, {}>
       } {
     %2 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
         ins(%0 : tensor<4x16x8x4x16x2x4xf16>)
@@ -321,7 +321,7 @@ module {
   func.func @inferred_small_inner_dim_dont_fill_non_contiguous(
     %0: tensor<4x16x4x4xf16>, %1: tensor<4x16x4x4xf16>) -> tensor<4x16x4x4xf16>
       attributes {
-        translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
+        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
       } {
     %2 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
         ins(%0 : tensor<4x16x4x4xf16>)
@@ -343,7 +343,7 @@ module {
 module {
   func.func @inferred_unaligned(%0: tensor<70xf16>, %1: tensor<70xf16>) -> tensor<70xf16>
       attributes {
-        translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
+        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
       } {
     %2 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
         ins(%0 : tensor<70xf16>)
@@ -365,7 +365,7 @@ module {
 module {
   func.func @inferred_smaller_load(%0: tensor<128xf16>, %1: tensor<128xf16>) -> tensor<128xf16>
       attributes {
-        translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
+        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
       } {
     %2 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
         ins(%0 : tensor<128xf16>)
@@ -386,7 +386,7 @@ module {
 module {
   func.func @inferred_im2col(%2: tensor<2x34x34x128xf16>, %3: tensor<2x128x8xf16>) -> tensor<2x128x8xf16>
       attributes {
-        translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [16, 32, 1] subgroup_size = 64, {}>
+        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [16, 32, 1] subgroup_size = 64, {}>
       } {
     %4 = iree_linalg_ext.im2col {lowering_config = #config}
       strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
@@ -529,7 +529,7 @@ module {
 func.func @distribute_multi_result_generic(
   %arg0: tensor<3x4x5xf32>, %arg1: tensor<3x4xf32>, %arg2: tensor<3x4xf32>) -> (tensor<3x4x5xf32>, tensor<3x4x5xf32>)
       attributes {
-        translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32, {}>
+        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32, {}>
       } {
   %empty = tensor.empty() : tensor<3x4x5xf32>
   %0:2 = linalg.generic {

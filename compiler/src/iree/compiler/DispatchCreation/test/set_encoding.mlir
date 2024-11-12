@@ -535,11 +535,11 @@ util.func public @fold_fill_with_tensor_pad(%arg0 : index, %arg1 : index, %arg2 
 
 #compilation0 = #iree_codegen.compilation_info<
     lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0]]>,
-    translation_info  = <CPUDefault>>
+    translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>>
 
 #compilation1 = #iree_codegen.compilation_info<
     lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0, 0]]>,
-    translation_info  = <CPUDefault>>
+    translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>>
 
 
 util.func public @preset_compilation_info(

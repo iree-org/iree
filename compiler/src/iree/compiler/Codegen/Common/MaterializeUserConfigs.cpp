@@ -89,7 +89,8 @@ struct MaterializeUserConfigsPass final
       //   2. Use the configuration strategy to do codegen directly. At the end
       //   of
       //      the strategy, the variant needs to be annotated with
-      //      "translation_info" = #iree_codegen.translation_info<None>
+      //      "translation_info" = #iree_codegen.translation_info<pipeline =
+      //      None>
       SmallVector<StringRef, 2> parts;
       llvm::SplitString(
           llvm::StringRef(clCodegenTransformDialectLibraryFileName), parts,

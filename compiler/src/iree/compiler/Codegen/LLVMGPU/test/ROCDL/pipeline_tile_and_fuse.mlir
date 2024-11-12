@@ -21,7 +21,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b()
-        attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64>} {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x1280xf16>>
@@ -88,7 +88,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b_mfma()
-        attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x1280xf16>>
@@ -155,7 +155,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b_wmma()
-        attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>} {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x1280xf16>>
@@ -226,7 +226,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b_mfma_16x16x4()
-        attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x1280x!eltype>>
@@ -282,7 +282,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b_mfma_16x16x32_f8()
-        attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x1280x!eltype>>
@@ -338,7 +338,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b_mfma_32x32x16_i8()
-        attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x1280x!eltype>>
@@ -394,7 +394,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b_wmma_f16_16x16x16_f16()
-        attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>} {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x1280x!eltype>>
@@ -431,7 +431,7 @@ hal.executable public @main {
   workgroup = [1, 1, 4, 8, 0, 0, 0]
 }>
 
-#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [8, 4, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [8, 4, 1] subgroup_size = 32>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
@@ -495,7 +495,7 @@ hal.executable public @main {
   promote_operands = [0, 1]
 }>
 
-#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [8, 4, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [8, 4, 1] subgroup_size = 32>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
@@ -572,7 +572,7 @@ hal.executable public @main {
   #hal.pipeline.binding<storage_buffer, Indirect>
 ]>
 
-#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
 
 #lowering_config = #iree_gpu.lowering_config<{
   mma_kind = #iree_gpu.mma_layout<WMMA_I32_16x16x16_I8>,
@@ -639,7 +639,7 @@ hal.executable public @main {
   thread = [1, 1], workgroup = [1, 1]
 }>
 
-#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
@@ -689,7 +689,7 @@ hal.executable public @main {
   #hal.pipeline.binding<storage_buffer, Indirect>],
   flags = Indirect
 >
-#translation_info = #iree_codegen.translation_info<
+#translation_info = #iree_codegen.translation_info<pipeline =
   LLVMGPUTileAndFuse
   workgroup_size = [256, 1, 1]
   subgroup_size = 64,
@@ -816,7 +816,7 @@ hal.executable public @main {
   thread = [1, 4, 0],
   workgroup = [1, 128, 0]
 }>
-#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
 
 hal.executable public @main {
   hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
@@ -883,7 +883,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @small_matvec()
-        attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>} {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<10x10xf32>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<10x1xf32>>
@@ -932,7 +932,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @elemwise_reduction_elemwise() attributes {
-        translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
       } {
         %cst_3 = arith.constant 3.0 : f32
         %cst_4 = arith.constant 4.0 : f32

@@ -2,7 +2,7 @@
 
 func.func @multiple_dim_distribute(%s0 : index, %s1 : index, %s2 : index, %s3 : index,
     %arg0 : tensor<2x3x4x5xf32>) attributes {
-    translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>} {
+    translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>} {
   %c0 = arith.constant 0 : index
   %result = hal.interface.binding.subspan layout(
       <bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,

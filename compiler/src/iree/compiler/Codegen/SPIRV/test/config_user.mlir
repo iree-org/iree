@@ -6,7 +6,7 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[128, 256], [16, 16]]>
-#translation = #iree_codegen.translation_info<SPIRVBaseVectorize workgroup_size = [16, 8, 1] subgroup_size = 64>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [16, 8, 1] subgroup_size = 64>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @matmul_128x1024x256() {
   %cst = arith.constant 0.000000e+00 : f32
@@ -26,7 +26,7 @@ func.func @matmul_128x1024x256() {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 256], [16, 16]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize workgroup_size = [16, 8, 1] subgroup_size = 64>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [16, 8, 1] subgroup_size = 64>
 //      CHECK: func.func @matmul_128x1024x256()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
