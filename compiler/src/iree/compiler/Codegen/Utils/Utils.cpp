@@ -1511,11 +1511,6 @@ computeDimUpperBound(Value shapedValue, unsigned dimNum,
   return roundedDimBound.getSize();
 }
 
-static bool isAllConstantValue(ArrayRef<OpFoldResult> ofrs, int64_t v) {
-  return llvm::all_of(
-      ofrs, [&](OpFoldResult ofr) { return isConstantIntValue(ofr, v); });
-}
-
 static bool isFullSlice(ArrayRef<OpFoldResult> mixedOffsets,
                         ArrayRef<OpFoldResult> mixedSizes,
                         ArrayRef<OpFoldResult> mixedStrides,
@@ -1525,8 +1520,9 @@ static bool isFullSlice(ArrayRef<OpFoldResult> mixedOffsets,
   SmallVector<int64_t> tensorShape = llvm::to_vector(tensorType.getShape());
   SmallVector<OpFoldResult> mixedTensorShape =
       mlir::getMixedValues(tensorShape, dynamicDims, builder);
-  return isAllConstantValue(mixedOffsets, 0) &&
-         isAllConstantValue(mixedStrides, 1) && mixedTensorShape == mixedSizes;
+  return areAllConstantIntValue(mixedOffsets, 0) &&
+         areAllConstantIntValue(mixedStrides, 1) &&
+         mixedTensorShape == mixedSizes;
 }
 
 bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
