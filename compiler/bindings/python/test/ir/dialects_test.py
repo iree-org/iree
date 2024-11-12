@@ -7,7 +7,7 @@
 from iree.compiler import ir
 
 # Make sure that our dialects import.
-from iree.compiler.dialects import flow, hal, stream, vm, util, iree_gpu
+from iree.compiler.dialects import flow, hal, stream, vm, util, iree_codegen, iree_gpu
 
 
 def run(fn):
@@ -17,6 +17,32 @@ def run(fn):
             print("\nTEST:", fn.__name__)
             fn()
     return fn
+
+
+# ======================================================================
+# IREE Codegen Dialect
+# ======================================================================
+
+
+@run
+def codegen_dispatch_lowering_pass_pipeline():
+    pipeline_attr = iree_codegen.DispatchLoweringPassPipelineAttr.get(
+        iree_codegen.DispatchLoweringPassPipeline.LLVMGPUTileAndFuse
+    )
+    assert pipeline_attr is not None
+    assert (
+        pipeline_attr.value
+        == iree_codegen.DispatchLoweringPassPipeline.LLVMGPUTileAndFuse
+    )
+    assert pipeline_attr.raw_value == int(
+        iree_codegen.DispatchLoweringPassPipeline.LLVMGPUTileAndFuse
+    )
+    assert "LLVMGPUTileAndFuse" in str(pipeline_attr)
+
+
+# ======================================================================
+# IREE GPU Dialect
+# ======================================================================
 
 
 @run

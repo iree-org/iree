@@ -5,11 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cstdint>
+#include "iree/compiler/dialects/iree_codegen.h"
 #include "iree/compiler/dialects/iree_gpu.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/IR.h"
 #include "mlir/Bindings/Python/PybindAdaptors.h"
 
+static const char *kCodegenModuleImportPath =
+    MAKE_MLIR_PYTHON_QUALNAME("dialects.iree_codegen");
 static const char *kGpuModuleImportPath =
     MAKE_MLIR_PYTHON_QUALNAME("dialects.iree_gpu");
 
@@ -18,6 +21,34 @@ using namespace mlir::python::adaptors;
 
 PYBIND11_MODULE(_ireeCompilerDialects, m) {
   m.doc() = "iree-compiler dialects python extension";
+
+  auto iree_codegen_module =
+      m.def_submodule("iree_codegen", "iree_codegen dialect bindings");
+
+  //===-------------------------------------------------------------------===//
+  // CodegenDispatchLoweringPassPipelineAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(
+      iree_codegen_module, "DispatchLoweringPassPipelineAttr",
+      ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr,
+      ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, uint32_t value, MlirContext ctx) {
+            return ireeCodegenDispatchLoweringPassPipelineAttrGet(ctx, value);
+          },
+          "cls"_a, "value"_a, "ctx"_a = py::none(),
+          "Gets an #iree_codegen.dispatch_lowering_pass_pipeline from "
+          "parameters.")
+      .def_property_readonly(
+          "raw_value", ireeCodegenDispatchLoweringPassPipelineAttrGetValue)
+      .def_property_readonly("value", [](MlirAttribute self) -> py::object {
+        uint32_t rawValue =
+            ireeCodegenDispatchLoweringPassPipelineAttrGetValue(self);
+        return py::module_::import(kCodegenModuleImportPath)
+            .attr("DispatchLoweringPassPipeline")(rawValue);
+      });
 
   auto iree_gpu_module =
       m.def_submodule("iree_gpu", "iree_gpu dialect bindings");
@@ -35,7 +66,7 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
             return ireeGPUReorderWorkgroupsStrategyAttrGet(ctx, value);
           },
           "cls"_a, "value"_a, "ctx"_a = py::none(),
-          "Gets a gpu.reorder_workgroups_strategy from parameters.")
+          "gets an #iree_gpu.reorder_workgroups_strategy from parameters.")
       .def_property_readonly("raw_value",
                              ireeGPUReorderWorkgroupsStrategyAttrGetValue)
       .def_property_readonly("value", [](MlirAttribute self) -> py::object {
@@ -75,7 +106,8 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
           "no_reduce_shared_memory_bank_conflicts"_a = py::none(),
           "use_igemm_convolution"_a = py::none(),
           "reorder_workgroups_strategy"_a = py::none(), py::kw_only(),
-          "ctx"_a = py::none(), "Gets a gpu.pipeline_options from parameters.")
+          "ctx"_a = py::none(),
+          "gets an #iree_gpu.pipeline_options from parameters.")
       .def_property_readonly(
           "prefetch_shared_memory",
           [](MlirAttribute self) -> std::optional<bool> {
@@ -125,7 +157,7 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
             return ireeGPUMMAIntrinsicAttrGet(ctx, value);
           },
           "cls"_a, "value"_a, "ctx"_a = py::none(),
-          "Gets a gpu.mma_intrinsic from parameters.")
+          "gets an #iree_gpu.mma_intrinsic from parameters.")
       .def_property_readonly("raw_value", ireeGPUMMAIntrinsicAttrGetValue)
       .def_property_readonly("value",
                              [](MlirAttribute self) -> py::object {
@@ -151,7 +183,7 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
             return ireeGPUMMAAttrGet(ctx, value);
           },
           "cls"_a, "value"_a, "ctx"_a = py::none(),
-          "Gets a gpu.mma from parameters.")
+          "gets an #iree_gpu.mma from parameters.")
       .def_property_readonly(
           "abc_element_types",
           [](MlirAttribute self) -> py::tuple {
@@ -185,7 +217,7 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
             return ireeGPULoweringConfigAttrGet(ctx, attributeDictionary);
           },
           "cls"_a, "value"_a, "ctx"_a = py::none(),
-          "Gets a gpu.lowering_config from parameters.")
+          "gets an #iree_gpu.lowering_config from parameters.")
       .def_property_readonly("attributes",
                              ireeGPULoweringConfigAttrGetAttributes);
 }
