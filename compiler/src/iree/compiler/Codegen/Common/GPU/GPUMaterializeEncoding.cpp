@@ -184,10 +184,10 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   //
   // That does simplify the below adjustments for narrow M/N, as we don't need
   // to think about unroll-to-subgroups when making the narrowing adjustment.
-  int unrollMToSubgroups = 1;
-  int unrollNToSubgroups = *wgp.getSimdsPerWgp();
-  int unrollM = totalUnrollM / unrollMToSubgroups;
-  int unrollN = totalUnrollN / unrollNToSubgroups;
+  int subgroupsM = 1;
+  int subgroupsN = *wgp.getSimdsPerWgp();
+  int unrollM = totalUnrollM / subgroupsM;
+  int unrollN = totalUnrollN / subgroupsN;
 
   //
   // Step 3: Adjust the unrolling factors when there is a narrow dimension.
@@ -201,15 +201,14 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   }
   if (narrowDim.isN()) {
     std::swap(unrollM, unrollN);
-    std::swap(unrollMToSubgroups, unrollNToSubgroups);
-    assert(unrollNToSubgroups == 1);
+    std::swap(subgroupsM, subgroupsN);
+    assert(subgroupsN == 1);
     unrollN = std::min(unrollN, static_cast<int>(llvm::divideCeil(
                                     narrowDim.size, intrinsicMma.getNSize())));
   }
 
   return DataTiledMMAAttr::get(ctx, intrinsicMma.getIntrinsic(), unrollM,
-                               unrollMToSubgroups, unrollN, unrollNToSubgroups,
-                               unrollK);
+                               subgroupsM, unrollN, subgroupsN, unrollK);
 }
 
 static FailureOr<MaterializeEncodingInfo>

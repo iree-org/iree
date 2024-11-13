@@ -625,8 +625,8 @@ distributeMultiMmaOp(RewriterBase &rewriter, IREE::GPU::MultiMmaOp mmaOp,
   if (auto dataTiledMma = dyn_cast<DataTiledMMAAttr>(newKind)) {
     newKind = DataTiledMMAAttr::get(
         context, dataTiledMma.getIntrinsic(), dataTiledMma.getUnrollM(),
-        /*unroll_m_to_subgroups=*/1, dataTiledMma.getUnrollN(),
-        /*unroll_n_to_subgroups=*/1, dataTiledMma.getUnrollK());
+        /*subgroups_m=*/1, dataTiledMma.getUnrollN(),
+        /*subgroups_n=*/1, dataTiledMma.getUnrollK());
   }
   auto newMmaOp = rewriter.create<IREE::GPU::MultiMmaOp>(
       loc, lhsSlice, rhsSlice, accSlice, mmaOp.getIndexingMaps(),
