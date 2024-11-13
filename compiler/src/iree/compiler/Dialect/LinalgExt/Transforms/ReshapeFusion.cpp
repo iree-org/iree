@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -263,9 +264,11 @@ static bool isFusableWithReshapeByDimExpansion(OpTy op,
          operandMap.getNumResults() > 0;
 }
 
-static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
-    AttentionOp attentionOp, Operation *reshapeOp, OpOperand *fusableOpOperand,
-    PatternRewriter &rewriter) {
+template <typename AttnTy>
+static std::optional<SmallVector<Value>>
+fuseAttentionWithReshapeByExpansion(AttnTy attentionOp, Operation *reshapeOp,
+                                    OpOperand *fusableOpOperand,
+                                    PatternRewriter &rewriter) {
   assert(isFusableWithReshapeByDimExpansion(attentionOp, fusableOpOperand) &&
          "preconditions for fuse operation failed");
 
@@ -330,28 +333,28 @@ static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
     expandedOpOperands.push_back(opOperand->get());
   }
 
-  Value output;
-  OpOperand &outOperand = attentionOp.getOutputMutable();
-
-  AffineMap indexingMap = attentionOp.getMatchingIndexingMap(&outOperand);
-  auto opOperandType = cast<RankedTensorType>(outOperand.get().getType());
-  RankedTensorType expandedOutputType =
-      getExpandedType(opOperandType, indexingMap, expansionInfo);
-  if (expandedOutputType != outOperand.get().getType()) {
-    SmallVector<ReassociationIndices> reassociation =
-        getReassociationForExpansion(indexingMap, expansionInfo);
-    if (failed(reshapeLikeShapesAreCompatible(
-            [&](const Twine &msg) {
-              return rewriter.notifyMatchFailure(attentionOp, msg);
-            },
-            opOperandType.getShape(), expandedOutputType.getShape(),
-            reassociation,
-            /*isExpandingReshape=*/true)))
-      return std::nullopt;
-    output = rewriter.create<tensor::ExpandShapeOp>(
-        loc, expandedOutputType, outOperand.get(), reassociation);
-  } else {
-    output = outOperand.get();
+  SmallVector<Value> outputs;
+  for (OpOperand &opOperand : attentionOp.getDpsInitsMutable()) {
+    AffineMap indexingMap = attentionOp.getMatchingIndexingMap(&opOperand);
+    auto opOperandType = cast<RankedTensorType>(opOperand.get().getType());
+    RankedTensorType expandedOutputType =
+        getExpandedType(opOperandType, indexingMap, expansionInfo);
+    if (expandedOutputType != opOperand.get().getType()) {
+      SmallVector<ReassociationIndices> reassociation =
+          getReassociationForExpansion(indexingMap, expansionInfo);
+      if (failed(reshapeLikeShapesAreCompatible(
+              [&](const Twine &msg) {
+                return rewriter.notifyMatchFailure(attentionOp, msg);
+              },
+              opOperandType.getShape(), expandedOutputType.getShape(),
+              reassociation,
+              /*isExpandingReshape=*/true)))
+        return std::nullopt;
+      outputs.push_back(rewriter.create<tensor::ExpandShapeOp>(
+          loc, expandedOutputType, opOperand.get(), reassociation));
+    } else {
+      outputs.push_back(opOperand.get());
+    }
   }
 
   Value maskOperand;
@@ -360,12 +363,10 @@ static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
   }
 
   // Create a new `AttentionOp` that has the computed operands/indexing maps.
-  TypeRange resultTypes = ValueRange(output).getTypes();
-  auto fusedOp = rewriter.create<AttentionOp>(
-      attentionOp.getLoc(), resultTypes, expandedOpOperands[0],
-      expandedOpOperands[1], expandedOpOperands[2], expandedOpOperands[3],
-      output, rewriter.getAffineMapArrayAttr(expandedOpIndexingMaps),
-      maskOperand);
+  TypeRange resultTypes = ValueRange(outputs).getTypes();
+  auto fusedOp = rewriter.create<AttnTy>(
+      attentionOp.getLoc(), resultTypes, expandedOpOperands, outputs,
+      rewriter.getAffineMapArrayAttr(expandedOpIndexingMaps));
 
   rewriter.inlineRegionBefore(attentionOp.getRegion(), fusedOp.getRegion(),
                               fusedOp.getRegion().begin());
@@ -394,6 +395,7 @@ static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
 namespace {
 
 // Fold attention with its consumer expand_shape op.
+template <typename AttnTy>
 struct FoldAttentionWithConsumerReshapeByExpansion
     : public OpRewritePattern<tensor::ExpandShapeOp> {
   FoldAttentionWithConsumerReshapeByExpansion(
@@ -410,7 +412,7 @@ struct FoldAttentionWithConsumerReshapeByExpansion
                                          "source not produced by an operation");
     }
 
-    auto producer = dyn_cast<AttentionOp>(producerResult.getOwner());
+    auto producer = dyn_cast<AttnTy>(producerResult.getOwner());
     if (!producer) {
       return rewriter.notifyMatchFailure(reshapeOp,
                                          "producer is not an attention op");
@@ -450,15 +452,16 @@ struct FoldAttentionWithConsumerReshapeByExpansion
 // Fold a collapse_shape op with its consumer attention op.
 // class FoldWith
 
+template <typename AttnType>
 struct FoldAttentionWithProducerReshapeByExpansion final
-    : public OpRewritePattern<AttentionOp> {
+    : public OpRewritePattern<AttnType> {
   FoldAttentionWithProducerReshapeByExpansion(
       MLIRContext *context, linalg::ControlFusionFn controlFoldingReshapes,
       PatternBenefit benefit = 1)
-      : OpRewritePattern<AttentionOp>(context, benefit),
+      : OpRewritePattern<AttnType>(context, benefit),
         controlFoldingReshapes(std::move(controlFoldingReshapes)) {}
 
-  LogicalResult matchAndRewrite(AttentionOp attentionOp,
+  LogicalResult matchAndRewrite(AttnType attentionOp,
                                 PatternRewriter &rewriter) const override {
     for (OpOperand *opOperand : attentionOp.getDpsInputOperands()) {
       tensor::CollapseShapeOp reshapeOp =
@@ -636,9 +639,8 @@ static Operation *createCollapsedOp(AttentionOp origOp,
   }
 
   auto collapsedOp = rewriter.create<AttentionOp>(
-      origOp.getLoc(), resultTypes, inputOperands[0], inputOperands[1],
-      inputOperands[2], inputOperands[3], outputOperands[0],
-      rewriter.getAffineMapArrayAttr(indexingMaps), maskOperand);
+      origOp.getLoc(), resultTypes, inputOperands, outputOperands,
+      rewriter.getAffineMapArrayAttr(indexingMaps));
   rewriter.inlineRegionBefore(origOp.getRegion(), collapsedOp.getRegion(),
                               collapsedOp.getRegion().begin());
   return collapsedOp;
@@ -702,9 +704,13 @@ collapseOpIterationDims(AttentionOp op,
 void populateFoldReshapeOpsByExpansionPatterns(
     RewritePatternSet &patterns,
     const linalg::ControlFusionFn &controlFoldingReshapes) {
-  patterns.add<FoldAttentionWithConsumerReshapeByExpansion>(
+  patterns.add<FoldAttentionWithConsumerReshapeByExpansion<AttentionOp>>(
       patterns.getContext(), controlFoldingReshapes);
-  patterns.add<FoldAttentionWithProducerReshapeByExpansion>(
+  patterns.add<FoldAttentionWithConsumerReshapeByExpansion<OnlineAttentionOp>>(
+      patterns.getContext(), controlFoldingReshapes);
+  patterns.add<FoldAttentionWithProducerReshapeByExpansion<AttentionOp>>(
+      patterns.getContext(), controlFoldingReshapes);
+  patterns.add<FoldAttentionWithProducerReshapeByExpansion<OnlineAttentionOp>>(
       patterns.getContext(), controlFoldingReshapes);
 }
 

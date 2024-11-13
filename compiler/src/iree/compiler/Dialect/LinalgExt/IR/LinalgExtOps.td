@@ -526,7 +526,12 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     "Value":$scale,
     "Value":$output,
     "ArrayAttr":$indexing_maps,
-    CArg<"std::optional<Value>", "std::nullopt">:$mask)>
+    CArg<"std::optional<Value>", "std::nullopt">:$mask)>,
+
+    OpBuilder<(ins "TypeRange":$results,
+    "ValueRange":$inputs,
+    "ValueRange":$outputs,
+    "ArrayAttr":$indexing_maps)>
   ];
 
   let extraClassDeclaration = [{
@@ -576,6 +581,9 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
 def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
+     DeclareOpInterfaceMethods<LinalgFusionInterface,
+      ["getIndexingMapsForResults", "getIndexingMapsForOperands",
+       "getStaticLoopRanges"]>,
      DestinationStyleOpInterface, LinalgExtInterface,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
@@ -646,7 +654,12 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     "Value":$max,
     "Value":$sum,
     "ArrayAttr":$indexing_maps,
-    CArg<"std::optional<Value>", "std::nullopt">:$mask)>
+    CArg<"std::optional<Value>", "std::nullopt">:$mask)>,
+
+    OpBuilder<(ins "TypeRange":$results,
+    "ValueRange":$inputs,
+    "ValueRange":$outputs,
+    "ArrayAttr":$indexing_maps)>
   ];
 
 

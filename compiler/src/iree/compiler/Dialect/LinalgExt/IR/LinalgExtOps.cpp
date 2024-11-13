@@ -1216,6 +1216,14 @@ void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
         indexingMaps, DictionaryAttr());
 }
 
+void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                        TypeRange results, ValueRange inputs,
+                        ValueRange outputs, ArrayAttr indexingMaps) {
+  auto operands = llvm::to_vector<8>(llvm::concat<Value>(inputs, outputs));
+  build(odsBuilder, odsState, results, ValueRange(operands),
+        odsBuilder.getNamedAttr("indexing_maps", indexingMaps));
+}
+
 LogicalResult AttentionOp::verify() {
   AttentionOp attnOp = *this;
 
@@ -1391,6 +1399,14 @@ void OnlineAttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
         max, sum, indexingMaps, DictionaryAttr());
 }
 
+void OnlineAttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                              TypeRange results, ValueRange inputs,
+                              ValueRange outputs, ArrayAttr indexingMaps) {
+  auto operands = llvm::to_vector<6>(llvm::concat<Value>(inputs, outputs));
+  build(odsBuilder, odsState, results, ValueRange(operands),
+        odsBuilder.getNamedAttr("indexing_maps", indexingMaps));
+}
+
 LogicalResult OnlineAttentionOp::verify() {
   OnlineAttentionOp attnOp = *this;
 
@@ -1512,6 +1528,43 @@ LogicalResult OnlineAttentionOp::reifyResultShapes(
 SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsArray() {
   return SmallVector<AffineMap>(
       getIndexingMaps().getAsValueRange<AffineMapAttr>());
+}
+
+FailureOr<SmallVector<int64_t>> OnlineAttentionOp::getStaticLoopRanges() {
+  SmallVector<int64_t> bounds(getIterationDomainRank());
+  SmallVector<bool> dimsFound(getIterationDomainRank(), false);
+
+  // batch(s), m, k1
+  ArrayRef<int64_t> queryShape = getQuery().getType().getShape();
+  ArrayRef<AffineExpr> queryDims = getQueryMap().getResults();
+  // batch(s), k2, n
+  ArrayRef<int64_t> valueShape = getValue().getType().getShape();
+  ArrayRef<AffineExpr> valueDims = getValueMap().getResults();
+
+  auto fillSizes = [&](ArrayRef<int64_t> sizes, ArrayRef<AffineExpr> dims) {
+    for (auto [size, dim] : llvm::zip_equal(sizes, dims)) {
+      int pos = cast<AffineDimExpr>(dim).getPosition();
+      if (dimsFound[pos]) {
+        continue;
+      }
+      bounds[pos] = size;
+      dimsFound[pos] = true;
+    }
+  };
+  fillSizes(queryShape, queryDims);
+  fillSizes(valueShape, valueDims);
+  return bounds;
+}
+
+SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsForOperands() {
+  auto maps = getIndexingMapsArray();
+  maps.resize(getNumDpsInputs());
+  return maps;
+}
+
+SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsForResults() {
+  auto maps = getIndexingMapsArray();
+  return SmallVector<AffineMap>(maps.begin() + getNumDpsInputs(), maps.end());
 }
 
 //===----------------------------------------------------------------------===//
