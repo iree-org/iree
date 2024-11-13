@@ -24,6 +24,10 @@ jobs:
     runs-on: arc-runner-set
     env:
       BASE_BUILD_DIR_POWERSHELL: C:\mnt\azure\b
+      SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
+      SCCACHE_AZURE_BLOB_CONTAINER: ccache-container
+      SCCACHE_CCACHE_ZSTD_LEVEL: 10
+      SCCACHE_AZURE_KEY_PREFIX: "ci_windows_x64_msvc"
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
@@ -48,10 +52,13 @@ jobs:
           python3 -m venv .venv
           .venv/Scripts/activate.bat
           python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+      - name: "Installing requirements"
+        run: choco install ccache --yes
       - name: "Configuring MSVC"
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
       - name: "Installing IREE requirements"
         run: |
+          choco install sccache
           choco install cmake
           choco install ninja
           Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
