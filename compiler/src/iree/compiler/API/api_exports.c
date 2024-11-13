@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 
+extern void ireeAttributeIsACodegenCompilationInfoAttr();
 extern void ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr();
 extern void ireeAttributeIsACodegenTranslationInfoAttr();
 extern void ireeAttributeIsAGPULoweringConfigAttr();
@@ -17,6 +18,9 @@ extern void ireeAttributeIsAGPUMMAAttr();
 extern void ireeAttributeIsAGPUMMAIntrinsicAttr();
 extern void ireeAttributeIsAGPUPipelineOptionsAttr();
 extern void ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr();
+extern void ireeCodegenCompilationInfoAttrGet();
+extern void ireeCodegenCompilationInfoAttrGetParameters();
+extern void ireeCodegenCompilationInfoAttrGetTypeID();
 extern void ireeCodegenDispatchLoweringPassPipelineAttrGet();
 extern void ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID();
 extern void ireeCodegenDispatchLoweringPassPipelineAttrGetValue();
@@ -868,6 +872,7 @@ extern void mlirVectorTypeIsScalable();
 
 uintptr_t __iree_compiler_hidden_force_extern() {
   uintptr_t x = 0;
+  x += (uintptr_t)&ireeAttributeIsACodegenCompilationInfoAttr;
   x += (uintptr_t)&ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr;
   x += (uintptr_t)&ireeAttributeIsACodegenTranslationInfoAttr;
   x += (uintptr_t)&ireeAttributeIsAGPULoweringConfigAttr;
@@ -875,6 +880,9 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeAttributeIsAGPUMMAIntrinsicAttr;
   x += (uintptr_t)&ireeAttributeIsAGPUPipelineOptionsAttr;
   x += (uintptr_t)&ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr;
+  x += (uintptr_t)&ireeCodegenCompilationInfoAttrGet;
+  x += (uintptr_t)&ireeCodegenCompilationInfoAttrGetParameters;
+  x += (uintptr_t)&ireeCodegenCompilationInfoAttrGetTypeID;
   x += (uintptr_t)&ireeCodegenDispatchLoweringPassPipelineAttrGet;
   x += (uintptr_t)&ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID;
   x += (uintptr_t)&ireeCodegenDispatchLoweringPassPipelineAttrGetValue;
