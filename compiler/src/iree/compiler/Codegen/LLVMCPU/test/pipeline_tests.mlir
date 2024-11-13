@@ -156,7 +156,7 @@ func.func @check_buffer_ops_vectorization() attributes {hal.executable.target = 
   }
   return
 }
-// CHECK-LABEL:  #{{.+}} = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize
+// CHECK-LABEL:  #{{.+}} = #iree_codegen.translation_info<pipeline = CPUBufferOpsTileAndVectorize
 //       CHECK:      func.func @check_buffer_ops_vectorization
 //       CHECK:        vector.load
 //       CHECK:        vector.store
@@ -340,7 +340,7 @@ func.func @dispatch() attributes {hal.executable.target = #executable_target_emb
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 2, 0, 0], [1, 1, 0, 1], [0, 0, 0, 0], [0, 0, 0, 0]]>
 #config1 = #iree_codegen.lowering_config<tile_sizes = [[1, 2, 0, 0, 0, 0], [1, 1, 0, 1, 128, 0], [0, 0, 1, 0, 0, 1]]>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "+fma,+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-unknown-unknown-eabi-elf", ukernels = "all"}>
-func.func @unsupported_ukernel_fallback_to_vectorization() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_, translation_info = #iree_codegen.translation_info<Mmt4dTilingExpert>} {
+func.func @unsupported_ukernel_fallback_to_vectorization() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_, translation_info = #iree_codegen.translation_info<pipeline = Mmt4dTilingExpert>} {
   %c0 = arith.constant 0 : index
   %c1024 = arith.constant 1024 : index
   %c132096 = arith.constant 132096 : index

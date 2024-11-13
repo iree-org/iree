@@ -57,6 +57,11 @@ llvm::cl::opt<bool> clGPUTestTileAndFuseVectorize(
         "test the tile and fuse pipeline for all supported operations"),
     llvm::cl::init(false));
 
+llvm::cl::opt<bool> clLLVMGPUVectorizePipeline(
+    "iree-codegen-llvmgpu-vectorize-pipeline",
+    llvm::cl::desc("forces use of the legacy LLVMGPU vectorize pipeline"),
+    llvm::cl::init(false));
+
 llvm::cl::opt<bool> clGPUEnableVectorDistribution(
     "iree-codegen-llvmgpu-use-vector-distribution",
     llvm::cl::desc("enable the usage of the vector distribution pipeline"),
@@ -323,28 +328,29 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                              lhsElemType,  rhsElemType,  initElemType};
 
   // Helper fn to store mma information.
-  auto storeMmaInfo = [](IREE::GPU::MMAAttr mma,
+  auto storeMmaInfo = [](IREE::GPU::MmaInterfaceAttr mma,
                          SmallVector<GPUMatmulShapeType> &intrinsics,
-                         SmallVector<IREE::GPU::MMAAttr> &mmaAttrs) {
+                         SmallVector<IREE::GPU::MmaInterfaceAttr> &mmaKinds) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
-    mmaAttrs.emplace_back(mma);
+    mmaKinds.emplace_back(mma);
   };
 
   SmallVector<GPUMatmulShapeType> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
-  SmallVector<IREE::GPU::MMAAttr> mmaAttrs;
+  SmallVector<IREE::GPU::MmaInterfaceAttr> mmaKinds;
   MLIRContext *context = op.getContext();
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     if (mma.getSubgroupSize() != targetSubgroupSize)
       continue;
-    storeMmaInfo(mma, intrinsics, mmaAttrs);
+    storeMmaInfo(mma, intrinsics, mmaKinds);
     // Store info on virtual intrinsics based on current mma if any
-    for (IREE::GPU::MMAIntrinsic virtualIntrinsic :
+    for (IREE::GPU::VirtualMMAIntrinsic virtualIntrinsic :
          mma.getVirtualIntrinsics()) {
-      auto virtualMma = IREE::GPU::MMAAttr::get(context, virtualIntrinsic);
-      storeMmaInfo(virtualMma, intrinsics, mmaAttrs);
+      auto virtualMma =
+          IREE::GPU::VirtualMMAAttr::get(context, virtualIntrinsic);
+      storeMmaInfo(virtualMma, intrinsics, mmaKinds);
     }
   }
 
@@ -417,7 +423,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                      b.getI64ArrayAttr(reductionTileSizes));
   IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, attrs, {0, 1});
   IREE::GPU::LoweringConfigAttr::setMmaKind(context, attrs,
-                                            mmaAttrs[schedule->index]);
+                                            mmaKinds[schedule->index]);
   IREE::GPU::LoweringConfigAttr::setSubgroupMCount(
       context, attrs, schedule->mSubgroupCounts[0]);
   IREE::GPU::LoweringConfigAttr::setSubgroupNCount(
@@ -536,28 +542,29 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
                              lhsElemType,  rhsElemType,  initElemType};
 
   // Helper fn to store mma information.
-  auto storeMmaInfo = [](IREE::GPU::MMAAttr mma,
+  auto storeMmaInfo = [](IREE::GPU::MmaInterfaceAttr mma,
                          SmallVector<GPUMatmulShapeType> &intrinsics,
-                         SmallVector<IREE::GPU::MMAAttr> &mmaAttrs) {
+                         SmallVector<IREE::GPU::MmaInterfaceAttr> &mmaKinds) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
-    mmaAttrs.emplace_back(mma);
+    mmaKinds.emplace_back(mma);
   };
 
   SmallVector<GPUMatmulShapeType> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
-  SmallVector<IREE::GPU::MMAAttr> mmaAttrs;
+  SmallVector<IREE::GPU::MmaInterfaceAttr> mmaKinds;
   MLIRContext *context = op.getContext();
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     if (mma.getSubgroupSize() != targetSubgroupSize)
       continue;
-    storeMmaInfo(mma, intrinsics, mmaAttrs);
+    storeMmaInfo(mma, intrinsics, mmaKinds);
     // Store info on virtual intrinsics based on current mma if any
-    for (IREE::GPU::MMAIntrinsic virtualIntrinsic :
+    for (IREE::GPU::VirtualMMAIntrinsic virtualIntrinsic :
          mma.getVirtualIntrinsics()) {
-      auto virtualMma = IREE::GPU::MMAAttr::get(context, virtualIntrinsic);
-      storeMmaInfo(virtualMma, intrinsics, mmaAttrs);
+      auto virtualMma =
+          IREE::GPU::VirtualMMAAttr::get(context, virtualIntrinsic);
+      storeMmaInfo(virtualMma, intrinsics, mmaKinds);
     }
   }
 
@@ -682,7 +689,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
                      b.getI64ArrayAttr(reductionTileSizes));
   IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, attrs, {0, 1});
   IREE::GPU::LoweringConfigAttr::setMmaKind(context, attrs,
-                                            mmaAttrs[schedule->index]);
+                                            mmaKinds[schedule->index]);
   IREE::GPU::LoweringConfigAttr::setSubgroupMCount(
       context, attrs, schedule->mSubgroupCounts[0]);
   IREE::GPU::LoweringConfigAttr::setSubgroupNCount(
@@ -734,7 +741,8 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   ArrayRef<int64_t> bounds = maybeBounds.value();
 
   auto opInfo =
-      IREE::LinalgExt::AttentionOpDetail::get(op.getIndexingMapsArray())
+      IREE::LinalgExt::AttentionOpDetail::get(
+          op.getQueryMap(), op.getKeyMap(), op.getValueMap(), op.getOutputMap())
           .value();
 
   int64_t mDim = opInfo.getMDims().back();
@@ -758,28 +766,29 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   Value vMatrix = op.getValue();
 
   // Helper fn to store mma information.
-  auto storeMmaInfo = [](IREE::GPU::MMAAttr mma,
+  auto storeMmaInfo = [](IREE::GPU::MmaInterfaceAttr mma,
                          SmallVector<GPUMatmulShapeType> &intrinsics,
-                         SmallVector<IREE::GPU::MMAAttr> &mmaAttrs) {
+                         SmallVector<IREE::GPU::MmaInterfaceAttr> &mmaKinds) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
-    mmaAttrs.emplace_back(mma);
+    mmaKinds.emplace_back(mma);
   };
 
   SmallVector<GPUMatmulShapeType> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
-  SmallVector<IREE::GPU::MMAAttr> mmaAttrs;
+  SmallVector<IREE::GPU::MmaInterfaceAttr> mmaKinds;
   MLIRContext *context = op.getContext();
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     if (mma.getSubgroupSize() != targetSubgroupSize)
       continue;
-    storeMmaInfo(mma, intrinsics, mmaAttrs);
+    storeMmaInfo(mma, intrinsics, mmaKinds);
     // Store info on virtual intrinsics based on current mma if any
-    for (IREE::GPU::MMAIntrinsic virtualIntrinsic :
+    for (IREE::GPU::VirtualMMAIntrinsic virtualIntrinsic :
          mma.getVirtualIntrinsics()) {
-      auto virtualMma = IREE::GPU::MMAAttr::get(context, virtualIntrinsic);
-      storeMmaInfo(virtualMma, intrinsics, mmaAttrs);
+      auto virtualMma =
+          IREE::GPU::VirtualMMAAttr::get(context, virtualIntrinsic);
+      storeMmaInfo(virtualMma, intrinsics, mmaKinds);
     }
   }
 
@@ -915,7 +924,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, qkConfig,
                                                         {0, 1});
   IREE::GPU::LoweringConfigAttr::setMmaKind(context, qkConfig,
-                                            mmaAttrs[schedule->index]);
+                                            mmaKinds[schedule->index]);
   IREE::GPU::LoweringConfigAttr::setSubgroupMCount(
       context, qkConfig, schedule->mSubgroupCounts[0]);
   IREE::GPU::LoweringConfigAttr::setSubgroupNCount(context, qkConfig, 1);
@@ -923,7 +932,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Configuring for pv matmul.
   IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, pvConfig, {1});
   IREE::GPU::LoweringConfigAttr::setMmaKind(context, pvConfig,
-                                            mmaAttrs[schedule->index]);
+                                            mmaKinds[schedule->index]);
   IREE::GPU::LoweringConfigAttr::setSubgroupMCount(
       context, pvConfig, schedule->mSubgroupCounts[0]);
   IREE::GPU::LoweringConfigAttr::setSubgroupNCount(
@@ -2171,6 +2180,13 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       })
       .Default([&](auto op) {
         LDBG("Default Config");
+        if (!clLLVMGPUVectorizePipeline) {
+          if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(
+                  target, entryPointFn, computeOp))) {
+            LDBG("Tile and fuse default config");
+            return success();
+          }
+        }
         return setRootDefaultConfig(target, entryPointFn, computeOp);
       });
 }

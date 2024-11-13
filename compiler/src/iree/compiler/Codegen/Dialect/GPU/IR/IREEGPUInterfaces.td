@@ -16,7 +16,7 @@ def IREEGPU_MmaInterfaceAttr : AttrInterface<"MmaInterfaceAttr"> {
 
   let description = [{
     Interface used to query information needed to generate code targeting a
-    specific Matrix Multiply–Accumulate (MMA) machine intrinsic instruction.
+    specific Matrix Multiply-Accumulate (MMA) machine intrinsic instruction.
     Layout information can be explicit or opaque, however all such attributes
     must specify the static shape of the operation and the required element
     types.

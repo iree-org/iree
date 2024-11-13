@@ -6,7 +6,7 @@
 // to be migrated to the rocdl heuristics, but for now is just physically
 // located here.
 
-// CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
+// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -46,7 +46,7 @@ func.func @expanded_matmul_transpose_b() {
 
 // -----
 
-// CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
+// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -108,11 +108,11 @@ func.func @matmul_256x256x256() attributes {hal.executable.target = #executable_
 
 // Check that we do not use the distribute pipeline if there are no supported
 // intrinsics.
-//       CHECK-NOT: iree_codegen.translation_info<LLVMGPUVectorDistribute
+//       CHECK-NOT: iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
 
 // -----
 
-// CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
+// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -144,7 +144,7 @@ func.func @mfma_matmul_1024x1024x1024() {
 
 // -----
 
-// CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
+// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -195,7 +195,7 @@ func.func @conv_nchwc() {
 
 // -----
 
-// CHECK:      #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
+// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUPadAndVectorDistribute
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -227,7 +227,7 @@ func.func @unaligned_mk_batch_matmul() {
 
 // -----
 
-// CHECK:      #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
+// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUPadAndVectorDistribute
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -279,7 +279,7 @@ func.func @narrow_n_batch_matmul_64x968x4x320_f16() {
   return
 }
 // Check that we don't support LLVMGPUPadAndVectorDistribute for narrow N/M atm.
-// CHECK-NOT:      #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
+// CHECK-NOT:      #iree_codegen.translation_info<pipeline = LLVMGPUPadAndVectorDistribute
 // CHECK-LABEL: func.func @narrow_n_batch_matmul_64x968x4x320_f16()
 
 // -----
@@ -313,11 +313,11 @@ func.func @matmul_dynamic_dim() {
   return
 }
 // Check that we have unhandled dynamic dimension.
-//       CHECK-NOT: iree_codegen.translation_info<LLVMGPUVectorDistribute
+//       CHECK-NOT: iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
 
 // -----
 
-// CHECK:       #iree_codegen.translation_info<LLVMGPUVectorDistribute
+// CHECK:       #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
 // CHECK-NOT:   prefetch_shared_memory = true
 
 // CHECK-LABEL: func.func @attention_20x4096x64x4096x64()
@@ -360,7 +360,7 @@ func.func @attention_20x4096x64x4096x64() {
 
 // -----
 
-// CHECK:       #iree_codegen.translation_info<LLVMGPUVectorDistribute
+// CHECK:       #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
 // CHECK-NOT:   prefetch_shared_memory = true
 
 // CHECK-LABEL: func.func @attention_large_head_dim_shared_mem()

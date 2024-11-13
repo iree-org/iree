@@ -23,9 +23,6 @@ def BlockDynamicDimensionsPass
     : Pass<"iree-codegen-block-dynamic-dimensions"> {
   let summary = "Expand dynamic dimensions that are known to be multiples of "
                 "statically known values.";
-  let options = [
-    Option<"test", "test", "bool", /*default=*/"false", "Enable test mode">
-  ];
 }
 
 def BubbleUpOrdinalOpsPass : Pass<"iree-codegen-bubble-up-ordinal-ops", ""> {
@@ -490,6 +487,11 @@ def RemoveSingleIterationLoopPass :
   let summary = "Remove distributed loop with single iteration.";
 }
 
+def StripCompilationInfoPass :
+    Pass<"iree-codegen-strip-compilation-info", "">{
+   let summary = "Remove all the the lowering configuration and translation info attributes.";
+}
+
 // TODO: Replace with upstream: https://github.com/iree-org/iree/issues/18759
 def IREELoopInvariantCodeMotionPass :
   Pass<"iree-loop-invariant-code-motion", ""> {
@@ -571,6 +573,21 @@ def TileAndDistributeToWorkgroupsUsingForallOpPass :
     "IREE::LinalgExt::IREELinalgExtDialect",
     "scf::SCFDialect",
     "tensor::TensorDialect",
+  ];
+}
+
+def TileLargeTensorsPass :
+    InterfacePass<"iree-codegen-tile-large-tensors", "mlir::FunctionOpInterface"> {
+  let summary = "Greedily tiles all linalg ops that are beyond a certain size";
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::affine::AffineDialect",
+    "::mlir::scf::SCFDialect",
+  ];
+  let options = [
+    Option<"maxVectorSize", "max-vector-size", "int64_t",
+           /*default=*/"64",
+           "Maximum static size to tile to (i.e. all remaining ops will be smaller)">,
   ];
 }
 

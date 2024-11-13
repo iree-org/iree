@@ -290,7 +290,7 @@ func.func @unset_encoding_ACC_dynamic_unroll8x8x4_MFMA_F32_16x16x4_F32() {
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
       : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #encoding>>{%M, %K}
       -> tensor<?x?xf32, #encoding>
-  %3 = iree_encoding.unset_encoding %2 : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>
+  %3 = iree_encoding.unset_encoding %2 : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%M, %K}
   flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
       : tensor<?x?xf32>
       -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%M, %K}

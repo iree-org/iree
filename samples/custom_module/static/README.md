@@ -30,10 +30,10 @@ the same module code between all various modes with minor differences.
 
 ## Instructions
 
-1. Build or install the `iree-compile` binary:
+1. Build or install the `iree-base-compiler` binary:
 
     ```
-    python -m pip install iree-compiler
+    python -m pip install iree-base-compiler
     ```
 
     [See here](https://iree.dev/reference/bindings/python/)

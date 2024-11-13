@@ -15,7 +15,7 @@
 #map4 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 #map5 = affine_map<(d0, d1, d2, d3) -> (d2, d3, d1)>
 #map6 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
-#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1], {pipeline_depth = 1 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1], {pipeline_depth = 1 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @matmul_i4_quant_weight() {
   %c32 = arith.constant 32 : index

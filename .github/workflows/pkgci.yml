@@ -34,8 +34,6 @@ jobs:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_packages')
     uses: ./.github/workflows/pkgci_build_packages.yml
-    with:
-      package_version: 0.dev1
 
   # Package sanity checks.
   unit_test:

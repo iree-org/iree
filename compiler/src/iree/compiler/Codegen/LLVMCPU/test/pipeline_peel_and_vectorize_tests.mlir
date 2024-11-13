@@ -6,7 +6,7 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
-#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert, {enable_loop_peeling = true}>
+#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {enable_loop_peeling = true}>
 #executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {native_vector_size = 64}>
 func.func @no_peel_static_matmul() attributes {hal.executable.target = #executable_target_system_elf_x86_64_, translation_info = #translation} {
   %cst = arith.constant 0.000000e+00 : f32
@@ -38,7 +38,7 @@ func.func @no_peel_static_matmul() attributes {hal.executable.target = #executab
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[65, 65, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
-#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert, {enable_loop_peeling = true}>
+#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {enable_loop_peeling = true}>
 #executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {native_vector_size = 64}>
 func.func @peel_static_matmul() attributes {hal.executable.target = #executable_target_system_elf_x86_64_, translation_info = #translation} {
   %cst = arith.constant 0.000000e+00 : f32
@@ -82,7 +82,7 @@ func.func @peel_static_matmul() attributes {hal.executable.target = #executable_
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
-#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert, {enable_loop_peeling = true}>
+#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {enable_loop_peeling = true}>
 #executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {native_vector_size = 64}>
 func.func @peel_dynamic_matmul() attributes {hal.executable.target = #executable_target_system_elf_x86_64_, translation_info = #translation} {
   %cst = arith.constant 0.000000e+00 : f32
@@ -139,7 +139,7 @@ func.func @peel_dynamic_matmul() attributes {hal.executable.target = #executable
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0], [8, [32], 0], [0, 0, 1], [0, 0, 0]]>
-#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert, {enable_loop_peeling = true}>
+#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {enable_loop_peeling = true}>
 #executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
 module {
   func.func @peel_scalable_matmul() attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_, translation_info = #translation} {

@@ -67,7 +67,7 @@ trap "deactivate 2> /dev/null" EXIT
 
 python -m pip install --upgrade \
   --find-links https://iree.dev/pip-release-links.html \
-  iree-compiler iree-tools-tflite
+  iree-base-compiler iree-tools-tflite
 
 ###############################################################################
 # Download program source files                                               #

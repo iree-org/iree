@@ -2,7 +2,7 @@
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0, 0, 0, 0], [1, 1, 1, 4, 0, 0], [0, 0, 0, 0, 1, 4], [0, 0, 0, 0, 0, 0]]>
 #executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}>
-#translation = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
+#translation = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,

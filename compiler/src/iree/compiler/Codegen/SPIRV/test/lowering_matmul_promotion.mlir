@@ -14,7 +14,7 @@
 ]>
 #compilation = #iree_codegen.compilation_info<
     lowering_config  = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 16]]>,
-    translation_info = <SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 2, store_stage = 1}>>
+    translation_info = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 2, store_stage = 1}>>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 hal.executable @matmul_f32_128x256x64 {
   hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
@@ -52,7 +52,7 @@ hal.executable @matmul_f32_128x256x64 {
 }
 
 //       CHECK-DAG: #[[$MAP:.+]] = affine_map<(d0) -> ((d0 floordiv 16) mod 2)>
-//       CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1]
+//       CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1]
 //     CHECK-LABEL: func.func @matmul_f32_128x256x64()
 //      CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //           CHECK:   %[[CST0:.+]] = arith.constant 0.000000e+00 : f32
@@ -100,7 +100,7 @@ hal.executable @matmul_f32_128x256x64 {
 ]>
 #compilation = #iree_codegen.compilation_info<
     lowering_config  = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 16]]>,
-    translation_info = <SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 2, store_stage = 0}>>
+    translation_info = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 2, store_stage = 0}>>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 hal.executable @matmul_f32_128x256x64 {
   hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
@@ -138,7 +138,7 @@ hal.executable @matmul_f32_128x256x64 {
 }
 
 //       CHECK-DAG: #[[$MAP:.+]] = affine_map<(d0) -> ((d0 floordiv 16) mod 3)>
-//       CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1]
+//       CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1]
 //     CHECK-LABEL: func.func @matmul_f32_128x256x64()
 //      CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //           CHECK:   %[[CST0:.+]] = arith.constant 0.000000e+00 : f32
@@ -199,7 +199,7 @@ hal.executable @matmul_f32_128x256x64 {
 ]>
 #compilation = #iree_codegen.compilation_info<
     lowering_config  = #iree_codegen.lowering_config<tile_sizes = [[64, 256, 32]]>,
-    translation_info = <SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1], {pipeline_depth = 1, store_stage = 1}>>
+    translation_info = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1], {pipeline_depth = 1, store_stage = 1}>>
 hal.executable @matmul_f16_4096x512x512 {
   hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export public @matmul_f16_4096x512x512 ordinal(0) layout(#pipeline_layout) {

@@ -6,7 +6,7 @@
   #hal.pipeline.binding<storage_buffer, ReadOnly>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#translation = #iree_codegen.translation_info<
+#translation = #iree_codegen.translation_info<pipeline =
   LLVMGPUTileAndFuse
   workgroup_size = [256, 1, 1]
   subgroup_size = 64,

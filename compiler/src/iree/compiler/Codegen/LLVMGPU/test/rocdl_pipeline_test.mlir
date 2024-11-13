@@ -2,7 +2,7 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx940 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s --check-prefix=CDNA3
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s --check-prefix=RDNA3
 
-// Verify that a simple element wise op gets lowered succefully all the way to
+// Verify that a simple element wise op gets lowered successfully all the way to
 // nvvm/llvm dialect.
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -142,7 +142,7 @@ hal.executable @ext_fp8_dispatch {
 
 //   CDNA3-LABEL: hal.executable public @ext_fp8_dispatch
 //         CDNA3:   hal.executable.variant public @rocm
-//     CDNA3-DAG:     %[[EXTF8E4M3:.+]] = rocdl.cvt.f32.fp8 %{{.*}} : f32
-//     CDNA3-DAG:     %[[EXTF8E5M2:.+]] = rocdl.cvt.f32.bf8 %{{.*}} : f32
-//         CDNA3:     %[[ADD:.+]] = llvm.fadd %[[EXTF8E4M3]], %[[EXTF8E5M2]] : f32
-//         CDNA3:     llvm.store %[[ADD]], %{{.*}} : f32, !llvm.ptr<1>
+// CDNA3-COUNT-4:     rocdl.cvt.f32.fp8 %{{.*}} : f32
+// CDNA3-COUNT-4:     rocdl.cvt.f32.bf8 %{{.*}} : f32
+//         CDNA3:     %[[ADD:.+]] = llvm.fadd %{{.*}}, %{{.*}} : vector<4xf32>
+//         CDNA3:     llvm.store %[[ADD]], %{{.*}} : vector<4xf32>, !llvm.ptr<1>

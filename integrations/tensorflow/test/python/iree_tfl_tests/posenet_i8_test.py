@@ -11,6 +11,7 @@ import urllib.request
 
 from PIL import Image
 
+# TODO(#18518): Migrate these files to a new (ideally public) location
 model_path = "https://storage.googleapis.com/iree-model-artifacts/tflite-integration-tests/posenet_i8.tflite"
 model_input = "https://storage.googleapis.com/iree-model-artifacts/tflite-integration-tests/posenet_i8_input.jpg"
 

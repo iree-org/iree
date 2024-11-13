@@ -136,9 +136,9 @@ module attributes {
 // RUN: FileCheck %s --check-prefixes=CODEGEN-PRINTER
 
 // CODEGEN-PRINTER:     IR printer: Setting matmul strategy to custom_transform_strategy
-// CODEGEN-PRINTER:       translation_info = #iree_codegen.translation_info<TransformDialectCodegen codegen_spec = @custom_transform_strategy>
+// CODEGEN-PRINTER:       translation_info = #iree_codegen.translation_info<pipeline = TransformDialectCodegen codegen_spec = @custom_transform_strategy>
 // CODEGEN-PRINTER:     IR printer: Setting reduce strategy to base vectorize top-level
-// CODEGEN-PRINTER:       translation_info = #iree_codegen.translation_info<SPIRVBaseVectorize workgroup_size = [16, 1, 1]>
+// CODEGEN-PRINTER:       translation_info = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [16, 1, 1]>
 
 /// Then test with threading to make sure it runs
 // RUN: iree-compile %s --iree-hal-target-backends=vulkan \
