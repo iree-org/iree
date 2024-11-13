@@ -121,7 +121,7 @@ static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
     funcPassManager.addPass(createConvertToDestinationPassingStylePass());
     funcPassManager.addPass(createFoldAffineMinInDistributedLoopsPass());
   }
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
@@ -425,7 +425,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createTensorToVectorVectorizePadPass());
     if (pipelineOpt.decomposePackUnPackOps) {
       funcPassManager.addPass(createDecomposePackUnPackOpsPass());
-      funcPassManager.addPass(createCanonicalizerPass());
+      funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
       funcPassManager.addPass(createCSEPass());
     }
 
@@ -653,8 +653,14 @@ void addCPULinalgExtTileAndVectorizePipeline(
   }
 }
 
-void addCPUDefaultPassPipeline(OpPassManager &funcPassManager) {
-  addTileAndDistributePasses(funcPassManager);
+void addCPUDefaultPassPipeline(OpPassManager &funcPassManager,
+                               FailureOr<TilingConfig> &tilingConfig) {
+  if (succeeded(tilingConfig) &&
+      tilingConfig.value().getNumTilingLevels() > 1) {
+    addTileAndDistributePasses(funcPassManager);
+    funcPassManager.addPass(createLLVMCPUTileAndFusePass(
+        tilingConfig.value().getVectorCommonParallelLevel()));
+  }
   addCPUBufferizePasses(funcPassManager);
 }
 

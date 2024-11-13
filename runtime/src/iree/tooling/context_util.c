@@ -218,9 +218,9 @@ static iree_status_t iree_tooling_load_hal_async_module(
   // Create HAL module wrapping the device created above.
   iree_hal_module_flags_t flags = IREE_HAL_MODULE_FLAG_NONE;
   iree_vm_module_t* module = NULL;
-  iree_status_t status =
-      iree_hal_module_create(instance, device_list->count, device_list->devices,
-                             flags, host_allocator, &module);
+  iree_status_t status = iree_hal_module_create(
+      instance, device_list->count, device_list->devices, flags,
+      iree_hal_module_debug_sink_stdio(stderr), host_allocator, &module);
 
   iree_hal_device_list_free(device_list);
 
@@ -280,7 +280,8 @@ static iree_status_t iree_tooling_load_hal_inline_module(
   iree_hal_inline_module_flags_t flags = IREE_HAL_INLINE_MODULE_FLAG_NONE;
   iree_vm_module_t* module = NULL;
   iree_status_t status = iree_hal_inline_module_create(
-      instance, flags, device_allocator, host_allocator, &module);
+      instance, flags, iree_hal_module_debug_sink_stdio(stderr),
+      device_allocator, host_allocator, &module);
 
   if (iree_status_is_ok(status)) {
     *out_module = module;

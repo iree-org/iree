@@ -144,6 +144,22 @@ SmallVector<AffineMap> convertDimsToSymbols(MLIRContext *context,
                                             unsigned numDims,
                                             unsigned numSymbols);
 
+/// Returns the indexing maps array for a convolution operation with IGEMM
+/// indexing. The resulting indexing maps should represent the indexing of some
+/// contraction that computes the equivalent IGEMM matmul of the convolution.
+FailureOr<SmallVector<AffineMap>>
+getIGEMMContractionIndexingMaps(linalg::LinalgOp linalgOp);
+
+/// Returns the loop bounds of a convolution op with IGEMM indexing. This
+/// function assumes the same ordering of dimensions as
+/// getIGEMMContractionIndexingMaps;
+FailureOr<SmallVector<int64_t>> getIGEMMLoopBounds(linalg::LinalgOp linalgOp);
+
+/// Returns the operand list for a convolution with IGEMM indexing. This is
+/// used to determine which inputs are the lhs and rhs, since depending on the
+/// layout, the order can be different (e.g., NCHW has the lhs and rhs swapped).
+FailureOr<SmallVector<Value>> getIGEMMOperands(linalg::LinalgOp linalgOp);
+
 /// Returns true if the operation increases bitwidths of tensors.
 /// This function checks that the genericOp:
 /// 1. Has only one output.

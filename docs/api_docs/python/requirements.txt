@@ -12,5 +12,5 @@ sphinxcontrib-qthelp==1.0.3
 
 # IREE Python API
 -f https://iree.dev/pip-release-links.html
-iree-compiler
-iree-runtime
+iree-base-compiler
+iree-base-runtime

@@ -4,7 +4,7 @@
     [published to PyPI](https://pypi.org/user/google-iree-pypi-deploy/).
 
     ``` shell
-    python -m pip install iree-compiler
+    python -m pip install iree-base-compiler
     ```
 
 === ":material-alert: Nightly releases"
@@ -15,7 +15,7 @@
     ``` shell
     python -m pip install \
       --find-links https://iree.dev/pip-release-links.html \
-      --upgrade iree-compiler
+      --upgrade iree-base-compiler
     ```
 
 !!! tip

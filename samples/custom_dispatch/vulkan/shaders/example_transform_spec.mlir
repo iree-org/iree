@@ -40,10 +40,6 @@ module attributes {transform.with_named_sequence} {
         #hal.pipeline.binding<storage_buffer, ReadOnly>,
         #hal.pipeline.binding<storage_buffer>
       ]>)
-      bindings([
-        #hal.interface.binding<0>,
-        #hal.interface.binding<1>
-      ])
       objects({
         #spirv_target ordinal(0) = [
           #hal.executable.object<{

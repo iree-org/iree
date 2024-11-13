@@ -1,3 +1,5 @@
 # REQUIRES: llvmcpu
+# REQUIRES: bugfix
+#           File is inaccessible (#18518)
 # RUN: %PYTHON -m iree_tfl_tests.posenet_i8_test --target_backend=llvmcpu --artifacts_dir=%t
 # XFAIL: *

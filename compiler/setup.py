@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build/install the iree-compiler python package.
+# Build/install the iree-base-compiler python package.
 # Note that this includes a relatively large build of LLVM (~2400 C++ files)
 # and can take a considerable amount of time, especially with defaults.
 # To install:
@@ -106,11 +106,12 @@ else:
     )
 
 # Setup and get version information.
-VERSION_INFO_FILE = os.path.join(IREE_SOURCE_DIR, "version_info.json")
+VERSION_FILE = os.path.join(IREE_SOURCE_DIR, "compiler/version.json")
+VERSION_FILE_LOCAL = os.path.join(IREE_SOURCE_DIR, "compiler/version_local.json")
 
 
-def load_version_info():
-    with open(VERSION_INFO_FILE, "rt") as f:
+def load_version_info(version_file):
+    with open(version_file, "rt") as f:
         return json.load(f)
 
 
@@ -146,17 +147,19 @@ def find_git_submodule_revision(submodule_path):
         return ""
 
 
+is_dev_build = False
 try:
-    version_info = load_version_info()
+    version_info = load_version_info(VERSION_FILE_LOCAL)
 except FileNotFoundError:
-    print("version_info.json not found. Using defaults", file=sys.stderr)
-    version_info = {}
+    print("version_local.json not found. Using version.json defaults")
+    version_info = load_version_info(VERSION_FILE)
+    is_dev_build = True
 git_versions = find_git_versions()
 
 PACKAGE_SUFFIX = version_info.get("package-suffix") or ""
 PACKAGE_VERSION = version_info.get("package-version")
-if not PACKAGE_VERSION:
-    PACKAGE_VERSION = f"0.dev0+{git_versions.get('IREE') or '0'}"
+if is_dev_build:
+    PACKAGE_VERSION += f"+{git_versions.get('IREE') or '0'}"
 
 
 def get_cmake_version_info_args():
@@ -411,16 +414,31 @@ packages = find_namespace_packages(
 )
 print(f"Found compiler packages: {packages}")
 
+with open(
+    os.path.join(
+        IREE_SOURCE_DIR,
+        "compiler",
+        "bindings",
+        "python",
+        "iree",
+        "compiler",
+        "README.md",
+    ),
+    "rt",
+) as f:
+    README = f.read()
+
 custom_package_suffix = os.getenv("IREE_COMPILER_CUSTOM_PACKAGE_SUFFIX", "")
 custom_package_prefix = os.getenv("IREE_COMPILER_CUSTOM_PACKAGE_PREFIX", "")
 
 setup(
-    name=f"{custom_package_prefix}iree-compiler{custom_package_suffix}{PACKAGE_SUFFIX}",
+    name=f"{custom_package_prefix}iree-base-compiler{custom_package_suffix}{PACKAGE_SUFFIX}",
     version=f"{PACKAGE_VERSION}",
     author="IREE Authors",
     author_email="iree-technical-discussion@lists.lfaidata.foundation",
-    description="IREE Compiler API",
-    long_description="",
+    description="IREE Python Compiler API",
+    long_description=README,
+    long_description_content_type="text/markdown",
     license="Apache-2.0",
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -429,7 +447,14 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
     ],
+    project_urls={
+        "homepage": "https://iree.dev/",
+        "repository": "https://github.com/iree-org/iree",
+        "documentation": "https://iree.dev/reference/bindings/python/",
+    },
     ext_modules=[
         CMakeExtension("iree.compiler._mlir_libs._mlir"),
         CMakeExtension("iree.compiler._mlir_libs._ireeDialects"),
@@ -454,6 +479,7 @@ setup(
     packages=packages,
     entry_points={
         "console_scripts": [
+            "iree-build = iree.build.__main__:main",
             "iree-compile = iree.compiler.tools.scripts.iree_compile.__main__:main",
             "iree-import-onnx = iree.compiler.tools.import_onnx.__main__:_cli_main",
             "iree-ir-tool = iree.compiler.tools.ir_tool.__main__:_cli_main",

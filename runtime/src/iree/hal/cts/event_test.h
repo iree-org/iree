@@ -85,12 +85,8 @@ TEST_F(EventTest, SubmitWithChainedCommandBuffers) {
       /*buffer_barriers=*/NULL));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer_2));
 
-  iree_hal_command_buffer_t* command_buffer_ptrs[] = {
-      command_buffer_1,
-      command_buffer_2,
-  };
-  IREE_ASSERT_OK(SubmitCommandBuffersAndWait(
-      IREE_ARRAYSIZE(command_buffer_ptrs), command_buffer_ptrs));
+  IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer_1));
+  IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer_2));
 
   iree_hal_command_buffer_release(command_buffer_1);
   iree_hal_command_buffer_release(command_buffer_2);

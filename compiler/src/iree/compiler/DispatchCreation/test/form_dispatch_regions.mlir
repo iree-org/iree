@@ -269,30 +269,30 @@ util.func public @set_encoding_pad_elementwise_fusion(%arg0 : tensor<?x?xf32>, %
 #encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>
 util.func public @unset_encoding_elementwise_fusion(
     %arg0: tensor<?x?xf32, #encoding>,
-    %arg1: tensor<?xf32>) -> tensor<?x?xf32> {
+    %arg1: tensor<?xf32>,
+    %d0: index,
+    %d1: index) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %0 = iree_encoding.unset_encoding %arg0
-      : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>
-  %1 = tensor.dim %0, %c0 : tensor<?x?xf32>
-  %2 = tensor.dim %0, %c1 : tensor<?x?xf32>
-  %3 = tensor.empty(%1, %2) : tensor<?x?xf32>
-  %4 = linalg.generic {
+      : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%d0, %d1}
+  %1 = tensor.empty(%d0, %d1) : tensor<?x?xf32>
+  %2 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                        affine_map<(d0, d1) -> (d0)>,
                        affine_map<(d0, d1) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel"]}
       ins(%0, %arg1 : tensor<?x?xf32>, tensor<?xf32>)
-      outs(%3 : tensor<?x?xf32>) {
+      outs(%1 : tensor<?x?xf32>) {
     ^bb0(%b0 : f32, %b1 : f32, %b2 : f32):
-      %5 = arith.addf %b0, %b1 : f32
-      linalg.yield %5 : f32
+      %3 = arith.addf %b0, %b1 : f32
+      linalg.yield %3 : f32
     } -> tensor<?x?xf32>
-  util.return %4 : tensor<?x?xf32>
+  util.return %2 : tensor<?x?xf32>
 }
 // CHECK-LABEL: util.func public @unset_encoding_elementwise_fusion(
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>>
-//  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>)
+//  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.region
 //       CHECK:     %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[ARG0]]
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
@@ -309,7 +309,7 @@ util.func public @unset_encoding_slice_elementwise_fusion(
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %0 = iree_encoding.unset_encoding %arg0
-      : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>
+      : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>{%arg2, %arg3}
   %1 = tensor.extract_slice %0[0, 0] [%arg2, %arg3] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
   %2 = tensor.dim %1, %c0 : tensor<?x?xf32>
   %3 = tensor.dim %1, %c1 : tensor<?x?xf32>

@@ -88,6 +88,37 @@ func.func @specify_nested(%lhs: memref<32x32xf16>) -> vector<32x32xf16> {
 
 // -----
 
+#nested_0 = #iree_vector_ext.nested_layout<
+  subgroup_tile = [],
+  batch_tile = [],
+  outer_tile = [],
+  thread_tile = [],
+  element_tile = [],
+
+  subgroup_strides = [],
+  thread_strides   = []
+>
+
+func.func @specify_nested_0d(%lhs: vector<f16>) -> vector<f16> {
+  %result = iree_vector_ext.to_layout %lhs to layout(#nested_0) : vector<f16>
+  func.return %result : vector<f16>
+}
+
+// CHECK: #[[$LAYOUT0:.+]] = #iree_vector_ext.nested_layout<
+// CHECK-SAME: subgroup_tile = [],
+// CHECK-SAME: batch_tile = [],
+// CHECK-SAME: outer_tile = [],
+// CHECK-SAME: thread_tile = [],
+// CHECK-SAME: element_tile = [],
+// CHECK-SAME: subgroup_strides = [],
+// CHECK-SAME: thread_strides = []>
+
+// CHECK-LABEL: func.func @specify_nested_0d
+// CHECK:      to_layout
+// CHECK-SAME:         layout(#[[$LAYOUT0]])
+
+// -----
+
 func.func @to_simd_op(%simt: vector<4x4x4xf16>) -> vector<64x64xf16> {
   %simd = iree_vector_ext.to_simd %simt : vector<4x4x4xf16> -> vector<64x64xf16>
   func.return %simd : vector<64x64xf16>
@@ -100,6 +131,24 @@ func.func @to_simd_op(%simt: vector<4x4x4xf16>) -> vector<64x64xf16> {
 func.func @to_simt_op(%simd: vector<64x64xf32>) -> vector<4x4x4xf32> {
   %simt = iree_vector_ext.to_simd %simd : vector<64x64xf32> -> vector<4x4x4xf32>
   func.return %simt : vector<4x4x4xf32>
+}
+// CHECK-LABEL: func.func @to_simt_op
+// CHECK:      iree_vector_ext.to_simd
+
+// -----
+
+func.func @to_simd_op_0d(%simt: vector<f16>) -> vector<f16> {
+  %simd = iree_vector_ext.to_simd %simt : vector<f16> -> vector<f16>
+  func.return %simd : vector<f16>
+}
+// CHECK-LABEL: func.func @to_simd_op
+// CHECK:      iree_vector_ext.to_simd
+
+// -----
+
+func.func @to_simt_op_0d(%simd: vector<f32>) -> vector<f32> {
+  %simt = iree_vector_ext.to_simd %simd : vector<f32> -> vector<f32>
+  func.return %simt : vector<f32>
 }
 // CHECK-LABEL: func.func @to_simt_op
 // CHECK:      iree_vector_ext.to_simd

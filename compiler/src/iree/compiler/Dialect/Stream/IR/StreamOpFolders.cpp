@@ -105,7 +105,7 @@ static APInt computeRequiredPatternBits(APInt pattern) {
       return APInt(16, b0 | (b1 << 8));
     } else if (b0 == b4 && b1 == b5 && b2 == b6 && b3 == b7) {
       // 0xAABBCCDDAABBCCDD : i64 => 0xAABBCCDD : i32
-      return APInt(32, b0 | (b1 << 8) | (b2 << 16) | (b3 << 32));
+      return APInt(32, b0 | (b1 << 8) | (b2 << 16) | (b3 << 24));
     }
     return pattern;
   }

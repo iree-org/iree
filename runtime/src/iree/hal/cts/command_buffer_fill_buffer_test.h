@@ -58,7 +58,7 @@ class CommandBufferFillBufferTest
     IREE_CHECK_OK(iree_hal_command_buffer_fill_buffer(
         command_buffer,
         iree_hal_make_buffer_ref(device_buffer, target_offset, fill_length),
-        pattern, pattern_length));
+        pattern, pattern_length, IREE_HAL_FILL_FLAG_NONE));
     IREE_CHECK_OK(iree_hal_command_buffer_end(command_buffer));
     IREE_CHECK_OK(SubmitCommandBufferAndWait(command_buffer));
 
@@ -94,7 +94,7 @@ class CommandBufferFillBufferTest
     IREE_CHECK_OK(iree_hal_command_buffer_fill_buffer(
         command_buffer,
         iree_hal_make_buffer_ref(device_buffer, target_offset, fill_length),
-        pattern, pattern_length));
+        pattern, pattern_length, IREE_HAL_FILL_FLAG_NONE));
     IREE_CHECK_OK(iree_hal_command_buffer_end(command_buffer));
     IREE_CHECK_OK(SubmitCommandBufferAndWait(command_buffer));
 

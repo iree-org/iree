@@ -122,6 +122,7 @@ option(BUILD_SHARED_LIBS "Instructs CMake to build libraries as shared if possib
 set(IREE_RUNTIME_OPTIMIZATION_PROFILE "" CACHE STRING
     "Build optimization profile to apply. One of '', 'lto', 'size'.")
 set(IREE_LTO_MODE "full" CACHE STRING "LTO type, 'thin' or 'full'. Only consulted on clang-like compilers.")
+option(IREE_VISIBILITY_HIDDEN "Builds all C/C++ libraries with hidden visibility" ON)
 
 #-------------------------------------------------------------------------------
 # IREE command-line tooling configuration

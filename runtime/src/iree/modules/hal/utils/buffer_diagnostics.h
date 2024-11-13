@@ -35,8 +35,4 @@ iree_status_t iree_hal_modules_buffer_view_assert(
     iree_host_size_t expected_shape_rank,
     const iree_hal_dim_t* expected_shape_dims);
 
-iree_status_t iree_hal_modules_buffer_view_trace(
-    iree_vm_ref_t key_ref, iree_vm_size_t buffer_view_count,
-    iree_vm_abi_r_t* buffer_view_refs, iree_allocator_t host_allocator);
-
 #endif  // IREE_MODULES_HAL_UTILS_BUFFER_DIAGNOSTICS_H_

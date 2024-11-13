@@ -25,8 +25,7 @@ struct LLVMCPULinkExecutablesPass
     auto moduleOp = getOperation();
     auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
 
-    auto sourceExecutableOps =
-        llvm::to_vector<8>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
+    auto sourceExecutableOps = gatherExecutablesForTarget(moduleOp, target);
     if (sourceExecutableOps.size() <= 1)
       return;
 

@@ -11,7 +11,7 @@
 #map1 = affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>
 #map2 = affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>
 #map3 = affine_map<(d0, d1) -> (d0, d1)>
-#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1]>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1]>
 func.func @matmul_f32_256x1024x128() attributes {translation_info = #translation} {
   %c1024 = arith.constant 1024 : index
   %c256 = arith.constant 256 : index
@@ -119,7 +119,7 @@ func.func @matmul_f32_256x1024x128() attributes {translation_info = #translation
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<()[s0] -> (s0 * 256)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1]>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1]>
 func.func @batch_matmul_16x1024x1024x80() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
   %c16 = arith.constant 16 : index
@@ -183,7 +183,7 @@ func.func @batch_matmul_16x1024x1024x80() attributes {translation_info = #transl
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 512, 8], [1, 8, 4], [0, 0, 0, 16]]>
 #map = affine_map<()[s0] -> (s0 * 512)>
 #map1 = affine_map<()[s0] -> (s0 * 8)>
-#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [2, 64, 1]>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [2, 64, 1]>
 func.func @batch_matmul_f32_16x4096x40x4096() attributes {translation_info = #translation} {
   %c16 = arith.constant 16 : index
   %c4096 = arith.constant 4096 : index

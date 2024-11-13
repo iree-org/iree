@@ -499,7 +499,7 @@ void HalDevice::QueueDealloca(HalBuffer& buffer, py::handle wait_semaphores,
       "deallocating memory on queue");
 }
 
-void HalDevice::QueueExecute(py::handle command_buffers,
+void HalDevice::QueueExecute(py::handle command_buffer,
                              py::handle wait_semaphores,
                              py::handle signal_semaphores) {
   iree_hal_semaphore_list_t wait_list;
@@ -548,17 +548,14 @@ void HalDevice::QueueExecute(py::handle command_buffers,
   }
 
   // Unpack command buffers.
-  size_t cb_count = py::len(command_buffers);
-  iree_hal_command_buffer_t** cb_list =
-      static_cast<iree_hal_command_buffer_t**>(
-          alloca(sizeof(iree_hal_command_buffer_t*) * cb_count));
-  for (size_t i = 0; i < cb_count; ++i) {
-    cb_list[i] = py::cast<HalCommandBuffer*>(command_buffers[i])->raw_ptr();
-  }
+  iree_hal_command_buffer_t* cb =
+      !command_buffer.is_none()
+          ? py::cast<HalCommandBuffer*>(command_buffer)->raw_ptr()
+          : NULL;
 
   CheckApiStatus(iree_hal_device_queue_execute(
                      raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY, wait_list,
-                     signal_list, cb_count, cb_list, /*binding_tables=*/NULL),
+                     signal_list, cb, iree_hal_buffer_binding_table_empty()),
                  "executing command buffers");
 }
 
@@ -619,11 +616,12 @@ void HalDevice::QueueCopy(HalBuffer& source_buffer, HalBuffer& target_buffer,
         "Source and buffer length must be less than the target buffer length "
         "and it does not. Please check allocations");
   }
-  CheckApiStatus(iree_hal_device_queue_copy(
-                     raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY, wait_list,
-                     signal_list, source_buffer.raw_ptr(), 0,
-                     target_buffer.raw_ptr(), 0, source_length),
-                 "Copying buffer on queue");
+  CheckApiStatus(
+      iree_hal_device_queue_copy(
+          raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY, wait_list, signal_list,
+          source_buffer.raw_ptr(), 0, target_buffer.raw_ptr(), 0, source_length,
+          IREE_HAL_COPY_FLAG_NONE),
+      "Copying buffer on queue");
 }
 
 py::object HalDevice::CreateDLPackCapsule(HalBufferView& buffer_view,
@@ -1097,10 +1095,12 @@ VmModule CreateHalModule(VmInstance* instance, std::optional<HalDevice*> device,
     devices_ptr = devices_vector.data();
     device_count = devices_vector.size();
   }
-  CheckApiStatus(iree_hal_module_create(instance->raw_ptr(), device_count,
-                                        devices_ptr, IREE_HAL_MODULE_FLAG_NONE,
-                                        iree_allocator_system(), &module),
-                 "Error creating hal module");
+  CheckApiStatus(
+      iree_hal_module_create(instance->raw_ptr(), device_count, devices_ptr,
+                             IREE_HAL_MODULE_FLAG_NONE,
+                             iree_hal_module_debug_sink_stdio(stderr),
+                             iree_allocator_system(), &module),
+      "Error creating hal module");
   return VmModule::StealFromRawPtr(module);
 }
 
@@ -1727,7 +1727,8 @@ void SetupHalBindings(nanobind::module_ m) {
                     iree_hal_make_buffer_ref(source_buffer.raw_ptr(),
                                              source_offset, resolved_length),
                     iree_hal_make_buffer_ref(target_buffer.raw_ptr(),
-                                             target_offset, resolved_length)),
+                                             target_offset, resolved_length),
+                    IREE_HAL_COPY_FLAG_NONE),
                 "copy command");
             if (end) {
               CheckApiStatus(iree_hal_command_buffer_end(self.raw_ptr()),
@@ -1765,7 +1766,8 @@ void SetupHalBindings(nanobind::module_ m) {
                     self.raw_ptr(),
                     iree_hal_make_buffer_ref(target_buffer.raw_ptr(),
                                              target_offset, resolved_length),
-                    pattern_view.buf, pattern_view.len),
+                    pattern_view.buf, pattern_view.len,
+                    IREE_HAL_FILL_FLAG_NONE),
                 "command buffer fill");
             if (end) {
               CheckApiStatus(iree_hal_command_buffer_end(self.raw_ptr()),

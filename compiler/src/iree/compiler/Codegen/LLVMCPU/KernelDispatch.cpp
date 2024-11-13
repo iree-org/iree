@@ -1750,7 +1750,9 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    IREE::LinalgExt::AttentionOp attnOp) {
   FailureOr<IREE::LinalgExt::AttentionOpDetail> maybeOpInfo =
-      IREE::LinalgExt::AttentionOpDetail::get(attnOp.getIndexingMapsArray());
+      IREE::LinalgExt::AttentionOpDetail::get(
+          attnOp.getQueryMap(), attnOp.getKeyMap(), attnOp.getValueMap(),
+          attnOp.getOutputMap());
   assert(succeeded(maybeOpInfo) && "failed to infer attention dims");
   auto opInfo = maybeOpInfo.value();
 
@@ -2506,6 +2508,14 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(op, DistributionHeuristicConfig{});
   TileSizesListType tileSizes = {distTileSizes};
+  SmallVector<int64_t> vecTileSizes = distTileSizes;
+
+  // Add an extra level of tiling.
+  // TODO: Limit vector tile sizes for other TilingInterface ops.
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(*op)) {
+    limitVectorTileSizes(linalgOp, vecTileSizes);
+  }
+  tileSizes.push_back(vecTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes, DispatchLoweringPassPipeline::CPUDefault);
 }

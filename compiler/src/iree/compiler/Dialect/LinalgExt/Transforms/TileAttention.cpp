@@ -43,7 +43,8 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
   MLIRContext *ctx = attnOp.getContext();
 
   FailureOr<AttentionOpDetail> maybeOpInfo =
-      AttentionOpDetail::get(attnOp.getIndexingMapsArray());
+      AttentionOpDetail::get(attnOp.getQueryMap(), attnOp.getKeyMap(),
+                             attnOp.getValueMap(), attnOp.getOutputMap());
   assert(succeeded(maybeOpInfo) && "Invalid attention indexing maps");
   AttentionOpDetail opInfo = maybeOpInfo.value();
 

@@ -352,12 +352,93 @@ bool isGatherlikeOp(Operation *op) {
 
   // `yieldOp` should yield a single value from a `tensor.extract`
   auto yieldOp = cast<linalg::YieldOp>(region.front().getTerminator());
+  if (yieldOp.getNumOperands() != 1) {
+    return false;
+  }
   auto extractOp = yieldOp.getOperand(0).getDefiningOp<tensor::ExtractOp>();
   if (!extractOp) {
     return false;
   }
 
   return true;
+}
+
+FailureOr<SmallVector<AffineMap>>
+getIGEMMContractionIndexingMaps(linalg::LinalgOp linalgOp) {
+  MLIRContext *ctx = linalgOp->getContext();
+  return llvm::TypeSwitch<Operation *, FailureOr<SmallVector<AffineMap>>>(
+             linalgOp.getOperation())
+      .Case<linalg::Conv2DNchwFchwOp>(
+          [&](linalg::Conv2DNchwFchwOp convOp) -> SmallVector<AffineMap> {
+            AffineExpr bDim, mDim, nDim0, nDim1, kDim;
+            bindDims(ctx, bDim, mDim, nDim0, nDim1, kDim);
+            auto lhsMap = AffineMap::get(5, 0, {mDim, kDim}, ctx);
+            auto rhsMap = AffineMap::get(5, 0, {bDim, nDim0, nDim1, kDim}, ctx);
+            auto resultMap =
+                AffineMap::get(5, 0, {bDim, mDim, nDim0, nDim1}, ctx);
+            return {lhsMap, rhsMap, resultMap};
+          })
+      .Case<linalg::Conv2DNhwcHwcfOp>(
+          [&](linalg::Conv2DNhwcHwcfOp convOp) -> SmallVector<AffineMap> {
+            AffineExpr bDim, m0Dim, m1Dim, nDim, kDim;
+            bindDims(ctx, bDim, m0Dim, m1Dim, nDim, kDim);
+            auto lhsMap = AffineMap::get(5, 0, {bDim, m0Dim, m1Dim, kDim}, ctx);
+            auto rhsMap = AffineMap::get(5, 0, {kDim, nDim}, ctx);
+            auto resultMap =
+                AffineMap::get(5, 0, {bDim, m0Dim, m1Dim, nDim}, ctx);
+            return {lhsMap, rhsMap, resultMap};
+          })
+      .Default([](Operation *) { return failure(); });
+}
+
+FailureOr<SmallVector<int64_t>> getIGEMMLoopBounds(linalg::LinalgOp linalgOp) {
+  return llvm::TypeSwitch<Operation *, FailureOr<SmallVector<int64_t>>>(
+             linalgOp.getOperation())
+      .Case<linalg::Conv2DNchwFchwOp>(
+          [&](linalg::Conv2DNchwFchwOp convOp) -> SmallVector<int64_t> {
+            auto filterType =
+                cast<RankedTensorType>(convOp.getOperandTypes()[1]);
+            auto accType = cast<RankedTensorType>(convOp.getResultTypes()[0]);
+            const int64_t B = accType.getDimSize(0);
+            const int64_t N0 = accType.getDimSize(2);
+            const int64_t N1 = accType.getDimSize(3);
+            const int64_t M = filterType.getDimSize(0);
+            const int64_t K = filterType.getDimSize(1) *
+                              filterType.getDimSize(2) *
+                              filterType.getDimSize(3);
+            return {B, M, N0, N1, K};
+          })
+      .Case<linalg::Conv2DNhwcHwcfOp>(
+          [&](linalg::Conv2DNhwcHwcfOp convOp) -> SmallVector<int64_t> {
+            auto filterType =
+                cast<RankedTensorType>(convOp.getOperandTypes()[1]);
+            auto accType = cast<RankedTensorType>(convOp.getResultTypes()[0]);
+            const int64_t B = accType.getDimSize(0);
+            const int64_t M0 = accType.getDimSize(1);
+            const int64_t M1 = accType.getDimSize(2);
+            const int64_t N = accType.getDimSize(3);
+            const int64_t K = filterType.getDimSize(0) *
+                              filterType.getDimSize(1) *
+                              filterType.getDimSize(2);
+            return {B, M0, M1, N, K};
+          })
+      .Default([](Operation *) { return failure(); });
+}
+
+FailureOr<SmallVector<Value>> getIGEMMOperands(linalg::LinalgOp linalgOp) {
+  return llvm::TypeSwitch<Operation *, FailureOr<SmallVector<Value>>>(
+             linalgOp.getOperation())
+      .Case<linalg::Conv2DNchwFchwOp>(
+          [&](linalg::Conv2DNchwFchwOp convOp) -> SmallVector<Value> {
+            return {convOp.getOperands()[1], convOp.getOperands()[0],
+                    convOp.getOperands()[2]};
+          })
+      .Case<linalg::Conv2DNhwcHwcfOp>(
+          [&](linalg::Conv2DNhwcHwcfOp convOp) -> SmallVector<Value> {
+            return {convOp.getOperands()[0], convOp.getOperands()[1],
+                    convOp.getOperands()[2]};
+          })
+      .Default([](Operation *) { return failure(); });
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

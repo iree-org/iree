@@ -268,10 +268,7 @@ def ReorderWorkgroupsPass :
   let dependentDialects = ["::mlir::affine::AffineDialect"];
   let options = [
     Option<"strategy", "strategy", "std::string", /*default=*/"",
-           "Workgroup reordering strategy, one of: '' (none),  'transpose', 'swizzle'">,
-    Option<"logTile", "logTile", "unsigned",
-            /*default=*/"0",
-           "The log2 of the tile size used for swizzling. (0: disabled, non-0: swizzling enabled)">,
+           "Workgroup reordering strategy, one of: '' (none),  'transpose'">,
   ];
 }
 

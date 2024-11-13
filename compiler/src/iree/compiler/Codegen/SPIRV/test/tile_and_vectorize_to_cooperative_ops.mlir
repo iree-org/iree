@@ -10,7 +10,7 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32], [16, 16], [0, 0, 32], [16, 16, 16]]>
-#translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [32, 1, 1]>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size = [32, 1, 1]>
 func.func @matmul_256x1024x128_div_add() attributes {translation_info = #translation} {
   %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
@@ -139,7 +139,7 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 32, 32], [1, 16, 16], [0, 0, 0, 32], [1, 16, 16, 16]]>
-#translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size=[32, 1, 1]>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size=[32, 1, 1]>
 func.func @matmul_256x1024x128_div_add() attributes {translation_info = #translation} {
   %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
@@ -274,7 +274,7 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32], [16, 16], [0, 0, 32], [16, 16, 16]]>
-#translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size=[32, 1, 1]>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size=[32, 1, 1]>
 func.func @matmul_256x1024x128_mixed_signedness_int8() {
   %cst = arith.constant 0 : i32
   %cst_i8 = arith.constant 0 : i8

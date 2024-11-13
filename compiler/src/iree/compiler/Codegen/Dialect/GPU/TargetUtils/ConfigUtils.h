@@ -21,6 +21,15 @@ setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
                                    mlir::FunctionOpInterface entryPoint,
                                    Operation *op);
 
+/// Helper for setting up a convolution config using IGEMM based on the
+/// specified target.
+/// TODO: Currently this only succeeds if the target supports an mma
+/// kind. Add support for a fallback direct lowering path.
+LogicalResult
+setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
+                                  mlir::FunctionOpInterface entryPoint,
+                                  Operation *op);
+
 /// Helper for setting up a matmul config based on the specified target.
 /// TODO: Currently this only succeeds if the target supports an mma
 /// kind. Add support for a fallback direct lowering path.
@@ -43,6 +52,7 @@ using IREE::GPU::ReorderWorkgroupsStrategy;
 struct GPUPipelineOptions {
   bool enableReduceSharedMemoryBankConflicts = true;
   bool prefetchSharedMemory = false;
+  bool useIgemmConvolution = false;
   bool enableUkernels = false;
   std::optional<ReorderWorkgroupsStrategy> reorderStrategy;
 };

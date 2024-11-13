@@ -144,7 +144,7 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 // File I/O
 //===----------------------------------------------------------------------===//
 // On platforms without file systems or in applications where no file I/O
-// utilties are used, all file I/O operations can be stripped out. Functions
+// utilities are used, all file I/O operations can be stripped out. Functions
 // relying on file I/O will still be defined, but they will return errors.
 
 #if !defined(IREE_FILE_IO_ENABLE)

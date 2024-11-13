@@ -32,7 +32,7 @@ module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func @flatten_forall_thread_mapping
 //       CHECK:   scf.forall (%[[FLAT_ID:.+]]) in (64)
-//       CHECK:     %[[IDS:.+]]:2 = affine.delinearize_index %[[FLAT_ID]] into (%c4, %c16) : index, index
+//       CHECK:     %[[IDS:.+]]:2 = affine.delinearize_index %[[FLAT_ID]] into (4, 16) : index, index
 //   CHECK-DAG:     %[[IDX:.+]] = affine.apply #[[$MAP]](%[[IDS]]#0)
 //   CHECK-DAG:     %[[IDY:.+]] = affine.apply #[[$MAP1]](%[[IDS]]#1)
 //       CHECK:   } {mapping = [#gpu.thread<linear_dim_0>]}

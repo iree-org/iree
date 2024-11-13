@@ -5,6 +5,7 @@ import numpy as np
 from . import squad_test_data
 from . import test_util
 
+# TODO(#18518): Migrate this file to a new (ideally public) location
 # Source https://tfhub.dev/iree/lite-model/mobilebert/int8/1
 model_path = "https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-quant.tflite"
 

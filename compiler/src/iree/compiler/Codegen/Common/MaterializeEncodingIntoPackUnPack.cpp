@@ -280,7 +280,8 @@ FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
   // Create an `tensor.empty` for the result of the unpack operation.
   Location loc = encodingOp.getLoc();
   SmallVector<OpFoldResult> resultDims =
-      tensor::getMixedSizes(rewriter, loc, encodingOp.getSource());
+      getMixedValues(encodingOp.getResultType().getShape(),
+                     encodingOp.getResultDims(), rewriter);
   auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
                                                   sourceType.getElementType());
   FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr = getInnerTileSizesOfr(

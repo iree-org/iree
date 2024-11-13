@@ -23,6 +23,7 @@ iree_cc_library(
     iree::base
     iree::base::internal::cpu
     iree::hal
+    iree::modules::hal::debugging
     iree::modules::hal::types
     iree::modules::hal::utils::buffer_diagnostics
     iree::vm

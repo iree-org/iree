@@ -256,25 +256,24 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
   }];
 
   let parameters = (ins
-    ArrayRefParameter<"int64_t", "subgroup_tile">:$subgroupTile,
-    ArrayRefParameter<"int64_t", "batch_tile">:$batchTile,
-    ArrayRefParameter<"int64_t", "outer_tile">:$outerTile,
-    ArrayRefParameter<"int64_t", "thread_tile">:$threadTile,
-    ArrayRefParameter<"int64_t", "element_tile">:$elementTile,
+    OptionalArrayRefParameter<"int64_t", "subgroup_tile">:$subgroupTile,
+    OptionalArrayRefParameter<"int64_t", "batch_tile">:$batchTile,
+    OptionalArrayRefParameter<"int64_t", "outer_tile">:$outerTile,
+    OptionalArrayRefParameter<"int64_t", "thread_tile">:$threadTile,
+    OptionalArrayRefParameter<"int64_t", "element_tile">:$elementTile,
 
-    ArrayRefParameter<"int64_t", "subgroup_strides">:$subgroupStrides,
-    ArrayRefParameter<"int64_t", "thread_strides">:$threadStrides
+    OptionalArrayRefParameter<"int64_t", "subgroup_strides">:$subgroupStrides,
+    OptionalArrayRefParameter<"int64_t", "thread_strides">:$threadStrides
   );
 
   let assemblyFormat = [{
-    `<` `subgroup_tile` `=` `[` $subgroupTile `]` `,`
-        `batch_tile`    `=` `[` $batchTile `]` `,`
-        `outer_tile`        `=` `[` $outerTile `]` `,`
-        `thread_tile`       `=` `[` $threadTile `]` `,`
-        `element_tile`     `=` `[` $elementTile `]` `,`
-
-        `subgroup_strides`        `=` `[` $subgroupStrides `]` `,`
-        `thread_strides`          `=` `[` $threadStrides `]`
+    `<` `subgroup_tile`     `=` `[` (`]`) : ($subgroupTile^ `]`)? `,`
+        `batch_tile`        `=` `[` (`]`) : ($batchTile^ `]`)? `,`
+        `outer_tile`        `=` `[` (`]`) : ($outerTile^ `]`)? `,`
+        `thread_tile`       `=` `[` (`]`) : ($threadTile^ `]`)? `,`
+        `element_tile`      `=` `[` (`]`) : ($elementTile^ `]`)? `,`
+        `subgroup_strides`  `=` `[` (`]`) : ($subgroupStrides^ `]`)? `,`
+        `thread_strides`    `=` `[` (`]`) : ($threadStrides^ `]`)?
     `>`
   }];
 

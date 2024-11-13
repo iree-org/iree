@@ -347,7 +347,7 @@ static iree_status_t iree_hal_metal_device_queue_read(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list, iree_hal_file_t* source_file,
     uint64_t source_offset, iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length, uint32_t flags) {
+    iree_device_size_t length, iree_hal_read_flags_t flags) {
   // TODO: expose streaming chunk count/size options.
   iree_status_t loop_status = iree_ok_status();
   iree_hal_file_transfer_options_t options = {
@@ -366,7 +366,7 @@ static iree_status_t iree_hal_metal_device_queue_write(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list, iree_hal_buffer_t* source_buffer,
     iree_device_size_t source_offset, iree_hal_file_t* target_file, uint64_t target_offset,
-    iree_device_size_t length, uint32_t flags) {
+    iree_device_size_t length, iree_hal_write_flags_t flags) {
   // TODO: expose streaming chunk count/size options.
   iree_status_t loop_status = iree_ok_status();
   iree_hal_file_transfer_options_t options = {
@@ -415,9 +415,8 @@ static iree_status_t iree_hal_metal_replay_command_buffer(
 static iree_status_t iree_hal_metal_device_queue_execute(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
-    const iree_hal_semaphore_list_t signal_semaphore_list, iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers,
-    iree_hal_buffer_binding_table_t const* binding_tables) {
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_binding_table_t binding_table) {
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -434,37 +433,30 @@ static iree_status_t iree_hal_metal_device_queue_execute(
                                           signal_semaphore_list.semaphores);
   }
 
-  // Translate any deferred command buffers into real Metal command buffers.
+  // Translate deferred command buffers into real Metal command buffers.
   // We do this prior to beginning execution so that if we fail we don't leave the system in an
   // inconsistent state.
-  iree_hal_command_buffer_t** direct_command_buffers = (iree_hal_command_buffer_t**)iree_alloca(
-      command_buffer_count * sizeof(iree_hal_command_buffer_t*));
-  if (iree_status_is_ok(status)) {
-    for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
-      iree_hal_command_buffer_t* command_buffer = command_buffers[i];
-      iree_hal_command_buffer_t* direct_command_buffer = NULL;
-      if (iree_hal_deferred_command_buffer_isa(command_buffer)) {
-        // Create a temporary command buffer and replay the deferred command buffer with the
-        // binding table provided. Note that any resources used will be retained by the command
-        // buffer so we only need to retain the command buffer itself instead of the binding
-        // tables provided.
-        iree_hal_buffer_binding_table_t binding_table =
-            binding_tables ? binding_tables[i] : iree_hal_buffer_binding_table_empty();
-        @autoreleasepool {
-          status = iree_hal_metal_replay_command_buffer(device, command_buffer, binding_table,
-                                                        &direct_command_buffer);
-        }
-      } else {
-        // Retain the command buffer until the submission has completed.
-        iree_hal_command_buffer_retain(command_buffer);
-        direct_command_buffer = command_buffer;
+  iree_hal_command_buffer_t* direct_command_buffer = NULL;
+  if (iree_status_is_ok(status) && command_buffer) {
+    iree_hal_command_buffer_t* direct_command_buffer = NULL;
+    if (iree_hal_deferred_command_buffer_isa(command_buffer)) {
+      // Create a temporary command buffer and replay the deferred command buffer with the
+      // binding table provided. Note that any resources used will be retained by the command
+      // buffer so we only need to retain the command buffer itself instead of the binding
+      // tables provided.
+      @autoreleasepool {
+        status = iree_hal_metal_replay_command_buffer(device, command_buffer, binding_table,
+                                                      &direct_command_buffer);
       }
-      if (!iree_status_is_ok(status)) break;
-      status = iree_hal_resource_set_insert(resource_set, 1, &direct_command_buffer);
-      if (!iree_status_is_ok(status)) break;
-      iree_hal_command_buffer_release(direct_command_buffer);  // retained in resource set
-      direct_command_buffers[i] = direct_command_buffer;
+    } else {
+      // Retain the command buffer until the submission has completed.
+      iree_hal_command_buffer_retain(command_buffer);
+      direct_command_buffer = command_buffer;
     }
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_resource_set_insert(resource_set, 1, &direct_command_buffer);
+    }
+    iree_hal_command_buffer_release(direct_command_buffer);  // retained in resource set
   }
 
   if (iree_status_is_ok(status)) {
@@ -485,16 +477,14 @@ static iree_status_t iree_hal_metal_device_queue_execute(
       // Then commit all recorded compute command buffers, except the last one, which we will patch
       // up with semaphore signaling.
       id<MTLCommandBuffer> signal_command_buffer = nil;
-      for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
+      if (direct_command_buffer) {
         // NOTE: translation happens above such that we always know these are direct command
         // buffers.
         //
         // TODO(indirect-cmd): support indirect command buffers and switch here, or only use
         // indirect command buffers and assume that instead.
-        iree_hal_command_buffer_t* direct_command_buffer = direct_command_buffers[i];
         id<MTLCommandBuffer> handle =
             iree_hal_metal_direct_command_buffer_handle(direct_command_buffer);
-        if (i + 1 != command_buffer_count) [handle commit];
         signal_command_buffer = handle;
       }
       if (signal_command_buffer == nil) {
@@ -627,6 +617,9 @@ static const iree_hal_device_vtable_t iree_hal_metal_device_vtable = {
     .query_semaphore_compatibility = iree_hal_metal_device_query_semaphore_compatibility,
     .queue_alloca = iree_hal_metal_device_queue_alloca,
     .queue_dealloca = iree_hal_metal_device_queue_dealloca,
+    .queue_fill = iree_hal_device_queue_emulated_fill,
+    .queue_update = iree_hal_device_queue_emulated_update,
+    .queue_copy = iree_hal_device_queue_emulated_copy,
     .queue_read = iree_hal_metal_device_queue_read,
     .queue_write = iree_hal_metal_device_queue_write,
     .queue_execute = iree_hal_metal_device_queue_execute,

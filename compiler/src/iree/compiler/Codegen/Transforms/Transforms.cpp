@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/Liveness.h"
@@ -35,31 +36,6 @@
 #define DEBUG_TYPE "iree-codegen-transforms"
 
 namespace mlir::iree_compiler {
-
-static bool isAllConstantValue(ArrayRef<OpFoldResult> ofrs, int64_t v) {
-  return llvm::all_of(
-      ofrs, [&](OpFoldResult ofr) { return isConstantIntValue(ofr, v); });
-}
-
-static bool isFullSlice(ArrayRef<OpFoldResult> mixedOffsets,
-                        ArrayRef<OpFoldResult> mixedSizes,
-                        ArrayRef<OpFoldResult> mixedStrides,
-                        IREE::Flow::DispatchTensorType tensorType,
-                        ValueRange dynamicDims) {
-  OpBuilder builder(tensorType.getContext());
-  SmallVector<int64_t> tensorShape = llvm::to_vector(tensorType.getShape());
-  SmallVector<OpFoldResult> mixedTensorShape =
-      mlir::getMixedValues(tensorShape, dynamicDims, builder);
-  return isAllConstantValue(mixedOffsets, 0) &&
-         isAllConstantValue(mixedStrides, 1) && mixedTensorShape == mixedSizes;
-}
-static bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
-                        IREE::Flow::DispatchTensorType tensorType,
-                        ValueRange dynamicDims) {
-  return isFullSlice(
-      sliceLoadStoreOp.getMixedOffsets(), sliceLoadStoreOp.getMixedSizes(),
-      sliceLoadStoreOp.getMixedStrides(), tensorType, dynamicDims);
-}
 
 static bool sliceFilter(Operation *op, ValueRange nonIndexComputationOperands,
                         Operation *baseOp) {
@@ -1545,8 +1521,6 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
         // Step 5. Inline the body of the original forall into the new for loop.
         OpBuilder::InsertionGuard g2(rewriter);
         SmallVector<Value> argReplacements(newForallOp.getInductionVars());
-        // If there is no paired slice (for a single trip count loop) then
-        // replace the iter arg of the forall op directly.
         for (auto [forallIterArg, forIterArg, maybeSlice] :
              llvm::zip_equal(newForallOp.getRegionIterArgs(),
                              newLoop.getRegionIterArgs(), pairedSlices)) {

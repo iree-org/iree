@@ -1,7 +1,7 @@
 // RUN: iree-opt %s --split-input-file --mlir-print-local-scope \
 // RUN:   --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-distribute-forall, canonicalize, cse))" | FileCheck %s
 
-#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
 
 func.func @distribute_thread_forall(%out : memref<?xi32>)
     attributes {translation_info = #translation_info} {
@@ -20,12 +20,11 @@ func.func @distribute_thread_forall(%out : memref<?xi32>)
 //       CHECK:     %[[LINID:.+]] = affine.apply
 //  CHECK-SAME:       affine_map<(d0)[s0, s1, s2] -> (d0 + s0 + s1 * 64 + s2 * 128)>(%[[I]])
 //  CHECK-SAME:       [%[[TX]], %[[TY]], %[[TZ]]]
-//       CHECK:     %[[DELIN:.+]] = affine.delinearize_index %[[LINID]] into (%c1024) : index
-//       CHECK:     memref.store {{.*}}[%[[DELIN]]]
+//       CHECK:     memref.store {{.*}}[%[[LINID]]]
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
 
 func.func @distribute_warp_forall(%out : memref<?xi32>)
     attributes {translation_info = #translation_info} {
@@ -44,12 +43,11 @@ func.func @distribute_warp_forall(%out : memref<?xi32>)
 //       CHECK:     %[[LINID:.+]] = affine.apply
 //  CHECK-SAME:       affine_map<(d0)[s0, s1, s2] -> (d0 + s1 * 2 + s2 * 4 + s0 floordiv 32)>(%[[I]])
 //  CHECK-SAME:       [%[[TX]], %[[TY]], %[[TZ]]]
-//       CHECK:     %[[DELIN:.+]] = affine.delinearize_index %[[LINID]] into (%c32) : index
-//       CHECK:     memref.store {{.*}}[%[[DELIN]]]
+//       CHECK:     memref.store {{.*}}[%[[LINID]]]
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
 
 func.func @distribute_lane_forall(%out : memref<?xi32>)
     attributes {translation_info = #translation_info} {
@@ -66,7 +64,7 @@ func.func @distribute_lane_forall(%out : memref<?xi32>)
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
 
 func.func @distribute_thread_forall_drop_for_loop(%out : memref<?xi32>)
     attributes {translation_info = #translation_info} {
@@ -85,12 +83,11 @@ func.func @distribute_thread_forall_drop_for_loop(%out : memref<?xi32>)
 //       CHECK:   %[[LINID:.+]] = affine.apply
 //  CHECK-SAME:     affine_map<()[s0, s1, s2] -> (s0 + s1 * 64 + s2 * 128)>
 //  CHECK-SAME:     [%[[TX]], %[[TY]], %[[TZ]]]
-//       CHECK:   %[[DELIN:.+]] = affine.delinearize_index %[[LINID]] into (%c128) : index
-//       CHECK:   memref.store {{.*}}[%[[DELIN]]]
+//       CHECK:   memref.store {{.*}}[%[[LINID]]]
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
 
 func.func @distribute_thread_forall_single_thread(%out : memref<?xi32>)
     attributes {translation_info = #translation_info} {
@@ -102,7 +99,6 @@ func.func @distribute_thread_forall_single_thread(%out : memref<?xi32>)
 }
 
 // CHECK-LABEL: func @distribute_thread_forall_single_thread
-//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
 //   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
 //   CHECK-DAG:   %[[TZ:.+]] = gpu.thread_id z
@@ -110,11 +106,11 @@ func.func @distribute_thread_forall_single_thread(%out : memref<?xi32>)
 //  CHECK-SAME:     affine_map<()[s0, s1, s2] -> (s0 + s1 * 64 + s2 * 128)>
 //  CHECK-SAME:     [%[[TX]], %[[TY]], %[[TZ]]]
 //       CHECK:   scf.for %[[I:.+]] = %[[LINID]] to %c1 step %c128 {
-//       CHECK:     memref.store {{.*}}[%[[C0]]]
+//       CHECK:     memref.store {{.*}}[%[[I]]]
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
 
 func.func @distribute_thread_forall_multi_dim(%out : memref<?x?x?xi32>)
     attributes {translation_info = #translation_info} {
@@ -133,13 +129,13 @@ func.func @distribute_thread_forall_multi_dim(%out : memref<?x?x?xi32>)
 //       CHECK:     %[[LINID:.+]] = affine.apply
 //  CHECK-SAME:       affine_map<(d0)[s0, s1, s2] -> (d0 + s0 + s1 * 64 + s2 * 128)>(%[[I]])
 //  CHECK-SAME:       [%[[TX]], %[[TY]], %[[TZ]]]
-//       CHECK:     %[[DELIN:.+]]:3 = affine.delinearize_index %[[LINID]] into (%c16, %c8, %c4) : index
+//       CHECK:     %[[DELIN:.+]]:3 = affine.delinearize_index %[[LINID]] into (16, 8, 4) : index
 //       CHECK:     memref.store {{.*}}[%[[DELIN]]#0, %[[DELIN]]#1, %[[DELIN]]#2]
 
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [7, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [7, 1, 1] subgroup_size = 32>
 
 func.func @distribute_thread_forall_small_workgroup(%out : memref<?xi32>)
     attributes {translation_info = #translation_info} {
@@ -157,5 +153,4 @@ func.func @distribute_thread_forall_small_workgroup(%out : memref<?xi32>)
 //       CHECK:   %[[LINID:.+]] = affine.apply
 //  CHECK-SAME:     affine_map<()[s0, s1, s2] -> (s0 + s1 * 7 + s2 * 7)>
 //  CHECK-SAME:     [%[[TX]], %[[TY]], %[[TZ]]]
-//       CHECK:   %[[DELIN:.+]] = affine.delinearize_index %[[LINID]] into (%c7) : index
-//       CHECK:   memref.store {{.*}}[%[[DELIN]]]
+//       CHECK:   memref.store {{.*}}[%[[LINID]]]

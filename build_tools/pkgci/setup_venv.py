@@ -120,8 +120,8 @@ def main(args):
     artifact_prefix = f"{platform.system().lower()}_{platform.machine()}"
     wheels = []
     for package_stem, variant in [
-        ("iree-compiler", args.compiler_variant),
-        ("iree-runtime", args.runtime_variant),
+        ("iree-base-compiler", args.compiler_variant),
+        ("iree-base-runtime", args.runtime_variant),
     ]:
         wheels.append(
             find_wheel_for_variants(args, artifact_prefix, package_stem, variant)

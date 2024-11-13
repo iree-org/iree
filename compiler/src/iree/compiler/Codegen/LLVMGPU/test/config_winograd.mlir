@@ -16,7 +16,7 @@ func.func @winograd_filter_transform() {
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 16], [1, 1]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWinogradVectorize workgroup_size = [16, 32, 1]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWinogradVectorize workgroup_size = [16, 32, 1]>
 //       CHECK: func.func @winograd_filter_transform()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   iree_linalg_ext.winograd.filter_transform
@@ -40,7 +40,7 @@ func.func @winograd_input_transform() {
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 4, 4, 32], [1, 1, 1, 1]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWinogradVectorize workgroup_size = [32, 4, 4]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWinogradVectorize workgroup_size = [32, 4, 4]>
 //       CHECK: func.func @winograd_input_transform()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   iree_linalg_ext.winograd.input_transform
@@ -64,7 +64,7 @@ func.func @winograd_output_transform() {
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 4, 4, 32], [1, 1, 1, 1]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWinogradVectorize workgroup_size = [32, 4, 4]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWinogradVectorize workgroup_size = [32, 4, 4]>
 //       CHECK: func.func @winograd_output_transform()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   iree_linalg_ext.winograd.output_transform

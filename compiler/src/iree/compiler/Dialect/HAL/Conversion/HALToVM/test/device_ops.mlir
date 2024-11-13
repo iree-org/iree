@@ -141,6 +141,148 @@ util.func public @device_queue_dealloca(
 
 // -----
 
+// CHECK-LABEL: @device_queue_fill_i8
+util.func public @device_queue_fill_i8(
+    // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64,
+    %device: !hal.device, %affinity: i64,
+    // CHECK-SAME:  %[[WAIT_FENCE:.+]]: !vm.ref<!hal.fence>, %[[SIGNAL_FENCE:.+]]: !vm.ref<!hal.fence>,
+    %wait_fence: !hal.fence, %signal_fence: !hal.fence,
+    // CHECK-SAME:  %[[PATTERN_I8_I32:.+]]: i32,
+    %pattern_i8: i8,
+    // CHECK-SAME:  %[[TARGET_BUFFER:.+]]: !vm.ref<!hal.buffer>)
+    %target_buffer: !hal.buffer) {
+  // CHECK-DAG: %[[TARGET_OFFSET:.+]] = vm.const.i64 200
+  %target_offset = arith.constant 200 : index
+  // CHECK-DAG: %[[LENGTH:.+]] = vm.const.i64 300
+  %length = arith.constant 300 : index
+  // CHECK-DAG: %[[PATTERN_LENGTH:.+]] = vm.const.i32 1
+  // CHECK-DAG: %[[FLAGS:.+]] = vm.const.i64.zero
+  // CHECK-DAG: %[[PATTERN_I8_I64:.+]] = vm.ext.i32.i64.s %[[PATTERN_I8_I32]]
+  // CHECK: vm.call @hal.device.queue.fill(
+  // CHECK-SAME: %[[DEVICE]], %[[AFFINITY]],
+  // CHECK-SAME: %[[WAIT_FENCE]], %[[SIGNAL_FENCE]],
+  // CHECK-SAME: %[[TARGET_BUFFER]], %[[TARGET_OFFSET]],
+  // CHECK-SAME: %[[LENGTH]],
+  // CHECK-SAME: %[[PATTERN_I8_I64]], %[[PATTERN_LENGTH]],
+  // CHECK-SAME: %[[FLAGS]])
+  hal.device.queue.fill<%device : !hal.device>
+      affinity(%affinity)
+      wait(%wait_fence) signal(%signal_fence)
+      target(%target_buffer : !hal.buffer)[%target_offset]
+      length(%length)
+      pattern(%pattern_i8 : i8)
+      flags(0)
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @device_queue_fill_i32
+util.func public @device_queue_fill_i32(
+    // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64,
+    %device: !hal.device, %affinity: i64,
+    // CHECK-SAME:  %[[WAIT_FENCE:.+]]: !vm.ref<!hal.fence>, %[[SIGNAL_FENCE:.+]]: !vm.ref<!hal.fence>,
+    %wait_fence: !hal.fence, %signal_fence: !hal.fence,
+    // CHECK-SAME:  %[[PATTERN_I32:.+]]: i32,
+    %pattern_i32: i32,
+    // CHECK-SAME:  %[[TARGET_BUFFER:.+]]: !vm.ref<!hal.buffer>)
+    %target_buffer: !hal.buffer) {
+  // CHECK-DAG: %[[TARGET_OFFSET:.+]] = vm.const.i64 200
+  %target_offset = arith.constant 200 : index
+  // CHECK-DAG: %[[LENGTH:.+]] = vm.const.i64 300
+  %length = arith.constant 300 : index
+  // CHECK-DAG: %[[PATTERN_LENGTH:.+]] = vm.const.i32 4
+  // CHECK-DAG: %[[FLAGS:.+]] = vm.const.i64.zero
+  // CHECK-DAG: %[[PATTERN_I32_I64:.+]] = vm.ext.i32.i64.s %[[PATTERN_I32]]
+  // CHECK: vm.call @hal.device.queue.fill(
+  // CHECK-SAME: %[[DEVICE]], %[[AFFINITY]],
+  // CHECK-SAME: %[[WAIT_FENCE]], %[[SIGNAL_FENCE]],
+  // CHECK-SAME: %[[TARGET_BUFFER]], %[[TARGET_OFFSET]],
+  // CHECK-SAME: %[[LENGTH]],
+  // CHECK-SAME: %[[PATTERN_I32_I64]], %[[PATTERN_LENGTH]],
+  // CHECK-SAME: %[[FLAGS]])
+  hal.device.queue.fill<%device : !hal.device>
+      affinity(%affinity)
+      wait(%wait_fence) signal(%signal_fence)
+      target(%target_buffer : !hal.buffer)[%target_offset]
+      length(%length)
+      pattern(%pattern_i32 : i32)
+      flags(0)
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @device_queue_update
+util.func public @device_queue_update(
+    // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64,
+    %device: !hal.device, %affinity: i64,
+    // CHECK-SAME:  %[[WAIT_FENCE:.+]]: !vm.ref<!hal.fence>, %[[SIGNAL_FENCE:.+]]: !vm.ref<!hal.fence>,
+    %wait_fence: !hal.fence, %signal_fence: !hal.fence,
+    // CHECK-SAME:  %[[SOURCE_BUFFER:.+]]: !vm.buffer,
+    %source_buffer: !util.buffer,
+    // CHECK-SAME:  %[[TARGET_BUFFER:.+]]: !vm.ref<!hal.buffer>)
+    %target_buffer: !hal.buffer) {
+  // CHECK-DAG: %[[SOURCE_OFFSET:.+]] = vm.const.i64 100
+  %source_offset = arith.constant 100 : index
+  // CHECK-DAG: %[[TARGET_OFFSET:.+]] = vm.const.i64 200
+  %target_offset = arith.constant 200 : index
+  // CHECK-DAG: %[[LENGTH:.+]] = vm.const.i64 300
+  %length = arith.constant 300 : index
+  // CHECK-DAG: %[[FLAGS:.+]] = vm.const.i64.zero
+  // CHECK: vm.call @hal.device.queue.update(
+  // CHECK-SAME: %[[DEVICE]], %[[AFFINITY]],
+  // CHECK-SAME: %[[WAIT_FENCE]], %[[SIGNAL_FENCE]],
+  // CHECK-SAME: %[[SOURCE_BUFFER]], %[[SOURCE_OFFSET]],
+  // CHECK-SAME: %[[TARGET_BUFFER]], %[[TARGET_OFFSET]],
+  // CHECK-SAME: %[[LENGTH]], %[[FLAGS]])
+  hal.device.queue.update<%device : !hal.device>
+      affinity(%affinity)
+      wait(%wait_fence) signal(%signal_fence)
+      source(%source_buffer : !util.buffer)[%source_offset]
+      target(%target_buffer : !hal.buffer)[%target_offset]
+      length(%length)
+      flags(0)
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @device_queue_copy
+util.func public @device_queue_copy(
+    // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64,
+    %device: !hal.device, %affinity: i64,
+    // CHECK-SAME:  %[[WAIT_FENCE:.+]]: !vm.ref<!hal.fence>, %[[SIGNAL_FENCE:.+]]: !vm.ref<!hal.fence>,
+    %wait_fence: !hal.fence, %signal_fence: !hal.fence,
+    // CHECK-SAME:  %[[SOURCE_BUFFER:.+]]: !vm.ref<!hal.buffer>,
+    %source_buffer: !hal.buffer,
+    // CHECK-SAME:  %[[TARGET_BUFFER:.+]]: !vm.ref<!hal.buffer>)
+    %target_buffer: !hal.buffer) {
+  // CHECK-DAG: %[[SOURCE_OFFSET:.+]] = vm.const.i64 100
+  %source_offset = arith.constant 100 : index
+  // CHECK-DAG: %[[TARGET_OFFSET:.+]] = vm.const.i64 200
+  %target_offset = arith.constant 200 : index
+  // CHECK-DAG: %[[LENGTH:.+]] = vm.const.i64 300
+  %length = arith.constant 300 : index
+  // CHECK-DAG: %[[FLAGS:.+]] = vm.const.i64.zero
+  // CHECK: vm.call @hal.device.queue.copy(
+  // CHECK-SAME: %[[DEVICE]], %[[AFFINITY]],
+  // CHECK-SAME: %[[WAIT_FENCE]], %[[SIGNAL_FENCE]],
+  // CHECK-SAME: %[[SOURCE_BUFFER]], %[[SOURCE_OFFSET]],
+  // CHECK-SAME: %[[TARGET_BUFFER]], %[[TARGET_OFFSET]],
+  // CHECK-SAME: %[[LENGTH]], %[[FLAGS]])
+  hal.device.queue.copy<%device : !hal.device>
+      affinity(%affinity)
+      wait(%wait_fence) signal(%signal_fence)
+      source(%source_buffer : !hal.buffer)[%source_offset]
+      target(%target_buffer : !hal.buffer)[%target_offset]
+      length(%length)
+      flags(0)
+  util.return
+}
+
+// -----
+
 // CHECK-LABEL: @device_queue_read
 util.func public @device_queue_read(
     // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64,

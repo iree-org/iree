@@ -17,12 +17,14 @@ iree_compiler_cc_library(
     srcs = [
         "FlowExternalModels.cpp",
         "Interfaces.cpp",
+        "LinalgExtExternalModels.cpp",
         "StreamExternalModels.cpp",
         "UtilExternalModels.cpp",
     ],
     hdrs = [
         "FlowExternalModels.h",
         "Interfaces.h",
+        "LinalgExtExternalModels.h",
         "StreamExternalModels.h",
         "UtilExternalModels.h",
     ],
