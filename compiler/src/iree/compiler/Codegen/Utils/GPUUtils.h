@@ -207,9 +207,11 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
 std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func);
 
 /// Returns supported MMA intrinsic instructions based on the GPU target
-/// description stored in `moduleOp` and populates them in `mmaAttrs`.
-void QueryMMAIntrinsics(mlir::ModuleOp moduleOp,
-                        SmallVector<IREE::GPU::MMAAttr> &mmaAttrs);
+/// description stored in `moduleOp` and populates them in `MMAIntrinsic`.
+void queryMMAIntrinsics(
+    mlir::ModuleOp moduleOp,
+    llvm::SmallDenseMap<Operation *, SmallVector<IREE::GPU::MMAIntrinsic>>
+        &mmaAttributesMap);
 
 } // namespace mlir::iree_compiler
 

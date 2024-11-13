@@ -1029,27 +1029,22 @@ std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func) {
   return std::nullopt;
 }
 
-void QueryMMAIntrinsics(mlir::ModuleOp moduleOp,
-                        SmallVector<IREE::GPU::MMAAttr> &mmaAttrs) {
-  IREE::GPU::TargetAttr target;
-
-  // Walk through all `func::FuncOp` operations in `moduleOp`.
-  moduleOp.walk([&](func::FuncOp funcOp) {
-    if (auto attr = getGPUTargetAttr(funcOp)) {
-      // Store the target attribute if found.
-      target = attr;
-      return WalkResult::interrupt();
+void queryMMAIntrinsics(
+    mlir::ModuleOp moduleOp,
+    llvm::SmallDenseMap<Operation *, SmallVector<IREE::GPU::MMAIntrinsic>>
+        &mmaAttributesMap) {
+  moduleOp.walk([&](IREE::HAL::ExecutableVariantOp executableOp) {
+    if (IREE::GPU::TargetAttr target = getGPUTargetAttr(executableOp)) {
+      SmallVector<IREE::GPU::MMAIntrinsic> mmaIntrinsics;
+      llvm::append_range(
+          mmaIntrinsics,
+          llvm::map_range(target.getWgp().getMma(),
+                          [](IREE::GPU::MMAAttr attr) {
+                            return attr.getIntrinsic().getValue();
+                          }));
+      mmaAttributesMap[executableOp] = mmaIntrinsics;
     }
-    return WalkResult::advance();
   });
-
-  if (target) {
-    // Append each MMA attribute from the target's `Wgp` configuration to
-    // `mmaAttrs`.
-    for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
-      mmaAttrs.emplace_back(mma);
-    }
-  }
 }
 
 } // namespace mlir::iree_compiler

@@ -17,31 +17,31 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_TESTLLVMGPUQUERYMMAPASS
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
-static void printMMAVector(SmallVector<IREE::GPU::MMAAttr> &mmaAttrs,
-                           const std::string &extraMessage = {}) {
-  llvm::outs() << "Printing MMA Collection" << extraMessage
-               << ", size: " << mmaAttrs.size() << "\n";
-  for (const auto &mma : mmaAttrs) {
-    llvm::outs() << mma << " ";
-  }
-  llvm::outs() << "\n";
-}
-
 namespace {
 
 struct TestLLVMGPUQueryMMAPass final
     : impl::TestLLVMGPUQueryMMAPassBase<TestLLVMGPUQueryMMAPass> {
   void runOnOperation() override {
     ModuleOp moduleOp = getOperation();
-    SmallVector<IREE::GPU::MMAAttr> mmaCollecton;
-    // Print mma vector before collection.
-    printMMAVector(mmaCollecton,
-                   " Before querying supported mma instrinsic instructions");
-    // Collect mma intrinsic instructions.
-    QueryMMAIntrinsics(moduleOp, mmaCollecton);
-    // Print mma vector after collection.
-    printMMAVector(mmaCollecton,
-                   " After querying supported mma instrinsic instructions");
+    llvm::SmallDenseMap<Operation *, SmallVector<IREE::GPU::MMAIntrinsic>>
+        mmaMap;
+    queryMMAIntrinsics(moduleOp, mmaMap);
+    for (const auto &entry : mmaMap) {
+      Operation *op = entry.first;
+      const SmallVector<IREE::GPU::MMAIntrinsic> &mmaAttrs = entry.second;
+      if (auto variantOp = llvm::dyn_cast<IREE::HAL::ExecutableVariantOp>(op)) {
+        llvm::outs() << "Executable Variant Name: " << variantOp.getName()
+                     << "\n";
+      } else {
+        llvm::outs() << "Executable Variant Name: " << "Unnamed Operation"
+                     << "\n";
+      }
+      llvm::outs() << "MMA Intrinsics: ";
+      for (const auto &mma : mmaAttrs) {
+        llvm::outs() << mma << " ";
+      }
+      llvm::outs() << "\n";
+    }
   }
 };
 } // namespace
