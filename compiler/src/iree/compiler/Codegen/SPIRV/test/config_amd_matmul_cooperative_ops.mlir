@@ -37,7 +37,7 @@ func.func @matmul_256x1024x128_div_add() {
 }
 
 //  CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]{{\]}}>
-//  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [64, 2, 1] subgroup_size = 32, {pipeline_depth = 1 : i64, store_stage = 0 : i64}>
+//  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size = [64, 2, 1] subgroup_size = 32, {pipeline_depth = 1 : i64, store_stage = 0 : i64}>
 //      CHECK: func.func @matmul_256x1024x128_div_add()
 // CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK:   linalg.matmul
@@ -75,7 +75,7 @@ func.func @batch_matmul_16x128x256x512_div() {
 }
 
 //  CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64, 128], [1, 32, 64], [0, 0, 0, 32], [1, 16, 16, 16]{{\]}}>
-//  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [64, 2, 1] subgroup_size = 32, {pipeline_depth = 1 : i64, store_stage = 0 : i64}>
+//  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size = [64, 2, 1] subgroup_size = 32, {pipeline_depth = 1 : i64, store_stage = 0 : i64}>
 //      CHECK: func.func @batch_matmul_16x128x256x512_div()
 // CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK:   linalg.batch_matmul
@@ -117,7 +117,7 @@ func.func @generic_batch_matmul_32x8x512x64() {
 }
 
 //  CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64, 128], [1, 32, 64], [0, 0, 0, 32], [1, 16, 16, 16]{{\]}}>
-//  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [64, 2, 1] subgroup_size = 32, {pipeline_depth = 1 : i64, store_stage = 0 : i64}>
+//  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size = [64, 2, 1] subgroup_size = 32, {pipeline_depth = 1 : i64, store_stage = 0 : i64}>
 //      CHECK: func.func @generic_batch_matmul_32x8x512x64()
 // CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK:   linalg.generic
@@ -148,7 +148,7 @@ func.func @batch_matmul_16x1024x1024x80() {
 }
 
 //  CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64, 128], [1, 32, 64], [0, 0, 0, 16], [1, 16, 16, 16]{{\]}}>
-//  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [64, 2, 1] subgroup_size = 32, {pipeline_depth = 0 : i64, store_stage = 0 : i64}>
+//  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size = [64, 2, 1] subgroup_size = 32, {pipeline_depth = 0 : i64, store_stage = 0 : i64}>
 //      CHECK: func.func @batch_matmul_16x1024x1024x80()
 // CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK:   linalg.batch_matmul
@@ -180,6 +180,6 @@ func.func @matmul_256x1024x8() {
   return
 }
 
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 1 : i64, store_stage = 1 : i64}>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 1 : i64, store_stage = 1 : i64}>
 // CHECK-LABEL: func.func @matmul_256x1024x8
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]

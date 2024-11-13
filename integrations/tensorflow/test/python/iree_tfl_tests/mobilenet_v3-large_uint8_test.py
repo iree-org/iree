@@ -5,6 +5,7 @@ import numpy
 from . import imagenet_test_data
 from . import test_util
 
+# TODO(#18518): Migrate this file to a new (ideally public) location
 # Source https://tfhub.dev/iree/lite-model/mobilenet_v3_large_100_224/uint8/1
 model_path = "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v3-large_224_1.0_uint8.tflite"
 

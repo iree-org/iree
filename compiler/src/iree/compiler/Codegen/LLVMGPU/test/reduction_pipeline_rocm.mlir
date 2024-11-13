@@ -37,7 +37,7 @@ hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
 }
 }
 
-//         CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [32, 1, 1] subgroup_size = 32>
+//         CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [32, 1, 1] subgroup_size = 32>
 //         CDNA3: func.func @group_reduction_1d()
 //    CDNA3-SAME:    translation_info = #[[$TRANSLATION]]
 // CDNA3-COUNT-5:     gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
@@ -78,7 +78,7 @@ hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
 
 // On CDNA, we prefer wave64 with subgroup size of 64.
 
-//        CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+//        CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
 //        CHECK: func.func @group_reduction_1d
 // CHECK-COUNT-5:     gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
@@ -135,7 +135,7 @@ hal.executable private @i4_dequant_matvec {
   }
 }
 
-//        CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 32>
+//        CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 32>
 //        CDNA3: func.func @i4_dequant_matvec()
 //   CDNA3-SAME:    translation_info = #[[$TRANSLATION]]
 //         CDNA3:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x8xf16>
@@ -210,7 +210,7 @@ hal.executable private @i4_dequant_matvec {
   }
 }
 
-//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
 //      CHECK: func.func @i4_dequant_matvec()
 // CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 
@@ -257,7 +257,7 @@ hal.executable private @matvec_fp16 {
 // write 8 results at the end.
 // TODO(kuhar): We should reduce the number of `gpu.shuffles` performed.
 
-//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
 //          CHECK: func.func @matvec_fp16()
 //     CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -316,7 +316,7 @@ hal.executable private @matvec_fp16 {
 // Multi-row matvec with wave32.
 // TODO(kuhar): We should reduce the number of `gpu.shuffles` performed.
 
-//          CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 32>
+//          CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 32>
 //          CDNA3: func.func @matvec_fp16()
 //     CDNA3-SAME:     translation_info = #[[$TRANSLATION]]
 //      CDNA3-DAG:   %[[C0:.+]] = arith.constant 0 : index

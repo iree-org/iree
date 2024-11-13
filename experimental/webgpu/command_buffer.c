@@ -496,7 +496,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_end(
   return iree_hal_webgpu_command_buffer_flush(command_buffer);
 }
 
-static void iree_hal_webgpu_command_buffer_begin_debug_group(
+static iree_status_t iree_hal_webgpu_command_buffer_begin_debug_group(
     iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
     iree_hal_label_color_t label_color,
     const iree_hal_label_location_t* location) {
@@ -504,35 +504,29 @@ static void iree_hal_webgpu_command_buffer_begin_debug_group(
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
 
   WGPUCommandEncoder command_encoder = NULL;
-  iree_status_t status = iree_hal_webgpu_command_buffer_acquire_command_encoder(
-      command_buffer, &command_encoder);
-  if (!iree_status_is_ok(status)) {
-    // TODO(benvanik): mark recording as failed.
-    iree_status_ignore(status);
-    return;
-  }
+  IREE_RETURN_IF_ERROR(iree_hal_webgpu_command_buffer_acquire_command_encoder(
+      command_buffer, &command_encoder));
 
   // TODO(benvanik): ensure this works right when in a compute pass.
   char label_str[128] = {0};
   memcpy(label_str, label.data, iree_min(sizeof(label_str) - 1, label.size));
   wgpuCommandEncoderPushDebugGroup(command_encoder, label_str);
+
+  return iree_ok_status();
 }
 
-static void iree_hal_webgpu_command_buffer_end_debug_group(
+static iree_status_t iree_hal_webgpu_command_buffer_end_debug_group(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_webgpu_command_buffer_t* command_buffer =
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
 
   WGPUCommandEncoder command_encoder = NULL;
-  iree_status_t status = iree_hal_webgpu_command_buffer_acquire_command_encoder(
-      command_buffer, &command_encoder);
-  if (!iree_status_is_ok(status)) {
-    // TODO(benvanik): mark recording as failed.
-    iree_status_ignore(status);
-    return;
-  }
+  IREE_RETURN_IF_ERROR(iree_hal_webgpu_command_buffer_acquire_command_encoder(
+      command_buffer, &command_encoder));
 
   wgpuCommandEncoderPopDebugGroup(command_encoder);
+
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_webgpu_command_buffer_execution_barrier(
@@ -575,9 +569,10 @@ static iree_status_t iree_hal_webgpu_command_buffer_wait_events(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_webgpu_command_buffer_discard_buffer(
+static iree_status_t iree_hal_webgpu_command_buffer_advise_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_buffer_ref_t buffer_ref) {
+    iree_hal_buffer_ref_t buffer_ref, iree_hal_memory_advise_flags_t flags,
+    uint64_t arg0, uint64_t arg1) {
   // No-op: though maybe it'd be a useful addition to the spec as otherwise
   // false dependencies can creep in.
   return iree_ok_status();
@@ -608,7 +603,7 @@ static uint32_t iree_hal_webgpu_splat_pattern(const void* pattern,
 static iree_status_t iree_hal_webgpu_command_buffer_fill_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_buffer_ref_t target_ref, const void* pattern,
-    iree_host_size_t pattern_length) {
+    iree_host_size_t pattern_length, iree_hal_fill_flags_t flags) {
   iree_hal_webgpu_command_buffer_t* command_buffer =
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
 
@@ -693,7 +688,8 @@ static iree_status_t iree_hal_webgpu_command_buffer_fill_buffer(
 
 static iree_status_t iree_hal_webgpu_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
-    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref) {
+    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref,
+    iree_hal_update_flags_t flags) {
   iree_hal_webgpu_command_buffer_t* command_buffer =
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
 
@@ -734,7 +730,8 @@ static iree_status_t iree_hal_webgpu_command_buffer_update_buffer(
 
 static iree_status_t iree_hal_webgpu_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref) {
+    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref,
+    iree_hal_copy_flags_t flags) {
   iree_hal_webgpu_command_buffer_t* command_buffer =
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
 
@@ -1041,7 +1038,7 @@ const iree_hal_command_buffer_vtable_t iree_hal_webgpu_command_buffer_vtable = {
     .signal_event = iree_hal_webgpu_command_buffer_signal_event,
     .reset_event = iree_hal_webgpu_command_buffer_reset_event,
     .wait_events = iree_hal_webgpu_command_buffer_wait_events,
-    .discard_buffer = iree_hal_webgpu_command_buffer_discard_buffer,
+    .advise_buffer = iree_hal_webgpu_command_buffer_advise_buffer,
     .fill_buffer = iree_hal_webgpu_command_buffer_fill_buffer,
     .update_buffer = iree_hal_webgpu_command_buffer_update_buffer,
     .copy_buffer = iree_hal_webgpu_command_buffer_copy_buffer,

@@ -228,8 +228,11 @@ vm.import private @command_buffer.execution_barrier(
   %command_buffer : !vm.ref<!hal.command_buffer>,
   %source_stage_mask : i32,
   %target_stage_mask : i32,
+  // TODO(benvanik): make i64.
   %flags : i32
 )
+
+// TODO(benvanik): add @command_buffer.advise_buffer.
 
 // Fills the target buffer with the given repeating value.
 // NOTE: order slightly differs from op in order to get better arg alignment.
@@ -239,8 +242,10 @@ vm.import private @command_buffer.fill_buffer(
   %target_offset : i64,
   %length : i64,
   %target_buffer_slot : i32,
+  // TODO(benvanik): make pattern i64.
   %pattern : i32,
-  %pattern_length: i32
+  %pattern_length : i32
+  // TODO(benvanik): add %flags : i64.
 )
 
 // Updates a device buffer with the captured contents of a host buffer.
@@ -253,6 +258,7 @@ vm.import private @command_buffer.update_buffer(
   %target_offset : i64,
   %length : i64,
   %target_buffer_slot : i32
+  // TODO(benvanik): add %flags : i64.
 )
 
 // Copies a range of one buffer to another.
@@ -266,6 +272,7 @@ vm.import private @command_buffer.copy_buffer(
   %target_buffer : !vm.ref<!hal.buffer>,
   %target_offset : i64,
   %length : i64
+  // TODO(benvanik): add %flags : i64.
 )
 
 // Dispatches a collective operation defined by |op| using the given buffers.
@@ -345,7 +352,9 @@ vm.import private @device.queue.alloca(
   %pool : i32,
   %memory_types : i32,
   %buffer_usage : i32,
+  // TODO(benvanik): add %reserved : i32 (padding).
   %allocation_size : i64
+  // TODO(benvanik): add %flags : i64.
 ) -> !vm.ref<!hal.buffer>
 
 // Deallocates a queue-ordered transient buffer.
@@ -356,7 +365,50 @@ vm.import private @device.queue.dealloca(
   %queue_affinity : i64,
   %wait_fence : !vm.ref<!hal.fence>,
   %signal_fence : !vm.ref<!hal.fence>,
+  // TODO(benvanik): add %flags : i64.
   %buffer : !vm.ref<!hal.buffer>
+)
+
+// Enqueues a single queue-ordered fill operation.
+vm.import private @device.queue.fill(
+  %device : !vm.ref<!hal.device>,
+  %queue_affinity : i64,
+  %wait_fence : !vm.ref<!hal.fence>,
+  %signal_fence : !vm.ref<!hal.fence>,
+  %target_buffer : !vm.ref<!hal.buffer>,
+  %target_offset : i64,
+  %length : i64,
+  %pattern : i64,
+  %pattern_length: i32,
+  %flags : i64
+)
+
+// Enqueues a single queue-ordered buffer update operation.
+vm.import private @device.queue.update(
+  %device : !vm.ref<!hal.device>,
+  %queue_affinity : i64,
+  %wait_fence : !vm.ref<!hal.fence>,
+  %signal_fence : !vm.ref<!hal.fence>,
+  %source_buffer : !vm.buffer,
+  %source_offset : i64,
+  %target_buffer : !vm.ref<!hal.buffer>,
+  %target_offset : i64,
+  %length : i64,
+  %flags : i64
+)
+
+// Enqueues a single queue-ordered buffer copy operation.
+vm.import private @device.queue.copy(
+  %device : !vm.ref<!hal.device>,
+  %queue_affinity : i64,
+  %wait_fence : !vm.ref<!hal.fence>,
+  %signal_fence : !vm.ref<!hal.fence>,
+  %source_buffer : !vm.ref<!hal.buffer>,
+  %source_offset : i64,
+  %target_buffer : !vm.ref<!hal.buffer>,
+  %target_offset : i64,
+  %length : i64,
+  %flags : i64
 )
 
 // Reads a segment from a file into a device buffer.
@@ -370,6 +422,7 @@ vm.import private @device.queue.read(
   %target_buffer : !vm.ref<!hal.buffer>,
   %target_offset : i64,
   %length : i64,
+  // TODO(benvanik): make i64.
   %flags : i32
 )
 
@@ -384,6 +437,7 @@ vm.import private @device.queue.write(
   %target_file : !vm.ref<!hal.file>,
   %target_offset : i64,
   %length : i64,
+  // TODO(benvanik): make i64.
   %flags : i32
 )
 
@@ -396,7 +450,9 @@ vm.import private @device.queue.execute(
   %queue_affinity : i64,
   %wait_fence : !vm.ref<!hal.fence>,
   %signal_fence : !vm.ref<!hal.fence>,
+  // TODO(benvanik): make a single command buffer.
   %command_buffers : !vm.ref<!hal.command_buffer>...
+  // TODO(benvanik): add %flags : i64.
 )
 
 // Executes a command buffer on a device queue with the given binding table.
@@ -410,6 +466,7 @@ vm.import private @device.queue.execute.indirect(
   %command_buffer : !vm.ref<!hal.command_buffer>,
   // <buffer, offset, length>
   %binding_table : tuple<!vm.ref<!hal.buffer>, i64, i64>...
+  // TODO(benvanik): add %flags : i64.
 )
 
 // Flushes any locally-pending submissions in the queue.
@@ -437,6 +494,7 @@ attributes {nosideeffects}
 // Creates an executable for use with the specified device.
 vm.import private @executable.create(
   %device : !vm.ref<!hal.device>,
+  // TODO(benvanik): add %queue_affinity : i64.
   %executable_format : !vm.buffer,
   %executable_data : !vm.buffer,
   %constants : !vm.buffer
@@ -452,11 +510,13 @@ attributes {
 // Returns an unsignaled fence that defines a point in time.
 vm.import private @fence.create(
   %device : !vm.ref<!hal.device>,
+  // TODO(benvanik): make i64.
   %flags : i32
 ) -> !vm.ref<!hal.fence>
 
 // Returns a fence that joins the input fences as a wait-all operation.
 vm.import private @fence.join(
+  // TODO(benvanik): add %flags : i64? May be worth it to control access.
   %fences : !vm.ref<!hal.fence> ...
 ) -> !vm.ref<!hal.fence>
 attributes {nosideeffects}
@@ -480,7 +540,7 @@ vm.import private @fence.fail(
   %status : i32
 )
 
-// Yields the caller until all fences is reached.
+// Yields the caller until all fences are reached.
 vm.import private @fence.await(
   %timeout_millis : i32,
   %fences : !vm.ref<!hal.fence> ...

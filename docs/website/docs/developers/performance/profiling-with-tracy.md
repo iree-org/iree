@@ -114,11 +114,11 @@ be built from source by using either the upstream CMake build or IREE's
 
     ??? tip - "Tip - Instrumented Python packages"
 
-        The `iree-runtime` Python package includes prebuilt instrumented tools.
+        The `iree-base-runtime` Python package includes prebuilt instrumented tools.
         Set the `IREE_PY_RUNTIME=tracy` environment variable to use them:
 
         ```shell
-        python -m pip install iree-runtime
+        python -m pip install iree-base-runtime
         IREE_PY_RUNTIME=tracy iree-run-module ...
         ```
 

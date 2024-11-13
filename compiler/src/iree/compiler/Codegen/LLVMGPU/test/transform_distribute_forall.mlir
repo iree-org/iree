@@ -4,7 +4,7 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
-#translation = #iree_codegen.translation_info<TransformDialectCodegen, { config_test = "config_test" }>
+#translation = #iree_codegen.translation_info<pipeline = TransformDialectCodegen, { config_test = "config_test" }>
 module {
   func.func @distribute() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
     %cst = arith.constant dense<0.000000e+00> : vector<1xf16>
@@ -44,7 +44,7 @@ module {
 }
 
 // CHECK-DAG: #[[DIV32:.*]] = affine_map<()[s0] -> (s0 floordiv 32)>
-// CHECK-DAG: #[[TRANSLATION_INFO:.*]] = #iree_codegen.translation_info<None workgroup_size = [256, 1, 1] subgroup_size = 32, {config_test = "config_test"}>
+// CHECK-DAG: #[[TRANSLATION_INFO:.*]] = #iree_codegen.translation_info<pipeline = None workgroup_size = [256, 1, 1] subgroup_size = 32, {config_test = "config_test"}>
 // CHECK: func.func @distribute()
 // CHECK-SAME: translation_info = #[[TRANSLATION_INFO]]
 // CHECK: %[[TX:.+]] = gpu.thread_id  x

@@ -11,7 +11,7 @@
   target_triple = "riscv64-none-elf"
 }>
 #map = affine_map<()[s0] -> (s0 ceildiv 2)>
-#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 hal.executable private @apply_scale_no_vector_feature {
   hal.executable.variant public @embedded_elf_riscv_64 target(#executable_target_embedded_elf_riscv_64_) {
     hal.executable.export public @apply_scale_no_vector_feature ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
@@ -57,7 +57,7 @@ hal.executable private @apply_scale_no_vector_feature {
   target_triple = "riscv64-none-elf"
 }>
 #map = affine_map<()[s0] -> (s0 ceildiv 2)>
-#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 hal.executable private @apply_scale_v {
   hal.executable.variant public @embedded_elf_riscv_64 target(#executable_target_embedded_elf_riscv_64_) {
     hal.executable.export public @apply_scale_v ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
@@ -101,7 +101,7 @@ hal.executable private @apply_scale_v {
   target_triple = "riscv64-none-elf"
 }>
 #map = affine_map<()[s0] -> (s0 ceildiv 2)>
-#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 hal.executable private @apply_scale_zve64x {
   hal.executable.variant public @embedded_elf_riscv_64 target(#executable_target_embedded_elf_riscv_64_) {
     hal.executable.export public @apply_scale_zve64x ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
@@ -145,7 +145,7 @@ hal.executable private @apply_scale_zve64x {
   target_triple = "riscv64-none-elf"
 }>
 #map = affine_map<()[s0] -> (s0 ceildiv 2)>
-#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 hal.executable private @apply_scale_zve32x {
   hal.executable.variant public @embedded_elf_riscv_64 target(#executable_target_embedded_elf_riscv_64_) {
     hal.executable.export public @apply_scale_zve32x ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
@@ -196,7 +196,7 @@ hal.executable private @apply_scale_zve32x {
   target_triple = "riscv64-none-elf"
 }>
 #map = affine_map<()[s0] -> (s0 ceildiv 2)>
-#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 hal.executable private @apply_scale_zve32f {
   hal.executable.variant public @embedded_elf_riscv_64 target(#executable_target_embedded_elf_riscv_64_) {
     hal.executable.export public @apply_scale_zve32f ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {

@@ -1319,6 +1319,18 @@ LogicalResult DeviceQueueDeallocaOp::verify() {
   return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
 }
 
+LogicalResult DeviceQueueFillOp::verify() {
+  return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
+}
+
+LogicalResult DeviceQueueUpdateOp::verify() {
+  return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
+}
+
+LogicalResult DeviceQueueCopyOp::verify() {
+  return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
+}
+
 LogicalResult DeviceQueueReadOp::verify() {
   return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
 }

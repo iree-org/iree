@@ -57,8 +57,23 @@ def IREEGPU_LoweringConfigAttr :
         "The configured fields, including tiling levels">:$attributes
   );
   let extraClassDeclaration = [{
-    /// Helper to retrieve a target mma intrinsic if present.
+    /// Helper to retrieve/set a target mma intrinsic.
     ::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr getMmaKind() const;
+    static void setMmaKind(MLIRContext *context,
+                          SmallVectorImpl<NamedAttribute> &attrs,
+                          ::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr kind);
+
+    // TODO: Merge subgroup counts functionality into subgroup tiling level
+    //       lowering, when we have it implemented.
+    /// Helper to retrieve/set a target subgroup M/N counts.
+    std::optional<int64_t> getSubgroupMCount() const;
+    std::optional<int64_t> getSubgroupNCount() const;
+    static void setSubgroupMCount(MLIRContext *context,
+                                   SmallVectorImpl<NamedAttribute> &attrs,
+                                   int64_t subgroup_m_count);
+    static void setSubgroupNCount(MLIRContext *context,
+                                   SmallVectorImpl<NamedAttribute> &attrs,
+                                   int64_t subgroup_n_count);
 
     /// Helper to retrieve/set a list of operand indices to promote.
     std::optional<SmallVector<int64_t>> getPromotedOperandList() const;
@@ -137,6 +152,9 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     "getMNKShape",
     "getSubgroupSize",
     "getMmaScope",
+    "getASingleSubgroupLayout",
+    "getBSingleSubgroupLayout",
+    "getCSingleSubgroupLayout",
     "buildMmaOperation",
     "populateOperandOffsetsSizesStrides",
     "materializeOperandConcreteShape",
@@ -216,6 +234,8 @@ def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
     MMASingleSubgroupLayout getASingleSubgroupLayout() const;
     MMASingleSubgroupLayout getBSingleSubgroupLayout() const;
     MMASingleSubgroupLayout getCSingleSubgroupLayout() const;
+
+    SmallVector<VirtualMMAIntrinsic> getVirtualIntrinsics() const;
   }];
 }
 
@@ -264,6 +284,64 @@ def IREEGPU_DataTiledMMAAttr :
     DefaultValuedParameter<"int64_t", "1", "Unrolling along the N dimension, distributed across this many more threads.">:$unroll_n_to_subgroups,
     DefaultValuedParameter<"int64_t", "1", "Unrolling along the K dimension, on the same thread, with interleaved layout.">:$unroll_k
   );
+}
+
+def IREEGPU_VirtualMMAIntrinsicAttr
+  : IREEGPU_MmaEnumAttr<IREEGPU_VirtualMMAIntrinsic, "virtual_mma_intrinsic">;
+
+def IREEGPU_VirtualMMAAttr :
+    AttrDef<IREEGPU_Dialect, "VirtualMMA", [
+  DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
+    "getABCElementTypes",
+    "getABCVectorTypes",
+    "getMNKShape",
+    "getSubgroupSize",
+    "getMmaScope",
+    "getASingleSubgroupLayout",
+    "getBSingleSubgroupLayout",
+    "getCSingleSubgroupLayout",
+    "populateOperandOffsetsSizesStrides",
+    "buildMmaOperation",
+  ]>
+]> {
+  let mnemonic = "virtual_mma_layout";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let description = [{
+    This mma variant represents "virtual" MMA ops that has modification to
+    its native layouts by unrollK and/or interleave reads. The |intrinsic|
+    field represents different kinds of "Virtual" MMA Ops we found helpful.
+
+    These interleaving and/or unrolling changes in the layout is especially
+    useful to coalesce reads from shared memory to register or align layouts
+    in a chained-matmul operation.
+  }];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+  let builders = [
+    AttrBuilder<(ins "VirtualMMAIntrinsic":$intrinsic)>
+  ];
+
+  let parameters = (ins
+    "::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr":$intrinsic
+  );
+
+  let extraClassDeclaration = [{
+    int64_t getBlockSize() const;
+
+    // Returns the A/B/C matrix's partial nested layout shape inside a single
+    // subgroup. Shape at each outer/thread/element level is a 2-D value,
+    // following canonical matmul order--(M, K) for A, (K, N) for B, and
+    // (M, N) for C.
+    MMASingleSubgroupLayout getASingleSubgroupLayout() const;
+    MMASingleSubgroupLayout getBSingleSubgroupLayout() const;
+    MMASingleSubgroupLayout getCSingleSubgroupLayout() const;
+
+    // Factor to unroll K from native MMA/intrinsic size to virtual size.
+    // e.g MFMA_F32_16x16x16 has K of 16, while VMFMA_F32_16x16x32 has K of 32
+    // in this example, unrollK = 32/16 = 2.
+    int64_t getUnrollK() const;
+  }];
 }
 
 def IREEGPU_MMAOpsArrayAttr : ArrayOfAttr<
@@ -511,6 +589,7 @@ def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOption
   let parameters = (ins
     OptionalParameter<"BoolAttr">:$prefetch_shared_memory,
     OptionalParameter<"BoolAttr">:$no_reduce_shared_memory_bank_conflicts,
+    OptionalParameter<"BoolAttr">:$use_igemm_convolution,
     OptionalParameter<"ReorderWorkgroupsStrategyAttr">:$reorder_workgroups_strategy
   );
 
@@ -518,6 +597,7 @@ def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOption
     AttrBuilder<(ins
         CArg<"bool", "false">:$prefetch_shared_memory,
         CArg<"bool", "false">:$no_reduce_shared_memory_bank_conflicts,
+        CArg<"bool", "false">:$use_igemm_convolution,
         CArg<"std::optional<ReorderWorkgroupsStrategy>", "{}">:$reorder_workgroups_strategy)>
   ];
 

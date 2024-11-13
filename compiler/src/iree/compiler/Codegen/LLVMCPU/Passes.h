@@ -96,10 +96,11 @@ void addCPULinalgExtTileAndVectorizePipeline(
     OpPassManager &funcPassManager, TilingConfig &tilingConfig,
     LLVMCPUPipelineOptions &pipelineOpt);
 
-/// Populates the passes to lower to scalars operations for linalg based
-/// code-generation. This pipeline does not vectorize, but instead just
-/// converts to memrefs
-void addCPUDefaultPassPipeline(OpPassManager &funcPassManager);
+/// Populates the passes to lower scalars and unknown tensor op (i.e. linalg op
+/// that is not specialized by any pipeline). Adds an additional level of tiling
+/// and converts to memrefs.
+void addCPUDefaultPassPipeline(OpPassManager &funcPassManager,
+                               FailureOr<TilingConfig> &tilingConfig);
 
 void addConvTileAndDecomposeExpertPassPipeline(
     OpPassManager &funcPassManager, TilingConfig &tilingConfig,

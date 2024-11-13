@@ -7,7 +7,7 @@
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = []>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
-#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 func.func @illegal() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_, translation_info = #translation} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<4x8xf32>
@@ -26,7 +26,7 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_embe
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[4, 8], [8, 8, 0], [0, 0, 8], [0, 0, 0]], native_vector_size = [0, 0, 4]>
-#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
 func.func @illegal() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_, translation_info = #translation} {
   %c0 = arith.constant 0 : index
@@ -46,7 +46,7 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_embe
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [8, 32, 16], [0, 0, 16], [0, 0, 0]]>
-#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
 module {
   func.func @illegal() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_, translation_info = #translation} {
@@ -68,7 +68,7 @@ module {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [8, 0, 0], [0, 16, 16], [0, 0, 0]]>
-#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
 func.func @illegal() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_, translation_info = #translation} {
   %c0 = arith.constant 0 : index
@@ -88,7 +88,7 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_embe
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [{sizes = [4, 8], interchange = [1]}, [8, 8, 0], [0, 0, 8], [0, 0, 0]]>
-#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
 func.func @illegal() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_, translation_info = #translation} {
   %c0 = arith.constant 0 : index
@@ -108,7 +108,7 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_embe
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 7, 7, 64, 0, 0, 0], [6, 1, 7, 32, 0, 0, 0], [0, 0, 0, 0, 3, 3, 4], [0, 0, 0, 0, 0, 0, 0]]>
-#translation = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
+#translation = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
 func.func @illegal() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_, translation_info = #translation} {
   %c0 = arith.constant 0 : index
@@ -128,7 +128,7 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_embe
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 7, 64, 0, 0], [1, 1, 7, 8, 0, 0], [0, 0, 0, 0, 5, 5], [0, 0, 0, 0, 0, 0]]>
-#translation = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
+#translation = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
 module {
   func.func @illegal() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_, translation_info = #translation} {

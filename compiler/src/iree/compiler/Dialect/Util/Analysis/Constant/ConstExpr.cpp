@@ -176,8 +176,15 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp)
         for (auto &use : definingOp->getUses()) {
           Operation *useOp = use.getOwner();
           // Skip expanding of ops within dispatch or nested regions.
-          if (definingOp->getParentOp() != useOp->getParentOp())
+          if (definingOp->getParentOp() != useOp->getParentOp()) {
+            // check if we can expand to the parent op instead
+            if (auto parentOp = useOp->getParentOp()) {
+              if (definingOp->getParentOp() == parentOp->getParentOp()) {
+                expandToOp(parentOp);
+              }
+            }
             continue;
+          }
           expandToOp(useOp);
         }
       }

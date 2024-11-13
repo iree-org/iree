@@ -141,7 +141,7 @@ flow.executable private @ex1 {
       %0 = flow.dispatch.tie_shape %arg0 : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #encoding>>{%arg1, %arg2}
       %1 = flow.dispatch.tie_shape %arg3 : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg1, %arg2}
       %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #encoding>>{%arg1, %arg2} -> tensor<?x?xf32, #encoding>
-      %3 = iree_encoding.unset_encoding %2 : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>
+      %3 = iree_encoding.unset_encoding %2 : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%arg1, %arg2}
       flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg1, %arg2}
       return
     }

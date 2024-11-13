@@ -14,8 +14,8 @@
 #
 # MacOS convention is to refer to this as major.minor (i.e. "3.9", "3.10").
 # Valid packages:
-#   iree-runtime
-#   iree-compiler
+#   iree-base-runtime
+#   iree-base-compiler
 
 set -eu -o errtrace
 
@@ -23,7 +23,7 @@ this_dir="$(cd $(dirname $0) && pwd)"
 repo_root="$(cd $this_dir/../../ && pwd)"
 python_versions="${override_python_versions:-3.11}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
-packages="${packages:-iree-runtime iree-compiler}"
+packages="${packages:-iree-base-runtime iree-base-compiler}"
 
 # Note that this typically is selected to match the version that the official
 # Python distributed is built at.
@@ -50,12 +50,12 @@ function run() {
       export PATH=$python_dir/bin:$orig_path
       echo ":::: Python version $(python3 --version)"
       case "$package" in
-        iree-runtime)
-          clean_wheels iree_runtime $python_version
+        iree-base-runtime)
+          clean_wheels iree_base_runtime $python_version
           build_iree_runtime
           ;;
-        iree-compiler)
-          clean_wheels iree_compiler $python_version
+        iree-base-compiler)
+          clean_wheels iree_base_compiler $python_version
           build_iree_compiler
           ;;
         *)

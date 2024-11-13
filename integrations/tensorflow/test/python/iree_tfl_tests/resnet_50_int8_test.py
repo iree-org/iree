@@ -5,6 +5,7 @@ import numpy
 from . import imagenet_test_data
 from . import test_util
 
+# TODO(#18518): Migrate this file to a new (ideally public) location
 # Model is INT8 quantized but inputs and outputs are FP32.
 model_path = "https://storage.googleapis.com/tf_model_garden/vision/resnet50_imagenet/resnet_50_224_int8.tflite"
 

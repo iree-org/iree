@@ -1786,10 +1786,10 @@ getAttentionIterationDomain(Location loc, OpBuilder &b, int64_t domainRank,
 }
 
 static SmallVector<utils::IteratorType>
-getAttentionIteratorTypes(int64_t domainRank,
-                          ArrayRef<AffineMap> indexingMaps) {
+getAttentionIteratorTypes(int64_t domainRank, AffineMap qMap, AffineMap kMap,
+                          AffineMap vMap, AffineMap oMap) {
   FailureOr<AttentionOpDetail> maybeOpInfo =
-      AttentionOpDetail::get(indexingMaps);
+      AttentionOpDetail::get(qMap, kMap, vMap, oMap);
   assert(succeeded(maybeOpInfo) && "Failed to infer attention op details");
   AttentionOpDetail opInfo = maybeOpInfo.value();
 
@@ -1837,8 +1837,8 @@ SmallVector<Range> AttentionOp::getIterationDomain(OpBuilder &b) {
 }
 
 SmallVector<utils::IteratorType> AttentionOp::getLoopIteratorTypes() {
-  return getAttentionIteratorTypes(getIterationDomainRank(),
-                                   getIndexingMapsArray());
+  return getAttentionIteratorTypes(getIterationDomainRank(), getQueryMap(),
+                                   getKeyMap(), getValueMap(), getOutputMap());
 }
 
 FailureOr<TilingResult>
@@ -1990,8 +1990,8 @@ SmallVector<Range> OnlineAttentionOp::getIterationDomain(OpBuilder &b) {
 }
 
 SmallVector<utils::IteratorType> OnlineAttentionOp::getLoopIteratorTypes() {
-  return getAttentionIteratorTypes(getIterationDomainRank(),
-                                   getIndexingMapsArray());
+  return getAttentionIteratorTypes(getIterationDomainRank(), getQueryMap(),
+                                   getKeyMap(), getValueMap(), getOutputMap());
 }
 
 FailureOr<TilingResult>

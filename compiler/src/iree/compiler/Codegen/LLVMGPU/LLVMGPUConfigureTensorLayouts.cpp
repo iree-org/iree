@@ -48,6 +48,29 @@ static SmallVector<bool> getPromotedOperands(Operation *op) {
   return promotedOperands;
 }
 
+static IREE::GPU::MmaInterfaceAttr getIntrinsic(Operation *op) {
+  auto config = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
+  assert(config && "Cannot find intrinsic from unconfigured op.");
+
+  IREE::GPU::MmaInterfaceAttr mmaIntrinsic = config.getMmaKind();
+  assert(mmaIntrinsic && "Cannot find intrinsic in lowering config.");
+  return mmaIntrinsic;
+}
+
+static int64_t getSubgroupMCount(Operation *op) {
+  auto config = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
+  assert(config && "Cannot find intrinsic from unconfigured op.");
+
+  return *config.getSubgroupMCount();
+}
+
+static int64_t getSubgroupNCount(Operation *op) {
+  auto config = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
+  assert(config && "Cannot find intrinsic from unconfigured op.");
+
+  return *config.getSubgroupNCount();
+}
+
 static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
                                           SmallVector<bool> promotedOperands,
                                           RewriterBase &rewriter,
@@ -264,14 +287,19 @@ transposeSchedule(RewriterBase &rewriter, IREE::GPU::MMAScheduleAttr schedule) {
       schedule.getSubgroupMCount());
 }
 
-static LogicalResult
-setAttentionMatmulAnchor(IREE::GPU::MMAScheduleAttr schedule,
-                         RewriterBase &rewriter, linalg::LinalgOp qkMatmul,
-                         linalg::LinalgOp pvMatmul) {
-  // TODO: Add SIMT fallback.
-  if (!schedule) {
-    return pvMatmul->emitError("missing mma schedule for contraction");
-  }
+static LogicalResult setAttentionMatmulAnchor(RewriterBase &rewriter,
+                                              linalg::LinalgOp qkMatmul,
+                                              linalg::LinalgOp pvMatmul) {
+
+  IREE::GPU::MMAScheduleAttr qkSchedule =
+      rewriter.getAttr<IREE::GPU::MMAScheduleAttr>(getIntrinsic(qkMatmul),
+                                                   getSubgroupMCount(qkMatmul),
+                                                   getSubgroupNCount(qkMatmul));
+
+  IREE::GPU::MMAScheduleAttr pvSchedule =
+      rewriter.getAttr<IREE::GPU::MMAScheduleAttr>(getIntrinsic(pvMatmul),
+                                                   getSubgroupMCount(pvMatmul),
+                                                   getSubgroupNCount(pvMatmul));
 
   // Check if the intrinsic output for qkMatmul can be reused for pvMatmul.
   // We know that pvMatmul takes result of qkMatmul as it's lhs.
@@ -280,13 +308,16 @@ setAttentionMatmulAnchor(IREE::GPU::MMAScheduleAttr schedule,
   bool reuseIntrinsicOutput = false;
   bool transposeIntrinsic = false;
 
-  auto intrinsic = cast<IREE::GPU::MMAAttr>(schedule.getIntrinsic());
+  auto qkIntrinsic =
+      cast<IREE::GPU::MmaInterfaceAttr>(qkSchedule.getIntrinsic());
+  auto pvIntrinsic =
+      cast<IREE::GPU::MmaInterfaceAttr>(pvSchedule.getIntrinsic());
   IREE::GPU::MMASingleSubgroupLayout lhsLayout =
-      intrinsic.getASingleSubgroupLayout();
+      getASingleSubgroupLayout(pvIntrinsic);
   IREE::GPU::MMASingleSubgroupLayout rhsLayout =
-      intrinsic.getBSingleSubgroupLayout();
+      getBSingleSubgroupLayout(pvIntrinsic);
   IREE::GPU::MMASingleSubgroupLayout outLayout =
-      intrinsic.getCSingleSubgroupLayout();
+      getCSingleSubgroupLayout(qkIntrinsic);
 
   auto matchLayout = [](IREE::GPU::MMASingleSubgroupLayout layoutA,
                         IREE::GPU::MMASingleSubgroupLayout layoutB) -> bool {
@@ -304,15 +335,6 @@ setAttentionMatmulAnchor(IREE::GPU::MMAScheduleAttr schedule,
     reuseIntrinsicOutput = true;
     transposeIntrinsic = true;
   }
-
-  // subgroup_n count for attention matmul is always 1, because it is the
-  // reduction dimension. The subgroup_n count is in reality, for the pvMatmul.
-  IREE::GPU::MMAScheduleAttr qkSchedule =
-      rewriter.getAttr<IREE::GPU::MMAScheduleAttr>(
-          schedule.getIntrinsic(),
-          /*subgroup_m_count=*/schedule.getSubgroupMCount(),
-          /*subgroup_n_count=*/1);
-  IREE::GPU::MMAScheduleAttr pvSchedule = schedule;
 
   SmallVector<bool> promotedQKOperands = getPromotedOperands(qkMatmul);
   SmallVector<bool> promotedPVOperands = getPromotedOperands(pvMatmul);
@@ -444,6 +466,35 @@ static LogicalResult setDerivedThreadConfigLayout(
   return success();
 }
 
+static LogicalResult setIntrinsicLoweringConfigLayout(
+    IREE::GPU::LoweringConfigAttr config, linalg::LinalgOp candidate,
+    ArrayRef<int64_t> workgroupSize, RewriterBase &rewriter) {
+
+  SmallVector<bool> promotedOperands = getPromotedOperands(candidate);
+  auto schedule = rewriter.getAttr<IREE::GPU::MMAScheduleAttr>(
+      getIntrinsic(candidate), getSubgroupMCount(candidate),
+      getSubgroupNCount(candidate));
+
+  if (linalg::isaContractionOpInterface(candidate)) {
+    if (succeeded(setContractionAnchor(schedule, promotedOperands, rewriter,
+                                       candidate))) {
+      return success();
+    }
+  }
+
+  if (succeeded(linalg::inferConvolutionDims(candidate))) {
+    if (succeeded(setConvolutionAnchor(schedule, promotedOperands, rewriter,
+                                       candidate))) {
+      return success();
+    }
+  }
+
+  candidate->emitError() << "Unable to set intrinsic layouts on operation "
+                            "based on given lowering config: "
+                         << config;
+  return failure();
+}
+
 static Operation *getOpWithAttr(Operation *root, StringRef attr) {
   Operation *result = nullptr;
   WalkResult walkResult = root->walk([&](Operation *op) {
@@ -483,21 +534,10 @@ struct LLVMGPUConfigureTensorLayoutsPass final
       return signalPassFailure();
     }
 
-    if (failed(setDerivedConfigLayouts(func, maybeWorkgroupSize.value(),
-                                       rewriter))) {
+    if (failed(setLayoutsFromLoweringConfig(func, maybeWorkgroupSize.value(),
+                                            rewriter))) {
       return signalPassFailure();
     }
-
-    llvm::StringLiteral scheduleAttrName =
-        IREE::GPU::MMAScheduleAttr::getMnemonic();
-    DictionaryAttr configDict = getTranslationInfo(func).getConfiguration();
-    auto scheduleAttr = dyn_cast_or_null<IREE::GPU::MMAScheduleAttr>(
-        configDict.get(scheduleAttrName));
-
-    // Vector layout option setter aimed at contractions and convolutions. For
-    // now, layout setting for other problems like reductions is TODO.
-    SmallVector<linalg::LinalgOp> contracts;
-    SmallVector<linalg::LinalgOp> convs;
 
     auto attentionQKMatmul = dyn_cast_or_null<linalg::LinalgOp>(
         getOpWithAttr(func, "attention_qk_matmul"));
@@ -514,61 +554,51 @@ struct LLVMGPUConfigureTensorLayoutsPass final
       return signalPassFailure();
     }
 
-    func->walk([&](linalg::LinalgOp linalgOp) {
-      if (linalgOp == attentionQKMatmul || linalgOp == attentionPVMatmul) {
-        return WalkResult::advance();
-      }
-
-      if (linalg::isaContractionOpInterface(linalgOp)) {
-        contracts.push_back(linalgOp);
-      } else if (succeeded(linalg::inferConvolutionDims(linalgOp))) {
-        convs.push_back(linalgOp);
-      }
-      return WalkResult::advance();
-    });
-
-    for (linalg::LinalgOp contract : contracts) {
-      SmallVector<bool> promotedOperands = getPromotedOperands(contract);
-      if (failed(setContractionAnchor(scheduleAttr, promotedOperands, rewriter,
-                                      contract))) {
-        return signalPassFailure();
-      }
-    }
-
-    for (linalg::LinalgOp conv : convs) {
-      SmallVector<bool> promotedOperands = getPromotedOperands(conv);
-      if (failed(setConvolutionAnchor(scheduleAttr, promotedOperands, rewriter,
-                                      conv))) {
-        return signalPassFailure();
-      }
-    }
-
     if (attentionQKMatmul && attentionPVMatmul) {
-      if (failed(setAttentionMatmulAnchor(
-              scheduleAttr, rewriter, attentionQKMatmul, attentionPVMatmul))) {
+      if (failed(setAttentionMatmulAnchor(rewriter, attentionQKMatmul,
+                                          attentionPVMatmul))) {
         return signalPassFailure();
       }
     }
   }
 
-  LogicalResult setDerivedConfigLayouts(FunctionOpInterface funcOp,
-                                        ArrayRef<int64_t> workgroupSize,
-                                        RewriterBase &rewriter) {
+  LogicalResult setLayoutsFromLoweringConfig(FunctionOpInterface funcOp,
+                                             ArrayRef<int64_t> workgroupSize,
+                                             RewriterBase &rewriter) {
     SmallVector<linalg::LinalgOp> candidates;
     funcOp->walk([&](linalg::LinalgOp op) {
-      auto config = dyn_cast_or_null<IREE::GPU::DerivedThreadConfigAttr>(
-          getLoweringConfig(op));
-      if (config) {
+      if (getLoweringConfig(op)) {
         candidates.push_back(op);
       }
     });
 
     for (linalg::LinalgOp candidate : candidates) {
-      auto config = dyn_cast_or_null<IREE::GPU::DerivedThreadConfigAttr>(
-          getLoweringConfig(candidate));
-      assert(config);
-      if (failed(setDerivedThreadConfigLayout(config, candidate, workgroupSize,
-                                              rewriter))) {
+      // Skip attention candidates.
+      if (candidate->hasAttr("attention_qk_matmul") ||
+          candidate->hasAttr("attention_pv_matmul")) {
+        continue;
+      }
+
+      auto result =
+          TypeSwitch<IREE::Codegen::LoweringConfigAttrInterface, LogicalResult>(
+              getLoweringConfig(candidate))
+              .Case([&](IREE::GPU::DerivedThreadConfigAttr config) {
+                return setDerivedThreadConfigLayout(config, candidate,
+                                                    workgroupSize, rewriter);
+              })
+              .Case([&](IREE::GPU::LoweringConfigAttr config) {
+                if (config.getMmaKind()) {
+                  return setIntrinsicLoweringConfigLayout(
+                      config, candidate, workgroupSize, rewriter);
+                }
+                candidate->emitError() << "Unable to set layouts on operation "
+                                          "based on given lowering config: "
+                                       << config;
+                return failure();
+              })
+              .Default([](Attribute) -> LogicalResult { return failure(); });
+
+      if (failed(result)) {
         return failure();
       }
     }

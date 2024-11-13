@@ -22,7 +22,9 @@ NOTEBOOKS_TO_SKIP = [
 ]
 
 NOTEBOOKS_EXPECTED_TO_FAIL = [
-    # None!
+    # See https://github.com/iree-org/iree/issues/18919
+    "tensorflow_hub_import.ipynb",
+    "tflite_text_classification.ipynb",
 ]
 
 

@@ -6,6 +6,9 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
+#include "mlir/Analysis/DataFlow/IntegerRangeAnalysis.h"
+#include "mlir/Analysis/DataFlowFramework.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/PatternMatch.h"
@@ -37,12 +40,39 @@ static Value skipAffineMaxZero(Value dim) {
   return *affineMax.getSymbolOperands().begin();
 }
 
-static LogicalResult padAlloc(MLIRContext *context, memref::AllocOp allocOp) {
+static FailureOr<int64_t> getUpperBound(Value dim,
+                                        const DataFlowSolver &solver) {
+  // Check the integer range analysis.
+  if (auto *maybeRange =
+          solver.lookupState<dataflow::IntegerValueRangeLattice>(dim)) {
+    IntegerValueRange range = maybeRange->getValue();
+    if (!range.isUninitialized() &&
+        range.getValue().smax() !=
+            IntegerValueRange::getMaxRange(dim).getValue().smax()) {
+      return range.getValue().smax().getSExtValue();
+    }
+  }
+
+  // Check the value bounds constraint set.
+  // TODO: These two analysis could be merged, but probably needs
+  // to happen usptream.
+  auto ub = ValueBoundsConstraintSet::computeConstantBound(
+      presburger::BoundType::UB, {dim, /*dim=*/std::nullopt},
+      /*stopCondition=*/nullptr, /*closedUB=*/true);
+  if (succeeded(ub)) {
+    return ub.value();
+  }
+  return failure();
+}
+
+static LogicalResult padAlloc(MLIRContext *context, memref::AllocOp allocOp,
+                              const DataFlowSolver &solver) {
   IRRewriter rewriter(context);
   rewriter.setInsertionPoint(allocOp);
   SmallVector<int64_t> shape = llvm::to_vector(allocOp.getType().getShape());
   SmallVector<OpFoldResult> sizes;
   size_t dynamicDimIdx = 0;
+
   for (int64_t &dimSize : shape) {
     if (!ShapedType::isDynamic(dimSize)) {
       sizes.push_back(rewriter.getIndexAttr(dimSize));
@@ -50,9 +80,7 @@ static LogicalResult padAlloc(MLIRContext *context, memref::AllocOp allocOp) {
     }
     Value dim = allocOp.getDynamicSizes()[dynamicDimIdx++];
     dim = skipAffineMaxZero(dim);
-    auto ub = ValueBoundsConstraintSet::computeConstantBound(
-        presburger::BoundType::UB, {dim, /*dim=*/std::nullopt},
-        /*stopCondition=*/nullptr, /*closedUB=*/true);
+    FailureOr<int64_t> ub = getUpperBound(dim, solver);
     if (failed(ub)) {
       return allocOp.emitOpError(
           "unexpected allocation without upper bound shapes");
@@ -84,11 +112,20 @@ struct PadDynamicAllocPass final
     auto funcOp = getOperation();
     MLIRContext *context = &getContext();
     SmallVector<memref::AllocOp> sharedMemAllocs;
+
+    DataFlowSolver solver;
+    solver.load<dataflow::DeadCodeAnalysis>();
+    solver.load<dataflow::IntegerRangeAnalysis>();
+    if (failed(solver.initializeAndRun(funcOp))) {
+      funcOp.emitOpError("failed to run integer range analysis");
+      return signalPassFailure();
+    }
+
     // Collect all the alloc operations.
     funcOp.walk(
         [&](memref::AllocOp allocOp) { sharedMemAllocs.push_back(allocOp); });
     for (memref::AllocOp alloc : sharedMemAllocs) {
-      if (failed(padAlloc(context, alloc)))
+      if (failed(padAlloc(context, alloc, solver)))
         return signalPassFailure();
     }
   }

@@ -269,11 +269,9 @@ iree_status_t iree_hal_cuda_native_executable_create(
       (CUmodule*)((uint8_t*)executable + sizeof(*executable) +
                   export_count * sizeof(executable->exports[0]));
   executable->export_count = export_count;
-  IREE_TRACE(
-      iree_hal_debug_export_info_t* export_infos =
-          (iree_hal_debug_export_info_t*)((uint8_t*)executable->modules +
-                                          module_count *
-                                              sizeof(executable->modules[0])));
+  IREE_TRACE(uint8_t* export_info_ptr =
+                 ((uint8_t*)executable->modules +
+                  module_count * sizeof(executable->modules[0])));
 
   // Publish any embedded source files to the tracing infrastructure.
   iree_hal_debug_publish_source_files(
@@ -376,13 +374,13 @@ iree_status_t iree_hal_cuda_native_executable_create(
           iree_hal_cuda_BindingBits_vec_len(binding_flags_vec);
 
       IREE_TRACE({
-        iree_hal_debug_copy_export_info(
-            iree_hal_cuda_ExportDef_debug_info_get(export_def),
-            &export_infos[i]);
-        kernel_info->debug_info.function_name = export_infos[i].function_name;
-        kernel_info->debug_info.source_filename =
-            export_infos[i].source_filename;
-        kernel_info->debug_info.source_line = export_infos[i].source_line;
+        iree_hal_debug_export_info_t* export_info =
+            (iree_hal_debug_export_info_t*)export_info_ptr;
+        export_info_ptr += iree_hal_debug_copy_export_info(
+            iree_hal_cuda_ExportDef_debug_info_get(export_def), export_info);
+        kernel_info->debug_info.function_name = export_info->function_name;
+        kernel_info->debug_info.source_filename = export_info->source_filename;
+        kernel_info->debug_info.source_line = export_info->source_line;
       });
     }
   }

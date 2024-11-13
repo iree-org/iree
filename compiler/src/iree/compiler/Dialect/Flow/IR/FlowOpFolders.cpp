@@ -37,6 +37,8 @@ namespace mlir::iree_compiler::IREE::Flow {
 // Folding utilities
 //===----------------------------------------------------------------------===//
 
+namespace {
+
 // Erases an op if it has no uses.
 // This is to support ops that are "pure" but can't be marked as such because
 // the MLIR CSE pass would deduplicate them.
@@ -169,6 +171,8 @@ static SmallVector<Value> refreshDimsOnTypeChange(Operation *op, Type oldType,
   }
   return newDims;
 }
+
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // flow.dispatch.workgroups
@@ -365,6 +369,8 @@ void DispatchWorkgroupsOp::getCanonicalizationPatterns(
 // flow.dispatch.workload.ordinal
 //===----------------------------------------------------------------------===//
 
+namespace {
+
 // Bubble up the ordinal ops so that all uses go through this operation.
 struct BubbleUpOrdinalOp : public OpRewritePattern<DispatchWorkloadOrdinalOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -398,6 +404,8 @@ struct BubbleUpOrdinalOp : public OpRewritePattern<DispatchWorkloadOrdinalOp> {
     return success();
   }
 };
+
+} // namespace
 
 /// Fold away following sequence of `flow.dispatch.workload.ordinal`.
 ///
@@ -863,25 +871,6 @@ OpFoldResult TensorReshapeOp::fold(FoldAdaptor operands) {
   return {};
 }
 
-//===----------------------------------------------------------------------===//
-// flow.tensor.bitcast
-//===----------------------------------------------------------------------===//
-
-OpFoldResult TensorBitCastOp::fold(FoldAdaptor operands) {
-  auto sourceType = llvm::cast<ShapedType>(getSource().getType());
-  auto resultType = llvm::cast<ShapedType>(getResult().getType());
-  if (sourceType.getElementType() != resultType.getElementType()) {
-    // Element type mismatch, this is a bitcast.
-    return {};
-  }
-  if (compareShapesEqual(sourceType, getSourceDims(), resultType,
-                         getResultDims())) {
-    // Shapes match and this is a no-op so just fold to the source.
-    return getSource();
-  }
-  return {};
-}
-
 namespace {
 
 // Flatten a chain of reshapes or bitcasts (reshape/bitcast feeding into
@@ -926,48 +915,6 @@ struct FlattenTensorCastLikeChain : public OpRewritePattern<CastOpTy> {
           reshapeOp, reshapeOp.getResult().getType(), source, sourceDims,
           reshapeOp.getResultDims());
     }
-    return success();
-  }
-};
-
-// Replace `flow.tensor.splat`-`flow.tensor.load` op-pairs by the input
-// primitive value for the splat op.
-struct FoldSplatLoadIntoPrimitive : public OpRewritePattern<TensorLoadOp> {
-  using OpRewritePattern<TensorLoadOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(TensorLoadOp loadOp,
-                                PatternRewriter &rewriter) const override {
-    auto sourceOp =
-        dyn_cast_or_null<TensorSplatOp>(loadOp.getSource().getDefiningOp());
-
-    if (!sourceOp)
-      return failure();
-
-    rewriter.replaceOp(loadOp, sourceOp.getValue());
-    return success();
-  }
-};
-
-struct FoldSplatReshapeIntoSplat : public OpRewritePattern<TensorSplatOp> {
-  using OpRewritePattern<TensorSplatOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(TensorSplatOp splatOp,
-                                PatternRewriter &rewriter) const override {
-    if (!splatOp.getResult().hasOneUse())
-      return failure();
-
-    auto reshapeOp = dyn_cast_or_null<TensorReshapeOp>(
-        splatOp.getResult().use_begin()->getOwner());
-    if (!reshapeOp)
-      return failure();
-
-    PatternRewriter::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(reshapeOp);
-    rewriter.replaceOpWithNewOp<TensorSplatOp>(
-        reshapeOp, reshapeOp.getResult().getType(), splatOp.getValue(),
-        reshapeOp.getResultDims());
-    rewriter.eraseOp(splatOp);
-
     return success();
   }
 };
@@ -1032,6 +979,25 @@ void TensorReshapeOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<ResolveShapedDim>(context);
 }
 
+//===----------------------------------------------------------------------===//
+// flow.tensor.bitcast
+//===----------------------------------------------------------------------===//
+
+OpFoldResult TensorBitCastOp::fold(FoldAdaptor operands) {
+  auto sourceType = llvm::cast<ShapedType>(getSource().getType());
+  auto resultType = llvm::cast<ShapedType>(getResult().getType());
+  if (sourceType.getElementType() != resultType.getElementType()) {
+    // Element type mismatch, this is a bitcast.
+    return {};
+  }
+  if (compareShapesEqual(sourceType, getSourceDims(), resultType,
+                         getResultDims())) {
+    // Shapes match and this is a no-op so just fold to the source.
+    return getSource();
+  }
+  return {};
+}
+
 void TensorBitCastOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
   results.insert<ReplaceOpIfTensorOperandZeroElements<TensorBitCastOp, 0>>(
@@ -1059,6 +1025,25 @@ OpFoldResult TensorLoadOp::fold(FoldAdaptor operands) {
   }
   return {};
 }
+
+namespace {
+
+// Replace `flow.tensor.splat`-`flow.tensor.load` op-pairs by the input
+// primitive value for the splat op.
+struct FoldSplatLoadIntoPrimitive : public OpRewritePattern<TensorLoadOp> {
+  using OpRewritePattern<TensorLoadOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorLoadOp loadOp,
+                                PatternRewriter &rewriter) const override {
+    auto sourceOp =
+        dyn_cast_or_null<TensorSplatOp>(loadOp.getSource().getDefiningOp());
+    if (!sourceOp)
+      return failure();
+    rewriter.replaceOp(loadOp, sourceOp.getValue());
+    return success();
+  }
+};
+
+} // namespace
 
 void TensorLoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                MLIRContext *context) {
@@ -1115,6 +1100,25 @@ void TensorEmptyOp::getCanonicalizationPatterns(RewritePatternSet &results,
 //===----------------------------------------------------------------------===//
 // flow.tensor.splat
 //===----------------------------------------------------------------------===//
+
+namespace {
+
+struct FoldSplatReshapeIntoSplat : public OpRewritePattern<TensorReshapeOp> {
+  using OpRewritePattern<TensorReshapeOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorReshapeOp reshapeOp,
+                                PatternRewriter &rewriter) const override {
+    auto splatOp = dyn_cast_if_present<TensorSplatOp>(
+        reshapeOp.getSource().getDefiningOp());
+    if (!splatOp)
+      return failure();
+    rewriter.replaceOpWithNewOp<TensorSplatOp>(
+        reshapeOp, reshapeOp.getResult().getType(), splatOp.getValue(),
+        reshapeOp.getResultDims());
+    return success();
+  }
+};
+
+} // namespace
 
 void TensorSplatOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {

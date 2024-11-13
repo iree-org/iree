@@ -128,11 +128,12 @@ print(
 )
 
 # Setup and get version information.
-VERSION_INFO_FILE = os.path.join(IREE_SOURCE_DIR, "version_info.json")
+VERSION_FILE = os.path.join(IREE_SOURCE_DIR, "runtime/version.json")
+VERSION_FILE_LOCAL = os.path.join(IREE_SOURCE_DIR, "runtime/version_local.json")
 
 
-def load_version_info():
-    with open(VERSION_INFO_FILE, "rt") as f:
+def load_version_info(version_file):
+    with open(version_file, "rt") as f:
         return json.load(f)
 
 
@@ -168,17 +169,19 @@ def find_git_submodule_revision(submodule_path):
         return ""
 
 
+is_dev_build = False
 try:
-    version_info = load_version_info()
+    version_info = load_version_info(VERSION_FILE_LOCAL)
 except FileNotFoundError:
-    print("version_info.json not found. Using defaults", file=sys.stderr)
-    version_info = {}
+    print("version_local.json not found. Using version.json defaults")
+    version_info = load_version_info(VERSION_FILE)
+    is_dev_build = True
 git_versions = find_git_versions()
 
 PACKAGE_SUFFIX = version_info.get("package-suffix") or ""
 PACKAGE_VERSION = version_info.get("package-version")
-if not PACKAGE_VERSION:
-    PACKAGE_VERSION = f"0.dev0+{git_versions.get('IREE') or '0'}"
+if is_dev_build:
+    PACKAGE_VERSION += f"+{git_versions.get('IREE') or '0'}"
 
 
 def maybe_nuke_cmake_cache(cmake_build_dir, cmake_install_dir):
@@ -518,7 +521,7 @@ populate_built_package(
 )
 
 setup(
-    name=f"{custom_package_prefix}iree-runtime{custom_package_suffix}{PACKAGE_SUFFIX}",
+    name=f"{custom_package_prefix}iree-base-runtime{custom_package_suffix}{PACKAGE_SUFFIX}",
     version=f"{PACKAGE_VERSION}",
     author="IREE Authors",
     author_email="iree-technical-discussion@lists.lfaidata.foundation",
@@ -533,8 +536,14 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
     ],
-    url="https://github.com/iree-org/iree",
+    project_urls={
+        "homepage": "https://iree.dev/",
+        "repository": "https://github.com/iree-org/iree",
+        "documentation": "https://iree.dev/reference/bindings/python/",
+    },
     python_requires=">=3.9",
     ext_modules=(
         [

@@ -87,7 +87,8 @@ static iree_status_t iree_tooling_setup_buffer_transfer(
       iree_hal_make_buffer_ref(source_buffer, 0,
                                iree_hal_buffer_byte_length(source_buffer)),
       iree_hal_make_buffer_ref(target_buffer, 0,
-                               iree_hal_buffer_byte_length(source_buffer)));
+                               iree_hal_buffer_byte_length(source_buffer)),
+      IREE_HAL_COPY_FLAG_NONE);
 
   if (iree_status_is_ok(status)) {
     *out_target_buffer = target_buffer;
@@ -122,8 +123,8 @@ static iree_status_t iree_tooling_submit_transfer(
   if (iree_status_is_ok(status)) {
     status = iree_hal_device_queue_execute(
         device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
-        iree_hal_fence_semaphore_list(signal_fence), 1, &command_buffer,
-        /*binding_tables=*/NULL);
+        iree_hal_fence_semaphore_list(signal_fence), command_buffer,
+        iree_hal_buffer_binding_table_empty());
   }
 
   if (iree_status_is_ok(status) && needs_wait) {

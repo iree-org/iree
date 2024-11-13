@@ -25,14 +25,23 @@ namespace mlir::iree_compiler::IREE::GPU {
 // Partial nested layout for an MMA intrinsic's matrix input/output inside
 // a single subgroup.
 struct MMASingleSubgroupLayout {
-  llvm::SmallVector<int64_t, 2> outer;
-  llvm::SmallVector<int64_t, 2> thread;
-  llvm::SmallVector<int64_t, 2> tstrides;
-  llvm::SmallVector<int64_t, 2> element;
+  SmallVector<int64_t, 2> outer;
+  SmallVector<int64_t, 2> thread;
+  SmallVector<int64_t, 2> tstrides;
+  SmallVector<int64_t, 2> element;
 };
 
 MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
                                                 MMAFragment fragment);
+
+MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
+                                                MMAFragment fragment);
+
+MMASingleSubgroupLayout getASingleSubgroupLayout(MmaInterfaceAttr mmaKind);
+
+MMASingleSubgroupLayout getBSingleSubgroupLayout(MmaInterfaceAttr mmaKind);
+
+MMASingleSubgroupLayout getCSingleSubgroupLayout(MmaInterfaceAttr mmaKind);
 
 } // namespace mlir::iree_compiler::IREE::GPU
 

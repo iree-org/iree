@@ -9,7 +9,7 @@
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>
-#translation_info = #iree_codegen.translation_info<None workgroup_size = [64, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [64, 1, 1] subgroup_size = 32>
 func.func @reduce_dispatch_0() attributes {translation_info = #translation_info} {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index

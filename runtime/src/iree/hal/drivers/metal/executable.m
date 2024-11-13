@@ -414,10 +414,8 @@ iree_status_t iree_hal_metal_executable_create(
   iree_hal_resource_initialize(&iree_hal_metal_executable_vtable, &executable->resource);
   executable->host_allocator = host_allocator;
   executable->pipeline_count = pipeline_count;
-  IREE_TRACE(
-      iree_hal_debug_export_info_t* export_infos =
-          (iree_hal_debug_export_info_t*)((uint8_t*)executable->pipelines +
-                                          pipeline_count * sizeof(executable->pipelines[0])));
+  IREE_TRACE(uint8_t* export_info_ptr = ((uint8_t*)executable->pipelines +
+                                         pipeline_count * sizeof(executable->pipelines[0])));
 
   // Publish any embedded source files to the tracing infrastructure.
   iree_hal_debug_publish_source_files(
@@ -442,11 +440,12 @@ iree_status_t iree_hal_metal_executable_create(
       if (!iree_status_is_ok(status)) break;
 
       IREE_TRACE({
-        iree_hal_debug_copy_export_info(iree_hal_metal_PipelineDef_debug_info_get(pipeline_def),
-                                        &export_infos[i]);
-        pipeline->source_location.func_name = export_infos[i].function_name;
-        pipeline->source_location.file_name = export_infos[i].source_filename;
-        pipeline->source_location.line = export_infos[i].source_line;
+        iree_hal_debug_export_info_t* export_info = (iree_hal_debug_export_info_t*)export_info_ptr;
+        export_info_ptr += iree_hal_debug_copy_export_info(
+            iree_hal_metal_PipelineDef_debug_info_get(pipeline_def), export_info);
+        pipeline->source_location.func_name = export_info->function_name;
+        pipeline->source_location.file_name = export_info->source_filename;
+        pipeline->source_location.line = export_info->source_line;
       });
     }
   }

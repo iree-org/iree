@@ -44,6 +44,15 @@ def BufferizeCopyOnlyDispatchesPass :
   }];
 }
 
+def ConfigTrackingCanonicalizerPass :
+    Pass<"iree-codegen-config-tracking-canonicalize", ""> {
+  let summary = "Codegen specific canonicalization pass that tracks lowering configs";
+  let options = [
+    Option<"testConvergence", "test-convergence", "bool",
+           /*default=*/"false", "Fails if the patterns fail to converge">
+  ];
+}
+
 def CleanupBufferAllocViewPass :
     InterfacePass<"iree-codegen-cleanup-buffer-alloc-view", "mlir::FunctionOpInterface"> {
   let summary =
@@ -487,6 +496,11 @@ def RemoveSingleIterationLoopPass :
   let summary = "Remove distributed loop with single iteration.";
 }
 
+def StripCompilationInfoPass :
+    Pass<"iree-codegen-strip-compilation-info", "">{
+   let summary = "Remove all the the lowering configuration and translation info attributes.";
+}
+
 // TODO: Replace with upstream: https://github.com/iree-org/iree/issues/18759
 def IREELoopInvariantCodeMotionPass :
   Pass<"iree-loop-invariant-code-motion", ""> {
@@ -568,6 +582,21 @@ def TileAndDistributeToWorkgroupsUsingForallOpPass :
     "IREE::LinalgExt::IREELinalgExtDialect",
     "scf::SCFDialect",
     "tensor::TensorDialect",
+  ];
+}
+
+def TileLargeTensorsPass :
+    InterfacePass<"iree-codegen-tile-large-tensors", "mlir::FunctionOpInterface"> {
+  let summary = "Greedily tiles all linalg ops that are beyond a certain size";
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::affine::AffineDialect",
+    "::mlir::scf::SCFDialect",
+  ];
+  let options = [
+    Option<"maxVectorSize", "max-vector-size", "int64_t",
+           /*default=*/"64",
+           "Maximum static size to tile to (i.e. all remaining ops will be smaller)">,
   ];
 }
 

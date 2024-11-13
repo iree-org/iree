@@ -683,49 +683,6 @@ def TestVectorLayoutAnalysisOp :
     }];
 }
 
-def WorkgroupSwizzleOp :  Op<Transform_Dialect, "iree.workgroup_swizzle",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     TransformEachOpTrait,
-     TransformOpInterface,
-     ReportTrackingListenerFailuresOpTrait]> {
-  let summary = "Swizzle workgroup ids";
-  let description = [{
-    Swizzle workgroup ids for better cache reuse.
-
-    This transform implements the following swizzling logic (x, y here are the
-    workgroup ids and tiledx, tiledy are the swizzled workgroup ids) :
-
-    t_tiledx = (x + (y % tile) * grid_size_x) / tile;
-    t_tiledy = (y / tile) * tile + (x + (y % tile) * grid_size_x) % tile;
-    c = grid_size_y % tile != 0 && ((y / tile) * tile + tile) > grid_size_y;
-    tiledx = c ? x : t_tiledx;
-    tiledy = c ? y : t_tiledy;
-
-    #### Return modes
-    This transform replaces the old workgroup ids inside the given operation's
-    region with swizzled workgroup ids.
-
-    It does not consume the target handle and always return success.
-  }];
-
-  let arguments = (
-      ins TransformHandleTypeInterface:$target,
-          I64Attr:$log_tile
-  );
-  let results = (outs);
-
-  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::FunctionOpInterface funcOp,
-        ::mlir::transform::ApplyToEachResultList &results,
-        ::mlir::transform::TransformState &state);
-  }];
-}
-
 def FuseConsumerOp : Op<Transform_Dialect, "iree.fuse_consumer",
        [DeclareOpInterfaceMethods<TransformOpInterface>,
         DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,

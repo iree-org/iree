@@ -52,6 +52,24 @@ def Util_ClosureOpInterface : OpInterface<"ClosureOpInterface"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Returns the value captured by the closure operands or the provided value
+        if it was not captured.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"getClosureCapturedValue",
+      /*args=*/(ins "Value":$closureValue),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        if (auto arg = dyn_cast<BlockArgument>(closureValue)) {
+          if (arg.getParentRegion() == &$_op.getClosureBodyRegion()) {
+            return $_op.getClosureOperands()[arg.getArgNumber()];
+          }
+        }
+        return closureValue;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Returns true if the given operation can exist in the closure.
         Not all operations that a closure can contain are guaranteed to be folded
         into the closure, such as when the operation may have side-effects.

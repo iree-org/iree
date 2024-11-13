@@ -69,7 +69,8 @@ TEST_F(CommandBufferCopyBufferTest, CopyWholeBuffer) {
       command_buffer, /*source_ref=*/
       iree_hal_make_buffer_ref(host_buffer, 0, kDefaultAllocationSize),
       /*target_ref=*/
-      iree_hal_make_buffer_ref(device_buffer, 0, kDefaultAllocationSize)));
+      iree_hal_make_buffer_ref(device_buffer, 0, kDefaultAllocationSize),
+      IREE_HAL_COPY_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
   IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer));
@@ -136,7 +137,7 @@ TEST_F(CommandBufferCopyBufferTest, CopySubBuffer) {
       command_buffer,
       iree_hal_make_buffer_ref(device_buffer, /*target_offset=*/0,
                                /*length=*/8),
-      &zero_val, /*pattern_length=*/sizeof(zero_val)));
+      &zero_val, /*pattern_length=*/sizeof(zero_val), IREE_HAL_FILL_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
       command_buffer,
       iree_hal_make_buffer_ref(/*source_buffer=*/host_buffer,
@@ -144,7 +145,8 @@ TEST_F(CommandBufferCopyBufferTest, CopySubBuffer) {
                                /*length=*/kDefaultAllocationSize / 2 - 4),
       iree_hal_make_buffer_ref(/*target_buffer=*/device_buffer,
                                /*target_offset=*/8,
-                               /*length=*/kDefaultAllocationSize / 2 - 4)));
+                               /*length=*/kDefaultAllocationSize / 2 - 4),
+      IREE_HAL_COPY_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
       command_buffer,
       iree_hal_make_buffer_ref(
@@ -153,7 +155,7 @@ TEST_F(CommandBufferCopyBufferTest, CopySubBuffer) {
           /*length=*/kDefaultAllocationSize -
               (8 + kDefaultAllocationSize / 2 - 4)),
       &zero_val,
-      /*pattern_length=*/sizeof(zero_val)));
+      /*pattern_length=*/sizeof(zero_val), IREE_HAL_FILL_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
   IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer));
@@ -223,7 +225,7 @@ TEST_F(CommandBufferCopyBufferTest, CopySubBufferIndirect) {
       command_buffer,
       iree_hal_make_indirect_buffer_ref(kDeviceBufferSlot, /*offset=*/0,
                                         /*length=*/8),
-      &zero_val, /*pattern_length=*/sizeof(zero_val)));
+      &zero_val, /*pattern_length=*/sizeof(zero_val), IREE_HAL_FILL_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
       command_buffer,
       iree_hal_make_indirect_buffer_ref(
@@ -233,7 +235,8 @@ TEST_F(CommandBufferCopyBufferTest, CopySubBufferIndirect) {
       iree_hal_make_indirect_buffer_ref(
           kDeviceBufferSlot,
           /*offset=*/8,
-          /*length=*/kDefaultAllocationSize / 2 - 4)));
+          /*length=*/kDefaultAllocationSize / 2 - 4),
+      IREE_HAL_COPY_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
       command_buffer,
       iree_hal_make_indirect_buffer_ref(
@@ -242,7 +245,7 @@ TEST_F(CommandBufferCopyBufferTest, CopySubBufferIndirect) {
           /*length=*/kDefaultAllocationSize -
               (8 + kDefaultAllocationSize / 2 - 4)),
       &zero_val,
-      /*pattern_length=*/sizeof(zero_val)));
+      /*pattern_length=*/sizeof(zero_val), IREE_HAL_FILL_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
   const iree_hal_buffer_binding_t bindings[] = {

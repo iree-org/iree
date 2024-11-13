@@ -18,7 +18,7 @@ typedef enum iree_hal_command_type_e {
   IREE_HAL_CMD_SIGNAL_EVENT,
   IREE_HAL_CMD_RESET_EVENT,
   IREE_HAL_CMD_WAIT_EVENTS,
-  IREE_HAL_CMD_DISCARD_BUFFER,
+  IREE_HAL_CMD_ADVISE_BUFFER,
   IREE_HAL_CMD_FILL_BUFFER,
   IREE_HAL_CMD_UPDATE_BUFFER,
   IREE_HAL_CMD_COPY_BUFFER,
@@ -433,17 +433,21 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_wait_events(
 }
 
 //===----------------------------------------------------------------------===//
-// IREE_HAL_CMD_DISCARD_BUFFER
+// IREE_HAL_CMD_ADVISE_BUFFER
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_cmd_discard_buffer_t {
+typedef struct iree_hal_cmd_advise_buffer_t {
   iree_hal_cmd_header_t header;
   iree_hal_buffer_ref_t buffer_ref;
-} iree_hal_cmd_discard_buffer_t;
+  iree_hal_memory_advise_flags_t flags;
+  uint64_t arg0;
+  uint64_t arg1;
+} iree_hal_cmd_advise_buffer_t;
 
-static iree_status_t iree_hal_deferred_command_buffer_discard_buffer(
+static iree_status_t iree_hal_deferred_command_buffer_advise_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_buffer_ref_t buffer_ref) {
+    iree_hal_buffer_ref_t buffer_ref, iree_hal_memory_advise_flags_t flags,
+    uint64_t arg0, uint64_t arg1) {
   iree_hal_deferred_command_buffer_t* command_buffer =
       iree_hal_deferred_command_buffer_cast(base_command_buffer);
   iree_hal_cmd_list_t* cmd_list = &command_buffer->cmd_list;
@@ -451,22 +455,25 @@ static iree_status_t iree_hal_deferred_command_buffer_discard_buffer(
     IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
         command_buffer->resource_set, 1, &buffer_ref.buffer));
   }
-  iree_hal_cmd_discard_buffer_t* cmd = NULL;
+  iree_hal_cmd_advise_buffer_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
-      cmd_list, IREE_HAL_CMD_DISCARD_BUFFER, sizeof(*cmd), (void**)&cmd));
+      cmd_list, IREE_HAL_CMD_ADVISE_BUFFER, sizeof(*cmd), (void**)&cmd));
   cmd->buffer_ref = buffer_ref;
+  cmd->flags = flags;
+  cmd->arg0 = arg0;
+  cmd->arg1 = arg1;
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_deferred_command_buffer_apply_discard_buffer(
+static iree_status_t iree_hal_deferred_command_buffer_apply_advise_buffer(
     iree_hal_command_buffer_t* target_command_buffer,
     iree_hal_buffer_binding_table_t binding_table,
-    const iree_hal_cmd_discard_buffer_t* cmd) {
+    const iree_hal_cmd_advise_buffer_t* cmd) {
   iree_hal_buffer_ref_t buffer_ref;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_binding_table_resolve_ref(
       binding_table, cmd->buffer_ref, &buffer_ref));
-  return iree_hal_command_buffer_discard_buffer(target_command_buffer,
-                                                buffer_ref);
+  return iree_hal_command_buffer_advise_buffer(
+      target_command_buffer, buffer_ref, cmd->flags, cmd->arg0, cmd->arg1);
 }
 
 //===----------------------------------------------------------------------===//
@@ -478,12 +485,13 @@ typedef struct iree_hal_cmd_fill_buffer_t {
   iree_hal_buffer_ref_t target_ref;
   uint64_t pattern;
   iree_host_size_t pattern_length;
+  iree_hal_fill_flags_t flags;
 } iree_hal_cmd_fill_buffer_t;
 
 static iree_status_t iree_hal_deferred_command_buffer_fill_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_buffer_ref_t target_ref, const void* pattern,
-    iree_host_size_t pattern_length) {
+    iree_host_size_t pattern_length, iree_hal_fill_flags_t flags) {
   iree_hal_deferred_command_buffer_t* command_buffer =
       iree_hal_deferred_command_buffer_cast(base_command_buffer);
   iree_hal_cmd_list_t* cmd_list = &command_buffer->cmd_list;
@@ -501,6 +509,7 @@ static iree_status_t iree_hal_deferred_command_buffer_fill_buffer(
   cmd->target_ref = target_ref;
   memcpy(&cmd->pattern, pattern, pattern_length);
   cmd->pattern_length = pattern_length;
+  cmd->flags = flags;
   return iree_ok_status();
 }
 
@@ -513,7 +522,7 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_fill_buffer(
       binding_table, cmd->target_ref, &target_ref));
   return iree_hal_command_buffer_fill_buffer(target_command_buffer, target_ref,
                                              (void**)&cmd->pattern,
-                                             cmd->pattern_length);
+                                             cmd->pattern_length, cmd->flags);
 }
 
 //===----------------------------------------------------------------------===//
@@ -523,12 +532,14 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_fill_buffer(
 typedef struct iree_hal_cmd_update_buffer_t {
   iree_hal_cmd_header_t header;
   iree_hal_buffer_ref_t target_ref;
+  iree_hal_update_flags_t flags;
   uint8_t source_buffer[];
 } iree_hal_cmd_update_buffer_t;
 
 static iree_status_t iree_hal_deferred_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
-    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref) {
+    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref,
+    iree_hal_update_flags_t flags) {
   iree_hal_deferred_command_buffer_t* command_buffer =
       iree_hal_deferred_command_buffer_cast(base_command_buffer);
   iree_hal_cmd_list_t* cmd_list = &command_buffer->cmd_list;
@@ -542,6 +553,7 @@ static iree_status_t iree_hal_deferred_command_buffer_update_buffer(
       sizeof(*cmd) + sizeof(cmd->source_buffer[0]) * target_ref.length,
       (void**)&cmd));
   cmd->target_ref = target_ref;
+  cmd->flags = flags;
   memcpy(cmd->source_buffer, (const uint8_t*)source_buffer + source_offset,
          sizeof(cmd->source_buffer[0]) * target_ref.length);
   return iree_ok_status();
@@ -555,7 +567,7 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_update_buffer(
   IREE_RETURN_IF_ERROR(iree_hal_buffer_binding_table_resolve_ref(
       binding_table, cmd->target_ref, &target_ref));
   return iree_hal_command_buffer_update_buffer(
-      target_command_buffer, cmd->source_buffer, 0, target_ref);
+      target_command_buffer, cmd->source_buffer, 0, target_ref, cmd->flags);
 }
 
 //===----------------------------------------------------------------------===//
@@ -566,11 +578,13 @@ typedef struct iree_hal_cmd_copy_buffer_t {
   iree_hal_cmd_header_t header;
   iree_hal_buffer_ref_t source_ref;
   iree_hal_buffer_ref_t target_ref;
+  iree_hal_copy_flags_t flags;
 } iree_hal_cmd_copy_buffer_t;
 
 static iree_status_t iree_hal_deferred_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref) {
+    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref,
+    iree_hal_copy_flags_t flags) {
   iree_hal_deferred_command_buffer_t* command_buffer =
       iree_hal_deferred_command_buffer_cast(base_command_buffer);
   iree_hal_cmd_list_t* cmd_list = &command_buffer->cmd_list;
@@ -591,6 +605,7 @@ static iree_status_t iree_hal_deferred_command_buffer_copy_buffer(
       cmd_list, IREE_HAL_CMD_COPY_BUFFER, sizeof(*cmd), (void**)&cmd));
   cmd->source_ref = source_ref;
   cmd->target_ref = target_ref;
+  cmd->flags = flags;
   return iree_ok_status();
 }
 
@@ -605,7 +620,7 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_copy_buffer(
   IREE_RETURN_IF_ERROR(iree_hal_buffer_binding_table_resolve_ref(
       binding_table, cmd->target_ref, &target_ref));
   return iree_hal_command_buffer_copy_buffer(target_command_buffer, source_ref,
-                                             target_ref);
+                                             target_ref, cmd->flags);
 }
 
 //===----------------------------------------------------------------------===//
@@ -832,8 +847,8 @@ static const iree_hal_cmd_apply_fn_t iree_hal_cmd_apply_table[] = {
         iree_hal_deferred_command_buffer_apply_reset_event,
     [IREE_HAL_CMD_WAIT_EVENTS] = (iree_hal_cmd_apply_fn_t)
         iree_hal_deferred_command_buffer_apply_wait_events,
-    [IREE_HAL_CMD_DISCARD_BUFFER] = (iree_hal_cmd_apply_fn_t)
-        iree_hal_deferred_command_buffer_apply_discard_buffer,
+    [IREE_HAL_CMD_ADVISE_BUFFER] = (iree_hal_cmd_apply_fn_t)
+        iree_hal_deferred_command_buffer_apply_advise_buffer,
     [IREE_HAL_CMD_FILL_BUFFER] = (iree_hal_cmd_apply_fn_t)
         iree_hal_deferred_command_buffer_apply_fill_buffer,
     [IREE_HAL_CMD_UPDATE_BUFFER] = (iree_hal_cmd_apply_fn_t)
@@ -894,7 +909,7 @@ static const iree_hal_command_buffer_vtable_t
         .signal_event = iree_hal_deferred_command_buffer_signal_event,
         .reset_event = iree_hal_deferred_command_buffer_reset_event,
         .wait_events = iree_hal_deferred_command_buffer_wait_events,
-        .discard_buffer = iree_hal_deferred_command_buffer_discard_buffer,
+        .advise_buffer = iree_hal_deferred_command_buffer_advise_buffer,
         .fill_buffer = iree_hal_deferred_command_buffer_fill_buffer,
         .update_buffer = iree_hal_deferred_command_buffer_update_buffer,
         .copy_buffer = iree_hal_deferred_command_buffer_copy_buffer,

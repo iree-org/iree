@@ -42,6 +42,7 @@ typedef uintptr_t iree_hal_device_id_t;
 // request of the calling application. Note that certain features may disable
 // runtime optimizations or require compilation flags to ensure the required
 // metadata is present in executables.
+typedef uint64_t iree_hal_device_feature_t;
 enum iree_hal_device_feature_bits_t {
   IREE_HAL_DEVICE_FEATURE_NONE = 0u,
 
@@ -67,7 +68,6 @@ enum iree_hal_device_feature_bits_t {
   // partial embedded debug information to allow mapping back to source offsets.
   IREE_HAL_DEVICE_FEATURE_SUPPORTS_PROFILING = 1u << 2,
 };
-typedef uint32_t iree_hal_device_feature_t;
 
 // Describes an enumerated HAL device.
 typedef struct iree_hal_device_info_t {
@@ -81,6 +81,7 @@ typedef struct iree_hal_device_info_t {
 
 // Defines what information is captured during profiling.
 // Not all implementations will support all modes.
+typedef uint64_t iree_hal_device_profiling_mode_t;
 enum iree_hal_device_profiling_mode_bits_t {
   IREE_HAL_DEVICE_PROFILING_MODE_NONE = 0u,
 
@@ -98,7 +99,6 @@ enum iree_hal_device_profiling_mode_bits_t {
   // be used when investigating the performance of an individual dispatch.
   IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_COUNTERS = 1u << 2,
 };
-typedef uint32_t iree_hal_device_profiling_mode_t;
 
 // Controls profiling options.
 typedef struct iree_hal_device_profiling_options_t {
@@ -113,6 +113,7 @@ typedef struct iree_hal_device_profiling_options_t {
 } iree_hal_device_profiling_options_t;
 
 // A bitfield indicating compatible semaphore behavior for a device.
+typedef uint64_t iree_hal_semaphore_compatibility_t;
 enum iree_hal_semaphore_compatibility_bits_t {
   // Indicates (in the absence of other bits) the semaphore is not compatible
   // with the device at all. Any attempts to use the semaphore for any usage
@@ -152,7 +153,18 @@ enum iree_hal_semaphore_compatibility_bits_t {
       IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_SIGNAL |
       IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_SIGNAL,
 };
-typedef uint32_t iree_hal_semaphore_compatibility_t;
+
+// Bitfield specifying flags controlling a file read operation.
+typedef uint64_t iree_hal_read_flags_t;
+enum iree_hal_read_flag_bits_t {
+  IREE_HAL_READ_FLAG_NONE = 0,
+};
+
+// Bitfield specifying flags controlling a file write operation.
+typedef uint64_t iree_hal_write_flags_t;
+enum iree_hal_write_flag_bits_t {
+  IREE_HAL_WRITE_FLAG_NONE = 0,
+};
 
 // Defines how a multi-wait operation treats the results of multiple semaphores.
 typedef enum iree_hal_wait_mode_e {
@@ -300,11 +312,12 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_dealloca(
     iree_hal_buffer_t* buffer);
 
 // Enqueues a single queue-ordered fill operation.
+// The |target_buffer| must be visible to the device queue performing the fill.
 //
 // WARNING: individual fills have a high overhead and batching should be
 // performed by the caller instead of calling this multiple times. The
 // iree_hal_create_transfer_command_buffer utility makes it easy to create
-// batches of transfer operations (fill, copy, update) and is only a few lines
+// batches of transfer operations (fill, update, copy) and is only a few lines
 // more code.
 IREE_API_EXPORT iree_status_t iree_hal_device_queue_fill(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
@@ -312,14 +325,38 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_fill(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length, const void* pattern,
-    iree_host_size_t pattern_length);
+    iree_host_size_t pattern_length, iree_hal_fill_flags_t flags);
 
-// Enqueues a single queue-ordered copy operation.
+// Enqueues a single queue-ordered buffer update operation.
+// The provided |source_buffer| will be captured and need not remain live or
+// unchanged while the operation is queued. The |target_buffer| must be visible
+// to the device queue performing the update.
+//
+// Some implementations may have limits on the size of the update or may perform
+// poorly if the size is larger than an implementation-defined limit. Updates
+// should be kept as small and infrequent as possible.
 //
 // WARNING: individual copies have a high overhead and batching should be
 // performed by the caller instead of calling this multiple times. The
 // iree_hal_create_transfer_command_buffer utility makes it easy to create
-// batches of transfer operations (fill, copy, update) and is only a few lines
+// batches of transfer operations (fill, update, copy) and is only a few lines
+// more code.
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_update(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    const void* source_buffer, iree_host_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, iree_hal_update_flags_t flags);
+
+// Enqueues a single queue-ordered copy operation.
+// The |source_buffer| and |target_buffer| must both be visible to the device
+// queue performing the copy.
+//
+// WARNING: individual copies have a high overhead and batching should be
+// performed by the caller instead of calling this multiple times. The
+// iree_hal_create_transfer_command_buffer utility makes it easy to create
+// batches of transfer operations (fill, update, copy) and is only a few lines
 // more code.
 IREE_API_EXPORT iree_status_t iree_hal_device_queue_copy(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
@@ -327,7 +364,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_copy(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length);
+    iree_device_size_t length, iree_hal_copy_flags_t flags);
 
 // Enqueues a file read operation that streams a segment of the |source_file|
 // defined by the |source_offset| and |length| into the HAL |target_buffer| at
@@ -340,7 +377,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_read(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_file_t* source_file, uint64_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length, uint32_t flags);
+    iree_device_size_t length, iree_hal_read_flags_t flags);
 
 // Enqueues a file write operation that streams a segment of the HAL
 // |source_buffer| defined by the |source_offset| and |length| into the
@@ -353,14 +390,14 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_write(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_file_t* target_file, uint64_t target_offset,
-    iree_device_size_t length, uint32_t flags);
+    iree_device_size_t length, iree_hal_write_flags_t flags);
 
-// Executes zero or more command buffers on a device queue.
-// The command buffers are executed in order as if they were recorded as one.
+// Executes a command buffer on a device queue.
 // No commands will execute until the wait fence has been reached and the signal
-// fence will be signaled when all commands have completed.
+// fence will be signaled when all commands have completed. If a command buffer
+// is omitted this will act as a barrier.
 //
-// The queue is selected based on the command buffers submitted and the
+// The queue is selected based on the command buffer submitted and the
 // |queue_affinity|. As the number of available queues can vary the
 // |queue_affinity| is used to hash into the available queues for the required
 // categories. For example if 2 queues support transfer commands and the
@@ -369,10 +406,10 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_write(
 // placed on to the same queue. Note that the exact hashing function is
 // implementation dependent.
 //
-// A list of binding tables matching the list of command buffers must be
-// provided if any command buffer has indirect bindings and may otherwise be
-// NULL. The binding table contents will be captured during the call and need
-// not persist after the call returns.
+// A optional binding table must be provided if the command buffer has indirect
+// bindings and may otherwise be `iree_hal_buffer_binding_table_empty()`. The
+// binding table contents will be captured during the call and need not persist
+// after the call returns.
 //
 // The submission behavior matches Vulkan's vkQueueSubmit, with each submission
 // executing its command buffers in the order they are defined but allowing the
@@ -382,9 +419,8 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_execute(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers,
-    iree_hal_buffer_binding_table_t const* binding_tables);
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_binding_table_t binding_table);
 
 // Enqueues a barrier waiting for |wait_semaphore_list| and signaling
 // |signal_semaphore_list| when reached.
@@ -559,13 +595,37 @@ typedef struct iree_hal_device_vtable_t {
       const iree_hal_semaphore_list_t signal_semaphore_list,
       iree_hal_buffer_t* buffer);
 
+  iree_status_t(IREE_API_PTR* queue_fill)(
+      iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+      const iree_hal_semaphore_list_t wait_semaphore_list,
+      const iree_hal_semaphore_list_t signal_semaphore_list,
+      iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+      iree_device_size_t length, const void* pattern,
+      iree_host_size_t pattern_length, iree_hal_fill_flags_t flags);
+
+  iree_status_t(IREE_API_PTR* queue_update)(
+      iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+      const iree_hal_semaphore_list_t wait_semaphore_list,
+      const iree_hal_semaphore_list_t signal_semaphore_list,
+      const void* source_buffer, iree_host_size_t source_offset,
+      iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+      iree_device_size_t length, iree_hal_update_flags_t flags);
+
+  iree_status_t(IREE_API_PTR* queue_copy)(
+      iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+      const iree_hal_semaphore_list_t wait_semaphore_list,
+      const iree_hal_semaphore_list_t signal_semaphore_list,
+      iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
+      iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+      iree_device_size_t length, iree_hal_copy_flags_t flags);
+
   iree_status_t(IREE_API_PTR* queue_read)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
       const iree_hal_semaphore_list_t wait_semaphore_list,
       const iree_hal_semaphore_list_t signal_semaphore_list,
       iree_hal_file_t* source_file, uint64_t source_offset,
       iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-      iree_device_size_t length, uint32_t flags);
+      iree_device_size_t length, iree_hal_read_flags_t flags);
 
   iree_status_t(IREE_API_PTR* queue_write)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
@@ -573,15 +633,14 @@ typedef struct iree_hal_device_vtable_t {
       const iree_hal_semaphore_list_t signal_semaphore_list,
       iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
       iree_hal_file_t* target_file, uint64_t target_offset,
-      iree_device_size_t length, uint32_t flags);
+      iree_device_size_t length, iree_hal_write_flags_t flags);
 
   iree_status_t(IREE_API_PTR* queue_execute)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
       const iree_hal_semaphore_list_t wait_semaphore_list,
       const iree_hal_semaphore_list_t signal_semaphore_list,
-      iree_host_size_t command_buffer_count,
-      iree_hal_command_buffer_t* const* command_buffers,
-      iree_hal_buffer_binding_table_t const* binding_tables);
+      iree_hal_command_buffer_t* command_buffer,
+      iree_hal_buffer_binding_table_t binding_table);
 
   iree_status_t(IREE_API_PTR* queue_flush)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity);
@@ -599,6 +658,30 @@ typedef struct iree_hal_device_vtable_t {
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_device_vtable_t);
 
 IREE_API_EXPORT void iree_hal_device_destroy(iree_hal_device_t* device);
+
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_emulated_fill(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, const void* pattern,
+    iree_host_size_t pattern_length, iree_hal_fill_flags_t flags);
+
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_emulated_update(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    const void* source_buffer, iree_host_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, iree_hal_update_flags_t flags);
+
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_emulated_copy(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, iree_hal_copy_flags_t flags);
 
 #ifdef __cplusplus
 }  // extern "C"
