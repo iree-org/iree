@@ -144,6 +144,13 @@ iree_test_utils_e2e_value_t iree_test_utils_value_make_f32(float value) {
   return result;
 }
 
+iree_test_utils_e2e_value_t iree_test_utils_value_make_f64(float value) {
+  iree_test_utils_e2e_value_t result;
+  result.type = IREE_TEST_UTILS_VALUE_TYPE_F64;
+  result.f64 = value;
+  return result;
+}
+
 iree_test_utils_e2e_value_t iree_test_utils_read_buffer_element(
     iree_hal_dim_t index, iree_hal_element_type_t result_type,
     const void* data) {
@@ -167,6 +174,8 @@ iree_test_utils_e2e_value_t iree_test_utils_read_buffer_element(
     return iree_test_utils_value_make_bf16(((uint16_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
     return iree_test_utils_value_make_f32(((float*)data)[index]);
+  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_64) {
+    return iree_test_utils_value_make_f64(((double*)data)[index]);
   }
   iree_status_abort(iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                      "unhandled matmul result type"));
@@ -273,6 +282,10 @@ bool iree_test_utils_result_elements_agree(iree_test_utils_e2e_value_t expected,
       if (actual.f32 == expected.f32) return true;
       if (iree_test_utils_require_exact_results()) return false;
       return fabsf(actual.f32 - expected.f32) < acceptable_fp_delta;
+    case IREE_TEST_UTILS_VALUE_TYPE_F64:
+      if (actual.f64 == expected.f64) return true;
+      if (iree_test_utils_require_exact_results()) return false;
+      return fabs(actual.f64 - expected.f64) < acceptable_fp_delta;
     default:
       iree_status_abort(iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                          "unhandled value type"));
@@ -387,7 +400,7 @@ void iree_test_utils_get_min_max_for_element_type(
     case IREE_HAL_ELEMENT_TYPE_SINT_64:
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
       *min = -16;
-      *min = +16;
+      *max = +16;
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_64:
       *min = 0;

@@ -45,21 +45,17 @@ Value setEncoding(OpBuilder &builder, Location loc, Value source,
   return builder.create<IREE::Encoding::SetEncodingOp>(loc, resultType, source);
 };
 
-static Value unsetEncodingAndExtractSlice(OpBuilder &builder, Location loc,
-                                          Value source,
-                                          SmallVector<OpFoldResult> sizes) {
+static Value unsetEncoding(OpBuilder &builder, Location loc, Value source,
+                           SmallVector<OpFoldResult> sizes) {
+  SmallVector<Value> dynamicSizesVec;
+  SmallVector<int64_t> staticSizesVec;
+  dispatchIndexOpFoldResults(sizes, dynamicSizesVec, staticSizesVec);
+
   auto sourceType = cast<RankedTensorType>(source.getType());
   auto unsetEncodingReturnType =
       RankedTensorType::get(sourceType.getShape(), sourceType.getElementType());
-  auto unsetEncoding = builder
-                           .create<IREE::Encoding::UnsetEncodingOp>(
-                               loc, unsetEncodingReturnType, source)
-                           .getResult();
-  auto rank = sourceType.getRank();
-  SmallVector<OpFoldResult> offsets(rank, builder.getIndexAttr(0));
-  SmallVector<OpFoldResult> strides(rank, builder.getIndexAttr(1));
-  return builder.create<tensor::ExtractSliceOp>(loc, unsetEncoding, offsets,
-                                                sizes, strides);
+  return builder.create<IREE::Encoding::UnsetEncodingOp>(
+      loc, unsetEncodingReturnType, source, dynamicSizesVec);
 }
 
 /// Given a LinalgOp and one of its OpOperands, return the element type,
@@ -235,8 +231,7 @@ public:
     // Sizes are computed by original output size.
     SmallVector<OpFoldResult> outSizes =
         tensor::getMixedSizes(rewriter, loc, out);
-    Value result =
-        unsetEncodingAndExtractSlice(rewriter, loc, opTiled, outSizes);
+    Value result = unsetEncoding(rewriter, loc, opTiled, outSizes);
 
     rewriter.replaceOp(linalgOp, result);
     return success();

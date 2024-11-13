@@ -103,12 +103,8 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   // unrollK=4 to turn 4 separate 32-bit loads into one 128-bit load.
   int intrinsicLoadBits =
       std::min(sizeInBits(intrinsicA), sizeInBits(intrinsicB));
-  if (*wgp.getMaxLoadInstructionBits() % intrinsicLoadBits != 0) {
-    // Never seen that case: the ISA does not have a suitable load instruction
-    // to feed that intrinsic?!
-    return {};
-  }
-  const int unrollK = *wgp.getMaxLoadInstructionBits() / intrinsicLoadBits;
+  const int unrollK =
+      std::max(1, *wgp.getMaxLoadInstructionBits() / intrinsicLoadBits);
 
   // The total amount of unrolling along the M and N dimensions is normally
   // limited only by the number of available registers, since larger M and N
@@ -493,13 +489,13 @@ public:
     } else {
       gpuTargetAttr = getCLGPUTarget(op.getContext());
     }
-    std::optional<IREE::GPU::DataTiledMMAAttr> mma = chooseDataTiledMMAAttr(
+    IREE::GPU::DataTiledMMAAttr mma = chooseDataTiledMMAAttr(
         resultEncoding.getElementTypesArray(), gpuTargetAttr, resultEncoding);
     if (!mma) {
       LLVM_DEBUG(llvm::dbgs() << "can't find supported Mma intrinsic\n");
       return failure();
     }
-    LLVM_DEBUG(llvm::dbgs() << "Target MMA: " << mma.value() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Target MMA: " << mma << "\n");
 
     FailureOr<linalg::ContractionDimensions> contractionDims =
         linalg::inferContractionDims(linalgOp);
@@ -535,8 +531,7 @@ public:
     Location loc = op.getLoc();
     auto mmaOp = rewriter.create<IREE::GPU::MultiMmaOp>(
         loc, operands[0], operands[1], operands[2],
-        ArrayRef<AffineMap>{lhsMap, rhsMap, accMap}, iteratorTypes,
-        mma.value());
+        ArrayRef<AffineMap>{lhsMap, rhsMap, accMap}, iteratorTypes, mma);
     rewriter.replaceOp(op, mmaOp);
     return success();
   }

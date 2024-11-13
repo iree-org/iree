@@ -6,7 +6,7 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = []>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workgroup_size = [32, 8, 8], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulSimt workgroup_size = [32, 8, 8], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<4x8xf32>
@@ -25,7 +25,7 @@ func.func @illegal() attributes {translation_info = #translation} {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = []>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workgroup_size = [32, 8, 2], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulSimt workgroup_size = [32, 8, 2], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<4x8xf32>
@@ -44,7 +44,7 @@ func.func @illegal() attributes {translation_info = #translation} {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 10], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 10], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<32x16xf32>
@@ -63,7 +63,7 @@ func.func @illegal() attributes {translation_info = #translation} {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [48, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulTensorCore workgroup_size = [48, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<32x16xf32>
@@ -82,7 +82,7 @@ func.func @illegal() attributes {translation_info = #translation} {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 2], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 2], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<32x16xf32>
@@ -101,7 +101,7 @@ func.func @illegal() attributes {translation_info = #translation} {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 20]]>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<32x16xf32>
@@ -120,7 +120,7 @@ func.func @illegal() attributes {translation_info = #translation} {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 32, 16]]>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [128, 1, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulTensorCore workgroup_size = [128, 1, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<1024x512xf32>
@@ -139,7 +139,7 @@ func.func @illegal() attributes {translation_info = #translation} {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<48x16xf32>
@@ -158,7 +158,7 @@ func.func @illegal() attributes {translation_info = #translation} {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<32x16xf32>
@@ -182,7 +182,7 @@ func.func @illegal() attributes {translation_info = #translation} {
 #map2 = affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>
 #map3 = affine_map<(d0, d1, d2)[s0] -> (d0 * 65536 + s0 + d1 * 64 + d2)>
 #map4 = affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
@@ -228,7 +228,7 @@ func.func @illegal() attributes {translation_info = #translation} {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 32, 48]]>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 1, 1], {pipeline_depth = 4 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 1, 1], {pipeline_depth = 4 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<1024x512xf32>
@@ -247,7 +247,7 @@ func.func @illegal() attributes {translation_info = #translation} {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 32, 4]]>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 1, 1], {pipeline_depth = 4 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 1, 1], {pipeline_depth = 4 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<1024x512xf32>
@@ -266,7 +266,7 @@ func.func @illegal() attributes {translation_info = #translation} {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 64]]>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 1, 1], {pipeline_depth = 4 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 1, 1], {pipeline_depth = 4 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<1024x512xi8>

@@ -127,6 +127,13 @@ struct ResolveDeviceAliasesPass
       globalOp.setGlobalInitialValue(*resolvedValue);
     }
   }
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::HAL::HALDialect>();
+    for (StringRef name : targetRegistry->getRegisteredTargetBackends()) {
+      targetRegistry->getTargetBackend(name)->getDependentDialects(registry);
+    }
+  }
 };
 
 } // namespace

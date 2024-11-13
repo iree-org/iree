@@ -1,7 +1,60 @@
 # Python Deployment
 
+These scripts assist with building Python packages and pushing them to
+[PyPI (the Python Package Index)](https://pypi.org/). See also
+
+* The Python Packaging User Guide: <https://packaging.python.org/en/latest/>
+* Our release management documentation:
+  https://iree.dev/developers/general/release-management/
+
+## Overview
+
 See comments in scripts for canonical usage. This page includes additional
 notes.
+
+### Package building
+
+These scripts build all packages we maintain, for all Python versions and
+platforms that we support:
+
+* [`build_linux_packages.sh`](./build_linux_packages.sh)
+* [`build_macos_packages.sh`](./build_macos_packages.sh)
+* [`build_windows_packages.ps1`](./build_windows_packages.ps1)
+
+To assist with environment setup, we use a
+[manylinux Docker image](https://github.com/iree-org/base-docker-images/blob/main/dockerfiles/manylinux_x86_64.Dockerfile)
+for Linux builds and these scripts on other platforms:
+
+* [`install_macos_deps.sh`](./install_macos_deps.sh)
+* [`install_windows_deps.ps1`](./install_windows_deps.ps1)
+
+### Version management
+
+These scripts handle versioning across packages, including considerations like
+major, minor, and patch levels (`X.Y.Z`), as well as suffixes like
+`rc20241107` or `dev+{git hash}`:
+
+* [`compute_common_version.py`](./compute_common_version.py)
+* [`compute_local_version.py`](./compute_local_version.py)
+* [`promote_whl_from_rc_to_final.py`](./promote_whl_from_rc_to_final.py)
+
+### PyPI deployment
+
+These scripts handle promoting nightly releases packages to stable and pushing
+to PyPI:
+
+* [`promote_whl_from_rc_to_final.py`](./promote_whl_from_rc_to_final.py)
+* [`pypi_deploy.sh`](./pypi_deploy.sh)
+
+Both of these scripts expect to have the dependencies from
+[`pypi_deploy_requirements.txt`](./pypi_deploy_requirements.txt) installed.
+This can be easily managed by using a Python virtual environment:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r ./pypi_deploy_requirements.txt
+```
 
 ## Debugging manylinux builds
 

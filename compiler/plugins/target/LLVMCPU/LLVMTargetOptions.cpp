@@ -82,7 +82,7 @@ std::optional<LLVMTarget> LLVMTarget::createForHost() {
   if (status != ResolveCPUAndCPUFeaturesStatus::OK) {
     llvm::errs() << "Internal error while creating host target: "
                  << getMessage(status, triple) << "\n";
-    assert(false);
+    return std::nullopt;
   }
   if (target)
     target->populateDefaultsFromTargetMachine();

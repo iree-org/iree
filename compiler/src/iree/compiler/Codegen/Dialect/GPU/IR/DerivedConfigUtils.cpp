@@ -106,10 +106,6 @@ SmallVector<int64_t> deriveLinalgOpThreadTileSizes(linalg::LinalgOp linalgOp,
   if (!linalgOp.hasPureTensorSemantics()) {
     return {};
   }
-  // TODO: Support multi-result
-  if (linalgOp->getNumResults() != 1) {
-    return {};
-  }
   SmallVector<int64_t> loopRanges = linalgOp.getStaticLoopRanges();
   int64_t vectorSize = kPreferredCopyNumBits /
                        getElementTypeOrSelf(linalgOp->getResultTypes()[0])

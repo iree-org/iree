@@ -1,27 +1,26 @@
-// RUN: iree-opt --iree-llvmgpu-link-executables --split-input-file %s | FileCheck %s
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmgpu-link-executables{target="rocm"})' --split-input-file %s | FileCheck %s --check-prefix=CHECK-TARGET
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmgpu-link-executables{target="cuda"},iree-llvmgpu-link-executables{target="rocm"})' --split-input-file %s | FileCheck %s --check-prefix=CHECK-MULTI
 
 #executable_target_rocm = #hal.executable.target<"rocm", "rocm-hsaco-fb">
 
 // Expect a single executable with both exports and correct ordinals.
-// CHECK: hal.executable private @link_executables_linked
-// CHECK:   hal.executable.variant public @rocm_hsaco_fb
-// CHECK:     hal.executable.export public @export0 ordinal(0)
-// CHECK:     hal.executable.export public @export1 ordinal(1)
+// CHECK-TARGET: hal.executable private @link_executables_linked
+// CHECK-TARGET:   hal.executable.variant public @rocm_hsaco_fb
+// CHECK-TARGET:     hal.executable.export public @export0 ordinal(0)
+// CHECK-TARGET:     hal.executable.export public @export1 ordinal(1)
 
 // Expect one LLVM module with all globals and functions.
 // Note that shared memory is duplicated but dynamic shared memory is not.
-// CHECK: builtin.module
-// CHECK-NEXT: llvm.mlir.global external @__dynamic_shared_memory__
-// CHECK-NEXT: llvm.mlir.global private @__shared_memory__{{.+}} : !llvm.array<2 x array<64 x i32>>
-// CHECK-NEXT: llvm.func @export0
-// CHECK-NEXT:   llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<3>
-// CHECK-NEXT:   llvm.mlir.addressof @__shared_memory__ : !llvm.ptr<3>
-//      CHECK: llvm.mlir.global private @__shared_memory___0{{.+}} : !llvm.array<2 x array<128 x i32>>
-// CHECK-NEXT: llvm.func @export1
-// CHECK-NEXT:   llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<3>
-// CHECK-NEXT:   llvm.mlir.addressof @__shared_memory___0 : !llvm.ptr<3>
+// CHECK-TARGET: builtin.module
+// CHECK-TARGET-NEXT: llvm.mlir.global external @__dynamic_shared_memory__
+// CHECK-TARGET-NEXT: llvm.mlir.global private @__shared_memory__{{.+}} : !llvm.array<2 x array<64 x i32>>
+// CHECK-TARGET-NEXT: llvm.func @export0
+// CHECK-TARGET-NEXT:   llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<3>
+// CHECK-TARGET-NEXT:   llvm.mlir.addressof @__shared_memory__ : !llvm.ptr<3>
+//      CHECK-TARGET: llvm.mlir.global private @__shared_memory___0{{.+}} : !llvm.array<2 x array<128 x i32>>
+// CHECK-TARGET-NEXT: llvm.func @export1
+// CHECK-TARGET-NEXT:   llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<3>
+// CHECK-TARGET-NEXT:   llvm.mlir.addressof @__shared_memory___0 : !llvm.ptr<3>
 
 hal.executable private @executable0 {
   hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm) {
@@ -65,15 +64,6 @@ hal.executable private @executable1 {
 #executable_target_cuda = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #executable_target_rocm = #hal.executable.target<"rocm", "rocm-hsaco-fb">
 
-// Expect a single executable with multiple variants when not specifying target.
-// CHECK: hal.executable private @link_executables_linked
-// CHECK:   hal.executable.variant public @cuda_nvptx_fb_0
-// CHECK:     hal.executable.export public @export0 ordinal(0)
-// CHECK:     hal.executable.export public @export1 ordinal(1)
-// CHECK:   hal.executable.variant public @rocm_hsaco_fb_1
-// CHECK:     hal.executable.export public @export0 ordinal(0)
-// CHECK:     hal.executable.export public @export1 ordinal(1)
-
 // Expect only one target be linked when specified.
 // CHECK-TARGET: hal.executable private @link_executables_linked
 // CHECK-TARGET:   hal.executable.variant public @rocm_hsaco_fb_1
@@ -88,7 +78,7 @@ hal.executable private @executable1 {
 
 // Multiple applications of the pass per target should not conflict.
 // CHECK-MULTI: hal.executable private @link_executables_linked_0
-// CHECK-MULTI:   hal.executable.variant public @rocm_hsaco_fb_1
+// CHECK-MULTI:   hal.executable.variant public @rocm_hsaco_fb
 // CHECK-MULTI:     hal.executable.export public @export0 ordinal(0)
 // CHECK-MULTI:     hal.executable.export public @export1 ordinal(1)
 // CHECK-MULTI: hal.executable private @link_executables_linked

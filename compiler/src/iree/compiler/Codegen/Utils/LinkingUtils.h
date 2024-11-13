@@ -16,8 +16,10 @@ namespace mlir::iree_compiler {
 SetVector<IREE::HAL::ExecutableTargetAttr>
 gatherExecutableTargets(ArrayRef<IREE::HAL::ExecutableOp> executableOps);
 
-// TODO(benvanik): replace with iree/compiler/Utils/ModuleUtils.h version.
-// Only difference is one has the symbol map that we don't even need.
+// Returns a set of executables that contain one or more variants for the given
+// target backend name.
+SmallVector<IREE::HAL::ExecutableOp>
+gatherExecutablesForTarget(mlir::ModuleOp moduleOp, StringRef targetName);
 
 static inline bool allowRenamingPrivateSymbols(Operation *op) {
   return SymbolTable::getSymbolVisibility(op) ==
@@ -32,6 +34,9 @@ static inline bool allowRenamingPrivateSymbols(Operation *op) {
 //
 // Fails if a public symbol in |sourceModuleOp| conflicts with another public
 // symbol tracked in |targetSymbolMap|.
+//
+// TODO(benvanik): replace with iree/compiler/Utils/ModuleUtils.h version.
+// Only difference is one has the symbol map that we don't even need.
 LogicalResult
 mergeModuleInto(Operation *sourceModuleOp, Operation *targetModuleOp,
                 DenseMap<StringRef, Operation *> &targetSymbolMap,

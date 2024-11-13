@@ -14,7 +14,7 @@
 # Sample usage:
 #   python -m venv .venv
 #   source .venv/bin/activate
-#   python -m pip install iree-compiler iree-runtime
+#   python -m pip install iree-base-compiler iree-base-runtime
 #   build_tests.sh .venv/bin && serve_tests.sh
 
 set -e

@@ -2,7 +2,7 @@
 
 #executable_target = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
-#translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 4, 1]>
+#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 4, 1]>
 module attributes {transform.with_named_sequence} {
   memref.global "private" @__shared_memory__ : memref<64x16xf32, #gpu.address_space<workgroup>>
 

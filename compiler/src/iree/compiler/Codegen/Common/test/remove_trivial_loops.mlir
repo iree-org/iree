@@ -4,7 +4,7 @@
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#translation_info = #iree_codegen.translation_info<None workgroup_size = [64, 1, 1]>
+#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [64, 1, 1]>
 // CHECK-LABEL: func.func @dispatch_0()
 hal.executable private @dispatch_0  {
   hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
@@ -52,7 +52,7 @@ hal.executable private @dispatch_0  {
 ]>
 
 // CHECK-LABEL: func.func @workgroup_tile_loop()
-#translation = #iree_codegen.translation_info<LLVMGPUDistribute workgroup_size = [32, 1, 1]>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUDistribute workgroup_size = [32, 1, 1]>
 hal.executable private @workgroup_tile_loop  {
   hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @workgroup_tile_loop layout(#pipeline_layout) {
@@ -87,7 +87,7 @@ hal.executable private @workgroup_tile_loop  {
 ]>
 
 // CHECK-LABEL: func.func @workgroup_tile_loop_negative()
-#translation = #iree_codegen.translation_info<LLVMGPUDistribute>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUDistribute>
 hal.executable private @workgroup_tile_loop_negative  {
   hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @workgroup_tile_loop_negative layout(#pipeline_layout) {
@@ -124,7 +124,7 @@ hal.executable private @workgroup_tile_loop_negative  {
 // CHECK-LABEL: func.func @both_workgroup_and_workitem()
 //   CHECK-NOT:   scf.for
 //       CHECK:   gpu.barrier
-#translation = #iree_codegen.translation_info<LLVMGPUDistribute workgroup_size = [8, 2, 1]>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUDistribute workgroup_size = [8, 2, 1]>
 hal.executable private @both_workgroup_and_workitem  {
   hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @both_workgroup_and_workitem layout(#pipeline_layout) {
@@ -184,7 +184,7 @@ hal.executable private @both_workgroup_and_workitem  {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 #map0 = affine_map<()[s0] -> (s0 ceildiv 4)>
 #map1 = affine_map<()[s0] -> (s0 * 4)>
 #map2 = affine_map<()[s0, s1] -> (-((s0 * -4 + 4) mod (s1 * 4)) + 4)>

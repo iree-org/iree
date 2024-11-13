@@ -204,7 +204,7 @@ func.func @unset_encoding_dynamic() attributes {
       : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_lhs>>{%d0, %d1}
       -> tensor<?x?xf32, #encoding_lhs>
   %3 = iree_encoding.unset_encoding %2
-      : tensor<?x?xf32, #encoding_lhs> -> tensor<?x?xf32>
+      : tensor<?x?xf32, #encoding_lhs> -> tensor<?x?xf32>{%d0, %d1}
   %4 = tensor.extract_slice %3[0, 0] [%d0, %d1] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
   flow.dispatch.tensor.store %4, %1, offsets = [0, 0], sizes = [%d0, %d1], strides = [1, 1]
       : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%d0, %d1}

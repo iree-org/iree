@@ -25,6 +25,7 @@ class MatrixElemTypeId(enum.Enum):
     NONE = ""
     I8 = "i8"
     I32 = "i32"
+    F64 = "f64"
     F32 = "f32"
     F16 = "f16"
     BF16 = "bf16"
@@ -147,7 +148,7 @@ class IREEGPUCompilationInfo(CompilationInfo):
             f"  subgroup_n_count = {self.mma_schedule.n_count}, "
             f"  workgroup = {self.workgroup_tile}, "
             f"  reduction = {self.reduction_tile} }}>,\n"
-            f"  translation_info = <{compiler_pipeline} {self.workgroup_size_str()}\n"
+            f"  translation_info = #iree_codegen.translation_info<pipeline = {compiler_pipeline} {self.workgroup_size_str()}\n"
             f"  {subgroup_size_str}>>\n"
         )
 
@@ -177,7 +178,7 @@ class LegacyCompilationInfo(CompilationInfo):
         return (
             "#iree_codegen.compilation_info<\n"
             f"  lowering_config = #iree_codegen.lowering_config<tile_sizes = {self.tile_sizes}>,\n"
-            f"  translation_info = <{compiler_pipeline} {self.workgroup_size_str()}\n"
+            f"  translation_info = #iree_codegen.translation_info<pipeline = {compiler_pipeline} {self.workgroup_size_str()}\n"
             f"  {subgroup_size_str},\n"
             f"  {{ pipeline_depth = {self.software_pipeline_depth}, store_stage = 1}}>>"
         )
@@ -896,6 +897,7 @@ def parse_arguments():
         choices=[
             "i32",
             "i8",
+            "f64",
             "f32",
             "f16",
             "bf16",
@@ -910,7 +912,7 @@ def parse_arguments():
     parser.add_argument(
         "--acc_type",
         type=str,
-        choices=["i32", "f32", "f16", "bf16"],
+        choices=["i32", "f64", "f32", "f16", "bf16"],
         help="Numeric type of the accumulator and result matrices",
         required=True,
     )

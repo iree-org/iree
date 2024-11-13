@@ -62,11 +62,11 @@ stream.executable public @mul_dispatch_executable {
 }
 
 // PTX: .entry add_dispatch
-// PTX: .maxntid 64, 1, 1
+// PTX: .maxntid 32, 1, 1
 // PTX:   add.rn.f32
 
 // PTX: .entry mul_dispatch
-// PTX: .maxntid 64, 1, 1
+// PTX: .maxntid 32, 1, 1
 // PTX:   mul.rn.f32
 
 //      CHECK: hal.executable public @smoketest_linked

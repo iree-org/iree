@@ -535,7 +535,7 @@ def _probe_iree_compiler_dylib() -> str:
     if not paths:
         paths = _mlir_libs.__path__
 
-    logging.debug("Found installed iree-compiler package %r", version_dict)
+    logging.debug("Found installed IREE compiler package %r", version_dict)
     dylib_basename = "libIREECompiler.so"
     system = platform.system()
     if system == "Darwin":

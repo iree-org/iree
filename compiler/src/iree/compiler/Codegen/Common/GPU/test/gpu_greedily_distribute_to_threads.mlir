@@ -5,7 +5,7 @@
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func.func @simple_generic(%3: tensor<64x256xf32>, %4: tensor<64x256xf32>, %5: tensor<64x256xf32>) -> tensor<64x256xf32>
     attributes {
-      translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
+      translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
     } {
   %6 = linalg.generic {
     indexing_maps = [#map, #map, #map],
@@ -29,7 +29,7 @@ func.func @simple_generic(%3: tensor<64x256xf32>, %4: tensor<64x256xf32>, %5: te
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func.func @fuse_destination(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>) -> tensor<64x64xf32>
     attributes {
-      translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
+      translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
     } {
   %empty = tensor.empty() : tensor<64x64xf32>
   %cst = arith.constant 0.0 : f32
@@ -50,7 +50,7 @@ func.func @fuse_destination(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>) -> ten
 
 func.func @in_nested_region(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>, %5: tensor<64x64xf32>) -> tensor<64x64xf32>
     attributes {
-      translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
+      translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
     } {
   %c8 = arith.constant 8 : index
   %c64 = arith.constant 64 : index
@@ -77,7 +77,7 @@ func.func @in_nested_region(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>, %5: te
 
 func.func @do_not_redistribute_in_forall(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>, %5: tensor<64x64xf32>) -> tensor<64x64xf32>
     attributes {
-      translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
+      translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
     } {
   %c8 = arith.constant 8 : index
   %c64 = arith.constant 64 : index
@@ -134,7 +134,7 @@ func.func @do_not_redistribute_in_forall(%3: tensor<64x64xf32>, %4: tensor<64x64
 
 func.func @multiple_use_tilable_op(%3: tensor<64x256xf32>, %4: tensor<64x256xf32>) -> (tensor<64x256xf32>, tensor<256x64xf32>)
     attributes {
-      translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
+      translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
     } {
   %add_empty = tensor.empty() : tensor<64x256xf32>
   %6 = linalg.add

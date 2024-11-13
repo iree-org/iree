@@ -31,7 +31,7 @@ If `nvidia-smi` does not exist, you will need to
 Python packages are regularly published to
 [PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
 [Python Bindings](../../reference/bindings/python.md) page for more details.
-The core `iree-compiler` package includes the CUDA compiler:
+The core `iree-base-compiler` package includes the CUDA compiler:
 
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-compiler-from-release.md"
 
@@ -69,7 +69,7 @@ $ iree-run-module --list_devices
 Python packages are regularly published to
 [PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
 [Python Bindings](../../reference/bindings/python.md) page for more details.
-The core `iree-runtime` package includes the CUDA HAL driver:
+The core `iree-base-runtime` package includes the CUDA HAL driver:
 
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-runtime-from-release.md"
 

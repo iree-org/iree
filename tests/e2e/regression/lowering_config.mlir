@@ -1,12 +1,12 @@
 #compilation0 = #iree_codegen.compilation_info<
     lowering_config = #iree_codegen.lowering_config<tile_sizes = [[32, 32], [1, 8, 0], [0, 0, 8], [0, 0, 0]]>,
-    translation_info = <CPUDoubleTilingExpert>>
+    translation_info = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>>
 #compilation1 = #iree_codegen.compilation_info<
     lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [1, 4, 0], [0, 0, 4], [0, 0, 0]]>,
-    translation_info = <CPUDoubleTilingExpert>>
+    translation_info = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>>
 #compilation2 = #iree_codegen.compilation_info<
     lowering_config = #iree_codegen.lowering_config<tile_sizes = [{sizes=[32, 64], interchange=[1, 0]}, [1, 1, 0], [0, 0, 8], [0, 0, 0]]>,
-    translation_info = <CPUDoubleTilingExpert>>
+    translation_info = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>>
 
 func.func @lowering_config_test() {
   %a = util.unfoldable_constant dense<1.0> : tensor<128x256xf32>
@@ -25,11 +25,11 @@ func.func @lowering_config_test() {
 // Remove H
 #conv_compilation0 = #iree_codegen.compilation_info<
     lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 7, 7, 64, 0, 0, 0], [1, 1, 7, 4, 0, 0, 0], [0, 0, 0, 0, 1, 3, 4], [0, 0, 0, 0, 0, 0, 0]]>,
-    translation_info = <CPUConvTileAndDecomposeExpert>>
+    translation_info = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>>
 // Remove W
 #conv_compilation1 = #iree_codegen.compilation_info<
     lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 7, 7, 64, 0, 0, 0], [1, 7, 1, 4, 0, 0, 0], [0, 0, 0, 0, 3, 1, 4], [0, 0, 0, 0, 0, 0, 0]]>,
-    translation_info = <CPUConvTileAndDecomposeExpert>>
+    translation_info = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>>
 func.func @conv() {
   %input = util.unfoldable_constant dense<1.0> : tensor<36x7x7x512xf32>
   %filter = util.unfoldable_constant dense<1.0> : tensor<3x3x512x512xf32>

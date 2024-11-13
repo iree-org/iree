@@ -24,19 +24,22 @@ from iree.build.args import (
 _locals = threading.local()
 
 
-class FileNamespace(enum.StrEnum):
+class FileNamespace(enum.Enum):
     # Transient generated files go into the GEN namespace. These are typically
     # not packaged for distribution.
-    GEN = enum.auto()
+    GEN = "gen"
 
     # Distributable parameter files.
-    PARAMS = enum.auto()
+    PARAMS = "params"
 
     # Distributable, platform-neutral binaries.
-    BIN = enum.auto()
+    BIN = "bin"
 
     # Distributable, platform specific binaries.
-    PLATFORM_BIN = enum.auto()
+    PLATFORM_BIN = "platform_bin"
+
+    def __str__(self) -> str:
+        return self.value
 
 
 FileNamespaceToPath = {
@@ -264,10 +267,13 @@ class BuildFile(BuildDependency):
         return f"BuildFile[{self.namespace}]({self.path})"
 
 
-class ActionConcurrency(enum.StrEnum):
-    THREAD = enum.auto()
-    PROCESS = enum.auto()
-    NONE = enum.auto()
+class ActionConcurrency(enum.Enum):
+    THREAD = "thread"
+    PROCESS = "process"
+    NONE = "none"
+
+    def __str__(self) -> str:
+        return self.value
 
 
 class BuildAction(BuildDependency, abc.ABC):

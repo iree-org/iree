@@ -3,7 +3,7 @@
 // RUN:   %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 2, 2, 8], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1], [0, 1, 0, 0]]>
-#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>

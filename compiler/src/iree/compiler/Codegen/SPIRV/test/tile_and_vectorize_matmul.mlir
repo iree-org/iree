@@ -2,7 +2,7 @@
 // RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-gpu-tile,canonicalize,cse,iree-codegen-generic-vectorization,iree-spirv-initial-vector-lowering,iree-codegen-optimize-tensor-insert-extract-slices,iree-spirv-final-vector-lowering,canonicalize,cse)))))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]]>
-#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -62,7 +62,7 @@ hal.executable private @matmul_static_shape_f16 {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]]>
-#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,

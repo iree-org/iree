@@ -74,7 +74,7 @@ All steps here assume starting from the IREE root directory.
     # Install packages from nightly releases
     # This should work for most cases, as the importers change infrequently
     python -m pip install \
-      iree-compiler iree-runtime iree-tools-tf iree-tools-tflite \
+      iree-base-compiler iree-base-runtime iree-tools-tf iree-tools-tflite \
       --find-links https://iree.dev/pip-release-links.html
     ```
 

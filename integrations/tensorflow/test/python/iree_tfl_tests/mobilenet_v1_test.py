@@ -8,6 +8,7 @@ import absl.testing
 import numpy
 from . import test_util
 
+# TODO(#18518): Migrate this file to a new (ideally public) location
 model_path = "https://storage.googleapis.com/iree-model-artifacts/tflite-integration-tests/mobilenet_v1.tflite"
 
 
