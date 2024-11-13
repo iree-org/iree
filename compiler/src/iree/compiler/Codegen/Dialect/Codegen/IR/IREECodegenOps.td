@@ -16,6 +16,42 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 
 def TensorTypeAttr : TypeAttrBase<"TensorType", "Tensor type attribute">;
 
+//===----------------------------------------------------------------------===//
+// AssumeAlignmentOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_AssumeAlignmentOp : Op<IREECodegen_Dialect, "assume_alignment", [
+    Pure,
+    ViewLikeOpInterface,
+    SameOperandsAndResultType]> {
+  let summary = "Assumes the base alignment of the given memref and returns it";
+  let description = [{
+    This op carries the same semantics as memref::AssumeAlignmentOp upstream,
+    except it also returns the source memref to keep the assume as a part of
+    the use-def chain.
+  }];
+
+  let arguments = (ins
+    AnyStridedMemRef:$source,
+    ConfinedAttr<I32Attr, [IntPositive]>:$alignment
+  );
+  let results = (outs
+    AnyStridedMemRef:$result
+  );
+
+  let assemblyFormat = [{
+    $source `,` $alignment attr-dict `:` type($result)
+  }];
+
+  let extraClassDeclaration = [{
+    ::mlir::Value getViewSource() { return getSource(); }
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// QueryTileSizesOp
+//===----------------------------------------------------------------------===//
+
 def IREECodegen_QueryTileSizesOp :
     Op<IREECodegen_Dialect, "query_tile_sizes", [Pure]> {
   let summary = "Query tile sizes";
@@ -100,8 +136,6 @@ def IREECodegen_ExtractStridedMetadataOp : Op<IREECodegen_Dialect, "extract_stri
     ::mlir::Value getViewSource() { return getSource(); }
   }];
 }
-
-
 
 
 #endif // IREE_CODEGEN_DIALECT_IREECODEGENOPS

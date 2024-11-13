@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -129,6 +130,13 @@ findOrCreateSubspanBuffer(RewriterBase &rewriter,
         bufferSubspanOp.getAlignment() != subspanOp.getAlignment() ||
         memRefType != bufferMemrefType)
       continue;
+    // Forward the result of an `assume_alignment` op if present.
+    if (bufferSubspanOp.getResult().hasOneUse()) {
+      if (auto assumeOp = dyn_cast<IREE::Codegen::AssumeAlignmentOp>(
+              *bufferSubspanOp.getResult().user_begin())) {
+        return assumeOp.getResult();
+      }
+    }
     return bufferSubspanOp.getResult();
   }
 
@@ -141,7 +149,7 @@ findOrCreateSubspanBuffer(RewriterBase &rewriter,
       subspanOp.getBinding(), subspanOp.getByteOffset(),
       subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
       subspanOp.getDescriptorFlagsAttr());
-  rewriter.create<memref::AssumeAlignmentOp>(
+  buffer = rewriter.create<IREE::Codegen::AssumeAlignmentOp>(
       subspanOp->getLoc(), buffer, subspanOp.calculateAlignment().value());
   return buffer;
 }

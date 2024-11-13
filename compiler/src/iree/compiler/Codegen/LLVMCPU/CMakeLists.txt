@@ -148,6 +148,7 @@ iree_cc_library(
     MLIRX86VectorTransforms
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses
+    iree::compiler::Codegen::Common::LLVMLowerings
     iree::compiler::Codegen::Common::TransformDialectInterpreterPass
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface

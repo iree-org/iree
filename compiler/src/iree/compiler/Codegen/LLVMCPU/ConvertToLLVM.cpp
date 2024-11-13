@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/LLVMLowerings.h"
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/LLVMCPU/DispatchABI.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
@@ -1051,6 +1052,7 @@ void ConvertToLLVMPass::runOnOperation() {
   populateVectorToLLVMMatrixConversionPatterns(typeConverter, patterns);
   populateVectorToLLVMConversionPatterns(typeConverter, patterns,
                                          reassociateFpReductions);
+  populateConvertIREECodegenToLLVMPatterns(typeConverter, patterns);
 
   if (isAArch64(targetAttr) &&
       (hasAnySVEFeature(targetAttr) || hasSMEFeature(targetAttr))) {

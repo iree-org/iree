@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -84,6 +85,26 @@ struct ConvertHalInterfaceBindingSubspan final
         op, newResultType, adaptor.getLayout(), adaptor.getBinding(),
         byteOffset, dynamicLinearizedSize, adaptor.getAlignmentAttr(),
         adaptor.getDescriptorFlagsAttr());
+    return success();
+  }
+};
+
+struct ConvertCodegenAssumeAlignment final
+    : OpConversionPattern<IREE::Codegen::AssumeAlignmentOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::Codegen::AssumeAlignmentOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    Type newTy = getTypeConverter()->convertType(op.getSource().getType());
+    if (!newTy) {
+      return rewriter.notifyMatchFailure(
+          op->getLoc(), llvm::formatv("failed to convert memref type: {0}",
+                                      op.getSource().getType()));
+    }
+
+    rewriter.replaceOpWithNewOp<memref::AssumeAlignmentOp>(
+        op, adaptor.getSource(), adaptor.getAlignmentAttr());
     return success();
   }
 };

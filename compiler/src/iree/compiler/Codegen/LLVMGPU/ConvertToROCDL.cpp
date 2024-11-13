@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
+#include "iree/compiler/Codegen/Common/LLVMLowerings.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
@@ -66,21 +67,8 @@ struct ReplaceGPUBarrierWithLDSBarrier
   }
 };
 
-struct RemoveAssumeAlignOp
-    : public OpRewritePattern<memref::AssumeAlignmentOp> {
-public:
-  using OpRewritePattern<memref::AssumeAlignmentOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(memref::AssumeAlignmentOp op,
-                                PatternRewriter &rewriter) const override {
-    rewriter.eraseOp(op);
-    return success();
-  }
-};
-
 static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
   patterns.add<ReplaceGPUBarrierWithLDSBarrier>(patterns.getContext());
-  patterns.add<RemoveAssumeAlignOp>(patterns.getContext());
 }
 
 } // namespace
@@ -239,6 +227,7 @@ struct ConvertToROCDLPass final
       LLVMConversionTarget target(getContext());
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToROCDLConversionLegality(target);
+      populateConvertIREECodegenToLLVMPatterns(converter, llvmPatterns);
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns))))
         signalPassFailure();
     }

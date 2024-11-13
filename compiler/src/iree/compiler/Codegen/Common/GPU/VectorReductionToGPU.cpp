@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -96,7 +97,8 @@ moveScalarAndBindingUniformCode(vector::WarpExecuteOnLane0Op warpOp) {
       return true;
 
     if (isa<IREE::HAL::InterfaceBindingSubspanOp,
-            IREE::HAL::InterfaceConstantLoadOp, memref::AssumeAlignmentOp>(op))
+            IREE::HAL::InterfaceConstantLoadOp, memref::AssumeAlignmentOp,
+            IREE::Codegen::AssumeAlignmentOp>(op))
       return true;
     if (isUniformLoad(op))
       return true;
