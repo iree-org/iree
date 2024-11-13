@@ -50,6 +50,22 @@ MLIR_CAPI_EXPORTED MlirAttribute ireeCodegenTranslationInfoAttrGet(
 MLIR_CAPI_EXPORTED ireeCodegenTranslationInfoParameters
 ireeCodegenTranslationInfoAttrGetParameters(MlirAttribute attr);
 
+MLIR_CAPI_EXPORTED bool
+ireeAttributeIsACodegenCompilationInfoAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeCodegenCompilationInfoAttrGetTypeID(void);
+
+struct ireeCodegenCompilationInfoParameters {
+  MlirAttribute loweringConfig;
+  MlirAttribute translationInfo;
+};
+
+MLIR_CAPI_EXPORTED MlirAttribute ireeCodegenCompilationInfoAttrGet(
+    MlirContext mlirCtx, ireeCodegenCompilationInfoParameters parameters);
+
+MLIR_CAPI_EXPORTED ireeCodegenCompilationInfoParameters
+ireeCodegenCompilationInfoAttrGetParameters(MlirAttribute attr);
+
 #ifdef __cplusplus
 }
 #endif

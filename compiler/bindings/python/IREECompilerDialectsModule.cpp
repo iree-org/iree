@@ -83,8 +83,7 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
           "cls"_a, "pass_pipeline"_a, "codegen_spec"_a = py::none(),
           "workgroup_size"_a = py::none(), "subgroup_size"_a = py::none(),
           "configuration"_a = py::none(), py::kw_only(), "ctx"_a = py::none(),
-          "Gets an #iree_codegen.translation_info from "
-          "parameters.")
+          "Gets an #iree_codegen.translation_info from parameters.")
       .def_property_readonly(
           "pass_pipeline",
           [](MlirAttribute self) -> MlirAttribute {
@@ -122,6 +121,37 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
               return std::nullopt;
             }
             return parameters.configuration;
+          });
+
+  //===-------------------------------------------------------------------===//
+  // CodegenCompilationInfoAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_codegen_module, "CompilationInfoAttr",
+                          ireeAttributeIsACodegenCompilationInfoAttr,
+                          ireeCodegenCompilationInfoAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, MlirAttribute loweringConfig,
+             MlirAttribute translationInfo, MlirContext ctx) {
+            ireeCodegenCompilationInfoParameters parameters = {};
+            parameters.loweringConfig = loweringConfig;
+            parameters.translationInfo = translationInfo;
+            return ireeCodegenCompilationInfoAttrGet(ctx, parameters);
+          },
+          "cls"_a, "lowering_config"_a, "translation_info"_a,
+          "ctx"_a = py::none(),
+          "Gets an #iree_codegen.compilation_info from parameters.")
+      .def_property_readonly(
+          "lowering_config",
+          [](MlirAttribute self) -> MlirAttribute {
+            auto parameters = ireeCodegenCompilationInfoAttrGetParameters(self);
+            return parameters.loweringConfig;
+          })
+      .def_property_readonly(
+          "translation_info", [](MlirAttribute self) -> MlirAttribute {
+            auto parameters = ireeCodegenCompilationInfoAttrGetParameters(self);
+            return parameters.translationInfo;
           });
 
   //===--------------------------------------------------------------------===//
