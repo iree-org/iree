@@ -414,6 +414,20 @@ packages = find_namespace_packages(
 )
 print(f"Found compiler packages: {packages}")
 
+with open(
+    os.path.join(
+        IREE_SOURCE_DIR,
+        "compiler",
+        "bindings",
+        "python",
+        "iree",
+        "compiler",
+        "README.md",
+    ),
+    "rt",
+) as f:
+    README = f.read()
+
 custom_package_suffix = os.getenv("IREE_COMPILER_CUSTOM_PACKAGE_SUFFIX", "")
 custom_package_prefix = os.getenv("IREE_COMPILER_CUSTOM_PACKAGE_PREFIX", "")
 
@@ -422,8 +436,9 @@ setup(
     version=f"{PACKAGE_VERSION}",
     author="IREE Authors",
     author_email="iree-technical-discussion@lists.lfaidata.foundation",
-    description="IREE Compiler API",
-    long_description="",
+    description="IREE Python Compiler API",
+    long_description=README,
+    long_description_content_type="text/markdown",
     license="Apache-2.0",
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -435,6 +450,11 @@ setup(
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
     ],
+    project_urls={
+        "homepage": "https://iree.dev/",
+        "repository": "https://github.com/iree-org/iree",
+        "documentation": "https://iree.dev/reference/bindings/python/",
+    },
     ext_modules=[
         CMakeExtension("iree.compiler._mlir_libs._mlir"),
         CMakeExtension("iree.compiler._mlir_libs._ireeDialects"),
