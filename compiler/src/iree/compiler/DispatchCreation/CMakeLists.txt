@@ -24,6 +24,7 @@ iree_cc_library(
     "CollapseReductionDimensions.cpp"
     "ConvertDispatchRegionsToWorkgroups.cpp"
     "ConvertTensorToFlow.cpp"
+    "DecomposeConcat.cpp"
     "DispatchWithTransformDialect.cpp"
     "ElementwiseOpFusion.cpp"
     "FoldUnitExtentDims.cpp"

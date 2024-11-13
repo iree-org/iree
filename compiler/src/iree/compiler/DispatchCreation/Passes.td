@@ -39,6 +39,17 @@ def CollapseReductionDimensionsPass :
   ];
 }
 
+def DecomposeConcatPass :
+    Pass<"iree-dispatch-creation-decompose-concat", ""> {
+  let summary = "Decomposes concatenations into a destination and a sequence of slice inserts.";
+  let options = [
+    Option<"enableConcatTransposition", "enable-concat-transposition", "bool",
+           /*default=*/"false", "Allows transposing concatenations such that "
+                                "they occur on the inner most dims.">,
+  ];
+}
+
+
 def ElementwiseOpFusionPass :
     Pass<"iree-dispatch-creation-elementwise-op-fusion", ""> {
   let summary = "Fuse elementwise operations.";

@@ -109,9 +109,6 @@ struct GlobalOptimizationOptions {
   // rewriting named ops as fused generics.
   bool aggressiveTransposePropagation = false;
 
-  // Enables transposing all concatenations to the outer most dimension.
-  bool outerDimConcat = false;
-
   // Enables data tiling.
   bool dataTiling = true;
 
@@ -127,6 +124,15 @@ struct GlobalOptimizationOptions {
 
   // Strips debug assertions after any useful information has been extracted.
   bool stripAssertions = false;
+
+  void bindOptions(OptionsBinder &binder);
+  using FromFlags = OptionsFromFlags<GlobalOptimizationOptions>;
+};
+
+// Options controlling dispatch creation.
+struct DispatchCreationOptions {
+  // Enables transposing all concatenations to the outer most dimension.
+  bool outerDimConcat = false;
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalOptimizationOptions>;

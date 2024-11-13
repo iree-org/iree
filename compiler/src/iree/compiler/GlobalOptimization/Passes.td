@@ -19,16 +19,6 @@ def Convert1X1FilterConv2DToMatmulPass:
   let summary = "Convert linalg convolution ops with 1x1 kernels into linalg matrix multiplication ops.";
 }
 
-def DecomposeConcatPass :
-    Pass<"iree-global-opt-decompose-concat", ""> {
-  let summary = "Decomposes concatenations into a destination and a sequence of slice inserts.";
-  let options = [
-    Option<"enableConcatTransposition", "enable-concat-transposition", "bool",
-           /*default=*/"false", "Allows transposing concatenations such that "
-                                "they occur on the inner most dims.">,
-  ];
-}
-
 def DemoteContractionInputsToBF16Pass
     : Pass<"iree-global-opt-demote-contraction-inputs-to-bf16", ""> {
   let summary =

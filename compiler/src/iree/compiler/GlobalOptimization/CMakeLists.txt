@@ -43,7 +43,6 @@ iree_cc_library(
     "CleanupNumericNarrowing.cpp"
     "Convert1X1FilterConv2DToMatmul.cpp"
     "DataLayoutPropagation.cpp"
-    "DecomposeConcat.cpp"
     "DemoteContractionInputsToBF16.cpp"
     "DetachElementwiseFromNamedOps.cpp"
     "EraseUnusedLinalgOperands.cpp"

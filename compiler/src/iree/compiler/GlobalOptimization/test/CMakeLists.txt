@@ -33,7 +33,6 @@ iree_lit_test_suite(
     "raise_special_ops.mlir"
     "remove_zero_extent_tensors.mlir"
     "transformation_pipeline.mlir"
-    "transpose_and_decompose_concat.mlir"
   TOOLS
     FileCheck
     iree-opt

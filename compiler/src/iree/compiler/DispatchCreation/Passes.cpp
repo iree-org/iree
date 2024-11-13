@@ -204,9 +204,20 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
 
 // Pipeline to first create `flow.dispatch.region` ops and then lower to
 // `flow.dispatch.workgroup` ops.
-static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
+static void
+addDispatchRegionCreationPasses(OpPassManager &passManager,
+                                const TransformOptions &transformOptions) {
   FunctionLikeNest(passManager)
-      // Only want use the transform dialect for some dispatch regions and let
+      // We decompose and transpose concatenations immediately before folding
+      // unit extent dims because this allows decoupling unit dims in the
+      // concatenation from the transposes that are introduced.
+      .addPass([&]() {
+        DecomposeConcatPassOptions options;
+        options.enableConcatTransposition =
+            transformOptions.options.outerDimConcat;
+        return createDecomposeConcatPass(options);
+      }) // Only want use the transform dialect for some dispatch regions and
+         // let
       // the FormDispatchRegions handle the rest. This only moves the root
       // compute op into the dispatch region, so that we can run additional
       // transformations afterwards with a simple region and without bothering
@@ -303,7 +314,7 @@ void buildDispatchCreationPassPipeline(
       .addPass(mlir::createCSEPass);
 
   addDispatchRegionCreationPreprocessingPasses(passManager);
-  addDispatchRegionCreationPasses(passManager);
+  addDispatchRegionCreationPasses(passManager, transformOptions);
 
   FunctionLikeNest(passManager)
       .addPass(DispatchCreation::createConvertDispatchRegionsToWorkgroupsPass)

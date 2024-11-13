@@ -129,10 +129,6 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
           "Propagates transposes to named ops even when the resulting op will "
           "be a linalg.generic"),
       llvm::cl::cat(category));
-  binder.opt<bool>("iree-opt-outer-dim-concat", outerDimConcat,
-                   llvm::cl::desc("Transposes all concatenations to happen"
-                                  "along the outer most dimension."),
-                   llvm::cl::cat(category));
   binder.opt<bool>("iree-opt-data-tiling", dataTiling,
                    llvm::cl::desc("Enables data tiling path."),
                    llvm::cl::cat(category));
@@ -195,6 +191,16 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
           "File path to create a parameter archive of splat values out of all "
           "parameter backed globals."),
       llvm::cl::cat(category));
+}
+
+void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
+  static llvm::cl::OptionCategory category(
+      "IREE options for controlling dispatch creation.");
+
+  binder.opt<bool>("iree-opt-outer-dim-concat", outerDimConcat,
+                   llvm::cl::desc("Transposes all concatenations to happen"
+                                  "along the outer most dimension."),
+                   llvm::cl::cat(category));
 }
 
 void SchedulingOptions::bindOptions(OptionsBinder &binder) {
