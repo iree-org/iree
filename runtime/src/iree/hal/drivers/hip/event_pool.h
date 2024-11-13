@@ -52,7 +52,7 @@ typedef struct iree_hal_hip_event_pool_t iree_hal_hip_event_pool_t;
 // Extra events requested beyond the capability are directly created and
 // destroyed without pooling.
 iree_status_t iree_hal_hip_event_pool_allocate(
-    const iree_hal_hip_dynamic_symbols_t* symbols,
+    const iree_hal_hip_dynamic_symbols_t* symbols, hipCtx_t hip_context,
     iree_host_size_t available_capacity, iree_allocator_t host_allocator,
     iree_hal_hip_event_pool_t** out_event_pool);
 
