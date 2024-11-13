@@ -302,6 +302,8 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
     return {f16, f16, f32};
   }
   }
+  assert(false && "unexpected enum value");
+  return {};
 }
 
 static OpaqueMmaLayout getOpaqueMFMALayout(MLIRContext *context,
@@ -667,6 +669,7 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
   case MMAIntrinsic::NV_WMMA_F16_16x16x16_F16:
     return {};
   }
+  assert(false && "unexpected enum value");
   return {};
 }
 
@@ -696,7 +699,6 @@ SmallVector<VirtualMMAIntrinsic> MMAAttr::getVirtualIntrinsics() const {
   default:
     return {};
   }
-  return {};
 }
 
 // Generates amdgpu.mfma/wmma operation on the given inputs for this attribute
@@ -1281,7 +1283,6 @@ VirtualMMAAttr::getABCVectorTypes() const {
     return {aType, bType, cType};
   }
   }
-  // This should not happen but just to make GCC happy.
   assert(false && "unhandled virtual mma layout type.");
   return {VectorType{}, VectorType{}, VectorType{}};
 }
@@ -1301,7 +1302,6 @@ int64_t VirtualMMAAttr::getSubgroupSize() const {
     return 64;
   }
   }
-  // This should not happen but just to make GCC happy.
   assert(false && "unhandled virtual mma layout type.");
   return 0;
 }
@@ -1356,7 +1356,6 @@ int64_t VirtualMMAAttr::getUnrollK() const {
     return 1;
   }
   }
-  // This should not happen but just to make GCC happy.
   assert(false && "unhandled virtual mma layout type.");
   return 0;
 }
@@ -1424,7 +1423,6 @@ int64_t VirtualMMAAttr::getBlockSize() const {
     return 1;
   }
   }
-  // This should not happen but just to make GCC happy.
   assert(false && "unhandled virtual mma layout type.");
   return 0;
 }
