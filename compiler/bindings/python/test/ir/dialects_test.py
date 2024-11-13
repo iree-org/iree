@@ -79,12 +79,12 @@ def codegen_translation_info_full():
     foo_symbol = ir.SymbolRefAttr.get(["foo"])
     configuration = ir.DictAttr.get({"A": ir.IntegerAttr.get(ir.IndexType.get(), 42)})
     translation_info = iree_codegen.TranslationInfoAttr.get(
-        pipeline_attr, foo_symbol, [128, 1, 1], 32, configuration
+        pipeline_attr, foo_symbol, [128], 32, configuration
     )
     assert translation_info is not None
     assert translation_info.pass_pipeline == pipeline_attr
     assert translation_info.codegen_spec == foo_symbol
-    assert translation_info.workgroup_size == [128, 1, 1]
+    assert translation_info.workgroup_size == [128]
     assert translation_info.subgroup_size == 32
     assert translation_info.configuration == configuration
 
