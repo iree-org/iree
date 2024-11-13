@@ -122,26 +122,26 @@ jobs:
             build-family: linux-x86_64
             build-package: main-dist-linux
             experimental: false
-           - runs-on: ah-ubuntu_22_04-c7g_4x-50
-             build-family: linux-aarch64
-             build-package: main-dist-linux
-             experimental: true
+          - runs-on: ah-ubuntu_22_04-c7g_4x-50
+            build-family: linux-aarch64
+            build-package: main-dist-linux
+            experimental: true
           - runs-on: ubuntu-20.04
             build-family: linux-x86_64
             build-package: py-compiler-pkg
             experimental: false
-           - runs-on: ah-ubuntu_22_04-c7g_4x-50
-             build-family: linux-aarch64
-             build-package: py-compiler-pkg
-             experimental: true
+          - runs-on: ah-ubuntu_22_04-c7g_4x-50
+            build-family: linux-aarch64
+            build-package: py-compiler-pkg
+            experimental: true
           - runs-on: ubuntu-20.04
             build-family: linux-x86_64
             build-package: py-runtime-pkg
             experimental: false
-           - runs-on: ah-ubuntu_22_04-c7g_4x-50
-             build-family: linux-aarch64
-             build-package: py-runtime-pkg
-             experimental: true
+          - runs-on: ah-ubuntu_22_04-c7g_4x-50
+            build-family: linux-aarch64
+            build-package: py-runtime-pkg
+            experimental: true
           - runs-on: ubuntu-20.04
             build-family: linux-x86_64
             build-package: py-tf-compiler-tools-pkg
