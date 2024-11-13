@@ -23,12 +23,16 @@ namespace {
 
 struct TorchOptions {
   bool strictSymbolicShapes = true;
+  bool decompose = true;
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("Torch Input");
     binder.opt<bool>(
         "iree-torch-use-strict-symbolic-shapes", strictSymbolicShapes,
         llvm::cl::cat(category),
         llvm::cl::desc("Forces dynamic shapes to be treated as strict"));
+    binder.opt<bool>("iree-torch-decompose-complex-ops", decompose,
+                     llvm::cl::cat(category),
+                     llvm::cl::desc("Decompose complex torch operations."));
   }
 };
 
@@ -58,16 +62,9 @@ struct TorchSession
     if (typeMnemonic == "onnx") {
       // ONNX input is a pre-processing step to torch.
       mlir::torch::Torch::TorchLoweringPipelineOptions torchOnnxPipelineOptions;
-      // The `aten.flatten.using_ints` and `aten.unflatten.int` are added to the
-      // list of backend legal ops so that they are not decomposed into the
-      // `aten.view` op during the run of `DecomposeComplexOps` pass. The issue
-      // with this is that the `aten.view` op eventually lowers to
-      // `tensor.reshape` op while there exists a direct torch->linalg lowering
-      // for both the flatten/unflatten ops which lowers to
-      // `tensor.collapse_shape/expand_shape` op, and this is a more preferred
-      // path for the downstream pipeline.
-      torchOnnxPipelineOptions.backendLegalOps = {"aten.flatten.using_ints",
-                                                  "aten.unflatten.int"};
+      torchOnnxPipelineOptions.decompose = options.decompose;
+      torchOnnxPipelineOptions.backendLegalOps =
+          TorchInput::BackendLegalOps::get();
       mlir::torch::Torch::createTorchOnnxToTorchBackendPipeline(
           passManager, torchOnnxPipelineOptions);
     }
@@ -75,6 +72,7 @@ struct TorchSession
     if (typeMnemonic == "torch" || typeMnemonic == "onnx") {
       TorchInput::TorchToIREELoweringPipelineOptions torchOptions;
       torchOptions.strictSymbolicShapes = options.strictSymbolicShapes;
+      torchOptions.decompose = options.decompose;
       TorchInput::createTorchToIREEPipeline(passManager, torchOptions);
       return true;
     }

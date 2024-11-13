@@ -34,8 +34,6 @@ void createTorchToIREEPipeline(
   // backends. We do this first as it tends to involve pattern-matching against
   // constants, (e.g. dimensions which must be constant in a ranked programming
   // model) and those constants get somewhat obscured by TorchToArith.
-  llvm::ArrayRef<std::string> emptyArrayRef;
-
   // Dynamic shape bindings add a lot of structure to the IR which we prefer to
   // leverage and eliminate prior to any other activity, so do this first.
   pm.addNestedPass<func::FuncOp>(createBindSymbolicShapesPass());
@@ -51,8 +49,9 @@ void createTorchToIREEPipeline(
       torch::Torch::createReduceOpVariantsPass(llvm::StringRef()));
   pm.addNestedPass<func::FuncOp>(
       mlir::torch::TorchConversion::createConvertCustomQuantOpPass());
-  pm.addNestedPass<func::FuncOp>(
-      torch::Torch::createDecomposeComplexOpsPass(emptyArrayRef));
+  if (options.decompose)
+    pm.addNestedPass<func::FuncOp>(
+        torch::Torch::createDecomposeComplexOpsPass(BackendLegalOps::get()));
   pm.addNestedPass<func::FuncOp>(torch::Torch::createFuseQuantizedOpsPass());
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<func::FuncOp>(torch::Torch::createScalarizeShapesPass());

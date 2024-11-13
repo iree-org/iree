@@ -13,11 +13,28 @@
 
 namespace mlir::iree_compiler::TorchInput {
 
+// The following is a hard-coded list of ops we don't want to decompose in the
+// torch dialect, since they have disadvantageous decompositons for the
+// torch-to-linalg path. For example, decomposing `aten.flatten.using_ints` to
+// `aten.view` simply destroys useful information about what kind of reshape is
+// being performed, and hinders our ability, in some cases, to lower this to a
+// collapse instead of a generic reshape.
+struct BackendLegalOps {
+  static const llvm::SmallVector<std::string> get() {
+    return {"aten.flatten.using_ints", "aten.unflatten.int",
+            "aten.adaptive_avg_pool1d", "aten.adaptive_avg_pool2d",
+            "aten.adaptive_max_pool1d"};
+  };
+};
+
 struct TorchToIREELoweringPipelineOptions
     : public PassPipelineOptions<TorchToIREELoweringPipelineOptions> {
   Option<bool> strictSymbolicShapes{
       *this, "strict-symbolic-shapes",
       llvm::cl::desc("Use strict symbolic shapes."), llvm::cl::init(true)};
+  Option<bool> decompose{*this, "decompose",
+                         llvm::cl::desc("Decompose complex torch operations."),
+                         llvm::cl::init(true)};
 };
 
 // Creates a pipeline that lowers from the torch backend contract to IREE.
