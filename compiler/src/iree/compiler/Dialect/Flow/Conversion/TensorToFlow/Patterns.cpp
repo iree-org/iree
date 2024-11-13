@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -174,6 +175,75 @@ struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
   }
 };
 
+struct ConvertTensorConcatPattern : public OpRewritePattern<tensor::ConcatOp> {
+  using OpRewritePattern<tensor::ConcatOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::ConcatOp concatOp,
+                                PatternRewriter &rewriter) const override {
+    if (concatOp->getParentOfType<IREE::Flow::DispatchRegionOp>() ||
+        concatOp->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
+      return failure();
+    }
+    if (concatOp.getDim() != 0) {
+      return rewriter.notifyMatchFailure(
+          concatOp, "only outer-dim concat lowering supported");
+    }
+    if (cast<RankedTensorType>(concatOp.getInputs().front().getType())
+            .getRank() == 0) {
+      // This should be handled here, but not sure what concat operation does
+      // when inptus are of rank 0.
+      return rewriter.notifyMatchFailure(
+          concatOp, "unhandled concat of zero-rank tensors");
+    }
+
+    Location loc = concatOp.getLoc();
+    SmallVector<SmallVector<OpFoldResult>> inputShapes;
+    inputShapes.reserve(concatOp.getInputs().size());
+    SmallVector<OpFoldResult> outputShape;
+    AffineExpr addExpr =
+        rewriter.getAffineSymbolExpr(0) + rewriter.getAffineSymbolExpr(1);
+    SmallVector<OpFoldResult> concatOffsets;
+    concatOffsets.reserve(concatOp.getInputs().size());
+    for (auto [index, input] : llvm::enumerate(concatOp.getInputs())) {
+      SmallVector<OpFoldResult> inputShape =
+          tensor::getMixedSizes(rewriter, input.getLoc(), input);
+      if (index == 0) {
+        outputShape = inputShape;
+        concatOffsets.push_back(rewriter.getIndexAttr(0));
+      } else {
+        concatOffsets.push_back(outputShape[0]);
+        outputShape[0] = affine::makeComposedFoldedAffineApply(
+            rewriter, loc, addExpr, {outputShape[0], inputShape[0]});
+      }
+      inputShapes.emplace_back(std::move(inputShape));
+    }
+
+    Value replacement = rewriter.create<tensor::EmptyOp>(
+        loc, outputShape, concatOp.getType().getElementType());
+
+    SmallVector<int64_t> resultStaticDims;
+    SmallVector<Value> resultDynamicDims;
+    dispatchIndexOpFoldResults(outputShape, resultDynamicDims,
+                               resultStaticDims);
+    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    // Generate the `flow.tensor.update` operations for the concat.
+    for (auto [index, input] : llvm::enumerate(concatOp.getInputs())) {
+      SmallVector<int64_t> inputStaticShape;
+      SmallVector<Value> inputDynamicShape;
+      dispatchIndexOpFoldResults(inputShapes[index], inputDynamicShape,
+                                 inputStaticShape);
+      SmallVector<Value> offsets(inputStaticShape.size(), zero);
+      offsets[0] =
+          getValueOrCreateConstantIndexOp(rewriter, loc, concatOffsets[index]);
+      replacement = rewriter.create<IREE::Flow::TensorUpdateOp>(
+          loc, replacement.getType(), replacement, resultDynamicDims, offsets,
+          input, inputDynamicShape);
+    }
+    rewriter.replaceOp(concatOp, replacement);
+    return success();
+  }
+};
+
 struct ConvertTensorFromElementsPattern
     : public OpRewritePattern<tensor::FromElementsOp> {
   using OpRewritePattern<tensor::FromElementsOp>::OpRewritePattern;
@@ -316,14 +386,14 @@ struct ConvertTensorReshapePattern : public OpRewritePattern<TensorReshapeOp> {
 
 void populateTensorToFlowConversionPatterns(MLIRContext *context,
                                             RewritePatternSet &patterns) {
-  patterns
-      .insert<ConvertLinalgFillPattern, ConvertTensorBitcastPattern,
-              ConvertTensorCastPattern, ConvertTensorExtractPattern,
-              ConvertTensorExtractSlicePattern, ConvertTensorInsertSlicePattern,
-              ConvertTensorInsertPattern, ConvertTensorFromElementsPattern,
-              ConvertTensorDialectReshapeOpPattern,
-              ConvertTensorReshapePattern<tensor::CollapseShapeOp>,
-              ConvertTensorReshapePattern<tensor::ExpandShapeOp>>(context);
+  patterns.insert<ConvertLinalgFillPattern, ConvertTensorBitcastPattern,
+                  ConvertTensorCastPattern, ConvertTensorConcatPattern,
+                  ConvertTensorExtractPattern, ConvertTensorExtractSlicePattern,
+                  ConvertTensorInsertSlicePattern, ConvertTensorInsertPattern,
+                  ConvertTensorFromElementsPattern,
+                  ConvertTensorDialectReshapeOpPattern,
+                  ConvertTensorReshapePattern<tensor::CollapseShapeOp>,
+                  ConvertTensorReshapePattern<tensor::ExpandShapeOp>>(context);
 }
 
 } // namespace mlir::iree_compiler::IREE::Flow
