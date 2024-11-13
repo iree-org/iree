@@ -40,6 +40,55 @@ def codegen_dispatch_lowering_pass_pipeline():
     assert "LLVMGPUTileAndFuse" in str(pipeline_attr)
 
 
+@run
+def codegen_translation_info_minimal():
+    pipeline_attr = iree_codegen.DispatchLoweringPassPipelineAttr.get(
+        iree_codegen.DispatchLoweringPassPipeline.None_
+    )
+    translation_info = iree_codegen.TranslationInfoAttr.get(pipeline_attr)
+    assert translation_info is not None
+    assert str(translation_info) == "#iree_codegen.translation_info<pipeline = None>"
+    assert translation_info.pass_pipeline == pipeline_attr
+    assert translation_info.codegen_spec is None
+    assert translation_info.workgroup_size == []
+    assert translation_info.subgroup_size == 0
+    assert translation_info.configuration is None
+
+
+@run
+def codegen_translation_info_with_sizes():
+    pipeline_attr = iree_codegen.DispatchLoweringPassPipelineAttr.get(
+        iree_codegen.DispatchLoweringPassPipeline.Custom
+    )
+    translation_info = iree_codegen.TranslationInfoAttr.get(
+        pipeline_attr, None, [64, 4, 1], 32
+    )
+    assert translation_info is not None
+    assert translation_info.pass_pipeline == pipeline_attr
+    assert translation_info.codegen_spec is None
+    assert translation_info.workgroup_size == [64, 4, 1]
+    assert translation_info.subgroup_size == 32
+    assert translation_info.configuration is None
+
+
+@run
+def codegen_translation_info_full():
+    pipeline_attr = iree_codegen.DispatchLoweringPassPipelineAttr.get(
+        iree_codegen.DispatchLoweringPassPipeline.TransformDialectCodegen
+    )
+    foo_symbol = ir.SymbolRefAttr.get(["foo"])
+    configuration = ir.DictAttr.get({"A": ir.IntegerAttr.get(ir.IndexType.get(), 42)})
+    translation_info = iree_codegen.TranslationInfoAttr.get(
+        pipeline_attr, foo_symbol, [128], 32, configuration
+    )
+    assert translation_info is not None
+    assert translation_info.pass_pipeline == pipeline_attr
+    assert translation_info.codegen_spec == foo_symbol
+    assert translation_info.workgroup_size == [128]
+    assert translation_info.subgroup_size == 32
+    assert translation_info.configuration == configuration
+
+
 # ======================================================================
 # IREE GPU Dialect
 # ======================================================================

@@ -5,6 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cstdint>
+#include <optional>
+#include <vector>
 #include "iree/compiler/dialects/iree_codegen.h"
 #include "iree/compiler/dialects/iree_gpu.h"
 #include "mlir-c/BuiltinAttributes.h"
@@ -49,6 +51,80 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
         return py::module_::import(kCodegenModuleImportPath)
             .attr("DispatchLoweringPassPipeline")(rawValue);
       });
+
+  //===-------------------------------------------------------------------===//
+  // CodegenTranslationInfoAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_codegen_module, "TranslationInfoAttr",
+                          ireeAttributeIsACodegenTranslationInfoAttr,
+                          ireeCodegenTranslationInfoAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, MlirAttribute passPipeline,
+             std::optional<MlirAttribute> codegenSpec,
+             std::optional<std::vector<int64_t>> workgroupSize,
+             std::optional<int64_t> subgroupSize,
+             std::optional<MlirAttribute> configuration, MlirContext ctx) {
+            ireeCodegenTranslationInfoParameters parameters = {};
+            parameters.passPipeline = passPipeline;
+            parameters.codegenSpec =
+                codegenSpec.value_or(mlirAttributeGetNull());
+            if (workgroupSize.has_value()) {
+              parameters.workgroupSize = workgroupSize->data();
+              parameters.numWorkgroupSizeElements = workgroupSize->size();
+            }
+            parameters.subgroupSize = subgroupSize.value_or(0);
+            parameters.configuration =
+                configuration.value_or(mlirAttributeGetNull());
+
+            return ireeCodegenTranslationInfoAttrGet(ctx, parameters);
+          },
+          "cls"_a, "pass_pipeline"_a, "codegen_spec"_a = py::none(),
+          "workgroup_size"_a = py::none(), "subgroup_size"_a = py::none(),
+          "configuration"_a = py::none(), py::kw_only(), "ctx"_a = py::none(),
+          "Gets an #iree_codegen.translation_info from "
+          "parameters.")
+      .def_property_readonly(
+          "pass_pipeline",
+          [](MlirAttribute self) -> MlirAttribute {
+            auto parameters = ireeCodegenTranslationInfoAttrGetParameters(self);
+            return parameters.passPipeline;
+          })
+      .def_property_readonly(
+          "codegen_spec",
+          [](MlirAttribute self) -> std::optional<MlirAttribute> {
+            auto parameters = ireeCodegenTranslationInfoAttrGetParameters(self);
+            if (mlirAttributeIsNull(parameters.codegenSpec)) {
+              return std::nullopt;
+            }
+            return parameters.codegenSpec;
+          })
+      .def_property_readonly(
+          "workgroup_size",
+          [](MlirAttribute self) -> std::vector<int64_t> {
+            auto parameters = ireeCodegenTranslationInfoAttrGetParameters(self);
+            return {parameters.workgroupSize,
+                    parameters.workgroupSize +
+                        parameters.numWorkgroupSizeElements};
+          })
+      .def_property_readonly(
+          "subgroup_size",
+          [](MlirAttribute self) -> int64_t {
+            auto parameters = ireeCodegenTranslationInfoAttrGetParameters(self);
+            return parameters.subgroupSize;
+          })
+      .def_property_readonly(
+          "configuration",
+          [](MlirAttribute self) -> std::optional<MlirAttribute> {
+            auto parameters = ireeCodegenTranslationInfoAttrGetParameters(self);
+            if (mlirAttributeIsNull(parameters.configuration)) {
+              return std::nullopt;
+            }
+            return parameters.configuration;
+          });
+
+  //===--------------------------------------------------------------------===//
 
   auto iree_gpu_module =
       m.def_submodule("iree_gpu", "iree_gpu dialect bindings");

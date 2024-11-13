@@ -30,6 +30,26 @@ MLIR_CAPI_EXPORTED
 uint32_t
 ireeCodegenDispatchLoweringPassPipelineAttrGetValue(MlirAttribute attr);
 
+MLIR_CAPI_EXPORTED bool
+ireeAttributeIsACodegenTranslationInfoAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeCodegenTranslationInfoAttrGetTypeID(void);
+
+struct ireeCodegenTranslationInfoParameters {
+  MlirAttribute passPipeline;      // DispatchLoweringPassPipelineAttr.
+  MlirAttribute codegenSpec;       // Optional SymbolRefAttr.
+  const int64_t *workgroupSize;    // Optional ArrayRef<int64_t>.
+  size_t numWorkgroupSizeElements; // Size of the ArrayRef above.
+  int64_t subgroupSize;            // Optional int64_t.
+  MlirAttribute configuration;     // Optional DictionaryAttr.
+};
+
+MLIR_CAPI_EXPORTED MlirAttribute ireeCodegenTranslationInfoAttrGet(
+    MlirContext mlirCtx, ireeCodegenTranslationInfoParameters parameters);
+
+MLIR_CAPI_EXPORTED ireeCodegenTranslationInfoParameters
+ireeCodegenTranslationInfoAttrGetParameters(MlirAttribute attr);
+
 #ifdef __cplusplus
 }
 #endif
