@@ -73,14 +73,12 @@ getExpandedShape(SmallVector<ReassociationIndices> reIndices,
 /// account for the expand. If not we bail out. There are two supported users
 /// which are extract_slice -> expand_shape with the same exact reassociation
 /// map as the collapse op to be hoisted out or the root parallel_insert_slice.
-static LogicalResult
-verifyAndCollectExpandableUsers(Value insertDest,
-                                SmallVector<ReassociationIndices> reIndices,
-                                tensor::ParallelInsertSliceOp parallelInsertOp,
-                                SmallVector<Operation *> &expandableUsers) {
+static LogicalResult verifyAndCollectExpandableUsers(
+    Value insertDest, SmallVector<ReassociationIndices> reIndices,
+    tensor::ParallelInsertSliceOp parallelInsertOp,
+    SmallVector<tensor::ExtractSliceOp> &expandableUsers) {
   for (Operation *user : insertDest.getUsers()) {
     if (user == parallelInsertOp) {
-      expandableUsers.push_back(user);
       continue;
     }
     auto extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(user);
@@ -98,19 +96,20 @@ verifyAndCollectExpandableUsers(Value insertDest,
         expandShapeOp.getReassociationIndices();
     if (reIndices != expandReIndices)
       return failure();
-    expandableUsers.push_back(user);
+    expandableUsers.push_back(extractSliceOp);
   }
   return success();
 }
 
 /// Utility to expand the pre-verified expandable users of the scf.forall
 /// output.
-static void expandVerifiedUsers(PatternRewriter &rewriter, Location loc,
-                                MLIRContext *ctx,
-                                SmallVector<Operation *> expandableUsers,
-                                SmallVector<int64_t> totalInnerSizes,
-                                SmallVector<ReassociationIndices> reIndices,
-                                scf::ForallOp forallOp) {
+static void
+expandVerifiedUsers(PatternRewriter &rewriter, Location loc, MLIRContext *ctx,
+                    SmallVector<tensor::ExtractSliceOp> expandableUsers,
+                    SmallVector<int64_t> totalInnerSizes,
+                    SmallVector<ReassociationIndices> reIndices,
+                    scf::ForallOp forallOp,
+                    tensor::ParallelInsertSliceOp parallelInsertOp) {
   // compute the offsets,sizes,strides in the expanded dimensions.
   auto computeExpandedAccess = [&](ArrayRef<OpFoldResult> mixedOffsets,
                                    ShapedType resultType)
@@ -124,6 +123,7 @@ static void expandVerifiedUsers(PatternRewriter &rewriter, Location loc,
       for (size_t i = 1, e = reIndices[index].size(); i < e; ++i) {
         expandedOffsets.push_back(getAsIndexOpFoldResult(ctx, 0));
       }
+      rewriter.setInsertionPointToStart(forallOp.getBody());
       // Compute the outer dimension expression.
       AffineExpr s0, s1;
       bindSymbols(rewriter.getContext(), s0, s1);
@@ -144,31 +144,20 @@ static void expandVerifiedUsers(PatternRewriter &rewriter, Location loc,
                                               rewriter.getIndexAttr(1));
     return {expandedOffsets, expandedSizes, expandedStrides};
   };
-  for (Operation *user : expandableUsers) {
-    rewriter.setInsertionPointToStart(forallOp.getBody());
-    if (auto extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(user)) {
-      auto expandShapeOp =
-          dyn_cast<tensor::ExpandShapeOp>(*extractSliceOp->getUsers().begin());
-      RankedTensorType resultType = expandShapeOp.getResultType();
-      auto [expandedOffsets, expandedSizes, expandedStrides] =
-          computeExpandedAccess(extractSliceOp.getMixedOffsets(), resultType);
-      rewriter.setInsertionPoint(extractSliceOp);
-      rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
-          extractSliceOp, resultType, extractSliceOp.getSource(),
-          expandedOffsets, expandedSizes, expandedStrides);
-    } else if (auto parallelInsertOp =
-                   dyn_cast<tensor::ParallelInsertSliceOp>(user)) {
-      auto collapseShapeOp =
-          parallelInsertOp.getSource().getDefiningOp<tensor::CollapseShapeOp>();
-      RankedTensorType resultType = collapseShapeOp.getSrcType();
-      auto [expandedOffsets, expandedSizes, expandedStrides] =
-          computeExpandedAccess(parallelInsertOp.getMixedOffsets(), resultType);
-      rewriter.setInsertionPoint(parallelInsertOp);
-      rewriter.replaceOpWithNewOp<tensor::ParallelInsertSliceOp>(
-          parallelInsertOp, collapseShapeOp.getSrc(),
-          parallelInsertOp.getDest(), expandedOffsets, expandedSizes,
-          expandedStrides);
-    }
+  auto collapseShapeOp =
+      parallelInsertOp.getSource().getDefiningOp<tensor::CollapseShapeOp>();
+  RankedTensorType resultType = collapseShapeOp.getSrcType();
+  auto [expandedOffsets, expandedSizes, expandedStrides] =
+      computeExpandedAccess(parallelInsertOp.getMixedOffsets(), resultType);
+  rewriter.setInsertionPoint(parallelInsertOp);
+  rewriter.replaceOpWithNewOp<tensor::ParallelInsertSliceOp>(
+      parallelInsertOp, collapseShapeOp.getSrc(), parallelInsertOp.getDest(),
+      expandedOffsets, expandedSizes, expandedStrides);
+  for (tensor::ExtractSliceOp extractSliceOp : expandableUsers) {
+    rewriter.setInsertionPoint(extractSliceOp);
+    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
+        extractSliceOp, resultType, extractSliceOp.getSource(), expandedOffsets,
+        expandedSizes, expandedStrides);
   }
   return;
 }
@@ -242,7 +231,7 @@ struct ExpandDestinationForallOp final
 
     // Verify that the users of destination are valid to expand and collect all
     // such users.
-    SmallVector<Operation *> expandableUsers;
+    SmallVector<tensor::ExtractSliceOp> expandableUsers;
     if (failed(verifyAndCollectExpandableUsers(
             insertDest, collapseOp.getReassociationIndices(), parallelInsertOp,
             expandableUsers))) {
@@ -252,7 +241,7 @@ struct ExpandDestinationForallOp final
     // Expand the users of the destination.
     rewriter.setInsertionPointToStart(forallOp.getBody());
     expandVerifiedUsers(rewriter, loc, ctx, expandableUsers, totalInnerSizes,
-                        reIndices, forallOp);
+                        reIndices, forallOp, parallelInsertOp);
     rewriter.setInsertionPoint(forallOp);
 
     // Create the expand -> new scf.forall -> collapse chain.
