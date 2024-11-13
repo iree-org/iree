@@ -1334,13 +1334,6 @@ getMatmulRISCVVectorSizes(mlir::FunctionOpInterface entryPointFn,
     // TODO: support int data type
     return;
   }
-  Value lhs = op.getDpsInputs()[0];
-  auto lhsType = cast<ShapedType>(lhs.getType());
-  auto lhsShape = lhsType.getShape();
-  bool has_batch = isa<linalg::BatchMatmulOp, linalg::BatchMatmulTransposeBOp>(
-      op.getOperation());
-  int mDimIdx = (has_batch) ? 1 : 0;
-
   // Use 7 x lmul4 to fully utilize vector registers.
   sizes[0] = 7;
   // Calculate tile size for the main vector dimension (N).
@@ -1349,8 +1342,13 @@ getMatmulRISCVVectorSizes(mlir::FunctionOpInterface entryPointFn,
       (nativeVectorSize * 2 * kByteSizeInBits) / elementSize;
   sizes[1] = maxNumberElementsForLMUL4;
   sizes[2] = 1;
+  FailureOr<linalg::ContractionDimensions> cDims =
+      linalg::inferContractionDims(op);
+  if (failed(cDims))
+    return;
+  ArrayRef<int64_t> lhsShape = op.getShape(op.getDpsInputOperand(0));
   // If m = 1, set tile size to 1 x lmul8
-  if (lhsShape[mDimIdx] == 1) {
+  if (lhsShape[cDims->m[0]] == 1) {
     sizes[0] = 1;
     sizes[1] *= 2;
   }
