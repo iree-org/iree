@@ -12,7 +12,8 @@ from conftest import VmfbManager
 from pathlib import Path
 
 vmfb_dir = os.getenv("TEST_OUTPUT_ARTIFACTS", default=Path.cwd())
-rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
+rocm_chip = os.getenv("ROCM_CHIP", default="gfx942")
+iree_test_path_extension = os.getenv("IREE_TEST_PATH_EXTENSION", default=Path.cwd())
 
 ###############################################################################
 # Fixtures
@@ -93,7 +94,7 @@ sdxl_punet_int8_inference_input_5 = fetch_source_fixture(
 )
 
 sdxl_punet_int8_fp16_inference_output_0 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/new_punet_out.0.bin",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/11-13-2024/punet_fp16_out.0.bin",
     group="sdxl_punet_int8_fp16",
 )
 
@@ -103,14 +104,14 @@ sdxl_punet_int8_fp16_real_weights = fetch_source_fixture(
 )
 
 sdxl_punet_int8_fp16_mlir = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/punet.mlir",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/11-8-2024/punet_fp16.mlir",
     group="sdxl_punet_int8_fp16",
 )
 
 # INT8 Punet + FP8 Attention
 
 sdxl_punet_int8_fp8_inference_output_0 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/new_punet_fp8_out.0.bin",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/11-13-2024/punet_fp8_out.0.bin",
     group="sdxl_punet_int8_fp8",
 )
 
@@ -120,7 +121,7 @@ sdxl_punet_int8_fp8_real_weights = fetch_source_fixture(
 )
 
 sdxl_punet_int8_fp8_mlir = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/rob/sdxl-punet/punet_fp8.mlir",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/11-8-2024/punet_fp8.mlir",
     group="sdxl_punet_int8_fp8",
 )
 
@@ -214,6 +215,7 @@ FP16_UNET_FLAGS = [
 ]
 
 INT8_PUNET_FLAGS = [
+    f"--iree-codegen-transform-dialect-library={iree_test_path_extension}/attention_and_matmul_spec_punet.mlir",
     "--iree-preprocessing-pass-pipeline=builtin.module(util.func(iree-global-opt-raise-special-ops, iree-flow-canonicalize), iree-preprocessing-transpose-convolution-pipeline, iree-preprocessing-pad-to-intrinsics, util.func(iree-preprocessing-generalize-linalg-matmul-experimental))",
 ]
 
@@ -314,7 +316,14 @@ def test_run_unet_fp16_rocm(
     )
 
 
-def test_compile_punet_int8_fp16_rocm(sdxl_punet_int8_fp16_mlir):
+def test_compile_punet_int8_fp16_rocm(request, sdxl_punet_int8_fp16_mlir):
+    if rocm_chip == "gfx90a":
+        request.node.add_marker(
+            pytest.mark.xfail(
+                reason="Expected punet_int8_fp8 compilation on mi250 to fail",
+                strict=True,
+            )
+        )
     VmfbManager.sdxl_punet_int8_fp16_rocm_vmfb = iree_compile(
         sdxl_punet_int8_fp16_mlir,
         ROCM_COMPILE_FLAGS + INT8_PUNET_FLAGS,
