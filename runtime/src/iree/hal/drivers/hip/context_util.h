@@ -13,6 +13,9 @@
 
 static inline iree_status_t iree_hal_hip_set_context(
     const iree_hal_hip_dynamic_symbols_t* syms, hipCtx_t hip_context) {
+  if (!hip_context) {
+    return iree_ok_status();
+  }
   IREE_TRACE({
     hipCtx_t current_context = NULL;
     IREE_HIP_RETURN_IF_ERROR(syms, hipCtxGetCurrent(&current_context),
