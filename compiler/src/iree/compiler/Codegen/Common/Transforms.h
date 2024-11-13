@@ -18,6 +18,14 @@ struct OneShotBufferizationOptions;
 
 namespace mlir::iree_compiler {
 
+/// Common helper class for tracking lowering configs through pattern
+/// applications.
+class ConfigTrackingListener : public RewriterBase::Listener {
+public:
+  ConfigTrackingListener() = default;
+  void notifyOperationReplaced(Operation *op, ValueRange replacement) override;
+};
+
 using IGEMMConfigFn =
     std::function<LogicalResult(linalg::GenericOp, IREE::LinalgExt::Im2colOp)>;
 using IGEMMControlFn = std::function<bool(Operation *)>;

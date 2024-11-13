@@ -197,7 +197,7 @@ static void tileAndDistributeToWorkgroup(
   // TODO(#16421): Disable decomposition due to failure in bufferization.
   // funcPassManager.addPass(
   //     IREE::LinalgExt::createTileAndDecomposeAttentionPass());
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 }
 
@@ -238,13 +238,13 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
 void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
   tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/false);
 
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
   // Distribute linalg onto threads within the workgroup.
   funcPassManager.addPass(createGPUTensorTilePass());
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
   // Linalg -> vector
@@ -365,7 +365,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     GPUApplyTilingLevelPassOptions options;
     options.tilingLevel = IREE::GPU::TilingLevel::Reduction;
     funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
-    funcPassManager.addPass(createCanonicalizerPass());
+    funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
   }
 
@@ -384,7 +384,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   }
 
   funcPassManager.addPass(createPropagateReshapesByExpansionPass());
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
   // Step 4. Tile and fuse tileable ops to subgroups/threads.
@@ -392,7 +392,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     GPUApplyTilingLevelPassOptions options;
     options.tilingLevel = IREE::GPU::TilingLevel::Thread;
     funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
-    funcPassManager.addPass(createCanonicalizerPass());
+    funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
   }
   {
@@ -406,7 +406,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(iree_compiler::createNormalizeLoopBoundsPass(
       NormalizeLoopBoundsPassOptions{/*normalizeFor=*/false,
                                      /*normalizeForall=*/true}));
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
   // TODO: This LICM instance is load bearing due to brittleness of the
@@ -489,13 +489,13 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
 void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
   tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/false);
 
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
   // Distribute linalg onto threads within the workgroup.
   funcPassManager.addPass(createGPUTilePass());
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(
       IREE::LinalgExt::createDecomposeWinogradTransformPass());
@@ -512,7 +512,7 @@ void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
   // Post bufferization optimizations.
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createOptimizeVectorTransferPass());
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
@@ -526,8 +526,8 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &funcPassManager,
                                   const GPUPipelineOptions &options) {
   tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/false);
 
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
   funcPassManager.addPass(createGPUTensorTileToSerialLoopsPass());
@@ -727,8 +727,8 @@ void addGPUTransposePassPipeline(OpPassManager &funcPassManager,
                                  const GPUPipelineOptions &options) {
   tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/false);
 
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
   funcPassManager.addPass(
@@ -844,7 +844,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(
       IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass());
 
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
 
@@ -855,12 +855,12 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     options.allowZeroSlices = true;
     funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
     funcPassManager.addPass(affine::createLoopCoalescingPass());
-    funcPassManager.addPass(createCanonicalizerPass());
+    funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
   }
 
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
   // Set anchors at tensor level for vector distribution later and hoist out
@@ -927,9 +927,9 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
 void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager) {
   tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/false);
   funcPassManager.addPass(createRematerializeParallelOpsPass());
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createGPUTileReductionPass());
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
   // Linalg -> vector
@@ -970,11 +970,11 @@ void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager) {
 
 void addGPUPackUnPackPasses(OpPassManager &funcPassManager) {
   tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/false);
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
   funcPassManager.addPass(createGPUTensorTilePass());
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
   funcPassManager.addPass(createDecomposePackUnPackOpsPass(
@@ -1165,7 +1165,7 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
     addEncodingToNopPasses(funcPassManager);
     funcPassManager.addPass(createBlockDynamicDimensionsPass);
-    funcPassManager.addPass(createCanonicalizerPass);
+    funcPassManager.addPass(createConfigTrackingCanonicalizerPass);
     funcPassManager.addPass(createCSEPass);
   }
   modulePassManager.addPass(createMaterializeUserConfigsPass());
