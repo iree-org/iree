@@ -19,7 +19,10 @@
 # You must have `gh` installed and authenticated (run `gh auth`).
 #
 # Usage:
-# ./pypi_deploy.sh candidate-20220930.282
+#   python -m venv .venv
+#   source .venv/bin/activate
+#   python -m pip install -r ./pypi_deploy_requirements.txt
+#   ./pypi_deploy.sh candidate-20220930.282
 
 set -euo pipefail
 
@@ -29,15 +32,22 @@ SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 REQUIREMENTS_FILE="${SCRIPT_DIR}/pypi_deploy_requirements.txt"
 TMPDIR="$(mktemp --directory --tmpdir iree_pypi_wheels.XXXXX)"
 
-function check_exists() {
+function check_command_exists() {
   if ! command -v "$1" > /dev/null; then
     echo "$1 not found."
-    exit 1
+    return 1
   fi
+  return 0
 }
 
-# It really *seems* like there should be a pip command to do this, but there's
-# not, apparently.
+function check_python_package_installed() {
+  if ! pip show "$1" > /dev/null; then
+    echo "$1 not installed."
+    return 1
+  fi
+  return 0
+}
+
 function check_requirements() {
   while read line; do
     # Read in the package, ignoring everything after the first '='
@@ -48,7 +58,7 @@ function check_requirements() {
       echo "Reading requirements file '${REQUIREMENTS_FILE}' failed."
       exit "${ret}"
     fi
-    if ! check_exists "${package}"; then
+    if ! check_python_package_installed "${package}"; then
       echo "Recommend installing python dependencies in a venv using pypi_deploy_requirements.txt"
       exit 1
     fi
@@ -88,13 +98,16 @@ function upload_wheels() {
 function main() {
   echo "Changing into ${TMPDIR}"
   cd "${TMPDIR}"
+
+  set +e
   check_requirements
 
-  if ! check_exists gh; then
+  if ! check_command_exists gh; then
     echo "The GitHub CLI 'gh' is required. See https://github.com/cli/cli#installation."
     echo " Googlers, the PPA should already be on your linux machine."
     exit 1
   fi
+  set -e
 
   download_wheels
   edit_release_versions
