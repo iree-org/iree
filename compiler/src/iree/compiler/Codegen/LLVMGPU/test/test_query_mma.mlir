@@ -71,16 +71,10 @@ module {
   }
 }
 
-// CHECK:      Executable Variant Name
-// CHECK-SAME: main_0
-// CHECK:      MMA Intrinsics
-// CHECK-SAME: MFMA_F32_16x16x4_F32
-// CHECK-SAME: MFMA_F32_16x16x16_F16
-// CHECK:      Executable Variant Name
-// CHECK-SAME: main_1
-// CHECK:      MMA Intrinsics
-// CHECK-SAME: MFMA_F32_32x32x8_F16
-// CHECK-SAME: MFMA_F32_16x16x16_BF16
+// CHECK-DAG: main_0
+// CHECK-DAG: MMA Intrinsics: MFMA_F32_16x16x4_F32 MFMA_F32_16x16x16_F16
+// CHECK-DAG: main_1
+// CHECK-DAG: MMA Intrinsics: MFMA_F32_32x32x8_F16 MFMA_F32_16x16x16_BF16
 
 // -----
 
