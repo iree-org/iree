@@ -462,14 +462,7 @@ hal.executable @mma_fused {
 //           SM80:   nvvm.cp.async.commit.group
 //           SM80:   llvm.br
 //       SM80-NOT:   nvvm.wmma.mma
-//   SM80-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<3>, f32, f32, f32, f32, f32, f32, f32, f32
-//           SM80:   vvm.barrier0
-//           SM80:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
-//           SM80:   llvm.fadd {{.*}} : vector<4xf32>
-//           SM80:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
-//           SM80:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
-//           SM80:   llvm.fadd {{.*}} : vector<4xf32>
-//           SM80:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
+//   SM80-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<1>, f32, f32, f32, f32, f32, f32, f32, f32
 
 
 
@@ -547,12 +540,7 @@ hal.executable @mma_fused_fp16 {
 //           SM80:   nvvm.cp.async.commit.group
 //           SM80:   llvm.br
 //       SM80-NOT:   nvvm.wmma.mma
-//   SM80-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<3>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>
-//           SM80:   vvm.barrier0
-//           SM80:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<8xf16>
-//           SM80:   llvm.fadd {{.*}} : vector<8xf16>
-//           SM80:   llvm.store {{.*}} : vector<8xf16>, !llvm.ptr<1>
-//           SM80:   vvm.barrier0
+//   SM80-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<1>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>
 
 // -----
 
