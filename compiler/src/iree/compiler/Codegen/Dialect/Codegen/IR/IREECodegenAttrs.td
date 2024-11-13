@@ -226,7 +226,7 @@ def IREECodegen_TranslationInfoAttr :
   }];
 
   let assemblyFormat = [{
-    `<` `pipeline` `=` $passPipeline
+    `<` `pipeline` `=` `` $passPipeline
     (`codegen_spec` `=` $codegenSpec^)?
     (`workgroup_size` `=` `[` $workgroupSize^ `]`)?
     (`subgroup_size` `=` $subgroupSize^)?

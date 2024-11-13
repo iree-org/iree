@@ -2,6 +2,7 @@
 VER_0 {
   global:
     ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr;
+    ireeAttributeIsACodegenTranslationInfoAttr;
     ireeAttributeIsAGPULoweringConfigAttr;
     ireeAttributeIsAGPUMMAAttr;
     ireeAttributeIsAGPUMMAIntrinsicAttr;
@@ -10,6 +11,9 @@ VER_0 {
     ireeCodegenDispatchLoweringPassPipelineAttrGet;
     ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID;
     ireeCodegenDispatchLoweringPassPipelineAttrGetValue;
+    ireeCodegenTranslationInfoAttrGet;
+    ireeCodegenTranslationInfoAttrGetParameters;
+    ireeCodegenTranslationInfoAttrGetTypeID;
     ireeCompilerEnumeratePlugins;
     ireeCompilerEnumerateRegisteredHALTargetBackends;
     ireeCompilerErrorDestroy;

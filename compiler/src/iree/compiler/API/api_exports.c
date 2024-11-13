@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 extern void ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr();
+extern void ireeAttributeIsACodegenTranslationInfoAttr();
 extern void ireeAttributeIsAGPULoweringConfigAttr();
 extern void ireeAttributeIsAGPUMMAAttr();
 extern void ireeAttributeIsAGPUMMAIntrinsicAttr();
@@ -19,6 +20,9 @@ extern void ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr();
 extern void ireeCodegenDispatchLoweringPassPipelineAttrGet();
 extern void ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID();
 extern void ireeCodegenDispatchLoweringPassPipelineAttrGetValue();
+extern void ireeCodegenTranslationInfoAttrGet();
+extern void ireeCodegenTranslationInfoAttrGetParameters();
+extern void ireeCodegenTranslationInfoAttrGetTypeID();
 extern void ireeCompilerEnumeratePlugins();
 extern void ireeCompilerEnumerateRegisteredHALTargetBackends();
 extern void ireeCompilerErrorDestroy();
@@ -865,6 +869,7 @@ extern void mlirVectorTypeIsScalable();
 uintptr_t __iree_compiler_hidden_force_extern() {
   uintptr_t x = 0;
   x += (uintptr_t)&ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr;
+  x += (uintptr_t)&ireeAttributeIsACodegenTranslationInfoAttr;
   x += (uintptr_t)&ireeAttributeIsAGPULoweringConfigAttr;
   x += (uintptr_t)&ireeAttributeIsAGPUMMAAttr;
   x += (uintptr_t)&ireeAttributeIsAGPUMMAIntrinsicAttr;
@@ -873,6 +878,9 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCodegenDispatchLoweringPassPipelineAttrGet;
   x += (uintptr_t)&ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID;
   x += (uintptr_t)&ireeCodegenDispatchLoweringPassPipelineAttrGetValue;
+  x += (uintptr_t)&ireeCodegenTranslationInfoAttrGet;
+  x += (uintptr_t)&ireeCodegenTranslationInfoAttrGetParameters;
+  x += (uintptr_t)&ireeCodegenTranslationInfoAttrGetTypeID;
   x += (uintptr_t)&ireeCompilerEnumeratePlugins;
   x += (uintptr_t)&ireeCompilerEnumerateRegisteredHALTargetBackends;
   x += (uintptr_t)&ireeCompilerErrorDestroy;
