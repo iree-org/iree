@@ -44,8 +44,8 @@ iree_lit_test_suite(
     "split_reduction.mlir"
     "tensor_pad_to_tensor_insert_slice.mlir"
     "transform_dispatch_region_formation.mlir"
-    "transpose_and_decompose_concat.mlir"
     "transpose_generic_ops.mlir"
+    "transpose_or_decompose_concat.mlir"
   TOOLS
     FileCheck
     iree-opt
