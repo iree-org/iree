@@ -38,6 +38,77 @@ struct BubbleUpExpandShapesPass final
   void runOnOperation() override;
 };
 
+// TODO: move this upstream with other tensor bubbling patterns.
+struct BubbleExpandThroughExtract final
+    : public OpRewritePattern<tensor::ExpandShapeOp> {
+
+  using OpRewritePattern<tensor::ExpandShapeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::ExpandShapeOp expandOp,
+                                PatternRewriter &rewriter) const override {
+    auto extractOp = expandOp.getSrc().getDefiningOp<tensor::ExtractSliceOp>();
+    if (!extractOp) {
+      return failure();
+    }
+
+    auto origType = extractOp.getSourceType();
+    auto extractedType = extractOp.getType();
+    auto expandedType = expandOp.getType();
+
+    if (origType.getRank() != extractedType.getRank()) {
+      return rewriter.notifyMatchFailure(
+          extractOp, "Rank reducing extract_slice not supported");
+    }
+
+    if (!origType.hasStaticShape() || !extractedType.hasStaticShape() ||
+        !expandedType.hasStaticShape()) {
+      return failure();
+    }
+
+    auto reassoc = expandOp.getReassociationIndices();
+    for (auto i : llvm::seq<uint64_t>(0, extractedType.getRank())) {
+      if (reassoc[i].size() == 1) {
+        continue;
+      }
+
+      if (origType.getShape()[i] != extractedType.getShape()[i]) {
+        return rewriter.notifyMatchFailure(
+            extractOp, "Extract modifies the expanded dimension");
+      }
+    }
+
+    SmallVector<int64_t> newExpandShape;
+    SmallVector<int64_t> offsets;
+    SmallVector<int64_t> sizes;
+    SmallVector<int64_t> strides;
+    for (auto [inDim, outDims] : llvm::enumerate(reassoc)) {
+      if (outDims.size() == 1) {
+        newExpandShape.push_back(origType.getShape()[inDim]);
+        offsets.push_back(extractOp.getStaticOffsets()[inDim]);
+        sizes.push_back(extractOp.getStaticSizes()[inDim]);
+        strides.push_back(extractOp.getStaticStrides()[inDim]);
+      } else {
+        for (auto outDim : outDims) {
+          newExpandShape.push_back(expandedType.getShape()[outDim]);
+          offsets.push_back(0);
+          sizes.push_back(expandedType.getShape()[outDim]);
+          strides.push_back(1);
+        }
+      }
+    }
+
+    Type newExpandType =
+        RankedTensorType::get(newExpandShape, expandedType.getElementType());
+    auto newExpand = rewriter.create<tensor::ExpandShapeOp>(
+        expandOp.getLoc(), newExpandType, extractOp.getSource(), reassoc);
+
+    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
+        expandOp, expandedType, newExpand, ValueRange{}, ValueRange{},
+        ValueRange{}, offsets, sizes, strides);
+    return success();
+  }
+};
+
 } // namespace
 
 void BubbleUpExpandShapesPass::runOnOperation() {
@@ -87,6 +158,7 @@ void BubbleUpExpandShapesPass::runOnOperation() {
   // Add patterns to do some additional cleanup (on top of canonicalizations
   // that can be done later) of reshape ops.
   tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
+  bubbleExpandShapePatterns.insert<BubbleExpandThroughExtract>(context);
 
   GreedyRewriteConfig rewriteConfig;
   rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
