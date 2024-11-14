@@ -209,8 +209,8 @@ std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func);
 
 /// Returns a map of supported MMA intrinsic instructions based on the
 /// GPU target descriptions in `moduleOp`. Each entry in the map associates
-/// an `Operation*` ( an `IREE::HAL::ExecutableVariantOp`) with a
-/// vector of `IREE::GPU::MMAIntrinsic` attributes.
+/// an `IREE::HAL::ExecutableVariantOp` with a vector of
+/// `IREE::GPU::MMAIntrinsic` attributes.
 llvm::SmallDenseMap<IREE::HAL::ExecutableVariantOp,
                     SmallVector<IREE::GPU::MMAIntrinsic>>
 queryMMAIntrinsics(mlir::ModuleOp moduleOp);
