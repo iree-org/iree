@@ -281,11 +281,19 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   for (auto [i, mDim] : llvm::enumerate(mDims)) {
     workgroupTileSizes[mDim] =
         schedule->mSubgroupCounts[i] * schedule->mTileSizes[i];
+    // Multiply by the intrinsic shape for the inner most dim as we distribute
+    // to workgroups before packing to intrinsic.
+    if (i == mDims.size() - 1)
+      workgroupTileSizes[mDim] *= schedule->mSize;
     subgroupTileSizes[mDim] = schedule->mTileSizes[i];
   }
   for (auto [i, nDim] : llvm::enumerate(nDims)) {
     workgroupTileSizes[nDim] =
         schedule->nSubgroupCounts[i] * schedule->nTileSizes[i];
+    // Multiply by the intrinsic shape for the inner most dim as we distribute
+    // to workgroups before packing to intrinsic.
+    if (i == nDims.size() - 1)
+      workgroupTileSizes[nDim] *= schedule->nSize;
     subgroupTileSizes[nDim] = schedule->nTileSizes[i];
   }
 

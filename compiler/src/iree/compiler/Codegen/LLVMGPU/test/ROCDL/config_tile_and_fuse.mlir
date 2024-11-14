@@ -39,7 +39,7 @@ func.func @expanded_matmul_transpose_b(%lhs: tensor<2x64x2048xf16>, %rhs: tensor
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 0, 0, 4]
 //  CHECK-SAME:     subgroup = [1, 1, 4, 1, 0]
-//  CHECK-SAME:     workgroup = [1, 1, 4, 4, 0]
+//  CHECK-SAME:     workgroup = [1, 1, 64, 64, 0]
 
 // -----
 
@@ -72,7 +72,7 @@ func.func @multi_dim_mma_schedule(%lhs: tensor<10x32x128x16xf16>, %rhs: tensor<4
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 0, 0, 4, 1]
 //  CHECK-SAME:     subgroup = [2, 2, 1, 1, 0, 0]
-//  CHECK-SAME:     workgroup = [2, 2, 2, 2, 0, 0]
+//  CHECK-SAME:     workgroup = [2, 2, 32, 32, 0, 0]
 
 // -----
 
@@ -107,7 +107,7 @@ func.func @dynamic_multi_dim_mma_schedule(%lhs: tensor<?x6x16x?x16xf16>, %rhs: t
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 0, 0, 0, 1, 1]
 //  CHECK-SAME:     subgroup = [0, 1, 0, 1, 1, 0, 0]
-//  CHECK-SAME:     workgroup = [1, 2, 1, 1, 2, 0, 0]
+//  CHECK-SAME:     workgroup = [1, 2, 1, 16, 32, 0, 0]
 
 // -----
 
@@ -132,7 +132,7 @@ func.func @mfma_matmul_1024x1024x1024(%lhs: tensor<1024x1024xf16>, %rhs: tensor<
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 2]
 //  CHECK-SAME:     subgroup = [4, 4, 0]
-//  CHECK-SAME:     workgroup = [8, 8, 0]
+//  CHECK-SAME:     workgroup = [128, 128, 0]
 
 // -----
 
