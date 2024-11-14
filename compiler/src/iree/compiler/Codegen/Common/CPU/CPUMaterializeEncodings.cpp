@@ -45,9 +45,8 @@ enumerateMatmulTilesVMVX(linalg::ContractionDimensions cDims,
 
   // TODO(hanchung): The ukernel path does not support 3d
   // codegen.query_tile_sizes op, so we disable dynamic tile shapes for
-  // batch_matmul. Also, they are not set up for narrow M/N matmul, so it is
-  // disabled when it is the case.
-  if (!cDims.batch.empty() || getMatmulNarrowDim(encoding)) {
+  // batch_matmul.
+  if (!cDims.batch.empty()) {
     hasUkernelSupport = false;
   }
   if (hasUkernelSupport) {
