@@ -14,30 +14,14 @@ Or from Python:
 
   python -m iree.compiler.tools.import_onnx ...
 """
+
 import argparse
 import os
 from pathlib import Path
 import sys
 import tempfile
 
-try:
-    import onnx
-except ModuleNotFoundError as e:
-    raise ModuleNotFoundError(
-        f"iree-import-onnx requires that the `onnx` Python package is installed "
-        f"(typically `{sys.executable} -m pip install onnx`)"
-    ) from e
-
-try:
-    from ...extras import onnx_importer
-except ModuleNotFoundError as e:
-    raise ModuleNotFoundError(
-        "iree-import-onnx is only available if IREE was built with Torch support"
-    ) from e
-
-from ...ir import (
-    Context,
-)
+from .importer_externalization_overrides import *
 
 
 def main(args: argparse.Namespace):
@@ -45,10 +29,27 @@ def main(args: argparse.Namespace):
     context = Context()
     model_info = onnx_importer.ModelInfo(model_proto)
     m = model_info.create_module(context=context).operation
-    imp = onnx_importer.NodeImporter.define_function(model_info.main_graph, m)
+
+    imp: Any = None
+    if args.externalize_params:
+        imp = IREENodeImporter.define_function(
+            model_info.main_graph, m, args.num_elements_threshold, args.params_scope
+        )
+    else:
+        imp = onnx_importer.NodeImporter.define_function(model_info.main_graph, m)
     imp.import_all()
+
     if not args.no_verify:
         m.verify()
+
+    if args.externalize_params:
+        default_param_path = Path(args.output_file).parent / Path(args.output_file).stem
+        param_path = (
+            (str(default_param_path) + "_params.irpa")
+            if args.save_params_to is None
+            else str(args.save_params_to)
+        )
+        imp.param_archive.create_archive_file(param_path)
 
     # TODO: This isn't very efficient output. If these files ever
     # get large, enable bytecode and direct binary emission to save
@@ -70,6 +71,12 @@ def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
     else:
         raw_model = onnx.load(args.input_file, load_external_data=False)
         onnx.load_external_data_for_model(raw_model, str(args.data_dir))
+
+    # Only change the opset version if it is greater than the current one.
+    if args.opset_version and args.opset_version > raw_model.opset_import[0].version:
+        raw_model = onnx.version_converter.convert_version(
+            raw_model, args.opset_version
+        )
 
     # Do shape inference two ways.  First, attempt in-memory to avoid redundant
     # loading and the need for writing a temporary file somewhere.  If that
@@ -131,6 +138,37 @@ def parse_arguments(argv=None) -> argparse.Namespace:
         help="Path to the base directory of the data."
         " Defaults to the directory of the input file.",
         type=Path,
+    )
+    parser.add_argument(
+        "--opset-version",
+        help="Allows specification of a newer opset_version to update the model"
+        " to before importing to MLIR. This can sometime assist with shape inference.",
+        type=int,
+    )
+    parser.add_argument(
+        "--num-elements-threshold",
+        help="Minimum number of elements for an initializer to be externalized. Only has an effect if 'externalize-params' is true.",
+        type=int,
+        default=100,
+    )
+    parser.add_argument(
+        "--externalize-params",
+        help="Externalize large parameters and store them on the disk, to load at runtime.",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
+    parser.add_argument(
+        "--save-params-to",
+        help="Location to save the externalized parameters. When not set, the parameters will be written to '<output_file_name>_params.irpa'"
+        " under the namespace 'model', which can be configured by passing the namespace string to 'params-scope'.",
+        default=None,
+        type=Path,
+    )
+    parser.add_argument(
+        "--params-scope",
+        help="The namespace or the scope in which the externalized parameters are placed. Default is 'model'.",
+        type=str,
+        default="model",
     )
     args = parser.parse_args(argv)
     return args
