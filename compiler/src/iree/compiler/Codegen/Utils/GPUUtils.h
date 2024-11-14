@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -205,6 +206,14 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
 /// exists; otherwise returns the subgroup size from the GPU target description.
 /// Returns std::nullopt if none found.
 std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func);
+
+/// Returns a map of supported MMA intrinsic instructions based on the
+/// GPU target descriptions in `moduleOp`. Each entry in the map associates
+/// an `IREE::HAL::ExecutableVariantOp` with a vector of
+/// `IREE::GPU::MMAIntrinsic` attributes.
+llvm::SmallDenseMap<IREE::HAL::ExecutableVariantOp,
+                    SmallVector<IREE::GPU::MMAIntrinsic>>
+queryMMAIntrinsics(mlir::ModuleOp moduleOp);
 
 } // namespace mlir::iree_compiler
 
