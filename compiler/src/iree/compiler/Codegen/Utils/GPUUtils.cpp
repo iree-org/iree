@@ -18,7 +18,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -1029,9 +1028,11 @@ std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func) {
   return std::nullopt;
 }
 
-llvm::SmallDenseMap<Operation *, SmallVector<IREE::GPU::MMAIntrinsic>>
+llvm::SmallDenseMap<IREE::HAL::ExecutableVariantOp,
+                    SmallVector<IREE::GPU::MMAIntrinsic>>
 queryMMAIntrinsics(mlir::ModuleOp moduleOp) {
-  llvm::SmallDenseMap<Operation *, SmallVector<IREE::GPU::MMAIntrinsic>>
+  llvm::SmallDenseMap<IREE::HAL::ExecutableVariantOp,
+                      SmallVector<IREE::GPU::MMAIntrinsic>>
       mmaAttributesMap;
   moduleOp.walk([&](IREE::HAL::ExecutableVariantOp executableOp) {
     if (IREE::GPU::TargetAttr target = getGPUTargetAttr(executableOp)) {
@@ -1039,7 +1040,7 @@ queryMMAIntrinsics(mlir::ModuleOp moduleOp) {
           target.getWgp().getMma(), [](IREE::GPU::MMAAttr attr) {
             return attr.getIntrinsic().getValue();
           });
-      mmaAttributesMap[executableOp] = mmaIntrinsics;
+      mmaAttributesMap[executableOp] = std::move(mmaIntrinsics);
     }
   });
   return mmaAttributesMap;

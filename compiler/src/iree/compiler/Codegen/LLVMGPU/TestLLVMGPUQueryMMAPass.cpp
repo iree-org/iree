@@ -23,16 +23,13 @@ struct TestLLVMGPUQueryMMAPass final
     : impl::TestLLVMGPUQueryMMAPassBase<TestLLVMGPUQueryMMAPass> {
   void runOnOperation() override {
     ModuleOp moduleOp = getOperation();
-    llvm::SmallDenseMap<Operation *, SmallVector<IREE::GPU::MMAIntrinsic>>
+    llvm::SmallDenseMap<IREE::HAL::ExecutableVariantOp,
+                        SmallVector<IREE::GPU::MMAIntrinsic>>
         mmaMap = queryMMAIntrinsics(moduleOp);
     for (const auto &[op, mmaAttrs] : mmaMap) {
-      if (auto variantOp = llvm::dyn_cast<IREE::HAL::ExecutableVariantOp>(op)) {
-        llvm::outs() << "Executable Variant Name: " << variantOp.getName()
-                     << "\n";
-      } else {
-        llvm::outs() << "Executable Variant Name: " << "Unnamed Operation"
-                     << "\n";
-      }
+      llvm::outs() << "Executable Variant Name: "
+                   << cast<IREE::HAL::ExecutableVariantOp>(*op).getName()
+                   << "\n";
       llvm::outs() << "MMA Intrinsics: ";
       llvm::interleave(mmaAttrs, llvm::outs(), " ");
       llvm::outs() << "\n";
