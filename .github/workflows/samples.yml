@@ -86,6 +86,7 @@ jobs:
           python3 -m pip install \
             --find-links https://iree.dev/pip-release-links.html \
             --upgrade \
+            --pre \
             iree-base-compiler \
             iree-base-runtime
       - name: "Setup emsdk"

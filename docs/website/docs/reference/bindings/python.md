@@ -83,15 +83,16 @@ To use IREE's Python bindings, you will first need to install
       iree-base-runtime
     ```
 
-=== ":material-alert: Nightly releases"
+=== ":material-alert: Nightly pre-releases"
 
-    Nightly releases are published on
+    Nightly pre-releases are published on
     [GitHub releases](https://github.com/iree-org/iree/releases).
 
     ``` shell
     python -m pip install \
       --find-links https://iree.dev/pip-release-links.html \
       --upgrade \
+      --pre \
       iree-base-compiler \
       iree-base-runtime
     ```

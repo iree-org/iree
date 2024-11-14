@@ -70,13 +70,14 @@ graph LR
 
     === ":material-alert: Nightly releases"
 
-        Nightly releases are published on
+        Nightly pre-releases are published on
         [GitHub releases](https://github.com/iree-org/iree/releases).
 
         ``` shell
         python -m pip install \
           --find-links https://iree.dev/pip-release-links.html \
           --upgrade \
+          --pre \
           iree-base-compiler[onnx] \
           iree-base-runtime
         ```
