@@ -71,9 +71,9 @@ All steps here assume starting from the IREE root directory.
     Install distributed packages
 
     ```bash
-    # Install packages from nightly releases
+    # Install packages from nightly pre-releases
     # This should work for most cases, as the importers change infrequently
-    python -m pip install \
+    python -m pip install --pre \
       iree-base-compiler iree-base-runtime iree-tools-tf iree-tools-tflite \
       --find-links https://iree.dev/pip-release-links.html
     ```

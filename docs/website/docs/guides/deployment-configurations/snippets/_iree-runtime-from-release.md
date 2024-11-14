@@ -9,11 +9,11 @@
 
 === ":material-alert: Nightly releases"
 
-    Nightly releases are published on
+    Nightly pre-releases are published on
     [GitHub releases](https://github.com/iree-org/iree/releases).
 
     ``` shell
     python -m pip install \
       --find-links https://iree.dev/pip-release-links.html \
-      --upgrade iree-base-runtime
+      --upgrade --pre iree-base-runtime
     ```

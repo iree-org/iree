@@ -80,6 +80,7 @@ graph LR
         python -m pip install \
           --find-links https://iree.dev/pip-release-links.html \
           --upgrade \
+          --pre \
           iree-base-compiler \
           iree-base-runtime \
           iree-tools-tf

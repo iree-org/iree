@@ -65,7 +65,7 @@ trap "deactivate 2> /dev/null" EXIT
 # Skip package installs when you want by commenting this out. Freezing to a
 # specific version when iterating on metrics is useful, and fetching is slow.
 
-python -m pip install --upgrade \
+python -m pip install --upgrade --pre \
   --find-links https://iree.dev/pip-release-links.html \
   iree-base-compiler iree-tools-tflite
 
