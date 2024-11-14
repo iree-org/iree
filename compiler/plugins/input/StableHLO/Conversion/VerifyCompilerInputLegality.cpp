@@ -9,7 +9,6 @@
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #include "stablehlo/dialect/VhloOps.h"
 
@@ -32,7 +31,6 @@ struct VerifyCompilerStableHloInputLegality final
     // However, it is so common to sneak input-level ops into the pipeline
     // that we explicitly deny the dialects we know about.
     conversionTarget.addIllegalDialect<mlir::stablehlo::StablehloDialect>();
-    conversionTarget.addIllegalDialect<mlir::chlo::ChloDialect>();
     conversionTarget.addIllegalDialect<mlir::vhlo::VhloDialect>();
     conversionTarget.addIllegalDialect<mlir::shape::ShapeDialect>();
 

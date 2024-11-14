@@ -256,13 +256,6 @@ def check_unknown_backend(errortxt, _, __):
     return "RuntimeError: Unknown backend" in errortxt
 
 
-def check_unsigned_topk(_, mlirbc, __):
-    for line in mlirbc.split("\n"):
-        if "xui" in line and "chlo.top_k" in line:
-            return True
-    return False
-
-
 def check_runtime_crash(__, _, runtime_crash):
     return runtime_crash
 
@@ -389,7 +382,6 @@ KnownChecks = {
     "https://github.com/iree-org/iree/issues/????? (donation)": check_donation,
     "https://github.com/iree-org/iree/issues/????? (python callback)": check_python_callback,
     "https://github.com/iree-org/iree/issues/????? (subspan)": check_subspan,
-    "https://github.com/iree-org/iree/issues/14098 (unsigned topk)": check_unsigned_topk,
     "https://github.com/iree-org/iree/issues/????? (bounds indexing)": check_bounds_indexing,
     "https://github.com/iree-org/iree/issues/????? (nan correctness)": check_nan_correctness,
     "https://github.com/iree-org/iree/issues/????? (pointer mismatch)": check_pointer_mismatch,
