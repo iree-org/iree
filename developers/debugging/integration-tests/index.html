@@ -3793,9 +3793,9 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
 <li>
 <p>Install IREE's tools and Python bindings or build them from source</p>
 <p>Install distributed packages</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Install packages from nightly releases</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># Install packages from nightly pre-releases</span>
 <span class="c1"># This should work for most cases, as the importers change infrequently</span>
-python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>iree-base-compiler<span class="w"> </span>iree-base-runtime<span class="w"> </span>iree-tools-tf<span class="w"> </span>iree-tools-tflite<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--find-links<span class="w"> </span>https://iree.dev/pip-release-links.html
 </code></pre></div>
