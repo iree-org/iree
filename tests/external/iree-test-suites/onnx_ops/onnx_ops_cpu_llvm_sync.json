@@ -413,6 +413,7 @@
     "onnx/node/generated/test_qlinearmatmul_3D_uint8_float32",
     "onnx/node/generated/test_reduce_min_empty_set",
     "onnx/node/generated/test_reduce_sum_empty_set_non_reduced_axis_zero",
+    "onnx/node/generated/test_resize_downsample_scales_cubic_align_corners",
     "onnx/node/generated/test_resize_downsample_scales_linear_align_corners",
     "onnx/node/generated/test_sce_mean_weight",
     "onnx/node/generated/test_sce_mean_weight_ii",

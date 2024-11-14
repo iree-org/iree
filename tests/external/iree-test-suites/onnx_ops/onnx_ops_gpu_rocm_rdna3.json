@@ -461,6 +461,7 @@
     "onnx/node/generated/test_reduce_sum_square_default_axes_keepdims_random",
     "onnx/node/generated/test_reduce_sum_square_default_axes_keepdims_random_expanded",
     "onnx/node/generated/test_resize_downsample_scales_linear_align_corners",
+    "onnx/node/generated/test_resize_downsample_scales_cubic_align_corners",
     "onnx/node/generated/test_sce_mean_weight",
     "onnx/node/generated/test_sce_mean_weight_ii",
     "onnx/node/generated/test_sce_mean_weight_ii_log_prob",
