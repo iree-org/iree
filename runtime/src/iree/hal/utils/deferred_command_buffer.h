@@ -44,8 +44,8 @@ typedef struct iree_arena_block_pool_t iree_arena_block_pool_t;
 IREE_API_EXPORT iree_status_t iree_hal_deferred_command_buffer_create(
     iree_hal_allocator_t* device_allocator, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_host_size_t binding_capacity, iree_arena_block_pool_t* block_pool,
-    iree_allocator_t host_allocator,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
+    iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer);
 
 // Returns true if |command_buffer| is a deferred command buffer.
