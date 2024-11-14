@@ -188,17 +188,16 @@ struct ConvertTensorConcatPattern : public OpRewritePattern<tensor::ConcatOp> {
       return rewriter.notifyMatchFailure(
           concatOp, "only outer-dim concat lowering supported");
     }
-    if (cast<RankedTensorType>(concatOp.getInputs().front().getType())
-            .getRank() == 0) {
-      // This should be handled here, but not sure what concat operation does
-      // when inptus are of rank 0.
-      return rewriter.notifyMatchFailure(
-          concatOp, "unhandled concat of zero-rank tensors");
-    }
+    assert(cast<RankedTensorType>(concatOp.getInputs().front().getType())
+                   .getRank() != 0 &&
+           "concat cannot be of zero-rank tensors");
 
     Location loc = concatOp.getLoc();
     SmallVector<SmallVector<OpFoldResult>> inputShapes;
     inputShapes.reserve(concatOp.getInputs().size());
+    // Note the output shape is computed directly without using
+    // `reifyResultShapes` since we need the `inputShapes` anyway and using the
+    // method would create duplicate `tensor.dim` operations.
     SmallVector<OpFoldResult> outputShape;
     AffineExpr addExpr =
         rewriter.getAffineSymbolExpr(0) + rewriter.getAffineSymbolExpr(1);
