@@ -15,10 +15,6 @@
 #include "iree/hal/utils/collective_batch.h"
 #include "iree/hal/utils/stream_tracing.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif  // __cplusplus
-
 // Returns true if |id| is all zeros indicating an empty ID.
 static inline bool iree_hal_hip_nccl_id_is_empty(
     const iree_hal_hip_nccl_id_t* id) {
@@ -51,9 +47,5 @@ iree_status_t iree_hal_hip_nccl_submit_batch(
     iree_hal_stream_tracing_context_t* tracing_context,
     iree_hal_stream_tracing_context_event_list_t* tracing_event_list,
     const iree_hal_collective_batch_t* batch, hipStream_t stream);
-
-#ifdef __cplusplus
-}  // extern "C"
-#endif  // __cplusplus
 
 #endif  // IREE_HAL_DRIVERS_HIP_RCCL_CHANNEL_H_

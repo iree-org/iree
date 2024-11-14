@@ -11,10 +11,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/hip_headers.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif  // __cplusplus
+#include "iree/hal/utils/stream_tracing.h"
 
 // NOTE: hipGraph API used in this module is marked as beta in the HIP
 // documentation, meaning, while this is feature complete it is still open to
@@ -51,8 +48,8 @@ hipGraphExec_t iree_hal_hip_graph_command_buffer_handle(
 void iree_hal_hip_graph_tracing_notify_submitted_commands(
     iree_hal_command_buffer_t* command_buffer);
 
-#ifdef __cplusplus
-}  // extern "C"
-#endif  // __cplusplus
+iree_hal_stream_tracing_context_event_list_t
+iree_hal_hip_graph_command_buffer_tracing_events(
+    iree_hal_command_buffer_t* base_command_buffer);
 
 #endif  // IREE_HAL_DRIVERS_HIP_GRAPH_COMMAND_BUFFER_H_
