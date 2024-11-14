@@ -331,6 +331,42 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [],
+  batch_tile    = [],
+  outer_tile        = [],
+  thread_tile       = [],
+  element_tile     = [],
+
+  subgroup_strides        = [],
+  thread_strides          = []
+>
+
+// CHECK-LABEL: @distribute_transfer_read_0d
+func.func @distribute_transfer_read_0d(%arg0: memref<128xf16>) -> vector<f16> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f16
+  %root = vector.transfer_read %arg0[%c0], %cst
+          {in_bounds = []} : memref<128xf16>, vector<f16>
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<f16>
+  func.return %rootl : vector<f16>
+}
+
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK: %[[RD:.+]] = vector.transfer_read %{{.*}}[%c0]
+// CHECK-SAME: memref<128xf16>, vector<f16>
+// CHECK: iree_vector_ext.to_simd %[[RD]]
+
+// -----
+
 #layout_row_major = #iree_vector_ext.nested_layout<
   subgroup_tile = [1, 1],
   batch_tile    = [2, 2],

@@ -200,13 +200,20 @@ struct DistributeTransferRead final
           rewriter, indices, offsets, vectorLayout, readOp.getPermutationMap(),
           warpIndices, threadIndices);
 
-      Value slicedRead = rewriter.create<vector::TransferReadOp>(
+      VectorValue slicedRead = rewriter.create<vector::TransferReadOp>(
           readOp.getLoc(), innerVectorType, readOp.getSource(), slicedIndices,
           readOp.getPermutationMapAttr(), readOp.getPadding(), readOp.getMask(),
           readOp.getInBoundsAttr());
 
-      acc = rewriter.create<vector::InsertStridedSliceOp>(
-          readOp.getLoc(), slicedRead, acc, offsets, strides);
+      if (acc.getType().getRank() == 0) {
+        // TODO: This should really be a folding pattern in
+        // insert_strided_slice, but instead insert_strided_slice just doesn't
+        // support 0-d vectors...
+        acc = slicedRead;
+      } else {
+        acc = rewriter.create<vector::InsertStridedSliceOp>(
+            readOp.getLoc(), slicedRead, acc, offsets, strides);
+      }
     }
 
     replaceOpWithDistributedValues(rewriter, readOp, acc);
