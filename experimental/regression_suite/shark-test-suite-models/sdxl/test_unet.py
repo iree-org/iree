@@ -131,6 +131,7 @@ CPU_COMPILE_FLAGS = [
     "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false",
     "--iree-llvmcpu-distribution-size=32",
     "--iree-opt-const-eval=false",
+    "--iree-opt-strip-assertions=true",
     "--iree-llvmcpu-enable-ukernels=all",
     "--iree-global-opt-enable-quantized-matmul-reassociation",
 ]
@@ -194,6 +195,7 @@ ROCM_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
     f"--iree-hip-target={rocm_chip}",
     "--iree-opt-const-eval=false",
+    "--iree-opt-strip-assertions=true",
     "--iree-global-opt-propagate-transposes=true",
     "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
     "--iree-dispatch-creation-enable-aggressive-fusion=true",
