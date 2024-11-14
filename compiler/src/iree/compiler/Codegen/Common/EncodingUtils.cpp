@@ -76,7 +76,7 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
   // experimental path, so it is not clear what needs to be done here. For now
   // just use the original map for the new encoding.
   auto newEncoding = IREE::Encoding::EncodingAttr::get(
-      context, operandIndex, encoding.getOpType().getValue(),
+      context, operandIndex, IREE::Encoding::EncodingOpType::matmul,
       encoding.getElementTypesArray(), maps, encoding.getBcastMapValue(),
       newRoundDimsTo);
   return RankedTensorType::get(newShape, elemType, newEncoding);
