@@ -21,6 +21,7 @@ iree_cc_library(
     "Utils.cpp"
   DEPS
     LLVMSupport
+    MLIRAffineDialect
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
