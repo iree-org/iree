@@ -1029,22 +1029,20 @@ std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func) {
   return std::nullopt;
 }
 
-void queryMMAIntrinsics(
-    mlir::ModuleOp moduleOp,
-    llvm::SmallDenseMap<Operation *, SmallVector<IREE::GPU::MMAIntrinsic>>
-        &mmaAttributesMap) {
+llvm::SmallDenseMap<Operation *, SmallVector<IREE::GPU::MMAIntrinsic>>
+queryMMAIntrinsics(mlir::ModuleOp moduleOp) {
+  llvm::SmallDenseMap<Operation *, SmallVector<IREE::GPU::MMAIntrinsic>>
+      mmaAttributesMap;
   moduleOp.walk([&](IREE::HAL::ExecutableVariantOp executableOp) {
     if (IREE::GPU::TargetAttr target = getGPUTargetAttr(executableOp)) {
-      SmallVector<IREE::GPU::MMAIntrinsic> mmaIntrinsics;
-      llvm::append_range(
-          mmaIntrinsics,
-          llvm::map_range(target.getWgp().getMma(),
-                          [](IREE::GPU::MMAAttr attr) {
-                            return attr.getIntrinsic().getValue();
-                          }));
+      auto mmaIntrinsics = llvm::map_to_vector(
+          target.getWgp().getMma(), [](IREE::GPU::MMAAttr attr) {
+            return attr.getIntrinsic().getValue();
+          });
       mmaAttributesMap[executableOp] = mmaIntrinsics;
     }
   });
+  return mmaAttributesMap;
 }
 
 } // namespace mlir::iree_compiler

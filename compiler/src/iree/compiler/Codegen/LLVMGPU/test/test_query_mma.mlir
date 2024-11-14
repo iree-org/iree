@@ -1,13 +1,13 @@
 // RUN: iree-opt --split-input-file --iree-test-llvmgpu-query-mma %s | FileCheck %s
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-{abi = "hip", iree.gpu.target = #iree_gpu.target<arch = "gfx942", features = "",
+{iree.gpu.target = #iree_gpu.target<arch = "gfx942", features = "",
 wgp = <compute = int32, storage =  b32,
-subgroup =  shuffle|arithmetic, dot =  dp4xi8toi32,
+subgroup = arithmetic, dot = dp4xi8toi32,
 mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>],
-subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+subgroup_size_choices = [64], max_workgroup_sizes = [1024],
 max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
-max_workgroup_counts = [2147483647]>>, waves_per_eu = 2 : i64}>
+max_workgroup_counts = [2147483647]>>}>
 #pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
 module {
   hal.executable private @main {
@@ -32,21 +32,21 @@ module {
 // -----
 
 #executable_target_rocm_hsaco_fb0 = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-{abi = "hip", iree.gpu.target = #iree_gpu.target<arch = "gfx942", features = "",
+{iree.gpu.target = #iree_gpu.target<arch = "gfx942", features = "",
 wgp = <compute = int32, storage =  b32,
-subgroup =  shuffle|arithmetic, dot =  dp4xi8toi32,
+subgroup = arithmetic, dot = dp4xi8toi32,
 mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>],
-subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+subgroup_size_choices = [64], max_workgroup_sizes = [1024],
 max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
-max_workgroup_counts = [2147483647]>>, waves_per_eu = 2 : i64}>
+max_workgroup_counts = [2147483647]>>}>
 #executable_target_rocm_hsaco_fb1 = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-{abi = "hip", iree.gpu.target = #iree_gpu.target<arch = "gfx942", features = "",
+{iree.gpu.target = #iree_gpu.target<arch = "gfx942", features = "",
 wgp = <compute = int32, storage =  b32,
-subgroup =  shuffle|arithmetic, dot =  dp4xi8toi32,
+subgroup = arithmetic, dot = dp4xi8toi32,
 mma = [<MFMA_F32_32x32x8_F16>, <MFMA_F32_16x16x16_BF16>],
-subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+subgroup_size_choices = [64], max_workgroup_sizes = [1024],
 max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
-max_workgroup_counts = [2147483647]>>, waves_per_eu = 2 : i64}>
+max_workgroup_counts = [2147483647]>>}>
 #pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
 module {
   hal.executable private @main_0 {
