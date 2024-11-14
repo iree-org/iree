@@ -15,24 +15,34 @@ on:
 concurrency:
   # A PR number if a pull request and otherwise the commit hash. This cancels
   # queued and in-progress runs for the same PR (presubmit) or commit
-  # (postsubmit). The workflow name is prepended to avoid conflicts between
-  # different workflows.
+  # (postsubmit)
   group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
   cancel-in-progress: true
 
 jobs:
   windows_x64_msvc:
-    runs-on: windows-2022
-    defaults:
-      run:
-        shell: bash
+    runs-on: azure-windows-scale
     env:
-      BUILD_DIR: build-windows
+      BASE_BUILD_DIR_POWERSHELL: C:\mnt\azure\b
+      SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
+      SCCACHE_AZURE_BLOB_CONTAINER: ccache-container
+      SCCACHE_CCACHE_ZSTD_LEVEL: 10
+      SCCACHE_AZURE_KEY_PREFIX: "ci_windows_x64_msvc"
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           submodules: true
+      - name: "Create build dir"
+        run: |
+          $currentTime = (Get-Date).ToString('HHmmss')
+          $buildDir = "$env:BASE_BUILD_DIR_POWERSHELL\$currentTime"
+          echo "BUILD_DIR_POWERSHELL=$buildDir" >> $env:GITHUB_ENV
+          mkdir "$buildDir"
+          Write-Host "Generated Build Directory: $buildDir"
+          $bashBuildDir = $buildDir -replace '\\', '/' -replace '^C:', '/c'
+          echo  "BUILD_DIR_BASH=$bashBuildDir" >> $env:GITHUB_ENV
+          Write-Host "Converted Build Directory For Bash: $bashBuildDir"
       - name: "Setting up Python"
         uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
         with:
@@ -46,7 +56,19 @@ jobs:
         run: choco install ccache --yes
       - name: "Configuring MSVC"
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+      - name: "Installing IREE requirements"
+        run: |
+          choco install sccache
+          choco install cmake
+          choco install ninja
+          Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
+          refreshenv
       - name: "Building IREE"
-        run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+        run: |
+          echo "Building in ${{ env.BUILD_DIR_BASH }}"
+          bash ./build_tools/cmake/build_all.sh ${{ env.BUILD_DIR_BASH }}
       - name: "Testing IREE"
-        run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+        run: bash ./build_tools/cmake/ctest_all.sh ${{ env.BUILD_DIR_BASH }}
+      - name: "Clean up build dir"
+        if: always()
+        run: if (Test-Path -Path "$Env:BUILD_DIR_POWERSHELL") {Remove-Item -Path "$Env:BUILD_DIR_POWERSHELL" -Recurse -Force}
