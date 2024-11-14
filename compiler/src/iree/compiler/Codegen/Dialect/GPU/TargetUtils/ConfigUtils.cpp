@@ -53,8 +53,8 @@ setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
   // single subgroup.
   const int64_t targetSubgroupSize = dataTiledMmaAttr.getSubgroupSize();
   int64_t flatWorkgroupSize = targetSubgroupSize *
-                              dataTiledMmaAttr.getUnrollMToSubgroups() *
-                              dataTiledMmaAttr.getUnrollNToSubgroups();
+                              dataTiledMmaAttr.getSubgroupsM() *
+                              dataTiledMmaAttr.getSubgroupsN();
   std::array<int64_t, 3> workgroupSize{flatWorkgroupSize, 1, 1};
 
   // Set all workgroup and reduction tile sizes to 1, since the data tiled

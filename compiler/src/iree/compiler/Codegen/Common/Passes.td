@@ -44,6 +44,15 @@ def BufferizeCopyOnlyDispatchesPass :
   }];
 }
 
+def ConfigTrackingCanonicalizerPass :
+    Pass<"iree-codegen-config-tracking-canonicalize", ""> {
+  let summary = "Codegen specific canonicalization pass that tracks lowering configs";
+  let options = [
+    Option<"testConvergence", "test-convergence", "bool",
+           /*default=*/"false", "Fails if the patterns fail to converge">
+  ];
+}
+
 def CleanupBufferAllocViewPass :
     InterfacePass<"iree-codegen-cleanup-buffer-alloc-view", "mlir::FunctionOpInterface"> {
   let summary =

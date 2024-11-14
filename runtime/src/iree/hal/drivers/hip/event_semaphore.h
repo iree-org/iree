@@ -31,7 +31,7 @@ extern "C" {
 // Thread-safe; multiple threads may signal/wait values on the same semaphore.
 iree_status_t iree_hal_hip_event_semaphore_create(
     uint64_t initial_value, const iree_hal_hip_dynamic_symbols_t* symbols,
-    iree_hal_hip_timepoint_pool_t* timepoint_pool,
+    hipCtx_t hip_context, iree_hal_hip_timepoint_pool_t* timepoint_pool,
     iree_hal_deferred_work_queue_t* work_queue, iree_allocator_t host_allocator,
     iree_hal_semaphore_t** out_semaphore);
 

@@ -6,6 +6,7 @@
 
 #include "iree/hal/drivers/hip/memory_pools.h"
 
+#include "iree/hal/drivers/hip/context_util.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/hip_buffer.h"
 #include "iree/hal/drivers/hip/status_util.h"
@@ -59,6 +60,7 @@ static iree_status_t iree_hal_hip_create_memory_pool(
 
 iree_status_t iree_hal_hip_memory_pools_initialize(
     const iree_hal_hip_dynamic_symbols_t* hip_symbols, hipDevice_t hip_device,
+    hipCtx_t hip_context,
     const iree_hal_hip_memory_pooling_params_t* pooling_params,
     iree_allocator_t host_allocator,
     iree_hal_hip_memory_pools_t* IREE_RESTRICT out_pools) {
@@ -66,10 +68,13 @@ iree_status_t iree_hal_hip_memory_pools_initialize(
   IREE_ASSERT_ARGUMENT(pooling_params);
   IREE_ASSERT_ARGUMENT(out_pools);
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_set_context(hip_symbols, hip_context));
 
   memset(out_pools, 0, sizeof(*out_pools));
   out_pools->hip_symbols = hip_symbols;
   out_pools->host_allocator = host_allocator;
+  out_pools->hip_context = hip_context;
 
   iree_status_t status = iree_ok_status();
 
@@ -91,6 +96,8 @@ iree_status_t iree_hal_hip_memory_pools_initialize(
 void iree_hal_hip_memory_pools_deinitialize(
     iree_hal_hip_memory_pools_t* pools) {
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_IGNORE_ERROR(
+      iree_hal_hip_set_context(pools->hip_symbols, pools->hip_context));
 
   if (pools->device_local) {
     IREE_HIP_IGNORE_ERROR(pools->hip_symbols,
@@ -149,6 +156,9 @@ static void iree_hal_hip_memory_pool_track_free(
 void iree_hal_hip_memory_pools_merge_statistics(
     iree_hal_hip_memory_pools_t* pools,
     iree_hal_allocator_statistics_t* statistics) {
+  IREE_IGNORE_ERROR(
+      iree_hal_hip_set_context(pools->hip_symbols, pools->hip_context));
+
   IREE_STATISTICS({
     statistics->device_bytes_allocated = iree_atomic_load(
         &pools->statistics.device_bytes_allocated, iree_memory_order_relaxed);
@@ -181,6 +191,9 @@ void iree_hal_hip_memory_pools_merge_statistics(
 iree_status_t iree_hal_hip_memory_pools_trim(
     iree_hal_hip_memory_pools_t* pools,
     const iree_hal_hip_memory_pooling_params_t* pooling_params) {
+  IREE_RETURN_IF_ERROR(
+      iree_hal_hip_set_context(pools->hip_symbols, pools->hip_context));
+
   IREE_HIP_RETURN_IF_ERROR(
       pools->hip_symbols,
       hipMemPoolTrimTo(pools->device_local,
@@ -200,6 +213,8 @@ static void iree_hal_hip_async_buffer_release_callback(
     void* user_data, iree_hal_buffer_t* buffer) {
   iree_hal_hip_memory_pools_t* pools = (iree_hal_hip_memory_pools_t*)user_data;
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_IGNORE_ERROR(
+      iree_hal_hip_set_context(pools->hip_symbols, pools->hip_context));
 
   hipDeviceptr_t device_ptr = iree_hal_hip_buffer_device_pointer(buffer);
   if (device_ptr) {
@@ -213,6 +228,9 @@ static void iree_hal_hip_async_buffer_release_callback(
 iree_status_t iree_hal_hip_memory_pools_allocate_pointer(
     iree_hal_hip_memory_pools_t* pools, iree_hal_buffer_t* buffer,
     hipStream_t stream, iree_device_size_t allocation_size) {
+  IREE_RETURN_IF_ERROR(
+      iree_hal_hip_set_context(pools->hip_symbols, pools->hip_context));
+
   // TODO: more pools and better selection; this is coarsely deciding between
   // only device local (variables, constants, transients) and other (staging,
   // external) but could use more buffer properties (including usage/export
@@ -277,6 +295,8 @@ iree_status_t iree_hal_hip_memory_pools_deallocate(
     iree_hal_hip_memory_pools_t* pools, hipStream_t stream,
     iree_hal_buffer_t* buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_set_context(pools->hip_symbols, pools->hip_context));
   IREE_TRACE_ZONE_APPEND_VALUE_I64(
       z0, (int64_t)iree_hal_buffer_allocation_size(buffer));
 

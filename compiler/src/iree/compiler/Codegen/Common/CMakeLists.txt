@@ -85,6 +85,7 @@ iree_cc_library(
     "BufferizeCopyOnlyDispatchesPass.cpp"
     "CleanupBufferAllocViewPass.cpp"
     "ConcretizePadResultShape.cpp"
+    "ConfigTrackingCanonicalizer.cpp"
     "ConvertBf16ArithToF32.cpp"
     "ConvertBf16ToUInt16Buffers.cpp"
     "ConvertToDestinationPassingStylePass.cpp"

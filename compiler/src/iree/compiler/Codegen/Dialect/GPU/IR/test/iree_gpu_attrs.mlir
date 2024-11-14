@@ -29,21 +29,21 @@ module {
 
 module {
   func.func @test_data_tiled_mfma_f32_16x16x4_f32() attributes {
-      mma_types = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, unroll_m = 4, unroll_m_to_subgroups = 2, unroll_k = 1>} {
+      mma_types = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, unroll_m = 4, subgroups_m = 2, unroll_k = 1>} {
     return
   }
 }
 // CHECK-LABEL: func @test_data_tiled_mfma_f32_16x16x4_f32
-//  CHECK-SAME:   mma_types = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, unroll_m = 4, unroll_m_to_subgroups = 2>
+//  CHECK-SAME:   mma_types = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, unroll_m = 4, subgroups_m = 2>
 
 module {
   func.func @test_data_tiled_mfma_f32_16x16x16_f16() attributes {
-      mma_types = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x16_F16, unroll_m = 1, unroll_n_to_subgroups = 2, unroll_k = 2>} {
+      mma_types = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x16_F16, unroll_m = 1, subgroups_n = 2, unroll_k = 2>} {
     return
   }
 }
 // CHECK-LABEL: func @test_data_tiled_mfma_f32_16x16x16_f16
-//  CHECK-SAME:   mma_types = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x16_F16, unroll_n_to_subgroups = 2, unroll_k = 2>
+//  CHECK-SAME:   mma_types = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x16_F16, subgroups_n = 2, unroll_k = 2>
 
 module {
   func.func @test_data_tiled_mfma_i32_16x16x32_i8() attributes {
