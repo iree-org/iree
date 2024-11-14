@@ -62,6 +62,15 @@ std::optional<unsigned> EncodingAttr::mapDimToOperandIndex(int64_t dimPos) {
       getAffineDimExpr(dimPos, getContext()));
 }
 
+
+std::optional<AffineMap> EncodingAttr::getBcastMapValue() {
+  AffineMapAttr bcastMapAttr = getBcastMap();
+  if (!bcastMapAttr) {
+    return std::nullopt;
+  }
+  return bcastMapAttr.getValue();
+}
+
 MatmulNarrowDim getMatmulNarrowDim(linalg::LinalgOp linalgOp,
                                    int narrowThreshold) {
   linalg::ContractionDimensions cDims =

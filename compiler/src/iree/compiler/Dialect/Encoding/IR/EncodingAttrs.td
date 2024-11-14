@@ -88,6 +88,10 @@ def EncodingAttr :
     /// bcast_map and user_indexing_map.
     std::optional<unsigned> mapDimToOperandIndex(int64_t dimPos);
 
+    /// Returns the bcastMap with AffineMap type if present. Otherwise, returns
+    /// std::nullopt.
+    std::optional<AffineMap> getBcastMapValue();
+
     /// Returns an integer array with values in `round_dims_to`.
     ArrayRef<int64_t> getRoundDimsToArray();
 

@@ -75,13 +75,10 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
   // TODO(#17718): Handle the broadcast map for transpose cases. It is on the
   // experimental path, so it is not clear what needs to be done here. For now
   // just use the original map for the new encoding.
-  std::optional<AffineMap> newBcastMap;
-  if (encoding.getBcastMap()) {
-    newBcastMap = encoding.getBcastMap().getValue();
-  }
   auto newEncoding = IREE::Encoding::EncodingAttr::get(
       context, operandIndex, IREE::Encoding::EncodingOpType::matmul,
-      encoding.getElementTypesArray(), maps, newBcastMap, newRoundDimsTo);
+      encoding.getElementTypesArray(), maps, encoding.getBcastMapValue(),
+      newRoundDimsTo);
   return RankedTensorType::get(newShape, elemType, newEncoding);
 }
 
