@@ -402,7 +402,6 @@ static iree_status_t iree_hal_hip_graph_command_buffer_begin_debug_group(
       location ? location->file.data : NULL, location ? location->file.size : 0,
       location ? location->line : 0,
       /*func_name=*/NULL, 0, label.data, label.size);
-
   return iree_ok_status();
 }
 
@@ -490,9 +489,8 @@ static iree_status_t iree_hal_hip_graph_command_buffer_wait_events(
 }
 
 static iree_status_t iree_hal_hip_graph_command_buffer_advise_buffer(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_buffer_ref_t buffer_ref, iree_hal_memory_advise_flags_t flags,
-    uint64_t arg0, uint64_t arg1) {
+    iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_ref_t buffer_ref,
+    iree_hal_memory_advise_flags_t flags, uint64_t arg0, uint64_t arg1) {
   // We could mark the memory as invalidated so that if this is a managed buffer
   // HIP does not try to copy it back to the host.
   return iree_ok_status();
@@ -746,7 +744,8 @@ static iree_status_t iree_hal_hip_graph_command_buffer_dispatch(
   const iree_hal_hip_kernel_params_t* kernel_params = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_native_executable_lookup_kernel_params(
-              executable, entry_point, &kernel_params));
+              executable, entry_point, command_buffer->base.queue_affinity,
+              &kernel_params));
 
   IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE,
@@ -847,6 +846,14 @@ static iree_status_t iree_hal_hip_graph_command_buffer_dispatch_indirect(
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "indirect dispatch not yet implemented");
+}
+
+iree_hal_stream_tracing_context_event_list_t
+iree_hal_hip_graph_command_buffer_tracing_events(
+    iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_hip_graph_command_buffer_t* command_buffer =
+      iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
+  return command_buffer->tracing_event_list;
 }
 
 static const iree_hal_command_buffer_vtable_t

@@ -854,7 +854,7 @@ static iree_status_t iree_hal_cuda_device_create_command_buffer(
       if (binding_capacity > 0) {
         return iree_hal_deferred_command_buffer_create(
             iree_hal_device_allocator(base_device), mode, command_categories,
-            binding_capacity, &device->block_pool,
+            queue_affinity, binding_capacity, &device->block_pool,
             iree_hal_device_host_allocator(base_device), out_command_buffer);
       } else {
         return iree_hal_cuda_graph_command_buffer_create(
@@ -867,7 +867,7 @@ static iree_status_t iree_hal_cuda_device_create_command_buffer(
     case IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM: {
       return iree_hal_deferred_command_buffer_create(
           iree_hal_device_allocator(base_device), mode, command_categories,
-          binding_capacity, &device->block_pool,
+          queue_affinity, binding_capacity, &device->block_pool,
           iree_hal_device_host_allocator(base_device), out_command_buffer);
     }
     default: {

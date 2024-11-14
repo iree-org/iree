@@ -303,8 +303,8 @@ static iree_status_t iree_hal_task_device_create_command_buffer(
     // destructive.
     return iree_hal_deferred_command_buffer_create(
         iree_hal_device_allocator(base_device), mode, command_categories,
-        binding_capacity, &device->large_block_pool, device->host_allocator,
-        out_command_buffer);
+        queue_affinity, binding_capacity, &device->large_block_pool,
+        device->host_allocator, out_command_buffer);
   } else {
     iree_host_size_t queue_index = iree_hal_task_device_select_queue(
         device, command_categories, queue_affinity);
