@@ -70,7 +70,7 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
     map = map.compose(permutation);
   }
   auto elemType = tensorType.getElementType();
-  auto newIndex = encoding.getOperandIndex().getInt();
+  auto operandIndex = encoding.getOperandIndex().getInt();
 
   // TODO(#17718): Handle the broadcast map for transpose cases. It is on the
   // experimental path, so it is not clear what needs to be done here. For now
@@ -80,7 +80,7 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
     newBcastMap = encoding.getBcastMap().getValue();
   }
   auto newEncoding = IREE::Encoding::EncodingAttr::get(
-      context, newIndex, IREE::Encoding::EncodingOpType::matmul,
+      context, operandIndex, IREE::Encoding::EncodingOpType::matmul,
       encoding.getElementTypesArray(), maps, newBcastMap, newRoundDimsTo);
   return RankedTensorType::get(newShape, elemType, newEncoding);
 }
