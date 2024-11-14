@@ -27,6 +27,30 @@ LARGE_WEIGHTS_ONNX_FILE_PATH = os.path.join(
 )
 
 
+class ImportOnnxTest(unittest.TestCase):
+    def setUp(self):
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            self.outputPath = f.name
+
+    def tearDown(self) -> None:
+        if os.path.exists(self.outputPath):
+            os.unlink(self.outputPath)
+
+    def testConsoleOutput(self):
+        # Just test that it doesn't crash: rely on the file test for verification.
+        run_tool(ONNX_FILE_PATH)
+
+    def testDisableVerify(self):
+        # Just test that the flag is accepted.
+        run_tool(ONNX_FILE_PATH, "--no-verify")
+
+    def testFileOutput(self):
+        run_tool(ONNX_FILE_PATH, "-o", self.outputPath)
+        with open(self.outputPath, "rt") as f:
+            contents = f.read()
+            self.assertIn("torch.operator", contents)
+
+
 class ImportOnnxwithExternalizationTest(unittest.TestCase):
     def setUp(self):
         with tempfile.NamedTemporaryFile(delete=False) as f:
@@ -100,30 +124,6 @@ class ImportOnnxwithExternalizationTest(unittest.TestCase):
             # As the max allowed number of elements for inlining is 0 elements,
             # there should be no inlined constants.
             self.assertNotIn("onnx.Constant", contents)
-
-
-class ImportOnnxTest(unittest.TestCase):
-    def setUp(self):
-        with tempfile.NamedTemporaryFile(delete=False) as f:
-            self.outputPath = f.name
-
-    def tearDown(self) -> None:
-        if os.path.exists(self.outputPath):
-            os.unlink(self.outputPath)
-
-    def testConsoleOutput(self):
-        # Just test that it doesn't crash: rely on the file test for verification.
-        run_tool(ONNX_FILE_PATH)
-
-    def testDisableVerify(self):
-        # Just test that the flag is accepted.
-        run_tool(ONNX_FILE_PATH, "--no-verify")
-
-    def testFileOutput(self):
-        run_tool(ONNX_FILE_PATH, "-o", self.outputPath)
-        with open(self.outputPath, "rt") as f:
-            contents = f.read()
-            self.assertIn("torch.operator", contents)
 
 
 if __name__ == "__main__":
