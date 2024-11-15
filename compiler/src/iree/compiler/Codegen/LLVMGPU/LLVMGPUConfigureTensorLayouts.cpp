@@ -311,11 +311,12 @@ getContractionLayout(IREE::GPU::MMAScheduleAttr schedule,
     cSubgroupStrides[dim] = subgroupNStrides[i];
   }
 
-  auto cLayout = createNestedLayout(context, cRank, m, n,
-                                    /*subgroupCount=*/cSubgroupSizes,
-                                    /*subgroupStrides=*/cSubgroupStrides,
-                                    /*batchCount=*/cBatchSizes,
-                                    getCSingleSubgroupLayout(mmaAttr));
+  auto cLayout = createNestedLayout(
+      context, cRank, m, n,
+      /*subgroupCount=*/cSubgroupSizes,
+      /*subgroupStrides=*/cSubgroupStrides,
+      /*batchCount=*/cBatchSizes,
+      getSingleSubgroupLayout(mmaAttr, IREE::GPU::MMAFragment::Acc));
   LLVM_DEBUG({ llvm::dbgs() << "C layout: " << cLayout << "\n"; });
 
   // A matrix layout
@@ -339,11 +340,12 @@ getContractionLayout(IREE::GPU::MMAScheduleAttr schedule,
   }
   aBatchSizes[afk] = bounds[opInfo.getKDims().back()] / intrinsicK;
 
-  auto aLayout = createNestedLayout(context, aRank, afm, afk,
-                                    /*subgroupCount=*/aSubgroupSizes,
-                                    /*subgroupStrides=*/aSubgroupStrides,
-                                    /*batchCount=*/aBatchSizes,
-                                    getASingleSubgroupLayout(mmaAttr));
+  auto aLayout = createNestedLayout(
+      context, aRank, afm, afk,
+      /*subgroupCount=*/aSubgroupSizes,
+      /*subgroupStrides=*/aSubgroupStrides,
+      /*batchCount=*/aBatchSizes,
+      getSingleSubgroupLayout(mmaAttr, IREE::GPU::MMAFragment::Lhs));
   LLVM_DEBUG({ llvm::dbgs() << "A layout: " << aLayout << "\n"; });
 
   int64_t bRank = opInfo.getBRank();
@@ -363,11 +365,12 @@ getContractionLayout(IREE::GPU::MMAScheduleAttr schedule,
   }
   bBatchSizes[bfk] = bounds[opInfo.getKDims().back()] / intrinsicK;
 
-  auto bLayout = createNestedLayout(context, bRank, bfk, bfn,
-                                    /*subgroupCount=*/bSubgroupSizes,
-                                    /*subgroupStrides=*/bSubgroupStrides,
-                                    /*batchCount=*/bBatchSizes,
-                                    getBSingleSubgroupLayout(mmaAttr));
+  auto bLayout = createNestedLayout(
+      context, bRank, bfk, bfn,
+      /*subgroupCount=*/bSubgroupSizes,
+      /*subgroupStrides=*/bSubgroupStrides,
+      /*batchCount=*/bBatchSizes,
+      getSingleSubgroupLayout(mmaAttr, IREE::GPU::MMAFragment::Rhs));
   LLVM_DEBUG({ llvm::dbgs() << "B layout: " << bLayout << "\n"; });
 
   std::tuple<VectorLayoutInterface, VectorLayoutInterface,
@@ -618,11 +621,11 @@ static LogicalResult setAttentionMatmulAnchor(RewriterBase &rewriter,
   auto pvIntrinsic =
       cast<IREE::GPU::MmaInterfaceAttr>(pvSchedule.getIntrinsic());
   IREE::GPU::MMASingleSubgroupLayout lhsLayout =
-      getASingleSubgroupLayout(pvIntrinsic);
+      getSingleSubgroupLayout(pvIntrinsic, IREE::GPU::MMAFragment::Lhs);
   IREE::GPU::MMASingleSubgroupLayout rhsLayout =
-      getBSingleSubgroupLayout(pvIntrinsic);
+      getSingleSubgroupLayout(pvIntrinsic, IREE::GPU::MMAFragment::Rhs);
   IREE::GPU::MMASingleSubgroupLayout outLayout =
-      getCSingleSubgroupLayout(qkIntrinsic);
+      getSingleSubgroupLayout(qkIntrinsic, IREE::GPU::MMAFragment::Acc);
 
   auto matchLayout = [](IREE::GPU::MMASingleSubgroupLayout layoutA,
                         IREE::GPU::MMASingleSubgroupLayout layoutB) -> bool {

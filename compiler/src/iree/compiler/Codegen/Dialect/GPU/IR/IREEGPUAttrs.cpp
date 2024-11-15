@@ -292,38 +292,14 @@ OpaqueMmaLayout getOpaqueMMALayout(MLIRContext *context,
   return getOpaqueMMALayout<IREE::GPU::MMAIntrinsic>(context, intrinsic);
 }
 
-//===----------------------------------------------------------------------===//
-// MmaInterface Attribute Helper Functions
-//===----------------------------------------------------------------------===//
-
-MMASingleSubgroupLayout getASingleSubgroupLayout(MmaInterfaceAttr mmaKind) {
+MMASingleSubgroupLayout getSingleSubgroupLayout(MmaInterfaceAttr mmaKind,
+                                                MMAFragment fragment) {
   if (auto mmaAttr = dyn_cast<MMAAttr>(mmaKind)) {
-    return mmaAttr.getASingleSubgroupLayout();
+    return getSingleSubgroupLayout(mmaAttr.getIntrinsic().getValue(), fragment);
   }
   if (auto vmmaAttr = dyn_cast<VirtualMMAAttr>(mmaKind)) {
-    return vmmaAttr.getASingleSubgroupLayout();
-  }
-  assert(false && "unhandled MMA Interface type.");
-  return {};
-}
-
-MMASingleSubgroupLayout getBSingleSubgroupLayout(MmaInterfaceAttr mmaKind) {
-  if (auto mmaAttr = dyn_cast<MMAAttr>(mmaKind)) {
-    return mmaAttr.getBSingleSubgroupLayout();
-  }
-  if (auto vmmaAttr = dyn_cast<VirtualMMAAttr>(mmaKind)) {
-    return vmmaAttr.getBSingleSubgroupLayout();
-  }
-  assert(false && "unhandled MMA Interface type.");
-  return {};
-}
-
-MMASingleSubgroupLayout getCSingleSubgroupLayout(MmaInterfaceAttr mmaKind) {
-  if (auto mmaAttr = dyn_cast<MMAAttr>(mmaKind)) {
-    return mmaAttr.getCSingleSubgroupLayout();
-  }
-  if (auto vmmaAttr = dyn_cast<VirtualMMAAttr>(mmaKind)) {
-    return vmmaAttr.getCSingleSubgroupLayout();
+    return getSingleSubgroupLayout(vmmaAttr.getIntrinsic().getValue(),
+                                   fragment);
   }
   assert(false && "unhandled MMA Interface type.");
   return {};
@@ -405,18 +381,6 @@ int64_t MMAAttr::getSubgroupSize() const {
 
 FailureOr<IREE::GPU::MMAScope> MMAAttr::getMmaScope() const {
   return IREE::GPU::MMAScope::Subgroup;
-}
-
-MMASingleSubgroupLayout MMAAttr::getASingleSubgroupLayout() const {
-  return getSingleSubgroupLayout(getIntrinsic().getValue(), MMAFragment::Lhs);
-}
-
-MMASingleSubgroupLayout MMAAttr::getBSingleSubgroupLayout() const {
-  return getSingleSubgroupLayout(getIntrinsic().getValue(), MMAFragment::Rhs);
-}
-
-MMASingleSubgroupLayout MMAAttr::getCSingleSubgroupLayout() const {
-  return getSingleSubgroupLayout(getIntrinsic().getValue(), MMAFragment::Acc);
 }
 
 // Get virtual intrinsics that is composed/based on queried op.
@@ -1096,18 +1060,6 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
   }
   assert(false && "unhandled virtual mma layout type.");
   return {};
-}
-
-MMASingleSubgroupLayout VirtualMMAAttr::getASingleSubgroupLayout() const {
-  return getSingleSubgroupLayout(getIntrinsic().getValue(), MMAFragment::Lhs);
-}
-
-MMASingleSubgroupLayout VirtualMMAAttr::getBSingleSubgroupLayout() const {
-  return getSingleSubgroupLayout(getIntrinsic().getValue(), MMAFragment::Rhs);
-}
-
-MMASingleSubgroupLayout VirtualMMAAttr::getCSingleSubgroupLayout() const {
-  return getSingleSubgroupLayout(getIntrinsic().getValue(), MMAFragment::Acc);
 }
 
 //===----------------------------------------------------------------------===//

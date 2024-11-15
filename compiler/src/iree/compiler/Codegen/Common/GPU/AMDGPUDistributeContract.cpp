@@ -57,16 +57,19 @@ static LogicalResult isIntrinsicLayoutCompatible(
   auto [lhsM, rhsN] = opInfo.getOperandMNIndex();
   auto [lhsK, rhsK] = opInfo.getOperandKIndex();
   auto [accM, accN] = opInfo.getResultMNIndex();
-  if (failed(isSubgroupLayoutCompatible(getASingleSubgroupLayout(intrinsic),
-                                        lhsLayout, lhsM, lhsK))) {
+  if (failed(isSubgroupLayoutCompatible(
+          getSingleSubgroupLayout(intrinsic, IREE::GPU::MMAFragment::Lhs),
+          lhsLayout, lhsM, lhsK))) {
     return failure();
   }
-  if (failed(isSubgroupLayoutCompatible(getBSingleSubgroupLayout(intrinsic),
-                                        rhsLayout, rhsK, rhsN))) {
+  if (failed(isSubgroupLayoutCompatible(
+          getSingleSubgroupLayout(intrinsic, IREE::GPU::MMAFragment::Rhs),
+          rhsLayout, rhsK, rhsN))) {
     return failure();
   }
-  if (failed(isSubgroupLayoutCompatible(getCSingleSubgroupLayout(intrinsic),
-                                        accLayout, accM, accN))) {
+  if (failed(isSubgroupLayoutCompatible(
+          getSingleSubgroupLayout(intrinsic, IREE::GPU::MMAFragment::Acc),
+          accLayout, accM, accN))) {
     return failure();
   }
   return success();

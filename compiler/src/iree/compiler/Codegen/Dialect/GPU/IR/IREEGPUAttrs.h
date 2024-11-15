@@ -65,11 +65,8 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
 MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
                                                 MMAFragment fragment);
 
-MMASingleSubgroupLayout getASingleSubgroupLayout(MmaInterfaceAttr mmaKind);
-
-MMASingleSubgroupLayout getBSingleSubgroupLayout(MmaInterfaceAttr mmaKind);
-
-MMASingleSubgroupLayout getCSingleSubgroupLayout(MmaInterfaceAttr mmaKind);
+MMASingleSubgroupLayout getSingleSubgroupLayout(MmaInterfaceAttr mmaKind,
+                                                MMAFragment fragment);
 
 // Struct describing the shape of a MMA operation, but not the detailed layout.
 // TODO(bjacob): the only user outside of IREEGPUAttrs.cpp is
