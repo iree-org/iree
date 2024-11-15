@@ -114,32 +114,30 @@ static SmallVector<int64_t> getUnitOfRankWithDims(int64_t rank,
 /// And here inner most is referential to the iteration order, not the order
 /// they appear per fragment (because there is no relationship between the
 /// dimension order of M in A and in C, for example).
-static NestedLayoutAttr
-createNestedLayout(MLIRContext *context, int64_t rank, int64_t outerDim,
-                   int64_t innerDim, SmallVector<int64_t> subgroupSizes,
-                   SmallVector<int64_t> subgroupStrides,
-                   SmallVector<int64_t> batchCount,
-                   IREE::GPU::MMASingleSubgroupLayout counts) {
+static NestedLayoutAttr createNestedLayout(
+    MLIRContext *context, int64_t rank, int64_t outerDim, int64_t innerDim,
+    ArrayRef<int64_t> subgroupSizes, ArrayRef<int64_t> subgroupStrides,
+    ArrayRef<int64_t> batchCount, IREE::GPU::MMASingleSubgroupLayout counts) {
 
   LLVM_DEBUG({
-    llvm::errs() << "Creating Nested Layout for::";
-    llvm::errs() << "\n    outerDim = " << outerDim;
-    llvm::errs() << "\n    innerDim = " << innerDim;
-    llvm::errs() << "\n    subgroupSizes: ";
-    llvm::interleaveComma(subgroupSizes, llvm::errs());
-    llvm::errs() << "\n    subgroupStrides: ";
-    llvm::interleaveComma(subgroupStrides, llvm::errs());
-    llvm::errs() << "\n    batchCount: ";
-    llvm::interleaveComma(batchCount, llvm::errs());
-    llvm::errs() << "\n    counts.outer: ";
-    llvm::interleaveComma(counts.outer, llvm::errs());
-    llvm::errs() << "\n    counts.thread: ";
-    llvm::interleaveComma(counts.thread, llvm::errs());
-    llvm::errs() << "\n    counts.element: ";
-    llvm::interleaveComma(counts.element, llvm::errs());
-    llvm::errs() << "\n    counts.tstrides: ";
-    llvm::interleaveComma(counts.tstrides, llvm::errs());
-    llvm::errs() << "\n";
+    llvm::dbgs() << "Creating Nested Layout for::";
+    llvm::dbgs() << "\n    outerDim = " << outerDim;
+    llvm::dbgs() << "\n    innerDim = " << innerDim;
+    llvm::dbgs() << "\n    subgroupSizes: ";
+    llvm::interleaveComma(subgroupSizes, llvm::dbgs());
+    llvm::dbgs() << "\n    subgroupStrides: ";
+    llvm::interleaveComma(subgroupStrides, llvm::dbgs());
+    llvm::dbgs() << "\n    batchCount: ";
+    llvm::interleaveComma(batchCount, llvm::dbgs());
+    llvm::dbgs() << "\n    counts.outer: ";
+    llvm::interleaveComma(counts.outer, llvm::dbgs());
+    llvm::dbgs() << "\n    counts.thread: ";
+    llvm::interleaveComma(counts.thread, llvm::dbgs());
+    llvm::dbgs() << "\n    counts.element: ";
+    llvm::interleaveComma(counts.element, llvm::dbgs());
+    llvm::dbgs() << "\n    counts.tstrides: ";
+    llvm::interleaveComma(counts.tstrides, llvm::dbgs());
+    llvm::dbgs() << "\n";
   });
 
   SmallVector<int64_t> outerCount =
@@ -164,8 +162,8 @@ getContractionLayout(IREE::GPU::MMAScheduleAttr schedule,
                      VectorContractOpInfo &opInfo,
                      linalg::LinalgOp contractOp) {
   LLVM_DEBUG({
-    llvm::errs() << "Getting mma layouts for:\n" << contractOp << "\n";
-    llvm::errs() << "For schedule: " << schedule << "\n";
+    llvm::dbgs() << "Getting mma layouts for:\n" << contractOp << "\n";
+    llvm::dbgs() << "For schedule: " << schedule << "\n";
   });
 
   int64_t rank = contractOp.getIteratorTypesArray().size();
@@ -181,7 +179,7 @@ getContractionLayout(IREE::GPU::MMAScheduleAttr schedule,
 
   if (!llvm::all_of(opInfo.getBatchDims(),
                     [&bounds](int64_t dim) { return bounds[dim] == 1; })) {
-    LLVM_DEBUG({ llvm::errs() << "non-unit batch dimension\n"; });
+    LLVM_DEBUG({ llvm::dbgs() << "non-unit batch dimension\n"; });
     return failure();
   }
 
@@ -318,7 +316,7 @@ getContractionLayout(IREE::GPU::MMAScheduleAttr schedule,
                                     /*subgroupStrides=*/cSubgroupStrides,
                                     /*batchCount=*/cBatchSizes,
                                     getCSingleSubgroupLayout(mmaAttr));
-  LLVM_DEBUG({ llvm::errs() << "C layout: " << cLayout << "\n"; });
+  LLVM_DEBUG({ llvm::dbgs() << "C layout: " << cLayout << "\n"; });
 
   // A matrix layout
   auto [afm, bfn] = opInfo.getOperandMNIndex();
@@ -346,7 +344,7 @@ getContractionLayout(IREE::GPU::MMAScheduleAttr schedule,
                                     /*subgroupStrides=*/aSubgroupStrides,
                                     /*batchCount=*/aBatchSizes,
                                     getASingleSubgroupLayout(mmaAttr));
-  LLVM_DEBUG({ llvm::errs() << "A layout: " << aLayout << "\n"; });
+  LLVM_DEBUG({ llvm::dbgs() << "A layout: " << aLayout << "\n"; });
 
   int64_t bRank = opInfo.getBRank();
 
@@ -370,7 +368,7 @@ getContractionLayout(IREE::GPU::MMAScheduleAttr schedule,
                                     /*subgroupStrides=*/bSubgroupStrides,
                                     /*batchCount=*/bBatchSizes,
                                     getBSingleSubgroupLayout(mmaAttr));
-  LLVM_DEBUG({ llvm::errs() << "B layout: " << bLayout << "\n"; });
+  LLVM_DEBUG({ llvm::dbgs() << "B layout: " << bLayout << "\n"; });
 
   std::tuple<VectorLayoutInterface, VectorLayoutInterface,
              VectorLayoutInterface>

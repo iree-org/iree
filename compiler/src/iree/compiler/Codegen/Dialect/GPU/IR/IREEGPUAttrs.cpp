@@ -12,7 +12,6 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
-#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/STLForwardCompat.h"
@@ -552,22 +551,8 @@ LogicalResult MMAAttr::populateOperandOffsetsSizesStrides(
     SmallVector<OpFoldResult> &offsets, SmallVector<OpFoldResult> &sizes,
     SmallVector<OpFoldResult> &strides) const {
 
-  MMASingleSubgroupLayout subgroupLayout;
-  switch (fragment) {
-  case IREE::GPU::MMAFragment::Lhs: {
-    subgroupLayout = getASingleSubgroupLayout();
-    break;
-  }
-  case IREE::GPU::MMAFragment::Rhs: {
-    subgroupLayout = getBSingleSubgroupLayout();
-    break;
-  }
-  case IREE::GPU::MMAFragment::Acc: {
-    subgroupLayout = getCSingleSubgroupLayout();
-    break;
-  }
-  }
-
+  MMASingleSubgroupLayout subgroupLayout =
+      getSingleSubgroupLayout(getIntrinsic().getValue(), fragment);
   SmallVector<OpFoldResult> canonicalOffsets;
   SmallVector<OpFoldResult> canonicalSizes;
   if (failed(populateCanonicalOffsetsSizesAndStrides(
@@ -960,22 +945,8 @@ LogicalResult VirtualMMAAttr::populateOperandOffsetsSizesStrides(
     SmallVector<OpFoldResult> &offsets, SmallVector<OpFoldResult> &sizes,
     SmallVector<OpFoldResult> &strides) const {
 
-  MMASingleSubgroupLayout subgroupLayout;
-  switch (fragment) {
-  case IREE::GPU::MMAFragment::Lhs: {
-    subgroupLayout = getASingleSubgroupLayout();
-    break;
-  }
-  case IREE::GPU::MMAFragment::Rhs: {
-    subgroupLayout = getBSingleSubgroupLayout();
-    break;
-  }
-  case IREE::GPU::MMAFragment::Acc: {
-    subgroupLayout = getCSingleSubgroupLayout();
-    break;
-  }
-  }
-
+  MMASingleSubgroupLayout subgroupLayout =
+      getSingleSubgroupLayout(getIntrinsic().getValue(), fragment);
   SmallVector<OpFoldResult> canonicalOffsets;
   SmallVector<OpFoldResult> canonicalSizes;
   if (failed(populateCanonicalOffsetsSizesAndStrides(

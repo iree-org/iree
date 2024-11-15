@@ -24,15 +24,17 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 // Struct describing the detailed subgroup-level layout of a MMA operation.
 // Together with element type information and subgroup size, it completes the
-// full description of the semantics of a MMA operations.
+// full description of the semantics of a MMA operation.
 //
 // Note: It is not possible to infer subgroup size from the information in this
 // struct. The product of the `thread` sizes here is often, but not always equal
 // to subgroup size. When the product of the `thread` sizes (call that product
 // `P`) is smaller than subgroup size, it must be a divisor of it, and the
 // semantics in that case are that threads within the subgroup whose thread-ids
-// differ by a multiple of `P`, are accessing the same elements. For example,
-// if the subgroup size is 64 but the product `P` of `thread` sizes is 32, that
+// differ by a multiple of `P`, are accessing the same elements.
+//
+// Example observed in RDNA3 WMMA Wave64 ops:
+// If the subgroup size is 64 but the product `P` of `thread` sizes is 32, that
 // means that each element is being accessed by 2 threads (2 = 64/32), and the
 // threads accessing the same element are those whose tids are exactly 32 apart.
 struct MMASingleSubgroupLayout {
