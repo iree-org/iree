@@ -539,13 +539,14 @@ static iree_status_t iree_hal_hip_device_create_internal(
   // Create memory pools first so that we can share them with the allocator.
   if (iree_status_is_ok(status) && device->supports_memory_pools) {
     status = iree_hal_hip_memory_pools_initialize(
-        symbols, hip_device, context, &params->memory_pools, host_allocator,
-        &device->memory_pools);
+        (iree_hal_device_t*)device, symbols, hip_device, context,
+        &params->memory_pools, host_allocator, &device->memory_pools);
   }
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_hip_allocator_create(
-        symbols, hip_device, context, dispatch_stream,
+        (iree_hal_device_t*)device, symbols, hip_device, context,
+        dispatch_stream,
         device->supports_memory_pools ? &device->memory_pools : NULL,
         host_allocator, &device->device_allocator);
   }
@@ -1001,10 +1002,16 @@ static iree_status_t iree_hal_hip_device_pepare_async_alloc(
 
   iree_hal_buffer_params_canonicalize(&params);
 
+  const iree_hal_buffer_placement_t placement = {
+      .device = (iree_hal_device_t*)device,
+      .queue_affinity = params.queue_affinity ? params.queue_affinity
+                                              : IREE_HAL_QUEUE_AFFINITY_ANY,
+      .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS,
+  };
   iree_hal_buffer_t* buffer = NULL;
   iree_status_t status = iree_hal_hip_buffer_wrap(
-      device->device_allocator, params.type, params.access, params.usage,
-      allocation_size, /*byte_offset=*/0,
+      placement, params.type, params.access, params.usage, allocation_size,
+      /*byte_offset=*/0,
       /*byte_length=*/allocation_size, IREE_HAL_HIP_BUFFER_TYPE_ASYNC,
       /*device_ptr=*/NULL, /*host_ptr=*/NULL,
       iree_hal_buffer_release_callback_null(), device->host_allocator, &buffer);

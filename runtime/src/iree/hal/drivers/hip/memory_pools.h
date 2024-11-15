@@ -32,6 +32,7 @@ typedef struct iree_hal_hip_memory_pools_t {
   // Used for any host-visible/host-local memory types.
   hipMemPool_t other;
 
+  iree_hal_device_t* parent_device;
   const iree_hal_hip_dynamic_symbols_t* hip_symbols;
   hipCtx_t hip_context;
   iree_allocator_t host_allocator;
@@ -46,6 +47,7 @@ typedef struct iree_hal_hip_memory_pools_t {
 
 // Initializes |out_pools| by configuring new HIP memory pools.
 iree_status_t iree_hal_hip_memory_pools_initialize(
+    iree_hal_device_t* parent_device,
     const iree_hal_hip_dynamic_symbols_t* hip_symbols, hipDevice_t hip_device,
     hipCtx_t hip_context,
     const iree_hal_hip_memory_pooling_params_t* pooling_params,
