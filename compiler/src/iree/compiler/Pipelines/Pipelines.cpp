@@ -77,6 +77,7 @@ void buildIREEPrecompileTransformPassPipeline(
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     PreprocessingOptions preprocessingOptions,
     GlobalOptimizationOptions globalOptimizationOptions,
+    DispatchCreationOptions dispatchCreationOptions,
     SchedulingOptions schedulingOptions,
     IREE::HAL::TargetOptions halTargetOptions, IREEVMPipelineHooks &hooks,
     OpPassManager &passManager, IREEVMPipelinePhase compileFrom,
@@ -247,6 +248,7 @@ void buildIREEVMTransformPassPipeline(
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     PreprocessingOptions preprocessingOptions,
     GlobalOptimizationOptions globalOptimizationOptions,
+    DispatchCreationOptions vmDispatchCreationOptions,
     SchedulingOptions schedulingOptions,
     IREE::HAL::TargetOptions halTargetOptions,
     IREE::VM::TargetOptions vmTargetOptions, IREEVMPipelineHooks &hooks,
@@ -254,7 +256,7 @@ void buildIREEVMTransformPassPipeline(
     IREEVMPipelinePhase compileTo) {
   buildIREEPrecompileTransformPassPipeline(
       targetRegistry, bindingOptions, inputOptions, preprocessingOptions,
-      globalOptimizationOptions, schedulingOptions, halTargetOptions, hooks,
+      globalOptimizationOptions, vmDispatchCreationOptions, schedulingOptions, halTargetOptions, hooks,
       passManager, compileFrom, compileTo);
 
   if (compileTo <= IREEVMPipelinePhase::GlobalOptimization)
@@ -273,6 +275,7 @@ void buildIREEVMTransformPassPipeline(
     break;
   default:
     DispatchCreation::TransformOptions dispatchCreationOptions;
+    dispatchCreationOptions.options = vmDispatchCreationOptions;
     if (compileFrom < IREEVMPipelinePhase::DispatchCreation) { // late-entry
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "DispatchCreation");
       if (hooks.beforePhase)
@@ -378,11 +381,13 @@ void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
   // force disable const eval, which relies on the JIT.
   auto highLevelOptimizations = GlobalOptimizationOptions::FromFlags::get();
   highLevelOptimizations.constEval = false;
+  auto dispatchCreationOptions = DispatchCreationOptions::FromFlags::get();
 
   buildIREEVMTransformPassPipeline(
       IREE::HAL::TargetRegistry::getGlobal(), BindingOptions::FromFlags::get(),
       InputDialectOptions::FromFlags::get(),
       PreprocessingOptions::FromFlags::get(), highLevelOptimizations,
+      dispatchCreationOptions,
       SchedulingOptions::FromFlags::get(),
       IREE::HAL::TargetOptions::FromFlags::get(),
       IREE::VM::TargetOptions::FromFlags::get(), defaultHooks, passManager);

@@ -239,6 +239,7 @@ struct GlobalInit {
   InputDialectOptions *clInputOptions = nullptr;
   PreprocessingOptions *clPreprocessingOptions = nullptr;
   GlobalOptimizationOptions *clGlobalOptimizationOptions = nullptr;
+  DispatchCreationOptions *clDispatchCreationOptions = nullptr;
   SchedulingOptions *clSchedulingOptions = nullptr;
   IREE::HAL::TargetOptions *clHalTargetOptions = nullptr;
   IREE::VM::TargetOptions *clVmTargetOptions = nullptr;
@@ -283,6 +284,7 @@ void GlobalInit::registerCommandLineOptions() {
   clInputOptions = &InputDialectOptions::FromFlags::get();
   clPreprocessingOptions = &PreprocessingOptions::FromFlags::get();
   clGlobalOptimizationOptions = &GlobalOptimizationOptions::FromFlags::get();
+  clDispatchCreationOptions = &DispatchCreationOptions::FromFlags::get();
   clSchedulingOptions = &SchedulingOptions::FromFlags::get();
   clHalTargetOptions = &IREE::HAL::TargetOptions::FromFlags::get();
   clVmTargetOptions = &IREE::VM::TargetOptions::FromFlags::get();
@@ -391,6 +393,7 @@ struct Session {
   InputDialectOptions inputOptions;
   PreprocessingOptions preprocessingOptions;
   GlobalOptimizationOptions highLevelOptimizationOptions;
+  DispatchCreationOptions dispatchCreationOptions;
   SchedulingOptions schedulingOptions;
   IREE::HAL::TargetOptions halTargetOptions;
   IREE::VM::TargetOptions vmTargetOptions;
@@ -415,6 +418,7 @@ Session::Session(GlobalInit &globalInit)
     inputOptions = *globalInit.clInputOptions;
     preprocessingOptions = *globalInit.clPreprocessingOptions;
     highLevelOptimizationOptions = *globalInit.clGlobalOptimizationOptions;
+    dispatchCreationOptions = *globalInit.clDispatchCreationOptions;
     schedulingOptions = *globalInit.clSchedulingOptions;
     halTargetOptions = *globalInit.clHalTargetOptions;
     vmTargetOptions = *globalInit.clVmTargetOptions;
@@ -963,9 +967,9 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     buildIREEVMTransformPassPipeline(
         session.targetRegistry, session.bindingOptions, session.inputOptions,
         session.preprocessingOptions, session.highLevelOptimizationOptions,
-        session.schedulingOptions, session.halTargetOptions,
-        session.vmTargetOptions, pipelineHooks, *passManager, compileFrom,
-        compileTo);
+        session.dispatchCreationOptions, session.schedulingOptions,
+        session.halTargetOptions, session.vmTargetOptions, pipelineHooks,
+        *passManager, compileFrom, compileTo);
     break;
   }
   case IREE_COMPILER_PIPELINE_HAL_EXECUTABLE: {
@@ -996,8 +1000,9 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     buildIREEPrecompileTransformPassPipeline(
         session.targetRegistry, session.bindingOptions, session.inputOptions,
         session.preprocessingOptions, session.highLevelOptimizationOptions,
-        session.schedulingOptions, session.halTargetOptions, pipelineHooks,
-        *passManager, compileFrom, compileTo);
+        session.dispatchCreationOptions, session.schedulingOptions,
+        session.halTargetOptions, pipelineHooks, *passManager, compileFrom,
+        compileTo);
     break;
   }
   default:

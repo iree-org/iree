@@ -10,6 +10,7 @@ IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::BindingOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::InputDialectOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(
     mlir::iree_compiler::GlobalOptimizationOptions);
+IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::DispatchCreationOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::SchedulingOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::PreprocessingOptions);
 

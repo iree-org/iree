@@ -72,6 +72,7 @@ struct CompileOptions {
   InputDialectOptions inputOptions;
   PreprocessingOptions preprocessingOptions;
   GlobalOptimizationOptions globalOptimizationOptions;
+  DispatchCreationOptions dispatchCreationOptions;
   SchedulingOptions schedulingOptions;
   IREE::HAL::TargetOptions executableOptions;
   IREE::VM::TargetOptions targetOptions;
@@ -646,7 +647,7 @@ public:
     buildIREEVMTransformPassPipeline(
         *targetRegistry.value, compileOptions->bindingOptions,
         compileOptions->inputOptions, compileOptions->preprocessingOptions,
-        compileOptions->globalOptimizationOptions,
+        compileOptions->globalOptimizationOptions, compileOptions->dispatchCreationOptions,
         compileOptions->schedulingOptions, compileOptions->executableOptions,
         compileOptions->targetOptions, compileOptions->hooks, compilePipeline);
   }

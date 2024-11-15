@@ -135,7 +135,7 @@ struct DispatchCreationOptions {
   bool outerDimConcat = false;
 
   void bindOptions(OptionsBinder &binder);
-  using FromFlags = OptionsFromFlags<GlobalOptimizationOptions>;
+  using FromFlags = OptionsFromFlags<DispatchCreationOptions>;
 };
 
 // Options controlling scheduling across host/device.
