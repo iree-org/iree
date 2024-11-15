@@ -1958,3 +1958,28 @@ func.func @test_tiling_cpu_default(%arg0: tensor<256x256xi8>, %arg1: tensor<256x
 //      CHECK: func @test_tiling_cpu_default(
 // CHECK-SAME:     translation_info = #[[TRANSLATION_INFO]]
 //      CHECK:    linalg.quantized_matmul {lowering_config = #[[CONFIG0]]}
+
+// -----
+
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-linux-gnu"}>
+func.func @i1_type()  attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<8xi1>>
+  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<8xi1>>
+  %2 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<8xi1>>
+  %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [8], strides = [1] : !flow.dispatch.tensor<readonly:tensor<8xi1>> -> tensor<8xi1>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [8], strides = [1] : !flow.dispatch.tensor<readonly:tensor<8xi1>> -> tensor<8xi1>
+  %5 = tensor.empty() : tensor<8xi1>
+  %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%3, %4 : tensor<8xi1>, tensor<8xi1>) outs(%5 : tensor<8xi1>) {
+  ^bb0(%in: i1, %in_0: i1, %out: i1):
+    %7 = arith.xori %in, %in_0 : i1
+    linalg.yield %7 : i1
+  } -> tensor<8xi1>
+  flow.dispatch.tensor.store %6, %2, offsets = [0], sizes = [8], strides = [1] : tensor<8xi1> -> !flow.dispatch.tensor<writeonly:tensor<8xi1>>
+  return
+}
+
+// CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[8], [8], [0], [0]]>
+// CHECK: func @i1_type()
+// CHECK: linalg.generic {
+// CHECK-SAME: {lowering_config = #[[CONFIG]]}
