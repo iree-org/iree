@@ -18,6 +18,12 @@
 
 #define DEBUG_TYPE "iree-codegen-block-dynamic-dimensions"
 
+static llvm::cl::opt<bool> clEnableBlockedMatmuls(
+    "iree-codegen-block-dynamic-dimensions-of-contractions",
+    llvm::cl::desc("developer flag to gaurd blocking dynamic dimensions of "
+                   "contraction-like ops"),
+    llvm::cl::Hidden, llvm::cl::init(false));
+
 namespace mlir::iree_compiler {
 
 #define GEN_PASS_DEF_BLOCKDYNAMICDIMENSIONSPASS
@@ -290,7 +296,10 @@ blockDynamicDimensions(RewriterBase &rewriter,
                                       attentionOp);
       })
       .Case<linalg::LinalgOp>([&](auto linalgOp) {
-        return blockDynamicDimensions(rewriter, dynamicDimAnalysis, linalgOp);
+        if (clEnableBlockedMatmuls) {
+          return blockDynamicDimensions(rewriter, dynamicDimAnalysis, linalgOp);
+        }
+        return success();
       })
       .Default([&](Operation *op) { return success(); });
 }
