@@ -299,34 +299,34 @@ OpaqueMmaLayout getOpaqueMMALayout(MLIRContext *context,
 MMASingleSubgroupLayout getASingleSubgroupLayout(MmaInterfaceAttr mmaKind) {
   if (auto mmaAttr = dyn_cast<MMAAttr>(mmaKind)) {
     return mmaAttr.getASingleSubgroupLayout();
-  } else if (auto vmmaAttr = dyn_cast<VirtualMMAAttr>(mmaKind)) {
-    return vmmaAttr.getASingleSubgroupLayout();
-  } else {
-    assert(false && "unhandled MMA Interface type.");
-    return {};
   }
+  if (auto vmmaAttr = dyn_cast<VirtualMMAAttr>(mmaKind)) {
+    return vmmaAttr.getASingleSubgroupLayout();
+  }
+  assert(false && "unhandled MMA Interface type.");
+  return {};
 }
 
 MMASingleSubgroupLayout getBSingleSubgroupLayout(MmaInterfaceAttr mmaKind) {
   if (auto mmaAttr = dyn_cast<MMAAttr>(mmaKind)) {
     return mmaAttr.getBSingleSubgroupLayout();
-  } else if (auto vmmaAttr = dyn_cast<VirtualMMAAttr>(mmaKind)) {
-    return vmmaAttr.getBSingleSubgroupLayout();
-  } else {
-    assert(false && "unhandled MMA Interface type.");
-    return {};
   }
+  if (auto vmmaAttr = dyn_cast<VirtualMMAAttr>(mmaKind)) {
+    return vmmaAttr.getBSingleSubgroupLayout();
+  }
+  assert(false && "unhandled MMA Interface type.");
+  return {};
 }
 
 MMASingleSubgroupLayout getCSingleSubgroupLayout(MmaInterfaceAttr mmaKind) {
   if (auto mmaAttr = dyn_cast<MMAAttr>(mmaKind)) {
     return mmaAttr.getCSingleSubgroupLayout();
-  } else if (auto vmmaAttr = dyn_cast<VirtualMMAAttr>(mmaKind)) {
-    return vmmaAttr.getCSingleSubgroupLayout();
-  } else {
-    assert(false && "unhandled MMA Interface type.");
-    return {};
   }
+  if (auto vmmaAttr = dyn_cast<VirtualMMAAttr>(mmaKind)) {
+    return vmmaAttr.getCSingleSubgroupLayout();
+  }
+  assert(false && "unhandled MMA Interface type.");
+  return {};
 }
 
 //===----------------------------------------------------------------------===//

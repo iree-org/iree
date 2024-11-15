@@ -22,9 +22,9 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-// Struct describing the detailed subgroup-level layout of a MMA operation.
+// Struct describing the detailed subgroup-level layout of a MMA intrinsic.
 // Together with element type information and subgroup size, it completes the
-// full description of the semantics of a MMA operation.
+// full description of the semantics of a MMA intrinsic.
 //
 // Note: It is not possible to infer subgroup size from the information in this
 // struct. The product of the `thread` sizes here is often, but not always equal
@@ -33,7 +33,7 @@ namespace mlir::iree_compiler::IREE::GPU {
 // semantics in that case are that threads within the subgroup whose thread-ids
 // differ by a multiple of `P`, are accessing the same elements.
 //
-// Example observed in RDNA3 WMMA Wave64 ops:
+// Example observed in RDNA3 WMMA Wave64 intrinsics:
 // If the subgroup size is 64 but the product `P` of `thread` sizes is 32, that
 // means that each element is being accessed by 2 threads (2 = 64/32), and the
 // threads accessing the same element are those whose tids are exactly 32 apart.
@@ -44,7 +44,7 @@ struct MMASingleSubgroupLayout {
   // are NOT contiguous.
   // This is not used by every MMA op; ops which don't use that simply have 1's.
   SmallVector<int64_t, 2> outer;
-  // Cross-thread dimensions (as in  TileSwizzle::Dim::Kind::CrossThread).
+  // Cross-thread dimensions (as in TileSwizzle::Dim::Kind::CrossThread).
   // This is the kind of dimension that is present in all GPU MMA ops, by
   // definition of "SIMT". It is still possible for one of the `thread` dims to
   // be 1, but not both.
