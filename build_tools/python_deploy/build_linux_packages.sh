@@ -138,7 +138,7 @@ function run_in_docker() {
           ;;
         iree-base-compiler)
           clean_wheels "iree_base_compiler${package_suffix}" "${python_version}"
-          install_deps "iree_base_runtime${package_suffix}" "${python_version}"
+          install_deps "iree_base_compiler${package_suffix}" "${python_version}"
           build_iree_compiler
           run_audit_wheel "iree_base_compiler${package_suffix}" "${python_version}"
           ;;

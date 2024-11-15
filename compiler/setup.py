@@ -25,6 +25,7 @@
 from gettext import install
 import json
 from multiprocessing.spawn import prepare
+from pathlib import Path
 import os
 import platform
 import re
@@ -37,6 +38,7 @@ from distutils.command.build import build as _build
 from setuptools import find_namespace_packages, setup, Extension
 from setuptools.command.build_ext import build_ext as _build_ext
 from setuptools.command.build_py import build_py as _build_py
+from setuptools.command.egg_info import egg_info
 
 
 def check_pip_version():
@@ -361,6 +363,25 @@ class NoopBuildExtension(_build_ext):
         pass
 
 
+# I don't know. Something about the CMake 'install' is producing a .egg-info/
+# folder, which then get picked up by the .whl. For release wheels all we need
+# is a .dist-info/ folder, so delete the .egg-info/ folder.
+#
+# * Notes: https://github.com/iree-org/iree/issues/19155
+# * Implementation inspirted by https://stackoverflow.com/a/70146326
+class CleanEggInfo(egg_info):
+    def run(self):
+        install_dir = os.path.join(
+            CMAKE_INSTALL_DIR_ABS, "python_packages", "iree_compiler"
+        )
+        print(f"CleanEggInfo checking install_dir '{install_dir}'")
+        for d in Path(install_dir).glob("*.egg-info"):
+            print(f"found egg-info path '{d}', deleting")
+            shutil.rmtree(d, ignore_errors=True)
+
+        egg_info.run(self)
+
+
 def generate_version_py():
     return f"""# Auto-generated version info.
 PACKAGE_SUFFIX = "{PACKAGE_SUFFIX}"
@@ -469,6 +490,7 @@ setup(
         "build": CustomBuild,
         "built_ext": NoopBuildExtension,
         "build_py": CMakeBuildPy,
+        "egg_info": CleanEggInfo,
     },
     zip_safe=False,
     package_dir={
