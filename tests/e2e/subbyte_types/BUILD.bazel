@@ -1,0 +1,50 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Tests of end-to-end IREE support for individual ops in the TOSA dialect.
+# Each test file should have a name matching the corresponding TOSA op and test only the
+# functionality of that op (though may make use of other ops where necessary). Tests should be
+# written using the IREE Check framework.
+# See https://iree.dev/developers/general/testing-guide/#iree-core-end-to-end-e2e-tests.
+
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
+
+package(
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+LLVM_SRCS = enforce_glob(
+    # keep sorted
+    [
+        "subbyte_types.mlir",
+    ],
+    include = ["*.mlir"],
+    exclude = [],
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_llvm-cpu_subbyte_emulation",
+    srcs = LLVM_SRCS,
+    compiler_flags = [
+        "--iree-llvmcpu-target-cpu=generic",
+        "--iree-experimental-packed-i1-storage",
+    ],
+    driver = "local-task",
+    tags = [
+        # subbyte support for wasm is not on priorities.
+        "nowasm",
+    ],
+    target_backend = "llvm-cpu",
+)
+
+test_suite(
+    name = "check",
+    tests = [
+        ":check_llvm-cpu_subbyte_emulation",
+    ],
+)

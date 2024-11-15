@@ -530,7 +530,7 @@ def test_sdxl_rocm_benchmark(
         goldentime_rocm_unet,
         "SDXL unet benchmark time should not regress",
     )
-    check.equal(
+    check.less_equal(
         unet_dispatch_count,
         goldendispatch_rocm_unet,
         "SDXL scheduled unet dispatch count should not regress",
@@ -546,7 +546,7 @@ def test_sdxl_rocm_benchmark(
             goldentime_rocm_punet_int8_fp16,
             "SDXL punet f16 benchmark time should not regress",
         )
-        check.equal(
+        check.less_equal(
             punet_int8_fp16_dispatch_count,
             goldendispatch_rocm_punet_int8_fp16,
             "SDXL punet f16 dispatch count should not regress",
@@ -561,7 +561,7 @@ def test_sdxl_rocm_benchmark(
             goldentime_rocm_punet_int8_fp8,
             "SDXL punet f8 benchmark time should not regress",
         )
-        check.equal(
+        check.less_equal(
             punet_int8_fp8_dispatch_count,
             goldendispatch_rocm_punet_int8_fp8,
             "SDXL punet f8 dispatch count should not regress",
@@ -576,7 +576,7 @@ def test_sdxl_rocm_benchmark(
         goldentime_rocm_clip,
         "SDXL prompt encoder benchmark time should not regress",
     )
-    check.equal(
+    check.less_equal(
         clip_dispatch_count,
         goldendispatch_rocm_clip,
         "SDXL prompt encoder dispatch count should not regress",
@@ -591,7 +591,7 @@ def test_sdxl_rocm_benchmark(
         goldentime_rocm_vae,
         "SDXL vae decode benchmark time should not regress",
     )
-    check.equal(
+    check.less_equal(
         vae_dispatch_count,
         goldendispatch_rocm_vae,
         "SDXL vae decode dispatch count should not regress",

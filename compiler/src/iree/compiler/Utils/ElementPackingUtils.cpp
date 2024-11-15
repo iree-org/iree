@@ -15,7 +15,17 @@
 
 namespace mlir::iree_compiler {
 
+llvm::cl::opt<bool> clEnableI1Support(
+    "iree-experimental-packed-i1-storage",
+    llvm::cl::desc(
+        "Experimental feature: enable i1 data type support in codegen"),
+    llvm::cl::init(false));
+
 bool needToPackSubByteElementBitWidth(unsigned bitWidth) {
+  // Enable i1 support if requested.
+  if (clEnableI1Support && bitWidth == 1) {
+    return true;
+  }
   // Require the original bit width to be some power of two for now to avoid
   // trickiness and weirdness of packing and cross-byte access.
   // Also disallow boolean values for now--they may require separate interface
@@ -114,15 +124,14 @@ Value calculateStorageElementCountInBytes(Location loc,
   if (needToPackSubByteElementBitWidth(elementBits)) {
     assert(8 % elementBits == 0);
     unsigned byteElements = 8 / elementBits;
-    // Perform some basic sanity check to make sure the total count is byte
-    // aligned for fully static shapes.
-    if (paddedDynamicDims.empty() && (staticCount * elementBits) % 8 != 0) {
-      return nullptr;
-    }
-    auto divisor = builder.create<arith::ConstantIndexOp>(loc, byteElements);
     // TODO(antiagainst): We may want to emit runtime check to make sure this is
     // divisible.
-    value = builder.createOrFold<arith::DivUIOp>(loc, value, divisor);
+    auto divisor = builder.create<arith::ConstantIndexOp>(loc, byteElements);
+    if (!clEnableI1Support && paddedDynamicDims.empty() &&
+        (staticCount * elementBits) % 8 != 0) {
+      return nullptr;
+    }
+    value = builder.createOrFold<arith::CeilDivUIOp>(loc, value, divisor);
   }
 
   return value;
