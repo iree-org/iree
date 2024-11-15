@@ -23,7 +23,82 @@ struct ConcretizeMmaShapesPass final
   using ConcretizeMmaShapesPassBase::ConcretizeMmaShapesPassBase;
   void runOnOperation() override;
 };
-} // namespace
+
+LogicalResult materializeOperandConcreteShape(
+    OpBuilder &builder, MMAAttr mma, IREE::GPU::MMAFragment fragment,
+    Value operand, std::optional<ArrayRef<int64_t>> permutation,
+    SmallVector<ReassociationIndices> &reassociations,
+    RankedTensorType &resultType) {
+
+  SmallVector<int64_t, 2> outerSizes;
+  SmallVector<int64_t, 2> opaqueSizes;
+  auto [m, n, k] = mma.getMNKShape();
+  switch (fragment) {
+  case IREE::GPU::MMAFragment::Lhs: {
+    outerSizes = mma.getASingleSubgroupLayout().outer;
+    opaqueSizes.append({m, k});
+    break;
+  }
+  case IREE::GPU::MMAFragment::Rhs: {
+    outerSizes = mma.getBSingleSubgroupLayout().outer;
+    opaqueSizes.append({k, n});
+    break;
+  }
+  case IREE::GPU::MMAFragment::Acc: {
+    outerSizes = mma.getCSingleSubgroupLayout().outer;
+    opaqueSizes.append({m, n});
+    break;
+  }
+  }
+  if (permutation.has_value()) {
+    if (permutation.value().size() != outerSizes.size()) {
+      return failure();
+    }
+    applyPermutationToVector(opaqueSizes, permutation.value());
+    applyPermutationToVector(outerSizes, permutation.value());
+  }
+
+  // Inner tile must have sizes matching the opaque layout.
+  auto operandType = llvm::cast<RankedTensorType>(operand.getType());
+  ArrayRef<int64_t> operandShape = operandType.getShape();
+  SmallVector<int64_t, 2> innerShape(operandShape.end() - opaqueSizes.size(),
+                                     operandShape.end());
+  if (!llvm::equal(opaqueSizes, innerShape)) {
+    return failure();
+  }
+
+  // Expand the shape of the inner tile to reflect the MMA thread layout.
+  SmallVector<int64_t, 4> resultShape(operandShape.begin(),
+                                      operandShape.end() - 2);
+  SmallVector<ReassociationIndices> reInds =
+      llvm::map_to_vector(llvm::seq<int64_t>(resultShape.size()),
+                          [](int64_t idx) -> ReassociationIndices {
+                            return ReassociationIndices({idx});
+                          });
+  int idx = reInds.size();
+  for (auto [outer, native] : llvm::zip_equal(outerSizes, opaqueSizes)) {
+    // Skip expansion if the outer dim is unit as the SingleSubgroupLayout gives
+    // a guarantee that the |element| counts are contiguous within the layout,
+    // and a unit outer implies a single offset and size for that dimension.
+    if (outer == 1) {
+      resultShape.push_back(native);
+      reInds.push_back(ReassociationIndices({idx++}));
+      continue;
+    }
+
+    // Reshape to [outer, native / outer] == [outer, thread * element]. This
+    // corresponds to |outer| repetitions of the thread/element sublayout.
+    resultShape.push_back(outer);
+    assert(native % outer == 0 && "invalid mma layout");
+    resultShape.push_back(native / outer);
+    reInds.push_back(ReassociationIndices{idx, idx + 1});
+    idx += 2;
+  }
+
+  reassociations = reInds;
+  resultType = operandType.clone(resultShape);
+  return success();
+}
 
 struct ConcretizeMmaOperandShape final : OpRewritePattern<MultiMmaOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -56,12 +131,15 @@ struct ConcretizeMmaOperandShape final : OpRewritePattern<MultiMmaOp> {
     }
 
     // Get the reassociation indices and result type of the expand_shape op.
-    MmaInterfaceAttr kind = mmaOp.getKind();
+    MMAAttr kind = dyn_cast<MMAAttr>(mmaOp.getKind());
+    if (!kind) {
+      return failure();
+    }
     SmallVector<ReassociationIndices> reassociations;
     RankedTensorType concreteType;
-    if (failed(kind.materializeOperandConcreteShape(rewriter, fragment, operand,
-                                                    permutation, reassociations,
-                                                    concreteType))) {
+    if (failed(materializeOperandConcreteShape(rewriter, kind, fragment,
+                                               operand, permutation,
+                                               reassociations, concreteType))) {
       return failure();
     }
 
@@ -139,6 +217,8 @@ struct ConcretizeMmaOperandShape final : OpRewritePattern<MultiMmaOp> {
 private:
   MMAFragment fragment;
 };
+
+} // namespace
 
 void ConcretizeMmaShapesPass::runOnOperation() {
   MLIRContext *context = &getContext();

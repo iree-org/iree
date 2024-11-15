@@ -148,7 +148,6 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
   DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
     "getABCElementTypes",
     "getABCVectorTypes",
-    "getContractionLayout",
     "getMNKShape",
     "getSubgroupSize",
     "getMmaScope",
@@ -157,7 +156,6 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     "getCSingleSubgroupLayout",
     "buildMmaOperation",
     "populateOperandOffsetsSizesStrides",
-    "materializeOperandConcreteShape",
   ]>
 ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
@@ -259,19 +257,11 @@ def IREEGPU_DataTiledMMAAttr :
     |intrinsic| field specifies which particular MMA intrinsic is targeted by
     the data-tiling.
 
-    The tile swizzling already happens, so the attribute does not need to
-    implement materializeOperandConcreteShape interface method. E.g., if the
-    target intrinsic is MFMA_F32_16x16x4_F32:
-      - The inner tile shape of LHS is 4x16.
-      - The inner tile shape of RHS is 4x16.
-      - The inner tile shape of ACC is 4x16x4.
-
-    Furthermore, the unrolling and interleaving can be represented with the
-    attribute. In the concept of data-tiling, we always unroll the parallel
-    dimensions (i.e., M, N dimensions) to be outermost, and interleave the
-    unrolled K dimension. I.e., the unrolled K dimension becomes the innermost
-    dimension. The constraint can be relaxed based on data-tiling needs. The
-    additional information can be added to `parameters`.
+    The other fields default to one, and that default results in a single
+    intrinsic equivalent to MMAAttr, while values greater than one result in
+    wider "kernels" consisting of multiple intrinsics, with the data layout
+    already swizzled into a tile layout that allows each intrinsic to access
+    data at an offset that's as simple as possible a mapping from the thread ID.
   }];
 
   let assemblyFormat = "`<` struct(params) `>`";
@@ -369,15 +359,6 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
   );
 
   let assemblyFormat = "`<` struct(params) `>`";
-
-  let extraClassDeclaration = [{
-    // Returns the A/B/C matrix concrete layout targeting |contractOp|.
-    ::mlir::FailureOr<::std::tuple<VectorExt::VectorLayoutInterface,
-                                 VectorExt::VectorLayoutInterface,
-                                 VectorExt::VectorLayoutInterface>>
-      getContractionLayout(::mlir::iree_compiler::VectorContractOpInfo &opInfo,
-                           ::mlir::linalg::LinalgOp contractOp) const;
-  }];
 }
 
 //===----------------------------------------------------------------------===//
