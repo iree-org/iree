@@ -30,7 +30,7 @@ LogicalResult materializeOperandConcreteShape(
     SmallVector<ReassociationIndices> &reassociations,
     RankedTensorType &resultType) {
 
-  auto layout = getSingleSubgroupLayout(mma, fragment);
+  MMASingleSubgroupLayout layout = getSingleSubgroupLayout(mma, fragment);
   SmallVector<int64_t, 2> outerSizes = layout.outer;
   SmallVector<int64_t, 2> opaqueSizes;
   auto [m, n, k] = mma.getMNKShape();

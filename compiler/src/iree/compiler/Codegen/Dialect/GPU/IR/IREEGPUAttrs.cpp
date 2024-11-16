@@ -69,7 +69,7 @@ static bool is_AMD_WMMA(MMAIntrinsic intrinsic) {
 
 static int64_t getIntrinsicSubgroupSize(MMAIntrinsic intrinsic) {
   // Not using Wave64 at all at the moment, so the only place where the
-  // subgroup size is 64 is CDNA* architectures.
+  // subgroup size is 64 is on CDNA* architectures.
   return is_AMD_MFMA(intrinsic) ? 64 : 32;
 }
 

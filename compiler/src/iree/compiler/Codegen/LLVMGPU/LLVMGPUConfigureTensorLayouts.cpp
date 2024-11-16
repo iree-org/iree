@@ -311,7 +311,7 @@ getContractionLayout(IREE::GPU::MMAScheduleAttr schedule,
     cSubgroupStrides[dim] = subgroupNStrides[i];
   }
 
-  auto cLayout = createNestedLayout(
+  IREE::VectorExt::NestedLayoutAttr cLayout = createNestedLayout(
       context, cRank, m, n,
       /*subgroupCount=*/cSubgroupSizes,
       /*subgroupStrides=*/cSubgroupStrides,
@@ -340,7 +340,7 @@ getContractionLayout(IREE::GPU::MMAScheduleAttr schedule,
   }
   aBatchSizes[afk] = bounds[opInfo.getKDims().back()] / intrinsicK;
 
-  auto aLayout = createNestedLayout(
+  IREE::VectorExt::NestedLayoutAttr aLayout = createNestedLayout(
       context, aRank, afm, afk,
       /*subgroupCount=*/aSubgroupSizes,
       /*subgroupStrides=*/aSubgroupStrides,
@@ -365,7 +365,7 @@ getContractionLayout(IREE::GPU::MMAScheduleAttr schedule,
   }
   bBatchSizes[bfk] = bounds[opInfo.getKDims().back()] / intrinsicK;
 
-  auto bLayout = createNestedLayout(
+  IREE::VectorExt::NestedLayoutAttr bLayout = createNestedLayout(
       context, bRank, bfk, bfn,
       /*subgroupCount=*/bSubgroupSizes,
       /*subgroupStrides=*/bSubgroupStrides,
