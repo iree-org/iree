@@ -76,12 +76,6 @@ typedef struct iree_test_utils_value_t {
   };
 } iree_test_utils_e2e_value_t;
 
-// Enum controlling how many decimals to print floats with.
-typedef enum iree_test_utils_precision_e {
-  PRECISION_LOW,
-  PRECISION_HIGH,
-} precision_t;
-
 // Reads an element from a buffer given index.
 iree_test_utils_e2e_value_t iree_test_utils_read_buffer_element(
     iree_hal_dim_t index, iree_hal_element_type_t result_type,
@@ -90,8 +84,7 @@ iree_test_utils_e2e_value_t iree_test_utils_read_buffer_element(
 // Prints a iree_e2e_test_value_t to a string buffer. Returns the number of
 // characters written. Like snprintf.
 int iree_test_utils_snprintf_value(char* buf, size_t bufsize,
-                                   iree_test_utils_e2e_value_t value,
-                                   precision_t precision);
+                                   iree_test_utils_e2e_value_t value);
 
 // Returns true if |expected| and |actual| agree to tolerable accuracy.
 bool iree_test_utils_result_elements_agree(iree_test_utils_e2e_value_t expected,
