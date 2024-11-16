@@ -28,25 +28,23 @@ module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK-DAG:   #[[$MAP:.+]]  = affine_map<(d0) -> (d0 mod 16)>
-// CHECK-DAG:   #[[$MAP1:.+]] = affine_map<(d0) -> ((d0 floordiv 16) * 4 - ((d0 floordiv 16) floordiv 4) * 16)>
 // CHECK-LABEL: func @distribute_multi_mma_F16_16x16x16_F32
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<2x2x16x16xf16>
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<2x2x16x16xf16>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: tensor<2x2x16x16xf32>
 //       CHECK:   scf.forall (%[[LANE_ID:.+]]) in (64) shared_outs(%[[ITER_ARG:.+]] = %[[ACC]]) -> (tensor<2x2x16x16xf32>)
-//       CHECK:     %[[ID:.+]]  = affine.apply #[[$MAP]](%[[LANE_ID]])
-//       CHECK:     %[[ID1:.+]] = affine.apply #[[$MAP1]](%[[LANE_ID]])
-//       CHECK:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][0, 0, %[[ID]], %[[ID1]]]
+//       CHECK:     %[[ID:.+]]:3 = affine.delinearize_index %[[LANE_ID]] into (4, 16)
+//       CHECK:     %[[ID1:.+]]  = affine.linearize_index disjoint [%[[ID]]#1, %c0] by (4, 4)
+//       CHECK:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][0, 0, %[[ID]]#2, %[[ID1]]]
 //  CHECK-SAME:       [2, 2, 1, 4] [1, 1, 1, 1] : tensor<2x2x16x16xf16> to tensor<2x2x1x4xf16>
-//       CHECK:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][0, 0, %[[ID1]], %[[ID]]]
+//       CHECK:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][0, 0, %[[ID1]], %[[ID]]#2]
 //  CHECK-SAME:       [2, 2, 4, 1] [1, 1, 1, 1] : tensor<2x2x16x16xf16> to tensor<2x2x4x1xf16>
-//       CHECK:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ITER_ARG]][0, 0, %[[ID1]], %[[ID]]]
+//       CHECK:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ITER_ARG]][0, 0, %[[ID1]], %[[ID]]#2]
 //  CHECK-SAME:       [2, 2, 4, 1] [1, 1, 1, 1] : tensor<2x2x16x16xf32> to tensor<2x2x4x1xf32>
 //       CHECK:     %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS_SLICE]], %[[RHS_SLICE]], %[[ACC_SLICE]]
 //  CHECK-SAME:       : tensor<2x2x1x4xf16>, tensor<2x2x4x1xf16> into tensor<2x2x4x1xf32>
 //       CHECK:     scf.forall.in_parallel
-//       CHECK:       tensor.parallel_insert_slice %[[MMA]] into %[[ITER_ARG]][0, 0, %[[ID1]], %[[ID]]]
+//       CHECK:       tensor.parallel_insert_slice %[[MMA]] into %[[ITER_ARG]][0, 0, %[[ID1]], %[[ID]]#2]
 //  CHECK-SAME:         [2, 2, 4, 1] [1, 1, 1, 1] : tensor<2x2x4x1xf32> into tensor<2x2x16x16xf32>
 //       CHECK:   mapping = [#iree_gpu.lane_id<0>]
 
@@ -80,33 +78,27 @@ module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
-#map = affine_map<(d0) -> (d0 mod 16)>
-#map1 = affine_map<(d0) -> ((d0 floordiv 16) * 8 - ((d0 floordiv 16) floordiv 4) * 32)>
-#map2 = affine_map<(d0) -> ((d0 floordiv 16) * 4 - ((d0 floordiv 16) floordiv 4) * 16)>
-#map3 = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map4 = affine_map<(d0, d1, d2) -> (d1, d2)>
-#map5 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
-// CHECK-DAG:   #[[$MAP:.+]]  = affine_map<(d0) -> (d0 mod 16)>
-// CHECK-DAG:   #[[$MAP1:.+]] = affine_map<(d0) -> ((d0 floordiv 16) * 8 - ((d0 floordiv 16) floordiv 4) * 32)>
-// CHECK-DAG:   #[[$MAP2:.+]] = affine_map<(d0) -> ((d0 floordiv 16) * 4 - ((d0 floordiv 16) floordiv 4) * 16)>
 // CHECK-LABEL: func @distribute_multi_mma_I8_16x16x32_I32
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<2x2x16x32xi8>
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<2x2x16x32xi8>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: tensor<2x2x16x16xi32>
 //       CHECK:   scf.forall (%[[LANE_ID:.+]]) in (64) shared_outs(%[[ITER_ARG:.+]] = %[[ACC]]) -> (tensor<2x2x16x16xi32>)
-//       CHECK:     %[[ID:.+]]  = affine.apply #[[$MAP]](%[[LANE_ID]])
-//       CHECK:     %[[ID1:.+]] = affine.apply #[[$MAP1]](%[[LANE_ID]])
-//       CHECK:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][0, 0, %[[ID]], %[[ID1]]]
+//       CHECK:     %[[ID:.+]]:3  = affine.delinearize_index %[[LANE_ID]] into (4, 16)
+//       CHECK:     %[[ID1:.+]] = affine.linearize_index disjoint [%[[ID]]#1, %c0] by (4, 8)
+//       CHECK:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][0, 0, %[[ID]]#2, %[[ID1]]]
 //  CHECK-SAME:       [2, 2, 1, 8] [1, 1, 1, 1] : tensor<2x2x16x32xi8> to tensor<2x2x1x8xi8>
-//       CHECK:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][0, 0, %[[ID]], %[[ID1]]]
+//       CHECK:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][0, 0, %[[ID]]#2, %[[ID1]]]
 //  CHECK-SAME:       [2, 2, 1, 8] [1, 1, 1, 1] : tensor<2x2x16x32xi8> to tensor<2x2x1x8xi8>
-//       CHECK:     %[[ID2:.+]] = affine.apply #[[$MAP2]](%[[LANE_ID]])
-//       CHECK:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ITER_ARG]][0, 0, %[[ID2]], %[[ID]]]
+//       CHECK:     %[[ID1_2:.+]] = affine.linearize_index disjoint [%[[ID]]#1, %c0] by (4, 4)
+//       CHECK:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ITER_ARG]][0, 0, %[[ID1_2]], %[[ID]]#2]
 //  CHECK-SAME:       [2, 2, 4, 1] [1, 1, 1, 1] : tensor<2x2x16x16xi32> to tensor<2x2x4x1xi32>
 //       CHECK:     %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS_SLICE]], %[[RHS_SLICE]], %[[ACC_SLICE]]
 //  CHECK-SAME:       : tensor<2x2x1x8xi8>, tensor<2x2x1x8xi8> into tensor<2x2x4x1xi32>
 //       CHECK:     scf.forall.in_parallel
-//       CHECK:       tensor.parallel_insert_slice %[[MMA]] into %[[ITER_ARG]][0, 0, %[[ID2]], %[[ID]]]
+//       CHECK:       tensor.parallel_insert_slice %[[MMA]] into %[[ITER_ARG]][0, 0, %[[ID1_2]], %[[ID]]#2]
 //  CHECK-SAME:         [2, 2, 4, 1] [1, 1, 1, 1] : tensor<2x2x4x1xi32> into tensor<2x2x16x16xi32>
 //       CHECK:   mapping = [#iree_gpu.lane_id<0>]
