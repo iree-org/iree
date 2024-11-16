@@ -151,9 +151,6 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     "getMNKShape",
     "getSubgroupSize",
     "getMmaScope",
-    "getASingleSubgroupLayout",
-    "getBSingleSubgroupLayout",
-    "getCSingleSubgroupLayout",
     "buildMmaOperation",
     "populateOperandOffsetsSizesStrides",
   ]>
@@ -225,14 +222,6 @@ def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
   let extraClassDeclaration = [{
     int64_t getBlockSize() const;
 
-    // Returns the A/B/C matrix's partial nested layout shape inside a single
-    // subgroup. Shape at each outer/thread/element level is a 2-D value,
-    // following canonical matmul order--(M, K) for A, (K, N) for B, and
-    // (M, N) for C.
-    MMASingleSubgroupLayout getASingleSubgroupLayout() const;
-    MMASingleSubgroupLayout getBSingleSubgroupLayout() const;
-    MMASingleSubgroupLayout getCSingleSubgroupLayout() const;
-
     SmallVector<VirtualMMAIntrinsic> getVirtualIntrinsics() const;
   }];
 }
@@ -287,9 +276,6 @@ def IREEGPU_VirtualMMAAttr :
     "getMNKShape",
     "getSubgroupSize",
     "getMmaScope",
-    "getASingleSubgroupLayout",
-    "getBSingleSubgroupLayout",
-    "getCSingleSubgroupLayout",
     "populateOperandOffsetsSizesStrides",
     "buildMmaOperation",
   ]>
@@ -318,14 +304,6 @@ def IREEGPU_VirtualMMAAttr :
 
   let extraClassDeclaration = [{
     int64_t getBlockSize() const;
-
-    // Returns the A/B/C matrix's partial nested layout shape inside a single
-    // subgroup. Shape at each outer/thread/element level is a 2-D value,
-    // following canonical matmul order--(M, K) for A, (K, N) for B, and
-    // (M, N) for C.
-    MMASingleSubgroupLayout getASingleSubgroupLayout() const;
-    MMASingleSubgroupLayout getBSingleSubgroupLayout() const;
-    MMASingleSubgroupLayout getCSingleSubgroupLayout() const;
 
     // Factor to unroll K from native MMA/intrinsic size to virtual size.
     // e.g MFMA_F32_16x16x16 has K of 16, while VMFMA_F32_16x16x32 has K of 32

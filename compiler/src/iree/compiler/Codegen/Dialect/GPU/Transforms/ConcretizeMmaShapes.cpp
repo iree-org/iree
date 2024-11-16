@@ -30,22 +30,20 @@ LogicalResult materializeOperandConcreteShape(
     SmallVector<ReassociationIndices> &reassociations,
     RankedTensorType &resultType) {
 
-  SmallVector<int64_t, 2> outerSizes;
+  MMASingleSubgroupLayout layout = getSingleSubgroupLayout(mma, fragment);
+  SmallVector<int64_t, 2> outerSizes = layout.outer;
   SmallVector<int64_t, 2> opaqueSizes;
   auto [m, n, k] = mma.getMNKShape();
   switch (fragment) {
   case IREE::GPU::MMAFragment::Lhs: {
-    outerSizes = mma.getASingleSubgroupLayout().outer;
     opaqueSizes.append({m, k});
     break;
   }
   case IREE::GPU::MMAFragment::Rhs: {
-    outerSizes = mma.getBSingleSubgroupLayout().outer;
     opaqueSizes.append({k, n});
     break;
   }
   case IREE::GPU::MMAFragment::Acc: {
-    outerSizes = mma.getCSingleSubgroupLayout().outer;
     opaqueSizes.append({m, n});
     break;
   }

@@ -33,10 +33,10 @@ namespace mlir::iree_compiler::IREE::GPU {
 // semantics in that case are that threads within the subgroup whose thread-ids
 // differ by a multiple of `P`, are accessing the same elements.
 //
-// Example observed in RDNA3 WMMA Wave64 intrinsics:
-// If the subgroup size is 64 but the product `P` of `thread` sizes is 32, that
-// means that each element is being accessed by 2 threads (2 = 64/32), and the
-// threads accessing the same element are those whose tids are exactly 32 apart.
+// Example observed in RDNA3 WMMA Wave32 intrinsics:
+// If the subgroup size is 32 but the product `P` of `thread` sizes is 16, that
+// means that each element is being accessed by 2 threads (2 = 32/16), and the
+// threads accessing the same element are those whose tids are exactly 16 apart.
 struct MMASingleSubgroupLayout {
   // Internal dimensions (as in TileSwizzle::Dim::Kind::Internal) that are
   // outer-most in the layout. This happens when a MMA op, seen on a single
@@ -54,7 +54,7 @@ struct MMASingleSubgroupLayout {
   // Internal dimensions (as in TileSwizzle::Dim::Kind::Internal) that are
   // inner-most in the layout. This happens when a MMA op, seen on a single
   // thread, has an operand that consists of multiple elements, and these elems
-  // are NOT contiguous.
+  // are contiguous.
   // This is not used by every MMA op; ops which don't use that simply have 1's.
   SmallVector<int64_t, 2> element;
 };
@@ -65,11 +65,8 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
 MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
                                                 MMAFragment fragment);
 
-MMASingleSubgroupLayout getASingleSubgroupLayout(MmaInterfaceAttr mmaKind);
-
-MMASingleSubgroupLayout getBSingleSubgroupLayout(MmaInterfaceAttr mmaKind);
-
-MMASingleSubgroupLayout getCSingleSubgroupLayout(MmaInterfaceAttr mmaKind);
+MMASingleSubgroupLayout getSingleSubgroupLayout(MmaInterfaceAttr mmaKind,
+                                                MMAFragment fragment);
 
 // Struct describing the shape of a MMA operation, but not the detailed layout.
 // TODO(bjacob): the only user outside of IREEGPUAttrs.cpp is
