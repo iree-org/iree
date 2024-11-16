@@ -292,6 +292,13 @@ protected:
       s.eraseState(res);
   }
 
+  void notifyOperationModified(Operation *op) override {
+    s.eraseState(s.getProgramPointAfter(op));
+    for (Value res : op->getResults()) {
+      s.eraseState(res);
+    }
+  }
+
   DataFlowSolver &s;
 };
 
