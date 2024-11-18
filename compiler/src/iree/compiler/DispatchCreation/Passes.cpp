@@ -312,6 +312,7 @@ void buildDispatchCreationPassPipeline(
       // acts as a contiguous view of the tensor
       // - Apply tensor -> flow patterns
       .addPass(DispatchCreation::createConvertTensorToFlowPass)
+      .addPass(createCSEPass)
       .addPass(IREE::Flow::createCanonicalizerPass)
       /// Creates the workgroup count region where the materialized computation
       /// is derived as a program slice of the body of the dispatch. This method
