@@ -87,4 +87,14 @@ void setPromotedOperandList(MLIRContext *context,
                      b.getI64ArrayAttr(operands));
 }
 
+constexpr StringLiteral kPaddingName = "padding";
+
+std::optional<SmallVector<int64_t>> getPaddingList(LoweringConfigAttr config) {
+  auto array = config.getAttributes().getAs<ArrayAttr>(kPaddingName);
+  if (!array) {
+    return std::nullopt;
+  }
+  return getIntegerVector(array);
+}
+
 } // namespace mlir::iree_compiler::IREE::GPU
