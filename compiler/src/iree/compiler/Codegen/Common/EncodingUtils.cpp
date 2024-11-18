@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
+#include "iree/compiler/Codegen/Common/TileSwizzle.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -17,6 +18,66 @@ namespace mlir::iree_compiler {
 using IREE::Encoding::EncodingAttr;
 using IREE::Encoding::getEncodingAttr;
 using IREE::Encoding::getEncodingContractionDims;
+
+DictionaryAttr serializeMaterializeEncodingInfo(MLIRContext *ctx,
+                                                MaterializeEncodingInfo info) {
+  Builder b(ctx);
+  SmallVector<NamedAttribute> items;
+  items.emplace_back(b.getStringAttr("innerDimsPos"),
+                     b.getI64ArrayAttr(info.innerDimsPos));
+  items.emplace_back(b.getStringAttr("innerTileSizes"),
+                     b.getI64ArrayAttr(info.innerTileSizes));
+  items.emplace_back(b.getStringAttr("outerDimsPerm"),
+                     b.getI64ArrayAttr(info.outerDimsPerm));
+  if (info.swizzle) {
+    items.emplace_back(b.getStringAttr("swizzle"),
+                       serializeTileSwizzle(ctx, info.swizzle.value()));
+  }
+
+  return b.getDictionaryAttr(items);
+}
+
+std::optional<MaterializeEncodingInfo>
+deserializeMaterializeEncodingInfo(DictionaryAttr attr) {
+  MaterializeEncodingInfo info;
+
+  auto innerDimsPosAttr = attr.getNamed("innerDimsPos");
+  if (!innerDimsPosAttr) {
+    return std::nullopt;
+  }
+  auto innerDimsPos = cast<ArrayAttr>(innerDimsPosAttr->getValue())
+                          .getAsValueRange<IntegerAttr>();
+  for (auto val : innerDimsPos) {
+    info.innerDimsPos.push_back(val.getSExtValue());
+  }
+
+  auto innerTileSizesAttr = attr.getNamed("innerTileSizes");
+  if (!innerTileSizesAttr) {
+    return std::nullopt;
+  }
+  auto innerTileSizes = cast<ArrayAttr>(innerTileSizesAttr->getValue())
+                            .getAsValueRange<IntegerAttr>();
+  for (auto val : innerTileSizes) {
+    info.innerTileSizes.push_back(val.getSExtValue());
+  }
+
+  auto outerDimsPermAttr = attr.getNamed("outerDimsPerm");
+  if (!outerDimsPermAttr) {
+    return std::nullopt;
+  }
+  auto outerDimsPerm = cast<ArrayAttr>(outerDimsPermAttr->getValue())
+                           .getAsValueRange<IntegerAttr>();
+  for (auto val : outerDimsPerm) {
+    info.outerDimsPerm.push_back(val.getSExtValue());
+  }
+
+  if (attr.contains("swizzle")) {
+    info.swizzle = deserializeTileSwizzle(
+        cast<DictionaryAttr>(attr.getNamed("swizzle")->getValue()));
+  }
+
+  return info;
+}
 
 // If tensorType has the encoding of a matmul RESULT with narrow N, returns
 // the transposed type. Otherwise, just returns tensorType.

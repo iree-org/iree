@@ -10,6 +10,8 @@
 #include <cstdint>
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/MLIRContext.h"
 
 namespace mlir::iree_compiler {
 
@@ -67,6 +69,9 @@ struct TileSwizzle {
   // the leading dimension of the layout.
   llvm::SmallVector<int64_t> permutation;
 };
+
+DictionaryAttr serializeTileSwizzle(MLIRContext *ctx, TileSwizzle swizzle);
+std::optional<TileSwizzle> deserializeTileSwizzle(DictionaryAttr attr);
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               TileSwizzle::Dim::Kind kind);

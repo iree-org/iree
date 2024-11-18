@@ -5,9 +5,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUAttrs.h"
+#include <optional>
 
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
@@ -15,6 +17,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Support/LLVM.h"
@@ -70,11 +73,246 @@ static bool hasFeature(DictionaryAttr config, StringRef feature) {
   return false;
 }
 
+// Metadata for a swizzle, that is, an (expand_shape -> transposition)
+// pair of ops performing a change of layout within the tiles. This is used
+// on GPU, where the tiles themselves can have an arbitrary layout.
+struct TileSwizzle {
+  struct Dim {
+    // Describes what varies across this dimension.
+    enum class Kind : int8_t {
+      // This dimension is internal to one intrinsic on one thread. This
+      // is only seen for intrinsic operands that are themselves vectors.
+      // For example, with AMD MFMA, for the MFMA_F32_16x16x4_F32 intrinsic,
+      // the C-matrix operand is a vector of 4 floats already at the level of
+      // one intrinsic on one thread. That dimension of size 4 is 'Internal'.
+      Internal,
+      // This dimension is internal to one intrinsic, but is across threads.
+      // For example, with AMD MFMA, for the MFMA_F32_16x16x4_F32 intrinsic,
+      // the A-matrix tile has shape 16x4, and these two dimensions of size 16
+      // and 4 are 'CrossThread': neither is visible at the single-thread level
+      // (in the intrinsic itself, the A-matrix operand is a single scalar) but
+      // as we move along these dimensions, we are moving over the 64 threads
+      // of the subgroup.
+      //
+      // Another example of cross-thread dimensions is in kernels that are
+      // "unrolled" across subgroups. Such dimensions are cross-subgroup, so in
+      // particular they are cross-thread.
+      CrossThread,
+      // This dimensions is across intrinsics, as in, actual instructions in the
+      // generated code. In other words, it is an actual unrolling factor,
+      // resulting in this many more instructions being generated and executed
+      // on each thread/subgroup.
+      CrossIntrinsic
+    };
+
+    Kind kind = Kind::Internal;
+
+    // The size of the dimension.
+    int16_t size = 0;
+
+    // Support constructing from any size type.
+    template <typename T>
+    Dim(Kind kind, T size) : kind(kind), size(size) {}
+  };
+
+  using ExpandShapeDimVectorType = llvm::SmallVector<Dim, 4>;
+  using ExpandShapeType = llvm::SmallVector<ExpandShapeDimVectorType>;
+
+  // This vector-of-vectors contains all the information needed to generate
+  // a `tensor.expand_shape` creating additional internal dimensions into the
+  // tile. For example, expandShape = [[16], [4, 2]] means that the original
+  // tile shape [16, 8] gets expanded such that the first dimension 16 is left
+  // unchanged, and the second dimension 8 gets split into two internal dims
+  // of size 4 and 2.
+  ExpandShapeType expandShape;
+  // This permutation vector applies to the expanded dimensions and is used
+  // to generate a `linalg.transpose` changing the layout of the tile. For
+  // example, permutation[0] dictates which of the expanded dimensions becomes
+  // the leading dimension of the layout.
+  llvm::SmallVector<int64_t> permutation;
+};
+
+/// Container of information needed to materialize the layout transformations.
+struct MaterializeEncodingInfo {
+  // The next 3 fields are used to create a `tensor.pack` or `tensor.unpack` op,
+  // changing the overall layout between row-major and tiled (where each tile is
+  // row-major).
+  SmallVector<int64_t> innerDimsPos;
+  SmallVector<int64_t> innerTileSizes;
+  SmallVector<int64_t> outerDimsPerm;
+
+  // The optional swizzle, see the comment on TileSwizzle. Only used on GPU.
+  std::optional<TileSwizzle> swizzle;
+};
+
 struct TileMxNxK {
   int64_t M = 1;
   int64_t N = 1;
   int64_t K = 1;
 };
+
+static Attribute dimToArrayAttr(MLIRContext *ctx, TileSwizzle::Dim dim) {
+  Builder b(ctx);
+  return b.getDenseI16ArrayAttr({static_cast<int16_t>(dim.kind), dim.size});
+}
+
+static DictionaryAttr serializeTileSwizzle(MLIRContext *ctx,
+                                           TileSwizzle swizzle) {
+  Builder b(ctx);
+  SmallVector<NamedAttribute> items;
+
+  SmallVector<Attribute> expandShape;
+  for (auto expandConfig : swizzle.expandShape) {
+    Attribute expandAttr = b.getArrayAttr(
+        llvm::map_to_vector(expandConfig, [&](TileSwizzle::Dim dim) {
+          return dimToArrayAttr(ctx, dim);
+        }));
+    expandShape.push_back(expandAttr);
+  }
+
+  items.emplace_back(b.getStringAttr("expandShape"),
+                     b.getArrayAttr(expandShape));
+  items.emplace_back(b.getStringAttr("permutation"),
+                     b.getI64ArrayAttr(swizzle.permutation));
+
+  return b.getDictionaryAttr(items);
+}
+
+static std::optional<TileSwizzle> deserializeTileSwizzle(DictionaryAttr attr) {
+  TileSwizzle swizzle;
+
+  auto expandShapeAttr = attr.getNamed("expandShape");
+  if (!expandShapeAttr) {
+    return std::nullopt;
+  }
+  auto expandShapeArrayAttr = dyn_cast<ArrayAttr>(expandShapeAttr->getValue());
+  if (!expandShapeArrayAttr) {
+    return std::nullopt;
+  }
+
+  for (auto expandConfig : expandShapeArrayAttr.getAsRange<ArrayAttr>()) {
+    // FIXME: The attribute that created by the builder can't be casted back to
+    // the original attribute. Because it creates an ArrayAttr but not the
+    // attribute that we specificed. It is not used in the prototype. For the
+    // fix, see examples in the deserializeMaterializeEncodingInfo method.
+    TileSwizzle::ExpandShapeDimVectorType vec;
+    for (auto dimAttr : expandConfig.getAsRange<DenseI16ArrayAttr>()) {
+      ArrayRef<int16_t> dimRef = dimAttr.asArrayRef();
+      TileSwizzle::Dim dim(static_cast<TileSwizzle::Dim::Kind>(dimRef[0]),
+                           dimRef[1]);
+      vec.push_back(dim);
+    }
+    swizzle.expandShape.push_back(vec);
+  }
+
+  auto permutation =
+      cast<DenseI64ArrayAttr>(attr.getNamed("permutation")->getValue())
+          .asArrayRef();
+  swizzle.permutation.assign(permutation.begin(), permutation.end());
+
+  return swizzle;
+}
+
+static DictionaryAttr
+serializeMaterializeEncodingInfo(MLIRContext *ctx,
+                                 MaterializeEncodingInfo info) {
+  Builder b(ctx);
+  SmallVector<NamedAttribute> items;
+  items.emplace_back(b.getStringAttr("innerDimsPos"),
+                     b.getI64ArrayAttr(info.innerDimsPos));
+  items.emplace_back(b.getStringAttr("innerTileSizes"),
+                     b.getI64ArrayAttr(info.innerTileSizes));
+  items.emplace_back(b.getStringAttr("outerDimsPerm"),
+                     b.getI64ArrayAttr(info.outerDimsPerm));
+  if (info.swizzle) {
+    items.emplace_back(b.getStringAttr("swizzle"),
+                       serializeTileSwizzle(ctx, info.swizzle.value()));
+  }
+
+  return b.getDictionaryAttr(items);
+}
+
+static std::optional<MaterializeEncodingInfo>
+deserializeMaterializeEncodingInfo(DictionaryAttr attr) {
+  MaterializeEncodingInfo info;
+
+  auto innerDimsPosAttr = attr.getNamed("innerDimsPos");
+  if (!innerDimsPosAttr) {
+    return std::nullopt;
+  }
+  auto innerDimsPos = cast<ArrayAttr>(innerDimsPosAttr->getValue())
+                          .getAsValueRange<IntegerAttr>();
+  for (auto val : innerDimsPos) {
+    info.innerDimsPos.push_back(val.getSExtValue());
+  }
+
+  auto innerTileSizesAttr = attr.getNamed("innerTileSizes");
+  if (!innerTileSizesAttr) {
+    return std::nullopt;
+  }
+  auto innerTileSizes = cast<ArrayAttr>(innerTileSizesAttr->getValue())
+                            .getAsValueRange<IntegerAttr>();
+  for (auto val : innerTileSizes) {
+    info.innerTileSizes.push_back(val.getSExtValue());
+  }
+
+  auto outerDimsPermAttr = attr.getNamed("outerDimsPerm");
+  if (!outerDimsPermAttr) {
+    return std::nullopt;
+  }
+  auto outerDimsPerm = cast<ArrayAttr>(outerDimsPermAttr->getValue())
+                           .getAsValueRange<IntegerAttr>();
+  for (auto val : outerDimsPerm) {
+    info.outerDimsPerm.push_back(val.getSExtValue());
+  }
+
+  if (attr.contains("swizzle")) {
+    info.swizzle = deserializeTileSwizzle(
+        cast<DictionaryAttr>(attr.getNamed("swizzle")->getValue()));
+  }
+
+  return info;
+}
+
+MaterializeEncodingInfo
+getEncodingInfoForMatmul(IREE::Encoding::EncodingAttr encoding,
+                         TileMxNxK tileMxNxK) {
+  MaterializeEncodingInfo encodingInfo;
+  auto cDims = getEncodingContractionDims(encoding);
+  // The following expects M, N, K, and Batch sizes of at most 1 for now
+  assert(cDims->m.size() <= 1 && cDims->n.size() <= 1 && cDims->k.size() == 1 &&
+         cDims->batch.size() <= 1 &&
+         "Expected at most one M, N, K, and Batch dimension");
+  std::optional<unsigned> batchDim =
+      cDims->batch.empty() ? std::nullopt
+                           : encoding.mapDimToOperandIndex(cDims->batch[0]);
+  std::optional<unsigned> mDim =
+      cDims->m.empty() ? std::nullopt
+                       : encoding.mapDimToOperandIndex(cDims->m[0]);
+  std::optional<unsigned> nDim =
+      cDims->n.empty() ? std::nullopt
+                       : encoding.mapDimToOperandIndex(cDims->n[0]);
+  std::optional<unsigned> kDim = encoding.mapDimToOperandIndex(cDims->k[0]);
+  if (batchDim.has_value()) {
+    encodingInfo.outerDimsPerm.push_back(batchDim.value());
+  }
+  if (mDim.has_value()) {
+    encodingInfo.outerDimsPerm.push_back(mDim.value());
+    encodingInfo.innerDimsPos.push_back(mDim.value());
+    encodingInfo.innerTileSizes.push_back(tileMxNxK.M);
+  }
+  if (nDim.has_value()) {
+    encodingInfo.outerDimsPerm.push_back(nDim.value());
+    encodingInfo.innerDimsPos.push_back(nDim.value());
+    encodingInfo.innerTileSizes.push_back(tileMxNxK.N);
+  }
+  if (kDim.has_value()) {
+    encodingInfo.outerDimsPerm.push_back(kDim.value());
+    encodingInfo.innerDimsPos.push_back(kDim.value());
+    encodingInfo.innerTileSizes.push_back(tileMxNxK.K);
+  }
+  return encodingInfo;
+}
 
 // TODO: Do we really need to know the target triple? Can we just look at the
 // configuration like this?
@@ -278,45 +516,18 @@ OpFoldResult CPUEncodingSolverAttr::calculateStorageElementCountInBytes(
   if (!encoding) {
     return mulAll(builder, loc, shape);
   }
-  // We only know about contractions with {Batch, M, N, K} <= 1 at the moment.
-  auto cDims = getEncodingContractionDims(encoding);
-  if (failed(cDims) || cDims->batch.size() > 1 || cDims->m.size() > 1 ||
-      cDims->n.size() > 1 || cDims->k.size() > 1) {
-    return mulAll(builder, loc, shape);
-  }
 
-  SmallVector<TileMxNxK> enumeratedTileMxNxK =
-      enumerateMatmulTile(encoding.getElementTypesArray(), getConfig());
-  if (enumeratedTileMxNxK.empty()) {
+  std::optional<MaterializeEncodingInfo> info =
+      deserializeMaterializeEncodingInfo(getConfig());
+  if (!info) {
     return mulAll(builder, loc, shape);
   }
-  auto narrowDim = IREE::Encoding::getMatmulNarrowDim(encoding);
-  TileMxNxK chosenTileMxNxK = chooseMatmulTile(enumeratedTileMxNxK, narrowDim);
-  LLVM_DEBUG(llvm::dbgs() << "[iree-cpu-attrs]: choose TileMxNxK: ["
-                          << chosenTileMxNxK.M << ", " << chosenTileMxNxK.N
-                          << ", " << chosenTileMxNxK.K << "], operand_index: "
-                          << encoding.getOperandIndex() << "\n";);
 
   AffineExpr expr = builder.getAffineDimExpr(0);
-  auto pad = [&](int64_t dim, int64_t val) -> void {
-    std::optional<unsigned> maybeMappedDim = encoding.mapDimToOperandIndex(dim);
-    if (!maybeMappedDim) {
-      return;
-    }
-    unsigned mappedDim = maybeMappedDim.value();
-    LLVM_DEBUG(llvm::dbgs()
-                   << "Pad dim #" << dim << " with size=" << val << "\n";);
-    shape[mappedDim] = affine::makeComposedFoldedAffineApply(
-        builder, loc, expr.ceilDiv(val) * val, {shape[mappedDim]});
-  };
-  for (auto m : cDims->m) {
-    pad(m, chosenTileMxNxK.M);
-  }
-  for (auto n : cDims->n) {
-    pad(n, chosenTileMxNxK.N);
-  }
-  for (auto k : cDims->k) {
-    pad(k, chosenTileMxNxK.K);
+  for (auto [pos, size] :
+       llvm::zip_equal(info->innerDimsPos, info->innerTileSizes)) {
+    shape[pos] = affine::makeComposedFoldedAffineApply(
+        builder, loc, expr.ceilDiv(size) * size, {shape[pos]});
   }
 
   return mulAll(builder, loc, shape);
@@ -324,8 +535,26 @@ OpFoldResult CPUEncodingSolverAttr::calculateStorageElementCountInBytes(
 
 Encoding::EncodingSolverInterfaceAttr
 CPUEncodingSolverAttr::cloneWithConfig(DictionaryAttr attr) const {
+  return CPUEncodingSolverAttr::get(getContext(), attr);
+}
+
+Encoding::EncodingSolverInterfaceAttr
+CPUEncodingSolverAttr::cloneWithSimplifiedConfig(Attribute attr) const {
+  auto encoding = llvm::dyn_cast<IREE::Encoding::EncodingAttr>(attr);
+  if (!encoding) {
+    return llvm::cast<Encoding::EncodingSolverInterfaceAttr>(*this);
+  }
+
+  SmallVector<TileMxNxK> enumeratedTileMxNxK =
+      enumerateMatmulTile(encoding.getElementTypesArray(), getConfig());
+  auto narrowDim = IREE::Encoding::getMatmulNarrowDim(encoding);
+  TileMxNxK chosenTileMxNxK = chooseMatmulTile(enumeratedTileMxNxK, narrowDim);
+  MaterializeEncodingInfo info =
+      getEncodingInfoForMatmul(encoding, chosenTileMxNxK);
+
   return llvm::cast<Encoding::EncodingSolverInterfaceAttr>(
-      CPUEncodingSolverAttr::get(getContext(), attr));
+      CPUEncodingSolverAttr::get(
+          getContext(), serializeMaterializeEncodingInfo(getContext(), info)));
 }
 
 DictionaryAttr CPUEncodingSolverAttr::getConfig() const {
@@ -347,39 +576,22 @@ OpFoldResult VMVXEncodingSolverAttr::calculateStorageElementCountInBytes(
   if (!encoding) {
     return mulAll(builder, loc, shape);
   }
-  // We only know about contractions with {Batch, M, N, K} <= 1 at the moment.
-  auto cDims = getEncodingContractionDims(encoding);
-  if (failed(cDims) || cDims->batch.size() > 1 || cDims->m.size() > 1 ||
-      cDims->n.size() > 1 || cDims->k.size() > 1) {
+
+  std::optional<MaterializeEncodingInfo> info =
+      deserializeMaterializeEncodingInfo(getConfig());
+  if (!info) {
     return mulAll(builder, loc, shape);
   }
 
-  bool hasUkernelSupport = false;
-  if (getTargetConfiguration().get(builder.getStringAttr("ukernels"))) {
-    hasUkernelSupport = true;
-  }
-
-  if (hasUkernelSupport) {
-    AffineExpr expr = builder.getAffineDimExpr(0);
-    auto padTo16 = [&](int64_t dim) -> void {
-      std::optional<unsigned> maybeMappedDim =
-          encoding.mapDimToOperandIndex(dim);
-      if (!maybeMappedDim) {
-        return;
-      }
-      unsigned mappedDim = maybeMappedDim.value();
-      shape[mappedDim] = affine::makeComposedFoldedAffineApply(
-          builder, loc, expr.ceilDiv(16) * 16, {shape[mappedDim]});
-    };
-    for (auto m : cDims->m) {
-      padTo16(m);
+  AffineExpr expr = builder.getAffineDimExpr(0);
+  for (auto [pos, size] :
+       llvm::zip_equal(info->innerDimsPos, info->innerTileSizes)) {
+    int64_t padSize = 16;
+    if (!ShapedType::isDynamic(size)) {
+      padSize = size;
     }
-    for (auto n : cDims->n) {
-      padTo16(n);
-    }
-    for (auto k : cDims->k) {
-      padTo16(k);
-    }
+    shape[pos] = affine::makeComposedFoldedAffineApply(
+        builder, loc, expr.ceilDiv(padSize) * padSize, {shape[pos]});
   }
 
   return mulAll(builder, loc, shape);
@@ -389,6 +601,39 @@ Encoding::EncodingSolverInterfaceAttr
 VMVXEncodingSolverAttr::cloneWithConfig(DictionaryAttr attr) const {
   return llvm::cast<Encoding::EncodingSolverInterfaceAttr>(
       VMVXEncodingSolverAttr::get(getContext(), attr));
+}
+
+Encoding::EncodingSolverInterfaceAttr
+VMVXEncodingSolverAttr::cloneWithSimplifiedConfig(Attribute attr) const {
+  auto encoding = llvm::dyn_cast<IREE::Encoding::EncodingAttr>(attr);
+  if (!encoding) {
+    return llvm::cast<Encoding::EncodingSolverInterfaceAttr>(*this);
+  }
+
+  Builder builder(getContext());
+  SmallVector<TileMxNxK> enumeratedTileMxNxK;
+  if (getTargetConfiguration().get(builder.getStringAttr("ukernels"))) {
+    enumeratedTileMxNxK.push_back(TileMxNxK{
+        ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic});
+  } else {
+    enumeratedTileMxNxK.push_back(
+        TileMxNxK{8, 8, 4}); // Some vaguely reasonable tile shape.
+    enumeratedTileMxNxK.push_back(
+        TileMxNxK{4, 8, 4}); // Truncation of the above.
+    enumeratedTileMxNxK.push_back(
+        TileMxNxK{2, 8, 4}); // Truncation of the above.
+    enumeratedTileMxNxK.push_back(
+        TileMxNxK{1, 8, 4}); // Truncation of the above.
+  }
+
+  auto narrowDim = IREE::Encoding::getMatmulNarrowDim(encoding);
+  TileMxNxK chosenTileMxNxK = chooseMatmulTile(enumeratedTileMxNxK, narrowDim);
+  MaterializeEncodingInfo info =
+      getEncodingInfoForMatmul(encoding, chosenTileMxNxK);
+
+  return llvm::cast<Encoding::EncodingSolverInterfaceAttr>(
+      VMVXEncodingSolverAttr::get(
+          getContext(), serializeMaterializeEncodingInfo(getContext(), info)));
 }
 
 DictionaryAttr VMVXEncodingSolverAttr::getConfig() const {

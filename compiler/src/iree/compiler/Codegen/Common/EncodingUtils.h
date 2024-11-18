@@ -10,7 +10,10 @@
 #include "iree/compiler/Codegen/Common/TileSwizzle.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "mlir/Config/mlir-config.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler {
@@ -27,6 +30,11 @@ struct MaterializeEncodingInfo {
   // The optional swizzle, see the comment on TileSwizzle. Only used on GPU.
   std::optional<TileSwizzle> swizzle;
 };
+
+DictionaryAttr serializeMaterializeEncodingInfo(MLIRContext *ctx,
+                                                MaterializeEncodingInfo info);
+std::optional<MaterializeEncodingInfo>
+deserializeMaterializeEncodingInfo(DictionaryAttr attr);
 
 using MaterializeEncodingFn = std::function<FailureOr<MaterializeEncodingInfo>(
     RankedTensorType, IREE::HAL::ExecutableTargetAttr targetAttr)>;

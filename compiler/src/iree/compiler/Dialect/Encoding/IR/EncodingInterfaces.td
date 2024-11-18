@@ -54,6 +54,21 @@ def IREEEncoding_EncodingSolverInterfaceAttr :
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Returns the same EncodingSolver but with the new layout information.
+      }],
+      /*retTy=*/"::mlir::iree_compiler::IREE::Encoding::EncodingSolverInterfaceAttr",
+      /*methodName=*/"cloneWithSimplifiedConfig",
+      /*args=*/(ins
+        "::mlir::Attribute":$encoding
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return {};
+      }]
+    >,
+
+    InterfaceMethod<
+      /*desc=*/[{
         Returns the target configuration that is attached on the attribute.
       }],
       /*retTy=*/"::mlir::DictionaryAttr",

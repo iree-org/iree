@@ -20,6 +20,7 @@ def IREECPU_CPUEncodingSolverAttr :
   DeclareAttrInterfaceMethods<IREEEncoding_EncodingSolverInterfaceAttr, [
     "calculateStorageElementCountInBytes",
     "cloneWithConfig",
+    "cloneWithSimplifiedConfig",
     "getConfig"
   ]>
 ]> {
@@ -38,6 +39,7 @@ def IREECPU_VMVXEncodingSolverAttr :
   DeclareAttrInterfaceMethods<IREEEncoding_EncodingSolverInterfaceAttr, [
     "calculateStorageElementCountInBytes",
     "cloneWithConfig",
+    "cloneWithSimplifiedConfig",
     "getConfig"
   ]>
 ]> {

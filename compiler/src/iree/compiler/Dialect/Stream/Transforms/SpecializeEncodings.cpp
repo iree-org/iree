@@ -145,8 +145,16 @@ static void updateExecutableOpEncodings(
         auto encoding =
             dyn_cast<Encoding::EncodingAttr>(tensorType.getEncoding());
 
-        SmallVector<Attribute> targets(resolvedTargets.begin(),
-                                       resolvedTargets.end());
+        SmallVector<Attribute> targets;
+        for (Attribute attr : resolvedTargets) {
+          auto solver =
+              dyn_cast<IREE::Encoding::EncodingSolverInterfaceAttr>(attr);
+          if (!solver) {
+            targets.push_back(attr);
+            continue;
+          }
+          targets.push_back(solver.cloneWithSimplifiedConfig(encoding));
+        }
         subspanOp.getResult().setType(
             resType.updateEncoding(encoding.cloneWithTargets(targets)));
       }
@@ -206,14 +214,29 @@ struct SpecializeEncodingsPass
                     return success();
                   }
 
-                  SetVector<Attribute> vec;
-                  // if (failed(resolver(affAttr, sizeOfOp, vec))) {
-                  if (failed(resolver(affAttr, moduleOp, vec))) {
+                  SetVector<Attribute> resolvedTargets;
+                  if (failed(resolver(affAttr, moduleOp, resolvedTargets))) {
                     affinityOp.emitError("failed on getting target resolvers");
                     return failure();
                   }
 
-                  SmallVector<Attribute> targets(vec.begin(), vec.end());
+#if 0
+                  SmallVector<Attribute> targets(resolvedTargets.begin(),
+                                                 resolvedTargets.end());
+#else
+                  SmallVector<Attribute> targets;
+                  for (Attribute attr : resolvedTargets) {
+                    auto solver =
+                        dyn_cast<IREE::Encoding::EncodingSolverInterfaceAttr>(
+                            attr);
+                    if (!solver) {
+                      targets.push_back(attr);
+                      continue;
+                    }
+                    targets.push_back(
+                        solver.cloneWithSimplifiedConfig(encoding));
+                  }
+#endif
                   rewriter.modifyOpInPlace(sizeOfOp, [&] {
                     auto newEncoding = encoding.cloneWithTargets(targets);
                     sizeOfOp.setEncoding(RankedTensorType::get(
