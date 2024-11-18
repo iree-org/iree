@@ -633,4 +633,9 @@ def VectorizeMemrefCopyPass :
   let summary = "Vectorizes memref copy operations.";
 }
 
+def VerifyWorkgroupDistributionPass :
+    InterfacePass<"iree-codegen-verify-workgroup-distribution", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to verify proper distribution to workgroups.";
+}
+
 #endif // IREE_CODEGEN_COMMON_PASSES

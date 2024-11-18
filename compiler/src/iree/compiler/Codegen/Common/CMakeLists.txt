@@ -146,6 +146,7 @@ iree_cc_library(
     "UnrollAnnotatedLoops.cpp"
     "UserConfig.cpp"
     "VectorizeMemrefCopy.cpp"
+    "VerifyWorkgroupDistribution.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
