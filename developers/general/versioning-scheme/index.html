@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://iree.dev/guides/deployment-configurations/gpu-vulkan/">
+        <link rel="canonical" href="https://iree.dev/developers/general/versioning-scheme/">
       
       
-        <link rel="prev" href="../bare-metal/">
+        <link rel="prev" href="../release-management/">
       
       
-        <link rel="next" href="../gpu-cuda/">
+        <link rel="next" href="../testing-guide/">
       
       
       <link rel="icon" href="../../../assets/images/IREE_Logo_Icon_Color.svg">
@@ -22,7 +22,7 @@
     
     
       
-        <title>GPU - Vulkan - IREE</title>
+        <title>Versioning scheme - IREE</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#gpu-deployment-using-vulkan" class="md-skip">
+        <a href="#versioning-scheme" class="md-skip">
           Skip to content
         </a>
       
@@ -113,7 +113,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              GPU - Vulkan
+              Versioning scheme
             
           </span>
         </div>
@@ -249,13 +249,11 @@
         
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../../guides/" class="md-tabs__link">
           
   
     
@@ -291,11 +289,13 @@
         
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../../developers/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
           
   
     
@@ -344,8 +344,6 @@
         <div class="md-main__inner md-grid">
           
             
-              
-                
               
               <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
                 <div class="md-sidebar__scrollwrap">
@@ -569,8 +567,6 @@
       
   
   
-    
-  
   
   
     
@@ -589,24 +585,23 @@
     
     
       
-        
-        
-      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
         
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../" class="md-nav__link ">
+            <a href="../../../guides/" class="md-nav__link ">
               
   
   <span class="md-ellipsis">
@@ -617,13 +612,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Guides
@@ -660,13 +655,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -677,7 +669,7 @@
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../ml-frameworks/" class="md-nav__link ">
+            <a href="../../../guides/ml-frameworks/" class="md-nav__link ">
               
   
   <span class="md-ellipsis">
@@ -688,7 +680,7 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3_2" id="__nav_3_2_label" tabindex="">
+              <label class="md-nav__link " for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
@@ -710,7 +702,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ml-frameworks/jax/" class="md-nav__link">
+      <a href="../../../guides/ml-frameworks/jax/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.25.18.9.2.73.26.59.3.45.32.34.34.25.34.16.33.1.3.04.26.02.2-.01.13V8.5l-.05.63-.13.55-.21.46-.26.38-.3.31-.33.25-.35.19-.35.14-.33.1-.3.07-.26.04-.21.02H8.77l-.69.05-.59.14-.5.22-.41.27-.33.32-.27.35-.2.36-.15.37-.1.35-.07.32-.04.27-.02.21v3.06H3.17l-.21-.03-.28-.07-.32-.12-.35-.18-.36-.26-.36-.36-.35-.46-.32-.59-.28-.73-.21-.88-.14-1.05-.05-1.23.06-1.22.16-1.04.24-.87.32-.71.36-.57.4-.44.42-.33.42-.24.4-.16.36-.1.32-.05.24-.01h.16l.06.01h8.16v-.83H6.18l-.01-2.75-.02-.37.05-.34.11-.31.17-.28.25-.26.31-.23.38-.2.44-.18.51-.15.58-.12.64-.1.71-.06.77-.04.84-.02 1.27.05zm-6.3 1.98-.23.33-.08.41.08.41.23.34.33.22.41.09.41-.09.33-.22.23-.34.08-.41-.08-.41-.23-.33-.33-.22-.41-.09-.41.09zm13.09 3.95.28.06.32.12.35.18.36.27.36.35.35.47.32.59.28.73.21.88.14 1.04.05 1.23-.06 1.23-.16 1.04-.24.86-.32.71-.36.57-.4.45-.42.33-.42.24-.4.16-.36.09-.32.05-.24.02-.16-.01h-8.22v.82h5.84l.01 2.76.02.36-.05.34-.11.31-.17.29-.25.25-.31.24-.38.2-.44.17-.51.15-.58.13-.64.09-.71.07-.77.04-.84.01-1.27-.04-1.07-.14-.9-.2-.73-.25-.59-.3-.45-.33-.34-.34-.25-.34-.16-.33-.1-.3-.04-.25-.02-.2.01-.13v-5.34l.05-.64.13-.54.21-.46.26-.38.3-.32.33-.24.35-.2.35-.14.33-.1.3-.06.26-.04.21-.02.13-.01h5.84l.69-.05.59-.14.5-.21.41-.28.33-.32.27-.35.2-.36.15-.36.1-.35.07-.32.04-.28.02-.21V6.07h2.09l.14.01zm-6.47 14.25-.23.33-.08.41.08.41.23.33.33.23.41.08.41-.08.33-.23.23-.33.08-.41-.08-.41-.23-.33-.33-.23-.41-.08-.41.08z"/></svg>
@@ -733,7 +725,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ml-frameworks/onnx/" class="md-nav__link">
+      <a href="../../../guides/ml-frameworks/onnx/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M23.032 11.296c-.05 0-.1 0-.15.013L18.86 3.87a.968.968 0 0 0-1.558-1.118L9.286 1.156a.968.968 0 0 0-.968-.854.976.976 0 0 0-.967.967.93.93 0 0 0 .113.453L1.219 10.68a.81.81 0 0 0-.251-.038.968.968 0 0 0 0 1.935h.037l3.368 8.33a1.1 1.1 0 0 0-.088.403.968.968 0 0 0 1.671.666l10.115.993c.1.427.49.728.943.728.54 0 .967-.44.967-.967a.984.984 0 0 0-.226-.628l5.114-8.872c.05.013.1.013.164.013.54 0 .967-.44.967-.968a.97.97 0 0 0-.967-.98zm-5.805-7.275a.98.98 0 0 0 .453.327L16.147 15.92c-.1.025-.189.05-.277.1L7.451 8.708a.812.812 0 0 0 .038-.251c0-.063-.013-.126-.013-.189zm4.876 8.507-5.177 3.556a1.105 1.105 0 0 0-.126-.075l1.546-11.674h.012l3.946 7.288a.961.961 0 0 0-.201.905zM6.383 7.502a.983.983 0 0 0-.83.955v.062l-3.455 2.048 5.378-7.702zm.352 1.91a.904.904 0 0 0 .352-.164l8.356 7.263a1.09 1.09 0 0 0-.063.352v.05l-9.31 3.845a.966.966 0 0 0-.604-.402zm8.896 8.117a.922.922 0 0 0 .503.289l.465 4.046a1.05 1.05 0 0 0-.452.452l-9.814-.955zm1.144.213a.964.964 0 0 0 .54-.867.871.871 0 0 0-.038-.25l4.738-3.255-4.8 8.33zm.251-14.35-9.889 4.31-.113-.075 1.257-5.39h.037c.34 0 .641-.176.817-.44l7.891 1.57zM1.935 11.612c0-.063-.013-.126-.013-.189l3.908-2.3c.076.076.164.151.264.202L4.825 20.242l-3.204-7.904c.188-.176.314-.44.314-.728Z"/></svg>
@@ -764,7 +756,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ml-frameworks/pytorch/" class="md-nav__link">
+      <a href="../../../guides/ml-frameworks/pytorch/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12.005 0 4.952 7.053a9.865 9.865 0 0 0 0 14.022 9.866 9.866 0 0 0 14.022 0c3.984-3.9 3.986-10.205.085-14.023l-1.744 1.743c2.904 2.905 2.904 7.634 0 10.538s-7.634 2.904-10.538 0-2.904-7.634 0-10.538l4.647-4.646.582-.665zm3.568 3.899a1.327 1.327 0 0 0-1.327 1.327 1.327 1.327 0 0 0 1.327 1.328A1.327 1.327 0 0 0 16.9 5.226 1.327 1.327 0 0 0 15.573 3.9z"/></svg>
@@ -795,7 +787,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ml-frameworks/tensorflow/" class="md-nav__link">
+      <a href="../../../guides/ml-frameworks/tensorflow/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M1.292 5.856 11.54 0v24l-4.095-2.378V7.603l-6.168 3.564.015-5.31zm21.43 5.311-.014-5.31L12.46 0v24l4.095-2.378V14.87l3.092 1.788-.018-4.618-3.074-1.756V7.603l6.168 3.564z"/></svg>
@@ -818,7 +810,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ml-frameworks/tflite/" class="md-nav__link">
+      <a href="../../../guides/ml-frameworks/tflite/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M1.292 5.856 11.54 0v24l-4.095-2.378V7.603l-6.168 3.564.015-5.31zm21.43 5.311-.014-5.31L12.46 0v24l4.095-2.378V14.87l3.092 1.788-.018-4.618-3.074-1.756V7.603l6.168 3.564z"/></svg>
@@ -846,8 +838,6 @@
                 
   
   
-    
-  
   
   
     
@@ -874,22 +864,21 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
         
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../" class="md-nav__link ">
+            <a href="../../../guides/deployment-configurations/" class="md-nav__link ">
               
   
   <span class="md-ellipsis">
@@ -900,13 +889,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3_3" id="__nav_3_3_label" tabindex="">
+              <label class="md-nav__link " for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3_3">
             <span class="md-nav__icon md-icon"></span>
             Deployment configurations
@@ -922,7 +911,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cpu/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/cpu/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M6.5.75V2h3V.75a.75.75 0 0 1 1.5 0V2h1.25c.966 0 1.75.784 1.75 1.75V5h1.25a.75.75 0 0 1 0 1.5H14v3h1.25a.75.75 0 0 1 0 1.5H14v1.25A1.75 1.75 0 0 1 12.25 14H11v1.25a.75.75 0 0 1-1.5 0V14h-3v1.25a.75.75 0 0 1-1.5 0V14H3.75A1.75 1.75 0 0 1 2 12.25V11H.75a.75.75 0 0 1 0-1.5H2v-3H.75a.75.75 0 0 1 0-1.5H2V3.75C2 2.784 2.784 2 3.75 2H5V.75a.75.75 0 0 1 1.5 0Zm5.75 11.75a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25ZM5.75 5h4.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75v-4.5A.75.75 0 0 1 5.75 5Zm.75 4.5h3v-3h-3Z"/></svg>
@@ -945,7 +934,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../bare-metal/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/bare-metal/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M6.5.75V2h3V.75a.75.75 0 0 1 1.5 0V2h1.25c.966 0 1.75.784 1.75 1.75V5h1.25a.75.75 0 0 1 0 1.5H14v3h1.25a.75.75 0 0 1 0 1.5H14v1.25A1.75 1.75 0 0 1 12.25 14H11v1.25a.75.75 0 0 1-1.5 0V14h-3v1.25a.75.75 0 0 1-1.5 0V14H3.75A1.75 1.75 0 0 1 2 12.25V11H.75a.75.75 0 0 1 0-1.5H2v-3H.75a.75.75 0 0 1 0-1.5H2V3.75C2 2.784 2.784 2 3.75 2H5V.75a.75.75 0 0 1 1.5 0Zm5.75 11.75a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25ZM5.75 5h4.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75v-4.5A.75.75 0 0 1 5.75 5Zm.75 4.5h3v-3h-3Z"/></svg>
@@ -965,32 +954,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1.75 1h12.5c.966 0 1.75.784 1.75 1.75v4c0 .372-.116.717-.314 1 .198.283.314.628.314 1v4a1.75 1.75 0 0 1-1.75 1.75H1.75A1.75 1.75 0 0 1 0 12.75v-4c0-.358.109-.707.314-1a1.739 1.739 0 0 1-.314-1v-4C0 1.784.784 1 1.75 1ZM1.5 2.75v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25Zm.25 5.75a.25.25 0 0 0-.25.25v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25ZM7 4.75A.75.75 0 0 1 7.75 4h4.5a.75.75 0 0 1 0 1.5h-4.5A.75.75 0 0 1 7 4.75ZM7.75 10h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM3 4.75A.75.75 0 0 1 3.75 4h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 4.75ZM3.75 10h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5Z"/></svg>
-  
-  <span class="md-ellipsis">
-    GPU - Vulkan
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../../guides/deployment-configurations/gpu-vulkan/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1.75 1h12.5c.966 0 1.75.784 1.75 1.75v4c0 .372-.116.717-.314 1 .198.283.314.628.314 1v4a1.75 1.75 0 0 1-1.75 1.75H1.75A1.75 1.75 0 0 1 0 12.75v-4c0-.358.109-.707.314-1a1.739 1.739 0 0 1-.314-1v-4C0 1.784.784 1 1.75 1ZM1.5 2.75v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25Zm.25 5.75a.25.25 0 0 0-.25.25v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25ZM7 4.75A.75.75 0 0 1 7.75 4h4.5a.75.75 0 0 1 0 1.5h-4.5A.75.75 0 0 1 7 4.75ZM7.75 10h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM3 4.75A.75.75 0 0 1 3.75 4h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 4.75ZM3.75 10h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5Z"/></svg>
@@ -1001,149 +968,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#support-matrix" class="md-nav__link">
-    <span class="md-ellipsis">
-      Support matrix
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    <span class="md-ellipsis">
-      Prerequisites
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Prerequisites">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#get-the-iree-compiler" class="md-nav__link">
-    <span class="md-ellipsis">
-      Get the IREE compiler
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Get the IREE compiler">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#download-the-compiler-from-a-release" class="md-nav__link">
-    <span class="md-ellipsis">
-      Download the compiler from a release
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#build-the-compiler-from-source" class="md-nav__link">
-    <span class="md-ellipsis">
-      Build the compiler from source
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#get-the-iree-runtime" class="md-nav__link">
-    <span class="md-ellipsis">
-      Get the IREE runtime
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Get the IREE runtime">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#download-the-runtime-from-a-release" class="md-nav__link">
-    <span class="md-ellipsis">
-      Download the runtime from a release
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#build-the-runtime-from-source" class="md-nav__link">
-    <span class="md-ellipsis">
-      Build the runtime from source
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#compile-and-run-a-program" class="md-nav__link">
-    <span class="md-ellipsis">
-      Compile and run a program
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Compile and run a program">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#compile-a-program" class="md-nav__link">
-    <span class="md-ellipsis">
-      Compile a program
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#run-a-compiled-program" class="md-nav__link">
-    <span class="md-ellipsis">
-      Run a compiled program
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1156,7 +980,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../gpu-cuda/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/gpu-cuda/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8.948 8.798v-1.43a6.7 6.7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851a3.67 3.67 0 0 1-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952a6.016 6.016 0 0 0-.796.035m0-4.735v2.138l.424-.027c5.45-.185 9.01 4.47 9.01 4.47s-4.08 4.964-8.33 4.964a6.46 6.46 0 0 1-1.095-.097v1.325c.3.035.61.062.91.062 3.957 0 6.82-2.023 9.593-4.408.459.371 2.34 1.263 2.73 1.652-2.633 2.208-8.772 3.984-12.253 3.984-.335 0-.653-.018-.971-.053v1.864H24V4.063zm0 10.326v1.131c-3.657-.654-4.673-4.46-4.673-4.46s1.758-1.944 4.673-2.262v1.237H8.94c-1.528-.186-2.73 1.245-2.73 1.245s.68 2.412 2.739 3.11M2.456 10.9s2.164-3.197 6.5-3.533V6.201C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936z"/></svg>
@@ -1179,7 +1003,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../gpu-rocm/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/gpu-rocm/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m18.324 9.137 1.559 1.56h2.556v2.557L24 14.814V9.137zM2 9.52l-2 4.96h1.309l.37-.982H3.9l.408.982h1.338L3.432 9.52zm4.209 0v4.955h1.238v-3.092l1.338 1.562h.188l1.338-1.556v3.091h1.238V9.52H10.47l-1.592 1.845L7.287 9.52zm6.283 0v4.96h2.057c1.979 0 2.88-1.046 2.88-2.472 0-1.36-.937-2.488-2.747-2.488zm1.237.91h.792c1.17 0 1.63.711 1.63 1.57 0 .728-.372 1.572-1.616 1.572h-.806zm-10.985.273.791 1.932H2.008zm17.137.307-1.604 1.603v2.25h2.246l1.604-1.607h-2.246z"/></svg>
@@ -1202,7 +1026,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../gpu-metal/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/gpu-metal/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>
@@ -1242,13 +1066,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1257,7 +1078,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_4" >
         
           
-          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="">
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
             
   
   <span class="md-ellipsis">
@@ -1282,7 +1103,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../parameters/" class="md-nav__link">
+      <a href="../../../guides/parameters/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2 1.75C2 .784 2.784 0 3.75 0h5.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v8.586A1.75 1.75 0 0 1 12.25 15h-7a.75.75 0 0 1 0-1.5h7a.25.25 0 0 0 .25-.25V6H9.75A1.75 1.75 0 0 1 8 4.25V1.5H3.75a.25.25 0 0 0-.25.25V4.5a.75.75 0 0 1-1.5 0Zm-.5 10.487v1.013a.75.75 0 0 1-1.5 0v-1.012a3.748 3.748 0 0 1 3.77-3.749L4 8.49V6.573a.25.25 0 0 1 .42-.183l2.883 2.678a.25.25 0 0 1 0 .366L4.42 12.111a.25.25 0 0 1-.42-.183V9.99l-.238-.003a2.25 2.25 0 0 0-2.262 2.25Zm8-10.675V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914-.013-.011Z"/></svg>
@@ -2183,6 +2004,8 @@
       
   
   
+    
+  
   
   
     
@@ -2207,23 +2030,24 @@
     
     
       
+        
+        
+      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../developers/" class="md-nav__link ">
+            <a href="../../" class="md-nav__link ">
               
   
   <span class="md-ellipsis">
@@ -2234,13 +2058,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             Developers
@@ -2253,8 +2077,10 @@
                 
   
   
+    
   
   
+  
     
     
       
@@ -2276,20 +2102,21 @@
     
       
       
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
         
           
+          
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" checked>
         
           
-          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -2300,7 +2127,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_5_2">
             <span class="md-nav__icon md-icon"></span>
             General development topics
@@ -2314,7 +2141,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/general/contributing/" class="md-nav__link">
+      <a href="../contributing/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1.75 1h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 13H8.061l-2.574 2.573A1.458 1.458 0 0 1 3 14.543V13H1.75A1.75 1.75 0 0 1 0 11.25v-8.5C0 1.784.784 1 1.75 1ZM1.5 2.75v8.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h6.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25Zm5.28 1.72a.75.75 0 0 1 0 1.06L5.31 7l1.47 1.47a.751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018l-2-2a.75.75 0 0 1 0-1.06l2-2a.75.75 0 0 1 1.06 0Zm2.44 0a.75.75 0 0 1 1.06 0l2 2a.75.75 0 0 1 0 1.06l-2 2a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L10.69 7 9.22 5.53a.75.75 0 0 1 0-1.06Z"/></svg>
@@ -2337,7 +2164,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/general/developer-overview/" class="md-nav__link">
+      <a href="../developer-overview/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/></svg>
@@ -2360,7 +2187,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/general/developer-tips/" class="md-nav__link">
+      <a href="../developer-tips/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 6a6 6 0 0 1 6 6c0 2.22-1.21 4.16-3 5.2V19a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-1.8c-1.79-1.04-3-2.98-3-5.2a6 6 0 0 1 6-6m2 15v1a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-1h4m6-10h3v2h-3v-2M1 11h3v2H1v-2M13 1v3h-2V1h2M4.92 3.5l2.13 2.14-1.42 1.41L3.5 4.93 4.92 3.5m12.03 2.13 2.12-2.13 1.43 1.43-2.13 2.12-1.42-1.42Z"/></svg>
@@ -2383,7 +2210,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/general/github-actions/" class="md-nav__link">
+      <a href="../github-actions/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm1.5 0a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm10.28-1.72-4.5 4.5a.75.75 0 0 1-1.06 0l-2-2a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018l1.47 1.47 3.97-3.97a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042Z"/></svg>
@@ -2406,7 +2233,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/general/release-management/" class="md-nav__link">
+      <a href="../release-management/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m8.878.392 5.25 3.045c.54.314.872.89.872 1.514v6.098a1.75 1.75 0 0 1-.872 1.514l-5.25 3.045a1.75 1.75 0 0 1-1.756 0l-5.25-3.045A1.75 1.75 0 0 1 1 11.049V4.951c0-.624.332-1.201.872-1.514L7.122.392a1.75 1.75 0 0 1 1.756 0ZM7.875 1.69l-4.63 2.685L8 7.133l4.755-2.758-4.63-2.685a.248.248 0 0 0-.25 0ZM2.5 5.677v5.372c0 .09.047.171.125.216l4.625 2.683V8.432Zm6.25 8.271 4.625-2.683a.25.25 0 0 0 .125-.216V5.677L8.75 8.432Z"/></svg>
@@ -2426,10 +2253,32 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../../developers/general/versioning-scheme/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M7.75 14A1.75 1.75 0 0 1 6 12.25v-8.5C6 2.784 6.784 2 7.75 2h6.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14Zm-.25-1.75c0 .138.112.25.25.25h6.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-6.5a.25.25 0 0 0-.25.25ZM4.9 3.508a.75.75 0 0 1-.274 1.025.249.249 0 0 0-.126.217v6.5c0 .09.048.173.126.217a.75.75 0 0 1-.752 1.298A1.75 1.75 0 0 1 3 11.25v-6.5c0-.649.353-1.214.874-1.516a.75.75 0 0 1 1.025.274ZM1.625 5.533h.001a.249.249 0 0 0-.126.217v4.5c0 .09.048.173.126.217a.75.75 0 0 1-.752 1.298A1.748 1.748 0 0 1 0 10.25v-4.5a1.748 1.748 0 0 1 .873-1.516.75.75 0 1 1 .752 1.299Z"/></svg>
+  
+  <span class="md-ellipsis">
+    Versioning scheme
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M7.75 14A1.75 1.75 0 0 1 6 12.25v-8.5C6 2.784 6.784 2 7.75 2h6.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14Zm-.25-1.75c0 .138.112.25.25.25h6.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-6.5a.25.25 0 0 0-.25.25ZM4.9 3.508a.75.75 0 0 1-.274 1.025.249.249 0 0 0-.126.217v6.5c0 .09.048.173.126.217a.75.75 0 0 1-.752 1.298A1.75 1.75 0 0 1 3 11.25v-6.5c0-.649.353-1.214.874-1.516a.75.75 0 0 1 1.025.274ZM1.625 5.533h.001a.249.249 0 0 0-.126.217v4.5c0 .09.048.173.126.217a.75.75 0 0 1-.752 1.298A1.748 1.748 0 0 1 0 10.25v-4.5a1.748 1.748 0 0 1 .873-1.516.75.75 0 1 1 .752 1.299Z"/></svg>
@@ -2440,6 +2289,83 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      Overview
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Overview">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#composition-of-version-numbers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Composition of version numbers
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Composition of version numbers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#development-and-nightly-releases" class="md-nav__link">
+    <span class="md-ellipsis">
+      Development and nightly releases
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Semantics
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2452,7 +2378,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/general/testing-guide/" class="md-nav__link">
+      <a href="../testing-guide/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg>
@@ -2498,10 +2424,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -2510,7 +2439,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
         
           
-          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -2535,7 +2464,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/building/bazel/" class="md-nav__link">
+      <a href="../../building/bazel/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M15 2.75a.75.75 0 0 1-.75.75h-4a.75.75 0 0 1 0-1.5h4a.75.75 0 0 1 .75.75Zm-8.5.75v1.25a.75.75 0 0 0 1.5 0v-4a.75.75 0 0 0-1.5 0V2H1.75a.75.75 0 0 0 0 1.5H6.5Zm1.25 5.25a.75.75 0 0 0 0-1.5h-6a.75.75 0 0 0 0 1.5h6ZM15 8a.75.75 0 0 1-.75.75H11.5V10a.75.75 0 1 1-1.5 0V6a.75.75 0 0 1 1.5 0v1.25h2.75A.75.75 0 0 1 15 8Zm-9 5.25v-2a.75.75 0 0 0-1.5 0v1.25H1.75a.75.75 0 0 0 0 1.5H4.5v1.25a.75.75 0 0 0 1.5 0v-2Zm9 0a.75.75 0 0 1-.75.75h-6a.75.75 0 0 1 0-1.5h6a.75.75 0 0 1 .75.75Z"/></svg>
@@ -2558,7 +2487,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/building/emscripten/" class="md-nav__link">
+      <a href="../../building/emscripten/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.745 0v.129a2.752 2.752 0 1 1-5.504 0V0H0v24h24V0h-9.255zm-3.291 21.431-1.169-5.783h-.02l-1.264 5.783H7.39l-1.824-8.497h1.59l1.088 5.783h.02l1.311-5.783h1.487l1.177 5.854h.02l1.242-5.854h1.561l-2.027 8.497h-1.581zm8.755 0-.542-1.891h-2.861l-.417 1.891h-1.59l2.056-8.497h2.509l2.5 8.497h-1.655zm-2.397-6.403-.694 3.118h2.159l-.796-3.118h-.669z"/></svg>
@@ -2581,7 +2510,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/building/cmake-options/" class="md-nav__link">
+      <a href="../../building/cmake-options/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.769.066.067 23.206l12.76-10.843zm11.438 23.868L7.471 17.587 0 23.934zm.793-.198L12.298.463l1.719 19.24zM12.893 12.959l-5.025 4.298 5.62 2.248z"/></svg>
@@ -2604,7 +2533,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/building/cmake-with-ccache/" class="md-nav__link">
+      <a href="../../building/cmake-with-ccache/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.769.066.067 23.206l12.76-10.843zm11.438 23.868L7.471 17.587 0 23.934zm.793-.198L12.298.463l1.719 19.24zM12.893 12.959l-5.025 4.298 5.62 2.248z"/></svg>
@@ -2656,10 +2585,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -2668,7 +2600,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
         
           
-          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -2693,7 +2625,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/android-with-lldb/" class="md-nav__link">
+      <a href="../../debugging/android-with-lldb/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18.44 5.559c-.676 1.166-1.353 2.331-2.028 3.498-.037-.016-.074-.029-.111-.043a12.098 12.098 0 0 0-8.68.033C7.537 8.897 5.868 6.026 5.6 5.56a1.145 1.145 0 0 0-.141-.19 1.104 1.104 0 0 0-1.768 1.298c1.947 3.37-.096-.216 1.948 3.36.017.03-.495.263-1.393 1.017C2.9 12.176.452 14.772 0 18.99h24a11.728 11.728 0 0 0-.746-3.068 12.1 12.1 0 0 0-2.74-4.184 12.105 12.105 0 0 0-2.131-1.687c.66-1.122 1.312-2.256 1.965-3.385a1.108 1.108 0 0 0-.008-1.12 1.1 1.1 0 0 0-.852-.532c-.522-.054-.939.313-1.049.545zm-.04 8.46c.395.593.324 1.331-.156 1.65-.48.32-1.188.1-1.582-.493-.394-.593-.324-1.33.156-1.65.473-.316 1.182-.11 1.582.494zm-11.193-.492c.48.32.55 1.058.156 1.65-.394.593-1.103.815-1.584.495-.48-.32-.55-1.058-.156-1.65.4-.603 1.109-.811 1.584-.495z"/></svg>
@@ -2716,7 +2648,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/compile-time-regressions/" class="md-nav__link">
+      <a href="../../debugging/compile-time-regressions/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4.72.22a.75.75 0 0 1 1.06 0l1 .999a3.488 3.488 0 0 1 2.441 0l.999-1a.748.748 0 0 1 1.265.332.75.75 0 0 1-.205.729l-.775.776c.616.63.995 1.493.995 2.444v.327c0 .1-.009.197-.025.292.408.14.764.392 1.029.722l1.968-.787a.75.75 0 0 1 .556 1.392L13 7.258V9h2.25a.75.75 0 0 1 0 1.5H13v.5c0 .409-.049.806-.141 1.186l2.17.868a.75.75 0 0 1-.557 1.392l-2.184-.873A4.997 4.997 0 0 1 8 16a4.997 4.997 0 0 1-4.288-2.427l-2.183.873a.75.75 0 0 1-.558-1.392l2.17-.868A5.036 5.036 0 0 1 3 11v-.5H.75a.75.75 0 0 1 0-1.5H3V7.258L.971 6.446a.75.75 0 0 1 .558-1.392l1.967.787c.265-.33.62-.583 1.03-.722a1.677 1.677 0 0 1-.026-.292V4.5c0-.951.38-1.814.995-2.444L4.72 1.28a.75.75 0 0 1 0-1.06Zm.53 6.28a.75.75 0 0 0-.75.75V11a3.5 3.5 0 1 0 7 0V7.25a.75.75 0 0 0-.75-.75ZM6.173 5h3.654A.172.172 0 0 0 10 4.827V4.5a2 2 0 1 0-4 0v.327c0 .096.077.173.173.173Z"/></svg>
@@ -2739,7 +2671,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/gpu/" class="md-nav__link">
+      <a href="../../debugging/gpu/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4.72.22a.75.75 0 0 1 1.06 0l1 .999a3.488 3.488 0 0 1 2.441 0l.999-1a.748.748 0 0 1 1.265.332.75.75 0 0 1-.205.729l-.775.776c.616.63.995 1.493.995 2.444v.327c0 .1-.009.197-.025.292.408.14.764.392 1.029.722l1.968-.787a.75.75 0 0 1 .556 1.392L13 7.258V9h2.25a.75.75 0 0 1 0 1.5H13v.5c0 .409-.049.806-.141 1.186l2.17.868a.75.75 0 0 1-.557 1.392l-2.184-.873A4.997 4.997 0 0 1 8 16a4.997 4.997 0 0 1-4.288-2.427l-2.183.873a.75.75 0 0 1-.558-1.392l2.17-.868A5.036 5.036 0 0 1 3 11v-.5H.75a.75.75 0 0 1 0-1.5H3V7.258L.971 6.446a.75.75 0 0 1 .558-1.392l1.967.787c.265-.33.62-.583 1.03-.722a1.677 1.677 0 0 1-.026-.292V4.5c0-.951.38-1.814.995-2.444L4.72 1.28a.75.75 0 0 1 0-1.06Zm.53 6.28a.75.75 0 0 0-.75.75V11a3.5 3.5 0 1 0 7 0V7.25a.75.75 0 0 0-.75-.75ZM6.173 5h3.654A.172.172 0 0 0 10 4.827V4.5a2 2 0 1 0-4 0v.327c0 .096.077.173.173.173Z"/></svg>
@@ -2762,7 +2694,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/integration-tests/" class="md-nav__link">
+      <a href="../../debugging/integration-tests/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4.72.22a.75.75 0 0 1 1.06 0l1 .999a3.488 3.488 0 0 1 2.441 0l.999-1a.748.748 0 0 1 1.265.332.75.75 0 0 1-.205.729l-.775.776c.616.63.995 1.493.995 2.444v.327c0 .1-.009.197-.025.292.408.14.764.392 1.029.722l1.968-.787a.75.75 0 0 1 .556 1.392L13 7.258V9h2.25a.75.75 0 0 1 0 1.5H13v.5c0 .409-.049.806-.141 1.186l2.17.868a.75.75 0 0 1-.557 1.392l-2.184-.873A4.997 4.997 0 0 1 8 16a4.997 4.997 0 0 1-4.288-2.427l-2.183.873a.75.75 0 0 1-.558-1.392l2.17-.868A5.036 5.036 0 0 1 3 11v-.5H.75a.75.75 0 0 1 0-1.5H3V7.258L.971 6.446a.75.75 0 0 1 .558-1.392l1.967.787c.265-.33.62-.583 1.03-.722a1.677 1.677 0 0 1-.026-.292V4.5c0-.951.38-1.814.995-2.444L4.72 1.28a.75.75 0 0 1 0-1.06Zm.53 6.28a.75.75 0 0 0-.75.75V11a3.5 3.5 0 1 0 7 0V7.25a.75.75 0 0 0-.75-.75ZM6.173 5h3.654A.172.172 0 0 0 10 4.827V4.5a2 2 0 1 0-4 0v.327c0 .096.077.173.173.173Z"/></svg>
@@ -2785,7 +2717,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/model-development/" class="md-nav__link">
+      <a href="../../debugging/model-development/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4.72.22a.75.75 0 0 1 1.06 0l1 .999a3.488 3.488 0 0 1 2.441 0l.999-1a.748.748 0 0 1 1.265.332.75.75 0 0 1-.205.729l-.775.776c.616.63.995 1.493.995 2.444v.327c0 .1-.009.197-.025.292.408.14.764.392 1.029.722l1.968-.787a.75.75 0 0 1 .556 1.392L13 7.258V9h2.25a.75.75 0 0 1 0 1.5H13v.5c0 .409-.049.806-.141 1.186l2.17.868a.75.75 0 0 1-.557 1.392l-2.184-.873A4.997 4.997 0 0 1 8 16a4.997 4.997 0 0 1-4.288-2.427l-2.183.873a.75.75 0 0 1-.558-1.392l2.17-.868A5.036 5.036 0 0 1 3 11v-.5H.75a.75.75 0 0 1 0-1.5H3V7.258L.971 6.446a.75.75 0 0 1 .558-1.392l1.967.787c.265-.33.62-.583 1.03-.722a1.677 1.677 0 0 1-.026-.292V4.5c0-.951.38-1.814.995-2.444L4.72 1.28a.75.75 0 0 1 0-1.06Zm.53 6.28a.75.75 0 0 0-.75.75V11a3.5 3.5 0 1 0 7 0V7.25a.75.75 0 0 0-.75-.75ZM6.173 5h3.654A.172.172 0 0 0 10 4.827V4.5a2 2 0 1 0-4 0v.327c0 .096.077.173.173.173Z"/></svg>
@@ -2808,7 +2740,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/releases/" class="md-nav__link">
+      <a href="../../debugging/releases/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m8.878.392 5.25 3.045c.54.314.872.89.872 1.514v6.098a1.75 1.75 0 0 1-.872 1.514l-5.25 3.045a1.75 1.75 0 0 1-1.756 0l-5.25-3.045A1.75 1.75 0 0 1 1 11.049V4.951c0-.624.332-1.201.872-1.514L7.122.392a1.75 1.75 0 0 1 1.756 0ZM7.875 1.69l-4.63 2.685L8 7.133l4.755-2.758-4.63-2.685a.248.248 0 0 0-.25 0ZM2.5 5.677v5.372c0 .09.047.171.125.216l4.625 2.683V8.432Zm6.25 8.271 4.625-2.683a.25.25 0 0 0 .125-.216V5.677L8.75 8.432Z"/></svg>
@@ -2831,7 +2763,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/sanitizers/" class="md-nav__link">
+      <a href="../../debugging/sanitizers/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m19.36 2.72 1.42 1.42-5.72 5.71c1.07 1.54 1.22 3.39.32 4.59L9.06 8.12c1.2-.9 3.05-.75 4.59.32l5.71-5.72M5.93 17.57c-2.01-2.01-3.24-4.41-3.58-6.65l4.88-2.09 7.44 7.44-2.09 4.88c-2.24-.34-4.64-1.57-6.65-3.58Z"/></svg>
@@ -2879,10 +2811,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -2891,7 +2826,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
         
           
-          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -2916,7 +2851,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/performance/benchmarking/" class="md-nav__link">
+      <a href="../../performance/benchmarking/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m11.628 16.186-2.047-2.14 6.791-5.953 1.21 1.302zm8.837 6.047c2.14-2.14 3.535-5.117 3.535-8.466 0-6.604-5.395-12-12-12s-12 5.396-12 12c0 3.35 1.302 6.326 3.535 8.466l1.674-1.675c-1.767-1.767-2.79-4.093-2.79-6.79A9.568 9.568 0 0 1 12 4.185a9.568 9.568 0 0 1 9.581 9.581c0 2.605-1.116 5.024-2.79 6.791Z"/></svg>
@@ -2939,7 +2874,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/performance/profiling/" class="md-nav__link">
+      <a href="../../performance/profiling/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg>
@@ -2962,7 +2897,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/performance/profiling-cpu-events/" class="md-nav__link">
+      <a href="../../performance/profiling-cpu-events/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg>
@@ -2985,7 +2920,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/performance/profiling-gpu-vulkan/" class="md-nav__link">
+      <a href="../../performance/profiling-gpu-vulkan/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg>
@@ -3008,7 +2943,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/performance/profiling-with-tracy/" class="md-nav__link">
+      <a href="../../performance/profiling-with-tracy/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg>
@@ -3060,10 +2995,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -3072,7 +3010,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_6" >
         
           
-          <label class="md-nav__link" for="__nav_5_6" id="__nav_5_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_6" id="__nav_5_6_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -3097,7 +3035,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/design-docs/design-roadmap/" class="md-nav__link">
+      <a href="../../design-docs/design-roadmap/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3118,7 +3056,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/design-docs/function-abi/" class="md-nav__link">
+      <a href="../../design-docs/function-abi/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3139,7 +3077,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/design-docs/invocation-execution-model/" class="md-nav__link">
+      <a href="../../design-docs/invocation-execution-model/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3160,7 +3098,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/design-docs/cuda-hal-driver/" class="md-nav__link">
+      <a href="../../design-docs/cuda-hal-driver/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3181,7 +3119,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/design-docs/hip-hal-driver/" class="md-nav__link">
+      <a href="../../design-docs/hip-hal-driver/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3202,7 +3140,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/design-docs/metal-hal-driver/" class="md-nav__link">
+      <a href="../../design-docs/metal-hal-driver/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3223,7 +3161,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/design-docs/vm/" class="md-nav__link">
+      <a href="../../design-docs/vm/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3263,10 +3201,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -3275,7 +3216,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_7" >
         
           
-          <label class="md-nav__link" for="__nav_5_7" id="__nav_5_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_7" id="__nav_5_7_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -3300,7 +3241,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/usage-best-practices/" class="md-nav__link">
+      <a href="../../usage-best-practices/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 6a6 6 0 0 1 6 6c0 2.22-1.21 4.16-3 5.2V19a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-1.8c-1.79-1.04-3-2.98-3-5.2a6 6 0 0 1 6-6m2 15v1a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-1h4m6-10h3v2h-3v-2M1 11h3v2H1v-2M13 1v3h-2V1h2M4.92 3.5l2.13 2.14-1.42 1.41L3.5 4.93 4.92 3.5m12.03 2.13 2.12-2.13 1.43 1.43-2.13 2.12-1.42-1.42Z"/></svg>
@@ -3323,7 +3264,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/vulkan-environment-setup/" class="md-nav__link">
+      <a href="../../vulkan-environment-setup/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1.75 1h12.5c.966 0 1.75.784 1.75 1.75v4c0 .372-.116.717-.314 1 .198.283.314.628.314 1v4a1.75 1.75 0 0 1-1.75 1.75H1.75A1.75 1.75 0 0 1 0 12.75v-4c0-.358.109-.707.314-1a1.739 1.739 0 0 1-.314-1v-4C0 1.784.784 1 1.75 1ZM1.5 2.75v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25Zm.25 5.75a.25.25 0 0 0-.25.25v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25ZM7 4.75A.75.75 0 0 1 7.75 4h4.5a.75.75 0 0 1 0 1.5h-4.5A.75.75 0 0 1 7 4.75ZM7.75 10h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM3 4.75A.75.75 0 0 1 3.75 4h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 4.75ZM3.75 10h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5Z"/></svg>
@@ -3755,8 +3696,6 @@
             
             
               
-                
-              
               <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
@@ -3776,87 +3715,21 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#support-matrix" class="md-nav__link">
+  <a href="#overview" class="md-nav__link">
     <span class="md-ellipsis">
-      Support matrix
+      Overview
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    <span class="md-ellipsis">
-      Prerequisites
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Prerequisites">
+    <nav class="md-nav" aria-label="Overview">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#get-the-iree-compiler" class="md-nav__link">
+  <a href="#key" class="md-nav__link">
     <span class="md-ellipsis">
-      Get the IREE compiler
+      Key
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Get the IREE compiler">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#download-the-compiler-from-a-release" class="md-nav__link">
-    <span class="md-ellipsis">
-      Download the compiler from a release
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#build-the-compiler-from-source" class="md-nav__link">
-    <span class="md-ellipsis">
-      Build the compiler from source
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#get-the-iree-runtime" class="md-nav__link">
-    <span class="md-ellipsis">
-      Get the IREE runtime
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Get the IREE runtime">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#download-the-runtime-from-a-release" class="md-nav__link">
-    <span class="md-ellipsis">
-      Download the runtime from a release
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#build-the-runtime-from-source" class="md-nav__link">
-    <span class="md-ellipsis">
-      Build the runtime from source
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
         
@@ -3866,28 +3739,19 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#compile-and-run-a-program" class="md-nav__link">
+  <a href="#composition-of-version-numbers" class="md-nav__link">
     <span class="md-ellipsis">
-      Compile and run a program
+      Composition of version numbers
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Compile and run a program">
+    <nav class="md-nav" aria-label="Composition of version numbers">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#compile-a-program" class="md-nav__link">
+  <a href="#development-and-nightly-releases" class="md-nav__link">
     <span class="md-ellipsis">
-      Compile a program
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#run-a-compiled-program" class="md-nav__link">
-    <span class="md-ellipsis">
-      Run a compiled program
+      Development and nightly releases
     </span>
   </a>
   
@@ -3895,6 +3759,15 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Semantics
+    </span>
+  </a>
   
 </li>
       
@@ -3911,28 +3784,9 @@
               <article class="md-content__inner md-typeset">
                 
                   
-  
-  
-
-<nav class="md-tags" hidden>
-  
-    
-    
-    
-      <a href="../../../community/tags/#gpu" class="md-tag">GPU</a>
-    
-  
-    
-    
-    
-      <a href="../../../community/tags/#vulkan" class="md-tag">Vulkan</a>
-    
-  
-</nav>
-
 
   
-    <a href="https://github.com/iree-org/iree/blob/main/docs/website/docs/guides/deployment-configurations/gpu-vulkan.md" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/iree-org/iree/blob/main/docs/website/docs/developers/general/versioning-scheme.md" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.15 8.15 0 0 1-1.23-2Z"/></svg>
     </a>
@@ -3940,335 +3794,130 @@
   
 
 
-<h1 id="gpu-deployment-using-vulkan">GPU deployment using Vulkan<a class="headerlink" href="#gpu-deployment-using-vulkan" title="Permanent link">link</a></h1>
-<p>IREE can accelerate model execution on GPUs via
-<a href="https://www.khronos.org/vulkan/">Vulkan</a>, a low-overhead graphics and compute
-API. Vulkan is cross-platform: it is available on many operating systems,
-including Android, Linux, and Windows. Vulkan is also cross-vendor: it is
-supported by most GPU vendors, including AMD, ARM, Intel, NVIDIA, and Qualcomm.</p>
-<h2 id="support-matrix"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4.75 7a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5ZM5 4.75A.75.75 0 0 1 5.75 4h5.5a.75.75 0 0 1 0 1.5h-5.5A.75.75 0 0 1 5 4.75ZM6.75 10a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5Z"/><path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25Z"/></svg></span> Support matrix<a class="headerlink" href="#support-matrix" title="Permanent link">link</a></h2>
-<p>As IREE and the compiler ecosystem it operates within matures, more
-target specific optimizations will be implemented. At this stage, expect
-reasonable performance across all GPUs and for improvements to be
-made over time for specific vendors and architectures.</p>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">GPU Vendor</th>
-<th style="text-align: center;">Category</th>
-<th style="text-align: center;">Performance</th>
-<th style="text-align: center;">Focus Architecture</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">ARM Mali GPU</td>
-<td style="text-align: center;">Mobile</td>
-<td style="text-align: center;">Good</td>
-<td style="text-align: center;">Valhall+</td>
-</tr>
-<tr>
-<td style="text-align: center;">Qualcomm Adreno GPU</td>
-<td style="text-align: center;">Mobile</td>
-<td style="text-align: center;">Reasonable</td>
-<td style="text-align: center;">640+</td>
-</tr>
-<tr>
-<td style="text-align: center;">AMD GPU</td>
-<td style="text-align: center;">Desktop/server</td>
-<td style="text-align: center;">Good</td>
-<td style="text-align: center;">RDNA+</td>
-</tr>
-<tr>
-<td style="text-align: center;">NVIDIA GPU</td>
-<td style="text-align: center;">Desktop/server</td>
-<td style="text-align: center;">Reasonable</td>
-<td style="text-align: center;">Turing+</td>
-</tr>
-</tbody>
-</table>
-<h2 id="prerequisites"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg></span> Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
-<p>In order to use Vulkan to drive the GPU, you need to have a functional Vulkan
-environment. IREE requires Vulkan 1.1 on Android and 1.2 elsewhere. It can be
-verified by the following steps:</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Android</label><label for="__tabbed_1_2"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.5.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M220.8 123.3c1 .5 1.8 1.7 3 1.7 1.1 0 2.8-.4 2.9-1.5.2-1.4-1.9-2.3-3.2-2.9-1.7-.7-3.9-1-5.5-.1-.4.2-.8.7-.6 1.1.3 1.3 2.3 1.1 3.4 1.7zm-21.9 1.7c1.2 0 2-1.2 3-1.7 1.1-.6 3.1-.4 3.5-1.6.2-.4-.2-.9-.6-1.1-1.6-.9-3.8-.6-5.5.1-1.3.6-3.4 1.5-3.2 2.9.1 1 1.8 1.5 2.8 1.4zM420 403.8c-3.6-4-5.3-11.6-7.2-19.7-1.8-8.1-3.9-16.8-10.5-22.4-1.3-1.1-2.6-2.1-4-2.9-1.3-.8-2.7-1.5-4.1-2 9.2-27.3 5.6-54.5-3.7-79.1-11.4-30.1-31.3-56.4-46.5-74.4-17.1-21.5-33.7-41.9-33.4-72C311.1 85.4 315.7.1 234.8 0 132.4-.2 158 103.4 156.9 135.2c-1.7 23.4-6.4 41.8-22.5 64.7-18.9 22.5-45.5 58.8-58.1 96.7-6 17.9-8.8 36.1-6.2 53.3-6.5 5.8-11.4 14.7-16.6 20.2-4.2 4.3-10.3 5.9-17 8.3s-14 6-18.5 14.5c-2.1 3.9-2.8 8.1-2.8 12.4 0 3.9.6 7.9 1.2 11.8 1.2 8.1 2.5 15.7.8 20.8-5.2 14.4-5.9 24.4-2.2 31.7 3.8 7.3 11.4 10.5 20.1 12.3 17.3 3.6 40.8 2.7 59.3 12.5 19.8 10.4 39.9 14.1 55.9 10.4 11.6-2.6 21.1-9.6 25.9-20.2 12.5-.1 26.3-5.4 48.3-6.6 14.9-1.2 33.6 5.3 55.1 4.1.6 2.3 1.4 4.6 2.5 6.7v.1c8.3 16.7 23.8 24.3 40.3 23 16.6-1.3 34.1-11 48.3-27.9 13.6-16.4 36-23.2 50.9-32.2 7.4-4.5 13.4-10.1 13.9-18.3.4-8.2-4.4-17.3-15.5-29.7zM223.7 87.3c9.8-22.2 34.2-21.8 44-.4 6.5 14.2 3.6 30.9-4.3 40.4-1.6-.8-5.9-2.6-12.6-4.9 1.1-1.2 3.1-2.7 3.9-4.6 4.8-11.8-.2-27-9.1-27.3-7.3-.5-13.9 10.8-11.8 23-4.1-2-9.4-3.5-13-4.4-1-6.9-.3-14.6 2.9-21.8zM183 75.8c10.1 0 20.8 14.2 19.1 33.5-3.5 1-7.1 2.5-10.2 4.6 1.2-8.9-3.3-20.1-9.6-19.6-8.4.7-9.8 21.2-1.8 28.1 1 .8 1.9-.2-5.9 5.5-15.6-14.6-10.5-52.1 8.4-52.1zm-13.6 60.7c6.2-4.6 13.6-10 14.1-10.5 4.7-4.4 13.5-14.2 27.9-14.2 7.1 0 15.6 2.3 25.9 8.9 6.3 4.1 11.3 4.4 22.6 9.3 8.4 3.5 13.7 9.7 10.5 18.2-2.6 7.1-11 14.4-22.7 18.1-11.1 3.6-19.8 16-38.2 14.9-3.9-.2-7-1-9.6-2.1-8-3.5-12.2-10.4-20-15-8.6-4.8-13.2-10.4-14.7-15.3-1.4-4.9 0-9 4.2-12.3zm3.3 334c-2.7 35.1-43.9 34.4-75.3 18-29.9-15.8-68.6-6.5-76.5-21.9-2.4-4.7-2.4-12.7 2.6-26.4v-.2c2.4-7.6.6-16-.6-23.9-1.2-7.8-1.8-15 .9-20 3.5-6.7 8.5-9.1 14.8-11.3 10.3-3.7 11.8-3.4 19.6-9.9 5.5-5.7 9.5-12.9 14.3-18 5.1-5.5 10-8.1 17.7-6.9 8.1 1.2 15.1 6.8 21.9 16l19.6 35.6c9.5 19.9 43.1 48.4 41 68.9zm-1.4-25.9c-4.1-6.6-9.6-13.6-14.4-19.6 7.1 0 14.2-2.2 16.7-8.9 2.3-6.2 0-14.9-7.4-24.9-13.5-18.2-38.3-32.5-38.3-32.5-13.5-8.4-21.1-18.7-24.6-29.9s-3-23.3-.3-35.2c5.2-22.9 18.6-45.2 27.2-59.2 2.3-1.7.8 3.2-8.7 20.8-8.5 16.1-24.4 53.3-2.6 82.4.6-20.7 5.5-41.8 13.8-61.5 12-27.4 37.3-74.9 39.3-112.7 1.1.8 4.6 3.2 6.2 4.1 4.6 2.7 8.1 6.7 12.6 10.3 12.4 10 28.5 9.2 42.4 1.2 6.2-3.5 11.2-7.5 15.9-9 9.9-3.1 17.8-8.6 22.3-15 7.7 30.4 25.7 74.3 37.2 95.7 6.1 11.4 18.3 35.5 23.6 64.6 3.3-.1 7 .4 10.9 1.4 13.8-35.7-11.7-74.2-23.3-84.9-4.7-4.6-4.9-6.6-2.6-6.5 12.6 11.2 29.2 33.7 35.2 59 2.8 11.6 3.3 23.7.4 35.7 16.4 6.8 35.9 17.9 30.7 34.8-2.2-.1-3.2 0-4.2 0 3.2-10.1-3.9-17.6-22.8-26.1-19.6-8.6-36-8.6-38.3 12.5-12.1 4.2-18.3 14.7-21.4 27.3-2.8 11.2-3.6 24.7-4.4 39.9-.5 7.7-3.6 18-6.8 29-32.1 22.9-76.7 32.9-114.3 7.2zm257.4-11.5c-.9 16.8-41.2 19.9-63.2 46.5-13.2 15.7-29.4 24.4-43.6 25.5s-26.5-4.8-33.7-19.3c-4.7-11.1-2.4-23.1 1.1-36.3 3.7-14.2 9.2-28.8 9.9-40.6.8-15.2 1.7-28.5 4.2-38.7 2.6-10.3 6.6-17.2 13.7-21.1.3-.2.7-.3 1-.5.8 13.2 7.3 26.6 18.8 29.5 12.6 3.3 30.7-7.5 38.4-16.3 9-.3 15.7-.9 22.6 5.1 9.9 8.5 7.1 30.3 17.1 41.6 10.6 11.6 14 19.5 13.7 24.6zM173.3 148.7c2 1.9 4.7 4.5 8 7.1 6.6 5.2 15.8 10.6 27.3 10.6 11.6 0 22.5-5.9 31.8-10.8 4.9-2.6 10.9-7 14.8-10.4s5.9-6.3 3.1-6.6-2.6 2.6-6 5.1c-4.4 3.2-9.7 7.4-13.9 9.8-7.4 4.2-19.5 10.2-29.9 10.2s-18.7-4.8-24.9-9.7c-3.1-2.5-5.7-5-7.7-6.9-1.5-1.4-1.9-4.6-4.3-4.9-1.4-.1-1.8 3.7 1.7 6.5z"/></svg></span> Linux</label><label for="__tabbed_1_3"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.5.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="m0 93.7 183.6-25.3v177.4H0V93.7zm0 324.6 183.6 25.3V268.4H0v149.9zm203.8 28L448 480V268.4H203.8v177.9zm0-380.6v180.1H448V32L203.8 65.7z"/></svg></span> Windows</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block">
-<p>Android mandates Vulkan 1.1 support since Android 10. You just need to
-make sure the device's Android version is 10 or higher.</p>
-</div>
-<div class="tabbed-block">
-<p>Run the following command in a shell:</p>
-<div class="highlight"><pre><span></span><code>vulkaninfo<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>apiVersion
-</code></pre></div>
-<p>If <code>vulkaninfo</code> does not exist, you will need to <a href="https://vulkan.lunarg.com/sdk/home/">install the latest Vulkan
-SDK</a>. Installing via LunarG's package
-repository is recommended, as it places Vulkan libraries and tools under
-system paths so it's easy to discover.</p>
-<p>If the listed version is lower than Vulkan 1.2, you will need to update the
-driver for your GPU.</p>
-</div>
-<div class="tabbed-block">
-<p>Run the following command in a shell:</p>
-<div class="highlight"><pre><span></span><code>vulkaninfo<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>apiVersion
-</code></pre></div>
-<p>If <code>vulkaninfo</code> does not exist, you will need to <a href="https://vulkan.lunarg.com/sdk/home/">install the latest Vulkan
-SDK</a>.</p>
-<p>If the listed version is lower than Vulkan 1.2, you will need to update the
-driver for your GPU.</p>
-</div>
-</div>
-</div>
-<h3 id="get-the-iree-compiler">Get the IREE compiler<a class="headerlink" href="#get-the-iree-compiler" title="Permanent link">link</a></h3>
-<p>Vulkan expects the program running on GPU to be expressed by the
-<a href="https://www.khronos.org/registry/spir-v/">SPIR-V</a> binary exchange format, which
-the model must be compiled into.</p>
-<h4 id="download-the-compiler-from-a-release"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m8.878.392 5.25 3.045c.54.314.872.89.872 1.514v6.098a1.75 1.75 0 0 1-.872 1.514l-5.25 3.045a1.75 1.75 0 0 1-1.756 0l-5.25-3.045A1.75 1.75 0 0 1 1 11.049V4.951c0-.624.332-1.201.872-1.514L7.122.392a1.75 1.75 0 0 1 1.756 0ZM7.875 1.69l-4.63 2.685L8 7.133l4.755-2.758-4.63-2.685a.248.248 0 0 0-.25 0ZM2.5 5.677v5.372c0 .09.047.171.125.216l4.625 2.683V8.432Zm6.25 8.271 4.625-2.683a.25.25 0 0 0 .125-.216V5.677L8.75 8.432Z"/></svg></span> Download the compiler from a release<a class="headerlink" href="#download-the-compiler-from-a-release" title="Permanent link">link</a></h4>
-<p>Python packages are regularly published to
-<a href="https://pypi.org/user/google-iree-pypi-deploy/">PyPI</a>. See the
-<a href="../../../reference/bindings/python/">Python Bindings</a> page for more details.
-The core <code>iree-base-compiler</code> package includes the SPIR-V compiler:</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Stable releases</label><label for="__tabbed_2_2"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 14h-2V9h2m0 9h-2v-2h2M1 21h22L12 2 1 21Z"/></svg></span> Nightly releases</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block">
-<p>Stable release packages are
-<a href="https://pypi.org/user/google-iree-pypi-deploy/">published to PyPI</a>.</p>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-base-compiler
-</code></pre></div>
-</div>
-<div class="tabbed-block">
-<p>Nightly pre-releases are published on
-<a href="https://github.com/iree-org/iree/releases">GitHub releases</a>.</p>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--find-links<span class="w"> </span>https://iree.dev/pip-release-links.html<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--upgrade<span class="w"> </span>--pre<span class="w"> </span>iree-base-compiler
-</code></pre></div>
-</div>
-</div>
-</div>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p><code>iree-compile</code> and other tools are installed to your python module
-installation path. If you pip install with the user mode, it is under
-<code>${HOME}/.local/bin</code>, or <code>%APPDATA%Python</code> on Windows. You may want to
-include the path in your system's <code>PATH</code> environment variable:</p>
-<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/.local/bin:<span class="si">${</span><span class="nv">PATH</span><span class="si">}</span>
-</code></pre></div>
-</div>
-<h4 id="build-the-compiler-from-source"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m13.78 15.3 6 6 2.11-2.16-6-6-2.11 2.16m3.72-5.2c-.39 0-.81-.05-1.14-.19L4.97 21.25l-2.11-2.11 7.41-7.4L8.5 9.96l-.72.7-1.45-1.41v2.86l-.7.7-3.52-3.56.7-.7h2.81l-1.4-1.41 3.56-3.56a2.976 2.976 0 0 1 4.22 0L9.89 5.74l1.41 1.4-.71.71 1.79 1.78 1.82-1.88c-.14-.33-.2-.75-.2-1.12a3.49 3.49 0 0 1 3.5-3.52c.59 0 1.11.14 1.58.42L16.41 6.2l1.5 1.5 2.67-2.67c.28.47.42.97.42 1.6 0 1.92-1.55 3.47-3.5 3.47Z"/></svg></span> Build the compiler from source<a class="headerlink" href="#build-the-compiler-from-source" title="Permanent link">link</a></h4>
-<p>Please make sure you have followed the
-<a href="../../../building-from-source/getting-started/">Getting started</a> page to build
-IREE for your host platform and the
-<a href="../../../building-from-source/android/">Android cross-compilation</a> page if you
-are cross compiling for Android. The SPIR-V compiler backend is compiled in by
-default on all platforms.</p>
-<p>Ensure that the <code>IREE_TARGET_BACKEND_VULKAN_SPIRV</code> CMake option is <code>ON</code> when
-configuring for the host.</p>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p><code>iree-compile</code> will be built under the <code>iree-build/tools/</code> directory. You
-may want to include this path in your system's <code>PATH</code> environment variable.</p>
-</div>
-<h3 id="get-the-iree-runtime">Get the IREE runtime<a class="headerlink" href="#get-the-iree-runtime" title="Permanent link">link</a></h3>
-<p>Next you will need to get an IREE runtime that supports the Vulkan HAL driver.</p>
-<p>You can check for Vulkan support by looking for a matching driver and device:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--list_drivers
-
-<span class="go">        cuda: NVIDIA CUDA HAL driver (via dylib)</span>
-<span class="go">         hip: HIP HAL driver (via dylib)</span>
-<span class="go">  local-sync: Local execution using a lightweight inline synchronous queue</span>
-<span class="go">  local-task: Local execution using the IREE multithreading task system</span>
-<span class="hll"><span class="go">      vulkan: Vulkan 1.x (dynamic)</span>
-</span></code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--list_devices
-
-<span class="go">  cuda://GPU-00000000-1111-2222-3333-444444444444</span>
-<span class="go">  local-sync://</span>
-<span class="go">  local-task://</span>
-<span class="hll"><span class="go">  vulkan://00000000-1111-2222-3333-444444444444</span>
-</span></code></pre></div>
-<h4 id="download-the-runtime-from-a-release"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m8.878.392 5.25 3.045c.54.314.872.89.872 1.514v6.098a1.75 1.75 0 0 1-.872 1.514l-5.25 3.045a1.75 1.75 0 0 1-1.756 0l-5.25-3.045A1.75 1.75 0 0 1 1 11.049V4.951c0-.624.332-1.201.872-1.514L7.122.392a1.75 1.75 0 0 1 1.756 0ZM7.875 1.69l-4.63 2.685L8 7.133l4.755-2.758-4.63-2.685a.248.248 0 0 0-.25 0ZM2.5 5.677v5.372c0 .09.047.171.125.216l4.625 2.683V8.432Zm6.25 8.271 4.625-2.683a.25.25 0 0 0 .125-.216V5.677L8.75 8.432Z"/></svg></span> Download the runtime from a release<a class="headerlink" href="#download-the-runtime-from-a-release" title="Permanent link">link</a></h4>
-<p>Python packages are regularly published to
-<a href="https://pypi.org/user/google-iree-pypi-deploy/">PyPI</a>. See the
-<a href="../../../reference/bindings/python/">Python Bindings</a> page for more details.
-The core <code>iree-base-runtime</code> package includes the Vulkan HAL drivers:</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="3:2"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Stable releases</label><label for="__tabbed_3_2"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 14h-2V9h2m0 9h-2v-2h2M1 21h22L12 2 1 21Z"/></svg></span> Nightly releases</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block">
-<p>Stable release packages are
-<a href="https://pypi.org/user/google-iree-pypi-deploy/">published to PyPI</a>.</p>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-base-runtime
-</code></pre></div>
-</div>
-<div class="tabbed-block">
-<p>Nightly pre-releases are published on
-<a href="https://github.com/iree-org/iree/releases">GitHub releases</a>.</p>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--find-links<span class="w"> </span>https://iree.dev/pip-release-links.html<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--upgrade<span class="w"> </span>--pre<span class="w"> </span>iree-base-runtime
-</code></pre></div>
-</div>
-</div>
-</div>
-<h4 id="build-the-runtime-from-source"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m13.78 15.3 6 6 2.11-2.16-6-6-2.11 2.16m3.72-5.2c-.39 0-.81-.05-1.14-.19L4.97 21.25l-2.11-2.11 7.41-7.4L8.5 9.96l-.72.7-1.45-1.41v2.86l-.7.7-3.52-3.56.7-.7h2.81l-1.4-1.41 3.56-3.56a2.976 2.976 0 0 1 4.22 0L9.89 5.74l1.41 1.4-.71.71 1.79 1.78 1.82-1.88c-.14-.33-.2-.75-.2-1.12a3.49 3.49 0 0 1 3.5-3.52c.59 0 1.11.14 1.58.42L16.41 6.2l1.5 1.5 2.67-2.67c.28.47.42.97.42 1.6 0 1.92-1.55 3.47-3.5 3.47Z"/></svg></span> Build the runtime from source<a class="headerlink" href="#build-the-runtime-from-source" title="Permanent link">link</a></h4>
-<p>Please make sure you have followed the
-<a href="../../../building-from-source/getting-started/">Getting started</a> page to build
-IREE for Linux/Windows and the
-<a href="../../../building-from-source/android/">Android cross-compilation</a> page for
-Android. The Vulkan HAL driver is compiled in by default on non-Apple platforms.</p>
-<p>Ensure that the <code>IREE_HAL_DRIVER_VULKAN</code> CMake option is <code>ON</code> when configuring
-for the target.</p>
-<h2 id="compile-and-run-a-program">Compile and run a program<a class="headerlink" href="#compile-and-run-a-program" title="Permanent link">link</a></h2>
-<p>With the SPIR-V compiler and Vulkan runtime, we can now compile programs and run
-them on GPUs.</p>
-<h3 id="compile-a-program"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4 1.75C4 .784 4.784 0 5.75 0h5.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v8.586A1.75 1.75 0 0 1 14.25 15h-9a.75.75 0 0 1 0-1.5h9a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 10 4.25V1.5H5.75a.25.25 0 0 0-.25.25v2.5a.75.75 0 0 1-1.5 0Zm1.72 4.97a.75.75 0 0 1 1.06 0l2 2a.75.75 0 0 1 0 1.06l-2 2a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734l1.47-1.47-1.47-1.47a.75.75 0 0 1 0-1.06ZM3.28 7.78 1.81 9.25l1.47 1.47a.751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018l-2-2a.75.75 0 0 1 0-1.06l2-2a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042Zm8.22-6.218V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914-.013-.011Z"/></svg></span> Compile a program<a class="headerlink" href="#compile-a-program" title="Permanent link">link</a></h3>
-<p>The IREE compiler transforms a model into its final deployable format in many
-sequential steps. A model authored with Python in an ML framework should use the
-corresponding framework's import tool to convert into a format (i.e.,
-<a href="https://mlir.llvm.org/">MLIR</a>) expected by the IREE compiler first.</p>
-<p>Using MobileNet v2 as an example, you can download the SavedModel with trained
-weights from
-<a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">TensorFlow Hub</a>
-and convert it using IREE's
-<a href="../../ml-frameworks/tensorflow/">TensorFlow importer</a>. Then run the following
-command to compile with the <code>vulkan-spirv</code> target:</p>
-<div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>vulkan-spirv<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">    </span>--iree-vulkan-target<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
-</span><span class="w">    </span>mobilenet_iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_vulkan.vmfb
-</code></pre></div>
-<p><code>iree-vulkan-target</code> specifies the GPU architecture to target. It accepts a few
-schemes:</p>
+<h1 id="versioning-scheme">Versioning scheme<a class="headerlink" href="#versioning-scheme" title="Permanent link">link</a></h1>
+<p>A shared version format is used for the packages</p>
 <ul>
-<li>LLVM CodeGen backend style: this is using LLVM AMDGPU/NVPTX CodeGen targets
-  like <code>gfx1100</code> for AMD RX 7900XTX and <code>sm_86</code> for NVIDIA RTX 3090 GPUs.</li>
-<li>Architecture code name style: e.g., using <code>rdna3</code>/<code>valhall4</code>/<code>ampere</code>/<code>adreno</code>
-  for AMD/ARM/NVIDIA/Qualcomm GPUs.</li>
-<li>Product name style(1): e.g., using <code>rx7900xtx</code>/<code>a100</code> for corresponding GPUs.</li>
+<li><code>iree-base-compiler</code> (formally named <code>iree-compiler</code>)</li>
+<li><code>iree-base-runtime</code> (formally named <code>iree-runtime</code>)</li>
+<li><code>iree-turbine</code></li>
 </ul>
-<p>Here are a few examples showing how you can target various recent common GPUs:</p>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">link</a></h2>
 <table>
 <thead>
 <tr>
-<th>GPU</th>
-<th>Target Architecture</th>
-<th>Architecture Code Name</th>
-<th>Product Name</th>
+<th>Type of build</th>
+<th>Version format</th>
+<th>Version example</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>AMD RX7900XTX</td>
-<td><code>gfx1100</code></td>
-<td><code>rdna3</code></td>
-<td><code>rx7900xtx</code></td>
+<td>Stable release (PyPI)</td>
+<td><code>X.Y.Z</code></td>
+<td><code>3.0.0</code></td>
 </tr>
 <tr>
-<td>AMD RX7900XT</td>
-<td><code>gfx1100</code></td>
-<td><code>rdna3</code></td>
-<td><code>rx7900xt</code></td>
+<td>Nightly release (GitHub <code>schedule</code>)</td>
+<td><code>X.Y.ZrcYYYYMMDD</code></td>
+<td><code>3.0.0rc20241029</code></td>
 </tr>
 <tr>
-<td>AMD RX7800XT</td>
-<td><code>gfx1101</code></td>
-<td><code>rdna3</code></td>
-<td><code>rx7800xt</code></td>
+<td>Dev release (GitHub <code>pull_request</code>)</td>
+<td><code>X.Y.Z.devNN</code></td>
+<td><code>3.0.0.dev+6d55a11</code></td>
 </tr>
 <tr>
-<td>AMD RX7700XT</td>
-<td><code>gfx1101</code></td>
-<td><code>rdna3</code></td>
-<td><code>rx7700xt</code></td>
-</tr>
-<tr>
-<td>AMD RX6000 series</td>
-<td></td>
-<td><code>rdna2</code></td>
-<td></td>
-</tr>
-<tr>
-<td>AMD RX5000 series</td>
-<td></td>
-<td><code>rdna1</code></td>
-<td></td>
-</tr>
-<tr>
-<td>ARM Mali G715</td>
-<td></td>
-<td><code>valhall4</code></td>
-<td>e.g., <code>mali-g715</code></td>
-</tr>
-<tr>
-<td>ARM Mali G510</td>
-<td></td>
-<td><code>valhall3</code></td>
-<td>e.g., <code>mali-g510</code></td>
-</tr>
-<tr>
-<td>ARM GPUs</td>
-<td></td>
-<td><code>valhall</code></td>
-<td></td>
-</tr>
-<tr>
-<td>NVIDIA RTX40 series</td>
-<td><code>sm_89</code></td>
-<td><code>ada</code></td>
-<td>e.g., <code>rtx4090</code></td>
-</tr>
-<tr>
-<td>NVIDIA RTX30 series</td>
-<td><code>sm_86</code></td>
-<td><code>ampere</code></td>
-<td>e.g., <code>rtx3080ti</code></td>
-</tr>
-<tr>
-<td>NVIDIA RTX20 series</td>
-<td><code>sm_75</code></td>
-<td><code>turing</code></td>
-<td>e.g., <code>rtx2070super</code></td>
-</tr>
-<tr>
-<td>Qualcomm GPUs</td>
-<td></td>
-<td><code>adreno</code></td>
-<td></td>
+<td>Local build</td>
+<td><code>X.Y.Z.devNN</code></td>
+<td><code>3.0.0.dev+6d55a11</code></td>
 </tr>
 </tbody>
 </table>
-<p>If no target is specified, then a safe but more limited default will be used.</p>
-<div class="admonition note annotate">
-<p class="admonition-title">Note</p>
-<p>Note that We don't support the full spectrum of GPUs here(2).
-This is more of a mechanism to help us develop IREE itself--in the long term
-we want to perform multiple targetting to generate to multiple architectures
-if no target is given.</p>
-</div>
-<ol>
-<li>Note that we only support very limited GPUs that we are actively developing
-   against in this category, particularly for desktops.</li>
-<li>It's also impossible to capture all details of a Vulkan implementation
-   with a target triple, given the allowed variances on extensions, properties,
-   limits, etc. So the target triple is just an approximation for usage.</li>
-</ol>
-<h3 id="run-a-compiled-program"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25ZM7.25 8a.749.749 0 0 1-.22.53l-2.25 2.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L5.44 8 3.72 6.28a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215l2.25 2.25c.141.14.22.331.22.53Zm1.5 1.5h3a.75.75 0 0 1 0 1.5h-3a.75.75 0 0 1 0-1.5Z"/></svg></span> Run a compiled program<a class="headerlink" href="#run-a-compiled-program" title="Permanent link">link</a></h3>
-<p>In the build directory, run the following command:</p>
-<div class="highlight"><pre><span></span><code>tools/iree-run-module<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">    </span>--device<span class="o">=</span>vulkan<span class="w"> </span><span class="se">\</span>
-</span><span class="w">    </span>--module<span class="o">=</span>mobilenet_vulkan.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--function<span class="o">=</span>predict<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
-</code></pre></div>
-<p>The above assumes the exported function in the model is named as <code>predict</code> and
-it expects one 224x224 RGB image. We are feeding in an image with all 0 values
-here for brevity, see <code>iree-run-module --help</code> for the format to specify
-concrete values.</p>
-<!-- TODO(??): Vulkan profiles / API versions / extensions -->
-
-<!-- TODO(??): measuring performance -->
-
-<!-- TODO(??): troubleshooting -->
+<h3 id="key">Key<a class="headerlink" href="#key" title="Permanent link">link</a></h3>
+<table>
+<thead>
+<tr>
+<th>Identifier</th>
+<th>Explanation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>X</code></td>
+<td>Major version</td>
+</tr>
+<tr>
+<td><code>Y</code></td>
+<td>Minor version</td>
+</tr>
+<tr>
+<td><code>Z</code></td>
+<td>Patch version</td>
+</tr>
+<tr>
+<td><code>rc</code></td>
+<td>release candidate (<code>main</code> branch)</td>
+</tr>
+<tr>
+<td><code>dev</code></td>
+<td>developer build (code on pull request branches)</td>
+</tr>
+<tr>
+<td><code>YYYY</code></td>
+<td>Year, e.g. <code>2024</code></td>
+</tr>
+<tr>
+<td><code>MM</code></td>
+<td>Month, e.g. <code>10</code></td>
+</tr>
+<tr>
+<td><code>DD</code></td>
+<td>Day, e.g. <code>29</code></td>
+</tr>
+<tr>
+<td><code>NN</code></td>
+<td>git commit hash, e.g. <code>6d55a11</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="composition-of-version-numbers">Composition of version numbers<a class="headerlink" href="#composition-of-version-numbers" title="Permanent link">link</a></h2>
+<p>A release number is in the format of <code>X.Y.Z</code> (MAJOR.MAJOR.PATCH)</p>
+<ul>
+<li><code>X</code> and <code>Y</code> are defined as shared version numbers between all packages.</li>
+<li>The patch level <code>Z</code> MAY be incremented individually.</li>
+<li>A PATCH release contains only bug fixes and the version <code>Z</code> (<code>x.y.Z</code>) MUST be
+  incremented. A bug fix is an internal change that fixes incorrect behavior
+  and MUST NOT introduce breaking changes.</li>
+<li>A MINOR release (unlike SemVer) as well as a MAJOR release MAY contain
+  backwards-incompatible, breaking changes, like API changes and removals and
+  furthermore bug fixes and new features.</li>
+</ul>
+<h3 id="development-and-nightly-releases">Development and nightly releases<a class="headerlink" href="#development-and-nightly-releases" title="Permanent link">link</a></h3>
+<ul>
+<li>Development builds (e.g. from a regular CI) MUST be released with a version
+  number defined as <code>X.Y.Z.dev+NN</code>, where <code>NN</code> is the git commit hash.</li>
+<li>Nightly releases MUST be released with a version number defined as <code>X.Y.ZrcYYYYMMDD</code>.</li>
+<li>The intent is to promote a recent, high quality release candidate to a final
+  version.</li>
+</ul>
+<p>Binary stamps and tools will continue to report the original release candidate version.</p>
+<h2 id="semantics">Semantics<a class="headerlink" href="#semantics" title="Permanent link">link</a></h2>
+<p>The following semantics apply:</p>
+<ul>
+<li>If the version <code>X</code> (<code>X.y.z</code>) is increased for one package, the version number
+  change MUST be adopted by all (other) packages. The same applies for the
+  version <code>Y</code> (<code>x.Y.Z</code>).</li>
+<li>If the version <code>X</code> or <code>Y</code> are changed, <code>Z</code> MUST be set <code>0</code>.</li>
+<li>After a regular (non-patch) release, <code>Y</code> MUST be increased to ensure
+  precedence of nightly builds.
+  For example:<ul>
+<li>The latest stable release published on November 15th 2024 is versioned as
+  version <code>3.0.0</code>.</li>
+<li>The next nightly builds are released as <code>3.1.0rc20241116</code>.</li>
+<li>The next stable release is released as <code>3.1.0</code> or <code>4.0.0</code>.</li>
+</ul>
+</li>
+</ul>
 
 
 
@@ -4281,8 +3930,6 @@ concrete values.</p>
 
 
 
-
-  
 
 
 
