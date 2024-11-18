@@ -70,4 +70,4 @@ The following semantics apply:
     * The latest stable release published on November 15th 2024 is versioned as
       version `3.0.0`.
     * The next nightly builds are released as `3.1.0rc20241116`.
-    * The next stable release is released as or `3.1.0`.
+    * The next stable release is released as `3.1.0` or `4.0.0`.
