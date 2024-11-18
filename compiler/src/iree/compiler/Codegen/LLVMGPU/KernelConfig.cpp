@@ -1775,64 +1775,6 @@ static bool hasTwoOrThreeLoopsInfo(linalg::LinalgOp linalgOp) {
 }
 
 //====---------------------------------------------------------------------===//
-// Transpose Pipeline Configuration
-//====---------------------------------------------------------------------===//
-
-static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
-                                        linalg::LinalgOp linalgOp) {
-  LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
-
-  // Checks preconditions for shared mem transpose.
-  if (!opInfo.isTranspose() || opInfo.isDynamic() || opInfo.isReduction() ||
-      !isa<linalg::GenericOp>(linalgOp) || !hasTwoOrThreeLoopsInfo(linalgOp)) {
-    return failure();
-  }
-
-  ArrayRef<OpOperand *> transposedOperands = opInfo.getTransposeOperands();
-
-  // Determine the fastest moving dimensions for the source/destination indices
-  // of each transpose. These inform the tile sizes.
-  int64_t outputFastestDim = linalgOp.getNumLoops() - 1;
-  int64_t inputFastestDim =
-      linalgOp.getMatchingIndexingMap(transposedOperands[0])
-          .getDimPosition(outputFastestDim);
-  // Ensure the other transposed operands match
-  for (int i = 1; i < transposedOperands.size(); ++i) {
-    if (inputFastestDim !=
-        linalgOp.getMatchingIndexingMap(transposedOperands[i])
-            .getDimPosition(outputFastestDim)) {
-      return failure();
-    }
-  }
-
-  int32_t tileM = 32;
-  int32_t tileN = 32;
-  TileSizesListType tileSizes;
-  // Set all tile sizes to 1 except for fastest moving dimensions.
-  SmallVector<int64_t> tileSizesTemp(linalgOp.getNumLoops(), 1);
-  tileSizesTemp[outputFastestDim] = 32;
-  tileSizesTemp[inputFastestDim] = 32;
-  tileSizes.push_back(tileSizesTemp);
-
-  // Check alignment with tile size for each transpose. Only the fastest moving
-  // dims need to match the transpose tile.
-  auto loopRanges = linalgOp.getStaticLoopRanges();
-  if (loopRanges[outputFastestDim] % tileM != 0 ||
-      loopRanges[inputFastestDim] % tileN != 0) {
-    return failure();
-  }
-
-  // Workgroup size contains 8 warps. Configured with 8 threads on fastest
-  // moving dimension so each thread can execute a vectorized copy of 4
-  // contigious elements at a time from the 32 block.
-  std::array<int64_t, 3> workgroupSize = {8, 32, 1};
-
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, linalgOp, tileSizes,
-      CodeGenPipeline::LLVMGPUTransposeSharedMem, workgroupSize);
-}
-
-//====---------------------------------------------------------------------===//
 // UKernel Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
@@ -2141,11 +2083,8 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       return success();
     }
     auto genericOp = dyn_cast<linalg::GenericOp>(computeOp);
-    if (genericOp && succeeded(setTransposeConfig(entryPointFn, genericOp))) {
-      LDBG("Transpose Config");
-      return success();
-    } else if (genericOp && succeeded(setArgmaxUkernelConfig(
-                                target, entryPointFn, genericOp))) {
+    if (genericOp &&
+        succeeded(setArgmaxUkernelConfig(target, entryPointFn, genericOp))) {
       LDBG("Argmax Ukernel Config");
       return success();
     }

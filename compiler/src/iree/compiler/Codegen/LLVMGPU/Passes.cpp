@@ -720,49 +720,6 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(
 }
 
 //===---------------------------------------------------------------------===//
-// Transpose
-//===---------------------------------------------------------------------===//
-
-void addGPUTransposePassPipeline(OpPassManager &funcPassManager,
-                                 const GPUPipelineOptions &options) {
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/false);
-
-  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  funcPassManager.addPass(
-      createGPUTensorAlloc(GPUPromoteSharedMemPattern::TransposeOpPattern));
-  funcPassManager.addPass(createGPUTensorTilePass());
-
-  // Linalg -> vector
-  addGPUVectorizationPasses(funcPassManager);
-  funcPassManager.addPass(createOptimizeVectorTransferPass());
-  funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
-
-  // tensor to memref
-  addBufferizePasses(funcPassManager);
-
-  // distribute foreach threads
-  funcPassManager.addPass(createGPUDistributePass());
-
-  funcPassManager.addPass(createMemrefCopyToLinalgPass());
-  funcPassManager.addPass(createGPUDistributeSharedMemoryCopyPass());
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  if (options.enableReduceSharedMemoryBankConflicts) {
-    // May or may not need to reduce shared mememory conflicts.
-    GPUReduceBankConflictsPassOptions options = {};
-    options.paddingBits = 32;
-    funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
-  }
-
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-}
-
-//===---------------------------------------------------------------------===//
 // Vector Distribution
 //===---------------------------------------------------------------------===//
 

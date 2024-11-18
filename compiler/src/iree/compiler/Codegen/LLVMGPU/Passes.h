@@ -57,10 +57,6 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
 void addGPUTransformDialectPasses(OpPassManager &funcPassManager,
                                   StringRef entryPoint);
 
-/// Lowering transpose using shared memory.
-void addGPUTransposePassPipeline(OpPassManager &funcPassManager,
-                                 const GPUPipelineOptions &options);
-
 /// Lowering calling vectorization patterns. Expects pass manager to be a
 /// module-level pass manager.
 void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager);
