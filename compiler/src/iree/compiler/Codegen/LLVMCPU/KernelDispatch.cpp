@@ -2922,10 +2922,15 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
   // loads and stores will have a performance impact.
   auto resultTypes = rootOperation->getResultTypes();
   if (commonVecTileSizes.size() != 0 && !resultTypes.empty()) {
-    auto elementTypeSize =
-        cast<ShapedType>(rootOperation->getResultTypes().front())
-            .getElementType()
-            .getIntOrFloatBitWidth();
+    Type elementType = cast<ShapedType>(rootOperation->getResultTypes().front())
+                           .getElementType();
+    unsigned int elementTypeSize;
+    if (auto complexType = llvm::dyn_cast<ComplexType>(elementType)) {
+      elementTypeSize =
+          2 * complexType.getElementType().getIntOrFloatBitWidth();
+    } else {
+      elementTypeSize = elementType.getIntOrFloatBitWidth();
+    }
     // for now just enable for i1
     if (elementTypeSize == 1) {
       auto innermostTileSize = commonVecTileSizes.back();
