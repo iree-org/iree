@@ -2922,8 +2922,7 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
   // loads and stores will have a performance impact.
   auto resultTypes = rootOperation->getResultTypes();
   if (commonVecTileSizes.size() != 0 && !resultTypes.empty()) {
-    Type elementType = cast<ShapedType>(rootOperation->getResultTypes().front())
-                           .getElementType();
+    Type elementType = cast<ShapedType>(resultTypes[0]).getElementType();
     unsigned int elementTypeSize;
     if (auto complexType = llvm::dyn_cast<ComplexType>(elementType)) {
       elementTypeSize =

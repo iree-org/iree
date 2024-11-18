@@ -2026,4 +2026,3 @@ func.func @complex_view_as_real() attributes {hal.executable.target = #executabl
 //      CHECK: func.func @complex_view_as_real()
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
-
