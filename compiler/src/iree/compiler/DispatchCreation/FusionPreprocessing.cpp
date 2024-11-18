@@ -149,76 +149,12 @@ struct FoldSuccessiveTensorInsertSliceOps final
   }
 };
 
-//===----------------------------------------------------------------------===//
-// GatherFusionPattern
-//===----------------------------------------------------------------------===//
-
-// Specific case. The linalg generic implementation of "gather"
-// cannot be fused because it there is no producer-consumer
-// relationship between the two generics. This is because the indexing
-// is not affine (index values come from a tensor).
-struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
-                                PatternRewriter &rewriter) const override {
-    // Check if extractOp is inside a generic op
-    auto consumerOp =
-        dyn_cast_or_null<linalg::GenericOp>(extractOp->getParentOp());
-    if (!consumerOp) {
-      return rewriter.notifyMatchFailure(
-          extractOp, "expected extract op to be inside a generic op");
-    }
-
-    auto producerOp = extractOp.getTensor().getDefiningOp<linalg::GenericOp>();
-    if (!producerOp) {
-      return rewriter.notifyMatchFailure(
-          consumerOp, "expected extract operand to be a generic op");
-    }
-
-    // Check if the producerOp is fusible
-    if (producerOp.getNumDpsInputs() != 1 || producerOp.getNumResults() != 1 ||
-        !isElementwise(producerOp) ||
-        !IREE::LinalgExt::isBitExtendOp(producerOp)) {
-      return rewriter.notifyMatchFailure(producerOp,
-                                         "producer op is not fusible");
-    }
-
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(extractOp);
-
-    // Create a new extract op that extracts from the original tensor
-    // (after the original extract). Clone the producerOp's body into the
-    // consumerOp, inline the cloned block (erases the block) after the new
-    // extract, and clean up.
-    auto newExtractOp = rewriter.create<tensor::ExtractOp>(
-        extractOp.getLoc(), producerOp.getDpsInputOperand(0)->get(),
-        extractOp.getIndices());
-    rewriter.cloneRegionBefore(producerOp.getRegion(), consumerOp.getRegion(),
-                               consumerOp.getRegion().begin());
-    Block &clonedBlock = consumerOp.getRegion().front();
-    auto producerTermOp = clonedBlock.getTerminator();
-
-    rewriter.inlineBlockBefore(
-        &clonedBlock, extractOp->getNextNode(),
-        {newExtractOp.getResult(), newExtractOp.getResult()});
-
-    // Replace the the all references to the original extract result with the
-    // result from the inlined producerOp.
-    extractOp.getResult().replaceAllUsesWith(producerTermOp->getOperand(0));
-    rewriter.eraseOp(producerTermOp);
-    rewriter.eraseOp(extractOp);
-
-    return success();
-  }
-};
-
 struct FusionPreprocessingPass final
     : public impl::FusionPreprocessingPassBase<FusionPreprocessingPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns.add<ElementwiseOpInterchangePattern,
-                 FoldSuccessiveTensorInsertSliceOps, GatherFusionPattern>(
-        &getContext());
+                 FoldSuccessiveTensorInsertSliceOps>(&getContext());
 
     // Fold away `tensor.dim` operations that can be resolved in terms of its
     // operand shapes.
