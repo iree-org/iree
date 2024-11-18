@@ -22,7 +22,7 @@ static llvm::cl::opt<bool> clEnableBlockedMatmuls(
     "iree-codegen-block-dynamic-dimensions-of-contractions",
     llvm::cl::desc("developer flag to gaurd blocking dynamic dimensions of "
                    "contraction-like ops"),
-    llvm::cl::Hidden, llvm::cl::init(false));
+    llvm::cl::Hidden, llvm::cl::init(true));
 
 namespace mlir::iree_compiler {
 
@@ -125,14 +125,15 @@ blockDynamicDimensionsOfValue(RewriterBase &rewriter,
   SmallVector<OpFoldResult> outputShape;
   SmallVector<ReassociationIndices> reassociation;
   Location loc = v.getLoc();
+  SmallVector<OpFoldResult> origShape = tensor::getMixedSizes(rewriter, loc, v);
 
-  for (auto [index, dim] : llvm::enumerate(tensorType.getShape())) {
+  for (auto [index, dim] : llvm::enumerate(origShape)) {
     reassociation.emplace_back(ReassociationIndices{});
 
     // Check if this needs division.
     if (!tensorType.isDynamicDim(index) || !divisibilityInfo.contains(index)) {
       reassociation.back().push_back(outputShape.size());
-      outputShape.push_back(rewriter.getIndexAttr(dim));
+      outputShape.push_back(dim);
       continue;
     }
 
@@ -142,9 +143,8 @@ blockDynamicDimensionsOfValue(RewriterBase &rewriter,
     uint64_t factor = currDivisibility.sdiv();
     AffineExpr s0 = rewriter.getAffineSymbolExpr(0);
     AffineExpr divExpr = s0.floorDiv(factor);
-    Value sourceDim = rewriter.create<tensor::DimOp>(loc, v, index).getResult();
     OpFoldResult newDynamicDim = affine::makeComposedFoldedAffineApply(
-        rewriter, loc, divExpr, ArrayRef<OpFoldResult>{sourceDim});
+        rewriter, loc, divExpr, ArrayRef<OpFoldResult>{dim});
     OpFoldResult newStaticDim = rewriter.getIndexAttr(factor);
 
     reassociation.back().push_back(outputShape.size());
