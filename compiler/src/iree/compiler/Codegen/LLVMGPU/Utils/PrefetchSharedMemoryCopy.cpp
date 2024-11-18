@@ -250,46 +250,82 @@ private:
     return success();
   }
 
-  /// Clones |op| and call |callback| on the cloned op's operands as well as any
-  /// operands of nested ops that 1) aren't defined within the new op or 2) are
-  /// block arguments.
-  static Operation *
-  cloneAndUpdateOperands(RewriterBase &rewriter, Operation *op,
-                         function_ref<void(OpOperand *newOperand)> callback) {
-    Operation *clone = rewriter.clone(*op);
-    for (OpOperand &operand : clone->getOpOperands())
-      callback(&operand);
-    return clone;
+  /// Clones the given operation and maps the operands and results to the new
+  /// operations. The operands are updated to reference the newly created
+  /// operations. The mapping is updated to map the results of the old operation
+  /// to the new one.
+  Operation *cloneAndMapOperation(RewriterBase &rewriter, Operation *op,
+                                  IRMapping &mapping) {
+    // Clone the operation
+    Operation *newOp = rewriter.clone(*op, mapping);
+
+    // Update the operands to reference the newly created operations
+    for (OpOperand &operand : newOp->getOpOperands()) {
+      if (mapping.contains(operand.get())) {
+        operand.set(mapping.lookup(operand.get()));
+      }
+    }
+
+    // Map the results of the old operation to the new one
+    for (unsigned i = 0, e = op->getNumResults(); i != e; ++i) {
+      mapping.map(op->getResult(i), newOp->getResult(i));
+    }
+
+    return newOp;
+  }
+
+  void cloneAndMapRegion(RewriterBase &rewriter, Region &srcRegion,
+                         Region &destRegion, IRMapping &mapping) {
+    rewriter.setInsertionPointToStart(&destRegion.front());
+    for (Operation &nestedOp : srcRegion.front()) {
+      cloneAndMapOperation(rewriter, &nestedOp, mapping);
+    }
+  }
+
+  void cloneAndMapIfOp(RewriterBase &rewriter, scf::IfOp ifOp,
+                       IRMapping &mapping) {
+    // Clone the scf::IfOp with its operands mapped
+    auto newIfOp = rewriter.create<scf::IfOp>(
+        ifOp.getLoc(), ifOp.getResultTypes(),
+        mapping.lookup(ifOp.getCondition()),
+        /*withElseRegion=*/ifOp.getElseRegion().empty() ? false : true);
+
+    // Map the results of the old scf::IfOp to the new one
+    for (unsigned i = 0, e = ifOp.getNumResults(); i != e; ++i) {
+      mapping.map(ifOp.getResult(i), newIfOp.getResult(i));
+    }
+
+    // Clone the then region
+    cloneAndMapRegion(rewriter, ifOp.getThenRegion(), newIfOp.getThenRegion(),
+                      mapping);
+
+    // Clone the else region, if it exists
+    if (!ifOp.getElseRegion().empty()) {
+      cloneAndMapRegion(rewriter, ifOp.getElseRegion(), newIfOp.getElseRegion(),
+                        mapping);
+    }
+
+    // Reset the insertion point to after the new scf::IfOp
+    rewriter.setInsertionPointAfter(newIfOp);
   }
 
   /// Creates all read stage ops for a loop iteration with |rewriter| and maps
   /// the original loop induction variable to |iv| in |mapping|.
-  SmallVector<Value> emitRead(IRMapping &mapping, RewriterBase &rewriter,
-                              Value iv) {
+  void emitRead(IRMapping &mapping, RewriterBase &rewriter, Value iv) {
     // Map the original loop induction variable to |iv| for later op rewrites.
     mapping.map(forOp.getInductionVar(), iv);
 
-    SmallVector<Value> results;
     for (Operation *op : readStage) {
-      // Clone the current read stage op and updates all its operands to
-      // reference newly created ops.
-      Operation *newOp =
-          cloneAndUpdateOperands(rewriter, op, [&](OpOperand *newOperand) {
-            if (mapping.contains(newOperand->get())) {
-              newOperand->set(mapping.lookup(newOperand->get()));
-            }
-          });
-
-      if (isa<vector::TransferReadOp>(newOp)) {
-        llvm::append_range(results, newOp->getResults());
+      // Check if this is scf.if op and handle it separately. This is needed
+      // because the scf.if op has regions and we need to clone the regions
+      // separately instead of just the op.
+      if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
+        cloneAndMapIfOp(rewriter, ifOp, mapping);
+        continue;
       }
 
-      // Update read stage op results mapping.
-      for (unsigned i = 0, e = op->getNumResults(); i != e; ++i) {
-        mapping.map(op->getResult(i), newOp->getResult(i));
-      }
+      cloneAndMapOperation(rewriter, op, mapping);
     }
-    return results;
   }
 
   /// Creates all write stage ops for a loop iteration with |rewriter| and maps
@@ -299,22 +335,7 @@ private:
     mapping.map(forOp.getInductionVar(), iv);
 
     for (Operation *op : writeStage) {
-      // Clone the current read stage op and updates all its operands to
-      // reference newly created ops.
-      Operation *newOp =
-          cloneAndUpdateOperands(rewriter, op, [&](OpOperand *newOperand) {
-            if (mapping.contains(newOperand->get())) {
-              newOperand->set(mapping.lookup(newOperand->get()));
-            }
-          });
-
-      // If a mapping for any results already exists, move on, otherwise,
-      // add a new mapping.
-      for (unsigned i = 0, e = op->getNumResults(); i != e; ++i) {
-        if (!mapping.contains(op->getResult(i))) {
-          mapping.map(op->getResult(i), newOp->getResult(i));
-        }
-      }
+      cloneAndMapOperation(rewriter, op, mapping);
     }
   }
 
@@ -341,18 +362,7 @@ private:
         break;
       }
 
-      Operation *newOp =
-          cloneAndUpdateOperands(rewriter, op, [&](OpOperand *newOperand) {
-            if (mapping.contains(newOperand->get())) {
-              newOperand->set(mapping.lookup(newOperand->get()));
-            }
-          });
-      results = newOp->getResults();
-
-      // Map compute operations to new compute operations.
-      for (unsigned i = 0, e = op->getNumResults(); i != e; ++i) {
-        mapping.map(op->getResult(i), newOp->getResult(i));
-      }
+      cloneAndMapOperation(rewriter, op, mapping);
     }
 
     return results;
@@ -361,12 +371,7 @@ private:
   void updateYield(IRMapping &mapping, RewriterBase &rewriter) {
     for (Operation *op : computeStage) {
       if (auto yield = dyn_cast<scf::YieldOp>(op)) {
-        cloneAndUpdateOperands(rewriter, yield, [&](OpOperand *newOperand) {
-          if (mapping.contains(newOperand->get())) {
-            newOperand->set(mapping.lookup(newOperand->get()));
-          }
-        });
-
+        cloneAndMapOperation(rewriter, op, mapping);
         break;
       }
     }
