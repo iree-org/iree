@@ -1217,11 +1217,14 @@ void AssumeIntOp::inferResultRanges(ArrayRef<ConstantIntRanges> argRanges,
     else
       continue;
     auto [umin, umax] = getUnionedUnsignedRange(index);
-    if (umin && umax) {
-      APInt uminAp(bitWidth, *umin);
-      APInt umaxAp(bitWidth, *umax);
-      setResultRange(result, ConstantIntRanges::fromUnsigned(uminAp, umaxAp));
-    }
+    auto uminAp = APInt::getMinValue(bitWidth);
+    auto umaxAp = APInt::getMaxValue(bitWidth);
+    if (umin)
+      uminAp = APInt(bitWidth, *umin);
+    if (umax)
+      umaxAp = APInt(bitWidth, *umax);
+
+    setResultRange(result, ConstantIntRanges::fromUnsigned(uminAp, umaxAp));
   }
 }
 
