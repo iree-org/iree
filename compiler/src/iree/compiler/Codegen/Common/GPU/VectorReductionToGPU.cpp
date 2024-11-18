@@ -139,13 +139,12 @@ moveScalarAndBindingUniformCode(vector::WarpExecuteOnLane0Op warpOp) {
     op->moveBefore(warpOp);
 }
 
-/// Pattern to convert InsertElement to broadcast, this is a workaround until
-/// MultiDimReduction distribution is supported.
-struct InsertElementToBroadcast final
-    : OpRewritePattern<vector::InsertElementOp> {
-  using OpRewritePattern<vector::InsertElementOp>::OpRewritePattern;
+/// Pattern to convert single element vector.insert to broadcast, this is a
+/// workaround until MultiDimReduction distribution is supported.
+struct InsertToBroadcast final : OpRewritePattern<vector::InsertOp> {
+  using OpRewritePattern::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(vector::InsertElementOp insertOp,
+  LogicalResult matchAndRewrite(vector::InsertOp insertOp,
                                 PatternRewriter &rewriter) const override {
     if (insertOp.getDestVectorType().getNumElements() != 1)
       return failure();
@@ -209,7 +208,7 @@ struct VectorReductionToGPUPass final
       vector::populateVectorMultiReductionLoweringPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerReduction);
       // Add clean up patterns after lowering of multidimreduce lowering.
-      patterns.add<InsertElementToBroadcast>(ctx);
+      patterns.add<InsertToBroadcast>(ctx);
       vector::ShapeCastOp::getCanonicalizationPatterns(patterns, ctx);
       vector::BroadcastOp::getCanonicalizationPatterns(patterns, ctx);
       vector::ExtractOp::getCanonicalizationPatterns(patterns, ctx);
