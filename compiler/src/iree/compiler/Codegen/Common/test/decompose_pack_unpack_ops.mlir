@@ -12,9 +12,8 @@ func.func @simple_KCRS_to_KCRSsr(%arg0: tensor<1x1x32x8xf32>, %arg1: tensor<1x1x
 // CHECK-RESHAPE:     %[[EXPANDED:.+]] = tensor.expand_shape %[[IN]] {{\[}}[0], [1], [2, 3], [4, 5]] output_shape [1, 1, 1, 32, 1, 8] : tensor<1x1x32x8xf32> into tensor<1x1x1x32x1x8xf32>
 // CHECK-RESHAPE:     %[[RESULT:.+]] = linalg.transpose ins(%[[EXPANDED]] : tensor<1x1x1x32x1x8xf32>) outs(%[[OUT]] : tensor<1x1x1x1x8x32xf32>) permutation = [0, 1, 2, 4, 5, 3]
 
-// CHECK:             %[[TILE:.+]] = tensor.extract_slice %[[IN]][0, 0, 0, 0] [1, 1, 32, 8] [1, 1, 1, 1] : tensor<1x1x32x8xf32> to tensor<32x8xf32>
-// CHECK:             %[[EMPTY:.+]] = tensor.empty() : tensor<8x32xf32>
-// CHECK:             %[[TRANS:.+]] = linalg.transpose ins(%[[TILE]] : tensor<32x8xf32>) outs(%[[EMPTY]] : tensor<8x32xf32>) permutation = [1, 0]
+// CHECK:             %[[EMPTY:.+]] = tensor.empty() : tensor<1x1x8x32xf32>
+// CHECK:             %[[TRANS:.+]] = linalg.transpose ins(%[[IN]] : tensor<1x1x32x8xf32>) outs(%[[EMPTY]] : tensor<1x1x8x32xf32>) permutation = [0, 1, 3, 2]
 // CHECK:             %[[RESULT:.+]] = tensor.insert_slice %[[TRANS]] into %[[OUT]][0, 0, 0, 0, 0, 0] [1, 1, 1, 1, 8, 32] [1, 1, 1, 1, 1, 1]
 
 // CHECK-ALL:         return %[[RESULT]]

@@ -106,7 +106,7 @@ hal.executable @i4_dequant_unit_matmul_f16 {
 //         CHECK: %[[VS1:.+]] = spirv.VectorShuffle [2 : i32, 3 : i32] %[[LD]]
 //         CHECK: spirv.Bitcast %[[VS1]] : vector<2xi32> to vector<4xf16>
 
-//         CHECK: spirv.GroupNonUniformFAdd "Subgroup" "Reduce" {{.*}} : f16
+//         CHECK: spirv.GroupNonUniformFAdd <Subgroup> <Reduce> {{.*}} : f16
 
 //         CHECK: spirv.mlir.selection
 
@@ -223,6 +223,6 @@ hal.executable @i4_dequant_matvec_f16_subgroup_64 {
 //         CHECK: %[[LD:.+]] = spirv.Load "Function" {{.*}} : vector<4xf16>
 //         CHECK: %[[RES:.+]] = spirv.Dot %[[LD]], %[[CSTVEC4XF16_1]] : vector<4xf16> -> f16
 
-//         CHECK: spirv.GroupNonUniformFAdd "Subgroup" "Reduce" %[[RES]] : f16
+//         CHECK: spirv.GroupNonUniformFAdd <Subgroup> <Reduce> %[[RES]] : f16
 
 //         CHECK: spirv.mlir.selection
