@@ -64,7 +64,8 @@ The following semantics apply:
   change MUST be adopted by all (other) packages. The same applies for the
   version `Y` (`x.Y.Z`).
 * If the version `X` or `Y` are changed, `Z` MUST be set `0`.
-* After a regular (non-patch) release, `Y` MUST be increased to ensure precedence of nightly builds.
+* After a regular (non-patch) release, `Y` MUST be increased to ensure
+  precedence of nightly builds.
   For example:
     * The latest stable release published on November 15th 2024 is versioned as
       version `3.0.0`.
