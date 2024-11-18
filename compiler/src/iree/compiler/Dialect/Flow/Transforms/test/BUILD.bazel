@@ -30,7 +30,6 @@ iree_lit_test_suite(
             "outline_constants.mlir",
             "outline_dispatch_externs.mlir",
             "outline_dispatch_regions.mlir",
-            "pipeline_tests.mlir",
             "top_level_scf_to_cfg.mlir",
             "verify_input_ir.mlir",
         ],
