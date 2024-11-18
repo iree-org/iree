@@ -539,7 +539,8 @@ hal.executable private @generalized_pool {
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 hal.executable private @shared_mem_transpose  {
   hal.executable.variant @cuda target(#executable_target_cuda_nvptx_fb) {
-    hal.executable.export public @shared_mem_transpose layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
+    hal.executable.export @shared_mem_transpose layout(#pipeline_layout)
+      count(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
         %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
         hal.return %x, %y, %z : index, index, index
     }
