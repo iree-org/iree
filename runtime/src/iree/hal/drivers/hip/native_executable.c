@@ -483,17 +483,17 @@ iree_status_t iree_hal_hip_native_executable_lookup_kernel_params(
   *out_params = NULL;
   iree_hal_hip_native_executable_t* executable =
       iree_hal_hip_native_executable_cast(base_executable);
-  iree_host_size_t device_index = 0;
+  int device_ordinal = 0;
   if (queue_affinity) {
-    device_index = iree_math_count_trailing_zeros_u64(queue_affinity);
+    device_ordinal = iree_math_count_trailing_zeros_u64(queue_affinity);
   }
-  if (device_index > executable->num_devices) {
+  if (device_ordinal > executable->num_devices) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "affinity for non-existent queue was provided.");
   }
 
   const iree_hal_hip_native_executable_per_device_data_t* data =
-      executable->per_device_data[device_index];
+      executable->per_device_data[device_ordinal];
   if (ordinal >= data->export_count) {
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
