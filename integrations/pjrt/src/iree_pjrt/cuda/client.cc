@@ -31,7 +31,6 @@ iree_status_t CUDAClientInstance::CreateDriver(iree_hal_driver_t** out_driver) {
   iree_hal_cuda_device_params_t default_params;
   iree_hal_cuda_device_params_initialize(&default_params);
   default_params.command_buffer_mode = IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM;
-  default_params.allow_inline_execution = false;
 
   // Driver params.
   iree_hal_cuda_driver_options_t driver_options;
@@ -39,7 +38,7 @@ iree_status_t CUDAClientInstance::CreateDriver(iree_hal_driver_t** out_driver) {
   driver_options.default_device_index = 0;
 
   IREE_RETURN_IF_ERROR(
-      iree_hal_cuda_driver_create(driver_name, &default_params, &driver_options,
+      iree_hal_cuda_driver_create(driver_name, &driver_options, &default_params,
                                   host_allocator_, out_driver));
   logger().debug("CUDA driver created");
   return iree_ok_status();

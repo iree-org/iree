@@ -590,8 +590,8 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
       device_.device(), IREE_HAL_QUEUE_AFFINITY_ANY,
       /*wait_semaphore_list=*/iree_hal_fence_semaphore_list(ready_fence_.get()),
       /*signal_semaphore_list=*/
-      iree_hal_fence_semaphore_list(dst_buffer_ready_fence.get()), transfer_cb,
-      iree_hal_buffer_binding_table_empty()));
+      iree_hal_fence_semaphore_list(dst_buffer_ready_fence.get()),
+      transfer_cb.get()));
 
   *out_done_event = copy_done_event;
   return iree_ok_status();
@@ -836,9 +836,8 @@ iree_status_t DeviceInstance::HostBufferToDeviceSplat(
       /*binding_capacity=*/0, &transfer_cb));
   IREE_CHECK_OK(iree_hal_command_buffer_begin(transfer_cb.get()));
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_fill_buffer(
-      transfer_cb.get(), buffer.get(), /*target_offset=*/0,
-      /*target_size=*/byte_length, data, element_type_byte_size,
-      IREE_HAL_FILL_FLAG_NONE));
+      transfer_cb.get(), iree_hal_make_buffer_ref(buffer.get(), 0, byte_length),
+      data, element_type_byte_size, IREE_HAL_FILL_FLAG_NONE));
   IREE_CHECK_OK(iree_hal_command_buffer_end(transfer_cb.get()));
 
   // Execute the enqueued splat:
@@ -847,8 +846,7 @@ iree_status_t DeviceInstance::HostBufferToDeviceSplat(
       /*wait_semaphore_list=*/
       {1, &transfer_timeline_, &signal_alloca_complete},
       /*signal_semaphore_list=*/
-      {1, &transfer_timeline_, &signal_copy_complete}, transfer_cb,
-      iree_hal_buffer_binding_table_empty()));
+      {1, &transfer_timeline_, &signal_copy_complete}, transfer_cb.get()));
 
   // Wrap in a buffer view and return:
   iree::vm::ref<iree_hal_buffer_view_t> result_buffer_view;
@@ -1191,8 +1189,7 @@ iree_status_t DeviceInstance::HostBufferToDevice(
       /*wait_semaphore_list=*/
       {1, &transfer_timeline_, &signal_alloca_complete},
       /*signal_semaphore_list=*/
-      {1, &transfer_timeline_, &signal_copy_complete}, transfer_cb,
-      iree_hal_buffer_binding_table_empty()));
+      {1, &transfer_timeline_, &signal_copy_complete}, transfer_cb.get()));
 
   // Wrap in a buffer view and return.
   iree::vm::ref<iree_hal_buffer_view_t> result_buffer_view;
