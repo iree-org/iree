@@ -102,6 +102,28 @@ IREE_API_EXPORT bool iree_hal_hip_multi_queue_command_buffer_isa(
                               &iree_hal_hip_multi_queue_command_buffer_vtable);
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_hip_multi_queue_command_buffer_get(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_queue_affinity_t affinity,
+    iree_hal_command_buffer_t** out_command_buffer) {
+  *out_command_buffer = NULL;
+  if (iree_math_count_ones_u64(affinity) != 1) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "one and only one device may be specified.");
+  }
+  iree_hal_hip_multi_queue_command_buffer_t* command_buffer =
+      iree_hal_hip_multi_queue_command_buffer_cast(base_command_buffer);
+  if (!(command_buffer->base.queue_affinity & affinity)) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "no command buffer for affinity %lu", affinity);
+  }
+  uint64_t index = iree_math_count_ones_u64(
+      command_buffer->base.queue_affinity & (affinity - 1));
+
+  *out_command_buffer = command_buffer->child_buffers[index];
+  return iree_ok_status();
+}
+
 #define CALL_COMMAND(status, command)                                      \
   iree_hal_queue_affinity_t a = command_buffer->base.queue_affinity;       \
   iree_host_size_t command_buffer_index = 0;                               \
@@ -306,28 +328,6 @@ static iree_status_t iree_hal_hip_multi_queue_command_buffer_dispatch_indirect(
                            executable, entry_point, workgroups_ref, constants,
                            bindings, flags));
   return status;
-}
-
-IREE_API_EXPORT iree_status_t iree_hal_hip_multi_queue_command_buffer_get(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_queue_affinity_t affinity,
-    iree_hal_command_buffer_t** out_command_buffer) {
-  *out_command_buffer = NULL;
-  if (iree_math_count_ones_u64(affinity) != 1) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "one and only one device may be specified.");
-  }
-  iree_hal_hip_multi_queue_command_buffer_t* command_buffer =
-      iree_hal_hip_multi_queue_command_buffer_cast(base_command_buffer);
-  if (!(command_buffer->base.queue_affinity & affinity)) {
-    return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "no command buffer for affinity %lu", affinity);
-  }
-  uint64_t index = iree_math_count_ones_u64(
-      command_buffer->base.queue_affinity & (affinity - 1));
-
-  *out_command_buffer = command_buffer->child_buffers[index];
-  return iree_ok_status();
 }
 
 static const iree_hal_command_buffer_vtable_t
