@@ -11,7 +11,7 @@
 
 #ifdef __cplusplus
 extern "C" {
-#endif
+#endif  // __cplusplus
 
 // A circular array where we can push to the back and pop from the front.
 // The helper functions allow you to index into the array. Furthermore an
@@ -51,8 +51,8 @@ void iree_hal_hip_util_queue_pop_front(iree_hal_hip_util_queue_t* queue,
 void* iree_hal_hip_util_queue_at(const iree_hal_hip_util_queue_t* queue,
                                  iree_host_size_t i);
 
-#define IREE_HAL__HIP_UTIL_TYPED_QUEUE_WRAPPER(name, type,                     \
-                                               default_element_count)          \
+#define IREE_HAL_HIP_UTIL_TYPED_QUEUE_WRAPPER(name, type,                      \
+                                              default_element_count)           \
   typedef struct name##_t {                                                    \
     iree_allocator_t allocator;                                                \
     void* elements;                                                            \

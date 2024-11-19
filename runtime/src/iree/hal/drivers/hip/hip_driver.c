@@ -219,7 +219,7 @@ static iree_status_t iree_hal_hip_driver_query_available_devices(
   int valid_device_count = 0;
   if (iree_status_is_ok(status)) {
     uint8_t* buffer_ptr =
-        (uint8_t*)device_infos + device_count * sizeof(iree_hal_device_info_t);
+        (uint8_t*)device_infos + device_count * sizeof(*device_infos);
     for (iree_host_size_t i = 0; i < device_count; ++i) {
       hipDevice_t device = 0;
       status = IREE_HIP_CALL_TO_STATUS(
@@ -449,7 +449,7 @@ static iree_status_t iree_hal_hip_driver_get_device_id_by_index(
     iree_hal_device_id_t* out_id) {
   iree_hal_hip_driver_t* driver = iree_hal_hip_driver_cast(base_driver);
 
-  int32_t device_index;
+  int32_t device_index = 0;
   if (!iree_string_view_atoi_int32(device_path, &device_index)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "device path is not an index");
@@ -548,7 +548,7 @@ static iree_status_t iree_hal_hip_driver_create_multi_queue_device_by_path(
   IREE_ASSERT_ARGUMENT(base_driver);
   IREE_ASSERT_ARGUMENT(out_device);
 
-  uint64_t multi_count = 0;
+  iree_host_size_t multi_count = 0;
   for (iree_host_size_t offs = 0; offs < device_path.size;) {
     iree_host_size_t comma_pos =
         iree_string_view_find_char(device_path, ',', offs);
@@ -563,7 +563,7 @@ static iree_status_t iree_hal_hip_driver_create_multi_queue_device_by_path(
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       host_allocator, sizeof(*device_ids) * multi_count, (void**)&device_ids));
 
-  iree_host_size_t idx = 0;
+  iree_host_size_t device_index = 0;
   for (iree_host_size_t offset = 0; offset < device_path.size;) {
     iree_host_size_t comma_pos =
         iree_string_view_find_char(device_path, ',', offset);
@@ -573,18 +573,18 @@ static iree_status_t iree_hal_hip_driver_create_multi_queue_device_by_path(
     iree_string_view_t this_device_path =
         iree_string_view_substr(device_path, offset, comma_pos - offset);
     iree_status_t status = iree_hal_hip_driver_get_device_id_by_path(
-        base_driver, this_device_path, &device_ids[idx]);
+        base_driver, this_device_path, &device_ids[device_index]);
     if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
       iree_allocator_free(host_allocator, device_ids);
       return status;
     }
     offset = comma_pos + 1;
-    ++idx;
+    ++device_index;
   }
 
   iree_status_t status = iree_hal_hip_driver_create_multi_queue_device_by_ids(
-      base_driver, device_ids, idx, param_count, params, host_allocator,
-      out_device);
+      base_driver, device_ids, device_index, param_count, params,
+      host_allocator, out_device);
   iree_allocator_free(host_allocator, device_ids);
   return status;
 }

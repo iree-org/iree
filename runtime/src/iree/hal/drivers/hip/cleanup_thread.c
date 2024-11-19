@@ -14,7 +14,7 @@ typedef struct iree_hal_hip_cleanup_thread_callback_t {
   iree_hal_hip_event_t* event;
 } iree_hal_hip_cleanup_thread_callback_t;
 
-IREE_HAL__HIP_UTIL_TYPED_QUEUE_WRAPPER(
+IREE_HAL_HIP_UTIL_TYPED_QUEUE_WRAPPER(
     iree_hal_hip_callback_queue, iree_hal_hip_cleanup_thread_callback_t,
     iree_hal_hip_cleanup_thread_default_queue_size);
 

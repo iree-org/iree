@@ -363,14 +363,15 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_hal_hip_buffer_allocate");
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, allocation_size);
 
-  uint32_t device_idx = 0;
+  iree_host_size_t device_index = 0;
   if (params->queue_affinity) {
-    device_idx = iree_math_count_trailing_zeros_u64(params->queue_affinity);
+    device_index = iree_math_count_trailing_zeros_u64(params->queue_affinity);
   }
 
   status = IREE_HIP_CALL_TO_STATUS(
       allocator->symbols,
-      hipCtxPushCurrent(allocator->topology->devices[device_idx].hip_context));
+      hipCtxPushCurrent(
+          allocator->topology->devices[device_index].hip_context));
   if (!iree_status_is_ok(status)) {
     return status;
   }
@@ -392,8 +393,9 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
             allocator->symbols,
             hipMemPrefetchAsync(
                 device_ptr, allocation_size,
-                allocator->topology->devices[device_idx].hip_device,
-                allocator->topology->devices[device_idx].hip_dispatch_stream));
+                allocator->topology->devices[device_index].hip_device,
+                allocator->topology->devices[device_index]
+                    .hip_dispatch_stream));
       }
       host_ptr = (void*)device_ptr;
     } else {
@@ -535,14 +537,15 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
   void* host_ptr = NULL;
   hipDeviceptr_t device_ptr = NULL;
 
-  uint32_t device_idx = 0;
+  iree_host_size_t device_index = 0;
   if (params->queue_affinity) {
-    device_idx = iree_math_count_trailing_zeros_u64(params->queue_affinity);
+    device_index = iree_math_count_trailing_zeros_u64(params->queue_affinity);
   }
 
   status = IREE_HIP_CALL_TO_STATUS(
       allocator->symbols,
-      hipCtxPushCurrent(allocator->topology->devices[device_idx].hip_context));
+      hipCtxPushCurrent(
+          allocator->topology->devices[device_index].hip_context));
   if (!iree_status_is_ok(status)) {
     return status;
   }

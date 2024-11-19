@@ -9,7 +9,7 @@
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
-IREE_HAL__HIP_UTIL_TYPED_QUEUE_WRAPPER(test_queue, int32_t, 4);
+IREE_HAL_HIP_UTIL_TYPED_QUEUE_WRAPPER(test_queue, int32_t, 4);
 
 class QueueTest : public ::testing::Test {
  protected:
