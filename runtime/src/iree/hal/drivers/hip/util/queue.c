@@ -6,8 +6,6 @@
 
 #include "iree/hal/drivers/hip/util/queue.h"
 
-#include "iree/base/api.h"
-
 void iree_hal_hip_util_queue_initialize(iree_allocator_t allocator,
                                         iree_host_size_t element_size,
                                         iree_host_size_t inline_count,
@@ -32,7 +30,7 @@ iree_status_t iree_hal_hip_util_queue_push_back(
   // Expand the queue if necessary.
   if (queue->capacity == queue->element_count) {
     uint8_t* new_mem = NULL;
-    queue->capacity = iree_max(16, queue->capacity << 1);
+    queue->capacity = iree_max(16, queue->capacity * 2);
     if (queue->elements == &queue->initial_allocation[0]) {
       IREE_RETURN_IF_ERROR(iree_allocator_malloc(
           queue->allocator, queue->element_size * queue->capacity,

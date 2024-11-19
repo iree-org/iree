@@ -274,9 +274,9 @@ static iree_status_t iree_hal_hip_device_initialize_internal(
 
     for (iree_host_size_t i = 0; i < device->topology.count; ++i) {
       iree_hal_hip_tracing_device_interface_t* tracing_device_interface;
-      status = iree_allocator_malloc(
-          host_allocator, sizeof(iree_hal_hip_tracing_device_interface_t),
-          (void**)&tracing_device_interface);
+      status = iree_allocator_malloc(host_allocator,
+                                     sizeof(*tracing_device_interface),
+                                     (void**)&tracing_device_interface);
 
       if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
         iree_hal_device_release((iree_hal_device_t*)device);
@@ -711,8 +711,7 @@ static iree_status_t iree_hal_hip_device_create_command_buffer_internal(
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
 
   iree_hal_command_buffer_t* buffers[IREE_HAL_MAX_QUEUES];
-  memset(buffers, 0x00,
-         sizeof(iree_hal_command_buffer_t*) * IREE_HAL_MAX_QUEUES);
+  memset(buffers, 0x00, sizeof(buffers[0]) * IREE_HAL_MAX_QUEUES);
   if (queue_affinity == 0) {
     queue_affinity = IREE_HAL_QUEUE_AFFINITY_ANY;
   }
@@ -720,17 +719,17 @@ static iree_status_t iree_hal_hip_device_create_command_buffer_internal(
       queue_affinity & ~(IREE_HAL_QUEUE_AFFINITY_ANY << device->topology.count);
 
   iree_status_t status = iree_ok_status();
-  iree_host_size_t idx = 0;
+  iree_host_size_t device_index = 0;
   iree_host_size_t cb_num = 0;
   iree_hal_queue_affinity_t affinity = queue_affinity;
   while (iree_status_is_ok(status) && affinity) {
-    iree_host_size_t next_idx_offset =
+    iree_host_size_t next_device_index_offset =
         iree_math_count_trailing_zeros_u64(affinity);
-    idx += next_idx_offset;
-    affinity >>= next_idx_offset + 1;
+    device_index += next_device_index_offset;
+    affinity >>= next_device_index_offset + 1;
     status = IREE_HIP_CALL_TO_STATUS(
         device->hip_symbols,
-        hipCtxPushCurrent(device->topology.devices[idx].hip_context));
+        hipCtxPushCurrent(device->topology.devices[device_index].hip_context));
     if (!iree_status_is_ok(status)) {
       break;
     }
@@ -741,10 +740,10 @@ static iree_status_t iree_hal_hip_device_create_command_buffer_internal(
             iree_hal_hip_stream_command_buffer_create(
                 iree_hal_device_allocator(base_device), device->hip_symbols,
                 device->nccl_symbols,
-                device->topology.devices[idx].tracing_context, mode,
-                command_categories, (iree_hal_queue_affinity_t)1 << idx,
-                binding_capacity,
-                device->topology.devices[idx].hip_dispatch_stream,
+                device->topology.devices[device_index].tracing_context, mode,
+                command_categories,
+                (iree_hal_queue_affinity_t)1 << device_index, binding_capacity,
+                device->topology.devices[device_index].hip_dispatch_stream,
                 &device->block_pool, device->host_allocator, &buffers[cb_num]));
         break;
       case IREE_HAL_HIP_DEVICE_COMMAND_BUFFER_TYPE_GRAPH:
@@ -752,16 +751,16 @@ static iree_status_t iree_hal_hip_device_create_command_buffer_internal(
             status,
             iree_hal_hip_graph_command_buffer_create(
                 iree_hal_device_allocator(base_device), device->hip_symbols,
-                device->topology.devices[idx].tracing_context,
-                device->topology.devices[idx].hip_context, mode,
-                command_categories, (iree_hal_queue_affinity_t)1 << idx,
-                binding_capacity, &device->block_pool, device->host_allocator,
-                &buffers[cb_num]));
+                device->topology.devices[device_index].tracing_context,
+                device->topology.devices[device_index].hip_context, mode,
+                command_categories,
+                (iree_hal_queue_affinity_t)1 << device_index, binding_capacity,
+                &device->block_pool, device->host_allocator, &buffers[cb_num]));
         break;
     }
     status =
         IREE_HIP_CALL_TO_STATUS(device->hip_symbols, hipCtxPopCurrent(NULL));
-    ++idx;
+    ++device_index;
     ++cb_num;
   }
 
@@ -1020,7 +1019,7 @@ static iree_status_t
 iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
     iree_hal_hip_device_t* device,
     iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_host_size_t device_idx, iree_hal_hip_cleanup_callback_t callback,
+    iree_host_size_t device_index, iree_hal_hip_cleanup_callback_t callback,
     void* user_data) {
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "Record completion semaphores");
   iree_status_t status = iree_ok_status();
@@ -1032,7 +1031,7 @@ iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
         z0, iree_hal_hip_semaphore_get_hip_event(
                 signal_semaphore_list.semaphores[i],
                 signal_semaphore_list.payload_values[i],
-                device->topology.devices[device_idx].device_event_pool, true,
+                device->topology.devices[device_index].device_event_pool, true,
                 &event));
     if (!event) {
       return iree_make_status(IREE_STATUS_ABORTED, "the hip event is missing");
@@ -1041,7 +1040,7 @@ iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
         device->hip_symbols,
         hipEventRecord(
             iree_hal_hip_event_handle(event),
-            device->topology.devices[device_idx].hip_dispatch_stream));
+            device->topology.devices[device_index].hip_dispatch_stream));
     iree_hal_hip_event_release(event);
   }
   IREE_TRACE_ZONE_END(z0);
@@ -1062,14 +1061,14 @@ iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z2,
       iree_hal_hip_event_pool_acquire(
-          device->topology.devices[device_idx].device_event_pool, 1, &event));
+          device->topology.devices[device_index].device_event_pool, 1, &event));
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z2, IREE_HIP_CALL_TO_STATUS(
               device->hip_symbols,
               hipEventRecord(
                   iree_hal_hip_event_handle(event),
-                  device->topology.devices[device_idx].hip_dispatch_stream)));
+                  device->topology.devices[device_index].hip_dispatch_stream)));
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z2, iree_hal_hip_cleanup_thread_add_cleanup(device->cleanup_thread, event,
@@ -1110,7 +1109,7 @@ static iree_status_t iree_hal_hip_device_complete_buffer_operation(
 static iree_status_t iree_hal_hip_device_stream_wait_for_semaphores(
     iree_hal_hip_device_t* device,
     iree_hal_semaphore_list_t wait_semaphore_list,
-    iree_host_size_t device_idx) {
+    iree_host_size_t device_index) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = iree_ok_status();
   // TODO(awoloszyn): Because of how hip works, if we only have a single
@@ -1124,7 +1123,7 @@ static iree_status_t iree_hal_hip_device_stream_wait_for_semaphores(
         z0, iree_hal_hip_semaphore_get_hip_event(
                 wait_semaphore_list.semaphores[i],
                 wait_semaphore_list.payload_values[i],
-                device->topology.devices[device_idx].device_event_pool, false,
+                device->topology.devices[device_index].device_event_pool, false,
                 &event));
     // If we don't have an event, then we don't have to wait for it since it
     // has already been signaled on the host.
@@ -1138,7 +1137,7 @@ static iree_status_t iree_hal_hip_device_stream_wait_for_semaphores(
         IREE_HIP_CALL_TO_STATUS(
             device->hip_symbols,
             hipStreamWaitEvent(
-                device->topology.devices[device_idx].hip_dispatch_stream,
+                device->topology.devices[device_index].hip_dispatch_stream,
                 iree_hal_hip_event_handle(event), 0)));
     iree_hal_hip_event_release(event);
     IREE_TRACE_ZONE_END(z1);
@@ -1167,19 +1166,19 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
     return data->status;
   }
 
-  iree_host_size_t idx =
+  iree_host_size_t device_index =
       iree_math_count_trailing_zeros_u64(data->queue_affinity);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, idx);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, device_index);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      IREE_HIP_CALL_TO_STATUS(
-          data->device->hip_symbols,
-          hipCtxPushCurrent(data->device->topology.devices[idx].hip_context)));
+      z0, IREE_HIP_CALL_TO_STATUS(
+              data->device->hip_symbols,
+              hipCtxPushCurrent(
+                  data->device->topology.devices[device_index].hip_context)));
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_device_stream_wait_for_semaphores(
-              data->device, data->wait_semaphore_list, idx));
+              data->device, data->wait_semaphore_list, device_index));
 
   // We have satisfied all of the waits.
 
@@ -1190,23 +1189,26 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
       if (device->supports_memory_pools) {
         status = iree_hal_hip_memory_pools_allocate_pointer(
             &device->memory_pools, data->buffer,
-            device->topology.devices[idx].hip_dispatch_stream,
+            device->topology.devices[device_index].hip_dispatch_stream,
             iree_hal_buffer_allocation_size(data->buffer));
         break;
       }
       status = iree_hal_hip_allocator_alloc_async(
           iree_hal_device_allocator((iree_hal_device_t*)data->device),
-          device->topology.devices[idx].hip_dispatch_stream, data->buffer);
+          device->topology.devices[device_index].hip_dispatch_stream,
+          data->buffer);
       break;
     case IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_DEALLOC:
       if (device->supports_memory_pools) {
         status = iree_hal_hip_memory_pools_deallocate(
             &device->memory_pools,
-            device->topology.devices[idx].hip_dispatch_stream, data->buffer);
+            device->topology.devices[device_index].hip_dispatch_stream,
+            data->buffer);
       }
       status = iree_hal_hip_allocator_free_async(
           iree_hal_device_allocator((iree_hal_device_t*)data->device),
-          device->topology.devices[idx].hip_dispatch_stream, data->buffer);
+          device->topology.devices[device_index].hip_dispatch_stream,
+          data->buffer);
       break;
   }
   IREE_TRACE_ZONE_END(z3);
@@ -1222,7 +1224,7 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
-              data->device, data->signal_semaphore_list, idx,
+              data->device, data->signal_semaphore_list, device_index,
               &iree_hal_hip_device_complete_buffer_operation, data));
 
   status = IREE_HIP_CALL_TO_STATUS(symbols, hipCtxPopCurrent(NULL));
@@ -1270,7 +1272,8 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
   queue_affinity_mask = queue_affinity_mask | (queue_affinity_mask - 1);
   queue_affinity &= queue_affinity_mask;
 
-  uint64_t device_index = iree_math_count_trailing_zeros_u64(queue_affinity);
+  iree_host_size_t device_index =
+      iree_math_count_trailing_zeros_u64(queue_affinity);
   queue_affinity = (uint64_t)1 << device_index;
 
   if (!iree_all_bits_set(params.type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) &&
@@ -1403,10 +1406,10 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
   // drop it on the floor and let it be freed when the buffer is released.
   iree_status_t status = iree_ok_status();
   if (device->supports_memory_pools) {
-    uint64_t device_num = 0;
+    iree_host_size_t device_index = 0;
     if (queue_affinity) {
-      device_num = iree_math_count_trailing_zeros_u64(queue_affinity);
-      if (device_num > device->topology.count) {
+      device_index = iree_math_count_trailing_zeros_u64(queue_affinity);
+      if (device_index > device->topology.count) {
         IREE_TRACE_ZONE_END(z0);
         return iree_make_status(
             IREE_STATUS_INVALID_ARGUMENT,
@@ -1417,7 +1420,7 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
 
     status = iree_hal_hip_memory_pools_deallocate(
         &device->memory_pools,
-        device->topology.devices[device_num].hip_dispatch_stream, buffer);
+        device->topology.devices[device_index].hip_dispatch_stream, buffer);
   }
 
   // Only signal if not returning a synchronous error - synchronous failure
@@ -1502,7 +1505,8 @@ static iree_status_t iree_hal_hip_device_complete_submission(
   iree_hal_hip_device_t* device = data->device;
 
   // Get the device_context from the queue_affinity.
-  uint32_t idx = iree_math_count_trailing_zeros_u64(data->queue_affinity);
+  iree_host_size_t device_index =
+      iree_math_count_trailing_zeros_u64(data->queue_affinity);
 
   // 1) Read any tracing events that were submitted.
 
@@ -1518,7 +1522,7 @@ static iree_status_t iree_hal_hip_device_complete_submission(
         status,
         iree_hal_stream_tracing_context_collect_list(
             // Get the tracing context from the device/stream/queue affinity.
-            device->topology.devices[idx].tracing_context,
+            device->topology.devices[device_index].tracing_context,
             // Get the tracing event list from the command buffer.
             iree_hal_hip_stream_command_buffer_tracing_events(command_buffer)
                 .head));
@@ -1527,7 +1531,7 @@ static iree_status_t iree_hal_hip_device_complete_submission(
         status,
         iree_hal_stream_tracing_context_collect_list(
             // Get the tracing context from the device/stream/queue affinity.
-            device->topology.devices[idx].tracing_context,
+            device->topology.devices[device_index].tracing_context,
             // Get the tracing event list from the command buffer.
             iree_hal_hip_graph_command_buffer_tracing_events(command_buffer)
                 .head));
@@ -1575,19 +1579,19 @@ static iree_status_t iree_hal_hip_device_execute_now(
     return status;
   }
 
-  iree_host_size_t idx =
+  iree_host_size_t device_index =
       iree_math_count_trailing_zeros_u64(data->queue_affinity);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, idx);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, device_index);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      IREE_HIP_CALL_TO_STATUS(
-          data->device->hip_symbols,
-          hipCtxPushCurrent(data->device->topology.devices[idx].hip_context)));
+      z0, IREE_HIP_CALL_TO_STATUS(
+              data->device->hip_symbols,
+              hipCtxPushCurrent(
+                  data->device->topology.devices[device_index].hip_context)));
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_device_stream_wait_for_semaphores(
-              data->device, data->wait_semaphore_list, idx));
+              data->device, data->wait_semaphore_list, device_index));
 
   // We have satisfied all of the waits.
 
@@ -1634,8 +1638,8 @@ static iree_status_t iree_hal_hip_device_execute_now(
     IREE_TRACE_ZONE_BEGIN_NAMED(z3, "HipGraphLaunch");
     status = IREE_HIP_CALL_TO_STATUS(
         data->device->hip_symbols,
-        hipGraphLaunch(exec,
-                       device->topology.devices[idx].hip_dispatch_stream));
+        hipGraphLaunch(
+            exec, device->topology.devices[device_index].hip_dispatch_stream));
     IREE_TRACE_ZONE_END(z3);
   } else if (command_buffer) {
     status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -1650,7 +1654,7 @@ static iree_status_t iree_hal_hip_device_execute_now(
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
-              data->device, data->signal_semaphore_list, idx,
+              data->device, data->signal_semaphore_list, device_index,
               iree_hal_hip_device_complete_submission, data));
 
   status = IREE_HIP_CALL_TO_STATUS(symbols, hipCtxPopCurrent(NULL));
@@ -1806,8 +1810,9 @@ static iree_status_t iree_hal_hip_device_queue_execute(
   queue_affinity_mask = queue_affinity_mask | (queue_affinity_mask - 1);
   queue_affinity &= queue_affinity_mask;
 
-  uint64_t nidx = iree_math_count_trailing_zeros_u64(queue_affinity);
-  queue_affinity = (uint64_t)1 << nidx;
+  iree_host_size_t device_index =
+      iree_math_count_trailing_zeros_u64(queue_affinity);
+  queue_affinity = (uint64_t)1 << device_index;
 
   iree_hal_hip_device_semaphore_submit_callback_data_t* callback_data;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -1828,7 +1833,7 @@ static iree_status_t iree_hal_hip_device_queue_execute(
     status = iree_hal_hip_semaphore_notify_work(
         wait_semaphore_list.semaphores[i],
         wait_semaphore_list.payload_values[i],
-        device->topology.devices[nidx].device_event_pool,
+        device->topology.devices[device_index].device_event_pool,
         &iree_hal_hip_device_semaphore_submit_callback, callback_data);
   }
   if (!iree_status_is_ok(status)) {

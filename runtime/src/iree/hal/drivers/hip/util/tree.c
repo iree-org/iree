@@ -6,10 +6,6 @@
 
 #include "iree/hal/drivers/hip/util/tree.h"
 
-#include <stdint.h>
-
-#include "iree/base/api.h"
-
 static iree_hal_hip_util_tree_node_t*
 iree_hal_hip_util_tree_get_node_from_cache(iree_hal_hip_util_tree_t* tree) {
   if (tree->cache) {
@@ -38,15 +34,13 @@ static iree_status_t iree_hal_hip_util_tree_allocate_node(
   iree_hal_hip_util_tree_node_t* node =
       iree_hal_hip_util_tree_get_node_from_cache(tree);
   if (node) {
-    memset(node, 0, sizeof(iree_hal_hip_util_tree_node_t) + tree->element_size);
+    memset(node, 0, sizeof(*node) + tree->element_size);
   } else {
     IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-        tree->allocator,
-        sizeof(iree_hal_hip_util_tree_node_t) + tree->element_size,
-        (void**)&node));
+        tree->allocator, sizeof(*node) + tree->element_size, (void**)&node));
   }
   *out_node = node;
-  node->data = (uint8_t*)node + sizeof(iree_hal_hip_util_tree_node_t);
+  node->data = (uint8_t*)node + sizeof(*node);
   return iree_ok_status();
 }
 
@@ -401,19 +395,19 @@ void iree_hal_hip_util_tree_initialize(iree_allocator_t allocator,
   out_tree->root = &out_tree->nil;
   out_tree->size = 0;
   out_tree->cache = NULL;  // Initialize cache
-  memset(&out_tree->nil, 0x00, sizeof(iree_hal_hip_util_tree_node_t));
+  memset(&out_tree->nil, 0x00, sizeof(out_tree->nil));
   out_tree->nil.is_sentinel = true;
   out_tree->initial_node_cache = initial_node_cache;
   out_tree->initial_node_cache_size = initial_node_cache_size;
   if (initial_node_cache) {
     memset(initial_node_cache, 0, initial_node_cache_size);
-    iree_host_size_t node_size = iree_host_align(
-        sizeof(iree_hal_hip_util_tree_node_t) + element_size, 16);
+    iree_host_size_t node_size =
+        iree_host_align(sizeof(out_tree->nil) + element_size, 16);
 
     iree_hal_hip_util_tree_node_t* node =
         (iree_hal_hip_util_tree_node_t*)initial_node_cache;
     for (iree_host_size_t i = 0; i < initial_node_cache_size / node_size; ++i) {
-      node->data = (uint8_t*)node + sizeof(iree_hal_hip_util_tree_node_t);
+      node->data = (uint8_t*)node + sizeof(*node);
       iree_hal_hip_util_tree_add_node_to_cache(out_tree, node);
       node = (iree_hal_hip_util_tree_node_t*)((uint8_t*)node + node_size);
     }
@@ -438,7 +432,7 @@ void iree_hal_hip_util_tree_deinitialize(iree_hal_hip_util_tree_t* tree) {
 
   // Reset the tree structure.
   tree->root = &tree->nil;
-  memset(&tree->nil, 0, sizeof(iree_hal_hip_util_tree_node_t));
+  memset(&tree->nil, 0, sizeof(tree->nil));
   tree->nil.is_sentinel = true;
   tree->size = 0;
   tree->cache = NULL;
