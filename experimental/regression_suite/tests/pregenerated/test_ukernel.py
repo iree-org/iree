@@ -6,6 +6,7 @@
 
 import pytest
 from ireers_tools import *
+from pathlib import Path
 
 ###############################################################################
 # Fixtures
@@ -25,7 +26,7 @@ argmax_ukernel_source = fetch_source_fixture(
 def argmax_ukernel_host_cpu_vmfb(argmax_ukernel_source):
     return iree_compile(
         argmax_ukernel_source,
-        "host_cpu",
+        vmfb_path=Path("host_cpu"),
         flags=COMMON_FLAGS
         + [
             "--iree-hal-target-backends=llvm-cpu",
@@ -38,7 +39,7 @@ def argmax_ukernel_host_cpu_vmfb(argmax_ukernel_source):
 def argmax_ukernel_gfx90a_rocm_vmfb(argmax_ukernel_source):
     return iree_compile(
         argmax_ukernel_source,
-        "gfx90a_rocm",
+        vmfb_path=Path("gfx90a_rocm"),
         flags=COMMON_FLAGS
         + [
             "--iree-hal-target-backends=rocm",
@@ -52,7 +53,7 @@ def argmax_ukernel_gfx90a_rocm_vmfb(argmax_ukernel_source):
 def argmax_ukernel_gfx940_rocm_vmfb(argmax_ukernel_source):
     return iree_compile(
         argmax_ukernel_source,
-        "gfx940_rocm",
+        vmfb_path=Path("gfx940_rocm"),
         flags=COMMON_FLAGS
         + [
             "--iree-hal-target-backends=rocm",
