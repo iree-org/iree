@@ -273,7 +273,7 @@ static iree_status_t iree_hal_hip_device_initialize_internal(
     }
 
     for (iree_host_size_t i = 0; i < device->topology.count; ++i) {
-      iree_hal_hip_tracing_device_interface_t* tracing_device_interface;
+      iree_hal_hip_tracing_device_interface_t* tracing_device_interface = NULL;
       status = iree_allocator_malloc(host_allocator,
                                      sizeof(*tracing_device_interface),
                                      (void**)&tracing_device_interface);
@@ -367,7 +367,7 @@ iree_status_t iree_hal_hip_device_create(
   IREE_ASSERT_ARGUMENT(out_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_hip_device_t* device;
+  iree_hal_hip_device_t* device = NULL;
   const iree_host_size_t total_device_size =
       sizeof(*device) + sizeof(iree_hal_hip_per_device_info_t) * device_count +
       identifier.size;
@@ -1026,7 +1026,7 @@ iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
 
   for (iree_host_size_t i = 0;
        i < signal_semaphore_list.count && iree_status_is_ok(status); ++i) {
-    iree_hal_hip_event_t* event;
+    iree_hal_hip_event_t* event = NULL;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_hip_semaphore_get_hip_event(
                 signal_semaphore_list.semaphores[i],
@@ -1056,7 +1056,7 @@ iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
   IREE_TRACE_ZONE_END(z1);
 
   IREE_TRACE_ZONE_BEGIN_NAMED(z2, "Enqueueing Cleanup");
-  iree_hal_hip_event_t* event;
+  iree_hal_hip_event_t* event = NULL;
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z2,
@@ -1118,7 +1118,7 @@ static iree_status_t iree_hal_hip_device_stream_wait_for_semaphores(
   // to work across multiple device/streams, we need these waits.
   for (iree_host_size_t i = 0;
        i < wait_semaphore_list.count && iree_status_is_ok(status); ++i) {
-    iree_hal_hip_event_t* event;
+    iree_hal_hip_event_t* event = NULL;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_hip_semaphore_get_hip_event(
                 wait_semaphore_list.semaphores[i],
@@ -1814,7 +1814,7 @@ static iree_status_t iree_hal_hip_device_queue_execute(
       iree_math_count_trailing_zeros_u64(queue_affinity);
   queue_affinity = (uint64_t)1 << device_index;
 
-  iree_hal_hip_device_semaphore_submit_callback_data_t* callback_data;
+  iree_hal_hip_device_semaphore_submit_callback_data_t* callback_data = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_device_make_callback_data(
               device, device->host_allocator, &device->block_pool,

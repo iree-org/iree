@@ -569,7 +569,7 @@ static iree_status_t iree_hal_hip_semaphore_wait(
     // cleanup thread, or someone else to advance the
     // semaphore.
     iree_slim_mutex_unlock(&semaphore->mutex);
-    iree_hal_hip_cpu_event_t* cpu_event;
+    iree_hal_hip_cpu_event_t* cpu_event = NULL;
     status =
         iree_hal_hip_semaphore_get_cpu_event(base_semaphore, value, &cpu_event);
     if (!iree_status_is_ok(status)) {
@@ -640,7 +640,7 @@ iree_status_t iree_hal_hip_semaphore_multi_wait(
     }
   }
 
-  iree_wait_set_t* wait_set;
+  iree_wait_set_t* wait_set = NULL;
   if (iree_status_is_ok(status) && !semaphore_hit) {
     status =
         iree_wait_set_allocate(semaphore_list.count, host_allocator, &wait_set);
@@ -712,7 +712,7 @@ iree_status_t iree_hal_hip_semaphore_notify_work(
     iree_hal_hip_semaphore_queue_item_t* item =
         (iree_hal_hip_semaphore_queue_item_t*)
             iree_hal_hip_util_tree_node_get_value(node);
-    iree_hal_hip_semaphore_work_item_t* work_item;
+    iree_hal_hip_semaphore_work_item_t* work_item = NULL;
     iree_status_t status = iree_allocator_malloc(
         semaphore->host_allocator, sizeof(*work_item), (void**)&work_item);
     if (!iree_status_is_ok(status)) {
