@@ -208,14 +208,14 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
 std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func);
 
 /// Returns all `IREE::HAL::ExecutableVariantOp` operations from the
-/// given `mlir::ModuleOp`,  ensuring they are returned in their original IR
+/// given `mlir::ModuleOp`, ensuring they are returned in their original IR
 /// order.
-llvm::SmallVector<IREE::HAL::ExecutableVariantOp>
+SmallVector<IREE::HAL::ExecutableVariantOp>
 getExecutableVariantOps(mlir::ModuleOp moduleOp);
 
 // Returns the MMA intrinsics associated with the given
 // `IREE::HAL::ExecutableVariantOp`.
-llvm::SmallVector<IREE::GPU::MMAIntrinsic>
+SmallVector<IREE::GPU::MMAIntrinsic>
 queryMMAIntrinsics(IREE::HAL::ExecutableVariantOp executableOp);
 
 } // namespace mlir::iree_compiler

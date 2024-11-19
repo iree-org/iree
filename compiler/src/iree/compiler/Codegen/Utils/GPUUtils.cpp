@@ -1028,17 +1028,16 @@ std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func) {
   return std::nullopt;
 }
 
-llvm::SmallVector<IREE::HAL::ExecutableVariantOp>
+SmallVector<IREE::HAL::ExecutableVariantOp>
 getExecutableVariantOps(mlir::ModuleOp moduleOp) {
   llvm::SmallVector<IREE::HAL::ExecutableVariantOp> executableVariantOps;
-  moduleOp.walk<WalkOrder::PreOrder>(
-      [&](IREE::HAL::ExecutableVariantOp executableOp) {
-        executableVariantOps.push_back(executableOp);
-      });
+  moduleOp.walk([&](IREE::HAL::ExecutableVariantOp executableOp) {
+    executableVariantOps.push_back(executableOp);
+  });
   return executableVariantOps;
 }
 
-llvm::SmallVector<IREE::GPU::MMAIntrinsic>
+SmallVector<IREE::GPU::MMAIntrinsic>
 queryMMAIntrinsics(IREE::HAL::ExecutableVariantOp executableOp) {
   llvm::SmallVector<IREE::GPU::MMAIntrinsic> mmaIntrinsics;
   if (IREE::GPU::TargetAttr target = getGPUTargetAttr(executableOp)) {
