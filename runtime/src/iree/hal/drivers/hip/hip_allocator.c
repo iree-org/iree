@@ -63,7 +63,7 @@ iree_status_t iree_hal_hip_allocator_create(
   IREE_ASSERT_ARGUMENT(hip_symbols);
   IREE_ASSERT_ARGUMENT(out_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
-
+  *out_allocator = NULL;
   if (topology->count < 1) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "Invalid number of devices, must be at least one");
@@ -325,6 +325,8 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
     iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  IREE_ASSERT_ARGUMENT(out_buffer);
+  *out_buffer = NULL;
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
 
@@ -500,6 +502,8 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
     iree_hal_external_buffer_t* IREE_RESTRICT external_buffer,
     iree_hal_buffer_release_callback_t release_callback,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  IREE_ASSERT_ARGUMENT(out_buffer);
+  *out_buffer = NULL;
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
 

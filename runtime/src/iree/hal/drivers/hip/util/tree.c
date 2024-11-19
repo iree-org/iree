@@ -31,6 +31,7 @@ static void iree_hal_hip_util_tree_delete_node(
 
 static iree_status_t iree_hal_hip_util_tree_allocate_node(
     iree_hal_hip_util_tree_t* tree, iree_hal_hip_util_tree_node_t** out_node) {
+  *out_node = NULL;
   iree_hal_hip_util_tree_node_t* node =
       iree_hal_hip_util_tree_get_node_from_cache(tree);
   if (node) {
@@ -446,6 +447,7 @@ iree_host_size_t iree_hal_hip_util_tree_element_size(
 iree_status_t iree_hal_hip_util_tree_insert(
     iree_hal_hip_util_tree_t* tree, iree_host_size_t key,
     iree_hal_hip_util_tree_node_t** out_data) {
+  *out_data = NULL;
   iree_hal_hip_util_tree_node_t* t = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_hip_util_tree_allocate_node(tree, &t));
 

@@ -94,6 +94,7 @@ iree_status_t iree_hal_hip_cleanup_thread_initialize(
     iree_allocator_t host_allocator,
     iree_hal_hip_cleanup_thread_t** out_thread) {
   IREE_TRACE_ZONE_BEGIN(z0);
+  *out_thread = NULL;
   iree_hal_hip_cleanup_thread_t* thread = NULL;
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(

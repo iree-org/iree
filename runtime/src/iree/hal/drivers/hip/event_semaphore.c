@@ -228,6 +228,7 @@ iree_status_t iree_hal_hip_event_semaphore_create(
   IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
+  *out_semaphore = NULL;
 
   iree_hal_hip_semaphore_t* semaphore = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -347,6 +348,7 @@ static iree_status_t iree_hal_hip_semaphore_query(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_slim_mutex_lock(&semaphore->mutex);
+  *out_value = semaphore->current_visible_value;
 
   iree_status_t status =
       iree_hal_hip_semaphore_query_locked(semaphore, out_value);
@@ -423,6 +425,8 @@ static void iree_hal_hip_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
 static iree_status_t iree_hal_hip_semaphore_get_cpu_event(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
     iree_hal_hip_cpu_event_t** out_event) {
+  IREE_ASSERT_ARGUMENT(out_event);
+  *out_event = NULL;
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -743,12 +747,12 @@ iree_status_t iree_hal_hip_semaphore_get_hip_event(
     iree_hal_hip_event_t** out_hip_event) {
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
+  *out_hip_event = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_slim_mutex_lock(&semaphore->mutex);
   if (value <= semaphore->current_visible_value) {
     iree_slim_mutex_unlock(&semaphore->mutex);
     IREE_TRACE_ZONE_END(z0);
-    *out_hip_event = NULL;
     return iree_ok_status();
   }
   iree_status_t status = semaphore->failure_status;

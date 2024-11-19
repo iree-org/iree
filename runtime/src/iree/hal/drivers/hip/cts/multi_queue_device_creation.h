@@ -15,6 +15,7 @@
 inline iree_status_t iree_hal_drivers_hip_cts_default_multi_queue_create(
     iree_hal_driver_t* driver, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
+  *out_device = NULL;
   std::multimap<std::string, iree_host_size_t> grouped_devices;
 
   iree_host_size_t device_info_count = 0;
