@@ -98,7 +98,6 @@ static iree_status_t iree_hal_hip_event_semaphore_advance(
   // Take out all of the values from the queue that are less than the
   // current visible value, and make sure we advance any work needed
   // on them.
-  iree_status_t status = iree_ok_status();
   do {
     iree_slim_mutex_lock(&semaphore->mutex);
     iree_hal_hip_util_tree_node_t* node =
@@ -141,15 +140,14 @@ static iree_status_t iree_hal_hip_event_semaphore_advance(
   iree_slim_mutex_lock(&semaphore->mutex);
   semaphore->max_value_to_be_signaled = iree_max(
       semaphore->max_value_to_be_signaled, semaphore->current_visible_value);
-  status =
-      iree_status_join(status, iree_status_clone(semaphore->failure_status));
+  iree_status_t status = iree_status_clone(semaphore->failure_status);
   iree_slim_mutex_unlock(&semaphore->mutex);
   // Now that we have accumulated all of the work items, and we have
   // unlocked the semaphore, start running through the work items.
   while (work_item) {
     iree_hal_hip_semaphore_work_item_t* next_work_item = work_item->next;
-    work_item->scheduled_callback(work_item->user_data, base_semaphore,
-                                  iree_status_clone(status));
+    iree_status_ignore(work_item->scheduled_callback(
+        work_item->user_data, base_semaphore, iree_status_clone(status)));
     iree_allocator_free(semaphore->host_allocator, work_item);
     work_item = next_work_item;
   }
@@ -293,15 +291,19 @@ static iree_status_t iree_hal_hip_semaphore_query_locked(
       node = iree_hal_hip_util_tree_node_next(node);
       continue;
     }
-    iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
-        semaphore->symbols,
-        hipEventQuery(iree_hal_hip_event_handle(
+
+    hipError_t err =
+        semaphore->symbols->hipEventQuery(iree_hal_hip_event_handle(
             ((iree_hal_hip_semaphore_queue_item_t*)
                  iree_hal_hip_util_tree_node_get_value(node))
-                ->event)));
-    if (!iree_status_is_ok(status)) {
+                ->event));
+    if (err == hipErrorNotReady) {
       break;
     }
+    if (err != hipSuccess) {
+      return IREE_HIP_RESULT_TO_STATUS(semaphore->symbols, err);
+    }
+
     *out_value = iree_hal_hip_util_tree_node_get_key(node);
     node = iree_hal_hip_util_tree_node_next(node);
   }
@@ -496,7 +498,8 @@ static iree_status_t iree_hal_hip_semaphore_wait(
         iree_notification_prepare_wait(&semaphore->state_notification);
     iree_slim_mutex_unlock(&semaphore->mutex);
 
-    iree_hal_hip_event_semaphore_advance(base_semaphore);
+    // We are going to pick up the correct status from query_locked below.
+    iree_status_ignore(iree_hal_hip_event_semaphore_advance(base_semaphore));
 
     // We have to wait for the semaphore to catch up.
     if (!iree_notification_commit_wait(&semaphore->state_notification, wait,
@@ -550,7 +553,7 @@ static iree_status_t iree_hal_hip_semaphore_wait(
     iree_hal_hip_event_retain(event);
     iree_slim_mutex_unlock(&semaphore->mutex);
     iree_hal_hip_event_semaphore_advance(base_semaphore);
-    status = IREE_HIP_RESULT_TO_STATUS(
+    status = IREE_HIP_CALL_TO_STATUS(
         semaphore->symbols,
         hipEventSynchronize(iree_hal_hip_event_handle(event)));
     iree_hal_hip_event_release(event);

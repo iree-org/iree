@@ -17,6 +17,7 @@
 
 typedef struct iree_hal_hip_multi_queue_command_buffer_t {
   iree_hal_command_buffer_t base;
+  iree_allocator_t host_allocator;
   iree_host_size_t command_buffer_count;
   const iree_hal_hip_device_topology_t* topology;
   const iree_hal_hip_dynamic_symbols_t* hip_symbols;
@@ -72,6 +73,7 @@ IREE_API_EXPORT iree_status_t iree_hal_hip_multi_queue_command_buffer_create(
   memcpy(command_buffer->child_buffers, in_command_buffers,
          sizeof(iree_hal_command_buffer_t*) * command_buffer_count);
 
+  command_buffer->host_allocator = host_allocator;
   command_buffer->command_buffer_count = command_buffer_count;
   command_buffer->topology = topology;
   command_buffer->hip_symbols = hip_symbols;
@@ -90,6 +92,7 @@ static void iree_hal_hip_multi_queue_command_buffer_destroy(
       iree_hal_resource_release(command_buffer->child_buffers[i]);
     }
   }
+  iree_allocator_free(command_buffer->host_allocator, command_buffer);
   IREE_TRACE_ZONE_END(z0);
 }
 
@@ -99,27 +102,27 @@ IREE_API_EXPORT bool iree_hal_hip_multi_queue_command_buffer_isa(
                               &iree_hal_hip_multi_queue_command_buffer_vtable);
 }
 
-#define CALL_COMMAND(status, command)                                  \
-  iree_hal_queue_affinity_t a = command_buffer->base.queue_affinity;   \
-  uint64_t num = 0;                                                    \
-  uint64_t idx = 0;                                                    \
-  while (a && IREE_LIKELY(iree_status_is_ok(status))) {                \
-    uint64_t ct = iree_math_count_trailing_zeros_u64(a);               \
-    idx += ct;                                                         \
-    status = IREE_HIP_RESULT_TO_STATUS(                                \
-        command_buffer->hip_symbols,                                   \
-        hipCtxPushCurrent(                                             \
-            command_buffer->topology->devices[idx].hip_context));      \
-    if (!iree_status_is_ok(status)) {                                  \
-      break;                                                           \
-    }                                                                  \
-    status = command;                                                  \
-    a >>= (ct + 1);                                                    \
-    idx += 1;                                                          \
-    status = iree_status_join(                                         \
-        status, IREE_HIP_RESULT_TO_STATUS(command_buffer->hip_symbols, \
-                                          hipCtxPopCurrent(NULL)));    \
-    ++num;                                                             \
+#define CALL_COMMAND(status, command)                                \
+  iree_hal_queue_affinity_t a = command_buffer->base.queue_affinity; \
+  uint64_t num = 0;                                                  \
+  uint64_t idx = 0;                                                  \
+  while (a && IREE_LIKELY(iree_status_is_ok(status))) {              \
+    uint64_t ct = iree_math_count_trailing_zeros_u64(a);             \
+    idx += ct;                                                       \
+    status = IREE_HIP_CALL_TO_STATUS(                                \
+        command_buffer->hip_symbols,                                 \
+        hipCtxPushCurrent(                                           \
+            command_buffer->topology->devices[idx].hip_context));    \
+    if (!iree_status_is_ok(status)) {                                \
+      break;                                                         \
+    }                                                                \
+    status = command;                                                \
+    a >>= (ct + 1);                                                  \
+    idx += 1;                                                        \
+    status = iree_status_join(                                       \
+        status, IREE_HIP_CALL_TO_STATUS(command_buffer->hip_symbols, \
+                                        hipCtxPopCurrent(NULL)));    \
+    ++num;                                                           \
   }
 
 static iree_status_t iree_hal_hip_multi_queue_command_buffer_begin(

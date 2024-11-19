@@ -64,7 +64,7 @@ IREE_API_EXPORT void iree_hal_hip_driver_options_initialize(
 static iree_status_t iree_hal_hip_init(iree_hal_hip_driver_t* driver) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status =
-      IREE_HIP_RESULT_TO_STATUS(&driver->hip_symbols, hipInit(0), "hipInit");
+      IREE_HIP_CALL_TO_STATUS(&driver->hip_symbols, hipInit(0), "hipInit");
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -222,7 +222,7 @@ static iree_status_t iree_hal_hip_driver_query_available_devices(
         (uint8_t*)device_infos + device_count * sizeof(iree_hal_device_info_t);
     for (iree_host_size_t i = 0; i < device_count; ++i) {
       hipDevice_t device = 0;
-      status = IREE_HIP_RESULT_TO_STATUS(
+      status = IREE_HIP_CALL_TO_STATUS(
           &driver->hip_symbols, hipDeviceGet(&device, i), "hipDeviceGet");
       if (!iree_status_is_ok(status)) break;
       status = iree_hal_hip_populate_device_info(
