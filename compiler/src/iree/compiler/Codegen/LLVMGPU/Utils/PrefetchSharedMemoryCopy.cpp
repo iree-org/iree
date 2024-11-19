@@ -250,65 +250,6 @@ private:
     return success();
   }
 
-  /// Clones the given operation and maps the operands and results to the new
-  /// operations. The operands are updated to reference the newly created
-  /// operations. The mapping is updated to map the results of the old operation
-  /// to the new one.
-  Operation *cloneAndMapOperation(RewriterBase &rewriter, Operation *op,
-                                  IRMapping &mapping) {
-    // Clone the operation
-    Operation *newOp = rewriter.clone(*op, mapping);
-
-    // Update the operands to reference the newly created operations
-    for (OpOperand &operand : newOp->getOpOperands()) {
-      if (mapping.contains(operand.get())) {
-        operand.set(mapping.lookup(operand.get()));
-      }
-    }
-
-    // Map the results of the old operation to the new one
-    for (unsigned i = 0, e = op->getNumResults(); i != e; ++i) {
-      mapping.map(op->getResult(i), newOp->getResult(i));
-    }
-
-    return newOp;
-  }
-
-  void cloneAndMapRegion(RewriterBase &rewriter, Region &srcRegion,
-                         Region &destRegion, IRMapping &mapping) {
-    rewriter.setInsertionPointToStart(&destRegion.front());
-    for (Operation &nestedOp : srcRegion.front()) {
-      cloneAndMapOperation(rewriter, &nestedOp, mapping);
-    }
-  }
-
-  void cloneAndMapIfOp(RewriterBase &rewriter, scf::IfOp ifOp,
-                       IRMapping &mapping) {
-    // Clone the scf::IfOp with its operands mapped
-    auto newIfOp = rewriter.create<scf::IfOp>(
-        ifOp.getLoc(), ifOp.getResultTypes(),
-        mapping.lookup(ifOp.getCondition()),
-        /*withElseRegion=*/ifOp.getElseRegion().empty() ? false : true);
-
-    // Map the results of the old scf::IfOp to the new one
-    for (unsigned i = 0, e = ifOp.getNumResults(); i != e; ++i) {
-      mapping.map(ifOp.getResult(i), newIfOp.getResult(i));
-    }
-
-    // Clone the then region
-    cloneAndMapRegion(rewriter, ifOp.getThenRegion(), newIfOp.getThenRegion(),
-                      mapping);
-
-    // Clone the else region, if it exists
-    if (!ifOp.getElseRegion().empty()) {
-      cloneAndMapRegion(rewriter, ifOp.getElseRegion(), newIfOp.getElseRegion(),
-                        mapping);
-    }
-
-    // Reset the insertion point to after the new scf::IfOp
-    rewriter.setInsertionPointAfter(newIfOp);
-  }
-
   /// Creates all read stage ops for a loop iteration with |rewriter| and maps
   /// the original loop induction variable to |iv| in |mapping|.
   void emitRead(IRMapping &mapping, RewriterBase &rewriter, Value iv) {
@@ -316,15 +257,7 @@ private:
     mapping.map(forOp.getInductionVar(), iv);
 
     for (Operation *op : readStage) {
-      // Check if this is scf.if op and handle it separately. This is needed
-      // because the scf.if op has regions and we need to clone the regions
-      // separately instead of just the op.
-      if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
-        cloneAndMapIfOp(rewriter, ifOp, mapping);
-        continue;
-      }
-
-      cloneAndMapOperation(rewriter, op, mapping);
+      rewriter.clone(*op, mapping);
     }
   }
 
@@ -335,7 +268,7 @@ private:
     mapping.map(forOp.getInductionVar(), iv);
 
     for (Operation *op : writeStage) {
-      cloneAndMapOperation(rewriter, op, mapping);
+      rewriter.clone(*op, mapping);
     }
   }
 
@@ -362,7 +295,7 @@ private:
         break;
       }
 
-      cloneAndMapOperation(rewriter, op, mapping);
+      rewriter.clone(*op, mapping);
     }
 
     return results;
@@ -371,7 +304,7 @@ private:
   void updateYield(IRMapping &mapping, RewriterBase &rewriter) {
     for (Operation *op : computeStage) {
       if (auto yield = dyn_cast<scf::YieldOp>(op)) {
-        cloneAndMapOperation(rewriter, op, mapping);
+        rewriter.clone(*op, mapping);
         break;
       }
     }
