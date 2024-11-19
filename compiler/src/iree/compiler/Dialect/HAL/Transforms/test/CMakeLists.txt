@@ -22,6 +22,7 @@ iree_lit_test_suite(
     "dump_executable_sources.mlir"
     "elide_redundant_commands.mlir"
     "fixup_legacy_sync.mlir"
+    "hoist_executable_objects.mlir"
     "initialize_devices.mlir"
     "inline_memoize_regions.mlir"
     "materialize_dispatch_instrumentation.mlir"
