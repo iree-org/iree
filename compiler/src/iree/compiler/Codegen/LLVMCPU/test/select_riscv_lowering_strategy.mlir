@@ -39,7 +39,7 @@ func.func @matmul_riscv() attributes {hal.executable.target = #executable_target
 
 #executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {cpu_features = "+m,+a,+f,+d,+zvl512b,+v", data_layout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128", native_vector_size = 128 : index, target_triple = "riscv64-unknown-unknown-eabi-elf"}>
 builtin.module {
-  func.func @matmul_riscv_vl512() attributes {hal.executable.target = #executable_target_embedded_elf_riscv_64_} {
+  func.func @matmul_gemm_riscv_vl512() attributes {hal.executable.target = #executable_target_embedded_elf_riscv_64_} {
     %cst = arith.constant 0.0 : f32
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<384x512xf32>>
     %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<512x128xf32>>
@@ -56,8 +56,8 @@ builtin.module {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [7, 64], [0, 0], [0, 0]]>
 //  CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [64, 64, 0], [0, 0, 0], [7, 64, 0], [0, 0, 1], [0, 0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
-//      CHECK: func.func @matmul_riscv_vl512()
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
+//      CHECK: func.func @matmul_gemm_riscv_vl512()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG2]]
@@ -72,7 +72,7 @@ builtin.module {
 
 #executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {cpu_features = "+m,+a,+f,+d,+zvl1024b,+v", data_layout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128", native_vector_size = 256 : index, target_triple = "riscv64-unknown-unknown-eabi-elf"}>
 builtin.module {
-  func.func @matmul_riscv_vl1024() attributes {hal.executable.target = #executable_target_embedded_elf_riscv_64_} {
+  func.func @matmul_gemm_riscv_vl1024() attributes {hal.executable.target = #executable_target_embedded_elf_riscv_64_} {
     %cst = arith.constant 0.0 : f32
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<384x512xf32>>
     %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<512x256xf32>>
@@ -89,16 +89,16 @@ builtin.module {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 128], [7, 128], [0, 0], [0, 0]]>
 //  CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 128, 0], [64, 128, 0], [0, 0, 0], [7, 128, 0], [0, 0, 1], [0, 0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
-//      CHECK: func.func @matmul_riscv_vl1024()
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
+//      CHECK: func.func @matmul_gemm_riscv_vl1024()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG2]]
 
 //  CHECK-AGGRESSIVE-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 256], [7, 128], [0, 0], [0, 0]]>
 //  CHECK-AGGRESSIVE-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 256, 0], [32, 256, 0], [0, 0, 0], [7, 128, 0], [0, 0, 1], [0, 0, 0]]>
-//  CHECK-AGGRESSIVE-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
-//      CHECK-AGGRESSIVE: func.func @matmul_riscv_vl1024()
+//  CHECK-AGGRESSIVE-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
+//      CHECK-AGGRESSIVE: func.func @matmul_gemm_riscv_vl1024()
 // CHECK-AGGRESSIVE-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK-AGGRESSIVE: linalg.matmul
 // CHECK-AGGRESSIVE-SAME:     lowering_config = #[[CONFIG2]]
@@ -113,7 +113,7 @@ builtin.module {
 
 #executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {cpu_features = "+m,+a,+f,+d,+zvl512b,+v", data_layout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128", native_vector_size = 128 : index, target_triple = "riscv64-unknown-unknown-eabi-elf"}>
 builtin.module {
-  func.func @gemv_riscv_vl512() attributes {hal.executable.target = #executable_target_embedded_elf_riscv_64_} {
+  func.func @matmul_gemv_riscv_vl512() attributes {hal.executable.target = #executable_target_embedded_elf_riscv_64_} {
     %cst = arith.constant 0.0 : f32
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<1x512xf32>>
     %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<512x128xf32>>
@@ -130,8 +130,8 @@ builtin.module {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 128], [1, 128], [0, 0], [0, 0]]>
 //  CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 128, 0], [0, 128, 0], [0, 0, 0], [1, 128, 0], [0, 0, 1], [0, 0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
-//      CHECK: func.func @gemv_riscv_vl512()
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
+//      CHECK: func.func @matmul_gemv_riscv_vl512()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG2]]
