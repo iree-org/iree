@@ -58,7 +58,7 @@ static int iree_hal_hip_cleanup_thread_main(void* param) {
       iree_slim_mutex_unlock(&thread->mutex);
 
       if (iree_status_is_ok(status)) {
-        status = IREE_HIP_RESULT_TO_STATUS(
+        status = IREE_HIP_CALL_TO_STATUS(
             thread->symbols,
             hipEventSynchronize(iree_hal_hip_event_handle(callback.event)));
       }

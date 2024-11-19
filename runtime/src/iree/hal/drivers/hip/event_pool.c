@@ -76,7 +76,7 @@ static inline iree_status_t iree_hal_hip_event_create(
   event->pool = pool;
   event->hip_event = NULL;
 
-  iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
+  iree_status_t status = IREE_HIP_CALL_TO_STATUS(
       symbols,
       hipEventCreateWithFlags(&event->hip_event, hipEventDisableTiming),
       "hipEventCreateWithFlags");
@@ -167,7 +167,7 @@ iree_status_t iree_hal_hip_event_pool_allocate(
   event_pool->available_count = 0;
   event_pool->device_context = device_context;
 
-  iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
+  iree_status_t status = IREE_HIP_CALL_TO_STATUS(
       symbols, hipCtxPushCurrent(device_context), "hipCtxPushCurrent");
 
   if (iree_status_is_ok(status)) {
@@ -178,8 +178,8 @@ iree_status_t iree_hal_hip_event_pool_allocate(
       if (!iree_status_is_ok(status)) break;
     }
     status = iree_status_join(
-        status, IREE_HIP_RESULT_TO_STATUS(symbols, hipCtxPopCurrent(NULL),
-                                          "hipCtxPopCurrent"));
+        status, IREE_HIP_CALL_TO_STATUS(symbols, hipCtxPopCurrent(NULL),
+                                        "hipCtxPopCurrent"));
   }
 
   if (iree_status_is_ok(status)) {
@@ -249,7 +249,7 @@ iree_status_t iree_hal_hip_event_pool_acquire(
   if (remaining_count > 0) {
     IREE_TRACE_ZONE_BEGIN_NAMED(z1, "event-pool-unpooled-acquire");
 
-    iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
+    iree_status_t status = IREE_HIP_CALL_TO_STATUS(
         event_pool->symbols, hipCtxPushCurrent(event_pool->device_context),
         "hipCtxPushCurrent");
     if (iree_status_is_ok(status)) {
@@ -266,7 +266,7 @@ iree_status_t iree_hal_hip_event_pool_acquire(
           break;
         }
       }
-      iree_status_t cleanup_status = IREE_HIP_RESULT_TO_STATUS(
+      iree_status_t cleanup_status = IREE_HIP_CALL_TO_STATUS(
           event_pool->symbols, hipCtxPopCurrent(NULL), "hipCtxPopCurrent");
       if (iree_status_is_ok(status) && !iree_status_is_ok(cleanup_status)) {
         // Clean up all of the events we've acquired.
