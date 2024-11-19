@@ -6,6 +6,8 @@
 
 #include "device.h"
 
+#include "allocator.h"
+
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -96,7 +98,14 @@ iree_status_t iree_hal_nl_sync_device_create(
                                       (char*)device + struct_size);
     device->host_allocator = host_allocator;
     device->device_allocator = device_allocator;
+
+    iree_hal_allocator_t *device_allocator = NULL;
+    iree_hal_nl_allocator_create(
+        host_allocator, &device_allocator);
+
     iree_hal_allocator_retain(device_allocator);
+    device->device_allocator = device_allocator;
+
     iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,
                                      &device->large_block_pool);
 

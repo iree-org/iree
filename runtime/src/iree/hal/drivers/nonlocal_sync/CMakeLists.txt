@@ -18,12 +18,16 @@ iree_cc_library(
     "driver.h"
     "event.h"
     "semaphore.h"
+    "../../nonlocal/buffer.h"
+    "../../nonlocal/allocator.h"
     "../../nonlocal/nl_api.h"
   SRCS
     "device.c"
     "driver.c"
     "event.c"
     "semaphore.c"
+    "../../nonlocal/buffer.c"
+    "../../nonlocal/allocator.c"
     "../../nonlocal/nl_api.c"
   DEPS
     iree::base
