@@ -180,7 +180,7 @@ static iree_status_t iree_hal_hip_util_tree_insert_internal(
 
 static bool iree_hal_hip_util_tree_walk_helper(
     iree_hal_hip_util_tree_node_t* node,
-    iree_hal_hip_util_tree_walk_type_e walk_type,
+    iree_hal_hip_util_tree_walk_type_t walk_type,
     iree_hal_hip_util_tree_walk_callback_fn_t callback, void* user_data) {
   IREE_ASSERT_LE(walk_type, IREE_TREE_WALK_POSTORDER);
   if (!node || node->is_sentinel) {
@@ -569,7 +569,7 @@ void iree_hal_hip_util_tree_erase(iree_hal_hip_util_tree_t* tree,
 
 void iree_hal_hip_util_tree_walk(
     const iree_hal_hip_util_tree_t* tree,
-    iree_hal_hip_util_tree_walk_type_e walk_type,
+    iree_hal_hip_util_tree_walk_type_t walk_type,
     iree_hal_hip_util_tree_walk_callback_fn_t callback, void* user_data) {
   iree_hal_hip_util_tree_walk_helper(tree->root, walk_type, callback,
                                      user_data);

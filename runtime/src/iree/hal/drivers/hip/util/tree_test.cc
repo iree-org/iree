@@ -138,7 +138,7 @@ TEST_F(RedBlackTreeTest, in_order_iterators_last) {
 
 class RedBlackTreeWalkTest
     : public RedBlackTreeTest,
-      public ::testing::WithParamInterface<iree_hal_hip_util_tree_walk_type_e> {
+      public ::testing::WithParamInterface<iree_hal_hip_util_tree_walk_type_t> {
 };
 
 TEST_P(RedBlackTreeWalkTest, walk) {

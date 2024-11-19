@@ -22,7 +22,7 @@ typedef enum iree_hal_hip_util_tree_walk_type_e {
   IREE_TREE_WALK_PREORDER,
   IREE_TREE_WALK_INORDER,
   IREE_TREE_WALK_POSTORDER,
-} iree_hal_hip_util_tree_walk_type_e;
+} iree_hal_hip_util_tree_walk_type_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_hip_util_tree_node_t
@@ -57,7 +57,7 @@ typedef bool (*iree_hal_hip_util_tree_walk_callback_fn_t)(
 // Walks the entire tree invoking the callback for every node in the tree.
 void iree_hal_hip_util_tree_walk(
     const iree_hal_hip_util_tree_t* tree,
-    iree_hal_hip_util_tree_walk_type_e walk_type,
+    iree_hal_hip_util_tree_walk_type_t walk_type,
     iree_hal_hip_util_tree_walk_callback_fn_t callback, void* user_data);
 
 // Returns the next node in the tree or NULL.
@@ -100,6 +100,7 @@ void iree_hal_hip_util_tree_deinitialize(iree_hal_hip_util_tree_t* tree);
 // Returns the number of bytes that are allocated for every value in the tree.
 iree_host_size_t iree_hal_hip_util_tree_element_size(
     const iree_hal_hip_util_tree_t* tree);
+
 // Inserts a new node into the tree with the given |key|.
 //
 // If the key is already present in the tree an error is returned.
@@ -116,6 +117,7 @@ iree_host_size_t iree_hal_hip_util_tree_size(
 iree_status_t iree_hal_hip_util_tree_move_node(
     iree_hal_hip_util_tree_t* tree, iree_hal_hip_util_tree_node_t* node,
     iree_host_size_t new_key);
+
 // Returns the node in the tree that has a given key.
 //
 // Returns NULL if the key could not be found in the tree.
@@ -129,6 +131,7 @@ iree_hal_hip_util_tree_node_t* iree_hal_hip_util_tree_lower_bound(
 // Returns the first node in the tree that has a key that is > |key| or NULL;
 iree_hal_hip_util_tree_node_t* iree_hal_hip_util_tree_upper_bound(
     const iree_hal_hip_util_tree_t* tree, iree_host_size_t key);
+
 // Returns the node in the tree with the smallest |key| or NULL.
 iree_hal_hip_util_tree_node_t* iree_hal_hip_util_tree_first(
     const iree_hal_hip_util_tree_t* tree);
