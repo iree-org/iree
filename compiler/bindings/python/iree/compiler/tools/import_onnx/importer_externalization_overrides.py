@@ -10,7 +10,7 @@ import string
 import iree.runtime as rt
 
 from ...dialects import util
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, NamedTuple
 
 try:
     import onnx
@@ -45,6 +45,14 @@ from ...ir import (
 )
 
 
+class ParamData(NamedTuple):
+    initializer_threshold: Optional[int]
+    num_elements_threshold: int
+    params_scope: str
+    data_dir: str
+    param_path: str
+
+
 class IREENodeImporter(onnx_importer.NodeImporter):
     def __init__(
         self,
@@ -55,8 +63,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         context_cache: "onnx_importer.ContextCache",
         module_op: Operation,
         module_cache: "onnx_importer.ModuleCache",
-        num_elements_threshold: int,
-        params_scope: str,
+        param_data: ParamData,
     ):
         super().__init__(
             graph_info,
@@ -69,9 +76,9 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         self.last_global_op = None
         self.symbol_table = SymbolTable(module_op)
         self.symbol_table.insert(parent_op)
-        self.num_elements_threshold = num_elements_threshold
+        self.param_data = param_data
+        self.param_count = 0
         self.param_archive = rt.ParameterIndex()
-        self.params_scope = params_scope
 
     def sanitize_name(self, name: str) -> str:
         # There are often some initializers in the models that have no name
@@ -115,7 +122,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
                 "type": TypeAttr.get(vtensor_type),
             }
 
-            external_scope_attr = StringAttr.get(self.params_scope)
+            external_scope_attr = StringAttr.get(self.param_data.params_scope)
             external_name_attr = StringAttr.get(name)
             ir_attrs["initial_value"] = Attribute.parse(
                 f"#stream.parameter.named<{external_scope_attr}::{external_name_attr}> : {vtensor_type}"
@@ -138,8 +145,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         cls,
         graph_info: onnx_importer.GraphInfo,
         module_op: Operation,
-        num_elements_threshold: int,
-        params_scope: str,
+        param_data: ParamData,
         context_cache: Optional["onnx_importer.ContextCache"] = None,
         module_cache: Optional["onnx_importer.ModuleCache"] = None,
         private: bool = False,
@@ -187,8 +193,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
             context_cache=cc,
             module_op=module_op,
             module_cache=mc,
-            num_elements_threshold=num_elements_threshold,
-            params_scope=params_scope,
+            param_data=param_data,
         )
         for node_name, input_value in zip(graph_info.input_map.keys(), block.arguments):
             imp._nv_map[node_name] = input_value
@@ -205,7 +210,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         num_elements = 1
         for d in dims:
             num_elements = num_elements * d
-        if num_elements < self.num_elements_threshold:
+        if num_elements < self.param_data.num_elements_threshold:
             imported_tensor = super().import_initializer(initializer)
             self._nv_map[initializer_name] = imported_tensor
             return imported_tensor
@@ -224,40 +229,50 @@ class IREENodeImporter(onnx_importer.NodeImporter):
             ).result
 
         self._nv_map[initializer_name] = converted_value
-        tensor_as_array = numpy_helper.to_array(initializer)
+        tensor_as_array = numpy_helper.to_array(
+            initializer, base_dir=self.param_data.data_dir
+        )
         self.param_archive.add_buffer(actual_symbol_name, tensor_as_array)
+        self.param_count = self.param_count + 1
+        if (
+            self.param_data.initializer_threshold
+            and self.param_count % self.param_data.initializer_threshold == 0
+        ):
+            self.param_archive = self.param_archive.create_archive_file(
+                self.param_data.param_path
+            )
         return converted_value
 
 
 ELEM_TYPE_TO_SIGNLESS_IR_TYPE = copy.deepcopy(onnx_importer.ELEM_TYPE_TO_IR_TYPE_CB)
 
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.INT64
-] = lambda: IntegerType.get_signless(64)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.INT32
-] = lambda: IntegerType.get_signless(32)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.INT16
-] = lambda: IntegerType.get_signless(16)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.INT8
-] = lambda: IntegerType.get_signless(8)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.INT4
-] = lambda: IntegerType.get_signless(4)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.UINT8
-] = lambda: IntegerType.get_signless(8)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.UINT4
-] = lambda: IntegerType.get_signless(4)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.UINT16
-] = lambda: IntegerType.get_signless(16)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.UINT64
-] = lambda: IntegerType.get_signless(64)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.UINT32
-] = lambda: IntegerType.get_signless(32)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.INT64] = (
+    lambda: IntegerType.get_signless(64)
+)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.INT32] = (
+    lambda: IntegerType.get_signless(32)
+)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.INT16] = (
+    lambda: IntegerType.get_signless(16)
+)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.INT8] = (
+    lambda: IntegerType.get_signless(8)
+)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.INT4] = (
+    lambda: IntegerType.get_signless(4)
+)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.UINT8] = (
+    lambda: IntegerType.get_signless(8)
+)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.UINT4] = (
+    lambda: IntegerType.get_signless(4)
+)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.UINT16] = (
+    lambda: IntegerType.get_signless(16)
+)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.UINT64] = (
+    lambda: IntegerType.get_signless(64)
+)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.UINT32] = (
+    lambda: IntegerType.get_signless(32)
+)

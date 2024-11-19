@@ -32,9 +32,25 @@ def main(args: argparse.Namespace):
 
     imp: Any = None
     if args.externalize_params:
-        imp = IREENodeImporter.define_function(
-            model_info.main_graph, m, args.num_elements_threshold, args.params_scope
+        default_param_path = Path(args.output_file).parent / Path(args.output_file).stem
+        param_path = (
+            (str(default_param_path) + "_params.irpa")
+            if args.save_params_to is None
+            else str(args.save_params_to)
         )
+        data_dir = (
+            args.data_dir
+            if args.data_dir is not None
+            else str(Path(args.input_file).parent)
+        )
+        param_data = ParamData(
+            args.num_elements_threshold,
+            args.params_scope,
+            data_dir,
+            param_path,
+            args.num_initializers_threshold,
+        )
+        imp = IREENodeImporter.define_function(model_info.main_graph, m, param_data)
     else:
         imp = onnx_importer.NodeImporter.define_function(model_info.main_graph, m)
     imp.import_all()
@@ -43,12 +59,6 @@ def main(args: argparse.Namespace):
         m.verify()
 
     if args.externalize_params:
-        default_param_path = Path(args.output_file).parent / Path(args.output_file).stem
-        param_path = (
-            (str(default_param_path) + "_params.irpa")
-            if args.save_params_to is None
-            else str(args.save_params_to)
-        )
         imp.param_archive.create_archive_file(param_path)
 
     # TODO: This isn't very efficient output. If these files ever
@@ -87,14 +97,15 @@ def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
 
     # Run the checker to test whether the file is above the threshold for
     # in-memory shape inference.  If not, go ahead and do the shape inference.
-    try:
-        onnx.checker.check_model(raw_model)
-        inferred_model = onnx.shape_inference.infer_shapes(
-            raw_model, data_prop=args.data_prop
-        )
-        return inferred_model
-    except ValueError:
-        pass
+    if args.check_model:
+        try:
+            onnx.checker.check_model(raw_model)
+            inferred_model = onnx.shape_inference.infer_shapes(
+                raw_model, data_prop=args.data_prop
+            )
+            return inferred_model
+        except ValueError:
+            pass
 
     # Model is too big for in-memory inference: do file-based shape inference
     # to a temp file.
@@ -111,7 +122,8 @@ def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
         # Load the temp file and the external data.
         inferred_model = onnx.load(temp_inferred_file, load_external_data=False)
         data_dir = Path(input_dir if args.data_dir is None else args.data_dir)
-        onnx.load_external_data_for_model(inferred_model, str(data_dir))
+        if not args.externalize_params:
+            onnx.load_external_data_for_model(inferred_model, str(data_dir))
 
         return inferred_model
 
@@ -144,6 +156,18 @@ def parse_arguments(argv=None) -> argparse.Namespace:
         help="Allows specification of a newer opset_version to update the model"
         " to before importing to MLIR. This can sometime assist with shape inference.",
         type=int,
+    )
+    parser.add_argument(
+        "--check-model",
+        help="specify whether to run the onnx model checker. For large models, it is recommended to set this to false.",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    parser.add_argument(
+        "--num-initializers-threshold",
+        help="The maximum number of initializer tensors to be stored in-memory when creating a param archive.",
+        type=Optional[int],
+        default=None,
     )
     parser.add_argument(
         "--num-elements-threshold",
