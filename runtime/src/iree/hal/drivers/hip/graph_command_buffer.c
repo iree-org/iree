@@ -371,7 +371,7 @@ static iree_status_t iree_hal_hip_graph_command_buffer_end(
 
   // Compile the graph.
   hipGraphNode_t error_node = NULL;
-  iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
+  iree_status_t status = IREE_HIP_CALL_TO_STATUS(
       command_buffer->symbols,
       hipGraphInstantiate(&command_buffer->hip_exec, command_buffer->hip_graph,
                           &error_node,

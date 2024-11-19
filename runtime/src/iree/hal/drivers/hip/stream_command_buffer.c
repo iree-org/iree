@@ -555,7 +555,7 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
         ((const uint32_t*)constants.data)[i];
   }
 
-  iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
+  iree_status_t status = IREE_HIP_CALL_TO_STATUS(
       command_buffer->hip_symbols,
       hipModuleLaunchKernel(
           kernel_params->function, workgroup_count[0], workgroup_count[1],

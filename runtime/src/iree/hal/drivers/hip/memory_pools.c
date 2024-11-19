@@ -43,7 +43,7 @@ static iree_status_t iree_hal_hip_create_memory_pool(
 
   IREE_HIP_RETURN_IF_ERROR(hip_symbols, hipMemPoolCreate(&pool, &pool_props),
                            "hipMemPoolCreate");
-  iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
+  iree_status_t status = IREE_HIP_CALL_TO_STATUS(
       hip_symbols,
       hipMemPoolSetAttribute(pool, hipMemPoolAttrReleaseThreshold,
                              &params.release_threshold),
@@ -228,7 +228,7 @@ iree_status_t iree_hal_hip_memory_pools_allocate_pointer(
           : pools->other;
 
   hipDeviceptr_t device_ptr = NULL;
-  IREE_RETURN_IF_ERROR(IREE_HIP_RESULT_TO_STATUS(
+  IREE_RETURN_IF_ERROR(IREE_HIP_CALL_TO_STATUS(
       pools->hip_symbols,
       hipMallocFromPoolAsync(&device_ptr, (size_t)allocation_size, memory_pool,
                              stream),
@@ -299,7 +299,7 @@ iree_status_t iree_hal_hip_memory_pools_deallocate(
     // Try to schedule the buffer for freeing.
     hipDeviceptr_t device_ptr = iree_hal_hip_buffer_device_pointer(buffer);
     if (device_ptr) {
-      status = IREE_HIP_RESULT_TO_STATUS(
+      status = IREE_HIP_CALL_TO_STATUS(
           pools->hip_symbols, hipFreeAsync(device_ptr, stream), "hipFreeAsync");
     }
     if (iree_status_is_ok(status)) {

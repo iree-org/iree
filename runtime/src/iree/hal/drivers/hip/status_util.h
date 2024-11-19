@@ -12,13 +12,21 @@
 #include "iree/base/api.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 
-// Converts a hipError_t to an iree_status_t.
+// Converts a call into the hip driver into an iree_status_t.
+//
+// Usage:
+//   iree_status_t status = IREE_HIP_CALL_TO_STATUS(hip_symbols,
+//                                                    hipDoThing(...));
+#define IREE_HIP_CALL_TO_STATUS(syms, expr, ...) \
+  iree_hal_hip_result_to_status((syms), ((syms)->expr), __FILE__, __LINE__)
+
+// Converts hip status into an iree_status_t.
 //
 // Usage:
 //   iree_status_t status = IREE_HIP_RESULT_TO_STATUS(hip_symbols,
 //                                                    hipDoThing(...));
-#define IREE_HIP_RESULT_TO_STATUS(syms, expr, ...) \
-  iree_hal_hip_result_to_status((syms), ((syms)->expr), __FILE__, __LINE__)
+#define IREE_HIP_RESULT_TO_STATUS(syms, result, ...) \
+  iree_hal_hip_result_to_status((syms), (result), __FILE__, __LINE__)
 
 // IREE_RETURN_IF_ERROR but implicitly converts the hipError_t return value to
 // an iree_status_t.

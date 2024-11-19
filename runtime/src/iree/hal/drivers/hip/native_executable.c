@@ -306,7 +306,7 @@ iree_status_t iree_hal_hip_native_executable_create(
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t j = 0; j < topology->count && iree_status_is_ok(status);
        ++j) {
-    status = IREE_HIP_RESULT_TO_STATUS(
+    status = IREE_HIP_CALL_TO_STATUS(
         symbols, hipCtxPushCurrent(topology->devices[j].hip_context),
         "hipCtxPushCurrent");
 
@@ -349,7 +349,7 @@ iree_status_t iree_hal_hip_native_executable_create(
           (void*)(uint32_t)sizeof(error_log),
       };
       hipModule_t module = NULL;
-      status = IREE_HIP_RESULT_TO_STATUS(
+      status = IREE_HIP_CALL_TO_STATUS(
           symbols,
           hipModuleLoadDataEx(&module, hsaco_image, IREE_ARRAYSIZE(jit_options),
                               jit_options, jit_option_values),
@@ -381,7 +381,7 @@ iree_status_t iree_hal_hip_native_executable_create(
           flatbuffers_string_t kernel_name =
               iree_hal_hip_ExportDef_kernel_name_get(export_def);
           hipFunction_t function = NULL;
-          status = IREE_HIP_RESULT_TO_STATUS(
+          status = IREE_HIP_CALL_TO_STATUS(
               symbols, hipModuleGetFunction(&function, module, kernel_name),
               "hipModuleGetFunction");
           if (!iree_status_is_ok(status)) break;
@@ -395,7 +395,7 @@ iree_status_t iree_hal_hip_native_executable_create(
 
           uint32_t block_shared_memory_size =
               iree_hal_hip_ExportDef_block_shared_memory_size_get(export_def);
-          status = IREE_HIP_RESULT_TO_STATUS(
+          status = IREE_HIP_CALL_TO_STATUS(
               symbols,
               hipFuncSetAttribute(
                   function,
@@ -438,8 +438,8 @@ iree_status_t iree_hal_hip_native_executable_create(
       }
     }
     {
-      IREE_IGNORE_ERROR(IREE_HIP_RESULT_TO_STATUS(
-          symbols, hipCtxPopCurrent(NULL), "hipCtxPopCurrent"));
+      IREE_IGNORE_ERROR(IREE_HIP_CALL_TO_STATUS(symbols, hipCtxPopCurrent(NULL),
+                                                "hipCtxPopCurrent"));
     }
   }
 
