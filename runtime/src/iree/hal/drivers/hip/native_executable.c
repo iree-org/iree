@@ -310,7 +310,7 @@ iree_status_t iree_hal_hip_native_executable_create(
         symbols, hipCtxPushCurrent(topology->devices[j].hip_context),
         "hipCtxPushCurrent");
 
-    if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+    if (!iree_status_is_ok(status)) {
       break;
     }
     iree_hal_hip_native_executable_per_device_data_t* per_device_data =
