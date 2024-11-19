@@ -614,10 +614,9 @@ iree_status_t iree_hal_hip_semaphore_multi_wait(
   }
 
   iree_hal_hip_cpu_event_t** cpu_events =
-      (iree_hal_hip_cpu_event_t**)iree_alloca(
-          semaphore_list.count * sizeof(iree_hal_hip_cpu_event_t*));
-  memset(cpu_events, 0x00,
-         sizeof(iree_hal_hip_cpu_event_t*) * semaphore_list.count);
+      (iree_hal_hip_cpu_event_t**)iree_alloca(semaphore_list.count *
+                                              sizeof(*cpu_events));
+  memset(cpu_events, 0x00, sizeof(*cpu_events) * semaphore_list.count);
   bool semaphore_hit = false;
   for (iree_host_size_t i = 0;
        i < semaphore_list.count && iree_status_is_ok(status); ++i) {

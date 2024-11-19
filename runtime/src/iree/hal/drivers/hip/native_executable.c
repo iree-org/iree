@@ -266,7 +266,7 @@ iree_status_t iree_hal_hip_native_executable_create(
   // Allocate storage for the executable and its associated data structures.
   iree_hal_hip_native_executable_t* executable = NULL;
   iree_host_size_t native_executable_device_info_size =
-      sizeof(iree_hal_hip_native_executable_per_device_data_t) +
+      sizeof(*executable->per_device_data[0]) +
       module_count * sizeof(executable->per_device_data[0]->modules[0]) +
       export_count * sizeof(executable->per_device_data[0]->exports[0]) +
       total_export_info_length;
@@ -482,17 +482,17 @@ iree_status_t iree_hal_hip_native_executable_lookup_kernel_params(
     const iree_hal_hip_kernel_params_t** out_params) {
   iree_hal_hip_native_executable_t* executable =
       iree_hal_hip_native_executable_cast(base_executable);
-  iree_host_size_t device_idx = 0;
+  iree_host_size_t device_index = 0;
   if (queue_affinity) {
-    device_idx = iree_math_count_trailing_zeros_u64(queue_affinity);
+    device_index = iree_math_count_trailing_zeros_u64(queue_affinity);
   }
-  if (device_idx > executable->num_devices) {
+  if (device_index > executable->num_devices) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "affinity for non-existent queue was provided.");
   }
 
   const iree_hal_hip_native_executable_per_device_data_t* data =
-      executable->per_device_data[device_idx];
+      executable->per_device_data[device_index];
   if (ordinal >= data->export_count) {
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
