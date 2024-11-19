@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/drivers/cuda/cuda_buffer.h"
+#include "buffer.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -12,34 +12,34 @@
 
 #include "iree/base/api.h"
 
-typedef struct iree_hal_cuda_buffer_t {
+typedef struct iree_hal_nl_buffer_t {
   iree_hal_buffer_t base;
-  iree_hal_cuda_buffer_type_t type;
+  iree_hal_nl_buffer_type_t type;
   void* host_ptr;
-  CUdeviceptr device_ptr;
+  nl_mem_device_ptr_t device_ptr;
   iree_hal_buffer_release_callback_t release_callback;
-} iree_hal_cuda_buffer_t;
+} iree_hal_nl_buffer_t;
 
-static const iree_hal_buffer_vtable_t iree_hal_cuda_buffer_vtable;
+static const iree_hal_buffer_vtable_t iree_hal_nl_buffer_vtable;
 
-static iree_hal_cuda_buffer_t* iree_hal_cuda_buffer_cast(
+static iree_hal_nl_buffer_t* iree_hal_nl_buffer_cast(
     iree_hal_buffer_t* base_value) {
-  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_cuda_buffer_vtable);
-  return (iree_hal_cuda_buffer_t*)base_value;
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_nl_buffer_vtable);
+  return (iree_hal_nl_buffer_t*)base_value;
 }
 
-static const iree_hal_cuda_buffer_t* iree_hal_cuda_buffer_const_cast(
+static const iree_hal_nl_buffer_t* iree_hal_nl_buffer_const_cast(
     const iree_hal_buffer_t* base_value) {
-  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_cuda_buffer_vtable);
-  return (const iree_hal_cuda_buffer_t*)base_value;
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_nl_buffer_vtable);
+  return (const iree_hal_nl_buffer_t*)base_value;
 }
 
-iree_status_t iree_hal_cuda_buffer_wrap(
+iree_status_t iree_hal_nl_buffer_wrap(
     iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
-    iree_hal_cuda_buffer_type_t buffer_type, CUdeviceptr device_ptr,
+    iree_hal_nl_buffer_type_t buffer_type, nl_mem_device_ptr_t device_ptr,
     void* host_ptr, iree_hal_buffer_release_callback_t release_callback,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(out_buffer);
@@ -52,14 +52,14 @@ iree_status_t iree_hal_cuda_buffer_wrap(
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_cuda_buffer_t* buffer = NULL;
+  iree_hal_nl_buffer_t* buffer = NULL;
   iree_status_t status =
       iree_allocator_malloc(host_allocator, sizeof(*buffer), (void**)&buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_buffer_initialize(host_allocator, allocator, &buffer->base,
                                allocation_size, byte_offset, byte_length,
                                memory_type, allowed_access, allowed_usage,
-                               &iree_hal_cuda_buffer_vtable, &buffer->base);
+                               &iree_hal_nl_buffer_vtable, &buffer->base);
     buffer->type = buffer_type;
     buffer->host_ptr = host_ptr;
     buffer->device_ptr = device_ptr;
@@ -71,8 +71,8 @@ iree_status_t iree_hal_cuda_buffer_wrap(
   return status;
 }
 
-static void iree_hal_cuda_buffer_destroy(iree_hal_buffer_t* base_buffer) {
-  iree_hal_cuda_buffer_t* buffer = iree_hal_cuda_buffer_cast(base_buffer);
+static void iree_hal_nl_buffer_destroy(iree_hal_buffer_t* base_buffer) {
+  iree_hal_nl_buffer_t* buffer = iree_hal_nl_buffer_cast(base_buffer);
   iree_allocator_t host_allocator = base_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
   if (buffer->release_callback.fn) {
@@ -83,14 +83,14 @@ static void iree_hal_cuda_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   IREE_TRACE_ZONE_END(z0);
 }
 
-static iree_status_t iree_hal_cuda_buffer_map_range(
+static iree_status_t iree_hal_nl_buffer_map_range(
     iree_hal_buffer_t* base_buffer, iree_hal_mapping_mode_t mapping_mode,
     iree_hal_memory_access_t memory_access,
     iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
     iree_hal_buffer_mapping_t* mapping) {
   IREE_ASSERT_ARGUMENT(base_buffer);
   IREE_ASSERT_ARGUMENT(mapping);
-  iree_hal_cuda_buffer_t* buffer = iree_hal_cuda_buffer_cast(base_buffer);
+  iree_hal_nl_buffer_t* buffer = iree_hal_nl_buffer_cast(base_buffer);
 
   // TODO(benvanik): add upload/download for unmapped buffers.
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
@@ -118,58 +118,58 @@ static iree_status_t iree_hal_cuda_buffer_map_range(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_buffer_unmap_range(
+static iree_status_t iree_hal_nl_buffer_unmap_range(
     iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length, iree_hal_buffer_mapping_t* mapping) {
   // Nothing to do today.
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_buffer_invalidate_range(
+static iree_status_t iree_hal_nl_buffer_invalidate_range(
     iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length) {
   // Nothing to do today.
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_buffer_flush_range(
+static iree_status_t iree_hal_nl_buffer_flush_range(
     iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length) {
   // Nothing to do today.
   return iree_ok_status();
 }
 
-iree_hal_cuda_buffer_type_t iree_hal_cuda_buffer_type(
+iree_hal_nl_buffer_type_t iree_hal_nl_buffer_type(
     const iree_hal_buffer_t* base_buffer) {
-  const iree_hal_cuda_buffer_t* buffer =
-      iree_hal_cuda_buffer_const_cast(base_buffer);
+  const iree_hal_nl_buffer_t* buffer =
+      iree_hal_nl_buffer_const_cast(base_buffer);
   return buffer->type;
 }
 
-CUdeviceptr iree_hal_cuda_buffer_device_pointer(
+nl_mem_device_ptr_t iree_hal_nl_buffer_device_pointer(
     const iree_hal_buffer_t* base_buffer) {
-  const iree_hal_cuda_buffer_t* buffer =
-      iree_hal_cuda_buffer_const_cast(base_buffer);
+  const iree_hal_nl_buffer_t* buffer =
+      iree_hal_nl_buffer_const_cast(base_buffer);
   return buffer->device_ptr;
 }
 
-void* iree_hal_cuda_buffer_host_pointer(const iree_hal_buffer_t* base_buffer) {
-  const iree_hal_cuda_buffer_t* buffer =
-      iree_hal_cuda_buffer_const_cast(base_buffer);
+void* iree_hal_nl_buffer_host_pointer(const iree_hal_buffer_t* base_buffer) {
+  const iree_hal_nl_buffer_t* buffer =
+      iree_hal_nl_buffer_const_cast(base_buffer);
   return buffer->host_ptr;
 }
 
-void iree_hal_cuda_buffer_drop_release_callback(
+void iree_hal_nl_buffer_drop_release_callback(
     iree_hal_buffer_t* base_buffer) {
-  iree_hal_cuda_buffer_t* buffer = iree_hal_cuda_buffer_cast(base_buffer);
+  iree_hal_nl_buffer_t* buffer = iree_hal_nl_buffer_cast(base_buffer);
   buffer->release_callback = iree_hal_buffer_release_callback_null();
 }
 
-static const iree_hal_buffer_vtable_t iree_hal_cuda_buffer_vtable = {
+static const iree_hal_buffer_vtable_t iree_hal_nl_buffer_vtable = {
     .recycle = iree_hal_buffer_recycle,
-    .destroy = iree_hal_cuda_buffer_destroy,
-    .map_range = iree_hal_cuda_buffer_map_range,
-    .unmap_range = iree_hal_cuda_buffer_unmap_range,
-    .invalidate_range = iree_hal_cuda_buffer_invalidate_range,
-    .flush_range = iree_hal_cuda_buffer_flush_range,
+    .destroy = iree_hal_nl_buffer_destroy,
+    .map_range = iree_hal_nl_buffer_map_range,
+    .unmap_range = iree_hal_nl_buffer_unmap_range,
+    .invalidate_range = iree_hal_nl_buffer_invalidate_range,
+    .flush_range = iree_hal_nl_buffer_flush_range,
 };
