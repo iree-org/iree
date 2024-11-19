@@ -312,6 +312,7 @@ IREE_API_EXPORT iree_status_t iree_hal_hip_multi_queue_command_buffer_get(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_queue_affinity_t affinity,
     iree_hal_command_buffer_t** out_command_buffer) {
+  *out_command_buffer = NULL;
   if (iree_math_count_ones_u64(affinity) != 1) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "one and only one device may be specified.");
