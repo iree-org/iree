@@ -433,7 +433,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
                              IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto encoding =
       dyn_cast_or_null<IREE::Encoding::EncodingAttr>(tensorType.getEncoding());
-  if (!encoding) {
+  if (!encoding || !encoding.getUserIndexingMaps()) {
     return failure();
   }
 
@@ -617,7 +617,6 @@ struct CPUMaterializeDeviceEncodingPass
   void runOnOperation() override {
     auto funcOp = getOperation();
     bool unsupported = false;
-    SetVector<ArrayAttr> encodingSolvers;
     funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp op) {
       auto resType = dyn_cast<IREE::Flow::DispatchTensorType>(op.getType());
       if (!resType) {
@@ -645,23 +644,7 @@ struct CPUMaterializeDeviceEncodingPass
         unsupported = true;
         return;
       }
-      encodingSolvers.insert(encoding.getTargets());
     });
-
-    if (!unsupported && encodingSolvers.size() != 1) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "unsupported: encodings are not from the same device\n");
-      unsupported = true;
-    }
-
-#if 1
-    if (!unsupported && !encodingSolvers.empty() &&
-        encodingSolvers[0].getValue().size() != 1) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "unsupported: only single target is supported atm\n");
-      unsupported = true;
-    }
-#endif
 
     if (unsupported) {
       LLVM_DEBUG(llvm::dbgs() << "drop encodings\n");
@@ -674,22 +657,8 @@ struct CPUMaterializeDeviceEncodingPass
       return;
     }
 
-    auto solver =
-        *encodingSolvers[0]
-             .getAsRange<IREE::Encoding::EncodingSolverInterfaceAttr>()
-             .begin();
     auto executableTargetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
-    // TODO: The fake target attribute is not needed. This is only correct when
-    // the encoding target is as same as the execution device. These
-    // materialization implementations should be moved into interface methods,
-    // and we query all the needed information from the solver.
-    // Note: perhaps a new Codegen attribute interface, not
-    // IREE::Encoding::EncodingSolverInterfaceAttr.
-    auto fakeTargetAttr = IREE::HAL::ExecutableTargetAttr::get(
-        &getContext(), executableTargetAttr.getBackend(),
-        executableTargetAttr.getFormat(), solver.getConfig());
-
-    if (failed(materializeFuncOpEncodings(funcOp, fakeTargetAttr))) {
+    if (failed(materializeFuncOpEncodings(funcOp, executableTargetAttr))) {
       return signalPassFailure();
     }
   }

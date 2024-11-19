@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -543,11 +544,34 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
     return failure();
   }
 
+  auto encoding =
+      dyn_cast<IREE::Encoding::EncodingAttr>(boundTensorType.getEncoding());
+  if (encoding.getTargets().empty()) {
+    // Unexpected in the prototype. All the targets should be reoslved in the
+    // boundary.
+    return failure();
+  }
+  auto target = dyn_cast<IREE::Encoding::EncodingSolverInterfaceAttr>(
+      encoding.getTargets().getValue()[0]);
+  if (!target) {
+    return failure();
+  }
+  std::optional<MaterializeEncodingInfo> srcLayout =
+      deserializeMaterializeEncodingInfo(target.getConfig());
+
   FailureOr<MaterializeEncodingInfo> encodingInfo =
       typeConverter.getEncodingInfo(boundTensorType);
   if (failed(encodingInfo)) {
     return failure();
   }
+
+  // TODO: Need to relayout it back to the original layout and re-apply the
+  // packing that the execution target device wants. Those operations should be
+  // derived by an interface method.
+  if (*encodingInfo != *srcLayout) {
+    return failure();
+  }
+
   if (typeConverter.getTransposeNarrowN() &&
       isNarrowNResult(IREE::Encoding::getEncodingAttr(boundTensorType))) {
     transposeInPlace(*encodingInfo);

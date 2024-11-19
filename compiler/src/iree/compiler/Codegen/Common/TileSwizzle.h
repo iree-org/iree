@@ -51,6 +51,11 @@ struct TileSwizzle {
 
     // The size of the dimension.
     int16_t size = 0;
+
+    bool operator==(const Dim &other) const {
+      return kind == other.kind && size == other.size;
+    }
+    bool operator!=(const Dim &other) const { return !(*this == other); }
   };
 
   using ExpandShapeDimVectorType = llvm::SmallVector<Dim, 4>;
@@ -68,6 +73,11 @@ struct TileSwizzle {
   // example, permutation[0] dictates which of the expanded dimensions becomes
   // the leading dimension of the layout.
   llvm::SmallVector<int64_t> permutation;
+
+  bool operator==(const TileSwizzle &other) const {
+    return expandShape == other.expandShape && permutation == other.permutation;
+  }
+  bool operator!=(const TileSwizzle &other) const { return !(*this == other); }
 };
 
 DictionaryAttr serializeTileSwizzle(MLIRContext *ctx, TileSwizzle swizzle);

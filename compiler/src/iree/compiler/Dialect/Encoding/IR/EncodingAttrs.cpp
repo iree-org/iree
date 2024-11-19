@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Support/LLVM.h"
@@ -114,8 +115,8 @@ EncodingAttr EncodingAttr::clone(AffineMap bcastMap) {
 EncodingAttr EncodingAttr::cloneWithTargets(ArrayRef<Attribute> targets) {
   MLIRContext *ctx = getContext();
   return get(ctx, getOperandIndex(), getOpType(), getElementTypes(),
-             getUserIndexingMaps(), getBcastMap(), getRoundDimsTo(),
-             ArrayAttr::get(ctx, targets));
+             getUserIndexingMaps(), /*bcast_map=*/AffineMapAttr(),
+             /*round_dims_to=*/DenseArrayAttr(), ArrayAttr::get(ctx, targets));
 }
 
 MatmulNarrowDim getMatmulNarrowDim(EncodingAttr encoding) {

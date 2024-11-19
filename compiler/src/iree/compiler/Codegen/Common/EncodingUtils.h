@@ -29,6 +29,15 @@ struct MaterializeEncodingInfo {
 
   // The optional swizzle, see the comment on TileSwizzle. Only used on GPU.
   std::optional<TileSwizzle> swizzle;
+
+  bool operator==(const MaterializeEncodingInfo &other) const {
+    return innerDimsPos == other.innerDimsPos &&
+           innerTileSizes == other.innerTileSizes &&
+           outerDimsPerm == other.outerDimsPerm && swizzle == other.swizzle;
+  }
+  bool operator!=(const MaterializeEncodingInfo &other) const {
+    return !(*this == other);
+  }
 };
 
 DictionaryAttr serializeMaterializeEncodingInfo(MLIRContext *ctx,
