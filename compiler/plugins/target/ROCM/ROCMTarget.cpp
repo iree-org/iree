@@ -527,6 +527,26 @@ public:
         }
       }
 
+      // Link bitcode (*.bc) object attrs specified by the input program.
+      // Note that this happens after the command-line files so that the command
+      // line ones override the symbols coming from the embedded files.
+      auto specializationCallback = [&](llvm::Module &userModule) {
+        // TODO: inject __nvvm_reflect-style functions/globals for
+        // bitcode specialization based on the targetMachine and configuration.
+        // These could use any information we have on the IREE side as well as
+        // the TargetMachine.
+      };
+      unsigned linkerFlags =
+          llvm::Linker::LinkOnlyNeeded | llvm::Linker::OverrideFromSrc;
+      if (failed(linkBitcodeObjects(variantOp.getLoc(), linker, linkerFlags,
+                                    *targetMachine, variantOp.getObjectsAttr(),
+                                    llvmModule->getContext(),
+                                    specializationCallback))) {
+        return mlir::emitError(variantOp.getLoc())
+               << "failed linking in user objects for target triple '"
+               << targetArch.str() << "'";
+      }
+
       // Link module to HIP device library.
       if (bitcodeDirectory.empty()) {
         return variantOp.emitError()
