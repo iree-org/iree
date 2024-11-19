@@ -65,6 +65,7 @@ iree_status_t iree_hal_hip_allocator_create(
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_allocator = NULL;
   if (topology->count < 1) {
+    IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "Invalid number of devices, must be at least one");
   }
@@ -370,13 +371,11 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
     device_index = iree_math_count_trailing_zeros_u64(params->queue_affinity);
   }
 
-  status = IREE_HIP_CALL_TO_STATUS(
-      allocator->symbols,
-      hipCtxPushCurrent(
-          allocator->topology->devices[device_index].hip_context));
-  if (!iree_status_is_ok(status)) {
-    return status;
-  }
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_HIP_CALL_TO_STATUS(
+              allocator->symbols,
+              hipCtxPushCurrent(
+                  allocator->topology->devices[device_index].hip_context)));
 
   if (iree_all_bits_set(compat_params.type,
                         IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
