@@ -267,11 +267,10 @@ iree_status_t iree_hal_stream_tracing_context_collect_list(
   if (!context) return iree_ok_status();
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_status_t status = iree_hal_stream_tracing_context_collect_list_internal(
-      context, completion_event);
-  if (!iree_status_is_ok(status)) {
-    return status;
-  }
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_stream_tracing_context_collect_list_internal(
+              context, completion_event));
+
   iree_slim_mutex_lock(&context->event_mutex);
   iree_hal_stream_tracing_context_event_t* events =
       context->submitted_event_list.head;
@@ -306,7 +305,7 @@ iree_status_t iree_hal_stream_tracing_context_collect(
     return iree_ok_status();
   }
   IREE_TRACE_ZONE_BEGIN(z0);
-
+  iree_status_t status = iree_ok_status();
   // submitted_event_list is a list of the head elements for each command
   // buffer that has been submitted. Here we loop over all of the events,
   // wait for them to complete and gather the results with event_query.
@@ -315,12 +314,11 @@ iree_status_t iree_hal_stream_tracing_context_collect(
   // Outer per-command_buffer loop.
   while (events) {
     iree_hal_stream_tracing_context_event_t* event = events;
-    iree_status_t status =
+
+    status =
         iree_hal_stream_tracing_context_collect_list_internal(context, event);
     if (!iree_status_is_ok(status)) {
-      IREE_TRACE_ZONE_END(z0);
-      iree_slim_mutex_unlock(&context->event_mutex);
-      return status;
+      break;
     }
     iree_hal_stream_tracing_context_event_t* next = events->next_submission;
     events->was_submitted = true;
@@ -330,7 +328,7 @@ iree_status_t iree_hal_stream_tracing_context_collect(
 
   IREE_TRACE_ZONE_END(z0);
   iree_slim_mutex_unlock(&context->event_mutex);
-  return iree_ok_status();
+  return status();
 }
 
 void iree_hal_stream_tracing_notify_submitted(

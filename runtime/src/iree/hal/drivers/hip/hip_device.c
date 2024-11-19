@@ -41,7 +41,7 @@
 typedef enum iree_hip_device_commandbuffer_type_e {
   IREE_HAL_HIP_DEVICE_COMMAND_BUFFER_TYPE_STREAM,
   IREE_HAL_HIP_DEVICE_COMMAND_BUFFER_TYPE_GRAPH,
-} iree_hip_device_commandbuffer_type_e;
+} iree_hip_device_commandbuffer_type_t;
 
 typedef struct iree_hal_hip_device_t {
   // Abstract resource used for injecting reference counting and vtable;
@@ -92,7 +92,7 @@ static iree_status_t iree_hal_hip_device_create_command_buffer_internal(
     iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
-    iree_hip_device_commandbuffer_type_e type,
+    iree_hip_device_commandbuffer_type_t type,
     iree_hal_command_buffer_t** out_command_buffer);
 
 typedef struct iree_hal_hip_tracing_device_interface_t {
@@ -706,7 +706,7 @@ static iree_status_t iree_hal_hip_device_create_command_buffer_internal(
     iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
-    iree_hip_device_commandbuffer_type_e type,
+    iree_hip_device_commandbuffer_type_t type,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_command_buffer = NULL;
@@ -724,12 +724,12 @@ static iree_status_t iree_hal_hip_device_create_command_buffer_internal(
   iree_status_t status = iree_ok_status();
   iree_host_size_t device_index = 0;
   iree_host_size_t cb_num = 0;
-  iree_hal_queue_affinity_t affinity = queue_affinity;
-  while (iree_status_is_ok(status) && affinity) {
+  iree_hal_queue_affinity_t current_affinity = queue_affinity;
+  while (iree_status_is_ok(status) && current_affinity) {
     iree_host_size_t next_device_index_offset =
-        iree_math_count_trailing_zeros_u64(affinity);
+        iree_math_count_trailing_zeros_u64(current_affinity);
     device_index += next_device_index_offset;
-    affinity >>= next_device_index_offset + 1;
+    current_affinity >>= next_device_index_offset + 1;
     status = IREE_HIP_CALL_TO_STATUS(
         device->hip_symbols,
         hipCtxPushCurrent(device->topology.devices[device_index].hip_context));

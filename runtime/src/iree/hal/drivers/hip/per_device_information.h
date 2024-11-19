@@ -21,7 +21,6 @@ typedef struct iree_hal_hip_per_device_info_t {
   iree_hal_stream_tracing_context_t* tracing_context;
 
   iree_hal_hip_event_pool_t* device_event_pool;
-
 } iree_hal_hip_per_device_info_t;
 
 typedef struct iree_hal_hip_device_topology_t {
