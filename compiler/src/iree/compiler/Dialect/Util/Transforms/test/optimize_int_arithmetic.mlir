@@ -523,3 +523,14 @@ util.func @hal_buffer_view_rank_min_max(%bv : !hal.buffer_view) -> (i1, i1, i1) 
   // CHECK: util.return %[[FALSE]], %[[TRUE]], %[[FALSE]]
   util.return %1, %2, %3 : i1, i1, i1
 }
+
+// -----
+
+util.func @assume_int_with_single_bound(%bool: i1, %ind: index) -> index {
+  %c1 = arith.constant 1 : index
+  %0 = util.assume.int %ind<umin = 1> : index
+  %1 = arith.select %bool, %0, %c1 : index
+  // select should not be optimized away.
+  // CHECK: arith.select
+  util.return %1 : index
+}
