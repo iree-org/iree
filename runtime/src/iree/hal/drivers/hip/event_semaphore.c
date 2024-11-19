@@ -28,7 +28,8 @@ static void iree_hal_hip_cpu_event_destroy(iree_hal_resource_t* resource) {
 }
 
 static const iree_hal_resource_vtable_t iree_hal_hip_cpu_event_vtable = {
-    .destroy = &iree_hal_hip_cpu_event_destroy};
+    .destroy = &iree_hal_hip_cpu_event_destroy,
+};
 
 typedef struct iree_hal_hip_cpu_event_vtable_t {
   void(IREE_API_PTR* destroy)(iree_hal_resource_t* resource);
@@ -742,7 +743,7 @@ iree_status_t iree_hal_hip_semaphore_get_hip_event(
   if (value <= semaphore->current_visible_value) {
     iree_slim_mutex_unlock(&semaphore->mutex);
     IREE_TRACE_ZONE_END(z0);
-    out_hip_event[0] = NULL;
+    *out_hip_event = NULL;
     return iree_ok_status();
   }
   iree_status_t status = semaphore->failure_status;
