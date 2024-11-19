@@ -74,7 +74,7 @@ annotateKernelForTranslation(LLVM::LLVMFuncOp funcOp,
     rocdlDialect->getWavesPerEuAttrHelper().setAttr(funcOp, *attr);
   }
 
-  // Kernel argument preloading is only supported on gfx940 and newer targets
+  // Kernel argument preloading is only supported on gfx942 and newer targets
   // from the CDNA family. This is enabled using the `inreg` function argument
   // attribute.
   FailureOr<amdgpu::Chipset> chipset = getChipsetVersion(targetAttr);

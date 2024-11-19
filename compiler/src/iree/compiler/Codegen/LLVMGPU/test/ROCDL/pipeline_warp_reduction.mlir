@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx940 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-rocdl-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline2)))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-rocdl-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline2)))" %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx940 --iree-codegen-llvmgpu-use-vector-distribution \
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --iree-codegen-llvmgpu-use-vector-distribution \
 // RUN:   --iree-codegen-llvmgpu-use-unaligned-gemm-vector-distribution --iree-codegen-llvmgpu-use-igemm=false \
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
 
@@ -83,7 +83,7 @@ func.func @conv_nhwc() {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#target = #iree_gpu.target<arch = "gfx940", features = "", wgp = <
+#target = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
   compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
   mma = [],

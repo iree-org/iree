@@ -1,4 +1,4 @@
-// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx940 \
+// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx942 \
 // RUN: --iree-codegen-llvmgpu-use-igemm=true --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
 
 func.func @nhwc_conv_mfma() {

@@ -125,7 +125,7 @@ endfunction()
 
 # TODO: Decide what to build by default. No real constaints here
 #       except compile-time cost, so just picked out the popular ones.
-set(_ukernel_supported_chips "gfx90a" "gfx940" "gfx1030" "gfx1100")
+set(_ukernel_supported_chips "gfx90a" "gfx942" "gfx1030" "gfx1100")
 foreach(_amd_chip ${_ukernel_supported_chips})
   iree_rocm_bitcode_library(
     NAME

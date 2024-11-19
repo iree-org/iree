@@ -45,10 +45,10 @@ builtin.module {
 
 // -----
 
-// Check that we annotate kernel arguments on gfx940-series.
+// Check that we annotate kernel arguments on gfx942-series.
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-  {iree.gpu.target = #iree_gpu.target<arch = "gfx940", features = "",
+  {iree.gpu.target = #iree_gpu.target<arch = "gfx942", features = "",
                                       wgp = <compute = int32, storage =  b32,
                                       subgroup =  none, dot =  none, mma = [],
                                       subgroup_size_choices = [64],
