@@ -207,3 +207,54 @@ util.func public @fuse_generic_gather2(
 // CHECK-NEXT:    %[[RES3:[a-zA-Z0-9]+]] = arith.mulf %[[RES]], %[[RES]] : f32
 // CHECK-NEXT:    %[[RES4:[a-zA-Z0-9]+]] = arith.addf %[[RES2]], %[[RES3]] : f32
 // CHECK-NEXT:    linalg.yield %[[RES4]] : f32
+
+util.func public @fuse_transpose_attention_to_producer(%q: tensor<2x10x4096x64xf16>, %k: tensor<2x10x4096x64xf16>, %quantized_v: tensor<2x10x4096x64xi32>, %quant_offset: tensor<10x64xi32>, %quant_scale: tensor<10x64xf32>, %scale: f16) -> tensor<2x10x4096x64xf16> {
+  // Dequantize int-quantization of V
+    %init_dequant = tensor.empty() : tensor<2x10x4096x64xf16>
+    %v = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%quantized_v, %quant_offset, %quant_scale : tensor<2x10x4096x64xi32>, tensor<10x64xi32>, tensor<10x64xf32>) outs(%init_dequant : tensor<2x10x4096x64xf16>) {
+    ^bb0(%in: i32, %in_0: i32, %in_1: f32, %out: f16):
+        %19 = arith.addi %in, %in_0 : i32
+        %20 = arith.sitofp %19 : i32 to f32
+        %21 = arith.mulf %20, %in_1 : f32
+        %22 = arith.truncf %21 : f32 to f16
+        linalg.yield %22 : f16
+    } -> tensor<2x10x4096x64xf16>
+
+  // Transpose-V
+  %init_transpose = tensor.empty() : tensor<2x10x64x4096xf16>
+  %transpose_v = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d3, d2)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%v : tensor<2x10x4096x64xf16>) outs(%init_transpose : tensor<2x10x64x4096xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    linalg.yield %in : f16
+  } -> tensor<2x10x64x4096xf16>
+
+  // Attention-Transpose-V
+  %init_attention = tensor.empty() : tensor<2x10x4096x64xf16>
+  %attention = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>, affine_map<(d0, d1, d2, d3, d4, d5) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]} ins(%q, %k, %transpose_v, %scale : tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, tensor<2x10x64x4096xf16>, f16) outs(%init_attention : tensor<2x10x4096x64xf16>) {
+    ^bb0(%score: f16):
+      iree_linalg_ext.yield %score: f16
+  } -> tensor<2x10x4096x64xf16>
+  util.return %attention : tensor<2x10x4096x64xf16>
+}
+
+// CHECK-LABEL: util.func public @fuse_transpose_attention_to_producer
+//  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG1:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG2:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG3:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG4:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG5:[A-Za-z0-9]+]]: f16
+//       CHECK:   %[[DEQUANT_V:.+]] = linalg.generic
+//  CHECK-SAME:     indexing_maps =
+//  CHECK-SAME:     affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+//  CHECK-SAME:     affine_map<(d0, d1, d2, d3) -> (d1, d3)>
+// CHECK-SAME:      affine_map<(d0, d1, d2, d3) -> (d1, d3)>
+// CHECK-SAME:      affine_map<(d0, d1, d2, d3) -> (d0, d1, d3, d2)>]
+//  CHECK-SAME:     ins(%[[ARG2]], %[[ARG3]], %[[ARG4]]
+//       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:     indexing_maps =
+//  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+//  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>
+//  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>
+//  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+//  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
+//  CHECK-SAME:     ins(%[[ARG0]], %[[ARG1]], %[[DEQUANT_V]], %[[ARG5]]
