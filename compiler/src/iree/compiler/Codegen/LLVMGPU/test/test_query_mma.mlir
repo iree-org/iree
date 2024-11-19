@@ -71,10 +71,10 @@ module {
   }
 }
 
-// CHECK-DAG: main_0
-// CHECK-DAG: MMA Intrinsics: MFMA_F32_16x16x4_F32 MFMA_F32_16x16x16_F16
-// CHECK-DAG: main_1
-// CHECK-DAG: MMA Intrinsics: MFMA_F32_32x32x8_F16 MFMA_F32_16x16x16_BF16
+// CHECK:      main_0
+// CHECK-NEXT: MMA Intrinsics: MFMA_F32_16x16x4_F32 MFMA_F32_16x16x16_F16
+// CHECK-NEXT: main_1
+// CHECK-NEXT: MMA Intrinsics: MFMA_F32_32x32x8_F16 MFMA_F32_16x16x16_BF16
 
 // -----
 
