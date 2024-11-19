@@ -214,6 +214,9 @@ void iree_hal_hip_event_pool_retain(iree_hal_hip_event_pool_t* event_pool) {
 }
 
 void iree_hal_hip_event_pool_release(iree_hal_hip_event_pool_t* event_pool) {
+  if (!event_pool) {
+    return;
+  }
   if (iree_atomic_ref_count_dec(&event_pool->ref_count) == 1) {
     iree_hal_hip_event_pool_free(event_pool);
   }

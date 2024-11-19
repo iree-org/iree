@@ -366,16 +366,16 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_hal_hip_buffer_allocate");
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, allocation_size);
 
-  iree_host_size_t device_index = 0;
+  int device_ordinal = 0;
   if (params->queue_affinity) {
-    device_index = iree_math_count_trailing_zeros_u64(params->queue_affinity);
+    device_ordinal = iree_math_count_trailing_zeros_u64(params->queue_affinity);
   }
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, IREE_HIP_CALL_TO_STATUS(
               allocator->symbols,
               hipCtxPushCurrent(
-                  allocator->topology->devices[device_index].hip_context)));
+                  allocator->topology->devices[device_ordinal].hip_context)));
 
   if (iree_all_bits_set(compat_params.type,
                         IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
@@ -394,8 +394,8 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
             allocator->symbols,
             hipMemPrefetchAsync(
                 device_ptr, allocation_size,
-                allocator->topology->devices[device_index].hip_device,
-                allocator->topology->devices[device_index]
+                allocator->topology->devices[device_ordinal].hip_device,
+                allocator->topology->devices[device_ordinal]
                     .hip_dispatch_stream));
       }
       host_ptr = (void*)device_ptr;
@@ -540,15 +540,15 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
   void* host_ptr = NULL;
   hipDeviceptr_t device_ptr = NULL;
 
-  iree_host_size_t device_index = 0;
+  int device_ordinal = 0;
   if (params->queue_affinity) {
-    device_index = iree_math_count_trailing_zeros_u64(params->queue_affinity);
+    device_ordinal = iree_math_count_trailing_zeros_u64(params->queue_affinity);
   }
 
   status = IREE_HIP_CALL_TO_STATUS(
       allocator->symbols,
       hipCtxPushCurrent(
-          allocator->topology->devices[device_index].hip_context));
+          allocator->topology->devices[device_ordinal].hip_context));
   if (!iree_status_is_ok(status)) {
     return status;
   }
