@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-softmax), iree-llvmgpu-select-lowering-strategy,  func.func(iree-llvmgpu-lower-executable-target))" %s | FileCheck %s
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx940 --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-softmax), iree-llvmgpu-select-lowering-strategy,  func.func(iree-llvmgpu-lower-executable-target))" %s | FileCheck %s --check-prefix=CDNA3
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-softmax), iree-llvmgpu-select-lowering-strategy,  func.func(iree-llvmgpu-lower-executable-target))" %s | FileCheck %s --check-prefix=CDNA3
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,

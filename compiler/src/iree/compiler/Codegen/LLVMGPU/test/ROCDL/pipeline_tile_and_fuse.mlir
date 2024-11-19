@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx940 \
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 \
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmgpu-lower-executable-target)))))" %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [

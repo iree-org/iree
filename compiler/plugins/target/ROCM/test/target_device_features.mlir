@@ -7,7 +7,7 @@
 // RUN:   --iree-hip-target=gfx941 --iree-hip-target-features=+sramecc,-xnack %s | FileCheck %s --check-prefix=GFX941
 //
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
-// RUN:   --iree-hip-target=gfx940 %s | FileCheck %s --check-prefix=GFX940
+// RUN:   --iree-hip-target=gfx942 %s | FileCheck %s --check-prefix=GFX940
 //
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-hip-target=rx7900xtx %s | FileCheck %s --check-prefix=GFX1100
@@ -25,7 +25,7 @@
 // GFX941: target = #iree_gpu.target<arch = "gfx941",
 // GFX941-SAME:         features = "+sramecc,-xnack"
 
-// GFX940: target = #iree_gpu.target<arch = "gfx940",
+// GFX940: target = #iree_gpu.target<arch = "gfx942",
 // GFX940-SAME:         mma =  [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>, <MFMA_F64_16x16x4_F64>, <MFMA_F32_16x16x16_BF16>, <MFMA_F32_32x32x8_BF16>, <MFMA_F32_16x16x32_F8E5M2FNUZ>, <MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ>, <MFMA_F32_16x16x32_F8E4M3FNUZ>, <MFMA_F32_16x16x32_F8E4M3FNUZ_F8E5M2FNUZ>, <MFMA_F32_32x32x16_F8E5M2FNUZ>, <MFMA_F32_32x32x16_F8E5M2FNUZ_F8E4M3FNUZ>, <MFMA_F32_32x32x16_F8E4M3FNUZ>, <MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ>, <MFMA_I32_16x16x32_I8>, <MFMA_I32_32x32x16_I8>],
 
 // GFX1100: target = #iree_gpu.target<arch = "gfx1100",

@@ -944,7 +944,7 @@ bool sharedMemTransposeFilter(AffineMap indexMap) {
 //       No real technical reason to only allow these aside from compile
 //       time and diskspace.
 bool hasUkernelSupportedRocmArch(StringRef targetChip) {
-  const char *kSupportedTargetChip[] = {"gfx90a", "gfx940", "gfx1030",
+  const char *kSupportedTargetChip[] = {"gfx90a", "gfx942", "gfx1030",
                                         "gfx1100"};
   size_t arraySize =
       sizeof(kSupportedTargetChip) / sizeof(kSupportedTargetChip[0]);
