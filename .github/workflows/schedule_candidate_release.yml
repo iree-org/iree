@@ -65,17 +65,16 @@ jobs:
 
       - name: Create Release
         id: create_release
-        uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
+        uses: ncipollo/release-action@2c591bcc8ecdcd2db72b97d6147f871fcd833ba5 # v1.14.0
         with:
-          tag_name: ${{ env.tag_name }}
-          release_name: iree candidate ${{ env.tag_name }}
-          commitish: ${{ steps.last_green_commit.outputs.release-commit }}
+          tag: ${{ env.tag_name }}
+          name: iree candidate ${{ env.tag_name }}
+          commit: ${{ steps.last_green_commit.outputs.release-commit }}
           body: |
             Automatic candidate release of iree.
           draft: true
           prerelease: true
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
 
       - name: "Invoke workflow :: Build Release Packages"
         uses: benc-uk/workflow-dispatch@e2e5e9a103e331dad343f381a29e654aea3cf8fc # v1.2.4
