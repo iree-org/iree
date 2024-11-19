@@ -44,11 +44,11 @@ def main(args: argparse.Namespace):
             else str(Path(args.input_file).parent)
         )
         param_data = ParamData(
+            args.num_initializers_threshold,
             args.num_elements_threshold,
             args.params_scope,
             data_dir,
             param_path,
-            args.num_initializers_threshold,
         )
         imp = IREENodeImporter.define_function(model_info.main_graph, m, param_data)
     else:
@@ -166,8 +166,7 @@ def parse_arguments(argv=None) -> argparse.Namespace:
     parser.add_argument(
         "--num-initializers-threshold",
         help="The maximum number of initializer tensors to be stored in-memory when creating a param archive.",
-        type=Optional[int],
-        default=None,
+        type=int,
     )
     parser.add_argument(
         "--num-elements-threshold",
