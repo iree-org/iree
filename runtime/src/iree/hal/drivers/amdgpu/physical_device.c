@@ -11,6 +11,9 @@
 #include "iree/hal/drivers/amdgpu/host_worker.h"
 #include "iree/hal/drivers/amdgpu/system.h"
 
+// DO NOT SUBMIT
+#include <unistd.h>
+
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_physical_device_options_t
 //===----------------------------------------------------------------------===//
@@ -236,6 +239,9 @@ void iree_hal_amdgpu_physical_device_deinitialize(
     iree_hal_amdgpu_physical_device_t* physical_device) {
   IREE_ASSERT_ARGUMENT(physical_device);
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  // DO NOT SUBMIT shutdown wait
+  sleep(4);
 
   // Deinitialize all queues and their device-side schedulers before releasing
   // any resources that may be used by them (such as the host worker).

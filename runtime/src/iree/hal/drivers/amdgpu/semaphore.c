@@ -390,7 +390,7 @@ iree_status_t iree_hal_amdgpu_wait_semaphores(
         iree_hsa_signal_wait_scacquire(IREE_LIBHSA(libhsa), signal,
                                        HSA_SIGNAL_CONDITION_GTE,
                                        semaphore_list.payload_values[i],
-                                       UINT64_MAX, HSA_WAIT_STATE_BLOCKED);
+                                       UINT64_MAX, HSA_WAIT_STATE_ACTIVE);
       }
     } break;
     case IREE_HAL_WAIT_MODE_ANY: {

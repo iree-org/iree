@@ -59,7 +59,9 @@ TEST_F(CommandBufferTest, SubmitEmpty) {
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
-  IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer));
+  for (int i = 0; i < 10000; ++i) {
+    IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer));
+  }
 
   iree_hal_command_buffer_release(command_buffer);
 }

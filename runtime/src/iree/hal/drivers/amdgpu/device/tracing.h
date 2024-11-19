@@ -43,7 +43,7 @@
 // TODO(benvanik): expose as a friendly option matching the host mode.
 // For now we need the compilation to match and there are extra flags required
 // for that.
-#if 0
+#if 1
 #define IREE_HAL_AMDGPU_TRACING_FEATURES                 \
   (IREE_HAL_AMDGPU_TRACING_FEATURE_INSTRUMENTATION |     \
    IREE_HAL_AMDGPU_TRACING_FEATURE_DEVICE_CONTROL |      \
