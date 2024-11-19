@@ -15,6 +15,8 @@
 #include "compiler/plugins/target/LLVMCPU/LibraryBuilder.h"
 #include "compiler/plugins/target/LLVMCPU/LinkerTool.h"
 #include "compiler/plugins/target/LLVMCPU/StaticLibraryGenerator.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -169,6 +171,9 @@ public:
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
     target.storeToConfigAttrs(context, configItems);
+    configItems.emplace_back(
+        b.getStringAttr("encoding_solver"),
+        IREE::CPU::CPUEncodingSolverAttr::get(context, {}));
 
     // Compute the format used at runtime to select the executable loader.
     std::string format;
@@ -218,6 +223,7 @@ public:
     // TODO: make inclusion of ArmNeon conditional?
     // clang-format off
     registry.insert<IREE::Codegen::IREECodegenDialect,
+                    IREE::CPU::IREECPUDialect,
                     IREE::LinalgExt::IREELinalgExtDialect,
                     mlir::transform::TransformDialect,
                     pdl::PDLDialect,
