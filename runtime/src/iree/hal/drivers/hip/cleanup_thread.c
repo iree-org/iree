@@ -1,3 +1,9 @@
+// Copyright 2024 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 #include "iree/hal/drivers/hip/cleanup_thread.h"
 
 #include "iree/base/internal/synchronization.h"
@@ -114,11 +120,10 @@ iree_status_t iree_hal_hip_cleanup_thread_initialize(
     iree_allocator_free(host_allocator, thread);
   }
   IREE_TRACE_ZONE_END(z0);
-  out_thread[0] = thread;
+  *out_thread = thread;
   return status;
 }
 
-// Deinitializes the cleanup thread for HIP driver.
 void iree_hal_hip_cleanup_thread_deinitialize(
     iree_hal_hip_cleanup_thread_t* thread) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -149,7 +154,10 @@ iree_status_t iree_hal_hip_cleanup_thread_add_cleanup(
   }
 
   iree_hal_hip_cleanup_thread_callback_t callback_data = {
-      .callback = callback, .user_data = user_data, .event = event};
+      .callback = callback,
+      .user_data = user_data,
+      .event = event,
+  };
   iree_hal_hip_callback_queue_push_back(&thread->queue, callback_data);
   iree_slim_mutex_unlock(&thread->mutex);
   iree_notification_post(&thread->notification, IREE_ALL_WAITERS);
