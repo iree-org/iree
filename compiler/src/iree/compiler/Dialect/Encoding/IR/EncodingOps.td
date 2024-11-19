@@ -66,11 +66,13 @@ def IREEEncoding_UnsetEncodingOp : IREEEncoding_PureOp<"unset_encoding", [
     its data layout into a tensor with default layout (i.e. no encoding).
     For now in IREE the default layout is row-major.
   }];
-  let arguments = (ins AnyRankedTensor:$source);
+  let arguments = (ins
+    AnyRankedTensor:$source,
+    Variadic<Index>:$result_dims);
   let results = (outs AnyRankedTensor:$result);
 
   let assemblyFormat = [{
-    attr-dict $source `:` type($source) `->` type($result)
+    attr-dict $source `:` type($source) `->` type($result) (`` `{` $result_dims^ `}`)?
   }];
 
   let hasVerifier = 1;

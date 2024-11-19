@@ -129,11 +129,14 @@ public:
       }
     }
 
+    // Populated below after all type converters are registered.
+    ImportTable importTable;
+
     RewritePatternSet patterns(&getContext());
     populateUtilConversionPatterns(context, conversionTarget, typeConverter,
                                    patterns);
     populateUtilToVMPatterns(context, conversionTarget, typeConverter,
-                             patterns);
+                             importTable, patterns);
 
     conversionTarget.addIllegalDialect<affine::AffineDialect>();
     populateAffineToStdConversionPatterns(patterns);
@@ -146,7 +149,7 @@ public:
     populateMathToVMPatterns(context, typeConverter, patterns);
 
     conversionTarget.addIllegalDialect<func::FuncDialect>();
-    populateStandardToVMPatterns(context, typeConverter, patterns);
+    populateStandardToVMPatterns(context, typeConverter, importTable, patterns);
 
     // Populate patterns from all used dialects, providing the imports they
     // registered earlier.
@@ -154,6 +157,12 @@ public:
     for (auto *dialectInterface : usedDialects) {
       dialectInterface->populateVMConversionPatterns(
           importSymbols, patterns, conversionTarget, typeConverter);
+    }
+
+    // Build an import table so that we can quickly look up import information
+    // during conversion.
+    if (failed(importTable.build(innerModuleOp, typeConverter))) {
+      return signalPassFailure(); // error emitted already
     }
 
     if (failed(applyPartialConversion(outerModuleOp, conversionTarget,

@@ -219,15 +219,6 @@ class CTSTestBase : public BaseType, public CTSTestResources {
       iree_hal_command_buffer_t* command_buffer,
       iree_hal_buffer_binding_table_t binding_table =
           iree_hal_buffer_binding_table_empty()) {
-    return SubmitCommandBuffersAndWait(1, &command_buffer, &binding_table);
-  }
-
-  // Submits |command_buffers| to the device and waits for them to complete
-  // before returning.
-  iree_status_t SubmitCommandBuffersAndWait(
-      iree_host_size_t command_buffer_count,
-      iree_hal_command_buffer_t** command_buffers,
-      const iree_hal_buffer_binding_table_t* binding_tables = nullptr) {
     // No wait semaphores.
     iree_hal_semaphore_list_t wait_semaphores = iree_hal_semaphore_list_empty();
 
@@ -244,8 +235,7 @@ class CTSTestBase : public BaseType, public CTSTestResources {
 
     iree_status_t status = iree_hal_device_queue_execute(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphores,
-        signal_semaphores, command_buffer_count, command_buffers,
-        binding_tables);
+        signal_semaphores, command_buffer, binding_table);
     if (iree_status_is_ok(status)) {
       status = iree_hal_semaphore_wait(signal_semaphore, target_payload_value,
                                        iree_infinite_timeout());

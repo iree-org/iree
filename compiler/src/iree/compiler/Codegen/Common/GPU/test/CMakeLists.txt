@@ -26,9 +26,13 @@ iree_lit_test_suite(
     "gpu_greedily_distribute_to_threads.mlir"
     "gpu_infer_memory_space.mlir"
     "gpu_lower_to_ukernels.mlir"
-    "gpu_materialize_encoding.mlir"
+    "gpu_materialize_encoding_gfx1100.mlir"
+    "gpu_materialize_encoding_gfx908.mlir"
+    "gpu_materialize_encoding_gfx90a.mlir"
+    "gpu_materialize_encoding_gfx942.mlir"
     "gpu_nested_layout_contract_amdgpu.mlir"
     "gpu_nested_layout_vector_distribution.mlir"
+    "gpu_nested_layout_vector_distribution_step.mlir"
     "gpu_pipeline.mlir"
     "gpu_promote_matmul_operands.mlir"
     "gpu_reorder_workgroups.mlir"
@@ -44,7 +48,6 @@ iree_lit_test_suite(
     "reduce_bank_conflicts.mlir"
     "transform_gpu_distribute_shared_memory.mlir"
     "transform_gpu_reduce_bank_conflicts.mlir"
-    "transform_gpu_workgroup_swizzle.mlir"
     "vector_reduction_to_gpu.mlir"
   TOOLS
     FileCheck

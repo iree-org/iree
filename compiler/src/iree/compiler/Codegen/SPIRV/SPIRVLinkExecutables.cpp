@@ -23,13 +23,15 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
 
 namespace IREE::HAL {
+
 // Compares two ExecutableTargetAttr according to the alphabetical order of used
 // SPIR-V features.
 //
 // Note that this is a very specific ordering per the needs of this pass--we
 // guarantee that input ExectuableTargetAttr only differ w.r.t. their used
 // SPIR-V features, and we want a deterministic order when mutating the IR.
-bool operator<(const ExecutableTargetAttr &a, const ExecutableTargetAttr &b) {
+static bool operator<(const ExecutableTargetAttr &a,
+                      const ExecutableTargetAttr &b) {
   auto aFeatures = a.getConfiguration().getAs<ArrayAttr>("iree.spirv.features");
   auto bFeatures = b.getConfiguration().getAs<ArrayAttr>("iree.spirv.features");
   for (unsigned i = 0; i < std::min(aFeatures.size(), bFeatures.size()); ++i) {
@@ -40,11 +42,26 @@ bool operator<(const ExecutableTargetAttr &a, const ExecutableTargetAttr &b) {
   }
   return aFeatures.size() < bFeatures.size();
 }
-} // namespace IREE::HAL
 
 namespace {
 
-using IREE::HAL::ExecutableTargetAttr;
+// Returns all executables that have one or more variants that use SPIR-V
+// codegen. Executables that contain object references are currently ignored as
+// we only support full replacement of the modules and not yet linking.
+static SmallVector<IREE::HAL::ExecutableOp>
+gatherExecutablesForSPIRVCodegen(mlir::ModuleOp moduleOp) {
+  SmallVector<IREE::HAL::ExecutableOp> result;
+  for (auto executableOp : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
+    if (llvm::any_of(executableOp.getOps<IREE::HAL::ExecutableVariantOp>(),
+                     [&](IREE::HAL::ExecutableVariantOp variantOp) {
+                       return usesSPIRVCodeGen(variantOp) &&
+                              !variantOp.getObjects().has_value();
+                     })) {
+      result.push_back(executableOp);
+    }
+  }
+  return result;
+}
 
 struct SPIRVLinkExecutablesPass final
     : impl::SPIRVLinkExecutablesPassBase<SPIRVLinkExecutablesPass> {
@@ -52,23 +69,9 @@ struct SPIRVLinkExecutablesPass final
     mlir::ModuleOp moduleOp = getOperation();
 
     // Collect all source executable ops.
-    SmallVector<IREE::HAL::ExecutableOp, 8> sourceExecutableOps =
-        llvm::to_vector<8>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
+    auto sourceExecutableOps = gatherExecutablesForSPIRVCodegen(moduleOp);
     if (sourceExecutableOps.size() <= 1)
       return;
-
-    // Retain only non-external source executables. Linking right now happens as
-    // placing spirv.module ops into the same hal.executable.variant ops.
-    // External source executables won't have any spirv.modules inside.
-    int retainSize = 0;
-    for (int i = 0, e = sourceExecutableOps.size(); i < e; ++i) {
-      IREE::HAL::ExecutableOp executable = sourceExecutableOps[i];
-      if (llvm::none_of(executable.getOps<IREE::HAL::ExecutableVariantOp>(),
-                        [](auto op) { return op.getObjects().has_value(); })) {
-        sourceExecutableOps[retainSize++] = executable;
-      }
-    }
-    sourceExecutableOps.resize(retainSize);
 
     // Note that at runtime, for a particular executable, only one variant of it
     // will be loaded. So, all variants of an executable are expected to provide
@@ -213,4 +216,6 @@ struct SPIRVLinkExecutablesPass final
 };
 
 } // namespace
+
+} // namespace IREE::HAL
 } // namespace mlir::iree_compiler

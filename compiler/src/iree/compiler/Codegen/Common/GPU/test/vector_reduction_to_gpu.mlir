@@ -6,7 +6,7 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 #map = affine_map<()[s0, s1] -> (s1 * 2 + s0 floordiv 32)>
-#translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
 module {
   func.func @simple_reduce() attributes {translation_info = #translation_info} {
     %c0 = arith.constant 0 : index
@@ -44,7 +44,7 @@ module {
 //   CHECK-DAG:   %[[TID:.*]] = gpu.thread_id  x
 //   CHECK-DAG:   %[[VCST:.*]] = arith.constant dense<0.000000e+00> : vector<1xf32>
 //       CHECK:   %[[F:.*]] = scf.for %{{.*}} = %{{.*}} to %{{.*}} step %{{.*}} iter_args(%[[V0:.*]] = %[[VCST]]) -> (vector<1xf32>) {
-//   CHECK-DAG:     %[[E:.*]] = vector.extractelement %[[V0]][%[[C0]] : index] : vector<1xf32>
+//   CHECK-DAG:     %[[E:.*]] = vector.extract %[[V0]][0] : f32 from vector<1xf32>
 //   CHECK-DAG:     %[[ID:.*]] = affine.apply
 //   CHECK-DAG:     %[[V1:.*]] = vector.transfer_read %{{.*}}[%{{.*}}, %[[ID]]], %{{.*}} {in_bounds = [true]} : memref<128x384xf32>, vector<1xf32>
 //       CHECK:     %[[S:.*]] = vector.extract %[[V1]][0] : f32 from vector<1xf32>
@@ -78,7 +78,7 @@ module {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<uniform_buffer>
 ]>
-#translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
 #map = affine_map<()[s0, s1] -> (s1 * 2 + s0 floordiv 32)>
 module {
   func.func @reduce_uniform_buffer_offset() attributes {translation_info = #translation_info} {
@@ -138,7 +138,7 @@ module {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #map = affine_map<()[s0, s1] -> (s1 * 2 + s0 floordiv 32)>
-#translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
 module {
   func.func @reduce_storage_buffer_offset() attributes {translation_info = #translation_info} {
     %c0 = arith.constant 0 : index
@@ -193,7 +193,7 @@ module {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
 module {
   func.func @shared_memory_copy() attributes {translation_info = #translation_info} {
     %c0 = arith.constant 0 : index
@@ -231,7 +231,7 @@ module {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#translation_info = #iree_codegen.translation_info<None workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [64, 1, 1] subgroup_size = 64>
 #map = affine_map<()[s0] -> (s0 * 4)>
 #map1 = affine_map<(d0, d1) -> (0, d1)>
 module {
@@ -285,7 +285,7 @@ module {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
 module {
   func.func @simple_nd_write() attributes {translation_info = #translation_info} {
     %c0 = arith.constant 0 : index
@@ -302,6 +302,6 @@ module {
 
 // CHECK-LABEL: func @simple_nd_write(
 //       CHECK:   %[[RD:.+]] = vector.transfer_read {{.*}} vector<1x128xf32>
-//       CHECK:   %[[IDS:.+]]:2 = affine.delinearize_index %{{.*}} into (%c4, %c8) : index, index
+//       CHECK:   %[[IDS:.+]]:2 = affine.delinearize_index %{{.*}} into (4, 8) : index, index
 //       CHECK:   %[[INNER_ID:.+]] = affine.apply #[[$MAP]]()[%[[IDS]]#1]
 //       CHECK:   vector.transfer_write %[[RD]], %{{.*}}[%[[IDS]]#0, %[[INNER_ID]]] {{.*}} : vector<1x128xf32>

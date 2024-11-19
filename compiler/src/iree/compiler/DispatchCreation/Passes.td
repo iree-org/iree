@@ -113,6 +113,7 @@ def SinkReshapesPass :
   let dependentDialects = [
     "mlir::affine::AffineDialect",
     "mlir::arith::ArithDialect",
+    "IREE::LinalgExt::IREELinalgExtDialect",
   ];
 }
 
@@ -183,6 +184,9 @@ def CollapseDimensionsPass :
     Collapse dimensions of Linalg Ops on tensor ops inside dispatch.region ops
     and hoist the reshaping operations out of the dispatch.
   }];
+  let dependentDialects = [
+    "IREE::LinalgExt::IREELinalgExtDialect",
+  ];
 }
 
 def DispatchWithTransformDialectPass : Pass<"iree-dispatch-creation-dispatch-with-transform-dialect"> {

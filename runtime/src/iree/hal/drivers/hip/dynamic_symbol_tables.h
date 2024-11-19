@@ -8,6 +8,7 @@
 // HIP symbols
 //===----------------------------------------------------------------------===//
 
+IREE_HAL_HIP_REQUIRED_PFN_DECL(hipCtxGetCurrent, hipCtx_t *)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipCtxSetCurrent, hipCtx_t)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipDeviceGet, hipDevice_t *, int)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipDeviceGetAttribute, int *,
@@ -73,6 +74,7 @@ IREE_HAL_HIP_REQUIRED_PFN_DECL(hipMallocFromPoolAsync, void **, size_t,
                                hipMemPool_t, hipStream_t)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipMallocManaged, hipDeviceptr_t *, size_t,
                                unsigned int)
+IREE_HAL_HIP_REQUIRED_PFN_DECL(hipMallocAsync, void **, size_t, hipStream_t)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipMemcpy, void *, const void *, size_t,
                                hipMemcpyKind)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipMemcpyAsync, void *, const void *, size_t,

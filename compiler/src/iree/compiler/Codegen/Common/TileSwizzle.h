@@ -49,6 +49,10 @@ struct TileSwizzle {
 
     // The size of the dimension.
     int16_t size = 0;
+
+    // Support constructing from any size type.
+    template <typename T>
+    Dim(Kind kind, T size) : kind(kind), size(size) {}
   };
 
   using ExpandShapeDimVectorType = llvm::SmallVector<Dim, 4>;

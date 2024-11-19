@@ -7,10 +7,10 @@ hal.executable private @reconcile_workgroup_size {
   hal.executable.variant public @reconcile_workgroup_size target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<None workgroup_size = [4]>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4]>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<None workgroup_size = [4]>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4]>} {
         return
       }
     }
@@ -29,7 +29,7 @@ hal.executable private @single_translation_info {
   hal.executable.variant public @single_translation_info target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<None workgroup_size = [4]>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4]>}  {
         return
       }
       func.func @fn2()  {
@@ -52,10 +52,10 @@ hal.executable private @err_mistmatched_workgroup_size {
     // expected-error @+1 {{failed to reconcile workgroup sizes}}
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<None workgroup_size = [4]>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4]>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<None workgroup_size = [4, 2]>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4, 2]>} {
         return
       }
     }
@@ -72,10 +72,10 @@ hal.executable private @err_mistmatched_workgroup_size2 {
     // expected-error @+1 {{failed to reconcile workgroup sizes}}
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<None workgroup_size = [4]>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4]>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<None>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None>} {
         return
       }
     }
@@ -91,10 +91,10 @@ hal.executable private @reconcile_subgroup_size {
   hal.executable.variant public @reconcile_subgroup_size target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<None subgroup_size = 32>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None subgroup_size = 32>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<None subgroup_size = 32>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None subgroup_size = 32>} {
         return
       }
     }
@@ -113,10 +113,10 @@ hal.executable private @err_reconcile_subgroup_size {
   hal.executable.variant public @err_reconcile_subgroup_size target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<None subgroup_size = 32>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None subgroup_size = 32>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<None subgroup_size = 32>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None subgroup_size = 32>} {
         return
       }
     }
@@ -135,10 +135,10 @@ hal.executable private @llvm_func_attrs {
   hal.executable.variant public @llvm_func_attrs target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<None, {llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None, {llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<None, {llvm_func_attrs = {"amdgpu-waves-per-eu" = "4"}}>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None, {llvm_func_attrs = {"amdgpu-waves-per-eu" = "4"}}>} {
         return
       }
     }
@@ -377,14 +377,11 @@ hal.executable private @scf_forall_4D_static_interchange {
 //  CHECK-DAG:   %[[C160:.+]] = arith.constant 160 : index
 //      CHECK:   hal.return %[[C6]], %[[C7]], %[[C160]]
 //      CHECK: func @scf_forall_4D_static_interchange()
-//  CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
-//  CHECK-DAG:   %[[C8:.+]] = arith.constant 8 : index
-//  CHECK-DAG:   %[[C5:.+]] = arith.constant 5 : index
 //  CHECK-DAG:   %[[WG_ID_X:.+]] = hal.interface.workgroup.id[0]
 //  CHECK-DAG:   %[[WG_ID_Y:.+]] = hal.interface.workgroup.id[1]
 //  CHECK-DAG:   %[[WG_ID_Z:.+]] = hal.interface.workgroup.id[2]
 //  CHECK-NOT:   scf.forall
-//      CHECK:   %[[DELINEARIZE:.+]]:3 = affine.delinearize_index %[[WG_ID_Z]] into (%[[C5]], %[[C8]], %[[C4]])
+//      CHECK:   %[[DELINEARIZE:.+]]:3 = affine.delinearize_index %[[WG_ID_Z]] into (5, 8, 4)
 //      CHECK:   %[[I:.+]] = affine.apply #[[MAP0]]()[%[[DELINEARIZE]]#0]
 //      CHECK:   %[[J:.+]] = affine.apply #[[MAP1]]()[%[[WG_ID_X]]]
 //      CHECK:   %[[K:.+]] = affine.apply #[[MAP2]]()[%[[WG_ID_Y]]]

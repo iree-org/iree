@@ -18,6 +18,56 @@
 
 namespace mlir::iree_compiler {
 
+LogicalResult ImportTable::build(Operation *rootOp,
+                                 const TypeConverter &typeConverter) {
+  for (auto funcOp : rootOp->getRegion(0).getOps<FunctionOpInterface>()) {
+    if (!funcOp.isExternal()) {
+      continue; // only external functions are imports
+    }
+
+    ImportTable::Import import;
+    import.name = funcOp.getNameAttr();
+    import.fallback = funcOp->getAttrOfType<SymbolRefAttr>("vm.fallback");
+
+    // Try to use an assigned signature or fall back to converting the input.
+    if (auto importOp = dyn_cast<IREE::VM::ImportOp>(funcOp.getOperation())) {
+      // Import ops have their signature used directly.
+      import.signature = importOp.getFunctionType();
+    } else if (auto signatureAttr =
+                   funcOp->getAttrOfType<TypeAttr>("vm.signature")) {
+      // Directly use the specified signature.
+      import.signature =
+          dyn_cast_if_present<FunctionType>(signatureAttr.getValue());
+    }
+    if (!import.signature) {
+      // Convert the signature using the type converter.
+      SmallVector<Type> argumentTypes;
+      if (failed(typeConverter.convertTypes(funcOp.getArgumentTypes(),
+                                            argumentTypes))) {
+        return funcOp.emitError() << "unable to convert import argument types";
+      }
+      SmallVector<Type> resultTypes;
+      if (failed(typeConverter.convertTypes(funcOp.getResultTypes(),
+                                            resultTypes))) {
+        return funcOp.emitError() << "unable to convert import result types";
+      }
+      import.signature =
+          FunctionType::get(rootOp->getContext(), argumentTypes, resultTypes);
+    }
+
+    symbols[import.name.getValue()] = std::move(import);
+  }
+
+  return success();
+}
+
+std::optional<ImportTable::Import> ImportTable::find(StringRef symbolName) {
+  auto it = symbols.find(symbolName);
+  if (it == symbols.end())
+    return std::nullopt;
+  return it->second;
+}
+
 // TODO(benvanik): replace with iree/compiler/Utils/ModuleUtils.h.
 // There may be some special insertion order arrangement required based on the
 // nested vm.module here.

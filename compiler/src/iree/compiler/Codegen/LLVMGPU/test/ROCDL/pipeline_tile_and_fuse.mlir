@@ -21,7 +21,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b()
-        attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64>} {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x1280xf16>>
@@ -73,7 +73,7 @@ hal.executable public @main {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_gpu.lowering_config<{
-  workgroup = [4, 4, 0],
+  workgroup = [64, 64, 0],
   reduction = [0, 0, 2],
   subgroup = [2, 2],
   mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
@@ -88,7 +88,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b_mfma()
-        attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x1280xf16>>
@@ -135,189 +135,12 @@ hal.executable public @main {
 // -----
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
-  #hal.pipeline.binding<storage_buffer, ReadOnly>,
-  #hal.pipeline.binding<storage_buffer, ReadOnly>,
-  #hal.pipeline.binding<storage_buffer>
-]>
-#config = #iree_gpu.lowering_config<{
-  workgroup = [1, 4, 4, 0],
-  reduction = [0, 0, 0, 2],
-  subgroup = [1, 2, 2],
-  mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-  promote_operands = [0, 1]
-}>
-hal.executable private @main {
-  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @conv_igemm_im2col ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
-      hal.return %x, %y, %z : index, index, index
-    }
-    builtin.module {
-      func.func @conv_igemm_im2col() attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
-        %cst = arith.constant 0.000000e+00 : f32
-        %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x34x34x1280xf16>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<11520x1280xf16>>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x256x1280xf32>>
-        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 34, 34, 1280], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x34x34x1280xf16>> -> tensor<2x34x34x1280xf16>
-        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [11520, 1280], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<11520x1280xf16>> -> tensor<11520x1280xf16>
-        %5 = tensor.empty() : tensor<2x256x1280xf32>
-        %6 = tensor.empty() : tensor<2x256x11520xf16>
-        %7 = iree_linalg_ext.im2col
-            strides = [2, 2] dilations = [1, 1] kernel_size = [3, 3]
-            m_offset = [0] * [1] k_offset = [0] * [1]
-            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
-          ins(%3 : tensor<2x34x34x1280xf16>)
-          outs(%6 : tensor<2x256x11520xf16>) -> tensor<2x256x11520xf16>
-        %8 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x256x1280xf32>) -> tensor<2x256x1280xf32>
-        %9 = linalg.generic {
-          indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
-                           affine_map<(d0, d1, d2, d3) -> (d3, d2)>,
-                           affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
-          iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
-          ins(%7, %4 : tensor<2x256x11520xf16>, tensor<11520x1280xf16>)
-          outs(%8 : tensor<2x256x1280xf32>) attrs =  {lowering_config = #config} {
-        ^bb0(%in: f16, %in_1: f16, %out: f32):
-          %10 = arith.extf %in : f16 to f32
-          %11 = arith.extf %in_1 : f16 to f32
-          %12 = arith.mulf %10, %11 : f32
-          %13 = arith.addf %12, %out : f32
-          linalg.yield %13 : f32
-        } -> tensor<2x256x1280xf32>
-        flow.dispatch.tensor.store %9, %2, offsets = [0, 0, 0], sizes = [2, 256, 1280], strides = [1, 1, 1] : tensor<2x256x1280xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x256x1280xf32>>
-        return
-      }
-    }
-  }
-}
-
-//   CHECK-LABEL: func @conv_igemm_im2col
-//     CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//     CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
-//     CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//     CHECK-DAG:   memref.alloc() : memref<1x64x36xf16, #gpu.address_space<workgroup>>
-//     CHECK-DAG:   memref.alloc() : memref<32x68xf16, #gpu.address_space<workgroup>>
-//     CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//     CHECK-DAG:   %[[C720:.+]] = arith.constant 720 : index
-//     CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
-//         CHECK:   scf.forall ({{.*}}) in (2, 4, 20) {
-//         CHECK:     %[[LOOP:.+]] = scf.for %[[IV:.+]] = %[[C0]] to %[[C720]] step %[[C2]] {{.*}} -> (vector<1x2x2x4x1xf32>)
-//         CHECK:       gpu.barrier
-//     CHECK-DAG:       %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<8xf16>
-//     CHECK-DAG:       vector.transfer_write %[[LHS_RD]]
-//     CHECK-DAG:       %[[RHS_RD:.+]] = vector.transfer_read %[[B1]]{{.*}} vector<8xf16>
-//     CHECK-DAG:       vector.transfer_write %[[RHS_RD]]
-//         CHECK:       gpu.barrier
-//     CHECK-DAG:       %[[LHS_MM0:.+]] = vector.transfer_read {{.*}} vector<2x1x2x4xf16>
-//     CHECK-DAG:       %[[LHS_MM1:.+]] = vector.broadcast {{.*}} vector<2x1x2x4xf16> to vector<1x2x1x2x4xf16>
-//     CHECK-DAG:       %[[RHS_MM:.+]] = vector.transfer_read {{.*}} vector<2x4x2x1xf16>
-//     CHECK-DAG:       vector.transpose %[[LHS_MM1]], [0, 1, 3, 2, 4] : vector<1x2x1x2x4xf16> to vector<1x2x2x1x4xf16>
-//     CHECK-DAG:       vector.transpose %[[RHS_MM]], [0, 2, 3, 1] : vector<2x4x2x1xf16> to vector<2x2x1x4xf16>
-// CHECK-COUNT-4:       amdgpu.mfma {{.*}}blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32
-//         CHECK:     %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 1, 3, 2, 4] : vector<1x2x2x4x1xf32> to vector<1x2x4x2x1xf32>
-//         CHECK:     %[[EXTRACT:.+]] = vector.extract %[[LOOP_T]][0] : vector<2x4x2x1xf32> from vector<1x2x4x2x1xf32>
-//         CHECK:     vector.transfer_write %[[EXTRACT]], %[[B2]]
-//         CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
-
-// -----
-
-#pipeline_layout = #hal.pipeline.layout<bindings = [
-  #hal.pipeline.binding<storage_buffer, ReadOnly>,
-  #hal.pipeline.binding<storage_buffer, ReadOnly>,
-  #hal.pipeline.binding<storage_buffer>
-]>
-#config = #iree_gpu.lowering_config<{
-  workgroup = [1, 4, 16, 16, 0],
-  reduction = [0, 0, 0, 0, 2],
-  subgroup = [1, 4, 1, 4, 0],
-  mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-  promote_operands = [0, 1]
-}>
-hal.executable private @main {
-  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @conv_igemm_im2col_expanded ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
-      hal.return %x, %y, %z : index, index, index
-    }
-    builtin.module {
-      func.func @conv_igemm_im2col_expanded() attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>} {
-        %cst = arith.constant 0.000000e+00 : f32
-        %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x34x34x1280xf16>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<3x3x1280x1280xf16>>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x16x16x1280xf32>>
-        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 34, 34, 1280], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x34x34x1280xf16>> -> tensor<2x34x34x1280xf16>
-        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [3, 3, 1280, 1280], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x1280x1280xf16>> -> tensor<3x3x1280x1280xf16>
-        %5 = tensor.empty() : tensor<2x16x16x1280xf32>
-        %6 = tensor.empty() : tensor<2x16x16x11520xf16>
-        %7 = iree_linalg_ext.im2col
-            strides = [2, 2] dilations = [1, 1] kernel_size = [3, 3]
-            m_offset = [0, 0] * [32, 1] k_offset = [0] * [1]
-            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
-          ins(%3 : tensor<2x34x34x1280xf16>)
-          outs(%6 : tensor<2x16x16x11520xf16>) -> tensor<2x16x16x11520xf16>
-        %collapsed = tensor.collapse_shape %4 [[0, 1, 2], [3]] : tensor<3x3x1280x1280xf16> into tensor<11520x1280xf16>
-        %8 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x16x16x1280xf32>) -> tensor<2x16x16x1280xf32>
-        %9 = linalg.generic {
-          indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>,
-                           affine_map<(d0, d1, d2, d3, d4) -> (d4, d3)>,
-                           affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>],
-          iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]}
-          ins(%7, %collapsed : tensor<2x16x16x11520xf16>, tensor<11520x1280xf16>)
-          outs(%8 : tensor<2x16x16x1280xf32>) attrs =  {lowering_config = #config} {
-        ^bb0(%in: f16, %in_1: f16, %out: f32):
-          %10 = arith.extf %in : f16 to f32
-          %11 = arith.extf %in_1 : f16 to f32
-          %12 = arith.mulf %10, %11 : f32
-          %13 = arith.addf %12, %out : f32
-          linalg.yield %13 : f32
-        } -> tensor<2x16x16x1280xf32>
-        flow.dispatch.tensor.store %9, %2, offsets = [0, 0, 0, 0], sizes = [2, 16, 16, 1280], strides = [1, 1, 1, 1] : tensor<2x16x16x1280xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x16x16x1280xf32>>
-        return
-      }
-    }
-  }
-}
-
-//    CHECK-LABEL: func @conv_igemm_im2col_expanded
-//      CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//      CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
-//      CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//      CHECK-DAG:   memref.alloc() : memref<1x4x16x36xf16, #gpu.address_space<workgroup>>
-//      CHECK-DAG:   memref.alloc() : memref<32x260xf16, #gpu.address_space<workgroup>>
-//      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//      CHECK-DAG:   %[[C720:.+]] = arith.constant 720 : index
-//      CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
-//         CHECK:   scf.forall ({{.*}}) in (2, 4, 5) {
-//          CHECK:   %[[LOOP:.+]] = scf.for %[[IV:.+]] = %[[C0]] to %[[C720]] step %[[C2]] {{.*}} -> (vector<1x4x1x4x4x1xf32>)
-//          CHECK:     gpu.barrier
-//      CHECK-DAG:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<8xf16>
-//      CHECK-DAG:     vector.transfer_write %[[LHS_RD]]
-//      CHECK-DAG:     %[[RHS_RD:.+]] = vector.transfer_read %[[B1]]{{.*}} vector<8xf16>
-//      CHECK-DAG:     vector.transfer_write %[[RHS_RD]]
-//          CHECK:     gpu.barrier
-//      CHECK-DAG:     %[[LHS_MM0:.+]] = vector.transfer_read {{.*}} vector<4x1x1x2x4xf16>
-//      CHECK-DAG:     %[[LHS_MM1:.+]] = vector.broadcast {{.*}} vector<4x1x1x2x4xf16> to vector<1x4x1x1x2x4xf16>
-//      CHECK-DAG:     %[[RHS_MM:.+]] = vector.transfer_read {{.*}} vector<2x4x4x1xf16>
-//      CHECK-DAG:     vector.transpose %[[LHS_MM1]], [0, 1, 2, 4, 3, 5] : vector<1x4x1x1x2x4xf16> to vector<1x4x1x2x1x4xf16>
-//      CHECK-DAG:     vector.transpose %[[RHS_MM]], [0, 2, 3, 1] : vector<2x4x4x1xf16> to vector<2x4x1x4xf16>
-// CHECK-COUNT-32:     amdgpu.mfma {{.*}}blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32
-//          CHECK:   %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 1, 2, 4, 3, 5] : vector<1x4x1x4x4x1xf32> to vector<1x4x1x4x4x1xf32>
-//          CHECK:   %[[EXTRACT:.+]] = vector.extract %[[LOOP_T]][0] : vector<4x1x4x4x1xf32> from vector<1x4x1x4x4x1xf32>
-//          CHECK:   vector.transfer_write %[[EXTRACT]], %[[B2]]
-//         CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
-
-// -----
-
-#pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_gpu.lowering_config<{
-  workgroup = [4, 4, 0],
+  workgroup = [64, 64, 0],
   reduction = [0, 0, 2],
   subgroup = [2, 2],
   mma_kind = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>,
@@ -332,7 +155,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b_wmma()
-        attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>} {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x1280xf16>>
@@ -384,7 +207,7 @@ hal.executable public @main {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_gpu.lowering_config<{
-  workgroup = [4, 4, 0],
+  workgroup = [64, 64, 0],
   reduction = [0, 0, 2],
   subgroup = [2, 2],
   mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
@@ -403,7 +226,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b_mfma_16x16x4()
-        attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x1280x!eltype>>
@@ -440,7 +263,7 @@ hal.executable public @main {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_gpu.lowering_config<{
-  workgroup = [4, 4, 0],
+  workgroup = [64, 64, 0],
   reduction = [0, 0, 2],
   subgroup = [2, 2],
   mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F8E4M3FNUZ>,
@@ -459,7 +282,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b_mfma_16x16x32_f8()
-        attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x1280x!eltype>>
@@ -496,7 +319,7 @@ hal.executable public @main {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_gpu.lowering_config<{
-  workgroup = [2, 2, 0],
+  workgroup = [64, 64, 0],
   reduction = [0, 0, 2],
   subgroup = [1, 1],
   mma_kind = #iree_gpu.mma_layout<MFMA_I32_32x32x16_I8>,
@@ -515,7 +338,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b_mfma_32x32x16_i8()
-        attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x1280x!eltype>>
@@ -552,7 +375,7 @@ hal.executable public @main {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_gpu.lowering_config<{
-  workgroup = [4, 4, 0],
+  workgroup = [64, 64, 0],
   reduction = [0, 0, 2],
   subgroup = [2, 2],
   mma_kind = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F16>,
@@ -571,7 +394,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b_wmma_f16_16x16x16_f16()
-        attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>} {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x1280x!eltype>>
@@ -608,7 +431,7 @@ hal.executable public @main {
   workgroup = [1, 1, 4, 8, 0, 0, 0]
 }>
 
-#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [8, 4, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [8, 4, 1] subgroup_size = 32>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
@@ -672,7 +495,7 @@ hal.executable public @main {
   promote_operands = [0, 1]
 }>
 
-#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [8, 4, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [8, 4, 1] subgroup_size = 32>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
@@ -730,7 +553,7 @@ hal.executable public @main {
 //   CHECK-DAG:   %[[IDY:.+]] = gpu.thread_id  y
 //   CHECK-DAG:   %[[IDZ:.+]] = gpu.thread_id  z
 //       CHECK:   %[[LINID0:.+]] = affine.apply #[[$MAP]]()[%[[IDX]], %[[IDY]], %[[IDZ]]]
-//       CHECK:   %[[IDS:.+]]:2 = affine.delinearize_index %[[LINID0:.+]] into (%c4, %c8) : index, index
+//       CHECK:   %[[IDS:.+]]:2 = affine.delinearize_index %[[LINID0:.+]] into (4, 8) : index, index
 //       CHECK:   %[[LINID1:.+]] = affine.apply #[[$MAP1]]()[%[[IDS]]#0, %[[IDS]]#1]
 //       CHECK:   scf.forall ({{.*}}) in (32, 98) {
 //       CHECK:     scf.for %{{.*}} = %c0 to %c256 step %c4 {{.*}} -> (vector<1x4xf32>)
@@ -749,13 +572,13 @@ hal.executable public @main {
   #hal.pipeline.binding<storage_buffer, Indirect>
 ]>
 
-#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
 
 #lowering_config = #iree_gpu.lowering_config<{
   mma_kind = #iree_gpu.mma_layout<WMMA_I32_16x16x16_I8>,
   reduction = [0, 0, 4],
   subgroup = [2, 4, 0],
-  workgroup = [4, 8, 0],
+  workgroup = [64, 128, 0],
   promote_operands = [0, 1]
 }>
 
@@ -816,7 +639,7 @@ hal.executable public @main {
   thread = [1, 1], workgroup = [1, 1]
 }>
 
-#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
@@ -866,7 +689,7 @@ hal.executable public @main {
   #hal.pipeline.binding<storage_buffer, Indirect>],
   flags = Indirect
 >
-#translation_info = #iree_codegen.translation_info<
+#translation_info = #iree_codegen.translation_info<pipeline =
   LLVMGPUTileAndFuse
   workgroup_size = [256, 1, 1]
   subgroup_size = 64,
@@ -912,7 +735,7 @@ hal.executable public @main {
             intrinsic = MFMA_F32_16x16x4_F32,
             unroll_m = 8,
             unroll_n = 2,
-            unroll_n_to_subgroups = 4,
+            subgroups_n = 4,
             unroll_k = 4>}
           : tensor<4x1x8x4x16x4xf32>, tensor<4x1x4x2x4x16x4xf32> into tensor<4x4x8x4x2x4x16x4xf32>
         flow.dispatch.tensor.store %6, %2, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [4, 4, 8, 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : tensor<4x4x8x4x2x4x16x4xf32> -> !flow.dispatch.tensor<readwrite:tensor<4x4x8x4x2x4x16x4xf32>>
@@ -973,10 +796,10 @@ hal.executable public @main {
 // CHECK-DAG:  %[[C_71_2:.+]] = amdgpu.mfma %[[A_EXTRACT71]] * %[[B_EXTRACT11]] + %[[C_71_1]]
 // CHECK-DAG:  %[[C_71_3:.+]] = amdgpu.mfma %[[A_EXTRACT72]] * %[[B_EXTRACT12]] + %[[C_71_2]]
 // CHECK-DAG:  %[[C_71_4:.+]] = amdgpu.mfma %[[A_EXTRACT73]] * %[[B_EXTRACT13]] + %[[C_71_3]]
-// CHECK:  vector.insert_strided_slice %[[C_00_4]], {{.*}}offsets = [0, 0, 0, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x1x2x1x1x4xf32>
-// CHECK:  vector.insert_strided_slice %[[C_01_4]], {{.*}}offsets = [0, 0, 1, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x1x2x1x1x4xf32>
-// CHECK:  vector.insert_strided_slice %[[C_70_4]], {{.*}}offsets = [7, 0, 0, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x1x2x1x1x4xf32>
-// CHECK:  vector.insert_strided_slice %[[C_71_4]], {{.*}}offsets = [7, 0, 1, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x1x2x1x1x4xf32>
+// CHECK:  vector.insert_strided_slice %[[C_00_4]], {{.*}}offsets = [0, 0, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
+// CHECK:  vector.insert_strided_slice %[[C_01_4]], {{.*}}offsets = [0, 1, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
+// CHECK:  vector.insert_strided_slice %[[C_70_4]], {{.*}}offsets = [7, 0, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
+// CHECK:  vector.insert_strided_slice %[[C_71_4]], {{.*}}offsets = [7, 1, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
 // CHECK:  vector.transfer_write
 
 // -----
@@ -993,7 +816,7 @@ hal.executable public @main {
   thread = [1, 4, 0],
   workgroup = [1, 128, 0]
 }>
-#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
 
 hal.executable public @main {
   hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
@@ -1060,7 +883,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @small_matvec()
-        attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>} {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<10x10xf32>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<10x1xf32>>
@@ -1091,3 +914,108 @@ hal.executable public @main {
 //  CHECK-NEXT:     }
 //  CHECK-NEXT:   } {mapping = [#iree_codegen.workgroup_mapping<x>]}
 //  CHECK-NEXT:   return
+
+// -----
+
+#layout = #hal.pipeline.layout<
+  bindings = [
+    #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+    #hal.pipeline.binding<storage_buffer, ReadOnly>,
+    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+
+hal.executable public @main {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @elemwise_reduction_elemwise ordinal(0) layout(#layout) {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @elemwise_reduction_elemwise() attributes {
+        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+      } {
+        %cst_3 = arith.constant 3.0 : f32
+        %cst_4 = arith.constant 4.0 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<32x16x9x9xi8>>
+        %1 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<32xi8>>
+        %2 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<32x16x9x9xf32>>
+        %3 = hal.interface.binding.subspan layout(#layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<32x16xf32>>
+        %4 = hal.interface.binding.subspan layout(#layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<32x16xf32>>
+        %5 = hal.interface.binding.subspan layout(#layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<32x16xf32>>
+        %6 = hal.interface.binding.subspan layout(#layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<32x16x9x9xi8>>
+        %7 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [32, 16, 9, 9], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<32x16x9x9xi8>> -> tensor<32x16x9x9xi8>
+        %8 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [32], strides = [1] : !flow.dispatch.tensor<readonly:tensor<32xi8>> -> tensor<32xi8>
+        %9 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0, 0], sizes = [32, 16, 9, 9], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<32x16x9x9xf32>> -> tensor<32x16x9x9xf32>
+        %10 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [32, 16], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x16xf32>> -> tensor<32x16xf32>
+        %11 = flow.dispatch.tensor.load %4, offsets = [0, 0], sizes = [32, 16], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x16xf32>> -> tensor<32x16xf32>
+        %12 = flow.dispatch.tensor.load %5, offsets = [0, 0], sizes = [32, 16], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x16xf32>> -> tensor<32x16xf32>
+        %13 = tensor.empty() : tensor<32x16x9x9xi8>
+        %14 = tensor.empty() : tensor<32xf32>
+        %15 = tensor.empty() : tensor<32x16x9x9xf32>
+        %16 = linalg.fill ins(%cst_4 : f32) outs(%14 : tensor<32xf32>) -> tensor<32xf32>
+        %17 = linalg.generic {
+          indexing_maps = [
+            affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+            affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+            ], iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+            ins(%7 : tensor<32x16x9x9xi8>) outs(%15 : tensor<32x16x9x9xf32>) {
+        ^bb0(%in: i8, %out: f32):
+          %20 = arith.extsi %in : i8 to i32
+          %21 = arith.sitofp %20 : i32 to f32
+          %22 = arith.mulf %21, %cst_3 : f32
+          linalg.yield %22 : f32
+        } -> tensor<32x16x9x9xf32>
+        %18 = linalg.generic {
+          indexing_maps = [
+            affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+            affine_map<(d0, d1, d2, d3) -> (d0)>,
+            affine_map<(d0, d1, d2, d3) -> (d0)>
+          ], iterator_types = ["parallel", "reduction", "reduction", "reduction"]}
+          ins(%17, %8 : tensor<32x16x9x9xf32>, tensor<32xi8>) outs(%16 : tensor<32xf32>)
+          attrs =  {lowering_config = #iree_gpu.lowering_config<{
+            reduction = [0, 1, 3, 3], thread = [1, 0, 0, 0], workgroup = [32, 0, 0, 0]}>} {
+        ^bb0(%in: f32, %in_14: i8, %out: f32):
+          %41 = arith.sitofp %in_14 : i8 to f32
+          %42 = arith.addf %in, %41 : f32
+          %43 = arith.mulf %42, %out : f32
+          linalg.yield %43 : f32
+        } -> tensor<32xf32>
+        %19 = linalg.generic {
+          indexing_maps = [
+            affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+            affine_map<(d0, d1, d2, d3) -> (d0, d1)>,
+            affine_map<(d0, d1, d2, d3) -> (d0)>,
+            affine_map<(d0, d1, d2, d3) -> (d0, d1)>,
+            affine_map<(d0, d1, d2, d3) -> (d0, d1)>,
+            affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+            iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+          ins(%9, %10, %18, %11, %12 : tensor<32x16x9x9xf32>, tensor<32x16xf32>, tensor<32xf32>, tensor<32x16xf32>, tensor<32x16xf32>)
+          outs(%13 : tensor<32x16x9x9xi8>) {
+        ^bb0(%in: f32, %in_14: f32, %in_15: f32, %in_16: f32, %in_17: f32, %out: i8):
+          %45 = arith.addf %in, %in_14 : f32
+          %46 = arith.addf %45, %in_15 : f32
+          %47 = arith.addf %46, %in_16 : f32
+          %48 = arith.addf %47, %in_17 : f32
+          %49 = arith.fptosi %48 : f32 to i8
+          linalg.yield %49 : i8
+        } -> tensor<32x16x9x9xi8>
+        flow.dispatch.tensor.store %19, %6, offsets = [0, 0, 0, 0], sizes = [32, 16, 9, 9], strides = [1, 1, 1, 1]
+          : tensor<32x16x9x9xi8> -> !flow.dispatch.tensor<writeonly:tensor<32x16x9x9xi8>>
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: func @elemwise_reduction_elemwise
+//       CHECK:   scf.for %{{.*}} = %{{.*}} to %c16 step %c1 {{.*}} -> (vector<1xf32>)
+//       CHECK:     scf.for
+//       CHECK:       scf.for
+//       CHECK:         %[[REDUCE:.+]] = vector.multi_reduction
+//       CHECK:         scf.yield %[[REDUCE]]
+
+//       CHECK:   scf.for %{{.*}} = %{{.*}} to %c16 step %c1
+//       CHECK:     scf.for
+// CHECK-COUNT-4:     arith.addf {{.*}} : vector<9xf32>
+//       CHECK:       vector.transfer_write {{.*}} vector<9xi8>, memref<32x16x9x9xi8, #hal.descriptor_type<storage_buffer>>

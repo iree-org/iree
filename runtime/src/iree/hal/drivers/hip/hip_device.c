@@ -14,11 +14,13 @@
 #include "iree/base/internal/event_pool.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/drivers/hip/context_util.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/event_pool.h"
 #include "iree/hal/drivers/hip/event_semaphore.h"
 #include "iree/hal/drivers/hip/graph_command_buffer.h"
 #include "iree/hal/drivers/hip/hip_allocator.h"
+#include "iree/hal/drivers/hip/hip_buffer.h"
 #include "iree/hal/drivers/hip/memory_pools.h"
 #include "iree/hal/drivers/hip/nop_executable_cache.h"
 #include "iree/hal/drivers/hip/rccl_channel.h"
@@ -86,6 +88,9 @@ typedef struct iree_hal_hip_device_t {
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
 } iree_hal_hip_device_t;
+
+static iree_hal_hip_device_t* iree_hal_hip_device_cast(
+    iree_hal_device_t* base_value);
 
 static const iree_hal_device_vtable_t iree_hal_hip_device_vtable;
 static const iree_hal_deferred_work_queue_device_interface_vtable_t
@@ -166,6 +171,7 @@ iree_hal_hip_deferred_work_queue_device_interface_synchronize_native_event(
   return IREE_HIP_RESULT_TO_STATUS(device_interface->hip_symbols,
                                    hipEventSynchronize((hipEvent_t)event));
 }
+
 static iree_status_t
 iree_hal_hip_deferred_work_queue_device_interface_destroy_native_event(
     iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
@@ -254,6 +260,45 @@ iree_hal_hip_deferred_work_queue_device_interface_submit_command_buffer(
     }
   }
   return status;
+}
+
+static iree_status_t
+iree_hal_hip_deferred_work_queue_device_interface_async_alloc(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_buffer_t* buffer) {
+  iree_hal_hip_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_hip_deferred_work_queue_device_interface_t*)
+          base_device_interface;
+  iree_hal_hip_device_t* device =
+      iree_hal_hip_device_cast(device_interface->device);
+  if (device->supports_memory_pools) {
+    return iree_hal_hip_memory_pools_allocate_pointer(
+        &device->memory_pools, buffer, device->hip_dispatch_stream,
+        iree_hal_buffer_allocation_size(buffer));
+  }
+
+  return iree_hal_hip_allocator_alloc_async(
+      iree_hal_device_allocator(device_interface->device),
+      device->hip_dispatch_stream, buffer);
+}
+
+// Asynchronously frees a buffer.
+static iree_status_t
+iree_hal_hip_deferred_work_queue_device_interface_async_dealloc(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_buffer_t* buffer) {
+  iree_hal_hip_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_hip_deferred_work_queue_device_interface_t*)
+          base_device_interface;
+  iree_hal_hip_device_t* device =
+      iree_hal_hip_device_cast(device_interface->device);
+  if (device->supports_memory_pools) {
+    return iree_hal_hip_memory_pools_deallocate(
+        &device->memory_pools, device->hip_dispatch_stream, buffer);
+  }
+  return iree_hal_hip_allocator_free_async(
+      iree_hal_device_allocator(device_interface->device),
+      device->hip_dispatch_stream, buffer);
 }
 
 typedef struct iree_hal_hip_tracing_device_interface_t {
@@ -494,13 +539,13 @@ static iree_status_t iree_hal_hip_device_create_internal(
   // Create memory pools first so that we can share them with the allocator.
   if (iree_status_is_ok(status) && device->supports_memory_pools) {
     status = iree_hal_hip_memory_pools_initialize(
-        symbols, hip_device, &params->memory_pools, host_allocator,
+        symbols, hip_device, context, &params->memory_pools, host_allocator,
         &device->memory_pools);
   }
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_hip_allocator_create(
-        symbols, hip_device, dispatch_stream,
+        symbols, hip_device, context, dispatch_stream,
         device->supports_memory_pools ? &device->memory_pools : NULL,
         host_allocator, &device->device_allocator);
   }
@@ -564,9 +609,9 @@ iree_status_t iree_hal_hip_device_create(
 
   iree_hal_hip_event_pool_t* device_event_pool = NULL;
   if (iree_status_is_ok(status)) {
-    status =
-        iree_hal_hip_event_pool_allocate(symbols, params->event_pool_capacity,
-                                         host_allocator, &device_event_pool);
+    status = iree_hal_hip_event_pool_allocate(
+        symbols, context, params->event_pool_capacity, host_allocator,
+        &device_event_pool);
   }
 
   iree_hal_hip_timepoint_pool_t* timepoint_pool = NULL;
@@ -687,6 +732,8 @@ static void iree_hal_hip_replace_channel_provider(
 
 static iree_status_t iree_hal_hip_device_trim(iree_hal_device_t* base_device) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_hip_set_context(device->hip_symbols, device->hip_context));
   iree_arena_block_pool_trim(&device->block_pool);
   IREE_RETURN_IF_ERROR(iree_hal_allocator_trim(device->device_allocator));
   if (device->supports_memory_pools) {
@@ -699,6 +746,8 @@ static iree_status_t iree_hal_hip_device_trim(iree_hal_device_t* base_device) {
 static iree_status_t iree_hal_hip_device_query_attribute(
     iree_hal_hip_device_t* device, hipDeviceAttribute_t attribute,
     int64_t* out_value) {
+  IREE_RETURN_IF_ERROR(
+      iree_hal_hip_set_context(device->hip_symbols, device->hip_context));
   int value = 0;
   IREE_HIP_RETURN_IF_ERROR(
       device->hip_symbols,
@@ -712,6 +761,8 @@ static iree_status_t iree_hal_hip_device_query_i64(
     iree_hal_device_t* base_device, iree_string_view_t category,
     iree_string_view_t key, int64_t* out_value) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_hip_set_context(device->hip_symbols, device->hip_context));
   *out_value = 0;
 
   if (iree_string_view_equal(category, IREE_SV("hal.device.id"))) {
@@ -735,6 +786,9 @@ static iree_status_t iree_hal_hip_device_create_channel(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_channel_params_t params, iree_hal_channel_t** out_channel) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_hip_set_context(device->hip_symbols, device->hip_context));
+
   if (!device->nccl_symbols || !device->nccl_symbols->dylib) {
     return iree_make_status(
         IREE_STATUS_UNAVAILABLE,
@@ -821,11 +875,14 @@ iree_status_t iree_hal_hip_device_create_stream_command_buffer(
     iree_host_size_t binding_capacity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_hip_set_context(device->hip_symbols, device->hip_context));
+
   return iree_hal_hip_stream_command_buffer_create(
       iree_hal_device_allocator(base_device), device->hip_symbols,
-      device->nccl_symbols, device->tracing_context, mode, command_categories,
-      binding_capacity, device->hip_dispatch_stream, &device->block_pool,
-      device->host_allocator, out_command_buffer);
+      device->nccl_symbols, device->hip_context, device->tracing_context, mode,
+      command_categories, binding_capacity, device->hip_dispatch_stream,
+      &device->block_pool, device->host_allocator, out_command_buffer);
 }
 
 static iree_status_t iree_hal_hip_device_create_command_buffer(
@@ -834,6 +891,9 @@ static iree_status_t iree_hal_hip_device_create_command_buffer(
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_hip_set_context(device->hip_symbols, device->hip_context));
+
   if (device->params.allow_inline_execution &&
       iree_all_bits_set(mode,
                         IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION)) {
@@ -843,9 +903,9 @@ static iree_status_t iree_hal_hip_device_create_command_buffer(
     // directly route commands to a HIP stream and let it eagerly flush.
     return iree_hal_hip_stream_command_buffer_create(
         iree_hal_device_allocator(base_device), device->hip_symbols,
-        device->nccl_symbols, device->tracing_context, mode, command_categories,
-        binding_capacity, device->hip_dispatch_stream, &device->block_pool,
-        device->host_allocator, out_command_buffer);
+        device->nccl_symbols, device->hip_context, device->tracing_context,
+        mode, command_categories, binding_capacity, device->hip_dispatch_stream,
+        &device->block_pool, device->host_allocator, out_command_buffer);
   }
   switch (device->params.command_buffer_mode) {
     case IREE_HAL_HIP_COMMAND_BUFFER_MODE_GRAPH:
@@ -886,6 +946,10 @@ static iree_status_t iree_hal_hip_device_import_file(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
     iree_hal_external_file_flags_t flags, iree_hal_file_t** out_file) {
+  iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_hip_set_context(device->hip_symbols, device->hip_context));
+
   if (iree_io_file_handle_type(handle) !=
       IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
     return iree_make_status(
@@ -901,8 +965,10 @@ static iree_status_t iree_hal_hip_device_create_executable_cache(
     iree_hal_device_t* base_device, iree_string_view_t identifier,
     iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_hip_set_context(device->hip_symbols, device->hip_context));
   return iree_hal_hip_nop_executable_cache_create(
-      identifier, device->hip_symbols, device->hip_device,
+      identifier, device->hip_symbols, device->hip_device, device->hip_context,
       device->host_allocator, out_executable_cache);
 }
 
@@ -910,9 +976,13 @@ static iree_status_t iree_hal_hip_device_create_semaphore(
     iree_hal_device_t* base_device, uint64_t initial_value,
     iree_hal_semaphore_flags_t flags, iree_hal_semaphore_t** out_semaphore) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_hip_set_context(device->hip_symbols, device->hip_context));
+
   return iree_hal_hip_event_semaphore_create(
-      initial_value, device->hip_symbols, device->timepoint_pool,
-      device->work_queue, device->host_allocator, out_semaphore);
+      initial_value, device->hip_symbols, device->hip_context,
+      device->timepoint_pool, device->work_queue, device->host_allocator,
+      out_semaphore);
 }
 
 static iree_hal_semaphore_compatibility_t
@@ -920,6 +990,34 @@ iree_hal_hip_device_query_semaphore_compatibility(
     iree_hal_device_t* base_device, iree_hal_semaphore_t* semaphore) {
   // TODO: implement HIP semaphores.
   return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY;
+}
+
+static iree_status_t iree_hal_hip_device_pepare_async_alloc(
+    iree_hal_hip_device_t* device, iree_hal_buffer_params_t params,
+    iree_device_size_t allocation_size,
+    iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)allocation_size);
+
+  iree_hal_buffer_params_canonicalize(&params);
+
+  iree_hal_buffer_t* buffer = NULL;
+  iree_status_t status = iree_hal_hip_buffer_wrap(
+      device->device_allocator, params.type, params.access, params.usage,
+      allocation_size, /*byte_offset=*/0,
+      /*byte_length=*/allocation_size, IREE_HAL_HIP_BUFFER_TYPE_ASYNC,
+      /*device_ptr=*/NULL, /*host_ptr=*/NULL,
+      iree_hal_buffer_release_callback_null(), device->host_allocator, &buffer);
+
+  if (iree_status_is_ok(status)) {
+    *out_buffer = buffer;
+  } else if (buffer) {
+    iree_hal_hip_buffer_set_allocation_empty(buffer);
+    iree_hal_buffer_release(buffer);
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 // TODO: implement multiple streams; today we only have one and queue_affinity
@@ -934,6 +1032,51 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
     iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_hip_set_context(device->hip_symbols, device->hip_context));
+
+  if (device->supports_memory_pools &&
+      !iree_all_bits_set(params.type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+    iree_hal_buffer_t* buffer = NULL;
+
+    IREE_RETURN_IF_ERROR(iree_hal_hip_memory_pools_prepare_buffer(
+        &device->memory_pools, device->hip_dispatch_stream, pool, params,
+        allocation_size, &buffer));
+
+    iree_status_t status = iree_hal_deferred_work_queue_enqueue_alloc(
+        device->work_queue, wait_semaphore_list, signal_semaphore_list, buffer);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_deferred_work_queue_issue(device->work_queue);
+    }
+    if (iree_status_is_ok(status)) {
+      *out_buffer = buffer;
+    } else {
+      iree_hal_hip_buffer_set_allocation_empty(buffer);
+      iree_hal_resource_release(&buffer->resource);
+    }
+    return status;
+  } else if (!iree_all_bits_set(params.type,
+                                IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) &&
+             iree_hal_hip_allocator_isa(
+                 iree_hal_device_allocator(base_device))) {
+    iree_hal_buffer_t* buffer = NULL;
+
+    IREE_RETURN_IF_ERROR(iree_hal_hip_device_pepare_async_alloc(
+        device, params, allocation_size, &buffer));
+
+    iree_status_t status = iree_hal_deferred_work_queue_enqueue_alloc(
+        device->work_queue, wait_semaphore_list, signal_semaphore_list, buffer);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_deferred_work_queue_issue(device->work_queue);
+    }
+    if (iree_status_is_ok(status)) {
+      *out_buffer = buffer;
+    } else {
+      iree_hal_hip_buffer_set_allocation_empty(buffer);
+      iree_hal_resource_release(&buffer->resource);
+    }
+    return status;
+  }
 
   // NOTE: block on the semaphores here; we could avoid this by properly
   // sequencing device work with semaphores. The HIP HAL is not currently
@@ -945,17 +1088,9 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
   // exhaustion but the error may be deferred until a later synchronization.
   // If pools are not supported we allocate a buffer as normal from whatever
   // allocator is set on the device.
-  iree_status_t status = iree_ok_status();
-  if (device->supports_memory_pools &&
-      !iree_all_bits_set(params.type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
-    status = iree_hal_hip_memory_pools_allocate(
-        &device->memory_pools, device->hip_dispatch_stream, pool, params,
-        allocation_size, out_buffer);
-  } else {
-    status = iree_hal_allocator_allocate_buffer(
-        iree_hal_device_allocator(base_device), params, allocation_size,
-        out_buffer);
-  }
+  iree_status_t status =
+      iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
+                                         params, allocation_size, out_buffer);
 
   // Only signal if not returning a synchronous error - synchronous failure
   // indicates that the stream is unchanged (it's not really since we waited
@@ -976,6 +1111,17 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* buffer) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_hip_set_context(device->hip_symbols, device->hip_context));
+
+  if (iree_hal_hip_allocator_isa(iree_hal_device_allocator(base_device))) {
+    iree_status_t status = iree_hal_deferred_work_queue_enqueue_dealloc(
+        device->work_queue, wait_semaphore_list, signal_semaphore_list, buffer);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_deferred_work_queue_issue(device->work_queue);
+    }
+    return status;
+  }
 
   // NOTE: block on the semaphores here; we could avoid this by properly
   // sequencing device work with semaphores. The HIP HAL is not currently
@@ -1006,7 +1152,7 @@ static iree_status_t iree_hal_hip_device_queue_read(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_file_t* source_file, uint64_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length, uint32_t flags) {
+    iree_device_size_t length, iree_hal_read_flags_t flags) {
   // TODO: expose streaming chunk count/size options.
   iree_status_t loop_status = iree_ok_status();
   iree_hal_file_transfer_options_t options = {
@@ -1027,7 +1173,7 @@ static iree_status_t iree_hal_hip_device_queue_write(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_file_t* target_file, uint64_t target_offset,
-    iree_device_size_t length, uint32_t flags) {
+    iree_device_size_t length, iree_hal_write_flags_t flags) {
   // TODO: expose streaming chunk count/size options.
   iree_status_t loop_status = iree_ok_status();
   iree_hal_file_transfer_options_t options = {
@@ -1051,16 +1197,19 @@ static iree_status_t iree_hal_hip_device_queue_execute(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers,
-    iree_hal_buffer_binding_table_t const* binding_tables) {
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_binding_table_t binding_table) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
+
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_set_context(device->hip_symbols, device->hip_context));
 
   iree_status_t status = iree_hal_deferred_work_queue_enqueue(
       device->work_queue, iree_hal_hip_device_collect_tracing_context,
       device->tracing_context, wait_semaphore_list, signal_semaphore_list,
-      command_buffer_count, command_buffers, binding_tables);
+      command_buffer ? 1 : 0, command_buffer ? &command_buffer : NULL,
+      &binding_table);
   if (iree_status_is_ok(status)) {
     // Try to advance the deferred work queue.
     status = iree_hal_deferred_work_queue_issue(device->work_queue);
@@ -1084,6 +1233,9 @@ static iree_status_t iree_hal_hip_device_wait_semaphores(
     iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_hip_set_context(device->hip_symbols, device->hip_context));
+
   return iree_hal_hip_semaphore_multi_wait(semaphore_list, wait_mode, timeout,
                                            &device->block_pool);
 }
@@ -1126,6 +1278,9 @@ static const iree_hal_device_vtable_t iree_hal_hip_device_vtable = {
         iree_hal_hip_device_query_semaphore_compatibility,
     .queue_alloca = iree_hal_hip_device_queue_alloca,
     .queue_dealloca = iree_hal_hip_device_queue_dealloca,
+    .queue_fill = iree_hal_device_queue_emulated_fill,
+    .queue_update = iree_hal_device_queue_emulated_update,
+    .queue_copy = iree_hal_device_queue_emulated_copy,
     .queue_read = iree_hal_hip_device_queue_read,
     .queue_write = iree_hal_hip_device_queue_write,
     .queue_execute = iree_hal_hip_device_queue_execute,
@@ -1165,6 +1320,10 @@ static const iree_hal_deferred_work_queue_device_interface_vtable_t
             iree_hal_hip_deferred_work_queue_device_interface_create_stream_command_buffer,
         .submit_command_buffer =
             iree_hal_hip_deferred_work_queue_device_interface_submit_command_buffer,
+        .async_alloc =
+            iree_hal_hip_deferred_work_queue_device_interface_async_alloc,
+        .async_dealloc =
+            iree_hal_hip_deferred_work_queue_device_interface_async_dealloc,
 };
 
 static const iree_hal_stream_tracing_device_interface_vtable_t

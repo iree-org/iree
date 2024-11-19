@@ -33,7 +33,8 @@ trap "deactivate 2> /dev/null" EXIT
 python -m pip install \
   --find-links https://iree.dev/pip-release-links.html \
   --upgrade \
-  iree-compiler
+  --pre \
+  iree-base-compiler
 
 # 3. Compile `dynamic_shapes.mlir` using `iree-compile`.
 iree-compile \

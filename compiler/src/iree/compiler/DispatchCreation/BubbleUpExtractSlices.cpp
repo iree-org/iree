@@ -41,9 +41,10 @@ struct BubbleUpExtract : OpRewritePattern<tensor::ExtractSliceOp> {
                    "single result");
     }
 
-    if (!IREE::LinalgExt::isBitExtendOp(genericOp)) {
+    if (!IREE::LinalgExt::isBitExtendOp(genericOp) && !genericOp->hasOneUse()) {
       return rewriter.notifyMatchFailure(
-          sliceOp, "expected source to be dequantize-like");
+          sliceOp,
+          "expected source to be dequantize-like op or have a single use");
     }
 
     if (!sliceOp.hasUnitStride()) {

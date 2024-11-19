@@ -79,7 +79,7 @@ util.func public @_main(%arg0: tensor<1x33x33x480xf32>, %arg1: tensor<3x3x480x1x
 
 // ----
 
-#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>
+#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32]>
 util.func public @dispatch_dispatch_0_generic_512x1024_f32(
     %arg0: !flow.dispatch.tensor<readonly:tensor<512x1024xf32>>,
     %arg1: index, %arg2: index, %arg3: index, %arg4: index,
@@ -99,8 +99,9 @@ util.func public @dispatch_dispatch_0_generic_512x1024_f32(
   flow.dispatch.tensor.store %11, %2, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : tensor<?x?xf32, #encoding> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding>>{%0, %1}
   util.return
 }
-
-// CHECK:  %[[LOAD:.+]] = flow.dispatch.tensor.load
-// CHECK:  %[[PAD:.+]] = tensor.pad %[[LOAD]] low
-// CHECK:  %[[ENCODE:.+]] = iree_encoding.set_encoding %[[PAD]] : tensor<?x?xf32> -> tensor<?x?xf32, #iree_encoding.encoding
-// CHECK:  flow.dispatch.tensor.store %[[ENCODE]],
+// CHECK:  #[[ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32]>
+// CHECK:  util.func public @dispatch_dispatch_0_generic_512x1024_f32
+// CHECK:    %[[LOAD:.+]] = flow.dispatch.tensor.load
+// CHECK:    %[[PAD:.+]] = tensor.pad %[[LOAD]] low
+// CHECK:    %[[ENCODE:.+]] = iree_encoding.set_encoding %[[PAD]] : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING]]>
+// CHECK:    flow.dispatch.tensor.store %[[ENCODE]],

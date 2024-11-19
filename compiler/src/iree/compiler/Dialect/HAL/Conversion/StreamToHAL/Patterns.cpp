@@ -32,6 +32,15 @@ static llvm::cl::opt<bool> clIndirectCommandBuffers{
     llvm::cl::init(true),
 };
 
+// TODO(benvanik): remove when we support capturing dynamic values for reuse.
+static llvm::cl::opt<bool> clForceIndirectCommandBuffers{
+    "iree-hal-force-indirect-command-buffers",
+    llvm::cl::desc("Forces indirect command buffers when they would otherwise "
+                   "not be chosen due to the values they capture. They may not "
+                   "be reusable but will still be outlined."),
+    llvm::cl::init(false),
+};
+
 struct ContextResolveOpPattern
     : public StreamConversionPattern<IREE::Stream::ContextResolveOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -986,6 +995,49 @@ static void insertSerializationBarriers(Location loc, Block &block,
   }
 }
 
+// Checks if |executeOp| contains only a single transfer operation and returns
+// it. Non-transfer/dispatch operations like cache control will be ignored.
+//
+// Intended to match things like:
+//   stream.cmd.execute ... {
+//     stream.cmd.invalidate
+//     stream.cmd.fill        <----- returned
+//     stream.cmd.flush
+//   }
+// And not:
+//   stream.cmd.execute ... {
+//     stream.cmd.invalidate
+//     stream.cmd.fill
+//     stream.cmd.flush
+//     stream.cmd.dispatch
+//   }
+static Operation *matchSingleTransferOp(IREE::Stream::CmdExecuteOp executeOp) {
+  Operation *foundOp = nullptr;
+  for (auto &block : executeOp.getBodyRegion()) {
+    for (auto &op : block) {
+      if (!TypeSwitch<Operation *, bool>(&op)
+               // Ignore non-transfer/dispatch ops.
+               .Case<IREE::Stream::CmdInvalidateOp, IREE::Stream::CmdFlushOp,
+                     IREE::Stream::CmdDiscardOp, IREE::Stream::YieldOp>(
+                   [&](auto metaOp) { return true; })
+               .Case<IREE::Stream::CmdFillOp, IREE::Stream::CmdCopyOp>(
+                   [&](auto transferOp) {
+                     if (!foundOp) {
+                       foundOp = &op; // first found
+                       return true;
+                     } else {
+                       return false; // more than one transfer op
+                     }
+                   })
+               // Dispatch/collective/etc fail the search.
+               .Default([&](auto otherOp) { return false; })) {
+        return nullptr;
+      }
+    }
+  }
+  return foundOp;
+}
+
 struct CmdExecuteOpPattern
     : public StreamConversionPattern<IREE::Stream::CmdExecuteOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -996,13 +1048,61 @@ struct CmdExecuteOpPattern
     auto [device, queueAffinity] =
         lookupDeviceAndQueueAffinityFor(executeOp, rewriter);
 
+    // If the command buffer only contains a single transfer command we may be
+    // able to convert it to a queue operation instead. This will have
+    // significantly less overhead than a command buffer especially if we are
+    // not able to memoize it.
+    if (auto *singleTransferOp = matchSingleTransferOp(executeOp)) {
+      // Gather wait/signal fence, which are optional.
+      Value waitFence =
+          getOrCreateWaitFence(loc, adaptor.getAwaitTimepoint(), rewriter);
+      Value signalFence = getOrCreateSignalFence(
+          loc, device, executeOp.getResultTimepoint(), rewriter);
+
+      // Replace the op with the queue operation.
+      // Note that since we are matching an op nested within the region we have
+      // to get the corresponding externally captured operand and lookup the
+      // remapped value from the conversion state.
+      //
+      // Example:
+      //   stream.cmd.execute ... with(%operand as %capture: !stream.resource)
+      //     stream.cmd.fill ... %capture
+      //  ->
+      //   hal.device.queue.fill ... target(%operand : !hal.buffer)
+      if (auto fillOp = dyn_cast<IREE::Stream::CmdFillOp>(*singleTransferOp)) {
+        auto fillTargetBuffer = rewriter.getRemappedValue(
+            executeOp.getClosureCapturedValue(fillOp.getTarget()));
+        rewriter.create<IREE::HAL::DeviceQueueFillOp>(
+            loc, device, queueAffinity, waitFence, signalFence,
+            fillTargetBuffer, fillOp.getTargetOffset(),
+            fillOp.getTargetLength(), fillOp.getValue(),
+            /*flags=*/0);
+      } else if (auto copyOp =
+                     dyn_cast<IREE::Stream::CmdCopyOp>(*singleTransferOp)) {
+        auto copySourceBuffer = rewriter.getRemappedValue(
+            executeOp.getClosureCapturedValue(copyOp.getSource()));
+        auto copyTargetBuffer = rewriter.getRemappedValue(
+            executeOp.getClosureCapturedValue(copyOp.getTarget()));
+        rewriter.create<IREE::HAL::DeviceQueueCopyOp>(
+            loc, device, queueAffinity, waitFence, signalFence,
+            copySourceBuffer, copyOp.getSourceOffset(), copyTargetBuffer,
+            copyOp.getTargetOffset(), copyOp.getLength(),
+            /*flags=*/0);
+      }
+
+      rewriter.replaceOp(executeOp, signalFence);
+      return success();
+    }
+
     // Until uniform buffers are implemented we can't reuse command buffers that
     // contain non-constant uniform values (i32, index, etc). We'll have a pass
     // that runs prior to conversion that creates new stream resources and
     // changes dispatches to use them for any dispatch we can - note that there
     // may still be some that slip through due to custom executables.
     const bool capturesDynamicUniformValues =
-        regionCapturesDynamicUniformValues(executeOp);
+        clForceIndirectCommandBuffers
+            ? false
+            : regionCapturesDynamicUniformValues(executeOp);
 
     // Calculate the indirect buffer references used within the command buffer
     // by analyzing captured resources. This analysis will be used by subsequent

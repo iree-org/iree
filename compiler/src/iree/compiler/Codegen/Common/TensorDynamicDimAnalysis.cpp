@@ -59,7 +59,8 @@ static void updateTensorDimInfo(
   // Update solver info
   auto *divisibilityState =
       solver.lookupState<IREE::Util::IntegerDivisibilityLattice>(dynamicDim);
-  if (divisibilityState && !divisibilityState->getValue().isUninitialized()) {
+  if (divisibilityState && !divisibilityState->getValue().isUninitialized() &&
+      divisibilityState->getValue().getValue().sdiv() != 1) {
     updateDivisibilityInfo(divisibilityInfo, tensorValue, dimIndex,
                            divisibilityState->getValue().getValue());
   }

@@ -378,7 +378,7 @@ module {
  affine_map<(i, j, k) -> (i, j)>
 ]
 func.func @data_tiled_1x1x1_tensor_multi_mma(%lhs: tensor<1x1x4x16xf32>, %rhs: tensor<1x1x4x16xf32>, %acc: tensor<1x1x4x16x4xf32>) -> tensor<1x1x4x16x4xf32>
-      attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>} {
+      attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>} {
   %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
     indexing_maps = #contraction_accesses,
     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
@@ -393,11 +393,9 @@ func.func @data_tiled_1x1x1_tensor_multi_mma(%lhs: tensor<1x1x4x16xf32>, %rhs: t
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]
-//   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
-//   CHECK-DAG:   %[[C16:.+]] = arith.constant 16 : index
 //       CHECK:   scf.forall (%[[THREAD_ID:.+]]) in (64) shared_outs(%[[ACC_ARG:.+]] = %[[ACC]]) -> (tensor<1x1x4x16x4xf32>)
 //       CHECK:     %[[ID_CLAMPED:.+]] = affine.apply #[[$MAP]](%[[THREAD_ID]])
-//   CHECK-DAG:     %[[IN_IDS:.+]]:2 = affine.delinearize_index %[[ID_CLAMPED]] into (%[[C4]], %[[C16]])
+//   CHECK-DAG:     %[[IN_IDS:.+]]:2 = affine.delinearize_index %[[ID_CLAMPED]] into (4, 16)
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][0, 0, %[[IN_IDS]]#0, %[[IN_IDS]]#1] [1, 1, 1, 1] [1, 1, 1, 1]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][0, 0, %[[IN_IDS]]#0, %[[IN_IDS]]#1] [1, 1, 1, 1] [1, 1, 1, 1]
 //   CHECK-DAG:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ACC_ARG]]
@@ -417,7 +415,7 @@ func.func @data_tiled_1x1x1_tensor_multi_mma(%lhs: tensor<1x1x4x16xf32>, %rhs: t
  affine_map<(i, j, k) -> (i, j)>
 ]
 func.func @data_tiled_2x2x4_tensor_multi_mma_unrolled(%lhs: tensor<1x1x2x4x16x4xf32>, %rhs: tensor<1x1x2x4x16x4xf32>, %acc: tensor<1x1x2x2x4x16x4xf32>) -> tensor<1x1x2x2x4x16x4xf32>
-      attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>} {
+      attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>} {
   %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
     indexing_maps = #contraction_accesses,
     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
@@ -432,11 +430,9 @@ func.func @data_tiled_2x2x4_tensor_multi_mma_unrolled(%lhs: tensor<1x1x2x4x16x4x
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]
-//   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
-//   CHECK-DAG:   %[[C16:.+]] = arith.constant 16 : index
 //       CHECK:   scf.forall (%[[THREAD_ID:.+]]) in (64) shared_outs(%[[ACC_ARG:.+]] = %[[ACC]]) -> (tensor<1x1x2x2x4x16x4xf32>)
 //       CHECK:     %[[ID_CLAMPED:.+]] = affine.apply #[[$MAP]](%[[THREAD_ID]])
-//   CHECK-DAG:     %[[IN_IDS:.+]]:2 = affine.delinearize_index %[[ID_CLAMPED]] into (%[[C4]], %[[C16]])
+//   CHECK-DAG:     %[[IN_IDS:.+]]:2 = affine.delinearize_index %[[ID_CLAMPED]] into (4, 16)
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]]
 //  CHECK-SAME:       [0, 0, 0, %[[IN_IDS]]#0, %[[IN_IDS]]#1, 0] [1, 1, 2, 1, 1, 4] [1, 1, 1, 1, 1, 1]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]]
@@ -458,11 +454,11 @@ func.func @data_tiled_2x2x4_tensor_multi_mma_unrolled(%lhs: tensor<1x1x2x4x16x4x
  affine_map<(i, j, k) -> (i, j)>
 ]
 func.func @data_tiled_2x2x4_tensor_multi_mma_unrolled_to_subgroups(%lhs: tensor<1x1x2x4x16x4xf32>, %rhs: tensor<1x1x2x4x16x4xf32>, %acc: tensor<1x1x2x2x4x16x4xf32>) -> tensor<1x1x2x2x4x16x4xf32>
-      attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>} {
+      attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>} {
   %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
     indexing_maps = #contraction_accesses,
     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, unroll_m_to_subgroups = 2, unroll_n_to_subgroups = 2, unroll_k = 4>
+    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, subgroups_m = 2, subgroups_n = 2, unroll_k = 4>
   } : tensor<1x1x2x4x16x4xf32>, tensor<1x1x2x4x16x4xf32> into tensor<1x1x2x2x4x16x4xf32>
   return %0 : tensor<1x1x2x2x4x16x4xf32>
 }
@@ -474,23 +470,19 @@ func.func @data_tiled_2x2x4_tensor_multi_mma_unrolled_to_subgroups(%lhs: tensor<
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]
-//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
-//   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
-//   CHECK-DAG:   %[[C16:.+]] = arith.constant 16 : index
 //       CHECK:   scf.forall (%[[THREAD_ID:.+]]) in (256) shared_outs(%[[ACC_ARG:.+]] = %[[ACC]]) -> (tensor<1x1x2x2x4x16x4xf32>)
 //       CHECK:     %[[ID_CLAMPED_128:.+]] = affine.apply #[[$MAP]](%[[THREAD_ID]])
-//   CHECK-DAG:     %[[IN_IDS:.+]]:3 = affine.delinearize_index %[[ID_CLAMPED_128]] into (%[[C2]], %[[C4]], %[[C16]])
+//   CHECK-DAG:     %[[IN_IDS:.+]]:3 = affine.delinearize_index %[[ID_CLAMPED_128]] into (2, 4, 16)
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]]
 //  CHECK-SAME:       [0, 0, %[[IN_IDS]]#0, %[[IN_IDS]]#1, %[[IN_IDS]]#2, 0] [1, 1, 1, 1, 1, 4] [1, 1, 1, 1, 1, 1]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]]
 //  CHECK-SAME:       [0, 0, %[[IN_IDS]]#0, %[[IN_IDS]]#1, %[[IN_IDS]]#2, 0] [1, 1, 1, 1, 1, 4] [1, 1, 1, 1, 1, 1]
 //       CHECK:     %[[ID_CLAMPED_256:.+]] = affine.apply #[[$MAP1]](%[[THREAD_ID]])
-//   CHECK-DAG:     %[[ACC_IDS:.+]]:4 = affine.delinearize_index %[[ID_CLAMPED_256]] into (%[[C2]], %[[C2]], %[[C4]], %[[C16]])
+//   CHECK-DAG:     %[[ACC_IDS:.+]]:4 = affine.delinearize_index %[[ID_CLAMPED_256]] into (2, 2, 4, 16)
 //   CHECK-DAG:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ACC_ARG]]
 //  CHECK-SAME:       [0, 0, %[[ACC_IDS]]#0, %[[ACC_IDS]]#1, %[[ACC_IDS]]#2, %[[ACC_IDS]]#3, 0] [1, 1, 1, 1, 1, 1, 4] [1, 1, 1, 1, 1, 1, 1]
 //       CHECK:     %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS_SLICE]], %[[RHS_SLICE]], %[[ACC_SLICE]]
-//  CHECK-SAME:       kind = #iree_gpu.data_tiled_mma_layout<intrinsic =  MFMA_F32_16x16x4_F32,
-//  CHECK-SAME:         unroll_m_to_subgroups = 2, unroll_n_to_subgroups = 2, unroll_k = 4>}
+//  CHECK-SAME:       kind = #iree_gpu.data_tiled_mma_layout<intrinsic =  MFMA_F32_16x16x4_F32, unroll_k = 4>}
 //  CHECK-SAME:       : tensor<1x1x1x1x1x4xf32>, tensor<1x1x1x1x1x4xf32> into tensor<1x1x1x1x1x1x4xf32>
 //       CHECK:     tensor.parallel_insert_slice %[[MMA]] into %[[ACC_ARG]]
 //  CHECK-SAME:       [0, 0, %[[ACC_IDS]]#0, %[[ACC_IDS]]#1, %[[ACC_IDS]]#2, %[[ACC_IDS]]#3, 0] [1, 1, 1, 1, 1, 1, 4] [1, 1, 1, 1, 1, 1, 1]

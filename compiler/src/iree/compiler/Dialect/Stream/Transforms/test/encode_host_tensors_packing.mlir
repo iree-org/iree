@@ -85,7 +85,7 @@ util.func public @denseTensorSizeOfDynamic(%arg0: index) -> index {
   // CHECK-DAG: %[[C5:.+]] = arith.constant 5 : index
   // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
   // CHECK: %[[MUL:.+]] = arith.muli %arg0, %[[C5]] : index
-  // CHECK: %[[DIV:.+]] = arith.divui %[[MUL]], %[[C2]] : index
+  // CHECK: %[[DIV:.+]] = arith.ceildivui %[[MUL]], %[[C2]] : index
   %0 = stream.tensor.sizeof tensor<?x5xi4>{%arg0} : index
   // CHECK: util.return %[[DIV]]
   util.return %0 : index

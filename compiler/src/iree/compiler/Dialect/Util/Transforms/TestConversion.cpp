@@ -20,10 +20,8 @@ namespace mlir::iree_compiler::IREE::Util {
 
 namespace {
 
-static std::optional<Value> buildUnrealizedConversionCastOp(OpBuilder &builder,
-                                                            Type toType,
-                                                            ValueRange inputs,
-                                                            Location loc) {
+static Value buildUnrealizedConversionCastOp(OpBuilder &builder, Type toType,
+                                             ValueRange inputs, Location loc) {
   return builder.create<UnrealizedConversionCastOp>(loc, toType, inputs)
       .getResult(0);
 }

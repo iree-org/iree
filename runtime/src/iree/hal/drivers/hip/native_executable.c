@@ -9,6 +9,7 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/drivers/hip/context_util.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/status_util.h"
 #include "iree/hal/utils/executable_debug_info.h"
@@ -207,12 +208,14 @@ static iree_status_t iree_hal_hip_native_executable_flatbuffer_verify(
 
 iree_status_t iree_hal_hip_native_executable_create(
     const iree_hal_hip_dynamic_symbols_t* symbols, hipDevice_t device,
-    const iree_hal_executable_params_t* executable_params,
+    hipCtx_t context, const iree_hal_executable_params_t* executable_params,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(executable_params);
   IREE_ASSERT_ARGUMENT(out_executable);
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0,
+                                    iree_hal_hip_set_context(symbols, context));
 
   *out_executable = NULL;
 
@@ -267,11 +270,9 @@ iree_status_t iree_hal_hip_native_executable_create(
       (hipModule_t*)((uint8_t*)executable + sizeof(*executable) +
                      export_count * sizeof(executable->exports[0]));
   executable->export_count = export_count;
-  IREE_TRACE(
-      iree_hal_debug_export_info_t* export_infos =
-          (iree_hal_debug_export_info_t*)((uint8_t*)executable->modules +
-                                          module_count *
-                                              sizeof(executable->modules[0])));
+  IREE_TRACE(uint8_t* export_info_ptr =
+                 ((uint8_t*)executable->modules +
+                  module_count * sizeof(executable->modules[0])));
 
   // Publish any embedded source files to the tracing infrastructure.
   iree_hal_debug_publish_source_files(
@@ -376,13 +377,13 @@ iree_status_t iree_hal_hip_native_executable_create(
           iree_hal_hip_BindingBits_vec_len(binding_flags_vec);
 
       IREE_TRACE({
-        iree_hal_debug_copy_export_info(
-            iree_hal_hip_ExportDef_debug_info_get(export_def),
-            &export_infos[i]);
-        kernel_info->debug_info.function_name = export_infos[i].function_name;
-        kernel_info->debug_info.source_filename =
-            export_infos[i].source_filename;
-        kernel_info->debug_info.source_line = export_infos[i].source_line;
+        iree_hal_debug_export_info_t* export_info =
+            (iree_hal_debug_export_info_t*)export_info_ptr;
+        export_info_ptr += iree_hal_debug_copy_export_info(
+            iree_hal_hip_ExportDef_debug_info_get(export_def), export_info);
+        kernel_info->debug_info.function_name = export_info->function_name;
+        kernel_info->debug_info.source_filename = export_info->source_filename;
+        kernel_info->debug_info.source_line = export_info->source_line;
       });
     }
   }

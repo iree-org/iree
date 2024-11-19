@@ -29,7 +29,6 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
   if (!isNarrowNResult(encoding)) {
     return tensorType;
   }
-  auto newIndex = encoding.getOperandIndex();
   SmallVector<int64_t> newOriginalShape(tensorType.getShape());
   auto userIndexingMaps = encoding.getUserIndexingMaps();
   SmallVector<AffineMap> maps;
@@ -70,23 +69,19 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
   for (auto &map : maps) {
     map = map.compose(permutation);
   }
-  SmallVector<Attribute> newMaps;
-  for (auto map : maps) {
-    newMaps.push_back(AffineMapAttr::get(map));
-  }
-  ArrayAttr newIndexingMaps = ArrayAttr::get(context, newMaps);
   auto elemType = tensorType.getElementType();
-  OpBuilder builder(context);
+  auto operandIndex = encoding.getOperandIndex().getInt();
 
-  auto opTypeAttr = IREE::Encoding::EncodingOpTypeAttr::get(
-      context, IREE::Encoding::EncodingOpType::matmul);
   // TODO(#17718): Handle the broadcast map for transpose cases. It is on the
   // experimental path, so it is not clear what needs to be done here. For now
   // just use the original map for the new encoding.
+  std::optional<AffineMap> newBcastMap;
+  if (encoding.getBcastMap()) {
+    newBcastMap = encoding.getBcastMap().getValue();
+  }
   auto newEncoding = IREE::Encoding::EncodingAttr::get(
-      context, newIndex, opTypeAttr, encoding.getElementTypes(),
-      newIndexingMaps, encoding.getBcastMap(),
-      DenseI64ArrayAttr::get(context, newRoundDimsTo));
+      context, operandIndex, encoding.getOpType().getValue(),
+      encoding.getElementTypesArray(), maps, newBcastMap, newRoundDimsTo);
   return RankedTensorType::get(newShape, elemType, newEncoding);
 }
 

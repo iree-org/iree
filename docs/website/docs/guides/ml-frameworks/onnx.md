@@ -64,21 +64,22 @@ graph LR
 
         ``` shell
         python -m pip install \
-          iree-compiler[onnx] \
-          iree-runtime
+          iree-base-compiler[onnx] \
+          iree-base-runtime
         ```
 
     === ":material-alert: Nightly releases"
 
-        Nightly releases are published on
+        Nightly pre-releases are published on
         [GitHub releases](https://github.com/iree-org/iree/releases).
 
         ``` shell
         python -m pip install \
           --find-links https://iree.dev/pip-release-links.html \
           --upgrade \
-          iree-compiler[onnx] \
-          iree-runtime
+          --pre \
+          iree-base-compiler[onnx] \
+          iree-base-runtime
         ```
 
 ## :octicons-rocket-16: Quickstart

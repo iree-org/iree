@@ -119,7 +119,7 @@ static void addTileAndDistributeToWorkgroupsPasses(
   }
   funcPassManager.addPass(createConvertToDestinationPassingStylePass(
       useWARForCooperativeMatrixCodegen));
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 }
 
@@ -305,7 +305,7 @@ void addSPIRVBaseVectorizePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createFoldAffineMinInDistributedLoopsPass());
   funcPassManager.addPass(memref::createResolveShapedTypeResultDimsPass());
 
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
   // Tile to GPU invocations and vectorize.
@@ -341,18 +341,18 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createFoldAffineMinInDistributedLoopsPass());
   funcPassManager.addPass(memref::createResolveShapedTypeResultDimsPass());
 
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
   funcPassManager.addPass(createGPUTilePass());
   funcPassManager.addPass(
       IREE::LinalgExt::createDecomposeWinogradTransformPass());
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
   // Tile to GPU invocations and vectorize.
   funcPassManager.addPass(createSPIRVAnnotateWinogradLoopsPass());
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   {
     GenericVectorizationPassOptions options;
@@ -392,7 +392,7 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
   // Run canonicalization patterns to propagate constant shape sizes after
   // removing trip-one loops.
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
   // Tile and distribute to GPU subgroups.
@@ -550,7 +550,7 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &funcPassManager) {
   // Fuse input parallel ops into the reduction op so that we don't need to
   // create temporary allocations during bufferization.
   funcPassManager.addPass(createRematerializeParallelOpsPass());
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
 
   funcPassManager.addPass(createGPUTileReductionPass());
   funcPassManager.addPass(createCanonicalizerPass());

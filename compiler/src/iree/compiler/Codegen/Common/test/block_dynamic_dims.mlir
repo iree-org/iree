@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-block-dynamic-dimensions, cse))" --split-input-file --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-block-dynamic-dimensions, cse))" --split-input-file --mlir-print-local-scope --iree-codegen-block-dynamic-dimensions-of-contractions %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
     #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
@@ -99,3 +99,157 @@ func.func @block_attention_dims() {
 //       CHECK:       ins(%[[Q]], %[[K]], %[[V]], %{{.+}}, %[[MASK]] :
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //       CHECK:   flow.dispatch.tensor.store %[[GENERIC]], %[[OUTPUT_BINDING]]
+
+// -----
+
+func.func @basic_blocking_test(%arg0 : index) -> tensor<?x4096xf32> {
+  %0 = util.assume.int %arg0<umin = 0, umax = 1024, udiv = 16> : index
+  %lhs = tensor.empty(%0) : tensor<?x2048xf32>
+  %rhs = tensor.empty() : tensor<2048x4096xf32>
+  %init = tensor.empty(%0) : tensor<?x4096xf32>
+  %matmul = linalg.matmul ins(%lhs, %rhs : tensor<?x2048xf32>, tensor<2048x4096xf32>)
+      outs(%init : tensor<?x4096xf32>) -> tensor<?x4096xf32>
+  return %matmul : tensor<?x4096xf32>
+}
+// CHECK-LABEL: func @basic_blocking_test(
+//   CHECK-DAG:   %[[LHS:.+]] = tensor.empty(%{{.+}}) : tensor<?x16x2048xf32>
+//   CHECK-DAG:   %[[INIT:.+]] = tensor.empty(%{{.+}}) : tensor<?x16x4096xf32>
+//       CHECK:   %[[MATMUL:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[LHS]],
+//  CHECK-SAME:       outs(%[[INIT]] :
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[MATMUL]]
+//       CHECK:   return %[[COLLAPSE]]
+
+// -----
+
+func.func @no_blocking(%arg0 : index) -> tensor<?x4096xf32> {
+  %lhs = tensor.empty(%arg0) : tensor<?x2048xf32>
+  %rhs = tensor.empty() : tensor<2048x4096xf32>
+  %init = tensor.empty(%arg0) : tensor<?x4096xf32>
+  %matmul = linalg.matmul ins(%lhs, %rhs : tensor<?x2048xf32>, tensor<2048x4096xf32>)
+      outs(%init : tensor<?x4096xf32>) -> tensor<?x4096xf32>
+  return %matmul : tensor<?x4096xf32>
+}
+// CHECK-LABEL: func @no_blocking(
+//   CHECK-DAG:   %[[LHS:.+]] = tensor.empty(%{{.+}}) : tensor<?x2048xf32>
+//   CHECK-DAG:   %[[INIT:.+]] = tensor.empty(%{{.+}}) : tensor<?x4096xf32>
+//       CHECK:   %[[MATMUL:.+]] = linalg.matmul
+//  CHECK-SAME:       ins(%[[LHS]],
+//  CHECK-SAME:       outs(%[[INIT]] :
+//       CHECK:   return %[[MATMUL]]
+
+// -----
+
+func.func @no_unit_blocking(%arg0 : index) -> tensor<?x4096xf32> {
+  %0 = util.assume.int %arg0<umin = 0, umax = 1024, udiv = 1> : index
+  %lhs = tensor.empty(%0) : tensor<?x2048xf32>
+  %rhs = tensor.empty() : tensor<2048x4096xf32>
+  %init = tensor.empty(%0) : tensor<?x4096xf32>
+  %matmul = linalg.matmul ins(%lhs, %rhs : tensor<?x2048xf32>, tensor<2048x4096xf32>)
+      outs(%init : tensor<?x4096xf32>) -> tensor<?x4096xf32>
+  return %matmul : tensor<?x4096xf32>
+}
+// CHECK-LABEL: func @no_unit_blocking(
+//   CHECK-DAG:   %[[LHS:.+]] = tensor.empty(%{{.+}}) : tensor<?x2048xf32>
+//   CHECK-DAG:   %[[INIT:.+]] = tensor.empty(%{{.+}}) : tensor<?x4096xf32>
+//       CHECK:   %[[MATMUL:.+]] = linalg.matmul
+//  CHECK-SAME:       ins(%[[LHS]],
+//  CHECK-SAME:       outs(%[[INIT]] :
+//       CHECK:   return %[[MATMUL]]
+
+
+// -----
+
+func.func @contract_op_interface_op(%rhs : tensor<2048x4096xf16>, %m : index)
+    -> tensor<?x2048xf32> {
+  %0 = util.assume.int %m<udiv = 16> : index
+  %lhs = tensor.empty(%0) : tensor<?x4096xf16>
+  %init = tensor.empty(%0) : tensor<?x2048xf32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                       affine_map<(d0, d1, d2) -> (d1, d2)>,
+                       affine_map<(d0, d1, d2) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel", "reduction"]}
+      ins(%lhs, %rhs : tensor<?x4096xf16>, tensor<2048x4096xf16>)
+      outs(%init : tensor<?x2048xf32>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f32):
+    %17 = arith.extf %in : f16 to f32
+    %18 = arith.extf %in_0 : f16 to f32
+    %19 = arith.mulf %17, %18 : f32
+    %20 = arith.addf %out, %19 : f32
+    linalg.yield %20 : f32
+  } -> tensor<?x2048xf32>
+  return %1 : tensor<?x2048xf32>
+}
+// CHECK-LABEL: func @contract_op_interface_op(
+//   CHECK-DAG:   %[[LHS:.+]] = tensor.empty(%{{.+}}) : tensor<?x16x4096xf16>
+//   CHECK-DAG:   %[[INIT:.+]] = tensor.empty(%{{.+}}) : tensor<?x16x2048xf32>
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[LHS]],
+//  CHECK-SAME:       outs(%[[INIT]] :
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[GENERIC]] {{\[}}[0, 1], [2]{{\]}}
+//       CHECK:   return %[[COLLAPSED]]
+
+// -----
+
+func.func @reshape_propagation_test(%rhs : tensor<2048x4096xf16>, %m : index)
+    -> tensor<?x2048xf16> {
+  %cst = arith.constant 0.0 : f32
+  %0 = util.assume.int %m<udiv = 16> : index
+  %lhs = tensor.empty(%0) : tensor<?x4096xf16>
+  %init = tensor.empty(%0) : tensor<?x2048xf32>
+  %init2 = tensor.empty(%0) : tensor<?x2048xf16>
+  %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<?x2048xf32>) -> tensor<?x2048xf32>
+  %1 = linalg.matmul_transpose_b
+      ins(%lhs, %rhs : tensor<?x4096xf16>, tensor<2048x4096xf16>)
+      outs(%fill : tensor<?x2048xf32>) -> tensor<?x2048xf32>
+  %2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%1 : tensor<?x2048xf32>) outs(%init2 : tensor<?x2048xf16>) {
+    ^bb0(%b0 : f32, %b1 : f16):
+      %3 = arith.truncf %b0 : f32 to f16
+      linalg.yield %3 : f16
+  } -> tensor<?x2048xf16>
+  return %2 : tensor<?x2048xf16>
+}
+// CHECK-LABEL: func @reshape_propagation_test(
+//   CHECK-DAG:   %[[LHS:.+]] = tensor.empty(%{{.+}}) : tensor<?x16x4096xf16>
+//   CHECK-DAG:   %[[INIT:.+]] = tensor.empty(%{{.+}}) : tensor<?x16x2048xf32>
+//       CHECK:   %[[FILL:.+]] = linalg.fill
+//  CHECK-SAME:       outs(%[[INIT]] :
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[LHS]],
+//  CHECK-SAME:       outs(%[[FILL]] :
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty(%{{.+}}) : tensor<?x16x2048xf16>
+//       CHECK:   %[[TRUNC:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[GENERIC]] :
+//  CHECK-SAME:       outs(%[[EMPTY]] :
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[TRUNC]]
+//       CHECK:   return %[[COLLAPSED]]
+
+// -----
+
+func.func @multiple_dynamic_dims(%arg0 : index, %arg1 : index) -> tensor<?x?x4096xf32> {
+  %0 = util.assume.int %arg0<umin = 0, umax = 1024, udiv = 16> : index
+  %lhs = tensor.empty(%arg1, %0) : tensor<?x?x2048xf32>
+  %rhs = tensor.empty(%arg1) : tensor<?x2048x4096xf32>
+  %init = tensor.empty(%arg1, %0) : tensor<?x?x4096xf32>
+  %matmul = linalg.batch_matmul ins(%lhs, %rhs : tensor<?x?x2048xf32>, tensor<?x2048x4096xf32>)
+      outs(%init : tensor<?x?x4096xf32>) -> tensor<?x?x4096xf32>
+  return %matmul : tensor<?x?x4096xf32>
+}
+// CHECK-LABEL: func @multiple_dynamic_dims(
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: index,
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index)
+//   CHECK-DAG:   %[[ARG0_ASSUME:.+]] = util.assume.int %[[ARG0]]
+//   CHECK-DAG:   %[[RHS:.+]] = tensor.empty(%[[ARG1]]) : tensor<?x2048x4096xf32>
+//   CHECK-DAG:   %[[BLOCKED_M:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 16)>()[%[[ARG0_ASSUME]]]
+//   CHECK-DAG:   %[[LHS:.+]] = tensor.empty(%[[ARG1]], %[[BLOCKED_M]]) : tensor<?x?x16x2048xf32>
+//   CHECK-DAG:   %[[INIT:.+]] = tensor.empty(%[[ARG1]], %[[BLOCKED_M]]) : tensor<?x?x16x4096xf32>
+//       CHECK:   %[[MATMUL:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[LHS]], %[[RHS]]
+//  CHECK-SAME:       outs(%[[INIT]] :
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[MATMUL]]
+//       CHECK:   return %[[COLLAPSE]]

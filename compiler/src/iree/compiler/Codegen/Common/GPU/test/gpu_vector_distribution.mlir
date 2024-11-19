@@ -319,7 +319,7 @@ builtin.module attributes { transform.with_named_sequence } {
 #layout2d = #iree_vector_ext.layout<#row_layout, #col_layout>
 #layout1d = #iree_vector_ext.layout<#col_layout>
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {}>
-#translation_info = #iree_codegen.translation_info<None subgroup_size = 64>
+#translation_info = #iree_codegen.translation_info<pipeline = None subgroup_size = 64>
 module {
   func.func @distribute_reduction_f16(%source: vector<16x16xf16>, %init: vector<16xf16>) -> vector<16xf16>
   attributes {hal.executable.target = #executable_target_rocm_hsaco_fb, translation_info = #translation_info} {
@@ -569,7 +569,7 @@ func.func @resolve_wmma_layout_conflict_with_shared_memory(%15 : vector<16x16xf1
                                                            %35 : vector<16x16xf16>,
                                                            %33 : vector<16x16xf32>)
                                                            -> vector<16x16xf32>
-  attributes {translation_info = #iree_codegen.translation_info<None
+  attributes {translation_info = #iree_codegen.translation_info<pipeline = None
                                                                 workgroup_size = [32, 2, 1]
                                                                 subgroup_size = 32>} {
 

@@ -35,16 +35,24 @@ static void addCleanupPatterns(OpPassManager &passManager) {
   // TODO(benvanik): run in a fixed-point iteration pipeline.
 
   // Standard MLIR cleanup.
-  passManager.addPass(mlir::createCanonicalizerPass());
-  passManager.addPass(mlir::createCSEPass());
-
-  // Simplify util.global accesses; this can help with data flow tracking as
-  // redundant store-loads are removed.
   FunctionLikeNest(passManager)
-      .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass);
+
+  // Aggressive MLIR cleanup.
+  passManager.addNestedPass<IREE::VM::ModuleOp>(
+      IREE::VM::createDropUnusedCallsPass());
+  passManager.addPass(mlir::createSymbolDCEPass());
+
+  FunctionLikeNest(passManager)
+      // Simplify util.global accesses; this can help with data flow tracking as
+      // redundant store-loads are removed.
+      .addPass(IREE::Util::createSimplifyGlobalAccessesPass)
+
+      // Aggressive cleanup.
+      .addPass(IREE::Util::createApplyPatternsPass);
 
   // Cleanup and canonicalization of util.global (and other util ops).
-  passManager.addPass(IREE::Util::createApplyPatternsPass());
   passManager.addPass(IREE::Util::createFoldGlobalsPass());
   passManager.addPass(IREE::Util::createFuseGlobalsPass());
 }

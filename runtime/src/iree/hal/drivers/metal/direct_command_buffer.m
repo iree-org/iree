@@ -435,15 +435,17 @@ bool iree_hal_metal_command_buffer_isa(iree_hal_command_buffer_t* command_buffer
   return iree_hal_resource_is(&command_buffer->resource, &iree_hal_metal_command_buffer_vtable);
 }
 
-static void iree_hal_metal_command_buffer_begin_debug_group(
+static iree_status_t iree_hal_metal_command_buffer_begin_debug_group(
     iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
     iree_hal_label_color_t label_color, const iree_hal_label_location_t* location) {
   // TODO(antiagainst): implement support for debug group
+  return iree_ok_status();
 }
 
-static void iree_hal_metal_command_buffer_end_debug_group(
+static iree_status_t iree_hal_metal_command_buffer_end_debug_group(
     iree_hal_command_buffer_t* base_command_buffer) {
   // TODO(antiagainst): implement support for debug group
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_metal_command_buffer_prepare_barrier(
@@ -553,8 +555,9 @@ static iree_status_t iree_hal_metal_command_buffer_wait_events(
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "event not yet supported");
 }
 
-static iree_status_t iree_hal_metal_command_buffer_discard_buffer(
-    iree_hal_command_buffer_t* base_command_buffer, iree_hal_buffer_ref_t buffer_ref) {
+static iree_status_t iree_hal_metal_command_buffer_advise_buffer(
+    iree_hal_command_buffer_t* base_command_buffer, iree_hal_buffer_ref_t buffer_ref,
+    iree_hal_memory_advise_flags_t flags, uint64_t arg0, uint64_t arg1) {
   // This is a hint to the device and we have nothing to do for Metal.
   return iree_ok_status();
 }
@@ -620,7 +623,7 @@ static uint32_t iree_hal_metal_duplicate_to_four_byte_value(const void* pattern,
 
 static iree_status_t iree_hal_metal_command_buffer_prepare_fill_buffer(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_buffer_ref_t target_ref,
-    const void* pattern, iree_host_size_t pattern_length) {
+    const void* pattern, iree_host_size_t pattern_length, iree_hal_fill_flags_t flags) {
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -764,7 +767,8 @@ static iree_status_t iree_hal_metal_command_segment_record_copy_buffer(
 
 static iree_status_t iree_hal_metal_command_buffer_prepare_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
-    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref) {
+    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref,
+    iree_hal_update_flags_t flags) {
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -797,7 +801,7 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_update_buffer(
 
 static iree_status_t iree_hal_metal_command_buffer_prepare_copy_buffer(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_buffer_ref_t source_ref,
-    iree_hal_buffer_ref_t target_ref) {
+    iree_hal_buffer_ref_t target_ref, iree_hal_copy_flags_t flags) {
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -1068,7 +1072,7 @@ static const iree_hal_command_buffer_vtable_t iree_hal_metal_command_buffer_vtab
     .signal_event = iree_hal_metal_command_buffer_signal_event,
     .reset_event = iree_hal_metal_command_buffer_reset_event,
     .wait_events = iree_hal_metal_command_buffer_wait_events,
-    .discard_buffer = iree_hal_metal_command_buffer_discard_buffer,
+    .advise_buffer = iree_hal_metal_command_buffer_advise_buffer,
     .fill_buffer = iree_hal_metal_command_buffer_prepare_fill_buffer,
     .update_buffer = iree_hal_metal_command_buffer_prepare_update_buffer,
     .copy_buffer = iree_hal_metal_command_buffer_prepare_copy_buffer,

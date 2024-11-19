@@ -18,6 +18,12 @@
 
 #define DEBUG_TYPE "iree-codegen-block-dynamic-dimensions"
 
+static llvm::cl::opt<bool> clEnableBlockedMatmuls(
+    "iree-codegen-block-dynamic-dimensions-of-contractions",
+    llvm::cl::desc("developer flag to gaurd blocking dynamic dimensions of "
+                   "contraction-like ops"),
+    llvm::cl::Hidden, llvm::cl::init(true));
+
 namespace mlir::iree_compiler {
 
 #define GEN_PASS_DEF_BLOCKDYNAMICDIMENSIONSPASS
@@ -60,6 +66,7 @@ struct RemoveOptimizationBarrier final
 /// any un-propagated `tensor.expand_shape/tensor.collapse_shape` patterns.
 struct BlockDynamicDimensionsPass final
     : impl::BlockDynamicDimensionsPassBase<BlockDynamicDimensionsPass> {
+  using Base::Base;
   void runOnOperation() override;
 };
 } // namespace
@@ -101,7 +108,11 @@ getTensorDivisibilityInfo(const TensorDynamicDimAnalysis &dynamicDimAnalysis,
 /// inverses of each other. The `util.optimization.barrier` avoid these from
 /// getting folded away during reshape propagation. Return the result of the
 /// `tensor.collapse_shape generated.
-static std::optional<Value>
+struct ReshapeOps {
+  tensor::ExpandShapeOp expandShapeOp;
+  tensor::CollapseShapeOp collapseShapeOp;
+};
+static std::optional<ReshapeOps>
 blockDynamicDimensionsOfValue(RewriterBase &rewriter,
                               const TensorDivisibilityInfo &divisibilityInfo,
                               Value v) {
@@ -114,14 +125,15 @@ blockDynamicDimensionsOfValue(RewriterBase &rewriter,
   SmallVector<OpFoldResult> outputShape;
   SmallVector<ReassociationIndices> reassociation;
   Location loc = v.getLoc();
+  SmallVector<OpFoldResult> origShape = tensor::getMixedSizes(rewriter, loc, v);
 
-  for (auto [index, dim] : llvm::enumerate(tensorType.getShape())) {
+  for (auto [index, dim] : llvm::enumerate(origShape)) {
     reassociation.emplace_back(ReassociationIndices{});
 
     // Check if this needs division.
     if (!tensorType.isDynamicDim(index) || !divisibilityInfo.contains(index)) {
       reassociation.back().push_back(outputShape.size());
-      outputShape.push_back(rewriter.getIndexAttr(dim));
+      outputShape.push_back(dim);
       continue;
     }
 
@@ -131,9 +143,8 @@ blockDynamicDimensionsOfValue(RewriterBase &rewriter,
     uint64_t factor = currDivisibility.sdiv();
     AffineExpr s0 = rewriter.getAffineSymbolExpr(0);
     AffineExpr divExpr = s0.floorDiv(factor);
-    Value sourceDim = rewriter.create<tensor::DimOp>(loc, v, index).getResult();
     OpFoldResult newDynamicDim = affine::makeComposedFoldedAffineApply(
-        rewriter, loc, divExpr, ArrayRef<OpFoldResult>{sourceDim});
+        rewriter, loc, divExpr, ArrayRef<OpFoldResult>{dim});
     OpFoldResult newStaticDim = rewriter.getIndexAttr(factor);
 
     reassociation.back().push_back(outputShape.size());
@@ -153,18 +164,23 @@ blockDynamicDimensionsOfValue(RewriterBase &rewriter,
   auto outputType = RankedTensorType::get(
       staticOutputShape, tensorType.getElementType(), tensorType.getEncoding());
 
-  Value expandShape = rewriter.create<tensor::ExpandShapeOp>(
+  auto expandShapeOp = rewriter.create<tensor::ExpandShapeOp>(
       loc, outputType, v, reassociation, outputShape);
-  Value barrier =
-      rewriter.create<IREE::Util::OptimizationBarrierOp>(loc, expandShape)
-          .getResult(0);
-  Value collapseShape = rewriter.create<tensor::CollapseShapeOp>(
+  Value barrier = rewriter
+                      .create<IREE::Util::OptimizationBarrierOp>(
+                          loc, expandShapeOp.getResult())
+                      .getResult(0);
+  auto collapseShapeOp = rewriter.create<tensor::CollapseShapeOp>(
       loc, tensorType, barrier, reassociation);
-  return collapseShape;
+  return ReshapeOps{expandShapeOp, collapseShapeOp};
 }
 
+//===---------------------------------------------------------------------===//
+// Methods for blocking operands of operations
+//===---------------------------------------------------------------------===//
+
 /// For an operation, replace the operands at indices specified in
-/// `limitToOperandIndices` with the result of
+/// `limitToOperandNumbers` with the result of
 /// `tensor.expand_shape`/`tensor.collapse_shape` pair to materialize the
 /// information about dynamic dimensions that are known to be a multiple of a
 /// compile-time static value. For example,
@@ -185,11 +201,10 @@ blockDynamicDimensionsOfValue(RewriterBase &rewriter,
 /// ```
 static LogicalResult blockDynamicDimensions(
     RewriterBase &rewriter, const TensorDynamicDimAnalysis &dynamicDimAnalysis,
-    Operation *operation, llvm::SmallDenseSet<int64_t> limitToOperandIndices) {
-  OpBuilder::InsertionGuard g(rewriter);
-
+    Operation *operation, llvm::SmallDenseSet<int64_t> limitToOperandNumbers,
+    llvm::SmallDenseSet<int64_t> limitToResultNumbers) {
   for (OpOperand &operand : operation->getOpOperands()) {
-    if (!limitToOperandIndices.contains(operand.getOperandNumber()))
+    if (!limitToOperandNumbers.contains(operand.getOperandNumber()))
       continue;
     if (operand.get().getDefiningOp<tensor::CollapseShapeOp>())
       continue;
@@ -197,29 +212,96 @@ static LogicalResult blockDynamicDimensions(
         getTensorDivisibilityInfo(dynamicDimAnalysis, operand.get());
     if (operandDivisibilityInfo.empty())
       continue;
-    std::optional<Value> newOperand = blockDynamicDimensionsOfValue(
+    std::optional<ReshapeOps> reshapes = blockDynamicDimensionsOfValue(
         rewriter, operandDivisibilityInfo, operand.get());
-    if (newOperand) {
-      rewriter.modifyOpInPlace(operation,
-                               [&]() { operand.set(newOperand.value()); });
+    if (reshapes) {
+      rewriter.modifyOpInPlace(
+          operation, [&]() { operand.set(reshapes->collapseShapeOp); });
+    }
+  }
+
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPointAfter(operation);
+  for (OpResult result : operation->getResults()) {
+    if (!limitToResultNumbers.contains(result.getResultNumber()))
+      continue;
+    TensorDivisibilityInfo resultDivisibilityInfo =
+        getTensorDivisibilityInfo(dynamicDimAnalysis, result);
+    if (resultDivisibilityInfo.empty())
+      continue;
+    std::optional<ReshapeOps> reshapes =
+        blockDynamicDimensionsOfValue(rewriter, resultDivisibilityInfo, result);
+    if (reshapes) {
+      llvm::SmallPtrSet<Operation *, 1> ignoreUses;
+      ignoreUses.insert(reshapes->expandShapeOp);
+      rewriter.replaceAllUsesExcept(
+          result, reshapes->collapseShapeOp.getResult(), ignoreUses);
     }
   }
   return success();
 }
 
-/// Insert `tensor.expand_shape` operations to materialize in IR information
-/// about dynamic dimensions that are known to be a multiple of a compile-time
-/// know value, for the operands of `iree_linalg_ext.attention` operation.
+/// Generic method for blocking all operands of an operation.
+static LogicalResult blockDynamicDimensionsOfAllTensorOperandsAndResults(
+    RewriterBase &rewriter, const TensorDynamicDimAnalysis &dynamicDimAnalysis,
+    Operation *op) {
+  llvm::SmallDenseSet<int64_t> tensorOperandsList, tensorResultsList;
+  for (OpOperand &opOperand : op->getOpOperands()) {
+    if (isa<RankedTensorType>(opOperand.get().getType())) {
+      tensorOperandsList.insert(opOperand.getOperandNumber());
+    }
+  }
+  for (OpResult result : op->getResults()) {
+    if (isa<RankedTensorType>(result.getType())) {
+      tensorResultsList.insert(result.getResultNumber());
+    }
+  }
+  return blockDynamicDimensions(rewriter, dynamicDimAnalysis, op,
+                                tensorOperandsList, tensorResultsList);
+}
+
+/// Block dynamic dimensions in operands of `LinalgOp`.
+static LogicalResult
+blockDynamicDimensions(RewriterBase &rewriter,
+                       const TensorDynamicDimAnalysis &dynamicDimAnalysis,
+                       linalg::LinalgOp linalgOp) {
+  if (linalg::isaContractionOpInterface(linalgOp)) {
+    return blockDynamicDimensionsOfAllTensorOperandsAndResults(
+        rewriter, dynamicDimAnalysis, linalgOp);
+  }
+  return success();
+}
+
+/// Block dynamic dimensions in operands of `AttentionOp`.
 static LogicalResult
 blockDynamicDimensions(RewriterBase &rewriter,
                        const TensorDynamicDimAnalysis &dynamicDimAnalysis,
                        IREE::LinalgExt::AttentionOp attentionOp) {
   // Only block the q and k values.
-  llvm::SmallDenseSet<int64_t> prunedOperandsList;
+  llvm::SmallDenseSet<int64_t> prunedOperandsList, prunedResultsList;
   prunedOperandsList.insert(attentionOp.getQueryMutable().getOperandNumber());
   prunedOperandsList.insert(attentionOp.getKeyMutable().getOperandNumber());
   return blockDynamicDimensions(rewriter, dynamicDimAnalysis, attentionOp,
-                                prunedOperandsList);
+                                prunedOperandsList, prunedResultsList);
+}
+
+/// Dispatch to methods that block dynamic dimensions of operations.
+static LogicalResult
+blockDynamicDimensions(RewriterBase &rewriter,
+                       const TensorDynamicDimAnalysis &dynamicDimAnalysis,
+                       Operation *operation) {
+  return TypeSwitch<Operation *, LogicalResult>(operation)
+      .Case<IREE::LinalgExt::AttentionOp>([&](auto attentionOp) {
+        return blockDynamicDimensions(rewriter, dynamicDimAnalysis,
+                                      attentionOp);
+      })
+      .Case<linalg::LinalgOp>([&](auto linalgOp) {
+        if (clEnableBlockedMatmuls) {
+          return blockDynamicDimensions(rewriter, dynamicDimAnalysis, linalgOp);
+        }
+        return success();
+      })
+      .Default([&](Operation *op) { return success(); });
 }
 
 void BlockDynamicDimensionsPass::runOnOperation() {
@@ -231,12 +313,10 @@ void BlockDynamicDimensionsPass::runOnOperation() {
   }
 
   IRRewriter rewriter(context);
-  auto walkResult = operation->walk(
-      [&](IREE::LinalgExt::AttentionOp attentionOp) -> WalkResult {
-        rewriter.setInsertionPoint(attentionOp);
-        return blockDynamicDimensions(rewriter, dynamicDimAnalysis,
-                                      attentionOp);
-      });
+  auto walkResult = operation->walk([&](Operation *op) -> WalkResult {
+    rewriter.setInsertionPoint(op);
+    return blockDynamicDimensions(rewriter, dynamicDimAnalysis, op);
+  });
   if (walkResult.wasInterrupted()) {
     return signalPassFailure();
   }
@@ -252,7 +332,11 @@ void BlockDynamicDimensionsPass::runOnOperation() {
     // Add patterns to "push down" the `tensor.collapse_shape` patterns (which
     // are the dual of the patterns to "bubble up" `tensor.expand_shape`
     // patterns)
-    linalg::ControlFusionFn controlFn = [](OpOperand *) { return true; };
+    linalg::ControlFusionFn controlFn = [](OpOperand *opOperand) {
+      // Avoid fusion with fills/empty using the propagation patterns.
+      return !isa_and_nonnull<linalg::FillOp, tensor::EmptyOp>(
+          opOperand->get().getDefiningOp());
+    };
     linalg::populateFoldReshapeOpsByExpansionPatterns(bubbleExpandShapePatterns,
                                                       controlFn);
     IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(
@@ -262,6 +346,8 @@ void BlockDynamicDimensionsPass::runOnOperation() {
     // bindings or `tensor.empty` operations.
     populateReshapeToInterfaceTensorPatterns(bubbleExpandShapePatterns);
     tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
+    linalg::FillOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
+                                                context);
     // Add some additional patterns that can simplify the IR and remove dead
     // operations.
     memref::populateResolveRankedShapedTypeResultDimsPatterns(
@@ -289,6 +375,11 @@ void BlockDynamicDimensionsPass::runOnOperation() {
                                                        context);
     tensor::CollapseShapeOp::getCanonicalizationPatterns(
         removeBarrierOpsPatterns, context);
+    tensor::populateFoldTensorEmptyPatterns(removeBarrierOpsPatterns);
+    linalg::FillOp::getCanonicalizationPatterns(removeBarrierOpsPatterns,
+                                                context);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(
+        removeBarrierOpsPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             operation, std::move(removeBarrierOpsPatterns)))) {
       operation->emitOpError("failed in cleanup patterns");

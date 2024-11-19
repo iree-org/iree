@@ -3142,49 +3142,8 @@ void CondBranchOp::getCanonicalizationPatterns(RewritePatternSet &results,
                  SwapInvertedCondBranchOpTargets>(context);
 }
 
-namespace {
-
-/// Removes vm.call ops to functions that are marked as having no side-effects
-/// if the results are unused.
-template <typename T>
-struct EraseUnusedCallOp : public OpRewritePattern<T> {
-  using OpRewritePattern<T>::OpRewritePattern;
-  LogicalResult matchAndRewrite(T op,
-                                PatternRewriter &rewriter) const override {
-    // First check if the call is unused - this ensures we only do the symbol
-    // lookup if we are actually going to use it.
-    for (auto result : op.getResults()) {
-      if (!result.use_empty()) {
-        return failure();
-      }
-    }
-
-    auto *calleeOp = SymbolTable::lookupSymbolIn(
-        op->template getParentOfType<ModuleOp>(), op.getCallee());
-
-    bool hasNoSideEffects = false;
-    if (calleeOp->getAttr("nosideeffects")) {
-      hasNoSideEffects = true;
-    } else if (auto import = dyn_cast<ImportInterface>(calleeOp)) {
-      hasNoSideEffects = !import.hasSideEffects();
-    }
-    if (!hasNoSideEffects) {
-      // Op has side-effects (or may have them); can't remove.
-      return failure();
-    }
-
-    // Erase op as it is unused.
-    rewriter.eraseOp(op);
-    return success();
-  }
-};
-
-} // namespace
-
 void CallOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                         MLIRContext *context) {
-  results.insert<EraseUnusedCallOp<CallOp>>(context);
-}
+                                         MLIRContext *context) {}
 
 namespace {
 
@@ -3210,8 +3169,7 @@ struct ConvertNonVariadicToCallOp : public OpRewritePattern<CallVariadicOp> {
 
 void CallVariadicOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                  MLIRContext *context) {
-  results.insert<EraseUnusedCallOp<CallVariadicOp>, ConvertNonVariadicToCallOp>(
-      context);
+  results.insert<ConvertNonVariadicToCallOp>(context);
 }
 
 namespace {

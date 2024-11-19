@@ -791,12 +791,12 @@ void RodataOp::build(OpBuilder &builder, OperationState &result, StringRef name,
   result.addAttributes(attrs);
 }
 
-LogicalResult ConstRefRodataOp::verify() {
+LogicalResult
+ConstRefRodataOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   Operation *op = getOperation();
-  auto *rodataOp =
-      op->getParentOfType<VM::ModuleOp>().lookupSymbol(getRodata());
-  if (!rodataOp) {
-    return op->emitOpError() << "Undefined rodata section: " << getRodata();
+  if (!symbolTable.lookupNearestSymbolFrom(op, getRodataAttr())) {
+    return op->emitError() << "undefined rodata section: '" << getRodata()
+                           << "'";
   }
   return success();
 }

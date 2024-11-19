@@ -80,6 +80,32 @@ struct TransposeInnerConcatenation : public OpRewritePattern<tensor::ConcatOp> {
   }
 };
 
+/// Only decompose the concats that are not outer most here to see if they get
+/// folded into other dispatches. Outerdim concats get lowered to
+/// `flow.tensor.update` on conversion to Flow and then they get modified to be
+/// in-place.
+struct DecomposeNonOuterDimConcats : public OpRewritePattern<tensor::ConcatOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::ConcatOp concatOp,
+                                PatternRewriter &rewriter) const override {
+    if (concatOp.getDim() == 0) {
+      return rewriter.notifyMatchFailure(
+          concatOp, "non-outer dim concats are not decomposed");
+    }
+
+    FailureOr<SmallVector<Value>> decomposed =
+        concatOp.decomposeOperation(rewriter);
+    if (failed(decomposed)) {
+      return rewriter.notifyMatchFailure(concatOp,
+                                         "failed to decompose concat op");
+    }
+
+    rewriter.replaceOp(concatOp, decomposed.value()[0]);
+    return success();
+  }
+};
+
 struct DecomposeConcatPass
     : public impl::DecomposeConcatPassBase<DecomposeConcatPass> {
   using impl::DecomposeConcatPassBase<
@@ -97,10 +123,10 @@ struct DecomposeConcatPass
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
 
+    patterns.insert<DecomposeNonOuterDimConcats>(context);
     if (enableConcatTransposition) {
       patterns.insert<TransposeInnerConcatenation>(context, /*benefit=*/2);
     }
-    tensor::populateDecomposeTensorConcatPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();

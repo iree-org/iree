@@ -88,12 +88,12 @@ extern "C++" {
 extern "C" {
 
 typedef enum iree_memory_order_e {
-  iree_memory_order_relaxed = _Atomic_memory_order_relaxed,
-  iree_memory_order_consume = _Atomic_memory_order_consume,
-  iree_memory_order_acquire = _Atomic_memory_order_acquire,
-  iree_memory_order_release = _Atomic_memory_order_release,
-  iree_memory_order_acq_rel = _Atomic_memory_order_acq_rel,
-  iree_memory_order_seq_cst = _Atomic_memory_order_seq_cst,
+  iree_memory_order_relaxed = std::memory_order::memory_order_relaxed,
+  iree_memory_order_consume = std::memory_order::memory_order_consume,
+  iree_memory_order_acquire = std::memory_order::memory_order_acquire,
+  iree_memory_order_release = std::memory_order::memory_order_release,
+  iree_memory_order_acq_rel = std::memory_order::memory_order_acq_rel,
+  iree_memory_order_seq_cst = std::memory_order::memory_order_seq_cst,
 } iree_memory_order_t;
 
 #define IREE_ATOMIC_VAR_INIT(value) (value)

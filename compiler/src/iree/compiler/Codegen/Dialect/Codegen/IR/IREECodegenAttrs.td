@@ -127,9 +127,7 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
 
 // Define the AttrDef
 def DispatchLoweringPassPipelineAttr :
-    EnumAttr<IREECodegen_Dialect, DispatchLoweringPassPipelineEnum, ""> {
-  let assemblyFormat = "``$value";
-}
+    EnumAttr<IREECodegen_Dialect, DispatchLoweringPassPipelineEnum, "">;
 
 //===---------------------------------------------------------------------===//
 // IREE Codegen workgroup mapping attributes
@@ -228,7 +226,7 @@ def IREECodegen_TranslationInfoAttr :
   }];
 
   let assemblyFormat = [{
-    `<` `` $passPipeline
+    `<` `pipeline` `=` `` $passPipeline
     (`codegen_spec` `=` $codegenSpec^)?
     (`workgroup_size` `=` `[` $workgroupSize^ `]`)?
     (`subgroup_size` `=` $subgroupSize^)?

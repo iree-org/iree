@@ -255,7 +255,8 @@ static iree_status_t iree_benchmark_executable_run(
     ++fence_value;
     IREE_RETURN_IF_ERROR(iree_hal_device_queue_execute(
         args->device, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphore_list,
-        signal_semaphore_list, 1, &command_buffer, /*binding_tables=*/NULL));
+        signal_semaphore_list, command_buffer,
+        iree_hal_buffer_binding_table_empty()));
 
     // Block and wait for the submission to complete.
     // Note that this will include round-trip overhead and if the dispatch or

@@ -86,6 +86,9 @@ createOrdinalAllocationPass();
 std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
 createDropEmptyModuleInitializersPass();
 
+// Drops unused calls to functions marked as having no side effects.
+std::unique_ptr<OperationPass<IREE::VM::ModuleOp>> createDropUnusedCallsPass();
+
 // Sinks defining ops with few uses to their use-sites to reduce the total
 // number of live registers at the cost of additional storage requirements.
 std::unique_ptr<OperationPass<IREE::VM::ModuleOp>> createSinkDefiningOpsPass();
@@ -101,6 +104,7 @@ inline void registerVMPasses() {
   createHoistInlinedRodataPass();
   createDeduplicateRodataPass();
   createDropEmptyModuleInitializersPass();
+  createDropUnusedCallsPass();
   createGlobalInitializationPass();
   createOrdinalAllocationPass();
   createResolveRodataLoadsPass();

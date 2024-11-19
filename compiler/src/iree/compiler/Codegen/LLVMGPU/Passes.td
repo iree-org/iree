@@ -87,22 +87,6 @@ def LLVMGPUConfigureTensorLayoutsPass :
   let summary = "Pass to set layouts on tensors for later vector distribution";
 }
 
-def LLVMGPUConfigureVectorLayoutsPass :
-    InterfacePass<"iree-llvmgpu-configure-vector-layouts", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to set layouts for vector distribution";
-}
-
-def LLVMGPUConvolutionToIGEMMPass :
-    InterfacePass<"iree-llvmgpu-convolution-to-igemm", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to convert conv_2d ops to igemm and set a lowering configuration.";
-  let dependentDialects = [
-    "tensor::TensorDialect",
-    "iree_compiler::IREE::Codegen::IREECodegenDialect",
-    "iree_compiler::IREE::GPU::IREEGPUDialect",
-    "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect"
-  ];
-}
-
 def LLVMGPULinkExecutablesPass :
     Pass<"iree-llvmgpu-link-executables", "mlir::ModuleOp"> {
   let summary = "Links LLVMGPU HAL executables within the top-level program module.";
@@ -177,6 +161,11 @@ def LLVMGPUVectorToGPUPass :
 def TestLLVMGPUScalarizeMathOpPass :
     Pass<"iree-test-llvmgpu-legalize-ops", "ModuleOp"> {
   let summary = "Test pass for several legalization patterns.";
+}
+
+def TestLLVMGPUQueryMMAPass :
+    Pass<"iree-test-llvmgpu-query-mma", "ModuleOp"> {
+  let summary = "Test pass for querying the supported mma intrinsic instructions.";
 }
 
 #endif // IREE_CODEGEN_LLVMGPU_PASSES

@@ -424,11 +424,11 @@ struct GenericTypeConvert final : ConversionPattern {
   }
 };
 
-std::optional<Value> scalarToTensor(OpBuilder &builder, Type /*type*/,
-                                    ValueRange inputs, Location loc) {
+Value scalarToTensor(OpBuilder &builder, Type /*type*/, ValueRange inputs,
+                     Location loc) {
   assert(inputs.size() == 1);
   if (isa<ShapedType>(inputs.front().getType())) {
-    return std::nullopt;
+    return Value();
   }
   return builder
       .create<tensor::FromElementsOp>(

@@ -957,20 +957,21 @@ iree_status_t iree_hal_vulkan_native_executable_create(
   // Populate tracing info for each pipeline.
   if (iree_status_is_ok(status)) {
     IREE_TRACE({
-      iree_hal_debug_export_info_t* export_infos =
-          (iree_hal_debug_export_info_t*)((uint8_t*)executable->pipelines +
-                                          pipeline_count *
-                                              sizeof(executable->pipelines[0]));
+      uint8_t* export_info_ptr =
+          ((uint8_t*)executable->pipelines +
+           pipeline_count * sizeof(executable->pipelines[0]));
       for (iree_host_size_t i = 0; i < pipeline_count; ++i) {
         iree_hal_vulkan_PipelineDef_table_t pipeline_def =
             iree_hal_vulkan_PipelineDef_vec_at(pipelines_vec, i);
-        iree_hal_vulkan_pipeline_t* pipeline = &executable->pipelines[i];
-        iree_hal_debug_copy_export_info(
+        iree_hal_debug_export_info_t* export_info =
+            (iree_hal_debug_export_info_t*)export_info_ptr;
+        export_info_ptr += iree_hal_debug_copy_export_info(
             iree_hal_vulkan_PipelineDef_debug_info_get(pipeline_def),
-            &export_infos[i]);
-        pipeline->source_location.file_name = export_infos[i].source_filename;
-        pipeline->source_location.line = export_infos[i].source_line;
-        pipeline->source_location.func_name = export_infos[i].function_name;
+            export_info);
+        iree_hal_vulkan_pipeline_t* pipeline = &executable->pipelines[i];
+        pipeline->source_location.file_name = export_info->source_filename;
+        pipeline->source_location.line = export_info->source_line;
+        pipeline->source_location.func_name = export_info->function_name;
       }
     });
   }

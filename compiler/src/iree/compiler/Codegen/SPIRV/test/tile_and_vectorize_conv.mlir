@@ -3,7 +3,7 @@
 // RUN:   %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]]>
-#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -75,7 +75,7 @@ hal.executable private @nhwc_conv_static_shape_f32 {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 8, 32], [0, 1, 4, 4], [0, 0, 0, 0, 1, 1], [0, 1, 0, 0]]>
-#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -143,7 +143,7 @@ hal.executable private @nhwc_nhwc_depthwise_conv_static_shape_f32 {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 4, 32], [0, 1, 2, 4], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]]>
-#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -259,7 +259,7 @@ hal.executable private @low_padded_conv {
 // -----
 
 #config =  #iree_codegen.lowering_config<tile_sizes = [[0, 1, 4, 32], [0, 1, 2, 4], [0, 0, 0, 0, 1, 1], [0, 1, 0, 0]]>
-#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -378,7 +378,7 @@ hal.executable private @low_high_padded_nhwc_depthwise_conv {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 16, 8, 8], [0, 8, 1, 4], [0, 0, 0, 0, 4, 1, 1], [0, 0, 1, 0]]>
-#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -450,7 +450,7 @@ hal.executable private @nchw_conv_static_shape_f32 {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 64, 64], [1, 1, 8, 8], [0, 0, 0, 0, 1, 1, 8], [0, 1, 0, 0]]>
-#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
+#translation = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,

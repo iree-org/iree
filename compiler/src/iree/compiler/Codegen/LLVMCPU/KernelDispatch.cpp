@@ -1844,7 +1844,9 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    IREE::LinalgExt::AttentionOp attnOp) {
   FailureOr<IREE::LinalgExt::AttentionOpDetail> maybeOpInfo =
-      IREE::LinalgExt::AttentionOpDetail::get(attnOp.getIndexingMapsArray());
+      IREE::LinalgExt::AttentionOpDetail::get(
+          attnOp.getQueryMap(), attnOp.getKeyMap(), attnOp.getValueMap(),
+          attnOp.getOutputMap());
   assert(succeeded(maybeOpInfo) && "failed to infer attention dims");
   auto opInfo = maybeOpInfo.value();
 
@@ -2600,6 +2602,14 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(op, DistributionHeuristicConfig{});
   TileSizesListType tileSizes = {distTileSizes};
+  SmallVector<int64_t> vecTileSizes = distTileSizes;
+
+  // Add an extra level of tiling.
+  // TODO: Limit vector tile sizes for other TilingInterface ops.
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(*op)) {
+    limitVectorTileSizes(linalgOp, vecTileSizes);
+  }
+  tileSizes.push_back(vecTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes, DispatchLoweringPassPipeline::CPUDefault);
 }
@@ -2996,6 +3006,26 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
         commonVecTileSizes[idx] = 0;
         commonVecScalableTileFlags[idx] = false;
       }
+    }
+  }
+
+  // Make sure the innermost tile size times element size is multiple
+  // of byte bits. This is required for now because we do not fully
+  // support sub-byte vector stores. Once vector stores are supported
+  // then this can be eliminated. Note that emulating sub-byte sized vector
+  // loads and stores will have a performance impact.
+  auto resultTypes = rootOperation->getResultTypes();
+  if (commonVecTileSizes.size() != 0 && !resultTypes.empty()) {
+    auto elementTypeSize =
+        cast<ShapedType>(rootOperation->getResultTypes().front())
+            .getElementType()
+            .getIntOrFloatBitWidth();
+    // for now just enable for i1
+    if (elementTypeSize == 1) {
+      auto innermostTileSize = commonVecTileSizes.back();
+      commonVecTileSizes.back() =
+          llvm::alignTo(innermostTileSize * elementTypeSize, 8) /
+          elementTypeSize;
     }
   }
 

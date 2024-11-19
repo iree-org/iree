@@ -95,6 +95,8 @@ void buildGlobalOptimizationPassPipeline(
 
   // Preprocessing passes to get the program into a canonical state.
   FunctionLikeNest(mainPassManager)
+      .addPredicatedPass(transformOptions.options.stripAssertions,
+                         IREE::Util::createStripDebugOpsPass)
       .addPass(IREE::Util::createOptimizeIntArithmeticPass)
       .addPass(createLinalgQuantizedConvToConvPass)
       .addPass(createLinalgQuantizedMatmulToMatmulPass)
@@ -182,16 +184,17 @@ void buildGlobalOptimizationPassPipeline(
   FunctionLikeNest(mainPassManager)
       .addPass(createGlobalLoopInvariantCodeMotionPass)
       .addPass(IREE::Flow::createCanonicalizerPass)
-      .addPass(mlir::createCSEPass);
+      .addPass(mlir::createCSEPass)
 
-  // Simplify util.global accesses early on; this can help with dispatch
-  // region formation as redundant store-loads are removed.
-  FunctionLikeNest(mainPassManager)
-      .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
+      // Simplify util.global accesses early on; this can help with dispatch
+      // region formation as redundant store-loads are removed.
+      .addPass(IREE::Util::createSimplifyGlobalAccessesPass)
+
+      // Aggressive cleanup.
+      .addPass(IREE::Util::createApplyPatternsPass);
 
   // Module level cleanup and canonicalization of util.global (and other
   // util ops).
-  mainPassManager.addPass(IREE::Util::createApplyPatternsPass());
   mainPassManager.addPass(IREE::Util::createFoldGlobalsPass());
   mainPassManager.addPass(IREE::Util::createIPOPass());
 
@@ -216,16 +219,10 @@ void buildGlobalOptimizationPassPipeline(
 
   FunctionLikeNest(mainPassManager)
       .addPass(IREE::Flow::createCanonicalizerPass)
-      .addPass(mlir::createCSEPass);
-
-  FunctionLikeNest(mainPassManager)
+      .addPass(mlir::createCSEPass)
       // After running const-eval to a fixed point and folding unit extent dims,
       // try any new raising opportunities.
-      .addPass(createRaiseSpecialOpsPass)
-      // Strip std.assert & co after we perform optimizations; prior to this we
-      // may use the assertions to derive information during analysis.
-      .addPredicatedPass(transformOptions.options.stripAssertions,
-                         IREE::Util::createStripDebugOpsPass);
+      .addPass(createRaiseSpecialOpsPass);
 
   // Export after const-eval. If the user wants to keep the input constants
   // as is in the final parameter archive, they will probably want to disable

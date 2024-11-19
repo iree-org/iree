@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -138,7 +139,11 @@ public:
     {
       RewritePatternSet patterns(context);
       populateConcretizePadResultShapePatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      GreedyRewriteConfig config;
+      auto listener = ConfigTrackingListener();
+      config.listener = &listener;
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns),
+                                              config))) {
         return signalPassFailure();
       }
     }

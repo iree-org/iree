@@ -281,6 +281,10 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
                                                      linalgOp))) {
       return success();
     }
+    if (succeeded(IREE::GPU::setIGEMMConvolutionLoweringConfig(
+            target, entryPointFn, computeOp))) {
+      return success();
+    }
     if (succeeded(setWarpReductionConfig(target, entryPointFn, linalgOp))) {
       return success();
     }

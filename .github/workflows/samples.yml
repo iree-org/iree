@@ -86,8 +86,9 @@ jobs:
           python3 -m pip install \
             --find-links https://iree.dev/pip-release-links.html \
             --upgrade \
-            iree-compiler \
-            iree-runtime
+            --pre \
+            iree-base-compiler \
+            iree-base-runtime
       - name: "Setup emsdk"
         uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021 # v14
         with:

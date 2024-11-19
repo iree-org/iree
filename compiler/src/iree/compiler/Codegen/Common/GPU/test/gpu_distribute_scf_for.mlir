@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-distribute-scf-for))" --mlir-print-local-scope %s | FileCheck %s
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-distribute-scf-for{use-block-dims=false}))" --mlir-print-local-scope %s | FileCheck --check-prefix=NO-BLOCK-DIM %s
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [64, 1, 1]>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorize workgroup_size = [64, 1, 1]>
 func.func @distribute_to_x(%lb : index, %ub : index, %step: index, %output: memref<?xf32>)
   attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
@@ -37,7 +37,7 @@ func.func @distribute_to_x(%lb : index, %ub : index, %step: index, %output: memr
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [1, 64, 1]>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorize workgroup_size = [1, 64, 1]>
 func.func @distribute_to_y(%lb : index, %ub : index, %step: index, %output: memref<?xf32>)
   attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
@@ -64,7 +64,7 @@ func.func @distribute_to_y(%lb : index, %ub : index, %step: index, %output: memr
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [1, 1, 64]>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorize workgroup_size = [1, 1, 64]>
 func.func @distribute_to_z(%lb : index, %ub : index, %step: index, %output: memref<?xf32>)
   attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index

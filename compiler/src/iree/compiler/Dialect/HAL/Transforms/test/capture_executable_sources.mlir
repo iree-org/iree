@@ -18,7 +18,7 @@ hal.executable private @ex0 {
     // CHECK: hal.executable.export public @dispatch0
     // CHECK-SAME: source_locs = {configured = #[[EX0_VARIANT0_LOC]]}
     hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
       %c1 = arith.constant 1 : index
@@ -40,7 +40,7 @@ hal.executable private @ex1 {
     // CHECK: hal.executable.export public @dispatch1
     // CHECK-SAME: source_locs = {configured = #[[EX1_VARIANT1_LOC]]}
     hal.executable.export public @dispatch1 ordinal(0) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<CPUDefault>
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
       %c1 = arith.constant 1 : index

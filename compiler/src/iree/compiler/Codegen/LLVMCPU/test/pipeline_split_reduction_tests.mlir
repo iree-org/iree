@@ -276,5 +276,5 @@ func.func @split_reduction_double_reduction_unsupported() attributes {hal.execut
 }
 
 // CHECK-LABEL:  func.func @split_reduction_double_reduction_unsupported()
-// CHECK:          vector.insertelement %{{.+}}, %{{.+}} : vector<4xi32>
-// CHECK-NOT:      vector.insertelement %{{.+}}, %{{.+}} : vector<1xi32>
+// CHECK:          vector.insert %{{.+}}, %{{.+}} : i32 into vector<4xi32>
+// CHECK-NOT:      vector.insert %{{.+}}, %{{.+}} : i32 into vector<1xi32>

@@ -225,7 +225,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_end(
   return iree_ok_status();
 }
 
-static void iree_hal_vulkan_direct_command_buffer_begin_debug_group(
+static iree_status_t iree_hal_vulkan_direct_command_buffer_begin_debug_group(
     iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
     iree_hal_label_color_t label_color,
     const iree_hal_label_location_t* location) {
@@ -255,9 +255,10 @@ static void iree_hal_vulkan_direct_command_buffer_begin_debug_group(
     command_buffer->syms->vkCmdBeginDebugUtilsLabelEXT(command_buffer->handle,
                                                        &label_info);
   }
+  return iree_ok_status();
 }
 
-static void iree_hal_vulkan_direct_command_buffer_end_debug_group(
+static iree_status_t iree_hal_vulkan_direct_command_buffer_end_debug_group(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
@@ -266,6 +267,7 @@ static void iree_hal_vulkan_direct_command_buffer_end_debug_group(
   }
   IREE_VULKAN_TRACE_ZONE_END(command_buffer->tracing_context,
                              command_buffer->handle);
+  return iree_ok_status();
 }
 
 static VkPipelineStageFlags iree_hal_vulkan_convert_pipeline_stage_flags(
@@ -495,9 +497,10 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_wait_events(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_vulkan_direct_command_buffer_discard_buffer(
+static iree_status_t iree_hal_vulkan_direct_command_buffer_advise_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_buffer_ref_t buffer_ref) {
+    iree_hal_buffer_ref_t buffer_ref, iree_hal_memory_advise_flags_t flags,
+    uint64_t arg0, uint64_t arg1) {
   // NOTE: we could use this to prevent queue family transitions.
   return iree_ok_status();
 }
@@ -527,7 +530,7 @@ static uint32_t iree_hal_vulkan_splat_pattern(const void* pattern,
 static iree_status_t iree_hal_vulkan_direct_command_buffer_fill_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_buffer_ref_t target_ref, const void* pattern,
-    iree_host_size_t pattern_length) {
+    iree_host_size_t pattern_length, iree_hal_fill_flags_t flags) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
   VkBuffer target_device_buffer =
@@ -590,7 +593,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_fill_buffer(
 
 static iree_status_t iree_hal_vulkan_direct_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
-    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref) {
+    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref,
+    iree_hal_update_flags_t flags) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
   VkBuffer target_device_buffer =
@@ -631,7 +635,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_update_buffer(
 
 static iree_status_t iree_hal_vulkan_direct_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref) {
+    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref,
+    iree_hal_copy_flags_t flags) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
   VkBuffer source_device_buffer =
@@ -817,8 +822,8 @@ const iree_hal_command_buffer_vtable_t
         iree_hal_vulkan_direct_command_buffer_signal_event,
         /*.reset_event=*/iree_hal_vulkan_direct_command_buffer_reset_event,
         /*.wait_events=*/iree_hal_vulkan_direct_command_buffer_wait_events,
-        /*.discard_buffer=*/
-        iree_hal_vulkan_direct_command_buffer_discard_buffer,
+        /*.advise_buffer=*/
+        iree_hal_vulkan_direct_command_buffer_advise_buffer,
         /*.fill_buffer=*/iree_hal_vulkan_direct_command_buffer_fill_buffer,
         /*.update_buffer=*/
         iree_hal_vulkan_direct_command_buffer_update_buffer,

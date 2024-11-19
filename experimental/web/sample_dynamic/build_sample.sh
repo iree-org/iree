@@ -14,7 +14,7 @@
 # Sample usage:
 #   python -m venv .venv
 #   source .venv/bin/activate
-#   python -m pip install iree-compiler iree-runtime
+#   python -m pip install iree-base-compiler iree-base-runtime
 #   build_sample.sh .venv/bin && serve_sample.sh
 #
 # The build directory for the emscripten build is taken from the environment

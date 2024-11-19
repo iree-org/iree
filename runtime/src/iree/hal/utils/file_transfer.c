@@ -524,7 +524,8 @@ static iree_status_t iree_hal_transfer_worker_copy_file_to_buffer(
         operation->device, operation->queue_affinity, wait_semaphore_list,
         signal_semaphore_list, operation->staging_buffer,
         worker->staging_buffer_offset, operation->buffer,
-        operation->buffer_offset + transfer_offset, transfer_length);
+        operation->buffer_offset + transfer_offset, transfer_length,
+        IREE_HAL_COPY_FLAG_NONE);
   }
 
   // Wait for the copy to complete and tick again if we expect there to be more
@@ -688,7 +689,7 @@ static iree_status_t iree_hal_transfer_worker_copy_buffer_to_staging(
       operation->device, operation->queue_affinity, wait_semaphore_list,
       signal_semaphore_list, operation->buffer,
       operation->buffer_offset + transfer_offset, operation->staging_buffer,
-      worker->staging_buffer_offset, transfer_length);
+      worker->staging_buffer_offset, transfer_length, IREE_HAL_COPY_FLAG_NONE);
 
   // Wait for the copy to complete so we can write it to the file.
   if (iree_status_is_ok(status)) {
@@ -860,7 +861,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_read_streaming(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_file_t* source_file, uint64_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length, uint32_t flags,
+    iree_device_size_t length, iree_hal_read_flags_t flags,
     iree_hal_file_transfer_options_t options) {
   IREE_RETURN_IF_ERROR(
       iree_hal_file_validate_access(source_file, IREE_HAL_MEMORY_ACCESS_READ));
@@ -872,7 +873,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_read_streaming(
     return iree_hal_device_queue_copy(
         device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
         storage_buffer, (iree_device_size_t)source_offset, target_buffer,
-        target_offset, length);
+        target_offset, length, IREE_HAL_COPY_FLAG_NONE);
   }
 
   // Allocate full transfer operation.
@@ -900,7 +901,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_write_streaming(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_file_t* target_file, uint64_t target_offset,
-    iree_device_size_t length, uint32_t flags,
+    iree_device_size_t length, iree_hal_write_flags_t flags,
     iree_hal_file_transfer_options_t options) {
   // EXPERIMENTAL: assume memory files only today (as that's all we have).
   IREE_RETURN_IF_ERROR(
@@ -913,7 +914,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_write_streaming(
     return iree_hal_device_queue_copy(
         device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
         source_buffer, source_offset, storage_buffer,
-        (iree_device_size_t)target_offset, length);
+        (iree_device_size_t)target_offset, length, IREE_HAL_COPY_FLAG_NONE);
   }
 
   // Allocate full transfer operation.

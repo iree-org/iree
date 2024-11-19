@@ -139,8 +139,7 @@ iree_status_t hal_device_queue_execute(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers) {
+    iree_hal_command_buffer_t* command_buffer) {
   if (LOGGING_ENABLED) {
     LogInvoke(__func__, "device=%p, wait={%s}, signal={%s}", device,
               SemaphoreListToString(wait_semaphore_list).c_str(),
@@ -148,8 +147,8 @@ iree_status_t hal_device_queue_execute(
   }
   return HandleStatus(__func__, iree_hal_device_queue_execute(
                                     device, queue_affinity, wait_semaphore_list,
-                                    signal_semaphore_list, command_buffer_count,
-                                    command_buffers, /*binding_tables=*/NULL));
+                                    signal_semaphore_list, command_buffer,
+                                    iree_hal_buffer_binding_table_empty()));
 }
 
 iree_status_t hal_fence_create(iree_host_size_t capacity,

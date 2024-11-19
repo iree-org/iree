@@ -454,11 +454,13 @@ function(iree_generated_e2e_runner_test)
     list(GET _RULE_TARGET_BACKENDS ${_INDEX} _TARGET_BACKEND)
     list(GET _RULE_DRIVERS ${_INDEX} _DRIVER)
     foreach(_VARIANT_STRING IN LISTS _TARGET_CPU_FEATURES_VARIANTS)
-      parse_target_cpu_features_variant("${_VARIANT_STRING}"
-        _ENABLED _TARGET_CPU_FEATURES_NAME _VARIANT_COMPILER_FLAGS)
-      if(NOT _ENABLED)
-        # The current entry is disabled on the target CPU architecture.
-        continue()
+      if(_TARGET_BACKEND STREQUAL "llvm-cpu")
+        parse_target_cpu_features_variant("${_VARIANT_STRING}"
+          _ENABLED _TARGET_CPU_FEATURES_NAME _VARIANT_COMPILER_FLAGS)
+        if(NOT _ENABLED)
+          # The current entry is disabled on the target CPU architecture.
+          continue()
+        endif()
       endif()
       set(_TARGET_CPU_FEATURES_SUFFIX "")
       set(_LABELS "${_RULE_LABELS}")

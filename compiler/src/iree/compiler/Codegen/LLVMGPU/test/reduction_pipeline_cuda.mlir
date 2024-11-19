@@ -37,7 +37,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 }
 }
 
-//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [256, 1, 1] subgroup_size = 32>
+//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [256, 1, 1] subgroup_size = 32>
 //         CHECK:  func.func @warp_reduction_dispatch()
 //    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
 //     CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<4xf32>
@@ -110,7 +110,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 }
 }
 
-//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [256, 1, 1] subgroup_size = 32>
+//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [256, 1, 1] subgroup_size = 32>
 //         CHECK:  func.func @warp_reduction_broadcast_dispatch()
 //    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
@@ -160,7 +160,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 }
 }
 
-//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [1024, 1, 1] subgroup_size = 32>
+//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [1024, 1, 1] subgroup_size = 32>
 //         CHECK:  func.func @softmax()
 //    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
@@ -276,9 +276,8 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
 
 // Small reduction computes the whole reduction on a single thread.
 //   CHECK-LABEL: func.func @small_reduction
-//         CHECK: scf.for %{{.*}} = %c0 to %c13 step %c4
-//         CHECK:   linalg.generic
-//         CHECK:     arith.addf
+//         CHECK:   %[[READ:.+]] = vector.transfer_read {{.*}} #hal.descriptor_type<storage_buffer>>, vector<4x13xf32>
+//         CHECK:   vector.multi_reduction <add>, %[[READ]], {{.*}} : vector<4x13xf32> to vector<4xf32>
 
 // -----
 

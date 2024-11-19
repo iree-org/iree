@@ -43,7 +43,8 @@ TEST_F(CommandBufferUpdateBufferTest, UpdateBufferWholeBuffer) {
   IREE_CHECK_OK(iree_hal_command_buffer_update_buffer(
       command_buffer,
       /*source_buffer=*/source_buffer.data(), /*source_offset=*/0,
-      iree_hal_make_buffer_ref(device_buffer, 0, target_buffer_size)));
+      iree_hal_make_buffer_ref(device_buffer, 0, target_buffer_size),
+      IREE_HAL_UPDATE_FLAG_NONE));
   IREE_CHECK_OK(iree_hal_command_buffer_end(command_buffer));
   IREE_CHECK_OK(SubmitCommandBufferAndWait(command_buffer));
 
@@ -81,7 +82,8 @@ TEST_F(CommandBufferUpdateBufferTest, UpdateBufferWithOffsets) {
       command_buffer,
       /*source_buffer=*/source_buffer.data(), /*source_offset=*/4,
       iree_hal_make_buffer_ref(device_buffer,
-                               /*target_offset=*/4, /*length=*/8)));
+                               /*target_offset=*/4, /*length=*/8),
+      IREE_HAL_UPDATE_FLAG_NONE));
   IREE_CHECK_OK(iree_hal_command_buffer_end(command_buffer));
   IREE_CHECK_OK(SubmitCommandBufferAndWait(command_buffer));
 
@@ -129,7 +131,8 @@ TEST_F(CommandBufferUpdateBufferTest, UpdateBufferSubspan) {
       command_buffer,
       /*source_buffer=*/source_buffer.data(), /*source_offset=*/4,
       iree_hal_make_buffer_ref(buffer_subspan,
-                               /*target_offset=*/4, /*length=*/4)));
+                               /*target_offset=*/4, /*length=*/4),
+      IREE_HAL_UPDATE_FLAG_NONE));
   IREE_CHECK_OK(iree_hal_command_buffer_end(command_buffer));
   IREE_CHECK_OK(SubmitCommandBufferAndWait(command_buffer));
 

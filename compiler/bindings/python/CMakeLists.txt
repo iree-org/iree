@@ -103,6 +103,15 @@ declare_mlir_dialect_python_bindings(
 declare_mlir_dialect_python_bindings(
   ADD_TO_PARENT IREEPythonSources.Dialects
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
+  TD_FILE dialects/IREECodegenBinding.td
+  GEN_ENUM_BINDINGS
+  SOURCES dialects/iree_codegen.py
+  DIALECT_NAME iree_codegen
+)
+
+declare_mlir_dialect_python_bindings(
+  ADD_TO_PARENT IREEPythonSources.Dialects
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   TD_FILE dialects/IREEGPUBinding.td
   GEN_ENUM_BINDINGS
   SOURCES dialects/iree_gpu.py
@@ -136,6 +145,7 @@ declare_mlir_python_sources(IREECompilerAPIPythonTools
     tools/tf.py
     tools/tflite.py
     tools/import_onnx/__main__.py
+    tools/import_onnx/importer_externalization_overrides.py
     tools/ir_tool/__main__.py
     tools/scripts/iree_compile/__main__.py
     tools/scripts/iree_opt/__main__.py
@@ -233,6 +243,41 @@ add_mlir_python_modules(IREECompilerPythonModules
     iree_compiler_API_SharedImpl
   )
 
+
+################################################################################
+# iree.build package
+# This is a pure Python part of the namespace, not rooted under iree.compiler
+# like the above. It is only using the same build support for compatibility
+# with the existing development flow.
+# If the build system for Python code is ever redone, this can just be
+# source namespace in the project definition.
+################################################################################
+
+# The iree.build package.
+declare_mlir_python_sources(IREECompilerBuildPythonPackage
+ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/build"
+SOURCES
+  __init__.py
+  __main__.py
+  args.py
+  compile_actions.py
+  executor.py
+  lang.py
+  main.py
+  metadata.py
+  net_actions.py
+  onnx_actions.py
+  target_machine.py
+)
+
+add_mlir_python_modules(IREECompilerBuildPythonModules
+  ROOT_PREFIX "${_PYTHON_BUILD_PREFIX}/iree/build"
+  INSTALL_PREFIX "${_PYTHON_INSTALL_PREFIX}/iree/build"
+  DECLARED_SOURCES
+    IREECompilerBuildPythonPackage
+)
+
+add_dependencies(IREECompilerPythonModules IREECompilerBuildPythonModules)
 
 ################################################################################
 # Tools linked against the shared CAPI library

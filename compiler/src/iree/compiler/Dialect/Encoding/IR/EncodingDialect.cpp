@@ -23,9 +23,27 @@
 #undef GET_ATTRDEF_CLASSES
 
 namespace mlir::iree_compiler::IREE::Encoding {
+namespace {
+
+// Used for custom printing support.
+struct EncodingOpAsmInterface : public OpAsmDialectInterface {
+  using OpAsmDialectInterface::OpAsmDialectInterface;
+  /// Hooks for getting an alias identifier alias for a given symbol, that is
+  /// not necessarily a part of this dialect. The identifier is used in place
+  /// of the symbol when printing textual IR. These aliases must not contain
+  /// `.` or end with a numeric digit([0-9]+). Returns success if an alias was
+  /// provided, failure otherwise.
+  AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
+    if (llvm::isa<EncodingAttr>(attr)) {
+      os << "encoding";
+      return AliasResult::OverridableAlias;
+    }
+    return AliasResult::NoAlias;
+  }
+};
 
 // Used to control inlining behavior.
-struct IREEEncodingInlinerInterface : public DialectInlinerInterface {
+struct EncodingInlinerInterface : public DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
   bool isLegalToInline(Operation *call, Operation *callable,
@@ -45,9 +63,10 @@ struct IREEEncodingInlinerInterface : public DialectInlinerInterface {
     return true;
   }
 };
+} // namespace
 
 void IREEEncodingDialect::initialize() {
-  addInterfaces<IREEEncodingInlinerInterface>();
+  addInterfaces<EncodingOpAsmInterface, EncodingInlinerInterface>();
 
   addAttributes<
 #define GET_ATTRDEF_LIST

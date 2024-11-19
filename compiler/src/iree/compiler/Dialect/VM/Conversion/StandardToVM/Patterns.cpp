@@ -170,7 +170,6 @@ static void copyImportAttrs(func::FuncOp srcOp, IREE::VM::ImportOp dstOp) {
   constexpr const char *kRetainedAttributes[] = {
       "nosideeffects",
       "vm.fallback",
-      "vm.signature",
   };
   auto retainedAttributes = ArrayRef<const char *>(
       kRetainedAttributes,
@@ -241,7 +240,11 @@ struct ExternalFuncOpConversion : public OpConversionPattern<func::FuncOp> {
 };
 
 struct CallOpConversion : public OpConversionPattern<func::CallOp> {
-  using OpConversionPattern::OpConversionPattern;
+  ImportTable &importTable;
+  CallOpConversion(const TypeConverter &typeConverter, MLIRContext *context,
+                   ImportTable &importTable, PatternBenefit benefit = 1)
+      : OpConversionPattern(typeConverter, context, benefit),
+        importTable(importTable) {}
   LogicalResult
   matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -262,7 +265,8 @@ struct CallOpConversion : public OpConversionPattern<func::CallOp> {
     // conversion if imports have fallbacks that are themselves imports.
     auto callResults = convertCallOp(
         callOp->getParentOfType<IREE::VM::ModuleOp>(), callOp.getLoc(),
-        callOp.getCallee(), adaptor.getOperands(), resultTypes, rewriter);
+        callOp.getCallee(), adaptor.getOperands(), resultTypes, importTable,
+        rewriter);
     if (failed(callResults)) {
       return rewriter.notifyMatchFailure(
           callOp, "unable to convert call (results mismatch)");
@@ -277,36 +281,12 @@ struct CallOpConversion : public OpConversionPattern<func::CallOp> {
   FailureOr<SmallVector<Value>>
   convertCallOp(Operation *rootOp, Location loc, StringRef calleeName,
                 ValueRange operands, TypeRange resultTypes,
+                ImportTable &importTable,
                 ConversionPatternRewriter &rewriter) const {
-    // (Slow) lookup of the target function, which may be an import that we need
-    // to perform type conversion for.
-    auto calleeOp = SymbolTable::lookupSymbolIn(rootOp, calleeName);
-    if (auto funcOp = dyn_cast_or_null<FunctionOpInterface>(calleeOp)) {
-      if (funcOp.isExternal()) {
-        // Import that may require conversion.
-        // This case handles when funcs are declared after the call.
-        FunctionType convertedSignature;
-        if (auto signatureAttr =
-                funcOp->getAttrOfType<TypeAttr>("vm.signature")) {
-          if (auto importSignature =
-                  llvm::dyn_cast<FunctionType>(signatureAttr.getValue())) {
-            convertedSignature = importSignature;
-          }
-        }
-        if (!convertedSignature) {
-          convertedSignature =
-              rewriter.getFunctionType(TypeRange(operands), resultTypes);
-        }
-        return convertImportCallOp(rootOp, loc, calleeName, operands,
-                                   resultTypes, convertedSignature, funcOp,
-                                   rewriter);
-      }
-    } else if (auto importOp = dyn_cast_or_null<IREE::VM::ImportOp>(calleeOp)) {
-      // Calling an import.
-      // This case handles when funcs are declared before the call and have
-      // already been converted.
-      return convertImportCallOp(rootOp, loc, calleeName, operands, resultTypes,
-                                 importOp.getFunctionType(), importOp,
+    // Lookup the target and detect if it is an import.
+    auto import = importTable.find(calleeName);
+    if (import.has_value()) {
+      return convertImportCallOp(rootOp, loc, *import, operands, resultTypes,
                                  rewriter);
     }
 
@@ -319,19 +299,19 @@ struct CallOpConversion : public OpConversionPattern<func::CallOp> {
   // Converts a call to an import that may be optional.
   // Returns the new converted call results.
   FailureOr<SmallVector<Value>>
-  convertImportCallOp(Operation *rootOp, Location loc, StringRef calleeName,
-                      ValueRange operands, TypeRange resultTypes,
-                      FunctionType importSignature, Operation *calleeOp,
+  convertImportCallOp(Operation *rootOp, Location loc,
+                      ImportTable::Import &import, ValueRange operands,
+                      TypeRange resultTypes,
                       ConversionPatternRewriter &rewriter) const {
-    auto fallbackAttr = calleeOp->getAttrOfType<SymbolRefAttr>("vm.fallback");
-    return fallbackAttr
-               ? convertOptionalImportCallOp(
-                     rootOp, loc, calleeName, operands, resultTypes,
-                     importSignature,
-                     fallbackAttr.getLeafReference().getValue(), rewriter)
-               : convertMandatoryImportCallOp(rootOp, loc, calleeName, operands,
-                                              resultTypes, importSignature,
-                                              rewriter);
+    if (import.fallback) {
+      return convertOptionalImportCallOp(
+          rootOp, loc, import.name, operands, resultTypes, import.signature,
+          import.fallback.getLeafReference().getValue(), rewriter);
+    } else {
+      return convertMandatoryImportCallOp(rootOp, loc, import.name, operands,
+                                          resultTypes, import.signature,
+                                          rewriter);
+    }
   }
 
   // Converts a call to an optional import by adding logic to check whether it
@@ -374,7 +354,7 @@ struct CallOpConversion : public OpConversionPattern<func::CallOp> {
     // Not resolved: call fallback as a normal function.
     rewriter.setInsertionPointToStart(fallbackBlock);
     auto fallbackResults = convertCallOp(rootOp, loc, fallbackName, operands,
-                                         resultTypes, rewriter);
+                                         resultTypes, importTable, rewriter);
     if (failed(fallbackResults))
       return failure();
     rewriter.create<IREE::VM::BranchOp>(loc, exitBlock, *fallbackResults);
@@ -557,12 +537,14 @@ struct SwitchOpConversion : public OpConversionPattern<cf::SwitchOp> {
 
 void populateStandardToVMPatterns(MLIRContext *context,
                                   TypeConverter &typeConverter,
+                                  ImportTable &importTable,
                                   RewritePatternSet &patterns) {
   patterns
-      .insert<AssertOpConversion, BranchOpConversion, CallOpConversion,
-              CondBranchOpConversion, SwitchOpConversion, ModuleOpConversion,
-              FuncOpConversion, ExternalFuncOpConversion, ReturnOpConversion>(
-          typeConverter, context);
+      .insert<AssertOpConversion, BranchOpConversion, CondBranchOpConversion,
+              SwitchOpConversion, ModuleOpConversion, FuncOpConversion,
+              ExternalFuncOpConversion, ReturnOpConversion>(typeConverter,
+                                                            context);
+  patterns.insert<CallOpConversion>(typeConverter, context, importTable);
   patterns.insert<CastingOpConversion<mlir::UnrealizedConversionCastOp>>(
       typeConverter, context);
 }
