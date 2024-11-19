@@ -4,20 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <iterator>
-
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/ScopeExit.h"
-#include "llvm/ADT/iterator_range.h"
-#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/Transform/IR/TransformDialect.h"
-#include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-materialize-user-configs"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
@@ -40,7 +31,8 @@ llvm::cl::opt<std::string> clCodegenTransformDialectLibraryFileName(
 
 namespace {
 
-static const char kTranslationInfoAttrName[] = "translation_info";
+constexpr StringLiteral kTranslationInfoAttrName = "translation_info";
+constexpr StringLiteral kDefaultTransformSequenceName = "__kernel_config";
 
 enum StrategyRunResult {
   Success = 0,
@@ -87,10 +79,11 @@ struct MaterializeUserConfigsPass final
       //      or any other IREE codegen pipeline.
       //
       //   2. Use the configuration strategy to do codegen directly. At the end
-      //   of
-      //      the strategy, the variant needs to be annotated with
-      //      "translation_info" = #iree_codegen.translation_info<pipeline =
-      //      None>
+      //      of the strategy, the variant needs to be annotated with:
+      //      ```mlir
+      //      "translation_info" =
+      //        #iree_codegen.translation_info<pipeline = None>
+      //      ```
       SmallVector<StringRef, 2> parts;
       llvm::SplitString(
           llvm::StringRef(clCodegenTransformDialectLibraryFileName), parts,
@@ -112,7 +105,7 @@ struct MaterializeUserConfigsPass final
         libraryFileName = parts[0];
       }
 
-      std::string entrySequenceName;
+      StringRef entrySequenceName = kDefaultTransformSequenceName;
       // Check if the user specified a custom entry point name.
       if (parts.size() == 2) {
         if (parts[1].empty()) {
@@ -120,8 +113,6 @@ struct MaterializeUserConfigsPass final
           return signalPassFailure();
         }
         entrySequenceName = parts[1];
-      } else {
-        entrySequenceName = "__kernel_config";
       }
 
       LDBG("MaterializeUserConfigsPass on function: " << funcOp);
@@ -145,7 +136,8 @@ struct MaterializeUserConfigsPass final
           funcOp.emitError() << "transform kernel config strategy `"
                              << entrySequenceName << " not found";
           return signalPassFailure();
-        } else if (runResult == StrategyRunResult::Failed) {
+        }
+        if (runResult == StrategyRunResult::Failed) {
           funcOp.emitError() << "transform kernel config strategy `"
                              << entrySequenceName << "` failed to apply";
           return signalPassFailure();
