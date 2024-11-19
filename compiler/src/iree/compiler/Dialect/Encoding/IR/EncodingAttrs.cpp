@@ -116,7 +116,7 @@ EncodingAttr EncodingAttr::cloneWithTargets(ArrayRef<Attribute> targets) {
   MLIRContext *ctx = getContext();
   return get(ctx, getOperandIndex(), getOpType(), getElementTypes(),
              getUserIndexingMaps(), /*bcast_map=*/AffineMapAttr(),
-             /*round_dims_to=*/DenseArrayAttr(), ArrayAttr::get(ctx, targets));
+             getRoundDimsTo(), ArrayAttr::get(ctx, targets));
 }
 
 MatmulNarrowDim getMatmulNarrowDim(EncodingAttr encoding) {

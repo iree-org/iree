@@ -54,7 +54,7 @@ enumerateMatmulTilesVMVX(linalg::ContractionDimensions cDims,
   // codegen.query_tile_sizes op, so we disable dynamic tile shapes for
   // batch_matmul. Also, they are not set up for narrow M/N matmul, so it is
   // disabled when it is the case.
-  if (!cDims.batch.empty() || getMatmulNarrowDim(encoding)) {
+  if (!cDims.batch.empty()) {
     hasUkernelSupport = false;
   }
   if (hasUkernelSupport) {
@@ -344,26 +344,7 @@ chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
   SmallVector<RatedTileMxNxK> ratedTiles;
   ratedTiles.reserve(enumeratedTiles.size());
   int64_t bestPaddingPenalty = INT64_MAX;
-  int64_t mUB = INT64_MAX;
-  int64_t nUB = INT64_MAX;
-  int64_t kUB = INT64_MAX;
-  if (!hostDefinedUpperBound.empty()) {
-    mUB = hostDefinedUpperBound[0];
-    nUB = hostDefinedUpperBound[1];
-    kUB = hostDefinedUpperBound[2];
-  }
   for (auto tile : enumeratedTiles) {
-    if (tile.M > mUB || tile.N > nUB || tile.K > kUB) {
-      LLVM_DEBUG(llvm::dbgs() << "[" << DEBUG_TYPE << "]: tile (";
-                 llvm::interleaveComma(
-                     ArrayRef<int64_t>{tile.M, tile.N, tile.K}, llvm::dbgs());
-                 llvm::dbgs()
-                 << ") is skipped because it is not valid for upper_bound (";
-                 llvm::interleaveComma(ArrayRef<int64_t>{mUB, nUB, kUB},
-                                       llvm::dbgs());
-                 llvm::dbgs() << ")\n");
-      continue;
-    }
     RatedTileMxNxK ratedTile(tile);
     ratedTile.paddingPenalty = 0;
     // If we are choosing a tile for a narrow-M case, we want to minimize
@@ -447,6 +428,11 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   // taking narrow dimensions into account.
   TileMxNxK chosenTileMxNxK = chooseMatmulTile(enumeratedTileMxNxK, narrowDim,
                                                encoding.getRoundDimsToArray());
+  LLVM_DEBUG(llvm::dbgs() << "chosenTileMxNxK: "; llvm::interleaveComma(
+                 ArrayRef<int64_t>{chosenTileMxNxK.M, chosenTileMxNxK.N,
+                                   chosenTileMxNxK.K},
+                 llvm::dbgs());
+             llvm::dbgs() << "\n");
 
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its operand index in the matmul.

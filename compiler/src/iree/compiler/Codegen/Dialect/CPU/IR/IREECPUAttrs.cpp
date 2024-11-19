@@ -609,10 +609,26 @@ VMVXEncodingSolverAttr::cloneWithSimplifiedConfig(Attribute attr) const {
   if (!encoding) {
     return llvm::cast<Encoding::EncodingSolverInterfaceAttr>(*this);
   }
+  auto cDims = getEncodingContractionDims(encoding);
+  if (failed(cDims)) {
+    return llvm::cast<Encoding::EncodingSolverInterfaceAttr>(*this);
+  }
 
   Builder builder(getContext());
   SmallVector<TileMxNxK> enumeratedTileMxNxK;
-  if (getTargetConfiguration().get(builder.getStringAttr("ukernels"))) {
+  bool hasUkernelSupport = false;
+  if (auto ukernelAttr = getTargetConfiguration().getNamed(
+          builder.getStringAttr("ukernels"))) {
+    auto strAttr = llvm::dyn_cast<StringAttr>(ukernelAttr->getValue());
+    if (strAttr && strAttr.getValue() == "all") {
+      hasUkernelSupport = true;
+    }
+  }
+  if (!cDims->batch.empty()) {
+    hasUkernelSupport = false;
+  }
+
+  if (hasUkernelSupport) {
     enumeratedTileMxNxK.push_back(TileMxNxK{
         ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic});
   } else {
@@ -628,6 +644,12 @@ VMVXEncodingSolverAttr::cloneWithSimplifiedConfig(Attribute attr) const {
 
   auto narrowDim = IREE::Encoding::getMatmulNarrowDim(encoding);
   TileMxNxK chosenTileMxNxK = chooseMatmulTile(enumeratedTileMxNxK, narrowDim);
+  LLVM_DEBUG(llvm::dbgs() << "chosenTileMxNxK: "; llvm::interleaveComma(
+                 ArrayRef<int64_t>{chosenTileMxNxK.M, chosenTileMxNxK.N,
+                                   chosenTileMxNxK.K},
+                 llvm::dbgs());
+             llvm::dbgs() << "\n");
+
   MaterializeEncodingInfo info =
       getEncodingInfoForMatmul(encoding, chosenTileMxNxK);
 

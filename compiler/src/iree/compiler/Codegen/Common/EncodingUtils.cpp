@@ -19,6 +19,18 @@ using IREE::Encoding::EncodingAttr;
 using IREE::Encoding::getEncodingAttr;
 using IREE::Encoding::getEncodingContractionDims;
 
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const MaterializeEncodingInfo &info) {
+  os << "{ innerDimsPos: [";
+  llvm::interleaveComma(info.innerDimsPos, os);
+  os << "], innerTileSizes: [";
+  llvm::interleaveComma(info.innerTileSizes, os);
+  os << "], outerDimsPerm: [";
+  llvm::interleaveComma(info.outerDimsPerm, os);
+  os << "]\n  swizzle: " << info.swizzle << " }";
+  return os;
+}
+
 DictionaryAttr serializeMaterializeEncodingInfo(MLIRContext *ctx,
                                                 MaterializeEncodingInfo info) {
   Builder b(ctx);

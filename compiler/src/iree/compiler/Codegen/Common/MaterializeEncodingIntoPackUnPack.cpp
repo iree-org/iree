@@ -569,6 +569,9 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
   // packing that the execution target device wants. Those operations should be
   // derived by an interface method.
   if (*encodingInfo != *srcLayout) {
+    llvm::dbgs() << "encoding: " << encoding << "\n";
+    llvm::dbgs() << "inferred encoding info: " << *encodingInfo << "\n";
+    llvm::dbgs() << "attached encoding info: " << *srcLayout << "\n";
     return failure();
   }
 

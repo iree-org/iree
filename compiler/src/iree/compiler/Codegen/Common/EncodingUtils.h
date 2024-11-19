@@ -40,6 +40,9 @@ struct MaterializeEncodingInfo {
   }
 };
 
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const MaterializeEncodingInfo &info);
+
 DictionaryAttr serializeMaterializeEncodingInfo(MLIRContext *ctx,
                                                 MaterializeEncodingInfo info);
 std::optional<MaterializeEncodingInfo>
