@@ -27,6 +27,12 @@ iree_status_t iree_hal_hip_cleanup_thread_initialize(
 void iree_hal_hip_cleanup_thread_deinitialize(
     iree_hal_hip_cleanup_thread_t* thread);
 
+// Adds a pending cleanup to the thread.
+//
+// The thread will wait on the event and fire the callback,
+// once the event has completed.
+// |user_data| must remain valid until the callback is called,
+// and it is up to the callee to clean up user_data if required.
 iree_status_t iree_hal_hip_cleanup_thread_add_cleanup(
     iree_hal_hip_cleanup_thread_t* thread, iree_hal_hip_event_t* event,
     iree_hal_hip_cleanup_callback_t callback, void* user_data);
