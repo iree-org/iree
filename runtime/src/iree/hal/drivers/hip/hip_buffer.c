@@ -49,6 +49,7 @@ iree_status_t iree_hal_hip_buffer_wrap(
     void* host_ptr, iree_hal_buffer_release_callback_t release_callback,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(out_buffer);
+  *out_buffer = NULL;
   if (!host_ptr && iree_any_bit_set(allowed_usage,
                                     IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT |
                                         IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED)) {

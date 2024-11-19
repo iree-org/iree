@@ -246,7 +246,6 @@ iree_status_t iree_hal_hip_memory_pools_prepare_buffer(
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)allocation_size);
-
   iree_hal_buffer_params_canonicalize(&params);
 
   // NOTE: we don't provide a device allocator because we didn't allocate from
@@ -271,14 +270,12 @@ iree_status_t iree_hal_hip_memory_pools_prepare_buffer(
       /*device_ptr*/ NULL, /*host_ptr=*/NULL, release_callback,
       pools->host_allocator, &buffer);
 
-  if (iree_status_is_ok(status)) {
-    // Update statistics (note that it may not yet be accurate).
-    *out_buffer = buffer;
-  } else if (buffer) {
+  if (!iree_status_is_ok(status)) {
     iree_hal_hip_buffer_set_allocation_empty(buffer);
     iree_hal_buffer_release(buffer);
   }
 
+  *out_buffer = buffer;
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

@@ -566,6 +566,8 @@ static iree_status_t iree_hal_hip_device_trim(iree_hal_device_t* base_device) {
 static iree_status_t iree_hal_hip_device_query_attribute(
     iree_hal_hip_device_t* device, hipDeviceAttribute_t attribute,
     int64_t* out_value) {
+  IREE_ASSERT_ARGUMENT(out_value);
+  *out_value = 0;
   int value = 0;
   IREE_HIP_RETURN_IF_ERROR(
       device->hip_symbols,
@@ -707,6 +709,7 @@ static iree_status_t iree_hal_hip_device_create_command_buffer_internal(
     iree_hip_device_commandbuffer_type_e type,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
+  *out_command_buffer = NULL;
 
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
 
@@ -798,6 +801,7 @@ static iree_status_t iree_hal_hip_device_create_command_buffer(
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_hal_command_buffer_t** out_command_buffer) {
+  *out_command_buffer = NULL;
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
   if (device->params.allow_inline_execution &&
       iree_all_bits_set(mode,
@@ -848,6 +852,7 @@ static iree_status_t iree_hal_hip_device_import_file(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
     iree_hal_external_file_flags_t flags, iree_hal_file_t** out_file) {
+  *out_file = NULL;
   if (iree_io_file_handle_type(handle) !=
       IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
     return iree_make_status(
@@ -896,7 +901,7 @@ static iree_status_t iree_hal_hip_device_pepare_async_alloc(
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)allocation_size);
-
+  *out_buffer = NULL;
   iree_hal_buffer_params_canonicalize(&params);
 
   iree_hal_buffer_t* buffer = NULL;
@@ -944,6 +949,7 @@ static iree_status_t iree_hal_hip_device_make_buffer_callback_data(
     iree_hal_buffer_t* buffer,
     iree_hal_hip_device_semaphore_buffer_operation_type_t type,
     iree_hal_hip_device_semaphore_buffer_operation_callback_data_t** out_data) {
+  *out_data = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
   // Embed captured tables in the action allocation.
   iree_hal_hip_device_semaphore_buffer_operation_callback_data_t*
@@ -1264,6 +1270,7 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
     iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  *out_buffer = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
@@ -1691,6 +1698,7 @@ static iree_status_t iree_hal_hip_device_make_callback_data(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_buffer_binding_table_t binding_table,
     iree_hal_hip_device_semaphore_submit_callback_data_t** out_data) {
+  *out_data = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
   // Embed captured tables in the action allocation.
   iree_hal_hip_device_semaphore_submit_callback_data_t* callback_data = NULL;
