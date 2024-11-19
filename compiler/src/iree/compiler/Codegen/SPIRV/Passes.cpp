@@ -631,7 +631,8 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &variantPassManager) {
     modulePassManager.addPass(
         createSPIRVLowerExecutableUsingTransformDialectPass());
     FunctionLikeNest(modulePassManager)
-        .addPass(createSPIRVLowerExecutableTargetPass);
+        .addPass(createSPIRVLowerExecutableTargetPass)
+        .addPass(createVerifyWorkgroupDistributionPass);
     addMemRefLoweringPasses(modulePassManager);
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());

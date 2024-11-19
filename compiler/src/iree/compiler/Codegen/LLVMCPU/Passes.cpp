@@ -813,7 +813,8 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
     OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
     modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
     FunctionLikeNest(modulePassManager)
-        .addPass(createLLVMCPULowerExecutableTargetPass);
+        .addPass(createLLVMCPULowerExecutableTargetPass)
+        .addPass(createVerifyWorkgroupDistributionPass);
   }
 
   variantPassManager.addPass(createReconcileTranslationInfoPass());

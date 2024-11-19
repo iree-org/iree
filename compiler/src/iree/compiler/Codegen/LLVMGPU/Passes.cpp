@@ -1184,7 +1184,8 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
     OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
     modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
     FunctionLikeNest(modulePassManager)
-        .addPass(createLLVMGPULowerExecutableTargetPass);
+        .addPass(createLLVMGPULowerExecutableTargetPass)
+        .addPass(createVerifyWorkgroupDistributionPass);
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
 
@@ -1250,7 +1251,8 @@ void buildROCDLCodegenPassPipeline(OpPassManager &variantPassManager) {
     OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
     modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
     FunctionLikeNest(modulePassManager)
-        .addPass(createROCDLLowerExecutableTargetPass);
+        .addPass(createROCDLLowerExecutableTargetPass)
+        .addPass(createVerifyWorkgroupDistributionPass);
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
   variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());

@@ -633,4 +633,15 @@ def VectorizeMemrefCopyPass :
   let summary = "Vectorizes memref copy operations.";
 }
 
+def VerifyWorkgroupDistributionPass :
+    InterfacePass<"iree-codegen-verify-workgroup-distribution", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to verify proper distribution to workgroups.";
+  let description = [{
+    Pass to verify that all writes to global memory are explicitly mapped to
+    workgroups. This means that in cases where we use loops (scf.forall) to
+    manage distribution to workgroups, we require that all ops with write
+    side effects are contained within a workgroup distributed loop.
+  }];
+}
+
 #endif // IREE_CODEGEN_COMMON_PASSES
