@@ -57,9 +57,13 @@ typedef struct iree_hal_hip_semaphore_t {
   // The symbols used to issue HIP API calls.
   const iree_hal_hip_dynamic_symbols_t* symbols;
 
-  // The queue of hip events that back any GPU signals of this semaphore.
-  iree_hal_hip_util_tree_t event_queue;
-  uint8_t event_queue_precache[1024];
+  struct {
+    // The queue of hip events that back any GPU signals of this semaphore.
+    iree_hal_hip_util_tree_t tree;
+    // Inline storage for this tree. We expect the normal number of
+    // nodes in use for a single semaphore to be relatively small.
+    uint8_t inline_storage[sizeof(iree_hal_hip_util_tree_node_t) * 16];
+  } event_queue;
 
   // Notify any potential CPU waiters that this semaphore
   // has changed state.
@@ -102,7 +106,7 @@ static iree_status_t iree_hal_hip_event_semaphore_advance(
   do {
     iree_slim_mutex_lock(&semaphore->mutex);
     iree_hal_hip_util_tree_node_t* node =
-        iree_hal_hip_util_tree_first(&semaphore->event_queue);
+        iree_hal_hip_util_tree_first(&semaphore->event_queue.tree);
     if (node == NULL) {
       iree_slim_mutex_unlock(&semaphore->mutex);
       break;
@@ -115,7 +119,7 @@ static iree_status_t iree_hal_hip_event_semaphore_advance(
     iree_hal_hip_semaphore_queue_item_t copy =
         *(iree_hal_hip_semaphore_queue_item_t*)
             iree_hal_hip_util_tree_node_get_value(node);
-    iree_hal_hip_util_tree_erase(&semaphore->event_queue, node);
+    iree_hal_hip_util_tree_erase(&semaphore->event_queue.tree, node);
     iree_slim_mutex_unlock(&semaphore->mutex);
     if (copy.event) {
       iree_hal_hip_event_release(copy.event);
@@ -174,7 +178,7 @@ iree_status_t iree_hal_hip_semaphore_notify_forward_progress_to(
   iree_hal_hip_semaphore_work_item_t* last_work_item = NULL;
   if (value > semaphore->max_value_to_be_signaled) {
     iree_hal_hip_util_tree_node_t* node = iree_hal_hip_util_tree_upper_bound(
-        &semaphore->event_queue, semaphore->max_value_to_be_signaled);
+        &semaphore->event_queue.tree, semaphore->max_value_to_be_signaled);
     // Collect all of the things to schedule now that we know we can safely make
     // it to a given value.
     while (node && iree_hal_hip_util_tree_node_get_key(node) <= value) {
@@ -197,7 +201,7 @@ iree_status_t iree_hal_hip_semaphore_notify_forward_progress_to(
       iree_hal_hip_util_tree_node_t* last_node = node;
       node = iree_hal_hip_util_tree_node_next(node);
       if (!queue_item->event) {
-        iree_hal_hip_util_tree_erase(&semaphore->event_queue, last_node);
+        iree_hal_hip_util_tree_erase(&semaphore->event_queue.tree, last_node);
       }
     }
   }
@@ -236,8 +240,9 @@ iree_status_t iree_hal_hip_event_semaphore_create(
   semaphore->symbols = symbols;
   iree_hal_hip_util_tree_initialize(
       host_allocator, sizeof(iree_hal_hip_semaphore_queue_item_t),
-      semaphore->event_queue_precache, sizeof(semaphore->event_queue_precache),
-      &semaphore->event_queue);
+      semaphore->event_queue.inline_storage,
+      sizeof(semaphore->event_queue.inline_storage),
+      &semaphore->event_queue.tree);
   iree_notification_initialize(&semaphore->state_notification);
 
   iree_slim_mutex_initialize(&semaphore->mutex);
@@ -263,7 +268,7 @@ static void iree_hal_hip_semaphore_destroy(
 
   iree_notification_deinitialize(&semaphore->state_notification);
   for (iree_hal_hip_util_tree_node_t* i =
-           iree_hal_hip_util_tree_first(&semaphore->event_queue);
+           iree_hal_hip_util_tree_first(&semaphore->event_queue.tree);
        i != NULL; i = iree_hal_hip_util_tree_node_next(i)) {
     iree_hal_hip_event_t* event = ((iree_hal_hip_semaphore_queue_item_t*)
                                        iree_hal_hip_util_tree_node_get_value(i))
@@ -272,7 +277,7 @@ static void iree_hal_hip_semaphore_destroy(
       iree_hal_hip_event_release(event);
     }
   }
-  iree_hal_hip_util_tree_deinitialize(&semaphore->event_queue);
+  iree_hal_hip_util_tree_deinitialize(&semaphore->event_queue.tree);
   iree_allocator_free(host_allocator, semaphore);
 
   IREE_TRACE_ZONE_END(z0);
@@ -284,7 +289,7 @@ static iree_status_t iree_hal_hip_semaphore_query_locked(
 
   *out_value = semaphore->current_visible_value;
   iree_hal_hip_util_tree_node_t* node =
-      iree_hal_hip_util_tree_first(&semaphore->event_queue);
+      iree_hal_hip_util_tree_first(&semaphore->event_queue.tree);
   while (node) {
     if (!((iree_hal_hip_semaphore_queue_item_t*)
               iree_hal_hip_util_tree_node_get_value(node))
@@ -427,10 +432,10 @@ static iree_status_t iree_hal_hip_semaphore_get_cpu_event(
     return iree_ok_status();
   }
   iree_hal_hip_util_tree_node_t* node =
-      iree_hal_hip_util_tree_get(&semaphore->event_queue, value);
+      iree_hal_hip_util_tree_get(&semaphore->event_queue.tree, value);
   if (!node) {
-    iree_status_t status =
-        iree_hal_hip_util_tree_insert(&semaphore->event_queue, value, &node);
+    iree_status_t status = iree_hal_hip_util_tree_insert(
+        &semaphore->event_queue.tree, value, &node);
     if (!iree_status_is_ok(status)) {
       iree_slim_mutex_unlock(&semaphore->mutex);
       IREE_TRACE_ZONE_END(z0);
@@ -537,7 +542,7 @@ static iree_status_t iree_hal_hip_semaphore_wait(
     // Use iree_hal_hip_util_tree_lower_bound to find the first element in the
     // tree that would signal our semaphore to at least the given value.
     iree_hal_hip_util_tree_node_t* node =
-        iree_hal_hip_util_tree_lower_bound(&semaphore->event_queue, value);
+        iree_hal_hip_util_tree_lower_bound(&semaphore->event_queue.tree, value);
     IREE_ASSERT(
         node,
         "We really should either have an event in the queue that will satisfy"
@@ -688,10 +693,10 @@ iree_status_t iree_hal_hip_semaphore_notify_work(
   }
   if (value > semaphore->max_value_to_be_signaled) {
     iree_hal_hip_util_tree_node_t* node =
-        iree_hal_hip_util_tree_get(&semaphore->event_queue, value);
+        iree_hal_hip_util_tree_get(&semaphore->event_queue.tree, value);
     if (node == NULL) {
-      status =
-          iree_hal_hip_util_tree_insert(&semaphore->event_queue, value, &node);
+      status = iree_hal_hip_util_tree_insert(&semaphore->event_queue.tree,
+                                             value, &node);
       if (!iree_status_is_ok(status)) {
         iree_slim_mutex_unlock(&semaphore->mutex);
         IREE_TRACE_ZONE_END(z0);
@@ -753,11 +758,11 @@ iree_status_t iree_hal_hip_semaphore_get_hip_event(
     return status;
   }
   iree_hal_hip_util_tree_node_t* node =
-      iree_hal_hip_util_tree_get(&semaphore->event_queue, value);
+      iree_hal_hip_util_tree_get(&semaphore->event_queue.tree, value);
 
   if (node == NULL) {
-    status =
-        iree_hal_hip_util_tree_insert(&semaphore->event_queue, value, &node);
+    status = iree_hal_hip_util_tree_insert(&semaphore->event_queue.tree, value,
+                                           &node);
     if (!iree_status_is_ok(status)) {
       iree_slim_mutex_unlock(&semaphore->mutex);
       IREE_TRACE_ZONE_END(z0);
