@@ -2,6 +2,7 @@
 // RUN:   --pass-pipeline="builtin.module(func.func(iree-codegen-verify-workgroup-distribution))" \
 // RUN:   | FileCheck %s
 
+// expected-error@+1 {{op failed on workgroup distribution verification}}
 func.func @write_outside_workgroup_forall(%i: i32, %out: memref<32xi32, #hal.descriptor_type<storage_buffer>>) {
   scf.forall (%arg0) in (32) {
   } {mapping = [#iree_codegen.workgroup_mapping<x>]}
@@ -26,6 +27,7 @@ func.func @non_workgroup_write_outside_workgroup_forall(
 
 // -----
 
+// expected-error@+1 {{op failed on workgroup distribution verification}}
 func.func @write_nested_in_other_forall(%i: i32, %out: memref<32xi32, #hal.descriptor_type<storage_buffer>>) {
   scf.forall (%arg0) in (32) {
   } {mapping = [#iree_codegen.workgroup_mapping<x>]}

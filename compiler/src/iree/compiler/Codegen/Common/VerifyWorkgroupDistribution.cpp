@@ -19,10 +19,6 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-/// Pass to verify that all writes to global memory are explicitly mapped to
-/// workgroups. This means that in cases where we use loops (scf.forall) to
-/// manage distribution to workgroups, we require that all ops with write
-/// side effects are contained within a workgroup distributed loop.
 struct VerifyWorkgroupDistributionPass final
     : impl::VerifyWorkgroupDistributionPassBase<
           VerifyWorkgroupDistributionPass> {
@@ -30,12 +26,10 @@ struct VerifyWorkgroupDistributionPass final
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
 
-    WalkResult hasForall = funcOp.walk([&](Operation *op) {
-      if (auto forallOp = dyn_cast<scf::ForallOp>(op)) {
-        if (forallOpHasMappingType<IREE::Codegen::WorkgroupMappingAttr>(
-                forallOp)) {
-          return WalkResult::interrupt();
-        }
+    WalkResult hasForall = funcOp.walk([&](scf::ForallOp forallOp) {
+      if (forallOpHasMappingType<IREE::Codegen::WorkgroupMappingAttr>(
+              forallOp)) {
+        return WalkResult::interrupt();
       }
       return WalkResult::advance();
     });
@@ -50,11 +44,10 @@ struct VerifyWorkgroupDistributionPass final
     auto globalAddressSpace = IREE::HAL::DescriptorTypeAttr::get(
         &getContext(), IREE::HAL::DescriptorType::StorageBuffer);
 
-    bool failed = false;
     // Walk in PreOrder so that parent operations are visited before children,
     // thus allowing all operations contained within workgroup foralls to be
     // skipped.
-    funcOp.walk<WalkOrder::PreOrder>([&](Operation *op) {
+    WalkResult res = funcOp.walk<WalkOrder::PreOrder>([&](Operation *op) {
       if (auto forallOp = dyn_cast<scf::ForallOp>(op)) {
         // Skip ops contained within forall ops with workgroup mappings.
         if (forallOpHasMappingType<IREE::Codegen::WorkgroupMappingAttr>(
@@ -78,15 +71,14 @@ struct VerifyWorkgroupDistributionPass final
           op->emitOpError(
               "write affecting operations on global resources are restricted "
               "to workgroup distributed contexts.");
-          failed = true;
           return WalkResult::interrupt();
         }
       }
       return WalkResult::advance();
     });
 
-    // We can't use the WalkResult here because it's an enum
-    if (failed) {
+    if (res.wasInterrupted()) {
+      funcOp.emitOpError("failed on workgroup distribution verification");
       return signalPassFailure();
     }
   }
