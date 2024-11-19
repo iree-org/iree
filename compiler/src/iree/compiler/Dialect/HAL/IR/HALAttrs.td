@@ -542,7 +542,7 @@ def HAL_ExecutableObjectAttr : AttrDef<HAL_Dialect, "ExecutableObject"> {
 
   let parameters = (ins
     AttrParameter<"StringAttr", "">:$path,
-    OptionalParameter<"DenseIntElementsAttr", "">:$data
+    OptionalParameter<"IREE::Util::SerializableAttrInterface", "">:$data
   );
 
   let hasCustomAssemblyFormat = 1;

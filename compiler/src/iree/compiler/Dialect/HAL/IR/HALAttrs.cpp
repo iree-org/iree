@@ -231,7 +231,8 @@ Attribute ExecutableObjectAttr::parse(AsmParser &p, Type type) {
   }
   auto pathAttr = llvm::dyn_cast_if_present<StringAttr>(dict.get("path"));
   auto dataAttr =
-      llvm::dyn_cast_if_present<DenseIntElementsAttr>(dict.get("data"));
+      llvm::dyn_cast_if_present<IREE::Util::SerializableAttrInterface>(
+          dict.get("data"));
   return get(p.getContext(), pathAttr, dataAttr);
 }
 
@@ -312,12 +313,14 @@ FailureOr<std::string> ExecutableObjectAttr::getAbsolutePath() {
 
 std::optional<std::string> ExecutableObjectAttr::loadData() {
   if (auto dataAttr = getData()) {
-    // This is shady but so is using this feature.
-    // TODO(benvanik): figure out a way to limit the attribute to signless int8.
-    // We could share the attribute -> byte array code with the VM constant
-    // serialization if we wanted.
-    auto rawData = dataAttr.getRawData();
-    return std::string(rawData.data(), rawData.size());
+    std::string buffer;
+    buffer.resize(dataAttr.getStorageSize());
+    if (failed(dataAttr.serializeToBuffer(
+            UnknownLoc::get(dataAttr.getContext()), llvm::endianness::native,
+            ArrayRef(buffer.data(), buffer.size())))) {
+      return std::nullopt;
+    }
+    return buffer;
   } else if (auto pathAttr = getPath()) {
     // Search for file and try to load it if found.
     auto filePath =

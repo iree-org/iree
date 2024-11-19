@@ -126,8 +126,10 @@ convertPipelineLayout(IREE::Input::PipelineLayoutAttr src) {
 
 static IREE::HAL::ExecutableObjectAttr
 convertExecutableObject(IREE::Input::ExecutableObjectAttr src) {
-  return IREE::HAL::ExecutableObjectAttr::get(src.getContext(), src.getPath(),
-                                              src.getData());
+  return IREE::HAL::ExecutableObjectAttr::get(
+      src.getContext(), src.getPath(),
+      dyn_cast_if_present<IREE::Util::SerializableAttrInterface>(
+          src.getData()));
 }
 
 static IREE::HAL::ExecutableTargetAttr
