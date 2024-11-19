@@ -519,3 +519,156 @@ func.func @multi_result(%arg0: tensor<64x128xf32>, %arg1: tensor<128x256xf32>, %
 //       CHECK:       tensor.parallel_insert_slice
 //       CHECK:       tensor.parallel_insert_slice
 //       CHECK:  return %[[RESULT]]#1, %[[RESULT]]#0
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+func.func @multi_use_producer_no_yield_replacement(%7: tensor<12x197x197xf32>) -> tensor<12x197x197xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %cst_0 = arith.constant -3.40282347E+38 : f32
+  %8 = tensor.empty() : tensor<12x197x197xf32>
+  %9 = tensor.empty() : tensor<12x197xf32>
+  %10 = linalg.fill ins(%cst_0 : f32) outs(%9 : tensor<12x197xf32>) -> tensor<12x197xf32>
+  %11 = linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel", "reduction"]
+  } ins(%7 : tensor<12x197x197xf32>) outs(%10 : tensor<12x197xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %15 = arith.maxnumf %in, %out : f32
+    linalg.yield %15 : f32
+  } -> tensor<12x197xf32>
+  %12 = linalg.fill ins(%cst : f32) outs(%9 : tensor<12x197xf32>) -> tensor<12x197xf32>
+  %13 = linalg.generic {
+    indexing_maps = [#map, #map1, #map1],
+    iterator_types = ["parallel", "parallel", "reduction"]
+  } ins(%7, %11 : tensor<12x197x197xf32>, tensor<12x197xf32>)
+    outs(%12 : tensor<12x197xf32>) attrs =  {
+      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[4, 8, 0]]>} {
+  ^bb0(%in: f32, %in_1: f32, %out: f32):
+    %15 = arith.subf %in, %in_1 : f32
+    %16 = math.exp %15 : f32
+    %17 = arith.addf %16, %out : f32
+    linalg.yield %17 : f32
+  } -> tensor<12x197xf32>
+  %14:2 = linalg.generic {
+    indexing_maps = [#map, #map1, #map1, #map, #map],
+    iterator_types = ["parallel", "parallel", "parallel"]
+  } ins(%7, %11, %13 : tensor<12x197x197xf32>, tensor<12x197xf32>, tensor<12x197xf32>)
+    outs(%8, %8 : tensor<12x197x197xf32>, tensor<12x197x197xf32>) {
+  ^bb0(%in: f32, %in_1: f32, %in_2: f32, %out: f32, %out_3: f32):
+    %15 = arith.subf %in, %in_1 : f32
+    %16 = math.exp %15 : f32
+    %17 = arith.divf %16, %in_2 : f32
+    linalg.yield %16, %17 : f32, f32
+  } -> (tensor<12x197x197xf32>, tensor<12x197x197xf32>)
+  return %14#1 : tensor<12x197x197xf32>
+}
+
+// CHECK-LABEL: func @multi_use_producer_no_yield_replacement(
+//       CHECK:   %[[RESULT:.+]] = scf.forall
+//       CHECK:     %[[MAX:.+]] = linalg.generic
+//       CHECK:       arith.maxnumf
+//       CHECK:     %[[EXPSUM:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%{{.*}}, %[[MAX]]
+//       CHECK:       arith.subf
+//       CHECK:       math.exp
+//       CHECK:       arith.addf
+//       CHECK:     %[[EXPDIV:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%{{.*}}, %[[MAX]], %[[EXPSUM]]
+//       CHECK:       arith.subf
+//       CHECK:       math.exp
+//       CHECK:       arith.divf
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
+// Fusion of the following graph, root marked with [brackets].
+//   A
+//  / \
+// B  [C]
+//  \ /
+//   D
+#map = affine_map<(d0) -> (d0)>
+func.func @diamond_graph(%0: tensor<12xf32>, %1: tensor<12xf32>) -> tensor<12xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %2 = tensor.empty() : tensor<12xf32>
+  %3 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel"]
+  } ins(%0, %1 : tensor<12xf32>, tensor<12xf32>) outs(%2 : tensor<12xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %7 = arith.addf %in, %in_0 : f32
+    linalg.yield %7 : f32
+  } -> tensor<12xf32>
+  %4 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel"]
+  } ins(%3, %0 : tensor<12xf32>, tensor<12xf32>) outs(%2 : tensor<12xf32>) attrs =  {
+      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[4]]>} {
+  ^bb0(%in: f32, %in_1: f32, %out: f32):
+    %8 = arith.addf %in, %in_1 : f32
+    linalg.yield %8 : f32
+  } -> tensor<12xf32>
+  %5 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel"]
+  } ins(%3, %1 : tensor<12xf32>, tensor<12xf32>) outs(%2 : tensor<12xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %9 = arith.addf %in, %in_0 : f32
+    linalg.yield %9 : f32
+  } -> tensor<12xf32>
+  %6 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel"]
+  } ins(%4, %5 : tensor<12xf32>, tensor<12xf32>) outs(%2 : tensor<12xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %10 = arith.addf %in, %in_0 : f32
+    linalg.yield %10 : f32
+  } -> tensor<12xf32>
+  return %6 : tensor<12xf32>
+}
+
+// CHECK-LABEL: func @diamond_graph(
+//       CHECK:   %[[RESULT:.+]] = scf.forall
+//       CHECK:     %[[TOP:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[IN0_SLICE:.+]], %[[IN1_SLICE:.+]]
+//   CHECK-DAG:     %[[LEFT:.+]] = linalg.generic {{.*}} ins(%[[TOP]], %[[IN0_SLICE]]
+//   CHECK-DAG:     %[[RIGHT:.+]] = linalg.generic {{.*}} ins(%[[TOP]], %[[IN1_SLICE]]
+//       CHECK:     linalg.generic {{.*}} ins(%[[LEFT]], %[[RIGHT]]
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
+// Fusion of the following graph, root marked with [brackets].
+// [A] B
+//  \ /
+//   C
+#map = affine_map<(d0) -> (d0)>
+func.func @v_shaped_graph(%0: tensor<12xf32>, %1: tensor<12xf32>) -> tensor<12xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %2 = tensor.empty() : tensor<12xf32>
+  %3 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]
+  } ins(%0 : tensor<12xf32>) outs(%2 : tensor<12xf32>) attrs =  {
+      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[4]]>} {
+  ^bb0(%in: f32, %out: f32):
+    %6 = math.sqrt %in : f32
+    linalg.yield %6 : f32
+  } -> tensor<12xf32>
+  %4 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]
+  } ins(%1 : tensor<12xf32>) outs(%2 : tensor<12xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %7 = math.sqrt %in : f32
+    linalg.yield %7 : f32
+  } -> tensor<12xf32>
+  %5 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel"]
+  } ins(%3, %4 : tensor<12xf32>, tensor<12xf32>) outs(%2 : tensor<12xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %8 = arith.addf %in, %in_0 : f32
+    linalg.yield %8 : f32
+  } -> tensor<12xf32>
+  return %5 : tensor<12xf32>
+}
+
+// CHECK-LABEL: func @v_shaped_graph(
+//  CHECK-SAME:   %[[IN0:[A-Za-z0-9]+]]: tensor<12xf32>
+//  CHECK-SAME:   %[[IN1:[A-Za-z0-9]+]]: tensor<12xf32>
+//       CHECK:   %[[RESULT:.+]] = scf.forall
+//   CHECK-DAG:     %[[SLICE0:.+]] = tensor.extract_slice %[[IN0]]
+//   CHECK-DAG:     %[[SLICE1:.+]] = tensor.extract_slice %[[IN1]]
+//   CHECK-DAG:     %[[LEFT:.+]] = linalg.generic {{.*}} ins(%[[SLICE0]]
+//   CHECK-DAG:     %[[RIGHT:.+]] = linalg.generic {{.*}} ins(%[[SLICE1]]
+//       CHECK:     linalg.generic {{.*}} ins(%[[LEFT]], %[[RIGHT]]
+//       CHECK:   return %[[RESULT]]
