@@ -209,12 +209,13 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         host_ary = self.to_host()
         return host_ary.__getitem__(index)
 
+    def __deepcopy__(self, memo):
+        return self.to_host()
+
     def __reduce__(self):
-        # Since this is used for making deep copies and pickling, we map
-        # separately from any interactive state. We just reduce to the actual
-        # host ndarray, which supports the necessary serialization protocols.
-        _, host_array = self._map_to_host()
-        return _restore_reduced_array, (host_array,)
+        # We just reduce to the actual host ndarray, which supports the necessary
+        # serialization protocols.
+        return _restore_reduced_array, (self.to_host(),)
 
 
 def _restore_reduced_array(ary):
