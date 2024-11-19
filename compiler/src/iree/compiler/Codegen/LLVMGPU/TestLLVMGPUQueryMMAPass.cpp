@@ -25,7 +25,7 @@ struct TestLLVMGPUQueryMMAPass final
     ModuleOp moduleOp = getOperation();
     SmallVector<IREE::HAL::ExecutableVariantOp> executableVariantOps =
         getExecutableVariantOps(moduleOp);
-    for (const auto &op : executableVariantOps) {
+    for (IREE::HAL::ExecutableVariantOp op : executableVariantOps) {
       llvm::outs() << "Executable Variant Name: "
                    << cast<IREE::HAL::ExecutableVariantOp>(*op).getName()
                    << "\n";
