@@ -278,7 +278,7 @@ static iree_status_t iree_hal_hip_device_initialize_internal(
                                      sizeof(*tracing_device_interface),
                                      (void**)&tracing_device_interface);
 
-      if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+      if (!iree_status_is_ok(status)) {
         iree_hal_device_release((iree_hal_device_t*)device);
         IREE_TRACE_ZONE_END(z0);
         return status;
@@ -292,7 +292,7 @@ static iree_status_t iree_hal_hip_device_initialize_internal(
 
       status = IREE_HIP_CALL_TO_STATUS(
           symbols, hipCtxPushCurrent(device->topology.devices[i].hip_context));
-      if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+      if (!iree_status_is_ok(status)) {
         iree_hal_device_release((iree_hal_device_t*)device);
         IREE_TRACE_ZONE_END(z0);
         return status;
@@ -303,7 +303,7 @@ static iree_status_t iree_hal_hip_device_initialize_internal(
           &device->block_pool, host_allocator,
           &device->topology.devices[i].tracing_context);
       status = IREE_HIP_CALL_TO_STATUS(symbols, hipCtxPopCurrent(NULL));
-      if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+      if (!iree_status_is_ok(status)) {
         iree_hal_device_release((iree_hal_device_t*)device);
         IREE_TRACE_ZONE_END(z0);
         return status;
@@ -767,7 +767,7 @@ static iree_status_t iree_hal_hip_device_create_command_buffer_internal(
     ++cb_num;
   }
 
-  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+  if (!iree_status_is_ok(status)) {
     for (iree_host_size_t i = 0; i < IREE_HAL_MAX_QUEUES; ++i) {
       if (buffers[i]) {
         iree_hal_resource_release(buffers[i]);
