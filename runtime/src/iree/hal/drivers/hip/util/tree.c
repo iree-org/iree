@@ -452,7 +452,7 @@ iree_status_t iree_hal_hip_util_tree_insert(
   IREE_RETURN_IF_ERROR(iree_hal_hip_util_tree_allocate_node(tree, &t));
 
   iree_status_t status = iree_hal_hip_util_tree_insert_internal(tree, key, t);
-  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+  if (!iree_status_is_ok(status)) {
     iree_hal_hip_util_tree_delete_node(tree, t);
     return status;
   }
