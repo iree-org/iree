@@ -146,3 +146,51 @@ hal.executable @ext_fp8_dispatch {
 // CDNA3-COUNT-4:     rocdl.cvt.f32.bf8 %{{.*}} : f32
 //         CDNA3:     %[[ADD:.+]] = llvm.fadd %{{.*}}, %{{.*}} : vector<4xf32>
 //         CDNA3:     llvm.store %[[ADD]], %{{.*}} : vector<4xf32>, !llvm.ptr<1>
+
+// -----
+
+// Verify that the ceildivsi op gets expanded and lowered successfully all the way to
+// the llvm dialect.
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable @ceildiv_expand_dispatch {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
+  hal.executable.export @ceildiv_expand layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1
+      hal.return %x, %y, %z : index, index, index
+    }
+  builtin.module {
+    func.func @ceildiv_expand() {
+      %c0 = arith.constant 0 : index
+      %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<16xi32>>
+      %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<16xi32>>
+      %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<16xi32>>
+      %3 = tensor.empty() : tensor<16xi32>
+      %4 = flow.dispatch.tensor.load %0, offsets=[0], sizes=[16], strides=[1] : !flow.dispatch.tensor<readonly:tensor<16xi32>> -> tensor<16xi32>
+      %5 = flow.dispatch.tensor.load %1, offsets=[0], sizes=[16], strides=[1] : !flow.dispatch.tensor<readonly:tensor<16xi32>> -> tensor<16xi32>
+      %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%4, %5 : tensor<16xi32>, tensor<16xi32>) outs(%3 : tensor<16xi32>) {
+      ^bb0(%arg0: i32, %arg1: i32, %arg2: i32):  // no predecessors
+          %7 = arith.ceildivsi %arg0, %arg1 : i32
+          linalg.yield %7 : i32
+        } -> tensor<16xi32>
+        flow.dispatch.tensor.store %6, %2, offsets=[0], sizes=[16], strides=[1] : tensor<16xi32> -> !flow.dispatch.tensor<writeonly:tensor<16xi32>>
+        return
+      }
+    }
+  }
+}
+
+//   CDNA3-LABEL: hal.executable public @ceildiv_expand_dispatch
+//         CDNA3:   hal.executable.variant public @rocm
+//     CDNA3-NOT:     arith.ceildivsi
+// CDNA3-COUNT-1:     llvm.select {{.*}} : i1, i32
+// CDNA3-COUNT-2:     llvm.sdiv {{.*}} : i32
+// CDNA3-COUNT-4:     llvm.icmp {{.*}} : i32
+// CDNA3-COUNT-2:     llvm.and {{.*}} : i1
+// CDNA3-COUNT-1:     llvm.or {{.*}} : i1
+// CDNA3-COUNT-1:     llvm.select {{.*}} : i1, i32
