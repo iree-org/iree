@@ -36,17 +36,14 @@ ireeCodegenGetExecutableVariantOpsBinding(MlirModule module) {
 std::vector<py::object> ireeCodegenQueryMMAIntrinsicsBinding(MlirOperation op) {
   size_t numMMAs = 0;
   ireeCodegenQueryMMAIntrinsics(op, &numMMAs, nullptr);
-
   std::vector<uint32_t> mmaIntrinsics(numMMAs);
-
   ireeCodegenQueryMMAIntrinsics(op, &numMMAs, mmaIntrinsics.data());
 
+  py::object mmaIntrinsicEnum =
+      py::module_::import(kGpuModuleImportPath).attr("MMAIntrinsic");
   std::vector<py::object> mmaList(numMMAs);
   std::transform(mmaIntrinsics.begin(), mmaIntrinsics.end(), mmaList.begin(),
-                 [&](uint32_t rawValue) {
-                   return py::module_::import(kGpuModuleImportPath)
-                       .attr("MMAIntrinsic")(rawValue);
-                 });
+                 [&](uint32_t rawValue) { return mmaIntrinsicEnum(rawValue); });
   return mmaList;
 }
 

@@ -155,6 +155,7 @@ ireeCodegenCompilationInfoAttrGetParameters(MlirAttribute attr) {
 
 void ireeCodegenGetExecutableVariantOps(MlirModule module, size_t *numOps,
                                         MlirOperation *executableOps) {
+  assert(module.ptr && "module cannot be nullptr");
   assert(numOps && "numOps cannot be nullptr");
 
   mlir::ModuleOp moduleOp = unwrap(module);
@@ -181,7 +182,6 @@ void ireeCodegenQueryMMAIntrinsics(MlirOperation op, size_t *numIntrinsics,
 
   mlir::Operation *mlirOp = unwrap(op);
   auto variantOp = llvm::dyn_cast_if_present<ExecutableVariantOp>(mlirOp);
-
   assert(variantOp && "operation is not a ExecutableVariantOp");
 
   llvm::SmallVector<MMAIntrinsic> intrinsics =
