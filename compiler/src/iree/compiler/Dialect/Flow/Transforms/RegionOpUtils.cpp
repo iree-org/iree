@@ -43,12 +43,6 @@ static llvm::cl::opt<int> clInlineConstantByteLength(
                    "into a dispatch region or 0 to disable inlining."),
     llvm::cl::init(256));
 
-// TODO(#18457, #18447): Remove once backends support gather fusion.
-static llvm::cl::opt<bool>
-    clEnableGatherFusion("iree-flow-enable-gather-fusion",
-                         llvm::cl::desc("Fuse gather-like ops with consumer."),
-                         llvm::cl::init(false));
-
 namespace mlir::iree_compiler::IREE::Flow {
 
 //===----------------------------------------------------------------------===//
@@ -804,7 +798,7 @@ bool isClonableIntoDispatchOp(Operation *op) {
   if (LinalgExt::isBitExtendOp(op)) {
     return true;
   }
-  if (clEnableGatherFusion && LinalgExt::isGatherlikeOp(op)) {
+  if (LinalgExt::isGatherlikeOp(op)) {
     return true;
   }
   if (isa<arith::ConstantOp>(op) || isa<complex::ConstantOp>(op)) {
