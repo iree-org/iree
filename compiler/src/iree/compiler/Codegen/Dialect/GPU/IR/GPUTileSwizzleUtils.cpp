@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
 

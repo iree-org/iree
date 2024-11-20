@@ -15,10 +15,10 @@
 
 namespace mlir::iree_compiler {
 
+using IREE::Codegen::MaterializeEncodingInfo;
 using IREE::Encoding::EncodingAttr;
 using IREE::Encoding::getEncodingAttr;
 using IREE::Encoding::getEncodingContractionDims;
-using IREE::Codegen::MaterializeEncodingInfo;
 
 // If tensorType has the encoding of a matmul RESULT with narrow N, returns
 // the transposed type. Otherwise, just returns tensorType.
