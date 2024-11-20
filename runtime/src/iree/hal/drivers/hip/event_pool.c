@@ -278,6 +278,8 @@ iree_status_t iree_hal_hip_event_pool_acquire(
       }
       status = iree_status_join(status, cleanup_status);
       if (!iree_status_is_ok(status)) {
+        IREE_TRACE_ZONE_END(z1);
+        IREE_TRACE_ZONE_END(z0);
         return status;
       }
     }
