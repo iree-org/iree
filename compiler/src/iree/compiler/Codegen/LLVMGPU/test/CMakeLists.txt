@@ -14,9 +14,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "amdgpu_chained_matmul.mlir"
-    "amdgpu_contraction_distribution.mlir"
-    "amdgpu_set_anchor_layouts.mlir"
     "assign_constant_ordinals.mlir"
     "cast_address_space_function.mlir"
     "cast_type_to_fit_mma.mlir"

@@ -17,7 +17,6 @@ package(
 iree_compiler_cc_library(
     name = "Utils",
     srcs = [
-        "AMDGPUDistributionPatterns.cpp",
         "LLVMGPUUtils.cpp",
         "PrefetchSharedMemoryCopy.cpp",
     ],

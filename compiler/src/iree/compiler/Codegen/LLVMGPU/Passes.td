@@ -13,34 +13,6 @@ include "mlir/Pass/PassBase.td"
 // LLVMGPU Passes (keep alphabetical)
 //------------------------------------------------------------------------------
 
-def AMDGPUPrepareForChainedMatmulPass :
-    InterfacePass<"iree-amdgpu-prepare-chained-matmul", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to swap operands and transpose accumulator and result";
-  let description = [{
-    Given a chain of matmuls with some or no operations
-    in between, like
-
-    d = matmul_transpose_b(a, b) + c
-    ...
-    e = matmul_transpose_b(d, f) + g
-
-    this pattern transforms the above IR to
-
-    c.t = transpose c
-    d = matmul_transpose_b(b, a) + c.t
-    d.t = transpose d
-    ...
-    g.t = transpose g
-    e = matmul_transpose_b(f, d.t) + g.t
-    e.t = transpose e
-
-    On CDNA architectures, where the layouts of the RHS and result
-    are the same and transposed from the LHS layout, this type
-    of transformation can avoid trips to shared memory/shuffle instructions
-    on operators like Flash Attention.
-  }];
-}
-
 // TODO: Bring the argument in line with the names used elsewhere.
 def ConvertToNVVMPass :
     Pass<"iree-convert-to-nvvm", "ModuleOp"> {

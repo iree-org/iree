@@ -34,7 +34,6 @@ public:
                                  int64_t subgroupSize)
       : VectorLayoutOptions(root), patterns(root->getContext()) {
     populateGPUDistributionPatterns(patterns);
-    populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
     populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId,
                                                   subgroupSize);
     populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
