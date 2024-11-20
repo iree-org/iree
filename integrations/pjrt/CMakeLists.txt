@@ -38,7 +38,9 @@ if(IREE_PJRT_ENABLE_LTO)
 endif()
 
 # Customize defaults.
-option(IREE_BUILD_COMPILER "Disable compiler for runtime-library build" OFF)
+# IREE_BUILD_COMPILER should be enabled to make target IREELLVMIncludeSetup available,
+# which is required by PJRT dylib targets
+option(IREE_BUILD_COMPILER "Enable compiler for runtime-library build" ON)
 option(IREE_BUILD_SAMPLES "Disable samples for runtime-library build" OFF)
 
 # Include IREE.

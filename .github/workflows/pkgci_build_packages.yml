@@ -90,8 +90,8 @@ jobs:
           export toolchain_suffix=release
           export manylinux_docker_image="$MANYLINUX_DOCKER_IMAGE"
           export package_suffix="$PACKAGE_SUFFIX"
-          # If just iterating locally, uncomment this to build a cheap wheel.
-          # export packages="iree-base-runtime"
+          # If just iterating locally, change this to build a cheap wheel.
+          export packages="iree-base-runtime iree-base-compiler iree-pjrt-plugin-cpu"
           ./build_tools/pkgci/build_linux_packages.sh
           # Some things put stuff in cache with weird, root read-only
           # permissions. Take them back.
