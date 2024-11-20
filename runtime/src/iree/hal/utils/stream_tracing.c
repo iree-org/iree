@@ -226,7 +226,7 @@ void iree_hal_stream_tracing_context_free(
 
   iree_slim_mutex_deinitialize(&context->event_mutex);
 
-  context->device_interface->vtable.destroy(context->device_interface);
+  context->device_interface->vtable->destroy(context->device_interface);
   iree_allocator_t host_allocator = context->host_allocator;
   iree_allocator_free(host_allocator, context);
 
@@ -328,7 +328,7 @@ iree_status_t iree_hal_stream_tracing_context_collect(
 
   IREE_TRACE_ZONE_END(z0);
   iree_slim_mutex_unlock(&context->event_mutex);
-  return status();
+  return status;
 }
 
 void iree_hal_stream_tracing_notify_submitted(
