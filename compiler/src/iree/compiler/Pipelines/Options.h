@@ -126,7 +126,7 @@ struct GlobalOptimizationOptions {
   bool numericPrecisionReduction = false;
 
   // Strips debug assertions after any useful information has been extracted.
-  bool stripAssertions = false;
+  bool stripAssertions = true;
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalOptimizationOptions>;
