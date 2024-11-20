@@ -79,7 +79,7 @@ hal.executable @transpose_single_operand_dispatch_0_generic_768x2048 {
   }
 }
 
-// CHECK-LABEL:   func @transpose_single_operand_dispatch_0_generic_768x2048 
+// CHECK-LABEL:   func @transpose_single_operand_dispatch_0_generic_768x2048
 //       CHECK:   %[[A:.*]] = memref.alloc() : memref<32x34xf32, #gpu.address_space<workgroup>>
 //       CHECK:   %[[B0:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //       CHECK:   %[[B1:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
@@ -171,7 +171,7 @@ hal.executable @transpose_3d_yes_dispatch_0_generic_10x768x2048 {
   }
 }
 
-// CHECK-LABEL:   func @transpose_3d_yes_dispatch_0_generic_10x768x2048 
+// CHECK-LABEL:   func @transpose_3d_yes_dispatch_0_generic_10x768x2048
 //       CHECK:   %[[A:.*]] = memref.alloc() : memref<1x32x34xf32, #gpu.address_space<workgroup>>
 //       CHECK:   %[[B0:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //       CHECK:   %[[B1:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
