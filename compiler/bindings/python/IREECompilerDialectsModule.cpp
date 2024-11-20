@@ -21,36 +21,33 @@ static const char *kGpuModuleImportPath =
 namespace py = pybind11;
 using namespace mlir::python::adaptors;
 
-py::list ireeCodegenGetExecutableVariantOpsBinding(MlirModule module) {
-  int numOps = 0;
+std::vector<MlirOperation>
+ireeCodegenGetExecutableVariantOpsBinding(MlirModule module) {
+  size_t numOps = 0;
   ireeCodegenGetExecutableVariantOps(module, &numOps, nullptr);
 
   std::vector<MlirOperation> ops(numOps);
 
   ireeCodegenGetExecutableVariantOps(module, &numOps, ops.data());
 
-  py::list opsList;
-  for (int i = 0; i < numOps; ++i) {
-    opsList.append(ops[i]);
-  }
-
-  return opsList;
+  return ops;
 }
 
-py::list ireeCodegenQueryMMAIntrinsicsBinding(MlirOperation op) {
-  int numMMAs = 0;
+std::vector<py::object> ireeCodegenQueryMMAIntrinsicsBinding(MlirOperation op) {
+  size_t numMMAs = 0;
   ireeCodegenQueryMMAIntrinsics(op, &numMMAs, nullptr);
 
   std::vector<uint32_t> mmaIntrinsics(numMMAs);
 
   ireeCodegenQueryMMAIntrinsics(op, &numMMAs, mmaIntrinsics.data());
 
-  py::list opsList;
-  for (int i = 0; i < numMMAs; ++i) {
-    opsList.append(mmaIntrinsics[i]);
-  }
-
-  return opsList;
+  std::vector<py::object> mmaList(numMMAs);
+  std::transform(mmaIntrinsics.begin(), mmaIntrinsics.end(), mmaList.begin(),
+                 [&](uint32_t rawValue) {
+                   return py::module_::import(kGpuModuleImportPath)
+                       .attr("MMAIntrinsic")(rawValue);
+                 });
+  return mmaList;
 }
 
 PYBIND11_MODULE(_ireeCompilerDialects, m) {
@@ -374,5 +371,6 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
 
   iree_codegen_module.def(
       "query_mma_intrinsics", &ireeCodegenQueryMMAIntrinsicsBinding,
-      "Querys the mma intrinsics from a executable variant op.", py::arg("op"));
+      "Queries the MMA intrinsics from an executable variant op.",
+      py::arg("op"));
 }

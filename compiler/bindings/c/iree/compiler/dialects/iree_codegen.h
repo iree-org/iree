@@ -67,12 +67,12 @@ MLIR_CAPI_EXPORTED ireeCodegenCompilationInfoParameters
 ireeCodegenCompilationInfoAttrGetParameters(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED void
-ireeCodegenGetExecutableVariantOps(MlirModule module, int *num_ops,
+ireeCodegenGetExecutableVariantOps(MlirModule module, size_t *numOps,
                                    MlirOperation *executableOps);
 
 MLIR_CAPI_EXPORTED void ireeCodegenQueryMMAIntrinsics(MlirOperation op,
-                                                      int *num_intrinsics,
-                                                      uint32_t *mma_intrinsics);
+                                                      size_t *numIntrinsics,
+                                                      uint32_t *mmaIntrinsics);
 
 #ifdef __cplusplus
 }

@@ -25,6 +25,8 @@ using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipeline;
 using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipelineAttr;
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttrInterface;
 using mlir::iree_compiler::IREE::Codegen::TranslationInfoAttr;
+using mlir::iree_compiler::IREE::GPU::MMAIntrinsic;
+using mlir::iree_compiler::IREE::HAL::ExecutableVariantOp;
 
 bool ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr(
     MlirAttribute attr) {
@@ -151,40 +153,48 @@ ireeCodegenCompilationInfoAttrGetParameters(MlirAttribute attr) {
   return parameters;
 }
 
-void ireeCodegenGetExecutableVariantOps(MlirModule module, int *num_ops,
+void ireeCodegenGetExecutableVariantOps(MlirModule module, size_t *numOps,
                                         MlirOperation *executableOps) {
+  assert(numOps && "numOps cannot be nullptr");
+
   mlir::ModuleOp moduleOp = unwrap(module);
-  llvm::SmallVector<mlir::iree_compiler::IREE::HAL::ExecutableVariantOp>
-      executableVariantOps =
-          mlir::iree_compiler::getExecutableVariantOps(moduleOp);
+  llvm::SmallVector<ExecutableVariantOp> executableVariantOps =
+      mlir::iree_compiler::getExecutableVariantOps(moduleOp);
 
   if (!executableOps) {
-    *num_ops = executableVariantOps.size();
+    *numOps = executableVariantOps.size();
     return;
   }
 
-  for (size_t i = 0; i < executableVariantOps.size(); i++) {
+  assert(
+      *numOps == executableVariantOps.size() &&
+      "*numOps must match the number of elements in the executableVariantOps");
+
+  for (size_t i = 0, e = executableVariantOps.size(); i < e; ++i) {
     executableOps[i] = wrap(executableVariantOps[i]);
   }
 }
 
-void ireeCodegenQueryMMAIntrinsics(MlirOperation op, int *num_intrinsics,
-                                   uint32_t *mma_intrinsics) {
+void ireeCodegenQueryMMAIntrinsics(MlirOperation op, size_t *numIntrinsics,
+                                   uint32_t *mmaIntrinsics) {
+  assert(numIntrinsics && "numIntrinsics cannot be nullptr");
+
   mlir::Operation *mlirOp = unwrap(op);
-  auto variantOp =
-      llvm::dyn_cast<mlir::iree_compiler::IREE::HAL::ExecutableVariantOp>(
-          mlirOp);
+  auto variantOp = llvm::dyn_cast_if_present<ExecutableVariantOp>(mlirOp);
 
   assert(variantOp && "operation is not a ExecutableVariantOp");
 
-  llvm::SmallVector<mlir::iree_compiler::IREE::GPU::MMAIntrinsic>
-      mmaIntrinsics = mlir::iree_compiler::queryMMAIntrinsics(variantOp);
-  if (!mma_intrinsics) {
-    *num_intrinsics = mmaIntrinsics.size();
+  llvm::SmallVector<MMAIntrinsic> intrinsics =
+      mlir::iree_compiler::queryMMAIntrinsics(variantOp);
+  if (!mmaIntrinsics) {
+    *numIntrinsics = intrinsics.size();
     return;
   }
 
-  for (size_t i = 0; i < mmaIntrinsics.size(); i++) {
-    mma_intrinsics[i] = static_cast<uint32_t>(mmaIntrinsics[i]);
+  assert(*numIntrinsics == intrinsics.size() &&
+         "*numIntrinsics must match the number of elements in the intrinsics");
+
+  for (size_t i = 0, e = intrinsics.size(); i < e; ++i) {
+    mmaIntrinsics[i] = static_cast<uint32_t>(intrinsics[i]);
   }
 }
