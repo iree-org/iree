@@ -539,6 +539,22 @@ util.func public @sliceConst3D() -> tensor<1x2x3xi32> {
   // CHECK-NEXT: util.return %[[C]]
   util.return %1 : tensor<1x2x3xi32>
 }
+// -----
+
+// CHECK-LABEL: @sliceDenseResourceAttr
+util.func public @sliceDenseResourceAttr() -> tensor<1x1x3xf32> {
+  %0 = arith.constant dense_resource<__elided__> : tensor<1x2x3xf32>
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
+  %1 = flow.tensor.slice %0[%c0, %c0, %c0 for %c1, %c1, %c3] : tensor<1x2x3xf32> -> tensor<1x1x3xf32>
+  // CHECK: %[[C:.+]] = arith.constant dense_resource
+  // CHECK-SAME:             : tensor<1x2x3xf32>
+  // CHECK: %[[S:.+]] = flow.tensor.slice %[[C]]
+  // CHECK-SAME:             -> tensor<1x1x3xf32>
+  // CHECK-NEXT: util.return %[[S]]
+  util.return %1 : tensor<1x1x3xf32>
+}
 
 // -----
 
