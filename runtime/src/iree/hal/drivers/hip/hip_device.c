@@ -1303,7 +1303,7 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
           signal_semaphore_list, buffer,
           IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_ALLOC, &callback_data);
     }
-    if (iree_status_is_ok(status)) {
+    if (iree_status_is_ok(status) && wait_semaphore_list.count == 0) {
       status = iree_hal_hip_device_perform_buffer_operation_now(callback_data);
       *out_buffer = buffer;
       IREE_TRACE_ZONE_END(z0);
@@ -1393,13 +1393,11 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
         signal_semaphore_list, buffer,
         IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_DEALLOC, &callback_data);
 
-    if (iree_status_is_ok(status)) {
-      if (wait_semaphore_list.count == 0) {
-        iree_status_t status =
-            iree_hal_hip_device_perform_buffer_operation_now(callback_data);
-        IREE_TRACE_ZONE_END(z0);
-        return status;
-      }
+    if (iree_status_is_ok(status) && wait_semaphore_list.count == 0) {
+      iree_status_t status =
+          iree_hal_hip_device_perform_buffer_operation_now(callback_data);
+      IREE_TRACE_ZONE_END(z0);
+      return status;
     }
 
     for (iree_host_size_t i = 0;
