@@ -895,3 +895,48 @@ hal.executable private @generalized_pool {
 //         CHECK:     llvm.load %{{.*}} : !llvm.ptr<1> -> f32
 //         CHECK:     llvm.intr.maxnum
 //         CHECK:     llvm.store %{{.*}}, %{{.*}} : f32, !llvm.ptr<1>
+
+// -----
+
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[32,32]]>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#map0 = affine_map<(d0, d1) -> (d1, d0)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+hal.executable private @shared_mem_transpose  {
+  hal.executable.variant @cuda target(#executable_target_cuda_nvptx_fb) {
+    hal.executable.export @shared_mem_transpose layout(#pipeline_layout) {
+      ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+        %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+        hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+        func.func @shared_mem_transpose() {
+          %c0 = arith.constant 0 : index
+          %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2048x768xf32>>
+          %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<768x2048xf32>>
+          %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2048, 768], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2048x768xf32>> -> tensor<2048x768xf32>
+          %3 = tensor.empty() : tensor<768x2048xf32>
+          %4 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<2048x768xf32>) outs(%3 : tensor<768x2048xf32>) {
+          ^bb0(%arg0: f32, %arg1: f32):
+            linalg.yield %arg0 : f32
+          } -> tensor<768x2048xf32>
+          flow.dispatch.tensor.store %4, %1, offsets = [0, 0], sizes = [768, 2048], strides = [1, 1] : tensor<768x2048xf32> -> !flow.dispatch.tensor<writeonly:tensor<768x2048xf32>>
+          return
+        }
+    }
+  }
+}
+
+// Check that bufferization is emitting correct code for the temp shared
+// memory alloc.
+//   SM80-LABEL: hal.executable private @shared_mem_transpose
+//         SM80:   hal.executable.variant public @cuda
+//         SM80:     nvvm.barrier0
+//         SM80:     llvm.load %{{.*}} {alignment = 4 : i64} : !llvm.ptr<1> -> vector<4xf32>
+//         SM80:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : vector<4xf32>, !llvm.ptr<3>
+//         SM80:     nvvm.barrier0

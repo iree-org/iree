@@ -1775,6 +1775,103 @@ static bool hasTwoOrThreeLoopsInfo(linalg::LinalgOp linalgOp) {
 }
 
 //====---------------------------------------------------------------------===//
+// Transpose Pipeline Configuration
+//====---------------------------------------------------------------------===//
+
+static LogicalResult setTransposeConfig(IREE::GPU::TargetAttr target,
+                                        mlir::FunctionOpInterface entryPoint,
+                                        linalg::LinalgOp linalgOp) {
+  LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
+
+  // Checks preconditions for shared mem transpose.
+  if (!opInfo.isTranspose() || opInfo.isDynamic() || opInfo.isReduction() ||
+      !isa<linalg::GenericOp>(linalgOp) || !hasTwoOrThreeLoopsInfo(linalgOp)) {
+    return failure();
+  }
+
+  ArrayRef<OpOperand *> transposedOperands = opInfo.getTransposeOperands();
+
+  // Determine the fastest moving dimensions for the source/destination indices
+  // of each transpose. These inform the tile sizes.
+  int64_t outputFastestDim = linalgOp.getNumLoops() - 1;
+  int64_t inputFastestDim =
+      linalgOp.getMatchingIndexingMap(transposedOperands[0])
+          .getDimPosition(outputFastestDim);
+  // Ensure the other transposed operands match
+  for (int i = 1; i < transposedOperands.size(); ++i) {
+    if (inputFastestDim !=
+        linalgOp.getMatchingIndexingMap(transposedOperands[i])
+            .getDimPosition(outputFastestDim)) {
+      return failure();
+    }
+  }
+
+  int32_t tileM = 32;
+  int32_t tileN = 32;
+  // Set all tile sizes to 1 except for fastest moving dimensions.
+  SmallVector<int64_t> workgroupTileSizes(linalgOp.getNumLoops(), 1);
+  workgroupTileSizes[outputFastestDim] = 32;
+  workgroupTileSizes[inputFastestDim] = 32;
+
+  // Set the thread tile sizes to 1 for all dims except the fastest varying
+  // output dim which we set to 4. Because we promote the tranposed input
+  // operands, this gives both vectorized global reads and writes.
+  SmallVector<int64_t> threadTileSizes(linalgOp.getNumLoops(), 1);
+  threadTileSizes[outputFastestDim] = 4;
+
+  // Check alignment with tile size for each transpose. Only the fastest moving
+  // dims need to match the transpose tile.
+  auto loopRanges = linalgOp.getStaticLoopRanges();
+  if (loopRanges[outputFastestDim] % tileM != 0 ||
+      loopRanges[inputFastestDim] % tileN != 0) {
+    return failure();
+  }
+
+  // Workgroup size contains 8 warps. Configured with 8 threads on fastest
+  // moving dimension so each thread can execute a vectorized copy of 4
+  // contigious elements at a time from the 32 block.
+  std::array<int64_t, 3> workgroupSize = {8, 32, 1};
+
+  // Attach the MMA schedule as an attribute to the entry point export function
+  // for later access in the pipeline.
+  MLIRContext *context = linalgOp.getContext();
+  SmallVector<NamedAttribute, 1> attrs;
+  Builder b(context);
+  attrs.emplace_back(StringAttr::get(context, "workgroup"),
+                     b.getI64ArrayAttr(workgroupTileSizes));
+  attrs.emplace_back(StringAttr::get(context, "thread"),
+                     b.getI64ArrayAttr(threadTileSizes));
+  SmallVector<int64_t> promotedOperands;
+  for (auto operand : transposedOperands) {
+    promotedOperands.push_back(operand->getOperandNumber());
+  }
+  IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, attrs,
+                                                        promotedOperands);
+  auto configDict = DictionaryAttr::get(context, attrs);
+  auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
+
+  SmallVector<NamedAttribute, 1> pipelineAttrs;
+  auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
+      linalgOp->getContext(), /*prefetchSharedMemory=*/false,
+      /*no_reduce_shared_memory_bank_conflicts=*/false,
+      /*use_igemm_convolution=*/false,
+      /*reorder_workgroups_strategy=*/std::nullopt);
+  pipelineAttrs.emplace_back(
+      StringAttr::get(linalgOp->getContext(),
+                      IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
+      pipelineOptions);
+  auto pipelineConfig =
+      DictionaryAttr::get(linalgOp->getContext(), pipelineAttrs);
+  const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
+
+  // TODO(qedawkins): Use a shared pipeline identifier here.
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, linalgOp, loweringConfig,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
+      workgroupSize, targetSubgroupSize, pipelineConfig);
+}
+
+//====---------------------------------------------------------------------===//
 // UKernel Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
@@ -2084,7 +2181,11 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     }
     auto genericOp = dyn_cast<linalg::GenericOp>(computeOp);
     if (genericOp &&
-        succeeded(setArgmaxUkernelConfig(target, entryPointFn, genericOp))) {
+        succeeded(setTransposeConfig(target, entryPointFn, genericOp))) {
+      LDBG("Transpose Config");
+      return success();
+    } else if (genericOp && succeeded(setArgmaxUkernelConfig(
+                                target, entryPointFn, genericOp))) {
       LDBG("Argmax Ukernel Config");
       return success();
     }
