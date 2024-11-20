@@ -1104,6 +1104,10 @@ static iree_status_t iree_hal_hip_device_complete_buffer_operation(
         data->signal_semaphore_list.semaphores[i], &unused_return_value));
   }
 
+  for (iree_host_size_t i = 0; i < data->signal_semaphore_list.count; ++i) {
+    iree_hal_resource_release(data->signal_semaphore_list.semaphores[i]);
+  }
+
   // Free the iree_hal_hip_device_semaphore_buffer_operation_callback_data_t
   // and the buffer attached.
   iree_hal_buffer_release(data->buffer);
@@ -1215,6 +1219,10 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
   IREE_TRACE_ZONE_END(z3);
   const iree_hal_hip_dynamic_symbols_t* symbols = data->device->hip_symbols;
   if (iree_status_is_ok(status)) {
+    // Retain the semaphores for the cleanup thread.
+    for (iree_host_size_t i = 0; i < data->signal_semaphore_list.count; ++i) {
+      iree_hal_resource_retain(data->signal_semaphore_list.semaphores[i]);
+    }
     // Data may get deleted any time after adding it to the cleanup,
     // so retain the symbols here.
     status = iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
@@ -1297,6 +1305,7 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
     }
     if (iree_status_is_ok(status)) {
       status = iree_hal_hip_device_perform_buffer_operation_now(callback_data);
+      *out_buffer = buffer;
       IREE_TRACE_ZONE_END(z0);
       return status;
     }
@@ -1547,6 +1556,10 @@ static iree_status_t iree_hal_hip_device_complete_submission(
         data->signal_semaphore_list.semaphores[i], &unused_return_value));
   }
 
+  for (iree_host_size_t i = 0; i < data->signal_semaphore_list.count; ++i) {
+    iree_hal_resource_release(data->signal_semaphore_list.semaphores[i]);
+  }
+
   // Free the iree_hal_hip_device_semaphore_submit_callback_data_t and
   // the resource set attached.
   iree_hal_resource_set_free(data->resource_set);
@@ -1652,6 +1665,9 @@ static iree_status_t iree_hal_hip_device_execute_now(
   const iree_hal_hip_dynamic_symbols_t* symbols = data->device->hip_symbols;
 
   if (iree_status_is_ok(status)) {
+    for (iree_host_size_t i = 0; i < data->signal_semaphore_list.count; ++i) {
+      iree_hal_resource_retain(data->signal_semaphore_list.semaphores[i]);
+    }
     status = iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
         data->device, data->signal_semaphore_list, device_ordinal,
         iree_hal_hip_device_complete_submission, data);
