@@ -56,7 +56,7 @@ using llvm::dbgs;
 using namespace mlir;
 using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::IREE;
-using TileSwizzle = mlir::iree_compiler::IREE::Codegen::TileSwizzle;
+using mlir::iree_compiler::IREE::Codegen::TileSwizzle;
 
 iree_compiler::IREE::transform_dialect::LLVMGPUExtensions::LLVMGPUExtensions() {
   // CreateAsyncGroupsOp depends on the following two dialects.

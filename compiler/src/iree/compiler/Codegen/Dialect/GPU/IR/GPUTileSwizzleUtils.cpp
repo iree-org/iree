@@ -10,7 +10,7 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-using TileSwizzle = ::mlir::iree_compiler::IREE::Codegen::TileSwizzle;
+using ::mlir::iree_compiler::IREE::Codegen::TileSwizzle;
 using Kind = TileSwizzle::Dim::Kind;
 
 // Returns the index of the first destination dimension corresponding to the
