@@ -433,36 +433,34 @@ SmallVector<Value>
 NestedLayoutAttr::computeThreadIds(Value threadId, int64_t subgroupSize,
                                    RewriterBase &rewriter) const {
   SmallVector<Value> virtualTids;
-
   Location loc = threadId.getLoc();
 
-  AffineExpr tidExpr, size, stride;
-  bindDims(rewriter.getContext(), tidExpr);
-  bindSymbols(rewriter.getContext(), size, stride);
-
-  // (tid floordiv stride) mod size
-  AffineMap threadTidMap =
-      AffineMap::get(/*dims=*/1, /*syms=*/2, tidExpr.floorDiv(stride) % size);
-
-  // (tid floordiv (stride * subgroup_size)) mod size
-  AffineMap subgroupTidMap = AffineMap::get(
-      /*dims=*/1, /*syms=*/2, tidExpr.floorDiv(stride * subgroupSize) % size);
+  OpFoldResult outerBound =
+      rewriter.createOrFold<arith::ConstantOp>(loc, rewriter.getIndexAttr(0));
+  OpFoldResult subgroupSizeVal = rewriter.createOrFold<arith::ConstantOp>(
+      loc, rewriter.getIndexAttr(subgroupSize));
 
   for (auto [dimSize, dimStride] :
        llvm::zip_equal(getSubgroupTile(), getSubgroupStrides())) {
     // Dimension is not distributed.
     if (dimStride == 0) {
-      virtualTids.push_back(rewriter.create<arith::ConstantOp>(
-          loc, rewriter.getIndexAttr(dimStride)));
+      virtualTids.push_back(
+          rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(0)));
       continue;
     }
 
-    auto sizeVal =
-        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(dimSize));
-    auto strideVal = rewriter.create<arith::ConstantOp>(
+    OpFoldResult sizeVal = rewriter.createOrFold<arith::ConstantOp>(
+        loc, rewriter.getIndexAttr(dimSize));
+    OpFoldResult strideVal = rewriter.createOrFold<arith::ConstantOp>(
         loc, rewriter.getIndexAttr(dimStride));
-    virtualTids.push_back(rewriter.create<affine::AffineApplyOp>(
-        loc, subgroupTidMap, ValueRange{threadId, sizeVal, strideVal}));
+
+    virtualTids.push_back(
+        rewriter
+            .create<affine::AffineDelinearizeIndexOp>(
+                loc, threadId,
+                ArrayRef<OpFoldResult>{outerBound, sizeVal, strideVal,
+                                       subgroupSizeVal})
+            .getResult(1));
   }
 
   for (auto [dimSize, dimStride] :
@@ -474,12 +472,17 @@ NestedLayoutAttr::computeThreadIds(Value threadId, int64_t subgroupSize,
       continue;
     }
 
-    auto sizeVal =
-        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(dimSize));
-    auto strideVal = rewriter.create<arith::ConstantOp>(
+    OpFoldResult sizeVal = rewriter.createOrFold<arith::ConstantOp>(
+        loc, rewriter.getIndexAttr(dimSize));
+    OpFoldResult strideVal = rewriter.createOrFold<arith::ConstantOp>(
         loc, rewriter.getIndexAttr(dimStride));
-    virtualTids.push_back(rewriter.create<affine::AffineApplyOp>(
-        loc, threadTidMap, ValueRange{threadId, sizeVal, strideVal}));
+
+    virtualTids.push_back(
+        rewriter
+            .create<affine::AffineDelinearizeIndexOp>(
+                loc, threadId,
+                ArrayRef<OpFoldResult>{outerBound, sizeVal, strideVal})
+            .getResult(1));
   }
 
   return virtualTids;
