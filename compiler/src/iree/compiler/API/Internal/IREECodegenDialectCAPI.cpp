@@ -155,7 +155,7 @@ ireeCodegenCompilationInfoAttrGetParameters(MlirAttribute attr) {
 
 void ireeCodegenGetExecutableVariantOps(MlirModule module, size_t *numOps,
                                         MlirOperation *executableOps) {
-  assert(module.ptr && "module cannot be nullptr");
+  assert(!mlirModuleIsNull(module) && "module cannot be nullptr");
   assert(numOps && "numOps cannot be nullptr");
 
   mlir::ModuleOp moduleOp = unwrap(module);

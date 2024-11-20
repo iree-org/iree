@@ -21,19 +21,18 @@ static const char *kGpuModuleImportPath =
 namespace py = pybind11;
 using namespace mlir::python::adaptors;
 
-std::vector<MlirOperation>
+static std::vector<MlirOperation>
 ireeCodegenGetExecutableVariantOpsBinding(MlirModule module) {
   size_t numOps = 0;
   ireeCodegenGetExecutableVariantOps(module, &numOps, nullptr);
-
   std::vector<MlirOperation> ops(numOps);
-
   ireeCodegenGetExecutableVariantOps(module, &numOps, ops.data());
 
   return ops;
 }
 
-std::vector<py::object> ireeCodegenQueryMMAIntrinsicsBinding(MlirOperation op) {
+static std::vector<py::object>
+ireeCodegenQueryMMAIntrinsicsBinding(MlirOperation op) {
   size_t numMMAs = 0;
   ireeCodegenQueryMMAIntrinsics(op, &numMMAs, nullptr);
   std::vector<uint32_t> mmaIntrinsics(numMMAs);
@@ -42,8 +41,10 @@ std::vector<py::object> ireeCodegenQueryMMAIntrinsicsBinding(MlirOperation op) {
   py::object mmaIntrinsicEnum =
       py::module_::import(kGpuModuleImportPath).attr("MMAIntrinsic");
   std::vector<py::object> mmaList(numMMAs);
-  std::transform(mmaIntrinsics.begin(), mmaIntrinsics.end(), mmaList.begin(),
-                 [&](uint32_t rawValue) { return mmaIntrinsicEnum(rawValue); });
+  for (size_t i = 0; i < numMMAs; ++i) {
+    mmaList[i] = mmaIntrinsicEnum(mmaIntrinsics[i]);
+  }
+
   return mmaList;
 }
 
