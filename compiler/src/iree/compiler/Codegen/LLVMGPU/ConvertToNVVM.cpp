@@ -148,6 +148,7 @@ struct ConvertToNVVMPass final
       populateFinalizeMemRefToLLVMConversionPatterns(converter, llvmPatterns);
       populateFuncToLLVMConversionPatterns(converter, llvmPatterns);
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
+      arith::populateCeilFloorDivExpandOpsPatterns(llvmPatterns);
       arith::populateArithToLLVMConversionPatterns(converter, llvmPatterns);
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
       populateGpuToNVVMConversionPatterns(converter, llvmPatterns);
