@@ -57,7 +57,7 @@ iree_status_t iree_hal_hip_util_queue_push_back(
       if (num_wrapped_elements) {
         memcpy(
             new_mem + (queue->head + num_head_elements) * queue->element_size,
-            new_mem, num_wrapped_elements * num_wrapped_elements);
+            new_mem, num_wrapped_elements * queue->element_size);
       }
     }
     queue->elements = new_mem;
