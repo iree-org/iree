@@ -117,3 +117,39 @@ func.func @dequant_avgpool(%arg0: tensor<1x320x65x65xi8>) -> tensor<1x320x1x1xf3
 // CHECK-REDUCTION:               }
 // CHECK-REDUCTION:             }
 // CHECK-REDUCTION:           }
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+#translation = #iree_codegen.translation_info<pipeline = Mmt4dTilingExpert>
+module {
+// Silently bail in case of no root op instead of a crash or failure.
+  func.func @silently_bail_no_root_op() attributes {translation_info = #translation} {
+    %c1794_i32 = arith.constant 1794 : i32
+    %c2_i32 = arith.constant 2 : i32
+    %c4_i32 = arith.constant 4 : i32
+    %c1_i32 = arith.constant 1 : i32
+    %c2 = arith.constant 2 : index
+    %c1 = arith.constant 1 : index
+    %c0 = arith.constant 0 : index
+    %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+    %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
+    %2 = arith.index_castui %0 : i32 to index
+    %3 = arith.index_castui %1 : i32 to index
+    %4:2 = util.assume.int
+        %2[<umin = 0, umax = 0>, <umin = 64, umax = 64, udiv = 64>],
+        %3[<umin = 64, umax = 64, udiv = 64>, <umin = 128, umax = 128, udiv = 128>]
+      : index, index
+    %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%4#0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<1x2x1x2xi8>>
+    %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<1x2x4x2xi8>>
+    %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%4#1) flags(Indirect) : !flow.dispatch.tensor<readwrite:tensor<1x1x1x4xi32>>
+    %8 = flow.dispatch.tensor.load %5, offsets = [0, 0, 0, 0], sizes = [1, 2, 1, 2], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x2x1x2xi8>> -> tensor<1x2x1x2xi8>
+    %9 = flow.dispatch.tensor.load %6, offsets = [0, 0, 0, 0], sizes = [1, 2, 4, 2], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x2x4x2xi8>> -> tensor<1x2x4x2xi8>
+    %10 = flow.dispatch.tensor.load %7, offsets = [0, 0, 0, 0], sizes = [1, 1, 1, 4], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readwrite:tensor<1x1x1x4xi32>> -> tensor<1x1x1x4xi32>
+    %11:2 = iree_codegen.ukernel.generic "iree_uk_mmt4d" ins(%8, %9 : tensor<1x2x1x2xi8>, tensor<1x2x4x2xi8>) outs(%10 : tensor<1x1x1x4xi32>) (%c1, %c1, %c2, %c1_i32, %c4_i32, %c2_i32, %c1794_i32 : index, index, index, i32, i32, i32, i32) fn_def_attrs {hal.import.bitcode = true, hal.import.fields = ["processor_data"]} strided_outer_dims(1) -> tensor<1x1x1x4xi32>, i32
+    flow.dispatch.tensor.store %11#0, %7, offsets = [0, 0, 0, 0], sizes = [1, 1, 1, 4], strides = [1, 1, 1, 1] : tensor<1x1x1x4xi32> -> !flow.dispatch.tensor<readwrite:tensor<1x1x1x4xi32>>
+    return
+  }
+}
+
+// CHECK-REDUCTION-LABEL:   func.func @silently_bail_no_root_op(
