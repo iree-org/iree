@@ -2,8 +2,8 @@
 
 // We want to check that uKernel is indeed generated from e2e workflow.
 
-// CHECK: llvm.func @iree_uk_amdgpu_argmax_F32I64
-// CHECK: llvm.call @iree_uk_amdgpu_argmax_F32I64
+// CHECK: llvm.func @iree_uk_amdgpu_argmax_f32i64
+// CHECK: llvm.call @iree_uk_amdgpu_argmax_f32i64
 func.func @argmax_1d_f32i64(%arg0: tensor<1x?xf32>) -> tensor<1x1xi64> {
   %c0 = arith.constant 0 : index
   %c0_i64 = arith.constant 0 : i64
@@ -29,8 +29,8 @@ func.func @argmax_1d_f32i64(%arg0: tensor<1x?xf32>) -> tensor<1x1xi64> {
 
 // -----
 
-// CHECK: llvm.func @iree_uk_amdgpu_argmax_F16I64
-// CHECK: llvm.call @iree_uk_amdgpu_argmax_F16I64
+// CHECK: llvm.func @iree_uk_amdgpu_argmax_f16i64
+// CHECK: llvm.call @iree_uk_amdgpu_argmax_f16i64
 func.func @argmax_1d_f16i64(%arg0: tensor<1x?xf16>) -> tensor<1x1xi64> {
   %c0 = arith.constant 0 : index
   %c0_i64 = arith.constant 0 : i64
@@ -57,8 +57,8 @@ func.func @argmax_1d_f16i64(%arg0: tensor<1x?xf16>) -> tensor<1x1xi64> {
 
 // -----
 
-// CHECK: llvm.func @iree_uk_amdgpu_argmax_F32I64
-// CHECK: llvm.call @iree_uk_amdgpu_argmax_F32I64
+// CHECK: llvm.func @iree_uk_amdgpu_argmax_f32i64
+// CHECK: llvm.call @iree_uk_amdgpu_argmax_f32i64
 func.func @argmax_2d_f32i64(%arg0: tensor<16x?xf32>) -> tensor<16x1xi64> {
   %c0 = arith.constant 0 : index
   %c0_i64 = arith.constant 0 : i64
@@ -84,8 +84,8 @@ func.func @argmax_2d_f32i64(%arg0: tensor<16x?xf32>) -> tensor<16x1xi64> {
 
 // -----
 
-// CHECK: llvm.func @iree_uk_amdgpu_argmax_F32I32
-// CHECK: llvm.call @iree_uk_amdgpu_argmax_F32I32
+// CHECK: llvm.func @iree_uk_amdgpu_argmax_f32i32
+// CHECK: llvm.call @iree_uk_amdgpu_argmax_f32i32
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func.func @argmax_3d_dyn_f32i32(%arg0: tensor<?x?x?xf32>) -> tensor<?x?xf32> {
@@ -115,8 +115,8 @@ func.func @argmax_3d_dyn_f32i32(%arg0: tensor<?x?x?xf32>) -> tensor<?x?xf32> {
 
 // -----
 
-// CHECK: llvm.func @iree_uk_amdgpu_argmax_F32I64
-// CHECK: llvm.call @iree_uk_amdgpu_argmax_F32I64
+// CHECK: llvm.func @iree_uk_amdgpu_argmax_f32i64
+// CHECK: llvm.call @iree_uk_amdgpu_argmax_f32i64
 func.func @argmax_3d_dyn_f32i64(%arg0: tensor<?x?x?xf32>) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c0_i64 = arith.constant 0 : i64
@@ -144,8 +144,8 @@ func.func @argmax_3d_dyn_f32i64(%arg0: tensor<?x?x?xf32>) -> tensor<?x?xf32> {
 
 // -----
 
-// CHECK: llvm.func @iree_uk_amdgpu_argmax_F16I32
-// CHECK: llvm.call @iree_uk_amdgpu_argmax_F16I32
+// CHECK: llvm.func @iree_uk_amdgpu_argmax_f16i32
+// CHECK: llvm.call @iree_uk_amdgpu_argmax_f16i32
 func.func @argmax_3d_dyn_f16i32(%arg0: tensor<?x?x?xf16>) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c0_i32 = arith.constant 0 : i32
@@ -173,8 +173,8 @@ func.func @argmax_3d_dyn_f16i32(%arg0: tensor<?x?x?xf16>) -> tensor<?x?xf32> {
 
 // -----
 
-// CHECK: llvm.func @iree_uk_amdgpu_argmax_F16I64
-// CHECK: llvm.call @iree_uk_amdgpu_argmax_F16I64
+// CHECK: llvm.func @iree_uk_amdgpu_argmax_f16i64
+// CHECK: llvm.call @iree_uk_amdgpu_argmax_f16i64
 func.func @argmax_3d_dyn_f16i64(%arg0: tensor<?x?x?xf16>) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c0_i64 = arith.constant 0 : i64

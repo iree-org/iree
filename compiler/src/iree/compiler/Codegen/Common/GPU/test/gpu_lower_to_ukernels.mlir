@@ -28,7 +28,7 @@ func.func @argmax_2d_f32i64(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes
 //  CHECK-DAG:   %[[C1_index:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[C0_i64:.+]] = arith.constant 0
 //  CHECK-DAG:   %[[FILL:.+]] = linalg.fill ins(%[[C0_i64]]
-//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "iree_uk_amdgpu_argmax_F32I64"
+//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "iree_uk_amdgpu_argmax_f32i64"
 // CHECK-SAME:       ins(%[[ARG0]] :
 // CHECK-SAME:       outs(%[[FILL]] :
 //      CHECK:   return %[[MICRO_KERNEL]]

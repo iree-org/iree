@@ -95,16 +95,12 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
     return failure();
   }
 
-  std::string typeSuffixID = "";
-  if (inputElemType.isF16() && indexElemType.isInteger(32)) {
-    typeSuffixID = "F16I32";
-  } else if (inputElemType.isF16() && indexElemType.isInteger(64)) {
-    typeSuffixID = "F16I64";
-  } else if (inputElemType.isF32() && indexElemType.isInteger(32)) {
-    typeSuffixID = "F32I32";
-  } else if (inputElemType.isF32() && indexElemType.isInteger(64)) {
-    typeSuffixID = "F32I64";
-  } else {
+  std::string typeSuffixID;
+  llvm::raw_string_ostream(typeSuffixID) << inputElemType << indexElemType;
+  // TODO(bjacob): this check won't be needed one this code will be updated to
+  // look up the table of contents of embedded bitcode files, one per symbol.
+  if (!(typeSuffixID == "f16i32" || typeSuffixID == "f16i64" ||
+        typeSuffixID == "f32i32" || typeSuffixID == "f32i64")) {
     return rewriter.notifyMatchFailure(
         op, "unsupported combination of element types");
   }

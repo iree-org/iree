@@ -13,7 +13,7 @@ only use single subgroup/warp per workgroup. This constraint is also set during
 tiling phase in KernelConfig.
 */
 
-void iree_uk_amdgpu_argmax_F32I32(const float *inputBuffer,
+void iree_uk_amdgpu_argmax_f32i32(const float *inputBuffer,
                                   int64_t input_offset, int32_t *outputBuffer,
                                   int64_t output_offset,
                                   int64_t reductionSize) {
@@ -60,7 +60,7 @@ void iree_uk_amdgpu_argmax_F32I32(const float *inputBuffer,
     outputBuffer[output_offset] = laneResult;
 }
 
-void iree_uk_amdgpu_argmax_F32I64(const float *inputBuffer,
+void iree_uk_amdgpu_argmax_f32i64(const float *inputBuffer,
                                   int64_t input_offset, int64_t *outputBuffer,
                                   int64_t output_offset,
                                   int64_t reductionSize) {
@@ -107,7 +107,7 @@ void iree_uk_amdgpu_argmax_F32I64(const float *inputBuffer,
     outputBuffer[output_offset] = laneResult;
 }
 
-void iree_uk_amdgpu_argmax_F16I32(const _Float16 *inputBuffer,
+void iree_uk_amdgpu_argmax_f16i32(const _Float16 *inputBuffer,
                                   int64_t input_offset, int32_t *outputBuffer,
                                   int64_t output_offset,
                                   int64_t reductionSize) {
@@ -149,7 +149,7 @@ void iree_uk_amdgpu_argmax_F16I32(const _Float16 *inputBuffer,
     outputBuffer[output_offset] = laneResult;
 }
 
-void iree_uk_amdgpu_argmax_F16I64(const _Float16 *inputBuffer,
+void iree_uk_amdgpu_argmax_f16i64(const _Float16 *inputBuffer,
                                   int64_t input_offset, int64_t *outputBuffer,
                                   int64_t output_offset,
                                   int64_t reductionSize) {
