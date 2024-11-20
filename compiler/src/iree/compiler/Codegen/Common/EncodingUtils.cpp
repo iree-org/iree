@@ -199,8 +199,8 @@ bool isNarrowNResult(EncodingAttr encoding) {
   return IREE::Encoding::getMatmulNarrowDim(encoding).isN();
 }
 
-SmallVector<int64_t>
-getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape) {
+SmallVector<int64_t> getExpandedTileShape(
+    const IREE::Codegen::TileSwizzle::ExpandShapeType &expandShape) {
   SmallVector<int64_t> result;
   for (auto e : expandShape) {
     for (auto d : e) {

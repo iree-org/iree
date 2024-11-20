@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_
 #define IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_
 
-#include "iree/compiler/Codegen/Common/TileSwizzle.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -25,7 +25,7 @@ struct MaterializeEncodingInfo {
   SmallVector<int64_t> outerDimsPerm;
 
   // The optional swizzle, see the comment on TileSwizzle. Only used on GPU.
-  std::optional<TileSwizzle> swizzle;
+  std::optional<IREE::Codegen::TileSwizzle> swizzle;
 };
 
 using MaterializeEncodingFn = std::function<FailureOr<MaterializeEncodingInfo>(
@@ -143,8 +143,8 @@ void populateShapeIndependentMaterializeEncodingPatterns(
 bool isNarrowNResult(IREE::Encoding::EncodingAttr encoding);
 
 /// Concatenates the vectors.
-SmallVector<int64_t>
-getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape);
+SmallVector<int64_t> getExpandedTileShape(
+    const IREE::Codegen::TileSwizzle::ExpandShapeType &expandShape);
 
 } // namespace mlir::iree_compiler
 

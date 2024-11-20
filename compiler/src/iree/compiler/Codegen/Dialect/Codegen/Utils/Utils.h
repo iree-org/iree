@@ -4,14 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_TILESWIZZLE_H_
-#define IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_TILESWIZZLE_H_
+#ifndef IREE_COMPILER__CODEGEN_DIALECT_CODEGEN_UTILS_H_
+#define IREE_COMPILER__CODEGEN_DIALECT_CODEGEN_UTILS_H_
 
 #include <cstdint>
+#include "llvm-c/TargetMachine.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 
-namespace mlir::iree_compiler {
+namespace mlir::iree_compiler::IREE::Codegen {
 
 // Metadata for a swizzle, that is, an (expand_shape -> transposition)
 // pair of ops performing a change of layout within the tiles. This is used
@@ -80,6 +81,6 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, TileSwizzle::Dim dim);
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const TileSwizzle &swizzle);
 
-} // namespace mlir::iree_compiler
+} // namespace mlir::iree_compiler::IREE::Codegen
 
-#endif // IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_TILESWIZZLE_H_
+#endif // IREE_COMPILER__CODEGEN_DIALECT_CODEGEN_UTILS_H_

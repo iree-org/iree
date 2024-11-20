@@ -4,10 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/TileSwizzle.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 
-namespace mlir::iree_compiler {
+namespace mlir::iree_compiler::IREE::Codegen {
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               TileSwizzle::Dim::Kind kind) {
@@ -47,4 +47,4 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-} // namespace mlir::iree_compiler
+} // namespace mlir::iree_compiler::IREE::Codegen

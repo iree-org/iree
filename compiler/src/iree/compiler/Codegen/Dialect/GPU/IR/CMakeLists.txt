@@ -63,8 +63,8 @@ iree_cc_library(
     MLIRTilingInterface
     MLIRVectorDialect
     MLIRVectorInterfaces
-    iree::compiler::Codegen::Common::TileSwizzle
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::Utils
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Utils::VectorOpUtils
     iree::compiler::Dialect::LinalgExt::IR
