@@ -990,6 +990,19 @@ struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
     return lens;
   }
 
+  // This is a helper to extract strides from a given shape
+  // E.g. : a shape of 2x3x4 will return strides [12, 4, 1]
+  SmallVector<int64_t> getStrides(ArrayRef<int64_t> shape) const {
+    int64_t elementCount = ShapedType::getNumElements(shape);
+    SmallVector<int64_t> strides;
+    int64_t currStride = elementCount;
+    for (int64_t len : shape) {
+      currStride = currStride / len;
+      strides.push_back(currStride);
+    }
+    return strides;
+  }
+
   // Once we are in the realm of remaining dimensions,
   // the strides are not packed. This is a helper to
   // obtain the packed strides of the remaining dimensions.
@@ -997,14 +1010,7 @@ struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
   //  getRemainingDims)
   SmallVector<int64_t> getPackedStrides(ArrayRef<DimInfo> dims) const {
     SmallVector<int64_t> lens = getLens(dims);
-    int64_t elementCount = ShapedType::getNumElements(lens);
-    SmallVector<int64_t> packedStrides;
-    int64_t currStride = elementCount;
-    for (int64_t len : lens) {
-      currStride = currStride / len;
-      packedStrides.push_back(currStride);
-    }
-    return packedStrides;
+    return getStrides(lens);
   }
 
   // This function emulates the slicing of otherwise large constant
@@ -1091,9 +1097,14 @@ struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
     SmallVector<Value> subgroupIndices, threadIndices;
     populateWarpAndThreadIndices(rewriter, threadId, subgroupSize, resultLayout,
                                  subgroupIndices, threadIndices);
-    ArrayRef<int64_t> subgroupStrides = resultLayout.getSubgroupStrides();
+
+    SmallVector<int64_t> undistributedShape =
+        resultLayout.getUndistributedPackedShape();
+    SmallVector<int64_t> undistributedStrides = getStrides(undistributedShape);
+    constexpr int64_t subgroupIdx = 0;
+    constexpr int64_t threadIdx = 3;
+
     ArrayRef<int64_t> subgroupLengths = resultLayout.getSubgroupTile();
-    ArrayRef<int64_t> threadStrides = resultLayout.getThreadStrides();
     ArrayRef<int64_t> threadLengths = resultLayout.getThreadTile();
     // Step op by definition should be single dimensional.
     SmallVector<int64_t> distributedShape =
@@ -1102,8 +1113,9 @@ struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
     int64_t distributedElements = ShapedType::getNumElements(distributedShape);
     int64_t originalElements = result.getType().getNumElements();
     SmallVector<DimInfo, 2> distributedDims{
-        {subgroupIndices[0], subgroupLengths[0], subgroupStrides[0]},
-        {threadIndices[0], threadLengths[0], threadStrides[0]}};
+        {subgroupIndices[0], subgroupLengths[0],
+         undistributedStrides[subgroupIdx]},
+        {threadIndices[0], threadLengths[0], undistributedStrides[threadIdx]}};
     llvm::sort(distributedDims, [](const DimInfo &lhs, const DimInfo &rhs) {
       return lhs.dimStride > rhs.dimStride;
     });

@@ -292,6 +292,9 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     // Returns the subgroup/lane ids delinearized from a single linearized
     // thread ID.
     SmallVector<Value> computeThreadIds(Value threadId, int64_t subgroupSize, RewriterBase &rewriter) const;
+
+    // Get the undistributed shape that is subgroup x batch x outer x thread x element
+    SmallVector<int64_t> getUndistributedPackedShape() const;
   }];
 
   let genVerifyDecl = 1;

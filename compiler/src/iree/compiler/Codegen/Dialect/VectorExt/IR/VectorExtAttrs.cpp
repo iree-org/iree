@@ -311,6 +311,20 @@ SmallVector<int64_t> NestedLayoutAttr::getDistributedShape() const {
   return shape;
 }
 
+/// Before we distribute, we would like to see this as:
+/// <SUBGROUP x BATCH x OUTER x THREAD x ELEMENT>
+SmallVector<int64_t> NestedLayoutAttr::getUndistributedPackedShape() const {
+  SmallVector<int64_t> shape;
+  int64_t rank = getRank();
+  shape.reserve(rank * 5);
+  shape.append(getSubgroupTile().begin(), getSubgroupTile().end());
+  shape.append(getBatchTile().begin(), getBatchTile().end());
+  shape.append(getOuterTile().begin(), getOuterTile().end());
+  shape.append(getThreadTile().begin(), getThreadTile().end());
+  shape.append(getElementTile().begin(), getElementTile().end());
+  return shape;
+}
+
 // Gets the rank of the undistributed vector for this layout.
 int64_t NestedLayoutAttr::getRank() const {
   // The layout requires that all size lists are the same length and match
