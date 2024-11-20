@@ -1310,21 +1310,25 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
       return status;
     }
 
-    for (iree_host_size_t i = 0;
-         i < wait_semaphore_list.count && iree_status_is_ok(status); ++i) {
-      status = iree_hal_hip_semaphore_notify_work(
-          wait_semaphore_list.semaphores[i],
-          wait_semaphore_list.payload_values[i],
-          device->topology.devices[device_ordinal].device_event_pool,
-          &iree_hal_hip_device_semaphore_buffer_operation_callback,
-          callback_data);
+    if (iree_status_is_ok(status)) {
+      for (iree_host_size_t i = 0;
+           i < wait_semaphore_list.count && iree_status_is_ok(status); ++i) {
+        status = iree_status_join(
+            status,
+            iree_hal_hip_semaphore_notify_work(
+                wait_semaphore_list.semaphores[i],
+                wait_semaphore_list.payload_values[i],
+                device->topology.devices[device_ordinal].device_event_pool,
+                &iree_hal_hip_device_semaphore_buffer_operation_callback,
+                callback_data));
+      }
+    } else {
+      iree_allocator_free(device->host_allocator, callback_data);
     }
+
     if (iree_status_is_ok(status)) {
       *out_buffer = buffer;
     } else {
-      if (callback_data) {
-        iree_allocator_free(device->host_allocator, callback_data);
-      }
       if (buffer) {
         iree_hal_hip_buffer_set_allocation_empty(buffer);
         iree_hal_resource_release(&buffer->resource);
@@ -1400,16 +1404,18 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
       return status;
     }
 
-    for (iree_host_size_t i = 0;
-         i < wait_semaphore_list.count && iree_status_is_ok(status); ++i) {
-      status = iree_hal_hip_semaphore_notify_work(
-          wait_semaphore_list.semaphores[i],
-          wait_semaphore_list.payload_values[i],
-          device->topology.devices[device_ordinal].device_event_pool,
-          &iree_hal_hip_device_semaphore_buffer_operation_callback,
-          callback_data);
-    }
-    if (!iree_status_is_ok(status)) {
+    if (iree_status_is_ok(status)) {
+      for (iree_host_size_t i = 0; i < wait_semaphore_list.count; ++i) {
+        status = iree_status_join(
+            status,
+            iree_hal_hip_semaphore_notify_work(
+                wait_semaphore_list.semaphores[i],
+                wait_semaphore_list.payload_values[i],
+                device->topology.devices[device_ordinal].device_event_pool,
+                &iree_hal_hip_device_semaphore_buffer_operation_callback,
+                callback_data));
+      }
+    } else {
       iree_allocator_free(device->host_allocator, callback_data);
     }
     IREE_TRACE_ZONE_END(z0);
@@ -1854,15 +1860,17 @@ static iree_status_t iree_hal_hip_device_queue_execute(
     }
   }
 
-  for (iree_host_size_t i = 0;
-       i < wait_semaphore_list.count && iree_status_is_ok(status); ++i) {
-    status = iree_hal_hip_semaphore_notify_work(
-        wait_semaphore_list.semaphores[i],
-        wait_semaphore_list.payload_values[i],
-        device->topology.devices[device_ordinal].device_event_pool,
-        &iree_hal_hip_device_semaphore_submit_callback, callback_data);
-  }
-  if (!iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status)) {
+    for (iree_host_size_t i = 0; i < wait_semaphore_list.count; ++i) {
+      status = iree_status_join(
+          status,
+          iree_hal_hip_semaphore_notify_work(
+              wait_semaphore_list.semaphores[i],
+              wait_semaphore_list.payload_values[i],
+              device->topology.devices[device_ordinal].device_event_pool,
+              &iree_hal_hip_device_semaphore_submit_callback, callback_data));
+    }
+  } else {
     iree_allocator_free(device->host_allocator, callback_data);
   }
   IREE_TRACE_ZONE_END(z0);

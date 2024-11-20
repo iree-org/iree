@@ -394,13 +394,10 @@ iree_status_t iree_hal_hip_semaphore_notify_work(
       iree_hal_hip_semaphore_cast(base_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_slim_mutex_lock(&semaphore->mutex);
-  iree_status_t status = semaphore->failure_status;
-  if (!iree_status_is_ok(status)) {
-    iree_slim_mutex_unlock(&semaphore->mutex);
-    IREE_TRACE_ZONE_END(z0);
-    return iree_status_clone(status);
-  }
-  if (value > semaphore->max_value_to_be_signaled) {
+  iree_status_t status = iree_status_clone(semaphore->failure_status);
+
+  if (iree_status_is_ok(status) &&
+      value > semaphore->max_value_to_be_signaled) {
     iree_hal_hip_util_tree_node_t* node =
         iree_hal_hip_util_tree_get(&semaphore->event_queue.tree, value);
     if (node == NULL) {
@@ -433,9 +430,10 @@ iree_status_t iree_hal_hip_semaphore_notify_work(
   }
   iree_slim_mutex_unlock(&semaphore->mutex);
 
-  // If this semaphore requirement has already been satisfied, then
-  // we can just run the callback right now.
-  if (iree_status_is_ok(status) && callback) {
+  // If this semaphore requirement has already been satisfied,
+  // of if this semaphore has failed then we can just run the callback right
+  // now.
+  if (callback) {
     status = callback(user_data, base_semaphore, status);
   }
   IREE_TRACE_ZONE_END(z0);
@@ -533,38 +531,40 @@ iree_status_t iree_hal_hip_semaphore_get_hip_event(
       }
     }
 
-    iree_hal_hip_event_t* event =
-        ((iree_hal_hip_semaphore_queue_item_t*)
-             iree_hal_hip_util_tree_node_get_value(node))
-            ->event;
-    if (!event && create_if_necessary) {
-      status = iree_hal_hip_event_pool_acquire(
-          event_pool, 1,
-          &((iree_hal_hip_semaphore_queue_item_t*)
-                iree_hal_hip_util_tree_node_get_value(node))
-               ->event);
-      if (iree_status_is_ok(status)) {
-        event = ((iree_hal_hip_semaphore_queue_item_t*)
-                     iree_hal_hip_util_tree_node_get_value(node))
-                    ->event;
-      }
-    } else if (!event) {
-      do {
-        node = iree_hal_hip_util_tree_node_next(node);
-        if (!node) {
-          status = iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                                    "there was no event that could be valid");
-          break;
+    if (iree_status_is_ok(status)) {
+      iree_hal_hip_event_t* event =
+          ((iree_hal_hip_semaphore_queue_item_t*)
+               iree_hal_hip_util_tree_node_get_value(node))
+              ->event;
+      if (!event && create_if_necessary) {
+        status = iree_hal_hip_event_pool_acquire(
+            event_pool, 1,
+            &((iree_hal_hip_semaphore_queue_item_t*)
+                  iree_hal_hip_util_tree_node_get_value(node))
+                 ->event);
+        if (iree_status_is_ok(status)) {
+          event = ((iree_hal_hip_semaphore_queue_item_t*)
+                       iree_hal_hip_util_tree_node_get_value(node))
+                      ->event;
         }
-        event = ((iree_hal_hip_semaphore_queue_item_t*)
-                     iree_hal_hip_util_tree_node_get_value(node))
-                    ->event;
-      } while (!event);
+      } else if (!event) {
+        do {
+          node = iree_hal_hip_util_tree_node_next(node);
+          if (!node) {
+            status = iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                                      "there was no event that could be valid");
+            break;
+          }
+          event = ((iree_hal_hip_semaphore_queue_item_t*)
+                       iree_hal_hip_util_tree_node_get_value(node))
+                      ->event;
+        } while (!event);
+      }
+      if (event) {
+        iree_hal_hip_event_retain(event);
+      }
+      *out_hip_event = event;
     }
-    if (event) {
-      iree_hal_hip_event_retain(event);
-    }
-    *out_hip_event = event;
   }
   iree_slim_mutex_unlock(&semaphore->mutex);
 
