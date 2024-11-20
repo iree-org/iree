@@ -39,7 +39,7 @@ getFnNameAndDefAttrs(const char *ukernelName, std::string &typeSuffixID,
   FnNameAndDefAttrs result;
   if (isROCMBackend(targetAttr)) {
     result.name =
-        std::string("__iree_uk_rocm_") + ukernelName + "_" + typeSuffixID;
+        std::string("iree_uk_amdgpu_") + ukernelName + "_" + typeSuffixID;
     result.defAttrs.emplace_back(rewriter.getStringAttr("vm.import.module"),
                                  rewriter.getStringAttr("rocm"));
   }
