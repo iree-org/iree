@@ -39,6 +39,7 @@ def IREEEncoding_EncodingLayoutAttrInterface :
       ),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
         return {};
       }]
     >
