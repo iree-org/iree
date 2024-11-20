@@ -123,7 +123,7 @@ func.func @dequant_avgpool(%arg0: tensor<1x320x65x65xi8>) -> tensor<1x320x1x1xf3
 #pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 #translation = #iree_codegen.translation_info<pipeline = Mmt4dTilingExpert>
 module {
-// Silently bail in case of no root op instead of a crash or failure.
+// Silently bail in the case of no root op.
   func.func @silently_bail_no_root_op() attributes {translation_info = #translation} {
     %c1794_i32 = arith.constant 1794 : i32
     %c2_i32 = arith.constant 2 : i32
