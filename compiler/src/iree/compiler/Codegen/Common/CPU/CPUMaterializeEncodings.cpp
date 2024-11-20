@@ -30,6 +30,8 @@
 
 namespace mlir::iree_compiler {
 
+using IREE::Codegen::MaterializeEncodingInfo;
+
 #define GEN_PASS_DEF_CPUMATERIALIZEDEVICEENCODINGPASS
 #define GEN_PASS_DEF_CPUMATERIALIZEHOSTENCODINGPASS
 #include "iree/compiler/Codegen/Common/CPU/Passes.h.inc"

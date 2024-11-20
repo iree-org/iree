@@ -9,6 +9,10 @@
 
 namespace mlir::iree_compiler::IREE::Codegen {
 
+//===----------------------------------------------------------------------===//
+// Layout Structs.
+//===----------------------------------------------------------------------===//
+
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               TileSwizzle::Dim::Kind kind) {
   switch (kind) {
@@ -45,6 +49,21 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   llvm::interleaveComma(swizzle.permutation, os);
   os << "]}";
   return os;
+}
+
+//===----------------------------------------------------------------------===//
+// Layout Utilities.
+//===----------------------------------------------------------------------===//
+
+SmallVector<int64_t>
+getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape) {
+  SmallVector<int64_t> result;
+  for (auto e : expandShape) {
+    for (auto d : e) {
+      result.push_back(d.size);
+    }
+  }
+  return result;
 }
 
 } // namespace mlir::iree_compiler::IREE::Codegen

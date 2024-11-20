@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -17,6 +18,7 @@ namespace mlir::iree_compiler {
 using IREE::Encoding::EncodingAttr;
 using IREE::Encoding::getEncodingAttr;
 using IREE::Encoding::getEncodingContractionDims;
+using IREE::Codegen::MaterializeEncodingInfo;
 
 // If tensorType has the encoding of a matmul RESULT with narrow N, returns
 // the transposed type. Otherwise, just returns tensorType.
@@ -120,7 +122,7 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     SmallVector<int64_t> newShape(
         packedType.getShape().drop_back(encodingInfo.innerTileSizes.size()));
     SmallVector<int64_t> swizzledTileShape =
-        getExpandedTileShape(swizzle.expandShape);
+        IREE::Codegen::getExpandedTileShape(swizzle.expandShape);
     applyPermutationToVector(swizzledTileShape, swizzle.permutation);
     newShape.append(swizzledTileShape);
     return RankedTensorType::get(newShape, packedType.getElementType());
@@ -197,17 +199,6 @@ bool isNarrowNResult(EncodingAttr encoding) {
   }
 
   return IREE::Encoding::getMatmulNarrowDim(encoding).isN();
-}
-
-SmallVector<int64_t> getExpandedTileShape(
-    const IREE::Codegen::TileSwizzle::ExpandShapeType &expandShape) {
-  SmallVector<int64_t> result;
-  for (auto e : expandShape) {
-    for (auto d : e) {
-      result.push_back(d.size);
-    }
-  }
-  return result;
 }
 
 } // namespace mlir::iree_compiler

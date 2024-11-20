@@ -28,6 +28,8 @@
 
 namespace mlir::iree_compiler {
 
+using IREE::Codegen::MaterializeEncodingInfo;
+
 //===---------------------------------------------------------------------===//
 // Utility methods
 //===---------------------------------------------------------------------===//
@@ -48,7 +50,7 @@ getSwizzledShape(ArrayRef<OpFoldResult> packedShape,
 
   SmallVector<OpFoldResult> newShape(packedShape.take_front(srcRank));
   SmallVector<int64_t> expandedTileShape =
-      getExpandedTileShape(encodingInfo.swizzle->expandShape);
+      IREE::Codegen::getExpandedTileShape(encodingInfo.swizzle->expandShape);
   MLIRContext *ctx = packedShape[0].getContext();
   Builder b(ctx);
   for (int64_t d : expandedTileShape) {

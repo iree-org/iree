@@ -42,7 +42,8 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_GPUMATERIALIZEHOSTENCODINGPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
-using TileSwizzle = ::mlir::iree_compiler::IREE::Codegen::TileSwizzle;
+using IREE::Codegen::MaterializeEncodingInfo;
+using IREE::Codegen::TileSwizzle;
 
 static IREE::GPU::MMAAttr chooseIntrinsicMMAAttr(TypeRange eTypes,
                                                  IREE::GPU::TargetWgpAttr wgp) {
