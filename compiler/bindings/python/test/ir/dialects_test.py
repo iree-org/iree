@@ -232,3 +232,44 @@ def compilation_info():
     assert compilation_info is not None
     assert compilation_info.lowering_config == lowering_config
     assert compilation_info.translation_info == translation_info
+
+
+@run
+def test_query_mma():
+    test_module = ir.Module.parse(
+        """
+            #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
+            {iree.gpu.target = #iree_gpu.target<arch = "gfx942", features = "",
+            wgp = <compute = int32, storage =  b32,
+            subgroup = arithmetic, dot = dp4xi8toi32,
+            mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>],
+            subgroup_size_choices = [64], max_workgroup_sizes = [1024],
+            max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
+            max_workgroup_counts = [2147483647]>>}>
+            #pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
+            module {
+                hal.executable private @main {
+                    hal.executable.variant public @main target(#executable_target_rocm_hsaco_fb) {
+                    hal.executable.export public @entry_point layout(#pipeline_layout)
+                    builtin.module {
+                        func.func @fn() {
+                          return
+                        }
+                      }
+                    }
+                }
+            }
+        """
+    )
+
+    op_list = iree_codegen.get_executable_variant_ops(test_module)
+    assert len(op_list) == 1
+
+    variant_op = op_list[0]
+    op_name = ir.SymbolTable.get_symbol_name(variant_op).value
+    assert op_name == "main"
+
+    mma_list = iree_codegen.query_mma_intrinsics(variant_op)
+    assert len(mma_list) == 2
+    assert mma_list[0] == iree_gpu.MMAIntrinsic.MFMA_F32_16x16x4_F32
+    assert mma_list[1] == iree_gpu.MMAIntrinsic.MFMA_F32_16x16x16_F16

@@ -21,6 +21,38 @@ static const char *kGpuModuleImportPath =
 namespace py = pybind11;
 using namespace mlir::python::adaptors;
 
+py::list ireeCodegenGetExecutableVariantOpsBinding(MlirModule module) {
+  int numOps = 0;
+  ireeCodegenGetExecutableVariantOps(module, &numOps, nullptr);
+
+  std::vector<MlirOperation> ops(numOps);
+
+  ireeCodegenGetExecutableVariantOps(module, &numOps, ops.data());
+
+  py::list opsList;
+  for (int i = 0; i < numOps; ++i) {
+    opsList.append(ops[i]);
+  }
+
+  return opsList;
+}
+
+py::list ireeCodegenQueryMMAIntrinsicsBinding(MlirOperation op) {
+  int numMMAs = 0;
+  ireeCodegenQueryMMAIntrinsics(op, &numMMAs, nullptr);
+
+  std::vector<uint32_t> mmaIntrinsics(numMMAs);
+
+  ireeCodegenQueryMMAIntrinsics(op, &numMMAs, mmaIntrinsics.data());
+
+  py::list opsList;
+  for (int i = 0; i < numMMAs; ++i) {
+    opsList.append(mmaIntrinsics[i]);
+  }
+
+  return opsList;
+}
+
 PYBIND11_MODULE(_ireeCompilerDialects, m) {
   m.doc() = "iree-compiler dialects python extension";
 
@@ -326,4 +358,21 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
           "Gets an #iree_gpu.lowering_config from parameters.")
       .def_property_readonly("attributes",
                              ireeGPULoweringConfigAttrGetAttributes);
+
+  //===-------------------------------------------------------------------===//
+  // Binding to utility function getExecutableVariantOps
+  //===-------------------------------------------------------------------===//
+
+  iree_codegen_module.def(
+      "get_executable_variant_ops", &ireeCodegenGetExecutableVariantOpsBinding,
+      "Gets the executable variant operations from a module.",
+      py::arg("module"));
+
+  //===-------------------------------------------------------------------===//
+  // Binding to utility function queryMMAIntrinsics
+  //===-------------------------------------------------------------------===//
+
+  iree_codegen_module.def(
+      "query_mma_intrinsics", &ireeCodegenQueryMMAIntrinsicsBinding,
+      "Querys the mma intrinsics from a executable variant op.", py::arg("op"));
 }

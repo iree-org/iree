@@ -10,6 +10,7 @@
 #include <type_traits>
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/dialects/iree_codegen.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/IR.h"
@@ -148,4 +149,42 @@ ireeCodegenCompilationInfoAttrGetParameters(MlirAttribute attr) {
   parameters.loweringConfig = wrap(compilationInfo.getLoweringConfig());
   parameters.translationInfo = wrap(compilationInfo.getTranslationInfo());
   return parameters;
+}
+
+void ireeCodegenGetExecutableVariantOps(MlirModule module, int *num_ops,
+                                        MlirOperation *executableOps) {
+  mlir::ModuleOp moduleOp = unwrap(module);
+  llvm::SmallVector<mlir::iree_compiler::IREE::HAL::ExecutableVariantOp>
+      executableVariantOps =
+          mlir::iree_compiler::getExecutableVariantOps(moduleOp);
+
+  if (!executableOps) {
+    *num_ops = executableVariantOps.size();
+    return;
+  }
+
+  for (size_t i = 0; i < executableVariantOps.size(); i++) {
+    executableOps[i] = wrap(executableVariantOps[i]);
+  }
+}
+
+void ireeCodegenQueryMMAIntrinsics(MlirOperation op, int *num_intrinsics,
+                                   uint32_t *mma_intrinsics) {
+  mlir::Operation *mlirOp = unwrap(op);
+  auto variantOp =
+      llvm::dyn_cast<mlir::iree_compiler::IREE::HAL::ExecutableVariantOp>(
+          mlirOp);
+
+  assert(variantOp && "operation is not a ExecutableVariantOp");
+
+  llvm::SmallVector<mlir::iree_compiler::IREE::GPU::MMAIntrinsic>
+      mmaIntrinsics = mlir::iree_compiler::queryMMAIntrinsics(variantOp);
+  if (!mma_intrinsics) {
+    *num_intrinsics = mmaIntrinsics.size();
+    return;
+  }
+
+  for (size_t i = 0; i < mmaIntrinsics.size(); i++) {
+    mma_intrinsics[i] = static_cast<uint32_t>(mmaIntrinsics[i]);
+  }
 }
