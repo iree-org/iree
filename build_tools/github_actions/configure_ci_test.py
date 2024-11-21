@@ -251,8 +251,19 @@ key2: value2"""
 key: value line 1
   value line 2"""
         )
-        # Note: Discarding the multi-line part of the key.
+        # Note: Only using the first non-empty line of the trailer.
         self.assertDictEqual(trailer_map, {"key": "value line 1"})
+
+    def test_parse_trailer_map_multiline_trailer_skip_first(self):
+        trailer_map = configure_ci.parse_trailer_map_from_description(
+            """First line
+
+key:
+  value line 2
+  value line 3"""
+        )
+        # Note: Only using the first non-empty line of the trailer.
+        self.assertDictEqual(trailer_map, {"key": "value line 2"})
 
 
 if __name__ == "__main__":
