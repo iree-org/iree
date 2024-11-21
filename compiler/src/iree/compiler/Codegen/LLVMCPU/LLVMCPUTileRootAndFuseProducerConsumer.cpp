@@ -257,9 +257,8 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
   }
 
   if (!loweringConfig.hasTilingLevel(tilingLevel)) {
-    LLVM_DEBUG(
-        llvm::dbgs()
-        << "not able to find the lowering config with the tiling level\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "unable to find the lowering config with the tiling level\n");
     return;
   }
 

@@ -153,3 +153,4 @@ module {
 }
 
 // CHECK-REDUCTION-LABEL:   func.func @silently_bail_no_root_op(
+// CHECK-REDUCTION-NOT:       scf.for

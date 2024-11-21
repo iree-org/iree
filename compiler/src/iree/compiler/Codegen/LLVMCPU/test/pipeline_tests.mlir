@@ -366,10 +366,9 @@ func.func @unsupported_ukernel_fallback_to_vectorization() attributes {hal.execu
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#config = #iree_codegen.lowering_config<tile_sizes = [[1, 2, 0, 0, 0, 0], [1, 1, 0, 1, 128, 0], [0, 0, 1, 0, 0, 1]]>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "+fma,+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-unknown-unknown-eabi-elf", ukernels = "all"}>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-func.func @dequant_matmul() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_, translation_info = #iree_codegen.translation_info<pipeline = Mmt4dTilingExpert>} {
+func.func @dequant_matmul() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
   %c0 = arith.constant 0 : index
   %c1024 = arith.constant 1024 : index
   %c132096 = arith.constant 132096 : index
@@ -387,7 +386,7 @@ func.func @dequant_matmul() attributes {hal.executable.target = #executable_targ
       linalg.yield %10 : f32
     } -> tensor<4x256x128x1xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<1x4x1x128xf32>) -> tensor<1x4x1x128xf32>
-  %7 = linalg.mmt4d {lowering_config = #config} ins(%3, %9 : tensor<1x256x1x1xf32>, tensor<4x256x128x1xf32>) outs(%6 : tensor<1x4x1x128xf32>) -> tensor<1x4x1x128xf32>
+  %7 = linalg.mmt4d  ins(%3, %9 : tensor<1x256x1x1xf32>, tensor<4x256x128x1xf32>) outs(%6 : tensor<1x4x1x128xf32>) -> tensor<1x4x1x128xf32>
   flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [1, 4, 1, 128], strides = [1, 1, 1, 1] : tensor<1x4x1x128xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x4x1x128xf32>>
   return
 }
