@@ -4,7 +4,7 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Imports TensorFlow artifacts via the `iree-import-tf tool."""
+"""Imports TensorFlow artifacts via the `iree-import-tf` tool."""
 
 from __future__ import annotations
 from dataclasses import dataclass, field
