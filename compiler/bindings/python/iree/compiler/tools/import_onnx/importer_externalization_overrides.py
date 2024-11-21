@@ -5,9 +5,9 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import copy
+import sys
 import random
 import string
-import iree.runtime as rt
 
 from ...dialects import util
 from typing import Optional, Tuple, Any, NamedTuple
@@ -78,7 +78,19 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         self.symbol_table.insert(parent_op)
         self.param_data = param_data
         self.param_count = 0
+        try:
+            import iree.runtime as rt
+        except ModuleNotFoundError as e:
+            raise ModuleNotFoundError(
+                "iree-import-onnx requires iree runtime api for externalizing parameters. "
+                "For example: `pip install iree-base-runtime`"
+            ) from e
         self.param_archive = rt.ParameterIndex()
+
+    def import_all(self, func=True):
+        super().import_all(func)
+        # write the param archive to an irpa file:
+        self.param_archive.create_archive_file(self.param_path)
 
     def sanitize_name(self, name: str) -> str:
         # There are often some initializers in the models that have no name

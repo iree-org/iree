@@ -20,7 +20,6 @@ import os
 from pathlib import Path
 import sys
 import tempfile
-
 from .importer_externalization_overrides import *
 
 
@@ -53,6 +52,7 @@ def main(args: argparse.Namespace):
         imp = IREENodeImporter.define_function(model_info.main_graph, m, param_data)
     else:
         imp = onnx_importer.NodeImporter.define_function(model_info.main_graph, m)
+
     imp.import_all()
 
     if not args.no_verify:
@@ -74,30 +74,39 @@ def main(args: argparse.Namespace):
 def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
     input_dir = os.path.dirname(os.path.abspath(args.input_file))
 
-    # Load the model, with possible external data coming from the default
-    # location, or the location specified on the command line.
-    if args.data_dir is None:
-        raw_model = onnx.load(args.input_file)
-    else:
-        raw_model = onnx.load(args.input_file, load_external_data=False)
-        onnx.load_external_data_for_model(raw_model, str(args.data_dir))
-
-    # Only change the opset version if it is greater than the current one.
-    if args.opset_version and args.opset_version > raw_model.opset_import[0].version:
-        raw_model = onnx.version_converter.convert_version(
-            raw_model, args.opset_version
+    # TODO: setup updating opset version without loading external weights.
+    if args.opset_version and args.large_model:
+        raise NotImplementedError(
+            "Updating the opset version for large models is currently unsupported."
         )
 
-    # Do shape inference two ways.  First, attempt in-memory to avoid redundant
-    # loading and the need for writing a temporary file somewhere.  If that
-    # fails, typically because of the 2 GB protobuf size limit, try again via
-    # files.  See
-    # https://onnx.ai/onnx/repo-docs/PythonAPIOverview.html#shape-inference-a-large-onnx-model-2gb
-    # for details about the file-based technique.
+    if not args.large_model:
+        # Load the model, with possible external data coming from the default
+        # location, or the location specified on the command line.
+        if args.data_dir is None:
+            raw_model = onnx.load(args.input_file)
+        else:
+            raw_model = onnx.load(args.input_file, load_external_data=False)
+            onnx.load_external_data_for_model(raw_model, str(args.data_dir))
 
-    # Run the checker to test whether the file is above the threshold for
-    # in-memory shape inference.  If not, go ahead and do the shape inference.
-    if args.check_model:
+        # Only change the opset version if it is greater than the current one.
+        if (
+            args.opset_version
+            and args.opset_version > raw_model.opset_import[0].version
+        ):
+            raw_model = onnx.version_converter.convert_version(
+                raw_model, args.opset_version
+            )
+
+        # Do shape inference two ways.  First, attempt in-memory to avoid redundant
+        # loading and the need for writing a temporary file somewhere.  If that
+        # fails, typically because of the 2 GB protobuf size limit, try again via
+        # files.  See
+        # https://onnx.ai/onnx/repo-docs/PythonAPIOverview.html#shape-inference-a-large-onnx-model-2gb
+        # for details about the file-based technique.
+
+        # Run the checker to test whether the file is above the threshold for
+        # in-memory shape inference.  If not, go ahead and do the shape inference.
         try:
             onnx.checker.check_model(raw_model)
             inferred_model = onnx.shape_inference.infer_shapes(
@@ -158,10 +167,10 @@ def parse_arguments(argv=None) -> argparse.Namespace:
         type=int,
     )
     parser.add_argument(
-        "--check-model",
-        help="specify whether to run the onnx model checker. For large models, it is recommended to set this to false.",
+        "--large-model",
+        help="Setting this to true is recommended for large models. It will bypass loading external weights and running the onnx checker to determine the model size.",
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=False,
     )
     parser.add_argument(
         "--num-initializers-threshold",
