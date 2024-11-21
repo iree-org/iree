@@ -224,6 +224,32 @@ def check_description_and_show_diff(
     )
 
 
+def parse_trailer_map_from_description(description: str):
+    trailer_lines = subprocess.run(
+        ["git", "interpret-trailers", "--parse", "--no-divider"],
+        input=description,
+        stdout=subprocess.PIPE,
+        check=True,
+        text=True,
+        timeout=60,
+    ).stdout.splitlines()
+
+    # Skip over multi-line or malformed trailers we don't want to support.
+    # https://github.com/iree-org/iree/issues/19240
+    # https://stackoverflow.com/q/66215644
+    # We could also handle multi-line git trailers, but we'd need to rework the
+    # .splitlines() call above.
+    trailer_lines = [line for line in trailer_lines if not line.startswith((" ", "\t"))]
+    trailer_lines = [line for line in trailer_lines if ":" in line]
+
+    trailer_map = {
+        k.lower().strip(): v.strip()
+        for k, v in (line.split(":", maxsplit=1) for line in trailer_lines)
+    }
+
+    return trailer_map
+
+
 def get_trailers_and_labels(is_pr: bool) -> Tuple[Mapping[str, str], List[str]]:
     if not is_pr:
         return ({}, [])
@@ -260,18 +286,7 @@ def get_trailers_and_labels(is_pr: bool) -> Tuple[Mapping[str, str], List[str]]:
 
     print("Parsing PR description and labels:", description, labels, sep="\n")
 
-    trailer_lines = subprocess.run(
-        ["git", "interpret-trailers", "--parse", "--no-divider"],
-        input=description,
-        stdout=subprocess.PIPE,
-        check=True,
-        text=True,
-        timeout=60,
-    ).stdout.splitlines()
-    trailer_map = {
-        k.lower().strip(): v.strip()
-        for k, v in (line.split(":", maxsplit=1) for line in trailer_lines)
-    }
+    trailer_map = parse_trailer_map_from_description(description)
 
     for key in trailer_map:
         if not Trailer.contains(key):

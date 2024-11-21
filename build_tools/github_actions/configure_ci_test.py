@@ -223,6 +223,37 @@ class ConfigureCITest(unittest.TestCase):
             ),
         )
 
+    def test_parse_trailer_map_no_trailers(self):
+        trailer_map = configure_ci.parse_trailer_map_from_description("""No trailers""")
+        self.assertDictEqual(trailer_map, {})
+
+    def test_parse_trailer_map_one_trailer(self):
+        trailer_map = configure_ci.parse_trailer_map_from_description(
+            """First line
+
+key: value"""
+        )
+        self.assertDictEqual(trailer_map, {"key": "value"})
+
+    def test_parse_trailer_map_two_trailers(self):
+        trailer_map = configure_ci.parse_trailer_map_from_description(
+            """First line
+
+key1: value1
+key2: value2"""
+        )
+        self.assertDictEqual(trailer_map, {"key1": "value1", "key2": "value2"})
+
+    def test_parse_trailer_map_multiline_trailer(self):
+        trailer_map = configure_ci.parse_trailer_map_from_description(
+            """First line
+
+key: value line 1
+  value line 2"""
+        )
+        # Note: Discarding the multi-line part of the key.
+        self.assertDictEqual(trailer_map, {"key": "value line 1"})
+
 
 if __name__ == "__main__":
     unittest.main()
