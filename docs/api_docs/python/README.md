@@ -13,18 +13,31 @@ project and is served at
 Either install python packages or, from the build directory:
 
 ```shell
-export PYTHONPATH=$PWD/bindings/python:$PWD/compiler-api/python_package
+source .env && export PYTHONPATH
 ```
 
-### Install dependencies
+(See
+<https://iree.dev/building-from-source/getting-started/#using-the-python-bindings>)
+
+### Setup virtual environment with requirements
 
 ```shell
+python -m venv .venv
+source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
-
 
 ### Build docs
 
 ```shell
 sphinx-build -b html . _build
 ```
+
+### Serve locally locally with autoreload
+
+```shell
+sphinx-autobuild . _build
+```
+
+Then open http://127.0.0.1:8000 as instructed by the logs and make changes to
+the files in this directory as needed to update the documentation.

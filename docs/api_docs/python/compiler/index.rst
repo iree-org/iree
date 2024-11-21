@@ -7,6 +7,7 @@ Compiler API
 
    api.rst
    tools.rst
+   build.rst
+   mlir.rst
    iree_input_dialect.rst
    mlir_dialects.rst
-   mlir.rst

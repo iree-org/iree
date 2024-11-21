@@ -12,7 +12,7 @@ A number of optional arguments to the compiler can be useful for debugging:
   a reproducer will be output at the listed path.
 * `extra_args=[...]` - Passes extra arguments to the compiler. Useful for \
   various standard features of MLIR based compilers like
-  `-mlir-print-ir-after-all`.
+  `--mlir-print-ir-after-all`.
 
 
 In addition, the core compiler and frontend compiler APIs have a unified
