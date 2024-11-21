@@ -4,7 +4,7 @@ vm.module @my_module {
   // CHECK-LABEL: emitc.func private @my_module_list_alloc
   vm.func @list_alloc(%arg0: i32) {
     // CHECK: %[[REF:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>
-    // CHECK: %[[REFPTR:.+]] = emitc.apply "&"(%[[REF]]) : (!emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
+    // CHECK: %[[REFPTR:.+]] = apply "&"(%[[REF]]) : (!emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
     %list = vm.list.alloc %arg0 : (i32) -> !vm.list<i32>
     %list_dno = util.optimization_barrier %list : !vm.list<i32>
     // CHECK: util.optimization_barrier %[[REFPTR]] : !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
@@ -15,9 +15,9 @@ vm.module @my_module {
   vm.func @list_size(%arg0: i32) {
     %list = vm.list.alloc %arg0 : (i32) -> !vm.list<i32>
     // CHECK: %[[REF:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>
-    // CHECK: %[[REFPTR:.+]] = emitc.apply "&"(%[[REF]]) : (!emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
+    // CHECK: %[[REFPTR:.+]] = apply "&"(%[[REF]]) : (!emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
     %size = vm.list.size %list : (!vm.list<i32>) -> i32
-    // CHECK: %[[SIZE:.+]] = emitc.call_opaque "iree_vm_list_size"(%{{.+}})
+    // CHECK: %[[SIZE:.+]] = call_opaque "iree_vm_list_size"(%{{.+}})
     %size_dno = util.optimization_barrier %size : i32
     // CHECK: util.optimization_barrier %[[SIZE]] : i32
     vm.return
@@ -32,7 +32,7 @@ vm.module @my_module {
   vm.export @ref
   vm.func @ref(%arg0: i32) {
     // CHECK: %[[REF:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>
-    // CHECK: %[[REFPTR:.+]] = emitc.apply "&"(%[[REF]]) : (!emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
+    // CHECK: %[[REFPTR:.+]] = apply "&"(%[[REF]]) : (!emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
     %buffer = vm.const.ref.rodata @byte_buffer : !vm.buffer
     %buffer_dno = util.optimization_barrier %buffer : !vm.buffer
     // CHECK: util.optimization_barrier %[[REFPTR]] : !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
