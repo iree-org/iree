@@ -31,12 +31,6 @@ void populateDropSharedMemoryDeallocOpPatterns(RewritePatternSet &patterns);
 
 void populateGPUDistributionPatterns(RewritePatternSet &patterns);
 
-void populateGPUDistributionLayoutAttrPatterns(Value laneId,
-                                               RewritePatternSet &patterns);
-
-void populateGPUReductionDistributionPatterns(RewritePatternSet &patterns,
-                                              int64_t maxBitsPerShuffle = 32);
-
 void populateGPUDistributeNestedLayoutAttrPatterns(
     RewritePatternSet &patterns, Value threadId, int64_t subgroupSize,
     int64_t maxBitsPerShuffle = 32);
@@ -44,9 +38,6 @@ void populateGPUDistributeNestedLayoutAttrPatterns(
 // Adds patterns that distributes vector.contract ops with nested layout
 // annotations to amdgpu.mfma ops.
 void populateGPUDistributeNestedLayoutContractAMDGPUPatterns(
-    RewritePatternSet &patterns);
-
-void populateGPULayoutResolutionDistributionPatterns(
     RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler

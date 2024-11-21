@@ -14,9 +14,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "amdgpu_chained_matmul.mlir"
-    "amdgpu_contraction_distribution.mlir"
-    "amdgpu_set_anchor_layouts.mlir"
     "assign_constant_ordinals.mlir"
     "cast_address_space_function.mlir"
     "cast_type_to_fit_mma.mlir"
@@ -49,6 +46,7 @@ iree_lit_test_suite(
     "reduction_pipeline_cuda.mlir"
     "reduction_pipeline_rocm.mlir"
     "reduction_pipeline_softmax_rocm.mlir"
+    "reuse_shared_memory_allocs.mlir"
     "rocdl_pipeline_test.mlir"
     "tensor_pad.mlir"
     "tensorcore_vectorization.mlir"

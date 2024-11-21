@@ -7,29 +7,13 @@ if(NOT IREE_TARGET_BACKEND_ROCM)
   return()
 endif()
 
-# Check if HIP is installed on system.
-# HIP is required to compile ukernels.
-# TODO: We can do better than this and ensure that headers are always available.
-if(NOT IREE_ROCM_PATH)
-  set(IREE_ROCM_PATH "/opt/rocm")
-endif()
-set(IREE_ROCM_VERSION "${IREE_ROCM_PATH}/include/hip/hip_version.h")
-if(NOT EXISTS ${IREE_ROCM_VERSION})
-  message(STATUS
-          "hip runtime cannot be found in ${IREE_ROCM_PATH}.
-          Please try setting IREE_ROCM_PATH to rocm directory.
-          Ukernels will not be compiled.")
-  return()
-endif()
-
-
 iree_add_all_subdirs()
 
 set(_platform_lib_reldir "iree_platform_libs/rocm")
 set(_device_bc_path "${IREE_COMPILER_DYLIB_DIR}/iree_platform_libs/rocm")
 set(_amd_ukernel_libs)
 set(_amd_ukernel_targets)
-function(iree_rocm_bitcode_library)
+function(iree_amdgpu_bitcode_library)
   cmake_parse_arguments(
     _RULE
     ""
@@ -45,30 +29,29 @@ function(iree_rocm_bitcode_library)
   endif()
 
   set(_ROCM_ARCH "${_RULE_ROCM_ARCH}")
-  set(OPT_FLAG "-O0")
-  if(_ROCM_ARCH MATCHES "GFX9")
-    set(OPT_FLAG "-O3")
-  endif()
   set(_COPTS
-    "-x" "hip"
+    # Language: C23
+    "-x" "c"
+    "-std=c23"
 
-    # Compile only the device code for the target architecture.
-    "--offload-device-only"
-    "--offload-arch=${_ROCM_ARCH}"
+    # Local headers.
+    "-I${IREE_SOURCE_DIR}"
 
-    # Suppress warnings about about ROCM version (we mostly don't care).
-    "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
-
-    # Use the ROCM specified by the IREE cmake variable (instead of guessing
-    # or failing if ROCM is not on the user's path).
-    "--rocm-path=${IREE_ROCM_PATH}"
-
-    # Avoid linking in default libraries as we will link them at a later phase.
+    # Avoid dependencies.
     "-nogpulib"
 
-    # Only enable necessary optimizations S.T we can use -O3.
-    "-Xclang" "-disable-llvm-optzns"
-    "${OPT_FLAG}"
+    # Avoid ABI issues.
+    "-fno-short-wchar"  # Shouldn't matter to us, but doesn't hurt.
+
+    # Target architecture/machine.
+    "-target" "amdgcn-amd-amdhsa"
+    "-march=${_ROCM_ARCH}"
+    "-fgpu-rdc"  # NOTE: may not be required for all targets.
+
+    # Optimized.
+    "-O3"
+    "-fno-ident"
+    "-fvisibility=hidden"
 
     # Object file only in bitcode format:
     "-c"
@@ -77,7 +60,8 @@ function(iree_rocm_bitcode_library)
 
   set(_BITCODE_FILES)
   foreach(_SRC ${_RULE_SRCS})
-    get_filename_component(_BITCODE_SRC_PATH "${_SRC}" REALPATH)
+    get_filename_component(_SRC_PATH "${_SRC}" REALPATH)
+    get_filename_component(_COMMON_H_PATH "common.h" REALPATH)
     set(_BITCODE_FILE "${_RULE_NAME}_${_SRC}_${_ROCM_ARCH}.bc")
     list(APPEND _BITCODE_FILES ${_BITCODE_FILE})
     add_custom_command(
@@ -86,12 +70,13 @@ function(iree_rocm_bitcode_library)
       COMMAND
         "${IREE_CLANG_BINARY}"
         ${_COPTS}
-        "${_BITCODE_SRC_PATH}"
+        "${_SRC_PATH}"
         "-o"
         "${_BITCODE_FILE}"
       DEPENDS
         "${IREE_CLANG_BINARY}"
-        "${_SRC}"
+        "${_SRC_PATH}"
+        "${_COMMON_H_PATH}"
       COMMENT
         "Compiling ${_SRC} to ${_BITCODE_FILE}"
       VERBATIM
@@ -127,7 +112,7 @@ endfunction()
 #       except compile-time cost, so just picked out the popular ones.
 set(_ukernel_supported_chips "gfx90a" "gfx942" "gfx1030" "gfx1100")
 foreach(_amd_chip ${_ukernel_supported_chips})
-  iree_rocm_bitcode_library(
+  iree_amdgpu_bitcode_library(
     NAME
       rocm_argmax_ukernel
     ROCM_ARCH

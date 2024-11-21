@@ -10,11 +10,6 @@
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
-
 namespace mlir::iree_compiler {
 
 class TileSizeSelection : public ::testing::Test {

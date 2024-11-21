@@ -20,6 +20,7 @@ iree_cc_test(
     gtest
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::testing::gtest_main
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

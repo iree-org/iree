@@ -18,9 +18,6 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "amdgpu_chained_matmul.mlir",
-            "amdgpu_contraction_distribution.mlir",
-            "amdgpu_set_anchor_layouts.mlir",
             "assign_constant_ordinals.mlir",
             "conv_pipeline_test_cuda.mlir",
             "convert_to_nvvm.mlir",
@@ -44,6 +41,7 @@ iree_lit_test_suite(
             "reduction_pipeline_cuda.mlir",
             "reduction_pipeline_rocm.mlir",
             "reduction_pipeline_softmax_rocm.mlir",
+            "reuse_shared_memory_allocs.mlir",
             "rocdl_pipeline_test.mlir",
             "illegal_configuration.mlir",
             "legalize.mlir",

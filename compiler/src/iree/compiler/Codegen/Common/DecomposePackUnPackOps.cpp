@@ -108,8 +108,8 @@ static LogicalResult commonRunOnOperation(
   // they do not generate reshape ops.
   if (!useOnlyReshapes) {
     RewritePatternSet patterns(ctx);
-    patterns.add<linalg::GeneralizeOuterUnitDimsPackOpPattern,
-                 linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(ctx);
+    patterns.add<linalg::DecomposeOuterUnitDimsPackOpPattern,
+                 linalg::DecomposeOuterUnitDimsUnPackOpPattern>(ctx);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitError(
           "failed to apply generalization patterns on pack/unpack ops for "
@@ -239,8 +239,8 @@ static LogicalResult commonRunOnOperation(
     if (useOnlyReshapes) {
       patterns.add<LowerPackPattern, LowerUnPackPattern>(ctx, controlFn);
     } else {
-      patterns.add<linalg::GeneralizeOuterUnitDimsPackOpPattern,
-                   linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(ctx);
+      patterns.add<linalg::DecomposeOuterUnitDimsPackOpPattern,
+                   linalg::DecomposeOuterUnitDimsUnPackOpPattern>(ctx);
     }
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return failure();

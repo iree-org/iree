@@ -92,6 +92,8 @@ static LogicalResult populateLivenessRanges(
     }
   }
   if (sharedMemAllocs.size() < 2) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "There are less than two shared memory allocations.\n");
     return failure();
   }
 
@@ -216,6 +218,7 @@ struct GPUReuseSharedMemoryAllocsPass final
     // If the funcOp does not meet the conditions for the analysis, do nothing.
     if (failed(populateLivenessRanges(funcOp, livenessMap, allocs,
                                       dominanceInfo))) {
+      LLVM_DEBUG(llvm::dbgs() << "populateLivenessRanges failed.\n");
       return;
     }
 
@@ -226,6 +229,7 @@ struct GPUReuseSharedMemoryAllocsPass final
 
     // Nothing to reuse if there is only a single alias group.
     if (aliasGroups.size() < 2) {
+      LLVM_DEBUG(llvm::dbgs() << "There are less than 2 alias groups.\n");
       return;
     }
 

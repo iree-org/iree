@@ -1,0 +1,15 @@
+# Local clangd configuration file for this directory.
+# The flags here mirror CMakeLists.txt. Flags that should not matter to clangd
+# have been omitted.
+
+-x c
+-std=c23
+-I
+../../../../../..
+-nogpulib
+-fno-short-wchar
+-target
+amdgcn-amd-amdhsa
+-march=gfx942
+-Xclang
+-finclude-default-header
