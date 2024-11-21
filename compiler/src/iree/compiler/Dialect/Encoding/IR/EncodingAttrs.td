@@ -63,8 +63,19 @@ def EncodingAttr :
     AttrParameter<"ArrayAttr", "element types of the user's operands">:$element_types,
     OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps,
     OptionalParameter<"AffineMapAttr", "Indexing map that represents the broadcasting dims in the producer">:$bcast_map,
-    // TODO(hanchung): The round_dims_to parameter can be revisited. We explicitly map them to M,N,K dimension for now.
-    OptionalParameter<"DenseArrayAttr", "Values for padding M,N,K dimensions">:$round_dims_to
+    // TODO(hanchung): Deprecate the round_dims_to field when we plumb the layouts
+    // field through the whole stack. See https://github.com/iree-org/iree/issues/17924
+    // for details. Note that today we abuse the attribute to carry narrow
+    // matrix information. The end goal is deprecating the field and add a
+    // "iteration_space_size" field to describe the shape. It is useful to
+    // handle narrow matrix cases.
+    OptionalParameter<"DenseArrayAttr", "Values for padding M,N,K dimensions">:$round_dims_to,
+    OptionalParameter<"ArrayAttr", "An array of attributes that describes the "
+    "potential layouts on the device. It is an array because a device could "
+    "have several executable targets. Note that it can be any attribute that "
+    "implements EncodingLayoutAttrInterface. The expectation of the field "
+    "is to bridge the logics between host codes and device codes. If an "
+    "attribute does not implement the interface, it could be discarded anytime.">:$layouts
   );
 
   let builders = [
@@ -73,7 +84,8 @@ def EncodingAttr :
         "ArrayRef<Type>":$elemTypes,
         CArg<"ArrayRef<AffineMap>", "{}">:$maps,
         CArg<"std::optional<AffineMap>", "{}">:$bcastMap,
-        CArg<"ArrayRef<int64_t>", "{}">:$roundDimsTo)>
+        CArg<"ArrayRef<int64_t>", "{}">:$roundDimsTo,
+        CArg<"ArrayRef<Attribute>", "{}">:$layouts)>
   ];
 
   let extraClassDeclaration = [{
