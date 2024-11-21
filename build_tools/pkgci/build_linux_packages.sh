@@ -165,12 +165,6 @@ function run_in_docker() {
           build_iree_compiler
           run_audit_wheel "iree_base_compiler${package_suffix}" "${python_version}"
           ;;
-        iree-pjrt-plugin-*)
-          pjrt_platform=${package##*-}
-          clean_wheels "iree_pjrt_plugin_${pjrt_platform}" "py3-none"
-          build_iree_pjrt_plugin ${pjrt_platform}
-          run_audit_wheel "iree_pjrt_plugin_${pjrt_platform}" "py3-none"
-          ;;
         *)
           echo "Unrecognized package '${package}'"
           exit 1
@@ -206,12 +200,6 @@ function build_iree_compiler() {
   IREE_TARGET_BACKEND_ROCM=ON \
   IREE_TARGET_BACKEND_CUDA="${enable_cuda}" \
   build_wheel compiler/
-}
-
-function build_iree_pjrt_plugin() {
-  # the first parameter can be `cpu`, `cuda`, `rocm` or `vulkan`
-  local pjrt_platform=$1
-  build_wheel integrations/pjrt/python_packages/iree_${pjrt_platform}_plugin/
 }
 
 function run_audit_wheel() {
