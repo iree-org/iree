@@ -235,6 +235,17 @@ key: value"""
         )
         self.assertDictEqual(trailer_map, {"key": "value"})
 
+    def test_parse_trailer_map_text_after_trailers(self):
+        trailer_map = configure_ci.parse_trailer_map_from_description(
+            """First line
+
+key: value
+
+More non-trailer text here"""
+        )
+        # Trailers can't appear in the middle of the description.
+        self.assertDictEqual(trailer_map, {})
+
     def test_parse_trailer_map_two_trailers(self):
         trailer_map = configure_ci.parse_trailer_map_from_description(
             """First line
