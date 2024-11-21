@@ -269,7 +269,7 @@ static LogicalResult dropUnitDistributedDims(RewriterBase &rewriter,
 // Returns a list of new `tensor.extract_slice` ops with new fusion
 // opportunities, as well as the new surrounding `scf.forall` (because consumer
 // fusion replaces the loop).
-static std::pair<std::deque<Operation *>, scf::ForallOp>
+static std::pair<std::queue<Operation *>, scf::ForallOp>
 fuseConsumers(RewriterBase &rewriter, Operation *tiledOp) {
   auto addCandidateSlices =
       [](Operation *fusedOp,
@@ -287,7 +287,7 @@ fuseConsumers(RewriterBase &rewriter, Operation *tiledOp) {
   std::queue<tensor::ParallelInsertSliceOp> candidates;
   addCandidateSlices(tiledOp, candidates);
 
-  std::deque<Operation *> newFusionOpportunities;
+  std::queue<Operation *> newFusionOpportunities;
   scf::ForallOp newLoop = tiledOp->getParentOfType<scf::ForallOp>();
   while (!candidates.empty()) {
 
@@ -320,7 +320,7 @@ fuseConsumers(RewriterBase &rewriter, Operation *tiledOp) {
                 operand.getDefiningOp<tensor::ExtractSliceOp>()) {
           if (llvm::isa_and_present<TilingInterface>(
                   sliceProducer.getSource().getDefiningOp())) {
-            newFusionOpportunities.push_back(sliceProducer);
+            newFusionOpportunities.push(sliceProducer);
           }
         }
       }
@@ -332,14 +332,14 @@ fuseConsumers(RewriterBase &rewriter, Operation *tiledOp) {
 }
 
 static void fuseProducersOfSlices(RewriterBase &rewriter,
-                                  std::deque<Operation *> &worklist,
+                                  std::queue<Operation *> &worklist,
                                   scf::SCFTileAndFuseOptions &options,
                                   scf::ForallOp forallOp) {
   SmallVector<LoopLikeOpInterface> loops = {
       cast<LoopLikeOpInterface>(&*forallOp)};
   while (!worklist.empty()) {
     auto candidateSlice = cast<tensor::ExtractSliceOp>(worklist.front());
-    worklist.pop_front();
+    worklist.pop();
 
     auto fusableProducer =
         candidateSlice.getSource().getDefiningOp<TilingInterface>();
@@ -362,7 +362,7 @@ static void fuseProducersOfSlices(RewriterBase &rewriter,
       continue;
 
     for (auto newSlice : fusedResult->generatedSlices) {
-      worklist.push_back(newSlice);
+      worklist.push(newSlice);
     }
   }
 }
