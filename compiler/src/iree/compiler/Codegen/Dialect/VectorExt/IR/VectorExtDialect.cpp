@@ -23,10 +23,6 @@ namespace mlir::iree_compiler::IREE::VectorExt {
 struct IREEVectorExtDialectOpAsmInterface : public OpAsmDialectInterface {
   using OpAsmDialectInterface::OpAsmDialectInterface;
   AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
-    if (llvm::isa<LayoutAttr>(attr)) {
-      os << "layout";
-      return AliasResult::OverridableAlias;
-    }
     if (llvm::isa<NestedLayoutAttr>(attr)) {
       os << "nested";
       return AliasResult::OverridableAlias;

@@ -18,10 +18,6 @@ namespace mlir::iree_compiler {
 void createAsyncGroups(RewriterBase &rewriter, mlir::FunctionOpInterface funcOp,
                        bool useMMASync);
 
-/// Function to do layout analysis and distribution.
-void doLayoutAnalysisAndDistribution(RewriterBase &rewriter,
-                                     mlir::FunctionOpInterface funcOp);
-
 /// Function to reorder transposes and elementwise ops.
 void reorderTranspose(RewriterBase &rewriter, mlir::FunctionOpInterface funcOp);
 
@@ -32,9 +28,6 @@ void reorderTranspose(RewriterBase &rewriter, mlir::FunctionOpInterface funcOp);
 /// Also adds barriers to make sure we are done writing/reading
 /// from the previous alias group before starting a new one.
 void packSharedMemoryAlloc(mlir::FunctionOpInterface funcOp);
-
-// Add patterns to distribute contractions to MFMA ops.
-void populateAMDGPUDistributionPatterns(RewritePatternSet &patterns);
 
 // Prefetches data written to shared memory for the next iteration. Returns the
 // new loop on success or failure when the `forOp` is not supported.

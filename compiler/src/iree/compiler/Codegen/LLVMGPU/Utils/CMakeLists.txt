@@ -16,7 +16,6 @@ iree_cc_library(
   HDRS
     "LLVMGPUUtils.h"
   SRCS
-    "AMDGPUDistributionPatterns.cpp"
     "LLVMGPUUtils.cpp"
     "PrefetchSharedMemoryCopy.cpp"
   DEPS

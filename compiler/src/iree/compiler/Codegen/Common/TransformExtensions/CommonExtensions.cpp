@@ -1120,14 +1120,10 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
       rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::x);
 
   populateGPUDistributionPatterns(patterns);
-  populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
-  populateGPUReductionDistributionPatterns(patterns);
   // For testing we use subgroup size = 64.
   populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId,
                                                 /*subgroupSize=*/64);
   populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
-  if (getExperimental())
-    populateGPULayoutResolutionDistributionPatterns(patterns);
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultDefiniteFailure(target);
   }
