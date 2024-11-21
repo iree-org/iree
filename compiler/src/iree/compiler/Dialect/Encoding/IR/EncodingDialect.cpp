@@ -20,6 +20,7 @@
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Dialect/Encoding/IR/EncodingAttrs.cpp.inc"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingEnums.cpp.inc"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingInterfaces.cpp.inc"
 #undef GET_ATTRDEF_CLASSES
 
 namespace mlir::iree_compiler::IREE::Encoding {
