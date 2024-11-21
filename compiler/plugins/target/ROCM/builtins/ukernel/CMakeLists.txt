@@ -37,16 +37,16 @@ function(iree_amdgpu_bitcode_library)
     # Local headers.
     "-I${IREE_SOURCE_DIR}"
 
-    # Avoid dependencies
+    # Avoid dependencies.
     "-nogpulib"
 
-    # Avoid ABI issues
+    # Avoid ABI issues.
     "-fno-short-wchar"  # Shouldn't matter to us, but doesn't hurt.
 
     # Target architecture/machine.
     "-target" "amdgcn-amd-amdhsa"
     "-march=${_ROCM_ARCH}"
-    "-fgpu-rdc"  # NOTE: may not be required for all targets
+    "-fgpu-rdc"  # NOTE: may not be required for all targets.
 
     # Optimized.
     "-O3"
