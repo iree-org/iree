@@ -475,7 +475,12 @@ public:
         opt.UnsafeFPMath = false;
         opt.NoInfsFPMath = false;
         opt.NoNaNsFPMath = true;
+        // Be extra cautious while this is less tested, and prevent unknown
+        // fallbacks from global isel.
         opt.EnableGlobalISel = options.globalISel;
+        opt.GlobalISelAbort = options.globalISel
+                                  ? llvm::GlobalISelAbortMode::Enable
+                                  : llvm::GlobalISelAbortMode::Disable;
         SmallVector<std::string> features;
         if (targetArch.starts_with("gfx10") ||
             targetArch.starts_with("gfx11")) {
