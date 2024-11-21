@@ -12,6 +12,8 @@
 #include "llvm-c/TargetMachine.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir::iree_compiler::IREE::Codegen {
@@ -60,6 +62,11 @@ struct TileSwizzle {
     // Support constructing from any size type.
     template <typename T>
     Dim(Kind kind, T size) : kind(kind), size(size) {}
+
+    bool operator==(const Dim &other) const {
+      return kind == other.kind && size == other.size;
+    }
+    bool operator!=(const Dim &other) const { return !(*this == other); }
   };
 
   using ExpandShapeDimVectorType = llvm::SmallVector<Dim, 4>;
@@ -77,6 +84,11 @@ struct TileSwizzle {
   // example, permutation[0] dictates which of the expanded dimensions becomes
   // the leading dimension of the layout.
   llvm::SmallVector<int64_t> permutation;
+
+  bool operator==(const TileSwizzle &other) const {
+    return expandShape == other.expandShape && permutation == other.permutation;
+  }
+  bool operator!=(const TileSwizzle &other) const { return !(*this == other); }
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
@@ -103,6 +115,10 @@ struct MaterializeEncodingInfo {
 //===----------------------------------------------------------------------===//
 // Layout Utilities.
 //===----------------------------------------------------------------------===//
+
+/// Conversion between TileSwizzle struct and DictionaryAttr.
+DictionaryAttr serializeTileSwizzle(MLIRContext *ctx, TileSwizzle swizzle);
+std::optional<TileSwizzle> deserializeTileSwizzle(DictionaryAttr attr);
 
 /// Concatenates the vectors.
 SmallVector<int64_t>

@@ -6,6 +6,10 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 namespace mlir::iree_compiler::IREE::Codegen {
 
@@ -54,6 +58,66 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 //===----------------------------------------------------------------------===//
 // Layout Utilities.
 //===----------------------------------------------------------------------===//
+
+static Attribute dimToArrayAttr(MLIRContext *ctx, TileSwizzle::Dim dim) {
+  Builder b(ctx);
+  return b.getI64ArrayAttr({static_cast<int16_t>(dim.kind), dim.size});
+}
+
+DictionaryAttr serializeTileSwizzle(MLIRContext *ctx, TileSwizzle swizzle) {
+  Builder b(ctx);
+  SmallVector<NamedAttribute> items;
+
+  SmallVector<Attribute> expandShape;
+  for (auto expandConfig : swizzle.expandShape) {
+    Attribute expandAttr = b.getArrayAttr(
+        llvm::map_to_vector(expandConfig, [&](TileSwizzle::Dim dim) {
+          return dimToArrayAttr(ctx, dim);
+        }));
+    expandShape.push_back(expandAttr);
+  }
+
+  items.emplace_back(b.getStringAttr("expandShape"),
+                     b.getArrayAttr(expandShape));
+  items.emplace_back(b.getStringAttr("permutation"),
+                     b.getI64ArrayAttr(swizzle.permutation));
+
+  return b.getDictionaryAttr(items);
+}
+
+std::optional<TileSwizzle> deserializeTileSwizzle(DictionaryAttr attr) {
+  TileSwizzle swizzle;
+
+  auto expandShapeAttr = attr.getNamed("expandShape");
+  if (!expandShapeAttr) {
+    return std::nullopt;
+  }
+  auto expandShapeArrayAttr = dyn_cast<ArrayAttr>(expandShapeAttr->getValue());
+  if (!expandShapeArrayAttr) {
+    return std::nullopt;
+  }
+
+  for (auto expandConfig : expandShapeArrayAttr.getAsRange<ArrayAttr>()) {
+    TileSwizzle::ExpandShapeDimVectorType vec;
+    for (auto dimAttr : expandConfig.getAsRange<ArrayAttr>()) {
+      SmallVector<int64_t> dimValue =
+          extractFromIntegerArrayAttr<int64_t>(dimAttr);
+      TileSwizzle::Dim dim(static_cast<TileSwizzle::Dim::Kind>(dimValue[0]),
+                           dimValue[1]);
+      vec.push_back(dim);
+    }
+    swizzle.expandShape.push_back(vec);
+  }
+
+  auto permAttr = attr.getNamed("permutation");
+  if (!permAttr || !isa<ArrayAttr>(permAttr->getValue())) {
+    return std::nullopt;
+  }
+  swizzle.permutation =
+      extractFromIntegerArrayAttr<int64_t>(permAttr->getValue());
+
+  return swizzle;
+}
 
 SmallVector<int64_t>
 getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape) {
