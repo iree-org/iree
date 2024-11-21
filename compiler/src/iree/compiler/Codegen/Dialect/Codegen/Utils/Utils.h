@@ -4,14 +4,21 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_TILESWIZZLE_H_
-#define IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_TILESWIZZLE_H_
+#ifndef IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_UTILS_H_
+#define IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_UTILS_H_
 
 #include <cstdint>
+
+#include "llvm-c/TargetMachine.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/Support/LLVM.h"
 
-namespace mlir::iree_compiler {
+namespace mlir::iree_compiler::IREE::Codegen {
+
+//===----------------------------------------------------------------------===//
+// Layout Structs.
+//===----------------------------------------------------------------------===//
 
 // Metadata for a swizzle, that is, an (expand_shape -> transposition)
 // pair of ops performing a change of layout within the tiles. This is used
@@ -80,6 +87,27 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, TileSwizzle::Dim dim);
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const TileSwizzle &swizzle);
 
-} // namespace mlir::iree_compiler
+/// Container of information needed to materialize the layout transformations.
+struct MaterializeEncodingInfo {
+  // The next 3 fields are used to create a `tensor.pack` or `tensor.unpack` op,
+  // changing the overall layout between row-major and tiled (where each tile is
+  // row-major).
+  SmallVector<int64_t> innerDimsPos;
+  SmallVector<int64_t> innerTileSizes;
+  SmallVector<int64_t> outerDimsPerm;
 
-#endif // IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_TILESWIZZLE_H_
+  // The optional swizzle, see the comment on TileSwizzle. Only used on GPU.
+  std::optional<TileSwizzle> swizzle;
+};
+
+//===----------------------------------------------------------------------===//
+// Layout Utilities.
+//===----------------------------------------------------------------------===//
+
+/// Concatenates the vectors.
+SmallVector<int64_t>
+getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape);
+
+} // namespace mlir::iree_compiler::IREE::Codegen
+
+#endif // IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_UTILS_H_

@@ -46,6 +46,8 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
+using ::mlir::iree_compiler::IREE::Codegen::TileSwizzle;
+
 //===----------------------------------------------------------------------===//
 // MMA intrinsics semantics: shapes, layouts, operand element types.
 //===----------------------------------------------------------------------===//

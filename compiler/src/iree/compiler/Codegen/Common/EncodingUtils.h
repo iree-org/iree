@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_
 #define IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_
 
-#include "iree/compiler/Codegen/Common/TileSwizzle.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -15,21 +15,9 @@
 
 namespace mlir::iree_compiler {
 
-/// Container of information needed to materialize the layout transformations.
-struct MaterializeEncodingInfo {
-  // The next 3 fields are used to create a `tensor.pack` or `tensor.unpack` op,
-  // changing the overall layout between row-major and tiled (where each tile is
-  // row-major).
-  SmallVector<int64_t> innerDimsPos;
-  SmallVector<int64_t> innerTileSizes;
-  SmallVector<int64_t> outerDimsPerm;
-
-  // The optional swizzle, see the comment on TileSwizzle. Only used on GPU.
-  std::optional<TileSwizzle> swizzle;
-};
-
-using MaterializeEncodingFn = std::function<FailureOr<MaterializeEncodingInfo>(
-    RankedTensorType, IREE::HAL::ExecutableTargetAttr targetAttr)>;
+using MaterializeEncodingFn =
+    std::function<FailureOr<IREE::Codegen::MaterializeEncodingInfo>(
+        RankedTensorType, IREE::HAL::ExecutableTargetAttr targetAttr)>;
 
 struct MaterializeEncodingValueInfo {
   SmallVector<Value> innerTileSizes;
@@ -56,7 +44,7 @@ public:
 
   IREE::HAL::ExecutableTargetAttr getTargetAttr() const { return targetAttr; }
 
-  FailureOr<MaterializeEncodingInfo>
+  FailureOr<IREE::Codegen::MaterializeEncodingInfo>
   getEncodingInfo(RankedTensorType type) const {
     return materializeEncodingFn(type, targetAttr);
   }
@@ -103,7 +91,7 @@ struct TileMxNxK {
   int64_t K = 1;
 };
 
-MaterializeEncodingInfo
+IREE::Codegen::MaterializeEncodingInfo
 getEncodingInfoForMatmul(IREE::Encoding::EncodingAttr encoding, int64_t rank,
                          TileMxNxK tileMxNxK);
 
@@ -141,10 +129,6 @@ void populateShapeIndependentMaterializeEncodingPatterns(
 // Returns true if `encoding` represents a narrow-N matmul RESULT, e.g. the
 // result of a matvec.
 bool isNarrowNResult(IREE::Encoding::EncodingAttr encoding);
-
-/// Concatenates the vectors.
-SmallVector<int64_t>
-getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape);
 
 } // namespace mlir::iree_compiler
 

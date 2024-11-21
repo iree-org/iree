@@ -3,9 +3,13 @@
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
-namespace mlir::iree_compiler {
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
+
+namespace mlir::iree_compiler::IREE::GPU {
+
+using ::mlir::iree_compiler::IREE::Codegen::TileSwizzle;
 using Kind = TileSwizzle::Dim::Kind;
 
 // Returns the index of the first destination dimension corresponding to the
@@ -193,4 +197,4 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
   return swizzle;
 }
 
-} // namespace mlir::iree_compiler
+} // namespace mlir::iree_compiler::IREE::GPU
