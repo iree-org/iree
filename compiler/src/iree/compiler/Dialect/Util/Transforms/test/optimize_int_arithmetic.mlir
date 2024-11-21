@@ -496,6 +496,7 @@ util.func @util_align_zero(%arg0 : i64) -> i64 {
 
 // -----
 
+// CHECK-LABEL: @hal_buffer_view_dim_min_max
 util.func @hal_buffer_view_dim_min_max(%bv : !hal.buffer_view) -> (i1, i1, i1) {
   %zero = arith.constant 0 : index
   %max = arith.constant 9007199254740991 : index
@@ -511,6 +512,7 @@ util.func @hal_buffer_view_dim_min_max(%bv : !hal.buffer_view) -> (i1, i1, i1) {
 
 // -----
 
+// CHECK-LABEL: @hal_buffer_view_rank_min_max
 util.func @hal_buffer_view_rank_min_max(%bv : !hal.buffer_view) -> (i1, i1, i1) {
   %zero = arith.constant 0 : index
   %max = arith.constant 4096 : index
@@ -533,4 +535,24 @@ util.func @assume_int_with_single_bound(%bool: i1, %ind: index) -> index {
   // select should not be optimized away.
   // CHECK: arith.select
   util.return %1 : index
+}
+
+// -----
+
+// Example taken from an end-to-end test where %0#1 was being incorrectly folded
+// to [4096, 4096]
+// CHECK-LABEL: @assume_int_doesnt_throw_away_zeros
+// CHECK: %[[ret:.+]] = arith.select
+// CHECK: return %[[ret]]
+util.func @assume_int_doesnt_throw_away_zeros(%arg0: index, %arg1: index) -> index {
+  %0:2 = util.assume.int
+    %arg0[<umin = 8704, umax = 8704, udiv = 8704>, <umin = 4608, umax = 4608, udiv = 4608>, <umin = 8704, umax = 8704, udiv = 8704>, <umin = 8704, umax = 8704, udiv = 8704>, <umin = 8704, umax = 8704, udiv = 8704>, <umin = 8704, umax = 8704, udiv = 8704>, <umin = 8704, umax = 8704, udiv = 8704>, <umin = 4608, umax = 4608, udiv = 4608>, <umin = 8704, umax = 8704, udiv = 8704>, <umin = 0, umax = 0>],
+    %arg1[<umin = 0, umax = 0>, <umin = 0, umax = 0>, <umin = 0, umax = 0>, <umin = 0, umax = 0>, <umin = 0, umax = 0>, <umin = 0, umax = 0>, <umin = 0, umax = 0>, <umin = 0, umax = 0>, <umin = 0, umax = 0>, <umin = 4096, umax = 4096, udiv = 4096>]
+      : index, index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %1 = arith.cmpi ugt, %0#1, %c0 : index
+  %2 = arith.select %1, %c1, %c2 : index
+  util.return %2 : index
 }

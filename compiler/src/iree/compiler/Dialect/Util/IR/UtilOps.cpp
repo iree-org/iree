@@ -1162,31 +1162,26 @@ AssumeIntOp::getOperandAssumptions(unsigned operandIndex) {
 std::pair<std::optional<uint64_t>, std::optional<uint64_t>>
 AssumeIntOp::getUnionedUnsignedRange(unsigned operandIndex) {
   auto assumptions = getOperandAssumptions(operandIndex);
-  uint64_t uminUnion = std::numeric_limits<uint64_t>::max();
+  std::optional<uint64_t> uminUnion;
   int uminCount = 0;
-  uint64_t umaxUnion = std::numeric_limits<uint64_t>::min();
+  std::optional<uint64_t> umaxUnion;
   int umaxCount = 0;
 
   for (auto assumption : assumptions) {
     auto umin = assumption.getUmin();
     auto umax = assumption.getUmax();
     if (umin) {
-      uminUnion = std::min(
-          *umin, uminUnion ? uminUnion : std::numeric_limits<uint64_t>::max());
+      uminUnion = uminUnion ? std::min(*umin, *uminUnion) : *umin;
       uminCount += 1;
     }
     if (umax) {
-      umaxUnion = std::max(
-          *umax, umaxUnion ? umaxUnion : std::numeric_limits<uint64_t>::min());
+      umaxUnion = umaxUnion ? std::max(*umax, *umaxUnion) : *umax;
       umaxCount += 1;
     }
   }
-  return std::make_pair(uminCount > 0 && uminCount == assumptions.size()
-                            ? std::optional<uint64_t>(uminUnion)
-                            : std::nullopt,
-                        umaxCount > 0 && umaxCount == assumptions.size()
-                            ? std::optional<uint64_t>(umaxUnion)
-                            : std::nullopt);
+  return std::make_pair(
+      uminCount == assumptions.size() ? uminUnion : std::nullopt,
+      umaxCount == assumptions.size() ? umaxUnion : std::nullopt);
 }
 
 std::optional<uint64_t>
