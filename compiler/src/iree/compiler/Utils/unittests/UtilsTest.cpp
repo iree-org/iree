@@ -12,11 +12,6 @@
 using namespace mlir::iree_compiler;
 using namespace testing;
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
-
 TEST(Permutation, MakeMovePermutation) {
   EXPECT_THAT(makeMovePermutation(1, 0, 0), ElementsAre(0));
   EXPECT_THAT(makeMovePermutation(2, 0, 1), ElementsAre(1, 0));
