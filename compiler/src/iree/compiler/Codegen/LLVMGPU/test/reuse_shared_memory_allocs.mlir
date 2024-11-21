@@ -121,7 +121,7 @@ func.func @shared_no_reuse_scf_for(%in0: memref<128x128xf16>, %in1: memref<1x409
     return
 }
 
-// The IR is expected not to be modifed if there is no oppurtunities
+// The IR is expected not to be modified if there is no opportunities
 // for reuse.
 // CHECK-LABEL: @shared_no_reuse_scf_for
 // CHECK-COUNT-2: memref.alloc() : memref<64x128xf16, #gpu.address_space<workgroup>>
