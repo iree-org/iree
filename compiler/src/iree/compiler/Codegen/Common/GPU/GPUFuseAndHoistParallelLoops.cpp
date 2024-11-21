@@ -25,18 +25,21 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-gpu-fuse-and-hoist-parallel-loops"
+#define DEBUG_TYPE "iree-codegen-gpu-fuse-and-hoist-parallel-loops"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
-namespace mlir::iree_compiler::IREE::GPU {
+namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_FUSEANDHOISTPARALLELLOOPSPASS
-#include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h.inc"
+#define GEN_PASS_DEF_GPUFUSEANDHOISTPARALLELLOOPSPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
+
+using namespace IREE::GPU;
 
 namespace {
-struct FuseAndHoistParallelLoopsPass final
-    : impl::FuseAndHoistParallelLoopsPassBase<FuseAndHoistParallelLoopsPass> {
+struct GPUFuseAndHoistParallelLoopsPass final
+    : impl::GPUFuseAndHoistParallelLoopsPassBase<
+          GPUFuseAndHoistParallelLoopsPass> {
   void runOnOperation() override;
 };
 } // namespace
@@ -322,7 +325,7 @@ struct FuseTilableForallConsumers final
   }
 };
 
-void FuseAndHoistParallelLoopsPass::runOnOperation() {
+void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
   MLIRContext *context = &getContext();
 
   FunctionOpInterface funcOp = getOperation();
@@ -390,4 +393,4 @@ void FuseAndHoistParallelLoopsPass::runOnOperation() {
   LDBG("After fusing new producers\n" << funcOp);
 }
 
-} // namespace mlir::iree_compiler::IREE::GPU
+} // namespace mlir::iree_compiler

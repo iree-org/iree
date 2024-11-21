@@ -71,6 +71,16 @@ def GPUDistributeScfForPass :
   ];
 }
 
+def GPUFuseAndHoistParallelLoopsPass :
+    InterfacePass<"iree-codegen-gpu-fuse-and-hoist-parallel-loops", "mlir::FunctionOpInterface"> {
+  let summary = "Greedily fuses and hoists parallel loops.";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+    "::mlir::bufferization::BufferizationDialect"
+  ];
+}
+
 def GPUGeneralizeNamedOpsPass :
     InterfacePass<"iree-codegen-gpu-generalize-named-ops", "mlir::FunctionOpInterface"> {
   let summary = "Convert named Linalg ops to linalg.generic ops";
@@ -112,6 +122,15 @@ def GPUMultiBufferingPass :
     Option<"numBuffers", "num-buffers", "unsigned",
             /*default=*/"5",
             "Number of buffers to use.">,
+  ];
+}
+
+def GPUPackToIntrinsicsPass :
+    InterfacePass<"iree-codegen-gpu-pack-to-intrinsics", "mlir::FunctionOpInterface"> {
+  let summary = "Packs matmul like operations and converts to iree_gpu.multi_mma";
+  let dependentDialects = [
+    "::mlir::tensor::TensorDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
 }
 
