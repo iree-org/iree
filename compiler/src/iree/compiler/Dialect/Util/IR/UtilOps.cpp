@@ -1189,14 +1189,26 @@ AssumeIntOp::getUnionedUnsignedRange(unsigned operandIndex) {
                             : std::nullopt);
 }
 
+static bool isConstantZero(IntAssumptionAttr assumption) {
+  std::optional<uint64_t> umin = assumption.getUmin();
+  std::optional<uint64_t> umax = assumption.getUmax();
+  if (!umin || !umax)
+    return false;
+  return *umin == 0 && *umax == 0;
+}
+
 std::optional<uint64_t>
 AssumeIntOp::getUnionedUnsignedDivisor(unsigned operandIndex) {
   auto assumptions = getOperandAssumptions(operandIndex);
   std::optional<uint64_t> divisorUnion;
   for (auto assumption : assumptions) {
     auto divisor = assumption.getUdiv();
-    if (!divisor)
+    if (!divisor) {
+      // Constant zero is divisible by anything
+      if (isConstantZero(assumption))
+        continue;
       return std::nullopt;
+    }
     if (divisorUnion)
       divisorUnion = std::gcd(*divisor, *divisorUnion);
     else
