@@ -1,5 +1,5 @@
 Build API
-=======================
+=========
 
 .. automodule:: iree.build
   :members:
