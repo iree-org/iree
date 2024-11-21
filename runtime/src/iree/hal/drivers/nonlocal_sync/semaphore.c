@@ -14,31 +14,31 @@
 #include "iree/hal/utils/semaphore_base.h"
 
 //===----------------------------------------------------------------------===//
-// iree_hal_sync_semaphore_state_t
+// iree_hal_nl_sync_semaphore_state_t
 //===----------------------------------------------------------------------===//
 
-void iree_hal_sync_semaphore_state_initialize(
-    iree_hal_sync_semaphore_state_t* out_shared_state) {
+void iree_hal_nl_sync_semaphore_state_initialize(
+    iree_hal_nl_sync_semaphore_state_t* out_shared_state) {
   memset(out_shared_state, 0, sizeof(*out_shared_state));
   iree_notification_initialize(&out_shared_state->notification);
 }
 
-void iree_hal_sync_semaphore_state_deinitialize(
-    iree_hal_sync_semaphore_state_t* shared_state) {
+void iree_hal_nl_sync_semaphore_state_deinitialize(
+    iree_hal_nl_sync_semaphore_state_t* shared_state) {
   iree_notification_deinitialize(&shared_state->notification);
   memset(shared_state, 0, sizeof(*shared_state));
 }
 
 //===----------------------------------------------------------------------===//
-// iree_hal_sync_semaphore_t
+// iree_hal_nl_sync_semaphore_t
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_sync_semaphore_t {
+typedef struct iree_hal_nl_sync_semaphore_t {
   iree_hal_semaphore_t base;
   iree_allocator_t host_allocator;
 
   // Shared across all semaphores.
-  iree_hal_sync_semaphore_state_t* shared_state;
+  iree_hal_nl_sync_semaphore_state_t* shared_state;
 
   // Guards all mutable fields. We expect low contention on semaphores and since
   // iree_slim_mutex_t is (effectively) just a CAS this keeps things simpler
@@ -52,29 +52,29 @@ typedef struct iree_hal_sync_semaphore_t {
 
   // OK or the status passed to iree_hal_semaphore_fail. Owned by the semaphore.
   iree_status_t failure_status;
-} iree_hal_sync_semaphore_t;
+} iree_hal_nl_sync_semaphore_t;
 
-static const iree_hal_semaphore_vtable_t iree_hal_sync_semaphore_vtable;
+static const iree_hal_semaphore_vtable_t iree_hal_nl_sync_semaphore_vtable;
 
-static iree_hal_sync_semaphore_t* iree_hal_sync_semaphore_cast(
+static iree_hal_nl_sync_semaphore_t* iree_hal_nl_sync_semaphore_cast(
     iree_hal_semaphore_t* base_value) {
-  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_sync_semaphore_vtable);
-  return (iree_hal_sync_semaphore_t*)base_value;
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_nl_sync_semaphore_vtable);
+  return (iree_hal_nl_sync_semaphore_t*)base_value;
 }
 
-iree_status_t iree_hal_sync_semaphore_create(
-    iree_hal_sync_semaphore_state_t* shared_state, uint64_t initial_value,
+iree_status_t iree_hal_nl_sync_semaphore_create(
+    iree_hal_nl_sync_semaphore_state_t* shared_state, uint64_t initial_value,
     iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore) {
   IREE_ASSERT_ARGUMENT(shared_state);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   *out_semaphore = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_sync_semaphore_t* semaphore = NULL;
+  iree_hal_nl_sync_semaphore_t* semaphore = NULL;
   iree_status_t status = iree_allocator_malloc(
       host_allocator, sizeof(*semaphore), (void**)&semaphore);
   if (iree_status_is_ok(status)) {
-    iree_hal_semaphore_initialize(&iree_hal_sync_semaphore_vtable,
+    iree_hal_semaphore_initialize(&iree_hal_nl_sync_semaphore_vtable,
                                   &semaphore->base);
     semaphore->host_allocator = host_allocator;
     semaphore->shared_state = shared_state;
@@ -90,10 +90,10 @@ iree_status_t iree_hal_sync_semaphore_create(
   return status;
 }
 
-static void iree_hal_sync_semaphore_destroy(
+static void iree_hal_nl_sync_semaphore_destroy(
     iree_hal_semaphore_t* base_semaphore) {
-  iree_hal_sync_semaphore_t* semaphore =
-      iree_hal_sync_semaphore_cast(base_semaphore);
+  iree_hal_nl_sync_semaphore_t* semaphore =
+      iree_hal_nl_sync_semaphore_cast(base_semaphore);
   iree_allocator_t host_allocator = semaphore->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -106,10 +106,10 @@ static void iree_hal_sync_semaphore_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-static iree_status_t iree_hal_sync_semaphore_query(
+static iree_status_t iree_hal_nl_sync_semaphore_query(
     iree_hal_semaphore_t* base_semaphore, uint64_t* out_value) {
-  iree_hal_sync_semaphore_t* semaphore =
-      iree_hal_sync_semaphore_cast(base_semaphore);
+  iree_hal_nl_sync_semaphore_t* semaphore =
+      iree_hal_nl_sync_semaphore_cast(base_semaphore);
 
   iree_slim_mutex_lock(&semaphore->mutex);
 
@@ -127,8 +127,8 @@ static iree_status_t iree_hal_sync_semaphore_query(
 
 // Signals |semaphore| to |new_value| or returns an error if doing so would be
 // invalid. The semaphore mutex must be held.
-static iree_status_t iree_hal_sync_semaphore_signal_unsafe(
-    iree_hal_sync_semaphore_t* semaphore, uint64_t new_value) {
+static iree_status_t iree_hal_nl_sync_semaphore_signal_unsafe(
+    iree_hal_nl_sync_semaphore_t* semaphore, uint64_t new_value) {
   if (new_value <= semaphore->current_value) {
     uint64_t current_value IREE_ATTRIBUTE_UNUSED = semaphore->current_value;
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
@@ -144,15 +144,15 @@ static iree_status_t iree_hal_sync_semaphore_signal_unsafe(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_sync_semaphore_signal(
+static iree_status_t iree_hal_nl_sync_semaphore_signal(
     iree_hal_semaphore_t* base_semaphore, uint64_t new_value) {
-  iree_hal_sync_semaphore_t* semaphore =
-      iree_hal_sync_semaphore_cast(base_semaphore);
+  iree_hal_nl_sync_semaphore_t* semaphore =
+      iree_hal_nl_sync_semaphore_cast(base_semaphore);
 
   iree_slim_mutex_lock(&semaphore->mutex);
 
   iree_status_t status =
-      iree_hal_sync_semaphore_signal_unsafe(semaphore, new_value);
+      iree_hal_nl_sync_semaphore_signal_unsafe(semaphore, new_value);
   if (!iree_status_is_ok(status)) {
     iree_slim_mutex_unlock(&semaphore->mutex);
     return status;
@@ -172,10 +172,10 @@ static iree_status_t iree_hal_sync_semaphore_signal(
   return iree_ok_status();
 }
 
-static void iree_hal_sync_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
+static void iree_hal_nl_sync_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
                                          iree_status_t status) {
-  iree_hal_sync_semaphore_t* semaphore =
-      iree_hal_sync_semaphore_cast(base_semaphore);
+  iree_hal_nl_sync_semaphore_t* semaphore =
+      iree_hal_nl_sync_semaphore_cast(base_semaphore);
   const iree_status_code_t status_code = iree_status_code(status);
 
   iree_slim_mutex_lock(&semaphore->mutex);
@@ -203,8 +203,8 @@ static void iree_hal_sync_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
                          IREE_ALL_WAITERS);
 }
 
-iree_status_t iree_hal_sync_semaphore_multi_signal(
-    iree_hal_sync_semaphore_state_t* shared_state,
+iree_status_t iree_hal_nl_sync_semaphore_multi_signal(
+    iree_hal_nl_sync_semaphore_state_t* shared_state,
     const iree_hal_semaphore_list_t semaphore_list) {
   IREE_ASSERT_ARGUMENT(shared_state);
   if (semaphore_list.count == 0) {
@@ -218,11 +218,11 @@ iree_status_t iree_hal_sync_semaphore_multi_signal(
   // Try to signal all semaphores, stopping if we encounter any issues.
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
-    iree_hal_sync_semaphore_t* semaphore =
-        iree_hal_sync_semaphore_cast(semaphore_list.semaphores[i]);
+    iree_hal_nl_sync_semaphore_t* semaphore =
+        iree_hal_nl_sync_semaphore_cast(semaphore_list.semaphores[i]);
 
     iree_slim_mutex_lock(&semaphore->mutex);
-    status = iree_hal_sync_semaphore_signal_unsafe(
+    status = iree_hal_nl_sync_semaphore_signal_unsafe(
         semaphore, semaphore_list.payload_values[i]);
     if (!iree_status_is_ok(status)) {
       iree_slim_mutex_unlock(&semaphore->mutex);
@@ -245,14 +245,14 @@ iree_status_t iree_hal_sync_semaphore_multi_signal(
   return status;
 }
 
-typedef struct iree_hal_sync_semaphore_notify_state_t {
-  iree_hal_sync_semaphore_t* semaphore;
+typedef struct iree_hal_nl_sync_semaphore_notify_state_t {
+  iree_hal_nl_sync_semaphore_t* semaphore;
   uint64_t value;
-} iree_hal_sync_semaphore_notify_state_t;
+} iree_hal_nl_sync_semaphore_notify_state_t;
 
-static bool iree_hal_sync_semaphore_is_signaled(
-    iree_hal_sync_semaphore_notify_state_t* state) {
-  iree_hal_sync_semaphore_t* semaphore = state->semaphore;
+static bool iree_hal_nl_sync_semaphore_is_signaled(
+    iree_hal_nl_sync_semaphore_notify_state_t* state) {
+  iree_hal_nl_sync_semaphore_t* semaphore = state->semaphore;
   iree_slim_mutex_lock(&semaphore->mutex);
   bool is_signaled = semaphore->current_value >= state->value ||
                      !iree_status_is_ok(semaphore->failure_status);
@@ -260,11 +260,11 @@ static bool iree_hal_sync_semaphore_is_signaled(
   return is_signaled;
 }
 
-static iree_status_t iree_hal_sync_semaphore_wait(
+static iree_status_t iree_hal_nl_sync_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
     iree_timeout_t timeout) {
-  iree_hal_sync_semaphore_t* semaphore =
-      iree_hal_sync_semaphore_cast(base_semaphore);
+  iree_hal_nl_sync_semaphore_t* semaphore =
+      iree_hal_nl_sync_semaphore_cast(base_semaphore);
 
   // Try to see if we can return immediately.
   iree_slim_mutex_lock(&semaphore->mutex);
@@ -289,14 +289,14 @@ static iree_status_t iree_hal_sync_semaphore_wait(
   // iree_wait_handle_t.
 
   // Perform wait on the global notification. Will wait forever.
-  iree_hal_sync_semaphore_state_t* shared_state = semaphore->shared_state;
-  iree_hal_sync_semaphore_notify_state_t notify_state = {
+  iree_hal_nl_sync_semaphore_state_t* shared_state = semaphore->shared_state;
+  iree_hal_nl_sync_semaphore_notify_state_t notify_state = {
       .semaphore = semaphore,
       .value = value,
   };
   iree_notification_await(
       &shared_state->notification,
-      (iree_condition_fn_t)iree_hal_sync_semaphore_is_signaled,
+      (iree_condition_fn_t)iree_hal_nl_sync_semaphore_is_signaled,
       (void*)&notify_state, timeout);
 
   iree_status_t status = iree_ok_status();
@@ -314,11 +314,11 @@ static iree_status_t iree_hal_sync_semaphore_wait(
 
 // Returns true if any semaphore in the list has signaled (or failed).
 // Used with with iree_condition_fn_t and must match that signature.
-static bool iree_hal_sync_semaphore_any_signaled(
+static bool iree_hal_nl_sync_semaphore_any_signaled(
     const iree_hal_semaphore_list_t* semaphore_list) {
   for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
-    iree_hal_sync_semaphore_t* semaphore =
-        iree_hal_sync_semaphore_cast(semaphore_list->semaphores[i]);
+    iree_hal_nl_sync_semaphore_t* semaphore =
+        iree_hal_nl_sync_semaphore_cast(semaphore_list->semaphores[i]);
     iree_slim_mutex_lock(&semaphore->mutex);
     bool is_signaled =
         semaphore->current_value >= semaphore_list->payload_values[i] ||
@@ -331,11 +331,11 @@ static bool iree_hal_sync_semaphore_any_signaled(
 
 // Returns true if all semaphores in the list has signaled (or any failed).
 // Used with with iree_condition_fn_t and must match that signature.
-static bool iree_hal_sync_semaphore_all_signaled(
+static bool iree_hal_nl_sync_semaphore_all_signaled(
     const iree_hal_semaphore_list_t* semaphore_list) {
   for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
-    iree_hal_sync_semaphore_t* semaphore =
-        iree_hal_sync_semaphore_cast(semaphore_list->semaphores[i]);
+    iree_hal_nl_sync_semaphore_t* semaphore =
+        iree_hal_nl_sync_semaphore_cast(semaphore_list->semaphores[i]);
     iree_slim_mutex_lock(&semaphore->mutex);
     bool is_signaled =
         semaphore->current_value >= semaphore_list->payload_values[i] ||
@@ -350,15 +350,15 @@ static bool iree_hal_sync_semaphore_all_signaled(
 // - IREE_STATUS_OK: any or all semaphores signaled (based on |wait_mode|).
 // - IREE_STATUS_ABORTED: one or more semaphores failed.
 // - IREE_STATUS_DEADLINE_EXCEEDED: any or all semaphores unsignaled.
-static iree_status_t iree_hal_sync_semaphore_result_from_state(
+static iree_status_t iree_hal_nl_sync_semaphore_result_from_state(
     iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t semaphore_list) {
   bool any_signaled = false;
   bool all_signaled = true;
   bool any_failed = false;
   for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
-    iree_hal_sync_semaphore_t* semaphore =
-        iree_hal_sync_semaphore_cast(semaphore_list.semaphores[i]);
+    iree_hal_nl_sync_semaphore_t* semaphore =
+        iree_hal_nl_sync_semaphore_cast(semaphore_list.semaphores[i]);
     iree_slim_mutex_lock(&semaphore->mutex);
     const uint64_t current_value = semaphore->current_value;
     const iree_status_code_t current_status_code =
@@ -392,8 +392,8 @@ static iree_status_t iree_hal_sync_semaphore_result_from_state(
   }
 }
 
-iree_status_t iree_hal_sync_semaphore_multi_wait(
-    iree_hal_sync_semaphore_state_t* shared_state,
+iree_status_t iree_hal_nl_sync_semaphore_multi_wait(
+    iree_hal_nl_sync_semaphore_state_t* shared_state,
     iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
   if (semaphore_list.count == 0) {
@@ -409,7 +409,7 @@ iree_status_t iree_hal_sync_semaphore_multi_wait(
   // Fast-path for polling; we'll never wait and can just do a quick query.
   if (iree_timeout_is_immediate(timeout)) {
     iree_status_t status =
-        iree_hal_sync_semaphore_result_from_state(wait_mode, semaphore_list);
+        iree_hal_nl_sync_semaphore_result_from_state(wait_mode, semaphore_list);
     IREE_TRACE_ZONE_END(z0);
     return status;
   }
@@ -418,22 +418,22 @@ iree_status_t iree_hal_sync_semaphore_multi_wait(
   iree_notification_await(
       &shared_state->notification,
       wait_mode == IREE_HAL_WAIT_MODE_ALL
-          ? (iree_condition_fn_t)iree_hal_sync_semaphore_all_signaled
-          : (iree_condition_fn_t)iree_hal_sync_semaphore_any_signaled,
+          ? (iree_condition_fn_t)iree_hal_nl_sync_semaphore_all_signaled
+          : (iree_condition_fn_t)iree_hal_nl_sync_semaphore_any_signaled,
       (void*)&semaphore_list, iree_infinite_timeout());
 
   // We may have been successful - or may have a partial failure.
   iree_status_t status =
-      iree_hal_sync_semaphore_result_from_state(wait_mode, semaphore_list);
+      iree_hal_nl_sync_semaphore_result_from_state(wait_mode, semaphore_list);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
-static const iree_hal_semaphore_vtable_t iree_hal_sync_semaphore_vtable = {
-    .destroy = iree_hal_sync_semaphore_destroy,
-    .query = iree_hal_sync_semaphore_query,
-    .signal = iree_hal_sync_semaphore_signal,
-    .fail = iree_hal_sync_semaphore_fail,
-    .wait = iree_hal_sync_semaphore_wait,
+static const iree_hal_semaphore_vtable_t iree_hal_nl_sync_semaphore_vtable = {
+    .destroy = iree_hal_nl_sync_semaphore_destroy,
+    .query = iree_hal_nl_sync_semaphore_query,
+    .signal = iree_hal_nl_sync_semaphore_signal,
+    .fail = iree_hal_nl_sync_semaphore_fail,
+    .wait = iree_hal_nl_sync_semaphore_wait,
 };

@@ -20,11 +20,11 @@ iree_cc_library(
   DEPS
     iree::base
     iree::hal
-    iree::hal::drivers::local_sync::sync_driver
+    drivers::nonlocal_sync
     iree::hal::local::loaders::registration
     iree::hal::local::plugins::registration
   DEFINES
-    "IREE_HAVE_HAL_LOCAL_SYNC_DRIVER_MODULE=1"
+    "IREE_HAVE_HAL_NONLOCAL_SYNC_DRIVER_MODULE=1"
   PUBLIC
 )
 

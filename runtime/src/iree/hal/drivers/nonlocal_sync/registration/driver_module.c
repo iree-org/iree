@@ -14,11 +14,11 @@
 #include "iree/hal/local/loaders/registration/init.h"
 #include "iree/hal/local/plugins/registration/init.h"
 
-static iree_status_t iree_hal_local_sync_driver_factory_enumerate(
+static iree_status_t iree_hal_nonlocal_sync_driver_factory_enumerate(
     void* self, iree_host_size_t* out_driver_info_count,
     const iree_hal_driver_info_t** out_driver_infos) {
   static const iree_hal_driver_info_t default_driver_info = {
-      .driver_name = IREE_SVL("local-sync"),
+      .driver_name = IREE_SVL("nonlocal-sync"),
       .full_name = IREE_SVL("Local execution using a lightweight "
                             "inline synchronous queue"),
   };
@@ -27,17 +27,17 @@ static iree_status_t iree_hal_local_sync_driver_factory_enumerate(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_local_sync_driver_factory_try_create(
+static iree_status_t iree_hal_nonlocal_sync_driver_factory_try_create(
     void* self, iree_string_view_t driver_name, iree_allocator_t host_allocator,
     iree_hal_driver_t** out_driver) {
-  if (!iree_string_view_equal(driver_name, IREE_SV("local-sync"))) {
+  if (!iree_string_view_equal(driver_name, IREE_SV("nonlocal-sync"))) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
                             "no driver '%.*s' is provided by this factory",
                             (int)driver_name.size, driver_name.data);
   }
 
-  iree_hal_sync_device_params_t default_params;
-  iree_hal_sync_device_params_initialize(&default_params);
+  iree_hal_nl_sync_device_params_t default_params;
+  iree_hal_nl_sync_device_params_initialize(&default_params);
 
   iree_hal_executable_plugin_manager_t* plugin_manager = NULL;
   iree_status_t status = iree_hal_executable_plugin_manager_create_from_flags(
@@ -59,7 +59,7 @@ static iree_status_t iree_hal_local_sync_driver_factory_try_create(
   }
 
   if (iree_status_is_ok(status)) {
-    status = iree_hal_sync_driver_create(
+    status = iree_hal_nl_sync_driver_create(
         driver_name, &default_params, loader_count, loaders, device_allocator,
         host_allocator, out_driver);
   }
@@ -72,12 +72,12 @@ static iree_status_t iree_hal_local_sync_driver_factory_try_create(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_local_sync_driver_module_register(
+IREE_API_EXPORT iree_status_t iree_hal_nonlocal_sync_driver_module_register(
     iree_hal_driver_registry_t* registry) {
   static const iree_hal_driver_factory_t factory = {
       .self = NULL,
-      .enumerate = iree_hal_local_sync_driver_factory_enumerate,
-      .try_create = iree_hal_local_sync_driver_factory_try_create,
+      .enumerate = iree_hal_nonlocal_sync_driver_factory_enumerate,
+      .try_create = iree_hal_nonlocal_sync_driver_factory_try_create,
   };
   return iree_hal_driver_registry_register_factory(registry, &factory);
 }
