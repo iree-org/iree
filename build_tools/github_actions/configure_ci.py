@@ -268,6 +268,7 @@ def get_trailers_and_labels(is_pr: bool) -> Tuple[Mapping[str, str], List[str]]:
         text=True,
         timeout=60,
     ).stdout.splitlines()
+    print(f"trailer_lines = {trailer_lines}")
     trailer_map = {
         k.lower().strip(): v.strip()
         for k, v in (line.split(":", maxsplit=1) for line in trailer_lines)
