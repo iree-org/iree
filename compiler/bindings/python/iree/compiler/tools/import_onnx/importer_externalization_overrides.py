@@ -90,7 +90,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
     def import_all(self, func=True):
         super().import_all(func)
         # write the param archive to an irpa file:
-        self.param_archive.create_archive_file(self.param_path)
+        self.param_archive.create_archive_file(self.param_data.param_path)
 
     def sanitize_name(self, name: str) -> str:
         # There are often some initializers in the models that have no name
