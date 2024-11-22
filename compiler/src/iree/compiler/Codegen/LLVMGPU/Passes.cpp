@@ -346,7 +346,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
 
   // Step 1. Promote matmul operands and pack to intrinsic shapes.
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
-  funcPassManager.addPass(IREE::GPU::createPackToIntrinsicsPass());
+  funcPassManager.addPass(createGPUPackToIntrinsicsPass());
   // Decompose packs and unpacks that are at the function boundary.
   funcPassManager.addPass(createDecomposeBoundaryPackUnPackOpsPass());
 
@@ -421,7 +421,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   }
 
   // Step 5. Greedily fuse parallel loops and hoist from serial loops.
-  funcPassManager.addPass(IREE::GPU::createFuseAndHoistParallelLoopsPass());
+  funcPassManager.addPass(createGPUFuseAndHoistParallelLoopsPass());
   funcPassManager.addPass(createGPUGreedilyDistributeToThreadsPass());
   funcPassManager.addPass(createTileLargeTensorsPass());
   funcPassManager.addPass(createCanonicalizerPass());

@@ -13,21 +13,20 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir::iree_compiler::IREE::GPU {
+namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_PACKTOINTRINSICSPASS
-#include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h.inc"
+#define GEN_PASS_DEF_GPUPACKTOINTRINSICSPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
 namespace {
-struct PackToIntrinsicsPass final
-    : impl::PackToIntrinsicsPassBase<PackToIntrinsicsPass> {
+struct GPUPackToIntrinsicsPass final
+    : impl::GPUPackToIntrinsicsPassBase<GPUPackToIntrinsicsPass> {
   void runOnOperation() override;
 };
 } // namespace
@@ -90,7 +89,7 @@ struct ConvertToMultiMma final : OpInterfaceRewritePattern<linalg::LinalgOp> {
   }
 };
 
-void PackToIntrinsicsPass::runOnOperation() {
+void GPUPackToIntrinsicsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
 
@@ -143,4 +142,4 @@ void PackToIntrinsicsPass::runOnOperation() {
   }
 }
 
-} // namespace mlir::iree_compiler::IREE::GPU
+} // namespace mlir::iree_compiler
