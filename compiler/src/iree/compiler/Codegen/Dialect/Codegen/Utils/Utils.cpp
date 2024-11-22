@@ -6,12 +6,33 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 namespace mlir::iree_compiler::IREE::Codegen {
 
 //===----------------------------------------------------------------------===//
 // Layout Structs.
 //===----------------------------------------------------------------------===//
+
+bool operator==(TileSwizzle::Dim lhs, TileSwizzle::Dim rhs) {
+  return lhs.kind == rhs.kind && lhs.size == rhs.size;
+}
+
+bool operator!=(TileSwizzle::Dim lhs, TileSwizzle::Dim rhs) {
+  return !(lhs == rhs);
+}
+
+bool operator==(const TileSwizzle &lhs, const TileSwizzle &rhs) {
+  return lhs.expandShape == rhs.expandShape &&
+         lhs.permutation == rhs.permutation;
+}
+
+bool operator!=(const TileSwizzle &lhs, const TileSwizzle &rhs) {
+  return !(lhs == rhs);
+}
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               TileSwizzle::Dim::Kind kind) {
@@ -54,6 +75,118 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 //===----------------------------------------------------------------------===//
 // Layout Utilities.
 //===----------------------------------------------------------------------===//
+
+std::string convertSwizzleKindToString(TileSwizzle::Dim::Kind kind) {
+  switch (kind) {
+  case TileSwizzle::Dim::Kind::Internal:
+    return "Internal";
+  case TileSwizzle::Dim::Kind::CrossThread:
+    return "CrossThread";
+  case TileSwizzle::Dim::Kind::CrossIntrinsic:
+    return "CrossIntrinsic";
+  default:
+    assert(false && "unhandled enum type");
+  }
+  return "";
+}
+
+std::optional<TileSwizzle::Dim::Kind>
+convertStringToSwizzleKind(StringRef str) {
+  if (str == "Internal") {
+    return TileSwizzle::Dim::Kind::Internal;
+  }
+  if (str == "CrossThread") {
+    return TileSwizzle::Dim::Kind::CrossThread;
+  }
+  if (str == "CrossIntrinsic") {
+    return TileSwizzle::Dim::Kind::CrossIntrinsic;
+  }
+  return std::nullopt;
+}
+
+static ArrayAttr swizzleDimToArrayAttr(MLIRContext *ctx, TileSwizzle::Dim dim) {
+  Builder b(ctx);
+  return b.getArrayAttr({b.getStringAttr(convertSwizzleKindToString(dim.kind)),
+                         b.getI16IntegerAttr(dim.size)});
+}
+
+static std::optional<TileSwizzle::Dim> arrayAttrToSwizzleDim(Attribute attr) {
+  auto arrayAttr = dyn_cast<ArrayAttr>(attr);
+  if (!arrayAttr) {
+    return std::nullopt;
+  }
+  ArrayRef<Attribute> attrs = arrayAttr.getValue();
+  if (attrs.size() != 2) {
+    return std::nullopt;
+  }
+  auto kindAttr = dyn_cast<StringAttr>(attrs[0]);
+  auto sizeAttr = dyn_cast<IntegerAttr>(attrs[1]);
+  if (!kindAttr || !sizeAttr) {
+    return std::nullopt;
+  }
+  std::optional<TileSwizzle::Dim::Kind> maybeKind =
+      convertStringToSwizzleKind(kindAttr.getValue());
+  if (!maybeKind) {
+    return std::nullopt;
+  }
+  return TileSwizzle::Dim(maybeKind.value(), sizeAttr.getInt());
+}
+
+DictionaryAttr serializeTileSwizzle(MLIRContext *ctx,
+                                    const TileSwizzle &swizzle) {
+  Builder b(ctx);
+  SmallVector<NamedAttribute> items;
+
+  SmallVector<Attribute> expandShape;
+  for (auto expandConfig : swizzle.expandShape) {
+    Attribute expandAttr = b.getArrayAttr(
+        llvm::map_to_vector(expandConfig, [&](TileSwizzle::Dim dim) {
+          return cast<Attribute>(swizzleDimToArrayAttr(ctx, dim));
+        }));
+    expandShape.push_back(expandAttr);
+  }
+
+  items.emplace_back(b.getStringAttr("expandShape"),
+                     b.getArrayAttr(expandShape));
+  items.emplace_back(b.getStringAttr("permutation"),
+                     b.getI64ArrayAttr(swizzle.permutation));
+
+  return b.getDictionaryAttr(items);
+}
+
+std::optional<TileSwizzle> deserializeTileSwizzle(DictionaryAttr attr) {
+  TileSwizzle swizzle;
+
+  auto expandShapeAttr = attr.getNamed("expandShape");
+  if (!expandShapeAttr) {
+    return std::nullopt;
+  }
+  auto expandShapeArrayAttr = dyn_cast<ArrayAttr>(expandShapeAttr->getValue());
+  if (!expandShapeArrayAttr) {
+    return std::nullopt;
+  }
+
+  for (auto expandConfig : expandShapeArrayAttr.getAsRange<ArrayAttr>()) {
+    TileSwizzle::ExpandShapeDimVectorType vec;
+    for (auto dimAttr : expandConfig.getAsRange<ArrayAttr>()) {
+      auto maybeDim = arrayAttrToSwizzleDim(dimAttr);
+      if (!maybeDim) {
+        return std::nullopt;
+      }
+      vec.push_back(maybeDim.value());
+    }
+    swizzle.expandShape.push_back(vec);
+  }
+
+  auto permAttr = attr.getNamed("permutation");
+  if (!permAttr || !isa<ArrayAttr>(permAttr->getValue())) {
+    return std::nullopt;
+  }
+  swizzle.permutation =
+      extractFromIntegerArrayAttr<int64_t>(permAttr->getValue());
+
+  return swizzle;
+}
 
 SmallVector<int64_t>
 getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape) {
