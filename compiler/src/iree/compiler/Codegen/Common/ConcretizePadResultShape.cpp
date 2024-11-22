@@ -136,11 +136,11 @@ public:
     MLIRContext *context = &getContext();
     auto funcOp = getOperation();
 
+    ConfigTrackingListener listener;
     {
       RewritePatternSet patterns(context);
       populateConcretizePadResultShapePatterns(patterns);
       GreedyRewriteConfig config;
-      auto listener = ConfigTrackingListener();
       config.listener = &listener;
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns),
                                               config))) {
