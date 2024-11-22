@@ -20,12 +20,6 @@
 // Command Line Options
 //===----------------------------------------------------------------------===//
 
-static llvm::cl::opt<std::string> clDispatchTransformFileName(
-    "iree-dispatch-creation-dispatch-use-transform-dialect",
-    llvm::cl::desc("MLIR file containing a top-level module that specifies "
-                   "the transformations to apply to form dispatch regions."),
-    llvm::cl::init(""));
-
 static llvm::cl::opt<bool> clDetensoring(
     "iree-dispatch-creation-enable-detensoring",
     llvm::cl::desc(
@@ -206,19 +200,7 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
 // `flow.dispatch.workgroup` ops.
 static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
   FunctionLikeNest(passManager)
-      // Only want use the transform dialect for some dispatch regions and let
-      // the FormDispatchRegions handle the rest. This only moves the root
-      // compute op into the dispatch region, so that we can run additional
-      // transformations afterwards with a simple region and without bothering
-      // producers.
-      .addPredicatedPass(
-          !clDispatchTransformFileName.empty(),
-          [&]() {
-            DispatchWithTransformDialectPassOptions options;
-            options.transformSpecPath = clDispatchTransformFileName;
-            return createDispatchWithTransformDialectPass(options);
-          })
-      // Create dispatches for scalar operations as roots
+      // Create dispatches for scalar operations as roots.
       .addPass(DispatchCreation::createFormScalarDispatchesPass)
       // Create `flow.dispatch.region` centered around a root and fuse with
       // producers and consumers.
