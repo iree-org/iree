@@ -665,3 +665,31 @@ util.func public @bubble_transpose_to_broadcast_elementwise(%arg0: tensor<2x3x4x
 //  BUBBLE-SAME:     ins(%[[ARG0]], %[[ARG1]] : tensor<2x3x4xf32>, tensor<2x4xf32>
 //       BUBBLE:     arith.addf
 //       BUBBLE:   util.return %[[ELEM]] : tensor<3x4x2xf32>
+
+// -----
+
+util.func public @bubble_transpose_v_from_attention(%q: tensor<2x10x4096x64xf16>, %k: tensor<2x10x4096x64xf16>, %v: tensor<2x10x4096x64xf16>, %scale: f16) -> tensor<2x10x4096x64xf16> {
+  %init_attention = tensor.empty() : tensor<2x10x4096x64xf16>
+  %attention = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]} ins(%q, %k, %v, %scale : tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, f16) outs(%init_attention : tensor<2x10x4096x64xf16>) {
+    ^bb0(%score: f16):
+      iree_linalg_ext.yield %score: f16
+  } -> tensor<2x10x4096x64xf16>
+  util.return %attention : tensor<2x10x4096x64xf16>
+}
+
+// CHECK-DAG: #[[$MAP_Q:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+// CHECK-DAG: #[[$MAP_K:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>
+// CHECK-DAG: #[[$MAP_V:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>
+// CHECK-DAG: #[[$MAP_S:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+// CHECK-DAG: #[[$MAP_O:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
+
+// CHECK-LABEL:         util.func public @bubble_transpose_v_from_attention(
+// CHECK-SAME:         %[[ARG0:.*]]: tensor<2x10x4096x64xf16>, %[[ARG1:.*]]: tensor<2x10x4096x64xf16>, %[[ARG2:.*]]: tensor<2x10x4096x64xf16>,
+// CHECK-SAME:         %[[ARG3:.*]]: f16) -> tensor<2x10x4096x64xf16> {
+// CHECK:         %[[EMPTY:.*]] = tensor.empty() : tensor<2x10x4096x64xf16>
+// CHECK:         %[[TRANS_ARG2:.*]] = linalg.transpose ins(%[[ARG2]] : tensor<2x10x4096x64xf16>) outs({{.*}} : tensor<2x10x64x4096xf16>) permutation = [0, 1, 3, 2]
+// CHECK:         %[[ATTN:.*]] = iree_linalg_ext.attention
+// CHECK-SAME:    {indexing_maps = [#[[$MAP_Q]], #[[$MAP_K]], #[[$MAP_V]], #[[$MAP_S]], #[[$MAP_O]]]}
+// CHECK-SAME:    ins(%[[ARG0]], %[[ARG1]], %[[TRANS_ARG2]], %[[ARG3]] : tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, tensor<2x10x64x4096xf16>, f16)
+// CHECK-SAME:    outs(%[[EMPTY]] : tensor<2x10x4096x64xf16>)
+// CHECK:         util.return %[[ATTN]] : tensor<2x10x4096x64xf16>

@@ -13,6 +13,7 @@
 
 #include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Utils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/Support/Debug.h"
@@ -1087,6 +1088,8 @@ void PropagateLinalgTransposePass::runOnOperation() {
     linalg::populateFoldReshapeOpsByExpansionPatterns(bubblingPatterns,
                                                       reshapePropagationFn);
     linalg::FillOp::getCanonicalizationPatterns(bubblingPatterns, context);
+    IREE::LinalgExt::populateBubbleTransposeFromLinalgExtOps(context,
+                                                             bubblingPatterns);
     bubblingPatterns.insert<FuseTransposeWithProducerLinalgOp>(
         context, enableAggressivePropagation);
     bubblingPatterns.insert<BubbleTransposeThroughCollapseShape>(context);

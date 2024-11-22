@@ -80,7 +80,7 @@ static SmallVector<AffineMap> getStandardAttentionIndexingMaps(MLIRContext *ctx,
 
   auto qMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k1}, ctx);
   auto kMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, k1}, ctx);
-  auto vMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {n, k2}, ctx);
+  auto vMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, n}, ctx);
   auto sMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, ctx);
   auto rMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, n}, ctx);
   if (hasMask) {
@@ -162,37 +162,8 @@ struct AttentionOpConversion
       }
     }
 
-    // Generate TransposeV S.T we can give it an opportunity to be fused
-    // with attention producer to increase perf. Worst case, it will
-    // get fused back into attentionOp, giving same performance.
-    ShapedType valueType = op.getValueType();
-    SmallVector<Value> valueDynSizes;
-    int64_t valueRank = valueType.getRank();
-    for (int i = 0; i < valueRank; ++i) {
-      if (valueType.isDynamicDim(i)) {
-        valueDynSizes.push_back(rewriter.create<tensor::DimOp>(loc, value, i));
-      }
-    }
-    // Since we only transpose the 2 fastest dim, we only need to swap dynamic
-    // sizes iff the 2 fastest dim are dynamic.
-    if (valueType.isDynamicDim(valueRank - 1) &&
-        valueType.isDynamicDim(valueRank - 2)) {
-      std::swap(valueDynSizes[valueDynSizes.size() - 1],
-                valueDynSizes[valueDynSizes.size() - 2]);
-    }
-    SmallVector<int64_t> transVShape(op.getValueType().getShape());
-    std::swap(transVShape[valueRank - 1], transVShape[valueRank - 2]);
-    Value initTransV = rewriter.create<tensor::EmptyOp>(
-        loc, transVShape, valueType.getElementType(), valueDynSizes);
-    SmallVector<int64_t> perm =
-        llvm::to_vector(llvm::seq<int64_t>(0, valueRank));
-    std::swap(perm[valueRank - 1], perm[valueRank - 2]);
-    Value transposeV =
-        rewriter.create<linalg::TransposeOp>(loc, value, initTransV, perm)
-            ->getResult(0);
-
     auto attention = rewriter.create<IREE::LinalgExt::AttentionOp>(
-        loc, result.getType(), query, key, transposeV, scale, result,
+        loc, result.getType(), query, key, value, scale, result,
         rewriter.getAffineMapArrayAttr(indexingMaps), optionalMask);
 
     {
