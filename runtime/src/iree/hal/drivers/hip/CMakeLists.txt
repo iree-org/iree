@@ -23,6 +23,8 @@ iree_cc_library(
     "api.h"
     "cleanup_thread.c"
     "cleanup_thread.h"
+    "dispatch_thread.c"
+    "dispatch_thread.h"
     "event_pool.c"
     "event_pool.h"
     "event_semaphore.c"
