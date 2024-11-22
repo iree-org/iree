@@ -37,7 +37,6 @@ jobs:
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       VENV_DIR: ${{ github.workspace }}/.venv
-      IREE_VMVX_DISABLE: 0
     steps:
       - name: Checking out repository
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
@@ -63,7 +62,7 @@ jobs:
           python -m pip install -e integrations/pjrt/python_packages/iree_${{ matrix.pjrt_platform }}_plugin
           # install jax (must be no larger than 0.4.20, refer to #19223)
           # TODO: switch to the latest JAX after #19223 is fixed
-          python -m pip install jax==0.4.20 jaxlib==0.4.20
+          python -m pip install jax==0.4.20 jaxlib==0.4.20 numpy<2
       - name: Run tests
         run: |
           source ${VENV_DIR}/bin/activate
