@@ -8,8 +8,6 @@
 #define IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_UTILS_H_
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
-#include "llvm-c/TargetMachine.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"

@@ -227,6 +227,98 @@ function(iree_cuda_bitcode_library)
   )
 endfunction()
 
+# iree_amdgpu_bitcode_library()
+#
+# Builds an AMDGPU LLVM bitcode library from an input file via clang.
+#
+# Parameters:
+# NAME: Name of the target.
+# GPU_ARCH: Target AMDGPU architecture, e.g. gfx942.
+# SRCS: Source files to pass to clang. Headers (*.h) are for dependency
+#       tracking only. Current limitation: only one non-header source is
+#       supported.
+# COPTS: Additional flags to pass to clang.
+# OUT: Output file name. Defaults to {source.c}.{gpu_arch}.bc.
+#
+function(iree_amdgpu_bitcode_library)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "NAME;OUT;GPU_ARCH"
+    "SRCS;COPTS"
+    ${ARGN}
+  )
+
+  set(_SRC "")
+  foreach(_SRCS_ENTRY IN LISTS _RULE_SRCS)
+    if(_SRCS_ENTRY MATCHES "\.h$")
+      continue()
+    endif()
+    if (_SRC)
+      message(SEND_ERROR "Currently limitation: only one non-header file allowed in SRCS.")
+    endif()
+    set(_SRC "${_SRCS_ENTRY}")
+  endforeach()
+  if(NOT _SRC)
+    message(SEND_ERROR "Error: no non-header file found in SRCS=${_RULE_SRCS}.")
+  endif()
+
+  if(DEFINED _RULE_OUT)
+    set(_OUT "${_RULE_OUT}")
+  else()
+    set(_OUT "${_SRC}.${_RULE_GPU_ARCH}.bc")
+  endif()
+
+  set(_COPTS
+    # Language: C23
+    "-std=c23"
+
+    # Avoid dependencies.
+    "-nogpulib"
+
+    # Avoid ABI issues.
+    "-fno-short-wchar"  # Shouldn't matter to us, but doesn't hurt.
+
+    # Target architecture/machine.
+    "-target"
+    "amdgcn-amd-amdhsa"
+    "-march=${_RULE_GPU_ARCH}"
+    "-fgpu-rdc"  # NOTE: may not be required for all targets.
+
+    # Optimized.
+    "-O3"
+    "-fno-ident"
+    "-fvisibility=hidden"
+
+    # Object file only in bitcode format.
+    "-c"
+    "-emit-llvm"
+  )
+
+  add_custom_command(
+    OUTPUT
+      "${_OUT}"
+    COMMAND
+      "${IREE_CLANG_BINARY}"
+      ${_COPTS}
+      "-I" "${IREE_SOURCE_DIR}"
+      "${CMAKE_CURRENT_SOURCE_DIR}/${_SRC}"
+      "-o" "${_OUT}"
+    DEPENDS
+      "${IREE_CLANG_BINARY}"
+      "${_RULE_SRCS}"
+    COMMENT
+      "Compiling ${_SRC} to ${_OUT}"
+    VERBATIM
+  )
+
+  # Only add iree_${NAME} as custom target doesn't support aliasing to
+  # iree::${NAME}.
+  iree_package_name(_PACKAGE_NAME)
+  add_custom_target("${_PACKAGE_NAME}_${_RULE_NAME}"
+    DEPENDS "${_OUT}"
+  )
+endfunction()
 
 # iree_link_bitcode()
 #
