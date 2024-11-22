@@ -59,6 +59,13 @@ struct BubbleUpExtract : OpRewritePattern<tensor::ExtractSliceOp> {
           "expected generic op to have all projected permutation maps");
     }
 
+    if (!genericOp.isAllParallelLoops()) {
+      // TODO(#19230): causing codegen issues when the `extract_slice` was
+      // created during `PadToIntrinsics`.
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "expected no reduction loops");
+    }
+
     if (genericOp.hasIndexSemantics()) {
       return rewriter.notifyMatchFailure(
           genericOp, "pattern doesn't support index semantics");
