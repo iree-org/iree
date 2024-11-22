@@ -34,6 +34,13 @@ using ScalableTileFlagsListTypeRef = ArrayRef<SmallVector<bool>>;
 // clang-format on
 
 namespace mlir::iree_compiler {
+//===----------------------------------------------------------------------===//
+// Constant names.
+//===----------------------------------------------------------------------===//
+constexpr StringLiteral kConfigAttrName = "lowering_config";
+constexpr StringLiteral kTuningSpecAttrName =
+    "iree_codegen.tuning_spec_entrypoint";
+constexpr StringLiteral kKernelConfigSpecName = "__kernel_config";
 
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting iree_codegen.translation_info attribute on the
@@ -65,8 +72,6 @@ void eraseTranslationInfo(mlir::FunctionOpInterface funcOp);
 // Helpers for getting/setting `iree_codegen.lowering_config` attribute on root
 // operations.
 //===----------------------------------------------------------------------===//
-
-static const char kConfigAttrName[] = "lowering_config";
 
 /// Returns the lowering configuration set for an operation. Returns `nullptr`
 /// if no value is set.  It expects that the attribute is stored using the
@@ -200,6 +205,10 @@ void setCompilationInfo(Operation *op,
 /// Removes the `#iree_codegen.compilation_info` attribute that is set on the
 /// operation.
 void eraseCompilationInfo(Operation *op);
+
+//===----------------------------------------------------------------------===//
+// Helpers for getting/setting TD kenel config and tuning spec attribues.
+//===----------------------------------------------------------------------===//
 
 } // namespace mlir::iree_compiler
 
