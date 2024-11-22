@@ -16,6 +16,7 @@ iree_cc_test(
   SRCS
     "UtilsTest.cpp"
   DEPS
+    MLIRIR
     gmock
     gtest
     iree::compiler::Codegen::Dialect::Codegen::Utils
