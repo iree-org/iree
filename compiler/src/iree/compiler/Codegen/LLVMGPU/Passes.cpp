@@ -67,6 +67,12 @@ static llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
                    "allocated for the given target"),
     llvm::cl::init(163 * 1024));
 
+static llvm::cl::opt<bool> clLLVMGPUEnableSharedMemoryReuse(
+    "iree-llvmgpu-enable-shared-memory-reuse",
+    llvm::cl::desc(
+        "Enable shared memory reuse in the vector distribute pipeline"),
+    llvm::cl::init(false));
+
 //===----------------------------------------------------------------------===//
 // Bufferization Configuration
 //===----------------------------------------------------------------------===//
@@ -914,9 +920,12 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     options.paddingBits = 64;
     funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
   }
-
   if (options.prefetchSharedMemory) {
     funcPassManager.addPass(createLLVMGPUPrefetchSharedMemoryPass());
+  }
+  if (clLLVMGPUEnableSharedMemoryReuse) {
+    funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
+    funcPassManager.addPass(createGPUReuseSharedMemoryAllocsPass());
   }
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCSEPass());
