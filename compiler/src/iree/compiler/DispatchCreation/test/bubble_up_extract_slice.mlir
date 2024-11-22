@@ -139,3 +139,25 @@ func.func @bubble_up_extract_slice_single_use(%arg0: tensor<131072xi64>, %arg1: 
 //  CHECK-SAME:       ins(%[[SLICE0]], %[[SLICE1]] :
 //  CHECK-SAME:       outs(%[[EMPTY]] :
 //       CHECK:   return %[[GENERIC]]
+
+// -----
+
+func.func @dont_bubble_through_reduction(%arg0: tensor<8x128x128xf16>, %arg1: tensor<16x8xf16>, %arg2: tensor<16x128x128xf32>) -> tensor<8x128x128xf32> {
+  %0 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d3, d1, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<8x128x128xf16>, tensor<16x8xf16>) outs(%arg2 : tensor<16x128x128xf32>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f32):
+    %1 = arith.extf %in : f16 to f32
+    %2 = arith.extf %in_0 : f16 to f32
+    %3 = arith.mulf %1, %2 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<16x128x128xf32>
+  %extracted_slice = tensor.extract_slice %0[0, 0, 0] [8, 128, 128] [1, 1, 1] : tensor<16x128x128xf32> to tensor<8x128x128xf32>
+  return %extracted_slice : tensor<8x128x128xf32>
+}
+// CHECK-LABEL: func @dont_bubble_through_reduction
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<8x128x128xf16>
+//  CHECK-SAME:     %[[ARG1:.+]]: tensor<16x8xf16>
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
+//   CHECK-DAG:   %[[SLICE:.+]] = tensor.extract_slice %[[GENERIC]]
+//       CHECK:   return %[[SLICE]]
