@@ -20,12 +20,11 @@ namespace mlir::iree_compiler {
 namespace {
 static constexpr int64_t kCudaWarpSize = 32;
 
-template <typename OpTy>
 static void
 replaceUnitMappingIdsHelper(RewriterBase &rewriter, Location loc, Block *parent,
                             Value replacement,
                             ArrayRef<int64_t> availableMappingSizes) {
-  parent->walk([&](OpTy idOp) {
+  parent->walk([&](gpu::ThreadIdOp idOp) {
     if (availableMappingSizes[static_cast<int64_t>(idOp.getDimension())] == 1)
       rewriter.replaceAllUsesWith(idOp.getResult(), replacement);
   });
@@ -63,8 +62,7 @@ DiagnosedSilenceableFailure static mapNestedForallToThreadsImpl(
 
   // Replace ids of dimensions known to be 1 by 0 to simplify the IR.
   // Here, the result of mapping determines the available mapping sizes.
-  replaceUnitMappingIdsHelper<gpu::ThreadIdOp>(rewriter, loc, parentBlock, zero,
-                                               blockDims);
+  replaceUnitMappingIdsHelper(rewriter, loc, parentBlock, zero, blockDims);
   return DiagnosedSilenceableFailure::success();
 }
 
