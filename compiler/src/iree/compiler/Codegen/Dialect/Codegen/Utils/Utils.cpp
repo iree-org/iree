@@ -72,6 +72,18 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   return os;
 }
 
+bool operator==(const MaterializeEncodingInfo &lhs,
+                const MaterializeEncodingInfo &rhs) {
+  return lhs.innerDimsPos == rhs.innerDimsPos &&
+         lhs.innerTileSizes == rhs.innerTileSizes &&
+         lhs.outerDimsPerm == rhs.outerDimsPerm && lhs.swizzle == rhs.swizzle;
+}
+
+bool operator!=(const MaterializeEncodingInfo &lhs,
+                const MaterializeEncodingInfo &rhs) {
+  return !(lhs == rhs);
+}
+
 //===----------------------------------------------------------------------===//
 // Layout Utilities.
 //===----------------------------------------------------------------------===//
@@ -186,6 +198,57 @@ std::optional<TileSwizzle> deserializeTileSwizzle(DictionaryAttr attr) {
       extractFromIntegerArrayAttr<int64_t>(permAttr->getValue());
 
   return swizzle;
+}
+
+DictionaryAttr serializeEncodingInfo(MLIRContext *ctx,
+                                     const MaterializeEncodingInfo &info) {
+  Builder b(ctx);
+  SmallVector<NamedAttribute> items;
+  items.emplace_back(b.getStringAttr("innerDimsPos"),
+                     b.getI64ArrayAttr(info.innerDimsPos));
+  items.emplace_back(b.getStringAttr("innerTileSizes"),
+                     b.getI64ArrayAttr(info.innerTileSizes));
+  items.emplace_back(b.getStringAttr("outerDimsPerm"),
+                     b.getI64ArrayAttr(info.outerDimsPerm));
+  if (info.swizzle) {
+    items.emplace_back(b.getStringAttr("swizzle"),
+                       serializeTileSwizzle(ctx, info.swizzle.value()));
+  }
+
+  return b.getDictionaryAttr(items);
+}
+
+std::optional<MaterializeEncodingInfo>
+deserializeEncodingInfo(DictionaryAttr attr) {
+  MaterializeEncodingInfo info;
+
+#define extractArrayAttrItem(name)                                             \
+  {                                                                            \
+    auto value = attr.getNamed(#name);                                         \
+    if (!value || !isa<ArrayAttr>(value->getValue())) {                        \
+      return std::nullopt;                                                     \
+    }                                                                          \
+    info.name = extractFromIntegerArrayAttr<int64_t>(value->getValue());       \
+  }
+
+  extractArrayAttrItem(innerDimsPos);
+  extractArrayAttrItem(innerTileSizes);
+  extractArrayAttrItem(outerDimsPerm);
+#undef extractArrayAttrItem
+
+  if (attr.contains("swizzle")) {
+    auto dictAttr =
+        dyn_cast<DictionaryAttr>(attr.getNamed("swizzle")->getValue());
+    if (!dictAttr) {
+      return std::nullopt;
+    }
+    info.swizzle = deserializeTileSwizzle(dictAttr);
+    if (!info.swizzle) {
+      return std::nullopt;
+    }
+  }
+
+  return info;
 }
 
 SmallVector<int64_t>
