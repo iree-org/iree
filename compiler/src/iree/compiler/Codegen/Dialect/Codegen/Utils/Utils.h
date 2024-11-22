@@ -9,7 +9,6 @@
 
 #include <cstdint>
 
-#include "llvm-c/TargetMachine.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Support/LLVM.h"

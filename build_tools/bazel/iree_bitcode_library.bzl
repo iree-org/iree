@@ -255,6 +255,80 @@ def iree_cuda_bitcode_library(
         **kwargs
     )
 
+def iree_amdgpu_bitcode_library(
+        name,
+        gpu_arch,
+        srcs,
+        copts = [],
+        out = None,
+        **kwargs):
+    """Builds an AMDGPU LLVM bitcode library from an input file via clang.
+
+    Args:
+        name: Name of the target.
+        gpu_arch: Target AMDGPU architecture, e.g. gfx942.
+        srcs: Source files to pass to clang. Headers (*.h) are for dependency
+              tracking only. Current limitation: only one non-header source is
+              supported.
+        copts: Additional flags to pass to clang.
+        out: Output file name. Defaults to {source.c}.{gpu_arch}.bc.
+        **kwargs: any additional attributes to pass to the underlying rules.
+    """
+
+    clang_tool = "@llvm-project//clang:clang"
+
+    base_copts = [
+        # Language: C23
+        "-std=c23",
+
+        # Avoid dependencies.
+        "-nogpulib",
+
+        # Avoid ABI issues.
+        "-fno-short-wchar",  # Shouldn't matter to us, but doesn't hurt.
+
+        # Target architecture/machine.
+        "-target",
+        "amdgcn-amd-amdhsa",
+        "-march=%s" % gpu_arch,
+        "-fgpu-rdc",  # NOTE: may not be required for all targets.
+
+        # Optimized.
+        "-O3",
+        "-fno-ident",
+        "-fvisibility=hidden",
+
+        # Object file only in bitcode format.
+        "-c",
+        "-emit-llvm",
+    ]
+
+    c_srcs = [src for src in srcs if src.endswith(".c")]
+    if len(c_srcs) != 1:
+        fail("Expected exactly one file with .c extension in srcs")
+    src = c_srcs[0]
+
+    if not out:
+        out = "%s.%s.bc" % (src, gpu_arch)
+
+    native.genrule(
+        name = "gen_%s" % (out),
+        srcs = srcs,
+        outs = [out],
+        cmd = " ".join([
+            "$(location %s)" % (clang_tool),
+            "$(location %s)" % (src),
+            "-o $(location %s)" % (out),
+            "-I .",
+        ] + base_copts + copts),
+        tools = [
+            clang_tool,
+        ],
+        message = "Compiling %s to %s..." % (src, out),
+        output_to_bindir = 1,
+        **kwargs
+    )
+
 def iree_link_bitcode(
         name,
         bitcode_files,

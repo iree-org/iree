@@ -34,9 +34,6 @@ LogicalResult linkUkernelBitcodeFiles(Location loc, llvm::Module *module,
 // a blob.
 std::string createHsaco(Location loc, StringRef isa, StringRef name);
 
-// Returns true if the rocm archtecture target is supported for ukernels.
-bool hasUkernelSupportedRocmArch(IREE::HAL::ExecutableTargetAttr targetAttr);
-
 } // namespace mlir::iree_compiler::IREE::HAL
 
 #endif // IREE_COMPILER_PLUGINS_TARGET_ROCM_ROCMTARGETUTILS_H_

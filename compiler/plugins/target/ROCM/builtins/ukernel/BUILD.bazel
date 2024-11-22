@@ -1,0 +1,61 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library")
+load("//build_tools/bazel:iree_bitcode_library.bzl", "iree_amdgpu_bitcode_library")
+load("//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_cmake_extra_content(
+    content = """
+if(NOT IREE_TARGET_BACKEND_ROCM)
+  return()
+endif()
+""",
+    inline = True,
+)
+
+gpu_archs = [
+    "gfx90a",
+    "gfx942",
+    "gfx1030",
+    "gfx1100",
+]
+
+argmax_types = [
+    "f16i32",
+    "f16i64",
+    "f32i32",
+    "f32i64",
+]
+
+[iree_amdgpu_bitcode_library(
+    name = "iree_uk_amdgpu_argmax_%s_%s" % (type, gpu_arch),
+    srcs = [
+        "iree_uk_amdgpu_argmax_%s.c" % type,
+        "common.h",
+    ],
+    gpu_arch = gpu_arch,
+) for type in argmax_types for gpu_arch in gpu_archs]
+
+argmax_bc_files = {gpu_arch: [
+    ":iree_uk_amdgpu_argmax_%s.c.%s.bc" % (type, gpu_arch)
+    for type in argmax_types
+] for gpu_arch in gpu_archs}
+
+[iree_c_embed_data(
+    name = "iree_uk_amdgpu_%s" % gpu_arch,
+    srcs = argmax_bc_files[gpu_arch],
+    c_file_output = "iree_uk_amdgpu_%s.c" % gpu_arch,
+    flatten = True,
+    h_file_output = "iree_uk_amdgpu_%s.h" % gpu_arch,
+    identifier = "iree_uk_amdgpu_%s" % gpu_arch,
+) for gpu_arch in gpu_archs]

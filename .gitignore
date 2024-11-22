@@ -27,6 +27,8 @@ Testing/
 
 # Bazel artifacts
 **/bazel-*
+MODULE.bazel
+MODULE.bazel.lock
 
 # Executables
 *.exe

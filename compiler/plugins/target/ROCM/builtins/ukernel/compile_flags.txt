@@ -2,7 +2,6 @@
 # The flags here mirror CMakeLists.txt. Flags that should not matter to clangd
 # have been omitted.
 
--x c
 -std=c23
 -I
 ../../../../../..
