@@ -74,7 +74,7 @@ jobs:
           cat runtime/version_local.json
 
       - name: Enable cache
-        uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # v3.3.1
+        uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4.1.2
         with:
           path: ${{ env.CACHE_DIR }}
           key: iree-pkgci-linux-release-x86_64-v1-${{ github.sha }}
@@ -139,7 +139,7 @@ jobs:
 #         realpath version_info.json
 #         cat version_info.json
 #     - name: Enable cache
-#       uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8  # v3.3.1
+#       uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4.1.2
 #       with:
 #         path: ${{ env.CACHE_DIR }}
 #         key: iree-pkgci-linux-release-asserts-x86_64-v1-${{ github.sha }}
