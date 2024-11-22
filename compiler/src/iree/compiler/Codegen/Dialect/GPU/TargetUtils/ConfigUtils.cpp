@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
@@ -81,7 +82,7 @@ setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
   attrs.emplace_back(b.getStringAttr("reduction"),
                      b.getI64ArrayAttr(reductionTileSizes));
   // Promote operands to use shared memory for LHS and RHS.
-  GPU::LoweringConfigAttr::setPromotedOperandList(context, attrs, {0, 1});
+  GPU::setPromotedOperandList(context, attrs, {0, 1});
   auto configDict = b.getDictionaryAttr(attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
@@ -317,7 +318,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   attrs.emplace_back(StringAttr::get(context, "subgroup"),
                      b.getI64ArrayAttr(subgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "mma_kind"), mmaKind);
-  GPU::LoweringConfigAttr::setPromotedOperandList(context, attrs, {0, 1});
+  GPU::setPromotedOperandList(context, attrs, {0, 1});
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
   int64_t flatWorkgroupSize =
@@ -657,7 +658,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
                      b.getI64ArrayAttr(threadTileSizes));
 
   if (isNonMatvecContraction(linalgOp)) {
-    GPU::LoweringConfigAttr::setPromotedOperandList(context, attrs, {0, 1});
+    GPU::setPromotedOperandList(context, attrs, {0, 1});
   }
 
   // Heuristic value chosen to limit maximum vector sizes when tiling below.

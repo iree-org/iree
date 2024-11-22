@@ -12,6 +12,7 @@
 
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
@@ -421,13 +422,10 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                      b.getI64ArrayAttr(workgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "reduction"),
                      b.getI64ArrayAttr(reductionTileSizes));
-  IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, attrs, {0, 1});
-  IREE::GPU::LoweringConfigAttr::setMmaKind(context, attrs,
-                                            mmaKinds[schedule->index]);
-  IREE::GPU::LoweringConfigAttr::setSubgroupMCount(
-      context, attrs, schedule->mSubgroupCounts[0]);
-  IREE::GPU::LoweringConfigAttr::setSubgroupNCount(
-      context, attrs, schedule->nSubgroupCounts[0]);
+  IREE::GPU::setPromotedOperandList(context, attrs, {0, 1});
+  IREE::GPU::setMmaKind(context, attrs, mmaKinds[schedule->index]);
+  IREE::GPU::setSubgroupMCount(context, attrs, schedule->mSubgroupCounts[0]);
+  IREE::GPU::setSubgroupNCount(context, attrs, schedule->nSubgroupCounts[0]);
 
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
@@ -687,13 +685,10 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
                      b.getI64ArrayAttr(workgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "reduction"),
                      b.getI64ArrayAttr(reductionTileSizes));
-  IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, attrs, {0, 1});
-  IREE::GPU::LoweringConfigAttr::setMmaKind(context, attrs,
-                                            mmaKinds[schedule->index]);
-  IREE::GPU::LoweringConfigAttr::setSubgroupMCount(
-      context, attrs, schedule->mSubgroupCounts[0]);
-  IREE::GPU::LoweringConfigAttr::setSubgroupNCount(
-      context, attrs, schedule->nSubgroupCounts[0]);
+  IREE::GPU::setPromotedOperandList(context, attrs, {0, 1});
+  IREE::GPU::setMmaKind(context, attrs, mmaKinds[schedule->index]);
+  IREE::GPU::setSubgroupMCount(context, attrs, schedule->mSubgroupCounts[0]);
+  IREE::GPU::setSubgroupNCount(context, attrs, schedule->nSubgroupCounts[0]);
 
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
@@ -905,8 +900,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                      b.getI64ArrayAttr(workgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "reduction"),
                      b.getI64ArrayAttr(reductionTileSizes));
-  IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, attrs,
-                                                        {0, 1, 2});
+  IREE::GPU::setPromotedOperandList(context, attrs, {0, 1, 2});
 
   SmallVector<NamedAttribute, 2> qkConfig;
   SmallVector<NamedAttribute, 2> pvConfig;
@@ -921,22 +915,16 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Configuring for qk matmul.
   // subgroup_n count for qk matmul is always 1, since we do not tile K1.
-  IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, qkConfig,
-                                                        {0, 1});
-  IREE::GPU::LoweringConfigAttr::setMmaKind(context, qkConfig,
-                                            mmaKinds[schedule->index]);
-  IREE::GPU::LoweringConfigAttr::setSubgroupMCount(
-      context, qkConfig, schedule->mSubgroupCounts[0]);
-  IREE::GPU::LoweringConfigAttr::setSubgroupNCount(context, qkConfig, 1);
+  IREE::GPU::setPromotedOperandList(context, qkConfig, {0, 1});
+  IREE::GPU::setMmaKind(context, qkConfig, mmaKinds[schedule->index]);
+  IREE::GPU::setSubgroupMCount(context, qkConfig, schedule->mSubgroupCounts[0]);
+  IREE::GPU::setSubgroupNCount(context, qkConfig, 1);
 
   // Configuring for pv matmul.
-  IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, pvConfig, {1});
-  IREE::GPU::LoweringConfigAttr::setMmaKind(context, pvConfig,
-                                            mmaKinds[schedule->index]);
-  IREE::GPU::LoweringConfigAttr::setSubgroupMCount(
-      context, pvConfig, schedule->mSubgroupCounts[0]);
-  IREE::GPU::LoweringConfigAttr::setSubgroupNCount(
-      context, pvConfig, schedule->nSubgroupCounts[0]);
+  IREE::GPU::setPromotedOperandList(context, pvConfig, {1});
+  IREE::GPU::setMmaKind(context, pvConfig, mmaKinds[schedule->index]);
+  IREE::GPU::setSubgroupMCount(context, pvConfig, schedule->mSubgroupCounts[0]);
+  IREE::GPU::setSubgroupNCount(context, pvConfig, schedule->nSubgroupCounts[0]);
 
   SmallVector<NamedAttribute, 2> qkAttrs;
   SmallVector<NamedAttribute, 2> pvAttrs;
