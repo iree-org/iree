@@ -189,38 +189,6 @@ def CollapseDimensionsPass :
   ];
 }
 
-def DispatchWithTransformDialectPass : Pass<"iree-dispatch-creation-dispatch-with-transform-dialect"> {
-  let summary = "Dispatch Linalg operations on tensors by using the transform dialect interpreter.";
-  let description = [{
-    Pass to perform dispatch of Linalg on tensor ops by using the transform
-    dialect. Dispatch regions are created as specified by the transform module
-    that is parsed from `transformSpecPath`.
-
-    TODO: Drop this pass in favor of the one upstream. The one upstream requires
-    separate loading of the module and thus isn't suited for single-use
-    transform scripts.
-  }];
-  let dependentDialects = [
-    "mlir::affine::AffineDialect",
-    "mlir::arith::ArithDialect",
-    "mlir::linalg::LinalgDialect",
-    "mlir::pdl::PDLDialect",
-    "mlir::pdl_interp::PDLInterpDialect",
-    "mlir::scf::SCFDialect",
-    "mlir::tensor::TensorDialect",
-    "mlir::transform::TransformDialect",
-    "IREE::Flow::FlowDialect",
-    "IREE::LinalgExt::IREELinalgExtDialect",
-  ];
-  let options = [
-    Option<"disableExpensiveChecks", "disable-expensive-checks", "bool",
-           "false",
-           "Disable expensive checks in the interpreter for a faster run.">,
-    Option<"transformSpecPath", "transform-spec-path", "std::string",
-           /*default=*/"", "File path to the transform spec to use.">,
-  ];
-}
-
 def FormDispatchRegionsPass :
     InterfacePass<"iree-dispatch-creation-form-dispatch-regions", "mlir::FunctionOpInterface"> {
   let summary = "Form Dispatch Region Ops from Linalg operations on tensors to form dispatch.regions.";
