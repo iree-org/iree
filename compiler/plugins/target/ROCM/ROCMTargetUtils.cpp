@@ -89,23 +89,7 @@ static LogicalResult linkBitcodeFile(Location loc, llvm::Linker &linker,
                                      llvm::LLVMContext &context) {
   llvm::MemoryBufferRef bitcodeBufferRef(contents, filename);
   auto setAlwaysInline = [&](llvm::Module &module) {
-    if (targetMachine.getTargetCPU().contains("gfx10") ||
-        targetMachine.getTargetCPU().contains("gfx11")) {
-      // Some ROCM/HIP functions for gfx10 or gfx11 has accuracy issue if
-      // inlined.
-      return;
-    }
     for (auto &func : module.getFunctionList()) {
-      // Some ROCM/HIP builtin functions have Optnone and NoInline for default.
-      if (targetMachine.getTargetTriple().isAMDGCN()) {
-        if (func.hasFnAttribute(llvm::Attribute::OptimizeNone)) {
-          func.removeFnAttr(llvm::Attribute::OptimizeNone);
-        }
-        if (targetMachine.getTargetTriple().isAMDGCN() &&
-            func.hasFnAttribute(llvm::Attribute::NoInline)) {
-          func.removeFnAttr(llvm::Attribute::NoInline);
-        }
-      }
       func.addFnAttr(llvm::Attribute::AlwaysInline);
     }
   };
