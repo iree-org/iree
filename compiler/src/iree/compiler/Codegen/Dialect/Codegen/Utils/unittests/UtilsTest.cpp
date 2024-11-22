@@ -99,5 +99,92 @@ TEST(TileSwizzle, Deserialization) {
   EXPECT_FALSE(deserializeTileSwizzle(b.getDictionaryAttr(items)).has_value());
 }
 
+TEST(MaterializeEncodingInfo, RelationalOperator) {
+  MaterializeEncodingInfo info1;
+  info1.innerDimsPos = {0, 1};
+  info1.innerTileSizes = {16, 1};
+  info1.outerDimsPerm = {0, 2, 1, 3};
+
+  MaterializeEncodingInfo info2;
+  info2.innerDimsPos = {1, 0};
+  info2.innerTileSizes = {16, 1};
+  info2.outerDimsPerm = {0, 2, 1, 3};
+
+  EXPECT_EQ(info1, info1);
+  EXPECT_EQ(info2, info2);
+  EXPECT_NE(info1, info2);
+
+  // They mismatch if one has a swizzle, but not the other.
+  info2 = info1;
+  info1.swizzle = TileSwizzle();
+  EXPECT_NE(info1, info2);
+
+  // They match because they all have an empty swizzle.
+  info2.swizzle = TileSwizzle();
+  EXPECT_EQ(info1, info2);
+}
+
+TEST(MaterializeEncodingInfo, Serialization) {
+  MaterializeEncodingInfo info;
+  info.innerDimsPos = {0, 1};
+  info.innerTileSizes = {16, 1};
+  info.outerDimsPerm = {0, 2, 1, 3};
+
+  MLIRContext ctx;
+  DictionaryAttr dictAttr = serializeEncodingInfo(&ctx, info);
+
+  EXPECT_TRUE(dictAttr.contains("innerDimsPos"));
+  EXPECT_TRUE(dictAttr.contains("innerTileSizes"));
+  EXPECT_TRUE(dictAttr.contains("outerDimsPerm"));
+  EXPECT_FALSE(dictAttr.contains("swizzle"));
+
+  EXPECT_TRUE(isa<ArrayAttr>(dictAttr.getNamed("innerDimsPos")->getValue()));
+  EXPECT_TRUE(isa<ArrayAttr>(dictAttr.getNamed("innerTileSizes")->getValue()));
+  EXPECT_TRUE(isa<ArrayAttr>(dictAttr.getNamed("outerDimsPerm")->getValue()));
+
+  auto extractedInnerDimsPos = extractFromIntegerArrayAttr<int64_t>(
+      dictAttr.getNamed("innerDimsPos")->getValue());
+  EXPECT_EQ(extractedInnerDimsPos, info.innerDimsPos);
+  auto extractedInnerTileSizes = extractFromIntegerArrayAttr<int64_t>(
+      dictAttr.getNamed("innerTileSizes")->getValue());
+  EXPECT_EQ(extractedInnerTileSizes, info.innerTileSizes);
+  auto extractedOuterDimsPerm = extractFromIntegerArrayAttr<int64_t>(
+      dictAttr.getNamed("outerDimsPerm")->getValue());
+  EXPECT_EQ(extractedOuterDimsPerm, info.outerDimsPerm);
+
+  std::optional<MaterializeEncodingInfo> deserializedInfo =
+      deserializeEncodingInfo(dictAttr);
+  EXPECT_THAT(deserializedInfo, Optional(info));
+}
+
+TEST(MaterializeEncodingInfo, Deserialization) {
+  MLIRContext ctx;
+  Builder b(&ctx);
+
+  auto emptyDictAttr = b.getDictionaryAttr({});
+  EXPECT_FALSE(deserializeEncodingInfo(emptyDictAttr).has_value());
+
+  SmallVector<NamedAttribute> items;
+  items.emplace_back(b.getStringAttr("innerDimsPos"),
+                     b.getI64ArrayAttr({0, 1}));
+  EXPECT_FALSE(deserializeEncodingInfo(b.getDictionaryAttr(items)).has_value());
+
+  items.emplace_back(b.getStringAttr("innerTileSizes"),
+                     b.getI64ArrayAttr({16, 1}));
+  EXPECT_FALSE(deserializeEncodingInfo(b.getDictionaryAttr(items)).has_value());
+
+  items.emplace_back(b.getStringAttr("outerDimsPerm"),
+                     b.getI64ArrayAttr({0, 2, 1, 3}));
+  EXPECT_TRUE(deserializeEncodingInfo(b.getDictionaryAttr(items)).has_value());
+
+  // If the swizzle presents, it needs to be deserializable to TileSwizzle.
+  items.emplace_back(b.getStringAttr("swizzle"), b.getUnitAttr());
+  EXPECT_FALSE(deserializeEncodingInfo(b.getDictionaryAttr(items)).has_value());
+
+  TileSwizzle swizzle;
+  items.back().setValue(serializeTileSwizzle(&ctx, swizzle));
+  EXPECT_TRUE(deserializeEncodingInfo(b.getDictionaryAttr(items)).has_value());
+}
+
 } // namespace
 } // namespace mlir::iree_compiler::IREE::Codegen

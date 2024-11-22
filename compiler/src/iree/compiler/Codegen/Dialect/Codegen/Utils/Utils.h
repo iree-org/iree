@@ -107,6 +107,11 @@ struct MaterializeEncodingInfo {
   std::optional<TileSwizzle> swizzle;
 };
 
+bool operator==(const MaterializeEncodingInfo &lhs,
+                const MaterializeEncodingInfo &rhs);
+bool operator!=(const MaterializeEncodingInfo &lhs,
+                const MaterializeEncodingInfo &rhs);
+
 //===----------------------------------------------------------------------===//
 // Layout Utilities.
 //===----------------------------------------------------------------------===//
@@ -119,6 +124,12 @@ std::optional<TileSwizzle::Dim::Kind> convertStringToSwizzleKind(StringRef str);
 DictionaryAttr serializeTileSwizzle(MLIRContext *ctx,
                                     const TileSwizzle &swizzle);
 std::optional<TileSwizzle> deserializeTileSwizzle(DictionaryAttr attr);
+
+/// Conversion between MaterializeEncodingInfo struct and DictionaryAttr.
+DictionaryAttr serializeEncodingInfo(MLIRContext *ctx,
+                                     const MaterializeEncodingInfo &info);
+std::optional<MaterializeEncodingInfo>
+deserializeEncodingInfo(DictionaryAttr attr);
 
 /// Concatenates the vectors.
 SmallVector<int64_t>
