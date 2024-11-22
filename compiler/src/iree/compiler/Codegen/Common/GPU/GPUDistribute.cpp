@@ -20,6 +20,54 @@ namespace mlir::iree_compiler {
 namespace {
 static constexpr int64_t kCudaWarpSize = 32;
 
+template <typename OpTy>
+static void
+replaceUnitMappingIdsHelper(RewriterBase &rewriter, Location loc, Block *parent,
+                            Value replacement,
+                            ArrayRef<int64_t> availableMappingSizes) {
+  parent->walk([&](OpTy idOp) {
+    if (availableMappingSizes[static_cast<int64_t>(idOp.getDimension())] == 1)
+      rewriter.replaceAllUsesWith(idOp.getResult(), replacement);
+  });
+}
+
+// This is an upstream method adapted from
+// https://github.com/llvm/llvm-project/blob/main/mlir/lib/Dialect/GPU/TransformOps/GPUTransformOps.cpp#L846
+// to fix the ASAN error.
+DiagnosedSilenceableFailure static mapNestedForallToThreadsImpl(
+    RewriterBase &rewriter, Operation *target, ArrayRef<int64_t> blockDims,
+    int64_t warpSize, bool syncAfterDistribute) {
+
+  if (blockDims.size() != 3) {
+    return emitDefiniteFailure(target, "requires size-3 thread mapping");
+  }
+
+  Block *parentBlock = target->getBlock();
+
+  // Create an early zero index value for replacements.
+  Location loc = target->getLoc();
+  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  DiagnosedSilenceableFailure diag = DiagnosedSilenceableFailure::success();
+  WalkResult walkResult = target->walk([&](scf::ForallOp forallOp) {
+    diag = mlir::transform::gpu::mapOneForallToThreadsImpl(
+        rewriter, std::nullopt, forallOp, blockDims, warpSize,
+        syncAfterDistribute);
+    if (diag.isDefiniteFailure())
+      return WalkResult::interrupt();
+    if (diag.succeeded())
+      return WalkResult::skip();
+    return WalkResult::advance();
+  });
+  if (walkResult.wasInterrupted())
+    return diag;
+
+  // Replace ids of dimensions known to be 1 by 0 to simplify the IR.
+  // Here, the result of mapping determines the available mapping sizes.
+  replaceUnitMappingIdsHelper<gpu::ThreadIdOp>(rewriter, loc, parentBlock, zero,
+                                               blockDims);
+  return DiagnosedSilenceableFailure::success();
+}
+
 struct GPUDistributePass final
     : impl::GPUDistributePassBase<GPUDistributePass> {
   void runOnOperation() override {
@@ -48,9 +96,8 @@ struct GPUDistributePass final
           llvm::any_of(forallOp.getMapping().value(),
                        llvm::IsaPred<IREE::Codegen::WorkgroupMappingAttr>);
       if (!hasWorkgroupMapping) {
-        result = mlir::transform::gpu::mapNestedForallToThreadsImpl(
-            rewriter, std::nullopt, forallOp, workgroupSize.value(),
-            subgroupSize, false);
+        result = mapNestedForallToThreadsImpl(
+            rewriter, forallOp, workgroupSize.value(), subgroupSize, false);
         if (result.isDefiniteFailure())
           return WalkResult::interrupt();
         if (result.succeeded())
