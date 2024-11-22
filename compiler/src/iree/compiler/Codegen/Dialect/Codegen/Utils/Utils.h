@@ -62,11 +62,6 @@ struct TileSwizzle {
     // Support constructing from any size type.
     template <typename T>
     Dim(Kind kind, T size) : kind(kind), size(size) {}
-
-    bool operator==(const Dim &other) const {
-      return kind == other.kind && size == other.size;
-    }
-    bool operator!=(const Dim &other) const { return !(*this == other); }
   };
 
   using ExpandShapeDimVectorType = llvm::SmallVector<Dim, 4>;
@@ -84,12 +79,12 @@ struct TileSwizzle {
   // example, permutation[0] dictates which of the expanded dimensions becomes
   // the leading dimension of the layout.
   llvm::SmallVector<int64_t> permutation;
-
-  bool operator==(const TileSwizzle &other) const {
-    return expandShape == other.expandShape && permutation == other.permutation;
-  }
-  bool operator!=(const TileSwizzle &other) const { return !(*this == other); }
 };
+
+bool operator==(TileSwizzle::Dim lhs, TileSwizzle::Dim rhs);
+bool operator!=(TileSwizzle::Dim lhs, TileSwizzle::Dim rhs);
+bool operator==(const TileSwizzle &lhs, const TileSwizzle &rhs);
+bool operator!=(const TileSwizzle &lhs, const TileSwizzle &rhs);
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               TileSwizzle::Dim::Kind kind);
@@ -116,8 +111,13 @@ struct MaterializeEncodingInfo {
 // Layout Utilities.
 //===----------------------------------------------------------------------===//
 
+/// Conversion between TileSwizzle::Dim::Kind and string.
+std::string convertSwizzleKindToString(TileSwizzle::Dim::Kind kind);
+std::optional<TileSwizzle::Dim::Kind> convertStringToSwizzleKind(StringRef str);
+
 /// Conversion between TileSwizzle struct and DictionaryAttr.
-DictionaryAttr serializeTileSwizzle(MLIRContext *ctx, TileSwizzle swizzle);
+DictionaryAttr serializeTileSwizzle(MLIRContext *ctx,
+                                    const TileSwizzle &swizzle);
 std::optional<TileSwizzle> deserializeTileSwizzle(DictionaryAttr attr);
 
 /// Concatenates the vectors.

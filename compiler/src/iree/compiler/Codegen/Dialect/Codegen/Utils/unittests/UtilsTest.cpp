@@ -14,6 +14,7 @@
 namespace mlir::iree_compiler::IREE::Codegen {
 namespace {
 
+using testing::Optional;
 using Kind = TileSwizzle::Dim::Kind;
 
 TEST(TileSwizzle, RelationalOperator) {
@@ -30,6 +31,24 @@ TEST(TileSwizzle, RelationalOperator) {
   EXPECT_EQ(swizzle1, swizzle2);
 }
 
+TEST(TileSwizzle, DimKindToString) {
+  EXPECT_EQ(convertSwizzleKindToString(Kind::Internal), "Internal");
+  EXPECT_EQ(convertSwizzleKindToString(Kind::CrossIntrinsic), "CrossIntrinsic");
+  EXPECT_EQ(convertSwizzleKindToString(Kind::CrossThread), "CrossThread");
+}
+
+TEST(TileSwizzle, StringToDimKind) {
+  std::optional<TileSwizzle::Dim::Kind> maybeKind;
+  maybeKind = convertStringToSwizzleKind("Internal");
+  EXPECT_THAT(maybeKind, Optional(TileSwizzle::Dim::Kind::Internal));
+  maybeKind = convertStringToSwizzleKind("CrossIntrinsic");
+  EXPECT_THAT(maybeKind, Optional(TileSwizzle::Dim::Kind::CrossIntrinsic));
+  maybeKind = convertStringToSwizzleKind("CrossThread");
+  EXPECT_THAT(maybeKind, Optional(TileSwizzle::Dim::Kind::CrossThread));
+  maybeKind = convertStringToSwizzleKind("deadbeef");
+  EXPECT_FALSE(maybeKind.has_value());
+}
+
 TEST(TileSwizzle, Serialization) {
   TileSwizzle swizzle;
   swizzle.expandShape.push_back({TileSwizzle::Dim(Kind::CrossThread, 16)});
@@ -43,19 +62,14 @@ TEST(TileSwizzle, Serialization) {
   EXPECT_TRUE(dictAttr.contains("expandShape"));
   EXPECT_TRUE(dictAttr.contains("permutation"));
 
+  // Verify if the sizes match. The check of values is done by the comparison
+  // between deserialzation result and the original struct.
   auto expandShapeArrayAttr =
       dyn_cast<ArrayAttr>(dictAttr.getNamed("expandShape")->getValue());
   EXPECT_EQ(expandShapeArrayAttr.size(), swizzle.expandShape.size());
   for (auto [expectedShape, actualShape] : llvm::zip_equal(
            swizzle.expandShape, expandShapeArrayAttr.getAsRange<ArrayAttr>())) {
     EXPECT_EQ(expectedShape.size(), actualShape.size());
-    for (auto [expectedDim, actualDim] :
-         llvm::zip_equal(expectedShape, actualShape)) {
-      SmallVector<int16_t> dimValue =
-          extractFromIntegerArrayAttr<int16_t>(actualDim);
-      EXPECT_EQ(expectedDim.kind, static_cast<Kind>(dimValue[0]));
-      EXPECT_EQ(expectedDim.size, dimValue[1]);
-    }
   }
 
   SmallVector<int64_t> extractedPerm = extractFromIntegerArrayAttr<int64_t>(
@@ -64,8 +78,7 @@ TEST(TileSwizzle, Serialization) {
 
   std::optional<TileSwizzle> deserializedSwizzle =
       deserializeTileSwizzle(dictAttr);
-  EXPECT_TRUE(deserializedSwizzle.has_value());
-  EXPECT_EQ(swizzle, deserializedSwizzle);
+  EXPECT_THAT(deserializedSwizzle, Optional(swizzle));
 }
 
 TEST(TileSwizzle, Deserialization) {

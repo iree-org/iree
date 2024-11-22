@@ -17,6 +17,23 @@ namespace mlir::iree_compiler::IREE::Codegen {
 // Layout Structs.
 //===----------------------------------------------------------------------===//
 
+bool operator==(TileSwizzle::Dim lhs, TileSwizzle::Dim rhs) {
+  return lhs.kind == rhs.kind && lhs.size == rhs.size;
+}
+
+bool operator!=(TileSwizzle::Dim lhs, TileSwizzle::Dim rhs) {
+  return !(lhs == rhs);
+}
+
+bool operator==(const TileSwizzle &lhs, const TileSwizzle &rhs) {
+  return lhs.expandShape == rhs.expandShape &&
+         lhs.permutation == rhs.permutation;
+}
+
+bool operator!=(const TileSwizzle &lhs, const TileSwizzle &rhs) {
+  return !(lhs == rhs);
+}
+
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               TileSwizzle::Dim::Kind kind) {
   switch (kind) {
@@ -59,12 +76,64 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 // Layout Utilities.
 //===----------------------------------------------------------------------===//
 
-static Attribute dimToArrayAttr(MLIRContext *ctx, TileSwizzle::Dim dim) {
-  Builder b(ctx);
-  return b.getI64ArrayAttr({static_cast<int16_t>(dim.kind), dim.size});
+std::string convertSwizzleKindToString(TileSwizzle::Dim::Kind kind) {
+  switch (kind) {
+  case TileSwizzle::Dim::Kind::Internal:
+    return "Internal";
+  case TileSwizzle::Dim::Kind::CrossThread:
+    return "CrossThread";
+  case TileSwizzle::Dim::Kind::CrossIntrinsic:
+    return "CrossIntrinsic";
+  default:
+    assert(false && "unhandled enum type");
+  }
+  return "";
 }
 
-DictionaryAttr serializeTileSwizzle(MLIRContext *ctx, TileSwizzle swizzle) {
+std::optional<TileSwizzle::Dim::Kind>
+convertStringToSwizzleKind(StringRef str) {
+  if (str == "Internal") {
+    return TileSwizzle::Dim::Kind::Internal;
+  }
+  if (str == "CrossThread") {
+    return TileSwizzle::Dim::Kind::CrossThread;
+  }
+  if (str == "CrossIntrinsic") {
+    return TileSwizzle::Dim::Kind::CrossIntrinsic;
+  }
+  return std::nullopt;
+}
+
+static ArrayAttr swizzleDimToArrayAttr(MLIRContext *ctx, TileSwizzle::Dim dim) {
+  Builder b(ctx);
+  return b.getArrayAttr({b.getStringAttr(convertSwizzleKindToString(dim.kind)),
+                         b.getI16IntegerAttr(dim.size)});
+}
+
+static std::optional<TileSwizzle::Dim> arrayAttrToSwizzleDim(Attribute attr) {
+  auto arrayAttr = dyn_cast<ArrayAttr>(attr);
+  if (!arrayAttr) {
+    return std::nullopt;
+  }
+  ArrayRef<Attribute> attrs = arrayAttr.getValue();
+  if (attrs.size() != 2) {
+    return std::nullopt;
+  }
+  auto kindAttr = dyn_cast<StringAttr>(attrs[0]);
+  auto sizeAttr = dyn_cast<IntegerAttr>(attrs[1]);
+  if (!kindAttr || !sizeAttr) {
+    return std::nullopt;
+  }
+  std::optional<TileSwizzle::Dim::Kind> maybeKind =
+      convertStringToSwizzleKind(kindAttr.getValue());
+  if (!maybeKind) {
+    return std::nullopt;
+  }
+  return TileSwizzle::Dim(maybeKind.value(), sizeAttr.getInt());
+}
+
+DictionaryAttr serializeTileSwizzle(MLIRContext *ctx,
+                                    const TileSwizzle &swizzle) {
   Builder b(ctx);
   SmallVector<NamedAttribute> items;
 
@@ -72,7 +141,7 @@ DictionaryAttr serializeTileSwizzle(MLIRContext *ctx, TileSwizzle swizzle) {
   for (auto expandConfig : swizzle.expandShape) {
     Attribute expandAttr = b.getArrayAttr(
         llvm::map_to_vector(expandConfig, [&](TileSwizzle::Dim dim) {
-          return dimToArrayAttr(ctx, dim);
+          return cast<Attribute>(swizzleDimToArrayAttr(ctx, dim));
         }));
     expandShape.push_back(expandAttr);
   }
@@ -100,11 +169,11 @@ std::optional<TileSwizzle> deserializeTileSwizzle(DictionaryAttr attr) {
   for (auto expandConfig : expandShapeArrayAttr.getAsRange<ArrayAttr>()) {
     TileSwizzle::ExpandShapeDimVectorType vec;
     for (auto dimAttr : expandConfig.getAsRange<ArrayAttr>()) {
-      SmallVector<int64_t> dimValue =
-          extractFromIntegerArrayAttr<int64_t>(dimAttr);
-      TileSwizzle::Dim dim(static_cast<TileSwizzle::Dim::Kind>(dimValue[0]),
-                           dimValue[1]);
-      vec.push_back(dim);
+      auto maybeDim = arrayAttrToSwizzleDim(dimAttr);
+      if (!maybeDim) {
+        return std::nullopt;
+      }
+      vec.push_back(maybeDim.value());
     }
     swizzle.expandShape.push_back(vec);
   }
