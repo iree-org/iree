@@ -109,3 +109,9 @@ jobs:
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_tensorflow')
     uses: ./.github/workflows/pkgci_test_tensorflow.yml
+
+  test_pjrt:
+    name: Test PJRT plugin
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_pjrt')
+    uses: ./.github/workflows/pkgci_test_pjrt.yml
