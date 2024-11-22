@@ -66,4 +66,4 @@ jobs:
       - name: Run tests
         run: |
           source ${VENV_DIR}/bin/activate
-          build_tools/cmake/run_jax_tests.sh ${{ matrix.pjrt_platform }}
+          build_tools/testing/run_jax_tests.sh ${{ matrix.pjrt_platform }}
