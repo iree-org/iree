@@ -43,23 +43,18 @@ static iree_status_t iree_hal_nonlocal_sync_driver_factory_try_create(
   iree_status_t status = iree_hal_executable_plugin_manager_create_from_flags(
       host_allocator, &plugin_manager);
 
-  iree_hal_executable_loader_t* loaders[8] = {NULL};
-  iree_host_size_t loader_count = 0;
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_create_all_available_executable_loaders(
-        plugin_manager, IREE_ARRAYSIZE(loaders), &loader_count, loaders,
-        host_allocator);
-  }
+  iree_hal_executable_loader_t* loader = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_create_executable_loader_by_name(
+      iree_make_cstring_view("embedded-elf"), plugin_manager,
+      host_allocator, &loader));
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_nl_sync_driver_create(
-        driver_name, &default_params, loader_count, loaders,
+        driver_name, &default_params, 1, &loader,
         host_allocator, out_driver);
   }
 
-  for (iree_host_size_t i = 0; i < loader_count; ++i) {
-    iree_hal_executable_loader_release(loaders[i]);
-  }
+  iree_hal_executable_loader_release(loader);
   iree_hal_executable_plugin_manager_release(plugin_manager);
   return status;
 }
