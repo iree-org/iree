@@ -129,7 +129,20 @@ jobs:
           # fast-forwarded.
           fetch-depth: 0
 
+      - name: Set up python
+        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
+        with:
+          python-version: "3.9"
+
+      - name: Check for patch release
+        run: |
+          python -m pip install packaging
+          is_patch_release="$(python -c "from packaging.version import Version;print('true' if Version('${{ github.event.inputs.package_version }}').micro !=0 else 'false')")"
+          echo "is_patch_release=${is_patch_release}" >> $GITHUB_ENV
+
       - name: Updating latest-snapshot branch
+        # Do not update the branch if the release is a patch release
+        if: ${{ env.is_patch_release == 'false'}}
         uses: ad-m/github-push-action@d91a481090679876dfc4178fef17f286781251df # v0.8.0
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
