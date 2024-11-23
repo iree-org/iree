@@ -31,7 +31,18 @@ iree_status_t ROCMClientInstance::CreateDriver(iree_hal_driver_t** out_driver) {
 }
 
 bool ROCMClientInstance::SetDefaultCompilerFlags(CompilerJob* compiler_job) {
-  return compiler_job->SetFlag("--iree-hal-target-backends=rocm");
+  auto flags = {
+      "--iree-hal-target-backends=rocm",
+
+      // TODO: gfx908 is just a placeholder here to make it work,
+      // we should instead detect the device target on the fly
+      "--iree-hip-target=gfx908",
+  };
+
+  for (auto flag : flags) {
+    if (!compiler_job->SetFlag(flag)) return false;
+  }
+  return true;
 }
 
 }  // namespace iree::pjrt::rocm
