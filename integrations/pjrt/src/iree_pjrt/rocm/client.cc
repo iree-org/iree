@@ -23,7 +23,7 @@ ROCMClientInstance::ROCMClientInstance(std::unique_ptr<Platform> platform)
 ROCMClientInstance::~ROCMClientInstance() {}
 
 iree_status_t ROCMClientInstance::CreateDriver(iree_hal_driver_t** out_driver) {
-  iree_string_view_t driver_name = iree_make_cstring_view("rocm");
+  iree_string_view_t driver_name = iree_make_cstring_view("hip");
   IREE_RETURN_IF_ERROR(iree_hal_driver_registry_try_create(
       driver_registry_, driver_name, host_allocator_, out_driver));
   logger().debug("ROCM driver created");
