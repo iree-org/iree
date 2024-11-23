@@ -44,7 +44,7 @@ with requirements_path.open() as requirements_txt:
     pin_versions = dict(pin_pairs)
     print(f"requirements.txt pins: {pin_versions}")
     # Convert pinned versions to >= for install_requires.
-    for pin_name in ("iree-compiler", "jaxlib"):
+    for pin_name in ("iree-base-compiler", "jaxlib"):
         pin_version = pin_versions[pin_name]
         install_requires.append(f"{pin_name}>={pin_version}")
 
