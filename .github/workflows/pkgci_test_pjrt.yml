@@ -27,11 +27,10 @@ jobs:
         # TODO: cuda runner is not available yet, refer to #18814
         #   - runner: some-cuda-available-runner
         #     pjrt_platform: cuda
-        # TODO: enable these AMD runners
-        #   - runner: nodai-amdgpu-w7900-x86-64
-        #     pjrt_platform: rocm
-        #   - runner: nodai-amdgpu-w7900-x86-64
-        #     pjrt_platform: vulkan
+          - runner: nodai-amdgpu-w7900-x86-64
+            pjrt_platform: rocm
+          - runner: nodai-amdgpu-w7900-x86-64
+            pjrt_platform: vulkan
     name: Build and test
     runs-on: ${{ matrix.runner }}
     env:
