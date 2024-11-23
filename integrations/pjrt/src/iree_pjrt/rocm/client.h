@@ -7,7 +7,7 @@
 #ifndef IREE_PJRT_PLUGIN_PJRT_ROCM_CLIENT_H_
 #define IREE_PJRT_PLUGIN_PJRT_ROCM_CLIENT_H_
 
-#include "experimental/rocm/api.h"
+#include "iree/hal/drivers/hip/api.h"
 #include "iree_pjrt/common/api_impl.h"
 
 namespace iree::pjrt::rocm {

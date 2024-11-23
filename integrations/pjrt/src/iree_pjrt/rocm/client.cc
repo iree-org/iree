@@ -6,7 +6,7 @@
 
 #include "iree_pjrt/rocm/client.h"
 
-#include "experimental/rocm/registration/driver_module.h"
+#include "iree/hal/drivers/hip/registration/driver_module.h"
 
 namespace iree::pjrt::rocm {
 
@@ -17,7 +17,7 @@ ROCMClientInstance::ROCMClientInstance(std::unique_ptr<Platform> platform)
   // TODO: Get this when constructing the client so it is guaranteed to
   // match.
   cached_platform_name_ = "iree_rocm";
-  IREE_CHECK_OK(iree_hal_rocm_driver_module_register(driver_registry_));
+  IREE_CHECK_OK(iree_hal_hip_driver_module_register(driver_registry_));
 }
 
 ROCMClientInstance::~ROCMClientInstance() {}
