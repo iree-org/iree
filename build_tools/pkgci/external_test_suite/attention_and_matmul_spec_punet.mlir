@@ -208,6 +208,41 @@ transform.named_sequence @match_attention_f8(%attention: !transform.any_op {tran
     transform.yield %cont, %config : !transform.any_op, !transform.any_param
   }
 
+
+  // Variant of matmul_like_Bx20x1024x64x1280_i8xi8xi32 from Transposed-V.
+  transform.named_sequence @match_matmul_like_Bx20x64x1024x1280_i8xi8xi32(%cont: !transform.any_op {transform.readonly})
+    -> (!transform.any_op, !transform.any_param) {
+    %ins, %outs = transform.iree.match.cast_compatible_dag_from_root %cont {
+    ^bb0(%lhs: tensor<?x1024x1280xi8>, %rhs: tensor<20x64x1280xi8>, %out: tensor<?x20x64x1024xi32>):
+      %16 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                                             affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d4)>,
+                                             affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>],
+                            iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]}
+        ins(%lhs, %rhs : tensor<?x1024x1280xi8>, tensor<20x64x1280xi8>)
+        outs(%out : tensor<?x20x64x1024xi32>) {
+      ^bb0(%in: i8, %in_0: i8, %acc: i32):
+        %18 = arith.extsi %in : i8 to i32
+        %19 = arith.extsi %in_0 : i8 to i32
+        %20 = arith.muli %18, %19 : i32
+        %21 = arith.addi %acc, %20 : i32
+        linalg.yield %21 : i32
+      } -> tensor<?x20x64x1024xi32>
+    } : (!transform.any_op) -> (!transform.any_value, !transform.any_value)
+    %config = transform.param.constant #iree_codegen.compilation_info<
+      lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
+                                                   mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>,
+                                                   subgroup_m_count = 2, subgroup_n_count = 2,
+                                                   reduction = [0, 0, 0, 0, 128],
+                                                   workgroup = [1, 1, 160, 64, 0]}>,
+      translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+        workgroup_size = [256, 1, 1] subgroup_size = 64,
+        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true,
+                                                           reorder_workgroups_strategy = <Transpose>>
+        }>
+    > -> !transform.any_param
+    transform.yield %cont, %config : !transform.any_op, !transform.any_param
+  }
+
   transform.named_sequence @match_matmul_like_Bx20x64x64x2048_i8xi8xi32(%cont: !transform.any_op {transform.readonly})
     -> (!transform.any_op, !transform.any_param) {
     %ins, %outs = transform.iree.match.cast_compatible_dag_from_root %cont {
@@ -232,6 +267,38 @@ transform.named_sequence @match_attention_f8(%attention: !transform.any_op {tran
                                                    subgroup_m_count = 2, subgroup_n_count = 1,
                                                    reduction = [0, 0, 0, 0, 128],
                                                    workgroup = [1, 1, 32, 320, 0]}>,
+      translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+        workgroup_size = [128, 1, 1] subgroup_size = 64,
+        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
+    > -> !transform.any_param
+    transform.yield %cont, %config : !transform.any_op, !transform.any_param
+  }
+
+  // Variant of matmul_like_Bx20x64x64x2048_i8xi8xi32 from Transposed-V.
+transform.named_sequence @match_matmul_like_Bx20x64x64x2048_transposev_i8xi8xi32(%cont: !transform.any_op {transform.readonly})
+    -> (!transform.any_op, !transform.any_param) {
+    %ins, %outs = transform.iree.match.cast_compatible_dag_from_root %cont {
+    ^bb0(%lhs: tensor<?x64x2048xi8>, %rhs: tensor<20x64x2048xi8>, %out: tensor<?x20x64x64xi32>):
+      %16 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                                             affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d4)>,
+                                             affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>],
+                            iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]}
+        ins(%lhs, %rhs : tensor<?x64x2048xi8>, tensor<20x64x2048xi8>)
+        outs(%out : tensor<?x20x64x64xi32>) {
+      ^bb0(%in: i8, %in_0: i8, %acc: i32):
+        %18 = arith.extsi %in : i8 to i32
+        %19 = arith.extsi %in_0 : i8 to i32
+        %20 = arith.muli %18, %19 : i32
+        %21 = arith.addi %acc, %20 : i32
+        linalg.yield %21 : i32
+      } -> tensor<?x20x64x64xi32>
+    } : (!transform.any_op) -> (!transform.any_value, !transform.any_value)
+    %config = transform.param.constant #iree_codegen.compilation_info<
+      lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
+                                                   mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>,
+                                                   subgroup_m_count = 2, subgroup_n_count = 1,
+                                                   reduction = [0, 0, 0, 0, 128],
+                                                   workgroup = [1, 1, 320, 32, 0]}>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
         workgroup_size = [128, 1, 1] subgroup_size = 64,
         {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
@@ -301,6 +368,10 @@ transform.named_sequence @match_attention_f8(%attention: !transform.any_op {tran
         , @match_matmul_like_Bx20x1024x64x1280_i8xi8xi32 -> @apply_op_config
         , @match_matmul_like_Bx10x4096x64x640_i8xi8xi32 -> @apply_op_config
         , @match_matmul_like_Bx20x64x64x2048_i8xi8xi32 -> @apply_op_config
+
+        // Transpose-V generated contraction.
+        , @match_matmul_like_Bx20x64x1024x1280_i8xi8xi32 -> @apply_op_config
+        , @match_matmul_like_Bx20x64x64x2048_transposev_i8xi8xi32 -> @apply_op_config
 
         // TUNING_MATCH_END DO NOT REMOVE
       : (!transform.any_op) -> (!transform.any_op)
