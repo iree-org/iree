@@ -20,6 +20,7 @@ class ROCMClientInstance final : public ClientInstance {
   bool SetDefaultCompilerFlags(CompilerJob* compiler_job) override;
 
  private:
+  std::string hip_target_;
 };
 
 }  // namespace iree::pjrt::rocm
