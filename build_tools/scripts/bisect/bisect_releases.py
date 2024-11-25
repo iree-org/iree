@@ -18,9 +18,6 @@ Requirements:
     Linux   (at least until IREE builds packages for other systems at each commit)
 
 Example usage:
-    python -m venv .venv
-    source ./.venv/bin/activate
-
     bisect_releases.py \
         --good-ref=iree-3.0.0 \
         --bad-ref=iree-3.1.0rc20241122 \
