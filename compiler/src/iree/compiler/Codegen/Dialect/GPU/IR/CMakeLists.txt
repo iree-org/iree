@@ -15,6 +15,7 @@ iree_cc_library(
     IREEGPUDialect
   HDRS
     "DerivedConfigUtils.h"
+    "GPULoweringConfigUtils.h"
     "GPUTileSwizzleUtils.h"
     "IREEGPUAttrs.h"
     "IREEGPUDialect.h"
@@ -34,6 +35,7 @@ iree_cc_library(
     "IREEGPUOps.h.inc"
   SRCS
     "DerivedConfigUtils.cpp"
+    "GPULoweringConfigUtils.cpp"
     "GPUTileSwizzleUtils.cpp"
     "IREEGPUAttrs.cpp"
     "IREEGPUDialect.cpp"

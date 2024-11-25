@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
@@ -37,7 +38,7 @@ LogicalResult packToIntrinsic(linalg::LinalgOp linalgOp,
       getLoweringConfig<IREE::GPU::LoweringConfigAttr>(linalgOp);
   assert(loweringConfig && "Packing unconfigured op");
 
-  IREE::GPU::MmaInterfaceAttr kind = loweringConfig.getMmaKind();
+  IREE::GPU::MmaInterfaceAttr kind = getMmaKind(loweringConfig);
   assert(kind && "Packing op without mma kind");
 
   FailureOr<linalg::ContractionDimensions> contractionDims =
@@ -78,7 +79,7 @@ struct ConvertToMultiMma final : OpInterfaceRewritePattern<linalg::LinalgOp> {
     if (!loweringConfig) {
       return failure();
     }
-    IREE::GPU::MmaInterfaceAttr kind = loweringConfig.getMmaKind();
+    IREE::GPU::MmaInterfaceAttr kind = getMmaKind(loweringConfig);
     if (!kind) {
       return failure();
     }
@@ -102,7 +103,7 @@ void GPUPackToIntrinsicsPass::runOnOperation() {
     if (!loweringConfig) {
       return;
     }
-    if (!loweringConfig.getMmaKind()) {
+    if (!getMmaKind(loweringConfig)) {
       return;
     }
     packingCandidates.push_back(linalgOp);

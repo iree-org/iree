@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
@@ -37,7 +38,7 @@ static SmallVector<bool> getPromotedOperands(Operation *op) {
   }
 
   std::optional<SmallVector<int64_t>> promoteConfig =
-      config.getPromotedOperandList();
+      getPromotedOperandList(config);
   if (!promoteConfig) {
     return promotedOperands;
   }
@@ -53,7 +54,7 @@ static IREE::GPU::MmaInterfaceAttr getIntrinsic(Operation *op) {
   auto config = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
   assert(config && "Cannot find intrinsic from unconfigured op.");
 
-  IREE::GPU::MmaInterfaceAttr mmaIntrinsic = config.getMmaKind();
+  IREE::GPU::MmaInterfaceAttr mmaIntrinsic = getMmaKind(config);
   assert(mmaIntrinsic && "Cannot find intrinsic in lowering config.");
   return mmaIntrinsic;
 }
@@ -62,14 +63,14 @@ static int64_t getSubgroupMCount(Operation *op) {
   auto config = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
   assert(config && "Cannot find intrinsic from unconfigured op.");
 
-  return *config.getSubgroupMCount();
+  return getSubgroupMCount(config).value();
 }
 
 static int64_t getSubgroupNCount(Operation *op) {
   auto config = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
   assert(config && "Cannot find intrinsic from unconfigured op.");
 
-  return *config.getSubgroupNCount();
+  return getSubgroupNCount(config).value();
 }
 
 /// Gets a unit vector of the given rank, but fills in the given dimensions
@@ -895,7 +896,7 @@ struct LLVMGPUConfigureTensorLayoutsPass final
                                                     workgroupSize, rewriter);
               })
               .Case([&](IREE::GPU::LoweringConfigAttr config) {
-                if (config.getMmaKind()) {
+                if (getMmaKind(config)) {
                   return setIntrinsicLoweringConfigLayout(
                       config, candidate, workgroupSize, rewriter);
                 }
