@@ -23,7 +23,7 @@ Linux | (at least until IREE builds packages for other systems at each commit)
 `git` | https://git-scm.com/
 `gh` CLI | https://cli.github.com/
 iree-org/iree repository read access | Needed to [download workflow artifacts](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/downloading-workflow-artifacts). See also [obtaining commit access](https://iree.dev/developers/general/contributing/#obtaining-commit-access).
-`python3` with `venv` support | `sudo apt install python3-dev python3-venv`
+`python3.11` with `venv` support | (Version must match what PkgCI builds) `sudo apt install python3.11 python3.11-dev python3.11-venv`
 
 ### Data requirements
 
@@ -80,9 +80,17 @@ To run the bisect tool:
     chmod +x /tmp/issue_18879.sh
     ```
 
-2. Run the bisect tool:
+2. Run the bisect tool, under Python 3.11:
 
     ```bash
+    # Ensure 'python' is Python 3.11, e.g. using venv
+    # (https://docs.python.org/3/library/venv.html):
+    python3.11 -m venv .venv && source .venv/bin/activate
+    # OR using pyenv (https://github.com/pyenv/pyenv):
+    # pyenv shell 3.11
+    python --version
+    # Python 3.11.10
+
     ./bisect_releases.py \
       --good-ref=f9fa934c649749b30fc4be05d9cef78eb043f0e9 \
       --bad-ref=05bbcf1385146d075829cd940a52bf06961614d0 \
@@ -304,6 +312,8 @@ bisect found first bad commit
 Testing package installation:
 
 ```bash
+pyenv shell 3.11
+
 # Test installing packages
 ./install_packages_for_commit.py 5b0740c97a33edce29e753b14b9ff04789afcc53
 ./install_packages_for_commit.py 4c0fd906bfd1e8888654b3e8a967ef977bb84403
@@ -320,6 +330,8 @@ iree-compile --version
 Testing bisect:
 
 ```bash
+pyenv shell 3.11
+
 ./bisect_releases.py \
   --good-ref=iree-3.0.0 \
   --bad-ref=iree-3.1.0rc20241122 \

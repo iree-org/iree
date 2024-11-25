@@ -23,6 +23,16 @@ Prerequisites:
     gh auth login
     ```
 
+    Python 3.11 (matching what PkgCI builds):
+
+    ```bash
+    # Using venv:
+    sudo apt install python3.11 python3.11-dev python3.11-venv
+
+    # Using pyenv (https://github.com/pyenv/pyenv):
+    pyenv shell 3.11
+    ```
+
 Example usage:
     install_packages_for_commit.py iree-3.1.0rc20241122
 
@@ -128,6 +138,10 @@ def install_packages_from_directory(dir: Path):
     subprocess.check_call(install_deps_args)
 
     # Install each .whl in the directory.
+    # NOTE: this will fail if the Python interpreter is not the same version
+    # as the packages or if packages are ever built for multiple Python
+    # versions.
+    # TODO(scotttodd): Make this robust or at least log a better error message.
     whl_files = list(dir.glob("*.whl"))
     for file in whl_files:
         install_package_args = [
