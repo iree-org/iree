@@ -44,17 +44,9 @@ diff_jax_test() {
     echo "no difference found"
 }
 
-# FIXME: due to #19223, we need to use jax no higher than 0.4.20,
-# but in such version of jax, 'stablehlo.broadcast_in_dim' op
-# will be emitted without attribute 'broadcast_dimensions',
-# which leads to an error in IREE PJRT plugin.
-# So currently any program with broadcast will fail,
-# e.g. test/test_simple.py.
-# After #19223 is fixed, we can uncomment the line below.
-
-# diff_jax_test test/test_simple.py
-
 diff_jax_test test/test_add.py
+diff_jax_test test/test_degenerate.py
+diff_jax_test test/test_simple.py
 
 
 # FIXME: we can also utilize the native test cases from JAX,
