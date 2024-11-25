@@ -249,10 +249,10 @@ jobs:
             --goldensize-rocm-clip-bytes 860000  \
             --goldensize-rocm-vae-bytes 840000 \
             --goldentime-rocm-punet-int8-fp16-ms 55 \
-            --goldendispatch-rocm-punet-int8-fp16 1494 \
+            --goldendispatch-rocm-punet-int8-fp16 1424 \
             --goldensize-rocm-punet-int8-fp16-bytes 2560000 \
             --goldentime-rocm-punet-int8-fp8-ms 59 \
-            --goldendispatch-rocm-punet-int8-fp8 1774 \
+            --goldendispatch-rocm-punet-int8-fp8 1704 \
             --goldensize-rocm-punet-int8-fp8-bytes 2800000 \
             --rocm-chip gfx942 \
             --log-cli-level=info \
