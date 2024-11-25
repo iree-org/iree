@@ -1,4 +1,4 @@
-# Release bisect scripting
+# Package bisect scripting
 
 This scripting connects the `git bisect` tool
 (https://git-scm.com/docs/git-bisect) with IREE's package builds, allowing
@@ -91,7 +91,7 @@ To run the bisect tool:
     python --version
     # Python 3.11.10
 
-    ./bisect_releases.py \
+    ./bisect_packages.py \
       --good-ref=f9fa934c649749b30fc4be05d9cef78eb043f0e9 \
       --bad-ref=05bbcf1385146d075829cd940a52bf06961614d0 \
       --test-script=/tmp/issue_18879.sh
@@ -105,7 +105,7 @@ To run the bisect tool:
     Note that any git ref can be used, so we can use tags too:
 
     ```bash
-    ./bisect_releases.py \
+    ./bisect_packages.py \
       --good-ref=candidate-20241016.1048 \
       --bad-ref=candidate-20241017.1049 \
       --test-script=/tmp/issue_18879.sh
@@ -113,7 +113,7 @@ To run the bisect tool:
 
 ## How the tool works
 
-1. `bisect_releases.py` is the main entry point which runs `git bisect`
+1. `bisect_packages.py` is the main entry point which runs `git bisect`
    commands.
 2. The script starts a `git bisect start --no-checkout --first-parent` run and
    specifies the commit range with `git bisect good` and `git bisect bad`.
@@ -195,12 +195,12 @@ fi
 Raw logs here: https://gist.github.com/ScottTodd/cff468a50df63b65e5c5f449fabab6af
 
 ```bash
-$ ./bisect_releases.py \
+$ ./bisect_packages.py \
   --good-ref=candidate-20241016.1048 \
   --bad-ref=candidate-20241017.1049 \
   --test-script=/home/nod/.iree/bisect/issue_18879.sh
 
-Welcome to bisect_releases.py!
+Welcome to bisect_packages.py!
 
 ------------------------------------------------------------------
 --------- Configuration ------------------------------------------
@@ -332,7 +332,7 @@ Testing bisect:
 ```bash
 pyenv shell 3.11
 
-./bisect_releases.py \
+./bisect_packages.py \
   --good-ref=iree-3.0.0 \
   --bad-ref=iree-3.1.0rc20241122 \
   --test-script=./bisect_example_timestamp.sh

@@ -22,10 +22,10 @@
 #     ...
 #     5b0740c97a33edce29e753b14b9ff04789afcc53 is the first bad commit
 #
-# Example usage with ./bisect_releases.py (even though this doesn't use any
+# Example usage with ./bisect_packages.py (even though this doesn't use any
 # release artifacts like `iree-compile`):
 #
-#   ./bisect_releases.py \
+#   ./bisect_packages.py \
 #     --good-ref=iree-3.0.0 \
 #     --bad-ref=iree-3.1.0rc20241122 \
 #     --test-script=./bisect_example_timestamp.sh

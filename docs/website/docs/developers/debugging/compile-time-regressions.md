@@ -48,7 +48,7 @@ Building the compiler from source and using
 specific commits in IREE, though it typically won't let you step through changes
 in submodules (e.g. MLIR updates in `third_party/llvm-project/`).
 
-#### Scripted bisecting with release artifacts
+#### Scripted bisecting with package artifacts
 
 See <https://github.com/iree-org/iree/tree/main/build_tools/scripts/bisect>.
 

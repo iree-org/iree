@@ -5,7 +5,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""build_tools/scripts/bisect/bisect_releases.py
+"""build_tools/scripts/bisect/bisect_packages.py
 
 This connects the `git bisect` tool (https://git-scm.com/docs/git-bisect)
 with IREE's package builds, allowing developers to run tests through commit
@@ -18,7 +18,7 @@ Requirements:
     Linux   (at least until IREE builds packages for other systems at each commit)
 
 Example usage:
-    bisect_releases.py \
+    bisect_packages.py \
         --good-ref=iree-3.0.0 \
         --bad-ref=iree-3.1.0rc20241122 \
         --test-script=bisect_example_timestamp.sh
@@ -70,7 +70,7 @@ def parse_arguments():
 
 
 def main(args):
-    print("Welcome to bisect_releases.py!")
+    print("Welcome to bisect_packages.py!")
 
     print("")
     print("------------------------------------------------------------------")
