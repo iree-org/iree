@@ -143,9 +143,7 @@ struct LinkTuningSpecsPass final
       return;
     }
 
-    NamedSequenceOp newSpec = emitLinkedTuningSpec(module, tuningSpecs);
-    (void)newSpec;
-    LDBG("Linked tuning spec: " << newSpec);
+    emitLinkedTuningSpec(module, tuningSpecs);
   }
 };
 
