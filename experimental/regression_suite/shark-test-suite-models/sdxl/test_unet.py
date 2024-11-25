@@ -197,7 +197,6 @@ ROCM_COMPILE_FLAGS = [
     "--iree-opt-const-eval=false",
     "--iree-opt-strip-assertions=true",
     "--iree-global-opt-propagate-transposes=true",
-    "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
     "--iree-dispatch-creation-enable-aggressive-fusion=true",
     "--iree-opt-aggressively-propagate-transposes=true",
     "--iree-opt-outer-dim-concat=true",

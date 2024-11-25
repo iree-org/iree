@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
@@ -113,10 +112,6 @@ public:
 
   LogicalResult matchAndRewrite(LinalgExt::AttentionOp attentionOp,
                                 PatternRewriter &rewriter) const override {
-    if (!IREE::Flow::isNonNullAndOutsideDispatch(attentionOp)) {
-      return failure();
-    }
-
     // Extract Attention indexing information.
     AffineMap qMap = attentionOp.getQueryMap();
     AffineMap kMap = attentionOp.getKeyMap();
