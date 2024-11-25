@@ -11,9 +11,9 @@
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
-std::tuple<LogicalResult, Value, Value>
-rewriteFft(Operation *op, Value operand, int64_t fftLength,
-           ConversionPatternRewriter &rewriter) {
+std::tuple<LogicalResult, Value, Value> rewriteFft(Operation *op, Value operand,
+                                                   int64_t fftLength,
+                                                   PatternRewriter &rewriter) {
 
   assert(!(fftLength & (fftLength - 1)) &&
          "expected FFT length to be a power of two");

@@ -22,17 +22,16 @@ namespace mlir::iree_compiler::TorchInput {
 namespace {
 
 struct FftRfftOpConversion
-    : public OpConversionPattern<torch::Torch::AtenFftRfftOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult
-  matchAndRewrite(torch::Torch::AtenFftRfftOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
+    : public OpRewritePattern<torch::Torch::AtenFftRfftOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(torch::Torch::AtenFftRfftOp op,
+                                PatternRewriter &rewriter) const override {
 
     Location loc = op.getLoc();
-    Value self = adaptor.getSelf();
+    Value self = op.getSelf();
 
     int64_t dim;
-    Value dimVal = adaptor.getDim();
+    Value dimVal = op.getDim();
     if (isa<torch::Torch::NoneType>(dimVal.getType())) {
       dim = -1;
     } else if (!matchPattern(dimVal, torch::Torch::m_TorchConstantInt(&dim))) {
@@ -40,11 +39,11 @@ struct FftRfftOpConversion
           op, "unimplemented: requires dim to be constant");
     }
 
-    if (!isa<torch::Torch::NoneType>(adaptor.getN().getType())) {
+    if (!isa<torch::Torch::NoneType>(op.getN().getType())) {
       return rewriter.notifyMatchFailure(op, "unimplemented: parameter n");
     }
 
-    if (!isa<torch::Torch::NoneType>(adaptor.getNorm().getType())) {
+    if (!isa<torch::Torch::NoneType>(op.getNorm().getType())) {
       return rewriter.notifyMatchFailure(op, "unimplemented: parameter norm");
     }
 
@@ -179,18 +178,10 @@ public:
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
 
-    ConversionTarget target(getContext());
-
-    target.addLegalDialect<IREE::LinalgExt::IREELinalgExtDialect,
-                           torch::Torch::TorchDialect, tensor::TensorDialect,
-                           linalg::LinalgDialect, arith::ArithDialect,
-                           torch::TorchConversion::TorchConversionDialect>();
-
-    target.addIllegalOp<torch::Torch::AtenFftRfftOp>();
     patterns.add<FftRfftOpConversion>(context);
 
-    if (failed(applyPartialConversion(getOperation(), target,
-                                      std::move(patterns)))) {
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
       signalPassFailure();
     }
   }
