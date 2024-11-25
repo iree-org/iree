@@ -8,14 +8,12 @@
 """build_tools/scripts/bisect/install_packages_for_commit.py
 
 This downloads Python packages from the pkgci_build_packages.yml step in the
-pkgci.yml workflow then installs them. For script maintenance, refer to the
-GitHub API docs:
-  * https://docs.github.com/en/rest/actions/workflow-runs
-  * https://docs.github.com/en/rest/actions/artifacts
+pkgci.yml workflow then installs them into a Python venv.
 
-These packages are installed:
-  * iree-base-compiler
-  * iree-base-runtime
+All packages that are uploaded to actions artifacts are installed. Typically
+that means the `iree-base-compiler` and `iree-base-runtime` packages. Note that
+older runs using the iree-compiler and iree-runtime packages should still work
+too, so long as their artifacts did not expire yet.
 
 Prerequisites:
     Install gh (https://cli.github.com/) following instructions at
@@ -25,15 +23,15 @@ Prerequisites:
     gh auth login
     ```
 
-    Have a venv (https://docs.python.org/3/library/venv.html) active:
-
-    ```bash
-    python -m venv .venv
-    source ./.venv/bin/activate
-    ```
-
 Example usage:
     install_packages_for_commit.py iree-3.1.0rc20241122
+
+    install_packages_for_commit.py 5b0740c97a33edce29e753b14b9ff04789afcc53
+    source ~/.iree/bisect/5b0740c97a33edce29e753b14b9ff04789afcc53/.venv/bin/activate
+
+For script maintenance, refer to the GitHub API docs:
+  * https://docs.github.com/en/rest/actions/workflow-runs
+  * https://docs.github.com/en/rest/actions/artifacts
 """
 
 import argparse
