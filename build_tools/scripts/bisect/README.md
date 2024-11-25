@@ -41,8 +41,9 @@ serialized `.mlir` files not being stable, etc.).
 
 ### Example
 
-For https://github.com/iree-org/iree/issues/18879, we have everything we need to
-run a bisect:
+Let's try to find the culprit commit for issue
+https://github.com/iree-org/iree/issues/18879. Thanks to the detailed issue
+description, we have all the data we need to run a bisect already.
 
 To run the bisect tool:
 
@@ -51,6 +52,8 @@ To run the bisect tool:
 
     ```mlir
     // /tmp/issue_18879.mlir
+
+    // This is the input program to the test script.
     module {
       func.func @main_graph(
         // ...
@@ -58,6 +61,17 @@ To run the bisect tool:
 
     ```bash
     # /tmp/issue_18879.sh
+
+    # This is the script that will be tested at each commit.
+    # This script should succeed (return 0) at and prior to the `--good-ref`
+    # commit and should fail (return non-0) at the `--bad-ref` commit.
+
+    # Try to keep these test scripts minimal. If the failure is in an earlier
+    # phase of the compiler (e.g. 'Flow' or 'Stream'), consider using
+    # a flag like `--compile-to=hal` to exit early on successful run instead
+    # of spending all the time to serialize an output `.vmfb` file.
+    # https://iree.dev/developers/general/developer-tips/#compiling-phase-by-phase
+
     iree-compile --iree-hal-target-backends=llvm-cpu -o /dev/null /tmp/issue_18879.mlir
     ```
 
