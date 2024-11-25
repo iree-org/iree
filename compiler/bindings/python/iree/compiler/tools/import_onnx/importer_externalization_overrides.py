@@ -264,33 +264,33 @@ class IREENodeImporter(onnx_importer.NodeImporter):
 
 ELEM_TYPE_TO_SIGNLESS_IR_TYPE = copy.deepcopy(onnx_importer.ELEM_TYPE_TO_IR_TYPE_CB)
 
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.INT64] = (
-    lambda: IntegerType.get_signless(64)
-)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.INT32] = (
-    lambda: IntegerType.get_signless(32)
-)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.INT16] = (
-    lambda: IntegerType.get_signless(16)
-)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.INT8] = (
-    lambda: IntegerType.get_signless(8)
-)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.INT4] = (
-    lambda: IntegerType.get_signless(4)
-)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.UINT8] = (
-    lambda: IntegerType.get_signless(8)
-)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.UINT4] = (
-    lambda: IntegerType.get_signless(4)
-)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.UINT16] = (
-    lambda: IntegerType.get_signless(16)
-)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.UINT64] = (
-    lambda: IntegerType.get_signless(64)
-)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.UINT32] = (
-    lambda: IntegerType.get_signless(32)
-)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.INT64
+] = lambda: IntegerType.get_signless(64)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.INT32
+] = lambda: IntegerType.get_signless(32)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.INT16
+] = lambda: IntegerType.get_signless(16)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.INT8
+] = lambda: IntegerType.get_signless(8)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.INT4
+] = lambda: IntegerType.get_signless(4)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.UINT8
+] = lambda: IntegerType.get_signless(8)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.UINT4
+] = lambda: IntegerType.get_signless(4)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.UINT16
+] = lambda: IntegerType.get_signless(16)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.UINT64
+] = lambda: IntegerType.get_signless(64)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.UINT32
+] = lambda: IntegerType.get_signless(32)
