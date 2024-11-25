@@ -66,6 +66,9 @@ module @td_module_1 attributes { transform.with_named_sequence } {
       attributes { iree_codegen.tuning_spec_entrypoint } {
       transform.yield
     }
+    func.func @baz(%arg0: i32) -> () {
+      return
+    }
   }
 }
 

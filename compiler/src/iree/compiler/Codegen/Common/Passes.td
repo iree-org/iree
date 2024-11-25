@@ -415,7 +415,7 @@ def LinkTuningSpecsPass : Pass<"iree-codegen-link-tuning-specs", "ModuleOp"> {
     as the in which these nested tuning specs appear in the IR.
 
     A tuning spec entry point is a `transform.named_sequence` op annotated with the
-    `iree_codegen.tuning_spec` unit attribute. We require it to perform in-pace op
+    `iree_codegen.tuning_spec` unit attribute. We require it to perform in-place op
     modification and not consume the handle.
   }];
   let dependentDialects = ["transform::TransformDialect"];
