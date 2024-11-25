@@ -16,6 +16,7 @@ Requirements:
     git     (https://git-scm.com/)
     gh      (https://cli.github.com/)
     Linux   (at least until IREE builds packages for other systems at each commit)
+    Python 3.11
 
 Example usage:
     bisect_packages.py \
@@ -27,7 +28,9 @@ Example usage:
 
 import argparse
 import os
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 THIS_DIR = Path(__file__).parent.resolve()
@@ -83,6 +86,23 @@ def main(args):
     Path.mkdir(args.work_dir, parents=True, exist_ok=True)
 
     print(f"  Using test script       : '{args.test_script}'")
+
+    print("")
+    print(f"  Current Python version is '{sys.version}'. This script requires 3.11.")
+    if sys.version_info[:2] == (3, 11):
+        python311_path = "python"
+    else:
+        python311_path = shutil.which("python3.11")
+        if python311_path:
+            print(f"  Found python3.11 at '{python311_path}', using that instead.")
+        else:
+            print(
+                "ERROR! Could not find Python version 3.11. Python version must be 3.11 to match package builds."
+            )
+            print(
+                "  See `.github/workflows/pkgci_build_packages.yml` and `build_tools/pkgci/build_linux_packages.sh`."
+            )
+            sys.exit(1)
     print("")
     print("------------------------------------------------------------------")
 
@@ -106,7 +126,8 @@ def main(args):
         contents += "REF_HASH=$(git rev-parse BISECT_HEAD)\n"
         contents += str(THIS_DIR / "install_packages_for_commit.py")
         contents += " ${REF_HASH}"
-        contents += f" --work-dir {args.work_dir}\n"
+        contents += f" --work-dir={args.work_dir}"
+        contents += f" --python-interpreter={python311_path}\n"
         # Prepend the venv bin dir to $PATH. This is similar to running
         #   `source .venv/bin/activate`
         # while scoped to this process. Note that this does not modify

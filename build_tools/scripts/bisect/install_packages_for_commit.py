@@ -47,7 +47,6 @@ For script maintenance, refer to the GitHub API docs:
 import argparse
 import json
 import subprocess
-import sys
 from pathlib import Path
 
 OWNER = "iree-org"
@@ -68,6 +67,11 @@ def parse_arguments():
         help="The working directory to use. Defaults to ~/.iree/bisect/",
         default=Path.home() / ".iree" / "bisect",
         type=Path,
+    )
+    parser.add_argument(
+        "--python-interpreter",
+        help="The path to the Python interpreter to use. Must be compatible with packages (typically version 3.11)",
+        default="python",
     )
     return parser.parse_args()
 
@@ -113,11 +117,11 @@ def download_artifacts_for_run_id(run_id: int, dir: Path):
     subprocess.check_call(download_artifacts_args)
 
 
-def install_packages_from_directory(dir: Path):
+def install_packages_from_directory(dir: Path, python_interpreter: str):
     # Setup venv.
     venv_dir = dir / ".venv"
     print(f"Creating venv at '{venv_dir}'")
-    subprocess.check_call(["python", "-m", "venv", str(venv_dir)])
+    subprocess.check_call([python_interpreter, "-m", "venv", str(venv_dir)])
     venv_python_interpreter = str(venv_dir / "bin" / "python")
     subprocess.check_call(
         [venv_python_interpreter, "-m", "pip", "install", "--upgrade", "pip", "--quiet"]
@@ -180,7 +184,9 @@ def main(args):
     else:
         download_artifacts_for_run_id(latest_run_id, artifacts_dir)
 
-    install_packages_from_directory(artifacts_dir)
+    install_packages_from_directory(
+        artifacts_dir, python_interpreter=args.python_interpreter
+    )
 
     print("------------------------------------------------------------------")
     print("")
