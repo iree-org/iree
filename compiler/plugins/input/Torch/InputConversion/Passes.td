@@ -29,6 +29,11 @@ def SetStrictSymbolicShapesPass :
   let summary = "Adds the attribute indicating strict symbolic shapes in Torch IR";
 }
 
+def TorchToIREEPass :
+    InterfacePass<"torch-convert-to-iree", "mlir::FunctionOpInterface"> {
+  let summary = "IREE specific lowerings of certain Torch ops";
+}
+
 def FuncConversionPass :
     Pass<"torch-iree-func-conversion", "ModuleOp"> {
   let summary = "Finalizes conversion from torch to IREE";
