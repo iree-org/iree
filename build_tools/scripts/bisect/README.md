@@ -113,18 +113,24 @@ To run the bisect tool:
 
 ## How the tool works
 
-1. `bisect_packages.py` is the main entry point which runs `git bisect`
-   commands.
-2. The script starts a `git bisect start --no-checkout --first-parent` run and
-   specifies the commit range with `git bisect good` and `git bisect bad`.
-3. The script injects wrapper code around the provided `--test-script`. The
-   wrapper script downloads IREE packages built at the test commit, installs
-   those packages into an isolated virtual environment, and then puts that
-   environment at the front of `PATH`. The wrapper script then runs the
-   original script and forwards its exit code to `git bisect`.
-4. The script kicks off a `git bisect run` using the generated/wrapper script,
+1. The [`bisect_packages.py`](./bisect_packages.py) script is the main entry
+   point which sets things up and runs `git bisect` commands.
+2. The bisect operation starts with
+   `git bisect start --no-checkout --first-parent` (flags to avoid modifying
+   the working tree and traversing merge commits) and then calls to
+   specify the commit range with `git bisect good` and `git bisect bad`.
+3. The script injects wrapper code around the provided `--test-script`. First,
+   the wrapper script calls
+   [`install_packages_for_commit.py`](./install_packages_for_commit.py) to
+   download IREE packages built at the test commit (marked by `BISECT_HEAD`) and
+   install those packages into an isolated virtual environment. The wrapper
+   script then puts that environment at the front of `PATH`, runs the original
+   script, and finally forwards the original script's exit code to `git bisect`.
+4. The script kicks off a `git bisect run` using the generated wrapper script,
    which then proceeds to test commits between `--good-ref` and `--bad-ref`,
    looking for when the test script switched from succeeding to failing.
+5. After the script, the logs can be analyzed and `git bisect log` can be run
+   from the repository root.
 
 ### Working directory cache
 
