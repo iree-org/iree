@@ -77,8 +77,6 @@ typedef struct iree_hal_hip_device_t {
 
   iree_hal_allocator_t* device_allocator;
 
-  iree_hal_hip_memory_pools_t memory_pools;
-
   iree_hal_hip_cleanup_thread_t* cleanup_thread;
 
   iree_hal_hip_device_topology_t topology;
@@ -324,19 +322,20 @@ static iree_status_t iree_hal_hip_device_initialize_internal(
 
   // Create memory pools first so that we can share them with the allocator.
   if (iree_status_is_ok(status) && device->supports_memory_pools) {
-    device->supports_memory_pools = false;
-    // TODO(awoloszyn): Figure out how to set up memory pools in a device group
-    // status = iree_hal_hip_memory_pools_initialize(
-    //     symbols, hip_devices[i], &params->memory_pools, host_allocator,
-    //     &device->topology.devices[i].memory_pools);
+    for (iree_host_size_t i = 0; i < device->topology.count; ++i) {
+      device->supports_memory_pools = false;
+      // TODO(awoloszyn): Figure out how to set up memory pools in a device
+      // group
+      status = iree_hal_hip_memory_pools_initialize(
+          symbols, device->topology.devices[i].hip_device,
+          &params->memory_pools, host_allocator,
+          &device->topology.devices[i].memory_pools);
+    }
   }
 
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_hip_allocator_create(
-        (iree_hal_device_t*)device, symbols, &device->topology,
-        device->supports_memory_pools ? &device->memory_pools : NULL,
-        host_allocator, &device->device_allocator);
-  }
+  status = iree_hal_hip_allocator_create(
+      (iree_hal_device_t*)device, symbols, &device->topology, device->supports_memory_pools, host_allocator,
+      &device->device_allocator);
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_hip_cleanup_thread_initialize(symbols, host_allocator,
@@ -490,9 +489,9 @@ static void iree_hal_hip_device_destroy(iree_hal_device_t* base_device) {
   // Buffers may have been retaining collective resources.
   iree_hal_channel_provider_release(device->channel_provider);
 
-  // Destroy memory pools that hold on to reserved memory.
-  iree_hal_hip_memory_pools_deinitialize(&device->memory_pools);
   for (iree_host_size_t i = 0; i < device->topology.count; ++i) {
+    iree_hal_hip_memory_pools_deinitialize(
+        &device->topology.devices[i].memory_pools);
     iree_hal_stream_tracing_context_free(
         device->topology.devices[i].tracing_context);
   }
@@ -567,8 +566,11 @@ static iree_status_t iree_hal_hip_device_trim(iree_hal_device_t* base_device) {
   iree_arena_block_pool_trim(&device->block_pool);
   IREE_RETURN_IF_ERROR(iree_hal_allocator_trim(device->device_allocator));
   if (device->supports_memory_pools) {
-    IREE_RETURN_IF_ERROR(iree_hal_hip_memory_pools_trim(
-        &device->memory_pools, &device->params.memory_pools));
+    for (iree_host_size_t i = 0; i < device->topology.count; ++i) {
+      IREE_RETURN_IF_ERROR(iree_hal_hip_memory_pools_trim(
+          &device->topology.devices[i].memory_pools,
+          &device->params.memory_pools));
+    }
   }
   return iree_ok_status();
 }
@@ -1214,7 +1216,8 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
       case IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_ALLOC:
         if (device->supports_memory_pools) {
           status = iree_hal_hip_memory_pools_allocate_pointer(
-              &device->memory_pools, data->buffer,
+              &device->topology.devices[device_ordinal].memory_pools,
+              data->buffer,
               device->topology.devices[device_ordinal].hip_dispatch_stream,
               iree_hal_buffer_allocation_size(data->buffer));
           break;
@@ -1227,7 +1230,7 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
       case IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_DEALLOC:
         if (device->supports_memory_pools) {
           status = iree_hal_hip_memory_pools_deallocate(
-              &device->memory_pools,
+              &device->topology.devices[device_ordinal].memory_pools,
               device->topology.devices[device_ordinal].hip_dispatch_stream,
               data->buffer);
           break;
@@ -1468,7 +1471,7 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
   // drop it on the floor and let it be freed when the buffer is released.
   if (device->supports_memory_pools) {
     status = iree_hal_hip_memory_pools_deallocate(
-        &device->memory_pools,
+        &device->topology.devices[device_ordinal].memory_pools,
         device->topology.devices[device_ordinal].hip_dispatch_stream, buffer);
   }
 
