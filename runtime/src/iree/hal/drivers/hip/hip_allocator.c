@@ -30,8 +30,7 @@ typedef struct iree_hal_hip_allocator_t {
 
   const iree_hal_hip_device_topology_t* topology;
 
-  // NOTE: optional depending on device support.
-  iree_hal_hip_memory_pools_t* pools;
+  bool supports_memory_pools;
 
   const iree_hal_hip_dynamic_symbols_t* symbols;
 
@@ -55,10 +54,9 @@ static iree_hal_hip_allocator_t* iree_hal_hip_allocator_cast(
 
 iree_status_t iree_hal_hip_allocator_create(
     iree_hal_device_t* parent_device,
-    const iree_hal_hip_dynamic_symbols_t* hip_symbols,
-    const iree_hal_hip_device_topology_t* topology,
-    iree_hal_hip_memory_pools_t* pools, iree_allocator_t host_allocator,
-    iree_hal_allocator_t** out_allocator) {
+    const iree_hal_hip_dynamic_symbols_t* hip_symbols
+    const iree_hal_hip_device_topology_t* topology, bool supports_memory_pools,
+    iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(parent_device);
   IREE_ASSERT_ARGUMENT(hip_symbols);
   IREE_ASSERT_ARGUMENT(out_allocator);
@@ -98,7 +96,7 @@ iree_status_t iree_hal_hip_allocator_create(
   iree_hal_resource_initialize(&iree_hal_hip_allocator_vtable,
                                &allocator->resource);
   allocator->parent_device = parent_device;
-  allocator->pools = pools;
+  allocator->supports_memory_pools = supports_memory_pools;
   allocator->symbols = hip_symbols;
   allocator->host_allocator = host_allocator;
   allocator->supports_concurrent_managed_access =
@@ -144,9 +142,12 @@ static void iree_hal_hip_allocator_query_statistics(
     iree_hal_hip_allocator_t* allocator =
         iree_hal_hip_allocator_cast(base_allocator);
     memcpy(out_statistics, &allocator->statistics, sizeof(*out_statistics));
-    if (allocator->pools) {
-      iree_hal_hip_memory_pools_merge_statistics(allocator->pools,
-                                                 out_statistics);
+
+    if (allocator->supports_memory_pools) {
+      for (iree_host_size_t i = 0; i < allocator->topology->count; ++i) {
+        iree_hal_hip_memory_pools_merge_statistics(
+            &allocator->topology->devices[i].memory_pools, out_statistics);
+      }
     }
   });
 }

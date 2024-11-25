@@ -21,9 +21,8 @@ typedef struct iree_hal_hip_device_topology_t iree_hal_hip_device_topology_t;
 iree_status_t iree_hal_hip_allocator_create(
     iree_hal_device_t* parent_device,
     const iree_hal_hip_dynamic_symbols_t* hip_symbols,
-    const iree_hal_hip_device_topology_t* topology,
-    iree_hal_hip_memory_pools_t* pools, iree_allocator_t host_allocator,
-    iree_hal_allocator_t** out_allocator);
+    const iree_hal_hip_device_topology_t* topology, bool supports_memory_pools,
+    iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator);
 
 bool iree_hal_hip_allocator_isa(iree_hal_allocator_t* base_value);
 
