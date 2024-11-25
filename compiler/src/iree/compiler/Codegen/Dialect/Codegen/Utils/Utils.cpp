@@ -14,7 +14,7 @@
 namespace mlir::iree_compiler::IREE::Codegen {
 
 //===----------------------------------------------------------------------===//
-// Layout Structs.
+// Relational operator and IOstream implementations for Layout Structs.
 //===----------------------------------------------------------------------===//
 
 bool operator==(TileSwizzle::Dim lhs, TileSwizzle::Dim rhs) {
