@@ -77,20 +77,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         self.symbol_table = SymbolTable(module_op)
         self.symbol_table.insert(parent_op)
         self.param_data = param_data
-        self.param_count = 0
-        try:
-            import iree.runtime as rt
-        except ModuleNotFoundError as e:
-            raise ModuleNotFoundError(
-                "iree-import-onnx requires iree runtime api for externalizing parameters. "
-                "For example: `pip install iree-base-runtime`"
-            ) from e
-        self.param_archive = rt.ParameterIndex()
-
-    def import_all(self, func=True):
-        super().import_all(func)
-        # write the param archive to an irpa file:
-        self.param_archive.create_archive_file(self.param_data.param_path)
+        self.globals = []
 
     def sanitize_name(self, name: str) -> str:
         # There are often some initializers in the models that have no name
@@ -241,50 +228,69 @@ class IREENodeImporter(onnx_importer.NodeImporter):
             ).result
 
         self._nv_map[initializer_name] = converted_value
-        tensor_as_array = numpy_helper.to_array(
-            initializer, base_dir=self.param_data.data_dir
-        )
-        self.param_archive.add_buffer(actual_symbol_name, tensor_as_array)
-        self.param_count = self.param_count + 1
-        if (
-            self.param_data.initializer_threshold
-            and self.param_count % self.param_data.initializer_threshold == 0
-        ):
-            self.param_archive = self.param_archive.create_archive_file(
-                self.param_data.param_path
-            )
+        self.globals.append((initializer_name, actual_symbol_name))
         return converted_value
+
+    def save_params(self):
+        """
+        Only gets called if the arg `--save-params` is set to `True`.
+        Saving params requires iree-runtime, so putting the import here will avoid requiring it uniformly for the importer.
+        """
+        try:
+            import iree.runtime as rt
+        except ModuleNotFoundError as e:
+            raise ModuleNotFoundError(
+                "iree-import-onnx requires iree runtime api for externalizing parameters. "
+                "For example: `pip install iree-base-runtime`"
+            ) from e
+        param_archive = rt.ParameterIndex()
+        param_count = 0
+        for name, actual_symbol_name in self.globals:
+            initializer = self._gi.initializer_map[name]
+            tensor_as_array = numpy_helper.to_array(
+                initializer, base_dir=self.param_data.data_dir
+            )
+            param_archive.add_buffer(actual_symbol_name, tensor_as_array)
+            param_count += 1
+            if (
+                self.param_data.initializer_threshold
+                and param_count % self.param_data.initializer_threshold == 0
+            ):
+                param_archive = param_archive.create_archive_file(
+                    self.param_data.param_path
+                )
+        param_archive = param_archive.create_archive_file(self.param_data.param_path)
 
 
 ELEM_TYPE_TO_SIGNLESS_IR_TYPE = copy.deepcopy(onnx_importer.ELEM_TYPE_TO_IR_TYPE_CB)
 
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.INT64
-] = lambda: IntegerType.get_signless(64)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.INT32
-] = lambda: IntegerType.get_signless(32)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.INT16
-] = lambda: IntegerType.get_signless(16)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.INT8
-] = lambda: IntegerType.get_signless(8)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.INT4
-] = lambda: IntegerType.get_signless(4)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.UINT8
-] = lambda: IntegerType.get_signless(8)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.UINT4
-] = lambda: IntegerType.get_signless(4)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.UINT16
-] = lambda: IntegerType.get_signless(16)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.UINT64
-] = lambda: IntegerType.get_signless(64)
-ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
-    onnx.TensorProto.DataType.UINT32
-] = lambda: IntegerType.get_signless(32)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.INT64] = (
+    lambda: IntegerType.get_signless(64)
+)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.INT32] = (
+    lambda: IntegerType.get_signless(32)
+)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.INT16] = (
+    lambda: IntegerType.get_signless(16)
+)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.INT8] = (
+    lambda: IntegerType.get_signless(8)
+)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.INT4] = (
+    lambda: IntegerType.get_signless(4)
+)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.UINT8] = (
+    lambda: IntegerType.get_signless(8)
+)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.UINT4] = (
+    lambda: IntegerType.get_signless(4)
+)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.UINT16] = (
+    lambda: IntegerType.get_signless(16)
+)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.UINT64] = (
+    lambda: IntegerType.get_signless(64)
+)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[onnx.TensorProto.DataType.UINT32] = (
+    lambda: IntegerType.get_signless(32)
+)
