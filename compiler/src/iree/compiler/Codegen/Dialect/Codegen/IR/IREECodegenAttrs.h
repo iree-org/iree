@@ -206,10 +206,6 @@ void setCompilationInfo(Operation *op,
 /// operation.
 void eraseCompilationInfo(Operation *op);
 
-//===----------------------------------------------------------------------===//
-// Helpers for getting/setting TD kenel config and tuning spec attribues.
-//===----------------------------------------------------------------------===//
-
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG_H_
