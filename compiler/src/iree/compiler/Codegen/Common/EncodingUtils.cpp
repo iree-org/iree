@@ -89,9 +89,10 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
 
 MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     MaterializeEncodingFn materializeEncodingFn,
-    IREE::HAL::ExecutableTargetAttr targetAttr, bool transposeNarrowN)
+    IREE::HAL::ExecutableTargetAttr targetAttr, bool transposeNarrowN,
+    IREE::Codegen::LayoutAttrInterface layoutAttr)
     : materializeEncodingFn(materializeEncodingFn), targetAttr(targetAttr),
-      transposeNarrowN(transposeNarrowN) {
+      transposeNarrowN(transposeNarrowN), layoutAttr(layoutAttr) {
   addConversion([](IntegerType intType) { return intType; });
   addConversion([](IndexType indexType) { return indexType; });
   addConversion([](FloatType floatType) { return floatType; });

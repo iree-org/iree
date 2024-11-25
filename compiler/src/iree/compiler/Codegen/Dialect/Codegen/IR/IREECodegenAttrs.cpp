@@ -8,11 +8,13 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/StorageUniquerSupport.h"
 
@@ -458,6 +460,23 @@ bool WorkgroupMappingAttr::isLinearMapping() const { return false; }
 
 int64_t WorkgroupMappingAttr::getRelativeIndex() const {
   return getMappingId();
+}
+
+//===---------------------------------------------------------------------===//
+// iree_codegen.encoding_layout
+//===---------------------------------------------------------------------===//
+
+MaterializeEncodingInfo
+EncodingLayoutAttr::getEncodingInfo(RankedTensorType type) const {
+  return MaterializeEncodingInfo{};
+}
+
+SmallVector<Operation *>
+EncodingLayoutAttr::lowerComputeOp(OpBuilder &b, Operation *op,
+                                   TypeRange convertedResTypes,
+                                   ValueRange convertedOperands) const {
+  Operation *clonedOp = clone(b, op, convertedResTypes, convertedOperands);
+  return SmallVector<Operation *>{clonedOp};
 }
 
 //===----------------------------------------------------------------------===//

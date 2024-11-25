@@ -418,4 +418,24 @@ def IREECodegen_ExportConfig : AttrDef<IREECodegen_Dialect, "ExportConfig", []> 
   let genVerifyDecl = 1;
 }
 
+//===---------------------------------------------------------------------===//
+// iree_codegen.encoding_layout
+//===---------------------------------------------------------------------===//
+
+def IREECodegen_EncodingLayoutAttr  :
+    AttrDef<IREECodegen_Dialect, "EncodingLayout", [
+    DeclareAttrInterfaceMethods<IREECodegen_LayoutAttrInterface, [
+        "getEncodingInfo",
+        "lowerComputeOp"
+      ]>
+    ]> {
+  let mnemonic = "encoding_layout";
+  let summary = "An attribute with implementation that treats encoding as nop.";
+  let description = [{
+    An attribute that implements the interface methods that discards the
+    encodings. It can be a default attribute when a backend does not implement
+    encoding details.
+  }];
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS

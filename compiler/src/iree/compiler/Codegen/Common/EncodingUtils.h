@@ -7,7 +7,8 @@
 #ifndef IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_
 #define IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_
 
-#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -34,9 +35,13 @@ using MaterializeEncodingValueFn =
 /// TypeConverter to use for materializing the encoding.
 class MaterializeEncodingTypeConverter : public TypeConverter {
 public:
-  MaterializeEncodingTypeConverter(MaterializeEncodingFn fn,
-                                   IREE::HAL::ExecutableTargetAttr targetAttr,
-                                   bool transposeNarrowN);
+  MaterializeEncodingTypeConverter(
+      MaterializeEncodingFn fn, IREE::HAL::ExecutableTargetAttr targetAttr,
+      bool transposeNarrowN, IREE::Codegen::LayoutAttrInterface layoutAttr);
+
+  const IREE::Codegen::LayoutAttrInterface &getLayoutAttr() const {
+    return layoutAttr;
+  }
 
   const MaterializeEncodingFn &getMaterializeEncodingFn() const {
     return materializeEncodingFn;
@@ -46,6 +51,9 @@ public:
 
   FailureOr<IREE::Codegen::MaterializeEncodingInfo>
   getEncodingInfo(RankedTensorType type) const {
+    if (layoutAttr) {
+      return layoutAttr.getEncodingInfo(type);
+    }
     return materializeEncodingFn(type, targetAttr);
   }
 
@@ -55,6 +63,13 @@ private:
   const MaterializeEncodingFn materializeEncodingFn;
   const IREE::HAL::ExecutableTargetAttr targetAttr;
   bool transposeNarrowN = false;
+  // The `layoutAttr` implements the logics of encoding materialization. It has
+  // a higher priority when it presents.
+  // TODO(hanchung): Move the logics that take `targetAttr` and
+  // `transposeNarrowN` into accounts to their own attribute implementation. It
+  // is in a transition state, so we have two path atm. We're incrementally
+  // moving the logics to attributes.
+  const IREE::Codegen::LayoutAttrInterface layoutAttr;
 };
 
 /// Conversion target to use for for materializing the encoding.
@@ -96,17 +111,27 @@ getEncodingInfoForMatmul(IREE::Encoding::EncodingAttr encoding, int64_t rank,
                          TileMxNxK tileMxNxK);
 
 /// Utility method to convert from `set_encoding` op to `pack` operation.
-/// For now this takes a `paddingValue` as input. The source is also taken
-/// as input so that these could be used with `OpConversionPatterns`.
-FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
+/// Note that `source` could be returned when the pack op is a nop. Because
+/// creating a new operation is not cheap.
+/// TODO(hanchung): Move the utility to
+/// `Dialect/Codegen/Utils/LayoutUtils.[h|cpp]`. It is not moved because it
+/// needs some cleanup for the c++ file. E.g., the method will no longer take
+/// the type converter into account. Ideally we should move CPU specific
+/// patterns (e.g., lowerContractionOpWithEncoding, etc) to their LayoutAttr
+/// implementation; move general patterns to the utilitiy files, and retire this
+/// file.
+FailureOr<Value> lowerSetEncodingOpToPackOp(
     RewriterBase &rewriter, IREE::Encoding::SetEncodingOp encodingOp,
     Value source, const MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn);
 
 /// Utility method to convert from `unset_encoding` op to `unpack` operation.
-/// The source is taken as input so that these could be used with
-/// `OpConversionPatterns`.
-FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
+/// Note that `packedValue` could be returned when the unpack op is a nop.
+/// Because creating a new operation is not cheap.
+/// TODO(hanchung): Move the implementation to
+/// `Dialect/Codegen/Utils/LayoutUtils.[h|cpp]`. See the reason in the function
+/// comment of lowerSetEncodingToPackOp method.
+FailureOr<Value> lowerUnsetEncodingToUnpackOp(
     RewriterBase &rewriter, IREE::Encoding::UnsetEncodingOp encodingOp,
     Value packedValue, const MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn);

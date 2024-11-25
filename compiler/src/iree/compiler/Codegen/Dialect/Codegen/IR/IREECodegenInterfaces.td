@@ -116,4 +116,44 @@ def IREECodegen_LoweringConfigAttrInterface :
   ];
 }
 
+def IREECodegen_LayoutAttrInterface :
+  AttrInterface<"LayoutAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+  let description = [{
+    An interface that collects a set of methods for encoding materialization.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the layout of materialized encoding for a tensor type.
+      }],
+      /*retTy=*/"::mlir::iree_compiler::IREE::Codegen::MaterializeEncodingInfo",
+      /*methodName=*/"getEncodingInfo",
+      /*args=*/(ins "::mlir::RankedTensorType":$type),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return MaterializeEncodingInfo{};
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the layout of materialized encoding for a tensor type.
+      }],
+      /*retTy=*/"::llvm::SmallVector<::mlir::Operation *>",
+      /*methodName=*/"lowerComputeOp",
+      /*args=*/(ins "::mlir::OpBuilder &":$b,
+                    "::mlir::Operation *":$op,
+                    "::mlir::TypeRange":$convertedResTypes,
+                    "::mlir::ValueRange":$convertedOperands),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return {op};
+      }]
+    >
+  ];
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_IREECODEGENINTERFACES
