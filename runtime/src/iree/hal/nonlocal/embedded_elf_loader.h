@@ -24,7 +24,7 @@ typedef struct iree_hal_executable_plugin_manager_t
 // libraries on any platform. This allows us to use a single file format across
 // all operating systems at the cost of some missing debugging/profiling
 // features.
-iree_status_t iree_hal_embedded_elf_loader_create(
+iree_status_t iree_hal_nonlocal_embedded_elf_loader_create(
     iree_hal_executable_plugin_manager_t* plugin_manager,
     iree_allocator_t host_allocator,
     iree_hal_executable_loader_t** out_executable_loader);

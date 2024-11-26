@@ -4,14 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/local/local_executable.h"
+#include "local_executable.h"
 
 #include "iree/hal/local/executable_environment.h"
 
-void iree_hal_local_executable_initialize(
-    const iree_hal_local_executable_vtable_t* vtable,
+void iree_hal_nonlocal_executable_initialize(
+    const iree_hal_nonlocal_executable_vtable_t* vtable,
     iree_allocator_t host_allocator,
-    iree_hal_local_executable_t* out_base_executable) {
+    iree_hal_nonlocal_executable_t* out_base_executable) {
   iree_hal_resource_initialize(vtable, &out_base_executable->resource);
   out_base_executable->host_allocator = host_allocator;
 
@@ -23,30 +23,30 @@ void iree_hal_local_executable_initialize(
                                              &out_base_executable->environment);
 }
 
-void iree_hal_local_executable_deinitialize(
-    iree_hal_local_executable_t* base_executable) {}
+void iree_hal_nonlocal_executable_deinitialize(
+    iree_hal_nonlocal_executable_t* base_executable) {}
 
-iree_hal_local_executable_t* iree_hal_local_executable_cast(
+iree_hal_nonlocal_executable_t* iree_hal_nonlocal_executable_cast(
     iree_hal_executable_t* base_value) {
-  return (iree_hal_local_executable_t*)base_value;
+  return (iree_hal_nonlocal_executable_t*)base_value;
 }
 
-iree_status_t iree_hal_local_executable_issue_call(
-    iree_hal_local_executable_t* executable, iree_host_size_t ordinal,
+iree_status_t iree_hal_nonlocal_executable_issue_call(
+    iree_hal_nonlocal_executable_t* executable, iree_host_size_t ordinal,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
     const iree_hal_executable_workgroup_state_v0_t* workgroup_state,
     uint32_t worker_id) {
   IREE_ASSERT_ARGUMENT(executable);
   IREE_ASSERT_ARGUMENT(dispatch_state);
   IREE_ASSERT_ARGUMENT(workgroup_state);
-  return ((const iree_hal_local_executable_vtable_t*)
+  return ((const iree_hal_nonlocal_executable_vtable_t*)
               executable->resource.vtable)
       ->issue_call(executable, ordinal, dispatch_state, workgroup_state,
                    worker_id);
 }
 
-iree_status_t iree_hal_local_executable_issue_dispatch_inline(
-    iree_hal_local_executable_t* executable, iree_host_size_t ordinal,
+iree_status_t iree_hal_nonlocal_executable_issue_dispatch_inline(
+    iree_hal_nonlocal_executable_t* executable, iree_host_size_t ordinal,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
     uint32_t processor_id, iree_byte_span_t local_memory) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -83,7 +83,7 @@ iree_status_t iree_hal_local_executable_issue_dispatch_inline(
       workgroup_state.workgroup_id_y = y;
       for (uint32_t x = 0; x < workgroup_count_x; ++x) {
         workgroup_state.workgroup_id_x = x;
-        status = iree_hal_local_executable_issue_call(
+        status = iree_hal_nonlocal_executable_issue_call(
             executable, ordinal, dispatch_state, &workgroup_state,
             /*worker_id=*/0);
         if (!iree_status_is_ok(status)) break;

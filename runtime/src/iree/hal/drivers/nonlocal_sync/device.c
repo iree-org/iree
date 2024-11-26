@@ -17,7 +17,7 @@
 #include "event.h"
 #include "semaphore.h"
 #include "iree/hal/local/executable_environment.h"
-#include "iree/hal/local/inline_command_buffer.h"
+#include "inline_command_buffer.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/file_transfer.h"
@@ -241,7 +241,7 @@ static iree_status_t iree_hal_nl_sync_device_create_command_buffer(
     iree_hal_command_buffer_t** out_command_buffer) {
   if (iree_all_bits_set(mode,
                         IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION)) {
-    return iree_hal_inline_command_buffer_create(
+    return iree_hal_nonlocal_inline_command_buffer_create(
         iree_hal_device_allocator(base_device), mode, command_categories,
         queue_affinity, binding_capacity,
         iree_hal_device_host_allocator(base_device), out_command_buffer);
@@ -394,7 +394,7 @@ static iree_status_t iree_hal_nl_sync_device_apply_deferred_command_buffers(
                        : iree_hal_buffer_binding_table_empty();
     max_storage_size = iree_max(
         max_storage_size,
-        iree_hal_inline_command_buffer_size(
+        iree_hal_nonlocal_inline_command_buffer_size(
             iree_hal_command_buffer_mode(command_buffer) |
                 IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT |
                 IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION |
@@ -420,7 +420,7 @@ static iree_status_t iree_hal_nl_sync_device_apply_deferred_command_buffers(
       // NOTE: we run unvalidated as inline command buffers don't support
       // binding tables and can be validated entirely while recording.
       iree_hal_command_buffer_t* inline_command_buffer = NULL;
-      IREE_RETURN_IF_ERROR(iree_hal_inline_command_buffer_initialize(
+      IREE_RETURN_IF_ERROR(iree_hal_nonlocal_inline_command_buffer_initialize(
           device->device_allocator,
           iree_hal_command_buffer_mode(command_buffer) |
               IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT |
@@ -436,7 +436,7 @@ static iree_status_t iree_hal_nl_sync_device_apply_deferred_command_buffers(
           &inline_command_buffer));
       iree_status_t status = iree_hal_deferred_command_buffer_apply(
           command_buffer, inline_command_buffer, binding_table);
-      iree_hal_inline_command_buffer_deinitialize(inline_command_buffer);
+      iree_hal_nonlocal_inline_command_buffer_deinitialize(inline_command_buffer);
       IREE_RETURN_IF_ERROR(status);
     }
   }

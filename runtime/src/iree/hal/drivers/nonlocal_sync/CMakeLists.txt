@@ -20,6 +20,9 @@ iree_cc_library(
     "semaphore.h"
     "../../nonlocal/buffer.h"
     "../../nonlocal/allocator.h"
+    "../../nonlocal/inline_command_buffer.h"
+    "../../nonlocal/local_executable.h"
+    "../../nonlocal/embedded_elf_loader.h"
     "../../nonlocal/nl_api.h"
   SRCS
     "device.c"
@@ -28,6 +31,9 @@ iree_cc_library(
     "semaphore.c"
     "../../nonlocal/buffer.c"
     "../../nonlocal/allocator.c"
+    "../../nonlocal/inline_command_buffer.c"
+    "../../nonlocal/local_executable.c"
+    "../../nonlocal/embedded_elf_loader.c"
     "../../nonlocal/nl_api.c"
   DEPS
     iree::base

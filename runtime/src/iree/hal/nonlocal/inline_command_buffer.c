@@ -15,7 +15,7 @@
 #include "iree/base/internal/fpu_state.h"
 #include "iree/base/internal/math.h"
 #include "iree/hal/local/executable_library.h"
-#include "iree/hal/local/local_executable.h"
+#include "local_executable.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_nonlocal_inline_command_buffer_t
@@ -352,8 +352,8 @@ static iree_status_t iree_hal_nonlocal_inline_command_buffer_dispatch(
   iree_hal_nonlocal_inline_command_buffer_t* command_buffer =
       iree_hal_nonlocal_inline_command_buffer_cast(base_command_buffer);
 
-  iree_hal_local_executable_t* local_executable =
-      iree_hal_local_executable_cast(executable);
+  iree_hal_nonlocal_executable_t* local_executable =
+      iree_hal_nonlocal_executable_cast(executable);
 
   iree_hal_executable_dispatch_attrs_v0_t dispatch_attrs = {0};
   if (local_executable->dispatch_attrs) {
@@ -450,7 +450,8 @@ static iree_status_t iree_hal_nonlocal_inline_command_buffer_dispatch(
   // floating point state. Reset it.
   iree_fpu_state_t fpu_state =
       iree_fpu_state_push(IREE_FPU_STATE_FLAG_FLUSH_DENORMALS_TO_ZERO);
-  iree_status_t status = iree_hal_local_executable_issue_dispatch_inline(
+
+  iree_status_t status = iree_hal_nonlocal_executable_issue_dispatch_inline(
       local_executable, entry_point, dispatch_state,
       command_buffer->state.processor_id, local_memory);
   iree_fpu_state_pop(fpu_state);
