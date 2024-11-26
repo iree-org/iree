@@ -208,6 +208,19 @@ jobs:
         env:
           ROCM_CHIP: ${{ matrix.rocm-chip }}
 
+      - name: "Running SD3 special model tests"
+        if: "!cancelled()"
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest ./experimental/regression_suite/shark-test-suite-models/sd3 \
+            -k ${{ matrix.backend }} \
+            -rpfE \
+            --capture=no \
+            --log-cli-level=info \
+            --timeout=240 \
+            --durations=0
+        env:
+          ROCM_CHIP: ${{ matrix.rocm-chip }}
       # Note: mi250 benchmark times are more lenient than mi300 (allowing about
       # 10% deviation from observed averages), since the mi250 runners we use
       # are more unstable and we care most about peak performance on mi300.
