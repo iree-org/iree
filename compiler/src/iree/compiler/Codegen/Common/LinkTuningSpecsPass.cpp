@@ -35,19 +35,17 @@ using mlir::transform::NamedSequenceOp;
 static SmallVector<ModuleOp>
 findNestedModulesWithNamedSequences(ModuleOp module) {
   Block *body = module.getBody();
-  return llvm::to_vector(
-      llvm::make_filter_range(body->getOps<ModuleOp>(), [](ModuleOp op) {
-        return op.getSymName().has_value() &&
-               op->hasAttr(
-                   transform::TransformDialect::kWithNamedSequenceAttrName);
-      }));
+  return llvm::filter_to_vector(body->getOps<ModuleOp>(), [](ModuleOp op) {
+    return op.getSymName().has_value() &&
+           op->hasAttr(transform::TransformDialect::kWithNamedSequenceAttrName);
+  });
 }
 
 static SmallVector<NamedSequenceOp> findTuningSpecs(ModuleOp module) {
   Block *body = module.getBody();
-  return llvm::to_vector(llvm::make_filter_range(
+  return llvm::filter_to_vector(
       body->getOps<NamedSequenceOp>(),
-      [](NamedSequenceOp op) { return op->hasAttr(kTuningSpecAttrName); }));
+      [](NamedSequenceOp op) { return op->hasAttr(kTuningSpecAttrName); });
 }
 
 static LogicalResult validateTuningSpec(NamedSequenceOp op) {
