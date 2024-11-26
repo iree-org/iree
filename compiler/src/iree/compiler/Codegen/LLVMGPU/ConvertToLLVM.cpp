@@ -507,7 +507,7 @@ struct HALInterfaceWorkgroupOpsConverter final
                                           gpu::Dimension::z};
     NewOpTy newOp =
         rewriter.replaceOpWithNewOp<NewOpTy>(op, op.getType(), dimAttr[index]);
-    if (auto bound = op.getUpperBoundAttr())
+    if (IntegerAttr bound = op.getUpperBoundAttr())
       newOp.setUpperBoundAttr(bound);
     return success();
   }
