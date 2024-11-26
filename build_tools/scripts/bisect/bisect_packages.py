@@ -28,6 +28,7 @@ Example usage:
 
 import argparse
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -65,11 +66,80 @@ def parse_arguments():
         help="The script to run at each commit",
         required=True,
     )
+    parser.add_argument(
+        "--ignore-system-requirements",
+        help="Ignores system requirements like Python 3.11 and tries to run even if they are not met.",
+        action="store_true",
+        default=False,
+    )
     # TODO(scotttodd): --clean arg to `rm -rf` the workdir
     # TODO(scotttodd): control over logging
     #   redirect stdout/stderr from test script separate files in the workdir?
 
     return parser.parse_args()
+
+
+def check_system_requirements(ignore_system_requirements):
+    print("")
+    system_check_okay = True
+
+    # Check for Linux.
+    print(
+        f"  Current platform is '{platform.platform()}', platform.system is '{platform.system()}'."
+    )
+    if "Linux" not in platform.system():
+        print("  ERROR! platform.system must be 'Linux'.", file=sys.stderr)
+        system_check_okay = False
+
+    # Check for Python 3.11.
+    print("")
+    print(f"  Current Python version is '{sys.version}'. This script requires 3.11.")
+    if sys.version_info[:2] == (3, 11):
+        python311_path = "python"
+    else:
+        python311_path = shutil.which("python3.11")
+        if python311_path:
+            print(f"  Found python3.11 at '{python311_path}', using that instead.")
+        else:
+            print(
+                "  ERROR! Could not find Python version 3.11. Python version must be 3.11 to match package builds.",
+                file=sys.stderr,
+            )
+            print(
+                "  See `.github/workflows/pkgci_build_packages.yml` and `build_tools/pkgci/build_linux_packages.sh`.",
+                file=sys.stderr,
+            )
+            system_check_okay = False
+
+    # Check for 'gh'.
+    print("")
+    gh_path = shutil.which("gh")
+    if not gh_path:
+        print(
+            "  ERROR! Could not find 'gh'. Install by following https://github.com/cli/cli#installation.",
+            file=sys.stderr,
+        )
+        system_check_okay = False
+    else:
+        print(f"  Found gh at '{gh_path}'.")
+
+    if not system_check_okay:
+        print("")
+        if ignore_system_requirements:
+            print(
+                "One or more configuration issues detected, but --ignore-system-requirements is set. Continuing.",
+                file=sys.stderr,
+            )
+            return
+        print(
+            "One or more configuration issues detected. Fix the reported issues or pass --ignore-system-requirements to try running anyways. Exiting.",
+            file=sys.stderr,
+        )
+        print("")
+        print("------------------------------------------------------------------")
+        sys.exit(1)
+
+    return python311_path
 
 
 def main(args):
@@ -87,22 +157,8 @@ def main(args):
 
     print(f"  Using test script       : '{args.test_script}'")
 
-    print("")
-    print(f"  Current Python version is '{sys.version}'. This script requires 3.11.")
-    if sys.version_info[:2] == (3, 11):
-        python311_path = "python"
-    else:
-        python311_path = shutil.which("python3.11")
-        if python311_path:
-            print(f"  Found python3.11 at '{python311_path}', using that instead.")
-        else:
-            print(
-                "ERROR! Could not find Python version 3.11. Python version must be 3.11 to match package builds."
-            )
-            print(
-                "  See `.github/workflows/pkgci_build_packages.yml` and `build_tools/pkgci/build_linux_packages.sh`."
-            )
-            sys.exit(1)
+    python311_path = check_system_requirements(args.ignore_system_requirements)
+
     print("")
     print("------------------------------------------------------------------")
 
@@ -124,7 +180,7 @@ def main(args):
 
         # Download packages for REF_HASH and install them into REF_HASH/.venv/.
         contents += "REF_HASH=$(git rev-parse BISECT_HEAD)\n"
-        contents += str(THIS_DIR / "install_packages_for_commit.py")
+        contents += str((THIS_DIR / "install_packages_for_commit.py").as_posix())
         contents += " ${REF_HASH}"
         contents += f" --work-dir={args.work_dir}"
         contents += f" --python-interpreter={python311_path}\n"
