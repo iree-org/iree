@@ -181,6 +181,44 @@ LogicalResult ScatterOp::getResultTilePosition(
   return success();
 }
 
+/// Method to return the position of the result tile computed by the tiled
+/// operation.
+LogicalResult ScatterOp::getIterationDomainTileFromOperandTile(
+    OpBuilder &b, unsigned operandNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes,
+    SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
+    SmallVectorImpl<OpFoldResult> &iterDomainSizes) {
+  // Fusion with producers is not possible in general if `unique_indices` is not
+  // true as reductions along the scattered indices are not tilable in parallel.
+  if (!getUniqueIndices()) {
+    return failure();
+  }
+  // Fusion with a producer is only possible if fusing along the |input|
+  // operand.
+  if (getInputs().getBeginOperandIndex() != operandNumber) {
+    return failure();
+  }
+
+  // The iteration domain is defined in terms of the |input|, so simply
+  // use the given offsets/sizes.
+  iterDomainOffsets.assign(offsets.begin(), offsets.end());
+  iterDomainSizes.assign(sizes.begin(), sizes.end());
+  return success();
+}
+
+/// Method to generate the tiled implementation of an operation from the tile
+/// of the operand.
+FailureOr<TilingResult> ScatterOp::getTiledImplementationFromOperandTile(
+    OpBuilder &b, unsigned operandNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) {
+  SmallVector<OpFoldResult> mappedOffsets, mappedSizes;
+  if (failed(getIterationDomainTileFromOperandTile(
+          b, operandNumber, offsets, sizes, mappedOffsets, mappedSizes))) {
+    return failure();
+  }
+  return getTiledImplementation(b, mappedOffsets, mappedSizes);
+}
+
 LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
                                                       Location loc,
                                                       ValueRange ivs) {
