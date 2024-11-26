@@ -141,8 +141,8 @@ def IREECodegen_LayoutAttrInterface :
       /*desc=*/[{
         Returns the layout of materialized encoding for a tensor type.
       }],
-      /*retTy=*/"::llvm::SmallVector<::mlir::Operation *>",
-      /*methodName=*/"lowerComputeOp",
+      /*retTy=*/"::mlir::Operation *",
+      /*methodName=*/"lowerOp",
       /*args=*/(ins "::mlir::OpBuilder &":$b,
                     "::mlir::Operation *":$op,
                     "::mlir::TypeRange":$convertedResTypes,
@@ -150,7 +150,7 @@ def IREECodegen_LayoutAttrInterface :
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         assert(false && "unimplemented interface method");
-        return {op};
+        return nullptr;
       }]
     >
   ];

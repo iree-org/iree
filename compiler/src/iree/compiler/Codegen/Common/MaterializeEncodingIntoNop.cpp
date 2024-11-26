@@ -51,7 +51,7 @@ struct MaterializeEncodingIntoNopPass final
     MaterializeEncodingTypeConverter typeConverter(
         materializeEncodingFn, IREE::HAL::ExecutableTargetAttr(),
         /*transposeNarrowN=*/false,
-        IREE::Codegen::EncodingLayoutAttr::get(context));
+        IREE::Codegen::EncodingNopLayoutAttr::get(context));
     MaterializeEncodingConversionTarget target(*context);
     populateMaterializeEncodingIntoPackUnPackPatterns(
         materializeEncodingPattern, typeConverter, materializeEncodingValueFn);

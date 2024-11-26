@@ -917,9 +917,9 @@ public:
       for (auto init : op.getDpsInits()) {
         convertedResTypes.push_back(converter->convertType(init.getType()));
       }
-      SmallVector<Operation *> newOps =
-          layoutAttr.lowerComputeOp(rewriter, op, convertedResTypes, operands);
-      rewriter.replaceOp(op, newOps.back());
+      Operation *newOp =
+          layoutAttr.lowerOp(rewriter, op, convertedResTypes, operands);
+      rewriter.replaceOp(op, newOp->getResults());
       return success();
     }
 

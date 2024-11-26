@@ -467,16 +467,14 @@ int64_t WorkgroupMappingAttr::getRelativeIndex() const {
 //===---------------------------------------------------------------------===//
 
 MaterializeEncodingInfo
-EncodingLayoutAttr::getEncodingInfo(RankedTensorType type) const {
+EncodingNopLayoutAttr::getEncodingInfo(RankedTensorType type) const {
   return MaterializeEncodingInfo{};
 }
 
-SmallVector<Operation *>
-EncodingLayoutAttr::lowerComputeOp(OpBuilder &b, Operation *op,
-                                   TypeRange convertedResTypes,
-                                   ValueRange convertedOperands) const {
-  Operation *clonedOp = clone(b, op, convertedResTypes, convertedOperands);
-  return SmallVector<Operation *>{clonedOp};
+Operation *EncodingNopLayoutAttr::lowerOp(OpBuilder &b, Operation *op,
+                                          TypeRange convertedResTypes,
+                                          ValueRange convertedOperands) const {
+  return clone(b, op, convertedResTypes, convertedOperands);
 }
 
 //===----------------------------------------------------------------------===//
