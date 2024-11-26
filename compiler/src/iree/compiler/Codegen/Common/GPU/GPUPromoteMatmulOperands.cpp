@@ -40,7 +40,8 @@ Value promoteValue(OpBuilder &builder, Location loc, Value v) {
   return copy.getResult(0);
 }
 
-/// Helper to promote results.
+/// Helper to promote results. If the target value is consumed only by a
+/// `tensor.extract_slice`, this will promote the result of the slice instead.
 void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared) {
   IRRewriter rewriter(builder);
   Location loc = op->getLoc();
@@ -54,6 +55,9 @@ void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared) {
     if (extractSliceOp) {
       // If the result is consumed by an extract_slice then we expect there to
       // be exactly one extract slice that is then consumed.
+      // TODO (nirvedhmeshram) : This is fairly special case. Instead we should
+      // just promote results before doing padding which introduces the extract
+      // slice.
       if (!valToMakeShared.hasOneUse())
         return;
       valueToReplace = extractSliceOp.getResult();
