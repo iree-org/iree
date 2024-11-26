@@ -520,8 +520,9 @@ class Scheduler:
         except TimeoutError:
             pass
         except concurrent.futures.TimeoutError:
-            # Python 3.10 doesn't have a builtin TimeoutError and raises this
-            # type. This was marked as a deprecated alias in 3.11.
+            # In Python 3.10, future access throws concurrent.futures.TimeoutError.
+            # In 3.11, that was made a subclass of TimeoutError, which is advertised
+            # as thrown (and the original is marked as deprecated).
             # TODO: Remove this clause once 3.10 support is dropped.
             pass
 
