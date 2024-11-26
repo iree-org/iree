@@ -268,7 +268,7 @@ func.func @not_vmt() {
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 128, 8]{{\]}}>
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulSimt workgroup_size = [32, 1, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 //       CHECK: func.func @not_vmt()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic

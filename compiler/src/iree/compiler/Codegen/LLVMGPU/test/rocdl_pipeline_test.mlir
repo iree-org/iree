@@ -87,17 +87,12 @@ hal.executable @dot_dispatch_0 {
 //   RDNA3-LABEL: hal.executable public @dot_dispatch_0
 //         RDNA3:   hal.executable.variant public @rocm
 //       RDNA3-NOT:   llvm.store
-//   RDNA3-COUNT-3:   llvm.load {{.*}} : !llvm.ptr<1> -> vector<4xf32>
 //           RDNA3:   llvm.br
-//   RDNA3-COUNT-3:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<3>
-//  RDNA3-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
-// RDNA3-COUNT-128:   llvm.intr.fmuladd({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
-//   RDNA3-COUNT-3:   llvm.load {{.*}} : !llvm.ptr<1> -> vector<4xf32>
+//    RDNA3-COUNT-1:   llvm.load {{.*}} : !llvm.ptr<1> -> vector<1024xf32>
+// RDNA3-COUNT-1024:   llvm.load {{.*}} : !llvm.ptr<1> -> f32
+// RDNA3-COUNT-1024:   llvm.intr.fmuladd({{.*}}) : (vector<1xf32>, vector<1xf32>, vector<1xf32>) -> vector<1xf32>
+//    RDNA3-COUNT-1:   llvm.store {{.*}} : f32, !llvm.ptr<1>
 //           RDNA3:   llvm.br
-//   RDNA3-COUNT-3:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<3>
-//  RDNA3-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
-// RDNA3-COUNT-128:   llvm.intr.fmuladd({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
-//   RDNA3-COUNT-4:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
 
 // -----
 

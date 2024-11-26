@@ -6,13 +6,13 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = []>
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulSimt workgroup_size = [32, 8, 8], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 8, 8], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<4x8xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<8x16xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<4x16xf32>
-  // expected-error @+1 {{Total number of threads in a thread block 2048 exceeds the limit of 1024 with compilation pipeline LLVMGPUMatmulSimt}}
+  // expected-error @+1 {{Total number of threads in a thread block 2048 exceeds the limit of 1024 with compilation pipeline LLVMGPUTileAndFuse}}
   linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<4x8xf32>, memref<8x16xf32>) outs(%2 : memref<4x16xf32>)
   return
 }
@@ -25,13 +25,13 @@ func.func @illegal() attributes {translation_info = #translation} {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = []>
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulSimt workgroup_size = [32, 8, 2], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 8, 2], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<4x8xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<8x16xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<4x16xf32>
-  // expected-error @+1 {{Expected workgroup size in z-dim = 1, but got 2 with compilation pipeline LLVMGPUMatmulSimt}}
+  // expected-error @+1 {{Expected workgroup size in z-dim = 1, but got 2 with compilation pipeline LLVMGPUTileAndFuse}}
   linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<4x8xf32>, memref<8x16xf32>) outs(%2 : memref<4x16xf32>)
   return
 }
