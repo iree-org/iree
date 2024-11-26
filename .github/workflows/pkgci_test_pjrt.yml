@@ -20,6 +20,7 @@ on:
 jobs:
   build_and_test:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - runner: ubuntu-20.04
