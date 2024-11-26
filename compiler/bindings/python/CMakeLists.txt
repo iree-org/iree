@@ -268,6 +268,7 @@ SOURCES
   net_actions.py
   onnx_actions.py
   target_machine.py
+  test_actions.py
 )
 
 add_mlir_python_modules(IREECompilerBuildPythonModules

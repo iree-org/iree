@@ -48,6 +48,7 @@ iree_compiler_cc_library(
     name = "IREEGPUDialect",
     srcs = [
         "DerivedConfigUtils.cpp",
+        "GPULoweringConfigUtils.cpp",
         "GPUTileSwizzleUtils.cpp",
         "IREEGPUAttrs.cpp",
         "IREEGPUDialect.cpp",
@@ -57,6 +58,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "DerivedConfigUtils.h",
+        "GPULoweringConfigUtils.h",
         "GPUTileSwizzleUtils.h",
         "IREEGPUAttrs.h",
         "IREEGPUDialect.h",

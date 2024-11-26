@@ -60,9 +60,8 @@ jobs:
           # install editable into venv
           source ${VENV_DIR}/bin/activate
           python -m pip install -v --no-deps -e integrations/pjrt/python_packages/iree_${{ matrix.pjrt_platform }}_plugin
-          # install jax (must be no larger than 0.4.20, refer to #19223)
-          # TODO: switch to the latest JAX after #19223 is fixed
-          python -m pip install jax==0.4.20 jaxlib==0.4.20 'numpy<2'
+          # install
+          python -m pip install jax==0.4.35
       - name: Run tests
         run: |
           source ${VENV_DIR}/bin/activate

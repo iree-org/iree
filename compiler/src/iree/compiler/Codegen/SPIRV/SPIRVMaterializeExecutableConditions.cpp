@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
@@ -322,10 +323,10 @@ struct SPIRVMaterializeExecutableConditionsPass final
 
     // Drop the fine-grained SPIR-V target and add the course-grained device
     // queries as a list.
-    auto dictKeyValues = llvm::to_vector(llvm::make_filter_range(
+    auto dictKeyValues = llvm::filter_to_vector(
         configuration.getValue(), [](NamedAttribute attr) {
           return attr.getName() != spirv::getTargetEnvAttrName();
-        }));
+        });
     dictKeyValues.emplace_back(builder.getStringAttr("iree.spirv.features"),
                                builder.getStrArrayAttr(queries));
     variantOp.setTargetAttr(IREE::HAL::ExecutableTargetAttr::get(

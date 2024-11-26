@@ -31,8 +31,8 @@ llvm::cl::opt<std::string> clCodegenTransformDialectLibraryFileName(
 
 namespace {
 
-constexpr StringLiteral kTranslationInfoAttrName = "translation_info";
-constexpr StringLiteral kDefaultTransformSequenceName = "__kernel_config";
+constexpr StringLiteral kTranslationInfoAttrName =
+    IREE::Codegen::TranslationInfoAttr::name;
 
 enum StrategyRunResult {
   Success = 0,
@@ -105,7 +105,7 @@ struct MaterializeUserConfigsPass final
         libraryFileName = parts[0];
       }
 
-      StringRef entrySequenceName = kDefaultTransformSequenceName;
+      StringRef entrySequenceName = kKernelConfigSpecName;
       // Check if the user specified a custom entry point name.
       if (parts.size() == 2) {
         if (parts[1].empty()) {

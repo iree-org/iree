@@ -118,7 +118,10 @@ foreach(_amd_chip ${_ukernel_supported_chips})
     ROCM_ARCH
       ${_amd_chip}
     SRCS
-      "argmax_ukernel.c"
+      "iree_uk_amdgpu_argmax_f16i32.c"
+      "iree_uk_amdgpu_argmax_f16i64.c"
+      "iree_uk_amdgpu_argmax_f32i32.c"
+      "iree_uk_amdgpu_argmax_f32i64.c"
   )
 endforeach()
 
@@ -145,6 +148,10 @@ endforeach()
 # Generate a custom target with all file level dependencies and commands to
 # copy to our build tree locations.
 # Our GenDeviceLibs target depends on all of the defined device lib targets.
+message(STATUS "_all_ukernel_bc_files=${_all_ukernel_bc_files}")
+message(STATUS "_amd_ukernel_targets=${_amd_ukernel_targets}")
+message(STATUS "_all_ukernel_bc_copy_commands=${_all_ukernel_bc_copy_commands}")
+
 add_custom_command(
   OUTPUT ${_all_ukernel_bc_files}
   DEPENDS ${_amd_ukernel_targets}

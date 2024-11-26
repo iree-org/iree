@@ -2164,6 +2164,15 @@ void BindMonomorphicApi(PJRT_Api* api) {
   BindUndefineds(api);
   ErrorInstance::BindApi(api);
 
+  // PJRT_Plugin_Attributes should be implemented since it will always be
+  // called from the PJRT client in the initial phase.
+  // here we provide a blank implementation to avoid crash due to unimplemented.
+  api->PJRT_Plugin_Attributes =
+      +[](PJRT_Plugin_Attributes_Args* args) -> PJRT_Error* {
+    args->num_attributes = 0;
+    args->attributes = nullptr;
+    return nullptr;
+  };
   api->PJRT_Plugin_Initialize =
       +[](PJRT_Plugin_Initialize_Args* args) -> PJRT_Error* { return nullptr; };
 

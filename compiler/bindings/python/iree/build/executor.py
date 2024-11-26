@@ -276,8 +276,17 @@ class ActionConcurrency(enum.Enum):
         return self.value
 
 
-class BuildAction(BuildDependency, abc.ABC):
-    """An action that must be carried out."""
+class BuildAction(BuildDependency):
+    """An action that must be carried out.
+
+    This class is designed to be subclassed by concrete actions. In-process
+    only actions should override `_invoke`, whereas those that can be executed
+    out-of-process must override `_remotable_thunk`.
+
+    Note that even actions that are marked for `PROCESS` concurrency will
+    run on a dedicated thread within the host process. Only the `_remotable_thunk`
+    result will be scheduled out of process.
+    """
 
     def __init__(
         self,
@@ -289,7 +298,7 @@ class BuildAction(BuildDependency, abc.ABC):
     ):
         super().__init__(executor=executor, deps=deps)
         self.desc = desc
-        self.concurrnecy = concurrency
+        self.concurrency = concurrency
 
     def __str__(self):
         return self.desc
@@ -297,12 +306,35 @@ class BuildAction(BuildDependency, abc.ABC):
     def __repr__(self):
         return f"Action[{type(self).__name__}]('{self.desc}')"
 
-    def invoke(self):
-        self._invoke()
+    def invoke(self, scheduler: "Scheduler"):
+        # Invoke is run within whatever in-process execution context was requested:
+        #   - On the scheduler thread for NONE
+        #   - On a worker thread for THREAD or PROCESS
+        # For PROCESS concurrency, we have to create a compatible invocation
+        # thunk, schedule that on the process pool and wait for it.
+        if self.concurrency == ActionConcurrency.PROCESS:
+            thunk = self._remotable_thunk()
+            fut = scheduler.process_pool_executor.submit(thunk)
+            fut.result()
+        else:
+            self._invoke()
 
-    @abc.abstractmethod
     def _invoke(self):
-        ...
+        self._remotable_thunk()()
+
+    def _remotable_thunk(self) -> Callable[[], None]:
+        """Creates a remotable no-arg thunk that will execute this out of process.
+
+        This must return a no arg/result callable that can be pickled. While there
+        are various ways to ensure this, here are a few guidelines:
+
+        * Must be a type/function defined at a module level.
+        * Cannot be decorated.
+        * Must only contain attributes with the same constraints.
+        """
+        raise NotImplementedError(
+            f"Action '{self}' does not implement remotable invocation"
+        )
 
 
 class BuildContext(BuildDependency):
@@ -513,19 +545,20 @@ class Scheduler:
         if isinstance(dep, BuildAction):
 
             def invoke():
-                dep.invoke()
+                dep.invoke(self)
                 return dep
 
             print(f"Scheduling action: {dep}", file=self.stderr)
-            if dep.concurrnecy == ActionConcurrency.NONE:
+            if dep.concurrency == ActionConcurrency.NONE:
                 invoke()
-            elif dep.concurrnecy == ActionConcurrency.THREAD:
+            elif (
+                dep.concurrency == ActionConcurrency.THREAD
+                or dep.concurrency == ActionConcurrency.PROCESS
+            ):
                 dep.start(self.thread_pool_executor.submit(invoke))
-            elif dep.concurrnecy == ActionConcurrency.PROCESS:
-                dep.start(self.process_pool_executor.submit(invoke))
             else:
                 raise AssertionError(
-                    f"Unhandled ActionConcurrency value: {dep.concurrnecy}"
+                    f"Unhandled ActionConcurrency value: {dep.concurrency}"
                 )
         else:
             # Not schedulable. Just mark it as done.
