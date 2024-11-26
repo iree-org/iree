@@ -42,6 +42,7 @@ ROCM_COMPILE_FLAGS = [
 # CPU
 ###############################################################################
 
+
 # This allows using as part of a matrix strat that includes cpu
 def test_pass_cpu():
     pass
