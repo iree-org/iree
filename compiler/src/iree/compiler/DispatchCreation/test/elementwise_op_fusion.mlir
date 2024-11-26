@@ -210,15 +210,15 @@ util.func public @fuse_generic_gather2(
 
 util.func public @fuse_transpose_attention_to_producer(%q: tensor<2x10x4096x64xf16>, %k: tensor<2x10x4096x64xf16>, %quantized_v: tensor<2x10x4096x64xi32>, %quant_offset: tensor<10x64xi32>, %quant_scale: tensor<10x64xf32>, %scale: f16) -> tensor<2x10x4096x64xf16> {
   // Dequantize int-quantization of V
-    %init_dequant = tensor.empty() : tensor<2x10x4096x64xf16>
-    %v = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%quantized_v, %quant_offset, %quant_scale : tensor<2x10x4096x64xi32>, tensor<10x64xi32>, tensor<10x64xf32>) outs(%init_dequant : tensor<2x10x4096x64xf16>) {
-    ^bb0(%in: i32, %in_0: i32, %in_1: f32, %out: f16):
-        %19 = arith.addi %in, %in_0 : i32
-        %20 = arith.sitofp %19 : i32 to f32
-        %21 = arith.mulf %20, %in_1 : f32
-        %22 = arith.truncf %21 : f32 to f16
-        linalg.yield %22 : f16
-    } -> tensor<2x10x4096x64xf16>
+  %init_dequant = tensor.empty() : tensor<2x10x4096x64xf16>
+  %v = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%quantized_v, %quant_offset, %quant_scale : tensor<2x10x4096x64xi32>, tensor<10x64xi32>, tensor<10x64xf32>) outs(%init_dequant : tensor<2x10x4096x64xf16>) {
+  ^bb0(%in: i32, %in_0: i32, %in_1: f32, %out: f16):
+      %19 = arith.addi %in, %in_0 : i32
+      %20 = arith.sitofp %19 : i32 to f32
+      %21 = arith.mulf %20, %in_1 : f32
+      %22 = arith.truncf %21 : f32 to f16
+      linalg.yield %22 : f16
+  } -> tensor<2x10x4096x64xf16>
 
   // Transpose-V
   %init_transpose = tensor.empty() : tensor<2x10x64x4096xf16>

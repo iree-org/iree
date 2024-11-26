@@ -21,8 +21,9 @@ void populateFuseLinalgExtOpsWithTransposes(
 
 /// Bubble up transpose-like ops from LinalgExt ops (only `AttentionOp`
 /// supported).
-void populateBubbleTransposeFromLinalgExtOps(MLIRContext *context,
-                                             RewritePatternSet &patterns);
+void populateBubbleTransposeFromLinalgExtOps(
+    RewritePatternSet &patterns,
+    const linalg::ControlFusionFn &controlFusionFn);
 
 /// Helper struct to hold the results of collapsing an operation.
 struct CollapseResult {

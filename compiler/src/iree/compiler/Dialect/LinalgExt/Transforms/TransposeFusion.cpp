@@ -105,13 +105,23 @@ private:
 
 // Bubbles transpose-V out of attention to expose the more performant
 // attention-transposeV.
-class BubbleTransposeVFromAttentionOp
+struct BubbleTransposeVFromAttentionOp
     : public OpRewritePattern<LinalgExt::AttentionOp> {
-public:
-  using OpRewritePattern<LinalgExt::AttentionOp>::OpRewritePattern;
+  BubbleTransposeVFromAttentionOp(MLIRContext *context,
+                                  linalg::ControlFusionFn controlFn,
+                                  PatternBenefit benefit = 1)
+      : OpRewritePattern<LinalgExt::AttentionOp>(context, benefit),
+        controlFn(controlFn) {}
 
   LogicalResult matchAndRewrite(LinalgExt::AttentionOp attentionOp,
                                 PatternRewriter &rewriter) const override {
+    // Only checking for V because we are only bubbling transpose-V.
+    OpOperand *valueOpOperand = &attentionOp.getValueMutable();
+    if (controlFn && !controlFn(valueOpOperand)) {
+      return rewriter.notifyMatchFailure(
+          attentionOp, "Expected attentionOp and producer of V to be non-null "
+                       "and outside dispatch.");
+    }
     // Extract Attention indexing information.
     AffineMap qMap = attentionOp.getQueryMap();
     AffineMap kMap = attentionOp.getKeyMap();
@@ -173,7 +183,7 @@ public:
                        rewriter.getContext());
 
     // Modify attention to have transposed V inputs and mapping.
-    int64_t valueIndex = attentionOp.getValueMutable().getOperandNumber();
+    int64_t valueIndex = valueOpOperand->getOperandNumber();
     rewriter.modifyOpInPlace(attentionOp, [&]() {
       SmallVector<AffineMap> newIndexingMaps =
           attentionOp.getIndexingMapsArray();
@@ -184,6 +194,9 @@ public:
     });
     return success();
   }
+
+private:
+  linalg::ControlFusionFn controlFn;
 };
 
 } // namespace
@@ -195,9 +208,11 @@ void populateFuseLinalgExtOpsWithTransposes(
                                              controlFusionFn);
 }
 
-void populateBubbleTransposeFromLinalgExtOps(MLIRContext *context,
-                                             RewritePatternSet &patterns) {
-  patterns.add<BubbleTransposeVFromAttentionOp>(context);
+void populateBubbleTransposeFromLinalgExtOps(
+    RewritePatternSet &patterns,
+    const linalg::ControlFusionFn &controlFusionFn) {
+  patterns.add<BubbleTransposeVFromAttentionOp>(patterns.getContext(),
+                                                controlFusionFn);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
