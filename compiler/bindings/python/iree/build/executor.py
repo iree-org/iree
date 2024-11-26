@@ -519,6 +519,11 @@ class Scheduler:
                 completed_deps.add(completed_dep)
         except TimeoutError:
             pass
+        except concurrent.futures.TimeoutError:
+            # Python 3.10 doesn't have a builtin TimeoutError and raises this
+            # type. This was marked as a deprecated alias in 3.11.
+            # TODO: Remove this clause once 3.10 support is dropped.
+            pass
 
         # Purge done from in-flight list.
         self.in_flight_deps.difference_update(completed_deps)
