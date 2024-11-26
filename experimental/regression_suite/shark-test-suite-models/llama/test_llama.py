@@ -16,11 +16,6 @@ vmfb_dir = os.getenv("TEST_OUTPUT_ARTIFACTS", default=Path.cwd())
 ###############################################################################
 # Fixtures
 ###############################################################################
-llama_real_weights = fetch_source_fixture(
-    "https://sharkblobs.blob.core.windows.net/halo-models/llm-dev/llama3_8b/8b_f16.irpa",
-    group="llama_fp16_8b",
-)
-
 llama_mlir = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/halo-models/llm-dev/llama3_8b/8b_f16_decomposed_11_22.mlir",
     group="llama_fp16_8b",

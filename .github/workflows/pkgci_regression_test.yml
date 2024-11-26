@@ -208,11 +208,11 @@ jobs:
         env:
           ROCM_CHIP: ${{ matrix.rocm-chip }}
 
-      - name: "Running SD3 special model tests"
+      - name: "Running llama special model tests"
         if: "!cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
-          pytest ./experimental/regression_suite/shark-test-suite-models/sd3 \
+          pytest ./experimental/regression_suite/shark-test-suite-models/llama \
             -k ${{ matrix.backend }} \
             -rpfE \
             --capture=no \
