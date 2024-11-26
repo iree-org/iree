@@ -21,6 +21,7 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Dialect::Encoding::IR
   PUBLIC
 )
 

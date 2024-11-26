@@ -10,6 +10,7 @@
 #include <cstdint>
 
 #include "llvm/ADT/SmallVector.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir::iree_compiler::IREE::Codegen {
@@ -88,6 +89,9 @@ struct MaterializeEncodingInfo {
   // The optional swizzle, see the comment on TileSwizzle. Only used on GPU.
   std::optional<TileSwizzle> swizzle;
 };
+
+using ResolveEncodingInfoFn =
+    std::function<FailureOr<MaterializeEncodingInfo>(RankedTensorType type)>;
 
 } // namespace mlir::iree_compiler::IREE::Codegen
 #endif // IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_IR_IREECODEGENTYPES_H_
