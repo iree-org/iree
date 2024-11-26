@@ -80,7 +80,7 @@ static Value createTranspose(OpBuilder &builder, Value source,
 }
 
 static RankedTensorType getPermutedTensorType(RankedTensorType type,
-                                              SmallVector<int64_t> perm) {
+                                              ArrayRef<int64_t> perm) {
   SmallVector<int64_t> permutedShape = applyPermutation(type.getShape(), perm);
   return RankedTensorType::get(permutedShape, type.getElementType());
 }
@@ -555,6 +555,79 @@ public:
   }
 };
 
+// Sinks a transpose through a tensor.pad
+class SinkTransposeThroughPad : public OpRewritePattern<tensor::PadOp> {
+public:
+  using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::PadOp padOp,
+                                PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(padOp)) {
+      return failure();
+    }
+    Value source = padOp.getSource();
+    auto transposeOp = source.getDefiningOp<linalg::TransposeOp>();
+    // Do not propagate through reshapes if the transpose has multiple users, as
+    // this could end up duplicating the transposes. We should only propagate
+    // through reshape when it is free to do so.
+    if (!transposeOp || !transposeOp->hasOneUse()) {
+      return rewriter.notifyMatchFailure(
+          padOp, "pad input is not a single-use transpose");
+    }
+
+    auto invPerm = invertPermutationVector(transposeOp.getPermutation());
+    auto padHigh = padOp.getMixedHighPad();
+    auto padLow = padOp.getMixedLowPad();
+
+    // Apply the inverse permutation to the high and low pads to get the correct
+    // pads on the input to the transpose.
+    applyPermutationToVector(padHigh, invPerm);
+    applyPermutationToVector(padLow, invPerm);
+
+    auto newPad = rewriter.create<tensor::PadOp>(
+        padOp.getLoc(), getPermutedTensorType(padOp.getType(), invPerm),
+        transposeOp.getInput(), padLow, padHigh, padOp.getNofold());
+    rewriter.inlineRegionBefore(padOp.getRegion(), newPad.getRegion(),
+                                newPad.getRegion().begin());
+    auto newTranspose =
+        createTranspose(rewriter, newPad, transposeOp.getPermutation());
+    rewriter.replaceAllOpUsesWith(padOp, newTranspose);
+    return success();
+  }
+};
+
+// Sinks a transpose through a tensor.pad
+class BubbleTransposeThroughPad : public OpRewritePattern<linalg::TransposeOp> {
+public:
+  using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::TransposeOp transposeOp,
+                                PatternRewriter &rewriter) const override {
+    auto padOp = transposeOp.getInput().getDefiningOp<tensor::PadOp>();
+    if (!IREE::Flow::isNonNullAndOutsideDispatch({padOp, transposeOp})) {
+      return failure();
+    }
+
+    auto padHigh = padOp.getMixedHighPad();
+    auto padLow = padOp.getMixedLowPad();
+
+    // Apply the inverse permutation to the high and low pads to get the correct
+    // pads on the input to the transpose.
+    applyPermutationToVector(padHigh, transposeOp.getPermutation());
+    applyPermutationToVector(padLow, transposeOp.getPermutation());
+
+    auto newTranspose = createTranspose(rewriter, padOp.getSource(),
+                                        transposeOp.getPermutation());
+    auto newPad = rewriter.create<tensor::PadOp>(
+        padOp.getLoc(),
+        getPermutedTensorType(padOp.getType(), transposeOp.getPermutation()),
+        newTranspose, padLow, padHigh, padOp.getNofold());
+    rewriter.inlineRegionBefore(padOp.getRegion(), newPad.getRegion(),
+                                newPad.getRegion().begin());
+    rewriter.replaceAllOpUsesWith(transposeOp, newPad);
+    return success();
+  }
+};
 // Fuses a transpose with the input of a linalg.generic op or contraction op.
 // Contraction ops are generalized and then treated as a generic. For example,
 //
@@ -1033,6 +1106,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
     RewritePatternSet sinkingPatterns(context);
     sinkingPatterns.insert<SinkTransposeThroughExtractSlice>(context);
     sinkingPatterns.insert<SinkTransposeThroughExpandShape>(context);
+    sinkingPatterns.insert<SinkTransposeThroughPad>(context);
     populateNamedOpSinkingPatterns(context, sinkingPatterns);
     populateCommonCanonicalizationPatterns(context, sinkingPatterns);
     sinkingPatterns.add<SinkTransposeThroughUnaryElementwiseInput>(
@@ -1086,10 +1160,12 @@ void PropagateLinalgTransposePass::runOnOperation() {
     RewritePatternSet bubblingPatterns(context);
     linalg::populateFoldReshapeOpsByExpansionPatterns(bubblingPatterns,
                                                       reshapePropagationFn);
+    tensor::populateBubbleUpExpandShapePatterns(bubblingPatterns);
     linalg::FillOp::getCanonicalizationPatterns(bubblingPatterns, context);
     bubblingPatterns.insert<FuseTransposeWithProducerLinalgOp>(
         context, enableAggressivePropagation);
     bubblingPatterns.insert<BubbleTransposeThroughCollapseShape>(context);
+    bubblingPatterns.insert<BubbleTransposeThroughPad>(context);
     bubblingPatterns.add<BubbleTransposeThroughUnaryElementwiseDpsInit>(
         context, /*benefit=*/2);
     bubblingPatterns.insert<ComposeTransposes>(context);
@@ -1141,6 +1217,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
     linalg::populateFoldReshapeOpsByExpansionPatterns(sinkingPatterns,
                                                       reshapePropagationFn);
     sinkingPatterns.insert<SinkTransposeThroughExtractSlice>(context);
+    sinkingPatterns.insert<SinkTransposeThroughPad>(context);
     sinkingPatterns.insert<SinkTransposeThroughExpandShape>(context);
     sinkingPatterns.insert<FuseTransposeWithLinalgOpConsumer>(
         context, enableAggressivePropagation);
