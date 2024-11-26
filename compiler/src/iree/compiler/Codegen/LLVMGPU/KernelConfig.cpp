@@ -1175,7 +1175,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
       return setMatmulConfig(
           sizeN, sizeM, 4, {sizeM, sizeN, 1},
           target.getWgp().getSubgroupSizeChoices().asArrayRef(),
-          softwarePipelineDepthSimt, CodeGenPipeline::LLVMGPUMatmulSimt);
+          softwarePipelineDepthSimt, CodeGenPipeline::LLVMGPUTileAndFuse);
     }
 
     // SIMT matmul case. Query the best configuration.
@@ -1189,7 +1189,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
             config.tileSize[0], config.tileSize[1], config.tileSize[2],
             config.workgroupSize,
             target.getWgp().getSubgroupSizeChoices().asArrayRef(),
-            softwarePipelineDepthSimt, CodeGenPipeline::LLVMGPUMatmulSimt);
+            softwarePipelineDepthSimt, CodeGenPipeline::LLVMGPUTileAndFuse);
       }
     }
   }
@@ -1214,7 +1214,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
   return setMatmulConfig(tileX, tileY, tileK, workgroupSize,
                          target.getWgp().getSubgroupSizeChoices().asArrayRef(),
                          softwarePipelineDepthSimt,
-                         CodeGenPipeline::LLVMGPUMatmulSimt);
+                         CodeGenPipeline::LLVMGPUTileAndFuse);
 }
 
 //====---------------------------------------------------------------------===//
