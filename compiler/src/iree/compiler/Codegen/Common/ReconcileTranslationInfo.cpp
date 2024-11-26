@@ -265,8 +265,8 @@ static LogicalResult resolveWorkgroupForAll(RewriterBase &rewriter,
   }
 
   auto forAllOps = body.getOps<scf::ForallOp>();
-  SmallVector<scf::ForallOp> workgroupForAllOps = llvm::to_vector(
-      llvm::make_filter_range(forAllOps, [&](scf::ForallOp forAllOp) {
+  SmallVector<scf::ForallOp> workgroupForAllOps =
+      llvm::filter_to_vector(forAllOps, [&](scf::ForallOp forAllOp) {
         auto mapping = forAllOp.getMapping();
         if (!mapping) {
           return false;
@@ -277,7 +277,7 @@ static LogicalResult resolveWorkgroupForAll(RewriterBase &rewriter,
           return false;
         }
         return true;
-      }));
+      });
 
   if (workgroupForAllOps.empty()) {
     // If there are no workgroup distribution loops, set the default

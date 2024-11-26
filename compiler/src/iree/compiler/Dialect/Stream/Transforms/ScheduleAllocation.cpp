@@ -102,10 +102,10 @@ static void computeRegionValueAliases(Operation *regionOp,
 
   // Filter out to only resource results - some regions may return additional
   // things like stream.async.execute returning a timepoint.
-  auto resourceResults = llvm::to_vector_of<OpResult>(
-      llvm::make_filter_range(regionOp->getResults(), [](OpResult result) {
+  auto resourceResults =
+      llvm::filter_to_vector(regionOp->getResults(), [](OpResult result) {
         return llvm::isa<IREE::Stream::ResourceType>(result.getType());
-      }));
+      });
 
   // Start with outputs so that we handle tied values that may lead all the way
   // back up the chain to the stream inputs.
@@ -1145,12 +1145,12 @@ static std::optional<ConstantAllocation>
 extractConstantsWithLifetime(IREE::Stream::AsyncExecuteOp executeOp,
                              IREE::Stream::Lifetime lifetime,
                              OpBuilder &externalBuilder) {
-  auto constantOps = llvm::to_vector(llvm::make_filter_range(
+  auto constantOps = llvm::filter_to_vector(
       executeOp.getOps<IREE::Stream::AsyncConstantOp>(),
       [&](IREE::Stream::AsyncConstantOp op) {
         return cast<IREE::Stream::ResourceType>(op.getResult().getType())
                    .getLifetime() == lifetime;
-      }));
+      });
   if (constantOps.empty())
     return {};
 
