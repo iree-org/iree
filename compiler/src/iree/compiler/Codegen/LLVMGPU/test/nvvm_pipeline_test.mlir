@@ -83,20 +83,15 @@ hal.executable @dot_dispatch_0 {
   }
 }
 
-//     CHECK-LABEL: hal.executable public @dot_dispatch_0
-//           CHECK:   hal.executable.variant public @cuda
-//       CHECK-NOT:   llvm.store
-//   CHECK-COUNT-3:   llvm.load {{.*}} : !llvm.ptr<1> -> vector<4xf32>
-//           CHECK:   llvm.br
-//   CHECK-COUNT-3:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<3>
-//  CHECK-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
-// CHECK-COUNT-128:   llvm.intr.fmuladd({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
-//   CHECK-COUNT-3:   llvm.load {{.*}} : !llvm.ptr<1> -> vector<4xf32>
-//           CHECK:   llvm.br
-//   CHECK-COUNT-3:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<3>
-//  CHECK-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
-// CHECK-COUNT-128:   llvm.intr.fmuladd({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
-//   CHECK-COUNT-4:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
+//      CHECK-LABEL: hal.executable public @dot_dispatch_0
+//            CHECK:   hal.executable.variant public @cuda
+//        CHECK-NOT:   llvm.store
+//            CHECK:   llvm.br
+//            CHECK:    llvm.load {{.*}} : !llvm.ptr<1> -> vector<1024xf32>
+// CHECK-COUNT-1024:    llvm.load {{.*}} : !llvm.ptr<1> -> f32
+// CHECK-COUNT-1024:    llvm.intr.fmuladd({{.*}}) : (vector<1xf32>, vector<1xf32>, vector<1xf32>) -> vector<1xf32>
+//           CHECK:     llvm.store {{.*}} : f32, !llvm.ptr<1>
+//           CHECK:    llvm.br
 
 // -----
 
@@ -158,11 +153,11 @@ hal.executable @dot_dispatch_0 {
 }
 
 //   CHECK-LABEL: hal.executable public @dot_dispatch_0
-//         CHECK:   hal.executable.variant public @cuda
-//         CHECK:   llvm.br
-// CHECK-COUNT-8:   llvm.intr.fmuladd({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
-//         CHECK:   llvm.br
-// CHECK-COUNT-2:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
+//            CHECK:   hal.executable.variant public @cuda
+//            CHECK:  llvm.br
+// CHECK-COUNT-1024:   llvm.intr.fmuladd({{.*}}) : (vector<1xf32>, vector<1xf32>, vector<1xf32>) -> vector<1xf32>
+//            CHECK:   llvm.store {{.*}} : f32, !llvm.ptr<1>
+//            CHECK:  llvm.br
 
 // -----
 
