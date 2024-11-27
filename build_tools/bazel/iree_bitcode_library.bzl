@@ -262,7 +262,7 @@ def iree_amdgpu_bitcode_library(
         copts = [],
         out = None,
         **kwargs):
-    """Builds an AMDGPU LLVM bitcode library from an input file via clang.
+    """Builds an AMDGPU LLVM bitcode library from an input file using clang.
 
     Args:
         name: Name of the target.
@@ -278,7 +278,7 @@ def iree_amdgpu_bitcode_library(
     clang_tool = "@llvm-project//clang:clang"
 
     base_copts = [
-        # Language: C23
+        # Language: C23.
         "-std=c23",
 
         # Avoid dependencies.

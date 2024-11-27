@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IRReader/IRReader.h"
@@ -184,35 +185,18 @@ LogicalResult linkHIPBitcodeIfNeeded(Location loc, llvm::Module *module,
   return linkWithBitcodeFiles(loc, module, bitcodePaths);
 }
 
-static SmallVector<llvm::Expected<std::unique_ptr<llvm::Module>>>
-loadUKernelBitcodeFiles(llvm::LLVMContext &context, StringRef targetGpuArch) {
-  const iree_file_toc_t *toc = nullptr;
-  int toc_size = 0;
-  if (targetGpuArch == "gfx90a") {
-    toc = iree_uk_amdgpu_gfx90a_create();
-    toc_size = iree_uk_amdgpu_gfx90a_size();
-  } else if (targetGpuArch == "gfx942") {
-    toc = iree_uk_amdgpu_gfx942_create();
-    toc_size = iree_uk_amdgpu_gfx942_size();
-  } else if (targetGpuArch == "gfx1030") {
-    toc = iree_uk_amdgpu_gfx1030_create();
-    toc_size = iree_uk_amdgpu_gfx1030_size();
-  } else if (targetGpuArch == "gfx1100") {
-    toc = iree_uk_amdgpu_gfx1100_create();
-    toc_size = iree_uk_amdgpu_gfx1100_size();
-  } else {
-    return {};
-  }
-  SmallVector<llvm::Expected<std::unique_ptr<llvm::Module>>> modules;
-  for (int i = 0; i < toc_size; ++i) {
-    llvm::MemoryBufferRef bitcodeBufferRef(
-        llvm::StringRef(toc[i].data, toc[i].size), toc[i].name);
-    modules.push_back(llvm::parseBitcodeFile(bitcodeBufferRef, context));
-  }
-
-  // Some bitcode files are optional: we don't have arch-specific ukernel code
-  // for all architectures. So it's normal to be returning nullptr here.
-  return modules;
+static std::tuple<const iree_file_toc_t *, int>
+getUkernelBitcodeTOC(StringRef gpuArch) {
+  return llvm::StringSwitch<std::tuple<const iree_file_toc_t *, int>>(gpuArch)
+      .Case("gfx90a",
+            {iree_uk_amdgpu_gfx90a_create(), iree_uk_amdgpu_gfx90a_size()})
+      .Case("gfx942",
+            {iree_uk_amdgpu_gfx942_create(), iree_uk_amdgpu_gfx942_size()})
+      .Case("gfx1030",
+            {iree_uk_amdgpu_gfx1030_create(), iree_uk_amdgpu_gfx1030_size()})
+      .Case("gfx1100",
+            {iree_uk_amdgpu_gfx1100_create(), iree_uk_amdgpu_gfx1100_size()})
+      .Default({nullptr, 0});
 }
 
 // Links optimized Ukernel bitcode into the given module if the module needs it.
@@ -222,21 +206,8 @@ LogicalResult linkUkernelBitcodeFiles(Location loc, llvm::Module *module,
                                       StringRef bitcodePath,
                                       unsigned linkerFlags,
                                       llvm::TargetMachine &targetMachine) {
-  const iree_file_toc_t *toc = nullptr;
-  int toc_size = 0;
-  if (targetChip == "gfx90a") {
-    toc = iree_uk_amdgpu_gfx90a_create();
-    toc_size = iree_uk_amdgpu_gfx90a_size();
-  } else if (targetChip == "gfx942") {
-    toc = iree_uk_amdgpu_gfx942_create();
-    toc_size = iree_uk_amdgpu_gfx942_size();
-  } else if (targetChip == "gfx1030") {
-    toc = iree_uk_amdgpu_gfx1030_create();
-    toc_size = iree_uk_amdgpu_gfx1030_size();
-  } else if (targetChip == "gfx1100") {
-    toc = iree_uk_amdgpu_gfx1100_create();
-    toc_size = iree_uk_amdgpu_gfx1100_size();
-  } else {
+  auto [toc, toc_size] = getUkernelBitcodeTOC(targetChip);
+  if (!toc) {
     return failure();
   }
 
