@@ -10,7 +10,7 @@ import os
 from conftest import VmfbManager
 from pathlib import Path
 
-rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
+rocm_chip = os.getenv("ROCM_CHIP", default="gfx942")
 vmfb_dir = os.getenv("TEST_OUTPUT_ARTIFACTS", default=Path.cwd())
 
 ###############################################################################
