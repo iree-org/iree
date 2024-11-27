@@ -4,15 +4,17 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cassert>
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/OwningOpRef.h"
+#include "mlir/Parser/Parser.h"
 
 #define DEBUG_TYPE "iree-codegen-materialize-user-configs"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
@@ -110,6 +112,40 @@ getTransformLibraryFromPath(ModuleOp compiledModule, StringRef path) {
                                         entrySequenceName.str()};
 }
 
+/// Look up the tuning spec in the given module or any of its parents.
+static LogicalResult getModuleTuningSpec(ModuleOp compiledModule,
+                                         OwningOpRef<ModuleOp> &tuningSpec) {
+  IREE::Util::SerializableAttrInterface serializedTuningSpec;
+  Operation *op = compiledModule;
+  while (!serializedTuningSpec && op) {
+    serializedTuningSpec =
+        op->getAttrOfType<IREE::Util::SerializableAttrInterface>(
+            kSerializedTuningSpecAttrName);
+    op = op->getParentOp();
+  }
+
+  if (!serializedTuningSpec) {
+    return failure();
+  }
+
+  SmallVector<char, 0> bytecode;
+  if (failed(serializedTuningSpec.serializeToVector(
+          compiledModule->getLoc(), llvm::endianness::native, bytecode))) {
+    return compiledModule.emitError()
+           << "Failed to read attribute " << kSerializedTuningSpecAttrName;
+  }
+
+  ParserConfig config(compiledModule.getContext());
+  tuningSpec = parseSourceString<ModuleOp>(
+      StringRef(bytecode.data(), bytecode.size()), config);
+  if (!tuningSpec) {
+    return compiledModule.emitError() << "Failed to parse tuning spec in "
+                                      << kSerializedTuningSpecAttrName;
+  }
+  LDBG("--loaded tuning spec");
+  return success();
+}
+
 struct MaterializeUserConfigsPass final
     : impl::MaterializeUserConfigsPassBase<MaterializeUserConfigsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -119,9 +155,28 @@ struct MaterializeUserConfigsPass final
   void runOnOperation() override {
     ModuleOp moduleOp = getOperation();
 
+    // Try to load the transform library from the user flag first. If none is
+    // specified, fall back to using the module tuning spec.
     FailureOr<TransformLibraryWithEntrypoint> userTransformLibrary =
         getTransformLibraryFromPath(moduleOp,
                                     clCodegenTransformDialectLibraryFileName);
+    OwningOpRef<ModuleOp> tuningSpec;
+    if (failed(userTransformLibrary)) {
+      if (succeeded(getModuleTuningSpec(moduleOp, tuningSpec))) {
+        assert(tuningSpec);
+        userTransformLibrary = TransformLibraryWithEntrypoint{
+            tuningSpec.get(), kKernelConfigSpecName.str()};
+      }
+    }
+
+    // Remove the tuning spec, if any, from the current module. If the tuning
+    // spec is attached to some other parent op, we conservatively keep it
+    // as-is, as we are not sure who the producer is and if they want it
+    // removed.
+    if (moduleOp->hasAttr(kSerializedTuningSpecAttrName)) {
+      moduleOp->removeAttr(kSerializedTuningSpecAttrName);
+      LDBG("--dropped the serialized tuning spec from the module");
+    }
 
     for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
 
