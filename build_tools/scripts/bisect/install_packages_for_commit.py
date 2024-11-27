@@ -10,11 +10,6 @@
 This downloads Python packages from the pkgci_build_packages.yml step in the
 pkgci.yml workflow then installs them into a Python venv.
 
-All packages that are uploaded to actions artifacts are installed. Typically
-that means the `iree-base-compiler` and `iree-base-runtime` packages. Note that
-older runs using the iree-compiler and iree-runtime packages should still work
-too, so long as their artifacts did not expire yet.
-
 Prerequisites:
     Install gh (https://cli.github.com/) following instructions at
     https://github.com/cli/cli#installation and authenticate:
@@ -35,6 +30,7 @@ Prerequisites:
 
 Example usage:
     install_packages_for_commit.py iree-3.1.0rc20241122
+    install_packages_for_commit.py iree-3.1.0rc20241122 --python-interpreter=python3.11
 
     install_packages_for_commit.py 5b0740c97a33edce29e753b14b9ff04789afcc53
     source ~/.iree/bisect/5b0740c97a33edce29e753b14b9ff04789afcc53/.venv/bin/activate
@@ -48,6 +44,9 @@ import argparse
 import json
 import subprocess
 from pathlib import Path
+
+THIS_DIR = Path(__file__).parent.resolve()
+REPO_ROOT = THIS_DIR.parent.parent.parent
 
 OWNER = "iree-org"
 REPO = "iree"
@@ -98,75 +97,6 @@ def get_latest_workflow_run_id_for_ref(ref: str) -> int:
     return latest_run["id"]
 
 
-def download_artifacts_for_run_id(run_id: int, dir: Path):
-    download_artifacts_args = [
-        "gh",
-        "run",
-        "download",
-        "--repo",
-        f"{OWNER}/{REPO}",
-        str(run_id),
-        "--name",
-        "linux_x86_64_release_packages",
-        "--dir",
-        str(dir),
-    ]
-    print(
-        f"Running command to download artifacts:\n  {' '.join(download_artifacts_args)}"
-    )
-    subprocess.check_call(download_artifacts_args)
-
-
-def install_packages_from_directory(dir: Path, python_interpreter: str):
-    # Setup venv.
-    venv_dir = dir / ".venv"
-    print(f"Creating venv at '{venv_dir}'")
-    subprocess.check_call([python_interpreter, "-m", "venv", str(venv_dir)])
-    venv_python_interpreter = str(venv_dir / "bin" / "python")
-    subprocess.check_call(
-        [venv_python_interpreter, "-m", "pip", "install", "--upgrade", "pip", "--quiet"]
-    )
-
-    # Install common deps.
-    install_deps_args = [
-        venv_python_interpreter,
-        "-m",
-        "pip",
-        "install",
-        "--quiet",
-        "numpy",
-        "sympy",
-    ]
-    print("")
-    print(f"Running command to install dependencies:\n  {' '.join(install_deps_args)}")
-    subprocess.check_call(install_deps_args)
-
-    # Install each .whl in the directory.
-    # NOTE: this will fail if the Python interpreter is not the same version
-    # as the packages or if packages are ever built for multiple Python
-    # versions.
-    # TODO(scotttodd): Make this robust or at least log a better error message.
-    whl_files = list(dir.glob("*.whl"))
-    for file in whl_files:
-        install_package_args = [
-            venv_python_interpreter,
-            "-m",
-            "pip",
-            "install",
-            "--quiet",
-            str(file),
-        ]
-        print(
-            f"Running command to install package:\n  {' '.join(install_package_args)}"
-        )
-        subprocess.check_call(install_package_args)
-
-    # Log which packages are installed.
-    print("")
-    print(f"Checking packages with 'pip freeze':")
-    subprocess.check_call([venv_python_interpreter, "-m", "pip", "freeze"])
-
-
 def main(args):
     print("------------------------------------------------------------------")
     print(f"Installing packages for ref: {args.ref}")
@@ -178,15 +108,24 @@ def main(args):
     artifacts_dir = args.work_dir / str(args.ref)
     Path.mkdir(artifacts_dir, exist_ok=True)
 
-    existing_files = list(artifacts_dir.glob("*.whl"))
-    if existing_files:
-        print("Found cached .whl files in artifacts dir, skipping download")
-    else:
-        download_artifacts_for_run_id(latest_run_id, artifacts_dir)
-
-    install_packages_from_directory(
-        artifacts_dir, python_interpreter=args.python_interpreter
+    venv_dir = artifacts_dir / ".venv"
+    subprocess.check_call(
+        [
+            args.python_interpreter,
+            str(REPO_ROOT / "build_tools" / "pkgci" / "setup_venv.py"),
+            str(venv_dir),
+            "--artifact-path",
+            str(artifacts_dir),
+            "--fetch-gh-workflow",
+            str(latest_run_id),
+        ]
     )
+
+    # Log which packages are installed.
+    venv_python_interpreter = str(venv_dir / "bin" / "python")
+    print("")
+    print(f"Checking packages with 'pip freeze':")
+    subprocess.check_call([venv_python_interpreter, "-m", "pip", "freeze"])
 
     print("------------------------------------------------------------------")
     print("")
