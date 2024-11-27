@@ -50,7 +50,7 @@ in submodules (e.g. MLIR updates in `third_party/llvm-project/`).
 
 #### Scripted bisecting with package artifacts
 
-See <https://github.com/iree-org/iree/tree/main/build_tools/scripts/bisect>.
+See <https://github.com/iree-org/iree/tree/main/build_tools/pkgci/bisect>.
 
 #### Manually bisecting with source builds
 
