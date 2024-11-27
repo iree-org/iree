@@ -76,7 +76,7 @@ transform.named_sequence @match_attention_f8(%attention: !transform.any_op {tran
     transform.iree.match.cast_compatible_type %in0 = tensor<?x?x?x?xf8E4M3FNUZ> : !transform.any_value
 
     %config = transform.param.constant #iree_codegen.compilation_info<
-            lowering_config = #iree_gpu.lowering_config<{workgroup = [1, 1, 64, 0, 0, 0], reduction=[0, 0, 0, 0, 64, 0], promote_operands = [1, 2]}>,
+            lowering_config = #iree_gpu.lowering_config<{workgroup = [1, 1, 64, 0, 0, 0], reduction=[0, 0, 0, 0, 0, 64], promote_operands = [1, 2]}>,
             translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
                                                               workgroup_size = [64, 4]
                                                               subgroup_size = 64 ,
