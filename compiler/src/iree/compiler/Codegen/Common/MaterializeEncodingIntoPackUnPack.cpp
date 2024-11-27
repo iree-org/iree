@@ -10,6 +10,7 @@
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -29,6 +30,8 @@
 namespace mlir::iree_compiler {
 
 using IREE::Codegen::MaterializeEncodingInfo;
+using IREE::Codegen::MaterializeEncodingValueFn;
+using IREE::Codegen::transposeInPlace;
 
 //===---------------------------------------------------------------------===//
 // Utility methods
@@ -61,151 +64,13 @@ getSwizzledShape(ArrayRef<OpFoldResult> packedShape,
   return newShape;
 }
 
-static FailureOr<SmallVector<OpFoldResult>>
-getInnerTileSizesOfr(OpBuilder &rewriter, Location loc,
-                     RankedTensorType tensorType,
-                     const MaterializeEncodingInfo &materializeEncodingInfo,
-                     MaterializeEncodingValueFn materializeEncodingValueFn) {
-  ArrayRef<int64_t> staticTileSizes = materializeEncodingInfo.innerTileSizes;
-  if (llvm::all_of(staticTileSizes,
-                   [](int64_t i) { return !ShapedType::isDynamic(i); })) {
-    return getAsOpFoldResult(rewriter.getI64ArrayAttr(staticTileSizes));
-  }
-  assert(materializeEncodingValueFn &&
-         "When dynamic tile sizes are generated, a MaterializeEncodingValueFn "
-         "should be provided.");
-
-  FailureOr<MaterializeEncodingValueInfo> materializeEncodingValueInfo =
-      materializeEncodingValueFn(tensorType, rewriter, loc);
-  if (failed(materializeEncodingValueInfo)) {
-    return failure();
-  }
-  ArrayRef<Value> innerTileSizeValues =
-      materializeEncodingValueInfo->innerTileSizes;
-
-  SmallVector<OpFoldResult> result(staticTileSizes.size());
-  for (size_t i = 0; i < result.size(); ++i) {
-    if (ShapedType::isDynamic(staticTileSizes[i])) {
-      result[i] = innerTileSizeValues[i];
-    } else if (tensorType.isDynamicDim(i)) {
-      result[i] =
-          rewriter.create<arith::ConstantIndexOp>(loc, staticTileSizes[i])
-              .getResult();
-    } else {
-      result[i] = rewriter.getI64IntegerAttr(staticTileSizes[i]);
-    }
-  }
-  return result;
-}
-
-static void transposeInPlace(MaterializeEncodingInfo &info) {
-  // Vector cases: nothing to do.
-  if (info.innerTileSizes.size() < 2) {
-    return;
-  }
-  // Not a vector case, so all three arrays in `info` have size at least 2,
-  // outerDimsPerm may have size 3 if there is a batch dimension, but in all
-  // cases, the last 2 entries of each array are M and N, not batch.
-  auto transpose = [](SmallVector<int64_t> &a) {
-    std::swap(a[a.size() - 2], a[a.size() - 1]);
-  };
-  transpose(info.innerDimsPos);
-  transpose(info.innerTileSizes);
-  transpose(info.outerDimsPerm);
-}
-
-//===---------------------------------------------------------------------===//
-// Methods to convert `set_encoding` and `unset_encoding` operations
-// to `pack` and `unpack` operations respectively.
-//===---------------------------------------------------------------------===//
-
-/// TODO(hanchung): Move the implementation to EncodingUtils.cpp. It is not
-/// moved because it needs some cleanup for this file. E.g., `getPaddingValue`
-/// is no longer needed. Ideally we should move CPU specific patterns (e.g.,
-/// lowerContractionOpWithEncoding, etc) to the CPUMaterializeEncoding file;
-/// move general patterns to EncodingUtils, and retire this file.
-FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
-    RewriterBase &rewriter, IREE::Encoding::SetEncodingOp encodingOp,
-    Value source, const MaterializeEncodingTypeConverter &typeConverter,
-    MaterializeEncodingValueFn materializeEncodingValueFn) {
-  RankedTensorType resultType = encodingOp.getResultType();
-  FailureOr<MaterializeEncodingInfo> encodingInfo =
-      typeConverter.getEncodingInfo(resultType);
-  if (failed(encodingInfo)) {
-    return rewriter.notifyMatchFailure(encodingOp, "unhandled result encoding");
-  }
-
-  auto encoding = IREE::Encoding::getEncodingAttr(resultType);
-  if (!encoding) {
-    return failure();
-  }
-  if (typeConverter.getTransposeNarrowN() && isNarrowNResult(encoding)) {
-    transposeInPlace(*encodingInfo);
-  }
-
-  // Create `tensor.empty` operation for the result of the pack operation.
-  Location loc = encodingOp.getLoc();
-  FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr = getInnerTileSizesOfr(
-      rewriter, loc, resultType, *encodingInfo, materializeEncodingValueFn);
-  if (failed(innerTileSizesOfr)) {
-    return rewriter.notifyMatchFailure(
-        encodingOp, "failed to generate runtime tile size query");
-  }
-  Value paddingValue = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getZeroAttr(resultType.getElementType()));
-  SmallVector<OpFoldResult> sourceDims =
-      tensor::getMixedSizes(rewriter, loc, source);
-  SmallVector<OpFoldResult> resultDims = tensor::PackOp::getResultShape(
-      rewriter, loc, sourceDims, *innerTileSizesOfr, encodingInfo->innerDimsPos,
-      encodingInfo->outerDimsPerm);
-  auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
-                                                  resultType.getElementType());
-  return rewriter.create<tensor::PackOp>(
-      loc, source, emptyOp, encodingInfo->innerDimsPos, *innerTileSizesOfr,
-      paddingValue, encodingInfo->outerDimsPerm);
-}
-
-/// TODO(hanchung): Move the implementation to EncodingUtils.cpp. See the reason
-/// in the implementation comment of lowerSetEncodingToPackOp method.
-FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
-    RewriterBase &rewriter, IREE::Encoding::UnsetEncodingOp encodingOp,
-    Value packedValue, const MaterializeEncodingTypeConverter &typeConverter,
-    MaterializeEncodingValueFn materializeEncodingValueFn) {
-  RankedTensorType sourceType = encodingOp.getSourceType();
-  FailureOr<MaterializeEncodingInfo> encodingInfo =
-      typeConverter.getEncodingInfo(sourceType);
-  if (failed(encodingInfo)) {
-    return rewriter.notifyMatchFailure(encodingOp, "unhandled source encoding");
-  }
-  auto encoding = IREE::Encoding::getEncodingAttr(sourceType);
-  if (typeConverter.getTransposeNarrowN() && isNarrowNResult(encoding)) {
-    transposeInPlace(*encodingInfo);
-  }
-  // Create an `tensor.empty` for the result of the unpack operation.
-  Location loc = encodingOp.getLoc();
-  SmallVector<OpFoldResult> resultDims =
-      getMixedValues(encodingOp.getResultType().getShape(),
-                     encodingOp.getResultDims(), rewriter);
-  auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
-                                                  sourceType.getElementType());
-  FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr = getInnerTileSizesOfr(
-      rewriter, loc, sourceType, *encodingInfo, materializeEncodingValueFn);
-  if (failed(innerTileSizesOfr)) {
-    return rewriter.notifyMatchFailure(
-        encodingOp, "failed to generate runtime tile size query");
-  }
-  return rewriter.create<tensor::UnPackOp>(
-      loc, packedValue, emptyOp, encodingInfo->innerDimsPos, *innerTileSizesOfr,
-      encodingInfo->outerDimsPerm);
-}
-
 /// Utility method to convert `tensor.empty` with encoding to a `tensor.empty`
 /// of the materialized type.
-static FailureOr<Operation *>
-lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
-                    ValueRange convertedOperands,
-                    const MaterializeEncodingTypeConverter &typeConverter,
-                    MaterializeEncodingValueFn materializeEncodingValueFn) {
+static FailureOr<Operation *> lowerOpWithEncoding(
+    RewriterBase &rewriter, tensor::EmptyOp emptyOp,
+    ValueRange convertedOperands,
+    const MaterializeEncodingTypeConverter &typeConverter,
+    const MaterializeEncodingValueFn &materializeEncodingValueFn) {
   auto emptyType = cast<RankedTensorType>(emptyOp->getResultTypes()[0]);
   FailureOr<MaterializeEncodingInfo> encodingInfo =
       typeConverter.getEncodingInfo(emptyType);
@@ -221,8 +86,9 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
     transposeInPlace(*encodingInfo);
   }
 
-  FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr = getInnerTileSizesOfr(
-      rewriter, loc, emptyType, *encodingInfo, materializeEncodingValueFn);
+  FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr =
+      IREE::Codegen::getInnerTileSizesOfr(
+          rewriter, loc, emptyType, *encodingInfo, materializeEncodingValueFn);
   if (failed(innerTileSizesOfr)) {
     return rewriter.notifyMatchFailure(
         emptyOp, "failed to generate runtime tile size query");
@@ -598,9 +464,17 @@ struct SetEncodingOpToPackOpConversion
                   ConversionPatternRewriter &rewriter) const override {
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         getTypeConverter());
-    auto packOp = lowerSetEncodingOpToPackOp(rewriter, encodingOp,
-                                             adaptor.getSource(), *converter,
-                                             this->materializeEncodingValueFn);
+    // TODO(hanchung): This is a transition state for moving the implementation
+    // details to backend attributes. We won't need the function type argument
+    // after all the backends that support encodings implement the attribute.
+    auto getEncodingInfoWrapper =
+        [&](RankedTensorType type) -> FailureOr<MaterializeEncodingInfo> {
+      return converter->getEncodingInfo(type);
+    };
+    auto packOp = IREE::Codegen::lowerSetEncodingOpToPackOp(
+        rewriter, encodingOp, adaptor.getSource(),
+        converter->getTransposeNarrowN(), getEncodingInfoWrapper,
+        this->materializeEncodingValueFn);
     if (failed(packOp)) {
       Type targetType =
           getTypeConverter()->convertType(encodingOp.getResultType());
@@ -625,8 +499,16 @@ struct UnsetEncodingOpToUnPackOpConversion
                   ConversionPatternRewriter &rewriter) const override {
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         this->getTypeConverter());
-    auto unpackOp = lowerUnsetEncodingToUnpackOp(
-        rewriter, encodingOp, adaptor.getSource(), *converter,
+    // TODO(hanchung): This is a transition state for moving the implementation
+    // details to backend attributes. We won't need the function type argument
+    // after all the backends that support encodings implement the attribute.
+    auto getEncodingInfoWrapper =
+        [&](RankedTensorType type) -> FailureOr<MaterializeEncodingInfo> {
+      return converter->getEncodingInfo(type);
+    };
+    auto unpackOp = IREE::Codegen::lowerUnsetEncodingToUnpackOp(
+        rewriter, encodingOp, adaptor.getSource(),
+        converter->getTransposeNarrowN(), getEncodingInfoWrapper,
         this->materializeEncodingValueFn);
     if (failed(unpackOp)) {
       Type targetType =

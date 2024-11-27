@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LLVM.h"
@@ -70,6 +71,8 @@ struct TileMxNxK {
 MaterializeEncodingInfo
 getEncodingInfoForMatmul(Encoding::EncodingAttr encoding, TileMxNxK tileMxNxK);
 
+void transposeInPlace(MaterializeEncodingInfo &info);
+
 //===----------------------------------------------------------------------===//
 // Operation Lowering Utilities.
 //===----------------------------------------------------------------------===//
@@ -78,6 +81,32 @@ FailureOr<Operation *>
 lowerContractionOpWithEncoding(OpBuilder &builder, linalg::LinalgOp linalgOp,
                                ValueRange operands, bool transposeNarrowN,
                                ResolveEncodingInfoFn getEncodingInfo);
+
+struct MaterializeEncodingValueInfo {
+  SmallVector<Value> innerTileSizes;
+};
+
+using MaterializeEncodingValueFn =
+    std::function<FailureOr<MaterializeEncodingValueInfo>(
+        RankedTensorType, OpBuilder &, Location)>;
+
+FailureOr<SmallVector<OpFoldResult>> getInnerTileSizesOfr(
+    OpBuilder &rewriter, Location loc, RankedTensorType tensorType,
+    const MaterializeEncodingInfo &materializeEncodingInfo,
+    const MaterializeEncodingValueFn &materializeEncodingValueFn);
+
+/// Utility method to convert from `set_encoding` op to `pack` operation.
+FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
+    RewriterBase &rewriter, IREE::Encoding::SetEncodingOp encodingOp,
+    Value source, bool transposeNarrowN, ResolveEncodingInfoFn getEncodingInfo,
+    const MaterializeEncodingValueFn &materializeEncodingValueFn);
+
+/// Utility method to convert from `unset_encoding` op to `unpack` operation.
+FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
+    RewriterBase &rewriter, IREE::Encoding::UnsetEncodingOp encodingOp,
+    Value packedValue, bool transposeNarrowN,
+    ResolveEncodingInfoFn getEncodingInfo,
+    const MaterializeEncodingValueFn &materializeEncodingValueFn);
 
 } // namespace mlir::iree_compiler::IREE::Codegen
 
