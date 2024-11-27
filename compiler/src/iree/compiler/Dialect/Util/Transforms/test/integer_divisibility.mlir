@@ -100,3 +100,15 @@ util.func @divui_divisibility(%arg0 : index) -> (index, index) {
 //       CHECK:   %[[V:.+]] = arith.divui
 //       CHECK:   %[[REM:.+]] = arith.remui %[[V]], %[[C32]]
 //       CHECK:   return %[[C0]], %[[REM]]
+
+// -----
+
+util.func @everything_divides_zero(%arg0 : index) -> index {
+  %c32 = arith.constant 32 : index
+  %0 = util.assume.int %arg0[<umin = 0, umax = 0>, <umin = 64, umax = 64, udiv = 64>] : index
+  %1 = arith.remui %0, %c32 : index
+  util.return %1 : index
+}
+// CHECK-LABEL: @everything_divides_zero
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   return %[[C0]]

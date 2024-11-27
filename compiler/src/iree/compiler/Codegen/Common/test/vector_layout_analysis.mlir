@@ -1,6 +1,15 @@
 // RUN: iree-opt -iree-transform-dialect-interpreter --split-input-file %s --verify-diagnostics
 
-#layout = #iree_vector_ext.layout<<[VECTORY], [16]>, <[VECTORX], [16]>>
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [16, 16],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
 
 // Propagate the layout from transfer_read to everyone.
 builtin.module attributes { transform.with_named_sequence } {
@@ -8,14 +17,14 @@ builtin.module attributes { transform.with_named_sequence } {
     %c0 = arith.constant 0 : index
     %cst_0 = arith.constant 0.0 : f16
     %root = vector.transfer_read %arr[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    // expected-remark @above {{element_tile = [16, 16]}}
     %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<16x16xf16>
     %c = arith.mulf %rootl, %b : vector<16x16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    // expected-remark @above {{element_tile = [16, 16]}}
     %d = arith.addf %c, %a : vector<16x16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    // expected-remark @above {{element_tile = [16, 16]}}
     %e = arith.select %cond, %c, %d : vector<16x16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    // expected-remark @above {{element_tile = [16, 16]}}
     func.return %e : vector<16x16xf16>
   }
 
@@ -28,7 +37,16 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-#layout = #iree_vector_ext.layout<<[VECTORY], [16]>, <[VECTORX], [16]>>
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [16, 16],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
 
 // Enforce the layout from the transfer_write to everyone
 builtin.module attributes { transform.with_named_sequence } {
@@ -36,11 +54,11 @@ builtin.module attributes { transform.with_named_sequence } {
     %c0 = arith.constant 0 : index
     %cst_0 = arith.constant 0.0 : f16
     %cst0 = arith.constant dense<0.0> : vector<16x16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    // expected-remark @above {{element_tile = [16, 16]}}
     %c = arith.mulf %cst0, %b : vector<16x16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    // expected-remark @above {{element_tile = [16, 16]}}
     %d = arith.addf %c, %a : vector<16x16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    // expected-remark @above {{element_tile = [16, 16]}}
     %dl = iree_vector_ext.to_layout %d to layout(#layout) : vector<16x16xf16>
     vector.transfer_write %dl, %arr[%c0, %c0] {in_bounds = [true, true]} : vector<16x16xf16>, memref<16x16xf16>
     func.return %d : vector<16x16xf16>
@@ -55,7 +73,16 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-#layout = #iree_vector_ext.layout<<[VECTORY], [16]>, <[VECTORX], [16]>>
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [16, 16],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
 
 // First propagate the layout, and then enforce it up.
 builtin.module attributes { transform.with_named_sequence } {
@@ -63,16 +90,16 @@ builtin.module attributes { transform.with_named_sequence } {
     %c0 = arith.constant 0 : index
     %cst_0 = arith.constant 0.0 : f16
     %root = vector.transfer_read %arr[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    // expected-remark @above {{element_tile = [16, 16]}}
     %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<16x16xf16>
     %root2 = vector.transfer_read %arr2[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    // expected-remark @above {{element_tile = [16, 16]}}
     %c = arith.mulf %rootl, %b : vector<16x16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    // expected-remark @above {{element_tile = [16, 16]}}
     %d = arith.addf %c, %a : vector<16x16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    // expected-remark @above {{element_tile = [16, 16]}}
     %e = arith.divf %d, %root2 : vector<16x16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    // expected-remark @above {{element_tile = [16, 16]}}
     func.return %e : vector<16x16xf16>
   }
 
@@ -85,7 +112,16 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-#layout = #iree_vector_ext.layout<<[VECTORY], [16]>, <[BATCHY, VECTORX], [2, 8]>>
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 2],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [16, 8],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
 
 // Propagate and enforce through reduction.
 builtin.module attributes { transform.with_named_sequence } {
@@ -93,20 +129,20 @@ builtin.module attributes { transform.with_named_sequence } {
     %c0 = arith.constant 0 : index
     %cst_0 = arith.constant 0.0 : f16
     %cst0_1 = arith.constant dense<0.0> : vector<16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  VECTORX], [2, 8]>>}}
+    // expected-remark @above {{element_tile = [8]}}
     %root = vector.transfer_read %arr[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ BATCHY,  VECTORX], [2, 8]>>}}
+    // expected-remark @above {{element_tile = [16, 8]}}
     %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<16x16xf16>
     %root2 = vector.transfer_read %arr2[%c0], %cst_0 {in_bounds = [true]} : memref<16xf16>, vector<16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  VECTORX], [2, 8]>>}}
+    // expected-remark @above {{element_tile = [8]}}
     %root_red = vector.multi_reduction<add>, %rootl, %cst0_1 [0]  : vector<16x16xf16> to vector<16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  VECTORX], [2, 8]>>}}
+    // expected-remark @above {{element_tile = [8]}}
     %c = arith.mulf %root_red, %b : vector<16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  VECTORX], [2, 8]>>}}
+    // expected-remark @above {{element_tile = [8]}}
     %d = arith.addf %c, %a : vector<16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  VECTORX], [2, 8]>>}}
+    // expected-remark @above {{element_tile = [8]}}
     %e = arith.divf %d, %root2 : vector<16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  VECTORX], [2, 8]>>}}
+    // expected-remark @above {{element_tile = [8]}}
     func.return %e : vector<16xf16>
   }
 
@@ -119,7 +155,16 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-#layout = #iree_vector_ext.layout<<[VECTORY], [16]>, <[BATCHY, VECTORX], [2, 8]>>
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 2],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [16, 8],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
 
 // Propagate and enforce through transpose and then reduction.
 builtin.module attributes { transform.with_named_sequence } {
@@ -127,22 +172,22 @@ builtin.module attributes { transform.with_named_sequence } {
     %c0 = arith.constant 0 : index
     %cst_0 = arith.constant 0.0 : f16
     %cst0_1 = arith.constant dense<0.0> : vector<16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>>}}
+    // expected-remark @above {{element_tile = [16]}}
     %root = vector.transfer_read %arr[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ BATCHY,  VECTORX], [2, 8]>>}}
+    // expected-remark @above {{element_tile = [16, 8]}}
     %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<16x16xf16>
     %root2 = vector.transfer_read %arr2[%c0], %cst_0 {in_bounds = [true]} : memref<16xf16>, vector<16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>>}}
+    // expected-remark @above {{element_tile = [16]}}
     %root_transpose = vector.transpose %rootl, [1, 0] : vector<16x16xf16> to vector<16x16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  VECTORX], [2, 8]>, <[ VECTORY], [16]>>}}
+    // expected-remark @above {{element_tile = [8, 16]}}
     %root_red = vector.multi_reduction<add>, %root_transpose, %cst0_1 [0]  : vector<16x16xf16> to vector<16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>>}}
+    // expected-remark @above {{element_tile = [16]}}
     %c = arith.mulf %root_red, %b : vector<16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>>}}
+    // expected-remark @above {{element_tile = [16]}}
     %d = arith.addf %c, %a : vector<16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>>}}
+    // expected-remark @above {{element_tile = [16]}}
     %e = arith.divf %d, %root2 : vector<16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>>}}
+    // expected-remark @above {{element_tile = [16]}}
     func.return %e : vector<16xf16>
   }
 
@@ -155,9 +200,38 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-#layoutA = #iree_vector_ext.layout<<[VECTORX], [32]>, <[VECTORY], [64]>>
-#layoutB = #iree_vector_ext.layout<<[VECTORX], [128]>, <[VECTORY], [64]>>
-#layoutC = #iree_vector_ext.layout<<[VECTORY], [128]>, <[VECTORX], [32]>>
+#layoutA = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [32, 64],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+#layoutB = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [128, 64],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+#layoutC = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [128, 32],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
 
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -171,7 +245,7 @@ builtin.module attributes { transform.with_named_sequence } {
     %c = iree_vector_ext.to_layout %C to layout(#layoutC) : vector<128x32xf32>
 
     // Check if the layout of %C was properly propagated to %D.
-    // expected-remark @below {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [128]>, <[ VECTORX], [32]>>}}
+    // expected-remark @below {{element_tile = [128, 32]}}
     %D = vector.contract
         {indexing_maps = [#map1, #map2, #map3],
          iterator_types = ["parallel", "parallel", "reduction"],
@@ -190,21 +264,30 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-#layout = #iree_vector_ext.layout<<[VECTORY], [16]>, <[VECTORX], [16]>>
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [16, 16],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
 
 // Propagate the layout from transfer_read to everyone.
 builtin.module attributes { transform.with_named_sequence } {
   func.func @gather(%base: memref<16x16xf16>, %arr: memref<16x16xindex>) -> vector<16x16xf16> {
     %c0 = arith.constant 0 : index
     %mask = arith.constant dense<true> : vector<16x16xi1>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    // expected-remark @above {{element_tile = [16, 16]}}
     %pass = arith.constant dense<0.000000e+00> : vector<16x16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    // expected-remark @above {{element_tile = [16, 16]}}
     %index = vector.transfer_read %arr[%c0, %c0], %c0 {in_bounds = [true, true]} : memref<16x16xindex>, vector<16x16xindex>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    // expected-remark @above {{element_tile = [16, 16]}}
     %index_dist = iree_vector_ext.to_layout %index to layout(#layout) : vector<16x16xindex>
     %c = vector.gather %base[%c0, %c0] [%index_dist], %mask, %pass : memref<16x16xf16>, vector<16x16xindex>, vector<16x16xi1>, vector<16x16xf16> into vector<16x16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    // expected-remark @above {{element_tile = [16, 16]}}
     func.return %c : vector<16x16xf16>
   }
 
@@ -224,25 +307,44 @@ builtin.module attributes { transform.with_named_sequence } {
 // Useful proxy for ensuring that layout conversions on attention
 // happens where we intend it to happen.
 
-#layoutA = #iree_vector_ext.layout<<[BATCHY, LANEX], [2, 32]>, <[BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 2, 4]>>
-#layoutB = #iree_vector_ext.layout<<[BATCHY, LANEX], [2, 32]>, <[BATCHX,  LANEY,  VECTORX], [2, 4, 8]>>
+#layoutA = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [2, 2],
+  outer_tile = [1, 4],
+  thread_tile = [32, 2],
+  element_tile = [1, 4],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [2, 1]
+>
+
+#layoutB = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [2, 2],
+  outer_tile = [1, 1],
+  thread_tile = [32, 4],
+  element_tile = [1, 8],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [4, 1]
+>
 
 builtin.module attributes { transform.with_named_sequence } {
   func.func @resolve_select(%A : vector<64x64xf16>, %B : vector<64x64xf16>, %condition : i1) -> vector<64x64xf16> {
     %a = iree_vector_ext.to_layout %A to layout(#layoutA) : vector<64x64xf16>
     %b = iree_vector_ext.to_layout %B to layout(#layoutB) : vector<64x64xf16>
-    // expected-remark @below {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  LANEX], [2, 32]>, <[ BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 2, 4]>>}}
+    // expected-remark @below {{element_tile = [1, 4]}}
     %offset_0 = arith.constant dense<2.0> : vector<64x64xf16>
-    // expected-remark @below {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  LANEX], [2, 32]>, <[ BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 2, 4]>>}}
+    // expected-remark @below {{element_tile = [1, 4]}}
     %offset_1 = arith.constant dense<4.0> : vector<64x64xf16>
 
-    // expected-remark @below {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  LANEX], [2, 32]>, <[ BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 2, 4]>>}}
+    // expected-remark @below {{element_tile = [1, 4]}}
     %sel = arith.select %condition, %offset_0, %offset_1 : vector<64x64xf16>
-    // expected-remark @below {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  LANEX], [2, 32]>, <[ BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 2, 4]>>}}
+    // expected-remark @below {{element_tile = [1, 4]}}
     %add = arith.addf %a, %sel : vector<64x64xf16>
     %add_layout = iree_vector_ext.to_layout %add to layout(#layoutB) : vector<64x64xf16>
     // CHECK-COUNT-3: iree_vector_ext.to_layout
-    // expected-remark @below {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  LANEX], [2, 32]>, <[ BATCHX,  LANEY,  VECTORX], [2, 4, 8]>>}}
+    // expected-remark @below {{element_tile = [1, 8]}}
     %add_1 = arith.addf %add_layout, %b : vector<64x64xf16>
     func.return %add_1 : vector<64x64xf16>
   }
@@ -256,7 +358,16 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-#layout = #iree_vector_ext.layout<<[VECTORY], [16]>, <[BATCHY, VECTORX], [2, 8]>>
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 2],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [16, 8],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
 
 // Propagate and enforce through scf.for
 builtin.module attributes { transform.with_named_sequence } {
@@ -266,25 +377,24 @@ builtin.module attributes { transform.with_named_sequence } {
     %c1024 = arith.constant 1024 : index
     %cst_0 = arith.constant 0.0 : f16
     %cst0_1 = arith.constant dense<0.0> : vector<16xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>>}}
-
+    // expected-remark @above {{element_tile = [16]}}
     %out = scf.for %iv = %c0 to %c1024 step %c1 iter_args(%arg1 = %cst0_1) -> (vector<16xf16>) {
-      // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>>}}
+      // expected-remark @above {{element_tile = [16]}}
       %root = vector.transfer_read %arr[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
-      // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ BATCHY,  VECTORX], [2, 8]>>}}
+      // expected-remark @above {{element_tile = [16, 8]}}
       %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<16x16xf16>
       %root2 = vector.transfer_read %arr2[%c0], %cst_0 {in_bounds = [true]} : memref<16xf16>, vector<16xf16>
-      // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>>}}
+      // expected-remark @above {{element_tile = [16]}}
       %root_transpose = vector.transpose %rootl, [1, 0] : vector<16x16xf16> to vector<16x16xf16>
-      // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  VECTORX], [2, 8]>, <[ VECTORY], [16]>>}}
+      // expected-remark @above {{element_tile = [8, 16]}}
       %root_red = vector.multi_reduction<add>, %root_transpose, %arg1 [0]  : vector<16x16xf16> to vector<16xf16>
-      // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>>}}
+      // expected-remark @above {{element_tile = [16]}}
       %c = arith.mulf %root_red, %b : vector<16xf16>
-      // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>>}}
+      // expected-remark @above {{element_tile = [16]}}
       %d = arith.addf %c, %a : vector<16xf16>
-      // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>>}}
+      // expected-remark @above {{element_tile = [16]}}
       %e = arith.divf %d, %root2 : vector<16xf16>
-      // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>>}}
+      // expected-remark @above {{element_tile = [16]}}
       scf.yield %e : vector<16xf16>
     }
 
@@ -565,7 +675,16 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-#layout = #iree_vector_ext.layout<<[VECTORY], [16]>, <[BATCHY, VECTORX], [2, 8]>>
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 2],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [16, 8],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
 
 // Propagate and enforce through scf.for
 builtin.module attributes { transform.with_named_sequence } {
@@ -578,7 +697,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
     %out = scf.for %iv = %c0 to %c1024 step %c1 iter_args(%arg1 = %cst) -> (vector<f16>) {
       %root = vector.transfer_read %arr[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
-      // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ BATCHY,  VECTORX], [2, 8]>>}}
+      // expected-remark @above {{element_tile = [16, 8]}}
       %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<16x16xf16>
       %init = vector.extractelement %arg1[] : vector<f16>
       %root_red = vector.multi_reduction<add>, %rootl, %init [0, 1]  : vector<16x16xf16> to f16

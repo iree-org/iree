@@ -15,6 +15,7 @@ iree_cc_library(
     IREEGPUDialect
   HDRS
     "DerivedConfigUtils.h"
+    "GPULoweringConfigUtils.h"
     "GPUTileSwizzleUtils.h"
     "IREEGPUAttrs.h"
     "IREEGPUDialect.h"
@@ -34,6 +35,7 @@ iree_cc_library(
     "IREEGPUOps.h.inc"
   SRCS
     "DerivedConfigUtils.cpp"
+    "GPULoweringConfigUtils.cpp"
     "GPUTileSwizzleUtils.cpp"
     "IREEGPUAttrs.cpp"
     "IREEGPUDialect.cpp"
@@ -63,8 +65,8 @@ iree_cc_library(
     MLIRTilingInterface
     MLIRVectorDialect
     MLIRVectorInterfaces
-    iree::compiler::Codegen::Common::TileSwizzle
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::Utils
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Utils::VectorOpUtils
     iree::compiler::Dialect::LinalgExt::IR

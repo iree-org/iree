@@ -22,6 +22,7 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 using namespace IREE::Encoding;
+using IREE::Codegen::MaterializeEncodingInfo;
 
 namespace {
 struct MaterializeEncodingIntoNopPass final

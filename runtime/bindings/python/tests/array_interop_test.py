@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import copy
+import pickle
 import gc
 import numpy as np
 import unittest
@@ -134,6 +135,16 @@ class DeviceHalTest(unittest.TestCase):
             self.device, init_ary, implicit_host_transfer=True
         )
         copy_ary = copy.deepcopy(orig_ary)
+        self.assertIsNot(orig_ary, copy_ary)
+        np.testing.assert_array_equal(orig_ary, copy_ary)
+
+    def testPickle(self):
+        init_ary = np.arange(3 * 4, dtype=np.float32).reshape([3, 4])
+        orig_ary = iree.runtime.asdevicearray(
+            self.device, init_ary, implicit_host_transfer=True
+        )
+        serialized_ary = pickle.dumps(orig_ary)
+        copy_ary = pickle.loads(serialized_ary)
         self.assertIsNot(orig_ary, copy_ary)
         np.testing.assert_array_equal(orig_ary, copy_ary)
 

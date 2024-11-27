@@ -7,7 +7,7 @@
 R'''
 This module contains Python wrappers for various IREE command-line tools.
 
-This top-level API provides access to the `iree-compiler` tool, which compiles
+This top-level API provides access to the `iree-compile` tool, which compiles
 MLIR ASM via IREE's compiler to a supported output format (i.e. VM FlatBuffer, C
 source code, etc).
 

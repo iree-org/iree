@@ -42,23 +42,25 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     """An IREE device array.
 
     Device arrays can be in one of two states:
-      1. Host accessible: The array will be backed by host accessible memory
-         and can have the usual things done with it that one expects to be
-         able to do with an ndarray.
-      2. Device resident: The array is just a handle to a device resident
-         Buffer (and BufferView wrapper). Metadata about the array are accessible
-         (shape and dtype) but anything that touches the data cannot be accessed
-         in this state.
+
+    1. Host accessible: The array will be backed by host accessible memory
+       and can have the usual things done with it that one expects to be
+       able to do with an ndarray.
+    2. Device resident: The array is just a handle to a device resident
+       Buffer (and BufferView wrapper). Metadata about the array are accessible
+       (shape and dtype) but anything that touches the data cannot be accessed
+       in this state.
 
     How a device array comes into existence controls how it can transition
     between these states:
-      * A user can create a DeviceArray explicitly with a device allocator.
-        Such an array will not be implicitly convertible to host accessible,
-        although accessors exist to do so.
-      * When created by the platform with a synchronization policy, then
-        implicit transfer back to the host will trigger appropriate waits and
-        be performed automatically (this is the common case for function return
-        values if not otherwise configured, as an example).
+
+    * A user can create a DeviceArray explicitly with a device allocator.
+      Such an array will not be implicitly convertible to host accessible,
+      although accessors exist to do so.
+    * When created by the platform with a synchronization policy, then
+      implicit transfer back to the host will trigger appropriate waits and
+      be performed automatically (this is the common case for function return
+      values if not otherwise configured, as an example).
     """
 
     def __init__(
@@ -209,12 +211,13 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         host_ary = self.to_host()
         return host_ary.__getitem__(index)
 
+    def __deepcopy__(self, memo):
+        return self.to_host()
+
     def __reduce__(self):
-        # Since this is used for making deep copies and pickling, we map
-        # separately from any interactive state. We just reduce to the actual
-        # host ndarray, which supports the necessary serialization protocols.
-        _, host_array = self._map_to_host()
-        return _restore_reduced_array, (host_array,)
+        # We just reduce to the actual host ndarray, which supports the necessary
+        # serialization protocols.
+        return _restore_reduced_array, (self.to_host(),)
 
 
 def _restore_reduced_array(ary):

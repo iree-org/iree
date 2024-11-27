@@ -699,7 +699,8 @@ def AMDGPUDistributeVectorsOp :
     }];
 
     let arguments = (ins TransformHandleTypeInterface:$target,
-                         UnitAttr:$test_conversion);
+                         UnitAttr:$test_conversion,
+                         DefaultValuedOptionalAttr<I64Attr, "64">:$subgroup_size);
     let results = (outs TransformHandleTypeInterface:$result);
 
     let assemblyFormat = [{
@@ -733,26 +734,6 @@ def CreateMatmulMfmaTileSizesOp :
                       TransformParamTypeInterface:$problem_specific_sizes);
 
   let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-}
-
-def SetContractionLayoutAttributes :
-  Op<Transform_Dialect, "iree.set_contraction_layout_attributes",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
-  let description = [{
-    Infers and sets the layout of the target contraction op based on the given
-    MFMA attribute. The optional read_layout_indices attribute determines whether
-    to apply a modified version of the MFMA layout to the operands of
-    the contracts that enables loading a greater number of elements from LDS.
-    If empty, the read layout is not applied to any operand. 0 specifies
-    LHS and 1 RHS.
-  }];
-
-  let arguments = (ins TransformHandleTypeInterface:$target,
-                       TransformParamTypeInterface:$mma_type,
-                       DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$read_layout_indices);
-  let assemblyFormat = "$target `,` $mma_type attr-dict `:` type($target) `,` type($mma_type)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 

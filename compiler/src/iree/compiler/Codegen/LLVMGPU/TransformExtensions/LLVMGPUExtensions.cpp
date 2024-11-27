@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
@@ -55,6 +56,7 @@ using llvm::dbgs;
 using namespace mlir;
 using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::IREE;
+using mlir::iree_compiler::IREE::Codegen::TileSwizzle;
 
 iree_compiler::IREE::transform_dialect::LLVMGPUExtensions::LLVMGPUExtensions() {
   // CreateAsyncGroupsOp depends on the following two dialects.
@@ -151,7 +153,7 @@ void transform_dialect::VectorToWarpExecuteOnLane0Op::build(
 // SCCP.
 static LogicalResult
 replaceAllUsesOfLaneWithin(RewriterBase &b,
-                           vector::WarpExecuteOnLane0Op executeOp) {
+                           gpu::WarpExecuteOnLane0Op executeOp) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(executeOp);
   Value zero = b.create<arith::ConstantIndexOp>(executeOp.getLoc(), 0);
@@ -223,7 +225,7 @@ static FailureOr<gpu::ThreadIdOp> isThreadIdxxZeroPredicate(scf::IfOp ifOp) {
 }
 
 struct VectorDistributionResult {
-  vector::WarpExecuteOnLane0Op warpOp;
+  gpu::WarpExecuteOnLane0Op warpOp;
 };
 
 static FailureOr<VectorDistributionResult>
@@ -255,7 +257,7 @@ rewriteScfIfAsWarpExecuteOnLane0(RewriterBase &rewriter, Location loc,
         rewriter.create<scf::IfOp>(loc, predicate, /*withElseRegion=*/false);
     rewriter.setInsertionPointToStart(&newIfOp.getThenRegion().front());
   }
-  auto warpOp = rewriter.create<vector::WarpExecuteOnLane0Op>(
+  auto warpOp = rewriter.create<gpu::WarpExecuteOnLane0Op>(
       loc, TypeRange(), threadIdxx, warpSize);
 
   // Move the code from the previous ifOp to the
@@ -268,7 +270,7 @@ rewriteScfIfAsWarpExecuteOnLane0(RewriterBase &rewriter, Location loc,
                                      sourceBlock.without_terminator().begin(),
                                      sourceBlock.without_terminator().end());
   rewriter.setInsertionPointToEnd(&targetBlock);
-  rewriter.create<vector::YieldOp>(loc);
+  rewriter.create<gpu::YieldOp>(loc);
 
   // Erase old op.
   rewriter.eraseOp(ifOp);
@@ -356,7 +358,7 @@ void transform_dialect::VectorWarpDistributionOp::getEffects(
 /// Emit shared local memory allocation in case it is needed when lowering the
 /// warp operations.
 static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
-                                        vector::WarpExecuteOnLane0Op warpOp,
+                                        gpu::WarpExecuteOnLane0Op warpOp,
                                         Type type) {
   MemRefType memrefType;
   auto addressSpaceAttr = gpu::AddressSpaceAttr::get(
@@ -372,11 +374,11 @@ static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
   return builder.create<memref::AllocOp>(loc, memrefType);
 }
 
-/// Return a value yielded by `warpOp` which statifies the filter lamdba
+/// Return a value yielded by `warpOp` which satisfies the filter lambda
 /// condition and is not dead.
-static OpOperand *getWarpResult(vector::WarpExecuteOnLane0Op warpOp,
+static OpOperand *getWarpResult(gpu::WarpExecuteOnLane0Op warpOp,
                                 function_ref<bool(Operation *)> fn) {
-  auto yield = cast<vector::YieldOp>(
+  auto yield = cast<gpu::YieldOp>(
       warpOp.getBodyRegion().getBlocks().begin()->getTerminator());
   for (OpOperand &yieldOperand : yield->getOpOperands()) {
     Value yieldValues = yieldOperand.get();
@@ -424,9 +426,9 @@ public:
 /// }
 /// gpu.synchronize
 /// %0 = memref.load %src[%c0] : memref<1024xf32>
-struct WarpOpLoad : public OpRewritePattern<vector::WarpExecuteOnLane0Op> {
-  using OpRewritePattern<vector::WarpExecuteOnLane0Op>::OpRewritePattern;
-  LogicalResult matchAndRewrite(vector::WarpExecuteOnLane0Op warpOp,
+struct WarpOpLoad : public OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
+  using OpRewritePattern<gpu::WarpExecuteOnLane0Op>::OpRewritePattern;
+  LogicalResult matchAndRewrite(gpu::WarpExecuteOnLane0Op warpOp,
                                 PatternRewriter &rewriter) const override {
     OpOperand *operand = getWarpResult(warpOp, llvm::IsaPred<memref::LoadOp>);
     if (!operand)
@@ -474,7 +476,7 @@ struct HoistSharedMemoryAlloc : public OpRewritePattern<memref::AllocOp> {
                                 PatternRewriter &rewriter) const override {
     if (!iree_compiler::hasSharedMemoryAddressSpace(alloc.getType()))
       return failure();
-    auto warpParent = alloc->getParentOfType<vector::WarpExecuteOnLane0Op>();
+    auto warpParent = alloc->getParentOfType<gpu::WarpExecuteOnLane0Op>();
     if (!warpParent)
       return failure();
     alloc->moveBefore(warpParent);
@@ -559,7 +561,7 @@ static void populatePropagateVectorDistribution(Operation *target,
 }
 
 static void warpSyncronizationFn(Location loc, OpBuilder &builder,
-                                 vector::WarpExecuteOnLane0Op warpOp) {
+                                 gpu::WarpExecuteOnLane0Op warpOp) {
   builder.create<gpu::BarrierOp>(loc);
 };
 
@@ -1474,15 +1476,10 @@ transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(
   rewriter.setInsertionPointToStart(&target.getFunctionBody().front());
   Value laneId =
       rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::x);
+  int64_t subgroupSize = getSubgroupSize();
 
   populateGPUDistributionPatterns(patterns);
-  populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
-  populateGPUReductionDistributionPatterns(patterns);
-  // For testing we use subgroup size = 64.
-  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId,
-                                                /*subgroupSize=*/64);
-  populateAMDGPUDistributionPatterns(patterns);
-  populateGPULayoutResolutionDistributionPatterns(patterns);
+  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize);
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultSilenceableFailure(target);
   }
@@ -1548,358 +1545,6 @@ transform_dialect::CreateMatmulMfmaTileSizesOp::apply(
   results.setParams(cast<OpResult>(getResult(0)), paramsArray0);
   results.setParams(cast<OpResult>(getResult(1)), paramsArray0);
   return DiagnosedSilenceableFailure::success();
-}
-
-//===----------------------------------------------------------------------===//
-// SetContractionLayoutAttributes
-//===----------------------------------------------------------------------===//
-
-/// This function creates a modified version of the MFMA layout that allows
-/// for reading more elements from LDS. Specifically, the MFMA layout looks
-/// something like this:
-/// <<[ BATCHY,  LANEX], [2, 16]>, <[ BATCHX,  LANEY,  VECTORX], [8, 4, 4]>>
-/// Here VECTORX specifies how many elements can be read from LDS.
-/// Now, in order to read more elements from LDS, we can modify this layout
-/// while maintaining the overall shape to:
-/// <<[ BATCHY,  LANEX], [2, 16]>, <[ BATCHX,  LANEY,  VECTORX], [4, 4, 8]>>
-/// This is what this function does. In situations where the batch dimension
-/// is too small, or if we are not transferring 4 elements at a time, it
-/// returns nullopt.
-static std::optional<VectorExt::LayoutAttr>
-createReadLayout(MLIRContext *ctx, const VectorExt::LayoutAttr &layout) {
-  SmallVector<VectorExt::PerDimLayoutAttr> perDimLayouts;
-  for (VectorExt::PerDimLayoutAttr perDimLayout : layout.getLayouts()) {
-    DenseSet<VectorExt::LayoutDimension> labels;
-    for (VectorExt::LayoutDimensionAttr dim : perDimLayout.getLabels()) {
-      labels.insert(dim.getValue());
-    }
-    if (!labels.contains(VectorExt::LayoutDimension::VECTORX)) {
-      perDimLayouts.push_back(perDimLayout);
-      continue;
-    }
-    SmallVector<int64_t> newShapes;
-    for (auto [label, shape] :
-         llvm::zip_equal(perDimLayout.getLabels(), perDimLayout.getShapes())) {
-      if (VectorExt::isBatchDimension(label.getValue())) {
-        if (shape == 1)
-          return std::nullopt;
-        newShapes.push_back(shape / 2);
-        continue;
-      }
-      if (label.getValue() == VectorExt::LayoutDimension::VECTORX) {
-        if (shape != 4)
-          return std::nullopt;
-        newShapes.push_back(shape * 2);
-        continue;
-      }
-      newShapes.push_back(shape);
-    }
-    perDimLayouts.push_back(VectorExt::PerDimLayoutAttr::get(
-        ctx, perDimLayout.getLabels(), newShapes));
-  }
-  return VectorExt::LayoutAttr::get(ctx, perDimLayouts);
-}
-
-// Struct containing concrete MMA shape, type, and layout information.
-struct ConcreteMmaLayout {
-  GPU::OpaqueMmaLayout base;
-  VectorExt::PerDimLayoutAttr aMLayout;
-  VectorExt::PerDimLayoutAttr aKLayout;
-  VectorExt::PerDimLayoutAttr bKLayout;
-  VectorExt::PerDimLayoutAttr bNLayout;
-  VectorExt::PerDimLayoutAttr cMLayout;
-  VectorExt::PerDimLayoutAttr cNLayout;
-};
-
-static std::tuple<VectorExt::PerDimLayoutAttr, VectorExt::PerDimLayoutAttr>
-getPerDimLayoutAttrs(MLIRContext *context, TileSwizzle swizzle) {
-  // Step 1: obtain the swizzled tile shape, but keeping track of the source
-  // dimension indices.
-  struct SrcIndexAndSwizzleDim {
-    size_t srcIndex;
-    TileSwizzle::Dim dim;
-  };
-  SmallVector<SrcIndexAndSwizzleDim> swizzledShape;
-  for (auto [i, e] : llvm::enumerate(swizzle.expandShape)) {
-    for (TileSwizzle::Dim d : e) {
-      swizzledShape.push_back(SrcIndexAndSwizzleDim{i, d});
-    }
-  }
-  applyPermutationToVector(swizzledShape, swizzle.permutation);
-
-  // Step 2: collect the appropriate labels to use for the swizzled dims.
-  VectorExt::LayoutDimension internalLabels[] = {
-      VectorExt::LayoutDimension::VECTORZ, VectorExt::LayoutDimension::VECTORY,
-      VectorExt::LayoutDimension::VECTORX};
-  VectorExt::LayoutDimension crossThreadLabels[] = {
-      VectorExt::LayoutDimension::LANEZ, VectorExt::LayoutDimension::LANEY,
-      VectorExt::LayoutDimension::LANEX};
-  auto internalLabelIter = std::end(internalLabels);
-  auto crossThreadLabelIter = std::end(crossThreadLabels);
-  for (SrcIndexAndSwizzleDim d : swizzledShape) {
-    if (d.dim.kind == TileSwizzle::Dim::Kind::Internal) {
-      assert(internalLabelIter != std::begin(internalLabels));
-      --internalLabelIter;
-    } else if (d.dim.kind == TileSwizzle::Dim::Kind::CrossThread) {
-      assert(crossThreadLabelIter != std::begin(crossThreadLabels));
-      --crossThreadLabelIter;
-    } else {
-      assert(false && "unexpected dimension kind in intrinsic swizzle");
-    }
-  }
-
-  // Step 3: put together the result PerDimLayoutAttr'd for the two source dims.
-  SmallVector<VectorExt::LayoutDimensionAttr> labels[2];
-  SmallVector<int64_t> shape[2];
-  for (SrcIndexAndSwizzleDim d : swizzledShape) {
-    shape[d.srcIndex].push_back(d.dim.size);
-    auto &labelIterRef = (d.dim.kind == TileSwizzle::Dim::Kind::Internal)
-                             ? internalLabelIter
-                             : crossThreadLabelIter;
-    labels[d.srcIndex].push_back(VectorExt::LayoutDimensionAttr::get(
-        context, static_cast<VectorExt::LayoutDimension>(*labelIterRef++)));
-  }
-  return {VectorExt::PerDimLayoutAttr::get(context, labels[0], shape[0]),
-          VectorExt::PerDimLayoutAttr::get(context, labels[1], shape[1])};
-};
-
-static ConcreteMmaLayout getConcreteMMALayout(MLIRContext *context,
-                                              GPU::MMAIntrinsic intrinsic) {
-  auto opaque = GPU::getOpaqueMMALayout(context, intrinsic);
-  ConcreteMmaLayout concreteLayout;
-  concreteLayout.base = opaque;
-  auto lhsSwizzle = getIntrinsicSwizzle(intrinsic, GPU::MMAFragment::Lhs);
-  auto rhsSwizzle = getIntrinsicSwizzle(intrinsic, GPU::MMAFragment::Rhs);
-  auto accSwizzle = getIntrinsicSwizzle(intrinsic, GPU::MMAFragment::Acc);
-  std::tie(concreteLayout.aMLayout, concreteLayout.aKLayout) =
-      getPerDimLayoutAttrs(context, lhsSwizzle);
-  std::tie(concreteLayout.bNLayout, concreteLayout.bKLayout) =
-      getPerDimLayoutAttrs(context, rhsSwizzle);
-  std::tie(concreteLayout.cMLayout, concreteLayout.cNLayout) =
-      getPerDimLayoutAttrs(context, accSwizzle);
-  return concreteLayout;
-}
-
-static VectorExt::PerDimLayoutAttr
-getBatchedPerDimLayoutAttr(VectorExt::LayoutDimensionAttr batchDim,
-                           VectorExt::PerDimLayoutAttr baseLayout,
-                           int64_t problemSize, int64_t fragmentDimSize) {
-  assert(problemSize % fragmentDimSize == 0 &&
-         "invalid layout fragment for problem size");
-
-  SmallVector<VectorExt::LayoutDimensionAttr, 3> dimAttrs(
-      baseLayout.getLabels());
-  dimAttrs.insert(dimAttrs.begin(), batchDim);
-
-  SmallVector<int64_t, 3> shapes(baseLayout.getShapes());
-  shapes.insert(shapes.begin(), problemSize / fragmentDimSize);
-  auto layout = VectorExt::PerDimLayoutAttr::get(baseLayout.getContext(),
-                                                 dimAttrs, shapes);
-  return layout;
-}
-
-// Get the batched layout attributes for the given fragment layouts, indexing
-// map, and problem shape. The canonical fragment map is used to compare against
-// the problem map |indexingMap|. For example, for mma fragment B (RHS):
-//
-// indexingMap = affine_map<(d0, d1, d2) -> (d1, d2) # Transposed B
-// fragmentMap = affine_map<(d0, d1, d2) -> (d2, d1)
-// problemShape = [32, 64]
-// fragmentSize = [16, 8]
-// fragmentLayouts = [kLayout, nLayout]
-//
-// Gives batched layout
-//
-// Dim0 Layout = [BATCHX, nLayoutLabels], [8, nLayoutShape]
-// Dim1 Layout = [BATCHY, kLayoutLabels], [2, kLayoutShape]
-static VectorExt::LayoutAttr
-getBatchedLayoutAttr(AffineMap indexingMap, AffineMap fragmentMap,
-                     ArrayRef<int64_t> problemShape,
-                     ArrayRef<int64_t> fragmentSize,
-                     ArrayRef<VectorExt::PerDimLayoutAttr> fragmentLayouts) {
-  // Current distribution to MFMA operations does not support batched
-  // contractions so that is reflected here.
-  assert(indexingMap.getNumResults() == 2 &&
-         "invalid indexing map to non-batched simple contraction");
-
-  VectorExt::LayoutDimensionAttr batchX = VectorExt::LayoutDimensionAttr::get(
-      indexingMap.getContext(), VectorExt::LayoutDimension::BATCHX);
-  VectorExt::LayoutDimensionAttr batchY = VectorExt::LayoutDimensionAttr::get(
-      indexingMap.getContext(), VectorExt::LayoutDimension::BATCHY);
-
-  SmallVector<VectorExt::PerDimLayoutAttr, 2> perDimAttrs;
-  for (auto [expr, batchType] : llvm::zip_equal(
-           indexingMap.getResults(),
-           SmallVector<VectorExt::LayoutDimensionAttr, 2>{batchX, batchY})) {
-    auto maybeResultPosition = fragmentMap.getResultPosition(expr);
-    assert(maybeResultPosition && "fragment map and problem map mismatch");
-    int64_t idx = *maybeResultPosition;
-    perDimAttrs.push_back(getBatchedPerDimLayoutAttr(
-        batchType, fragmentLayouts[idx], problemShape[idx], fragmentSize[idx]));
-  }
-
-  return VectorExt::LayoutAttr::get(indexingMap.getContext(), perDimAttrs);
-}
-
-static FailureOr<std::tuple<VectorLayoutInterface, VectorLayoutInterface,
-                            VectorLayoutInterface>>
-getContractionLayout(vector::ContractionOp contract, ConcreteMmaLayout layout) {
-  MLIRContext *context = contract.getContext();
-  FailureOr<linalg::ContractionDimensions> maybeContractionDims =
-      linalg::inferContractionDims(contract.getIndexingMapsArray());
-  if (failed(maybeContractionDims)) {
-    return failure();
-  }
-  auto contractionDims = *maybeContractionDims;
-  // TODO: Relax this condition to strictly alignment requirements.
-  if (contractionDims.k.size() != 1 || contractionDims.m.size() != 1 ||
-      contractionDims.n.size() != 1) {
-    return failure();
-  }
-  // TODO: Support batched contractions.
-  if (contractionDims.batch.size() > 0) {
-    return failure();
-  }
-  unsigned mDim = contractionDims.m[0];
-  unsigned nDim = contractionDims.n[0];
-  unsigned kDim = contractionDims.k[0];
-
-  SmallVector<int64_t> iterationBounds;
-  contract.getIterationBounds(iterationBounds);
-
-  int64_t problemMSize = iterationBounds[mDim];
-  int64_t problemNSize = iterationBounds[nDim];
-  int64_t problemKSize = iterationBounds[kDim];
-
-  int64_t mSize = layout.base.mSize;
-  int64_t nSize = layout.base.nSize;
-  int64_t kSize = layout.base.kSize;
-
-  // The problem size currently must be strictly aligned to the size of the mma.
-  // This is expected to succeed assuming the correct [masked] vector size was
-  // set at strategy configuration time (for this mma).
-  if (problemMSize % mSize != 0 || problemNSize % nSize ||
-      problemKSize % kSize) {
-    return failure();
-  }
-
-  VectorExt::LayoutAttr aLayout = getBatchedLayoutAttr(
-      contract.getIndexingMapsArray()[0],
-      AffineMap::getMultiDimMapWithTargets(3, {mDim, kDim}, context),
-      {problemMSize, problemKSize}, {mSize, kSize},
-      {layout.aMLayout, layout.aKLayout});
-  VectorExt::LayoutAttr bLayout = getBatchedLayoutAttr(
-      contract.getIndexingMapsArray()[1],
-      AffineMap::getMultiDimMapWithTargets(3, {kDim, nDim}, context),
-      {problemKSize, problemNSize}, {kSize, nSize},
-      {layout.bKLayout, layout.bNLayout});
-  VectorExt::LayoutAttr cLayout = getBatchedLayoutAttr(
-      contract.getIndexingMapsArray()[2],
-      AffineMap::getMultiDimMapWithTargets(3, {mDim, nDim}, context),
-      {problemMSize, problemNSize}, {mSize, nSize},
-      {layout.cMLayout, layout.cNLayout});
-
-  return std::make_tuple<VectorLayoutInterface, VectorLayoutInterface,
-                         VectorLayoutInterface>(aLayout, bLayout, cLayout);
-}
-
-FailureOr<std::tuple<
-    VectorLayoutInterface, VectorLayoutInterface,
-    VectorLayoutInterface>> static getContractionLayout(GPU::MMAAttr mma,
-                                                        vector::ContractionOp
-                                                            contract) {
-  ConcreteMmaLayout layout = getConcreteMMALayout(
-      contract->getContext(), mma.getIntrinsic().getValue());
-  return getContractionLayout(contract, layout);
-}
-
-DiagnosedSilenceableFailure
-transform_dialect::SetContractionLayoutAttributes::apply(
-    transform::TransformRewriter &rewriter,
-    transform::TransformResults &results, transform::TransformState &state) {
-  auto payloadList = state.getPayloadOps(getTarget());
-  auto typeList = state.getParams(getMmaType());
-  if (typeList.size() != 1) {
-    return emitDefiniteFailure()
-           << "invalid more than one attribute for contraction annotation";
-  }
-  auto mmaType = llvm::dyn_cast<GPU::MMAAttr>(typeList.front());
-  if (!mmaType) {
-    return emitDefiniteFailure()
-           << "invalid non-mma attribute for contraction annotation "
-           << typeList.front();
-  }
-
-  for (Operation *payload : payloadList) {
-    auto contract = llvm::dyn_cast<vector::ContractionOp>(payload);
-    if (!contract) {
-      return emitDefiniteFailure()
-             << "invalid non-contraction annotation " << payload;
-    }
-
-    auto maybeLayouts = getContractionLayout(mmaType, contract);
-    if (failed(maybeLayouts)) {
-      return emitDefiniteFailure()
-             << "invalid opaque mma layout for annotation " << mmaType;
-    }
-
-    Location loc = contract.getLoc();
-    auto [aLayout, bLayout, cLayout] = *maybeLayouts;
-
-    // Set packed read layout for specified indices.
-    ArrayRef<int64_t> operandIndices = getReadLayoutIndices();
-    if (!operandIndices.empty()) {
-      SmallVector<Value> operands;
-      SmallVector<VectorExt::VectorLayoutInterface> layouts;
-      for (int64_t index : operandIndices) {
-        operands.push_back(contract.getOperand(index));
-        layouts.push_back(index == 0 ? aLayout : bLayout);
-      }
-      rewriter.setInsertionPoint(contract);
-      for (const auto &idxAndVals :
-           llvm::enumerate(llvm::zip_equal(operands, layouts))) {
-        int64_t i = idxAndVals.index();
-        auto [operand, layoutInterface] = idxAndVals.value();
-        VectorExt::LayoutAttr layout =
-            dyn_cast<VectorExt::LayoutAttr>(layoutInterface);
-        std::optional<VectorExt::LayoutAttr> maybeReadLayout =
-            createReadLayout(rewriter.getContext(), layout);
-        if (!maybeReadLayout)
-          continue;
-        VectorExt::LayoutAttr readLayout = maybeReadLayout.value();
-        Operation *parentOp = operand.getDefiningOp();
-        if (!parentOp || (parentOp->getNumResults() != 1))
-          continue;
-        Value resolvedOperand =
-            rewriter.create<VectorExt::ToLayoutOp>(loc, operand, readLayout);
-        contract.setOperand(operandIndices[i], resolvedOperand);
-      }
-    }
-
-    // Set layout anchors.
-    rewriter.setInsertionPoint(contract);
-    Value newLhs =
-        rewriter.create<VectorExt::ToLayoutOp>(loc, contract.getLhs(), aLayout);
-    Value newRhs =
-        rewriter.create<VectorExt::ToLayoutOp>(loc, contract.getRhs(), bLayout);
-    Value newAcc =
-        rewriter.create<VectorExt::ToLayoutOp>(loc, contract.getAcc(), cLayout);
-    contract.setOperand(0, newLhs);
-    contract.setOperand(1, newRhs);
-    contract.setOperand(2, newAcc);
-
-    // Set intrinsic type.
-    contract->setAttr("iree.amdgpu.mma", mmaType);
-  }
-
-  return DiagnosedSilenceableFailure::success();
-}
-
-void transform_dialect::SetContractionLayoutAttributes::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTargetMutable(), effects);
-  transform::onlyReadsHandle(getMmaTypeMutable(), effects);
-  transform::modifiesPayload(effects);
 }
 
 #define GET_OP_CLASSES

@@ -337,12 +337,6 @@ We group runners into categories:
 * Organization admins can monitor organization runners at
   <https://github.com/organizations/iree-org/settings/actions/runners>.
 
-### Self-hosted runner maintenance
-
-Configuration scripting for runners hosted on Google Cloud Platform (GCP) is
-stored at
-[`./build_tools/github_actions/runner/`](https://github.com/iree-org/iree/tree/main/build_tools/github_actions/runner/).
-
 ## :material-help-box-multiple-outline: Useful resources
 
 Official:

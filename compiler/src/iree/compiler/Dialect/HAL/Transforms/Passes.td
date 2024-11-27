@@ -415,6 +415,15 @@ def TranslateTargetExecutableVariantsPass :
   ];
 }
 
+def HoistExecutableObjectsPass :
+    Pass<"iree-hal-hoist-executable-objects", "IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Hoists local executable object annotations to the parent `hal.executable.variant`.";
+  let description = [{
+    Finds all `hal.executable.objects` attrs on all ops within an executable
+    inner module and moves them to the parent `hal.executable.variant` op.
+  }];
+}
+
 def PruneExecutablesPass :
     Pass<"iree-hal-prune-executables", "mlir::ModuleOp"> {
   let summary = "Prunes executable variants and exports that are not referenced.";

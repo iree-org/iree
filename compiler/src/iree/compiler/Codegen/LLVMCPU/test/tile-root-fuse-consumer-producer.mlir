@@ -117,3 +117,23 @@ func.func @dequant_avgpool(%arg0: tensor<1x320x65x65xi8>) -> tensor<1x320x1x1xf3
 // CHECK-REDUCTION:               }
 // CHECK-REDUCTION:             }
 // CHECK-REDUCTION:           }
+
+// -----
+
+module {
+// Silently bail in the case of no root op.
+  func.func @silently_bail_no_root_op(%arg0: tensor<1x2x1x2xi8>, %arg1: tensor<1x2x4x2xi8>, %arg2: tensor<1x1x1x4xi32>) -> tensor<1x1x1x4xi32> {
+    %c1794_i32 = arith.constant 1794 : i32
+    %c2_i32 = arith.constant 2 : i32
+    %c4_i32 = arith.constant 4 : i32
+    %c1_i32 = arith.constant 1 : i32
+    %c2 = arith.constant 2 : index
+    %c1 = arith.constant 1 : index
+    %c0 = arith.constant 0 : index
+    %0:2 = iree_codegen.ukernel.generic "iree_uk_mmt4d" ins(%arg0, %arg1 : tensor<1x2x1x2xi8>, tensor<1x2x4x2xi8>) outs(%arg2 : tensor<1x1x1x4xi32>) (%c1, %c1, %c2, %c1_i32, %c4_i32, %c2_i32, %c1794_i32 : index, index, index, i32, i32, i32, i32) fn_def_attrs {hal.import.bitcode = true, hal.import.fields = ["processor_data"]} strided_outer_dims(1) -> tensor<1x1x1x4xi32>, i32
+    return %0#0 : tensor<1x1x1x4xi32>
+  }
+}
+
+// CHECK-REDUCTION-LABEL:   func.func @silently_bail_no_root_op(
+// CHECK-REDUCTION-NOT:       scf.for

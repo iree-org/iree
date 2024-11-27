@@ -173,12 +173,13 @@ externalizeExecutableOp(IREE::HAL::ExecutableOp executableOp,
   // objects in case there were any as this does entire executable replacement -
   // there may have been microkernel libraries or something referenced by the
   // existing module.
-  auto dataObjectAttr = builder.getAttr<IREE::HAL::ExecutableObjectAttr>(
-      builder.getStringAttr(llvm::sys::path::filename(filePath)),
-      DenseIntElementsAttr::get(
+  auto dataAttr =
+      cast<IREE::Util::SerializableAttrInterface>(DenseIntElementsAttr::get(
           VectorType::get({static_cast<int64_t>(fileContents->size())},
                           builder.getI8Type()),
           ArrayRef(fileContents->data(), fileContents->size())));
+  auto dataObjectAttr = builder.getAttr<IREE::HAL::ExecutableObjectAttr>(
+      builder.getStringAttr(llvm::sys::path::filename(filePath)), dataAttr);
   variantOp.setObjectsAttr(builder.getArrayAttr({dataObjectAttr}));
 
   // Drop the inner module if present (may already be external).

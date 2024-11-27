@@ -18,6 +18,7 @@ iree_compiler_cc_test(
     deps = [
         "//compiler/src/iree/compiler/Codegen/Common",
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
+        "//compiler/src/iree/testing:gtest_main",
         "@com_google_googletest//:gtest",
     ],
 )

@@ -44,30 +44,11 @@ def DistributeMmaToLanesPass :
   ];
 }
 
-def FuseAndHoistParallelLoopsPass :
-    InterfacePass<"iree-gpu-fuse-and-hoist-parallel-loops", "mlir::FunctionOpInterface"> {
-  let summary = "Greedily fuses and hoists parallel loops.";
-  let dependentDialects = [
-    "::mlir::affine::AffineDialect",
-    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
-    "::mlir::bufferization::BufferizationDialect"
-  ];
-}
-
 def LowerIREEGPUOpsPass :
     InterfacePass<"iree-gpu-lower-ops", "mlir::FunctionOpInterface"> {
   let summary = "Post bufferization lowerings of iree_gpu ops before late lowerings";
   let dependentDialects = [
     "::mlir::gpu::GPUDialect",
-  ];
-}
-
-def PackToIntrinsicsPass :
-    InterfacePass<"iree-gpu-pack-to-intrinsics", "mlir::FunctionOpInterface"> {
-  let summary = "Packs matmul like operations and converts to iree_gpu.multi_mma";
-  let dependentDialects = [
-    "::mlir::tensor::TensorDialect",
-    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
 }
 

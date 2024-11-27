@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
@@ -40,6 +41,9 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_GPUMATERIALIZEDEVICEENCODINGPASS
 #define GEN_PASS_DEF_GPUMATERIALIZEHOSTENCODINGPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
+
+using IREE::Codegen::MaterializeEncodingInfo;
+using IREE::Codegen::TileSwizzle;
 
 static IREE::GPU::MMAAttr chooseIntrinsicMMAAttr(TypeRange eTypes,
                                                  IREE::GPU::TargetWgpAttr wgp) {

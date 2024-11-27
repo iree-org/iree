@@ -48,6 +48,7 @@ iree_lit_test_suite(
     "iree_comprehensive_bufferize.mlir"
     "iree_expand_strided_metadata.mlir"
     "iree_loop_invariant_code_motion.mlir"
+    "link_tuning_specs.mlir"
     "lower_ukernel_to_calls.mlir"
     "materialize_encoding_into_nop.mlir"
     "materialize_user_configs.mlir"
@@ -82,6 +83,7 @@ iree_lit_test_suite(
     "vector_layout_analysis.mlir"
     "vectorize_memref_copy.mlir"
     "vectorize_tensor_pad.mlir"
+    "verify_workgroup_distribution.mlir"
   TOOLS
     FileCheck
     iree-opt

@@ -1226,6 +1226,10 @@ static ElementsAttr tensorSlice(ElementsAttr tensor, uint64_t dim,
 
 OpFoldResult TensorSliceOp::fold(FoldAdaptor operands) {
   if (llvm::count(operands.getOperands(), nullptr) == 0) {
+    // Ignore DenseResources for now and do not perfom folding on them.
+    if (isa<DenseResourceElementsAttr>(operands.getSource())) {
+      return {};
+    }
     // Fully constant arguments so we can perform the slice here.
     auto tensor = llvm::cast<ElementsAttr>(operands.getSource());
     int64_t rank = llvm::cast<ShapedType>(getSource().getType()).getRank();

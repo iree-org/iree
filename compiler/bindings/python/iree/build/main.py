@@ -37,6 +37,7 @@ def iree_build_main(
     add a stanza at the end:
 
     .. code-block:: python
+
         from iree.build import *
 
         if __name__ == "__main__":

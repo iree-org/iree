@@ -114,6 +114,7 @@ iree_cc_library(
     "IREEExpandStridedMetadata.cpp"
     "IREELoopInvariantCodeMotion.cpp"
     "InstrumentMemoryAccesses.cpp"
+    "LinkTuningSpecsPass.cpp"
     "LowerExecutableUsingTransformDialect.cpp"
     "LowerUKernelsToCalls.cpp"
     "MaterializeEncodingIntoNop.cpp"
@@ -146,6 +147,7 @@ iree_cc_library(
     "UnrollAnnotatedLoops.cpp"
     "UserConfig.cpp"
     "VectorizeMemrefCopy.cpp"
+    "VerifyWorkgroupDistribution.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
@@ -198,8 +200,8 @@ iree_cc_library(
     MLIRVectorTransforms
     MLIRViewLikeInterface
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
-    iree::compiler::Codegen::Common::TileSwizzle
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::Utils
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
@@ -214,18 +216,6 @@ iree_cc_library(
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    TileSwizzle
-  HDRS
-    "TileSwizzle.h"
-  SRCS
-    "TileSwizzle.cpp"
-  DEPS
-    LLVMSupport
   PUBLIC
 )
 

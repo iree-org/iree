@@ -1,16 +1,19 @@
-sphinx==4.2.0
-myst-parser==0.15.2  # For markdown
-sphinx_rtd_theme==1.0.0
+# Sphinx documentation generator.
 commonmark==0.9.1
-enum_tools==0.10.0
-sphinx_toolbox==2.16.1
+enum-tools==0.10.0
+myst-parser==0.15.2  # For markdown
+sphinx==4.2.0
+sphinx-rtd-theme==1.0.0
+sphinx-autobuild
+sphinx-toolbox==2.16.1
 sphinxcontrib-applehelp==1.0.4
 sphinxcontrib-devhelp==1.0.2
 sphinxcontrib-htmlhelp==2.0.1
 sphinxcontrib-serializinghtml==1.1.5
 sphinxcontrib-qthelp==1.0.3
 
-# IREE Python API
--f https://iree.dev/pip-release-links.html
+# IREE Python API (using the latest pre-release / nightly packages).
+--find-links https://iree.dev/pip-release-links.html
+--pre
 iree-base-compiler
 iree-base-runtime

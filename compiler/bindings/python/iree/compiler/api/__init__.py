@@ -7,7 +7,7 @@
 """Compiler invocation API.
 
 This package defines Python API wrappers around the IREE compiler C embedding
-API. Refer to the C documentation in bindings/c/iree/compiler/embedding_api.h
+API. Refer to the C documentation in `bindings/c/iree/compiler/embedding_api.h`
 for the most up to date information.
 
 The objects in the C API are represented in Python as classes:
@@ -18,8 +18,8 @@ The objects in the C API are represented in Python as classes:
 * `iree_compiler_source_t`: `Source` class.
 * `iree_compiler_output_t`: `Output` class.
 
-In MLIR parlance, the `Session` wraps an MLIRContext with a set of flags for
-configuring the compiler and context setup. `Invocation` wraps a Module in
+In MLIR parlance, the `Session` wraps an `MLIRContext` with a set of flags for
+configuring the compiler and context setup. `Invocation` wraps a `Module` in
 the process of being compiled.
 """
 

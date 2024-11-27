@@ -46,6 +46,8 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
+using ::mlir::iree_compiler::IREE::Codegen::TileSwizzle;
+
 //===----------------------------------------------------------------------===//
 // MMA intrinsics semantics: shapes, layouts, operand element types.
 //===----------------------------------------------------------------------===//
@@ -647,21 +649,16 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
         getSubgroupSize() / intrinsicLayoutThreadBound);
   }
 
-  // AffineDelinearizeIndexOp requires an in-bounds input index, so we bound it.
-  OpFoldResult threadIdBound =
-      builder.getIndexAttr(ShapedType::getNumElements(distributionThreadSizes));
-  AffineExpr d0 = builder.getAffineDimExpr(0), d1 = builder.getAffineDimExpr(1);
-  OpFoldResult boundedThreadId = affine::makeComposedFoldedAffineApply(
-      builder, loc, {d0 % d1}, {threadId, threadIdBound});
-
   // Obtain the offsets from delinearization along the distributionThreadSizes.
+  // Use a delinearize without outer bound and throw away its initial result
+  // to get clamping behavior.
   SmallVector<OpFoldResult> tileOffsets =
       builder
           .create<affine::AffineDelinearizeIndexOp>(
-              loc,
-              getValueOrCreateConstantIndexOp(builder, loc, boundedThreadId),
-              getAsIndexOpFoldResult(ctx, distributionThreadSizes))
-          ->getResults();
+              loc, getValueOrCreateConstantIndexOp(builder, loc, threadId),
+              distributionThreadSizes, /*hasOuterBound=*/false)
+          ->getResults()
+          .drop_front();
 
   if (hasDistributionOnlyDim) {
     // Erase the delinearized index that corresponds to the extra distribution
@@ -1170,76 +1167,6 @@ bool LoweringConfigAttr::hasTilingLevel(unsigned level) const {
 
 bool LoweringConfigAttr::hasWorkgroupTilingLevel() const {
   return !getWorkgroupTileSizes().empty();
-}
-
-constexpr StringLiteral kMmaKindName = "mma_kind";
-
-IREE::GPU::MmaInterfaceAttr LoweringConfigAttr::getMmaKind() const {
-  return getAttributes().getAs<IREE::GPU::MmaInterfaceAttr>(kMmaKindName);
-}
-
-void LoweringConfigAttr::setMmaKind(MLIRContext *context,
-                                    SmallVectorImpl<NamedAttribute> &attrs,
-                                    IREE::GPU::MmaInterfaceAttr kind) {
-  attrs.emplace_back(StringAttr::get(context, kMmaKindName), kind);
-}
-
-// TODO: Merge subgroup counts functionality into subgroup tiling level
-//       lowering, when we have it implemented.
-constexpr StringLiteral kSubgroupMCountName = "subgroup_m_count";
-constexpr StringLiteral kSubgroupNCountName = "subgroup_n_count";
-
-std::optional<int64_t> LoweringConfigAttr::getSubgroupMCount() const {
-  auto subgroup_m_count_attr =
-      getAttributes().getAs<IntegerAttr>(kSubgroupMCountName);
-  if (!subgroup_m_count_attr) {
-    return std::nullopt;
-  }
-  return subgroup_m_count_attr.getInt();
-}
-
-std::optional<int64_t> LoweringConfigAttr::getSubgroupNCount() const {
-  auto subgroup_n_count_attr =
-      getAttributes().getAs<IntegerAttr>(kSubgroupNCountName);
-  if (!subgroup_n_count_attr) {
-    return std::nullopt;
-  }
-  return subgroup_n_count_attr.getInt();
-}
-
-void LoweringConfigAttr::setSubgroupMCount(
-    MLIRContext *context, SmallVectorImpl<NamedAttribute> &attrs,
-    int64_t subgroup_m_count) {
-  attrs.emplace_back(
-      StringAttr::get(context, kSubgroupMCountName),
-      IntegerAttr::get(IntegerType::get(context, 64), subgroup_m_count));
-}
-
-void LoweringConfigAttr::setSubgroupNCount(
-    MLIRContext *context, SmallVectorImpl<NamedAttribute> &attrs,
-    int64_t subgroup_n_count) {
-  attrs.emplace_back(
-      StringAttr::get(context, kSubgroupNCountName),
-      IntegerAttr::get(IntegerType::get(context, 64), subgroup_n_count));
-}
-
-constexpr StringLiteral kPromoteOperandsName = "promote_operands";
-
-std::optional<SmallVector<int64_t>>
-LoweringConfigAttr::getPromotedOperandList() const {
-  auto array = getAttributes().getAs<ArrayAttr>(kPromoteOperandsName);
-  if (!array) {
-    return std::nullopt;
-  }
-  return getIntegerVector(array);
-}
-
-void LoweringConfigAttr::setPromotedOperandList(
-    MLIRContext *context, SmallVectorImpl<NamedAttribute> &attrs,
-    ArrayRef<int64_t> operands) {
-  Builder b(context);
-  attrs.emplace_back(StringAttr::get(context, kPromoteOperandsName),
-                     b.getI64ArrayAttr(operands));
 }
 
 //===----------------------------------------------------------------------===//

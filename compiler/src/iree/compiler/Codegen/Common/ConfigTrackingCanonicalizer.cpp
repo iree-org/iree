@@ -91,13 +91,15 @@ public:
 
   void runOnOperation() override {
     // Canonicalization is best-effort. Non-convergence is not a pass failure.
-    auto listener = ConfigTrackingListener();
-    config.listener = &listener;
-    LogicalResult didConverge =
-        applyPatternsAndFoldGreedily(getOperation(), *patterns, config);
-    if (this->testConvergence && failed(didConverge)) {
-      getOperation()->emitError("Canonicalizer failed to converge");
-      return signalPassFailure();
+    ConfigTrackingListener listener;
+    {
+      config.listener = &listener;
+      LogicalResult didConverge =
+          applyPatternsAndFoldGreedily(getOperation(), *patterns, config);
+      if (this->testConvergence && failed(didConverge)) {
+        getOperation()->emitError("Canonicalizer failed to converge");
+        return signalPassFailure();
+      }
     }
   }
   GreedyRewriteConfig config;

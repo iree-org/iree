@@ -21,6 +21,33 @@ static const char *kGpuModuleImportPath =
 namespace py = pybind11;
 using namespace mlir::python::adaptors;
 
+static std::vector<MlirOperation>
+ireeCodegenGetExecutableVariantOpsBinding(MlirModule module) {
+  size_t numOps = 0;
+  ireeCodegenGetExecutableVariantOps(module, &numOps, nullptr);
+  std::vector<MlirOperation> ops(numOps);
+  ireeCodegenGetExecutableVariantOps(module, &numOps, ops.data());
+
+  return ops;
+}
+
+static std::vector<py::object>
+ireeCodegenQueryMMAIntrinsicsBinding(MlirOperation op) {
+  size_t numMMAs = 0;
+  ireeCodegenQueryMMAIntrinsics(op, &numMMAs, nullptr);
+  std::vector<uint32_t> mmaIntrinsics(numMMAs);
+  ireeCodegenQueryMMAIntrinsics(op, &numMMAs, mmaIntrinsics.data());
+
+  py::object mmaIntrinsicEnum =
+      py::module_::import(kGpuModuleImportPath).attr("MMAIntrinsic");
+  std::vector<py::object> mmaList(numMMAs);
+  for (size_t i = 0; i < numMMAs; ++i) {
+    mmaList[i] = mmaIntrinsicEnum(mmaIntrinsics[i]);
+  }
+
+  return mmaList;
+}
+
 PYBIND11_MODULE(_ireeCompilerDialects, m) {
   m.doc() = "iree-compiler dialects python extension";
 
@@ -326,4 +353,22 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
           "Gets an #iree_gpu.lowering_config from parameters.")
       .def_property_readonly("attributes",
                              ireeGPULoweringConfigAttrGetAttributes);
+
+  //===-------------------------------------------------------------------===//
+  // Binding to utility function getExecutableVariantOps
+  //===-------------------------------------------------------------------===//
+
+  iree_codegen_module.def(
+      "get_executable_variant_ops", &ireeCodegenGetExecutableVariantOpsBinding,
+      "Gets the executable variant operations from a module.",
+      py::arg("module"));
+
+  //===-------------------------------------------------------------------===//
+  // Binding to utility function queryMMAIntrinsics
+  //===-------------------------------------------------------------------===//
+
+  iree_codegen_module.def(
+      "query_mma_intrinsics", &ireeCodegenQueryMMAIntrinsicsBinding,
+      "Queries the MMA intrinsics from an executable variant op.",
+      py::arg("op"));
 }

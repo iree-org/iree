@@ -243,23 +243,23 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   FailureOr<Operation *> rootOp = getRootOperation(computeOps);
 
-  if (failed(rootOp)) {
-    funcOp.emitError() << "not able to find the root operation\n";
-    return signalPassFailure();
+  if (failed(rootOp) || !rootOp.value()) {
+    LLVM_DEBUG(llvm::dbgs() << "unable to find the root operation\n");
+    return;
   }
 
   IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
       getLoweringConfig(rootOp.value());
+
   if (!loweringConfig) {
-    funcOp.emitError() << "not able to find the lowering config\n";
-    return signalPassFailure();
+    LLVM_DEBUG(llvm::dbgs() << "unable to find the attached lowering config\n");
+    return;
   }
 
   if (!loweringConfig.hasTilingLevel(tilingLevel)) {
-    funcOp.emitError()
-        << "not able to find the lowering config with the tiling level "
-        << tilingLevel.getValue() << "\n";
-    return signalPassFailure();
+    LLVM_DEBUG(llvm::dbgs()
+               << "unable to find the lowering config with the tiling level\n");
+    return;
   }
 
   if (failed(tileRootAndFuse(

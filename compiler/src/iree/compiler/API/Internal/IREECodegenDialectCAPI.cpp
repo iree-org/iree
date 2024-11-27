@@ -10,6 +10,7 @@
 #include <type_traits>
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/dialects/iree_codegen.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/IR.h"
@@ -24,6 +25,8 @@ using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipeline;
 using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipelineAttr;
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttrInterface;
 using mlir::iree_compiler::IREE::Codegen::TranslationInfoAttr;
+using mlir::iree_compiler::IREE::GPU::MMAIntrinsic;
+using mlir::iree_compiler::IREE::HAL::ExecutableVariantOp;
 
 bool ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr(
     MlirAttribute attr) {
@@ -148,4 +151,50 @@ ireeCodegenCompilationInfoAttrGetParameters(MlirAttribute attr) {
   parameters.loweringConfig = wrap(compilationInfo.getLoweringConfig());
   parameters.translationInfo = wrap(compilationInfo.getTranslationInfo());
   return parameters;
+}
+
+void ireeCodegenGetExecutableVariantOps(MlirModule module, size_t *numOps,
+                                        MlirOperation *executableOps) {
+  assert(!mlirModuleIsNull(module) && "module cannot be nullptr");
+  assert(numOps && "numOps cannot be nullptr");
+
+  mlir::ModuleOp moduleOp = unwrap(module);
+  llvm::SmallVector<ExecutableVariantOp> executableVariantOps =
+      mlir::iree_compiler::getExecutableVariantOps(moduleOp);
+
+  if (!executableOps) {
+    *numOps = executableVariantOps.size();
+    return;
+  }
+
+  assert(
+      *numOps == executableVariantOps.size() &&
+      "*numOps must match the number of elements in the executableVariantOps");
+
+  for (size_t i = 0, e = executableVariantOps.size(); i < e; ++i) {
+    executableOps[i] = wrap(executableVariantOps[i]);
+  }
+}
+
+void ireeCodegenQueryMMAIntrinsics(MlirOperation op, size_t *numIntrinsics,
+                                   uint32_t *mmaIntrinsics) {
+  assert(numIntrinsics && "numIntrinsics cannot be nullptr");
+
+  mlir::Operation *mlirOp = unwrap(op);
+  auto variantOp = llvm::dyn_cast_if_present<ExecutableVariantOp>(mlirOp);
+  assert(variantOp && "operation is not a ExecutableVariantOp");
+
+  llvm::SmallVector<MMAIntrinsic> intrinsics =
+      mlir::iree_compiler::queryMMAIntrinsics(variantOp);
+  if (!mmaIntrinsics) {
+    *numIntrinsics = intrinsics.size();
+    return;
+  }
+
+  assert(*numIntrinsics == intrinsics.size() &&
+         "*numIntrinsics must match the number of elements in the intrinsics");
+
+  for (size_t i = 0, e = intrinsics.size(); i < e; ++i) {
+    mmaIntrinsics[i] = static_cast<uint32_t>(intrinsics[i]);
+  }
 }

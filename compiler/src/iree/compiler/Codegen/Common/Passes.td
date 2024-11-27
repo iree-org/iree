@@ -406,6 +406,21 @@ def InstrumentMemoryAccessesPass :
   let summary = "Instruments memory reads and writes for address tracking when dispatch instrumentation is enabled.";
 }
 
+def LinkTuningSpecsPass : Pass<"iree-codegen-link-tuning-specs", "ModuleOp"> {
+  let summary =
+      "Link nested transform dialect tuning specs named sequences into a single entry point";
+  let description = [{
+    Given a module with multiple nested tuning specs, introduce a new named sequence
+    that includes all the other tuning spec entry points. The order of inclusion is the same
+    as the in which these nested tuning specs appear in the IR.
+
+    A tuning spec entry point is a `transform.named_sequence` op annotated with the
+    `iree_codegen.tuning_spec` unit attribute. We require it to perform in-place op
+    modification and not consume the handle.
+  }];
+  let dependentDialects = ["transform::TransformDialect"];
+}
+
 def LowerExecutableUsingTransformDialectPass :
     Pass<"iree-codegen-lower-executable-using-transform-dialect", "ModuleOp"> {
   let summary = "Lower executables using the transform dialect recipe provided in the module.";
@@ -631,6 +646,17 @@ def UnrollAnnotatedLoopsPass :
 def VectorizeMemrefCopyPass :
     Pass<"iree-codegen-vectorize-memref-copy", ""> {
   let summary = "Vectorizes memref copy operations.";
+}
+
+def VerifyWorkgroupDistributionPass :
+    InterfacePass<"iree-codegen-verify-workgroup-distribution", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to verify proper distribution to workgroups.";
+  let description = [{
+    Pass to verify that all writes to global memory are explicitly mapped to
+    workgroups. This means that in cases where we use loops (scf.forall) to
+    manage distribution to workgroups, we require that all ops with write
+    side effects are contained within a workgroup distributed loop.
+  }];
 }
 
 #endif // IREE_CODEGEN_COMMON_PASSES

@@ -471,13 +471,21 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // TODO(benvanik): move translation down to here.
 
   // After all executables are translated and before resolving export
-  // ordinals, we allow the backends to link executables together. For
+  // ordinals we allow the backends to link executables together. For
   // example, the LLVM AOT backend may combine all executable targets for the
   // same architecture into a single executable and link it as a shared
   // library.
   if (transformOptions.linkExecutables) {
     passManager.addPass(IREE::HAL::createLinkExecutablesPass({targetRegistry}));
   }
+
+  // If any executable variants have external objects referenced within them
+  // we hoist them up to the top-level variant. This is done after linking so
+  // that we have the greatest chance of combining executables without different
+  // object attrs preventing the merging.
+  passManager.nest<IREE::HAL::ExecutableOp>()
+      .addNestedPass<IREE::HAL::ExecutableVariantOp>(
+          IREE::HAL::createHoistExecutableObjectsPass());
 
   // Resolve export ordinals from nested symbol references prior to
   // serialization. As this pass creates lookup ops it should run before

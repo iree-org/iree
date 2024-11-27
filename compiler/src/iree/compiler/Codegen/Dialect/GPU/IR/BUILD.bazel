@@ -48,6 +48,7 @@ iree_compiler_cc_library(
     name = "IREEGPUDialect",
     srcs = [
         "DerivedConfigUtils.cpp",
+        "GPULoweringConfigUtils.cpp",
         "GPUTileSwizzleUtils.cpp",
         "IREEGPUAttrs.cpp",
         "IREEGPUDialect.cpp",
@@ -57,6 +58,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "DerivedConfigUtils.h",
+        "GPULoweringConfigUtils.h",
         "GPUTileSwizzleUtils.h",
         "IREEGPUAttrs.h",
         "IREEGPUDialect.h",
@@ -83,8 +85,8 @@ iree_compiler_cc_library(
         ":IREEGPUInterfaces",
         ":IREEGPUOpsGen",
         "//compiler/bindings/c:headers",
-        "//compiler/src/iree/compiler/Codegen/Common:TileSwizzle",
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/Utils",
         "//compiler/src/iree/compiler/Codegen/Dialect/VectorExt/IR:IREEVectorExtDialect",
         "//compiler/src/iree/compiler/Codegen/Utils:VectorOpUtils",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",

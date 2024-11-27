@@ -340,7 +340,7 @@ def Stream_ResourceLoadOp : Stream_Op<"resource.load", [
     Stream_Offset:$source_offset
   );
   let results = (outs
-    AnyTypeOf<[Stream_PrimitiveType, AnyVector]>:$result
+    AnyTypeOf<[Stream_PrimitiveType, AnyVectorOfNonZeroRank]>:$result
   );
 
   let assemblyFormat = [{
@@ -375,7 +375,7 @@ def Stream_ResourceStoreOp : Stream_Op<"resource.store", [
     Stream_StagingResource:$target,
     Stream_Size:$target_size,
     Stream_Offset:$target_offset,
-    AnyTypeOf<[Stream_PrimitiveType, AnyVector]>:$value
+    AnyTypeOf<[Stream_PrimitiveType, AnyVectorOfNonZeroRank]>:$value
   );
 
   let assemblyFormat = [{
@@ -1626,7 +1626,7 @@ def Stream_TensorLoadOp : Stream_PureOp<"tensor.load", [
     Variadic<Stream_Dim>:$indices
   );
   let results = (outs
-    AnyTypeOf<[Stream_PrimitiveType, AnyVector]>:$result
+    AnyTypeOf<[Stream_PrimitiveType, AnyVectorOfNonZeroRank]>:$result
   );
 
   let assemblyFormat = [{
@@ -1674,7 +1674,7 @@ def Stream_TensorStoreOp : Stream_PureOp<"tensor.store", [
     Stream_ShapeDynamicDims:$target_encoding_dims,
     Stream_Size:$target_size,
     Variadic<Stream_Dim>:$indices,
-    AnyTypeOf<[Stream_PrimitiveType, AnyVector]>:$value
+    AnyTypeOf<[Stream_PrimitiveType, AnyVectorOfNonZeroRank]>:$value
   );
   let results = (outs
     Stream_StagingResource:$result
@@ -2289,7 +2289,7 @@ def Stream_AsyncLoadOp : Stream_PureOp<"async.load", [
     Stream_Offset:$source_offset
   );
   let results = (outs
-    AnyTypeOf<[Stream_PrimitiveType, AnyVector]>:$result
+    AnyTypeOf<[Stream_PrimitiveType, AnyVectorOfNonZeroRank]>:$result
   );
 
   let assemblyFormat = [{
@@ -2330,7 +2330,7 @@ def Stream_AsyncStoreOp : Stream_PureOp<"async.store", [
     Stream_StagingResource:$target,
     Stream_Size:$target_size,
     Stream_Offset:$target_offset,
-    AnyTypeOf<[Stream_PrimitiveType, AnyVector]>:$value
+    AnyTypeOf<[Stream_PrimitiveType, AnyVectorOfNonZeroRank]>:$value
   );
   let results = (outs
     Stream_StagingResource:$result
