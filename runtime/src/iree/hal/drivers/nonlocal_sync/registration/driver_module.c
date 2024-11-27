@@ -11,7 +11,7 @@
 
 #include "iree/base/api.h"
 #include "driver.h"
-#include "iree/hal/local/loaders/registration/init.h"
+#include "embedded_elf_loader.h"
 #include "iree/hal/local/plugins/registration/init.h"
 
 static iree_status_t iree_hal_nonlocal_sync_driver_factory_enumerate(
@@ -44,8 +44,7 @@ static iree_status_t iree_hal_nonlocal_sync_driver_factory_try_create(
       host_allocator, &plugin_manager);
 
   iree_hal_executable_loader_t* loader = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_create_executable_loader_by_name(
-      iree_make_cstring_view("embedded-elf"), plugin_manager,
+  IREE_RETURN_IF_ERROR(iree_hal_nonlocal_embedded_elf_loader_create(plugin_manager,
       host_allocator, &loader));
 
   if (iree_status_is_ok(status)) {
