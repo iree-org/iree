@@ -59,8 +59,14 @@ def parse_arguments():
     )
     # TODO(scotttodd): choice between manual or script (`git bisect run`) to use
     #                  note that a "manual" mode would need developers to run
-    #   1. `setup_venv_for_ref.py $(git rev-parse BISECT_HEAD)`
-    #   2. `source $WORKDIR/$(git rev-parse BISECT_HEAD)/.venv/bin/activate`
+    #   ```bash
+    #   REF_HASH=$(git rev-parse BISECT_HEAD)
+    #   python3.11 setup_venv.py \
+    #     $WORKDIR/$REF_HASH/.venv \
+    #     --artifact-path=$WORKDIR/$REF_HASH \
+    #     --fetch-git-ref=$REF_HASH
+    #   source $WORKDIR/$REF_HASH/.venv/bin/activate
+    #   ```
     parser.add_argument(
         "--test-script",
         help="The script to run at each commit",
