@@ -63,12 +63,12 @@ private:
   const MaterializeEncodingFn materializeEncodingFn;
   const IREE::HAL::ExecutableTargetAttr targetAttr;
   bool transposeNarrowN = false;
-  // The `layoutAttr` implements the logics of encoding materialization. It has
-  // a higher priority when it presents.
-  // TODO(hanchung): Move the logics that take `targetAttr` and
-  // `transposeNarrowN` into accounts to their own attribute implementation. It
-  // is in a transition state, so we have two path atm. We're incrementally
-  // moving the logics to attributes.
+  // The `layoutAttr` implements the logic of encoding materialization. It has
+  // a higher priority when it is present.
+  // TODO(hanchung): Move the logic that takes `targetAttr` and
+  // `transposeNarrowN` into account to their own attribute implementation. It
+  // is in a transition state, so we have two paths atm. We're incrementally
+  // moving the logic to attributes.
   const IREE::Codegen::LayoutAttrInterface layoutAttr;
 };
 
@@ -111,26 +111,14 @@ getEncodingInfoForMatmul(IREE::Encoding::EncodingAttr encoding, int64_t rank,
                          TileMxNxK tileMxNxK);
 
 /// Utility method to convert from `set_encoding` op to `pack` operation.
-/// Note that `source` could be returned when the pack op is a nop. Because
-/// creating a new operation is not cheap.
-/// TODO(hanchung): Move the utility to
-/// `Dialect/Codegen/Utils/LayoutUtils.[h|cpp]`. It is not moved because it
-/// needs some cleanup for the c++ file. E.g., the method will no longer take
-/// the type converter into account. Ideally we should move CPU specific
-/// patterns (e.g., lowerContractionOpWithEncoding, etc) to their LayoutAttr
-/// implementation; move general patterns to the utilitiy files, and retire this
-/// file.
+/// NOTE: `source` could be returned when packing is not needed.
 FailureOr<Value> lowerSetEncodingOpToPackOp(
     RewriterBase &rewriter, IREE::Encoding::SetEncodingOp encodingOp,
     Value source, const MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn);
 
 /// Utility method to convert from `unset_encoding` op to `unpack` operation.
-/// Note that `packedValue` could be returned when the unpack op is a nop.
-/// Because creating a new operation is not cheap.
-/// TODO(hanchung): Move the implementation to
-/// `Dialect/Codegen/Utils/LayoutUtils.[h|cpp]`. See the reason in the function
-/// comment of lowerSetEncodingToPackOp method.
+/// NOTE: `packedValue` could be returned when unpacking is not needed.
 FailureOr<Value> lowerUnsetEncodingToUnpackOp(
     RewriterBase &rewriter, IREE::Encoding::UnsetEncodingOp encodingOp,
     Value packedValue, const MaterializeEncodingTypeConverter &typeConverter,
