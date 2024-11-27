@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -67,6 +68,65 @@ struct ConvertHalInterfaceBindingSubspan final
     LLVM_DEBUG(llvm::dbgs()
                << "WideIntegerEmulation: new op: " << newOp << "\n");
     (void)newOp;
+    return success();
+  }
+};
+
+/// Rewrite away assumptions on integers. If the input to the operation is the
+/// result of an extui (so usually it's an i32 that's been extended to an i64)
+/// we port the assumptions over to the underlying 32-bit value. Otherwise, if
+/// there's a type conversion, we drop the assumptions.
+struct ConvertUtilAssumeIntOp final
+    : OpConversionPattern<IREE::Util::AssumeIntOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::Util::AssumeIntOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Value> replacements;
+    SmallVector<Value> newArgs;
+    SmallVector<ArrayAttr> newAssumptions;
+    for (auto [result, oldArg, newArg, assumeList] :
+         llvm::zip_equal(op.getResults(), op.getOperands(),
+                         adaptor.getOperands(), op.getAssumptions())) {
+      if (auto isExt = oldArg.getDefiningOp<arith::ExtUIOp>()) {
+        Value smallerOp = rewriter.getRemappedValue(isExt.getIn());
+        newArgs.push_back(smallerOp);
+        newAssumptions.push_back(cast<ArrayAttr>(assumeList));
+        replacements.push_back(nullptr);
+      } else if (oldArg.getType() == newArg.getType()) {
+        newArgs.push_back(newArg);
+        newAssumptions.push_back(cast<ArrayAttr>(assumeList));
+        replacements.push_back(nullptr);
+      } else {
+        replacements.push_back(newArg);
+      }
+    }
+
+    if (!newArgs.empty()) {
+      auto newOp = rewriter.create<IREE::Util::AssumeIntOp>(
+          op.getLoc(), newArgs, newAssumptions);
+      LLVM_DEBUG(llvm::dbgs()
+                 << "WideIntegerEmulation: new op: " << newOp << "\n");
+
+      unsigned replacementLoc = 0;
+      for (auto result : newOp.getResults()) {
+        while (replacements[replacementLoc] != nullptr)
+          replacementLoc++;
+        Value replacement = result;
+        Type newType = getTypeConverter()->convertType(
+            op.getResult(replacementLoc).getType());
+        if (auto vecType = dyn_cast_if_present<VectorType>(newType)) {
+          Value zeros = rewriter.create<arith::ConstantOp>(
+              op.getLoc(), newType, rewriter.getZeroAttr(newType));
+          replacement = rewriter.create<vector::InsertOp>(
+              op.getLoc(), result, zeros, ArrayRef<int64_t>{0});
+        }
+        replacements[replacementLoc] = replacement;
+      }
+    }
+
+    rewriter.replaceOp(op, replacements);
     return success();
   }
 };
@@ -150,8 +210,8 @@ struct FlattenElementwisePattern final : RewritePattern {
 static void
 populateIreeI64EmulationPatterns(arith::WideIntEmulationConverter &converter,
                                  RewritePatternSet &patterns) {
-  patterns.add<ConvertHalInterfaceBindingSubspan>(converter,
-                                                  patterns.getContext());
+  patterns.add<ConvertHalInterfaceBindingSubspan, ConvertUtilAssumeIntOp>(
+      converter, patterns.getContext());
 }
 
 static bool supportsI64(FunctionOpInterface op) {
@@ -190,13 +250,13 @@ struct SPIRVEmulateI64Pass final
       });
       target.addDynamicallyLegalDialect<
           arith::ArithDialect, func::FuncDialect, IREE::HAL::HALDialect,
-          memref::MemRefDialect, vector::VectorDialect>(
-          [&typeConverter](Operation *op) {
-            bool legal = typeConverter.isLegal(op);
-            LLVM_DEBUG(if (!legal) llvm::dbgs()
-                       << "WideIntegerEmulation: illegal op: " << *op << "\n");
-            return legal;
-          });
+          memref::MemRefDialect, vector::VectorDialect,
+          IREE::Util::UtilDialect>([&typeConverter](Operation *op) {
+        bool legal = typeConverter.isLegal(op);
+        LLVM_DEBUG(if (!legal) llvm::dbgs()
+                   << "WideIntegerEmulation: illegal op: " << *op << "\n");
+        return legal;
+      });
 
       RewritePatternSet patterns(ctx);
       arith::populateArithWideIntEmulationPatterns(typeConverter, patterns);
