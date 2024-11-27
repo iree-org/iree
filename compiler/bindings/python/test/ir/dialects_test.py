@@ -232,3 +232,11 @@ def compilation_info():
     assert compilation_info is not None
     assert compilation_info.lowering_config == lowering_config
     assert compilation_info.translation_info == translation_info
+
+
+@run
+def enum_collision():
+    from iree.compiler.dialects import linalg, vector
+
+    linalg_iter_type_e = linalg._iteratortype(0, None)
+    vector_iter_type_e = vector._vector_iteratortype(0, None)
