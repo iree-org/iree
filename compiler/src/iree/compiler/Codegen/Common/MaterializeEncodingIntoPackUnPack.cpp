@@ -734,10 +734,7 @@ public:
 
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         this->getTypeConverter());
-    // The `converter->getEncodingInfo` function is a const member function. The
-    // wrapper gets rid of the calling error "Reference to non-static member
-    // function must be called".
-    // XXX(hanchung): This is a transition state for moving the implementation
+    // TODO(hanchung): This is a transition state for moving the implementation
     // details to backend attributes. We won't need the function type argument
     // after all the backends that support encodings implement the attribute.
     auto getEncodingInfoWrapper =
