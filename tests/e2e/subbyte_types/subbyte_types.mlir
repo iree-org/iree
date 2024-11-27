@@ -26,3 +26,74 @@ func.func @i1_type_slice() {
   check.expect_eq_const(%tensor_res, dense<[255]> : tensor<1xi8>) : tensor<1xi8>
   return
 }
+
+func.func @i1_representation() {
+  %mask = util.unfoldable_constant dense<[140]> : tensor<1xi8>
+  %casted = flow.tensor.bitcast %mask : tensor<1xi8> -> tensor<2x4xi1>
+  %bar = util.optimization_barrier %casted : tensor<2x4xi1>
+  %tensor_res = flow.tensor.bitcast %bar : tensor<2x4xi1> -> tensor<1xi8>
+  check.expect_eq_const(%tensor_res, dense<[140]> : tensor<1xi8>) : tensor<1xi8>
+  return
+}
+
+func.func @i1_representation_2() {
+  %mask = util.unfoldable_constant dense<[140, 77]> : tensor<2xi8>
+  %casted = flow.tensor.bitcast %mask : tensor<2xi8> -> tensor<2x8xi1>
+  %bar = util.optimization_barrier %casted : tensor<2x8xi1>
+  %tensor_res = flow.tensor.bitcast %bar : tensor<2x8xi1> -> tensor<2xi8>
+  check.expect_eq_const(%tensor_res, dense<[140, 77]> : tensor<2xi8>) : tensor<2xi8>
+  return
+}
+
+func.func @i1_representation_3() {
+  %mask = util.unfoldable_constant dense<[140, 77]> : tensor<2xi8>
+  %casted = flow.tensor.bitcast %mask : tensor<2xi8> -> tensor<4x4xi1>
+  %bar = util.optimization_barrier %casted : tensor<4x4xi1>
+  %tensor_res = flow.tensor.bitcast %bar : tensor<4x4xi1> -> tensor<2xi8>
+  check.expect_eq_const(%tensor_res, dense<[140, 77]> : tensor<2xi8>) : tensor<2xi8>
+  return
+}
+
+func.func @truncate_i1() {
+  %mask = util.unfoldable_constant dense<[1, 1, 0, 0,
+                                          0, 0, 1, 1]> : tensor<8xi8>
+  %nm = tensor.empty() : tensor<8xi1>
+  %truncm = linalg.generic
+  {indexing_maps = [
+    affine_map<(d0) -> (d0)>,
+    affine_map<(d0) -> (d0)>],
+  iterator_types = ["parallel"]}
+  ins(%mask: tensor<8xi8>)
+  outs(%nm: tensor<8xi1>) {
+    ^bb0(%in: i8, %out: i1):
+      %zero = arith.constant 0 : i8
+      %truncated = arith.cmpi "sgt", %in, %zero : i8
+      linalg.yield %truncated : i1
+  } -> tensor<8xi1>
+  %tensor_res = flow.tensor.bitcast %truncm : tensor<8xi1> -> tensor<1xi8>
+  check.expect_eq_const(%tensor_res, dense<[195]> : tensor<1xi8>) : tensor<1xi8>
+  return
+}
+
+func.func @truncate_i1_2() {
+  %mask = util.unfoldable_constant dense<[[0, 0, 1, 1],
+                                          [1, 1, 0, 0],
+                                          [1, 1, 0, 0],
+                                          [0, 0, 1, 1]]> : tensor<4x4xi8>
+  %nm = tensor.empty() : tensor<4x4xi1>
+  %truncm = linalg.generic
+  {indexing_maps = [
+    affine_map<(d0, d1) -> (d0, d1)>,
+    affine_map<(d0, d1) -> (d0, d1)>],
+  iterator_types = ["parallel", "parallel"]}
+  ins(%mask: tensor<4x4xi8>)
+  outs(%nm: tensor<4x4xi1>) {
+    ^bb0(%in: i8, %out: i1):
+      %zero = arith.constant 0 : i8
+      %truncated = arith.cmpi "sgt", %in, %zero : i8
+      linalg.yield %truncated : i1
+  } -> tensor<4x4xi1>
+  %tensor_res = flow.tensor.bitcast %truncm : tensor<4x4xi1> -> tensor<2xi8>
+  check.expect_eq_const(%tensor_res, dense<[60, 195]> : tensor<2xi8>) : tensor<2xi8>
+  return
+}
