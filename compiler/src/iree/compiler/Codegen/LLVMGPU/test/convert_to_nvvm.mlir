@@ -55,10 +55,11 @@ hal.executable @abs_dynamic {
         %c5 = arith.constant 5 : index
         %c7 = arith.constant 7 : index
         %o = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+        %o.tagged = util.assume.int %o[<umin = 0, umax = 0>, <umin = 4096, umax = 4096, udiv = 4096>] : index
         %d0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
         %d1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
         %d2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%o) : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>{%d0, %d1, %d2}
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%o.tagged) : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>{%d0, %d1, %d2}
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<?x?x?xi32>{%d0, %d1, %d2}
         %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<?x?x?xf32>{%d0, %d1, %d2}
         %9 = memref.load %0[%c3, %c5, %c7] : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>
@@ -75,10 +76,15 @@ hal.executable @abs_dynamic {
 //  CHECK-SAME: (%[[ARG0:[a-zA-Z0-9]+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
 //  CHECK-SAME:  %[[ARG1:[a-zA-Z0-9]+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
 //  CHECK-SAME:  %[[ARG2:[a-zA-Z0-9]+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
-//  CHECK-SAME:  %[[ARG3:[a-zA-Z0-9]+]]: i32 {llvm.noundef},
+//  CHECK-SAME:  %[[ARG3:[a-zA-Z0-9]+]]: i32 {llvm.noundef, llvm.range = #llvm.constant_range<i32, 0, 4097>},
 //  CHECK-SAME:  %[[ARG4:[a-zA-Z0-9]+]]: i32 {llvm.noundef},
 //  CHECK-SAME:  %[[ARG5:[a-zA-Z0-9]+]]: i32 {llvm.noundef},
 //  CHECK-SAME:  %[[ARG6:[a-zA-Z0-9]+]]: i32 {llvm.noundef})
+//   CHECK-DAG: %[[C4096_i32:.+]] = llvm.mlir.constant(4096 : i32) : i32
+//   CHECK-DAG: %[[C0_i32:.+]] = llvm.mlir.constant(0 : i32) : i32
+//   CHECK-DAG: %[[ARG3_UREM:.+]] = llvm.urem %[[ARG3]], %[[C4096_i32]] : i32
+//   CHECK-DAG: %[[ARG3_CMP:.+]] = llvm.icmp "eq" %[[ARG3_UREM]], %[[C0_i32]]
+//   CHECK: llvm.intr.assume %[[ARG3_CMP]]
 //   CHECK-DAG:   %[[OFFSET:.+]] = llvm.zext %[[ARG3]] : i32 to i64
 //   CHECK-DAG:   %[[D1:.+]] = llvm.zext %[[ARG5]] : i32 to i64
 //   CHECK-DAG:   %[[D2:.+]] = llvm.zext %[[ARG6]] : i32 to i64
