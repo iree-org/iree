@@ -476,8 +476,8 @@ void IREECodegenDialect::initializeCodegenAttrs() {
 namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
-// Helpers for getting/setting iree_codegen.translation_info attribute on the
-// `hal.executable.export`
+// Helpers for getting/setting iree_codegen.translation_info attribute on a
+// FunctionOpInterface op.
 // ===----------------------------------------------------------------------===//
 
 IREE::Codegen::TranslationInfoAttr

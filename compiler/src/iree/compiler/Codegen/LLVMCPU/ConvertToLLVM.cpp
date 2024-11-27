@@ -161,8 +161,10 @@ struct ConvertHALEntryPointFuncOp
     // can use the attributes.
     // (%arg0: environment, %arg1: dispatch_state, %arg2: workgroup_state)
     for (unsigned i = 0; i <= 2; ++i) {
-      llvmFuncOp.setArgAttr(i, LLVM::LLVMDialect::getNoAliasAttrName(),
-                            rewriter.getUnitAttr());
+      Attribute unit = rewriter.getUnitAttr();
+      llvmFuncOp.setArgAttr(i, LLVM::LLVMDialect::getNoAliasAttrName(), unit);
+      llvmFuncOp.setArgAttr(i, LLVM::LLVMDialect::getNonNullAttrName(), unit);
+      llvmFuncOp.setArgAttr(i, LLVM::LLVMDialect::getNoUndefAttrName(), unit);
       llvmFuncOp.setArgAttr(i, LLVM::LLVMDialect::getAlignAttrName(),
                             rewriter.getI64IntegerAttr(16));
     }

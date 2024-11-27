@@ -209,11 +209,10 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
   // Compute the total producer loop worker count (P0 * ... * Pn).
   Value linearConsumerIdVal =
       getValueOrCreateConstantIndexOp(rewriter, loc, linearId);
-  SmallVector<Value> producerRanges;
+  SmallVector<OpFoldResult> producerRanges;
   OpFoldResult producerWorkerCount = rewriter.getIndexAttr(1);
   for (auto workerCount : producer.getMixedUpperBound()) {
-    producerRanges.push_back(
-        getValueOrCreateConstantIndexOp(rewriter, loc, workerCount));
+    producerRanges.push_back(workerCount);
     producerWorkerCount = affine::makeComposedFoldedAffineApply(
         rewriter, loc, d0 * d1, {producerWorkerCount, workerCount});
   }

@@ -6,10 +6,11 @@
 
 from typing import Callable, Collection, IO, Type, TypeVar
 
-import abc
 import concurrent.futures
 import enum
+import math
 import multiprocessing
+import os
 import time
 import traceback
 from pathlib import Path
@@ -88,16 +89,45 @@ class Entrypoint:
                 return files
 
 
+class ProgressReporter:
+    def reset_display(self):
+        ...
+
+    def start_graph(self, all_deps: set["BuildDependency"]):
+        ...
+
+    def start_dep(self, dep: "BuildDependency"):
+        ...
+
+    def finish_dep(self, dep: "BuildDependency"):
+        ...
+
+    def end_graph(self):
+        ...
+
+    def report_failure(self, dep: "BuildDependency"):
+        ...
+
+
+class DependenceException(Exception):
+    """Noted on a BuildDependency.failure when the dep could not be satisfied because
+    of failed dependencies."""
+
+    ...
+
+
 class Executor:
     """Executor that all build contexts share."""
 
-    def __init__(self, output_dir: Path, stderr: IO):
+    def __init__(self, output_dir: Path, stderr: IO, reporter: ProgressReporter):
         self.output_dir = output_dir
         self.verbose_level = 0
         # Keyed by path
         self.all: dict[str, "BuildContext" | "BuildFile"] = {}
         self.entrypoints: list["BuildEntrypoint"] = []
+        self.failed_deps: set["BuildDependency"] = set()
         self.stderr = stderr
+        self.reporter = reporter
         BuildContext("", self)
 
     def check_path_not_exists(self, path: str, for_entity):
@@ -143,19 +173,34 @@ class Executor:
             with self.get_context("") as context:
                 entrypoint()
 
-    def build(self, *initial_deps: "BuildDependency"):
+    def build(self, *initial_deps: "BuildDependency") -> bool:
         """Transitively builds the given deps."""
-        scheduler = Scheduler(stderr=self.stderr)
+        scheduler = Scheduler(reporter=self.reporter)
         success = False
+        started_reporter = False
         try:
             for d in initial_deps:
                 scheduler.add_initial_dep(d)
+                self.reporter.start_graph(set(scheduler.producer_graph.keys()))
+                started_reporter = True
                 scheduler.build()
-            success = True
+        except KeyboardInterrupt:
+            raise
+        except:
+            # This catches truly unhandled exceptions (not just build action failures,
+            # which are noted in the graph). Eagerly print the exception so that it
+            # doesn't get swallowed waiting for shutdown.
+            self.reporter.reset_display()
+            print(
+                "Unhandled exception during build. Waiting for background tasks to complete...",
+                file=self.stderr,
+            )
+            traceback.print_exc(file=self.stderr)
         finally:
-            if not success:
-                print("Waiting for background tasks to complete...", file=self.stderr)
             scheduler.shutdown()
+            if started_reporter:
+                self.reporter.end_graph()
+        self.failed_deps.update(scheduler.failed_deps)
 
 
 BuildMetaType = TypeVar("BuildMetaType", bound="BuildMeta")
@@ -206,8 +251,12 @@ class BuildDependency:
 
         # Scheduling state.
         self.future: concurrent.futures.Future | None = None
-        self.start_time: float | None = None
-        self.finish_time: float | None = None
+        self.start_time: float | None = None  # Time the action was scheduled.
+        self.invoke_time: float | None = None  # Time that invocation began.
+        self.finish_time: float | None = None  # Time that finished.
+
+        # If the dep ended in failure, there will be an exception here.
+        self.failure: Exception | None = None
 
         # Metadata.
         self._metadata: dict[str, BuildMeta] = {}
@@ -217,12 +266,22 @@ class BuildDependency:
         return self.future is not None
 
     @property
+    def is_dependence_failure(self) -> bool:
+        return isinstance(self.failure, DependenceException)
+
+    @property
     def execution_time(self) -> float:
-        if self.start_time is None:
+        """Time from begin of invocation to present or action finish.
+
+        This will be zero if the dependency has no invoke time. This does not
+        track queued time prior to receiving a thread.
+        """
+        start_time = self.invoke_time
+        if start_time is None:
             return 0.0
         if self.finish_time is None:
-            return time.time() - self.start_time
-        return self.finish_time - self.start_time
+            return time.time() - start_time
+        return self.finish_time - start_time
 
     def start(self, future: concurrent.futures.Future):
         assert not self.is_scheduled, f"Cannot start an already scheduled dep: {self}"
@@ -312,12 +371,16 @@ class BuildAction(BuildDependency):
         #   - On a worker thread for THREAD or PROCESS
         # For PROCESS concurrency, we have to create a compatible invocation
         # thunk, schedule that on the process pool and wait for it.
-        if self.concurrency == ActionConcurrency.PROCESS:
-            thunk = self._remotable_thunk()
-            fut = scheduler.process_pool_executor.submit(thunk)
-            fut.result()
-        else:
-            self._invoke()
+        self.invoke_time = time.time()
+        try:
+            if self.concurrency == ActionConcurrency.PROCESS:
+                thunk = self._remotable_thunk()
+                fut = scheduler.process_pool_executor.submit(thunk)
+                fut.result()
+            else:
+                self._invoke()
+        except Exception as e:
+            self.failure = e
 
     def _invoke(self):
         self._remotable_thunk()()
@@ -431,8 +494,8 @@ class BuildEntrypoint(BuildContext):
 class Scheduler:
     """Holds resources related to scheduling."""
 
-    def __init__(self, stderr: IO):
-        self.stderr = stderr
+    def __init__(self, reporter: ProgressReporter):
+        self.reporter = reporter
 
         # Inverted producer-consumer graph nodes mapping a producer dep to
         # all deps which directly depend on it and will be unblocked by it
@@ -443,11 +506,23 @@ class Scheduler:
         # have a future set on them prior to adding to the set.
         self.in_flight_deps: set[BuildDependency] = set()
 
+        # Any deps that have failed are added here.
+        self.failed_deps: set[BuildDependency] = set()
+
+        # TODO: This needs a flag or additional heuristics. Empirically, at the
+        # time of writing, it was found best to limit the scheduler concurrency
+        # to a bit less than half of the hardware concurrency and then letting
+        # the compiler's thread pool fan out to full hardware concurrency via
+        # `export IREE_COMPILER_TASK_COUNT=0`. This wasn't tested super
+        # scientifically but was shown to get the best throughput on a mixed
+        # torch import -> compile build of 1000 models (about 1m9s for all of it
+        # on the tested configuration).
+        concurrency = int(max(1, math.ceil((os.cpu_count() or 1) * 0.40)))
         self.thread_pool_executor = concurrent.futures.ThreadPoolExecutor(
-            max_workers=10, thread_name_prefix="iree.build"
+            max_workers=concurrency, thread_name_prefix="iree.build"
         )
         self.process_pool_executor = concurrent.futures.ProcessPoolExecutor(
-            max_workers=10, mp_context=multiprocessing.get_context("spawn")
+            max_workers=concurrency, mp_context=multiprocessing.get_context("spawn")
         )
 
     def shutdown(self):
@@ -501,10 +576,6 @@ class Scheduler:
                 self.in_flight_deps.add(eligible_dep)
 
         while self.producer_graph:
-            print(
-                f"Servicing {len(self.producer_graph)} outstanding tasks",
-                file=self.stderr,
-            )
             self._service_graph()
 
     def _service_graph(self):
@@ -515,9 +586,19 @@ class Scheduler:
             ):
                 completed_dep = completed_fut.result()
                 assert isinstance(completed_dep, BuildDependency)
-                print(f"Completed {completed_dep}", file=self.stderr)
+                if completed_dep.failure:
+                    self.failed_deps.add(completed_dep)
+                    self.reporter.report_failure(completed_dep)
                 completed_deps.add(completed_dep)
+                self.reporter.finish_dep(completed_dep)
+
         except TimeoutError:
+            pass
+        except concurrent.futures.TimeoutError:
+            # In Python 3.10, future access throws concurrent.futures.TimeoutError.
+            # In 3.11, that was made a subclass of TimeoutError, which is advertised
+            # as thrown (and the original is marked as deprecated).
+            # TODO: Remove this clause once 3.10 support is dropped.
             pass
 
         # Purge done from in-flight list.
@@ -542,13 +623,22 @@ class Scheduler:
     def _schedule_action(self, dep: BuildDependency):
         if dep.is_scheduled:
             return
+
+        # If any deps depended on failed, then cascade the failure.
+        for dep_dep in dep.deps:
+            if dep_dep.failure:
+                dep.failure = DependenceException()
+                dep.start(concurrent.futures.Future())
+                dep.finish()
+                return
+
         if isinstance(dep, BuildAction):
 
             def invoke():
                 dep.invoke(self)
                 return dep
 
-            print(f"Scheduling action: {dep}", file=self.stderr)
+            self.reporter.start_dep(dep)
             if dep.concurrency == ActionConcurrency.NONE:
                 invoke()
             elif (

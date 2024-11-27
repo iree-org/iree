@@ -40,18 +40,7 @@ bool operator!=(const TileSwizzle &lhs, const TileSwizzle &rhs) {
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               TileSwizzle::Dim::Kind kind) {
-  switch (kind) {
-  case TileSwizzle::Dim::Kind::Internal:
-    return os << "Internal";
-  case TileSwizzle::Dim::Kind::CrossThread:
-    return os << "CrossThread";
-  case TileSwizzle::Dim::Kind::CrossIntrinsic:
-    return os << "CrossIntrinsic";
-  default:
-    // Required by GCC.
-    assert(false);
-    return os;
-  }
+  return os << convertSwizzleKindToString(kind);
 }
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, TileSwizzle::Dim dim) {
