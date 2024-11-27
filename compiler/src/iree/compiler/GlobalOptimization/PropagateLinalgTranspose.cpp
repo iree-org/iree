@@ -1104,8 +1104,11 @@ void PropagateLinalgTransposePass::runOnOperation() {
         context, /*benefit=*/2);
     bubblingPatterns.insert<ComposeTransposes>(context);
     populateCommonCanonicalizationPatterns(context, bubblingPatterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                            std::move(bubblingPatterns)))) {
+
+    GreedyRewriteConfig config;
+    config.maxIterations = GreedyRewriteConfig::kNoLimit;
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(bubblingPatterns),
+                                            config))) {
       funcOp.emitError("Transpose bubbling patterns failed");
       return signalPassFailure();
     }
