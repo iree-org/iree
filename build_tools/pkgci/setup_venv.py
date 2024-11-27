@@ -109,34 +109,6 @@ def parse_arguments(argv=None):
     return args
 
 
-@functools.lru_cache
-def list_gh_artifacts(run_id: str) -> Dict[str, str]:
-    print(f"Fetching artifacts for workflow run: {run_id}")
-    base_path = f"/repos/iree-org/iree"
-    output = subprocess.check_output(
-        [
-            "gh",
-            "api",
-            "-H",
-            "Accept: application/vnd.github+json",
-            "-H",
-            "X-GitHub-Api-Version: 2022-11-28",
-            f"{base_path}/actions/runs/{run_id}/artifacts",
-        ]
-    )
-    data = json.loads(output)
-    # Uncomment to debug:
-    # print(json.dumps(data, indent=2))
-    artifacts = {
-        rec["name"]: f"{base_path}/actions/artifacts/{rec['id']}/zip"
-        for rec in data["artifacts"]
-    }
-    print("Found artifacts:")
-    for k, v in artifacts.items():
-        print(f"  {k}: {v}")
-    return artifacts
-
-
 def get_latest_workflow_run_id_for_ref(ref: str) -> int:
     print(f"Normalizing ref: {ref}")
     normalized_ref = (
@@ -165,6 +137,34 @@ def get_latest_workflow_run_id_for_ref(ref: str) -> int:
     latest_run = workflow_run_json_output["workflow_runs"][-1]
     print(f"Found workflow run: {latest_run['html_url']}")
     return latest_run["id"]
+
+
+@functools.lru_cache
+def list_gh_artifacts(run_id: str) -> Dict[str, str]:
+    print(f"Fetching artifacts for workflow run: {run_id}")
+    base_path = f"/repos/iree-org/iree"
+    output = subprocess.check_output(
+        [
+            "gh",
+            "api",
+            "-H",
+            "Accept: application/vnd.github+json",
+            "-H",
+            "X-GitHub-Api-Version: 2022-11-28",
+            f"{base_path}/actions/runs/{run_id}/artifacts",
+        ]
+    )
+    data = json.loads(output)
+    # Uncomment to debug:
+    # print(json.dumps(data, indent=2))
+    artifacts = {
+        rec["name"]: f"{base_path}/actions/artifacts/{rec['id']}/zip"
+        for rec in data["artifacts"]
+    }
+    print("Found artifacts:")
+    for k, v in artifacts.items():
+        print(f"  {k}: {v}")
+    return artifacts
 
 
 def fetch_gh_artifact(api_path: str, file: Path):
