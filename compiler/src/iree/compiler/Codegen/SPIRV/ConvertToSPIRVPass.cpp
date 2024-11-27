@@ -278,7 +278,12 @@ namespace {
 /// ops to load from a global variable representing the push constant storage.
 struct HALInterfaceLoadConstantConverter final
     : OpConversionPattern<IREE::HAL::InterfaceConstantLoadOp> {
-  using OpConversionPattern::OpConversionPattern;
+  bool supportsAssume = false;
+
+  HALInterfaceLoadConstantConverter(TypeConverter &typeConverter,
+                                    MLIRContext *context, bool supportsAssume)
+      : OpConversionPattern(typeConverter, context),
+        supportsAssume(supportsAssume) {}
 
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceConstantLoadOp loadOp, OpAdaptor adaptor,
@@ -300,7 +305,57 @@ struct HALInterfaceLoadConstantConverter final
     Value value = spirv::getPushConstantValue(loadOp, elementCount, index,
                                               i32Type, rewriter);
 
+    if (loadOp.getResult().hasOneUse() && supportsAssume) {
+      OpOperand *operand = loadOp.getResult().getUses().begin().getOperand();
+      auto assumeOp = dyn_cast<IREE::Util::AssumeIntOp>(operand->getOwner());
+      if (assumeOp) {
+        Location loc = assumeOp.getLoc();
+        unsigned opIdx = operand->getOperandNumber();
+
+        auto [min, max] = assumeOp.getUnionedUnsignedRange(opIdx);
+        if (min.has_value() && max.has_value()) {
+          Value minConst = rewriter.create<spirv::ConstantOp>(
+              loc, i32Type, rewriter.getI32IntegerAttr(*min));
+          Value maxConst = rewriter.create<spirv::ConstantOp>(
+              loc, i32Type, rewriter.getI32IntegerAttr(*max));
+          Value minBound =
+              rewriter.create<spirv::UGreaterThanEqualOp>(loc, value, minConst);
+          rewriter.create<spirv::KHRAssumeTrueOp>(loc, minBound);
+          Value maxBound =
+              rewriter.create<spirv::ULessThanEqualOp>(loc, value, maxConst);
+          rewriter.create<spirv::KHRAssumeTrueOp>(loc, maxBound);
+        }
+
+        std::optional<uint64_t> divisibility =
+            assumeOp.getUnionedUnsignedDivisor(opIdx);
+        if (divisibility.has_value() && *divisibility > 1) {
+          Value divisor = rewriter.create<spirv::ConstantOp>(
+              loc, i32Type, rewriter.getI32IntegerAttr(*divisibility));
+          Value zero = rewriter.create<spirv::ConstantOp>(
+              loc, i32Type, rewriter.getI32IntegerAttr(0));
+          Value lowPart = rewriter.create<spirv::UModOp>(loc, value, divisor);
+          Value dividesExactly =
+              rewriter.create<spirv::IEqualOp>(loc, lowPart, zero);
+          rewriter.create<spirv::KHRAssumeTrueOp>(loc, dividesExactly);
+        }
+      }
+    }
+
     rewriter.replaceOp(loadOp, value);
+    return success();
+  }
+};
+
+/// A pattern to convert util.assume.int into a noop, since we're using it
+/// to annotate push constants.
+struct UtilAssumeIntConverter final
+    : OpConversionPattern<IREE::Util::AssumeIntOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::Util::AssumeIntOp assumeOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOp(assumeOp, adaptor.getOperands());
     return success();
   }
 };
@@ -614,6 +669,8 @@ void ConvertToSPIRVPass::runOnOperation() {
     return signalPassFailure();
   }
 
+  bool supportsAssume = targetEnv.allows(spirv::Capability::ExpectAssumeKHR);
+
   SPIRVConversionOptions options = {};
   options.use64bitIndex = use64bitIndex;
 
@@ -661,14 +718,16 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   // Add IREE HAL interface op conversions.
   patterns.add<
-      HALInterfaceLoadConstantConverter,
       HALInterfaceWorkgroupOpsConverter<IREE::HAL::InterfaceWorkgroupIDOp,
                                         spirv::BuiltIn::WorkgroupId>,
       HALInterfaceWorkgroupOpsConverter<IREE::HAL::InterfaceWorkgroupSizeOp,
                                         spirv::BuiltIn::WorkgroupSize>,
       HALInterfaceWorkgroupOpsConverter<IREE::HAL::InterfaceWorkgroupCountOp,
-                                        spirv::BuiltIn::NumWorkgroups>>(
-      typeConverter, context);
+                                        spirv::BuiltIn::NumWorkgroups>,
+      UtilAssumeIntConverter>(typeConverter, context);
+
+  patterns.add<HALInterfaceLoadConstantConverter>(typeConverter, context,
+                                                  supportsAssume);
 
   // Performs a prelimiary step to analyze all hal.interface.binding.subspan ops
   // and creates spirv.GlobalVariables.
