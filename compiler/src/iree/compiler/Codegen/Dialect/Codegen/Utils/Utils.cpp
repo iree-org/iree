@@ -350,19 +350,19 @@ getExpandedType(RankedTensorType type, bool isBatched, bool isTransposed,
 /// Given an input Value and a desired output element type, create and return
 /// an element-wise linalg::GenericOp that extends the input Value to the
 /// output element type.
-static Value createElementWiseExtUIOp(RewriterBase &rewriter, Value input,
+static Value createElementWiseExtUIOp(OpBuilder &builder, Value input,
                                       Location loc, Type outElemType) {
   auto inputType = cast<RankedTensorType>(input.getType());
   SmallVector<AffineMap> maps(
-      2, rewriter.getMultiDimIdentityMap(inputType.getRank()));
+      2, builder.getMultiDimIdentityMap(inputType.getRank()));
   SmallVector<utils::IteratorType> iteratorTypes(inputType.getRank(),
                                                  utils::IteratorType::parallel);
   auto castedType = inputType.clone(outElemType);
   SmallVector<OpFoldResult> inputMixedSizes =
-      tensor::getMixedSizes(rewriter, loc, input);
+      tensor::getMixedSizes(builder, loc, input);
   Value init =
-      rewriter.create<tensor::EmptyOp>(loc, inputMixedSizes, outElemType);
-  return rewriter
+      builder.create<tensor::EmptyOp>(loc, inputMixedSizes, outElemType);
+  return builder
       .create<linalg::GenericOp>(
           loc, castedType, input, init, maps, iteratorTypes,
           [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
@@ -381,7 +381,7 @@ static Value createElementWiseExtUIOp(RewriterBase &rewriter, Value input,
 /// unsignedness information on the input for ukernels. If `transpose` is true,
 /// the `linalgOp`'s indexing maps are transposed.
 static Value getMmt4dOperand(Value value, linalg::LinalgOp linalgOp,
-                             bool transpose, RewriterBase &rewriter,
+                             bool transpose, OpBuilder &builder,
                              SmallVectorImpl<ReassociationIndices> &ri,
                              ArrayRef<Type> elemTypes, int operandIdx) {
   assert(linalgOp.getNumDpsInputs() == 2);
@@ -398,18 +398,19 @@ static Value getMmt4dOperand(Value value, linalg::LinalgOp linalgOp,
         type, /*isBatched=*/!cDims->batch.empty(),
         /*isTransposed=*/operandIdx == 2 && (transpose ^ cDims->n.empty()), ri);
     expandedValue =
-        rewriter.create<tensor::ExpandShapeOp>(loc, newType, value, ri);
+        builder.create<tensor::ExpandShapeOp>(loc, newType, value, ri);
   }
   if (elemTypes[operandIdx].isUnsignedInteger()) {
-    return createElementWiseExtUIOp(rewriter, expandedValue, loc,
+    return createElementWiseExtUIOp(builder, expandedValue, loc,
                                     elemTypes.back());
   }
   return expandedValue;
 }
 
-FailureOr<Operation *> lowerContractionOpWithEncoding(
-    RewriterBase &rewriter, linalg::LinalgOp linalgOp, ValueRange operands,
-    bool transposeNarrowN, ResolveEncodingInfoFn getEncodingInfo) {
+FailureOr<Operation *>
+lowerContractionOpWithEncoding(OpBuilder &builder, linalg::LinalgOp linalgOp,
+                               ValueRange operands, bool transposeNarrowN,
+                               ResolveEncodingInfoFn getEncodingInfo) {
   if (!linalgOp.hasPureTensorSemantics()) {
     return failure();
   }
@@ -439,36 +440,35 @@ FailureOr<Operation *> lowerContractionOpWithEncoding(
 
   Operation *result;
   if (failed(encodingInfo)) {
-    result = dropEncodingAndCloneOp(rewriter, linalgOp,
+    result = dropEncodingAndCloneOp(builder, linalgOp,
                                     operands.take_front(inputs.size()),
                                     operands.drop_front(inputs.size()));
   } else {
     bool transpose = transposeNarrowN && isNarrowNResult(resultEncoding);
     SmallVector<Type> elemTypes = lhsEncoding.getElementTypesArray();
     SmallVector<ReassociationIndices> ri;
-    Value newLhs = getMmt4dOperand(operands[0], linalgOp, transpose, rewriter,
+    Value newLhs = getMmt4dOperand(operands[0], linalgOp, transpose, builder,
                                    ri, elemTypes, /*operandIdx=*/0);
-    Value newRhs = getMmt4dOperand(operands[1], linalgOp, transpose, rewriter,
+    Value newRhs = getMmt4dOperand(operands[1], linalgOp, transpose, builder,
                                    ri, elemTypes, /*operandIdx=*/1);
-    Value newResult =
-        getMmt4dOperand(operands[2], linalgOp, transpose, rewriter, ri,
-                        elemTypes, /*operandIdx=*/2);
+    Value newResult = getMmt4dOperand(operands[2], linalgOp, transpose, builder,
+                                      ri, elemTypes, /*operandIdx=*/2);
     if (transpose) {
       std::swap(newLhs, newRhs);
     }
     Type newResultType = newResult.getType();
     auto cDims = IREE::Encoding::getEncodingContractionDims(lhsEncoding);
     if (cDims->batch.empty()) {
-      result = rewriter.create<linalg::Mmt4DOp>(
-          linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
-          ValueRange{newResult});
+      result = builder.create<linalg::Mmt4DOp>(linalgOp.getLoc(), newResultType,
+                                               ValueRange{newLhs, newRhs},
+                                               ValueRange{newResult});
     } else {
-      result = rewriter.create<linalg::BatchMmt4DOp>(
+      result = builder.create<linalg::BatchMmt4DOp>(
           linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
           ValueRange{newResult});
     }
     if (!ri.empty()) {
-      result = rewriter.create<tensor::CollapseShapeOp>(
+      result = builder.create<tensor::CollapseShapeOp>(
           linalgOp->getLoc(), operands[2].getType(), result->getResult(0), ri);
     }
   }
