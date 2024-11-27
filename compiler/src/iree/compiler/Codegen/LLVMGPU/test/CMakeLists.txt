@@ -62,7 +62,6 @@ iree_lit_test_suite(
     "transform_gpu_pipelining.mlir"
     "transform_vector_to_mma.mlir"
     "transpose_pipeline_test.mlir"
-    "ukernel_pipeline_transform.mlir"
     "vector_lowering.mlir"
     "vector_to_gpu.mlir"
     "winograd_pipeline_test.mlir"
@@ -75,5 +74,19 @@ iree_lit_test_suite(
     transform_dialect_codegen_vector_distribution_spec.mlir
     transform_dialect_codegen_vector_warp_execute_on_lane_0_spec.mlir
 )
+
+if(IREE_TARGET_BACKEND_ROCM)
+
+iree_lit_test_suite(
+  NAME
+    lit_requiring_rocm
+  SRCS
+    "ukernel_pipeline_transform.mlir"
+  TOOLS
+    FileCheck
+    iree-opt
+)
+
+endif()  # IREE_TARGET_BACKEND_ROCM
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

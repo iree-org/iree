@@ -616,7 +616,7 @@ class BuildFileFunctions(object):
             "GPU_ARCH", gpu_arch, quote=False
         )
         srcs_block = self._convert_srcs_block(srcs)
-        out_block = self._convert_string_arg_block("OUT", out, quote=False)
+        out_block = self._convert_string_arg_block("OUT", out, quote=True)
         copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
 
         self._converter.body += (

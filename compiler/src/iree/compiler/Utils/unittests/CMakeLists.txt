@@ -16,6 +16,7 @@ iree_cc_test(
   SRCS
     "UtilsTest.cpp"
   DEPS
+    LLVMSupport
     gmock
     gtest
     iree::compiler::Utils

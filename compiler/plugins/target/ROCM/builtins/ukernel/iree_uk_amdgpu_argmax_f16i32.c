@@ -6,10 +6,10 @@
 
 #include "compiler/plugins/target/ROCM/builtins/ukernel/common.h"
 
-void iree_uk_amdgpu_argmax_f16i32(const _Float16 *inputBuffer,
-                                  int64_t input_offset, int32_t *outputBuffer,
-                                  int64_t output_offset,
-                                  int64_t reductionSize) {
+[[gnu::always_inline]] void
+iree_uk_amdgpu_argmax_f16i32(const _Float16 *inputBuffer, int64_t input_offset,
+                             int32_t *outputBuffer, int64_t output_offset,
+                             int64_t reductionSize) {
   const int warpSize = __builtin_amdgcn_wavefrontsize();
   _Float16 NEG_F16_MAX = (_Float16)(-65504.0f);
   int32_t laneID = __builtin_amdgcn_workitem_id_x();
