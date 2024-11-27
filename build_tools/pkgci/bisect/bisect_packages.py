@@ -180,10 +180,13 @@ def main(args):
 
         # Download packages for REF_HASH and install them into REF_HASH/.venv/.
         contents += "REF_HASH=$(git rev-parse BISECT_HEAD)\n"
-        contents += str((THIS_DIR / ".." / "setup_venv_for_ref.py").as_posix())
-        contents += " ${REF_HASH}"
-        contents += f" --work-dir={args.work_dir}"
-        contents += f" --python-interpreter={python311_path}\n"
+        contents += f'"{python311_path}" '
+        contents += str((THIS_DIR / ".." / "setup_venv.py").as_posix())
+        contents += f" {args.work_dir}/"
+        contents += "${REF_HASH}/.venv"
+        contents += f" --artifact-path={args.work_dir}/"
+        contents += "${REF_HASH} "
+        contents += " --fetch-git-ref=${REF_HASH}\n"
         # Prepend the venv bin dir to $PATH. This is similar to running
         #   `source .venv/bin/activate`
         # while scoped to this process. Note that this does not modify

@@ -175,7 +175,7 @@ what gets passed to `git bisect run`:
 set -xeuo pipefail
 
 REF_HASH=$(git rev-parse BISECT_HEAD)
-/home/nod/dev/projects/iree/build_tools/pkgci/setup_venv_for_ref.py ${REF_HASH} --work-dir /home/nod/.iree/bisect
+"/home/nod/.pyenv/shims/python3.11" /home/nod/dev/projects/iree/build_tools/pkgci/bisect/../setup_venv.py /home/nod/.iree/bisect/${REF_HASH}/.venv --artifact-path=/home/nod/.iree/bisect/${REF_HASH}  --fetch-git-ref=${REF_HASH}
 PATH="/home/nod/.iree/bisect/$REF_HASH/.venv/bin:$PATH"
 
 set +e
@@ -314,24 +314,6 @@ bisect found first bad commit
 ```
 
 ### Development notes
-
-Testing package installation:
-
-```bash
-pyenv shell 3.11
-
-# Test installing packages, from the parent directory
-./setup_venv_for_ref.py 5b0740c97a33edce29e753b14b9ff04789afcc53
-./setup_venv_for_ref.py 4c0fd906bfd1e8888654b3e8a967ef977bb84403
-
-# Activate one of the venvs and test it
-source ~/.iree/bisect/5b0740c97a33edce29e753b14b9ff04789afcc53/.venv/bin/activate
-iree-compile --version
-# IREE (https://iree.dev):
-#   IREE compiler version 3.1.0.dev+5b0740c97a33edce29e753b14b9ff04789afcc53 @ 5b0740c97a33edce29e753b14b9ff04789afcc53
-#   LLVM version 20.0.0git
-#   Optimized build
-```
 
 Testing bisect:
 
