@@ -5,10 +5,10 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""build_tools/scripts/bisect/install_packages_for_commit.py
+"""Sets up a Python venv for compiler/runtime from a commit.
 
-This downloads Python packages from the pkgci_build_packages.yml step in the
-pkgci.yml workflow then installs them into a Python venv.
+This finds the latest pkgci workflow run for a given commit and then runs
+setup_venv.py.
 
 Prerequisites:
     Install gh (https://cli.github.com/) following instructions at
@@ -29,15 +29,14 @@ Prerequisites:
     ```
 
 Example usage:
-    install_packages_for_commit.py iree-3.1.0rc20241122
-    install_packages_for_commit.py iree-3.1.0rc20241122 --python-interpreter=python3.11
+    setup_venv_for_ref.py iree-3.1.0rc20241122
+    setup_venv_for_ref.py iree-3.1.0rc20241122 --python-interpreter=python3.11
 
-    install_packages_for_commit.py 5b0740c97a33edce29e753b14b9ff04789afcc53
+    setup_venv_for_ref.py 5b0740c97a33edce29e753b14b9ff04789afcc53
     source ~/.iree/bisect/5b0740c97a33edce29e753b14b9ff04789afcc53/.venv/bin/activate
 
 For script maintenance, refer to the GitHub API docs:
   * https://docs.github.com/en/rest/actions/workflow-runs
-  * https://docs.github.com/en/rest/actions/artifacts
 """
 
 import argparse
@@ -46,7 +45,6 @@ import subprocess
 from pathlib import Path
 
 THIS_DIR = Path(__file__).parent.resolve()
-REPO_ROOT = THIS_DIR.parent.parent.parent
 
 OWNER = "iree-org"
 REPO = "iree"
@@ -112,7 +110,7 @@ def main(args):
     subprocess.check_call(
         [
             args.python_interpreter,
-            str(REPO_ROOT / "build_tools" / "pkgci" / "setup_venv.py"),
+            str(THIS_DIR / "setup_venv.py"),
             str(venv_dir),
             "--artifact-path",
             str(artifacts_dir),

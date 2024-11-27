@@ -5,7 +5,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""build_tools/scripts/bisect/bisect_packages.py
+"""Dev package bisect script.
 
 This connects the `git bisect` tool (https://git-scm.com/docs/git-bisect)
 with IREE's package builds, allowing developers to run tests through commit
@@ -59,7 +59,7 @@ def parse_arguments():
     )
     # TODO(scotttodd): choice between manual or script (`git bisect run`) to use
     #                  note that a "manual" mode would need developers to run
-    #   1. `install_packages_for_commit.py $(git rev-parse BISECT_HEAD)`
+    #   1. `setup_venv_for_ref.py $(git rev-parse BISECT_HEAD)`
     #   2. `source $WORKDIR/$(git rev-parse BISECT_HEAD)/.venv/bin/activate`
     parser.add_argument(
         "--test-script",
@@ -180,7 +180,7 @@ def main(args):
 
         # Download packages for REF_HASH and install them into REF_HASH/.venv/.
         contents += "REF_HASH=$(git rev-parse BISECT_HEAD)\n"
-        contents += str((THIS_DIR / "install_packages_for_commit.py").as_posix())
+        contents += str((THIS_DIR / ".." / "setup_venv_for_ref.py").as_posix())
         contents += " ${REF_HASH}"
         contents += f" --work-dir={args.work_dir}"
         contents += f" --python-interpreter={python311_path}\n"

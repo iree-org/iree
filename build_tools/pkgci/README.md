@@ -1,9 +1,9 @@
 # PkgCI Scripts
 
-This directory contains scripts and configuration for the "new" CI, which
+This directory contains scripts and configuration for "PkgCI", which
 is based on building packages and then flowing those to followon jobs.
 
-The traditional CI attempted to do all steps as various kinds of source
+The prior/traditional CI attempted to do all steps as various kinds of source
 builds at head vs a split package/test style of workflow. It can mostly
 be found in the `cmake` directory but is also scattered around.
 

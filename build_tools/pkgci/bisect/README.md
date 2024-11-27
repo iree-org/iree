@@ -175,7 +175,7 @@ what gets passed to `git bisect run`:
 set -xeuo pipefail
 
 REF_HASH=$(git rev-parse BISECT_HEAD)
-/home/nod/dev/projects/iree/build_tools/scripts/bisect/install_packages_for_commit.py ${REF_HASH} --work-dir /home/nod/.iree/bisect
+/home/nod/dev/projects/iree/build_tools/pkgci/setup_venv_for_ref.py ${REF_HASH} --work-dir /home/nod/.iree/bisect
 PATH="/home/nod/.iree/bisect/$REF_HASH/.venv/bin:$PATH"
 
 set +e
@@ -231,7 +231,7 @@ Bisecting: 5 revisions left to test after this (roughly 3 steps)
 running  '/home/nod/.iree/bisect/bisect_run_script.sh'
 ++ git rev-parse BISECT_HEAD
 + REF_HASH=c7213deeb5c7abb0843088815580793b282fdc34
-+ /home/nod/dev/projects/iree/build_tools/scripts/bisect/install_packages_for_commit.py c7213deeb5c7abb0843088815580793b282fdc34 --work-dir /home/nod/.iree/bisect
++ /home/nod/dev/projects/iree/build_tools/pkgci/setup_venv_for_ref.py c7213deeb5c7abb0843088815580793b282fdc34 --work-dir /home/nod/.iree/bisect
 ------------------------------------------------------------------
 Installing packages for ref: c7213deeb5c7abb0843088815580793b282fdc34
   Using base working directory : '/home/nod/.iree/bisect'
@@ -320,9 +320,9 @@ Testing package installation:
 ```bash
 pyenv shell 3.11
 
-# Test installing packages
-./install_packages_for_commit.py 5b0740c97a33edce29e753b14b9ff04789afcc53
-./install_packages_for_commit.py 4c0fd906bfd1e8888654b3e8a967ef977bb84403
+# Test installing packages, from the parent directory
+./setup_venv_for_ref.py 5b0740c97a33edce29e753b14b9ff04789afcc53
+./setup_venv_for_ref.py 4c0fd906bfd1e8888654b3e8a967ef977bb84403
 
 # Activate one of the venvs and test it
 source ~/.iree/bisect/5b0740c97a33edce29e753b14b9ff04789afcc53/.venv/bin/activate
