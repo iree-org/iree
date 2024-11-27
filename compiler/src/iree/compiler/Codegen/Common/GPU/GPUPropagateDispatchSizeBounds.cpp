@@ -9,12 +9,9 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/Passes.h"
-
-#define DEBUG_TYPE "iree-codegen-gpu-propagate-dispatch-size-bounds"
 
 namespace mlir::iree_compiler {
 
@@ -52,8 +49,8 @@ static void applyBounds(FunctionOpInterface funcOp,
 struct GPUPropagateDispatchSizeBoundsPass final
     : impl::GPUPropagateDispatchSizeBoundsPassBase<
           GPUPropagateDispatchSizeBoundsPass> {
-  using GPUPropagateDispatchSizeBoundsPassBase::
-      GPUPropagateDispatchSizeBoundsPassBase;
+  using Base::Base;
+
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
     IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
@@ -76,7 +73,7 @@ struct GPUPropagateDispatchSizeBoundsPass final
               exportOp->getWorkgroupSize()) {
         staticWorkgroupSize =
             llvm::map_to_vector(exportWorkgroupSize->getAsRange<IntegerAttr>(),
-                                [](auto a) { return a.getInt(); });
+                                [](IntegerAttr a) { return a.getInt(); });
       }
     }
 
@@ -89,10 +86,8 @@ struct GPUPropagateDispatchSizeBoundsPass final
       }
     }
     SmallVector<int64_t> staticWorkgroupCounts = getStaticNumWorkgroups(funcOp);
-    if (staticWorkgroupCounts.size() > 3) {
-      funcOp.emitWarning("more than 3 workgroup count dimensions");
-      return;
-    }
+    assert(staticWorkgroupCounts.size() <= 3 &&
+           "workgroup counts are 3D at most");
     for (auto [count, staticCount] :
          llvm::zip(workgroupCounts, staticWorkgroupCounts)) {
       if (staticCount != ShapedType::kDynamic) {

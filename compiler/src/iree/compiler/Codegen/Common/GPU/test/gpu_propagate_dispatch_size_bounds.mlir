@@ -2,11 +2,12 @@
 // RUN:     --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-gpu-propagate-dispatch-size-bounds)))))" \
 // RUN:  | FileCheck %s
 
+// Note: not the real target definition, missing types
 #executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.target<arch = "gfx1100", features = "",
-  wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8,
-    storage =  b64|b32|b16|b8,
+  wgp = <compute =  fp32,
+    storage =  b32,
     subgroup =  shuffle|arithmetic,
-    dot =  dp4xi8toi32, mma = [<WMMA_F32_16x16x16_F16>, <WMMA_F16_16x16x16_F16>, <WMMA_I32_16x16x16_I8>],
+    dot =  none, mma = [],
     subgroup_size_choices = [32, 64],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
@@ -64,10 +65,10 @@ hal.executable private @static {
 
 #executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
   {iree.gpu.target = #iree_gpu.target<arch = "gfx1100", features = "",
-  wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8,
-    storage =  b64|b32|b16|b8,
+  wgp = <compute =  fp32,
+    storage =  b32,
     subgroup =  shuffle|arithmetic,
-    dot =  dp4xi8toi32, mma = [<WMMA_F32_16x16x16_F16>, <WMMA_F16_16x16x16_F16>, <WMMA_I32_16x16x16_I8>],
+    dot =  none, mma = [],
     subgroup_size_choices = [32, 64],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
