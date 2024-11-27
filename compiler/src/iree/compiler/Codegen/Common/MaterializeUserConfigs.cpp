@@ -73,7 +73,7 @@ struct TransformLibraryWithEntrypoint {
 static FailureOr<TransformLibraryWithEntrypoint>
 getTransformLibraryFromPath(ModuleOp compiledModule, StringRef path) {
   SmallVector<StringRef, 2> parts;
-  llvm::SplitString(llvm::StringRef(path), parts, "@");
+  llvm::SplitString(path, parts, "@");
   if (parts.empty()) {
     return failure();
   }
@@ -102,7 +102,7 @@ getTransformLibraryFromPath(ModuleOp compiledModule, StringRef path) {
       dialect->getOrLoadTransformLibraryModule(libraryFileName.str());
   if (failed(maybeTransformLibrary)) {
     return compiledModule.emitError()
-           << "failed to load transform library module: " << libraryFileName;
+           << "Failed to load transform library module: " << libraryFileName;
   }
   LDBG("--found transform library " << libraryFileName << "@"
                                     << entrySequenceName);
