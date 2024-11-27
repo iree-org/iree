@@ -171,7 +171,7 @@ def HAL_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat, AnyCompl
 def HAL_FillPatternType : AnyTypeOf<[I8, I16, I32]>;
 
 def HAL_GlobalRefAttr : Util_AliasedSymbolRefAttr;
-def HAL_GlobalType : AnyTypeOf<[HAL_PrimitiveType, AnyVector, HAL_ObjectType]>;
+def HAL_GlobalType : AnyTypeOf<[HAL_PrimitiveType, AnyVectorOfNonZeroRank, HAL_ObjectType]>;
 def HAL_GlobalPtr : Util_PtrOf<HAL_GlobalType>;
 
 def HAL_IndexAttr : Util_IndexAttrBase<"index">;

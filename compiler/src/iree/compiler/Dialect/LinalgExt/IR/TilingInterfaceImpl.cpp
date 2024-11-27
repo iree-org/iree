@@ -2186,7 +2186,8 @@ SmallVector<Range> CustomOp::getIterationDomainForDimensions(
       convertDimsToSymbols(context, maps, numDims, numSymbols);
 
   // 2b. Concat the affine maps.
-  AffineMap concatMap = inversePermutation(concatAffineMaps(modifiedMaps));
+  AffineMap concatMap =
+      inversePermutation(concatAffineMaps(modifiedMaps, context));
   // TODO: Ideally we should bail if the map is invalid, i.e. we abort from
   // applying the transformation. We could add this to the verifier as well, but
   // it is unclear if this makes the op invalid. Revisit after more experience
