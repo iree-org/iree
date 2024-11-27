@@ -16,7 +16,7 @@ endif()
 
 iree_py_test(
  NAME
-   concurrency_test
+   basic_test
  SRCS
-   "concurrency_test.py"
+   "basic_test.py"
 )

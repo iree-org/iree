@@ -17,7 +17,14 @@ from iree.build.args import (
     configure_arg_parser,
     run_global_arg_handlers,
 )
-from iree.build.executor import BuildEntrypoint, BuildFile, Entrypoint, Executor
+from iree.build.executor import (
+    BuildEntrypoint,
+    BuildFile,
+    DependenceException,
+    Entrypoint,
+    Executor,
+)
+from iree.build.console import ConsoleProgressReporter
 
 __all__ = [
     "iree_build_main",
@@ -123,6 +130,17 @@ class CliMain:
             help="Paths of actions to build (default to top-level actions)",
         )
 
+        test_group = p.add_argument_group(title="Testing flags")
+        test_group.add_argument(
+            "--test-long-display-time-threshold",
+            default=5,
+            type=int,
+            help=argparse.SUPPRESS,
+        )
+        test_group.add_argument(
+            "--test-force-console", action="store_true", help=argparse.SUPPRESS
+        )
+
         configure_arg_parser(p)
         self._define_action_arguments(p)
         self.args = self.arg_parser.parse_args(args)
@@ -176,7 +194,19 @@ class CliMain:
         return rem_args, top_module
 
     def _create_executor(self) -> Executor:
-        executor = Executor(self.args.output_dir, stderr=self.stderr)
+        force_console_mode = self.args.test_force_console
+        is_tty = False
+        if hasattr(self.stderr, "isatty"):
+            is_tty = self.stderr.isatty()
+        executor = Executor(
+            self.args.output_dir,
+            stderr=self.stderr,
+            reporter=ConsoleProgressReporter(
+                self.stderr,
+                long_display_time_threshold=self.args.test_long_display_time_threshold,
+                rich_console=force_console_mode or is_tty,
+            ),
+        )
         executor.analyze(*self.top_module.entrypoints.values())
         return executor
 
@@ -208,7 +238,17 @@ class CliMain:
                     )
                     self.abort()
         executor.build(*build_actions)
+        if executor.failed_deps:
+            print(
+                f"ERROR: Failed to build {len(executor.failed_deps)} actions. Root causes:",
+                file=self.stderr,
+            )
+            for failed_dep in executor.failed_deps:
+                if not failed_dep.is_dependence_failure:
+                    print(f"  * {failed_dep}", file=self.stderr)
+            self.abort()
 
+        # Success report.
         for build_action in build_actions:
             if isinstance(build_action, BuildEntrypoint):
                 for output in build_action.outputs:
