@@ -11,7 +11,6 @@
 #define IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG_H_
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/SCF/IR/DeviceMappingInterface.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -43,8 +42,8 @@ constexpr StringLiteral kTuningSpecAttrName =
 constexpr StringLiteral kKernelConfigSpecName = "__kernel_config";
 
 //===----------------------------------------------------------------------===//
-// Helpers for getting/setting iree_codegen.translation_info attribute on the
-// `hal.executable.export`
+// Helpers for getting/setting iree_codegen.translation_info attribute on a
+// FunctionOpInterface op.
 //===----------------------------------------------------------------------===//
 
 /// Returns the translation info for the `funcOp`. Returns `nullptr` on failure.
@@ -59,8 +58,8 @@ getWorkgroupSize(mlir::FunctionOpInterface funcOp);
 std::optional<int64_t> getSubgroupSize(mlir::FunctionOpInterface funcOp);
 
 /// Sets and overwites the translate executable info for the given entry point.
-/// Returns failure if the given entry point is not exported via
-/// hal.executable.export.
+/// Returns success() at the end. It is convenient when a caller need to
+/// propagate the state.
 LogicalResult
 setTranslationInfo(mlir::FunctionOpInterface entryPoint,
                    IREE::Codegen::TranslationInfoAttr translationInfo);
