@@ -121,36 +121,47 @@ static SmallVector<ReassociationIndices> getCollapsibleLoops(Operation *op) {
            (rDimsSet.count(prePos) && rDimsSet.count(nextPos));
   };
 
-  ReassociationIndices range;
-  AffineExpr preExpr;
-  // Find the largest sequence of dimensions that are
-  // - Either preserved in all maps, or
-  // - are completely absent
-  // This sequence can be collapsed. To find the sequence,
-  // 1) Take the result expressions of one of the indexing maps
-  // 2) Find a sequence of 2 that is found in all maps
-  // 3) Then take last element of this sequence and the next
-  //    result expression, and check if this sequence of 2 is
-  //    found in all maps. If so, add to sequence (to get a sequence of 3)
-  //    and repeat till the last element of sequence and the next result
-  //    expression is not found as a sequence in all maps.
-  for (auto nextExpr :
-       fusionInterfaceOp.getIndexingMapsArray().front().getResults()) {
-    unsigned position = cast<AffineDimExpr>(nextExpr).getPosition();
-    if (!range.empty()) {
-      if (!hasAllMapsSameSequence(preExpr, nextExpr) ||
-          !hasSameIteratorType(preExpr, nextExpr)) {
-        if (range.size() > 1) {
-          contiguousLoops.push_back({range.begin(), range.end()});
-        }
-        range.clear();
+  SmallVector<bool> seenLoop(fusionInterfaceOp.getNumLoops(), false);
+  for (AffineMap indexingMap : fusionInterfaceOp.getIndexingMapsArray()) {
+    ReassociationIndices range;
+    AffineExpr preExpr;
+
+    auto clearRange = [&]() {
+      if (range.size() > 1) {
+        contiguousLoops.push_back(range);
       }
+      range.clear();
+    };
+
+    // Find the largest sequence of dimensions that are
+    // - Either preserved in all maps, or
+    // - are completely absent
+    // This sequence can be collapsed. To find the sequence,
+    // 1) Take the result expressions of one of the indexing maps
+    // 2) Find a sequence of 2 that is found in all maps
+    // 3) Then take last element of this sequence and the next
+    //    result expression, and check if this sequence of 2 is
+    //    found in all maps. If so, add to sequence (to get a sequence of 3)
+    //    and repeat till the last element of sequence and the next result
+    //    expression is not found as a sequence in all maps.
+    for (AffineExpr nextExpr : indexingMap.getResults()) {
+      unsigned position = cast<AffineDimExpr>(nextExpr).getPosition();
+      if (seenLoop[position]) {
+        clearRange();
+        continue;
+      }
+
+      if (!range.empty()) {
+        if (!hasAllMapsSameSequence(preExpr, nextExpr) ||
+            !hasSameIteratorType(preExpr, nextExpr)) {
+          clearRange();
+        }
+      }
+      range.push_back(position);
+      seenLoop[position] = true;
+      preExpr = nextExpr;
     }
-    range.push_back(position);
-    preExpr = nextExpr;
-  }
-  if (range.size() > 1) {
-    contiguousLoops.push_back(range);
+    clearRange();
   }
 
   return contiguousLoops;
@@ -164,13 +175,6 @@ static bool isEligibleForCollapse(Operation *op) {
 
   auto genericOp = dyn_cast<linalg::GenericOp>(op);
   if (!genericOp) {
-    return false;
-  }
-
-  // TODO(guray) There is no mechanism to tell the collapsed indexes to
-  // `tensor.expand_shape`. Once we have this support in MLIR, we can enable
-  // dynamic tensor shapes.
-  if (genericOp.hasDynamicShape()) {
     return false;
   }
 
@@ -902,6 +906,11 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
     // don't collapse any ops in this dispatch.
     iterationCount++;
     if (iterationCount > maxIterations) {
+      LLVM_DEBUG({
+        llvm::dbgs()
+            << "[CollapseDims] : Producer/Consumer updates did not converge in "
+            << maxIterations << " iterations. Skipping...\n";
+      });
       return false;
     }
     // Step 4. For each producer, reduce the number of collapsed dimensions
@@ -937,6 +946,11 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
       llvm::dbgs() << "\n";
     });
   }
+
+  LLVM_DEBUG({
+    llvm::dbgs()
+        << "[CollapseDims] : Updated Producers/Consumers successfully\n";
+  });
 
   bool didCollapse = false;
 
