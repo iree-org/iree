@@ -43,6 +43,7 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
 using IREE::Codegen::MaterializeEncodingInfo;
+using IREE::Codegen::TileMxNxK;
 using IREE::Codegen::TileSwizzle;
 
 static IREE::GPU::MMAAttr chooseIntrinsicMMAAttr(TypeRange eTypes,
@@ -245,10 +246,10 @@ materializeEncodingForTarget(RankedTensorType tensorType,
 
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its operand index in the matmul.
-  auto rank = tensorType.getRank();
   TileMxNxK innerTile;
   std::tie(innerTile.M, innerTile.N, innerTile.K) = mma.getMNKShape();
-  auto encodingInfo = getEncodingInfoForMatmul(encoding, rank, innerTile);
+  auto encodingInfo =
+      IREE::Codegen::getEncodingInfoForMatmul(encoding, innerTile);
   auto fragment =
       static_cast<IREE::GPU::MMAFragment>(encoding.getOperandIndex().getInt());
   encodingInfo.swizzle = getSwizzle(mma, fragment);

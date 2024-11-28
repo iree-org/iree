@@ -31,6 +31,7 @@
 namespace mlir::iree_compiler {
 
 using IREE::Codegen::MaterializeEncodingInfo;
+using IREE::Codegen::TileMxNxK;
 
 #define GEN_PASS_DEF_CPUMATERIALIZEDEVICEENCODINGPASS
 #define GEN_PASS_DEF_CPUMATERIALIZEHOSTENCODINGPASS
@@ -445,8 +446,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
 
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its operand index in the matmul.
-  auto rank = tensorType.getRank();
-  return getEncodingInfoForMatmul(encoding, rank, chosenTileMxNxK);
+  return IREE::Codegen::getEncodingInfoForMatmul(encoding, chosenTileMxNxK);
 }
 
 static FailureOr<MaterializeEncodingValueInfo>

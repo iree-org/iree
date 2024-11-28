@@ -100,16 +100,6 @@ protected:
 /// Returns the RankedTensorType without encodings.
 RankedTensorType dropEncoding(RankedTensorType type);
 
-struct TileMxNxK {
-  int64_t M = 1;
-  int64_t N = 1;
-  int64_t K = 1;
-};
-
-IREE::Codegen::MaterializeEncodingInfo
-getEncodingInfoForMatmul(IREE::Encoding::EncodingAttr encoding, int64_t rank,
-                         TileMxNxK tileMxNxK);
-
 /// Utility method to convert from `set_encoding` op to `pack` operation.
 /// NOTE: `source` could be returned when packing is not needed.
 FailureOr<Value> lowerSetEncodingOpToPackOp(
@@ -138,10 +128,6 @@ void populateShapeIndependentMaterializeEncodingPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn);
-
-// Returns true if `encoding` represents a narrow-N matmul RESULT, e.g. the
-// result of a matvec.
-bool isNarrowNResult(IREE::Encoding::EncodingAttr encoding);
 
 } // namespace mlir::iree_compiler
 

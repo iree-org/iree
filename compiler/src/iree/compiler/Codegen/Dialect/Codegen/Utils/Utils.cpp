@@ -6,6 +6,10 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -36,18 +40,7 @@ bool operator!=(const TileSwizzle &lhs, const TileSwizzle &rhs) {
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               TileSwizzle::Dim::Kind kind) {
-  switch (kind) {
-  case TileSwizzle::Dim::Kind::Internal:
-    return os << "Internal";
-  case TileSwizzle::Dim::Kind::CrossThread:
-    return os << "CrossThread";
-  case TileSwizzle::Dim::Kind::CrossIntrinsic:
-    return os << "CrossIntrinsic";
-  default:
-    // Required by GCC.
-    assert(false);
-    return os;
-  }
+  return os << convertSwizzleKindToString(kind);
 }
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, TileSwizzle::Dim dim) {
@@ -265,6 +258,215 @@ getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape) {
   for (auto e : expandShape) {
     for (auto d : e) {
       result.push_back(d.size);
+    }
+  }
+  return result;
+}
+
+MaterializeEncodingInfo
+getEncodingInfoForMatmul(Encoding::EncodingAttr encoding, TileMxNxK tileMxNxK) {
+  MaterializeEncodingInfo encodingInfo;
+  auto cDims = getEncodingContractionDims(encoding);
+  // The following expects M, N, K, and Batch sizes of at most 1 for now
+  assert(cDims->m.size() <= 1 && cDims->n.size() <= 1 && cDims->k.size() == 1 &&
+         cDims->batch.size() <= 1 &&
+         "Expected at most one M, N, K, and Batch dimension");
+  std::optional<unsigned> batchDim =
+      cDims->batch.empty() ? std::nullopt
+                           : encoding.mapDimToOperandIndex(cDims->batch[0]);
+  std::optional<unsigned> mDim =
+      cDims->m.empty() ? std::nullopt
+                       : encoding.mapDimToOperandIndex(cDims->m[0]);
+  std::optional<unsigned> nDim =
+      cDims->n.empty() ? std::nullopt
+                       : encoding.mapDimToOperandIndex(cDims->n[0]);
+  std::optional<unsigned> kDim = encoding.mapDimToOperandIndex(cDims->k[0]);
+  if (batchDim.has_value()) {
+    encodingInfo.outerDimsPerm.push_back(batchDim.value());
+  }
+  if (mDim.has_value()) {
+    encodingInfo.outerDimsPerm.push_back(mDim.value());
+    encodingInfo.innerDimsPos.push_back(mDim.value());
+    encodingInfo.innerTileSizes.push_back(tileMxNxK.M);
+  }
+  if (nDim.has_value()) {
+    encodingInfo.outerDimsPerm.push_back(nDim.value());
+    encodingInfo.innerDimsPos.push_back(nDim.value());
+    encodingInfo.innerTileSizes.push_back(tileMxNxK.N);
+  }
+  if (kDim.has_value()) {
+    encodingInfo.outerDimsPerm.push_back(kDim.value());
+    encodingInfo.innerDimsPos.push_back(kDim.value());
+    encodingInfo.innerTileSizes.push_back(tileMxNxK.K);
+  }
+  return encodingInfo;
+}
+
+static RankedTensorType dropEncoding(RankedTensorType type) {
+  return RankedTensorType::get(type.getShape(), type.getElementType());
+}
+
+static Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
+                                         ValueRange convertedInputOperands,
+                                         ValueRange convertedOutputOperands) {
+  SmallVector<Value> operands;
+  operands.append(convertedInputOperands.begin(), convertedInputOperands.end());
+  operands.append(convertedOutputOperands.begin(),
+                  convertedOutputOperands.end());
+  return mlir::clone(builder, op,
+                     {dropEncoding(cast<RankedTensorType>(
+                         convertedOutputOperands[0].getType()))},
+                     operands);
+}
+
+static RankedTensorType
+getExpandedType(RankedTensorType type, bool isBatched, bool isTransposed,
+                SmallVectorImpl<ReassociationIndices> &ri) {
+  if (!isBatched) {
+    ri.assign({{0, 1}, {2, 3}});
+    if (!isTransposed) {
+      return RankedTensorType::get(
+          {1, type.getDimSize(0), 1, type.getDimSize(1)},
+          type.getElementType());
+    }
+    return RankedTensorType::get({type.getDimSize(0), 1, type.getDimSize(1), 1},
+                                 type.getElementType());
+  }
+
+  ri.assign({{0}, {1, 2}, {3, 4}});
+  if (!isTransposed) {
+    return RankedTensorType::get(
+        {type.getDimSize(0), 1, type.getDimSize(1), 1, type.getDimSize(2)},
+        type.getElementType());
+  }
+  return RankedTensorType::get(
+      {type.getDimSize(0), type.getDimSize(1), 1, type.getDimSize(2), 1},
+      type.getElementType());
+}
+
+/// Given an input Value and a desired output element type, create and return
+/// an element-wise linalg::GenericOp that extends the input Value to the
+/// output element type.
+static Value createElementWiseExtUIOp(OpBuilder &builder, Value input,
+                                      Location loc, Type outElemType) {
+  auto inputType = cast<RankedTensorType>(input.getType());
+  SmallVector<AffineMap> maps(
+      2, builder.getMultiDimIdentityMap(inputType.getRank()));
+  SmallVector<utils::IteratorType> iteratorTypes(inputType.getRank(),
+                                                 utils::IteratorType::parallel);
+  auto castedType = inputType.clone(outElemType);
+  SmallVector<OpFoldResult> inputMixedSizes =
+      tensor::getMixedSizes(builder, loc, input);
+  Value init =
+      builder.create<tensor::EmptyOp>(loc, inputMixedSizes, outElemType);
+  return builder
+      .create<linalg::GenericOp>(
+          loc, castedType, input, init, maps, iteratorTypes,
+          [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
+            Value castRes =
+                b.create<arith::ExtUIOp>(nestedLoc, outElemType, args[0])
+                    ->getResult(0);
+            b.create<linalg::YieldOp>(nestedLoc, castRes);
+          })
+      .getResult(0);
+}
+
+/// If needed, expand and the input Value, and return the resulting input with
+/// the canonical mmt4d input shape. If the input element type is unsigned,
+/// create a producer Linalg::GenericOp on the input that unsigned extends the
+/// input to the output element type. This extension is required to keep the
+/// unsignedness information on the input for ukernels. If `transpose` is true,
+/// the `linalgOp`'s indexing maps are transposed.
+static Value getMmt4dOperand(Value value, linalg::LinalgOp linalgOp,
+                             bool transpose, OpBuilder &builder,
+                             SmallVectorImpl<ReassociationIndices> &ri,
+                             ArrayRef<Type> elemTypes, int operandIdx) {
+  assert(linalgOp.getNumDpsInputs() == 2);
+  assert(linalgOp.getNumDpsInits() == 1);
+  auto cDims = linalg::inferContractionDims(linalgOp);
+  Location loc = linalgOp->getLoc();
+  Value expandedValue = value;
+  // If vecmat with non-rhs operandIdx or matvec with non-lhs operandIdx, the
+  // operand is a vector and must be extended
+  if ((cDims->m.empty() && operandIdx != 1) ||
+      (cDims->n.empty() && operandIdx != 0)) {
+    auto type = cast<RankedTensorType>(value.getType());
+    RankedTensorType newType = getExpandedType(
+        type, /*isBatched=*/!cDims->batch.empty(),
+        /*isTransposed=*/operandIdx == 2 && (transpose ^ cDims->n.empty()), ri);
+    expandedValue =
+        builder.create<tensor::ExpandShapeOp>(loc, newType, value, ri);
+  }
+  if (elemTypes[operandIdx].isUnsignedInteger()) {
+    return createElementWiseExtUIOp(builder, expandedValue, loc,
+                                    elemTypes.back());
+  }
+  return expandedValue;
+}
+
+FailureOr<Operation *>
+lowerContractionOpWithEncoding(OpBuilder &builder, linalg::LinalgOp linalgOp,
+                               ValueRange operands, bool transposeNarrowN,
+                               ResolveEncodingInfoFn getEncodingInfo) {
+  if (!linalgOp.hasPureTensorSemantics()) {
+    return failure();
+  }
+
+  auto inputs = linalgOp.getDpsInputOperands();
+  auto outputs = linalgOp.getDpsInits();
+
+  auto lhsType = cast<RankedTensorType>(inputs[0]->get().getType());
+  auto rhsType = cast<RankedTensorType>(inputs[1]->get().getType());
+  auto resultType = cast<RankedTensorType>(outputs[0].getType());
+  auto lhsEncoding = IREE::Encoding::getEncodingAttr(lhsType);
+  auto rhsEncoding = IREE::Encoding::getEncodingAttr(rhsType);
+  auto resultEncoding = IREE::Encoding::getEncodingAttr(resultType);
+  if (!lhsEncoding || !rhsEncoding || !resultEncoding) {
+    return failure();
+  }
+
+  if (lhsEncoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_LHS ||
+      rhsEncoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_RHS ||
+      resultEncoding.getOperandIndex().getValue() !=
+          IREE::Encoding::MATMUL_RESULT) {
+    return failure();
+  }
+
+  FailureOr<MaterializeEncodingInfo> encodingInfo =
+      getEncodingInfo(cast<RankedTensorType>(linalgOp->getResultTypes()[0]));
+
+  Operation *result;
+  if (failed(encodingInfo)) {
+    result = dropEncodingAndCloneOp(builder, linalgOp,
+                                    operands.take_front(inputs.size()),
+                                    operands.drop_front(inputs.size()));
+  } else {
+    bool transpose = transposeNarrowN && isNarrowNResult(resultEncoding);
+    SmallVector<Type> elemTypes = lhsEncoding.getElementTypesArray();
+    SmallVector<ReassociationIndices> ri;
+    Value newLhs = getMmt4dOperand(operands[0], linalgOp, transpose, builder,
+                                   ri, elemTypes, /*operandIdx=*/0);
+    Value newRhs = getMmt4dOperand(operands[1], linalgOp, transpose, builder,
+                                   ri, elemTypes, /*operandIdx=*/1);
+    Value newResult = getMmt4dOperand(operands[2], linalgOp, transpose, builder,
+                                      ri, elemTypes, /*operandIdx=*/2);
+    if (transpose) {
+      std::swap(newLhs, newRhs);
+    }
+    Type newResultType = newResult.getType();
+    auto cDims = IREE::Encoding::getEncodingContractionDims(lhsEncoding);
+    if (cDims->batch.empty()) {
+      result = builder.create<linalg::Mmt4DOp>(linalgOp.getLoc(), newResultType,
+                                               ValueRange{newLhs, newRhs},
+                                               ValueRange{newResult});
+    } else {
+      result = builder.create<linalg::BatchMmt4DOp>(
+          linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
+          ValueRange{newResult});
+    }
+    if (!ri.empty()) {
+      result = builder.create<tensor::CollapseShapeOp>(
+          linalgOp->getLoc(), operands[2].getType(), result->getResult(0), ri);
     }
   }
   return result;

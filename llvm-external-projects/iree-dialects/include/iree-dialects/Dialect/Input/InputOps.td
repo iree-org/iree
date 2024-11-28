@@ -549,7 +549,7 @@ def IREEInput_TensorLoadOp : IREEInput_PureOp<"tensor.load", [
     Variadic<IREEInput_Dim>:$indices
   );
   let results = (outs
-    AnyTypeOf<[IREEInput_PrimitiveType, AnyVector]>:$result
+    AnyTypeOf<[IREEInput_PrimitiveType, AnyVectorOfNonZeroRank]>:$result
   );
 
   let assemblyFormat = [{
@@ -573,7 +573,7 @@ def IREEInput_TensorStoreOp : IREEInput_PureOp<"tensor.store", [
   }];
 
   let arguments = (ins
-    AnyTypeOf<[IREEInput_PrimitiveType, AnyVector]>:$value,
+    AnyTypeOf<[IREEInput_PrimitiveType, AnyVectorOfNonZeroRank]>:$value,
     IREEInput_Tensor:$target,
     IREEInput_ShapeDynamicDims:$target_dims,
     Variadic<IREEInput_Dim>:$indices

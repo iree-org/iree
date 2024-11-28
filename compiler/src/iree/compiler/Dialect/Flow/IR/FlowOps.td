@@ -1269,7 +1269,7 @@ def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
     Variadic<FLOW_Dim>:$indices
   );
   let results = (outs
-    AnyTypeOf<[FLOW_PrimitiveType, AnyVector]>:$result
+    AnyTypeOf<[FLOW_PrimitiveType, AnyVectorOfNonZeroRank]>:$result
   );
 
   let assemblyFormat = [{
@@ -1315,7 +1315,7 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
   }];
 
   let arguments = (ins
-    AnyTypeOf<[FLOW_PrimitiveType, AnyVector]>:$value,
+    AnyTypeOf<[FLOW_PrimitiveType, AnyVectorOfNonZeroRank]>:$value,
     FLOW_Tensor:$target,
     FLOW_ShapeDynamicDims:$target_dims,
     Variadic<FLOW_Dim>:$indices
