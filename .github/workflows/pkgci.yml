@@ -104,6 +104,12 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_onnx')
     uses: ./.github/workflows/pkgci_test_onnx.yml
 
+  test_sharktank:
+    name: Test Sharktank
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_sharktank')
+    uses: ./.github/workflows/pkgci_test_sharktank.yml
+
   test_tensorflow:
     name: Test TensorFlow
     needs: [setup, build_packages]
