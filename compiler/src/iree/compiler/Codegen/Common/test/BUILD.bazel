@@ -57,6 +57,7 @@ iree_lit_test_suite(
             "iree_comprehensive_bufferize.mlir",
             "iree_expand_strided_metadata.mlir",
             "iree_loop_invariant_code_motion.mlir",
+            "linearize_memrefs.mlir",
             "link_tuning_specs.mlir",
             "llvmcpu_materialize_encoding.mlir",
             "lower_ukernel_to_calls.mlir",
