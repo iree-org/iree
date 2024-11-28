@@ -20,3 +20,10 @@ iree_py_test(
  SRCS
    "basic_test.py"
 )
+
+iree_py_test(
+ NAME
+   net_test
+ SRCS
+   "net_test.py"
+)
