@@ -478,10 +478,17 @@ bool CollapseInfo::updateFromConsumer(OpOperand *operand,
     }
   }
 
-  // Remove all collapsable loops in `producer` that are not collapsable in
-  // `consumer` (set intersect)
-  bool didChange = collapsableLoops.remove_if(
-      [&](long elem) -> bool { return !consumerCollapsable.contains(elem); });
+  // Remove all collapsable loops in `producer` that are present and not
+  // collapsable in `consumer` (set subtract).
+  bool didChange = collapsableLoops.remove_if([&](long elem) -> bool {
+    if (consumerCollapsable.contains(elem)) {
+      return false;
+    }
+    if (!consumerToProducerMap->isFunctionOfDim(elem)) {
+      return false;
+    }
+    return true;
+  });
 
   // Now update the reassociation indicies given the updated `collapsableLoops`
   // and `consumerCollapsableMap`.
@@ -520,12 +527,16 @@ bool CollapseInfo::updateFromConsumer(OpOperand *operand,
         }
         newIndicies.clear();
         collapseIntoIdx = kUninitialized;
+      } else if (!consumerCollapseMap.contains(index)) {
+        // (2) `index` is not present in consumer, so it is collapsable and can
+        // be collapsed into `collapseIntoIndex`.
+        newIndicies.push_back(index);
       } else if (collapseIntoIdx == kUninitialized) {
-        // (2) First occurance of collapsable loop, set collapseIntoIdx.
+        // (3) First occurance of collapsable loop, set collapseIntoIdx.
         collapseIntoIdx = consumerCollapseMap.at(index);
         newIndicies.push_back(index);
       } else if (consumerCollapseMap.at(index) != collapseIntoIdx) {
-        // (3) `index` is collapsable but not collapsable into the other loops.
+        // (5) `index` is collapsable but not collapsable into the other loops.
         // So, split them and look for other loops to collapse `index` into.
         didChange = true;
         if (newIndicies.size() > 1) {
@@ -535,7 +546,7 @@ bool CollapseInfo::updateFromConsumer(OpOperand *operand,
         collapseIntoIdx = consumerCollapseMap[index];
         newIndicies.push_back(index);
       } else {
-        // (4) `index` is collapsable and can be collapsed into
+        // (6) `index` is collapsable and can be collapsed into
         // `collapseIntoIndex`.
         newIndicies.push_back(index);
       }
@@ -987,6 +998,12 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
               return failure();
             });
     if (failed(maybeReplacements)) {
+      LLVM_DEBUG({
+        llvm::dbgs() << "[CollapseDims] : Failed to collapse dimensions for "
+                        "operation:\n";
+        opToCollapse->print(llvm::dbgs());
+        llvm::dbgs() << "\n";
+      });
       continue;
     }
     didCollapse = true;
