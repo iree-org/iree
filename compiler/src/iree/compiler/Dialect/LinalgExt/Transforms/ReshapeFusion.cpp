@@ -654,12 +654,6 @@ collapseOpIterationDims(AttentionOp op,
       }))
     return failure();
 
-  FailureOr<SmallVector<int64_t>> staticLoops = op.getStaticLoopRanges();
-  if (failed(staticLoops) ||
-      llvm::any_of(staticLoops.value(), ShapedType::isDynamic)) {
-    return failure();
-  }
-
   CollapsingInfo collapsingInfo;
   if (failed(
           collapsingInfo.initialize(op.getNumLoops(), foldedIterationDims))) {

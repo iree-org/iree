@@ -676,6 +676,7 @@ hoistTensorReshapesOutOfDispatchRegion(
       // 4a. Keep the same yield value if the producer is not a
       // `tensor.expand_shape` op.
       newReturnTypes.push_back(yieldedValue.getType());
+      newDynamicDims.append(dynamicDimsList.begin(), dynamicDimsList.end());
       newYieldVals.push_back(yieldedValue);
       continue;
     }
@@ -970,6 +971,14 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(opToCollapse);
 
+    LLVM_DEBUG({
+      llvm::dbgs() << "[CollapseDims] : Trying to collapse dimensions for:\n";
+      info.print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+      opToCollapse->print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    });
+
     using ResultsType = FailureOr<SmallVector<Value>>;
     auto maybeReplacements =
         llvm::TypeSwitch<Operation *, ResultsType>(opToCollapse)
@@ -1000,9 +1009,7 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
     if (failed(maybeReplacements)) {
       LLVM_DEBUG({
         llvm::dbgs() << "[CollapseDims] : Failed to collapse dimensions for "
-                        "operation:\n";
-        opToCollapse->print(llvm::dbgs());
-        llvm::dbgs() << "\n";
+                        "operation\n";
       });
       continue;
     }
