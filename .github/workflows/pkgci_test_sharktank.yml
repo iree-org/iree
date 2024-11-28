@@ -56,6 +56,7 @@ jobs:
           repository: iree-org/iree-test-suites
           ref: a0c84d59c4332463dd46a3c4877d8e0ab2e0a80d
           path: iree-test-suites
+          lfs: true
       - name: Install Sharktank models test suite requirements
         run: |
           source ${VENV_DIR}/bin/activate
