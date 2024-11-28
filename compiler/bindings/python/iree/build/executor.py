@@ -8,6 +8,7 @@ from typing import Callable, Collection, IO, Type, TypeVar
 
 import concurrent.futures
 import enum
+import json
 import math
 import multiprocessing
 import os
@@ -128,6 +129,7 @@ class Executor:
         self.failed_deps: set["BuildDependency"] = set()
         self.stderr = stderr
         self.reporter = reporter
+        self.metadata_lock = threading.RLock()
         BuildContext("", self)
 
     def check_path_not_exists(self, path: str, for_entity):
@@ -160,6 +162,7 @@ class Executor:
         return existing
 
     def write_status(self, message: str):
+        self.reporter.reset_display()
         print(message, file=self.stderr)
 
     def get_root(self, namespace: FileNamespace) -> Path:
@@ -294,6 +297,9 @@ class BuildDependency:
         self.future.set_result(self)
 
 
+BuildFileMetadata = dict[str, str | int | bool | float]
+
+
 class BuildFile(BuildDependency):
     """Generated file in the build tree."""
 
@@ -321,6 +327,35 @@ class BuildFile(BuildDependency):
         path = self.executor.get_root(self.namespace) / self.path
         path.parent.mkdir(parents=True, exist_ok=True)
         return path
+
+    def access_metadata(
+        self,
+        mutation_callback: Callable[[BuildFileMetadata], bool] | None = None,
+    ) -> BuildFileMetadata:
+        """Accesses persistent metadata about the build file.
+
+        This is intended for the storage of small amounts of metadata relevant to the
+        build system for performing up-to-date checks and the like.
+
+        If a `mutation_callback=` is provided, then any modifications it makes will be
+        persisted prior to returning. Using a callback in this fashion holds a lock
+        and avoids data races. If the callback returns True, it is persisted.
+        """
+        with self.executor.metadata_lock:
+            metadata = _load_metadata(self.executor)
+            path_metadata = metadata.get("paths")
+            if path_metadata is None:
+                path_metadata = {}
+                metadata["paths"] = path_metadata
+            file_key = f"{self.namespace}/{self.path}"
+            file_metadata = path_metadata.get(file_key)
+            if file_metadata is None:
+                file_metadata = {}
+                path_metadata[file_key] = file_metadata
+            if mutation_callback:
+                if mutation_callback(file_metadata):
+                    _save_metadata(self.executor, metadata)
+            return file_metadata
 
     def __repr__(self):
         return f"BuildFile[{self.namespace}]({self.path})"
@@ -658,3 +693,20 @@ class Scheduler:
 
 # Type aliases.
 BuildFileLike = BuildFile | str
+
+# Private utilities.
+_METADATA_FILENAME = ".metadata.json"
+
+
+def _load_metadata(executor: Executor) -> dict:
+    path = executor.output_dir / _METADATA_FILENAME
+    if not path.exists():
+        return {}
+    with open(path, "rb") as f:
+        return json.load(f)
+
+
+def _save_metadata(executor: Executor, metadata: dict):
+    path = executor.output_dir / _METADATA_FILENAME
+    with open(path, "wt") as f:
+        json.dump(metadata, f, sort_keys=True, indent=2)

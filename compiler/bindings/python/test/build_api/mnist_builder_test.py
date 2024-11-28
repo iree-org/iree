@@ -90,10 +90,7 @@ class MnistBuilderTest(unittest.TestCase):
         mod = load_build_module(THIS_DIR / "mnist_builder.py")
         out_file = io.StringIO()
         err_file = io.StringIO()
-        with self.assertRaisesRegex(
-            IOError,
-            re.escape("Failed to fetch URL 'https://github.com/iree-org/doesnotexist'"),
-        ):
+        with self.assertRaises(SystemExit):
             iree_build_main(
                 mod,
                 args=[
@@ -104,6 +101,7 @@ class MnistBuilderTest(unittest.TestCase):
                 stdout=out_file,
                 stderr=err_file,
             )
+        self.assertIn("ERROR:", err_file.getvalue())
 
     def testBuildNonDefaultSubTarget(self):
         mod = load_build_module(THIS_DIR / "mnist_builder.py")
