@@ -252,7 +252,7 @@ deserializeEncodingInfo(DictionaryAttr attr) {
 }
 
 bool isIdentityLayout(const MaterializeEncodingInfo &info) {
-  // It is not an identity layout if swizzle presents. The swizzle is an
+  // It is not an identity layout if swizzle is present. The swizzle is an
   // optional variable. User should not set the field when they do not need
   // swizzle.
   return info.innerDimsPos.empty() && info.innerTileSizes.empty() &&
