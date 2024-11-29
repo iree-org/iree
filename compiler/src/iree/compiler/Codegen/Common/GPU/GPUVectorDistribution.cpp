@@ -314,6 +314,11 @@ LogicalResult distributeVectorOps(Operation *root,
     return failure();
   }
 
+  // Remove signature after distribution.
+  root->walk([](Operation *op) {
+    op->removeDiscardableAttr(kVectorLayoutFetcherStorageAttrName);
+  });
+
   if (options.verifyConversion()) {
     WalkResult hasConversionOp = root->walk([](Operation *op) {
       if (isa<IREE::VectorExt::ToSIMDOp, IREE::VectorExt::ToSIMTOp>(op)) {

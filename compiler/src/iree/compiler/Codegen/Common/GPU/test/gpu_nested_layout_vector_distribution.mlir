@@ -955,21 +955,11 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK:      #[[$LAYOUT:.+]] = #iree_vector_ext.nested_layout
-// CHECK-SAME:   subgroup_tile = [2, 2],
-// CHECK-SAME:   batch_tile = [4, 2]
-// CHECK-SAME:   outer_tile = [1, 2]
-// CHECK-SAME:   thread_tile = [16, 4]
-// CHECK-SAME:   element_tile = [2, 2]
-// CHECK-SAME:   subgroup_strides = [1, 2],
-// CHECK-SAME:   thread_strides = [1, 16]
-
 // CHECK-LABEL: func @transpose
 // CHECK: iree_vector_ext.to_simt %{{.*}} : vector<64x256xf16> -> vector<2x4x2x1x2x2xf16>
 // CHECK: vector.transpose %{{.*}}, [1, 0, 3, 2, 5, 4] : vector<2x4x2x1x2x2xf16> to vector<4x2x1x2x2x2xf16>
 // CHECK: math.sqrt %{{.*}} : vector<4x2x1x2x2x2xf16>
 // CHECK: iree_vector_ext.to_simd %{{.*}} : vector<4x2x1x2x2x2xf16> -> vector<256x64xf16>
-// CHECK: return {{.*}}#[[$LAYOUT]]
 
 // -----
 
