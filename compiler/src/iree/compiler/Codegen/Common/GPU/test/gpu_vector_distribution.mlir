@@ -62,6 +62,40 @@ func.func @distribute_scf_for(%a: vector<16x16xi32>, %b: vector<16x16xi32>) -> v
   return %out : vector<16x16xi32>
 }
 
+#layout_0d = #iree_vector_ext.nested_layout<
+  subgroup_tile = [],
+  batch_tile = [],
+  outer_tile = [],
+  thread_tile = [],
+  element_tile = [],
+
+  subgroup_strides = [],
+  thread_strides = []
+>
+
+// CHECK-LABEL: @distribute_scf_for_0d
+func.func @distribute_scf_for_0d(%a: vector<i32>, %b: vector<i32>) -> vector<i32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c128 = arith.constant 128 : index
+  %cst_0 = arith.constant 0 : i32
+  // CHECK: %[[ROOT:.*]] = arith.constant dense<0> : vector<i32>
+  %root = arith.constant dense<0> : vector<i32>
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout_0d) : vector<i32>
+  // CHECK: iter_args(%[[ARG0:.*]] = %[[ROOT]]) -> (vector<i32>)
+  %out = scf.for %i = %c0 to %c128 step %c1 iter_args(%arg0 = %rootl) -> (vector<i32>) {
+    // CHECK-DAG: %[[B:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<i32> -> vector<i32>
+    // CHECK-DAG: %[[C:.*]] = arith.muli %[[ARG0]], %[[B]] {{.*}} : vector<i32>
+    %c = arith.muli %arg0, %b : vector<i32>
+    // CHECK-DAG: %[[A:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<i32> -> vector<i32>
+    // CHECK-DAG: %[[D:.*]] = arith.addi %[[C]], %[[A]] {{.*}} : vector<i32>
+    %d = arith.addi %c, %a : vector<i32>
+    // CHECK: scf.yield %[[D]] : vector<i32>
+    scf.yield %d : vector<i32>
+  }
+  return %out : vector<i32>
+}
+
 builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
