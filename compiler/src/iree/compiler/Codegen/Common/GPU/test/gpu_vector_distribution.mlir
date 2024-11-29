@@ -85,10 +85,10 @@ func.func @distribute_scf_for_0d(%a: vector<i32>, %b: vector<i32>) -> vector<i32
   // CHECK: iter_args(%[[ARG0:.*]] = %[[ROOT]]) -> (vector<i32>)
   %out = scf.for %i = %c0 to %c128 step %c1 iter_args(%arg0 = %rootl) -> (vector<i32>) {
     // CHECK-DAG: %[[B:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<i32> -> vector<i32>
-    // CHECK-DAG: %[[C:.*]] = arith.muli %[[ARG0]], %[[B]] {{.*}} : vector<i32>
+    // CHECK-DAG: %[[C:.*]] = arith.muli %[[ARG0]], %[[B]] : vector<i32>
     %c = arith.muli %arg0, %b : vector<i32>
     // CHECK-DAG: %[[A:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<i32> -> vector<i32>
-    // CHECK-DAG: %[[D:.*]] = arith.addi %[[C]], %[[A]] {{.*}} : vector<i32>
+    // CHECK-DAG: %[[D:.*]] = arith.addi %[[C]], %[[A]] : vector<i32>
     %d = arith.addi %c, %a : vector<i32>
     // CHECK: scf.yield %[[D]] : vector<i32>
     scf.yield %d : vector<i32>
