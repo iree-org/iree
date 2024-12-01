@@ -670,13 +670,15 @@ hoistTensorReshapesOutOfDispatchRegion(
   SmallVector<SmallVector<ReassociationIndices>> allReassociationIndices;
   ValueRange dynamicDimsList = dispatchOp.getResultDims();
   Location loc = dispatchOp.getLoc();
-  for (Value yieldedValue : returnOp->getOperands()) {
+  for (auto [resultIndex, yieldedValue] :
+       llvm::enumerate(returnOp->getOperands())) {
     auto expandShapeOp = yieldedValue.getDefiningOp<tensor::ExpandShapeOp>();
     if (!expandShapeOp) {
       // 4a. Keep the same yield value if the producer is not a
       // `tensor.expand_shape` op.
       newReturnTypes.push_back(yieldedValue.getType());
-      newDynamicDims.append(dynamicDimsList.begin(), dynamicDimsList.end());
+      ValueRange resultDims = dispatchOp.getResultDynamicDims(resultIndex);
+      newDynamicDims.append(resultDims.begin(), resultDims.end());
       newYieldVals.push_back(yieldedValue);
       continue;
     }
@@ -761,9 +763,24 @@ hoistTensorReshapesOutOfDispatchRegion(
       rewriter.replaceAllUsesWith(origResult, returnValue);
       continue;
     }
+
+    auto shapedType = dyn_cast<ShapedType>(origResult.getType());
+    assert(shapedType && "result should be shaped type");
+
+    SmallVector<OpFoldResult> outputShape;
+    ValueRange dynamicDims = dispatchOp.getResultDynamicDims(index);
+    for (int64_t dim : shapedType.getShape()) {
+      if (ShapedType::isDynamic(dim)) {
+        outputShape.push_back(dynamicDims.front());
+        dynamicDims.drop_front();
+        continue;
+      }
+      outputShape.push_back(rewriter.getIndexAttr(dim));
+    }
+
     auto newExpandShapeOp = rewriter.create<tensor::ExpandShapeOp>(
         loc, origResult.getType(), returnValue,
-        allReassociationIndicesRef.front());
+        allReassociationIndicesRef.front(), outputShape);
     allReassociationIndicesRef = allReassociationIndicesRef.drop_front();
     rewriter.replaceAllUsesWith(origResult, newExpandShapeOp.getResult());
   }
