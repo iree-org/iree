@@ -119,6 +119,7 @@ iree_cc_library(
     "LowerUKernelsToCalls.cpp"
     "MaterializeEncodingIntoNop.cpp"
     "MaterializeEncodingIntoPackUnPack.cpp"
+    "MaterializeTuningSpecsPass.cpp"
     "MemrefCopyToLinalg.cpp"
     "NormalizeLoopBounds.cpp"
     "OptimizeTensorInsertExtractSlices.cpp"
@@ -163,6 +164,7 @@ iree_cc_library(
     MLIRArithUtils
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
+    MLIRBytecodeWriter
     MLIRDestinationStyleOpInterface
     MLIRFuncDialect
     MLIRFuncTransforms
@@ -180,6 +182,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRMemRefUtils
+    MLIRParser
     MLIRPass
     MLIRSCFDialect
     MLIRSCFToControlFlow
@@ -257,6 +260,7 @@ iree_cc_library(
     MLIRMemRefTransformOps
     MLIRPDLDialect
     MLIRPDLInterpDialect
+    MLIRParser
     MLIRPass
     MLIRRewrite
     MLIRSCFDialect
