@@ -86,6 +86,10 @@ MatmulNarrowDim getMatmulNarrowDim(linalg::LinalgOp linalgOp,
 /// value.
 MatmulNarrowDim getMatmulNarrowDim(EncodingAttr encoding);
 
+// Returns true if `encoding` represents a narrow-N matmul RESULT, e.g. the
+// result of a matvec.
+bool isNarrowNResult(EncodingAttr encoding);
+
 } // namespace mlir::iree_compiler::IREE::Encoding
 
 #endif // IREE_COMPILER_DIALECT_ENCODING_IR_ENCODINGTYPES_H_

@@ -8,7 +8,6 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Patterns.h"
 #include "iree/compiler/Utils/IntegerSet.h"
@@ -29,6 +28,10 @@
 #define DEBUG_TYPE "iree-util-propagate-subranges"
 
 namespace mlir::iree_compiler::IREE::Util {
+
+#define GEN_PASS_DEF_PROPAGATESUBRANGESPASS
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc"
+
 namespace {
 
 // This pass is paired with the subrange type. Any type implementing the
@@ -634,14 +637,8 @@ static void expandSubranges(Operation *op, SymbolTable &symbolTable,
 // are always wrapped in a subrange op, with the elision/deduplication/etc left
 // until cleanup.
 class PropagateSubrangesPass
-    : public PropagateSubrangesBase<PropagateSubrangesPass> {
+    : public impl::PropagateSubrangesPassBase<PropagateSubrangesPass> {
 public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<mlir::scf::SCFDialect>();
-    registry.insert<IREE::Util::UtilDialect>();
-  }
-
   void runOnOperation() override {
     auto rootOp = getOperation();
     SymbolTable symbolTable(rootOp);
@@ -669,9 +666,5 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createPropagateSubrangesPass() {
-  return std::make_unique<PropagateSubrangesPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Util

@@ -23,7 +23,7 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
-#define GEN_PASS_DEF_TRANSLATEEXECUTABLESPASS
+#define GEN_PASS_DEF_TRANSLATEALLEXECUTABLESPASS
 #define GEN_PASS_DEF_TRANSLATETARGETEXECUTABLEVARIANTSPASS
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
 
@@ -75,14 +75,14 @@ struct TranslateTargetExecutableVariantsPass
 };
 
 //===----------------------------------------------------------------------===//
-// --iree-hal-translate-executables
+// --iree-hal-translate-all-executables
 //===----------------------------------------------------------------------===//
 
-struct TranslateExecutablesPass
-    : public IREE::HAL::impl::TranslateExecutablesPassBase<
-          TranslateExecutablesPass> {
-  using IREE::HAL::impl::TranslateExecutablesPassBase<
-      TranslateExecutablesPass>::TranslateExecutablesPassBase;
+struct TranslateAllExecutablesPass
+    : public IREE::HAL::impl::TranslateAllExecutablesPassBase<
+          TranslateAllExecutablesPass> {
+  using IREE::HAL::impl::TranslateAllExecutablesPassBase<
+      TranslateAllExecutablesPass>::TranslateAllExecutablesPassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();

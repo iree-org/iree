@@ -261,6 +261,7 @@ SOURCES
   __main__.py
   args.py
   compile_actions.py
+  console.py
   executor.py
   lang.py
   main.py
