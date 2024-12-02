@@ -23,6 +23,8 @@ namespace mlir::iree_compiler {
 
 using namespace IREE::Encoding;
 using IREE::Codegen::MaterializeEncodingInfo;
+using IREE::Codegen::MaterializeEncodingValueFn;
+using IREE::Codegen::MaterializeEncodingValueInfo;
 
 namespace {
 struct MaterializeEncodingIntoNopPass final

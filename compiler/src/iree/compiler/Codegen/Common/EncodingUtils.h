@@ -19,14 +19,6 @@ using MaterializeEncodingFn =
     std::function<FailureOr<IREE::Codegen::MaterializeEncodingInfo>(
         RankedTensorType, IREE::HAL::ExecutableTargetAttr targetAttr)>;
 
-struct MaterializeEncodingValueInfo {
-  SmallVector<Value> innerTileSizes;
-};
-
-using MaterializeEncodingValueFn =
-    std::function<FailureOr<MaterializeEncodingValueInfo>(
-        RankedTensorType, OpBuilder &, Location)>;
-
 //===---------------------------------------------------------------------===//
 // TypeConverter
 //===---------------------------------------------------------------------===//
@@ -69,13 +61,13 @@ public:
   OpMaterializeEncodingPattern(
       MLIRContext *context,
       const MaterializeEncodingTypeConverter &typeConverter,
-      MaterializeEncodingValueFn materializeEncodingValueFn = {},
+      IREE::Codegen::MaterializeEncodingValueFn materializeEncodingValueFn = {},
       PatternBenefit benefit = 1)
       : OpConversionPattern<OpTy>(typeConverter, context, benefit),
         materializeEncodingValueFn(materializeEncodingValueFn) {}
 
 protected:
-  const MaterializeEncodingValueFn materializeEncodingValueFn;
+  const IREE::Codegen::MaterializeEncodingValueFn materializeEncodingValueFn;
 };
 
 //===---------------------------------------------------------------------===//
@@ -85,28 +77,12 @@ protected:
 /// Returns the RankedTensorType without encodings.
 RankedTensorType dropEncoding(RankedTensorType type);
 
-/// Utility method to convert from `set_encoding` op to `pack` operation.
-/// For now this takes a `paddingValue` as input. The source is also taken
-/// as input so that these could be used with `OpConversionPatterns`.
-FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
-    RewriterBase &rewriter, IREE::Encoding::SetEncodingOp encodingOp,
-    Value source, const MaterializeEncodingTypeConverter &typeConverter,
-    MaterializeEncodingValueFn materializeEncodingValueFn);
-
-/// Utility method to convert from `unset_encoding` op to `unpack` operation.
-/// The source is taken as input so that these could be used with
-/// `OpConversionPatterns`.
-FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
-    RewriterBase &rewriter, IREE::Encoding::UnsetEncodingOp encodingOp,
-    Value packedValue, const MaterializeEncodingTypeConverter &typeConverter,
-    MaterializeEncodingValueFn materializeEncodingValueFn);
-
 /// Pouplates the set of patterns that lowers set_encoding, unset_encoding, and
 /// upstream dialect ops with encoding types to pack/unpack ops.
 void populateMaterializeEncodingIntoPackUnPackPatterns(
     RewritePatternSet &patterns,
     MaterializeEncodingTypeConverter &typeConverter,
-    MaterializeEncodingValueFn materializeEncodingValueFn);
+    IREE::Codegen::MaterializeEncodingValueFn materializeEncodingValueFn);
 
 /// Pouplates the set of patterns that lowers shape-like operations (e.g., Flow
 /// ops, Hal ops, tensor.empty, linalg.fill, etc) with encoding types to the
@@ -114,7 +90,7 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
 void populateShapeIndependentMaterializeEncodingPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
     MaterializeEncodingTypeConverter &typeConverter,
-    MaterializeEncodingValueFn materializeEncodingValueFn);
+    IREE::Codegen::MaterializeEncodingValueFn materializeEncodingValueFn);
 
 } // namespace mlir::iree_compiler
 

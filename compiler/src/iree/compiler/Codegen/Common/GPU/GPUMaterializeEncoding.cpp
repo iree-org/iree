@@ -43,6 +43,8 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
 using IREE::Codegen::MaterializeEncodingInfo;
+using IREE::Codegen::MaterializeEncodingValueFn;
+using IREE::Codegen::MaterializeEncodingValueInfo;
 using IREE::Codegen::TileMxNxK;
 using IREE::Codegen::TileSwizzle;
 
@@ -315,9 +317,17 @@ struct GPUSetEncodingOpLoweringConversion
                   ConversionPatternRewriter &rewriter) const override {
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         getTypeConverter());
-    auto packOp = lowerSetEncodingOpToPackOp(rewriter, encodingOp,
-                                             adaptor.getSource(), *converter,
-                                             this->materializeEncodingValueFn);
+    // TODO(hanchung): This is a transition state for moving the implementation
+    // details to backend attributes. We won't need the function type argument
+    // after all the backends that support encodings implement the attribute.
+    auto getEncodingInfoWrapper =
+        [&](RankedTensorType type) -> FailureOr<MaterializeEncodingInfo> {
+      return converter->getEncodingInfo(type);
+    };
+    auto packOp = IREE::Codegen::lowerSetEncodingOpToPackOp(
+        rewriter, encodingOp, adaptor.getSource(),
+        converter->getTransposeNarrowN(), getEncodingInfoWrapper,
+        this->materializeEncodingValueFn);
     if (failed(packOp)) {
       Type targetType =
           getTypeConverter()->convertType(encodingOp.getResultType());
@@ -433,9 +443,16 @@ struct GPUUnsetEncodingOpLoweringConversion
           loc, unpackSrcType, transposeOp->getResult(0), reassociation);
     }
 
-    auto unPackOp = lowerUnsetEncodingToUnpackOp(
-        rewriter, unsetEncodingOp, unpackSrc, *converter,
-        this->materializeEncodingValueFn);
+    // TODO(hanchung): This is a transition state for moving the implementation
+    // details to backend attributes. We won't need the function type argument
+    // after all the backends that support encodings implement the attribute.
+    auto getEncodingInfoWrapper =
+        [&](RankedTensorType type) -> FailureOr<MaterializeEncodingInfo> {
+      return converter->getEncodingInfo(type);
+    };
+    auto unPackOp = IREE::Codegen::lowerUnsetEncodingToUnpackOp(
+        rewriter, unsetEncodingOp, unpackSrc, converter->getTransposeNarrowN(),
+        getEncodingInfoWrapper, this->materializeEncodingValueFn);
     if (failed(unPackOp)) {
       Type targetType =
           getTypeConverter()->convertType(unsetEncodingOp.getResultType());

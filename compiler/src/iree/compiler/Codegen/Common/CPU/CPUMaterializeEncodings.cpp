@@ -31,6 +31,8 @@
 namespace mlir::iree_compiler {
 
 using IREE::Codegen::MaterializeEncodingInfo;
+using IREE::Codegen::MaterializeEncodingValueFn;
+using IREE::Codegen::MaterializeEncodingValueInfo;
 using IREE::Codegen::TileMxNxK;
 
 #define GEN_PASS_DEF_CPUMATERIALIZEDEVICEENCODINGPASS

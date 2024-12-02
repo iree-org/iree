@@ -294,6 +294,58 @@ getEncodingInfoForMatmul(Encoding::EncodingAttr encoding, TileMxNxK tileMxNxK) {
   return encodingInfo;
 }
 
+void transposeInPlace(MaterializeEncodingInfo &info) {
+  // Vector cases: nothing to do.
+  if (info.innerTileSizes.size() < 2) {
+    return;
+  }
+  // Not a vector case, so all three arrays in `info` have size at least 2,
+  // outerDimsPerm may have size 3 if there is a batch dimension, but in all
+  // cases, the last 2 entries of each array are M and N, not batch.
+  auto transpose = [](SmallVector<int64_t> &a) {
+    std::swap(a[a.size() - 2], a[a.size() - 1]);
+  };
+  transpose(info.innerDimsPos);
+  transpose(info.innerTileSizes);
+  transpose(info.outerDimsPerm);
+}
+
+FailureOr<SmallVector<OpFoldResult>> getInnerTileSizesOfr(
+    OpBuilder &rewriter, Location loc, RankedTensorType tensorType,
+    const MaterializeEncodingInfo &materializeEncodingInfo,
+    const MaterializeEncodingValueFn &materializeEncodingValueFn) {
+  ArrayRef<int64_t> staticTileSizes = materializeEncodingInfo.innerTileSizes;
+  if (llvm::all_of(staticTileSizes,
+                   [](int64_t i) { return !ShapedType::isDynamic(i); })) {
+    return getAsOpFoldResult(rewriter.getI64ArrayAttr(staticTileSizes));
+  }
+  assert(materializeEncodingValueFn &&
+         "When dynamic tile sizes are generated, a MaterializeEncodingValueFn "
+         "should be provided.");
+
+  FailureOr<MaterializeEncodingValueInfo> materializeEncodingValueInfo =
+      materializeEncodingValueFn(tensorType, rewriter, loc);
+  if (failed(materializeEncodingValueInfo)) {
+    return failure();
+  }
+  ArrayRef<Value> innerTileSizeValues =
+      materializeEncodingValueInfo->innerTileSizes;
+
+  SmallVector<OpFoldResult> result(staticTileSizes.size());
+  for (size_t i = 0; i < result.size(); ++i) {
+    if (ShapedType::isDynamic(staticTileSizes[i])) {
+      result[i] = innerTileSizeValues[i];
+    } else if (tensorType.isDynamicDim(i)) {
+      result[i] =
+          rewriter.create<arith::ConstantIndexOp>(loc, staticTileSizes[i])
+              .getResult();
+    } else {
+      result[i] = rewriter.getI64IntegerAttr(staticTileSizes[i]);
+    }
+  }
+  return result;
+}
+
 static RankedTensorType dropEncoding(RankedTensorType type) {
   return RankedTensorType::get(type.getShape(), type.getElementType());
 }
@@ -462,6 +514,78 @@ lowerContractionOpWithEncoding(OpBuilder &builder, linalg::LinalgOp linalgOp,
     }
   }
   return result;
+}
+
+FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
+    RewriterBase &rewriter, IREE::Encoding::SetEncodingOp encodingOp,
+    Value source, bool transposeNarrowN, ResolveEncodingInfoFn getEncodingInfo,
+    const MaterializeEncodingValueFn &materializeEncodingValueFn) {
+  RankedTensorType resultType = encodingOp.getResultType();
+  FailureOr<MaterializeEncodingInfo> encodingInfo = getEncodingInfo(resultType);
+  if (failed(encodingInfo)) {
+    return rewriter.notifyMatchFailure(encodingOp, "unhandled result encoding");
+  }
+
+  auto encoding = IREE::Encoding::getEncodingAttr(resultType);
+  if (!encoding) {
+    return failure();
+  }
+  if (transposeNarrowN && isNarrowNResult(encoding)) {
+    transposeInPlace(*encodingInfo);
+  }
+
+  // Create `tensor.empty` operation for the result of the pack operation.
+  Location loc = encodingOp.getLoc();
+  FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr = getInnerTileSizesOfr(
+      rewriter, loc, resultType, *encodingInfo, materializeEncodingValueFn);
+  if (failed(innerTileSizesOfr)) {
+    return rewriter.notifyMatchFailure(
+        encodingOp, "failed to generate runtime tile size query");
+  }
+  Value paddingValue = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getZeroAttr(resultType.getElementType()));
+  SmallVector<OpFoldResult> sourceDims =
+      tensor::getMixedSizes(rewriter, loc, source);
+  SmallVector<OpFoldResult> resultDims = tensor::PackOp::getResultShape(
+      rewriter, loc, sourceDims, *innerTileSizesOfr, encodingInfo->innerDimsPos,
+      encodingInfo->outerDimsPerm);
+  auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
+                                                  resultType.getElementType());
+  return rewriter.create<tensor::PackOp>(
+      loc, source, emptyOp, encodingInfo->innerDimsPos, *innerTileSizesOfr,
+      paddingValue, encodingInfo->outerDimsPerm);
+}
+
+FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
+    RewriterBase &rewriter, IREE::Encoding::UnsetEncodingOp encodingOp,
+    Value packedValue, bool transposeNarrowN,
+    ResolveEncodingInfoFn getEncodingInfo,
+    const MaterializeEncodingValueFn &materializeEncodingValueFn) {
+  RankedTensorType sourceType = encodingOp.getSourceType();
+  FailureOr<MaterializeEncodingInfo> encodingInfo = getEncodingInfo(sourceType);
+  if (failed(encodingInfo)) {
+    return rewriter.notifyMatchFailure(encodingOp, "unhandled source encoding");
+  }
+  auto encoding = IREE::Encoding::getEncodingAttr(sourceType);
+  if (transposeNarrowN && isNarrowNResult(encoding)) {
+    transposeInPlace(*encodingInfo);
+  }
+  // Create an `tensor.empty` for the result of the unpack operation.
+  Location loc = encodingOp.getLoc();
+  SmallVector<OpFoldResult> resultDims =
+      getMixedValues(encodingOp.getResultType().getShape(),
+                     encodingOp.getResultDims(), rewriter);
+  auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
+                                                  sourceType.getElementType());
+  FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr = getInnerTileSizesOfr(
+      rewriter, loc, sourceType, *encodingInfo, materializeEncodingValueFn);
+  if (failed(innerTileSizesOfr)) {
+    return rewriter.notifyMatchFailure(
+        encodingOp, "failed to generate runtime tile size query");
+  }
+  return rewriter.create<tensor::UnPackOp>(
+      loc, packedValue, emptyOp, encodingInfo->innerDimsPos, *innerTileSizesOfr,
+      encodingInfo->outerDimsPerm);
 }
 
 } // namespace mlir::iree_compiler::IREE::Codegen
