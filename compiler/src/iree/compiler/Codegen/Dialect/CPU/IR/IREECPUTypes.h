@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
+#include "llvm/TargetParser/Triple.h"
 
 // clang-format off
 #define GET_ATTRDEF_CLASSES
@@ -32,6 +33,23 @@ Codegen::TileMxNxK
 chooseMatmulTile(ArrayRef<Codegen::TileMxNxK> enumeratedTiles,
                  IREE::Encoding::MatmulNarrowDim narrowDim,
                  ArrayRef<int64_t> hostDefinedUpperBound = {});
+
+/// Returns the StringAttr with the name `str` in the `config`, if found.
+std::optional<StringAttr> getConfigStringAttr(DictionaryAttr config,
+                                              StringRef str);
+
+/// Returns the LLVM Target triple associated with the `config`, if set.
+std::optional<llvm::Triple> getTargetTriple(DictionaryAttr config);
+
+/// Returns true if `config` has `feature` in its CPU features.
+bool hasFeature(DictionaryAttr config, StringRef feature);
+
+// Architecture identification.
+bool isX86(DictionaryAttr config);
+bool isX86_64(DictionaryAttr config);
+bool isAArch64(DictionaryAttr config);
+bool isRISCV(DictionaryAttr config);
+bool isRISCV32(DictionaryAttr config);
 
 } // namespace mlir::iree_compiler::IREE::CPU
 

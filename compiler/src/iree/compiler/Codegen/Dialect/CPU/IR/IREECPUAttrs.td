@@ -15,6 +15,24 @@ include "mlir/IR/AttrTypeBase.td"
 // iree_cpu.encoding_solver
 //===----------------------------------------------------------------------===//
 
+def IREECPU_CPUEncodingLayoutAttr :
+    AttrDef<IREECPU_Dialect, "CPUEncodingLayout", [
+  DeclareAttrInterfaceMethods<IREECodegen_LayoutAttrInterface, [
+    "getEncodingInfo",
+    "lowerOp",
+  ]>
+]> {
+  let mnemonic = "cpu_encoding_layout";
+  let summary = "The encoding layout attribute for CPU backends";
+
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let parameters = (ins
+    OptionalParameter<"DictionaryAttr", "Executable target configuration. It is "
+    "expected to be used in a pass scope, but not the final IR output.">:$configuration
+  );
+}
+
 def IREECPU_VMVXEncodingLayoutAttr :
     AttrDef<IREECPU_Dialect, "VMVXEncodingLayout", [
   DeclareAttrInterfaceMethods<IREECodegen_LayoutAttrInterface, [

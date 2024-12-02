@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 #define DEBUG_TYPE "iree-cpu-types"
 
@@ -113,6 +114,82 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
   // locally here.
   assert(bestRatedTile.paddingPenalty == bestPaddingPenalty);
   return bestRatedTile;
+}
+
+std::optional<StringAttr> getConfigStringAttr(DictionaryAttr config,
+                                              StringRef str) {
+  if (!config) {
+    return std::nullopt;
+  }
+  auto attr = config.getAs<StringAttr>(str);
+  if (!attr) {
+    return std::nullopt;
+  }
+  return attr;
+}
+
+std::optional<llvm::Triple> getTargetTriple(DictionaryAttr config) {
+  auto triple = getConfigStringAttr(config, "target_triple");
+  if (!triple) {
+    return std::nullopt;
+  }
+  return llvm::Triple(triple.value().str());
+}
+
+static std::optional<StringRef> getCpuFeatures(DictionaryAttr config) {
+  auto cpuFeatures = getConfigStringAttr(config, "cpu_features");
+  if (!cpuFeatures) {
+    return std::nullopt;
+  }
+  return cpuFeatures->getValue();
+}
+
+// TODO: If we have to check for a significantly large number of features in the
+// future, we may want to consider a persistent state to carry over processed
+// HAL information or keeping the TTI instance alive and query subtarget
+// features data structure.
+bool hasFeature(DictionaryAttr config, StringRef feature) {
+  std::optional<StringRef> features = getCpuFeatures(config);
+  if (!features) {
+    return false;
+  }
+
+  // Find feature string in list of features, making sure that we don't match a
+  // sub-string.
+  std::stringstream sstream(features->str());
+  std::string str;
+  while (std::getline(sstream, str, ',')) {
+    if (str == feature) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool isX86(DictionaryAttr config) {
+  std::optional<llvm::Triple> triple = getTargetTriple(config);
+  return triple && triple.value().isX86();
+}
+
+bool isX86_64(DictionaryAttr config) {
+  std::optional<llvm::Triple> triple = getTargetTriple(config);
+  return triple && triple.value().getArch() == llvm::Triple::x86_64;
+}
+
+bool isAArch64(DictionaryAttr config) {
+  std::optional<llvm::Triple> triple = getTargetTriple(config);
+  return triple && triple.value().isAArch64();
+}
+
+bool isRISCV(DictionaryAttr config) {
+  std::optional<llvm::Triple> triple = getTargetTriple(config);
+  return triple && triple.value().isRISCV();
+}
+
+bool isRISCV32(DictionaryAttr config) {
+  std::optional<llvm::Triple> triple = getTargetTriple(config);
+  return triple && triple.value().isRISCV32();
 }
 
 } // namespace mlir::iree_compiler::IREE::CPU

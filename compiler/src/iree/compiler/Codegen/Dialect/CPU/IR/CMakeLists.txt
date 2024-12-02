@@ -29,6 +29,7 @@ iree_cc_library(
     ::IREECPUAttrs
     ::IREECPUDialectGen
     LLVMSupport
+    LLVMTargetParser
     MLIRAffineDialect
     MLIRIR
     MLIRLinalgDialect
