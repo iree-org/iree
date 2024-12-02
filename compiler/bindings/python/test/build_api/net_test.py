@@ -5,25 +5,26 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import io
-import os
 from pathlib import Path
 import tempfile
 import unittest
 
 from iree.build import *
-from iree.build.executor import BuildContext
-from iree.build.test_actions import ExecuteOutOfProcessThunkAction
 
 
 TEST_URL = None
-TEST_URL_1 = "https://huggingface.co/google-bert/bert-base-cased/resolve/cd5ef92a9fb2f889e972770a36d4ed042daf221e/tokenizer.json"
-TEST_URL_2 = "https://huggingface.co/google-bert/bert-base-cased/resolve/cd5ef92a9fb2f889e972770a36d4ed042daf221e/tokenizer_config.json"
+# Arbitrary URLs to download from via HTTP requests. These should require no
+# authentication to access and should ideally sit behind a CDN that can handle
+# random CI and developer traffic. We could also mock the fetching to make the
+# tests hermetic.
+TEST_URL_1 = "https://raw.githubusercontent.com/iree-org/iree/82724905d64eebb2f62bcc0e41626a7b5156fd8f/.gitignore"
+TEST_URL_2 = "https://raw.githubusercontent.com/iree-org/iree/82724905d64eebb2f62bcc0e41626a7b5156fd8f/.gitmodules"
 
 
 @entrypoint
-def tokenizer_via_http():
+def file_via_http():
     return fetch_http(
-        name="tokenizer.json",
+        name="file.txt",
         url=TEST_URL,
     )
 
@@ -43,7 +44,7 @@ class BasicTest(unittest.TestCase):
         out = None
         err = None
         global TEST_URL
-        path = self.output_path / "genfiles" / "tokenizer_via_http" / "tokenizer.json"
+        path = self.output_path / "genfiles" / "file_via_http" / "file.txt"
 
         def run():
             nonlocal out
@@ -53,7 +54,7 @@ class BasicTest(unittest.TestCase):
                 err_io = io.StringIO()
                 iree_build_main(
                     args=[
-                        "tokenizer_via_http",
+                        "file_via_http",
                         "--output-dir",
                         str(self.output_path),
                         "--test-force-console",
