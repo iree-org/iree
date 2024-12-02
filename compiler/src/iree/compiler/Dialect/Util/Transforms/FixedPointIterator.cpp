@@ -4,13 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
 namespace mlir::iree_compiler::IREE::Util {
+
+#define GEN_PASS_DEF_FIXEDPOINTITERATORPASS
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc"
+
 namespace {
 
 // Dynamic pass which runs a sub-pipeline to a fixed point or a maximum
@@ -23,11 +26,12 @@ namespace {
 // iteration terminates. If a sub-pass removes it, then iteration will
 // continue.
 class FixedPointIteratorPass
-    : public FixedPointIteratorBase<FixedPointIteratorPass> {
+    : public impl::FixedPointIteratorPassBase<FixedPointIteratorPass> {
 public:
+  using Base::Base;
   FixedPointIteratorPass() = default;
   FixedPointIteratorPass(const FixedPointIteratorPass &other)
-      : FixedPointIteratorBase<FixedPointIteratorPass>(other) {}
+      : impl::FixedPointIteratorPassBase<FixedPointIteratorPass>(other) {}
   FixedPointIteratorPass(OpPassManager pipeline);
 
 private:
