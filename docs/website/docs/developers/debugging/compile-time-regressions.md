@@ -48,6 +48,12 @@ Building the compiler from source and using
 specific commits in IREE, though it typically won't let you step through changes
 in submodules (e.g. MLIR updates in `third_party/llvm-project/`).
 
+#### Scripted bisecting with package artifacts
+
+See <https://github.com/iree-org/iree/tree/main/build_tools/pkgci/bisect>.
+
+#### Manually bisecting with source builds
+
 **Tip**: [Configure ccache](../building/cmake-with-ccache.md) if you'll be
 rebuilding the compiler while bisecting
 
@@ -71,8 +77,7 @@ git bisect bad [<rev>]
 
 An automated workflow can use `git bisect run` and a script:
 
-```shell
-# run_bisect.sh
+```shell title="run_bisect.sh"
 git submodule update
 cmake --build build/ --target iree-compile
 # Other logic here
@@ -87,7 +92,7 @@ git bisect run run_bisect.sh
 
 #### Sample: compile executable sources individually with a timeout
 
-```bash
+```bash title="run_bisect.sh"
 #!/bin/bash
 
 set -xeuo pipefail
