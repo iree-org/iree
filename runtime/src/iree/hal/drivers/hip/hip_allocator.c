@@ -664,12 +664,16 @@ iree_status_t iree_hal_hip_allocator_alloc_async(
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
 
+  // In an ideal world we would use hipMallocAsync/hipFreeAsync,
+  // however the caching inside can cause lots of slack
+  // to the point of unusability depending on the memory allocation
+  // patterns of the host program, so instead we simply hipMalloc/hipFree.
   hipDeviceptr_t ptr = NULL;
   iree_status_t status = IREE_HIP_CALL_TO_STATUS(
       allocator->symbols,
-      hipMallocAsync(&ptr, (size_t)iree_hal_buffer_allocation_size(buffer),
-                     stream),
-      "hipMallocAsync");
+      hipMalloc(&ptr, (size_t)iree_hal_buffer_allocation_size(buffer)),
+      "hipMalloc");
+
   if (iree_status_is_ok(status)) {
     iree_hal_hip_buffer_set_device_pointer(buffer, ptr);
     IREE_TRACE_ALLOC_NAMED(IREE_HAL_HIP_ALLOCATOR_ID, (void*)ptr,
@@ -694,8 +698,8 @@ iree_status_t iree_hal_hip_allocator_free_async(
     return iree_ok_status();
   }
 
-  IREE_RETURN_IF_ERROR(IREE_HIP_CALL_TO_STATUS(
-      allocator->symbols, hipFreeAsync(device_ptr, stream), "hipFreeAsync"));
+  IREE_RETURN_IF_ERROR(IREE_HIP_CALL_TO_STATUS(allocator->symbols,
+                                               hipFree(device_ptr), "hipFree"));
   iree_hal_hip_buffer_set_allocation_empty(buffer);
 
   IREE_TRACE_FREE_NAMED(IREE_HAL_HIP_ALLOCATOR_ID, (void*)device_ptr);

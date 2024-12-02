@@ -296,8 +296,8 @@ iree_status_t iree_hal_hip_memory_pools_deallocate(
     // Try to schedule the buffer for freeing.
     hipDeviceptr_t device_ptr = iree_hal_hip_buffer_device_pointer(buffer);
     if (device_ptr) {
-      status = IREE_HIP_CALL_TO_STATUS(
-          pools->hip_symbols, hipFreeAsync(device_ptr, stream), "hipFreeAsync");
+      status = IREE_HIP_CALL_TO_STATUS(pools->hip_symbols, hipFree(device_ptr),
+                                       "hipFree");
     }
     if (iree_status_is_ok(status)) {
       // Drop the release callback so that we don't try to double-free the
