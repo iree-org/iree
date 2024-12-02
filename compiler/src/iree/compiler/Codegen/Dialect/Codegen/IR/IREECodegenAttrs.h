@@ -117,12 +117,17 @@ SmallVector<Value> getTileSizes(OpBuilder &b, Operation *op, unsigned level);
 /// Sets the lowering configuration, overwriting existing attribute values.
 void setLoweringConfig(Operation *op, Attribute config);
 
+/// Sets an attribute to identify the rootOp and adds any information needed for
+/// the tuner from compiler. Currently, only sets a `UnitAttr`.
+void setRootOpInfo(Operation *op);
+
 /// Convenience function that sets the lowering configuration on the operation
 /// and translation info.
 inline LogicalResult setOpConfigAndEntryPointFnTranslation(
     mlir::FunctionOpInterface entryPointFn, Operation *op,
     IREE::Codegen::LoweringConfigAttrInterface config,
     IREE::Codegen::TranslationInfoAttr translationInfo) {
+  setRootOpInfo(op);
   if (config) {
     setLoweringConfig(op, config);
   }
