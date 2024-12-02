@@ -27,6 +27,17 @@ typedef struct iree_hal_hip_per_device_info_t {
   iree_hal_hip_dispatch_thread_t* dispatch_thread;
 
   iree_hal_hip_memory_pools_t memory_pools;
+
+  // Used in any place we need an event that is already signaled.
+  //
+  // This is to work around some hip runtime limitations.
+  // The implementation of hipMallocAsync will re-use ANY previous
+  // allocation that is at least as large as the requested allocation,
+  // So if you alloc 300MB, free 300MB, alloc 1B, alloc 300MB, free 300MB, alloc
+  // 1B, you will consume 600MB for what should only be 2 bytes of data. We can
+  // work around this by calling hipEventSynchronize before we allocate memory,
+  // (which unfortunately clears the internal cache), and then our allocator
+  // just effectively boils down to hipMalloc/hipFree.
 } iree_hal_hip_per_device_info_t;
 
 typedef struct iree_hal_hip_device_topology_t {
