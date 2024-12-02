@@ -193,7 +193,7 @@ See our documentation on
 the section on
 [tracing `iree-compile`](../performance/profiling-with-tracy.md#tracing-iree-compile).
 For compile time regressions, pay particular attention to the compilation
-phases (Flow/Stream/HAL), how many times `TranslateExecutablesPass` runs, and
+phases (Flow/Stream/HAL), how many times `TranslateAllExecutablesPass` runs, and
 if there are outlier passes that take significantly longer to run than others.
 
 Here are some previous analyses for inspiration:

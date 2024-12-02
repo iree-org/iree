@@ -3,7 +3,7 @@
 // RUN:     --iree-hal-dump-executable-sources-to=- | \
 // RUN: iree-compile - -o /dev/null \
 // RUN:     --compile-mode=hal-executable \
-// RUN:     --mlir-print-ir-before=iree-hal-serialize-executables 2>&1 | \
+// RUN:     --mlir-print-ir-before=iree-hal-serialize-all-executables 2>&1 | \
 // RUN: FileCheck %s
 
 // This test relies on us piping stdout and that there's only a single
@@ -19,7 +19,7 @@
 //  iree-compile some_input.mlir -o ignored.mlir \
 //      --iree-hal-target-backends=vmvx \
 //      --iree-hal-dump-executable-sources-to=sources/ | \
-//  ls -1 sources/ | xargs -i sh -c "iree-compile sources/{} --compile-mode=hal-executable --mlir-print-ir-before=iree-hal-serialize-executables"
+//  ls -1 sources/ | xargs -i sh -c "iree-compile sources/{} --compile-mode=hal-executable --mlir-print-ir-before=iree-hal-serialize-all-executables"
 //
 // NOTE: executable sources are not runnable: they only exist to allow for
 // iteration on executable translation. If you want to run them you need
@@ -36,7 +36,7 @@ func.func @abs(%input : tensor<f32>) -> (tensor<f32>) {
   return %result : tensor<f32>
 }
 
-// CHECK: IR Dump Before SerializeExecutablesPass
+// CHECK: IR Dump Before SerializeAllExecutablesPass
 // CHECK: hal.executable public @abs_dispatch_0
 // CHECK:   hal.executable.variant public @vmvx_bytecode_fb
 // CHECK:     vm.func private @abs_dispatch_0_elementwise

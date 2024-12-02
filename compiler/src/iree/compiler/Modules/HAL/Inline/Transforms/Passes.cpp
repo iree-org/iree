@@ -72,7 +72,7 @@ void buildHALInlineStaticTransformPassPipeline(
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
       IREE::HAL::createConfigureExecutablesPass({targetRegistry}));
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
-      IREE::HAL::createTranslateExecutablesPass({targetRegistry}));
+      IREE::HAL::createTranslateAllExecutablesPass({targetRegistry}));
 
   // Inline the translated executable functions.
   // We preserve the executables for their metadata used during conversion.
