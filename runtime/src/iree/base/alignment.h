@@ -238,19 +238,19 @@ static inline iree_page_range_t iree_page_range_union(
     const iree_page_range_t a, const iree_page_range_t b) {
   iree_host_size_t start = iree_min(a.offset, b.offset);
   iree_host_size_t end = iree_max(a.offset + a.length, b.offset + b.length);
-  return (iree_page_range_t){
-      /*.offset=*/start,
-      /*.length=*/end - start,
-  };
+  iree_page_range_t page_range;
+  page_range.offset = start;
+  page_range.length = end - start;
+  return page_range;
 }
 
 // Aligns a byte range to page boundaries defined by |page_alignment|.
 static inline iree_page_range_t iree_align_byte_range_to_pages(
     const iree_byte_range_t byte_range, iree_host_size_t page_alignment) {
-  return (iree_page_range_t){
-      /*.offset=*/iree_host_align(byte_range.offset, page_alignment),
-      /*.length=*/iree_host_align(byte_range.length, page_alignment),
-  };
+  iree_page_range_t page_range;
+  page_range.offset = iree_host_align(byte_range.offset, page_alignment);
+  page_range.length = iree_host_align(byte_range.length, page_alignment);
+  return page_range;
 }
 
 // Computes a page-aligned range base and total length from a range.
