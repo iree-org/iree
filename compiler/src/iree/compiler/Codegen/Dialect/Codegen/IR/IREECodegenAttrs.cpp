@@ -463,7 +463,7 @@ int64_t WorkgroupMappingAttr::getRelativeIndex() const {
 }
 
 //===---------------------------------------------------------------------===//
-// iree_codegen.encoding_layout
+// iree_codegen.encoding_nop_layout
 //===---------------------------------------------------------------------===//
 
 MaterializeEncodingInfo
