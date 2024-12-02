@@ -20,7 +20,6 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.cpp.inc"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/LoweringConfigEnums.cpp.inc"
 
-static const char kConfigAttrName[] = "lowering_config";
 static const char kTranslationInfoAttrName[] = "translation_info";
 static const char kCompilationInfoAttrName[] = "compilation_info";
 
