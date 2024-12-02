@@ -11,9 +11,6 @@
   thread_strides          = [8, 1]
 >
 
-// CHECK: #[[$MAP:.+]] = affine_map<()[s0] -> ((s0 floordiv 8) * 4 - ((s0 floordiv 8) floordiv 4) * 16)>
-// CHECK: #[[$MAP1:.+]] = affine_map<()[s0] -> (s0 mod 8)>
-// CHECK: #[[$MAP2:.+]] = affine_map<()[s0] -> (s0 mod 8 + 8)>
 // CHECK-LABEL: @distribute_transfer_read_col_major
 func.func @distribute_transfer_read_col_major(%arg0: memref<32x32xf16>) -> vector<16x16xf16> {
   %c0 = arith.constant 0 : index
@@ -33,12 +30,12 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK: %[[IDX:.+]] = gpu.thread_id  x
-// CHECK: %[[X:.+]] = affine.apply #[[$MAP]]()[%[[IDX]]]
-// CHECK: %[[Y:.+]] = affine.apply #[[$MAP1]]()[%[[IDX]]]
-// CHECK: %[[RD00:.+]] = vector.transfer_read %arg0[%[[X]], %[[Y]]], {{.*}} : memref<32x32xf16>, vector<4x1xf16>
+// CHECK: %[[YX:.+]]:3 = affine.delinearize_index %[[IDX]] into (4, 8)
+// CHECK: %[[Y_SCALED:.+]] = affine.linearize_index [%[[YX]]#1, %c0] by (4, 4)
+// CHECK: %[[RD00:.+]] = vector.transfer_read %arg0[%[[Y_SCALED]], %[[YX]]#2], {{.*}} : memref<32x32xf16>, vector<4x1xf16>
 // CHECK: vector.insert_strided_slice %[[RD00]], %{{.*}} {offsets = [0, 0, 0, 0, 0, 0], strides = [1, 1]} : vector<4x1xf16> into vector<1x2x1x1x4x1xf16>
-// CHECK: %[[X_PLUS_BATCH:.+]] = affine.apply #[[$MAP2]]()[%[[IDX]]]
-// CHECK: vector.transfer_read %arg0[%[[X]], %[[X_PLUS_BATCH]]], %{{.*}} {in_bounds = [true, true]} : memref<32x32xf16>, vector<4x1xf16>
+// CHECK: %[[X_PLUS_BATCH:.+]] = affine.linearize_index [%c1, %[[XY]]#2] by (2, 8)
+// CHECK: vector.transfer_read %arg0[%[[Y_SCALED]], %[[X_PLUS_BATCH]]], %{{.*}} {in_bounds = [true, true]} : memref<32x32xf16>, vector<4x1xf16>
 // CHECK: vector.insert_strided_slice {{.*}} {offsets = [0, 1, 0, 0, 0, 0]
 // CHECK: iree_vector_ext.to_simd %{{.*}} : vector<1x2x1x1x4x1xf16> -> vector<16x16xf16>
 
@@ -54,10 +51,6 @@ builtin.module attributes { transform.with_named_sequence } {
   subgroup_strides        = [1, 1],
   thread_strides          = [1, 1]
 >
-
-// CHECK-DAG: #[[$MAP:.+]] = affine_map<()[s0, s1] -> (s0 + s1 - (s1 floordiv 8) * 8)>
-// CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0] -> (s0 + 8)>
-// CHECK-DAG: #[[$MAP2:.+]] = affine_map<()[s0, s1] -> (s0 + s1 - (s1 floordiv 8) * 8 + 8)>
 
 func.func @distribute_transfer_read_row_major_with_nontrivial_index(%a: index, %b: index, %arg0: memref<32x32x32x32xf16>) -> vector<16x16xf16> {
   %c0 = arith.constant 0 : index
@@ -81,11 +74,12 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-SAME:    %[[I0:.+]]: index, %[[I1:.+]]: index
 
 // CHECK: %[[IDX:.+]] = gpu.thread_id  x
-// CHECK: %[[OFF0:.+]] = affine.apply #[[$MAP]]()[%[[I0]], %[[IDX]]]
+// CHECK: %[[X:.+]]:2 = affine.delinearize_idx %[[IDX]] into (8) : index, index
+// CHECK: %[[OFF0:.+]] = affine.linearize_index [%[[X]]#1, %[[I0]]]  by (8, 1)
 // CHECK: vector.transfer_read %{{.*}}[%c0, %c0, %[[OFF0]], %[[I1]]]
-// CHECK: %[[OFF1:.+]] = affine.apply #[[$MAP1]]()[%[[I1]]]
+// CHECK: %[[OFF1:.+]] = affine.linearize_index [%c1, %[[I1]]] by (2, 8)
 // CHECK: vector.transfer_read %{{.*}}[%c0, %c0, %[[OFF0]], %[[OFF1]]]
-// CHECK: %[[OFF2:.+]] = affine.apply #[[$MAP2]]()[%[[I0]], %[[IDX]]]
+// CHECK: %[[OFF2:.+]] = affine.linearize_index [%c1, %[[X]]#1, %[[I1]]] by (2, 8, 1)
 // CHECK: vector.transfer_read %{{.*}}[%c0, %c0, %[[OFF2]], %[[I1]]]
 // CHECK: vector.transfer_read %{{.*}}[%c0, %c0, %[[OFF2]], %[[OFF1]]]
 
@@ -143,9 +137,6 @@ builtin.module attributes { transform.with_named_sequence } {
   thread_strides          = [1, 1]
 >
 
-// CHECK-DAG: #[[$MAP:.+]] = affine_map<()[s0, s1] -> (s0 + s1 - (s1 floordiv 8) * 8)>
-// CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0] -> (s0 + 8)>
-// CHECK-DAG: #[[$MAP2:.+]] = affine_map<()[s0, s1] -> (s0 + s1 - (s1 floordiv 8) * 8 + 8)>
 // CHECK-DAG: #[[$PERM:.+]] = affine_map<(d0, d1, d2, d3) -> (d3, d2)>
 
 func.func @distribute_transfer_read_row_major_transpose(%a: index, %b: index, %arg0: memref<32x32x32x32xf16>) -> vector<16x16xf16> {
@@ -171,11 +162,12 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-SAME:    %[[I0:.+]]: index, %[[I1:.+]]: index
 
 // CHECK: %[[IDX:.+]] = gpu.thread_id  x
-// CHECK: %[[LIN_ID0:.+]] = affine.apply #[[$MAP:.+]]()[%[[I1]], %[[IDX]]]
+// CHECK: %[[X:.+]]:2 = affine.delinearize_index %[[IDX]] into (8) : index, index
+// CHECK: %[[LIN_ID0:.+]] = affine.linearize_index %[[[X]]#1, %[[I1]]] by (8, 1)
 // CHECK: vector.transfer_read %{{.*}}[%c0, %c0, %[[I0]], %[[LIN_ID0]]], {{.*}} permutation_map = #[[$PERM]]
-// CHECK: %[[I0_PLUS_8:.+]] = affine.apply #[[$MAP1]]()[%[[I0]]]
+// CHECK: %[[I0_PLUS_8:.+]] = affine.linearize_index [%c1, %[[I0]]] by (2, 8)
 // CHECK: vector.transfer_read %{{.*}}[%c0, %c0, %[[I0_PLUS_8]], %[[LIN_ID0]]], {{.*}} permutation_map = #[[$PERM]]
-// CHECK: %[[LIN_ID1:.+]] = affine.apply #[[$MAP2]]()[%[[I1]], %[[IDX]]]
+// CHECK: %[[LIN_ID1:.+]] = affine.linearize_index [%c1, %[[X]]#1, %[[I1]]] by (2, 8, 1)
 // CHECK: vector.transfer_read %{{.*}}[%c0, %c0, %[[I0]], %[[LIN_ID1]]], {{.*}} permutation_map = #[[$PERM]]
 // CHECK: vector.transfer_read %{{.*}}[%c0, %c0, %[[I0_PLUS_8]], %[[LIN_ID1]]], %cst_0 {in_bounds = [true, true], permutation_map = #[[$PERM]]} : memref<32x32x32x32xf16>, vector<1x8xf16>
 
@@ -268,8 +260,6 @@ builtin.module attributes { transform.with_named_sequence } {
   thread_strides          = [16]
 >
 
-// CHECK-DAG: #[[$MAP:.+]] = affine_map<()[s0] -> ((s0 floordiv 16) * 4 - ((s0 floordiv 16) floordiv 4) * 16)>
-
 // CHECK-LABEL: @distribute_transfer_read_broadcast
 func.func @distribute_transfer_read_broadcast(%arg0: memref<32x32xf16>) -> vector<16xf16> {
   %c0 = arith.constant 0 : index
@@ -289,7 +279,8 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK: %[[IDX:.+]] = gpu.thread_id  x
-// CHECK: %[[LANEY:.+]] = affine.apply #[[$MAP]]()[%[[IDX]]]
+// CHECK: %[[YX:.+]]:3 = affine.delinearize_index %[[IDX]] into (4, 16)
+// CHECK: %[[LANEY:.+]] = affine.linearize_index [%[[YX]]#1, %c0] by (4, 4)
 // CHECK: %[[RD:.+]] = vector.transfer_read %{{.*}}[%c0, %[[LANEY:.+]]], {{.*}} : memref<32x32xf16>, vector<4xf16>
 
 // -----
@@ -304,8 +295,6 @@ builtin.module attributes { transform.with_named_sequence } {
   subgroup_strides        = [1],
   thread_strides          = [1]
 >
-
-// CHECK-DAG: #[[$MAP:.+]] = affine_map<()[s0] -> (s0 * 4 + (s0 floordiv 64) * 64 - ((s0 floordiv 64) floordiv 2) * 128 - (s0 floordiv 16) * 64)>
 
 // CHECK-LABEL: @distribute_transfer_read_broadcast2
 func.func @distribute_transfer_read_broadcast2(%arg0: memref<32x128xf16>) -> vector<128xf16> {
@@ -326,7 +315,9 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK: %[[IDX:.+]] = gpu.thread_id  x
-// CHECK: %[[LANEY:.+]] = affine.apply #[[$MAP]]()[%[[IDX]]]
+// CHECK: %[[YX:.+]]:3 = affine.delinearize_index %[[IDX]] into (2, 64)
+// CHECK: %[[SUBGROUP:.+]]:2 = affine.delinearize_index %[[IDX]] into (16)
+// CHECK: %[[LANEY:.+]] = affine.linearize_index [%[[YX]]#1, %[[SUBGROUP]]#1, %c0] by (2, 16, 4)
 // CHECK: %[[RD:.+]] = vector.transfer_read %{{.*}}[%c0, %[[LANEY:.+]]], {{.*}} : memref<32x128xf16>, vector<4xf16>
 
 // -----
@@ -378,9 +369,6 @@ builtin.module attributes { transform.with_named_sequence } {
   thread_strides          = [1, 1]
 >
 
-// CHECK: #[[$MAP:.+]]  = affine_map<()[s0] -> (s0 mod 8)>
-// CHECK: #[[$MAP1:.+]] = affine_map<()[s0] -> (s0 mod 8 + 8)>
-
 // CHECK-LABEL: @distribute_transfer_write_row_major
 func.func @distribute_transfer_write_row_major(%root: vector<16x16xf16>, %alloc: memref<64x64xf16>) {
   %c0 = arith.constant 0 : index
@@ -400,12 +388,12 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK: %[[IDX:.+]] = gpu.thread_id  x
-// CHECK: %[[LANEX:.+]] = affine.apply #[[$MAP]]()[%[[IDX]]]
+// CHECK: %[[LANEX:.+]]:2 = affine.delinearize_index %[[IDX]] into (8)
 // CHECK: %[[SLICE:.+]] = vector.extract %{{.*}}[0, 0, 0, 0] : vector<1x8xf16> from vector<2x2x1x1x1x8xf16>
-// CHECK: vector.transfer_write %[[SLICE]], %{{.*}}[%[[LANEX]], %c0] {in_bounds = [true, true]} : vector<1x8xf16>, memref<64x64xf16>
+// CHECK: vector.transfer_write %[[SLICE]], %{{.*}}[%[[LANEX]]#1, %c0] {in_bounds = [true, true]} : vector<1x8xf16>, memref<64x64xf16>
 // CHECK: vector.extract %{{.*}}[0, 1, 0, 0]
-// CHECK: vector.transfer_write %{{.*}}, %{{.*}}[%[[LANEX]], %c8]
-// CHECK: %[[LANEX_PLUS_VECDIMX:.+]] = affine.apply #[[$MAP1]]()[%[[IDX]]]
+// CHECK: vector.transfer_write %{{.*}}, %{{.*}}[%[[LANEX]]#1, %c8]
+// CHECK: %[[LANEX_PLUS_VECDIMX:.+]] = affine.linearize_index [%c1, %[[LANEX]]#1] by (2, 8)
 // CHECK: vector.extract %{{.*}}[1, 0, 0, 0]
 // CHECK: vector.transfer_write %{{.*}}[%[[LANEX_PLUS_VECDIMX]], %c0]
 // CHECK: vector.extract %{{.*}}[1, 1, 0, 0]

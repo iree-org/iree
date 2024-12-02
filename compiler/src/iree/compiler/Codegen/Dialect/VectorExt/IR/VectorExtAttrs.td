@@ -48,7 +48,8 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     The subgroups are placed contiguously with their shape and ordering
     determined by:
       - `subgroup_tile`: Sizes of this level of tiling
-      - `subgroup_order`: Ordering of dimensions, from outermost to innermost
+      - `subgroup_strides`: Stride of this level of tiling. 0 if not distributed.
+    Tiling levels must not overlap.
 
     For example, subgroup_tile=[4, 2], subgroup_order=[1, 0] will
     arrange the subgroups in the order:
@@ -104,7 +105,9 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     distribution is represented by:
 
       - thread_tile: Sizes of this level of tiling
-      - thread_order: Ordering of dimensions, from outermost to innermost
+      - thread_strides: Strides of this level of tiling. 0 means this level is not
+        distributed.
+    Tiling levels must not overlap.
 
     Examples of thread distribution over a 8x4 shape:
 
@@ -198,7 +201,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
 
   let extraClassDeclaration = [{
     // Returns the subgroup/lane ids delinearized from a single linearized
-    // thread ID.
+    // thread ID. Returns the empty vector on failure.
     SmallVector<Value> computeThreadIds(Value threadId, int64_t subgroupSize, RewriterBase &rewriter) const;
 
     // Get the undistributed shape that is subgroup x batch x outer x thread x element

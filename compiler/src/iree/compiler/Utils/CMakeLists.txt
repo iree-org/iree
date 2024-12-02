@@ -36,6 +36,7 @@ iree_cc_library(
     "ElementPackingUtils.cpp"
     "EquivalenceUtils.cpp"
     "FlatbufferUtils.cpp"
+    "Indexing.cpp"
     "ModuleUtils.cpp"
     "OptionUtils.cpp"
     "PassUtils.cpp"
