@@ -2628,6 +2628,24 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#scripted-bisecting-with-package-artifacts" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scripted bisecting with package artifacts
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manually-bisecting-with-source-builds" class="md-nav__link">
+    <span class="md-ellipsis">
+      Manually bisecting with source builds
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#sample-compile-executable-sources-individually-with-a-timeout" class="md-nav__link">
     <span class="md-ellipsis">
       Sample: compile executable sources individually with a timeout
@@ -3786,6 +3804,24 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#scripted-bisecting-with-package-artifacts" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scripted bisecting with package artifacts
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manually-bisecting-with-source-builds" class="md-nav__link">
+    <span class="md-ellipsis">
+      Manually bisecting with source builds
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#sample-compile-executable-sources-individually-with-a-timeout" class="md-nav__link">
     <span class="md-ellipsis">
       Sample: compile executable sources individually with a timeout
@@ -3916,6 +3952,9 @@ down to a specific code change, bisecting can help.</p>
 <a href="https://git-scm.com/docs/git-bisect"><code>git bisect</code></a> will let you pinpoint
 specific commits in IREE, though it typically won't let you step through changes
 in submodules (e.g. MLIR updates in <code>third_party/llvm-project/</code>).</p>
+<h4 id="scripted-bisecting-with-package-artifacts">Scripted bisecting with package artifacts<a class="headerlink" href="#scripted-bisecting-with-package-artifacts" title="Permanent link">link</a></h4>
+<p>See <a href="https://github.com/iree-org/iree/tree/main/build_tools/pkgci/bisect">https://github.com/iree-org/iree/tree/main/build_tools/pkgci/bisect</a>.</p>
+<h4 id="manually-bisecting-with-source-builds">Manually bisecting with source builds<a class="headerlink" href="#manually-bisecting-with-source-builds" title="Permanent link">link</a></h4>
 <p><strong>Tip</strong>: <a href="../../building/cmake-with-ccache/">Configure ccache</a> if you'll be
 rebuilding the compiler while bisecting</p>
 <p>A manual workflow with <code>git bisect</code> looks like this:</p>
@@ -3934,8 +3973,7 @@ git<span class="w"> </span>bisect<span class="w"> </span>bad<span class="w"> </s
 <span class="c1">#   repeat</span>
 </code></pre></div>
 <p>An automated workflow can use <code>git bisect run</code> and a script:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># run_bisect.sh</span>
-git<span class="w"> </span>submodule<span class="w"> </span>update
+<div class="highlight"><span class="filename">run_bisect.sh</span><pre><span></span><code>git<span class="w"> </span>submodule<span class="w"> </span>update
 cmake<span class="w"> </span>--build<span class="w"> </span>build/<span class="w"> </span>--target<span class="w"> </span>iree-compile
 <span class="c1"># Other logic here</span>
 </code></pre></div>
@@ -3945,7 +3983,7 @@ git<span class="w"> </span>bisect<span class="w"> </span>bad<span class="w"> </s
 git<span class="w"> </span>bisect<span class="w"> </span>run<span class="w"> </span>run_bisect.sh
 </code></pre></div>
 <h4 id="sample-compile-executable-sources-individually-with-a-timeout">Sample: compile executable sources individually with a timeout<a class="headerlink" href="#sample-compile-executable-sources-individually-with-a-timeout" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code><span class="ch">#!/bin/bash</span>
+<div class="highlight"><span class="filename">run_bisect.sh</span><pre><span></span><code><span class="ch">#!/bin/bash</span>
 
 <span class="nb">set</span><span class="w"> </span>-xeuo<span class="w"> </span>pipefail
 
