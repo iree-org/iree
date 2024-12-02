@@ -10,6 +10,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
+#include "iree/hal/drivers/hip/context_util.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/status_util.h"
 #include "iree/hal/utils/executable_debug_info.h"
@@ -306,9 +307,8 @@ iree_status_t iree_hal_hip_native_executable_create(
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t j = 0; j < topology->count && iree_status_is_ok(status);
        ++j) {
-    status = IREE_HIP_CALL_TO_STATUS(
-        symbols, hipCtxPushCurrent(topology->devices[j].hip_context),
-        "hipCtxPushCurrent");
+    status =
+        iree_hal_hip_set_context(symbols, topology->devices[j].hip_context);
 
     if (!iree_status_is_ok(status)) {
       break;
@@ -436,10 +436,6 @@ iree_status_t iree_hal_hip_native_executable_create(
           });
         }
       }
-    }
-    {
-      IREE_IGNORE_ERROR(IREE_HIP_CALL_TO_STATUS(symbols, hipCtxPopCurrent(NULL),
-                                                "hipCtxPopCurrent"));
     }
   }
 

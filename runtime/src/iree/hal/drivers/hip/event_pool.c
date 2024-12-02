@@ -14,6 +14,7 @@
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/hip/context_util.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/status_util.h"
 
@@ -100,6 +101,9 @@ static void iree_hal_hip_event_pool_release_event(
     iree_hal_hip_event_t** events);
 
 void iree_hal_hip_event_release(iree_hal_hip_event_t* event) {
+  if (!event) {
+    return;
+  }
   if (iree_atomic_ref_count_dec(&event->ref_count) == 1) {
     iree_hal_hip_event_pool_t* pool = event->pool;
     // Release back to the pool if the reference count becomes 0.
@@ -167,8 +171,7 @@ iree_status_t iree_hal_hip_event_pool_allocate(
   event_pool->available_count = 0;
   event_pool->device_context = device_context;
 
-  iree_status_t status = IREE_HIP_CALL_TO_STATUS(
-      symbols, hipCtxPushCurrent(device_context), "hipCtxPushCurrent");
+  iree_status_t status = iree_hal_hip_set_context(symbols, device_context);
 
   if (iree_status_is_ok(status)) {
     for (iree_host_size_t i = 0; i < available_capacity; ++i) {
@@ -177,9 +180,6 @@ iree_status_t iree_hal_hip_event_pool_allocate(
           &event_pool->available_list[event_pool->available_count++]);
       if (!iree_status_is_ok(status)) break;
     }
-    status = iree_status_join(
-        status, IREE_HIP_CALL_TO_STATUS(symbols, hipCtxPopCurrent(NULL),
-                                        "hipCtxPopCurrent"));
   }
 
   if (iree_status_is_ok(status)) {
@@ -252,9 +252,8 @@ iree_status_t iree_hal_hip_event_pool_acquire(
   if (remaining_count > 0) {
     IREE_TRACE_ZONE_BEGIN_NAMED(z1, "event-pool-unpooled-acquire");
 
-    iree_status_t status = IREE_HIP_CALL_TO_STATUS(
-        event_pool->symbols, hipCtxPushCurrent(event_pool->device_context),
-        "hipCtxPushCurrent");
+    iree_status_t status = iree_hal_hip_set_context(event_pool->symbols,
+                                                    event_pool->device_context);
     if (iree_status_is_ok(status)) {
       for (iree_host_size_t i = 0; i < remaining_count; ++i) {
         status = iree_hal_hip_event_create(event_pool->symbols, event_pool,
@@ -269,14 +268,6 @@ iree_status_t iree_hal_hip_event_pool_acquire(
           break;
         }
       }
-      iree_status_t cleanup_status = IREE_HIP_CALL_TO_STATUS(
-          event_pool->symbols, hipCtxPopCurrent(NULL), "hipCtxPopCurrent");
-      if (iree_status_is_ok(status) && !iree_status_is_ok(cleanup_status)) {
-        // Clean up all of the events we've acquired.
-        iree_hal_hip_event_pool_release_event(
-            event_pool, from_pool_count + remaining_count, out_events);
-      }
-      status = iree_status_join(status, cleanup_status);
       if (!iree_status_is_ok(status)) {
         IREE_TRACE_ZONE_END(z1);
         IREE_TRACE_ZONE_END(z0);
