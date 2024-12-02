@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -31,6 +32,132 @@ namespace mlir::iree_compiler::DispatchCreation {
 
 #define GEN_PASS_DEF_FOLDUNITEXTENTDIMSPASS
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
+
+namespace {
+
+/// Simplify collapse_shape(expand_shape) by removing unneeded unit dimensions
+/// that get expanded and subsequently collapsed.
+struct DropUnitDimsFromCollapseOfExpand
+    : OpRewritePattern<tensor::CollapseShapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::CollapseShapeOp collapseOp,
+                                PatternRewriter &rewriter) const override {
+    auto expandOp = collapseOp.getSrc().getDefiningOp<tensor::ExpandShapeOp>();
+    if (!expandOp) {
+      return failure();
+    }
+
+    const auto collapseReassoc = collapseOp.getReassociationIndices();
+    ArrayRef<int64_t> interShape = expandOp.getType().getShape();
+    ArrayRef<int64_t> outShape = collapseOp.getType().getShape();
+    SmallVector<int64_t> interToOutMap(expandOp.getType().getRank());
+    llvm::SmallDenseSet<int64_t> toDrop;
+    for (const auto &[outDim, indicies] : llvm::enumerate(collapseReassoc)) {
+      for (auto [innerIdx, inDim] : llvm::enumerate(indicies)) {
+        // Can't drop this dim if it isnt statically 1 or if it isn't being
+        // combined with any other dimensions.
+        if (indicies.size() == 1 || interShape[inDim] != 1) {
+          continue;
+        }
+
+        // If we are collapsing multiple unit dims together, at least 1 must be
+        // kept (prefer the first).
+        if (outShape[outDim] == 1 && innerIdx != 0) {
+          continue;
+        }
+        toDrop.insert(inDim);
+      }
+    }
+
+    if (toDrop.empty()) {
+      return rewriter.notifyMatchFailure(collapseOp,
+                                         "Didn't find any unit dims to drop");
+    }
+
+    SmallVector<int64_t> newInterShape;
+    newInterShape.reserve(interShape.size() - toDrop.size());
+    for (auto [idx, length] : llvm::enumerate(interShape)) {
+      if (!toDrop.contains(idx)) {
+        newInterShape.push_back(length);
+      }
+    }
+
+    auto appendDroppedReassocation =
+        [&toDrop](SmallVector<ReassociationIndices, 4> &reassoc, int64_t start,
+                  int64_t count, int64_t origStart) {
+          reassoc.emplace_back();
+          auto &indicies = reassoc.back();
+          indicies.reserve(count);
+          int64_t dim = start;
+          for (int64_t idx : llvm::seq<int64_t>(origStart, origStart + count)) {
+            if (!toDrop.contains(idx)) {
+              indicies.push_back(dim++);
+            }
+          }
+
+          // All indicies have been dropped.
+          if (indicies.empty()) {
+            reassoc.pop_back();
+          }
+        };
+
+    auto dropOutputOfr = [&toDrop](const SmallVector<OpFoldResult> &sizes) {
+      return llvm::to_vector(llvm::map_range(
+          llvm::make_filter_range(
+              llvm::enumerate(sizes),
+              [&toDrop](auto pair) { return !toDrop.contains(pair.index()); }),
+          [](auto pair) -> OpFoldResult { return pair.value(); }));
+    };
+
+    auto isIdentityReassociation = [](ArrayRef<ReassociationIndices> reassoc) {
+      return llvm::all_of(reassoc,
+                          [](auto &indices) { return indices.size() == 1; });
+    };
+
+    SmallVector<ReassociationIndices, 4> newCollapseReassoc;
+    int64_t collapsedDim = 0;
+    for (auto dim : llvm::seq<int64_t>(0, outShape.size())) {
+      appendDroppedReassocation(newCollapseReassoc, collapsedDim,
+                                collapseReassoc[dim].size(),
+                                collapseReassoc[dim].front());
+      collapsedDim += newCollapseReassoc.back().size();
+    }
+
+    const auto expandReassoc = expandOp.getReassociationIndices();
+    SmallVector<ReassociationIndices, 4> newExpandReassoc;
+    ArrayRef<int64_t> srcShape = expandOp.getSrcType().getShape();
+    int64_t expandedDim = 0;
+    for (auto dim : llvm::seq<int64_t>(0, srcShape.size())) {
+      appendDroppedReassocation(newExpandReassoc, expandedDim,
+                                expandReassoc[dim].size(),
+                                expandReassoc[dim].front());
+      expandedDim += newExpandReassoc.back().size();
+    }
+
+    auto outputSizes = getMixedValues(expandOp.getStaticOutputShape(),
+                                      expandOp.getOutputShape(), rewriter);
+    Value newExpanded = expandOp.getSrc();
+    if (!isIdentityReassociation(newExpandReassoc)) {
+      newExpanded = rewriter.create<tensor::ExpandShapeOp>(
+          expandOp.getLoc(),
+          RankedTensorType::get(newInterShape,
+                                expandOp.getType().getElementType()),
+          expandOp.getSrc(), newExpandReassoc, dropOutputOfr(outputSizes));
+    }
+
+    Value newCollapsed = newExpanded;
+    if (!isIdentityReassociation(newCollapseReassoc)) {
+      newCollapsed = rewriter.create<tensor::CollapseShapeOp>(
+          collapseOp.getLoc(), collapseOp.getType(), newExpanded,
+          newCollapseReassoc);
+    }
+    rewriter.replaceOp(collapseOp, newCollapsed);
+    return success();
+  }
+};
+
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // Pass helpers
@@ -155,6 +282,7 @@ void FoldUnitExtentDimsPass::runOnOperation() {
   };
   linalg::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns, options);
   linalg::populateMoveInitOperandsToInputPattern(foldUnitDimsPatterns);
+  foldUnitDimsPatterns.insert<DropUnitDimsFromCollapseOfExpand>(context);
   if (failed(applyPatternsAndFoldGreedily(moduleOp,
                                           std::move(foldUnitDimsPatterns)))) {
     return signalPassFailure();
