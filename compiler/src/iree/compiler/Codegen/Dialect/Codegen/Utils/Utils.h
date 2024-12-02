@@ -57,6 +57,10 @@ DictionaryAttr serializeEncodingInfo(MLIRContext *ctx,
 std::optional<MaterializeEncodingInfo>
 deserializeEncodingInfo(DictionaryAttr attr);
 
+/// Returns true if the `info` denotes an identity layout, i.e., there is no
+/// relayout requirement.
+bool isIdentityLayout(const MaterializeEncodingInfo &info);
+
 /// Concatenates the vectors.
 SmallVector<int64_t>
 getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape);

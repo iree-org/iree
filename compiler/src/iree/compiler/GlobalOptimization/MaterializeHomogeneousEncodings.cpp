@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -44,7 +45,8 @@ class MaterializeHomogeneousEncodingsPass
           MaterializeHomogeneousEncodingsPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::HAL::HALDialect, tensor::TensorDialect>();
+    registry.insert<IREE::HAL::HALDialect, tensor::TensorDialect,
+                    IREE::Codegen::IREECodegenDialect>();
   }
 
   void addNopPipeline(OpPassManager &passManager) {

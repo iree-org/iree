@@ -7,6 +7,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Attributes.h"
@@ -184,6 +185,13 @@ TEST(MaterializeEncodingInfo, Deserialization) {
   TileSwizzle swizzle;
   items.back().setValue(serializeTileSwizzle(&ctx, swizzle));
   EXPECT_TRUE(deserializeEncodingInfo(b.getDictionaryAttr(items)).has_value());
+}
+
+TEST(MaterializeEncodingInfo, IdentityLayout) {
+  MaterializeEncodingInfo info;
+  EXPECT_TRUE(isIdentityLayout(info));
+  info.swizzle = TileSwizzle();
+  EXPECT_FALSE(isIdentityLayout(info));
 }
 
 } // namespace

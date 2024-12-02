@@ -10,12 +10,14 @@
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/SmallVectorExtras.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -119,12 +121,7 @@ static void transposeInPlace(MaterializeEncodingInfo &info) {
 // to `pack` and `unpack` operations respectively.
 //===---------------------------------------------------------------------===//
 
-/// TODO(hanchung): Move the implementation to EncodingUtils.cpp. It is not
-/// moved because it needs some cleanup for this file. E.g., `getPaddingValue`
-/// is no longer needed. Ideally we should move CPU specific patterns (e.g.,
-/// lowerContractionOpWithEncoding, etc) to the CPUMaterializeEncoding file;
-/// move general patterns to EncodingUtils, and retire this file.
-FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
+FailureOr<Value> lowerSetEncodingOpToPackOp(
     RewriterBase &rewriter, IREE::Encoding::SetEncodingOp encodingOp,
     Value source, const MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
@@ -133,6 +130,11 @@ FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
       typeConverter.getEncodingInfo(resultType);
   if (failed(encodingInfo)) {
     return rewriter.notifyMatchFailure(encodingOp, "unhandled result encoding");
+  }
+
+  // Shortcut to avoid creating new operations.
+  if (IREE::Codegen::isIdentityLayout(encodingInfo.value())) {
+    return source;
   }
 
   auto encoding = IREE::Encoding::getEncodingAttr(resultType);
@@ -160,14 +162,14 @@ FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
       encodingInfo->outerDimsPerm);
   auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
                                                   resultType.getElementType());
-  return rewriter.create<tensor::PackOp>(
-      loc, source, emptyOp, encodingInfo->innerDimsPos, *innerTileSizesOfr,
-      paddingValue, encodingInfo->outerDimsPerm);
+  return rewriter
+      .create<tensor::PackOp>(loc, source, emptyOp, encodingInfo->innerDimsPos,
+                              *innerTileSizesOfr, paddingValue,
+                              encodingInfo->outerDimsPerm)
+      .getResult();
 }
 
-/// TODO(hanchung): Move the implementation to EncodingUtils.cpp. See the reason
-/// in the implementation comment of lowerSetEncodingToPackOp method.
-FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
+FailureOr<Value> lowerUnsetEncodingToUnpackOp(
     RewriterBase &rewriter, IREE::Encoding::UnsetEncodingOp encodingOp,
     Value packedValue, const MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
@@ -177,6 +179,12 @@ FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
   if (failed(encodingInfo)) {
     return rewriter.notifyMatchFailure(encodingOp, "unhandled source encoding");
   }
+
+  // Shortcut to avoid creating new operations.
+  if (IREE::Codegen::isIdentityLayout(encodingInfo.value())) {
+    return packedValue;
+  }
+
   auto encoding = IREE::Encoding::getEncodingAttr(sourceType);
   if (typeConverter.getTransposeNarrowN() && isNarrowNResult(encoding)) {
     transposeInPlace(*encodingInfo);
@@ -194,9 +202,11 @@ FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
     return rewriter.notifyMatchFailure(
         encodingOp, "failed to generate runtime tile size query");
   }
-  return rewriter.create<tensor::UnPackOp>(
-      loc, packedValue, emptyOp, encodingInfo->innerDimsPos, *innerTileSizesOfr,
-      encodingInfo->outerDimsPerm);
+  return rewriter
+      .create<tensor::UnPackOp>(loc, packedValue, emptyOp,
+                                encodingInfo->innerDimsPos, *innerTileSizesOfr,
+                                encodingInfo->outerDimsPerm)
+      .getResult();
 }
 
 /// Utility method to convert `tensor.empty` with encoding to a `tensor.empty`
@@ -609,7 +619,7 @@ struct SetEncodingOpToPackOpConversion
       rewriter.replaceOp(encodingOp, result);
       return success();
     }
-    rewriter.replaceOp(encodingOp, packOp->getResult());
+    rewriter.replaceOp(encodingOp, packOp.value());
     return success();
   }
 };
@@ -625,10 +635,10 @@ struct UnsetEncodingOpToUnPackOpConversion
                   ConversionPatternRewriter &rewriter) const override {
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         this->getTypeConverter());
-    auto unpackOp = lowerUnsetEncodingToUnpackOp(
+    auto unpackedValue = lowerUnsetEncodingToUnpackOp(
         rewriter, encodingOp, adaptor.getSource(), *converter,
         this->materializeEncodingValueFn);
-    if (failed(unpackOp)) {
+    if (failed(unpackedValue)) {
       Type targetType =
           getTypeConverter()->convertType(encodingOp.getResultType());
       Value result = rewriter.createOrFold<tensor::CastOp>(
@@ -636,7 +646,7 @@ struct UnsetEncodingOpToUnPackOpConversion
       rewriter.replaceOp(encodingOp, result);
       return success();
     }
-    rewriter.replaceOp(encodingOp, unpackOp->getResult());
+    rewriter.replaceOp(encodingOp, unpackedValue.value());
     return success();
   }
 };
@@ -734,6 +744,18 @@ public:
 
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         this->getTypeConverter());
+
+    if (auto layoutAttr = converter->getLayoutAttr()) {
+      SmallVector<Type> convertedResTypes;
+      for (auto init : op.getDpsInits()) {
+        convertedResTypes.push_back(converter->convertType(init.getType()));
+      }
+      Operation *newOp =
+          layoutAttr.lowerOp(rewriter, op, convertedResTypes, operands);
+      rewriter.replaceOp(op, newOp->getResults());
+      return success();
+    }
+
     // TODO(hanchung): This is a transition state for moving the implementation
     // details to backend attributes. We won't need the function type argument
     // after all the backends that support encodings implement the attribute.
