@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "invalid.mlir"
     "lowering_config_attr.mlir"
+    "root_op_attribute.mlir"
     "ukernel_ops.mlir"
     "ukernel_ops_cse.mlir"
     "workgroup_mapping_attrs.mlir"
