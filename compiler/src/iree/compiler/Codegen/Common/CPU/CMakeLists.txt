@@ -78,6 +78,7 @@ iree_cc_library(
     MLIRVectorTransforms
     iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Dialect::CPU::IR::IREECPUDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::Codegen::Utils
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
