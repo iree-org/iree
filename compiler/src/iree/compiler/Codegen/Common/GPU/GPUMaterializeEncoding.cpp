@@ -46,12 +46,12 @@ using IREE::Codegen::MaterializeEncodingInfo;
 using IREE::Codegen::TileMxNxK;
 using IREE::Codegen::TileSwizzle;
 
-static IREE::GPU::MMAAttr chooseIntrinsicMMAAttr(TypeRange eTypes,
-                                                 IREE::GPU::TargetWgpAttr wgp) {
-  IREE::GPU::MMAAttr candidateMma;
-  for (IREE::GPU::MMAAttr mma : wgp.getMma()) {
+static IREE::GPU::MMAIntrinsicAttr
+chooseMMAIntrinsicAttr(TypeRange eTypes, IREE::GPU::TargetWgpAttr wgp) {
+  IREE::GPU::MMAIntrinsicAttr candidateMma;
+  for (IREE::GPU::MMAIntrinsicAttr mma : wgp.getMma()) {
     // Filter out intrinsics that don't match the element types of this matmul.
-    auto [et0, et1, et2] = mma.getABCElementTypes();
+    auto [et0, et1, et2] = getABCElementTypes(mma);
     if (et0 != eTypes[0] || et1 != eTypes[1] || et2 != eTypes[2]) {
       continue;
     }
@@ -61,8 +61,13 @@ static IREE::GPU::MMAAttr chooseIntrinsicMMAAttr(TypeRange eTypes,
     // which would optimize performance when power is not the bottleneck.
     // Currently we just choose the intrinsic maximizing K, but that can be
     // revisited later.
-    if (candidateMma && candidateMma.getKSize() > mma.getKSize()) {
-      continue;
+    auto [mSize, nSize, kSize] = IREE::GPU::getMNKShape(mma);
+    if (candidateMma) {
+      auto [mSizeCandidate, nSizeCandidate, kSizeCandidate] =
+          IREE::GPU::getMNKShape(candidateMma);
+      if (kSizeCandidate > kSize) {
+        continue;
+      }
     }
     candidateMma = mma;
   }
@@ -87,8 +92,8 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   //
   // Step 1: select a MMAIntrinsic.
   //
-  MMAAttr intrinsicMma = chooseIntrinsicMMAAttr(eTypes, wgp);
-  if (!intrinsicMma) {
+  MMAIntrinsicAttr intrinsic = chooseMMAIntrinsicAttr(eTypes, wgp);
+  if (!intrinsic) {
     return {};
   }
 
@@ -101,7 +106,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
     return type.getElementTypeBitWidth() * type.getNumElements();
   };
 
-  auto [intrinsicA, intrinsicB, intrinsicC] = intrinsicMma.getABCVectorTypes();
+  auto [intrinsicA, intrinsicB, intrinsicC] = getABCVectorTypes(intrinsic);
   // The unrollK factor serves to allow loads from the A and B matrices to use
   // the target ISA's vector loads. For instance, if the ISA has 128-bit loads
   // and each intrinsic consumes only 32 bits from A and B, then we want to set
@@ -198,22 +203,24 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   // Step 3: Adjust the unrolling factors when there is a narrow dimension.
   // TODO(#18850): dealing with narrow cases as a fix-up is suboptimal.
   //
+  auto [intrinsicMSize, intrinsicNSize, intrinsicKSize] =
+      getMNKShape(intrinsic);
   IREE::Encoding::MatmulNarrowDim narrowDim =
       IREE::Encoding::getMatmulNarrowDim(encoding);
   if (narrowDim.isM()) {
     unrollM = std::min(unrollM, static_cast<int>(llvm::divideCeil(
-                                    narrowDim.size, intrinsicMma.getMSize())));
+                                    narrowDim.size, intrinsicMSize)));
   }
   if (narrowDim.isN()) {
     std::swap(unrollM, unrollN);
     std::swap(subgroupsM, subgroupsN);
     assert(subgroupsN == 1);
     unrollN = std::min(unrollN, static_cast<int>(llvm::divideCeil(
-                                    narrowDim.size, intrinsicMma.getNSize())));
+                                    narrowDim.size, intrinsicNSize)));
   }
 
-  return DataTiledMMAAttr::get(ctx, intrinsicMma.getIntrinsic(), unrollM,
-                               subgroupsM, unrollN, subgroupsN, unrollK);
+  return DataTiledMMAAttr::get(ctx, intrinsic, unrollM, subgroupsM, unrollN,
+                               subgroupsN, unrollK);
 }
 
 static FailureOr<MaterializeEncodingInfo>

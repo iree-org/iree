@@ -288,7 +288,7 @@ def IREEGPU_VirtualMMAAttr :
 }
 
 def IREEGPU_MMAOpsArrayAttr : ArrayOfAttr<
-  IREEGPU_Dialect, "MMAOpsArray", "mma_ops", "MMAAttr"> {
+  IREEGPU_Dialect, "MMAOpsArray", "mma_ops", "MMAIntrinsicAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 }
 

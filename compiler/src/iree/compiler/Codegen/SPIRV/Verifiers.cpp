@@ -250,9 +250,9 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   // and subgroup tile sizes should be multiple of cooperative matrix (M, N, K)
   // sizes.
   bool isNativeVectorSizeAccepted = false;
-  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
-    auto [mSize, nSize, kSize] = mma.getMNKShape();
-    auto [aType, bType, cType] = mma.getABCElementTypes();
+  for (IREE::GPU::MMAIntrinsicAttr mma : target.getWgp().getMma()) {
+    auto [mSize, nSize, kSize] = getMNKShape(mma);
+    auto [aType, bType, cType] = getABCElementTypes(mma);
 
     if (aType == lhsType && bType == rhsType && cType == resultType &&
         mSize == nativeVectorSizes[0] && nSize == nativeVectorSizes[1] &&

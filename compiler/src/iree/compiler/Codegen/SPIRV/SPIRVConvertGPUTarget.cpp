@@ -190,9 +190,9 @@ spirv::ResourceLimitsAttr convertLimits(IREE::GPU::TargetAttr target) {
   Builder b(context);
 
   SmallVector<Attribute, 4> coopMatAttrs;
-  for (IREE::GPU::MMAAttr mmaOp : wgp.getMma()) {
-    auto [mSize, nSize, kSize] = mmaOp.getMNKShape();
-    auto [aType, bType, cType] = mmaOp.getABCElementTypes();
+  for (IREE::GPU::MMAIntrinsicAttr mmaOp : wgp.getMma()) {
+    auto [mSize, nSize, kSize] = getMNKShape(mmaOp);
+    auto [aType, bType, cType] = getABCElementTypes(mmaOp);
     coopMatAttrs.push_back(spirv::CooperativeMatrixPropertiesKHRAttr::get(
         context, mSize, nSize, kSize, aType, bType, cType, cType,
         false /*saturatingAccumulation*/,

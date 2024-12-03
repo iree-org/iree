@@ -113,10 +113,10 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     bool transposedLhs, bool transposedRhs, bool mustBeAligned = true) {
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   SmallVector<GPUMatmulShapeType> intrinsics;
-  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
-    auto [mSize, nSize, kSize] = mma.getMNKShape();
-    auto [aType, bType, cType] = mma.getABCElementTypes();
-    if (mma.getSubgroupSize() != targetSubgroupSize)
+  for (IREE::GPU::MMAIntrinsicAttr mma : target.getWgp().getMma()) {
+    auto [mSize, nSize, kSize] = getMNKShape(mma);
+    auto [aType, bType, cType] = getABCElementTypes(mma);
+    if (getSubgroupSize(mma) != targetSubgroupSize)
       continue;
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
   }
@@ -311,12 +311,12 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     reductionTileSizes[kDim] = schedule->kTileSizes[i];
   }
 
-  IREE::GPU::MmaInterfaceAttr mmaKind =
-      target.getWgp().getMma()[schedule->index];
+  MLIRContext *context = lhs.getContext();
+  IREE::GPU::MmaInterfaceAttr mmaKind = IREE::GPU::MMAAttr::get(
+      context, target.getWgp().getMma()[schedule->index].getValue());
 
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
-  MLIRContext *context = lhs.getContext();
   SmallVector<NamedAttribute, 1> attrs;
   Builder b(context);
   attrs.emplace_back(StringAttr::get(context, "workgroup"),

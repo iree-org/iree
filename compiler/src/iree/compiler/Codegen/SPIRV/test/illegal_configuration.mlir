@@ -227,7 +227,7 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|fp16|int32, storage = b32|b16, subgroup = none, dot = none,
-    mma = [<WMMA_F32_16x16x16_F16>, <WMMA_F16_16x16x16_F16>],
+    mma = [ WMMA_F32_16x16x16_F16, WMMA_F16_16x16x16_F16],
     subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -261,7 +261,7 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|fp16|int32, storage = b32|b16, subgroup = none, dot = none,
-    mma = [<WMMA_F32_16x16x16_F16>, <WMMA_F16_16x16x16_F16>],
+    mma = [ WMMA_F32_16x16x16_F16, WMMA_F16_16x16x16_F16],
     subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -295,7 +295,7 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|fp16|int32, storage = b32|b16, subgroup = none, dot = none,
-    mma = [<WMMA_F32_16x16x16_F16>, <WMMA_F16_16x16x16_F16>],
+    mma = [ WMMA_F32_16x16x16_F16, WMMA_F16_16x16x16_F16],
     subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -329,7 +329,7 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|fp16|int32, storage = b32|b16, subgroup = none, dot = none,
-    mma = [<WMMA_F32_16x16x16_F16>, <WMMA_F16_16x16x16_F16>],
+    mma = [ WMMA_F32_16x16x16_F16, WMMA_F16_16x16x16_F16],
     subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -363,7 +363,7 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|fp16|int32, storage = b32|b16, subgroup = none, dot = none,
-    mma = [<WMMA_F32_16x16x16_F16>, <WMMA_F16_16x16x16_F16>],
+    mma = [ WMMA_F32_16x16x16_F16, WMMA_F16_16x16x16_F16],
     subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -396,7 +396,8 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 2, 2, 2], [0, 0, 0, 0, 1, 1, 4]]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none,
+    mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>

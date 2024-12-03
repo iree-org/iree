@@ -4,7 +4,7 @@
 {iree.gpu.target = #iree_gpu.target<arch = "gfx942", features = "",
 wgp = <compute = int32, storage =  b32,
 subgroup = arithmetic, dot = dp4xi8toi32,
-mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>],
+mma = [ MFMA_F32_16x16x4_F32, MFMA_F32_16x16x16_F16],
 subgroup_size_choices = [64], max_workgroup_sizes = [1024],
 max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
 max_workgroup_counts = [2147483647]>>}>
@@ -35,7 +35,7 @@ module {
 {iree.gpu.target = #iree_gpu.target<arch = "gfx942", features = "",
 wgp = <compute = int32, storage =  b32,
 subgroup = arithmetic, dot = dp4xi8toi32,
-mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>],
+mma = [ MFMA_F32_16x16x4_F32, MFMA_F32_16x16x16_F16],
 subgroup_size_choices = [64], max_workgroup_sizes = [1024],
 max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
 max_workgroup_counts = [2147483647]>>}>
@@ -43,7 +43,7 @@ max_workgroup_counts = [2147483647]>>}>
 {iree.gpu.target = #iree_gpu.target<arch = "gfx942", features = "",
 wgp = <compute = int32, storage =  b32,
 subgroup = arithmetic, dot = dp4xi8toi32,
-mma = [<MFMA_F32_32x32x8_F16>, <MFMA_F32_16x16x16_BF16>],
+mma = [ MFMA_F32_32x32x8_F16, MFMA_F32_16x16x16_BF16],
 subgroup_size_choices = [64], max_workgroup_sizes = [1024],
 max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
 max_workgroup_counts = [2147483647]>>}>

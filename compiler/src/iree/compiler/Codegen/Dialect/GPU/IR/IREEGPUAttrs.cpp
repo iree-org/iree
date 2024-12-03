@@ -69,7 +69,7 @@ static bool is_AMD_WMMA(MMAIntrinsic intrinsic) {
   return getArchID(intrinsic) >= 0x1800 && getArchID(intrinsic) <= 0x1FFF;
 }
 
-static int64_t getIntrinsicSubgroupSize(MMAIntrinsic intrinsic) {
+static int64_t getSubgroupSize(MMAIntrinsic intrinsic) {
   // Not using Wave64 at all at the moment, so the only place where the
   // subgroup size is 64 is on CDNA* architectures.
   return is_AMD_MFMA(intrinsic) ? 64 : 32;
@@ -127,6 +127,10 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
   }
   assert(false && "unexpected enum value");
   return {};
+}
+
+std::tuple<Type, Type, Type> getABCElementTypes(MMAIntrinsicAttr intrinsic) {
+  return getABCElementTypes(intrinsic.getContext(), intrinsic.getValue());
 }
 
 MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
@@ -276,6 +280,21 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
   return {};
 }
 
+template <typename MMAIntrinsicType>
+static std::tuple<int64_t, int64_t, int64_t>
+getMNKShape(MMAIntrinsicType intrinsic) {
+  auto lhs = getSingleSubgroupLayout(intrinsic, MMAFragment::Lhs);
+  auto rhs = getSingleSubgroupLayout(intrinsic, MMAFragment::Rhs);
+  int64_t mSize = lhs.outer[0] * lhs.thread[0] * lhs.element[0];
+  int64_t nSize = rhs.outer[1] * rhs.thread[1] * rhs.element[1];
+  int64_t kSize = lhs.outer[1] * lhs.thread[1] * lhs.element[1];
+  return {mSize, nSize, kSize};
+}
+
+std::tuple<int64_t, int64_t, int64_t> getMNKShape(MMAIntrinsicAttr intrinsic) {
+  return getMNKShape(intrinsic.getValue());
+}
+
 // Struct describing the shape of a MMA operation, but not the detailed layout.
 struct OpaqueMmaLayout {
   int64_t mSize = 0;
@@ -291,6 +310,7 @@ static OpaqueMmaLayout getOpaqueMMALayout(MLIRContext *context,
                                           MMAIntrinsicType intrinsic) {
   OpaqueMmaLayout o;
   std::tie(o.aType, o.bType, o.cType) = getABCElementTypes(context, intrinsic);
+  std::tie(o.mSize, o.nSize, o.kSize) = getMNKShape(intrinsic);
   auto lhs = getSingleSubgroupLayout(intrinsic, MMAFragment::Lhs);
   auto rhs = getSingleSubgroupLayout(intrinsic, MMAFragment::Rhs);
   o.mSize = lhs.outer[0] * lhs.thread[0] * lhs.element[0];
@@ -310,6 +330,10 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MmaInterfaceAttr mmaKind,
   }
   assert(false && "unhandled MMA Interface type.");
   return {};
+}
+
+int64_t getSubgroupSize(MMAIntrinsicAttr intrinsic) {
+  return getSubgroupSize(intrinsic.getValue());
 }
 
 //===----------------------------------------------------------------------===//
@@ -369,13 +393,18 @@ static VectorType getVectorType(MLIRContext *context,
 }
 
 std::tuple<VectorType, VectorType, VectorType>
-MMAAttr::getABCVectorTypes() const {
-  MLIRContext *context = getContext();
-  MMAIntrinsic intrinsic = getIntrinsic().getValue();
+getABCVectorTypes(MMAIntrinsicAttr intrinsicAttr) {
+  MLIRContext *context = intrinsicAttr.getContext();
+  MMAIntrinsic intrinsic = intrinsicAttr.getValue();
   VectorType aVecType = getVectorType(context, intrinsic, MMAFragment::Lhs);
   VectorType bVecType = getVectorType(context, intrinsic, MMAFragment::Rhs);
   VectorType cVecType = getVectorType(context, intrinsic, MMAFragment::Acc);
   return {aVecType, bVecType, cVecType};
+}
+
+std::tuple<VectorType, VectorType, VectorType>
+MMAAttr::getABCVectorTypes() const {
+  return IREE::GPU::getABCVectorTypes(getIntrinsic());
 }
 
 int64_t MMAAttr::getBlockSize() const {
@@ -383,7 +412,7 @@ int64_t MMAAttr::getBlockSize() const {
 }
 
 int64_t MMAAttr::getSubgroupSize() const {
-  return getIntrinsicSubgroupSize(getIntrinsic().getValue());
+  return IREE::GPU::getSubgroupSize(getIntrinsic());
 }
 
 FailureOr<IREE::GPU::MMAScope> MMAAttr::getMmaScope() const {
@@ -585,7 +614,7 @@ DataTiledMMAAttr::getABCVectorTypes() const {
 }
 
 int64_t DataTiledMMAAttr::getSubgroupSize() const {
-  return getIntrinsicSubgroupSize(getIntrinsic().getValue());
+  return IREE::GPU::getSubgroupSize(getIntrinsic());
 }
 
 FailureOr<IREE::GPU::MMAScope> DataTiledMMAAttr::getMmaScope() const {

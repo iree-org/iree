@@ -342,7 +342,8 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   intrinsics.reserve(target.getWgp().getMma().size());
   SmallVector<IREE::GPU::MmaInterfaceAttr> mmaKinds;
   MLIRContext *context = op.getContext();
-  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
+  for (IREE::GPU::MMAIntrinsicAttr intrinsic : target.getWgp().getMma()) {
+    auto mma = IREE::GPU::MMAAttr::get(context, intrinsic.getValue());
     if (mma.getSubgroupSize() != targetSubgroupSize)
       continue;
     storeMmaInfo(mma, intrinsics, mmaKinds);
@@ -553,7 +554,8 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   intrinsics.reserve(target.getWgp().getMma().size());
   SmallVector<IREE::GPU::MmaInterfaceAttr> mmaKinds;
   MLIRContext *context = op.getContext();
-  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
+  for (IREE::GPU::MMAIntrinsicAttr intrinsic : target.getWgp().getMma()) {
+    auto mma = IREE::GPU::MMAAttr::get(context, intrinsic.getValue());
     if (mma.getSubgroupSize() != targetSubgroupSize)
       continue;
     storeMmaInfo(mma, intrinsics, mmaKinds);
@@ -774,7 +776,8 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   intrinsics.reserve(target.getWgp().getMma().size());
   SmallVector<IREE::GPU::MmaInterfaceAttr> mmaKinds;
   MLIRContext *context = op.getContext();
-  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
+  for (IREE::GPU::MMAIntrinsicAttr intrinsic : target.getWgp().getMma()) {
+    auto mma = IREE::GPU::MMAAttr::get(context, intrinsic.getValue());
     if (mma.getSubgroupSize() != targetSubgroupSize)
       continue;
     storeMmaInfo(mma, intrinsics, mmaKinds);

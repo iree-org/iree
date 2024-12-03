@@ -89,10 +89,11 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
                             StringRef features, MLIRContext *context) {
   const WgpDetails *wgp = details.wgp;
 
-  SmallVector<MMAAttr, 8> mmaAttrs;
+  SmallVector<MMAIntrinsicAttr, 8> mmaAttrs;
   mmaAttrs.reserve(wgp->mmaCount);
-  for (int i = 0; i < wgp->mmaCount; ++i)
-    mmaAttrs.push_back(MMAAttr::get(context, wgp->mmaOps[i]));
+  for (int i = 0; i < wgp->mmaCount; ++i) {
+    mmaAttrs.push_back(MMAIntrinsicAttr::get(context, wgp->mmaOps[i]));
+  }
 
   SmallVector<int32_t, 2> subgroupSizes;
   assert(wgp->subgroupSizeChoices.front() != 0);

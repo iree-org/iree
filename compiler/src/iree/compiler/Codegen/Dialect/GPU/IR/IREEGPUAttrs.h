@@ -20,6 +20,11 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 
+// clang-format off
+#define GET_ATTRDEF_CLASSES
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h.inc"
+#undef GET_ATTRDEF_CLASSES
+// clang-format on
 namespace mlir::iree_compiler::IREE::GPU {
 
 // Struct describing the detailed subgroup-level layout of a MMA intrinsic.
@@ -68,12 +73,12 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
 MMASingleSubgroupLayout getSingleSubgroupLayout(MmaInterfaceAttr mmaKind,
                                                 MMAFragment fragment);
 
-} // namespace mlir::iree_compiler::IREE::GPU
+std::tuple<int64_t, int64_t, int64_t> getMNKShape(MMAIntrinsicAttr intrinsic);
+std::tuple<Type, Type, Type> getABCElementTypes(MMAIntrinsicAttr intrinsic);
+std::tuple<VectorType, VectorType, VectorType>
+getABCVectorTypes(MMAIntrinsicAttr intrinsicAttr);
+int64_t getSubgroupSize(MMAIntrinsicAttr intrinsic);
 
-// clang-format off
-#define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h.inc"
-#undef GET_ATTRDEF_CLASSES
-// clang-format on
+} // namespace mlir::iree_compiler::IREE::GPU
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS_H_
