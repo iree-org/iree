@@ -136,8 +136,8 @@ public:
     MLIRContext *context = &getContext();
     auto funcOp = getOperation();
 
-    GreedyRewriteConfig config;
     ConfigTrackingListener listener;
+    GreedyRewriteConfig config;
     config.listener = &listener;
 
     {
