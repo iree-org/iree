@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -62,16 +63,18 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
   // Mark any operation that has operands/results with encoding as
   // illegal.
   markUnknownOpDynamicallyLegal([](Operation *op) {
-    auto typeHasEncoding = [](Type t) -> bool {
+    auto typeHasDataTilingEncoding = [](Type t) -> bool {
       auto tensorType = dyn_cast<RankedTensorType>(t);
-      return tensorType && tensorType.getEncoding();
+      if (!tensorType)
+        return false;
+      return getEncodingAttr(tensorType) != nullptr;
     };
     auto valueHasEncoding = [=](Value v) -> bool {
-      return typeHasEncoding(v.getType());
+      return typeHasDataTilingEncoding(v.getType());
     };
     bool hasOperandOrResultsWithEncoding =
         llvm::any_of(op->getOperands(), valueHasEncoding) ||
-        llvm::any_of(op->getResultTypes(), typeHasEncoding);
+        llvm::any_of(op->getResultTypes(), typeHasDataTilingEncoding);
     return !hasOperandOrResultsWithEncoding;
   });
 }
