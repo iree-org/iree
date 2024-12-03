@@ -8,6 +8,7 @@ import os
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 
 def run_tool(*argv: str):
@@ -124,6 +125,70 @@ class ImportOnnxwithExternalizationTest(unittest.TestCase):
             # As the max allowed number of elements for inlining is 0 elements,
             # there should be no inlined constants.
             self.assertNotIn("onnx.Constant", contents)
+
+    def testExternalizeInitializersThreshold(self):
+        run_tool(
+            LARGE_WEIGHTS_ONNX_FILE_PATH,
+            "--externalize-params",
+            "--num-initializers-threshold",
+            "1",
+            "-o",
+            self.outputPath,
+        )
+        with open(self.outputPath, "rt") as f:
+            contents = f.read()
+            self.assertIn("util.global", contents)
+            self.assertIn("util.global.load", contents)
+            self.assertIn("onnx.Constant", contents)
+
+    def testExternalizeInputsThreshold(self):
+        run_tool(
+            LARGE_WEIGHTS_ONNX_FILE_PATH,
+            "--externalize-params",
+            "--externalize-inputs-threshold",
+            "0",
+            "-o",
+            self.outputPath,
+        )
+        with open(self.outputPath, "rt") as f:
+            contents = f.read()
+            self.assertIn("util.global", contents)
+            self.assertIn("util.global.load", contents)
+            self.assertNotIn("%arg0", contents)
+            self.assertIn("onnx.Constant", contents)
+
+    def testNoSaveParams(self):
+        param_path = str(Path(self.outputPath).parent / "test.irpa")
+        run_tool(
+            LARGE_WEIGHTS_ONNX_FILE_PATH,
+            "--externalize-params",
+            "--no-save-params",
+            "--save-params-to",
+            param_path,
+            "-o",
+            self.outputPath,
+        )
+        if os.path.exists(param_path):
+            self.fail("expected param_path to not exist with --no-save-params")
+        with open(self.outputPath, "rt") as f:
+            contents = f.read()
+            self.assertIn("util.global", contents)
+            self.assertIn("util.global.load", contents)
+            self.assertIn("onnx.Constant", contents)
+
+    def testLargeModelFlag(self):
+        run_tool(
+            LARGE_WEIGHTS_ONNX_FILE_PATH,
+            "--externalize-params",
+            "--large-model",
+            "-o",
+            self.outputPath,
+        )
+        with open(self.outputPath, "rt") as f:
+            contents = f.read()
+            self.assertIn("util.global", contents)
+            self.assertIn("util.global.load", contents)
+            self.assertIn("onnx.Constant", contents)
 
 
 if __name__ == "__main__":
