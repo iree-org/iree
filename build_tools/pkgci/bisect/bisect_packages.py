@@ -23,6 +23,11 @@ Example usage:
         --good-ref=iree-3.0.0 \
         --bad-ref=iree-3.1.0rc20241122 \
         --test-script=bisect_example_timestamp.sh
+
+    bisect_packages.py \
+        --good-ref=iree-3.0.0 \
+        --bad-ref=main \
+        --test-command="iree-compile --iree-hal-target-backends=llvm-cpu -o /dev/null /tmp/repro.mlir"
 """
 
 
@@ -58,21 +63,19 @@ def parse_arguments():
         default=Path.home() / ".iree" / "bisect",
         type=Path,
     )
-    # TODO(scotttodd): choice between manual or script (`git bisect run`) to use
-    #                  note that a "manual" mode would need developers to run
-    #   ```bash
-    #   REF_HASH=$(git rev-parse BISECT_HEAD)
-    #   python3.11 setup_venv.py \
-    #     $WORKDIR/$REF_HASH/.venv \
-    #     --artifact-path=$WORKDIR/$REF_HASH \
-    #     --fetch-git-ref=$REF_HASH
-    #   source $WORKDIR/$REF_HASH/.venv/bin/activate
-    #   ```
-    parser.add_argument(
+    test_group = parser.add_mutually_exclusive_group(required=True)
+    test_group.add_argument(
         "--test-script",
-        help="The script to run at each commit",
-        required=True,
+        help="Path to the bash script file to run at each commit (or use --test-command)",
     )
+    test_group.add_argument(
+        "--test-command",
+        help="The bash command to run at each commit (or use --test-script)",
+    )
+    # TODO(scotttodd): choice between manual or script (`git bisect run`) to use
+    #                  note that a "manual" mode would need developers to
+    #                  run the venv setup code themselves
+
     parser.add_argument(
         "--ignore-system-requirements",
         help="Ignores system requirements like Python 3.11 and tries to run even if they are not met.",
@@ -162,7 +165,10 @@ def main(args):
     print(f"  Using working directory : '{args.work_dir}'")
     Path.mkdir(args.work_dir, parents=True, exist_ok=True)
 
-    print(f"  Using test script       : '{args.test_script}'")
+    if args.test_script:
+        print(f"  Using test script       : '{args.test_script}'")
+    elif args.test_command:
+        print(f"  Using test command      : '{args.test_command}'")
 
     python311_path = check_system_requirements(args.ignore_system_requirements)
 
@@ -209,8 +215,11 @@ def main(args):
         contents += "#########################################\n"
         contents += "\n"
 
-        with open(args.test_script, "r") as original_script:
-            contents += original_script.read()
+        if args.test_script:
+            with open(args.test_script, "r") as original_script:
+                contents += original_script.read()
+        elif args.test_command:
+            contents += args.test_command + "\n"
 
         contents += "\n"
         contents += "#########################################\n"

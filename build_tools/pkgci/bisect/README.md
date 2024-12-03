@@ -47,38 +47,34 @@ description, we have all the data we need to run a bisect already.
 
 To run the bisect tool:
 
-1. Setup the test case by saving the input `.mlir` file and constructing a test
-   `.sh` script:
+1. Setup the test case by saving the input `.mlir` file and noting the test
+   command:
 
     ```mlir
     // /tmp/issue_18879.mlir
 
-    // This is the input program to the test script.
+    // This is the input program to the test command.
     module {
       func.func @main_graph(
         // ...
     ```
 
     ```bash
-    # /tmp/issue_18879.sh
-
-    # This is the script that will be tested at each commit.
-    # This script should succeed (return 0) at and prior to the `--good-ref`
+    # This is the command that will be tested at each commit.
+    # The command should succeed (return 0) at and prior to the `--good-ref`
     # commit and should fail (return non-0) at the `--bad-ref` commit.
 
-    # Try to keep these test scripts minimal. If the failure is in an earlier
-    # phase of the compiler (e.g. 'Flow' or 'Stream'), consider using
-    # a flag like `--compile-to=hal` to exit early on successful run instead
-    # of spending all the time to serialize an output `.vmfb` file.
+    # Try to keep these test commands (or scripts) minimal. If the failure is
+    # in an earlier phase of the compiler (e.g. 'Flow' or 'Stream'), consider
+    # using a flag like `--compile-to=hal` to exit early on successful run
+    # instead of spending all the time to serialize an output `.vmfb` file.
     # https://iree.dev/developers/general/developer-tips/#compiling-phase-by-phase
 
     iree-compile --iree-hal-target-backends=llvm-cpu -o /dev/null /tmp/issue_18879.mlir
     ```
 
-    ```bash
-    # Set the script as executable.
-    chmod +x /tmp/issue_18879.sh
-    ```
+    If the test command spans multiple lines, you can put it in an executable
+    `.sh` file and use the `--test-script` option instead of `--test-command`.
 
 2. Run the bisect tool, under Python 3.11:
 
@@ -94,7 +90,7 @@ To run the bisect tool:
     ./bisect_packages.py \
       --good-ref=f9fa934c649749b30fc4be05d9cef78eb043f0e9 \
       --bad-ref=05bbcf1385146d075829cd940a52bf06961614d0 \
-      --test-script=/tmp/issue_18879.sh
+      --test-command="iree-compile --iree-hal-target-backends=llvm-cpu -o /dev/null /tmp/issue_18879.mlir"
 
     # 206b60ca59c9dbbca5769694df4714c38cecaced is the first bad commit
     ```
