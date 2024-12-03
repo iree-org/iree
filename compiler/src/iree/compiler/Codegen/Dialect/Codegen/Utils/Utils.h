@@ -8,8 +8,7 @@
 #define IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_UTILS_H_
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
-#include "llvm-c/TargetMachine.h"
-#include "llvm/ADT/SmallVector.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
@@ -58,9 +57,31 @@ DictionaryAttr serializeEncodingInfo(MLIRContext *ctx,
 std::optional<MaterializeEncodingInfo>
 deserializeEncodingInfo(DictionaryAttr attr);
 
+/// Returns true if the `info` denotes an identity layout, i.e., there is no
+/// relayout requirement.
+bool isIdentityLayout(const MaterializeEncodingInfo &info);
+
 /// Concatenates the vectors.
 SmallVector<int64_t>
 getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape);
+
+struct TileMxNxK {
+  int64_t M = 1;
+  int64_t N = 1;
+  int64_t K = 1;
+};
+
+MaterializeEncodingInfo
+getEncodingInfoForMatmul(Encoding::EncodingAttr encoding, TileMxNxK tileMxNxK);
+
+//===----------------------------------------------------------------------===//
+// Operation Lowering Utilities.
+//===----------------------------------------------------------------------===//
+
+FailureOr<Operation *>
+lowerContractionOpWithEncoding(OpBuilder &builder, linalg::LinalgOp linalgOp,
+                               ValueRange operands, bool transposeNarrowN,
+                               ResolveEncodingInfoFn getEncodingInfo);
 
 } // namespace mlir::iree_compiler::IREE::Codegen
 

@@ -8,7 +8,6 @@
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/Support/Debug.h"
@@ -20,6 +19,10 @@
 #define DEBUG_TYPE "iree-constexpr"
 
 namespace mlir::iree_compiler::IREE::Util {
+
+#define GEN_PASS_DEF_HOISTINTOGLOBALSPASS
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc"
+
 namespace {
 
 static llvm::cl::opt<std::string> clPrintDotGraphToFile(
@@ -49,8 +52,11 @@ static std::string getHoistedName(Type type) {
 // necessary. Either this algorithm can be made smarter or a follow-on pass
 // can sink globals into the program where it is profitable to reduce
 // working set size.
-class HoistIntoGlobalsPass : public HoistIntoGlobalsBase<HoistIntoGlobalsPass> {
+class HoistIntoGlobalsPass
+    : public impl::HoistIntoGlobalsPassBase<HoistIntoGlobalsPass> {
 public:
+  using Base::Base;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registerConstExprDependentDialects(registry);
     if (this->registerDependentDialectsFn) {
@@ -59,7 +65,8 @@ public:
   }
 
   HoistIntoGlobalsPass(const ExprHoistingOptions &options)
-      : registerDependentDialectsFn(options.registerDependentDialectsFn) {
+      : Base(),
+        registerDependentDialectsFn(options.registerDependentDialectsFn) {
     this->maxSizeIncreaseThreshold.setValue(options.maxSizeIncreaseThreshold);
   }
 
@@ -347,13 +354,8 @@ private:
 
 } // namespace
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
+std::unique_ptr<Pass>
 createHoistIntoGlobalsPass(const ExprHoistingOptions &options) {
-  return std::make_unique<HoistIntoGlobalsPass>(options);
-}
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createHoistIntoGlobalsPass() {
-  IREE::Util::ExprHoistingOptions options;
   return std::make_unique<HoistIntoGlobalsPass>(options);
 }
 

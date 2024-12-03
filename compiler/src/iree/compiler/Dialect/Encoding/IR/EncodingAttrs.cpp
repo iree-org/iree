@@ -130,6 +130,14 @@ MatmulNarrowDim getMatmulNarrowDim(EncodingAttr encoding) {
   return {};
 }
 
+bool isNarrowNResult(EncodingAttr encoding) {
+  if (encoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_RESULT) {
+    return false;
+  }
+
+  return IREE::Encoding::getMatmulNarrowDim(encoding).isN();
+}
+
 EncodingAttr getEncodingAttr(RankedTensorType type) {
   return dyn_cast_or_null<EncodingAttr>(type.getEncoding());
 }

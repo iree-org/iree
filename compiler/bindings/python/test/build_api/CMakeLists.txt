@@ -16,7 +16,14 @@ endif()
 
 iree_py_test(
  NAME
-   concurrency_test
+   basic_test
  SRCS
-   "concurrency_test.py"
+   "basic_test.py"
+)
+
+iree_py_test(
+ NAME
+   net_test
+ SRCS
+   "net_test.py"
 )

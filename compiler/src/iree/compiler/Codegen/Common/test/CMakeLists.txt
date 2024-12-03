@@ -51,6 +51,9 @@ iree_lit_test_suite(
     "link_tuning_specs.mlir"
     "lower_ukernel_to_calls.mlir"
     "materialize_encoding_into_nop.mlir"
+    "materialize_tuning_specs.mlir"
+    "materialize_tuning_specs_invalid_spec.mlir"
+    "materialize_user_config_from_tuning_spec.mlir"
     "materialize_user_configs.mlir"
     "normalize_loop_bounds.mlir"
     "optimize_tensor_insert_extract_slices.mlir"
@@ -92,6 +95,7 @@ iree_lit_test_suite(
     convolution_match_spec.mlir
     reductions_codegen_spec.mlir
     reductions_match_spec.mlir
+    tuning_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

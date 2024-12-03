@@ -95,6 +95,8 @@ util.func public @bubble_up_extract_with_use(%arg0 : tensor<1024x7x7x2xi8>) -> (
 //  CHECK-SAME:      ins(%[[EXTRACT0]] : tensor<1024x7x7xi8>)
 //       CHECK:    util.return %[[GENERIC1]], %[[GENERIC0]]
 
+// -----
+
 util.func public @bubble_up_extract_fill_multi_use() -> tensor<2x320x130x130xf8E4M3FNUZ> {
   %cst_1 = arith.constant 1.000000e+00 : f8E4M3FNUZ
   %cst_2 = arith.constant 2.000000e+00 : f8E4M3FNUZ

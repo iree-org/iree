@@ -1,0 +1,68 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library")
+load("//build_tools/bazel:iree_bitcode_library.bzl", "iree_amdgpu_bitcode_library")
+load("//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_cmake_extra_content(
+    content = """
+if(NOT IREE_TARGET_BACKEND_ROCM)
+  return()
+endif()
+""",
+    inline = True,
+)
+
+# Target archs for ukernels. https://llvm.org/docs/AMDGPUUsage.html#processors
+# In general, we won't support all ukernels on all of these archs. It's fine to
+# support a ukernel on just one of these archs, and that will be the generic
+# case with "multi_mma" ukernels which will be entirely specific to the matrix
+# intrinsics found on each arch.
+gpu_archs = [
+    "gfx90a",
+    "gfx942",
+    "gfx1030",
+    "gfx1100",
+]
+
+# Element type combinations for the argmax ukernel.
+argmax_types = [
+    "f16i32",
+    "f16i64",
+    "f32i32",
+    "f32i64",
+]
+
+[iree_amdgpu_bitcode_library(
+    name = "iree_uk_amdgpu_argmax_%s_%s" % (type, gpu_arch),
+    srcs = [
+        "iree_uk_amdgpu_argmax_%s.c" % type,
+        "common.h",
+    ],
+    out = "iree_uk_amdgpu_argmax_%s.%s.bc" % (type, gpu_arch),
+    gpu_arch = gpu_arch,
+) for type in argmax_types for gpu_arch in gpu_archs]
+
+argmax_bc_files = [
+    ":iree_uk_amdgpu_argmax_%s.%s.bc" % (type, gpu_arch)
+    for type in argmax_types
+    for gpu_arch in gpu_archs
+]
+
+iree_c_embed_data(
+    name = "iree_uk_amdgpu_bitcode",
+    srcs = argmax_bc_files,
+    c_file_output = "iree_uk_amdgpu_bitcode.c",
+    flatten = True,
+    h_file_output = "iree_uk_amdgpu_bitcode.h",
+)

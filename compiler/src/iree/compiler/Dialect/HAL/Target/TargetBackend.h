@@ -51,7 +51,7 @@ namespace mlir::iree_compiler::IREE::HAL {
 //      filter="spirv-v1.2-desktop*"
 //          hal.executable.export @my_entry
 //          module { ... }
-//   [[-iree-hal-translate-executables]]
+//   [[-iree-hal-translate-all-executables]]
 //   -> hal.executable @my_exe
 //      + hal.executable.variant @spirv-v1.1-mobile filter="spirv-v1.1-mobile*"
 //          hal.executable.export @my_entry_1
@@ -66,9 +66,9 @@ namespace mlir::iree_compiler::IREE::HAL {
 //      filter="spirv-v1.2-desktop*"
 //          hal.executable.export @my_entry
 //          module { spirv.module { ... } }
-//   [[-iree-hal-link-executables]]
+//   [[-iree-hal-link-all-executables]]
 //   -> TODO(benvanik): linkage rules.
-//   [[-iree-hal-serialize-executables]]
+//   [[-iree-hal-serialize-all-executables]]
 //   -> hal.executable @my_exe
 //      + hal.executable.binary attributes { ... }
 //          data blob...

@@ -7,14 +7,58 @@
 
 """Sets up a Python venv with compiler/runtime from a workflow run.
 
-There are two modes in which to use this script:
+There are several modes in which to use this script:
 
-* Within a workflow, an artifact action will typically be used to fetch
-  relevant package artifacts. Specify the fetch location with
-  `--artifact-path=`.
+* Within a workflow triggered by `workflow_call`, an artifact action will
+  typically be used to fetch relevant package artifacts. Specify the fetched
+  location with `--artifact-path=`:
 
-* Locally, the `--fetch-gh-workflow=WORKFLOW_ID` can be used instead in order
-  to download and setup the venv in one step.
+  ```yml
+  - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+    with:
+      name: linux_x86_64_release_packages
+      path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
+  - name: Setup venv
+    run: |
+      ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
+      --artifact-path=${PACKAGE_DOWNLOAD_DIR}
+  ```
+
+* Within a workflow triggered by `workflow_dispatch`, pass `artifact_run_id` as
+  an input that developers must specify when running the workflow:
+
+  ```yml
+  on:
+    workflow_dispatch:
+      inputs:
+      artifact_run_id:
+        type: string
+        default: ""
+
+  ...
+    steps:
+    - name: Setup venv
+      run: |
+        ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
+        --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+  ```
+
+  (Note that these two modes are often combined to allow for workflow testing)
+
+* Locally, the `--fetch-gh-workflow=WORKFLOW_ID` can be used to download and
+  setup the venv from a specific workflow run in one step:
+
+
+  ```bash
+  python3.11 ./build_tools/pkgci/setup_venv.py /tmp/.venv --fetch-gh-workflow=11977414405
+  ```
+
+* Locally, the `--fetch-git-ref=GIT_REF` can be used to download and setup the
+  venv from the latest workflow run for a given ref (commit) in one step:
+
+  ```bash
+  python3.11 ./build_tools/pkgci/setup_venv.py /tmp/.venv --fetch-git-ref=main
+  ```
 
 You must have the `gh` command line tool installed and authenticated if you
 will be fetching artifacts.
@@ -34,10 +78,70 @@ import sys
 import tempfile
 import zipfile
 
+THIS_DIR = Path(__file__).parent.resolve()
+REPO_ROOT = THIS_DIR.parent.parent
+
+
+def parse_arguments(argv=None):
+    parser = argparse.ArgumentParser(description="Setup venv")
+    parser.add_argument(
+        "venv_dir", type=Path, help="Directory in which to create the venv"
+    )
+    parser.add_argument("--artifact-path", help="Path in which to find/fetch artifacts")
+
+    fetch_group = parser.add_mutually_exclusive_group()
+    fetch_group.add_argument(
+        "--fetch-gh-workflow", help="Fetch artifacts from a GitHub workflow"
+    )
+    fetch_group.add_argument("--fetch-git-ref", help="Fetch artifacts for a git ref")
+
+    parser.add_argument(
+        "--compiler-variant",
+        default="",
+        help="Package variant to install for the compiler ('', 'asserts')",
+    )
+    parser.add_argument(
+        "--runtime-variant",
+        default="",
+        help="Package variant to install for the runtime ('', 'asserts')",
+    )
+    args = parser.parse_args(argv)
+    return args
+
+
+def get_latest_workflow_run_id_for_ref(ref: str) -> int:
+    print(f"Normalizing ref: {ref}")
+    normalized_ref = (
+        subprocess.check_output(["git", "rev-parse", ref], cwd=REPO_ROOT)
+        .decode()
+        .strip()
+    )
+
+    print(f"Fetching artifacts for normalized ref: {normalized_ref}")
+    base_path = f"/repos/iree-org/iree"
+    workflow_run_args = [
+        "gh",
+        "api",
+        "-H",
+        "Accept: application/vnd.github+json",
+        "-H",
+        "X-GitHub-Api-Version: 2022-11-28",
+        f"{base_path}/actions/workflows/pkgci.yml/runs?head_sha={normalized_ref}",
+    ]
+    print(f"Running command to list workflow runs:\n  {' '.join(workflow_run_args)}")
+    workflow_run_output = subprocess.check_output(workflow_run_args)
+    workflow_run_json_output = json.loads(workflow_run_output)
+    if workflow_run_json_output["total_count"] == 0:
+        raise RuntimeError("Workflow did not run at this commit")
+
+    latest_run = workflow_run_json_output["workflow_runs"][-1]
+    print(f"Found workflow run: {latest_run['html_url']}")
+    return latest_run["id"]
+
 
 @functools.lru_cache
 def list_gh_artifacts(run_id: str) -> Dict[str, str]:
-    print(f"Fetching artifacts for workflow run {run_id}")
+    print(f"Fetching artifacts for workflow run: {run_id}")
     base_path = f"/repos/iree-org/iree"
     output = subprocess.check_output(
         [
@@ -87,30 +191,14 @@ def find_venv_python(venv_path: Path) -> Optional[Path]:
     return None
 
 
-def parse_arguments(argv=None):
-    parser = argparse.ArgumentParser(description="Setup venv")
-    parser.add_argument("--artifact-path", help="Path in which to find/fetch artifacts")
-    parser.add_argument(
-        "--fetch-gh-workflow", help="Fetch artifacts from a GitHub workflow"
-    )
-    parser.add_argument(
-        "--compiler-variant",
-        default="",
-        help="Package variant to install for the compiler ('', 'asserts')",
-    )
-    parser.add_argument(
-        "--runtime-variant",
-        default="",
-        help="Package variant to install for the runtime ('', 'asserts')",
-    )
-    parser.add_argument(
-        "venv_dir", type=Path, help="Directory in which to create the venv"
-    )
-    args = parser.parse_args(argv)
-    return args
-
-
 def main(args):
+    # Look up the workflow run for a ref.
+    if args.fetch_git_ref:
+        latest_gh_workflow = get_latest_workflow_run_id_for_ref(args.fetch_git_ref)
+        args.fetch_git_ref = ""
+        args.fetch_gh_workflow = str(latest_gh_workflow)
+        return main(args)
+
     # Make sure we have an artifact path if fetching.
     if not args.artifact_path and args.fetch_gh_workflow:
         with tempfile.TemporaryDirectory() as td:

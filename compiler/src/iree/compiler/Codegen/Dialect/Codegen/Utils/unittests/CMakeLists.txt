@@ -19,6 +19,7 @@ iree_cc_test(
     MLIRIR
     gmock
     gtest
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::Codegen::Utils
     iree::testing::gtest_main
 )

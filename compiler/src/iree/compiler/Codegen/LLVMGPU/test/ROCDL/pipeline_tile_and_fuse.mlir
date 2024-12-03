@@ -1087,3 +1087,82 @@ hal.executable public @main {
 //       CHECK:       vector.transfer_write %[[SHARED_READ]], %[[B2]]
 //       CHECK:    }
 //       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#config = #iree_gpu.lowering_config<{
+  mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
+  padding = [1, 16, 64, 4],
+  promote_operands = [0, 1, 2],
+  reduction = [0, 0, 0, 1],
+  subgroup = [0, 1, 1, 0],
+  workgroup = [1, 16, 64, 0]
+}>
+#translation = #iree_codegen.translation_info<pipeline =
+  LLVMGPUTileAndFuse
+  workgroup_size = [256, 1, 1]
+  subgroup_size = 64,
+  {
+    gpu_pipeline_options = #iree_gpu.pipeline_options<
+      prefetch_shared_memory = true,
+      no_reduce_shared_memory_bank_conflicts = false,
+      use_igemm_convolution = false>
+  }
+>
+hal.executable public @main {
+  hal.executable.variant public @rocm_hsaco_fb target(#hal.executable.target<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @unaligned_to_intrinsic_batched_matmul_dispatch_0_batch_matmul_12x577x577x577_f32 ordinal(0) layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @unaligned_to_intrinsic_batched_matmul() attributes {translation_info = #translation} {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<12x577x577xf32>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<12x577x577xf32>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<12x577x577xf32>>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [12, 577, 577], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<12x577x577xf32>> -> tensor<12x577x577xf32>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [12, 577, 577], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<12x577x577xf32>> -> tensor<12x577x577xf32>
+        %5 = tensor.empty() : tensor<12x577x577xf32>
+        %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<12x577x577xf32>) -> tensor<12x577x577xf32>
+        %7 = linalg.batch_matmul {lowering_config = #config} ins(%3, %4 : tensor<12x577x577xf32>, tensor<12x577x577xf32>) outs(%6 : tensor<12x577x577xf32>) -> tensor<12x577x577xf32>
+        flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [12, 577, 577], strides = [1, 1, 1] : tensor<12x577x577xf32> -> !flow.dispatch.tensor<writeonly:tensor<12x577x577xf32>>
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: func @unaligned_to_intrinsic_batched_matmul
+//   CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//   CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//   CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//   CHECK-DAG:   memref.alloc() : memref<1x4x66xf32, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   memref.alloc() : memref<1x16x6xf32, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   memref.alloc() : memref<1x1x16x4x16xf32, #gpu.address_space<workgroup>>
+//       CHECK:   scf.forall ({{.*}}) in (12, 37, 10) {
+//       CHECK:     %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c145 step %c1 {{.*}} -> (vector<1x1x1x4x1xf32>)
+//       CHECK:       gpu.barrier
+//   CHECK-DAG:       %[[LHS_RD:.+]] = vector.transfer_read {{.*}} vector<4xf32>
+//   CHECK-DAG:       vector.transfer_write %[[LHS_RD]]
+//   CHECK-DAG:       %[[RHS_RD:.+]] = vector.transfer_read {{.*}} vector<1xf32>
+//   CHECK-DAG:       vector.transfer_write %[[RHS_RD]]
+//       CHECK:       gpu.barrier
+//   CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
+//   CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
+// CHECK-COUNT-1:     amdgpu.mfma {{.*}}blocks = 1 : i32, k = 4 : i32, m = 16 : i32, n = 16 : i32
+//       CHECK:       scf.yield
+//       CHECK:     %[[LOOP_T:.+]] = vector.shape_cast %[[LOOP]] : vector<1x1x1x4x1xf32> to vector<4x1x1xf32>
+//       CHECK:     vector.transfer_write %[[LOOP_T]]
+//       CHECK:     scf.for {{.*}} {
+//       CHECK:       %[[SHARED_READ:.+]] = vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
+//       CHECK:       vector.transfer_write %[[SHARED_READ]], %[[B2]]
+//       CHECK:    }
+//       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}

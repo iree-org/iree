@@ -83,7 +83,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK:       %[[R_CAST:.+]] = vector.shape_cast %[[MFMA]] : vector<16xf32> to vector<4x1x4x1xf32>
 // CHECK:       %[[B_OUT:.*]] = vector.broadcast %[[R_CAST]] : vector<4x1x4x1xf32> to vector<1x1x4x1x4x1xf32>
 // CHECK:       %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[B_OUT]] : vector<1x1x4x1x4x1xf32> -> vector<32x32xf32>
-// CHECK:       return {{.*}} %[[R_SIMD]]
+// CHECK:       return %[[R_SIMD]]
 
 // -----
 
@@ -161,7 +161,7 @@ builtin.module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[MFMA]]  : vector<4xf32> to vector<1x1x4x1xf32>
 //       CHECK:   %[[B_OUT:.*]]  = vector.broadcast %[[R_CAST]] : vector<1x1x4x1xf32> to vector<1x1x1x1x4x1xf32>
 //       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[B_OUT]] : vector<1x1x1x1x4x1xf32> -> vector<16x16xf32>
-//       CHECK:   return {{.*}} %[[R_SIMD]]
+//       CHECK:   return %[[R_SIMD]]
 
 // -----
 
@@ -250,7 +250,7 @@ builtin.module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[R1_CAST:.+]] = vector.shape_cast %[[MFMA1]] : vector<16xf32> to vector<4x1x4x1xf32>
 //       CHECK:   %[[C1_INS:.+]] = vector.insert %[[R1_CAST]], %[[C0_INS]] [1, 0] : vector<4x1x4x1xf32> into vector<2x1x4x1x4x1xf32>
 //       CHECK:   %[[R:.+]] = iree_vector_ext.to_simd %[[C1_INS]] : vector<2x1x4x1x4x1xf32> -> vector<64x32xf32>
-//       CHECK:   return {{.*}}} %[[R]]
+//       CHECK:   return %[[R]]
 
 // -----
 
@@ -589,7 +589,7 @@ builtin.module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[WMMA]] : vector<8xf32> to vector<8x1x1x1xf32>
 //       CHECK:   %[[B_OUT:.*]] = vector.broadcast %[[R_CAST]] : vector<8x1x1x1xf32> to vector<1x1x8x1x1x1xf32>
 //       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[B_OUT]] : vector<1x1x8x1x1x1xf32> -> vector<16x16xf32>
-//       CHECK:   return {{.*}} %[[R_SIMD]]
+//       CHECK:   return %[[R_SIMD]]
 
 // -----
 
@@ -682,4 +682,4 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK:       %[[R_CAST:.+]] = vector.shape_cast %[[MFMA_1]] : vector<16xf32> to vector<4x1x4x1xf32>
 // CHECK:       %[[B_OUT:.*]] = vector.broadcast %[[R_CAST]] : vector<4x1x4x1xf32> to vector<1x1x4x1x4x1xf32>
 // CHECK:       %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[B_OUT]] : vector<1x1x4x1x4x1xf32> -> vector<32x32xf32>
-// CHECK:       return {{.*}} %[[R_SIMD]]
+// CHECK:       return %[[R_SIMD]]

@@ -6,7 +6,6 @@
 
 #include <utility>
 
-#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
@@ -17,9 +16,13 @@
 
 namespace mlir::iree_compiler::IREE::Util {
 
-struct DumpModulePass : public DumpModuleBase<DumpModulePass> {
-  DumpModulePass(std::string path) { this->path = path; }
-  DumpModulePass(const DumpModulePass &pass) {}
+#define GEN_PASS_DEF_DUMPMODULEPASS
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc"
+
+namespace {
+
+struct DumpModulePass : public impl::DumpModulePassBase<DumpModulePass> {
+  using Base::Base;
 
   void runOnOperation() override {
     // Ensure the parent paths exist.
@@ -48,15 +51,12 @@ struct DumpModulePass : public DumpModuleBase<DumpModulePass> {
     // Keep the temporary file after the write succeeds.
     file->keep();
   }
-
-  Option<std::string> path{
-      *this, "path",
-      llvm::cl::desc("File path to write the module text or binary into.")};
 };
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createDumpModulePass(std::string path) {
-  return std::make_unique<DumpModulePass>(path);
+} // namespace
+
+std::unique_ptr<Pass> createDumpModulePass(std::string path) {
+  return createDumpModulePass(DumpModulePassOptions{std::move(path)});
 }
 
 } // namespace mlir::iree_compiler::IREE::Util

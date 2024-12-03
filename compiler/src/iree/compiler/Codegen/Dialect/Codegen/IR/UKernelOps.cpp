@@ -61,7 +61,12 @@ createFunctionCall(RewriterBase &rewriter, Operation *op, StringRef fnName,
   }
 
   // Insert the function call.
-  return rewriter.create<func::CallOp>(loc, fnDecl, callOperands);
+  auto callOp = rewriter.create<func::CallOp>(loc, fnDecl, callOperands);
+  if (op->hasAttr("hal.executable.objects")) {
+    callOp->setAttr("hal.executable.objects",
+                    op->getAttr("hal.executable.objects"));
+  }
+  return callOp;
 }
 
 //===---------------------------------------------------------------------===//

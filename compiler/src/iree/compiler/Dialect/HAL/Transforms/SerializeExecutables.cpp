@@ -23,7 +23,7 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
-#define GEN_PASS_DEF_SERIALIZEEXECUTABLESPASS
+#define GEN_PASS_DEF_SERIALIZEALLEXECUTABLESPASS
 #define GEN_PASS_DEF_SERIALIZETARGETEXECUTABLESPASS
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
 
@@ -96,14 +96,14 @@ struct SerializeTargetExecutablesPass
 };
 
 //===----------------------------------------------------------------------===//
-// --iree-hal-serialize-executables
+// --iree-hal-serialize-all-executables
 //===----------------------------------------------------------------------===//
 
-struct SerializeExecutablesPass
-    : public IREE::HAL::impl::SerializeExecutablesPassBase<
-          SerializeExecutablesPass> {
-  using IREE::HAL::impl::SerializeExecutablesPassBase<
-      SerializeExecutablesPass>::SerializeExecutablesPassBase;
+struct SerializeAllExecutablesPass
+    : public IREE::HAL::impl::SerializeAllExecutablesPassBase<
+          SerializeAllExecutablesPass> {
+  using IREE::HAL::impl::SerializeAllExecutablesPassBase<
+      SerializeAllExecutablesPass>::SerializeAllExecutablesPassBase;
   void runOnOperation() override {
     auto executableOp = getOperation();
     OpPassManager passManager(executableOp.getOperationName());
