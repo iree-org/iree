@@ -26,13 +26,14 @@ Example usage:
 """
 
 
+from pathlib import Path
+
 import argparse
 import os
 import platform
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
 THIS_DIR = Path(__file__).parent.resolve()
 REPO_ROOT = THIS_DIR.parent.parent.parent

@@ -64,14 +64,13 @@ You must have the `gh` command line tool installed and authenticated if you
 will be fetching artifacts.
 """
 
+from glob import glob
+from pathlib import Path
 from typing import Optional, Dict, Tuple
 
 import argparse
 import functools
-from glob import glob
 import json
-import sys
-from pathlib import Path
 import platform
 import subprocess
 import sys
