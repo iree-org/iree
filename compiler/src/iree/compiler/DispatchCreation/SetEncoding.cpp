@@ -232,10 +232,8 @@ public:
         roundDimsTo[1] = llvm::PowerOf2Ceil(narrowDim.size);
       }
       auto optI1PackedStorageAttr = getI1PackedStorageAttr(rewriter.getContext());
-      auto layouts = optI1PackedStorageAttr ? ArrayAttr::get(
-                                                  rewriter.getContext(),
-                                                  {*optI1PackedStorageAttr})
-                                            : ArrayAttr();
+      auto layouts = optI1PackedStorageAttr ? ArrayRef<Attribute>(*optI1PackedStorageAttr)
+                                            : ArrayRef<Attribute>{};
       auto encoding = EncodingAttr::get(
           linalgOp.getContext(), operandIndex, opType, elemTypes, maps,
           /*bcastMap=*/std::nullopt, roundDimsTo, layouts);
