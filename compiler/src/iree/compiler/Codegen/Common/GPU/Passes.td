@@ -134,6 +134,16 @@ def GPUPackToIntrinsicsPass :
   ];
 }
 
+def GPUPadOperandsPass :
+    InterfacePass<"iree-codegen-gpu-pad-operands",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Pass to pad operands of ops with padding configuration provided. ";
+  let dependentDialects = [
+    "::mlir::linalg::LinalgDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+  ];
+}
+
 def GPUPipeliningPass :
     InterfacePass<"iree-codegen-gpu-pipelining", "mlir::FunctionOpInterface"> {
   let summary = "Pass to do software pipelining.";
