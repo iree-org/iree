@@ -19,7 +19,6 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
-#include "mlir/Interfaces/InferIntRangeInterface.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
@@ -2085,33 +2084,10 @@ static void getAsmResultNamesForInterfaceWorkgroupOp(
   }
 }
 
-// Minimum is the smallest possible result we could get. It's 0 for ID-like
-// operations and 1 for count-like ones.
-static void setResultRangesForInterfaceWorkgroupOp(
-    Value result, const std::optional<APInt> &upperBound,
-    SetIntRangeFn setResultRanges, int64_t minimum) {
-  unsigned width = ConstantIntRanges::getStorageBitwidth(result.getType());
-  if (!upperBound.has_value()) {
-    setResultRanges(
-        result, ConstantIntRanges::fromSigned(APInt(width, minimum),
-                                              APInt::getSignedMaxValue(width)));
-    return;
-  }
-  setResultRanges(result,
-                  ConstantIntRanges::fromUnsigned(APInt(width, minimum),
-                                                  *upperBound + minimum - 1));
-}
-
 void InterfaceWorkgroupIDOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   getAsmResultNamesForInterfaceWorkgroupOp("workgroup_id_", getDimension(),
                                            getResult(), setNameFn);
-}
-
-void InterfaceWorkgroupIDOp::inferResultRanges(
-    ArrayRef<ConstantIntRanges> argRanges, SetIntRangeFn setResultRanges) {
-  setResultRangesForInterfaceWorkgroupOp(getResult(), getUpperBound(),
-                                         setResultRanges, /*minimum=*/0);
 }
 
 void InterfaceWorkgroupCountOp::getAsmResultNames(
@@ -2120,22 +2096,10 @@ void InterfaceWorkgroupCountOp::getAsmResultNames(
                                            getResult(), setNameFn);
 }
 
-void InterfaceWorkgroupCountOp::inferResultRanges(
-    ArrayRef<ConstantIntRanges> argRanges, SetIntRangeFn setResultRanges) {
-  setResultRangesForInterfaceWorkgroupOp(getResult(), getUpperBound(),
-                                         setResultRanges, /*minimum=*/1);
-}
-
 void InterfaceWorkgroupSizeOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   getAsmResultNamesForInterfaceWorkgroupOp("workgroup_size_", getDimension(),
                                            getResult(), setNameFn);
-}
-
-void InterfaceWorkgroupSizeOp::inferResultRanges(
-    ArrayRef<ConstantIntRanges> argRanges, SetIntRangeFn setResultRanges) {
-  setResultRangesForInterfaceWorkgroupOp(getResult(), getUpperBound(),
-                                         setResultRanges, /*minimum=*/1);
 }
 
 //===----------------------------------------------------------------------===//

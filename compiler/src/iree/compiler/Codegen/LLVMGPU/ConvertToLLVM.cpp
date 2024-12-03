@@ -505,10 +505,7 @@ struct HALInterfaceWorkgroupOpsConverter final
     int32_t index = static_cast<int32_t>(op.getDimension().getSExtValue());
     std::array<gpu::Dimension, 3> dimAttr{gpu::Dimension::x, gpu::Dimension::y,
                                           gpu::Dimension::z};
-    NewOpTy newOp =
-        rewriter.replaceOpWithNewOp<NewOpTy>(op, op.getType(), dimAttr[index]);
-    if (IntegerAttr bound = op.getUpperBoundAttr())
-      newOp.setUpperBoundAttr(bound);
+    rewriter.replaceOpWithNewOp<NewOpTy>(op, op.getType(), dimAttr[index]);
     return success();
   }
 };
