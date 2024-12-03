@@ -108,6 +108,9 @@ def EncodingAttr :
 
     /// Clones an encoding with a new bcast_map
     EncodingAttr clone(AffineMap bcastMap);
+
+    /// Returns whether the encoding indicates packed storage for i1 datatype.
+    bool i1PackedStorage() const;
   }];
 
   let genVerifyDecl = 0;
