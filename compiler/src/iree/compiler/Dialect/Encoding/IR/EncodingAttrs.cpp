@@ -243,6 +243,10 @@ EncodingAttr getEncodingAttr(RankedTensorType type) {
   return dyn_cast_or_null<EncodingAttr>(type.getEncoding());
 }
 
+bool hasPackedStorageAttr(RankedTensorType type) {
+  return dyn_cast_or_null<PackedStorageAttr>(type.getEncoding()) != nullptr;
+}
+
 FailureOr<linalg::ContractionDimensions>
 getEncodingContractionDims(EncodingAttr encoding) {
   auto indexingMapsAttr = encoding.getUserIndexingMaps();
