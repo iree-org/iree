@@ -63,11 +63,28 @@ struct DetachElementwisePattern
       return failure();
     }
     auto outputType = llvm::cast<RankedTensorType>(outputOperand.getType());
+    int64_t outputRank = outputType.getRank();
     if (!outputType.getElementType().isIntOrFloat())
       return failure();
     auto elementType = outputType.getElementType();
 
     Location loc = linalgOp.getLoc();
+
+    // verify the original output affine map is parallel
+    auto outputMap = mlir::compressUnusedDims(
+        linalgOp.getMatchingIndexingMap(outputOperands.front()));
+    SmallVector<utils::IteratorType> iterators;
+    iterators.reserve(outputMap.getNumResults());
+    for (int i = 0, e = outputMap.getNumResults(); i < e; ++i) {
+      int pos = cast<AffineDimExpr>(outputMap.getResult(i)).getPosition();
+      auto attr = linalgOp.getIteratorTypesArray()[pos];
+      if (!linalg::isParallelIterator(attr))
+        return rewriter.notifyMatchFailure(linalgOp,
+                                           "iterator type is not parallel");
+      iterators.push_back(attr);
+    }
+
+    SmallVector<AffineMap> maps(3, rewriter.getMultiDimIdentityMap(outputRank));
 
     // Create a zero tensor as the new output tensor operand to the Linalg
     // contraction op.
@@ -83,24 +100,6 @@ struct DetachElementwisePattern
     // Update the contraction op to use the new zero tensor as output operand.
     rewriter.modifyOpInPlace(linalgOp,
                              [&]() { linalgOp.setDpsInitOperand(0, fill); });
-
-    auto outputMap = mlir::compressUnusedDims(
-        linalgOp.getMatchingIndexingMap(outputOperands.front()));
-    // Only support identity map for output access for now; this is the case for
-    // all existing contraction/convolution ops.
-    if (!outputMap.isIdentity())
-      return failure();
-    SmallVector<AffineMap> maps(3, outputMap);
-
-    SmallVector<utils::IteratorType> iterators;
-    iterators.reserve(outputMap.getNumResults());
-    for (int i = 0, e = outputMap.getNumResults(); i < e; ++i) {
-      int pos = cast<AffineDimExpr>(outputMap.getResult(i)).getPosition();
-      auto attr = linalgOp.getIteratorTypesArray()[pos];
-      if (!linalg::isParallelIterator(attr))
-        return failure();
-      iterators.push_back(attr);
-    }
 
     // Create a generic op to add back the original output tensor operand.
     rewriter.setInsertionPointAfter(linalgOp);
