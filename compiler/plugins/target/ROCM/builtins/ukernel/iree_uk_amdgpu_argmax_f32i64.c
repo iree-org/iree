@@ -6,10 +6,10 @@
 
 #include "compiler/plugins/target/ROCM/builtins/ukernel/common.h"
 
-void iree_uk_amdgpu_argmax_f32i64(const float *inputBuffer,
-                                  int64_t input_offset, int64_t *outputBuffer,
-                                  int64_t output_offset,
-                                  int64_t reductionSize) {
+[[clang::always_inline]] void
+iree_uk_amdgpu_argmax_f32i64(const float *inputBuffer, int64_t input_offset,
+                             int64_t *outputBuffer, int64_t output_offset,
+                             int64_t reductionSize) {
   const int warpSize = __builtin_amdgcn_wavefrontsize();
   int32_t laneID = __builtin_amdgcn_workitem_id_x();
   // Set identity value to handle problem non divisible by subgroupSize.

@@ -49,19 +49,20 @@ argmax_types = [
         "iree_uk_amdgpu_argmax_%s.c" % type,
         "common.h",
     ],
+    out = "iree_uk_amdgpu_argmax_%s.%s.bc" % (type, gpu_arch),
     gpu_arch = gpu_arch,
 ) for type in argmax_types for gpu_arch in gpu_archs]
 
-argmax_bc_files = {gpu_arch: [
-    ":iree_uk_amdgpu_argmax_%s.c.%s.bc" % (type, gpu_arch)
+argmax_bc_files = [
+    ":iree_uk_amdgpu_argmax_%s.%s.bc" % (type, gpu_arch)
     for type in argmax_types
-] for gpu_arch in gpu_archs}
+    for gpu_arch in gpu_archs
+]
 
-[iree_c_embed_data(
-    name = "iree_uk_amdgpu_%s" % gpu_arch,
-    srcs = argmax_bc_files[gpu_arch],
-    c_file_output = "iree_uk_amdgpu_%s.c" % gpu_arch,
+iree_c_embed_data(
+    name = "iree_uk_amdgpu_bitcode",
+    srcs = argmax_bc_files,
+    c_file_output = "iree_uk_amdgpu_bitcode.c",
     flatten = True,
-    h_file_output = "iree_uk_amdgpu_%s.h" % gpu_arch,
-    identifier = "iree_uk_amdgpu_%s" % gpu_arch,
-) for gpu_arch in gpu_archs]
+    h_file_output = "iree_uk_amdgpu_bitcode.h",
+)

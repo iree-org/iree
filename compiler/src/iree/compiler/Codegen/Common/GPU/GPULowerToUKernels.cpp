@@ -9,9 +9,12 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Utils/EmbeddedDataDirectory.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
@@ -24,22 +27,101 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+// Returns a ExecutableObjectAttr carrying the bitcode for the given ukernel.
+//
+// First tries finding the bitcode in the input `sourceExecutableObjects`, which
+// must be an array of ExecutableObjectAttr's and is typically coming from a
+// hal.executable.objects array attribute in the source IR, which is the
+// mechanism by which source programs may provide their own ukernel bitcode.
+//
+// If no matching bitcode was found in `sourceExecutableObjects`, this function
+// will then search in bitcode files that we have embedded as static data.
+static IREE::HAL::ExecutableObjectAttr
+getUKernelBitcode(OpBuilder &builder,
+                  IREE::HAL::ExecutableTargetAttr execTarget,
+                  ArrayAttr sourceExecutableObjects, StringRef ukernelName) {
+  IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(execTarget);
+  if (!gpuTarget) {
+    return {};
+  }
+  StringRef gpuArch = gpuTarget.getArch();
+  std::string bitcodeFilename =
+      llvm::formatv("{0}.{1}.bc", ukernelName, gpuArch);
+
+  // Early-return if the source executable.objects already contain an object
+  // with the expected file name. This happens with user-provided bitcode in the
+  // source IR.
+  if (sourceExecutableObjects) {
+    for (Attribute a : sourceExecutableObjects) {
+      if (auto object = dyn_cast<IREE::HAL::ExecutableObjectAttr>(a)) {
+        if (object.getPath() == bitcodeFilename) {
+          return object;
+        }
+      }
+    }
+  }
+
+  // No user-provided bitcode, so we search our embedded bitcode files in the
+  // EmbeddedDataDirectory singleton.
+  std::optional<StringRef> bitcode;
+  EmbeddedDataDirectory::withGlobal([&](EmbeddedDataDirectory &dir) {
+    bitcode = dir.getFile(bitcodeFilename);
+  });
+  if (!bitcode) {
+    return {};
+  }
+  MLIRContext *context = builder.getContext();
+  auto blob = HeapAsmResourceBlob::allocateAndCopyInferAlign(
+      ArrayRef<char>(bitcode->data(), bitcode->size()));
+  auto bitcodeDenseAttr = DenseI8ResourceElementsAttr::get(
+      VectorType::get({static_cast<int64_t>(bitcode->size())},
+                      builder.getI8Type()),
+      bitcodeFilename, std::move(blob));
+  return IREE::HAL::ExecutableObjectAttr::get(
+      context, StringAttr::get(context, bitcodeFilename),
+      cast<IREE::Util::SerializableAttrInterface>(bitcodeDenseAttr));
+}
+
+// Walks parents ops from `op` to return the nearest hal.executable.objects
+// array attribute. If the parent hal.executable.variant is reached, its objects
+// attribute is returned.
+// Adapted from ExecutableTargetAttr::lookup.
+static ArrayAttr lookUpExecutableObjects(Operation *op) {
+  MLIRContext *context = op->getContext();
+  auto attrId = StringAttr::get(context, "hal.executable.objects");
+  while (op) {
+    // Take directly from the enclosing variant.
+    if (auto variantOp = dyn_cast<IREE::HAL::ExecutableVariantOp>(op)) {
+      if (std::optional<ArrayAttr> objects = variantOp.getObjects()) {
+        return *objects;
+      }
+    }
+    // Take from op attributes.
+    if (auto attr = op->getAttrOfType<ArrayAttr>(attrId)) {
+      return attr;
+    }
+    // Continue walk.
+    op = op->getParentOp();
+  }
+  return {};
+}
+
 /// Holds a function name and attributes.
 struct FnNameAndDefAttrs {
   std::string name;
   SmallVector<NamedAttribute> defAttrs;
+  explicit operator bool() const { return !name.empty(); }
 };
 
 /// Returns the function name and attributes to use for a ukernel with given
-/// `ukernelName` on the target described by `targetAttr`.
+/// `name` and `suffix` on the target described by `targetAttr`.
 static FnNameAndDefAttrs
-getFnNameAndDefAttrs(const char *ukernelName, std::string &typeSuffixID,
+getFnNameAndDefAttrs(const char *name, std::string &suffix,
                      RewriterBase &rewriter,
                      IREE::HAL::ExecutableTargetAttr targetAttr) {
   FnNameAndDefAttrs result;
   if (isROCMBackend(targetAttr)) {
-    result.name =
-        std::string("iree_uk_amdgpu_") + ukernelName + "_" + typeSuffixID;
+    result.name = llvm::formatv("iree_uk_amdgpu_{0}_{1}", name, suffix);
     result.defAttrs.emplace_back(rewriter.getStringAttr("vm.import.module"),
                                  rewriter.getStringAttr("rocm"));
   }
@@ -54,9 +136,21 @@ static FailureOr<IREE::Codegen::UKernelOpInterface>
 matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   const char ukernelName[] = "argmax";
-  if (!hasUkernel(targetAttr, ukernelName) ||
-      !hasUkernelSupportedGpuArch(targetAttr)) {
-    return failure();
+  Value input = op.getDpsInputOperand(0)->get();
+  auto inputType = cast<ShapedType>(input.getType());
+  Value index = op.getDpsInitOperand(1)->get();
+  auto indexType = cast<ShapedType>(index.getType());
+  std::string suffix;
+  llvm::raw_string_ostream(suffix)
+      << inputType.getElementType() << indexType.getElementType();
+  FnNameAndDefAttrs fn =
+      getFnNameAndDefAttrs(ukernelName, suffix, rewriter, targetAttr);
+  if (!fn) {
+    return rewriter.notifyMatchFailure(op, "no ukernels on this backend");
+  }
+
+  if (!hasUkernel(targetAttr, ukernelName)) {
+    return rewriter.notifyMatchFailure(op, "ukernel not enabled");
   }
 
   // Currently only support argmax where parallel dims are 1.
@@ -74,68 +168,40 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
     }
     parallelSize *= bounds[dim];
   }
-  if (parallelSize != 1)
-    return failure();
-
-  // Get value/input type.
-  Value input = op.getDpsInputOperand(0)->get();
-  auto inputType = llvm::cast<ShapedType>(input.getType());
-  Type inputElemType = inputType.getElementType();
-  // Only support f16 and f32 values.
-  if (!inputElemType.isF16() && !inputElemType.isF32()) {
+  if (parallelSize != 1) {
     return failure();
   }
-
-  // Get index type.
-  Value index = op.getDpsInitOperand(1)->get();
-  auto indexType = llvm::cast<ShapedType>(index.getType());
-  Type indexElemType = indexType.getElementType();
-  // Only support i32 and i64 index.
-  if (!indexElemType.isInteger(32) && !indexElemType.isInteger(64)) {
-    return failure();
+  auto execTarget = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  ArrayAttr sourceExecutableObjects = lookUpExecutableObjects(op);
+  IREE::HAL::ExecutableObjectAttr bitcodeObject =
+      getUKernelBitcode(rewriter, execTarget, sourceExecutableObjects, fn.name);
+  if (!bitcodeObject) {
+    return rewriter.notifyMatchFailure(op, "no ukernel bitcode for this op");
   }
-
-  std::string typeSuffixID;
-  llvm::raw_string_ostream(typeSuffixID) << inputElemType << indexElemType;
-  // TODO(bjacob): this check won't be needed one this code will be updated to
-  // look up the table of contents of embedded bitcode files, one per symbol.
-  if (!(typeSuffixID == "f16i32" || typeSuffixID == "f16i64" ||
-        typeSuffixID == "f32i32" || typeSuffixID == "f32i64")) {
-    return rewriter.notifyMatchFailure(
-        op, "unsupported combination of element types");
-  }
-
   Location loc = op.getLoc();
   // Currently only support 1D reduction, where reduc is on fastest dim.
   // Tiling argmax ukernel is also set to enforce this structure.
   const int kReductionDim = op.getNumLoops() - 1;
   Value reductionDimSize =
       rewriter.create<tensor::DimOp>(loc, input, kReductionDim);
-  auto fn =
-      getFnNameAndDefAttrs(ukernelName, typeSuffixID, rewriter, targetAttr);
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
       loc, indexType, fn.name, ValueRange{input}, index,
       ValueRange{reductionDimSize},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
       /*strided_outer_dims=*/rewriter.getIndexAttr(0));
+  genericMicroKernelOp->setAttr(
+      "hal.executable.objects",
+      ArrayAttr::get(rewriter.getContext(), bitcodeObject));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
 }
 
-using TargetPredicate = std::function<bool(IREE::HAL::ExecutableTargetAttr)>;
-
 struct LowerArgmaxToUKernelPattern : OpRewritePattern<linalg::GenericOp> {
-  LowerArgmaxToUKernelPattern(MLIRContext *context,
-                              TargetPredicate targetPredicate)
-      : OpRewritePattern<linalg::GenericOp>(context),
-        targetPredicate(targetPredicate) {}
+  LowerArgmaxToUKernelPattern(MLIRContext *context)
+      : OpRewritePattern<linalg::GenericOp>(context) {}
 
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {
-    if (targetPredicate &&
-        !targetPredicate(IREE::HAL::ExecutableTargetAttr::lookup(op))) {
-      return failure();
-    }
     if (failed(isArgmaxOp(op))) {
       return failure();
     }
@@ -149,8 +215,6 @@ struct LowerArgmaxToUKernelPattern : OpRewritePattern<linalg::GenericOp> {
                                 ukernelOp.value()->getResults());
     return success();
   }
-
-  TargetPredicate targetPredicate;
 };
 
 struct GPULowerToUKernelsPass final
@@ -170,7 +234,7 @@ struct GPULowerToUKernelsPass final
     // evidence that it is difficult for codegen to consistently approach
     // microkernels performance, and that consideration overrides the benefit of
     // fusions for these ops.
-    patterns.insert<LowerArgmaxToUKernelPattern>(context, isROCMBackend);
+    patterns.insert<LowerArgmaxToUKernelPattern>(context);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();

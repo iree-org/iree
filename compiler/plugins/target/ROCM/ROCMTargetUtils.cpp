@@ -6,10 +6,6 @@
 
 #include "compiler/plugins/target/ROCM/ROCMTargetUtils.h"
 
-#include "compiler/plugins/target/ROCM/builtins/ukernel/iree_uk_amdgpu_gfx1030.h"
-#include "compiler/plugins/target/ROCM/builtins/ukernel/iree_uk_amdgpu_gfx1100.h"
-#include "compiler/plugins/target/ROCM/builtins/ukernel/iree_uk_amdgpu_gfx90a.h"
-#include "compiler/plugins/target/ROCM/builtins/ukernel/iree_uk_amdgpu_gfx942.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
@@ -183,43 +179,6 @@ LogicalResult linkHIPBitcodeIfNeeded(Location loc, llvm::Module *module,
         (bitcodePath + llvm::sys::path::get_separator() + "ockl.bc").str());
   }
   return linkWithBitcodeFiles(loc, module, bitcodePaths);
-}
-
-static std::tuple<const iree_file_toc_t *, int>
-getUkernelBitcodeTOC(StringRef gpuArch) {
-  return llvm::StringSwitch<std::tuple<const iree_file_toc_t *, int>>(gpuArch)
-      .Case("gfx90a",
-            {iree_uk_amdgpu_gfx90a_create(), iree_uk_amdgpu_gfx90a_size()})
-      .Case("gfx942",
-            {iree_uk_amdgpu_gfx942_create(), iree_uk_amdgpu_gfx942_size()})
-      .Case("gfx1030",
-            {iree_uk_amdgpu_gfx1030_create(), iree_uk_amdgpu_gfx1030_size()})
-      .Case("gfx1100",
-            {iree_uk_amdgpu_gfx1100_create(), iree_uk_amdgpu_gfx1100_size()})
-      .Default({nullptr, 0});
-}
-
-// Links optimized Ukernel bitcode into the given module if the module needs it.
-LogicalResult linkUkernelBitcodeFiles(Location loc, llvm::Module *module,
-                                      StringRef enabledUkernelsStr,
-                                      StringRef targetChip,
-                                      StringRef bitcodePath,
-                                      unsigned linkerFlags,
-                                      llvm::TargetMachine &targetMachine) {
-  auto [toc, toc_size] = getUkernelBitcodeTOC(targetChip);
-  if (!toc) {
-    return failure();
-  }
-
-  llvm::Linker linker(*module);
-  for (int i = 0; i < toc_size; ++i) {
-    if (failed(linkBitcodeFile(loc, linker, linkerFlags, toc[i].name,
-                               llvm::StringRef(toc[i].data, toc[i].size),
-                               targetMachine, module->getContext())))
-      return failure();
-  }
-
-  return success();
 }
 
 // Link object file using lld lnker to generate code object

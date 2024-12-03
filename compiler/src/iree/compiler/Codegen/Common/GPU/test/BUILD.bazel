@@ -30,7 +30,6 @@ iree_lit_test_suite(
             "gpu_fuse_and_hoist_forall.mlir",
             "gpu_greedily_distribute_to_threads.mlir",
             "gpu_infer_memory_space.mlir",
-            "gpu_lower_to_ukernels.mlir",
             "gpu_combine_value_barriers.mlir",
             "gpu_materialize_encoding_gfx908.mlir",
             "gpu_materialize_encoding_gfx90a.mlir",
@@ -58,8 +57,6 @@ iree_lit_test_suite(
             "vector_reduction_to_gpu.mlir",
         ],
         include = ["*.mlir"],
-        exclude = [
-        ],
     ),
     cfg = "//compiler:lit.cfg.py",
     tools = [
