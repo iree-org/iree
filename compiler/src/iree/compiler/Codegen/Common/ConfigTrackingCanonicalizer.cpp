@@ -90,19 +90,18 @@ public:
   }
 
   void runOnOperation() override {
+    config.listener = &listener;
+
     // Canonicalization is best-effort. Non-convergence is not a pass failure.
-    ConfigTrackingListener listener;
-    {
-      config.listener = &listener;
-      LogicalResult didConverge =
-          applyPatternsAndFoldGreedily(getOperation(), *patterns, config);
-      if (this->testConvergence && failed(didConverge)) {
-        getOperation()->emitError("Canonicalizer failed to converge");
-        return signalPassFailure();
-      }
+    LogicalResult didConverge =
+        applyPatternsAndFoldGreedily(getOperation(), *patterns, config);
+    if (this->testConvergence && failed(didConverge)) {
+      getOperation()->emitError("Canonicalizer failed to converge");
+      return signalPassFailure();
     }
   }
   GreedyRewriteConfig config;
+  ConfigTrackingListener listener;
   std::shared_ptr<const FrozenRewritePatternSet> patterns;
 };
 

@@ -132,16 +132,18 @@ class ConcretizePadResultShapePass final
     : public impl::ConcretizePadResultShapePassBase<
           ConcretizePadResultShapePass> {
 public:
+  LogicalResult initialize(MLIRContext *context) override {
+    config.listener = &listener;
+    return success();
+  }
+
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     auto funcOp = getOperation();
 
-    ConfigTrackingListener listener;
     {
       RewritePatternSet patterns(context);
       populateConcretizePadResultShapePatterns(patterns);
-      GreedyRewriteConfig config;
-      config.listener = &listener;
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns),
                                               config))) {
         return signalPassFailure();
@@ -155,6 +157,9 @@ public:
       llvm::dbgs() << "\n\n";
     });
   }
+
+  GreedyRewriteConfig config;
+  ConfigTrackingListener listener;
 };
 
 } // namespace
