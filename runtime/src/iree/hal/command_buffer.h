@@ -129,7 +129,7 @@ static inline iree_hal_buffer_ref_t iree_hal_make_indirect_buffer_ref(
     iree_device_size_t length) {
   iree_hal_buffer_ref_t buffer_ref = {0};
   buffer_ref.reserved = 0;
-  buffer_ref.buffer_slot = 0;
+  buffer_ref.buffer_slot = buffer_slot;
   buffer_ref.buffer = NULL;
   buffer_ref.offset = offset;
   buffer_ref.length = length;
