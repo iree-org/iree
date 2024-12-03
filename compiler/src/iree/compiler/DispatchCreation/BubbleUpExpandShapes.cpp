@@ -38,7 +38,10 @@ struct BubbleUpExpandShapesPass final
   void runOnOperation() override;
 };
 
-// TODO: move this upstream with other tensor bubbling patterns.
+/// Bubbles a `tensor.expand_shape` op through a `tensor.extract_slice` op. This
+/// pattern only gets applied when the `extract_slice` doesn't modify dimensions
+/// that are expanded by the `expand_shape`.
+/// TODO: move this upstream with other tensor bubbling patterns.
 struct BubbleExpandThroughExtract final
     : public OpRewritePattern<tensor::ExpandShapeOp> {
 
@@ -51,16 +54,16 @@ struct BubbleExpandThroughExtract final
       return failure();
     }
 
-    auto origType = extractOp.getSourceType();
+    auto srcType = extractOp.getSourceType();
     auto extractedType = extractOp.getType();
     auto expandedType = expandOp.getType();
 
-    if (origType.getRank() != extractedType.getRank()) {
+    if (srcType.getRank() != extractedType.getRank()) {
       return rewriter.notifyMatchFailure(
           extractOp, "Rank reducing extract_slice not supported");
     }
 
-    if (!origType.hasStaticShape() || !extractedType.hasStaticShape() ||
+    if (!srcType.hasStaticShape() || !extractedType.hasStaticShape() ||
         !expandedType.hasStaticShape()) {
       return failure();
     }
@@ -71,7 +74,7 @@ struct BubbleExpandThroughExtract final
         continue;
       }
 
-      if (origType.getShape()[i] != extractedType.getShape()[i]) {
+      if (srcType.getShape()[i] != extractedType.getShape()[i]) {
         return rewriter.notifyMatchFailure(
             extractOp, "Extract modifies the expanded dimension");
       }
@@ -83,7 +86,7 @@ struct BubbleExpandThroughExtract final
     SmallVector<int64_t> strides;
     for (auto [inDim, outDims] : llvm::enumerate(reassoc)) {
       if (outDims.size() == 1) {
-        newExpandShape.push_back(origType.getShape()[inDim]);
+        newExpandShape.push_back(srcType.getShape()[inDim]);
         offsets.push_back(extractOp.getStaticOffsets()[inDim]);
         sizes.push_back(extractOp.getStaticSizes()[inDim]);
         strides.push_back(extractOp.getStaticStrides()[inDim]);
