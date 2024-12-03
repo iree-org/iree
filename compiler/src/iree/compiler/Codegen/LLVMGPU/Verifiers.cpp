@@ -77,8 +77,7 @@ verifyGPUMatmulPipeline(Operation *op,
                         ArrayRef<int64_t> workgroupSize) {
   // This verifier only applies to matmul.
   CodeGenPipeline pipeline = translationInfo.getDispatchLoweringPassPipeline();
-  if (pipeline != CodeGenPipeline::LLVMGPUTileAndFuse &&
-      pipeline != CodeGenPipeline::LLVMGPUMatmulTensorCore &&
+  if (pipeline != CodeGenPipeline::LLVMGPUMatmulTensorCore &&
       pipeline != CodeGenPipeline::LLVMGPUMatmulTensorCoreMmaSync) {
     return success();
   }
@@ -175,10 +174,6 @@ verifyGPUMatmulPipeline(Operation *op,
            << workgroupSize[kDimZ] << " with compilation pipeline "
            << pipelineName;
   }
-
-  // Return success for SIMT/CUDA cores.
-  if (pipeline == CodeGenPipeline::LLVMGPUTileAndFuse)
-    return success();
 
   //
   // Additional verification Tensor Core pipelines.
