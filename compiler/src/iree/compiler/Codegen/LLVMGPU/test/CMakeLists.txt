@@ -75,18 +75,4 @@ iree_lit_test_suite(
     transform_dialect_codegen_vector_warp_execute_on_lane_0_spec.mlir
 )
 
-if(IREE_TARGET_BACKEND_ROCM)
-
-iree_lit_test_suite(
-  NAME
-    lit_requiring_rocm
-  SRCS
-    "ukernel_pipeline_transform.mlir"
-  TOOLS
-    FileCheck
-    iree-opt
-)
-
-endif()  # IREE_TARGET_BACKEND_ROCM
-
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

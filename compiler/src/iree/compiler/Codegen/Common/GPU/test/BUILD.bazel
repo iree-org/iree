@@ -6,7 +6,6 @@
 
 # Tests for common transforms.
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
@@ -14,12 +13,6 @@ package(
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
-
-tests_requiring_rocm = [
-    # This test checks that ops are lowered to ukernels, which only happens if
-    # the ukernels, which are part of the ROCM plugin, are found.
-    "gpu_lower_to_ukernels.mlir",
-]
 
 iree_lit_test_suite(
     name = "lit",
@@ -64,35 +57,10 @@ iree_lit_test_suite(
             "vector_reduction_to_gpu.mlir",
         ],
         include = ["*.mlir"],
-        exclude = tests_requiring_rocm,
     ),
     cfg = "//compiler:lit.cfg.py",
     tools = [
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",
     ],
-)
-
-iree_cmake_extra_content(
-    content = """
-if(IREE_TARGET_BACKEND_ROCM)
-""",
-    inline = True,
-)
-
-iree_lit_test_suite(
-    name = "lit_requiring_rocm",
-    srcs = tests_requiring_rocm,
-    cfg = "//compiler:lit.cfg.py",
-    tools = [
-        "//tools:iree-opt",
-        "@llvm-project//llvm:FileCheck",
-    ],
-)
-
-iree_cmake_extra_content(
-    content = """
-endif()  # IREE_TARGET_BACKEND_ROCM
-""",
-    inline = True,
 )

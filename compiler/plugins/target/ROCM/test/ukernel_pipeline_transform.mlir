@@ -4,10 +4,11 @@
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip", iree.gpu.target = #iree_gpu.target<arch = "gfx1100", features = "", wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8, storage =  b64|b32|b16|b8, subgroup =  shuffle|arithmetic, dot =  dp4xi8toi32, mma = [<WMMA_F32_16x16x16_F16>, <WMMA_F16_16x16x16_F16>, <WMMA_I32_16x16x16_I8>, <WMMA_I32_16x16x16_I8>, <WMMA_I32_16x16x16_I8>], subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647], max_load_instruction_bits = 128, simds_per_wgp = 4, vgpr_space_bits = 8192>>, ukernels = "argmax"}>
 #map = affine_map<(d0) -> (d0)>
 #map1 = affine_map<(d0) -> ()>
-func.func @argmax_1d_f16i64() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+func.func @argmax_1d_f16i64() attributes {
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "argmax"}>
+} {
   %c32_i64 = arith.constant 32 : i64
   %cst = arith.constant 0xFC00 : f16
   %c0_i64 = arith.constant 0 : i64
@@ -51,10 +52,11 @@ func.func @argmax_1d_f16i64() attributes {hal.executable.target = #executable_ta
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip", iree.gpu.target = #iree_gpu.target<arch = "gfx1100", features = "", wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8, storage =  b64|b32|b16|b8, subgroup =  shuffle|arithmetic, dot =  dp4xi8toi32, mma = [<WMMA_F32_16x16x16_F16>, <WMMA_F16_16x16x16_F16>, <WMMA_I32_16x16x16_I8>, <WMMA_I32_16x16x16_I8>, <WMMA_I32_16x16x16_I8>], subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647], max_load_instruction_bits = 128, simds_per_wgp = 4, vgpr_space_bits = 8192>>, ukernels = "argmax"}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
-func.func @argmax_2d_f32i64() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+func.func @argmax_2d_f32i64() attributes {
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "argmax"}>
+} {
   %c32_i64 = arith.constant 32 : i64
   %cst = arith.constant 0xFF800000 : f32
   %c0_i64 = arith.constant 0 : i64
@@ -100,10 +102,11 @@ func.func @argmax_2d_f32i64() attributes {hal.executable.target = #executable_ta
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb">
 #map = affine_map<(d0) -> (d0)>
 #map1 = affine_map<(d0) -> ()>
-func.func @no_ukernel_argmax_1d_f16i64() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+func.func @no_ukernel_argmax_1d_f16i64() attributes {
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb">
+} {
   %c32_i64 = arith.constant 32 : i64
   %cst = arith.constant 0xFC00 : f16
   %c0_i64 = arith.constant 0 : i64
@@ -147,10 +150,11 @@ func.func @no_ukernel_argmax_1d_f16i64() attributes {hal.executable.target = #ex
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip", iree.gpu.target = #iree_gpu.target<arch = "gfx1100", features = "", wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8, storage =  b64|b32|b16|b8, subgroup =  shuffle|arithmetic, dot =  dp4xi8toi32, mma = [<WMMA_F32_16x16x16_F16>, <WMMA_F16_16x16x16_F16>, <WMMA_I32_16x16x16_I8>, <WMMA_I32_16x16x16_I8>, <WMMA_I32_16x16x16_I8>], subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647], max_load_instruction_bits = 128, simds_per_wgp = 4, vgpr_space_bits = 8192>>, ukernels = "argmax"}>
 #map = affine_map<(d0) -> (d0)>
 #map1 = affine_map<(d0) -> ()>
-func.func @not_neg_inf_init_argmax_1d() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+func.func @not_neg_inf_init_argmax_1d() attributes {
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "argmax"}>
+} {
   %c32_i64 = arith.constant 32 : i64
   %cst = arith.constant 0.000000e+00 : f16
   %c0_i64 = arith.constant 0 : i64

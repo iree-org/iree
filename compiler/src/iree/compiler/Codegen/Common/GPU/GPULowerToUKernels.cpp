@@ -146,11 +146,11 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
   FnNameAndDefAttrs fn =
       getFnNameAndDefAttrs(ukernelName, suffix, rewriter, targetAttr);
   if (!fn) {
-    return rewriter.notifyMatchFailure(op, "No ukernels on this backend.");
+    return rewriter.notifyMatchFailure(op, "no ukernels on this backend");
   }
 
   if (!hasUkernel(targetAttr, ukernelName)) {
-    return rewriter.notifyMatchFailure(op, "Ukernel not enabled.");
+    return rewriter.notifyMatchFailure(op, "ukernel not enabled");
   }
 
   // Currently only support argmax where parallel dims are 1.
@@ -176,7 +176,7 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
   IREE::HAL::ExecutableObjectAttr bitcodeObject =
       getUKernelBitcode(rewriter, execTarget, sourceExecutableObjects, fn.name);
   if (!bitcodeObject) {
-    return rewriter.notifyMatchFailure(op, "No ukernel bitcode for this op.");
+    return rewriter.notifyMatchFailure(op, "no ukernel bitcode for this op");
   }
   Location loc = op.getLoc();
   // Currently only support 1D reduction, where reduc is on fastest dim.

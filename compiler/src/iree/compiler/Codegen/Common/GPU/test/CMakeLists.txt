@@ -56,18 +56,4 @@ iree_lit_test_suite(
     iree-opt
 )
 
-if(IREE_TARGET_BACKEND_ROCM)
-
-iree_lit_test_suite(
-  NAME
-    lit_requiring_rocm
-  SRCS
-    "gpu_lower_to_ukernels.mlir"
-  TOOLS
-    FileCheck
-    iree-opt
-)
-
-endif()  # IREE_TARGET_BACKEND_ROCM
-
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
