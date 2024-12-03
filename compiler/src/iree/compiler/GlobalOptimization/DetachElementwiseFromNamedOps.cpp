@@ -76,11 +76,17 @@ struct DetachElementwisePattern
     SmallVector<utils::IteratorType> iterators;
     iterators.reserve(outputMap.getNumResults());
     for (int i = 0, e = outputMap.getNumResults(); i < e; ++i) {
-      int pos = cast<AffineDimExpr>(outputMap.getResult(i)).getPosition();
+      auto expr = dyn_cast<AffineDimExpr>(outputMap.getResult(i));
+      if (!expr)
+        return rewriter.notifyMatchFailure(
+            linalgOp, "output affine map has a non dim expression at " +
+                          std::to_string(i));
+      int pos = expr.getPosition();
       auto attr = linalgOp.getIteratorTypesArray()[pos];
       if (!linalg::isParallelIterator(attr))
-        return rewriter.notifyMatchFailure(linalgOp,
-                                           "iterator type is not parallel");
+        return rewriter.notifyMatchFailure(
+            linalgOp, "output iterator type is not parallel at position " +
+                          std::to_string(pos));
       iterators.push_back(attr);
     }
 
