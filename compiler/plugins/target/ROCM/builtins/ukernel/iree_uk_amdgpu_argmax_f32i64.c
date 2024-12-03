@@ -6,7 +6,7 @@
 
 #include "compiler/plugins/target/ROCM/builtins/ukernel/common.h"
 
-[[gnu::always_inline]] void
+[[clang::always_inline]] void
 iree_uk_amdgpu_argmax_f32i64(const float *inputBuffer, int64_t input_offset,
                              int64_t *outputBuffer, int64_t output_offset,
                              int64_t reductionSize) {
