@@ -191,6 +191,50 @@ def find_venv_python(venv_path: Path) -> Optional[Path]:
     return None
 
 
+def find_wheel_for_variants(
+    args, artifact_prefix: str, package_stem: str, variant: str
+) -> Tuple[Path, str]:
+    artifact_path = Path(args.artifact_path)
+    package_suffix = "" if variant == "" else f"-{variant}"
+    package_name = f"{package_stem}{package_suffix}"
+
+    def has_package():
+        norm_package_name = package_name.replace("-", "_")
+        pattern = str(artifact_path / f"{norm_package_name}-*.whl")
+        files = glob(pattern)
+        return bool(files)
+
+    if has_package():
+        return (artifact_path, package_name)
+
+    if not args.fetch_gh_workflow:
+        raise RuntimeError(
+            f"Could not find package {package_name} to install from {artifact_path}"
+        )
+
+    # Fetch.
+    artifact_path.mkdir(parents=True, exist_ok=True)
+    artifact_suffix = "" if variant == "" else f"_{variant}"
+    artifact_name = f"{artifact_prefix}_release{artifact_suffix}_packages"
+    artifact_file = artifact_path / f"{artifact_name}.zip"
+    if not artifact_file.exists():
+        print(f"Package {package_name} not found. Fetching from {artifact_name}...")
+        artifacts = list_gh_artifacts(args.fetch_gh_workflow)
+        if artifact_name not in artifacts:
+            raise RuntimeError(
+                f"Could not find required artifact {artifact_name} in run {args.fetch_gh_workflow}"
+            )
+        fetch_gh_artifact(artifacts[artifact_name], artifact_file)
+    print(f"Extracting {artifact_file}")
+    with zipfile.ZipFile(artifact_file) as zip_ref:
+        zip_ref.extractall(artifact_path)
+
+    # Try again.
+    if not has_package():
+        raise RuntimeError(f"Could not find {package_name} in {artifact_path}")
+    return (artifact_path, package_name)
+
+
 def main(args):
     # Look up the workflow run for a ref.
     if args.fetch_git_ref:
@@ -247,50 +291,6 @@ def main(args):
         subprocess.check_call(cmd)
 
     return 0
-
-
-def find_wheel_for_variants(
-    args, artifact_prefix: str, package_stem: str, variant: str
-) -> Tuple[Path, str]:
-    artifact_path = Path(args.artifact_path)
-    package_suffix = "" if variant == "" else f"-{variant}"
-    package_name = f"{package_stem}{package_suffix}"
-
-    def has_package():
-        norm_package_name = package_name.replace("-", "_")
-        pattern = str(artifact_path / f"{norm_package_name}-*.whl")
-        files = glob(pattern)
-        return bool(files)
-
-    if has_package():
-        return (artifact_path, package_name)
-
-    if not args.fetch_gh_workflow:
-        raise RuntimeError(
-            f"Could not find package {package_name} to install from {artifact_path}"
-        )
-
-    # Fetch.
-    artifact_path.mkdir(parents=True, exist_ok=True)
-    artifact_suffix = "" if variant == "" else f"_{variant}"
-    artifact_name = f"{artifact_prefix}_release{artifact_suffix}_packages"
-    artifact_file = artifact_path / f"{artifact_name}.zip"
-    if not artifact_file.exists():
-        print(f"Package {package_name} not found. Fetching from {artifact_name}...")
-        artifacts = list_gh_artifacts(args.fetch_gh_workflow)
-        if artifact_name not in artifacts:
-            raise RuntimeError(
-                f"Could not find required artifact {artifact_name} in run {args.fetch_gh_workflow}"
-            )
-        fetch_gh_artifact(artifacts[artifact_name], artifact_file)
-    print(f"Extracting {artifact_file}")
-    with zipfile.ZipFile(artifact_file) as zip_ref:
-        zip_ref.extractall(artifact_path)
-
-    # Try again.
-    if not has_package():
-        raise RuntimeError(f"Could not find {package_name} in {artifact_path}")
-    return (artifact_path, package_name)
 
 
 if __name__ == "__main__":
