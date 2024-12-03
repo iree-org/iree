@@ -27,7 +27,7 @@ jobs:
         include:
           # CPU
           - name: cpu_llvm_task
-            runs-on: ubuntu-20.04
+            runs-on: nodai-amdgpu-w7900-x86-64
 
     env:
       VENV_DIR: ${{ github.workspace }}/venv
@@ -64,9 +64,8 @@ jobs:
       - name: Run Sharktank models test suite
         run: |
           source ${VENV_DIR}/bin/activate
-          pytest iree-test-suites/sharktank_models/ \
+          HIP_TARGET=gfx1100 pytest iree-test-suites/sharktank_models/ \
               -rA \
-              -m "target_cpu" \
               --log-cli-level=info \
               --override-ini=xfail_strict=false \
               --timeout=120 \
