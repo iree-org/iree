@@ -126,43 +126,41 @@ static SmallVector<ReassociationIndices> getCollapsibleLoops(Operation *op) {
   // - Either preserved in all maps, or
   // - are completely absent
   // This sequence can be collapsed. To find the sequence,
-  // 1) Take the result expressions of one of the indexing maps
-  // 2) Find a sequence of 2 that is found in all maps
+  // 1) For each indexing map, take the result expressions
+  // 2) Find a sequence of 2 that is found in all maps (or absent)
   // 3) Then take last element of this sequence and the next
   //    result expression, and check if this sequence of 2 is
   //    found in all maps. If so, add to sequence (to get a sequence of 3)
   //    and repeat till the last element of sequence and the next result
   //    expression is not found as a sequence in all maps.
 
-  llvm::DenseSet<unsigned> handledExprs;
+  llvm::SmallSetVector<unsigned, 8> seenLoops;
   for (auto map : fusionInterfaceOp.getIndexingMapsArray()) {
     ReassociationIndices range;
     AffineExpr preExpr;
+
+    auto appendAndClearRange = [&]() {
+      if (range.size() > 1) {
+        contiguousLoops.push_back(range);
+      }
+      range.clear();
+    };
+
     for (auto nextExpr : map.getResults()) {
       unsigned position = cast<AffineDimExpr>(nextExpr).getPosition();
-      if (handledExprs.contains(position)) {
-        preExpr = nullptr;
-        if (range.size() > 1) {
-          contiguousLoops.push_back({range.begin(), range.end()});
-        }
-        range.clear();
+      if (seenLoops.contains(position)) {
+        appendAndClearRange();
         continue;
-      } else if (!range.empty()) {
-        if (!hasAllMapsSameSequence(preExpr, nextExpr) ||
-            !hasSameIteratorType(preExpr, nextExpr)) {
-          if (range.size() > 1) {
-            contiguousLoops.push_back({range.begin(), range.end()});
-          }
-          range.clear();
-        }
+      }
+      if (!hasAllMapsSameSequence(preExpr, nextExpr) ||
+          !hasSameIteratorType(preExpr, nextExpr)) {
+        appendAndClearRange();
       }
       range.push_back(position);
-      handledExprs.insert(position);
+      seenLoops.insert(position);
       preExpr = nextExpr;
     }
-    if (range.size() > 1) {
-      contiguousLoops.push_back(range);
-    }
+    appendAndClearRange();
   }
 
   return contiguousLoops;
