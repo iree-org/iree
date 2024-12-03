@@ -54,7 +54,7 @@ func.func @dot_dispatch_1() {
   return
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 2, 4]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 2, 1], [0, 0, 4]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [2, 4, 1] subgroup_size = 32, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 //      CHECK: func.func @dot_dispatch_1
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -82,7 +82,7 @@ func.func @unaligned_k() {
   return
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 128, 2]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 128, 1], [0, 0, 2]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 8, 1] subgroup_size = 32, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 //      CHECK: func.func @unaligned_k
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -654,7 +654,7 @@ func.func @_main_dispatch_15_generic_512x4x42x42x64_f32() {
   return
 }
 
-//   CHECK-DAG:  #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 32, 128, 32]{{\]}}
+//   CHECK-DAG:  #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 32, 128, 1], [0, 0, 0, 0, 32]{{\]}}
 //   CHECK-DAG:  #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 8, 1] subgroup_size = 32, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 //       CHECK:  func.func @_main_dispatch_15_generic_512x4x42x42x64_f32()
 //  CHECK-SAME:    translation_info = #[[TRANSLATION]]
