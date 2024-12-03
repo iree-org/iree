@@ -143,8 +143,11 @@ Value calculateStorageElementOffsetInBytes(Location loc,
       legalizeStorageElementType(originalType.getElementType());
   unsigned elementBits = IREE::Util::getTypeBitWidth(alignedElementType);
 
+  auto encoding = IREE::Encoding::getEncodingAttr(originalType);
+  bool isI1PackedStorage = encoding && encoding.i1PackedStorage();
+
   // Sub-byte packing requires putting multiple elements in the same byte.
-  if (needToPackSubByteElementBitWidth(elementBits)) {
+  if (needToPackSubByteElementBitWidth(elementBits, isI1PackedStorage)) {
     Value byteElements =
         builder.create<arith::ConstantIndexOp>(loc, 8 / elementBits);
     // TODO(antiagainst): We may want to emit runtime check to make sure this is
