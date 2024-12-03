@@ -48,6 +48,7 @@ iree_lit_test_suite(
     "reduction_pipeline_softmax_rocm.mlir"
     "reuse_shared_memory_allocs.mlir"
     "rocdl_pipeline_test.mlir"
+    "root_op_attribute.mlir"
     "tensor_pad.mlir"
     "tensorcore_vectorization.mlir"
     "test_query_mma.mlir"

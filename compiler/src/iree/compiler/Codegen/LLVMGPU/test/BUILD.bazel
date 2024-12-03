@@ -43,6 +43,7 @@ iree_lit_test_suite(
             "reduction_pipeline_softmax_rocm.mlir",
             "reuse_shared_memory_allocs.mlir",
             "rocdl_pipeline_test.mlir",
+            "root_op_attribute.mlir",
             "illegal_configuration.mlir",
             "legalize.mlir",
             "linalg_transform.mlir",

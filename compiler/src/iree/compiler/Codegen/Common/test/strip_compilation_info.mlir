@@ -60,3 +60,14 @@ func.func @matmul_128x1024x256_1(%lhs : tensor<128x256xf32>, %rhs: tensor<256x10
 
 // CHECK-LABEL: func.func @matmul_128x1024x256_1
 // CHECK-NOT:   iree_codegen.lowering_config
+
+// -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[128, 256], [16, 16]]>
+func.func @matmul_128x1024x256_1(%lhs : tensor<128x256xf32>, %rhs: tensor<256x1024xf32>, %init: tensor<128x1024xf32>) -> tensor<128x1024xf32> {
+  %result =  linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[128, 256], [16, 16]]>, root_op} ins(%lhs, %rhs : tensor<128x256xf32>, tensor<256x1024xf32>) outs(%init : tensor<128x1024xf32>) -> tensor<128x1024xf32>
+  return %result : tensor<128x1024xf32>
+}
+
+// CHECK-LABEL: func.func @matmul_128x1024x256_1
+// CHECK:       linalg.matmul {root_op}
