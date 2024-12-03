@@ -40,7 +40,8 @@ struct BubbleUpExpandShapesPass final
 
 /// Bubbles a `tensor.expand_shape` op through a `tensor.extract_slice` op. This
 /// pattern only gets applied when the `extract_slice` doesn't modify dimensions
-/// that are expanded by the `expand_shape`.
+/// that are expanded by the `expand_shape` and when the `extract_slice` is
+/// completely static.
 /// TODO: move this upstream with other tensor bubbling patterns.
 struct BubbleExpandThroughExtract final
     : public OpRewritePattern<tensor::ExpandShapeOp> {
