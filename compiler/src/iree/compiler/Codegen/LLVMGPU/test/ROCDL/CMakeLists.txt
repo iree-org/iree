@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "config_vector_distribute_gfx1100.mlir"
     "config_vector_distribute_gfx942.mlir"
     "lowering_scalar_dispatch.mlir"
+    "lowering_strategy_from_tuning_spec.mlir"
     "pipeline_igemm_tile_and_fuse.mlir"
     "pipeline_tile_and_fuse.mlir"
     "pipeline_vector_distribute_gfx1100.mlir"
@@ -29,6 +30,8 @@ iree_lit_test_suite(
   TOOLS
     FileCheck
     iree-opt
+  DATA
+    tuning_spec_mmt_tile_and_fuse.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
