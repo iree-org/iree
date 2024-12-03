@@ -40,6 +40,11 @@ def EncodingOpType : IREEEncoding_I32EnumAttr<"EncodingOpType",
 def EncodingOpTypeAttr:
   IREEEncoding_EnumAttr<EncodingOpType, "optype">;
 
+
+def EncodingI1PackedStorageAttr : AttrDef<IREEEncoding_Dialect, "I1PackedStorage"> {
+  let mnemonic = "i1_packed_storage";
+}
+
 def EncodingAttr :
     IREEEncoding_Attr<"Encoding"> {
   let mnemonic = "encoding";
