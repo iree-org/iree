@@ -115,25 +115,25 @@ typedef struct iree_hal_buffer_ref_t {
 static inline iree_hal_buffer_ref_t iree_hal_make_buffer_ref(
     iree_hal_buffer_t* buffer, iree_device_size_t offset,
     iree_device_size_t length) {
-  iree_hal_buffer_ref_t hal_buffer_ref;
-  hal_buffer_ref.reserved = 0;
-  hal_buffer_ref.buffer_slot = 0;
-  hal_buffer_ref.buffer = buffer;
-  hal_buffer_ref.offset = offset;
-  hal_buffer_ref.length = length;
-  return hal_buffer_ref;
+  iree_hal_buffer_ref_t buffer_ref = {0};
+  buffer_ref.reserved = 0;
+  buffer_ref.buffer_slot = 0;
+  buffer_ref.buffer = buffer;
+  buffer_ref.offset = offset;
+  buffer_ref.length = length;
+  return buffer_ref;
 }
 
 static inline iree_hal_buffer_ref_t iree_hal_make_indirect_buffer_ref(
     uint32_t buffer_slot, iree_device_size_t offset,
     iree_device_size_t length) {
-  iree_hal_buffer_ref_t hal_buffer_ref;
-  hal_buffer_ref.reserved = 0;
-  hal_buffer_ref.buffer_slot = 0;
-  hal_buffer_ref.buffer = NULL;
-  hal_buffer_ref.offset = offset;
-  hal_buffer_ref.length = length;
-  return hal_buffer_ref;
+  iree_hal_buffer_ref_t buffer_ref = {0};
+  buffer_ref.reserved = 0;
+  buffer_ref.buffer_slot = 0;
+  buffer_ref.buffer = NULL;
+  buffer_ref.offset = offset;
+  buffer_ref.length = length;
+  return buffer_ref;
 }
 
 // A list of buffer references.
