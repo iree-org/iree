@@ -1066,7 +1066,7 @@ hal.executable public @main {
 //   CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
-//   CHECK-DAG:   memref.alloc() : memref<4x16x4x16xf32, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   memref.alloc() : memref<64x66xf32, #gpu.address_space<workgroup>>
 //       CHECK:   scf.forall ({{.*}}) in (32, 160) {
 //       CHECK:     %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x4x1xf32>)
 //       CHECK:       gpu.barrier
@@ -1147,7 +1147,7 @@ hal.executable public @main {
 //   CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
 //   CHECK-DAG:   memref.alloc() : memref<1x4x66xf32, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<1x16x6xf32, #gpu.address_space<workgroup>>
-//   CHECK-DAG:   memref.alloc() : memref<1x1x16x4x16xf32, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   memref.alloc() : memref<1x16x66xf32, #gpu.address_space<workgroup>>
 //       CHECK:   scf.forall ({{.*}}) in (12, 37, 10) {
 //       CHECK:     %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c145 step %c1 {{.*}} -> (vector<1x1x1x4x1xf32>)
 //       CHECK:       gpu.barrier
@@ -1155,7 +1155,7 @@ hal.executable public @main {
 //   CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
 // CHECK-COUNT-1:     amdgpu.mfma {{.*}}blocks = 1 : i32, k = 4 : i32, m = 16 : i32, n = 16 : i32
 //       CHECK:       scf.yield
-//       CHECK:     %[[LOOP_T:.+]] = vector.shape_cast %[[LOOP]] : vector<1x1x1x4x1xf32> to vector<4x1x1xf32>
+//       CHECK:     %[[LOOP_T:.+]] = vector.shape_cast %[[LOOP]] : vector<1x1x1x4x1xf32> to vector<4xf32>
 //       CHECK:     vector.transfer_write %[[LOOP_T]]
 //       CHECK:     scf.for {{.*}} {
 //       CHECK:       %[[SHARED_READ:.+]] = vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
