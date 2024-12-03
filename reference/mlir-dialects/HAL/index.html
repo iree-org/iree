@@ -10875,7 +10875,7 @@ and must be assumed to have any value.</p>
 <h4 id="halinterfaceworkgroupcount-halinterfaceworkgroupcountop"><code>hal.interface.workgroup.count</code> (HAL::InterfaceWorkgroupCountOp)<a class="headerlink" href="#halinterfaceworkgroupcount-halinterfaceworkgroupcountop" title="Permanent link">link</a></h4>
 <p><em>Returns the total workgroup count of the grid</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal.interface.workgroup.count` `[` $dimension `]` (`upper_bound` $upper_bound^)? attr-dict `:` type($result)
+<div class="highlight"><pre><span></span><code>operation ::= `hal.interface.workgroup.count` `[` $dimension `]` attr-dict `:` type($result)
 </code></pre></div>
 <p>The total number of workgroups along each dimension in the dispatch grid.
 Matches what was passed to the <code>hal.command_buffer.dispatch</code> command (or
@@ -10887,13 +10887,12 @@ built-in variable.</p>
 %z = hal.interface.workgroup.count[2] : index
 </code></pre></div>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferIntRangeInterface</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_42">Attributes:<a class="headerlink" href="#attributes_42" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>dimension</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
-<tr><td><code>upper_bound</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 </table>
 
 <h5 id="results_40">Results:<a class="headerlink" href="#results_40" title="Permanent link">link</a></h5>
@@ -10914,7 +10913,7 @@ built-in variable.</p>
 <h4 id="halinterfaceworkgroupid-halinterfaceworkgroupidop"><code>hal.interface.workgroup.id</code> (HAL::InterfaceWorkgroupIDOp)<a class="headerlink" href="#halinterfaceworkgroupid-halinterfaceworkgroupidop" title="Permanent link">link</a></h4>
 <p><em>Returns the index of the current workgroup in the grid</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal.interface.workgroup.id` `[` $dimension `]` (`upper_bound` $upper_bound^)? attr-dict `:` type($result)
+<div class="highlight"><pre><span></span><code>operation ::= `hal.interface.workgroup.id` `[` $dimension `]` attr-dict `:` type($result)
 </code></pre></div>
 <p>The global workgroup ID of the current tile in the range of
 <code>[0, hal.interface.workgroup.count)</code> along each XYZ dimension.</p>
@@ -10925,13 +10924,12 @@ built-in variable.</p>
 %z = hal.interface.workgroup.id[2] : index
 </code></pre></div>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferIntRangeInterface</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_43">Attributes:<a class="headerlink" href="#attributes_43" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>dimension</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
-<tr><td><code>upper_bound</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 </table>
 
 <h5 id="results_41">Results:<a class="headerlink" href="#results_41" title="Permanent link">link</a></h5>
@@ -10952,7 +10950,7 @@ built-in variable.</p>
 <h4 id="halinterfaceworkgroupsize-halinterfaceworkgroupsizeop"><code>hal.interface.workgroup.size</code> (HAL::InterfaceWorkgroupSizeOp)<a class="headerlink" href="#halinterfaceworkgroupsize-halinterfaceworkgroupsizeop" title="Permanent link">link</a></h4>
 <p><em>Returns the size of each workgroup in invocations</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal.interface.workgroup.size` `[` $dimension `]` (`upper_bound` $upper_bound^)? attr-dict `:` type($result)
+<div class="highlight"><pre><span></span><code>operation ::= `hal.interface.workgroup.size` `[` $dimension `]` attr-dict `:` type($result)
 </code></pre></div>
 <p>The number of local invocations within the current workgroup along each
 dimension. Depending on backend this may map to the SIMT thread count or
@@ -10964,13 +10962,12 @@ built-in variable.</p>
 %z = hal.interface.workgroup.size[2] : index
 </code></pre></div>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferIntRangeInterface</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_44">Attributes:<a class="headerlink" href="#attributes_44" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>dimension</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
-<tr><td><code>upper_bound</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 </table>
 
 <h5 id="results_42">Results:<a class="headerlink" href="#results_42" title="Permanent link">link</a></h5>
