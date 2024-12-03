@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Stream/Conversion/HALToStream/Patterns.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Stream/Conversion/PatternUtils.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
@@ -100,6 +101,13 @@ struct ConvertTensorImportOp
                                                RankedTensorType tensorType,
                                                ValueRange dynamicDims,
                                                OpBuilder &builder) {
+    // If the encoding attr is about packed storage then we don't need
+    // assertion, because packed storage attribute is about memory layout and it
+    // doesn't affect the tensor shape.
+    if (IREE::Encoding::hasPackedStorageAttr(tensorType)) {
+      return success();
+    }
+
     auto expectedElementType = builder.create<IREE::HAL::ElementTypeOp>(
         loc, tensorType.getElementType());
     auto expectedEncodingType = builder.create<IREE::HAL::EncodingTypeOp>(
