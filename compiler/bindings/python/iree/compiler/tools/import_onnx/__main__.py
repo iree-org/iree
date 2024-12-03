@@ -48,6 +48,7 @@ def main(args: argparse.Namespace):
             args.params_scope,
             data_dir,
             param_path,
+            args.externalize_inputs_threshold,
         )
         imp = IREENodeImporter.define_function(model_info.main_graph, m, param_data)
     else:
@@ -172,6 +173,12 @@ def parse_arguments(argv=None) -> argparse.Namespace:
         help="Import the mlir file with large weights replaced by external reference calls.",
         action=argparse.BooleanOptionalAction,
         default=False,
+    )
+    parser.add_argument(
+        "--externalize-inputs-threshold",
+        help="Treats inputs at or after the provided index as external parameters of the model."
+        " Only has an effect if 'externalize-params' is true.",
+        type=int,
     )
     parser.add_argument(
         "--large-model",

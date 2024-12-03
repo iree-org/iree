@@ -10,7 +10,7 @@ import random
 import string
 
 from ...dialects import util
-from typing import Optional, Tuple, Any, NamedTuple
+from typing import Optional, Tuple, Any, NamedTuple, Union
 
 try:
     import onnx
@@ -51,6 +51,7 @@ class ParamData(NamedTuple):
     params_scope: str
     data_dir: str
     param_path: str
+    input_index_threshold: Optional[int]
 
 
 class IREENodeImporter(onnx_importer.NodeImporter):
@@ -98,9 +99,17 @@ class IREENodeImporter(onnx_importer.NodeImporter):
             new_name = str(random.randrange(1, 1000)) + "__" + ch
         return new_name
 
+    def get_type_info_from_type(self, tp: onnx.TypeProto):
+        tt = tp.tensor_type
+        if tt.elem_type:
+            dims = tuple(
+                (d.dim_value if not d.dim_param else None) for d in tt.shape.dim
+            )
+        return dims, tt.elem_type
+
     def create_tensor_global(
         self,
-        t: onnx.TensorProto,
+        t: Union[onnx.TensorProto, onnx.ValueInfoProto],
     ) -> Tuple[str, IrType]:
         # Always create globals at the top. Then after created, if there was
         # a prior one, move the new one to after it to maintain declaration
@@ -112,8 +121,14 @@ class IREENodeImporter(onnx_importer.NodeImporter):
             # After lowering to linalg-on-tensors, the data type needs to be signless.
             # So, we construct the globals to have signless types, and use
             # torch_c.from_builtin_tensor to convert to the correct frontend type.
+            if isinstance(t, onnx.TensorProto):
+                dims = tuple(t.dims)
+                data_type = t.data_type
+            else:
+                dims, data_type = self.get_type_info_from_type(t.type)
+
             vtensor_type = RankedTensorType.get(
-                tuple(t.dims), ELEM_TYPE_TO_SIGNLESS_IR_TYPE[t.data_type]()
+                dims, ELEM_TYPE_TO_SIGNLESS_IR_TYPE[data_type]()
             )
             ir_attrs = {
                 "sym_name": StringAttr.get(name),
@@ -160,6 +175,20 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         # Recover per-module caches of various attributes.
         # Allows modification in the same module_op without
         # loss of current state.
+        all_input_map = copy.deepcopy(graph_info.input_map)
+        num_inputs = len(all_input_map.items())
+        if (
+            param_data.input_index_threshold is not None
+            and param_data.input_index_threshold < num_inputs
+        ):
+            thresh = (
+                param_data.input_index_threshold
+                if param_data.input_index_threshold >= 0
+                else max(0, param_data.input_index_threshold + num_inputs)
+            )
+            for _index in range(thresh, num_inputs):
+                _discarded = graph_info.input_map.popitem()
+
         mc = (
             module_cache
             if module_cache is not None
@@ -197,26 +226,48 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         for node_name, input_value in zip(graph_info.input_map.keys(), block.arguments):
             imp._nv_map[node_name] = input_value
         imp._populate_graph_attrs(func_op)
+        imp._gi.input_map = all_input_map
         return imp
 
+    def import_all(self, func=True):
+        num_inputs = len(self._gi.input_map.items())
+        if (
+            self.param_data.input_index_threshold is not None
+            and self.param_data.input_index_threshold < num_inputs
+        ):
+            thresh = (
+                self.param_data.input_index_threshold
+                if self.param_data.input_index_threshold >= 0
+                else max(0, self.param_data.input_index_threshold + num_inputs)
+            )
+            for i in range(thresh, num_inputs):
+                self.import_initializer(list(self._gi.input_map.values())[i])
+        super().import_all(func)
+
     def import_initializer(
-        self, initializer: onnx.TensorProto, extern_name: Optional[str] = None
+        self,
+        initializer: Union[onnx.TensorProto, onnx.ValueInfoProto],
+        extern_name: Optional[str] = None,
     ) -> Value:
         # If an explicitly specified name is given, use that; otherwise, pick
         # up the name from the tensor proto itself
         initializer_name = extern_name if extern_name else initializer.name
-        dims = list(initializer.dims)
-        num_elements = 1
-        for d in dims:
-            num_elements = num_elements * d
-        if num_elements < self.param_data.num_elements_threshold:
-            imported_tensor = super().import_initializer(initializer)
-            self._nv_map[initializer_name] = imported_tensor
-            return imported_tensor
+        if isinstance(initializer, onnx.TensorProto):
+            dims = tuple(initializer.dims)
+            num_elements = 1
+            for d in dims:
+                num_elements = num_elements * d
+            if num_elements < self.param_data.num_elements_threshold:
+                imported_tensor = super().import_initializer(initializer)
+                self._nv_map[initializer_name] = imported_tensor
+                return imported_tensor
+            data_type = initializer.data_type
+        else:
+            dims, data_type = self.get_type_info_from_type(initializer.type)
 
         actual_symbol_name, tensor_type = self.create_tensor_global(initializer)
         vtensor_type = self._cc.get_vtensor_type(
-            tuple(initializer.dims), self._cc.tensor_element_type(initializer.data_type)
+            dims, self._cc.tensor_element_type(data_type)
         )
 
         with InsertionPoint(self._b), Location.name(initializer_name):
@@ -228,7 +279,8 @@ class IREENodeImporter(onnx_importer.NodeImporter):
             ).result
 
         self._nv_map[initializer_name] = converted_value
-        self.globals.append((initializer_name, actual_symbol_name))
+        if isinstance(initializer, onnx.TensorProto):
+            self.globals.append((initializer_name, actual_symbol_name))
         return converted_value
 
     def save_params(self):
