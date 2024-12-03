@@ -137,11 +137,12 @@ public:
     auto funcOp = getOperation();
 
     ConfigTrackingListener listener;
+    GreedyRewriteConfig config;
+    config.listener = &listener;
+
     {
       RewritePatternSet patterns(context);
       populateConcretizePadResultShapePatterns(patterns);
-      GreedyRewriteConfig config;
-      config.listener = &listener;
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns),
                                               config))) {
         return signalPassFailure();
