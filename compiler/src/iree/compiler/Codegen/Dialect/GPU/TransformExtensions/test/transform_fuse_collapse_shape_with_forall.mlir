@@ -2,7 +2,7 @@
 
 #map = affine_map<(d0) -> (d0 * 2)>
 module {
-  func.func @fuse_collapse_shape_with_forall(%arg0: tensor<8x8xf32>) -> tensor<64xf32> {
+  func.func @fuse_collapse_shape_into_forall(%arg0: tensor<8x8xf32>) -> tensor<64xf32> {
     %0 = tensor.empty() : tensor<8x8xf32>
     %1 = scf.forall (%arg1) in (4) shared_outs(%arg2 = %0) -> (tensor<8x8xf32>) {
       %2 = affine.apply #map(%arg1)
@@ -22,7 +22,7 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
     %producer = transform.structured.match ops{["scf.forall"]} in %arg0 : (!transform.any_op) -> !transform.any_op
     %consumer = transform.structured.match ops{["tensor.collapse_shape"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-    %2 = transform.iree.fuse_collapse_shape_with_forall %consumer into %producer
+    %2 = transform.iree.fuse_collapse_shape_into_forall %consumer into %producer
       : (!transform.any_op, !transform.any_op) -> !transform.any_op
     transform.yield
   }
@@ -30,7 +30,7 @@ module attributes {transform.with_named_sequence} {
 
 // CHECK-DAG: #[[$MAP:.+]] = affine_map<(d0) -> (d0 * 2)>
 
-// CHECK-LABEL: func @fuse_collapse_shape_with_forall
+// CHECK-LABEL: func @fuse_collapse_shape_into_forall
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<8x8xf32>
 
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -55,7 +55,7 @@ module attributes {transform.with_named_sequence} {
 
 #map = affine_map<(d0)[s0] -> (-d0 + s0, 4)>
 module {
-  func.func @fuse_dynamic_collapse_shape_with_forall(%arg0: tensor<?x?x8xf32>, %arg1: index, %arg2: index) -> tensor<?x?xf32> {
+  func.func @fuse_dynamic_collapse_shape_into_forall(%arg0: tensor<?x?x8xf32>, %arg1: index, %arg2: index) -> tensor<?x?xf32> {
     %0 = tensor.empty(%arg1, %arg2) : tensor<?x?x8xf32>
     %1 = scf.forall (%arg3, %arg4) = (0, 0) to (%arg1, %arg2) step (4, 4) shared_outs(%arg5 = %0) -> (tensor<?x?x8xf32>) {
       %2 = affine.min #map(%arg3)[%arg1]
@@ -76,7 +76,7 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["scf.forall"]} in %arg0 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.match ops{["tensor.collapse_shape"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-    %2 = transform.iree.fuse_collapse_shape_with_forall %1 into %0 : (!transform.any_op, !transform.any_op) -> !transform.any_op
+    %2 = transform.iree.fuse_collapse_shape_into_forall %1 into %0 : (!transform.any_op, !transform.any_op) -> !transform.any_op
     transform.yield
   }
 }
@@ -84,7 +84,7 @@ module attributes {transform.with_named_sequence} {
 // CHECK-DAG: #[[$MAP:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 4)>
 // CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0) -> (d0 * 8)>
 
-// CHECK-LABEL: func @fuse_dynamic_collapse_shape_with_forall
+// CHECK-LABEL: func @fuse_dynamic_collapse_shape_into_forall
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<?x?x8xf32>
 //  CHECK-SAME:   %[[SIZE0:[A-Za-z0-9]+]]: index
 //  CHECK-SAME:   %[[SIZE1:[A-Za-z0-9]+]]: index
@@ -117,7 +117,7 @@ module attributes {transform.with_named_sequence} {
 
 #map = affine_map<(d0) -> (d0 * 2)>
 module {
-  func.func @fuse_collapse_shape_with_multi_result_forall(%arg0: tensor<8x8xf32>, %arg1: tensor<8x8xf16>) -> (tensor<64xf32>, tensor<8x8xf16>) {
+  func.func @fuse_collapse_shape_into_multi_result_forall(%arg0: tensor<8x8xf32>, %arg1: tensor<8x8xf16>) -> (tensor<64xf32>, tensor<8x8xf16>) {
     %0 = tensor.empty() : tensor<8x8xf32>
     %1 = tensor.empty() : tensor<8x8xf16>
     %2:2 = scf.forall (%arg2) in (4) shared_outs(%arg3 = %0, %arg4 = %1) -> (tensor<8x8xf32>, tensor<8x8xf16>) {
@@ -142,12 +142,12 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["scf.forall"]} in %arg0 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.match ops{["tensor.collapse_shape"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-    %2 = transform.iree.fuse_collapse_shape_with_forall %1 into %0 : (!transform.any_op, !transform.any_op) -> !transform.any_op
+    %2 = transform.iree.fuse_collapse_shape_into_forall %1 into %0 : (!transform.any_op, !transform.any_op) -> !transform.any_op
     transform.yield
   }
 }
 
-// CHECK-LABEL: func @fuse_collapse_shape_with_multi_result_forall
+// CHECK-LABEL: func @fuse_collapse_shape_into_multi_result_forall
 //       CHECK:   %[[FORALL_RESULT:.+]]:2 = scf.forall {{.*}} -> (tensor<64xf32>, tensor<8x8xf16>) {
 //       CHECK:     scf.forall.in_parallel {
 //   CHECK-DAG:       tensor.parallel_insert_slice {{.*}} : tensor<16xf32> into tensor<64xf32>

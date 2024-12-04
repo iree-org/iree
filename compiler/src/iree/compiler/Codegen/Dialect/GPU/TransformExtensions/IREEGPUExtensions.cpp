@@ -219,11 +219,11 @@ void transform_dialect::FuseForallOp::getEffects(
 }
 
 //===---------------------------------------------------------------------===//
-// FuseCollapseShapeWithForallOp
+// FuseCollapseShapeIntoForallOp
 //===---------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure
-transform_dialect::FuseCollapseShapeWithForallOp::apply(
+transform_dialect::FuseCollapseShapeIntoForallOp::apply(
     transform::TransformRewriter &rewriter,
     transform::TransformResults &results, transform::TransformState &state) {
   auto producers = state.getPayloadOps(getProducer());
@@ -258,7 +258,7 @@ transform_dialect::FuseCollapseShapeWithForallOp::apply(
   return DiagnosedSilenceableFailure::success();
 }
 
-void transform_dialect::FuseCollapseShapeWithForallOp::getEffects(
+void transform_dialect::FuseCollapseShapeIntoForallOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::consumesHandle(getProducerMutable(), effects);
   transform::consumesHandle(getConsumerMutable(), effects);

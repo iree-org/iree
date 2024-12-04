@@ -288,15 +288,32 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
 }
 
 /// Return whether a parallel insert slice operation can be collapsed with
-/// the given reassociation indices. For a slice to be collapsable, each group
+/// the given reassociation indices. For a slice to be collapsible, each group
 /// of collapsed dimensions must be fully contiguous in the destination type.
+/// For example, the following parallel_insert_slice can be collapsed:
+/// ```
+///   tensor.parallel_insert_slice ...
+///     tensor<1x2x3x4x5xf32> into tensor<?x?x3x?x5xf32>
+///   ...
+///   // Collapsed by:
+///   tensor.collapse_shape %result [[0, 1, 2], [3, 4]]
+///     tensor<?x?x3x?x5> into tensor<?x?x?xf32>
+/// ```
+/// Since the slice <1x2x3> is contiguous in <?x?x3> for the first group, and
+/// the slice <4x5> is contiguous in <?x5> for the second group.
 static LogicalResult
-collapsableSlicePrecondition(RewriterBase &rewriter,
+collapsibleSlicePrecondition(RewriterBase &rewriter,
                              tensor::ParallelInsertSliceOp sliceOp,
                              SmallVector<ReassociationIndices> reassociations) {
   if (!areAllConstantIntValue(sliceOp.getMixedStrides(), 1)) {
     return rewriter.notifyMatchFailure(sliceOp, "strides are not all 1");
   }
+  RankedTensorType sliceType = sliceOp.getSourceType();
+  if (sliceOp.getMixedSizes().size() != sliceType.getRank()) {
+    return rewriter.notifyMatchFailure(
+        sliceOp, "parallel insert slice is rank reducing");
+  }
+
   SmallVector<OpFoldResult> sizes = sliceOp.getMixedSizes();
   RankedTensorType fullTensorType = sliceOp.getDestType();
   ArrayRef<int64_t> destShape = fullTensorType.getShape();
@@ -330,18 +347,13 @@ collapsableSlicePrecondition(RewriterBase &rewriter,
     }
   }
 
-  RankedTensorType sliceType = sliceOp.getSourceType();
-  if (sliceOp.getMixedSizes().size() != sliceType.getRank()) {
-    return rewriter.notifyMatchFailure(
-        sliceOp, "parallel insert slice is rank reducing");
-  }
   return success();
 }
 
 /// Collapse all `ops` with the given `reassociations`. All `ops` are expected
 /// to have equivalent offsets, sizes, and strides. All strides are expected to
 /// be 1. This function assumes that the parallelInsertOp passes the
-/// collapsableSlicePrecondition.
+/// collapsibleSlicePrecondition.
 static tensor::ParallelInsertSliceOp
 collapseParallelInsertOp(RewriterBase &rewriter,
                          tensor::ParallelInsertSliceOp parallelInsertOp,
@@ -436,7 +448,7 @@ fuseCollapseShapeIntoProducerForall(RewriterBase &rewriter,
   // Collapse the parallel insert slice op.
   SmallVector<ReassociationIndices> reassociations =
       collapseOp.getReassociationIndices();
-  if (failed(collapsableSlicePrecondition(rewriter, parallelInsertOp,
+  if (failed(collapsibleSlicePrecondition(rewriter, parallelInsertOp,
                                           reassociations))) {
     return failure();
   }

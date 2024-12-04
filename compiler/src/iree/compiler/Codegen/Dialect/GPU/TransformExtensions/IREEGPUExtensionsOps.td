@@ -228,7 +228,7 @@ def FuseForallOp : Op<Transform_Dialect, "iree.fuse_forall",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
-def FuseCollapseShapeWithForallOp : Op<Transform_Dialect, "iree.fuse_collapse_shape_with_forall",
+def FuseCollapseShapeIntoForallOp : Op<Transform_Dialect, "iree.fuse_collapse_shape_into_forall",
     [FunctionalStyleTransformOpTrait,
      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      DeclareOpInterfaceMethods<TransformOpInterface>,
