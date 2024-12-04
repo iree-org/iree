@@ -301,7 +301,7 @@ LogicalResult distributeVectorOps(Operation *root,
     if (failed(setOpSignature(op, analysis, options))) {
       LLVM_DEBUG({
         llvm::dbgs() << "Skipping operation because not all vector "
-                        "operands/results have a layout: \n";
+                        "operands/results have a layout:\n";
         op->print(llvm::dbgs());
       });
     }

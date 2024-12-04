@@ -1106,14 +1106,9 @@ public:
     if (type.getRank() > 0) {
       return VectorLayoutInterface();
     }
-
-    // Return a nested layout with the shape as the element_tile.
-    SmallVector<int64_t> elementTile(type.getShape());
-    SmallVector<int64_t> identity =
-        llvm::to_vector(llvm::seq<int64_t>(type.getRank()));
+    ArrayRef<int64_t> empty = {};
     return IREE::VectorExt::NestedLayoutAttr::get(
-        type.getContext(), identity, identity, identity, identity, elementTile,
-        identity, identity);
+        type.getContext(), empty, empty, empty, empty, empty, empty, empty);
   }
 };
 
