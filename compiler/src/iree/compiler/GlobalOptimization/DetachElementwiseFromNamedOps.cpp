@@ -63,33 +63,23 @@ struct DetachElementwisePattern
       return failure();
     }
     auto outputType = llvm::cast<RankedTensorType>(outputOperand.getType());
-    int64_t outputRank = outputType.getRank();
     if (!outputType.getElementType().isIntOrFloat())
       return failure();
     auto elementType = outputType.getElementType();
 
     Location loc = linalgOp.getLoc();
 
-    // verify the original output affine map is parallel
+    // Check if the output tensor access is a projected permutation
     auto outputMap = mlir::compressUnusedDims(
         linalgOp.getMatchingIndexingMap(outputOperands.front()));
-    SmallVector<utils::IteratorType> iterators;
-    iterators.reserve(outputMap.getNumResults());
-    for (int i = 0, e = outputMap.getNumResults(); i < e; ++i) {
-      auto expr = dyn_cast<AffineDimExpr>(outputMap.getResult(i));
-      if (!expr)
-        return rewriter.notifyMatchFailure(
-            linalgOp, "output affine map has a non dim expression at " +
-                          std::to_string(i));
-      int pos = expr.getPosition();
-      auto attr = linalgOp.getIteratorTypesArray()[pos];
-      if (!linalg::isParallelIterator(attr))
-        return rewriter.notifyMatchFailure(
-            linalgOp, "output iterator type is not parallel at position " +
-                          std::to_string(pos));
-      iterators.push_back(attr);
+    if (!outputMap.isProjectedPermutation()) {
+      return rewriter.notifyMatchFailure(
+          linalgOp, "Output indexing map must be a permuted projection.");
     }
 
+    int64_t outputRank = outputType.getRank();
+    SmallVector<utils::IteratorType> iterators(outputRank,
+                                               utils::IteratorType::parallel);
     SmallVector<AffineMap> maps(3, rewriter.getMultiDimIdentityMap(outputRank));
 
     // Create a zero tensor as the new output tensor operand to the Linalg
