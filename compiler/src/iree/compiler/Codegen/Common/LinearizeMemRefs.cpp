@@ -33,31 +33,22 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-static SmallVector<int64_t> getLinearizedShape(MemRefType ty, int srcBits,
-                                               int dstBits) {
-  if (ty.getRank() == 0)
+static SmallVector<int64_t> getLinearizedShape(MemRefType type) {
+  if (type.getRank() == 0)
     return {};
 
   int64_t linearizedShape = 1;
-  for (auto shape : ty.getShape()) {
+  for (auto shape : type.getShape()) {
     if (shape == ShapedType::kDynamic)
       return {ShapedType::kDynamic};
     linearizedShape *= shape;
   }
-  int scale = dstBits / srcBits;
-  // Scale the size to the ceilDiv(linearizedShape, scale)
-  // to accomodate all the values.
-  linearizedShape = (linearizedShape + scale - 1) / scale;
   return {linearizedShape};
 }
 
-static LogicalResult linearizeType(MemRefType memrefType,
-                                   MemRefType &newMemrefType) {
+static FailureOr<MemRefType> linearizeType(MemRefType memrefType) {
   // Fetch linearized shape.
-  // TODO(avarma): Take into account different src/dst bits.
-  int srcBits = memrefType.getElementType().getIntOrFloatBitWidth();
-  SmallVector<int64_t> linearizedShape =
-      getLinearizedShape(memrefType, srcBits, srcBits);
+  SmallVector<int64_t> linearizedShape = getLinearizedShape(memrefType);
   // Fetch offset and strides of the old memref.
   SmallVector<int64_t> strides;
   int64_t offset;
@@ -74,20 +65,16 @@ static LogicalResult linearizeType(MemRefType memrefType,
                                         ArrayRef<int64_t>{1});
   }
   Type elementType = memrefType.getElementType();
-  newMemrefType = MemRefType::get(linearizedShape, elementType, layoutAttr,
-                                  memrefType.getMemorySpace());
-  return success();
+  return MemRefType::get(linearizedShape, elementType, layoutAttr,
+                         memrefType.getMemorySpace());
 }
 
-static LogicalResult
-getLinearizedTypeFromSourceType(MemRefType currentTypeOfSourceMemref,
-                                MemRefType &linearizedType) {
+static FailureOr<MemRefType>
+getLinearizedTypeFromSourceType(MemRefType currentTypeOfSourceMemref) {
   if (!currentTypeOfSourceMemref)
     return failure();
-  if (currentTypeOfSourceMemref.getRank() < 2)
-    return success();
   // Convert current type later.
-  return linearizeType(currentTypeOfSourceMemref, linearizedType);
+  return linearizeType(currentTypeOfSourceMemref);
 }
 
 template <typename OpTy>
@@ -103,30 +90,32 @@ struct LinearizeMemrefAlloc : public OpRewritePattern<OpTy> {
     Location loc = allocOp->getLoc();
     MemRefType currentTypeOfSourceMemref =
         dyn_cast<MemRefType>(allocOp.getMemref().getType());
-    MemRefType newTypeOfSourceMemref;
-    if (failed(getLinearizedTypeFromSourceType(currentTypeOfSourceMemref,
-                                               newTypeOfSourceMemref))) {
-      return failure();
-    }
     if (currentTypeOfSourceMemref.getRank() < 2)
       return success();
+    FailureOr<MemRefType> maybeNewTypeOfSourceMemref =
+        getLinearizedTypeFromSourceType(currentTypeOfSourceMemref);
+    if (failed(maybeNewTypeOfSourceMemref))
+      return failure();
+    MemRefType newTypeOfSourceMemref = *maybeNewTypeOfSourceMemref;
 
-    auto elementType = currentTypeOfSourceMemref.getElementType();
-    int srcBits = elementType.getIntOrFloatBitWidth();
+    SmallVector<Value> sizes =
+        llvm::map_to_vector(allocOp.getMixedSizes(), [&](OpFoldResult size) {
+          Value val;
+          if (dyn_cast<Attribute>(size)) {
+            val = rewriter.create<arith::ConstantIndexOp>(
+                loc, *getConstantIntValue(size));
+          } else {
+            val = cast<Value>(size);
+          }
+          return val;
+        });
 
-    OpFoldResult zero = rewriter.getIndexAttr(0);
-
-    // Get linearized type.
-    int dstBits = srcBits;
-    SmallVector<OpFoldResult> sizes = allocOp.getMixedSizes();
-
-    memref::LinearizedMemRefInfo linearizedMemRefInfo =
-        memref::getLinearizedMemRefOffsetAndSize(
-            rewriter, loc, srcBits, dstBits, /*offset =*/zero, sizes);
+    Value linearizedSize = rewriter.create<affine::AffineLinearizeIndexOp>(
+        loc, sizes, currentTypeOfSourceMemref.getShape(), true);
     SmallVector<Value> dynamicLinearizedSize;
     if (!newTypeOfSourceMemref.hasStaticShape()) {
-      dynamicLinearizedSize.push_back(getValueOrCreateConstantIndexOp(
-          rewriter, loc, linearizedMemRefInfo.linearizedSize));
+      dynamicLinearizedSize.push_back(
+          getValueOrCreateConstantIndexOp(rewriter, loc, linearizedSize));
     }
 
     rewriter.replaceOpWithNewOp<OpTy>(
@@ -150,14 +139,14 @@ struct LinearizeMemrefLoad : public OpRewritePattern<memref::LoadOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = loadOp->getLoc();
     MemRefType currentTypeOfSourceMemref = loadOp.getMemRefType();
-    MemRefType newTypeOfSourceMemref;
-    if (failed(getLinearizedTypeFromSourceType(currentTypeOfSourceMemref,
-                                               newTypeOfSourceMemref))) {
-      return failure();
-    }
     if (currentTypeOfSourceMemref.getRank() < 2 &&
         loadOp.getIndices().size() < 2)
       return success();
+    FailureOr<MemRefType> maybeNewTypeOfSourceMemref =
+        getLinearizedTypeFromSourceType(currentTypeOfSourceMemref);
+    if (failed(maybeNewTypeOfSourceMemref))
+      return failure();
+    MemRefType newTypeOfSourceMemref = *maybeNewTypeOfSourceMemref;
 
     Value linearizedIndices = rewriter.create<affine::AffineLinearizeIndexOp>(
         loc, loadOp.getIndices(), currentTypeOfSourceMemref.getShape(), true);
@@ -178,14 +167,14 @@ struct LinearizeMemrefStore : public OpRewritePattern<memref::StoreOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = storeOp->getLoc();
     MemRefType currentTypeOfSourceMemref = storeOp.getMemRefType();
-    MemRefType newTypeOfSourceMemref;
-    if (failed(getLinearizedTypeFromSourceType(currentTypeOfSourceMemref,
-                                               newTypeOfSourceMemref))) {
-      return failure();
-    }
     if (currentTypeOfSourceMemref.getRank() < 2 &&
         storeOp.getIndices().size() < 2)
       return success();
+    FailureOr<MemRefType> maybeNewTypeOfSourceMemref =
+        getLinearizedTypeFromSourceType(currentTypeOfSourceMemref);
+    if (failed(maybeNewTypeOfSourceMemref))
+      return failure();
+    MemRefType newTypeOfSourceMemref = *maybeNewTypeOfSourceMemref;
 
     auto elementType = storeOp.getMemRefType().getElementType();
     int srcBits = elementType.getIntOrFloatBitWidth();
@@ -209,13 +198,13 @@ struct LinearizeMemrefDealloc : public OpRewritePattern<memref::DeallocOp> {
     Location loc = deallocOp->getLoc();
     MemRefType currentTypeOfSourceMemref =
         dyn_cast<MemRefType>(deallocOp.getMemref().getType());
-    MemRefType newTypeOfSourceMemref;
-    if (failed(getLinearizedTypeFromSourceType(currentTypeOfSourceMemref,
-                                               newTypeOfSourceMemref))) {
-      return failure();
-    }
     if (currentTypeOfSourceMemref.getRank() < 2)
       return success();
+    FailureOr<MemRefType> maybeNewTypeOfSourceMemref =
+        getLinearizedTypeFromSourceType(currentTypeOfSourceMemref);
+    if (failed(maybeNewTypeOfSourceMemref))
+      return failure();
+    MemRefType newTypeOfSourceMemref = *maybeNewTypeOfSourceMemref;
 
     Value linearizedOperand = linearizeOperand(
         loc, rewriter, deallocOp.getMemref(), newTypeOfSourceMemref);
@@ -236,14 +225,14 @@ struct LinearizeMemrefCopy : public OpRewritePattern<memref::CopyOp> {
         dyn_cast<MemRefType>(copyOp.getSource().getType());
     MemRefType currentTypeOfTargetMemref =
         dyn_cast<MemRefType>(copyOp.getTarget().getType());
-    MemRefType newTypeOfSourceMemref;
-    if (failed(getLinearizedTypeFromSourceType(currentTypeOfSourceMemref,
-                                               newTypeOfSourceMemref))) {
-      return failure();
-    }
     if (currentTypeOfSourceMemref.getRank() < 2 &&
         currentTypeOfTargetMemref.getRank() < 2)
       return success();
+    FailureOr<MemRefType> maybeNewTypeOfSourceMemref =
+        getLinearizedTypeFromSourceType(currentTypeOfSourceMemref);
+    if (failed(maybeNewTypeOfSourceMemref))
+      return failure();
+    MemRefType newTypeOfSourceMemref = *maybeNewTypeOfSourceMemref;
 
     Value linearizedSource = linearizeOperand(loc, rewriter, copyOp.getSource(),
                                               newTypeOfSourceMemref);
@@ -263,14 +252,14 @@ struct LinearizeVectorLoad : public OpRewritePattern<vector::LoadOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = loadOp->getLoc();
     MemRefType currentTypeOfSourceMemref = loadOp.getMemRefType();
-    MemRefType newTypeOfSourceMemref;
-    if (failed(getLinearizedTypeFromSourceType(currentTypeOfSourceMemref,
-                                               newTypeOfSourceMemref))) {
-      return failure();
-    }
     if (currentTypeOfSourceMemref.getRank() < 2 &&
         loadOp.getIndices().size() < 2)
       return success();
+    FailureOr<MemRefType> maybeNewTypeOfSourceMemref =
+        getLinearizedTypeFromSourceType(currentTypeOfSourceMemref);
+    if (failed(maybeNewTypeOfSourceMemref))
+      return failure();
+    MemRefType newTypeOfSourceMemref = *maybeNewTypeOfSourceMemref;
 
     Value linearizedIndices = rewriter.create<affine::AffineLinearizeIndexOp>(
         loc, loadOp.getIndices(), currentTypeOfSourceMemref.getShape(), true);
@@ -291,14 +280,14 @@ struct LinearizeVectorStore : public OpRewritePattern<vector::StoreOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = storeOp->getLoc();
     MemRefType currentTypeOfSourceMemref = storeOp.getMemRefType();
-    MemRefType newTypeOfSourceMemref;
-    if (failed(getLinearizedTypeFromSourceType(currentTypeOfSourceMemref,
-                                               newTypeOfSourceMemref))) {
-      return failure();
-    }
     if (currentTypeOfSourceMemref.getRank() < 2 &&
         storeOp.getIndices().size() < 2)
       return success();
+    FailureOr<MemRefType> maybeNewTypeOfSourceMemref =
+        getLinearizedTypeFromSourceType(currentTypeOfSourceMemref);
+    if (failed(maybeNewTypeOfSourceMemref))
+      return failure();
+    MemRefType newTypeOfSourceMemref = *maybeNewTypeOfSourceMemref;
 
     Value linearizedIndices = rewriter.create<affine::AffineLinearizeIndexOp>(
         loc, storeOp.getIndices(), currentTypeOfSourceMemref.getShape(), true);
