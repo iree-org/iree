@@ -713,10 +713,10 @@ struct ConvertCollectiveSendRecvOp
 };
 
 struct ConvertDispatchOp
-    : public AffinityOpConversionPattern<IREE::Flow::DispatchOp> {
-  using AffinityOpConversionPattern::AffinityOpConversionPattern;
+    : public AffinityOp1toNConversionPattern<IREE::Flow::DispatchOp> {
+  using AffinityOp1toNConversionPattern::AffinityOp1toNConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
-      IREE::Flow::DispatchOp op, OpAdaptor adaptor,
+      IREE::Flow::DispatchOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
       ConversionPatternRewriter &rewriter) const override {
     // Zero is going to be used for each operand to start.
@@ -730,7 +730,7 @@ struct ConvertDispatchOp
     SmallVector<Value> dispatchOperandLengths;
     SmallVector<Value> operandSizes;
     for (auto [oldOperand, newOperand] :
-         llvm::zip_equal(op.getArguments(), adaptor.getArguments())) {
+         llvm::zip_equal(op.getArguments(), getOneToOneAdaptorOperands(adaptor.getArguments()))) {
       if (llvm::isa<ShapedType>(oldOperand.getType())) {
         auto newOperandCast =
             transferTensorOperand(op.getLoc(), oldOperand, newOperand,
@@ -774,7 +774,7 @@ struct ConvertDispatchOp
     }
 
     auto newOp = rewriter.replaceOpWithNewOp<IREE::Stream::AsyncDispatchOp>(
-        op, resultTypes, adaptor.getWorkload(), adaptor.getEntryPointsAttr(),
+        op, resultTypes, getOneToOneAdaptorOperands(adaptor.getWorkload()), adaptor.getEntryPointsAttr(),
         dispatchOperands, dispatchOperandSizes, dispatchOperandOffsets,
         dispatchOperandEnds, dispatchOperandLengths, resultSizes,
         adaptor.getTiedOperandsAttr(), executionAffinityAttr);

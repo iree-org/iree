@@ -364,11 +364,11 @@ struct OptimizationBarrierOpConversion
     : public AffinityAwareConversionPattern<IREE::Util::OptimizationBarrierOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
-  matchAndRewrite(IREE::Util::OptimizationBarrierOp op, OpAdaptor adaptor,
+  matchAndRewrite(IREE::Util::OptimizationBarrierOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     SmallVector<Value> newOperands;
     for (auto [originalOperand, convertedOperand] :
-         llvm::zip_equal(op.getOperands(), adaptor.getOperands())) {
+         llvm::zip_equal(op.getOperands(), getOneToOneAdaptorOperands(adaptor.getOperands()))) {
       if (isa<TensorType>(convertedOperand.getType())) {
         newOperands.push_back(resolveTensorOperand(op.getLoc(), originalOperand,
                                                    convertedOperand, rewriter)

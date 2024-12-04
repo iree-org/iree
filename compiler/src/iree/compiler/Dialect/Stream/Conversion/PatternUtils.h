@@ -125,6 +125,36 @@ private:
   }
 };
 
+template <typename OpT>
+struct AffinityOp1toNConversionPattern
+    : public AffinityAwareConversionPattern<OpT> {
+public:
+  AffinityOp1toNConversionPattern(const TypeConverter &typeConverter,
+                              MLIRContext *context,
+                              IREE::Stream::AffinityAnalysis *affinityAnalysis,
+                              PatternBenefit benefit = 1)
+      : AffinityAwareConversionPattern<OpT>(typeConverter, context,
+                                            affinityAnalysis, benefit) {}
+
+protected:
+
+  virtual LogicalResult matchAndRewriteOnAffinity(
+      OpT op, typename OpConversionPattern<OpT>::OneToNOpAdaptor adaptor,
+      IREE::Stream::AffinityAttr executionAffinityAttr,
+      ConversionPatternRewriter &rewriter) const = 0;
+
+private:
+
+  LogicalResult
+  matchAndRewrite(OpT op, typename OpConversionPattern<OpT>::OneToNOpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override final {
+    auto executionAffinityAttr =
+        tryLookupExecutionAffinity(op, this->getAffinityAnalysis());
+    return matchAndRewriteOnAffinity(op, adaptor, executionAffinityAttr,
+                                     rewriter);
+  }
+};
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_STREAM_CONVERSION_PATTERN_UTILS_H_
