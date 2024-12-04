@@ -83,14 +83,21 @@ repos:
         # probably changed again in a future version, whatever.
         language_version: "1.16"
 
-      - id: bazel_to_cmake
-        name: Run bazel_to_cmake.py
+      # Convert BUILD.bazel files to CMakeLists.txt files in two passes to
+      # avoid potential race conditions.
+      # Note: this passes file names to the tool. The tool can also be run
+      # manually with no arguments specified to walk directories on its own.
+      # Keep the top level directories here in sync with .bazel_to_cmake.cfg.py.
+      - id: bazel_to_cmake_1
+        name: Run bazel_to_cmake.py on BUILD.bazel files
         language: python
-        # Note: this passes file names to the tool. The tool can also be run
-        # manually with no arguments specified to walk directories on its own.
         entry: ./build_tools/bazel_to_cmake/bazel_to_cmake.py
-        # Keep the top level directories here in sync with .bazel_to_cmake.cfg.py.
-        files: '^(compiler|runtime|samples|tests|tools)/(.*/)?(BUILD\.bazel|CMakeLists.txt)$'
+        files: '^(compiler|runtime|samples|tests|tools)/(.*/)?(BUILD\.bazel)$'
+      - id: bazel_to_cmake_2
+        name: Run bazel_to_cmake.py on CMakeLists.txt files
+        language: python
+        entry: ./build_tools/bazel_to_cmake/bazel_to_cmake.py
+        files: "^(compiler|runtime|samples|tests|tools)/(.*/)?(CMakeLists.txt)$"
 
       - id: check_path_lengths
         name: Check for excessively long path lengths
