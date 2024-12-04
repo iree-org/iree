@@ -67,7 +67,7 @@ Value calculateStorageElementCountInBytes(Location loc,
 
   // Calculate all static dims first, if any.
   int64_t staticCount = 1;
-  if (!needToPackSubByteElementBitWidth(elementBits)) {
+  if (!needToPackSubByteElementBitWidth(elementBits, isI1PackedStorage)) {
     staticCount *= IREE::Util::getRoundedElementByteWidth(alignedElementType);
   }
 
@@ -119,7 +119,7 @@ Value calculateStorageElementCountInBytes(Location loc,
     value = builder.createOrFold<arith::MulIOp>(loc, value, dim);
   }
   // Sub-byte packing requires putting multiple elements in the same byte.
-  if (needToPackSubByteElementBitWidth(elementBits)) {
+  if (needToPackSubByteElementBitWidth(elementBits, isI1PackedStorage)) {
     assert(8 % elementBits == 0);
     unsigned byteElements = 8 / elementBits;
     // TODO(antiagainst): We may want to emit runtime check to make sure this is
