@@ -61,6 +61,7 @@ import importlib.util
 import os
 import re
 import sys
+import tempfile
 import textwrap
 from enum import Enum
 from pathlib import Path
@@ -328,8 +329,9 @@ def convert_directory(directory_path, write_files, allow_partial_conversion, ver
         preserved_header + header + converted_build_file + preserved_footer
     )
     if write_files:
-        with open(cmakelists_file_path, "wt") as cmakelists_file:
-            cmakelists_file.write(converted_content)
+        with tempfile.NamedTemporaryFile("wt", delete=False) as tmp:
+            tmp.write(converted_content)
+        os.replace(tmp.name, cmakelists_file_path)
     else:
         print(converted_content, end="")
 
