@@ -30,7 +30,7 @@ using ScalableTileFlagsListTypeRef = ArrayRef<SmallVector<bool>>;
 /// Flag to add attributes for tuner.
 inline llvm::cl::opt<bool>
     clSetTunerAttr("iree-config-add-tuner-attributes",
-                   llvm::cl::desc("add attributes for tuner"),
+                   llvm::cl::desc("Adds attribute for tuner."),
                    llvm::cl::init(false));
 } // namespace mlir::iree_compiler
 
