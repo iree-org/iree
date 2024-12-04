@@ -412,7 +412,7 @@ def LinkTuningSpecsPass : Pass<"iree-codegen-link-tuning-specs", "ModuleOp"> {
   let description = [{
     Given a module with multiple nested tuning specs, introduce a new named sequence
     that includes all the other tuning spec entry points. The order of inclusion is the same
-    as the in which these nested tuning specs appear in the IR.
+    as the order in which these nested tuning specs appear in the IR.
 
     A tuning spec entry point is a `transform.named_sequence` op annotated with the
     `iree_codegen.tuning_spec` unit attribute. We require it to perform in-place op
@@ -434,6 +434,25 @@ def LowerUKernelOpsToCallsPass :
 def MaterializeEncodingIntoNopPass :
     InterfacePass<"iree-codegen-materialize-encoding-into-nop", "mlir::FunctionOpInterface"> {
   let summary = "Drop the encodings from tensor types with encodings.";
+}
+
+def MaterializeTuningSpecsPass : Pass<"iree-codegen-materialize-tuning-specs", "ModuleOp"> {
+  let summary =
+      "Load tuning spec transform dialect libraries and encode them in the module";
+  let description = [{
+    Links all available tuning spec transform dialect modules into a single
+    tuning spec. Next, serializes this tuning spec to bytecode and attaches it
+    as a module attribute. We do this so that the full tuning spec is always
+    encoded in the program IR and can be checked with `--mlir-print-ir-after-all`
+    (or equivalent). The alternative would be to add the tuning spec as a
+    submodule in the compiled program, but this may result in the tuning spec
+    being inadvertently visited by other passes that attempt to `walk` the outer
+    module. Serialization makes the tuning specs opaque and prevents it from
+    happening.
+
+    This attribute is expected to be short-lived and removed by
+    `iree-codegen-materialize-user-configs`.
+  }];
 }
 
 def MaterializeUserConfigsPass : Pass<"iree-codegen-materialize-user-configs", "ModuleOp"> {

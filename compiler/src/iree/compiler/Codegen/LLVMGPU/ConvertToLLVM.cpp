@@ -354,15 +354,18 @@ public:
                           rewriter.getI32IntegerAttr(16));
     // It is safe to set the noalias attribute as it is guaranteed that the
     // ranges within bindings won't alias.
+    Attribute unit = rewriter.getUnitAttr();
     llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),
-                          LLVM::LLVMDialect::getNoAliasAttrName(),
-                          rewriter.getUnitAttr());
+                          LLVM::LLVMDialect::getNoAliasAttrName(), unit);
+    llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),
+                          LLVM::LLVMDialect::getNonNullAttrName(), unit);
+    llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),
+                          LLVM::LLVMDialect::getNoUndefAttrName(), unit);
     if (checkAllSubspansReadonly(llvmFuncOp, subspanOp.getBinding())) {
       // Setting the readonly attribute here will generate non-coherent cache
       // loads.
       llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),
-                            LLVM::LLVMDialect::getReadonlyAttrName(),
-                            rewriter.getUnitAttr());
+                            LLVM::LLVMDialect::getReadonlyAttrName(), unit);
     }
     // Add the byte offset.
     Value llvmBufferBasePtr = llvmBufferArg;
@@ -471,6 +474,13 @@ public:
     mlir::BlockArgument llvmBufferArg = llvmFuncOp.getArgument(
         argMapping.size() + ireeConstantOp.getOrdinal().getZExtValue());
     assert(llvmBufferArg.getType().isInteger(32));
+
+    // Push constants are never `undef`, annotate that here, just as with
+    // bindings.
+    llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),
+                          LLVM::LLVMDialect::getNoUndefAttrName(),
+                          rewriter.getUnitAttr());
+
     Type dstType = getTypeConverter()->convertType(ireeConstantOp.getType());
     // llvm.zext requires that the result type has a larger bitwidth.
     if (dstType == llvmBufferArg.getType()) {

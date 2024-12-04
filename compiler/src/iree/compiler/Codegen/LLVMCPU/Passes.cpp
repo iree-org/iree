@@ -405,11 +405,11 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
         // SplitReductionPass takes care of banked-tiling.
         funcPassManager.addPass(
             createLLVMCPUSplitReductionPass(clEnableReassociateFpReductions));
-        funcPassManager.addPass(createLLVMCPUTilePass(i));
+        funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperands(i));
         continue;
       }
 
-      funcPassManager.addPass(createLLVMCPUTilePass(i));
+      funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperands(i));
     }
   }
 

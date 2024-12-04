@@ -19,8 +19,12 @@ iree_cc_library(
     "Utils.cpp"
   DEPS
     LLVMSupport
+    MLIRArithDialect
     MLIRIR
+    MLIRLinalgDialect
+    MLIRTensorDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Dialect::Encoding::IR
   PUBLIC
 )
 

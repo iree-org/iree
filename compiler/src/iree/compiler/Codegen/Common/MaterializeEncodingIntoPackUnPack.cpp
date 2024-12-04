@@ -10,12 +10,14 @@
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/SmallVectorExtras.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -61,19 +63,6 @@ getSwizzledShape(ArrayRef<OpFoldResult> packedShape,
   return newShape;
 }
 
-static Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
-                                         ValueRange convertedInputOperands,
-                                         ValueRange convertedOutputOperands) {
-  SmallVector<Value> operands;
-  operands.append(convertedInputOperands.begin(), convertedInputOperands.end());
-  operands.append(convertedOutputOperands.begin(),
-                  convertedOutputOperands.end());
-  return mlir::clone(builder, op,
-                     {dropEncoding(cast<RankedTensorType>(
-                         convertedOutputOperands[0].getType()))},
-                     operands);
-}
-
 static FailureOr<SmallVector<OpFoldResult>>
 getInnerTileSizesOfr(OpBuilder &rewriter, Location loc,
                      RankedTensorType tensorType,
@@ -111,91 +100,6 @@ getInnerTileSizesOfr(OpBuilder &rewriter, Location loc,
   return result;
 }
 
-RankedTensorType getExpandedType(RankedTensorType type, bool isBatched,
-                                 bool isTransposed,
-                                 SmallVectorImpl<ReassociationIndices> &ri) {
-  if (!isBatched) {
-    ri.assign({{0, 1}, {2, 3}});
-    if (!isTransposed) {
-      return RankedTensorType::get(
-          {1, type.getDimSize(0), 1, type.getDimSize(1)},
-          type.getElementType());
-    }
-    return RankedTensorType::get({type.getDimSize(0), 1, type.getDimSize(1), 1},
-                                 type.getElementType());
-  }
-
-  ri.assign({{0}, {1, 2}, {3, 4}});
-  if (!isTransposed) {
-    return RankedTensorType::get(
-        {type.getDimSize(0), 1, type.getDimSize(1), 1, type.getDimSize(2)},
-        type.getElementType());
-  }
-  return RankedTensorType::get(
-      {type.getDimSize(0), type.getDimSize(1), 1, type.getDimSize(2), 1},
-      type.getElementType());
-}
-
-/// Given an input Value and a desired output element type, create and return
-/// an element-wise linalg::GenericOp that extends the input Value to the
-/// output element type.
-static Value createElementWiseExtUIOp(RewriterBase &rewriter, Value input,
-                                      Location loc, Type outElemType) {
-  auto inputType = cast<RankedTensorType>(input.getType());
-  SmallVector<AffineMap> maps(
-      2, rewriter.getMultiDimIdentityMap(inputType.getRank()));
-  SmallVector<utils::IteratorType> iteratorTypes(inputType.getRank(),
-                                                 utils::IteratorType::parallel);
-  auto castedType = inputType.clone(outElemType);
-  SmallVector<OpFoldResult> inputMixedSizes =
-      tensor::getMixedSizes(rewriter, loc, input);
-  Value init =
-      rewriter.create<tensor::EmptyOp>(loc, inputMixedSizes, outElemType);
-  return rewriter
-      .create<linalg::GenericOp>(
-          loc, castedType, input, init, maps, iteratorTypes,
-          [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-            Value castRes =
-                b.create<arith::ExtUIOp>(nestedLoc, outElemType, args[0])
-                    ->getResult(0);
-            b.create<linalg::YieldOp>(nestedLoc, castRes);
-          })
-      .getResult(0);
-}
-
-/// If needed, expand and the input Value, and return the resulting input with
-/// the canonical mmt4d input shape. If the input element type is unsigned,
-/// create a producer Linalg::GenericOp on the input that unsigned extends the
-/// input to the output element type. This extension is required to keep the
-/// unsignedness information on the input for ukernels. If `transpose` is true,
-/// the `linalgOp`'s indexing maps are transposed.
-static Value getMmt4dOperand(Value value, linalg::LinalgOp linalgOp,
-                             bool transpose, RewriterBase &rewriter,
-                             SmallVectorImpl<ReassociationIndices> &ri,
-                             ArrayRef<Type> elemTypes, int operandIdx) {
-  assert(linalgOp.getNumDpsInputs() == 2);
-  assert(linalgOp.getNumDpsInits() == 1);
-  auto cDims = linalg::inferContractionDims(linalgOp);
-  Location loc = linalgOp->getLoc();
-  Value expandedValue = value;
-  // If vecmat with non-rhs operandIdx or matvec with non-lhs operandIdx, the
-  // operand is a vector and must be extended
-  if ((cDims->m.empty() && operandIdx != 1) ||
-      (cDims->n.empty() && operandIdx != 0)) {
-    auto type = cast<RankedTensorType>(value.getType());
-    RankedTensorType newType = getExpandedType(
-        type, /*isBatched=*/!cDims->batch.empty(),
-        /*isTransposed=*/operandIdx == 2 && (transpose ^ cDims->n.empty()), ri);
-    expandedValue =
-        rewriter.create<tensor::ExpandShapeOp>(loc, newType, value, ri);
-  }
-  if (elemTypes[operandIdx].isUnsignedInteger()) {
-    return createElementWiseExtUIOp(rewriter, expandedValue, loc,
-                                    elemTypes.back());
-  }
-  return expandedValue;
-}
-
 static void transposeInPlace(MaterializeEncodingInfo &info) {
   // Vector cases: nothing to do.
   if (info.innerTileSizes.size() < 2) {
@@ -217,12 +121,7 @@ static void transposeInPlace(MaterializeEncodingInfo &info) {
 // to `pack` and `unpack` operations respectively.
 //===---------------------------------------------------------------------===//
 
-/// TODO(hanchung): Move the implementation to EncodingUtils.cpp. It is not
-/// moved because it needs some cleanup for this file. E.g., `getPaddingValue`
-/// is no longer needed. Ideally we should move CPU specific patterns (e.g.,
-/// lowerContractionOpWithEncoding, etc) to the CPUMaterializeEncoding file;
-/// move general patterns to EncodingUtils, and retire this file.
-FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
+FailureOr<Value> lowerSetEncodingOpToPackOp(
     RewriterBase &rewriter, IREE::Encoding::SetEncodingOp encodingOp,
     Value source, const MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
@@ -231,6 +130,11 @@ FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
       typeConverter.getEncodingInfo(resultType);
   if (failed(encodingInfo)) {
     return rewriter.notifyMatchFailure(encodingOp, "unhandled result encoding");
+  }
+
+  // Shortcut to avoid creating new operations.
+  if (IREE::Codegen::isIdentityLayout(encodingInfo.value())) {
+    return source;
   }
 
   auto encoding = IREE::Encoding::getEncodingAttr(resultType);
@@ -258,14 +162,14 @@ FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
       encodingInfo->outerDimsPerm);
   auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
                                                   resultType.getElementType());
-  return rewriter.create<tensor::PackOp>(
-      loc, source, emptyOp, encodingInfo->innerDimsPos, *innerTileSizesOfr,
-      paddingValue, encodingInfo->outerDimsPerm);
+  return rewriter
+      .create<tensor::PackOp>(loc, source, emptyOp, encodingInfo->innerDimsPos,
+                              *innerTileSizesOfr, paddingValue,
+                              encodingInfo->outerDimsPerm)
+      .getResult();
 }
 
-/// TODO(hanchung): Move the implementation to EncodingUtils.cpp. See the reason
-/// in the implementation comment of lowerSetEncodingToPackOp method.
-FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
+FailureOr<Value> lowerUnsetEncodingToUnpackOp(
     RewriterBase &rewriter, IREE::Encoding::UnsetEncodingOp encodingOp,
     Value packedValue, const MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
@@ -275,6 +179,12 @@ FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
   if (failed(encodingInfo)) {
     return rewriter.notifyMatchFailure(encodingOp, "unhandled source encoding");
   }
+
+  // Shortcut to avoid creating new operations.
+  if (IREE::Codegen::isIdentityLayout(encodingInfo.value())) {
+    return packedValue;
+  }
+
   auto encoding = IREE::Encoding::getEncodingAttr(sourceType);
   if (typeConverter.getTransposeNarrowN() && isNarrowNResult(encoding)) {
     transposeInPlace(*encodingInfo);
@@ -292,78 +202,11 @@ FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
     return rewriter.notifyMatchFailure(
         encodingOp, "failed to generate runtime tile size query");
   }
-  return rewriter.create<tensor::UnPackOp>(
-      loc, packedValue, emptyOp, encodingInfo->innerDimsPos, *innerTileSizesOfr,
-      encodingInfo->outerDimsPerm);
-}
-
-static FailureOr<Operation *> lowerContractionOpWithEncoding(
-    RewriterBase &rewriter, linalg::LinalgOp linalgOp, ValueRange operands,
-    const MaterializeEncodingTypeConverter &typeConverter) {
-  if (!linalgOp.hasPureTensorSemantics())
-    return failure();
-
-  auto inputs = linalgOp.getDpsInputOperands();
-  auto outputs = linalgOp.getDpsInits();
-
-  auto lhsType = cast<RankedTensorType>(inputs[0]->get().getType());
-  auto rhsType = cast<RankedTensorType>(inputs[1]->get().getType());
-  auto resultType = cast<RankedTensorType>(outputs[0].getType());
-  auto lhsEncoding = IREE::Encoding::getEncodingAttr(lhsType);
-  auto rhsEncoding = IREE::Encoding::getEncodingAttr(rhsType);
-  auto resultEncoding = IREE::Encoding::getEncodingAttr(resultType);
-  if (!lhsEncoding || !rhsEncoding || !resultEncoding) {
-    return failure();
-  }
-
-  if (lhsEncoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_LHS ||
-      rhsEncoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_RHS ||
-      resultEncoding.getOperandIndex().getValue() !=
-          IREE::Encoding::MATMUL_RESULT) {
-    return failure();
-  }
-
-  FailureOr<MaterializeEncodingInfo> encodingInfo =
-      typeConverter.getEncodingInfo(
-          cast<RankedTensorType>(linalgOp->getResultTypes()[0]));
-
-  Operation *result;
-  if (failed(encodingInfo)) {
-    result = dropEncodingAndCloneOp(rewriter, linalgOp,
-                                    operands.take_front(inputs.size()),
-                                    operands.drop_front(inputs.size()));
-  } else {
-    bool transpose =
-        typeConverter.getTransposeNarrowN() && isNarrowNResult(resultEncoding);
-    SmallVector<Type> elemTypes = lhsEncoding.getElementTypesArray();
-    SmallVector<ReassociationIndices> ri;
-    Value newLhs = getMmt4dOperand(operands[0], linalgOp, transpose, rewriter,
-                                   ri, elemTypes, /*operandIdx=*/0);
-    Value newRhs = getMmt4dOperand(operands[1], linalgOp, transpose, rewriter,
-                                   ri, elemTypes, /*operandIdx=*/1);
-    Value newResult =
-        getMmt4dOperand(operands[2], linalgOp, transpose, rewriter, ri,
-                        elemTypes, /*operandIdx=*/2);
-    if (transpose) {
-      std::swap(newLhs, newRhs);
-    }
-    Type newResultType = newResult.getType();
-    auto cDims = IREE::Encoding::getEncodingContractionDims(lhsEncoding);
-    if (cDims->batch.empty()) {
-      result = rewriter.create<linalg::Mmt4DOp>(
-          linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
-          ValueRange{newResult});
-    } else {
-      result = rewriter.create<linalg::BatchMmt4DOp>(
-          linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
-          ValueRange{newResult});
-    }
-    if (!ri.empty()) {
-      result = rewriter.create<tensor::CollapseShapeOp>(
-          linalgOp->getLoc(), operands[2].getType(), result->getResult(0), ri);
-    }
-  }
-  return result;
+  return rewriter
+      .create<tensor::UnPackOp>(loc, packedValue, emptyOp,
+                                encodingInfo->innerDimsPos, *innerTileSizesOfr,
+                                encodingInfo->outerDimsPerm)
+      .getResult();
 }
 
 /// Utility method to convert `tensor.empty` with encoding to a `tensor.empty`
@@ -776,7 +619,7 @@ struct SetEncodingOpToPackOpConversion
       rewriter.replaceOp(encodingOp, result);
       return success();
     }
-    rewriter.replaceOp(encodingOp, packOp->getResult());
+    rewriter.replaceOp(encodingOp, packOp.value());
     return success();
   }
 };
@@ -792,10 +635,10 @@ struct UnsetEncodingOpToUnPackOpConversion
                   ConversionPatternRewriter &rewriter) const override {
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         this->getTypeConverter());
-    auto unpackOp = lowerUnsetEncodingToUnpackOp(
+    auto unpackedValue = lowerUnsetEncodingToUnpackOp(
         rewriter, encodingOp, adaptor.getSource(), *converter,
         this->materializeEncodingValueFn);
-    if (failed(unpackOp)) {
+    if (failed(unpackedValue)) {
       Type targetType =
           getTypeConverter()->convertType(encodingOp.getResultType());
       Value result = rewriter.createOrFold<tensor::CastOp>(
@@ -803,7 +646,7 @@ struct UnsetEncodingOpToUnPackOpConversion
       rewriter.replaceOp(encodingOp, result);
       return success();
     }
-    rewriter.replaceOp(encodingOp, unpackOp->getResult());
+    rewriter.replaceOp(encodingOp, unpackedValue.value());
     return success();
   }
 };
@@ -901,8 +744,29 @@ public:
 
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         this->getTypeConverter());
+
+    if (auto layoutAttr = converter->getLayoutAttr()) {
+      SmallVector<Type> convertedResTypes;
+      for (auto init : op.getDpsInits()) {
+        convertedResTypes.push_back(converter->convertType(init.getType()));
+      }
+      Operation *newOp =
+          layoutAttr.lowerOp(rewriter, op, convertedResTypes, operands);
+      rewriter.replaceOp(op, newOp->getResults());
+      return success();
+    }
+
+    // TODO(hanchung): This is a transition state for moving the implementation
+    // details to backend attributes. We won't need the function type argument
+    // after all the backends that support encodings implement the attribute.
+    auto getEncodingInfoWrapper =
+        [&](RankedTensorType type) -> FailureOr<MaterializeEncodingInfo> {
+      return converter->getEncodingInfo(type);
+    };
     FailureOr<Operation *> convertedOp =
-        lowerContractionOpWithEncoding(rewriter, op, operands, *converter);
+        IREE::Codegen::lowerContractionOpWithEncoding(
+            rewriter, op, operands, converter->getTransposeNarrowN(),
+            getEncodingInfoWrapper);
     if (failed(convertedOp)) {
       return failure();
     }

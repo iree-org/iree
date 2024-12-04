@@ -7,7 +7,8 @@
 #ifndef IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_
 #define IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_
 
-#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -34,9 +35,13 @@ using MaterializeEncodingValueFn =
 /// TypeConverter to use for materializing the encoding.
 class MaterializeEncodingTypeConverter : public TypeConverter {
 public:
-  MaterializeEncodingTypeConverter(MaterializeEncodingFn fn,
-                                   IREE::HAL::ExecutableTargetAttr targetAttr,
-                                   bool transposeNarrowN);
+  MaterializeEncodingTypeConverter(
+      MaterializeEncodingFn fn, IREE::HAL::ExecutableTargetAttr targetAttr,
+      bool transposeNarrowN, IREE::Codegen::LayoutAttrInterface layoutAttr);
+
+  const IREE::Codegen::LayoutAttrInterface &getLayoutAttr() const {
+    return layoutAttr;
+  }
 
   const MaterializeEncodingFn &getMaterializeEncodingFn() const {
     return materializeEncodingFn;
@@ -46,6 +51,9 @@ public:
 
   FailureOr<IREE::Codegen::MaterializeEncodingInfo>
   getEncodingInfo(RankedTensorType type) const {
+    if (layoutAttr) {
+      return layoutAttr.getEncodingInfo(type);
+    }
     return materializeEncodingFn(type, targetAttr);
   }
 
@@ -55,6 +63,13 @@ private:
   const MaterializeEncodingFn materializeEncodingFn;
   const IREE::HAL::ExecutableTargetAttr targetAttr;
   bool transposeNarrowN = false;
+  // The `layoutAttr` implements the logic of encoding materialization. It has
+  // a higher priority when it is present.
+  // TODO(hanchung): Move the logic that takes `targetAttr` and
+  // `transposeNarrowN` into account to their own attribute implementation. It
+  // is in a transition state, so we have two paths atm. We're incrementally
+  // moving the logic to attributes.
+  const IREE::Codegen::LayoutAttrInterface layoutAttr;
 };
 
 /// Conversion target to use for for materializing the encoding.
@@ -85,28 +100,16 @@ protected:
 /// Returns the RankedTensorType without encodings.
 RankedTensorType dropEncoding(RankedTensorType type);
 
-struct TileMxNxK {
-  int64_t M = 1;
-  int64_t N = 1;
-  int64_t K = 1;
-};
-
-IREE::Codegen::MaterializeEncodingInfo
-getEncodingInfoForMatmul(IREE::Encoding::EncodingAttr encoding, int64_t rank,
-                         TileMxNxK tileMxNxK);
-
 /// Utility method to convert from `set_encoding` op to `pack` operation.
-/// For now this takes a `paddingValue` as input. The source is also taken
-/// as input so that these could be used with `OpConversionPatterns`.
-FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
+/// NOTE: `source` could be returned when packing is not needed.
+FailureOr<Value> lowerSetEncodingOpToPackOp(
     RewriterBase &rewriter, IREE::Encoding::SetEncodingOp encodingOp,
     Value source, const MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn);
 
 /// Utility method to convert from `unset_encoding` op to `unpack` operation.
-/// The source is taken as input so that these could be used with
-/// `OpConversionPatterns`.
-FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
+/// NOTE: `packedValue` could be returned when unpacking is not needed.
+FailureOr<Value> lowerUnsetEncodingToUnpackOp(
     RewriterBase &rewriter, IREE::Encoding::UnsetEncodingOp encodingOp,
     Value packedValue, const MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn);
@@ -125,10 +128,6 @@ void populateShapeIndependentMaterializeEncodingPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn);
-
-// Returns true if `encoding` represents a narrow-N matmul RESULT, e.g. the
-// result of a matvec.
-bool isNarrowNResult(IREE::Encoding::EncodingAttr encoding);
 
 } // namespace mlir::iree_compiler
 

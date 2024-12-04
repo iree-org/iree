@@ -28,6 +28,7 @@ iree_cc_library(
     "IREECodegenInterfaces.h.inc"
     "IREECodegenOps.cpp.inc"
     "IREECodegenOps.h.inc"
+    "IREECodegenTypes.h"
     "LoweringConfigEnums.cpp.inc"
     "LoweringConfigEnums.h.inc"
     "UKernelOps.cpp.inc"
@@ -62,7 +63,6 @@ iree_cc_library(
     MLIRTransformDialectTransforms
     MLIRViewLikeInterface
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
-    iree::compiler::Dialect::HAL::IR
   PUBLIC
 )
 

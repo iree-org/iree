@@ -21,6 +21,7 @@
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
@@ -51,6 +52,13 @@ void addConstantBufferizePasses(OpPassManager &funcPassManager);
 
 /// Populate Encoding to Nop pass and canonicalizer pass to the pipeline
 void addEncodingToNopPasses(FunctionLikeNest &passManager);
+
+/// Links nested transform dialect tuning specs named sequences into a single
+/// entry point. Returns the new named sequence op (inserted into the `module`)
+/// that includes the nested tuning specs, or a null op when no nested named
+/// sequences were found. The order of inclusion is the same as the order in
+/// which these nested tuning specs appear in the IR.
+FailureOr<transform::NamedSequenceOp> linkTuningSpecs(ModuleOp module);
 
 //------------------------------------------------------------------------------
 // Wrappers that not use tablegen options. See Passes.td for details.

@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
@@ -31,6 +32,7 @@
 namespace mlir::iree_compiler {
 
 using IREE::Codegen::MaterializeEncodingInfo;
+using IREE::Codegen::TileMxNxK;
 
 #define GEN_PASS_DEF_CPUMATERIALIZEDEVICEENCODINGPASS
 #define GEN_PASS_DEF_CPUMATERIALIZEHOSTENCODINGPASS
@@ -445,8 +447,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
 
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its operand index in the matmul.
-  auto rank = tensorType.getRank();
-  return getEncodingInfoForMatmul(encoding, rank, chosenTileMxNxK);
+  return IREE::Codegen::getEncodingInfoForMatmul(encoding, chosenTileMxNxK);
 }
 
 static FailureOr<MaterializeEncodingValueInfo>
@@ -481,7 +482,8 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
   // 3. Heuristics for cache-friendly dispatch tiling can get complex on CPU,
   //    so it is nice that they have fewer narrow cases to consider.
   MaterializeEncodingTypeConverter typeConverter(
-      materializeEncodingForTarget, targetAttr, /*transposeNarrowN=*/true);
+      materializeEncodingForTarget, targetAttr, /*transposeNarrowN=*/true,
+      /*layoutAttr=*/{});
   MaterializeEncodingConversionTarget target(*ctx);
   auto materializeEncodingValueFn = getMaterializeEncodingValueFn(targetAttr);
   populateMaterializeEncodingIntoPackUnPackPatterns(

@@ -13,3 +13,17 @@ if(IREE_INPUT_TORCH)
       "mnist_builder_test.py"
   )
 endif()
+
+iree_py_test(
+ NAME
+   basic_test
+ SRCS
+   "basic_test.py"
+)
+
+iree_py_test(
+ NAME
+   net_test
+ SRCS
+   "net_test.py"
+)

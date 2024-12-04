@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -2784,10 +2785,10 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
     // Remove the "enable_loop_peeling" attr from pipelineConfig
     auto enableLoopPeelingAttrName =
         getEnableLoopPeelingAttrName(rootOp->getContext());
-    auto newPipelineConfigEntries = llvm::to_vector(llvm::make_filter_range(
+    auto newPipelineConfigEntries = llvm::filter_to_vector(
         pipelineConfig.getValue(), [&](NamedAttribute entry) {
           return entry.getName() != enableLoopPeelingAttrName;
-        }));
+        });
 
     pipelineConfig =
         DictionaryAttr::get(rootOp->getContext(), newPipelineConfigEntries);

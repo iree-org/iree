@@ -8,6 +8,8 @@
 
 #include <cstdint>
 
+#include "compiler/plugins/target/ROCM/builtins/ukernel/iree_uk_amdgpu_bitcode.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
@@ -21,6 +23,7 @@
 #include "iree/compiler/Dialect/HAL/Utils/ExecutableDebugInfoUtils.h"
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/PluginAPI/Client.h"
+#include "iree/compiler/Utils/EmbeddedDataDirectory.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
 #include "iree/schemas/amdgpu_executable_def_builder.h"
@@ -206,6 +209,7 @@ static std::string translateModuleToISA(llvm::Module &module,
   }
   return targetISA;
 }
+
 } // namespace
 
 class ROCMTargetBackend final : public TargetBackend {
@@ -265,6 +269,8 @@ public:
     registry.insert<IREE::Codegen::IREECodegenDialect>();
     registry.insert<IREE::VectorExt::IREEVectorExtDialect>();
     registry.insert<IREE::GPU::IREEGPUDialect>();
+    // Configuration may load and manipulate transform dialect libraries.
+    registerTransformDialectTranslationDependentDialects(registry);
   }
 
   void
@@ -513,20 +519,6 @@ public:
         return failure();
       }
 
-      // Link module to any enabled ukernels.
-      StringRef bitcodeDirectory = options.bitcodeDirectory;
-      StringRef enabledUkernels;
-      if (auto attr = getConfigStringAttr(targetAttr, "ukernels"))
-        enabledUkernels = attr->getValue();
-      if (!enabledUkernels.empty() && enabledUkernels != "none") {
-        if (failed(linkUkernelBitcodeFiles(
-                variantOp.getLoc(), llvmModule.get(), enabledUkernels,
-                targetArch, bitcodeDirectory, llvm::Linker::OverrideFromSrc,
-                *targetMachine))) {
-          return failure();
-        }
-      }
-
       // Link bitcode (*.bc) object attrs specified by the input program.
       // Note that this happens after the command-line files so that the command
       // line ones override the symbols coming from the embedded files.
@@ -548,14 +540,15 @@ public:
       }
 
       // Link module to HIP device library.
-      if (bitcodeDirectory.empty()) {
+      if (options.bitcodeDirectory.empty()) {
         return variantOp.emitError()
                << "cannot find ROCM bitcode files. Check your installation "
                   "consistency and in the worst case, set "
                   "--iree-hip-bc-dir= to a path on your system.";
       }
       if (failed(linkHIPBitcodeIfNeeded(variantOp.getLoc(), llvmModule.get(),
-                                        targetArch, bitcodeDirectory))) {
+                                        targetArch,
+                                        options.bitcodeDirectory))) {
         return failure();
       }
 
@@ -881,6 +874,7 @@ private:
 };
 
 namespace {
+
 struct ROCMSession final
     : PluginSession<ROCMSession, ROCMOptions,
                     PluginActivationPolicy::DefaultActivated> {
@@ -910,10 +904,23 @@ struct ROCMSession final
 
 } // namespace mlir::iree_compiler::IREE::HAL
 
+// Iterate over ukernel bitcode embedded-data files, and insert them into the
+// EmbeddedDataDirectory singleton.
+static void addAMDGPUUkernelBitcodeToGlobalEmbeddedDataDirectory() {
+  using mlir::iree_compiler::EmbeddedDataDirectory;
+  EmbeddedDataDirectory::withGlobal([](EmbeddedDataDirectory &dir) {
+    const iree_file_toc_t *toc = iree_uk_amdgpu_bitcode_create();
+    for (size_t i = 0; i < iree_uk_amdgpu_bitcode_size(); ++i) {
+      dir.addFile(toc[i].name, llvm::StringRef{toc[i].data, toc[i].size});
+    }
+  });
+}
+
 extern "C" bool iree_register_compiler_plugin_hal_target_rocm(
     mlir::iree_compiler::PluginRegistrar *registrar) {
   registrar->registerPlugin<mlir::iree_compiler::IREE::HAL::ROCMSession>(
       "hal_target_rocm");
+  addAMDGPUUkernelBitcodeToGlobalEmbeddedDataDirectory();
   return true;
 }
 

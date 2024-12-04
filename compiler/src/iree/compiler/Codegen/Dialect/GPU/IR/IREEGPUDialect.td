@@ -41,7 +41,7 @@ def IREEGPU_Dialect : Dialect {
 
 class RankedTensorOrVectorOf<list<Type> allowedTypes> :
   ShapedContainerType<allowedTypes,
-      Or<[IsVectorTypePred, And<[IsTensorTypePred, HasRankPred]>]>,
+      Or<[IsVectorOfNonZeroRankTypePred, And<[IsTensorTypePred, HasRankPred]>]>,
   "ranked tensor or vector", "::mlir::ShapedType">;
 
 def AnyRankedTensorOrVector : RankedTensorOrVectorOf<[AnyType]>;

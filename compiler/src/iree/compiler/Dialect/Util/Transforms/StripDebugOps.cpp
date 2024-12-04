@@ -7,7 +7,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
-#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Pass/Pass.h"
@@ -15,9 +14,13 @@
 
 namespace mlir::iree_compiler::IREE::Util {
 
+#define GEN_PASS_DEF_STRIPDEBUGOPSPASS
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc"
+
 namespace {
 
-class StripDebugOpsPass : public StripDebugOpsBase<StripDebugOpsPass> {
+class StripDebugOpsPass
+    : public impl::StripDebugOpsPassBase<StripDebugOpsPass> {
 public:
   void runOnOperation() override {
     getOperation()->walk([](Operation *op) {
@@ -30,9 +33,5 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<void>> createStripDebugOpsPass() {
-  return std::make_unique<StripDebugOpsPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Util

@@ -153,7 +153,7 @@ void transform_dialect::VectorToWarpExecuteOnLane0Op::build(
 // SCCP.
 static LogicalResult
 replaceAllUsesOfLaneWithin(RewriterBase &b,
-                           vector::WarpExecuteOnLane0Op executeOp) {
+                           gpu::WarpExecuteOnLane0Op executeOp) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(executeOp);
   Value zero = b.create<arith::ConstantIndexOp>(executeOp.getLoc(), 0);
@@ -225,7 +225,7 @@ static FailureOr<gpu::ThreadIdOp> isThreadIdxxZeroPredicate(scf::IfOp ifOp) {
 }
 
 struct VectorDistributionResult {
-  vector::WarpExecuteOnLane0Op warpOp;
+  gpu::WarpExecuteOnLane0Op warpOp;
 };
 
 static FailureOr<VectorDistributionResult>
@@ -257,7 +257,7 @@ rewriteScfIfAsWarpExecuteOnLane0(RewriterBase &rewriter, Location loc,
         rewriter.create<scf::IfOp>(loc, predicate, /*withElseRegion=*/false);
     rewriter.setInsertionPointToStart(&newIfOp.getThenRegion().front());
   }
-  auto warpOp = rewriter.create<vector::WarpExecuteOnLane0Op>(
+  auto warpOp = rewriter.create<gpu::WarpExecuteOnLane0Op>(
       loc, TypeRange(), threadIdxx, warpSize);
 
   // Move the code from the previous ifOp to the
@@ -270,7 +270,7 @@ rewriteScfIfAsWarpExecuteOnLane0(RewriterBase &rewriter, Location loc,
                                      sourceBlock.without_terminator().begin(),
                                      sourceBlock.without_terminator().end());
   rewriter.setInsertionPointToEnd(&targetBlock);
-  rewriter.create<vector::YieldOp>(loc);
+  rewriter.create<gpu::YieldOp>(loc);
 
   // Erase old op.
   rewriter.eraseOp(ifOp);
@@ -358,7 +358,7 @@ void transform_dialect::VectorWarpDistributionOp::getEffects(
 /// Emit shared local memory allocation in case it is needed when lowering the
 /// warp operations.
 static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
-                                        vector::WarpExecuteOnLane0Op warpOp,
+                                        gpu::WarpExecuteOnLane0Op warpOp,
                                         Type type) {
   MemRefType memrefType;
   auto addressSpaceAttr = gpu::AddressSpaceAttr::get(
@@ -374,11 +374,11 @@ static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
   return builder.create<memref::AllocOp>(loc, memrefType);
 }
 
-/// Return a value yielded by `warpOp` which statifies the filter lamdba
+/// Return a value yielded by `warpOp` which satisfies the filter lambda
 /// condition and is not dead.
-static OpOperand *getWarpResult(vector::WarpExecuteOnLane0Op warpOp,
+static OpOperand *getWarpResult(gpu::WarpExecuteOnLane0Op warpOp,
                                 function_ref<bool(Operation *)> fn) {
-  auto yield = cast<vector::YieldOp>(
+  auto yield = cast<gpu::YieldOp>(
       warpOp.getBodyRegion().getBlocks().begin()->getTerminator());
   for (OpOperand &yieldOperand : yield->getOpOperands()) {
     Value yieldValues = yieldOperand.get();
@@ -426,9 +426,9 @@ public:
 /// }
 /// gpu.synchronize
 /// %0 = memref.load %src[%c0] : memref<1024xf32>
-struct WarpOpLoad : public OpRewritePattern<vector::WarpExecuteOnLane0Op> {
-  using OpRewritePattern<vector::WarpExecuteOnLane0Op>::OpRewritePattern;
-  LogicalResult matchAndRewrite(vector::WarpExecuteOnLane0Op warpOp,
+struct WarpOpLoad : public OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
+  using OpRewritePattern<gpu::WarpExecuteOnLane0Op>::OpRewritePattern;
+  LogicalResult matchAndRewrite(gpu::WarpExecuteOnLane0Op warpOp,
                                 PatternRewriter &rewriter) const override {
     OpOperand *operand = getWarpResult(warpOp, llvm::IsaPred<memref::LoadOp>);
     if (!operand)
@@ -476,7 +476,7 @@ struct HoistSharedMemoryAlloc : public OpRewritePattern<memref::AllocOp> {
                                 PatternRewriter &rewriter) const override {
     if (!iree_compiler::hasSharedMemoryAddressSpace(alloc.getType()))
       return failure();
-    auto warpParent = alloc->getParentOfType<vector::WarpExecuteOnLane0Op>();
+    auto warpParent = alloc->getParentOfType<gpu::WarpExecuteOnLane0Op>();
     if (!warpParent)
       return failure();
     alloc->moveBefore(warpParent);
@@ -561,7 +561,7 @@ static void populatePropagateVectorDistribution(Operation *target,
 }
 
 static void warpSyncronizationFn(Location loc, OpBuilder &builder,
-                                 vector::WarpExecuteOnLane0Op warpOp) {
+                                 gpu::WarpExecuteOnLane0Op warpOp) {
   builder.create<gpu::BarrierOp>(loc);
 };
 
@@ -1476,11 +1476,10 @@ transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(
   rewriter.setInsertionPointToStart(&target.getFunctionBody().front());
   Value laneId =
       rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::x);
+  int64_t subgroupSize = getSubgroupSize();
 
   populateGPUDistributionPatterns(patterns);
-  // For testing we use subgroup size = 64.
-  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId,
-                                                /*subgroupSize=*/64);
+  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize);
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultSilenceableFailure(target);
   }

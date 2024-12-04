@@ -4,10 +4,11 @@
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "argmax"}>
 #map = affine_map<(d0) -> (d0)>
 #map1 = affine_map<(d0) -> ()>
-func.func @argmax_1d_f16i64() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+func.func @argmax_1d_f16i64() attributes {
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "argmax"}>
+} {
   %c32_i64 = arith.constant 32 : i64
   %cst = arith.constant 0xFC00 : f16
   %c0_i64 = arith.constant 0 : i64
@@ -43,7 +44,7 @@ func.func @argmax_1d_f16i64() attributes {hal.executable.target = #executable_ta
 //       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUDefault workgroup_size = [32, 1, 1]>
 //       CHECK: func.func @argmax_1d_f16i64()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   iree_codegen.ukernel.generic  "iree_uk_amdgpu_argmax_f16i64"
+//       CHECK:   iree_codegen.ukernel.generic {hal.executable.objects = [{{.*}}]} "iree_uk_amdgpu_argmax_f16i64"
 
 // -----
 
@@ -51,10 +52,11 @@ func.func @argmax_1d_f16i64() attributes {hal.executable.target = #executable_ta
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "argmax"}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
-func.func @argmax_2d_f32i64() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+func.func @argmax_2d_f32i64() attributes {
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "argmax"}>
+} {
   %c32_i64 = arith.constant 32 : i64
   %cst = arith.constant 0xFF800000 : f32
   %c0_i64 = arith.constant 0 : i64
@@ -92,7 +94,7 @@ func.func @argmax_2d_f32i64() attributes {hal.executable.target = #executable_ta
 // CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK:   %[[SUBVIEW:.*]] = memref.subview{{.*}} memref<16x?xf32
 // CHECK-SAME:        to memref<1x?xf32
-//      CHECK:   iree_codegen.ukernel.generic  "iree_uk_amdgpu_argmax_f32i64" ins(%[[SUBVIEW]]
+//      CHECK:   iree_codegen.ukernel.generic {hal.executable.objects = [{{.*}}]} "iree_uk_amdgpu_argmax_f32i64" ins(%[[SUBVIEW]]
 
 // -----
 
@@ -100,10 +102,11 @@ func.func @argmax_2d_f32i64() attributes {hal.executable.target = #executable_ta
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb">
 #map = affine_map<(d0) -> (d0)>
 #map1 = affine_map<(d0) -> ()>
-func.func @no_ukernel_argmax_1d_f16i64() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+func.func @no_ukernel_argmax_1d_f16i64() attributes {
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb">
+} {
   %c32_i64 = arith.constant 32 : i64
   %cst = arith.constant 0xFC00 : f16
   %c0_i64 = arith.constant 0 : i64
@@ -147,10 +150,11 @@ func.func @no_ukernel_argmax_1d_f16i64() attributes {hal.executable.target = #ex
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "argmax"}>
 #map = affine_map<(d0) -> (d0)>
 #map1 = affine_map<(d0) -> ()>
-func.func @not_neg_inf_init_argmax_1d() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+func.func @not_neg_inf_init_argmax_1d() attributes {
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "argmax"}>
+} {
   %c32_i64 = arith.constant 32 : i64
   %cst = arith.constant 0.000000e+00 : f16
   %c0_i64 = arith.constant 0 : i64

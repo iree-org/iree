@@ -89,9 +89,10 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
 
 MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     MaterializeEncodingFn materializeEncodingFn,
-    IREE::HAL::ExecutableTargetAttr targetAttr, bool transposeNarrowN)
+    IREE::HAL::ExecutableTargetAttr targetAttr, bool transposeNarrowN,
+    IREE::Codegen::LayoutAttrInterface layoutAttr)
     : materializeEncodingFn(materializeEncodingFn), targetAttr(targetAttr),
-      transposeNarrowN(transposeNarrowN) {
+      transposeNarrowN(transposeNarrowN), layoutAttr(layoutAttr) {
   addConversion([](IntegerType intType) { return intType; });
   addConversion([](IndexType indexType) { return indexType; });
   addConversion([](FloatType floatType) { return floatType; });
@@ -151,54 +152,6 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
 
 RankedTensorType dropEncoding(RankedTensorType type) {
   return RankedTensorType::get(type.getShape(), type.getElementType());
-}
-
-MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingAttr encoding,
-                                                 int64_t rank,
-                                                 TileMxNxK tileMxNxK) {
-  MaterializeEncodingInfo encodingInfo;
-  auto cDims = getEncodingContractionDims(encoding);
-  // The following expects M, N, K, and Batch sizes of at most 1 for now
-  assert(cDims->m.size() <= 1 && cDims->n.size() <= 1 && cDims->k.size() == 1 &&
-         cDims->batch.size() <= 1 &&
-         "Expected at most one M, N, K, and Batch dimension");
-  std::optional<unsigned> batchDim =
-      cDims->batch.empty() ? std::nullopt
-                           : encoding.mapDimToOperandIndex(cDims->batch[0]);
-  std::optional<unsigned> mDim =
-      cDims->m.empty() ? std::nullopt
-                       : encoding.mapDimToOperandIndex(cDims->m[0]);
-  std::optional<unsigned> nDim =
-      cDims->n.empty() ? std::nullopt
-                       : encoding.mapDimToOperandIndex(cDims->n[0]);
-  std::optional<unsigned> kDim = encoding.mapDimToOperandIndex(cDims->k[0]);
-  if (batchDim.has_value()) {
-    encodingInfo.outerDimsPerm.push_back(batchDim.value());
-  }
-  if (mDim.has_value()) {
-    encodingInfo.outerDimsPerm.push_back(mDim.value());
-    encodingInfo.innerDimsPos.push_back(mDim.value());
-    encodingInfo.innerTileSizes.push_back(tileMxNxK.M);
-  }
-  if (nDim.has_value()) {
-    encodingInfo.outerDimsPerm.push_back(nDim.value());
-    encodingInfo.innerDimsPos.push_back(nDim.value());
-    encodingInfo.innerTileSizes.push_back(tileMxNxK.N);
-  }
-  if (kDim.has_value()) {
-    encodingInfo.outerDimsPerm.push_back(kDim.value());
-    encodingInfo.innerDimsPos.push_back(kDim.value());
-    encodingInfo.innerTileSizes.push_back(tileMxNxK.K);
-  }
-  return encodingInfo;
-}
-
-bool isNarrowNResult(EncodingAttr encoding) {
-  if (encoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_RESULT) {
-    return false;
-  }
-
-  return IREE::Encoding::getMatmulNarrowDim(encoding).isN();
 }
 
 } // namespace mlir::iree_compiler

@@ -43,6 +43,7 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
 using IREE::Codegen::MaterializeEncodingInfo;
+using IREE::Codegen::TileMxNxK;
 using IREE::Codegen::TileSwizzle;
 
 static IREE::GPU::MMAAttr chooseIntrinsicMMAAttr(TypeRange eTypes,
@@ -245,10 +246,10 @@ materializeEncodingForTarget(RankedTensorType tensorType,
 
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its operand index in the matmul.
-  auto rank = tensorType.getRank();
   TileMxNxK innerTile;
   std::tie(innerTile.M, innerTile.N, innerTile.K) = mma.getMNKShape();
-  auto encodingInfo = getEncodingInfoForMatmul(encoding, rank, innerTile);
+  auto encodingInfo =
+      IREE::Codegen::getEncodingInfoForMatmul(encoding, innerTile);
   auto fragment =
       static_cast<IREE::GPU::MMAFragment>(encoding.getOperandIndex().getInt());
   encodingInfo.swizzle = getSwizzle(mma, fragment);
@@ -314,10 +315,10 @@ struct GPUSetEncodingOpLoweringConversion
                   ConversionPatternRewriter &rewriter) const override {
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         getTypeConverter());
-    auto packOp = lowerSetEncodingOpToPackOp(rewriter, encodingOp,
-                                             adaptor.getSource(), *converter,
-                                             this->materializeEncodingValueFn);
-    if (failed(packOp)) {
+    auto packedValue = lowerSetEncodingOpToPackOp(
+        rewriter, encodingOp, adaptor.getSource(), *converter,
+        this->materializeEncodingValueFn);
+    if (failed(packedValue)) {
       Type targetType =
           getTypeConverter()->convertType(encodingOp.getResultType());
       Value result = rewriter.createOrFold<tensor::CastOp>(
@@ -333,7 +334,7 @@ struct GPUSetEncodingOpLoweringConversion
                                          "unhandled result encoding");
     }
     if (!maybeEncodingInfo->swizzle) {
-      rewriter.replaceOp(encodingOp, packOp->getResult());
+      rewriter.replaceOp(encodingOp, packedValue.value());
       return success();
     }
 
@@ -342,7 +343,9 @@ struct GPUSetEncodingOpLoweringConversion
     // Create expand_shape op to tile the innermost two dimensions.
     int origRank = encodingOp.getSourceType().getRank();
     SmallVector<int64_t> expandShapeShape(
-        packOp->getDestType().getShape().take_front(origRank));
+        cast<ShapedType>(packedValue->getType())
+            .getShape()
+            .take_front(origRank));
     expandShapeShape.append(
         getExpandedTileShape(maybeEncodingInfo->swizzle->expandShape));
     RankedTensorType expandShapeType =
@@ -351,7 +354,7 @@ struct GPUSetEncodingOpLoweringConversion
     SmallVector<ReassociationIndices> reassociation = getReassociationIndices(
         origRank, maybeEncodingInfo->swizzle->expandShape);
     auto expandShapeOp = rewriter.create<tensor::ExpandShapeOp>(
-        loc, expandShapeType, packOp->getResult(), reassociation);
+        loc, expandShapeType, packedValue.value(), reassociation);
 
     SmallVector<int64_t> transposePerm =
         llvm::to_vector(llvm::seq<int64_t>(0, origRank));
@@ -432,10 +435,10 @@ struct GPUUnsetEncodingOpLoweringConversion
           loc, unpackSrcType, transposeOp->getResult(0), reassociation);
     }
 
-    auto unPackOp = lowerUnsetEncodingToUnpackOp(
+    auto unpackedValue = lowerUnsetEncodingToUnpackOp(
         rewriter, unsetEncodingOp, unpackSrc, *converter,
         this->materializeEncodingValueFn);
-    if (failed(unPackOp)) {
+    if (failed(unpackedValue)) {
       Type targetType =
           getTypeConverter()->convertType(unsetEncodingOp.getResultType());
       Value result = rewriter.createOrFold<tensor::CastOp>(loc, targetType,
@@ -443,7 +446,7 @@ struct GPUUnsetEncodingOpLoweringConversion
       rewriter.replaceOp(unsetEncodingOp, result);
       return success();
     }
-    rewriter.replaceOp(unsetEncodingOp, unPackOp->getResult());
+    rewriter.replaceOp(unsetEncodingOp, unpackedValue.value());
     return success();
   }
 };
@@ -558,7 +561,8 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     // 3. Heuristics for cache-friendly dispatch tiling are internal to the GPU
     //    runtime, so we don't need a simplification at that level either.
     MaterializeEncodingTypeConverter typeConverter(
-        materializeEncodingForTarget, targetAttr, /*transposeNarrowN=*/false);
+        materializeEncodingForTarget, targetAttr, /*transposeNarrowN=*/false,
+        /*layoutAttr=*/{});
     MaterializeEncodingConversionTarget target(*ctx);
     MaterializeEncodingValueFn materializeEncodingValueFn =
         [](RankedTensorType, OpBuilder,

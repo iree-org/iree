@@ -12,7 +12,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
@@ -29,6 +28,10 @@
 #define DEBUG_TYPE "iree-util-fold-globals"
 
 namespace mlir::iree_compiler::IREE::Util {
+
+#define GEN_PASS_DEF_FOLDGLOBALSPASS
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc"
+
 namespace {
 
 template <typename R>
@@ -351,17 +354,8 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
   return true; // did change
 }
 
-class FoldGlobalsPass : public FoldGlobalsBase<FoldGlobalsPass> {
+class FoldGlobalsPass : public impl::FoldGlobalsPassBase<FoldGlobalsPass> {
 public:
-  explicit FoldGlobalsPass() = default;
-  FoldGlobalsPass(const FoldGlobalsPass &pass) {}
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::func::FuncDialect>();
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<IREE::Util::UtilDialect>();
-  }
-
   void runOnOperation() override {
     auto *context = &getContext();
     RewritePatternSet patterns(context);
@@ -433,18 +427,8 @@ public:
     afterFoldingGlobals =
         count(moduleOp.getOps<IREE::Util::GlobalOpInterface>());
   }
-
-private:
-  Statistic beforeFoldingGlobals{this, "global ops before folding",
-                                 "Number of util.global ops before folding"};
-  Statistic afterFoldingGlobals{this, "global ops after folding",
-                                "Number of util.global ops after folding"};
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldGlobalsPass() {
-  return std::make_unique<FoldGlobalsPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Util

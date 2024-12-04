@@ -1,5 +1,5 @@
 // RUN: iree-compile --compile-mode=hal-executable \
-// RUN:   --mlir-print-ir-after=iree-hal-serialize-executables \
+// RUN:   --mlir-print-ir-after=iree-hal-serialize-all-executables \
 // RUN:   --iree-hal-target-backends=vmvx %s \
 // RUN:   --o=/dev/null 2>&1 | FileCheck %s
 

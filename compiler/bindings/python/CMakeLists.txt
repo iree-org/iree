@@ -261,6 +261,7 @@ SOURCES
   __main__.py
   args.py
   compile_actions.py
+  console.py
   executor.py
   lang.py
   main.py
@@ -268,6 +269,7 @@ SOURCES
   net_actions.py
   onnx_actions.py
   target_machine.py
+  test_actions.py
 )
 
 add_mlir_python_modules(IREECompilerBuildPythonModules

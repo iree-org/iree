@@ -35,19 +35,18 @@ using mlir::transform::NamedSequenceOp;
 static SmallVector<ModuleOp>
 findNestedModulesWithNamedSequences(ModuleOp module) {
   Block *body = module.getBody();
-  return llvm::to_vector(
-      llvm::make_filter_range(body->getOps<ModuleOp>(), [](ModuleOp op) {
-        return op.getSymName().has_value() &&
-               op->hasAttr(
-                   transform::TransformDialect::kWithNamedSequenceAttrName);
-      }));
+  return llvm::filter_to_vector(body->getOps<ModuleOp>(), [](ModuleOp op) {
+    return op.getSymName().has_value() &&
+           op->hasAttr(transform::TransformDialect::kWithNamedSequenceAttrName);
+  });
 }
 
 static SmallVector<NamedSequenceOp> findTuningSpecs(ModuleOp module) {
   Block *body = module.getBody();
-  return llvm::to_vector(llvm::make_filter_range(
-      body->getOps<NamedSequenceOp>(),
-      [](NamedSequenceOp op) { return op->hasAttr(kTuningSpecAttrName); }));
+  return llvm::filter_to_vector(
+      body->getOps<NamedSequenceOp>(), [](NamedSequenceOp op) {
+        return op->hasAttr(kTuningSpecEntrypointAttrName);
+      });
 }
 
 static LogicalResult validateTuningSpec(NamedSequenceOp op) {
@@ -87,7 +86,7 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
       /*res_attrs*/ ArrayAttr{});
   newSpec.setArgAttr(0, transform::TransformDialect::kArgReadOnlyAttrName,
                      builder.getUnitAttr());
-  newSpec->setAttr(kTuningSpecAttrName, builder.getUnitAttr());
+  newSpec->setAttr(kTuningSpecEntrypointAttrName, builder.getUnitAttr());
 
   Region &region = newSpec.getRegion();
   Block *body = builder.createBlock(&region, region.begin(),
@@ -124,28 +123,34 @@ struct LinkTuningSpecsPass final
   }
 
   void runOnOperation() override {
-    ModuleOp module = getOperation();
-    SmallVector<NamedSequenceOp> tuningSpecs;
-
-    for (ModuleOp nested : findNestedModulesWithNamedSequences(module)) {
-      llvm::append_range(tuningSpecs, findTuningSpecs(nested));
+    if (failed(linkTuningSpecs(getOperation()))) {
+      signalPassFailure();
     }
-
-    for (NamedSequenceOp spec : tuningSpecs) {
-      LDBG("Found tuning spec: " << spec.getSymName());
-      if (failed(validateTuningSpec(spec))) {
-        return signalPassFailure();
-      }
-    }
-
-    if (tuningSpecs.empty()) {
-      LDBG("No tuning specs found, exiting without linking");
-      return;
-    }
-
-    emitLinkedTuningSpec(module, tuningSpecs);
   }
 };
 
 } // namespace
+
+FailureOr<NamedSequenceOp> linkTuningSpecs(ModuleOp module) {
+  SmallVector<NamedSequenceOp> tuningSpecs;
+
+  for (ModuleOp nested : findNestedModulesWithNamedSequences(module)) {
+    llvm::append_range(tuningSpecs, findTuningSpecs(nested));
+  }
+
+  for (NamedSequenceOp spec : tuningSpecs) {
+    LDBG("Found tuning spec: " << spec.getSymName());
+    if (failed(validateTuningSpec(spec))) {
+      return failure();
+    }
+  }
+
+  if (tuningSpecs.empty()) {
+    LDBG("No tuning specs found, exiting without linking");
+    return NamedSequenceOp{};
+  }
+
+  return emitLinkedTuningSpec(module, tuningSpecs);
+}
+
 } // namespace mlir::iree_compiler

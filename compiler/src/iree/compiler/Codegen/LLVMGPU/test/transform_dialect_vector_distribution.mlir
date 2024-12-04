@@ -24,7 +24,7 @@ func.func @reduce_dispatch_0() attributes {translation_info = #translation_info}
   // WARP-EXECUTE: %[[COND32:.*]] = arith.cmpi ult, %[[TIDX]], %[[C32]] : index
   // Single-warp guard filters out threads 32-63.
   // WARP-EXECUTE: scf.if %[[COND32]] {
-  // WARP-EXECUTE:   vector.warp_execute_on_lane_0(%[[TIDX]])[32] {
+  // WARP-EXECUTE:   gpu.warp_execute_on_lane_0(%[[TIDX]])[32] {
   // WARP-EXECUTE:     %[[V:.*]] = "some_def"() : () -> vector<128xf32>
   // WARP-EXECUTE:     vector.transfer_write %[[V]], %{{.*}} {in_bounds = [true]} : vector<128xf32>, memref<128xf32>
 

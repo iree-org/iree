@@ -68,22 +68,6 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
 MMASingleSubgroupLayout getSingleSubgroupLayout(MmaInterfaceAttr mmaKind,
                                                 MMAFragment fragment);
 
-// Struct describing the shape of a MMA operation, but not the detailed layout.
-// TODO(bjacob): the only user outside of IREEGPUAttrs.cpp is
-// LLVMGPU/TransformExtensions, so maybe make that internal again if/when that
-// goes away.
-struct OpaqueMmaLayout {
-  int64_t mSize = 0;
-  int64_t nSize = 0;
-  int64_t kSize = 0;
-  Type aType;
-  Type bType;
-  Type cType;
-};
-
-OpaqueMmaLayout getOpaqueMMALayout(MLIRContext *context,
-                                   IREE::GPU::MMAIntrinsic intrinsic);
-
 } // namespace mlir::iree_compiler::IREE::GPU
 
 // clang-format off

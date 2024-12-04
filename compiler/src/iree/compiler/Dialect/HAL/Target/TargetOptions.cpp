@@ -18,7 +18,7 @@ void TargetOptions::bindOptions(OptionsBinder &binder) {
       "IREE HAL executable target options");
 
   // This function is called as part of registering the pass
-  // TranslateExecutablesPass. Pass registry is also staticly
+  // TranslateAllExecutablesPass. Pass registry is also staticly
   // initialized, so targetBackendsFlags needs to be here to be initialized
   // first.
   binder.list<std::string>(

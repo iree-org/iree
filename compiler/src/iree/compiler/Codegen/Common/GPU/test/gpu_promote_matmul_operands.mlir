@@ -106,3 +106,54 @@ func.func @promote_pad(%a : tensor<4x127xf32>, %b: tensor<128x128xf32>) -> tenso
 //   CHECK:   linalg.copy
 // CHECK-SAME: derived_thread_config
 //       CHECK: return
+
+// -----
+
+#lowering_config = #iree_gpu.lowering_config<{promote_operands = [2]}>
+func.func @promote_result(%a : tensor<?x?xf32>, %b : tensor<?x?xf32>, %mdim : index, %ndim : index) -> tensor<?x?xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty(%mdim, %ndim) : tensor<?x?xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %mm = linalg.matmul {lowering_config = #lowering_config}
+    ins(%a, %b : tensor<?x?xf32>, tensor<?x?xf32>) outs(%fill : tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %mm : tensor<?x?xf32>
+}
+
+// CHECK-LABEL: func @promote_result(
+//       CHECK:   %[[MATMUL:.+]] = linalg.matmul
+//       CHECK:   %[[ALLOC:.+]] = bufferization.alloc_tensor
+//       CHECK:   %[[COPY1:.+]] = linalg.copy
+//  CHECK-SAME:       ins(%[[MATMUL]] : tensor<?x?xf32>) outs(%[[ALLOC]] : tensor<?x?xf32>)
+//  CHECK-SAME:       -> tensor<?x?xf32>
+//       CHECK:   %[[COPY2:.+]] = linalg.copy
+//  CHECK-SAME:       {lowering_config = #iree_gpu.derived_thread_config}
+//  CHECK-SAME:       ins(%[[COPY1]] : tensor<?x?xf32>)
+//       CHECK:   return %[[COPY2]] : tensor<?x?xf32>
+
+// -----
+
+#lowering_config = #iree_gpu.lowering_config<{promote_operands = [2]}>
+func.func @promote_padded_result(%a : tensor<?x?xf32>, %b : tensor<?x?xf32>, %mdim : index, %ndim : index, %pad : index, %slice : index) -> tensor<?x?xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty(%mdim, %ndim) : tensor<?x?xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %padded_fill = tensor.pad %fill low[0, 0] high[%pad, %pad] {
+    ^bb0(%arg3: index, %arg4: index):
+      tensor.yield %cst : f32
+    } : tensor<?x?xf32> to tensor<?x?xf32>
+  %mm = linalg.matmul {lowering_config = #lowering_config}
+    ins(%a, %b : tensor<?x?xf32>, tensor<?x?xf32>) outs(%padded_fill : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %mm_slice = tensor.extract_slice %mm [0, 0] [%slice, %slice] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+  return %mm_slice : tensor<?x?xf32>
+}
+
+// CHECK-LABEL: func @promote_padded_result(
+//       CHECK:   %[[MATMUL:.+]] = linalg.matmul
+//       CHECK:   %[[ALLOC:.+]] = bufferization.alloc_tensor
+//       CHECK:   %[[COPY1:.+]] = linalg.copy
+//  CHECK-SAME:       ins(%[[MATMUL]] : tensor<?x?xf32>) outs(%[[ALLOC]] : tensor<?x?xf32>)
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[COPY1]]
+//       CHECK:   %[[COPY2:.+]] = linalg.copy
+//  CHECK-SAME:       {lowering_config = #iree_gpu.derived_thread_config}
+//  CHECK-SAME:       ins(%[[EXTRACT]] : tensor<?x?xf32>)
+//       CHECK:   return %[[COPY2]] : tensor<?x?xf32>

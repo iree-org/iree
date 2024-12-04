@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "attention_fuse_by_expansion.mlir"
+    "bubble_up_expand_shapes.mlir"
     "bubble_up_extract_slice.mlir"
     "clone_producers_into_dispatch_regions.mlir"
     "collapse_dimensions.mlir"
