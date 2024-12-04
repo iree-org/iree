@@ -213,3 +213,110 @@ MlirAttribute ireeGPULoweringConfigAttrGetAttributes(MlirAttribute attr) {
                   unwrap(attr))
                   .getAttributes());
 }
+
+void ireeGPULoweringConfigAttrGetWorkgroupTileSizes(
+    MlirAttribute attr, size_t *len, int64_t *workgroupTileSizes) {
+  assert(ireeAttributeIsAGPULoweringConfigAttr(attr));
+  mlir::DictionaryAttr dict =
+      llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
+          unwrap(attr))
+          .getAttributes();
+  constexpr mlir::StringLiteral workgroupName = "workgroup";
+  mlir::ArrayAttr array = dict.getAs<mlir::ArrayAttr>(workgroupName);
+
+  if (!array ||
+      !llvm::all_of(array.getValue(), llvm::IsaPred<mlir::IntegerAttr>)) {
+    *len = -1;
+    return;
+  }
+
+  if (!workgroupTileSizes) {
+    *len = array.size();
+    return;
+  }
+
+  assert(*len == array.size() &&
+         "the length should match the number of tilesizes in the array");
+
+  for (size_t i = 0, e = array.size(); i < e; ++i) {
+    mlir::IntegerAttr element =
+        llvm::cast<mlir::IntegerAttr>(array.getValue()[i]);
+    workgroupTileSizes[i] = element.getInt();
+  }
+  return;
+}
+
+void ireeGPULoweringConfigAttrGetReductionTileSizes(
+    MlirAttribute attr, size_t *len, int64_t *reductionTileSizes) {
+  assert(ireeAttributeIsAGPULoweringConfigAttr(attr));
+  mlir::DictionaryAttr dict =
+      llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
+          unwrap(attr))
+          .getAttributes();
+  constexpr mlir::StringLiteral reductionName = "reduction";
+  mlir::ArrayAttr array = dict.getAs<mlir::ArrayAttr>(reductionName);
+
+  if (!array ||
+      !llvm::all_of(array.getValue(), llvm::IsaPred<mlir::IntegerAttr>)) {
+    *len = -1;
+    return;
+  }
+
+  if (!reductionTileSizes) {
+    *len = array.size();
+    return;
+  }
+
+  assert(*len == array.size() &&
+         "the length should match the number of tilesizes in the array");
+
+  for (size_t i = 0, e = array.size(); i < e; ++i) {
+    mlir::IntegerAttr element =
+        llvm::cast<mlir::IntegerAttr>(array.getValue()[i]);
+    reductionTileSizes[i] = element.getInt();
+  }
+  return;
+}
+
+MlirAttribute ireeGPULoweringConfigAttrGetSubgroupMCount(MlirAttribute attr) {
+  assert(ireeAttributeIsAGPULoweringConfigAttr(attr));
+  mlir::DictionaryAttr dict =
+      llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
+          unwrap(attr))
+          .getAttributes();
+
+  constexpr mlir::StringLiteral kSubgroupMCountName = "subgroup_m_count";
+  mlir::IntegerAttr subgroup_m_count_attr =
+      dict.getAs<mlir::IntegerAttr>(kSubgroupMCountName);
+
+  return wrap(subgroup_m_count_attr);
+}
+
+MlirAttribute ireeGPULoweringConfigAttrGetSubgroupNCount(MlirAttribute attr) {
+  assert(ireeAttributeIsAGPULoweringConfigAttr(attr));
+  mlir::DictionaryAttr dict =
+      llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
+          unwrap(attr))
+          .getAttributes();
+
+  constexpr mlir::StringLiteral kSubgroupNCountName = "subgroup_n_count";
+  mlir::IntegerAttr subgroup_n_count_attr =
+      dict.getAs<mlir::IntegerAttr>(kSubgroupNCountName);
+
+  return wrap(subgroup_n_count_attr);
+}
+
+MlirAttribute ireeGPULoweringConfigAttrGetMmaKind(MlirAttribute attr) {
+  assert(ireeAttributeIsAGPULoweringConfigAttr(attr));
+  mlir::DictionaryAttr dict =
+      llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
+          unwrap(attr))
+          .getAttributes();
+
+  constexpr mlir::StringLiteral kMmaKindName = "mma_kind";
+  mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr mma_attr =
+      dict.getAs<mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr>(
+          kMmaKindName);
+
+  return wrap(mma_attr);
+}

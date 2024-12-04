@@ -74,6 +74,11 @@ VER_0 {
     ireeGPULoweringConfigAttrGet;
     ireeGPULoweringConfigAttrGetAttributes;
     ireeGPULoweringConfigAttrGetTypeID;
+    ireeGPULoweringConfigAttrGetReductionTileSizes;
+    ireeGPULoweringConfigAttrGetWorkgroupTileSizes;
+    ireeGPULoweringConfigAttrGetSubgroupMCount;
+    ireeGPULoweringConfigAttrGetSubgroupNCount;
+    ireeGPULoweringConfigAttrGetMmaKind;
     ireeGPUMMAAttrGet;
     ireeGPUMMAAttrGetInfo;
     ireeGPUMMAAttrGetTypeID;

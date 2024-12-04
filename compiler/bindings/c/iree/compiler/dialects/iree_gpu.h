@@ -93,6 +93,23 @@ MLIR_CAPI_EXPORTED MlirAttribute ireeGPULoweringConfigAttrGet(
 MLIR_CAPI_EXPORTED MlirAttribute
 ireeGPULoweringConfigAttrGetAttributes(MlirAttribute attr);
 
+MLIR_CAPI_EXPORTED void
+ireeGPULoweringConfigAttrGetReductionTileSizes(MlirAttribute attr, size_t *len,
+                                               int64_t *reductionTileSizes);
+
+MLIR_CAPI_EXPORTED void
+ireeGPULoweringConfigAttrGetWorkgroupTileSizes(MlirAttribute attr, size_t *len,
+                                               int64_t *workgroupTileSizes);
+
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeGPULoweringConfigAttrGetSubgroupMCount(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeGPULoweringConfigAttrGetSubgroupNCount(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeGPULoweringConfigAttrGetMmaKind(MlirAttribute attr);
+
 #ifdef __cplusplus
 }
 #endif

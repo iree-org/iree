@@ -48,6 +48,36 @@ ireeCodegenQueryMMAIntrinsicsBinding(MlirOperation op) {
   return mmaList;
 }
 
+static std::optional<std::vector<int64_t>>
+ireeGPULoweringConfigAttrGetReductionTileSizesBinding(
+    MlirAttribute lowering_config) {
+  size_t tileSizes = 0;
+  ireeGPULoweringConfigAttrGetReductionTileSizes(lowering_config, &tileSizes,
+                                                 nullptr);
+  if (tileSizes == -1) {
+    return std::nullopt;
+  }
+  std::vector<int64_t> reductionTileSizes(tileSizes);
+  ireeGPULoweringConfigAttrGetReductionTileSizes(lowering_config, &tileSizes,
+                                                 reductionTileSizes.data());
+  return reductionTileSizes;
+}
+
+static std::optional<std::vector<int64_t>>
+ireeGPULoweringConfigAttrGetWorkgroupTileSizesBinding(
+    MlirAttribute lowering_config) {
+  size_t tileSizes = 0;
+  ireeGPULoweringConfigAttrGetWorkgroupTileSizes(lowering_config, &tileSizes,
+                                                 nullptr);
+  if (tileSizes == -1) {
+    return std::nullopt;
+  }
+  std::vector<int64_t> workgroupTileSizes(tileSizes);
+  ireeGPULoweringConfigAttrGetWorkgroupTileSizes(lowering_config, &tileSizes,
+                                                 workgroupTileSizes.data());
+  return workgroupTileSizes;
+}
+
 PYBIND11_MODULE(_ireeCompilerDialects, m) {
   m.doc() = "iree-compiler dialects python extension";
 
@@ -352,7 +382,36 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
           "cls"_a, "value"_a, "ctx"_a = py::none(),
           "Gets an #iree_gpu.lowering_config from parameters.")
       .def_property_readonly("attributes",
-                             ireeGPULoweringConfigAttrGetAttributes);
+                             ireeGPULoweringConfigAttrGetAttributes)
+      .def_property_readonly(
+          "workgroup_tile_sizes",
+          ireeGPULoweringConfigAttrGetWorkgroupTileSizesBinding)
+      .def_property_readonly(
+          "reduction_tile_sizes",
+          ireeGPULoweringConfigAttrGetReductionTileSizesBinding)
+      .def_property_readonly(
+          "subgroup_m_count",
+          [](MlirAttribute self) -> std::optional<int64_t> {
+            auto attr = ireeGPULoweringConfigAttrGetSubgroupMCount(self);
+            if (!mlirAttributeIsNull(attr))
+              return mlirIntegerAttrGetValueInt(attr);
+            return std::nullopt;
+          })
+      .def_property_readonly(
+          "subgroup_n_count",
+          [](MlirAttribute self) -> std::optional<int64_t> {
+            auto attr = ireeGPULoweringConfigAttrGetSubgroupNCount(self);
+            if (!mlirAttributeIsNull(attr))
+              return mlirIntegerAttrGetValueInt(attr);
+            return std::nullopt;
+          })
+      .def_property_readonly(
+          "mma_kind", [](MlirAttribute self) -> std::optional<MlirAttribute> {
+            auto attr = ireeGPULoweringConfigAttrGetMmaKind(self);
+            if (!mlirAttributeIsNull(attr))
+              return attr;
+            return std::nullopt;
+          });
 
   //===-------------------------------------------------------------------===//
   // Binding to utility function getExecutableVariantOps

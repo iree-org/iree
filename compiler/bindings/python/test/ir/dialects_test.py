@@ -210,11 +210,40 @@ def mma_intrinsic_attr():
 
 @run
 def lowering_config_attr():
-    attributes = ir.DictAttr.get({"reduction": ir.ArrayAttr.get([])})
+    attributes = ir.DictAttr.get(
+        {
+            "reduction": ir.ArrayAttr.get([]),
+        }
+    )
     lowering_config = iree_gpu.LoweringConfigAttr.get(attributes)
     assert lowering_config is not None
 
     assert lowering_config.attributes == attributes
+    assert lowering_config.workgroup_tile_sizes == None
+    assert lowering_config.reduction_tile_sizes == []
+    assert lowering_config.subgroup_m_count == None
+    assert lowering_config.mma_kind == None
+
+    mma_intrinsic = iree_gpu.MMAIntrinsic.MFMA_F32_16x16x16_F16
+    mma_attr = iree_gpu.MMAAttr.get(mma_intrinsic)
+    attributes = ir.DictAttr.get(
+        {
+            "reduction": ir.ArrayAttr.get([ir.IntegerAttr.get(ir.IndexType.get(), 1)]),
+            "workgroup": ir.ArrayAttr.get([ir.IntegerAttr.get(ir.IndexType.get(), 1)]),
+            "subgroup_m_count": ir.IntegerAttr.get(ir.IndexType.get(), 1),
+            "subgroup_n_count": ir.IntegerAttr.get(ir.IndexType.get(), 2),
+            "mma_kind": mma_attr,
+        }
+    )
+    lowering_config = iree_gpu.LoweringConfigAttr.get(attributes)
+    assert lowering_config.workgroup_tile_sizes == [1]
+    assert lowering_config.reduction_tile_sizes == [1]
+    assert lowering_config.subgroup_m_count == 1
+    assert lowering_config.subgroup_n_count == 2
+    assert lowering_config.mma_kind == mma_attr
+    assert (
+        str(lowering_config.mma_kind) == "#iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>"
+    )
 
 
 @run
