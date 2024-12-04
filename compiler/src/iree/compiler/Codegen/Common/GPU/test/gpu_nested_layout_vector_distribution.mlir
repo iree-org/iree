@@ -34,7 +34,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[Y_SCALED:.+]] = affine.linearize_index [%[[YX]]#1, %c0] by (4, 4)
 // CHECK: %[[RD00:.+]] = vector.transfer_read %arg0[%[[Y_SCALED]], %[[YX]]#2], {{.*}} : memref<32x32xf16>, vector<4x1xf16>
 // CHECK: vector.insert_strided_slice %[[RD00]], %{{.*}} {offsets = [0, 0, 0, 0, 0, 0], strides = [1, 1]} : vector<4x1xf16> into vector<1x2x1x1x4x1xf16>
-// CHECK: %[[X_PLUS_BATCH:.+]] = affine.linearize_index [%c1, %[[XY]]#2] by (2, 8)
+// CHECK: %[[X_PLUS_BATCH:.+]] = affine.linearize_index [%c1, %[[YX]]#2] by (2, 8)
 // CHECK: vector.transfer_read %arg0[%[[Y_SCALED]], %[[X_PLUS_BATCH]]], %{{.*}} {in_bounds = [true, true]} : memref<32x32xf16>, vector<4x1xf16>
 // CHECK: vector.insert_strided_slice {{.*}} {offsets = [0, 1, 0, 0, 0, 0]
 // CHECK: iree_vector_ext.to_simd %{{.*}} : vector<1x2x1x1x4x1xf16> -> vector<16x16xf16>
@@ -74,7 +74,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-SAME:    %[[I0:.+]]: index, %[[I1:.+]]: index
 
 // CHECK: %[[IDX:.+]] = gpu.thread_id  x
-// CHECK: %[[X:.+]]:2 = affine.delinearize_idx %[[IDX]] into (8) : index, index
+// CHECK: %[[X:.+]]:2 = affine.delinearize_index %[[IDX]] into (8) : index, index
 // CHECK: %[[OFF0:.+]] = affine.linearize_index [%[[X]]#1, %[[I0]]]  by (8, 1)
 // CHECK: vector.transfer_read %{{.*}}[%c0, %c0, %[[OFF0]], %[[I1]]]
 // CHECK: %[[OFF1:.+]] = affine.linearize_index [%c1, %[[I1]]] by (2, 8)

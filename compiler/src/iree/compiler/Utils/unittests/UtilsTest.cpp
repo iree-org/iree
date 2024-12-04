@@ -85,8 +85,8 @@ TEST(BasisFromSizeStrides, ZeroStride) {
 
   EXPECT_TRUE(succeeded(
       basisFromSizesStrides({16, 4, 4}, {1, 0, 16}, basis, dimToResult)));
-  EXPECT_THAT(basis, ElementsAre(16, 4, 1));
-  EXPECT_THAT(dimToResult, ElementsAre(1, 3, 2));
+  EXPECT_THAT(basis, ElementsAre(4, 16, 1));
+  EXPECT_THAT(dimToResult, ElementsAre(2, 3, 1));
 }
 
 TEST(BasisFromSizeStrides, JumpsInStrides) {
