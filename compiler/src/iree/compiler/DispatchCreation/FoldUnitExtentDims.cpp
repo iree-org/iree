@@ -23,6 +23,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
+#include "mlir/IR/Verifier.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -70,6 +71,14 @@ struct DropUnitDimsFromCollapseOfExpand
       }
     }
 
+    const auto expandReassoc = expandOp.getReassociationIndices();
+    for (const auto &[inDim, indicies] : llvm::enumerate(expandReassoc)) {
+      // Can't drop unit dim if it isn't from an expansion.
+      if (indicies.size() == 1) {
+        toDrop.erase(indicies[0]);
+      }
+    }
+
     if (toDrop.empty()) {
       return rewriter.notifyMatchFailure(collapseOp,
                                          "Didn't find any unit dims to drop");
@@ -83,6 +92,7 @@ struct DropUnitDimsFromCollapseOfExpand
       }
     }
 
+    /// Returns true if new `ReassociationIndices` were appended to `reassoc`.
     auto appendDroppedReassocation =
         [&toDrop](SmallVector<ReassociationIndices, 4> &reassoc, int64_t start,
                   int64_t count, int64_t origStart) {
@@ -99,7 +109,9 @@ struct DropUnitDimsFromCollapseOfExpand
           // All indicies have been dropped.
           if (indicies.empty()) {
             reassoc.pop_back();
+            return false;
           }
+          return true;
         };
 
     auto dropOutputOfr = [&toDrop](const SmallVector<OpFoldResult> &sizes) {
@@ -118,21 +130,24 @@ struct DropUnitDimsFromCollapseOfExpand
     SmallVector<ReassociationIndices, 4> newCollapseReassoc;
     int64_t collapsedDim = 0;
     for (auto dim : llvm::seq<int64_t>(0, outShape.size())) {
-      appendDroppedReassocation(newCollapseReassoc, collapsedDim,
-                                collapseReassoc[dim].size(),
-                                collapseReassoc[dim].front());
-      collapsedDim += newCollapseReassoc.back().size();
+      bool changed = appendDroppedReassocation(newCollapseReassoc, collapsedDim,
+                                               collapseReassoc[dim].size(),
+                                               collapseReassoc[dim].front());
+      if (changed) {
+        collapsedDim += newCollapseReassoc.back().size();
+      }
     }
 
-    const auto expandReassoc = expandOp.getReassociationIndices();
     SmallVector<ReassociationIndices, 4> newExpandReassoc;
     ArrayRef<int64_t> srcShape = expandOp.getSrcType().getShape();
     int64_t expandedDim = 0;
     for (auto dim : llvm::seq<int64_t>(0, srcShape.size())) {
-      appendDroppedReassocation(newExpandReassoc, expandedDim,
-                                expandReassoc[dim].size(),
-                                expandReassoc[dim].front());
-      expandedDim += newExpandReassoc.back().size();
+      bool changed = appendDroppedReassocation(newExpandReassoc, expandedDim,
+                                               expandReassoc[dim].size(),
+                                               expandReassoc[dim].front());
+      if (changed) {
+        expandedDim += newExpandReassoc.back().size();
+      }
     }
 
     auto outputSizes = getMixedValues(expandOp.getStaticOutputShape(),
