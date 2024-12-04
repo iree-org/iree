@@ -70,11 +70,10 @@ struct DetachElementwisePattern
     Location loc = linalgOp.getLoc();
 
     // Check if the output tensor access is a projected permutation
-    auto outputMap = mlir::compressUnusedDims(
-        linalgOp.getMatchingIndexingMap(outputOperands.front()));
-    if (!outputMap.isProjectedPermutation()) {
+    if (!linalgOp.getMatchingIndexingMap(outputOperands.front())
+             .isProjectedPermutation()) {
       return rewriter.notifyMatchFailure(
-          linalgOp, "Output indexing map must be a permuted projection.");
+          linalgOp, "Output indexing map must be a projected permutation.");
     }
 
     int64_t outputRank = outputType.getRank();
