@@ -32,6 +32,13 @@ llvm::cl::opt<std::string> clCodegenTransformDialectLibraryFileName(
         "this will default to `__kernel_config`."),
     llvm::cl::init(""));
 
+llvm::cl::opt<bool> clCodegenNotifyTransformDialectLibraryApplication(
+    "iree-codegen-notify-transform-strategy-application",
+    llvm::cl::desc(
+        "Emit a remark when a transform configuration strategy successfully "
+        "applies on a function. This is intended for testing/debuging."),
+    llvm::cl::init(false));
+
 #define GEN_PASS_DEF_MATERIALIZEUSERCONFIGSPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
@@ -194,6 +201,9 @@ struct MaterializeUserConfigsPass final
       //      ```
       LDBG("MaterializeUserConfigsPass on function: " << funcOp);
       if (succeeded(userTransformLibrary)) {
+        StringRef libraryModuleName =
+            userTransformLibrary->transformLibrary.getSymName().value_or(
+                "<unnamed>");
         StringRef entrySequenceName = userTransformLibrary->entrypointName;
         auto runResult = runTransformConfigurationStrategy(
             funcOp, entrySequenceName, userTransformLibrary->transformLibrary);
@@ -206,6 +216,12 @@ struct MaterializeUserConfigsPass final
           funcOp.emitError() << "transform kernel config strategy `"
                              << entrySequenceName << "` failed to apply";
           return signalPassFailure();
+        }
+
+        if (clCodegenNotifyTransformDialectLibraryApplication) {
+          funcOp->emitRemark()
+              << "Applied transform configuration strategy @"
+              << libraryModuleName << "::@" << entrySequenceName;
         }
       }
 

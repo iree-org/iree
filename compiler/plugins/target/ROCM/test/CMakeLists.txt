@@ -15,10 +15,13 @@ iree_lit_test_suite(
     lit
   SRCS
     "gpu_lower_to_ukernels.mlir"
+    "lowering_strategy_from_tuning_spec.mlir"
     "ukernel_pipeline_transform.mlir"
   TOOLS
     FileCheck
     iree-opt
+  DATA
+    tuning_spec_mmt_tile_and_fuse.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
