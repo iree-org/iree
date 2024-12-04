@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 // TODO(benvanik): have a stream/upstream equivalent of the flow.dispatch.* ops.
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
@@ -46,7 +47,8 @@ static LogicalResult checkEncoding(Operation *op, RankedTensorType encodingType,
                                    ValueRange encodingDims,
                                    PatternRewriter &rewriter) {
   auto encoding = encodingType.getEncoding();
-  if (encoding && !llvm::isa<IREE::Encoding::EncodingAttr>(encoding)) {
+  if (encoding && !llvm::isa<IREE::Encoding::EncodingAttr,
+                             IREE ::Encoding::PackedStorageAttr>(encoding)) {
     return rewriter.notifyMatchFailure(op, [=](Diagnostic &d) {
       d << "unsupported tensor encoding: " << encodingType;
     });

@@ -59,15 +59,15 @@ Value calculateStorageElementCountInBytes(Location loc,
                                           ValueRange dynamicDims,
                                           OpBuilder &builder) {
   auto encoding = IREE::Encoding::getEncodingAttr(shapedType);
-  bool isI1PackedStorage = encoding && encoding.i1PackedStorage();
+  bool packedStorage = IREE::Encoding::getPackedStorageAttr(shapedType) != nullptr;
   Type alignedElementType =
       legalizeStorageElementType(shapedType.getElementType(),
-                                 isI1PackedStorage);
+                                 packedStorage);
   unsigned elementBits = IREE::Util::getTypeBitWidth(alignedElementType);
 
   // Calculate all static dims first, if any.
   int64_t staticCount = 1;
-  if (!needToPackSubByteElementBitWidth(elementBits, isI1PackedStorage)) {
+  if (!needToPackSubByteElementBitWidth(elementBits, packedStorage)) {
     staticCount *= IREE::Util::getRoundedElementByteWidth(alignedElementType);
   }
 
@@ -119,13 +119,13 @@ Value calculateStorageElementCountInBytes(Location loc,
     value = builder.createOrFold<arith::MulIOp>(loc, value, dim);
   }
   // Sub-byte packing requires putting multiple elements in the same byte.
-  if (needToPackSubByteElementBitWidth(elementBits, isI1PackedStorage)) {
+  if (needToPackSubByteElementBitWidth(elementBits, packedStorage)) {
     assert(8 % elementBits == 0);
     unsigned byteElements = 8 / elementBits;
     // TODO(antiagainst): We may want to emit runtime check to make sure this is
     // divisible.
     auto divisor = builder.create<arith::ConstantIndexOp>(loc, byteElements);
-    if (!isI1PackedStorage && paddedDynamicDims.empty() &&
+    if (!packedStorage && paddedDynamicDims.empty() &&
         (staticCount * elementBits) % 8 != 0) {
       return nullptr;
     }

@@ -39,7 +39,7 @@ namespace mlir::iree_compiler::DispatchCreation {
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 using IREE::Encoding::EncodingAttr;
-using IREE::Encoding::I1PackedStorageAttr;
+using IREE::Encoding::PackedStorageAttr;
 
 //===---------------------------------------------------------------------===//
 // Utility functions
@@ -47,7 +47,7 @@ using IREE::Encoding::I1PackedStorageAttr;
 
 static std::optional<Attribute> getI1PackedStorageAttr(MLIRContext *context) {
   if (clEnableI1Support) {
-    return I1PackedStorageAttr::get(context);
+    return PackedStorageAttr::get(context);
   }
   return {};
 }
