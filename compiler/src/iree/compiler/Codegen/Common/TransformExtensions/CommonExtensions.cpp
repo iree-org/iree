@@ -1100,6 +1100,21 @@ class TestVectorLayoutOptions : public VectorLayoutOptions {
 public:
   TestVectorLayoutOptions(Operation *root)
       : VectorLayoutOptions(root, /*fullConversion=*/false) {}
+
+  VectorLayoutInterface getDefaultLayout(VectorType type) const override {
+    // We only allow a default layout for 0-d vectors for now.
+    if (type.getRank() > 0) {
+      return VectorLayoutInterface();
+    }
+
+    // Return a nested layout with the shape as the element_tile.
+    SmallVector<int64_t> elementTile(type.getShape());
+    SmallVector<int64_t> identity =
+        llvm::to_vector(llvm::seq<int64_t>(type.getRank()));
+    return IREE::VectorExt::NestedLayoutAttr::get(
+        type.getContext(), identity, identity, identity, identity, elementTile,
+        identity, identity);
+  }
 };
 
 DiagnosedSilenceableFailure

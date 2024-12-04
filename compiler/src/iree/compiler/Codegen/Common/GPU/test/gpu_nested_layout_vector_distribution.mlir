@@ -1395,3 +1395,41 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-NEXT: gpu.subgroup_reduce maxnumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
 // Accumulator reduction
 // CHECK: arith.maxnumf %{{.*}}, %{{.*}} : vector<2x1x1xf32>
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1],
+  batch_tile = [1],
+  outer_tile = [1],
+  thread_tile = [32],
+  element_tile = [2],
+
+  subgroup_strides = [1],
+  thread_strides = [1]
+>
+
+func.func @zero_d_vector_extract(%vec : vector<64xf32>, %acc : vector<f32>) -> f32 {
+  %layouted = iree_vector_ext.to_layout %vec to layout(#layout) : vector<64xf32>
+  %scalar = vector.extract %acc[] : f32 from vector<f32>
+  %out = vector.multi_reduction <add>, %layouted, %scalar [0] : vector<64xf32> to f32
+  return %out : f32
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @zero_d_vector_extract
+// CHECK-SAME:      %[[VEC:.+]]: vector<64xf32>, %[[ACC:.+]]: vector<f32>
+// CHECK-DAG:  %[[SCALAR:.+]] = vector.extract %[[ACC]][] : f32 from vector<f32>
+// CHECK-DAG:  %[[SIMT:.+]] = iree_vector_ext.to_simt %[[VEC]] : vector<64xf32> -> vector<1x1x2xf32>
+// CHECK:      %[[LOCAL:.+]] = vector.multi_reduction <add>, %[[SIMT]], %{{.*}}
+// CHECK:      gpu.subgroup_reduce add %[[LOCAL]]
+// Accumulator addition
+// CHECK:      %[[BROADCASTED:.+]] = vector.broadcast %[[SCALAR]] : f32 to vector<1xf32>
+// CHECK:      arith.addf %{{.*}}, %[[BROADCASTED]]
