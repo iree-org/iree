@@ -56,7 +56,8 @@ void addEncodingToNopPasses(FunctionLikeNest &passManager);
 /// Links nested transform dialect tuning specs named sequences into a single
 /// entry point. Returns the new named sequence op (inserted into the `module`)
 /// that includes the nested tuning specs, or a null op when no nested named
-/// sequences were found.
+/// sequences were found. The order of inclusion is the same as the in which
+/// these nested tuning specs appear in the IR.
 FailureOr<transform::NamedSequenceOp> linkTuningSpecs(ModuleOp module);
 
 //------------------------------------------------------------------------------
