@@ -329,7 +329,8 @@ def convert_directory(directory_path, write_files, allow_partial_conversion, ver
         preserved_header + header + converted_build_file + preserved_footer
     )
     if write_files:
-        with tempfile.NamedTemporaryFile("wt", delete=False) as tmp:
+        dirname, basename = os.path.split(cmakelists_file_path)
+        with tempfile.NamedTemporaryFile("wt", delete=False, prefix=basename, dir=dirname) as tmp:
             tmp.write(converted_content)
         os.replace(tmp.name, cmakelists_file_path)
     else:
