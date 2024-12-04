@@ -1638,7 +1638,7 @@ func.func @pad_only() attributes {hal.executable.target = #executable_target_emb
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   tensor.pad {{.+}} {
 //      CHECK:     tensor.yield
-// CHECK-NEXT:   } {lowering_config = #[[CONFIG]], root_op}
+// CHECK-NEXT:   } {lowering_config = #[[CONFIG]]}
 
 // -----
 
@@ -1665,7 +1665,7 @@ func.func @winograd_output_transform() attributes {hal.executable.target = #exec
 //      CHECK: func.func @winograd_output_transform()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   iree_linalg_ext.winograd.output_transform
-// CHECK-SAME:     {lowering_config = #[[CONFIG]], root_op}
+// CHECK-SAME:     {lowering_config = #[[CONFIG]]}
 
 // -----
 
@@ -1692,7 +1692,7 @@ func.func @winograd_input_transform() attributes {hal.executable.target = #execu
 //      CHECK: func.func @winograd_input_transform()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   iree_linalg_ext.winograd.input_transform
-// CHECK-SAME:     {lowering_config = #[[CONFIG]], root_op}
+// CHECK-SAME:     {lowering_config = #[[CONFIG]]}
 
 // -----
 
@@ -1719,7 +1719,7 @@ func.func @winograd_filter_transform() attributes {hal.executable.target = #exec
 //      CHECK: func.func @winograd_filter_transform()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   iree_linalg_ext.winograd.filter_transform
-// CHECK-SAME:     {lowering_config = #[[CONFIG]], root_op}
+// CHECK-SAME:     {lowering_config = #[[CONFIG]]}
 
 // -----
 
@@ -1762,7 +1762,7 @@ func.func @attention() attributes {hal.executable.target = #executable_target_em
 //      CHECK: func.func @attention()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //     CHECK:   iree_linalg_ext.attention
-// CHECK-SAME:    lowering_config = #[[CONFIG]], root_op
+// CHECK-SAME:    lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -1801,7 +1801,7 @@ func.func @elementwise_output_transposed() attributes {hal.executable.target = #
 //      CHECK: func.func @elementwise_output_transposed()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //     CHECK:    linalg.generic
-// CHECK-SAME:     {lowering_config = #[[CONFIG]], root_op}
+// CHECK-SAME:     {lowering_config = #[[CONFIG]]}
 
 // -----
 
@@ -1886,7 +1886,7 @@ func.func @custom_op(%arg0 : tensor<384x512xf32>, %arg1 : tensor<512x128xf32>,
 //      CHECK: func @custom_op(
 // CHECK-SAME:     translation_info = #translation
 //      CHECK:   iree_linalg_ext.custom_op
-// CHECK-SAME:       attributes {lowering_config = #[[CONFIG0]], root_op}
+// CHECK-SAME:       attributes {lowering_config = #[[CONFIG0]]}
 //      CHECK:   ^bb
 //      CHECK:     linalg.fill
 // CHECK-SAME:         {lowering_config = #[[CONFIG1]]}
@@ -1957,7 +1957,7 @@ func.func @test_tiling_cpu_default(%arg0: tensor<256x256xi8>, %arg1: tensor<256x
 // CHECK-DAG:  #[[TRANSLATION_INFO]] = #iree_codegen.translation_info<pipeline = CPUDefault>
 //      CHECK: func @test_tiling_cpu_default(
 // CHECK-SAME:     translation_info = #[[TRANSLATION_INFO]]
-//      CHECK:    linalg.quantized_matmul {lowering_config = #[[CONFIG0]], root_op}
+//      CHECK:    linalg.quantized_matmul {lowering_config = #[[CONFIG0]]}
 
 // -----
 
@@ -1982,7 +1982,7 @@ func.func @i1_type()  attributes {hal.executable.target = #executable_target_emb
 // CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[8], [8], [0], [0]]>
 // CHECK: func @i1_type()
 // CHECK: linalg.generic {
-// CHECK-SAME: {lowering_config = #[[CONFIG]], root_op}
+// CHECK-SAME: {lowering_config = #[[CONFIG]]}
 
 // -----
 #pipeline_layout = #hal.pipeline.layout<bindings = [

@@ -570,8 +570,7 @@ void eraseCompilationInfo(Operation *op) {
 }
 
 //===----------------------------------------------------------------------===//
-// Helpers for setting `iree_codegen.root_op` attribute on root operations for
-// tuner.
+// Helpers for setting attributes for tuner.
 // ===----------------------------------------------------------------------===//
 
 void setRootOpInfo(Operation *op) {

@@ -12,6 +12,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/SCF/IR/DeviceMappingInterface.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -25,6 +26,11 @@ using TileSizesListTypeRef = ArrayRef<SmallVector<int64_t>>;
 /// Typedef for scalable tile flags at different levels of tiling.
 using ScalableTileFlagsListType = SmallVector<SmallVector<bool>>;
 using ScalableTileFlagsListTypeRef = ArrayRef<SmallVector<bool>>;
+/// Flag to add attributes for tuner.
+inline llvm::cl::opt<bool>
+    clSetTunerAttr("iree-config-add-tuner-attributes",
+                   llvm::cl::desc("add attributes for tuner"),
+                   llvm::cl::init(false));
 } // namespace mlir::iree_compiler
 
 // clang-format off
@@ -118,7 +124,9 @@ SmallVector<Value> getTileSizes(OpBuilder &b, Operation *op, unsigned level);
 void setLoweringConfig(Operation *op, Attribute config);
 
 /// Sets an attribute to identify the rootOp and adds any information needed for
-/// the tuner from compiler. Currently, only sets a `UnitAttr`.
+/// the tuner from compiler. Currently, only sets a `UnitAttr`. Note that this
+/// attribute is not used by the compiler at any level and is only intended for
+/// tuner use.
 void setRootOpInfo(Operation *op);
 
 /// Convenience function that sets the lowering configuration on the operation
@@ -127,7 +135,9 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
     mlir::FunctionOpInterface entryPointFn, Operation *op,
     IREE::Codegen::LoweringConfigAttrInterface config,
     IREE::Codegen::TranslationInfoAttr translationInfo) {
-  setRootOpInfo(op);
+  if (clSetTunerAttr) {
+    setRootOpInfo(op);
+  }
   if (config) {
     setLoweringConfig(op, config);
   }
