@@ -12,13 +12,13 @@
 // CHECK-SAME:                    memref<2x3x4xi32> to memref<24xi32>
 // CHECK:         vector.store %[[LOAD]], %[[CAST_2]][%[[C6]]]
 // CHECK:         return %[[LOAD]]
-func.func @vector_load_store(%arg0: memref<2x3x4xi32>) -> vector<2xi32> {
+func.func @vector_load_store(%arg0: memref<2x3x4xi32>) -> vector<2x3xi32> {
   %c2 = arith.constant 2 : index
   %c1 = arith.constant 1 : index
   %c0 = arith.constant 0 : index
-  %1 = vector.load %arg0[%c0, %c1, %c2] : memref<2x3x4xi32>, vector<2xi32>
-  vector.store %1, %arg0[%c0, %c1, %c2] : memref<2x3x4xi32>, vector<2xi32>
-  return %1 : vector<2xi32>
+  %1 = vector.load %arg0[%c0, %c1, %c2] : memref<2x3x4xi32>, vector<2x3xi32>
+  vector.store %1, %arg0[%c0, %c1, %c2] : memref<2x3x4xi32>, vector<2x3xi32>
+  return %1 : vector<2x3xi32>
 }
 
 // -----
