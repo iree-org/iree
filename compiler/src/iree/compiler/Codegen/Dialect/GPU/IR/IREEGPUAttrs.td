@@ -315,6 +315,29 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
 }
 
 //===----------------------------------------------------------------------===//
+// iree_gpu.gpu_encoding_layout
+//===----------------------------------------------------------------------===//
+
+// This attribute needs to implement the Codegen::LayoutAttrInterface and
+// Encoding::EncodingLayoutAttrInterface. They are implemented through external
+// model mechanism because we do not want to put burdens to the dialect, and we
+// can have better code structure. See the implementations in
+// compiler/Codegen/ExternalInterfaces.
+def IREEGPU_GPUEncodingLayoutAttr :
+    AttrDef<IREEGPU_Dialect, "GPUEncodingLayout", [
+]> {
+  let mnemonic = "gpu_encoding_layout";
+  let summary = "The encoding layout attribute for VMVX backend";
+
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let parameters = (ins
+    OptionalParameter<"::mlir::iree_compiler::IREE::GPU::TargetAttr",
+     "IREE GPU target attribute. It is expected to be used in a pass scope, but not the final IR output.">:$targetAttr
+  );
+}
+
+//===----------------------------------------------------------------------===//
 // Workgroup processor level description
 //===----------------------------------------------------------------------===//
 

@@ -46,6 +46,7 @@ iree_compiler_cc_library(
         ":PartitionableLoopsInterface",
         ":ProcessorOpInterfaces",
         ":UKernelOpInterface",
+        "//compiler/src/iree/compiler/Codegen/ExternalInterfaces:ExternalModels",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/TransformExtensions:LinalgExtExtensions",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "@llvm-project//mlir:IR",
