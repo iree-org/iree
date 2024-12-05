@@ -23,7 +23,6 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
-#include "mlir/IR/Verifier.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -115,11 +114,11 @@ struct DropUnitDimsFromCollapseOfExpand
         };
 
     auto dropOutputOfr = [&toDrop](const SmallVector<OpFoldResult> &sizes) {
-      return llvm::to_vector(llvm::map_range(
+      return llvm::map_to_vector(
           llvm::make_filter_range(
               llvm::enumerate(sizes),
               [&toDrop](auto pair) { return !toDrop.contains(pair.index()); }),
-          [](auto pair) -> OpFoldResult { return pair.value(); }));
+          [](auto pair) -> OpFoldResult { return pair.value(); });
     };
 
     auto isIdentityReassociation = [](ArrayRef<ReassociationIndices> reassoc) {
