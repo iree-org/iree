@@ -16,7 +16,7 @@ on:
       # Directly authored website source files.
       - "docs/website/**"
       # Python/pip release index page.
-      - "build_tools/scripts/generate_release_index.py"
+      - "build_tools/python_deploy/generate_release_index.py"
       # MLIR dialect definitions and .md generation using iree-tblgen.
       #   Technically this should also include the sources for Tablegen, but
       #   that rarely changes and we want to run this workflow conservatively.
@@ -55,7 +55,7 @@ jobs:
           sudo apt install -y ninja-build
       - name: Generating release index
         run: |
-          ./build_tools/scripts/generate_release_index.py \
+          ./build_tools/python_deploy/generate_release_index.py \
             --repo="${GITHUB_REPOSITORY}" \
             --output=docs/website/docs/pip-release-links.html
       - name: ccache
