@@ -73,10 +73,9 @@ EXPORTS
   ireeGPULoweringConfigAttrGet
   ireeGPULoweringConfigAttrGetAttributes
   ireeGPULoweringConfigAttrGetTypeID
-  ireeGPULoweringConfigAttrGetWorkgroupTileSizes
-  ireeGPULoweringConfigAttrGetWorkgroupTileSizes
-  ireeGPULoweringConfigAttrGetSubgroupMCount
-  ireeGPULoweringConfigAttrGetSubgroupNCount
+  ireeGPULoweringConfigAttrGetTileSizes
+  ireeGPULoweringConfigAttrGetSubgroupCount
+  ireeGPULoweringConfigAttrGetMmaKind
   ireeGPUMMAAttrGet
   ireeGPUMMAAttrGetInfo
   ireeGPUMMAAttrGetTypeID

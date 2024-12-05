@@ -214,71 +214,29 @@ MlirAttribute ireeGPULoweringConfigAttrGetAttributes(MlirAttribute attr) {
                   .getAttributes());
 }
 
-void ireeGPULoweringConfigAttrGetWorkgroupTileSizes(
-    MlirAttribute attr, size_t *len, int64_t *workgroupTileSizes) {
+ireeGPUTileSizes ireeGPULoweringConfigAttrGetTileSizes(MlirAttribute attr) {
   assert(ireeAttributeIsAGPULoweringConfigAttr(attr));
-  mlir::DictionaryAttr dict =
+  ireeGPUTileSizes tilesizes = {};
+  auto loweringConfigAttr =
       llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
-          unwrap(attr))
-          .getAttributes();
-  constexpr mlir::StringLiteral workgroupName = "workgroup";
-  mlir::ArrayAttr array = dict.getAs<mlir::ArrayAttr>(workgroupName);
+          unwrap(attr));
 
-  if (!array ||
-      !llvm::all_of(array.getValue(), llvm::IsaPred<mlir::IntegerAttr>)) {
-    *len = -1;
-    return;
-  }
+  auto workgroups = loweringConfigAttr.getWorkgroupTileSizes();
+  tilesizes.workgroupTileSizes = workgroups.data();
+  tilesizes.numWorkgroupTileSizes = workgroups.size();
 
-  if (!workgroupTileSizes) {
-    *len = array.size();
-    return;
-  }
+  auto reduction = loweringConfigAttr.getStaticTilingLevelSizes(
+      static_cast<int64_t>(
+          mlir::iree_compiler::IREE::GPU::TilingLevel::Reduction),
+      nullptr);
+  tilesizes.reductionTileSizes = reduction.data();
+  tilesizes.numReductionTileSizes = reduction.size();
 
-  assert(*len == array.size() &&
-         "the length should match the number of tilesizes in the array");
-
-  for (size_t i = 0, e = array.size(); i < e; ++i) {
-    mlir::IntegerAttr element =
-        llvm::cast<mlir::IntegerAttr>(array.getValue()[i]);
-    workgroupTileSizes[i] = element.getInt();
-  }
-  return;
+  return tilesizes;
 }
 
-void ireeGPULoweringConfigAttrGetReductionTileSizes(
-    MlirAttribute attr, size_t *len, int64_t *reductionTileSizes) {
-  assert(ireeAttributeIsAGPULoweringConfigAttr(attr));
-  mlir::DictionaryAttr dict =
-      llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
-          unwrap(attr))
-          .getAttributes();
-  constexpr mlir::StringLiteral reductionName = "reduction";
-  mlir::ArrayAttr array = dict.getAs<mlir::ArrayAttr>(reductionName);
-
-  if (!array ||
-      !llvm::all_of(array.getValue(), llvm::IsaPred<mlir::IntegerAttr>)) {
-    *len = -1;
-    return;
-  }
-
-  if (!reductionTileSizes) {
-    *len = array.size();
-    return;
-  }
-
-  assert(*len == array.size() &&
-         "the length should match the number of tilesizes in the array");
-
-  for (size_t i = 0, e = array.size(); i < e; ++i) {
-    mlir::IntegerAttr element =
-        llvm::cast<mlir::IntegerAttr>(array.getValue()[i]);
-    reductionTileSizes[i] = element.getInt();
-  }
-  return;
-}
-
-MlirAttribute ireeGPULoweringConfigAttrGetSubgroupMCount(MlirAttribute attr) {
+ireeGPUSubgroupCountInfo
+ireeGPULoweringConfigAttrGetSubgroupCount(MlirAttribute attr) {
   assert(ireeAttributeIsAGPULoweringConfigAttr(attr));
   mlir::DictionaryAttr dict =
       llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
@@ -286,24 +244,17 @@ MlirAttribute ireeGPULoweringConfigAttrGetSubgroupMCount(MlirAttribute attr) {
           .getAttributes();
 
   constexpr mlir::StringLiteral kSubgroupMCountName = "subgroup_m_count";
+  constexpr mlir::StringLiteral kSubgroupNCountName = "subgroup_n_count";
+
   mlir::IntegerAttr subgroup_m_count_attr =
       dict.getAs<mlir::IntegerAttr>(kSubgroupMCountName);
-
-  return wrap(subgroup_m_count_attr);
-}
-
-MlirAttribute ireeGPULoweringConfigAttrGetSubgroupNCount(MlirAttribute attr) {
-  assert(ireeAttributeIsAGPULoweringConfigAttr(attr));
-  mlir::DictionaryAttr dict =
-      llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
-          unwrap(attr))
-          .getAttributes();
-
-  constexpr mlir::StringLiteral kSubgroupNCountName = "subgroup_n_count";
   mlir::IntegerAttr subgroup_n_count_attr =
       dict.getAs<mlir::IntegerAttr>(kSubgroupNCountName);
 
-  return wrap(subgroup_n_count_attr);
+  ireeGPUSubgroupCountInfo info = {};
+  info.subgroupMCountAttr = wrap(subgroup_m_count_attr);
+  info.subgroupNCountAttr = wrap(subgroup_n_count_attr);
+  return info;
 }
 
 MlirAttribute ireeGPULoweringConfigAttrGetMmaKind(MlirAttribute attr) {

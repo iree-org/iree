@@ -48,36 +48,6 @@ ireeCodegenQueryMMAIntrinsicsBinding(MlirOperation op) {
   return mmaList;
 }
 
-static std::optional<std::vector<int64_t>>
-ireeGPULoweringConfigAttrGetReductionTileSizesBinding(
-    MlirAttribute lowering_config) {
-  size_t tileSizes = 0;
-  ireeGPULoweringConfigAttrGetReductionTileSizes(lowering_config, &tileSizes,
-                                                 nullptr);
-  if (tileSizes == -1) {
-    return std::nullopt;
-  }
-  std::vector<int64_t> reductionTileSizes(tileSizes);
-  ireeGPULoweringConfigAttrGetReductionTileSizes(lowering_config, &tileSizes,
-                                                 reductionTileSizes.data());
-  return reductionTileSizes;
-}
-
-static std::optional<std::vector<int64_t>>
-ireeGPULoweringConfigAttrGetWorkgroupTileSizesBinding(
-    MlirAttribute lowering_config) {
-  size_t tileSizes = 0;
-  ireeGPULoweringConfigAttrGetWorkgroupTileSizes(lowering_config, &tileSizes,
-                                                 nullptr);
-  if (tileSizes == -1) {
-    return std::nullopt;
-  }
-  std::vector<int64_t> workgroupTileSizes(tileSizes);
-  ireeGPULoweringConfigAttrGetWorkgroupTileSizes(lowering_config, &tileSizes,
-                                                 workgroupTileSizes.data());
-  return workgroupTileSizes;
-}
-
 PYBIND11_MODULE(_ireeCompilerDialects, m) {
   m.doc() = "iree-compiler dialects python extension";
 
@@ -383,27 +353,40 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
           "Gets an #iree_gpu.lowering_config from parameters.")
       .def_property_readonly("attributes",
                              ireeGPULoweringConfigAttrGetAttributes)
+      .def_property_readonly("workgroup_tile_sizes",
+                             [](MlirAttribute self) -> std::vector<int64_t> {
+                               auto tilesizes =
+                                   ireeGPULoweringConfigAttrGetTileSizes(self);
+                               return {tilesizes.workgroupTileSizes,
+                                       tilesizes.workgroupTileSizes +
+                                           tilesizes.numWorkgroupTileSizes};
+                             })
+      .def_property_readonly("reduction_tile_sizes",
+                             [](MlirAttribute self) -> std::vector<int64_t> {
+                               auto tilesizes =
+                                   ireeGPULoweringConfigAttrGetTileSizes(self);
+                               return {tilesizes.reductionTileSizes,
+                                       tilesizes.reductionTileSizes +
+                                           tilesizes.numReductionTileSizes};
+                             })
       .def_property_readonly(
-          "workgroup_tile_sizes",
-          ireeGPULoweringConfigAttrGetWorkgroupTileSizesBinding)
-      .def_property_readonly(
-          "reduction_tile_sizes",
-          ireeGPULoweringConfigAttrGetReductionTileSizesBinding)
-      .def_property_readonly(
-          "subgroup_m_count",
-          [](MlirAttribute self) -> std::optional<int64_t> {
-            auto attr = ireeGPULoweringConfigAttrGetSubgroupMCount(self);
-            if (!mlirAttributeIsNull(attr))
-              return mlirIntegerAttrGetValueInt(attr);
-            return std::nullopt;
-          })
-      .def_property_readonly(
-          "subgroup_n_count",
-          [](MlirAttribute self) -> std::optional<int64_t> {
-            auto attr = ireeGPULoweringConfigAttrGetSubgroupNCount(self);
-            if (!mlirAttributeIsNull(attr))
-              return mlirIntegerAttrGetValueInt(attr);
-            return std::nullopt;
+          "subgroup_count",
+          [](MlirAttribute self) -> py::tuple {
+            ireeGPUSubgroupCountInfo info =
+                ireeGPULoweringConfigAttrGetSubgroupCount(self);
+            MlirAttribute mCountAttr = info.subgroupMCountAttr;
+            MlirAttribute nCountAttr = info.subgroupNCountAttr;
+            std::optional<int64_t> mCount =
+                mlirAttributeIsNull(mCountAttr)
+                    ? std::nullopt
+                    : std::optional<int64_t>(
+                          mlirIntegerAttrGetValueInt(mCountAttr));
+            std::optional<int64_t> nCount =
+                mlirAttributeIsNull(nCountAttr)
+                    ? std::nullopt
+                    : std::optional<int64_t>(
+                          mlirIntegerAttrGetValueInt(nCountAttr));
+            return py::make_tuple(mCount, nCount);
           })
       .def_property_readonly(
           "mma_kind", [](MlirAttribute self) -> std::optional<MlirAttribute> {

@@ -93,19 +93,28 @@ MLIR_CAPI_EXPORTED MlirAttribute ireeGPULoweringConfigAttrGet(
 MLIR_CAPI_EXPORTED MlirAttribute
 ireeGPULoweringConfigAttrGetAttributes(MlirAttribute attr);
 
-MLIR_CAPI_EXPORTED void
-ireeGPULoweringConfigAttrGetReductionTileSizes(MlirAttribute attr, size_t *len,
-                                               int64_t *reductionTileSizes);
+struct ireeGPUTileSizes {
+  const int64_t *workgroupTileSizes;
+  size_t numWorkgroupTileSizes;
+  const int64_t *reductionTileSizes;
+  size_t numReductionTileSizes;
+};
 
-MLIR_CAPI_EXPORTED void
-ireeGPULoweringConfigAttrGetWorkgroupTileSizes(MlirAttribute attr, size_t *len,
-                                               int64_t *workgroupTileSizes);
+MLIR_CAPI_EXPORTED ireeGPUTileSizes
+ireeGPULoweringConfigAttrGetTileSizes(MlirAttribute attr);
 
-MLIR_CAPI_EXPORTED MlirAttribute
-ireeGPULoweringConfigAttrGetSubgroupMCount(MlirAttribute attr);
+// MLIR_CAPI_EXPORTED void
+// ireeGPULoweringConfigAttrGetWorkgroupTileSizes(MlirAttribute attr, size_t
+// *len,
+//                                                int64_t *workgroupTileSizes);
 
-MLIR_CAPI_EXPORTED MlirAttribute
-ireeGPULoweringConfigAttrGetSubgroupNCount(MlirAttribute attr);
+struct ireeGPUSubgroupCountInfo {
+  MlirAttribute subgroupMCountAttr;
+  MlirAttribute subgroupNCountAttr;
+};
+
+MLIR_CAPI_EXPORTED ireeGPUSubgroupCountInfo
+ireeGPULoweringConfigAttrGetSubgroupCount(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED MlirAttribute
 ireeGPULoweringConfigAttrGetMmaKind(MlirAttribute attr);
