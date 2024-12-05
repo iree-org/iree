@@ -26,6 +26,14 @@ on:
   release:
     types: [published, unpublished]
 
+  # Run periodically to pick up any documentation changes that were somehow
+  # missed by the above path filters as well as to scrape releases from other
+  # projects that are included on the release index page. Downstream projects
+  # typically build releases in the middle of the night (3AM PST, 11:00 UTC),
+  # so we'll run a bit later than that (6AM PST, 14:00 UTC).
+  schedule:
+    - cron: "0 14 * * *"
+
 jobs:
   publish_website:
     if: ${{ github.repository_owner == 'iree-org' || github.event_name == 'workflow_dispatch' }}
