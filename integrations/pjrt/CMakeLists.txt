@@ -52,6 +52,10 @@ add_subdirectory("${IREE_ROOT_DIR}" "iree_core" EXCLUDE_FROM_ALL)
 # toolchain level.
 iree_setup_toolchain()
 
+# Setup protoc and protobuf library
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(protobuf_cc_library)
+
 add_subdirectory(src)
 add_subdirectory(third_party/pjrt_c_api)
 

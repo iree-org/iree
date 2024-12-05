@@ -16,7 +16,6 @@
 #include <thread>
 #include <vector>
 
-#include "compile_options.pb.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
@@ -26,6 +25,7 @@
 #include "iree_pjrt/common/layout_utils.h"
 #include "iree_pjrt/common/platform.h"
 #include "xla/pjrt/c/pjrt_c_api.h"
+#include "xla/pjrt/compile_options.pb.h"
 
 namespace iree::pjrt {
 
