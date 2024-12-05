@@ -56,6 +56,7 @@ iree_lit_test_suite(
             "lower_ukernel_to_calls.mlir",
             "materialize_encoding_into_nop.mlir",
             "materialize_tuning_specs.mlir",
+            "materialize_tuning_specs_default_missing.mlir",
             "materialize_tuning_specs_invalid_spec.mlir",
             "materialize_user_config_from_tuning_spec.mlir",
             "materialize_user_configs.mlir",
