@@ -65,7 +65,7 @@ iree_status_t iree_hal_hip_allocator_create(
   if (topology->count < 1) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "Invalid number of devices, must be at least one");
+                            "at least one device must be specified");
   }
 
   // To support device-local + host-visible memory we need concurrent managed
@@ -536,23 +536,20 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
 #endif  // IREE_STATUS_MODE
   }
 
-  iree_status_t status = iree_ok_status();
-  iree_hal_hip_buffer_type_t buffer_type = IREE_HAL_HIP_BUFFER_TYPE_DEVICE;
-  void* host_ptr = NULL;
-  hipDeviceptr_t device_ptr = NULL;
-
   int device_ordinal = 0;
   if (params->queue_affinity) {
     device_ordinal = iree_math_count_trailing_zeros_u64(params->queue_affinity);
   }
 
-  status = IREE_HIP_CALL_TO_STATUS(
+  IREE_RETURN_IF_ERROR(IREE_HIP_CALL_TO_STATUS(
       allocator->symbols,
       hipCtxPushCurrent(
-          allocator->topology->devices[device_ordinal].hip_context));
-  if (!iree_status_is_ok(status)) {
-    return status;
-  }
+          allocator->topology->devices[device_ordinal].hip_context)));
+
+  iree_status_t status = iree_ok_status();
+  iree_hal_hip_buffer_type_t buffer_type = IREE_HAL_HIP_BUFFER_TYPE_DEVICE;
+  void* host_ptr = NULL;
+  hipDeviceptr_t device_ptr = NULL;
 
   switch (external_buffer->type) {
     case IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION: {
@@ -620,10 +617,9 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
     }
   }
 
-  status = iree_status_join(
+  return iree_status_join(
       status,
       IREE_HIP_CALL_TO_STATUS(allocator->symbols, hipCtxPopCurrent(NULL)));
-  return status;
 }
 
 static iree_status_t iree_hal_hip_allocator_export_buffer(

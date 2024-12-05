@@ -250,7 +250,8 @@ iree_status_t iree_hal_hip_event_pool_acquire(
 
   // Allocate the rest of the events.
   if (remaining_count > 0) {
-    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "event-pool-unpooled-acquire");
+    IREE_TRACE_ZONE_APPEND_TEXT(z0, "unpooled acquire");
+    IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)remaining_count);
 
     iree_status_t status = iree_hal_hip_set_context(event_pool->symbols,
                                                     event_pool->device_context);
@@ -263,18 +264,15 @@ iree_status_t iree_hal_hip_event_pool_acquire(
           // Must release all events we've acquired so far.
           iree_hal_hip_event_pool_release_event(event_pool, from_pool_count + i,
                                                 out_events);
-          IREE_TRACE_ZONE_END(z1);
           IREE_TRACE_ZONE_END(z0);
-          break;
+          return status;
         }
       }
       if (!iree_status_is_ok(status)) {
-        IREE_TRACE_ZONE_END(z1);
         IREE_TRACE_ZONE_END(z0);
         return status;
       }
     }
-    IREE_TRACE_ZONE_END(z1);
   }
 
   // Retain a reference to a pool when we pass event to the caller. When the
@@ -320,11 +318,11 @@ static void iree_hal_hip_event_pool_release_event(
   // Deallocate the rest of the events. We don't bother resetting them as we are
   // getting rid of them.
   if (remaining_count > 0) {
-    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "event-pool-unpooled-release");
+    IREE_TRACE_ZONE_APPEND_TEXT(z0, "unpooled release");
+    IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)remaining_count);
     for (iree_host_size_t i = 0; i < remaining_count; ++i) {
       iree_hal_hip_event_destroy(events[to_pool_count + i]);
     }
-    IREE_TRACE_ZONE_END(z1);
   }
   IREE_TRACE_ZONE_END(z0);
 }
