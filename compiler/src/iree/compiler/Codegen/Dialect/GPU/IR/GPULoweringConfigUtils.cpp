@@ -68,10 +68,10 @@ void setSubgroupNCount(MLIRContext *context,
       IntegerAttr::get(IntegerType::get(context, 64), subgroup_n_count));
 }
 
-const char *kSubgroupBasisName = "subgroup_basis";
-const char *kThreadBasisName = "thread_basis";
+const StringLiteral kSubgroupBasisName = "subgroup_basis";
+const StringLiteral kThreadBasisName = "thread_basis";
 
-static std::string getBasisLevelName(IREE::GPU::TilingLevel level) {
+static StringLiteral getBasisLevelName(IREE::GPU::TilingLevel level) {
   switch (level) {
   case GPU::TilingLevel::Thread:
     return kThreadBasisName;
@@ -107,14 +107,16 @@ LogicalResult getBasis(IREE::GPU::LoweringConfigAttr config,
     return failure();
   }
 
-  auto maybeBasis = getIntegerVector(dyn_cast_or_null<ArrayAttr>(attrs[0]));
-  auto maybeMapping = getIntegerVector(dyn_cast_or_null<ArrayAttr>(attrs[1]));
+  std::optional<SmallVector<int64_t>> maybeBasis =
+      getIntegerVector(dyn_cast_or_null<ArrayAttr>(attrs[0]));
+  std::optional<SmallVector<int64_t>> maybeMapping =
+      getIntegerVector(dyn_cast_or_null<ArrayAttr>(attrs[1]));
 
   if (!maybeBasis.has_value() || !maybeMapping.has_value()) {
     return failure();
   }
-  basis = maybeBasis.value();
-  mapping = maybeMapping.value();
+  basis = std::move(maybeBasis.value());
+  mapping = std::move(maybeMapping.value());
 
   return success();
 }

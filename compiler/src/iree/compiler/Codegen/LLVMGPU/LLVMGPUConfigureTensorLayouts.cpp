@@ -805,23 +805,31 @@ static LogicalResult setIntrinsicLoweringConfigLayout(
   return failure();
 }
 
+/// Given two arrays bounds and tile, compute bounds /= tile.
+///
+/// If "tile" contains 0, or is smaller than bounds, divide bounds by 1
+/// for those values.
+///
+/// Returns the actual divisor (without zeros or out of bounds) used to compute
+/// bounds /= divisor.
 FailureOr<SmallVector<int64_t>> divideTile(SmallVector<int64_t> &bounds,
                                            ArrayRef<int64_t> tile) {
-  SmallVector<int64_t> quotient(bounds.size(), 1);
-  for (auto [quo, bound, size] : llvm::zip(quotient, bounds, tile)) {
+  assert(bounds.size() >= tile.size() &&
+         "cannot divide bounds with a larger tile size");
+
+  SmallVector<int64_t> divisor(bounds.size(), 1);
+  for (auto [div, size] : llvm::zip(divisor, tile)) {
     if (size == 0) {
       continue;
     }
-
-    if (bound % size != 0) {
-      return failure();
-    }
-
-    bound /= size;
-    quo = size;
+    div = size;
   }
 
-  return quotient;
+  for (auto [bound, div] : llvm::zip_equal(bounds, divisor)) {
+    bound /= div;
+  }
+
+  return divisor;
 }
 
 SmallVector<int64_t> applyProjectedPermutation(ArrayRef<int64_t> input,
@@ -837,7 +845,7 @@ SmallVector<int64_t> applyProjectedPermutation(ArrayRef<int64_t> input,
 SmallVector<int64_t> getStridesFromBasis(ArrayRef<int64_t> basis) {
   SmallVector<int64_t> strides(basis.size());
   int64_t currStride = 1;
-  for (auto [stride, size] : llvm::reverse(llvm::zip(strides, basis))) {
+  for (auto [stride, size] : llvm::reverse(llvm::zip_equal(strides, basis))) {
     stride = currStride;
     currStride *= size;
   }
