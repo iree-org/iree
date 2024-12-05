@@ -8,10 +8,11 @@
 
 """Creates an HTML page for releases for `pip install --find-links` from GitHub releases.
 
-Typical usage:
+Sample usage:
 
     ```bash
     ./build_tools/python_deploy/generate_release_index.py \
+        --repos=iree-org/iree,iree-org/iree-turbine \
         --output=docs/website/docs/pip-release-links.html
     ```
 """
@@ -21,6 +22,7 @@ Typical usage:
 
 import argparse
 import html
+import io
 import requests
 import sys
 import textwrap
@@ -29,10 +31,10 @@ import textwrap
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--repo",
-        "--repository",
+        "--repos",
+        "--repositories",
         default="iree-org/iree",
-        help="The GitHub repository to fetch releases from.",
+        help="Comma-delimited list of GitHub repositories to fetch releases from.",
     )
     parser.add_argument(
         "--output",
@@ -68,8 +70,22 @@ class ReleaseFetcher:
             page += 1
 
 
+def add_releases_for_repository(repo: str, file: io.TextIOWrapper):
+    fetcher = ReleaseFetcher(repo)
+
+    # TODO(scotttodd): section comment for each repository, human readable?
+
+    for release in fetcher.get_all():
+        if release["draft"]:
+            continue
+        for asset in release["assets"]:
+            url = html.escape(asset["browser_download_url"])
+            name = html.escape(asset["name"])
+            file.write(f"    <a href={url}>{name}</a><br>\n")
+
+
 def main(args):
-    fetcher = ReleaseFetcher(repo=args.repo)
+    repos = args.repos.split(",")
     with sys.stdout if args.output == "-" else open(args.output, "w") as f:
         f.write(
             textwrap.dedent(
@@ -80,13 +96,8 @@ def main(args):
             """
             )
         )
-        for release in fetcher.get_all():
-            if release["draft"]:
-                continue
-            for asset in release["assets"]:
-                url = html.escape(asset["browser_download_url"])
-                name = html.escape(asset["name"])
-                f.write(f"    <a href={url}>{name}</a><br />\n")
+        for repo in repos:
+            add_releases_for_repository(repo, f)
         f.write(
             textwrap.dedent(
                 """\
