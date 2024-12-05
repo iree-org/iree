@@ -21,7 +21,6 @@ FetchContent_Declare(
   protobuf
   GIT_REPOSITORY https://github.com/protocolbuffers/protobuf
   GIT_TAG v${protobuf_VERSION}
-  GIT_CONFIG http.proxy=http://172.22.144.1:7898
   GIT_SHALLOW ON
 )
 
