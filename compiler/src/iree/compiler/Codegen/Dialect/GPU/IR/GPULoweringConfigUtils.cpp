@@ -8,9 +8,9 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-static SmallVector<int64_t> getIntegerVector(ArrayAttr array) {
+static std::optional<SmallVector<int64_t>> getIntegerVector(ArrayAttr array) {
   if (!array || !llvm::all_of(array.getValue(), llvm::IsaPred<IntegerAttr>)) {
-    return {};
+    return std::nullopt;
   }
   return llvm::map_to_vector(array.getValue(), [](Attribute s) -> int64_t {
     return cast<IntegerAttr>(s).getInt();
@@ -66,6 +66,57 @@ void setSubgroupNCount(MLIRContext *context,
   attrs.emplace_back(
       StringAttr::get(context, kSubgroupNCountName),
       IntegerAttr::get(IntegerType::get(context, 64), subgroup_n_count));
+}
+
+const char *kSubgroupBasisName = "subgroup_basis";
+const char *kThreadBasisName = "thread_basis";
+
+static std::string getBasisLevelName(IREE::GPU::TilingLevel level) {
+  switch (level) {
+  case GPU::TilingLevel::Thread:
+    return kThreadBasisName;
+  case GPU::TilingLevel::Subgroup:
+    return kSubgroupBasisName;
+  default:
+    assert(false && "Unknown tiling level for distribution");
+    return "";
+  }
+}
+
+void setBasis(MLIRContext *context, SmallVector<NamedAttribute> &attrs,
+              IREE::GPU::TilingLevel level, ArrayRef<int64_t> basis,
+              ArrayRef<int64_t> mapping) {
+  Builder b(context);
+  ArrayAttr basisAttr =
+      b.getArrayAttr({b.getI64ArrayAttr(basis), b.getI64ArrayAttr(mapping)});
+  attrs.emplace_back(b.getNamedAttr(getBasisLevelName(level), basisAttr));
+}
+
+LogicalResult getBasis(IREE::GPU::LoweringConfigAttr config,
+                       IREE::GPU::TilingLevel level,
+                       SmallVector<int64_t> &basis,
+                       SmallVector<int64_t> &mapping) {
+  auto basisAttr = dyn_cast_or_null<ArrayAttr>(
+      config.getAttributes().get(getBasisLevelName(level)));
+  if (!basisAttr) {
+    return failure();
+  }
+
+  ArrayRef<Attribute> attrs = basisAttr.getValue();
+  if (attrs.size() != 2) {
+    return failure();
+  }
+
+  auto maybeBasis = getIntegerVector(dyn_cast_or_null<ArrayAttr>(attrs[0]));
+  auto maybeMapping = getIntegerVector(dyn_cast_or_null<ArrayAttr>(attrs[1]));
+
+  if (!maybeBasis.has_value() || !maybeMapping.has_value()) {
+    return failure();
+  }
+  basis = maybeBasis.value();
+  mapping = maybeMapping.value();
+
+  return success();
 }
 
 constexpr StringLiteral kPromoteOperandsName = "promote_operands";

@@ -804,6 +804,136 @@ static LogicalResult setIntrinsicLoweringConfigLayout(
   return failure();
 }
 
+FailureOr<SmallVector<int64_t>> divideTile(SmallVector<int64_t> &bounds,
+                                           ArrayRef<int64_t> tile) {
+  SmallVector<int64_t> quotient(bounds.size(), 1);
+  for (auto [quo, bound, size] : llvm::zip(quotient, bounds, tile)) {
+    if (size == 0) {
+      continue;
+    }
+
+    if (bound % size != 0) {
+      return failure();
+    }
+
+    bound /= size;
+    quo = size;
+  }
+
+  return quotient;
+}
+
+SmallVector<int64_t> getProjectedBasis(ArrayRef<int64_t> basis,
+                                       ArrayRef<int64_t> mapping) {
+  SmallVector<int64_t> projectedBasis;
+  for (int64_t dim : mapping) {
+    projectedBasis.push_back(basis[dim]);
+  }
+  return projectedBasis;
+}
+
+SmallVector<int64_t> getStridesFromBasis(ArrayRef<int64_t> basis,
+                                         ArrayRef<int64_t> mapping) {
+  SmallVector<int64_t> canonicalStrides(basis.size());
+  int64_t currStride = 1;
+  for (auto [stride, size] :
+       llvm::reverse(llvm::zip(canonicalStrides, basis))) {
+    stride = currStride;
+    currStride *= size;
+  }
+
+  SmallVector<int64_t> strides;
+  for (int64_t dim : mapping) {
+    strides.push_back(canonicalStrides[dim]);
+  }
+
+  return strides;
+}
+
+static LogicalResult setGPULoweringConfigLayout(
+    IREE::GPU::LoweringConfigAttr config, linalg::LinalgOp candidate,
+    ArrayRef<int64_t> workgroupSize, RewriterBase &rewriter) {
+  MLIRContext *context = config.getContext();
+  Location loc = candidate.getLoc();
+
+  SmallVector<int64_t> bounds = candidate.getStaticLoopRanges();
+  if (ShapedType::isDynamicShape(bounds)) {
+    candidate->emitError()
+        << "Cannot set layouts on a dynamically shaped iteration space";
+    return failure();
+  }
+
+  auto threadLevel = llvm::to_underlying(IREE::GPU::TilingLevel::Thread);
+
+  SmallVector<int64_t> threadSizes =
+      config.getStaticTilingLevelSizes(threadLevel, candidate);
+
+  SmallVector<int64_t> subgroupBasis, subgroupMapping;
+  if (failed(getBasis(config, IREE::GPU::TilingLevel::Subgroup, subgroupBasis,
+                      subgroupMapping))) {
+    candidate->emitError()
+        << "Could not find a subgroup basis from lowering config";
+    return failure();
+  }
+
+  SmallVector<int64_t> threadBasis, threadMapping;
+  if (failed(getBasis(config, IREE::GPU::TilingLevel::Thread, threadBasis,
+                      threadMapping))) {
+    candidate->emitError()
+        << "Could not find a thread basis from lowering config";
+    return failure();
+  }
+
+  SmallVector<int64_t> subgroupTile =
+      getProjectedBasis(subgroupBasis, subgroupMapping);
+  SmallVector<int64_t> threadTile =
+      getProjectedBasis(threadBasis, threadMapping);
+
+  if (failed(divideTile(bounds, subgroupTile))) {
+    candidate->emitError()
+        << "Could not divide bounds over given subgroup basis";
+    return failure();
+  }
+
+  if (failed(divideTile(bounds, threadTile))) {
+    candidate->emitError() << "Could not divide bounds over given thread basis";
+    return failure();
+  }
+
+  FailureOr<SmallVector<int64_t>> elementTile = divideTile(bounds, threadSizes);
+  if (failed(elementTile)) {
+    candidate->emitError() << "Could not divide bounds over given thread tile";
+    return failure();
+  }
+
+  ArrayRef<int64_t> batchTile = bounds;
+  SmallVector<int64_t> outerTile(bounds.size(), 1);
+
+  auto layout = IREE::VectorExt::NestedLayoutAttr::get(
+      context, subgroupTile, batchTile, outerTile, threadTile,
+      elementTile.value(), getStridesFromBasis(subgroupBasis, subgroupMapping),
+      getStridesFromBasis(threadBasis, threadMapping));
+
+  rewriter.setInsertionPoint(candidate);
+  for (OpOperand &operand : candidate->getOpOperands()) {
+    VectorLayoutInterface operandLayout =
+        getLayoutForMap(layout, candidate.getMatchingIndexingMap(&operand));
+    auto toLayout =
+        rewriter.create<ToLayoutOp>(loc, operand.get(), operandLayout);
+    operand.set(toLayout);
+  }
+
+  rewriter.setInsertionPointAfter(candidate);
+  for (OpResult result : candidate->getResults()) {
+    VectorLayoutInterface resultLayout =
+        getLayoutForMap(layout, candidate.getIndexingMapMatchingResult(result));
+    auto toLayout = rewriter.create<ToLayoutOp>(loc, result, resultLayout);
+    rewriter.replaceAllUsesExcept(result, toLayout, toLayout);
+  }
+
+  return success();
+}
+
 static Operation *getOpWithAttr(Operation *root, StringRef attr) {
   Operation *result = nullptr;
   WalkResult walkResult = root->walk([&](Operation *op) {
@@ -900,10 +1030,8 @@ struct LLVMGPUConfigureTensorLayoutsPass final
                   return setIntrinsicLoweringConfigLayout(
                       config, candidate, workgroupSize, rewriter);
                 }
-                candidate->emitError() << "Unable to set layouts on operation "
-                                          "based on given lowering config: "
-                                       << config;
-                return failure();
+                return setGPULoweringConfigLayout(config, candidate,
+                                                  workgroupSize, rewriter);
               })
               .Default([](Attribute) -> LogicalResult { return failure(); });
 
