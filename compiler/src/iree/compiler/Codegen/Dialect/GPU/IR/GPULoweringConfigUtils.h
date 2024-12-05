@@ -28,6 +28,26 @@ void setSubgroupNCount(MLIRContext *context,
                        SmallVectorImpl<NamedAttribute> &attrs,
                        int64_t subgroupNCount);
 
+// Helper to retrieve/set distribution basis.
+//
+// The basis consists of two integer arrays:
+//   - "counts": number of resource to use per dimension in the basis.
+//   - "mapping": a projected permutation to map to basis to the operations
+//     iteration space.
+//
+// Given a resource "x", the "basis" can be used to determine the distribution
+// of an iteration space using:
+//
+// b = delinearize(x, counts)
+// idx = apply(b, mapping)
+LogicalResult getBasis(IREE::GPU::LoweringConfigAttr config,
+                       IREE::GPU::TilingLevel level,
+                       SmallVector<int64_t> &basis,
+                       SmallVector<int64_t> &mapping);
+void setBasis(MLIRContext *context, SmallVector<NamedAttribute> &attrs,
+              IREE::GPU::TilingLevel level, ArrayRef<int64_t> basis,
+              ArrayRef<int64_t> mapping);
+
 /// Helper to retrieve/set a list of operand indices to promote.
 std::optional<SmallVector<int64_t>>
 getPromotedOperandList(LoweringConfigAttr config);
