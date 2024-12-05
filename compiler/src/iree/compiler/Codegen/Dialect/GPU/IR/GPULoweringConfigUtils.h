@@ -29,6 +29,17 @@ void setSubgroupNCount(MLIRContext *context,
                        int64_t subgroupNCount);
 
 // Helper to retrieve/set distribution basis.
+//
+// The basis consists of two integer arrays:
+//   - "counts": number of resource to use per dimension in the basis.
+//   - "mapping": a projected permutation to map to basis to the operations
+//     iteration space.
+//
+// Given a resource "x", the "basis" can be used to determine the distribution
+// of an iteration space using:
+//
+// b = delinearize(x, counts)
+// idx = apply(b, mapping)
 LogicalResult getBasis(IREE::GPU::LoweringConfigAttr config,
                        IREE::GPU::TilingLevel level,
                        SmallVector<int64_t> &basis,

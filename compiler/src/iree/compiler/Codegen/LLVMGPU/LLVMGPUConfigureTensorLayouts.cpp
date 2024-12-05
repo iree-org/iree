@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/PatternMatch.h"
@@ -823,31 +824,56 @@ FailureOr<SmallVector<int64_t>> divideTile(SmallVector<int64_t> &bounds,
   return quotient;
 }
 
-SmallVector<int64_t> getProjectedBasis(ArrayRef<int64_t> basis,
-                                       ArrayRef<int64_t> mapping) {
-  SmallVector<int64_t> projectedBasis;
-  for (int64_t dim : mapping) {
-    projectedBasis.push_back(basis[dim]);
+SmallVector<int64_t> applyProjectedPermutation(ArrayRef<int64_t> input,
+                                               ArrayRef<int64_t> perm) {
+  SmallVector<int64_t> result;
+  result.reserve(perm.size());
+  for (int64_t dim : perm) {
+    result.push_back(input[dim]);
   }
-  return projectedBasis;
+  return result;
 }
 
-SmallVector<int64_t> getStridesFromBasis(ArrayRef<int64_t> basis,
-                                         ArrayRef<int64_t> mapping) {
-  SmallVector<int64_t> canonicalStrides(basis.size());
+SmallVector<int64_t> getStridesFromBasis(ArrayRef<int64_t> basis) {
+  SmallVector<int64_t> strides(basis.size());
   int64_t currStride = 1;
-  for (auto [stride, size] :
-       llvm::reverse(llvm::zip(canonicalStrides, basis))) {
+  for (auto [stride, size] : llvm::reverse(llvm::zip(strides, basis))) {
     stride = currStride;
     currStride *= size;
   }
+  return strides;
+}
 
-  SmallVector<int64_t> strides;
-  for (int64_t dim : mapping) {
-    strides.push_back(canonicalStrides[dim]);
+static LogicalResult distributeTilingSizes(linalg::LinalgOp candidate,
+                                           IREE::GPU::LoweringConfigAttr config,
+                                           IREE::GPU::TilingLevel level,
+                                           SmallVector<int64_t> &bounds,
+                                           SmallVector<int64_t> &sizes,
+                                           SmallVector<int64_t> &strides) {
+  if (ShapedType::isDynamicShape(bounds)) {
+    candidate->emitError()
+        << "Cannot set layouts on a dynamically shaped iteration space";
+    return failure();
   }
 
-  return strides;
+  SmallVector<int64_t> basis, mapping;
+  if (failed(getBasis(config, level, basis, mapping))) {
+    candidate->emitError()
+        << "Could not find a subgroup basis from lowering config";
+    return failure();
+  }
+
+  sizes = applyProjectedPermutation(basis, mapping);
+  strides = applyProjectedPermutation(getStridesFromBasis(basis), mapping);
+
+  if (failed(divideTile(bounds, sizes))) {
+    candidate->emitError()
+        << "Could not divide bounds over given basis for level: "
+        << IREE::GPU::stringifyTilingLevel(level);
+    return failure();
+  }
+
+  return success();
 }
 
 static LogicalResult setGPULoweringConfigLayout(
@@ -857,62 +883,42 @@ static LogicalResult setGPULoweringConfigLayout(
   Location loc = candidate.getLoc();
 
   SmallVector<int64_t> bounds = candidate.getStaticLoopRanges();
-  if (ShapedType::isDynamicShape(bounds)) {
-    candidate->emitError()
-        << "Cannot set layouts on a dynamically shaped iteration space";
+
+  // Subgroup distribution layouts.
+  SmallVector<int64_t> subgroupSizes, subgroupStrides;
+  if (failed(distributeTilingSizes(candidate, config,
+                                   IREE::GPU::TilingLevel::Subgroup, bounds,
+                                   subgroupSizes, subgroupStrides))) {
     return failure();
   }
 
-  auto threadLevel = llvm::to_underlying(IREE::GPU::TilingLevel::Thread);
-
-  SmallVector<int64_t> threadSizes =
-      config.getStaticTilingLevelSizes(threadLevel, candidate);
-
-  SmallVector<int64_t> subgroupBasis, subgroupMapping;
-  if (failed(getBasis(config, IREE::GPU::TilingLevel::Subgroup, subgroupBasis,
-                      subgroupMapping))) {
-    candidate->emitError()
-        << "Could not find a subgroup basis from lowering config";
+  // Thread distribution layouts.
+  SmallVector<int64_t> threadSizes, threadStrides;
+  if (failed(distributeTilingSizes(candidate, config,
+                                   IREE::GPU::TilingLevel::Thread, bounds,
+                                   threadSizes, threadStrides))) {
     return failure();
   }
 
-  SmallVector<int64_t> threadBasis, threadMapping;
-  if (failed(getBasis(config, IREE::GPU::TilingLevel::Thread, threadBasis,
-                      threadMapping))) {
-    candidate->emitError()
-        << "Could not find a thread basis from lowering config";
-    return failure();
-  }
-
-  SmallVector<int64_t> subgroupTile =
-      getProjectedBasis(subgroupBasis, subgroupMapping);
-  SmallVector<int64_t> threadTile =
-      getProjectedBasis(threadBasis, threadMapping);
-
-  if (failed(divideTile(bounds, subgroupTile))) {
-    candidate->emitError()
-        << "Could not divide bounds over given subgroup basis";
-    return failure();
-  }
-
-  if (failed(divideTile(bounds, threadTile))) {
-    candidate->emitError() << "Could not divide bounds over given thread basis";
-    return failure();
-  }
-
-  FailureOr<SmallVector<int64_t>> elementTile = divideTile(bounds, threadSizes);
+  // Use thread tile sizes as the vector width for each thread.
+  SmallVector<int64_t> threadTileSizes = config.getStaticTilingLevelSizes(
+      llvm::to_underlying(IREE::GPU::TilingLevel::Thread), candidate);
+  FailureOr<SmallVector<int64_t>> elementTile =
+      divideTile(bounds, threadTileSizes);
   if (failed(elementTile)) {
     candidate->emitError() << "Could not divide bounds over given thread tile";
-    return failure();
   }
-
+  // The remaining bounds become batch sizes. We could also use subgroup tile
+  // sizes, as a way of specifying batch size, but since it is a derived
+  // property, we choose to compute it.
   ArrayRef<int64_t> batchTile = bounds;
   SmallVector<int64_t> outerTile(bounds.size(), 1);
 
   auto layout = IREE::VectorExt::NestedLayoutAttr::get(
-      context, subgroupTile, batchTile, outerTile, threadTile,
-      elementTile.value(), getStridesFromBasis(subgroupBasis, subgroupMapping),
-      getStridesFromBasis(threadBasis, threadMapping));
+      context, subgroupSizes, batchTile, outerTile, threadSizes,
+      elementTile.value(), subgroupStrides, threadStrides);
+
+  SmallVector<bool> promotedOperands = getPromotedOperands(candidate);
 
   rewriter.setInsertionPoint(candidate);
   for (OpOperand &operand : candidate->getOpOperands()) {
@@ -920,6 +926,9 @@ static LogicalResult setGPULoweringConfigLayout(
         getLayoutForMap(layout, candidate.getMatchingIndexingMap(&operand));
     auto toLayout =
         rewriter.create<ToLayoutOp>(loc, operand.get(), operandLayout);
+    // Set shared memory promotion if requested.
+    toLayout.setSharedMemoryConversion(
+        promotedOperands[operand.getOperandNumber()]);
     operand.set(toLayout);
   }
 
