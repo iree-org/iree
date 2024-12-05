@@ -15,6 +15,22 @@ Sample usage:
         --repos=iree-org/iree,iree-org/iree-turbine \
         --output=docs/website/docs/pip-release-links.html
     ```
+
+WARNING for developers:
+  GitHub's APIs have rate limits:
+    * 60 requests per hour for unauthenticated users
+    * 5000 requests per hour for authenticated users
+
+  This script only requires read access to public endpoints, but you
+  authenticate yourself to take advantage of the higher rate limit.
+  Creating a fine-grained personal access token with no extra permissions and
+  storing it in the `GITHUB_TOKEN` environment variable seems to work well
+  enough.
+
+  See documentation at:
+    * https://docs.github.com/en/rest/using-the-rest-api/getting-started-with-the-rest-api?apiVersion=2022-11-28#authentication
+    * https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28
+    * https://docs.github.com/en/rest/authentication/authenticating-to-the-rest-api?apiVersion=2022-11-28
 """
 
 # TODO(#10479) since we're generating this we might as well create a PEP 503
@@ -23,9 +39,12 @@ Sample usage:
 import argparse
 import html
 import io
+import os
 import requests
 import sys
 import textwrap
+
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 
 def parse_arguments():
@@ -50,6 +69,13 @@ class ReleaseFetcher:
         self._repo = repo
         self._per_page = per_page
 
+        self.headers = {
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        if GITHUB_TOKEN:
+            self.headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+
     def get_all(self):
         url = f"https://api.github.com/repos/{self._repo}/releases"
         page = 1
@@ -62,7 +88,12 @@ class ReleaseFetcher:
                     "page": page,
                     "per_page": self._per_page,
                 },
+                headers=self.headers,
             )
+            if response.status_code != 200:
+                raise RuntimeError(
+                    f"Request was not successful, reason: {response.reason}"
+                )
             for release in response.json():
                 yield release
             if "next" not in response.links:
