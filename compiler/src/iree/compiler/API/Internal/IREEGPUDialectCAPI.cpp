@@ -7,6 +7,7 @@
 #include <cassert>
 #include <cstdint>
 #include <type_traits>
+#include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/dialects/iree_gpu.h"
@@ -221,16 +222,18 @@ ireeGPUTileSizes ireeGPULoweringConfigAttrGetTileSizes(MlirAttribute attr) {
       llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
           unwrap(attr));
 
-  auto workgroups = loweringConfigAttr.getWorkgroupTileSizes();
+  llvm::SmallVector<int64_t> workgroups =
+      loweringConfigAttr.getWorkgroupTileSizes();
   tilesizes.workgroupTileSizes = workgroups.data();
   tilesizes.numWorkgroupTileSizes = workgroups.size();
 
-  auto reduction = loweringConfigAttr.getStaticTilingLevelSizes(
-      static_cast<int64_t>(
-          mlir::iree_compiler::IREE::GPU::TilingLevel::Reduction),
-      nullptr);
-  tilesizes.reductionTileSizes = reduction.data();
-  tilesizes.numReductionTileSizes = reduction.size();
+  llvm::SmallVector<int64_t> reductions =
+      loweringConfigAttr.getStaticTilingLevelSizes(
+          static_cast<int64_t>(
+              mlir::iree_compiler::IREE::GPU::TilingLevel::Reduction),
+          nullptr);
+  tilesizes.reductionTileSizes = reductions.data();
+  tilesizes.numReductionTileSizes = reductions.size();
 
   return tilesizes;
 }
@@ -238,36 +241,38 @@ ireeGPUTileSizes ireeGPULoweringConfigAttrGetTileSizes(MlirAttribute attr) {
 ireeGPUSubgroupCountInfo
 ireeGPULoweringConfigAttrGetSubgroupCount(MlirAttribute attr) {
   assert(ireeAttributeIsAGPULoweringConfigAttr(attr));
-  mlir::DictionaryAttr dict =
+  auto loweringConfigAttr =
       llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
-          unwrap(attr))
-          .getAttributes();
-
-  constexpr mlir::StringLiteral kSubgroupMCountName = "subgroup_m_count";
-  constexpr mlir::StringLiteral kSubgroupNCountName = "subgroup_n_count";
-
-  mlir::IntegerAttr subgroup_m_count_attr =
-      dict.getAs<mlir::IntegerAttr>(kSubgroupMCountName);
-  mlir::IntegerAttr subgroup_n_count_attr =
-      dict.getAs<mlir::IntegerAttr>(kSubgroupNCountName);
+          unwrap(attr));
+  std::optional<int64_t> subgroupMCount =
+      mlir::iree_compiler::IREE::GPU::getSubgroupMCount(loweringConfigAttr);
+  std::optional<int64_t> subgroupNCount =
+      mlir::iree_compiler::IREE::GPU::getSubgroupNCount(loweringConfigAttr);
 
   ireeGPUSubgroupCountInfo info = {};
-  info.subgroupMCountAttr = wrap(subgroup_m_count_attr);
-  info.subgroupNCountAttr = wrap(subgroup_n_count_attr);
+
+  if (subgroupMCount) {
+    info.subgroupMCountAttr = wrap(mlir::IntegerAttr::get(
+        mlir::IndexType::get(loweringConfigAttr.getContext()),
+        *subgroupMCount));
+  }
+
+  if (subgroupNCount) {
+    info.subgroupNCountAttr = wrap(mlir::IntegerAttr::get(
+        mlir::IndexType::get(loweringConfigAttr.getContext()),
+        *subgroupNCount));
+  }
   return info;
 }
 
 MlirAttribute ireeGPULoweringConfigAttrGetMmaKind(MlirAttribute attr) {
   assert(ireeAttributeIsAGPULoweringConfigAttr(attr));
-  mlir::DictionaryAttr dict =
+  auto loweringConfigAttr =
       llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
-          unwrap(attr))
-          .getAttributes();
+          unwrap(attr));
 
-  constexpr mlir::StringLiteral kMmaKindName = "mma_kind";
   mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr mma_attr =
-      dict.getAs<mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr>(
-          kMmaKindName);
+      mlir::iree_compiler::IREE::GPU::getMmaKind(loweringConfigAttr);
 
   return wrap(mma_attr);
 }

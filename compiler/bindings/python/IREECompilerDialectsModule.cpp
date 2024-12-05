@@ -370,7 +370,7 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
                                            tilesizes.numReductionTileSizes};
                              })
       .def_property_readonly(
-          "subgroup_count",
+          "subgroup_count_mn",
           [](MlirAttribute self) -> py::tuple {
             ireeGPUSubgroupCountInfo info =
                 ireeGPULoweringConfigAttrGetSubgroupCount(self);

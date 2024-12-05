@@ -103,11 +103,6 @@ struct ireeGPUTileSizes {
 MLIR_CAPI_EXPORTED ireeGPUTileSizes
 ireeGPULoweringConfigAttrGetTileSizes(MlirAttribute attr);
 
-// MLIR_CAPI_EXPORTED void
-// ireeGPULoweringConfigAttrGetWorkgroupTileSizes(MlirAttribute attr, size_t
-// *len,
-//                                                int64_t *workgroupTileSizes);
-
 struct ireeGPUSubgroupCountInfo {
   MlirAttribute subgroupMCountAttr;
   MlirAttribute subgroupNCountAttr;
