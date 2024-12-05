@@ -61,8 +61,9 @@ python -m pip install -r ./pypi_deploy_requirements.txt
 The [`generate_release_index.py`](./generate_release_index.py) script,
 run as part of
 [`.github/workflows/publish_website.yml`](../../.github/workflows/publish_website.yml),
-scrapes release artifact URLs from https://github.com/iree-org/iree/releases to
-generate the release index published at https://iree.dev/pip-release-links.html.
+scrapes release artifact URLs from https://github.com/iree-org/iree/releases
+(and the release pages for other ecosystem projects) to generate the release
+index published at https://iree.dev/pip-release-links.html.
 
 The release index can be used like so:
 
