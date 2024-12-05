@@ -73,7 +73,9 @@ class ReleaseFetcher:
 def add_releases_for_repository(repo: str, file: io.TextIOWrapper):
     fetcher = ReleaseFetcher(repo)
 
-    # TODO(scotttodd): section comment for each repository, human readable?
+    file.write(
+        f'    <h2>Packages for <a href="https://github.com/{repo}">{repo}</a></h2>\n'
+    )
 
     for release in fetcher.get_all():
         if release["draft"]:
