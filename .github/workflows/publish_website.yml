@@ -28,6 +28,8 @@ on:
 
 jobs:
   publish_website:
+    if: ${{ github.repository_owner == 'iree-org' || github.event_name == 'workflow_dispatch' }}
+
     # Note: a clean build of `iree-tblgen` takes ~5 minutes on standard runners.
     runs-on: ubuntu-20.04
     env:
@@ -53,11 +55,25 @@ jobs:
           pip install requests
           sudo apt update
           sudo apt install -y ninja-build
+
+      # Build a release index page by scraping release package URLs for any
+      # ecosystem projects that may interest users.
+      #
+      # This can scrape the release pages from any public GitHub repositories.
+      # Currently included repositories:
+      #   https://github.com/iree-org/iree
+      #   https://github.com/iree-org/iree-turbine
+      #   https://github.com/nod-ai/shark-ai
+      # For consideration:
+      #   https://github.com/openxla/stablehlo
+      #   https://github.com/llvm/torch-mlir (see below)
+      #   https://github.com/llvm/torch-mlir-release
       - name: Generating release index
         run: |
           ./build_tools/python_deploy/generate_release_index.py \
-            --repo="${GITHUB_REPOSITORY}" \
+            --repos="iree-org/iree,iree-org/iree-turbine,nod-ai/shark-ai" \
             --output=docs/website/docs/pip-release-links.html
+
       - name: ccache
         uses: hendrikmuhs/ccache-action@ed74d11c0b343532753ecead8a951bb09bb34bc9 # v1.2.14
         with:
