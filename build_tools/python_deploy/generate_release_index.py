@@ -5,17 +5,25 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Creates an HTML page for releases for `pip install --find-links` from GitHub releases."""
+
+"""Creates an HTML page for releases for `pip install --find-links` from GitHub releases.
+
+Typical usage:
+
+    ```bash
+    ./build_tools/python_deploy/generate_release_index.py \
+        --output=docs/website/docs/pip-release-links.html
+    ```
+"""
+
 # TODO(#10479) since we're generating this we might as well create a PEP 503
 # compliant index
+
 import argparse
 import html
-import json
-import subprocess
+import requests
 import sys
 import textwrap
-
-import requests
 
 
 def parse_arguments():
