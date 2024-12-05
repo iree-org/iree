@@ -1100,6 +1100,16 @@ class TestVectorLayoutOptions : public VectorLayoutOptions {
 public:
   TestVectorLayoutOptions(Operation *root)
       : VectorLayoutOptions(root, /*fullConversion=*/false) {}
+
+  VectorLayoutInterface getDefaultLayout(VectorType type) const override {
+    // We only allow a default layout for 0-d vectors for now.
+    if (type.getRank() > 0) {
+      return VectorLayoutInterface();
+    }
+    ArrayRef<int64_t> empty = {};
+    return IREE::VectorExt::NestedLayoutAttr::get(
+        type.getContext(), empty, empty, empty, empty, empty, empty, empty);
+  }
 };
 
 DiagnosedSilenceableFailure

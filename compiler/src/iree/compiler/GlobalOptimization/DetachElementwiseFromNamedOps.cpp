@@ -69,6 +69,18 @@ struct DetachElementwisePattern
 
     Location loc = linalgOp.getLoc();
 
+    // Check if the output tensor access is a projected permutation
+    if (!linalgOp.getMatchingIndexingMap(outputOperands.front())
+             .isProjectedPermutation()) {
+      return rewriter.notifyMatchFailure(
+          linalgOp, "Output indexing map must be a projected permutation.");
+    }
+
+    int64_t outputRank = outputType.getRank();
+    SmallVector<utils::IteratorType> iterators(outputRank,
+                                               utils::IteratorType::parallel);
+    SmallVector<AffineMap> maps(3, rewriter.getMultiDimIdentityMap(outputRank));
+
     // Create a zero tensor as the new output tensor operand to the Linalg
     // contraction op.
     SmallVector<OpFoldResult> mixedSizes =
@@ -83,24 +95,6 @@ struct DetachElementwisePattern
     // Update the contraction op to use the new zero tensor as output operand.
     rewriter.modifyOpInPlace(linalgOp,
                              [&]() { linalgOp.setDpsInitOperand(0, fill); });
-
-    auto outputMap = mlir::compressUnusedDims(
-        linalgOp.getMatchingIndexingMap(outputOperands.front()));
-    // Only support identity map for output access for now; this is the case for
-    // all existing contraction/convolution ops.
-    if (!outputMap.isIdentity())
-      return failure();
-    SmallVector<AffineMap> maps(3, outputMap);
-
-    SmallVector<utils::IteratorType> iterators;
-    iterators.reserve(outputMap.getNumResults());
-    for (int i = 0, e = outputMap.getNumResults(); i < e; ++i) {
-      int pos = cast<AffineDimExpr>(outputMap.getResult(i)).getPosition();
-      auto attr = linalgOp.getIteratorTypesArray()[pos];
-      if (!linalg::isParallelIterator(attr))
-        return failure();
-      iterators.push_back(attr);
-    }
 
     // Create a generic op to add back the original output tensor operand.
     rewriter.setInsertionPointAfter(linalgOp);

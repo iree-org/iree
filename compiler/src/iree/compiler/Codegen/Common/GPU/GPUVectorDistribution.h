@@ -108,6 +108,8 @@ public:
 
   bool verifyConversion() const { return fullConversion; }
 
+  virtual VectorLayoutInterface getDefaultLayout(VectorType type) const = 0;
+
 protected:
   Operation *root;
   bool fullConversion = true;

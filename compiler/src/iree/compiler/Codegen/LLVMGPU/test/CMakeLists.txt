@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "cast_type_to_fit_mma.mlir"
     "config_custom_op.mlir"
     "config_matvec.mlir"
+    "config_root_op_attribute.mlir"
     "config_winograd.mlir"
     "configure_tensor_layout.mlir"
     "conv_pipeline_test_cuda.mlir"
