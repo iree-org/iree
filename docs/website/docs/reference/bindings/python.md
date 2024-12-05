@@ -97,6 +97,27 @@ To use IREE's Python bindings, you will first need to install
       iree-base-runtime
     ```
 
+=== ":octicons-git-branch-24: Development packages"
+
+    Development packages are produced for every commit, including pull requests,
+    for limited configurations.
+
+    On **Linux** with **Python 3.11**, these packages can be installed into
+    a [Python `venv`](https://docs.python.org/3/library/venv.html) using the
+    [`build_tools/pkgci/setup_venv.py`](https://github.com/iree-org/iree/blob/main/build_tools/pkgci/setup_venv.py)
+    script:
+
+    ``` shell
+    # Latest completed run on the `main` branch.
+    ./build_tools/pkgci/setup_venv.py /tmp/.venv --fetch-latest-main
+
+    # A specific commit ref.
+    ./build_tools/pkgci/setup_venv.py /tmp/.venv --fetch-git-ref=8230f41d
+
+    # A specific workflow run (such as on a pull request).
+    ./build_tools/pkgci/setup_venv.py /tmp/.venv --fetch-gh-workflow=11977414405
+    ```
+
 ### :material-hammer-wrench: Building from source
 
 See [Building Python bindings](../../building-from-source/getting-started.md#python-bindings)
