@@ -16,6 +16,7 @@
   position: relative;
   top: 5px;
   left: 0;
+  display: inline;
 }
 
 pre.highlight code {
