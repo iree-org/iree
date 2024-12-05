@@ -772,7 +772,7 @@ static void addVectorBufferizePasses(OpPassManager &funcPassManager) {
 void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
                                         const GPUPipelineOptions &options,
                                         bool usePadToModelSharedMemcpy) {
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/false);
+  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true);
 
   ReorderWorkgroupsStrategy reorderStrategy =
       getReorderWorkgroupsStrategy(options.reorderStrategy);
@@ -1212,6 +1212,7 @@ void buildROCDLCodegenPassPipeline(OpPassManager &variantPassManager) {
         .addPass(createVerifyWorkgroupDistributionPass);
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
+  variantPassManager.addPass(createLowerAffinePass());
   variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());
 
   addLowerToLLVMGPUPasses(variantPassManager.nest<ModuleOp>(),
