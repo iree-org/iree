@@ -481,9 +481,10 @@ public:
         // When GlobalISelAbort is set, any failure of GlobalISel,
         // whether due to being not yet implemented or incorrect IR will result
         // in an immediate abortion of compilation. This disables the fallback
-        // path of FastISel which might work around unimplemented cases or
-        // errors in GlobalISel resulting in a successful compilation but would
-        // make one assume results are with GlobalISel when they are not.
+        // path of AMDGPUPassConfig::addInstSelector and 2 legacy passes which
+        // might work around unimplemented cases or errors in GlobalISel
+        // resulting in a successful compilation but would make one assume
+        // results are with GlobalISel when they are not.
         opt.EnableGlobalISel = options.globalISel;
         opt.GlobalISelAbort = options.globalISel
                                   ? llvm::GlobalISelAbortMode::Enable
