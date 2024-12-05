@@ -11,23 +11,22 @@
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
-std::tuple<LogicalResult, Value, Value> rewriteFft(Operation *op, Value operand,
-                                                   int64_t fftLength,
-                                                   PatternRewriter &rewriter) {
+FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
+                                              int64_t fftLength,
+                                              PatternRewriter &rewriter) {
 
-  assert(!(fftLength & (fftLength - 1)) &&
+  assert(llvm::isPowerOf2_64(fftLength) &&
          "expected FFT length to be a power of two");
   Location loc = op->getLoc();
 
   auto operandType = llvm::dyn_cast<RankedTensorType>(operand.getType());
   if (!operandType || !operandType.hasStaticShape()) {
-    return {failure(), Value(), Value()};
+    return failure();
   }
 
   // Skip else getBitReversalOrder produces invalid dense elements attr.
   if (isa<ComplexType>(getElementTypeOrSelf(operand.getType())))
-    return {rewriter.notifyMatchFailure(op, "expected real types"), Value(),
-            Value()};
+    return rewriter.notifyMatchFailure(op, "expected real types");
 
   ImplicitLocOpBuilder b(loc, rewriter);
 
@@ -122,12 +121,12 @@ std::tuple<LogicalResult, Value, Value> rewriteFft(Operation *op, Value operand,
   SmallVector<OpFoldResult> sizes =
       tensor::getMixedSizes(b, b.getLoc(), operand);
   sizes.back() = b.getIndexAttr(shape.back());
-  auto real =
+  Value real =
       b.create<tensor::ExtractSliceOp>(ty, results[0], offsets, sizes, strides);
-  auto imag =
+  Value imag =
       b.create<tensor::ExtractSliceOp>(ty, results[1], offsets, sizes, strides);
 
-  return {success(), real, imag};
+  return std::make_pair(real, imag);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

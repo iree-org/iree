@@ -60,7 +60,7 @@ struct FftRfftOpConversion
       return rewriter.notifyMatchFailure(op,
                                          "expected known FFT dimension size");
     }
-    if (fftLength & (fftLength - 1)) {
+    if (!llvm::isPowerOf2_64(fftLength)) {
       return rewriter.notifyMatchFailure(
           op, "expected FFT length to be a power of two");
     }
@@ -91,11 +91,13 @@ struct FftRfftOpConversion
                 .toBuiltinTensor(),
             self);
 
-    auto [res, real, imag] =
+    auto rewriteRes =
         IREE::LinalgExt::rewriteFft(op, builtinCast, fftLength, rewriter);
-    if (res.failed()) {
+    if (failed(rewriteRes)) {
       return failure();
     }
+
+    auto [real, imag] = rewriteRes.value();
 
     // Cast back
     SmallVector<int64_t> postFftShape(preFftShape);

@@ -306,16 +306,18 @@ struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
       return rewriter.notifyMatchFailure(op, "non-splat length");
     }
     int64_t fftLength = op.getFftLength().front();
-    if (fftLength & (fftLength - 1)) {
+    if (!llvm::isPowerOf2_64(fftLength)) {
       return rewriter.notifyMatchFailure(
           op, "expected FFT length to be a power of two");
     }
 
-    auto [res, real, imag] = IREE::LinalgExt::rewriteFft(
-        op, adaptor.getOperand(), fftLength, rewriter);
-    if (res.failed()) {
+    auto rewriteRes = IREE::LinalgExt::rewriteFft(op, adaptor.getOperand(),
+                                                  fftLength, rewriter);
+    if (failed(rewriteRes)) {
       return failure();
     }
+
+    auto [real, imag] = rewriteRes.value();
 
     rewriter.replaceOpWithNewOp<mlir::stablehlo::ComplexOp>(op, op.getType(),
                                                             real, imag);

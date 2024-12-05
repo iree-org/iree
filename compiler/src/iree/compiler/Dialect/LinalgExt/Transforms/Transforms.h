@@ -42,8 +42,8 @@ collapseOpIterationDims(AttentionOp op,
 
 // Rewrite input rfft op (dialect-agnostic) into linalg_ext.fft. Return real
 // and imaginary tensor values.
-std::tuple<LogicalResult, Value, Value> rewriteFft(Operation *op, Value operand,
-                                                   int64_t fftLength,
-                                                   PatternRewriter &rewriter);
+FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
+                                              int64_t fftLength,
+                                              PatternRewriter &rewriter);
 
 }; // namespace mlir::iree_compiler::IREE::LinalgExt
