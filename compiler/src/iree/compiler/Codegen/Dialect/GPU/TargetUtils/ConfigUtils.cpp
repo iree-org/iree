@@ -110,7 +110,8 @@ setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
 /// problem based on the available mma intrinsics.
 static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     IREE::GPU::TargetAttr target, GPUMatmulShapeType problem,
-    bool transposedLhs, bool transposedRhs, bool mustBeAligned = true) {
+    bool transposedLhs, bool transposedRhs, bool mustBeAligned = true,
+    bool doCPromotion = false) {
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   SmallVector<GPUMatmulShapeType> intrinsics;
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
@@ -155,13 +156,13 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
       transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
-      /*mustBeAligned*/ mustBeAligned);
+      /*mustBeAligned*/ mustBeAligned, doCPromotion);
   if (!schedule) {
     // Then try again by allowing upcasting accumulator.
     schedule = deduceMMASchedule(
         problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
         transposedLhs, transposedRhs, /*canUpcastAcc=*/true,
-        /*mustBeAligned*/ mustBeAligned);
+        /*mustBeAligned*/ mustBeAligned, doCPromotion);
   }
   return schedule;
 }
@@ -241,6 +242,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
       llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
   bool mustBeAligned = true;
+  bool doCPromotion = false;
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
       target, problem, transposedLhs, transposedRhs);
 
@@ -253,8 +255,10 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   if (!schedule && !contractionDims.batch.empty() && !hasFusedLeadingOp) {
     LDBG("Attempting to deduce unaligned TileAndFuse MMA schedulee");
     mustBeAligned = false;
-    schedule = getMmaScheduleFromProblemAndTarget(
-        target, problem, transposedLhs, transposedRhs, mustBeAligned);
+    doCPromotion = true;
+    schedule = getMmaScheduleFromProblemAndTarget(target, problem,
+                                                  transposedLhs, transposedRhs,
+                                                  mustBeAligned, doCPromotion);
   }
 
   if (!schedule) {
