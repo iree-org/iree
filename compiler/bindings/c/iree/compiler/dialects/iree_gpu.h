@@ -94,10 +94,8 @@ MLIR_CAPI_EXPORTED MlirAttribute
 ireeGPULoweringConfigAttrGetAttributes(MlirAttribute attr);
 
 struct ireeGPUTileSizes {
-  const int64_t *workgroupTileSizes;
-  size_t numWorkgroupTileSizes;
-  const int64_t *reductionTileSizes;
-  size_t numReductionTileSizes;
+  MlirAttribute workgroupAttr;
+  MlirAttribute reductionAttr;
 };
 
 MLIR_CAPI_EXPORTED ireeGPUTileSizes

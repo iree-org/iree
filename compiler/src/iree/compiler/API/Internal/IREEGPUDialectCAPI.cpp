@@ -218,23 +218,20 @@ MlirAttribute ireeGPULoweringConfigAttrGetAttributes(MlirAttribute attr) {
 ireeGPUTileSizes ireeGPULoweringConfigAttrGetTileSizes(MlirAttribute attr) {
   assert(ireeAttributeIsAGPULoweringConfigAttr(attr));
   ireeGPUTileSizes tilesizes = {};
-  auto loweringConfigAttr =
+  mlir::DictionaryAttr dict =
       llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
-          unwrap(attr));
+          unwrap(attr))
+          .getAttributes();
 
-  llvm::SmallVector<int64_t> workgroups =
-      loweringConfigAttr.getWorkgroupTileSizes();
-  tilesizes.workgroupTileSizes = workgroups.data();
-  tilesizes.numWorkgroupTileSizes = workgroups.size();
+  constexpr mlir::StringLiteral workgroupName = "workgroup";
+  if (auto workgroupArray = dict.getAs<mlir::ArrayAttr>(workgroupName)) {
+    tilesizes.workgroupAttr = wrap(workgroupArray);
+  }
 
-  llvm::SmallVector<int64_t> reductions =
-      loweringConfigAttr.getStaticTilingLevelSizes(
-          llvm::to_underlying(
-              mlir::iree_compiler::IREE::GPU::TilingLevel::Reduction),
-          nullptr);
-  tilesizes.reductionTileSizes = reductions.data();
-  tilesizes.numReductionTileSizes = reductions.size();
-
+  constexpr mlir::StringLiteral reductionName = "reduction";
+  if (auto reductionArray = dict.getAs<mlir::ArrayAttr>(reductionName)) {
+    tilesizes.reductionAttr = wrap(reductionArray);
+  }
   return tilesizes;
 }
 
