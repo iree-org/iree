@@ -557,3 +557,40 @@ func.func @distribute_multi_result_generic(
 //       THREAD:     linalg.generic
 //  THREAD-SAME:       outs(%{{.*}}, %{{.*}}: tensor<1x1x?xf32>, tensor<1x1x?xf32>)
 //       THREAD:   return %[[FORALL]]#0, %[[FORALL]]#1
+
+//  -----
+
+func.func @dont_yield_replacement_in_reduction_tiling(%arg0: tensor<4x77xbf16>, %arg1: tensor<4x77xf32>) -> (tensor<4x77xf32>, tensor<4xf32>) {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %0 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1) -> (d0, d1)>,
+      affine_map<(d0, d1) -> (d0, d1)>
+    ], iterator_types = ["parallel", "parallel"]}
+    ins(%arg0 : tensor<4x77xbf16>) outs(%arg1 : tensor<4x77xf32>) {
+    ^bb0(%in: bf16, %out: f32):
+      %6 = arith.extf %in : bf16 to f32
+      linalg.yield %6 : f32
+    } -> tensor<4x77xf32>
+  %1 = tensor.empty() : tensor<4xf32>
+  %2 = linalg.fill ins(%cst : f32) outs(%1 : tensor<4xf32>) -> tensor<4xf32>
+  %3 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1) -> (d0, d1)>,
+      affine_map<(d0, d1) -> (d0)>
+    ], iterator_types = ["parallel", "reduction"]}
+    ins(%0 : tensor<4x77xf32>) outs(%2 : tensor<4xf32>)
+    attrs =  {lowering_config = #iree_gpu.lowering_config<{reduction = [0, 7]}>} {
+    ^bb0(%in: f32, %out: f32):
+      %6 = arith.maxnumf %in, %out : f32
+      linalg.yield %6 : f32
+    } -> tensor<4xf32>
+  return %0, %3 : tensor<4x77xf32>, tensor<4xf32>
+}
+
+//  CHECK-LABEL: @dont_yield_replacement_in_reduction_tiling
+//        CHECK: scf.for
+// Note: if we yield replacement then we would see a large result of
+// tensor<4x77xf32> also being yielded which is not what we want in such a case.
+//   CHECK-SAME:  -> (tensor<4xf32>) {

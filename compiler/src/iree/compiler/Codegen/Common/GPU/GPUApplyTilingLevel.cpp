@@ -143,8 +143,11 @@ static LogicalResult applyTileAndFuseToEachRoot(
           return std::nullopt;
         }
       }
-
-      bool yieldProducerReplacement = yieldReplacementsFor.contains(owner);
+      bool yieldProducerReplacement = false;
+      // We dont want this for reduction tiling as it can lead to large tensors
+      // being yielded.
+      if (tilingLevel != IREE::GPU::TilingLevel::Reduction)
+        yieldProducerReplacement = yieldReplacementsFor.contains(owner);
       bool shouldFuse = false;
       if (auto tilingOwner = dyn_cast<TilingInterface>(owner)) {
         shouldFuse = !payloadOps.contains(tilingOwner);
