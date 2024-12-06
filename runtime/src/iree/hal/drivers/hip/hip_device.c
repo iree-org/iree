@@ -1048,11 +1048,12 @@ iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
 
   for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
     iree_hal_hip_event_t* event = NULL;
-    iree_status_t status = iree_hal_hip_semaphore_get_hip_event(
-        signal_semaphore_list.semaphores[i],
-        signal_semaphore_list.payload_values[i],
-        device->topology.devices[device_ordinal].device_event_pool, true,
-        &event);
+    iree_status_t status =
+        iree_hal_hip_semaphore_create_event_and_record_if_necessary(
+            signal_semaphore_list.semaphores[i],
+            signal_semaphore_list.payload_values[i],
+            device->topology.devices[device_ordinal].hip_dispatch_stream,
+            device->topology.devices[device_ordinal].device_event_pool, &event);
 
     if (!iree_status_is_ok(status)) {
       break;
@@ -1062,11 +1063,6 @@ iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
           iree_make_status(IREE_STATUS_ABORTED, "the hip event is missing");
       break;
     }
-    status = IREE_HIP_CALL_TO_STATUS(
-        device->hip_symbols,
-        hipEventRecord(
-            iree_hal_hip_event_handle(event),
-            device->topology.devices[device_ordinal].hip_dispatch_stream));
     iree_hal_hip_event_release(event);
     if (!iree_status_is_ok(status)) {
       break;
@@ -1240,8 +1236,7 @@ static iree_status_t iree_hal_hip_device_stream_wait_for_semaphores(
     status = iree_hal_hip_semaphore_get_hip_event(
         wait_semaphore_list.semaphores[i],
         wait_semaphore_list.payload_values[i],
-        device->topology.devices[device_ordinal].device_event_pool, false,
-        &event);
+        device->topology.devices[device_ordinal].device_event_pool, &event);
     if (!iree_status_is_ok(status)) {
       break;
     }
