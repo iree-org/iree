@@ -38,7 +38,7 @@ jobs:
       IREE_HIP_ENABLE: 0
     steps:
       - name: Check out repository
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: false
       - name: Check out runtime submodules
@@ -47,7 +47,7 @@ jobs:
         run: |
           ./build_tools/scripts/check_cuda.sh
           ./build_tools/scripts/check_vulkan.sh
-      - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
