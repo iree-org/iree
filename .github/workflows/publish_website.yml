@@ -64,22 +64,21 @@ jobs:
           sudo apt update
           sudo apt install -y ninja-build
 
-      # Build a release index page by scraping release package URLs for any
-      # ecosystem projects that may interest users.
+      # Build a release index page by scraping release package URLs.
       #
       # This can scrape the release pages from any public GitHub repositories.
       # Currently included repositories:
       #   https://github.com/iree-org/iree
       #   https://github.com/iree-org/iree-turbine
+      # Ecosystem projects for consideration:
       #   https://github.com/nod-ai/shark-ai
-      # For consideration:
       #   https://github.com/openxla/stablehlo
       #   https://github.com/llvm/torch-mlir (see below)
       #   https://github.com/llvm/torch-mlir-release
       - name: Generating release index
         run: |
           ./build_tools/python_deploy/generate_release_index.py \
-            --repos="iree-org/iree,iree-org/iree-turbine,nod-ai/shark-ai" \
+            --repos="iree-org/iree,iree-org/iree-turbine" \
             --output=docs/website/docs/pip-release-links.html
 
       - name: ccache
