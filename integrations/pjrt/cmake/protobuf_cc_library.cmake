@@ -29,7 +29,7 @@ FetchContent_MakeAvailable(protobuf)
 # make protobuf_generate() function available
 include(${protobuf_SOURCE_DIR}/cmake/protobuf-generate.cmake)
 
-# protobuf_cc_library()
+# iree_pjrt_protobuf_cc_library()
 #
 # CMake function to invoke the protoc compiler.
 #
@@ -41,14 +41,14 @@ include(${protobuf_SOURCE_DIR}/cmake/protobuf-generate.cmake)
 # Also in IDE, target will appear in IREE folder while non PUBLIC will be in IREE/internal.
 # TESTONLY: When added, this target will only be built if user passes -DIREE_BUILD_TESTS=ON to CMake.
 #
-# protobuf_cc_library(
+# iree_pjrt_protobuf_cc_library(
 #   NAME
 #     some_def
 #   SRC
 #     some_def.proto
 #   PUBLIC
 # )
-function(protobuf_cc_library)
+function(iree_pjrt_protobuf_cc_library)
   cmake_parse_arguments(_RULE
     "PUBLIC;TESTONLY"
     "NAME"

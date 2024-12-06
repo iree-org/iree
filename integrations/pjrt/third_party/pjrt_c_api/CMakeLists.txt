@@ -27,7 +27,7 @@ iree_cc_library(
   PUBLIC
 )
 
-protobuf_cc_library(
+iree_pjrt_protobuf_cc_library(
   NAME
     protos
   SRCS
