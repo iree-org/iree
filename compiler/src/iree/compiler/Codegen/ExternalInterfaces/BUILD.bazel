@@ -27,6 +27,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/Utils",
         "//compiler/src/iree/compiler/Codegen/Dialect/GPU/IR:IREEGPUDialect",
         "//compiler/src/iree/compiler/Dialect/Encoding/IR",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:TensorDialect",

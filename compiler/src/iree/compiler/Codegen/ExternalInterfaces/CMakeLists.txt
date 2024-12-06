@@ -20,6 +20,7 @@ iree_cc_library(
     "GPUEncodingExternalModels.cpp"
     "Interfaces.cpp"
   DEPS
+    LLVMSupport
     MLIRIR
     MLIRLinalgDialect
     MLIRTensorDialect
