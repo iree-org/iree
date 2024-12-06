@@ -13,15 +13,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-bubble-up-expand-shapes"
@@ -156,8 +158,47 @@ void BubbleUpExpandShapesPass::runOnOperation() {
       };
   linalg::populateFoldReshapeOpsByExpansionPatterns(bubbleExpandShapePatterns,
                                                     bubbleUpExpansionControlFn);
+
+  // TODO(#19263): Temporary fix to prevent compilation failures when the k2
+  // dims get expanded to unit dimensions. This adds the constraint to
+  // `bubbleUpExpansionControlFn` that the k2 dimensions cannot be expanded by
+  // the reshape fusion.
+  linalg::ControlFusionFn linalgExtExpansionFn = [&](OpOperand *fusedOperand) {
+    if (!bubbleUpExpansionControlFn(fusedOperand)) {
+      return false;
+    }
+
+    // There is no need to handle `expand_shape` ops because they would be the
+    // producer and therefore are unable to expand the k2 dims.
+    auto collapseOp =
+        dyn_cast<tensor::CollapseShapeOp>(fusedOperand->get().getDefiningOp());
+    auto attentionOp =
+        dyn_cast<IREE::LinalgExt::AttentionOp>(fusedOperand->getOwner());
+    if (!collapseOp || !attentionOp) {
+      return true;
+    }
+
+    SmallVector<ReassociationIndices> reassoc =
+        collapseOp.getReassociationIndices();
+    auto opDetail = IREE::LinalgExt::AttentionOpDetail::get(
+        attentionOp.getQueryMap(), attentionOp.getKeyMap(),
+        attentionOp.getValueMap(), attentionOp.getOutputMap());
+
+    // Don't sink the `collapse_shape` op if it is collapsing into any of the k2
+    // dimensions.
+    AffineMap operandMap = attentionOp.getMatchingIndexingMap(fusedOperand);
+    for (auto dim : opDetail->getK2Dims()) {
+      auto dimExpr = getAffineDimExpr(dim, operandMap.getContext());
+      if (std::optional<int64_t> maybeDim =
+              operandMap.getResultPosition(dimExpr);
+          maybeDim && !reassoc[maybeDim.value()].empty()) {
+        return false;
+      }
+    }
+    return true;
+  };
   IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(
-      bubbleExpandShapePatterns, bubbleUpExpansionControlFn);
+      bubbleExpandShapePatterns, linalgExtExpansionFn);
 
   // Add patterns to do some additional cleanup (on top of canonicalizations
   // that can be done later) of reshape ops.
