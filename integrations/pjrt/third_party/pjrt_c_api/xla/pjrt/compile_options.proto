@@ -2,8 +2,18 @@ syntax = "proto3";
 
 package xla;
 
-import "xla/stream_executor/device_description.proto";
-import "xla/xla.proto";
+// TODO: to avoid introducing too many source files in XLA to IREE PJRT,
+// currently we remove some fields in this file which is not in use
+// so that their message definitions are not required.
+// If we want to uncomment these removed fields, we should also
+// add the corresponding schema files, like below.
+//
+// Currently, these removed fields include:
+// - comp_envs, debug_options in ExecutableBuildOptionsProto
+// - target_config in CompileOptionsProto
+
+// import "xla/stream_executor/device_description.proto";
+// import "xla/xla.proto";
 import "xla/xla_data.proto";
 
 // A serialization of xla::ExecutableBuildOptions.
@@ -25,11 +35,11 @@ message ExecutableBuildOptionsProto {
 
   // Expose access to the XLA compilation environments, which will be passed to
   // the compilation process.
-  xla.CompilationEnvironmentsProto comp_envs = 13;
+  // xla.CompilationEnvironmentsProto comp_envs = 13;
 
   // Expose access to the XLA debug options which will be passed to the
   // compilation process.
-  xla.DebugOptions debug_options = 3;
+  // xla.DebugOptions debug_options = 3;
 
   // The number of replicas of this computation that are to be executed.
   // Defaults to 1.
@@ -149,7 +159,7 @@ message CompileOptionsProto {
   bytes serialized_multi_slice_config = 6;
   map<string, OptionOverrideProto> env_option_overrides = 7;
 
-  stream_executor.GpuTargetConfigProto target_config = 8;
+  // stream_executor.GpuTargetConfigProto target_config = 8;
 }
 
 // Helper for serializing opaque executables alongside CompileOptions.
