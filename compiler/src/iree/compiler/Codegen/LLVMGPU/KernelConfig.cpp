@@ -1620,7 +1620,7 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
 
   // Without any bounds on dynamic dims, we need specialization to
   // get peak performance. For now, just use the warp size.
-  if (numDynamicDims) {
+  if (numDynamicDims > 0) {
     SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
     int64_t preferredSubgroupSize = target.getPreferredSubgroupSize();
     reductionTileSizes[reductionDims[0]] = preferredSubgroupSize;
