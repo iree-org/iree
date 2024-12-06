@@ -74,7 +74,7 @@ To use IREE's Python bindings, you will first need to install
 
 ## Installing IREE packages
 
-### :octicons-package-dependents-24: Prebuilt packages
+### :octicons-download-16: Prebuilt packages
 
 === ":octicons-package-16: Stable releases"
 
