@@ -8,25 +8,29 @@ icon: simple/python
 
 # Python bindings
 
-## Overview
+## :octicons-book-16: Overview
 
-IREE offers Python bindings split into several packages, covering different
-components:
+IREE offers several Python packages, including API bindings, utilities, and
+integrations with frameworks:
 
-| PIP package name             | Description                                                                 |
-|------------------------------|-----------------------------------------------------------------------------|
-| `iree-base-compiler` | IREE's generic compiler tools and helpers                                   |
-| `iree-base-runtime`  | IREE's runtime, including CPU and GPU backends                              |
-| `iree-tools-tf`      | Tools for importing from [TensorFlow](https://www.tensorflow.org/)          |
-| `iree-tools-tflite`  | Tools for importing from [TensorFlow Lite](https://www.tensorflow.org/lite) |
-| `iree-jax`           | Tools for importing from [JAX](https://github.com/google/jax)               |
+PIP package name | Description
+-- | --
+[`iree-base-compiler`](https://pypi.org/project/iree-base-compiler/) | IREE's generic compiler tools and helpers
+[`iree-base-runtime`](https://pypi.org/project/iree-base-runtime/) | IREE's runtime, including CPU and GPU backends
+[`iree-tools-tf`](https://pypi.org/project/iree-tools-tf/) | Tools for importing from [TensorFlow](https://www.tensorflow.org/)
+[`iree-tools-tflite`](https://pypi.org/project/iree-tools-tflite/) | Tools for importing from [TensorFlow Lite](https://www.tensorflow.org/lite)
+[`iree-turbine`](https://pypi.org/project/iree-turbine/) | IREE's frontend for [PyTorch](https://pytorch.org/)
 
 Collectively, these packages allow for importing from frontends, compiling
 towards various targets, and executing compiled code on IREE's backends.
 
-???+ Note "Note - `iree-compiler` and `iree-runtime` are deprecated"
-    The Python packages `iree-compiler` and `iree-runtime` have been
-    renamed to `iree-base-compiler` and `iree-base-runtime`
+???+ Info "Note - `iree-compiler` and `iree-runtime` are deprecated"
+    The Python packages
+    [`iree-compiler`](https://pypi.org/project/iree-compiler/) and
+    [`iree-runtime`](https://pypi.org/project/iree-runtime/) have been
+    renamed to
+    [`iree-base-compiler`](https://pypi.org/project/iree-base-compiler/) and
+    [`iree-base-runtime`](https://pypi.org/project/iree-base-runtime/)
     respectively, thus effectively deprecating the old packages.
     This name change only affects the names of the packages but not
     the modules. To make sure the new packages are used, run
@@ -70,12 +74,11 @@ To use IREE's Python bindings, you will first need to install
 
 ## Installing IREE packages
 
-### :octicons-package-16: Prebuilt packages
+### :octicons-package-dependents-24: Prebuilt packages
 
-=== "Stable releases"
+=== ":octicons-package-16: Stable releases"
 
-    Stable release packages are
-    [published to PyPI](https://pypi.org/user/google-iree-pypi-deploy/).
+    Stable release packages are [published to PyPI](https://pypi.org/).
 
     ``` shell
     python -m pip install \
@@ -83,24 +86,24 @@ To use IREE's Python bindings, you will first need to install
       iree-base-runtime
     ```
 
-=== ":material-alert: Nightly pre-releases"
+=== ":octicons-beaker-16: Nightly pre-releases"
 
     Nightly pre-releases are published on
     [GitHub releases](https://github.com/iree-org/iree/releases).
 
-    ``` shell
+    ``` shell hl_lines="2-4"
     python -m pip install \
       --find-links https://iree.dev/pip-release-links.html \
-      --upgrade \
       --pre \
+      --upgrade \
       iree-base-compiler \
       iree-base-runtime
     ```
 
-=== ":octicons-git-branch-24: Development packages"
+=== ":octicons-git-branch-16: Development packages"
 
-    Development packages are produced for every commit, including pull requests,
-    for limited configurations.
+    Development packages are built at every commit and on pull requests, for
+    limited configurations.
 
     On **Linux** with **Python 3.11**, these packages can be installed into
     a [Python `venv`](https://docs.python.org/3/library/venv.html) using the
@@ -108,14 +111,20 @@ To use IREE's Python bindings, you will first need to install
     script:
 
     ``` shell
-    # Latest completed run on the `main` branch.
-    ./build_tools/pkgci/setup_venv.py /tmp/.venv --fetch-latest-main
+    # Install packages from a specific commit ref.
+    python ./build_tools/pkgci/setup_venv.py /tmp/.venv --fetch-git-ref=8230f41d
 
-    # A specific commit ref.
-    ./build_tools/pkgci/setup_venv.py /tmp/.venv --fetch-git-ref=8230f41d
+    # Install packages from the latest completed run on the `main` branch.
+    # python ./build_tools/pkgci/setup_venv.py /tmp/.venv --fetch-latest-main
 
-    # A specific workflow run (such as on a pull request).
-    ./build_tools/pkgci/setup_venv.py /tmp/.venv --fetch-gh-workflow=11977414405
+    # Install packages from a  specific workflow run (such as on a pull request).
+    # python ./build_tools/pkgci/setup_venv.py /tmp/.venv --fetch-gh-workflow=11977414405
+
+    # Activate the venv and see what was installed.
+    source /tmp/.venv/bin/activate
+    pip freeze
+    # iree-base-compiler==3.1.0.dev0+8230f41d53eeb30bf48238d47282a9ca124c3117
+    # iree-base-runtime==3.1.0.dev0+8230f41d53eeb30bf48238d47282a9ca124c3117
     ```
 
 ### :material-hammer-wrench: Building from source

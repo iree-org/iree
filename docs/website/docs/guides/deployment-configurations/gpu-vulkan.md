@@ -76,12 +76,12 @@ Vulkan expects the program running on GPU to be expressed by the
 [SPIR-V](https://www.khronos.org/registry/spir-v/) binary exchange format, which
 the model must be compiled into.
 
-#### :octicons-package-16: Download the compiler from a release
+#### :octicons-download-16: Download the compiler from a release
 
-Python packages are regularly published to
-[PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
+Python packages are distributed through multiple channels. See the
 [Python Bindings](../../reference/bindings/python.md) page for more details.
-The core `iree-base-compiler` package includes the SPIR-V compiler:
+The core [`iree-base-compiler`](https://pypi.org/project/iree-base-compiler/)
+package includes the SPIR-V compiler:
 
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-compiler-from-release.md"
 
@@ -120,12 +120,12 @@ $ iree-run-module --list_devices
   vulkan://00000000-1111-2222-3333-444444444444
 ```
 
-#### :octicons-package-16: Download the runtime from a release
+#### :octicons-download-16: Download the runtime from a release
 
-Python packages are regularly published to
-[PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
+Python packages are distributed through multiple channels. See the
 [Python Bindings](../../reference/bindings/python.md) page for more details.
-The core `iree-base-runtime` package includes the Vulkan HAL drivers:
+The core [`iree-base-runtime`](https://pypi.org/project/iree-base-runtime/)
+package includes the Vulkan HAL drivers:
 
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-runtime-from-release.md"
 
