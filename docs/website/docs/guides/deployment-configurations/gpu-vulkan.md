@@ -125,7 +125,7 @@ $ iree-run-module --list_devices
 Python packages are distributed through multiple channels. See the
 [Python Bindings](../../reference/bindings/python.md) page for more details.
 The core [`iree-base-runtime`](https://pypi.org/project/iree-base-runtime/)
-package includes the Vulkan HAL drivers:
+package includes the Vulkan HAL driver:
 
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-runtime-from-release.md"
 
