@@ -53,7 +53,7 @@ void iree_hal_hip_memory_pools_deinitialize(iree_hal_hip_memory_pools_t* pools);
 
 // Merges statistics information from |pools| into |statistics|.
 void iree_hal_hip_memory_pools_merge_statistics(
-    const iree_hal_hip_memory_pools_t* pools,
+    iree_hal_hip_memory_pools_t* pools,
     iree_hal_allocator_statistics_t* statistics);
 
 // Trims all memory pools by releasing resources back to the system.

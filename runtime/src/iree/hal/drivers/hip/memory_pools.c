@@ -150,7 +150,7 @@ static void iree_hal_hip_memory_pool_track_free(
 }
 
 void iree_hal_hip_memory_pools_merge_statistics(
-    const iree_hal_hip_memory_pools_t* pools,
+    iree_hal_hip_memory_pools_t* pools,
     iree_hal_allocator_statistics_t* statistics) {
   IREE_STATISTICS({
     statistics->device_bytes_allocated = iree_atomic_load(
