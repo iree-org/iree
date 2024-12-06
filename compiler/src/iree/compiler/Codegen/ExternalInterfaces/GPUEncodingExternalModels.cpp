@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 
 #define DEBUG_TYPE "iree-gpu-encoding-external-models"
 
@@ -199,6 +200,9 @@ static Operation *lowerContractionOpToMultiMmaOp(OpBuilder &builder,
                                                  ValueRange operands,
                                                  TargetAttr targetAttr) {
   if (!linalgOp.hasPureTensorSemantics()) {
+    return nullptr;
+  }
+  if (!linalg::isaContractionOpInterface(linalgOp)) {
     return nullptr;
   }
   FailureOr<linalg::ContractionDimensions> contractionDims =

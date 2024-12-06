@@ -320,14 +320,13 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
 
 // This attribute needs to implement the Codegen::LayoutAttrInterface and
 // Encoding::EncodingLayoutAttrInterface. They are implemented through external
-// model mechanism because we do not want to put burdens to the dialect, and we
-// can have better code structure. See the implementations in
-// compiler/Codegen/ExternalInterfaces.
+// model mechanism because we do not want to want to relocate domain-specific
+// logic to the dialect implementation, and we can have better code structure.
+// See the implementations in compiler/Codegen/ExternalInterfaces.
 def IREEGPU_GPUEncodingLayoutAttr :
-    AttrDef<IREEGPU_Dialect, "GPUEncodingLayout", [
-]> {
+    AttrDef<IREEGPU_Dialect, "GPUEncodingLayout"> {
   let mnemonic = "gpu_encoding_layout";
-  let summary = "The encoding layout attribute for VMVX backend";
+  let summary = "The encoding layout attribute for GPU backend";
 
   let assemblyFormat = "`<` struct(params) `>`";
 
