@@ -376,16 +376,15 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
                 ireeGPULoweringConfigAttrGetSubgroupCount(self);
             MlirAttribute mCountAttr = info.subgroupMCountAttr;
             MlirAttribute nCountAttr = info.subgroupNCountAttr;
-            std::optional<int64_t> mCount =
-                mlirAttributeIsNull(mCountAttr)
-                    ? std::nullopt
-                    : std::optional<int64_t>(
-                          mlirIntegerAttrGetValueInt(mCountAttr));
-            std::optional<int64_t> nCount =
-                mlirAttributeIsNull(nCountAttr)
-                    ? std::nullopt
-                    : std::optional<int64_t>(
-                          mlirIntegerAttrGetValueInt(nCountAttr));
+            std::optional<int64_t> mCount;
+            if (!mlirAttributeIsNull(mCountAttr)) {
+              mCount = mlirIntegerAttrGetValueInt(mCountAttr);
+            }
+
+            std::optional<int64_t> nCount;
+            if (!mlirAttributeIsNull(nCountAttr)) {
+              nCount = mlirIntegerAttrGetValueInt(nCountAttr);
+            }
             return py::make_tuple(mCount, nCount);
           })
       .def_property_readonly(

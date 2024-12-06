@@ -229,7 +229,7 @@ ireeGPUTileSizes ireeGPULoweringConfigAttrGetTileSizes(MlirAttribute attr) {
 
   llvm::SmallVector<int64_t> reductions =
       loweringConfigAttr.getStaticTilingLevelSizes(
-          static_cast<int64_t>(
+          llvm::to_underlying(
               mlir::iree_compiler::IREE::GPU::TilingLevel::Reduction),
           nullptr);
   tilesizes.reductionTileSizes = reductions.data();
