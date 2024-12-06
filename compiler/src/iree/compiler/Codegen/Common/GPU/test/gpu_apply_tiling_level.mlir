@@ -655,7 +655,7 @@ module {
   }
 }
 
-// THREAD-LABEL: func.func @swap_expand_shape_with_extract_slice
+// THREAD-LABEL: func.func @swap_expand_shape_with_extract_slice_full_inner_dim
 //       THREAD:   scf.forall (%[[X:[A-Za-z0-9]+]], %[[Y:[A-Za-z0-9]+]])
 //       THREAD:     %[[APPLY:.+]] = affine.apply affine_map<(d0, d1) -> (d0 * 40 + d1 * 10)>(%[[X]], %[[Y]])
 //       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[APPLY]]] [20] [1] : tensor<120xf32> to tensor<20xf32>
@@ -683,7 +683,7 @@ module {
 
 #config = #iree_gpu.lowering_config<{thread = [1, 2, 0, 1, 4]}>
 module {
-  func.func @swap_expand_shape_with_extract_slice_multiple_groups(%0: tensor<120x56xf32>) -> tensor<3x4x10x7x8xf32> {
+  func.func @swap_expand_shape_with_extract_slice_multiple_expanded_dims(%0: tensor<120x56xf32>) -> tensor<3x4x10x7x8xf32> {
     %expand = tensor.expand_shape %0 [[0, 1, 2], [3, 4]] output_shape [3, 4, 10, 7, 8] : tensor<120x56xf32> into tensor<3x4x10x7x8xf32>
     %empty = tensor.empty() : tensor<3x4x10x7x8xf32>
     %exp = linalg.exp {lowering_config = #config}
@@ -692,7 +692,7 @@ module {
   }
 }
 
-// THREAD-LABEL: func.func @swap_expand_shape_with_extract_slice_multiple_groups
+// THREAD-LABEL: func.func @swap_expand_shape_with_extract_slice_multiple_expanded_dims
 //       THREAD:   scf.forall (%[[ID0:[A-Za-z0-9]+]], %[[ID1:[A-Za-z0-9]+]], %[[ID2:[A-Za-z0-9]+]], %[[ID3:[A-Za-z0-9]+]])
 //       THREAD:     %[[APPLY0:.+]] = affine.apply affine_map<(d0, d1) -> (d0 * 40 + d1 * 10)>(%[[ID0]], %[[ID1]])
 //       THREAD:     %[[APPLY1:.+]] = affine.apply affine_map<(d0, d1) -> (d0 * 8 + d1)>(%[[ID2]], %[[ID3]])
