@@ -179,16 +179,12 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         # loss of current state.
         all_input_map = copy.deepcopy(graph_info.input_map)
         num_inputs = len(all_input_map.items())
-        if (
-            param_data.input_index_threshold is not None
-            and param_data.input_index_threshold < num_inputs
-        ):
-            threshold = (
-                param_data.input_index_threshold
-                if param_data.input_index_threshold >= 0
-                else max(0, param_data.input_index_threshold + num_inputs)
-            )
-            for _index in range(thresh, num_inputs):
+        if param_data.input_index_threshold is not None:
+            if param_data.input_index_threshold not in range(0, num_inputs):
+                raise ValueError(
+                    f"input_index_threshold must be in the range [0,num_inputs={num_inputs})"
+                )
+            for _index in range(param_data.input_index_threshold, num_inputs):
                 _discarded = graph_info.input_map.popitem()
 
         mc = (
