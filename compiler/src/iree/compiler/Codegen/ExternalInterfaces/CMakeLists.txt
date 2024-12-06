@@ -14,7 +14,7 @@ iree_cc_library(
   NAME
     ExternalModels
   HDRS
-    "GPUEncodingExternalModels.h"
+    "GPUEncodingExternalModels.cpp"
     "Interfaces.h"
   SRCS
     "GPUEncodingExternalModels.cpp"

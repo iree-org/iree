@@ -19,7 +19,7 @@ iree_compiler_cc_library(
         "Interfaces.cpp",
     ],
     hdrs = [
-        "GPUEncodingExternalModels.h",
+        "GPUEncodingExternalModels.cpp",
         "Interfaces.h",
     ],
     deps = [
