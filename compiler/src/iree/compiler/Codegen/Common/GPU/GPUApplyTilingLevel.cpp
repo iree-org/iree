@@ -43,12 +43,17 @@ struct GPUApplyTilingLevelPass final
 
 /// Pattern to convert `tensor.extract_slice(tensor.expand_shape)` to
 /// `tensor.expand_shape(tensor.extract_slice)`.
-LogicalResult swapExpandShapeWithSlice(RewriterBase &rewriter,
-                                       tensor::ExpandShapeOp expandShapeOp,
-                                       tensor::ExtractSliceOp sliceOp) {
-
+static LogicalResult
+swapExpandShapeWithSlice(RewriterBase &rewriter,
+                         tensor::ExpandShapeOp expandShapeOp,
+                         tensor::ExtractSliceOp sliceOp) {
   SmallVector<OpFoldResult> offsets = sliceOp.getMixedOffsets();
   SmallVector<OpFoldResult> sizes = sliceOp.getMixedSizes();
+
+  if (sliceOp.getResultType().getRank() != sizes.size()) {
+    return rewriter.notifyMatchFailure(sliceOp,
+                                       "unimplemented: rank reducing slice");
+  }
 
   // Helper variables and function for accumulating the new offset and length
   // values.
@@ -71,9 +76,6 @@ LogicalResult swapExpandShapeWithSlice(RewriterBase &rewriter,
       getMixedValues(expandShapeOp.getStaticOutputShape(),
                      expandShapeOp.getOutputShape(), rewriter);
 
-  // Compute new offsets, lengths, and strides.
-  SmallVector<OpFoldResult> newOffsets, newLengths, newStrides;
-
   auto isZeroOffsetAndFullSize = [](OpFoldResult offset, OpFoldResult sliceSize,
                                     OpFoldResult size) {
     if (!isConstantIntValue(offset, 0))
@@ -83,6 +85,35 @@ LogicalResult swapExpandShapeWithSlice(RewriterBase &rewriter,
     return llvm::succeeded(maybeEqual) && maybeEqual.value();
   };
 
+  // First verify that this is a full slice of the expanded tensor.
+  for (const ReassociationIndices &indices :
+       expandShapeOp.getReassociationIndices()) {
+    int64_t i = 0;
+    int64_t e = indices.size();
+    // Find the first expanded dim after the first dim with non-unit extracted
+    // size.
+    for (; i < e; ++i) {
+      if (!isConstantIntValue(sizes[indices[i]], 1)) {
+        // +1 to skip the first non-unit size dim.
+        i++;
+        break;
+      }
+    }
+
+    // Verify that all subsequent dimensions extract the full size of the
+    // source tensor.
+    for (; i < e; ++i) {
+      int64_t expandedDim = indices[i];
+      if (!isZeroOffsetAndFullSize(offsets[expandedDim], sizes[expandedDim],
+                                   outputShape[expandedDim])) {
+        return rewriter.notifyMatchFailure(
+            sliceOp, "Not a contiguous slice of the expanded tensor.");
+      }
+    }
+  }
+
+  // Compute new offsets, lengths, and strides.
+  SmallVector<OpFoldResult> newOffsets, newLengths, newStrides;
   for (const ReassociationIndices &indices :
        expandShapeOp.getReassociationIndices()) {
     OpFoldResult newOffset = rewriter.getIndexAttr(0);
@@ -90,6 +121,7 @@ LogicalResult swapExpandShapeWithSlice(RewriterBase &rewriter,
 
     int64_t i = 0;
     int64_t e = indices.size();
+    // Offset = cumulative product of leading unit extracted dims.
     for (; i < e; ++i) {
       int64_t expandedDim = indices[i];
       if (!isConstantIntValue(sizes[expandedDim], 1))
@@ -108,15 +140,7 @@ LogicalResult swapExpandShapeWithSlice(RewriterBase &rewriter,
     }
 
     for (; i < e; ++i) {
-      int64_t expandedDim = indices[i];
-      OpFoldResult offset = offsets[expandedDim];
-      OpFoldResult fullSize = outputShape[expandedDim];
-      if (!isZeroOffsetAndFullSize(offset, sizes[expandedDim], fullSize)) {
-        llvm::errs() << "failed! " << offset << " " << sizes[expandedDim] << " "
-                     << fullSize << "\n";
-        return failure();
-      }
-
+      OpFoldResult fullSize = outputShape[indices[i]];
       newOffset = mul(newOffset, fullSize);
       newSize = mul(newSize, fullSize);
     }
