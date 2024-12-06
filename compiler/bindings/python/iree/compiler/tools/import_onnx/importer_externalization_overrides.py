@@ -234,10 +234,6 @@ class IREENodeImporter(onnx_importer.NodeImporter):
     def import_all(self, func=True):
         num_inputs = len(self._gi.input_map.items())
         if self.param_data.input_index_threshold is not None:
-            if self.param_data.input_index_threshold not in range(0, num_inputs):
-                raise ValueError(
-                    f"input_index_threshold must be in the range [0,num_inputs={num_inputs})"
-                )
             for i in range(self.param_data.input_index_threshold, num_inputs):
                 self.import_initializer(list(self._gi.input_map.values())[i])
         super().import_all(func)
