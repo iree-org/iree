@@ -130,8 +130,8 @@ class ImportOnnxwithExternalizationTest(unittest.TestCase):
         run_tool(
             LARGE_WEIGHTS_ONNX_FILE_PATH,
             "--externalize-params",
-            "--num-initializers-threshold",
-            "1",
+            "--param-gb-threshold",
+            "0.25",
             "-o",
             self.outputPath,
         )

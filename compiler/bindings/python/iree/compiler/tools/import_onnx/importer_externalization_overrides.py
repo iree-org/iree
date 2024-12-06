@@ -8,6 +8,8 @@ import copy
 import sys
 import random
 import string
+import numpy
+import warnings
 
 from ...dialects import util
 from typing import Optional, Tuple, Any, NamedTuple, Union
@@ -46,7 +48,7 @@ from ...ir import (
 
 
 class ParamData(NamedTuple):
-    initializer_threshold: Optional[int]
+    param_bit_threshold: Optional[int]
     num_elements_threshold: int
     params_scope: str
     data_dir: str
@@ -296,21 +298,42 @@ class IREENodeImporter(onnx_importer.NodeImporter):
                 "For example: `pip install iree-base-runtime`"
             ) from e
         param_archive = rt.ParameterIndex()
-        param_count = 0
+        in_memory_param_bits = 0
+        warnings.simplefilter("always", UserWarning)
         for name, actual_symbol_name in self.globals:
             initializer = self._gi.initializer_map[name]
             tensor_as_array = numpy_helper.to_array(
                 initializer, base_dir=self.param_data.data_dir
             )
             param_archive.add_buffer(actual_symbol_name, tensor_as_array)
-            param_count += 1
-            if (
-                self.param_data.initializer_threshold
-                and param_count % self.param_data.initializer_threshold == 0
-            ):
-                param_archive = param_archive.create_archive_file(
-                    self.param_data.param_path
+            if self.param_data.param_bit_threshold is not None:
+                # get the new param size
+                elem_dtype = tensor_as_array.dtype
+                elem_kind = elem_dtype.kind
+                if elem_kind not in ["i", "f"]:
+                    raise TypeError(f"Unhandled numpy dtype: {elem_dtype}")
+                elem_info = (
+                    numpy.iinfo(elem_dtype)
+                    if elem_kind == "i"
+                    else numpy.finfo(elem_dtype)
                 )
+                elem_bits = elem_info.bits
+                param_bits = tensor_as_array.size * elem_bits
+                # update the running total memory use
+                in_memory_param_bits += param_bits
+                if param_bits >= self.param_data.param_bit_threshold:
+                    warnings.warn(
+                        f"Single parameter {name} is {param_bits} bits, "
+                        + f"which exceeds threshold of {self.param_data.param_bit_threshold} bits."
+                    )
+                # flush the param archive to the param file if we exeed the threshold
+                if in_memory_param_bits >= self.param_data.param_bit_threshold:
+                    param_archive = param_archive.create_archive_file(
+                        self.param_data.param_path
+                    )
+                    in_memory_param_bits = 0
+
+        # write any remaining params to the archive
         param_archive = param_archive.create_archive_file(self.param_data.param_path)
 
 

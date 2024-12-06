@@ -31,9 +31,14 @@ def main(args: argparse.Namespace):
 
     imp: Any = None
     if args.externalize_params:
-        default_param_path = Path(args.output_file).parent / Path(args.output_file).stem
+        is_stdout = (args.output_file is None) or (args.output_file == "-")
+        output_dir = (
+            Path(args.input_file).parent if is_stdout else Path(args.output_file).parent
+        )
+        output_stem = "imported_model" if is_stdout else Path(args.output_file).stem
+        default_param_path = output_dir / (output_stem + "_params.irpa")
         param_path = (
-            (str(default_param_path) + "_params.irpa")
+            str(default_param_path)
             if args.save_params_to is None
             else str(args.save_params_to)
         )
@@ -42,8 +47,13 @@ def main(args: argparse.Namespace):
             if args.data_dir is not None
             else str(Path(args.input_file).parent)
         )
+        param_bit_threshold = (
+            None
+            if args.param_gb_threshold is None
+            else int(args.param_gb_threshold * 8 * (10**9))
+        )
         param_data = ParamData(
-            args.num_initializers_threshold,
+            param_bit_threshold,
             args.num_elements_threshold,
             args.params_scope,
             data_dir,
@@ -132,6 +142,7 @@ def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
         # Load the temp file and the external data.
         inferred_model = onnx.load(temp_inferred_file, load_external_data=False)
         data_dir = Path(input_dir if args.data_dir is None else args.data_dir)
+        # we don't need to load the model weights in-memory when externalizing params
         if not args.externalize_params:
             onnx.load_external_data_for_model(inferred_model, str(data_dir))
 
@@ -167,19 +178,6 @@ def parse_arguments(argv=None) -> argparse.Namespace:
         " to before importing to MLIR. This can sometime assist with shape inference.",
         type=int,
     )
-    # args for saving a file with externalized params
-    parser.add_argument(
-        "--externalize-params",
-        help="Import the mlir file with large weights replaced by external reference calls.",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-    )
-    parser.add_argument(
-        "--externalize-inputs-threshold",
-        help="Treats inputs at or after the provided index as external parameters of the model."
-        " Only has an effect if 'externalize-params' is true.",
-        type=int,
-    )
     parser.add_argument(
         "--large-model",
         help="Setting this to true is recommended for large models."
@@ -187,14 +185,30 @@ def parse_arguments(argv=None) -> argparse.Namespace:
         action=argparse.BooleanOptionalAction,
         default=False,
     )
-    parser.add_argument(
+    # args for saving a file with externalized params
+    externalization_args = parser.add_argument_group(
+        "externalization", "args used to customize the externalization of model weights"
+    )
+    externalization_args.add_argument(
+        "--externalize-params",
+        help="Import the mlir file with large weights replaced by external reference calls.",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
+    externalization_args.add_argument(
+        "--externalize-inputs-threshold",
+        help="Treats inputs at or after the provided index as external parameters of the model."
+        " Only has an effect if 'externalize-params' is true.",
+        type=int,
+    )
+    externalization_args.add_argument(
         "--num-elements-threshold",
         help="Minimum number of elements for an initializer to be externalized."
         " Only has an effect if 'externalize-params' is true.",
         type=int,
         default=100,
     )
-    parser.add_argument(
+    externalization_args.add_argument(
         "--params-scope",
         help="The namespace or the scope in which the externalized parameters are placed."
         " Default is 'model'.",
@@ -202,19 +216,19 @@ def parse_arguments(argv=None) -> argparse.Namespace:
         default="model",
     )
     # args for creating an external weight file
-    parser.add_argument(
+    externalization_args.add_argument(
         "--save-params",
         help="Whether to save the params to a file. Setting this to false will generate mlir with externalized weights"
         " without creating an associated .irpa file.",
         action=argparse.BooleanOptionalAction,
         default=True,
     )
-    parser.add_argument(
-        "--num-initializers-threshold",
-        help="The maximum number of initializer tensors to be stored in-memory when creating a param archive.",
-        type=int,
+    externalization_args.add_argument(
+        "--param-gb-threshold",
+        help="The maximum number of Gigabytes of param data to store in-memory before flushing to a param file.",
+        type=float,
     )
-    parser.add_argument(
+    externalization_args.add_argument(
         "--save-params-to",
         help="Location to save the externalized parameters. When not set, the parameters will be written to '<output_file_name>_params.irpa'"
         " under the namespace 'model', which can be configured by passing the namespace string to 'params-scope'.",
