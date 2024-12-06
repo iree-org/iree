@@ -25,7 +25,7 @@ typedef struct iree_hal_hip_allocator_t {
   // must be at offset 0.
   iree_hal_resource_t resource;
 
-  const iree_hal_hip_device_topology_t* topology;
+  iree_hal_hip_device_topology_t* topology;
 
   bool supports_memory_pools;
 
@@ -51,7 +51,7 @@ static iree_hal_hip_allocator_t* iree_hal_hip_allocator_cast(
 
 iree_status_t iree_hal_hip_allocator_create(
     const iree_hal_hip_dynamic_symbols_t* hip_symbols,
-    const iree_hal_hip_device_topology_t* topology, bool supports_memory_pools,
+    iree_hal_hip_device_topology_t* topology, bool supports_memory_pools,
     iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(hip_symbols);
   IREE_ASSERT_ARGUMENT(out_allocator);
