@@ -16,6 +16,7 @@
 #include <thread>
 #include <vector>
 
+#include "compile_options.pb.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
@@ -451,9 +452,9 @@ class ClientInstance {
 
   // Compiles.
   // See TODOs in PJRT_Client_Compile.
-  PJRT_Error* Compile(
-      const PJRT_Program* program, /*xla::CompileOptions options, */
-      LoadedExecutableInstance** executable);
+  PJRT_Error* Compile(const PJRT_Program* program,
+                      xla::CompileOptionsProto options,
+                      LoadedExecutableInstance** executable);
 
   // ---------------------------------------------------------------------------
   // Subclass hooks.

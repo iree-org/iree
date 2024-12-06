@@ -26,3 +26,26 @@ iree_cc_library(
     "xla/pjrt/c/pjrt_c_api.h"
   PUBLIC
 )
+
+find_package(Protobuf REQUIRED)
+
+protobuf_generate_cpp(
+  PJRT_PROTO_SRCS
+  PJRT_PROTO_HDRS
+  "xla/pjrt/compile_options.proto"
+  "xla/xla_data.proto"
+)
+
+iree_cc_library(
+  NAME
+    protos
+  INCLUDES
+    ${Protobuf_INCLUDE_DIRS}
+  HDRS
+    ${PJRT_PROTO_HDRS}
+  SRCS
+    ${PJRT_PROTO_SRCS}
+  DEPS
+    ${Protobuf_LIBRARIES}
+  PUBLIC
+)

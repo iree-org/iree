@@ -27,6 +27,7 @@ iree_cc_library(
     iree::vm
     iree::vm::bytecode::module
     iree_pjrt_deps::headers
+    iree_pjrt_deps::protos
   PUBLIC
 )
 
