@@ -773,6 +773,18 @@ endif()
 # MLIR/LLVM Dependency
 #-------------------------------------------------------------------------------
 
+# Both the IREE and MLIR Python bindings require nanobind. We initialize it here
+# at the top level so that everything uses ours consistently.
+if(IREE_BUILD_PYTHON_BINDINGS OR IREE_BUILD_COMPILER)
+  include(FetchContent)
+  FetchContent_Declare(
+    nanobind
+    GIT_REPOSITORY https://github.com/wjakob/nanobind.git
+    GIT_TAG        0f9ce749b257fdfe701edb3cf6f7027ba029434a # v2.4.0
+  )
+  FetchContent_MakeAvailable(nanobind)
+endif()
+
 # Both the IREE and MLIR Python bindings require pybind11. We initialize it here
 # at the top level so that everything uses ours consistently.
 if(IREE_BUILD_PYTHON_BINDINGS AND IREE_BUILD_COMPILER)
