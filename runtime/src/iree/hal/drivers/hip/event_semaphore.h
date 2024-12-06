@@ -63,7 +63,12 @@ iree_status_t iree_hal_hip_semaphore_notify_forward_progress_to(
 // must decrement when no longer needed.
 iree_status_t iree_hal_hip_semaphore_get_hip_event(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_hal_hip_event_pool_t* event_pool, bool create_if_needed,
+    iree_hal_hip_event_pool_t* event_pool,
+    iree_hal_hip_event_t** out_hip_event);
+
+iree_status_t iree_hal_hip_semaphore_create_event_and_record_if_necessary(
+    iree_hal_semaphore_t* base_semaphore, uint64_t value,
+    hipStream_t dispatch_stream, iree_hal_hip_event_pool_t* event_pool,
     iree_hal_hip_event_t** out_hip_event);
 
 static iree_status_t iree_hal_hip_event_semaphore_advance(

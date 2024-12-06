@@ -502,7 +502,7 @@ iree_status_t iree_hal_hip_semaphore_notify_forward_progress_to(
 
 iree_status_t iree_hal_hip_semaphore_get_hip_event(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_hal_hip_event_pool_t* event_pool, bool create_if_necessary,
+    iree_hal_hip_event_pool_t* event_pool,
     iree_hal_hip_event_t** out_hip_event) {
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
@@ -536,18 +536,7 @@ iree_status_t iree_hal_hip_semaphore_get_hip_event(
           ((iree_hal_hip_semaphore_queue_item_t*)
                iree_hal_hip_util_tree_node_get_value(node))
               ->event;
-      if (!event && create_if_necessary) {
-        status = iree_hal_hip_event_pool_acquire(
-            event_pool, 1,
-            &((iree_hal_hip_semaphore_queue_item_t*)
-                  iree_hal_hip_util_tree_node_get_value(node))
-                 ->event);
-        if (iree_status_is_ok(status)) {
-          event = ((iree_hal_hip_semaphore_queue_item_t*)
-                       iree_hal_hip_util_tree_node_get_value(node))
-                      ->event;
-        }
-      } else if (!event) {
+      if (!event) {
         do {
           node = iree_hal_hip_util_tree_node_next(node);
           if (!node) {
@@ -559,6 +548,71 @@ iree_status_t iree_hal_hip_semaphore_get_hip_event(
                        iree_hal_hip_util_tree_node_get_value(node))
                       ->event;
         } while (!event);
+      }
+      if (event) {
+        iree_hal_hip_event_retain(event);
+      }
+      *out_hip_event = event;
+    }
+  }
+  iree_slim_mutex_unlock(&semaphore->mutex);
+
+  IREE_TRACE_ZONE_END(z0);
+
+  return status;
+}
+
+iree_status_t iree_hal_hip_semaphore_create_event_and_record_if_necessary(
+    iree_hal_semaphore_t* base_semaphore, uint64_t value,
+    hipStream_t dispatch_stream, iree_hal_hip_event_pool_t* event_pool,
+    iree_hal_hip_event_t** out_hip_event) {
+  iree_hal_hip_semaphore_t* semaphore =
+      iree_hal_hip_semaphore_cast(base_semaphore);
+  *out_hip_event = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_slim_mutex_lock(&semaphore->mutex);
+  if (value <= semaphore->current_visible_value) {
+    iree_slim_mutex_unlock(&semaphore->mutex);
+    IREE_TRACE_ZONE_END(z0);
+    return iree_ok_status();
+  }
+  iree_status_t status = iree_status_clone(semaphore->failure_status);
+  if (iree_status_is_ok(status)) {
+    iree_hal_hip_util_tree_node_t* node =
+        iree_hal_hip_util_tree_get(&semaphore->event_queue.tree, value);
+
+    if (node == NULL) {
+      status = iree_hal_hip_util_tree_insert(&semaphore->event_queue.tree,
+                                             value, &node);
+      if (iree_status_is_ok(status)) {
+        iree_hal_hip_semaphore_queue_item_t* item =
+            (iree_hal_hip_semaphore_queue_item_t*)
+                iree_hal_hip_util_tree_node_get_value(node);
+        item->cpu_event = NULL;
+        item->work_item = NULL;
+      }
+    }
+
+    if (iree_status_is_ok(status)) {
+      iree_hal_hip_event_t* event =
+          ((iree_hal_hip_semaphore_queue_item_t*)
+               iree_hal_hip_util_tree_node_get_value(node))
+              ->event;
+      if (!event) {
+        status = iree_hal_hip_event_pool_acquire(
+            event_pool, 1,
+            &((iree_hal_hip_semaphore_queue_item_t*)
+                  iree_hal_hip_util_tree_node_get_value(node))
+                 ->event);
+        if (iree_status_is_ok(status)) {
+          event = ((iree_hal_hip_semaphore_queue_item_t*)
+                       iree_hal_hip_util_tree_node_get_value(node))
+                      ->event;
+          status = IREE_HIP_CALL_TO_STATUS(
+              semaphore->symbols,
+              hipEventRecord(iree_hal_hip_event_handle(event),
+                             dispatch_stream));
+        }
       }
       if (event) {
         iree_hal_hip_event_retain(event);
