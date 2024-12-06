@@ -65,8 +65,8 @@ static FailureOr<int64_t> getUpperBound(Value dim,
   return failure();
 }
 
-template <typename AllocOpTy>
-static LogicalResult padAlloc(MLIRContext *context, AllocOpTy allocOp,
+template <typename AllocLikeOp>
+static LogicalResult padAlloc(MLIRContext *context, AllocLikeOp allocOp,
                               const DataFlowSolver &solver) {
   IRRewriter rewriter(context);
   rewriter.setInsertionPoint(allocOp);
@@ -95,7 +95,7 @@ static LogicalResult padAlloc(MLIRContext *context, AllocOpTy allocOp,
   MemRefType allocType = MemRefType::get(shape, elType, AffineMap(),
                                          allocOp.getType().getMemorySpace());
   Location loc = allocOp.getLoc();
-  Value paddedAlloc = rewriter.create<AllocOpTy>(loc, allocType);
+  Value paddedAlloc = rewriter.create<AllocLikeOp>(loc, allocType);
   SmallVector<OpFoldResult> offsets(shape.size(), rewriter.getIndexAttr(0));
   SmallVector<OpFoldResult> strides(shape.size(), rewriter.getIndexAttr(1));
   Value subview = rewriter.create<memref::SubViewOp>(loc, paddedAlloc, offsets,
