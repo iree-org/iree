@@ -28,7 +28,7 @@ typedef struct iree_hal_hip_allocator_t {
   // Parent device that this allocator is associated with. Unowned.
   iree_hal_device_t* parent_device;
 
-  const iree_hal_hip_device_topology_t* topology;
+  iree_hal_hip_device_topology_t* topology;
 
   bool supports_memory_pools;
 
@@ -54,8 +54,8 @@ static iree_hal_hip_allocator_t* iree_hal_hip_allocator_cast(
 
 iree_status_t iree_hal_hip_allocator_create(
     iree_hal_device_t* parent_device,
-    const iree_hal_hip_dynamic_symbols_t* hip_symbols
-    const iree_hal_hip_device_topology_t* topology, bool supports_memory_pools,
+    const iree_hal_hip_dynamic_symbols_t* hip_symbols,
+    iree_hal_hip_device_topology_t* topology, bool supports_memory_pools,
     iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(parent_device);
   IREE_ASSERT_ARGUMENT(hip_symbols);
