@@ -126,8 +126,12 @@ class IREENodeImporter(onnx_importer.NodeImporter):
             if isinstance(t, onnx.TensorProto):
                 dims = tuple(t.dims)
                 data_type = t.data_type
-            else:
+            elif isinstance(t, onnx.ValueInfoProto):
                 dims, data_type = self.get_type_info_from_type(t.type)
+            else:
+                raise TypeError(
+                    f"Expected an onnx.TensorProto or an onnx.ValueInfoProto, recieved {type(t)} from {name}"
+                )
 
             vtensor_type = RankedTensorType.get(
                 dims, ELEM_TYPE_TO_SIGNLESS_IR_TYPE[data_type]()
