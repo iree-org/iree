@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
@@ -37,37 +39,6 @@ using IREE::Codegen::TileMxNxK;
 #define GEN_PASS_DEF_CPUMATERIALIZEDEVICEENCODINGPASS
 #define GEN_PASS_DEF_CPUMATERIALIZEHOSTENCODINGPASS
 #include "iree/compiler/Codegen/Common/CPU/Passes.h.inc"
-
-// Enumerate tile sizes to choose from when no specific architecture is
-// targeted. For narrow-{M,N} cases, this only enumerates on narrow M. The
-// narrow-N cases are handled by transposition in
-// IREE::Codegen::chooseMatmulTile.
-static SmallVector<TileMxNxK>
-enumerateMatmulTilesVMVX(linalg::ContractionDimensions cDims,
-                         IREE::Encoding::EncodingAttr encoding,
-                         IREE::HAL::ExecutableTargetAttr target) {
-  bool hasUkernelSupport = hasUkernel(target);
-
-  // TODO(hanchung): The ukernel path does not support 3d
-  // codegen.query_tile_sizes op, so we disable dynamic tile shapes for
-  // batch_matmul. Also, they are not set up for narrow M/N matmul, so it is
-  // disabled when it is the case.
-  if (!cDims.batch.empty() || getMatmulNarrowDim(encoding)) {
-    hasUkernelSupport = false;
-  }
-  if (hasUkernelSupport) {
-    // VMVX+ukernel uses dynamic tile shapes.
-    return {TileMxNxK{ShapedType::kDynamic, ShapedType::kDynamic,
-                      ShapedType::kDynamic}};
-  }
-
-  return {
-      TileMxNxK{8, 8, 4}, // Some vaguely reasonable tile shape.
-      TileMxNxK{4, 8, 4}, // Truncation of the above.
-      TileMxNxK{2, 8, 4}, // Truncation of the above.
-      TileMxNxK{1, 8, 4}, // Truncation of the above.
-  };
-}
 
 // Enumerate tile sizes to choose from on riscv32.
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
@@ -303,9 +274,6 @@ enumerateMatmulTileMxNxK(IREE::Encoding::EncodingAttr encoding,
   }
   // Enumerate available tile shapes for the given encoding and target.
   SmallVector<Type> elementTypes = encoding.getElementTypesArray();
-  if (isVMVXBackend(target)) {
-    return enumerateMatmulTilesVMVX(*cDims, encoding, target);
-  }
   if (isAArch64(target)) {
     return enumerateMatmulTileArm64(elementTypes, target);
   }
@@ -374,9 +342,15 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
   // 2. We use ukernels, and this allows writing 2x fewer narrow ukernels.
   // 3. Heuristics for cache-friendly dispatch tiling can get complex on CPU,
   //    so it is nice that they have fewer narrow cases to consider.
+  IREE::Codegen::LayoutAttrInterface layoutAttr;
+  if (isVMVXBackend(targetAttr)) {
+    layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
+        IREE::CPU::VMVXEncodingLayoutAttr::get(ctx,
+                                               targetAttr.getConfiguration()));
+  }
   MaterializeEncodingTypeConverter typeConverter(
       materializeEncodingForTarget, targetAttr, /*transposeNarrowN=*/true,
-      /*layoutAttr=*/{});
+      layoutAttr);
   MaterializeEncodingConversionTarget target(*ctx);
   auto materializeEncodingValueFn = getMaterializeEncodingValueFn(targetAttr);
   populateMaterializeEncodingIntoPackUnPackPatterns(
@@ -440,8 +414,9 @@ struct CPUMaterializeHostEncodingPass
     : public impl::CPUMaterializeHostEncodingPassBase<
           CPUMaterializeHostEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, tensor::TensorDialect,
-                    IREE::Codegen::IREECodegenDialect>();
+    registry
+        .insert<arith::ArithDialect, tensor::TensorDialect,
+                IREE::Codegen::IREECodegenDialect, IREE::CPU::IREECPUDialect>();
   }
 
   void runOnOperation() override {
@@ -500,8 +475,9 @@ struct CPUMaterializeDeviceEncodingPass
     : public impl::CPUMaterializeDeviceEncodingPassBase<
           CPUMaterializeDeviceEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, tensor::TensorDialect,
-                    IREE::Codegen::IREECodegenDialect>();
+    registry
+        .insert<arith::ArithDialect, tensor::TensorDialect,
+                IREE::Codegen::IREECodegenDialect, IREE::CPU::IREECPUDialect>();
   }
 
   void runOnOperation() override {
