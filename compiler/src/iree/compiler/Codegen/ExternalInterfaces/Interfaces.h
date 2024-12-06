@@ -11,7 +11,7 @@
 
 namespace mlir::iree_compiler {
 
-/// Registers all global optimization related interfaces.
+/// Registers all codegen related interfaces.
 void registerCodegenExternalInterfaces(DialectRegistry &registry);
 
 } // namespace mlir::iree_compiler
