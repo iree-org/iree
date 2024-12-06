@@ -6,6 +6,7 @@
 
 #include "iree_pjrt/common/api_impl.h"
 
+#include <iterator>
 #include <optional>
 #include <sstream>
 #include <utility>
@@ -1002,7 +1003,7 @@ iree_status_t DeviceInstance::TransposeBroadcastDeviceBuffer(
 
   // Compile program and check for errors:
   LoadedExecutableInstance* executable;
-  auto* error = this->client().Compile(&program, &executable);
+  auto* error = this->client().Compile(&program, {}, &executable);
   if (error) {
     auto errinst = ErrorInstance::FromError(error);
     auto ret = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -1351,22 +1352,14 @@ void ClientInstance::BindApi(PJRT_Api* api) {
     LoadedExecutableInstance* executable;
 
     // Read compilation options.
-    // TODO: Port CompileOptionsProto into the project or leave ommitted.
-    // xla::CompileOptionsProto options_proto;
-    // if (!options_proto.ParseFromArray(args->compile_options,
-    //                                   args->compile_options_size)) {
-    //   return MakeError(iree_make_status(IREE_STATUS_INTERNAL,
-    //                                     "could not parse compilation
-    //                                     options"));
-    // }
-    // auto options = xla::CompileOptions::FromProto(options_proto);
-    // if (!options.ok()) {
-    //   return MakeError(
-    //       iree_make_status(IREE_STATUS_INTERNAL,
-    //                        std::string(options.status().message()).c_str()));
-    // }
+    xla::CompileOptionsProto options_proto;
+    if (!options_proto.ParseFromArray(args->compile_options,
+                                      args->compile_options_size)) {
+      return MakeError(iree_make_status(IREE_STATUS_INTERNAL,
+                                        "could not parse compilation options"));
+    }
 
-    auto* error = client->Compile(args->program, /**options,*/ &executable);
+    auto* error = client->Compile(args->program, options_proto, &executable);
     if (error) return error;
     args->executable = *executable;
     return nullptr;
@@ -1451,7 +1444,7 @@ iree_status_t ClientInstance::PopulateDevices() {
 }
 
 PJRT_Error* ClientInstance::Compile(const PJRT_Program* program,
-                                    /*xla::CompileOptions options,*/
+                                    xla::CompileOptionsProto options,
                                     LoadedExecutableInstance** out_executable) {
   std::unique_ptr<ArtifactDumper::Transaction> artifact_tx;
   if (platform().artifact_dumper().enabled()) {
@@ -1570,11 +1563,28 @@ PJRT_Error* ClientInstance::Compile(const PJRT_Program* program,
                            output->GetDataSize()));
     }
 
+    // calculate devices for this computation from device assignment
+    std::vector<DeviceInstance*> devices;
+
+    const auto& build_options = options.executable_build_options();
+    if (build_options.has_device_assignment()) {
+      const auto& device_assignment = build_options.device_assignment();
+      for (auto id :
+           device_assignment.computation_devices(0).replica_device_ids()) {
+        if (id < addressable_devices_.size())
+          devices.push_back(addressable_devices_[id]);
+      }
+    }
+
+    if (devices.empty()) {
+      devices = addressable_devices_;
+    }
+
     auto executable = std::make_unique<LoadedExecutableInstance>(
         *this,
         new ExecutableImage(std::move(output),
                             std::string(program->code, program->code_size)),
-        addressable_devices_);
+        devices);
     status = executable->LoadAll();
     if (!iree_status_is_ok(status)) {
       return MakeError(status);
