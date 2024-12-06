@@ -558,7 +558,6 @@ func.func @distribute_multi_result_generic(
 //  THREAD-SAME:       outs(%{{.*}}, %{{.*}}: tensor<1x1x?xf32>, tensor<1x1x?xf32>)
 //       THREAD:   return %[[FORALL]]#0, %[[FORALL]]#1
 
-<<<<<<< HEAD
 //  -----
 
 func.func @dont_yield_replacement_in_reduction_tiling(%arg0: tensor<4x77xbf16>, %arg1: tensor<4x77xf32>) -> (tensor<4x77xf32>, tensor<4xf32>) {
@@ -595,7 +594,7 @@ func.func @dont_yield_replacement_in_reduction_tiling(%arg0: tensor<4x77xbf16>, 
 // Note: if we yield replacement then we would see a large result of
 // tensor<4x77xf32> also being yielded which is not what we want in such a case.
 //   CHECK-SAME:  -> (tensor<4xf32>) {
-=======
+
 // -----
 
 #config = #iree_gpu.lowering_config<{thread = [2, 16], subgroup = [2, 16]}>
@@ -699,4 +698,3 @@ module {
 //       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[APPLY0]], %[[APPLY1]]] [20, 4] [1, 1]
 //       THREAD:     %[[EXPAND:.+]] = tensor.expand_shape %[[SLICE]] {{\[\[}}0, 1, 2], [3, 4]] output_shape [1, 2, 10, 1, 4]
 //       THREAD:     linalg.exp {{.*}} ins(%[[EXPAND]]
->>>>>>> e6e562d39b ([Codegen][GPU] Add reshape fusion and cleanup to tiling pass)
