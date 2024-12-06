@@ -183,7 +183,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
             param_data.input_index_threshold is not None
             and param_data.input_index_threshold < num_inputs
         ):
-            thresh = (
+            threshold = (
                 param_data.input_index_threshold
                 if param_data.input_index_threshold >= 0
                 else max(0, param_data.input_index_threshold + num_inputs)
@@ -233,16 +233,12 @@ class IREENodeImporter(onnx_importer.NodeImporter):
 
     def import_all(self, func=True):
         num_inputs = len(self._gi.input_map.items())
-        if (
-            self.param_data.input_index_threshold is not None
-            and self.param_data.input_index_threshold < num_inputs
-        ):
-            thresh = (
-                self.param_data.input_index_threshold
-                if self.param_data.input_index_threshold >= 0
-                else max(0, self.param_data.input_index_threshold + num_inputs)
-            )
-            for i in range(thresh, num_inputs):
+        if self.param_data.input_index_threshold is not None:
+            if self.param_data.input_index_threshold not in range(0, num_inputs):
+                raise ValueError(
+                    f"input_index_threshold must be in the range [0,num_inputs={num_inputs})"
+                )
+            for i in range(self.param_data.input_index_threshold, num_inputs):
                 self.import_initializer(list(self._gi.input_map.values())[i])
         super().import_all(func)
 
@@ -264,8 +260,12 @@ class IREENodeImporter(onnx_importer.NodeImporter):
                 self._nv_map[initializer_name] = imported_tensor
                 return imported_tensor
             data_type = initializer.data_type
-        else:
+        elif isinstance(initializer, onnx.ValueInfoProto):
             dims, data_type = self.get_type_info_from_type(initializer.type)
+        else:
+            raise TypeError(
+                f"Expected an onnx.TensorProto or an onnx.ValueInfoProto, recieved {type(initializer)} from {initializer_name}"
+            )
 
         actual_symbol_name, tensor_type = self.create_tensor_global(initializer)
         vtensor_type = self._cc.get_vtensor_type(
