@@ -1802,6 +1802,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#gpuencodinglayoutattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      GPUEncodingLayoutAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#gpupipelineoptionsattr" class="md-nav__link">
     <span class="md-ellipsis">
       GPUPipelineOptionsAttr
@@ -4299,6 +4308,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#gpuencodinglayoutattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      GPUEncodingLayoutAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#gpupipelineoptionsattr" class="md-nav__link">
     <span class="md-ellipsis">
       GPUPipelineOptionsAttr
@@ -4774,6 +4792,7 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#datatiledmmaattr">DataTiledMMAAttr</a></li>
 <li><a href="#derivedthreadconfigattr">DerivedThreadConfigAttr</a></li>
 <li><a href="#dotproductopsattr">DotProductOpsAttr</a></li>
+<li><a href="#gpuencodinglayoutattr">GPUEncodingLayoutAttr</a></li>
 <li><a href="#gpupipelineoptionsattr">GPUPipelineOptionsAttr</a></li>
 <li><a href="#iteratortypeattr">IteratorTypeAttr</a></li>
 <li><a href="#laneidattr">LaneIdAttr</a></li>
@@ -5297,6 +5316,36 @@ tiling configs.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="gpuencodinglayoutattr">GPUEncodingLayoutAttr<a class="headerlink" href="#gpuencodinglayoutattr" title="Permanent link">link</a></h3>
+<p>The encoding layout attribute for GPU backend</p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_gpu.gpu_encoding_layout&lt;
+  ::mlir::iree_compiler::IREE::GPU::TargetAttr   # targetAttr
+&gt;
+</code></pre></div>
+<p>This attribute can implement any layout interface methods for data-tiling,
+e.g., Codegen::LayoutAttrInterface, etc. They should be implemented
+through external model mechanism because we do not want to relocate
+domain-specific logic to the dialect implementation, and we can have better
+code structure. See the implementation in
+compiler/Codegen/ExternalInterfaces/*.</p>
+<h5 id="parameters_3">Parameters:<a class="headerlink" href="#parameters_3" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">targetAttr</td>
+<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::TargetAttr</code></td>
+<td>IREE GPU target attribute. It is expected to be used in a pass scope, but not the final IR output.</td>
+</tr>
+</tbody>
+</table>
 <h3 id="gpupipelineoptionsattr">GPUPipelineOptionsAttr<a class="headerlink" href="#gpupipelineoptionsattr" title="Permanent link">link</a></h3>
 <p>GPU pipeline options attribute.</p>
 <p>Syntax:</p>
@@ -5315,7 +5364,7 @@ tiling configs.</p>
 * reorder_workgroups_strategy: Enum attribute indicating which strategy to
   choose for the workgroup reordering pass. Options are <code>None</code>, <code>Swizzle</code>,
   and <code>Transpose</code>.</p>
-<h5 id="parameters_3">Parameters:<a class="headerlink" href="#parameters_3" title="Permanent link">link</a></h5>
+<h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5357,7 +5406,7 @@ tiling configs.</p>
 <p>Enum cases:
 * parallel (<code>parallel</code>)
 * reduction (<code>reduction</code>)</p>
-<h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
+<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5381,7 +5430,7 @@ tiling configs.</p>
 &gt;
 </code></pre></div>
 <p>An attribute for mapping scf.forall ops to subgroup lanes.</p>
-<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
+<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5408,7 +5457,7 @@ tiling configs.</p>
 <p>GPU specific implementation of a lowering config. This carries just a
 dictionary attribute to store any relevant fields. This is the simplest
 form of a lowering config, offering flexibility at the cost of structure.</p>
-<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
+<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5443,7 +5492,7 @@ and |cType| for matrices <code>A</code>, <code>B</code>, and <code>C</code> resp
 field specifies which particular MMA intrinsic this refers to, with each
 intrinsic implicating a specific MNK shape and operand types.
 See IREEGPUEnums.td for the definition of the intrinsics.</p>
-<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
+<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5525,7 +5574,7 @@ See IREEGPUEnums.td for the definition of the intrinsics.</p>
 * WMMA_I32_16x16x16_I8 (<code>WMMA_I32_16x16x16_I8</code>)
 * NV_WMMA_F32_16x16x16_F16 (<code>NV_WMMA_F32_16x16x16_F16</code>)
 * NV_WMMA_F16_16x16x16_F16 (<code>NV_WMMA_F16_16x16x16_F16</code>)</p>
-<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
+<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5548,7 +5597,7 @@ See IREEGPUEnums.td for the definition of the intrinsics.</p>
   ::llvm::ArrayRef&lt;MMAAttr&gt;   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
+<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5575,7 +5624,7 @@ See IREEGPUEnums.td for the definition of the intrinsics.</p>
 </code></pre></div>
 <p>A schedule of MMA intrinsic instruction and various levels of tile sizes
 to solve a specific contraction problem.</p>
-<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
+<h5 id="parameters_11">Parameters:<a class="headerlink" href="#parameters_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5612,7 +5661,7 @@ to solve a specific contraction problem.</p>
 <p>Enum cases:
 * None (<code>None</code>)
 * Transpose (<code>Transpose</code>)</p>
-<h5 id="parameters_11">Parameters:<a class="headerlink" href="#parameters_11" title="Permanent link">link</a></h5>
+<h5 id="parameters_12">Parameters:<a class="headerlink" href="#parameters_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5641,7 +5690,7 @@ to solve a specific contraction problem.</p>
 * b32 (<code>B32</code>)
 * b16 (<code>B16</code>)
 * b8 (<code>B8</code>)</p>
-<h5 id="parameters_12">Parameters:<a class="headerlink" href="#parameters_12" title="Permanent link">link</a></h5>
+<h5 id="parameters_13">Parameters:<a class="headerlink" href="#parameters_13" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5669,7 +5718,7 @@ to solve a specific contraction problem.</p>
 * none (<code>None</code>)
 * shuffle (<code>Shuffle</code>)
 * arithmetic (<code>Arithmetic</code>)</p>
-<h5 id="parameters_13">Parameters:<a class="headerlink" href="#parameters_13" title="Permanent link">link</a></h5>
+<h5 id="parameters_14">Parameters:<a class="headerlink" href="#parameters_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5704,7 +5753,7 @@ to solve a specific contraction problem.</p>
   streaming multiprocessor
 * An optional TargetChipAttr describing GPU features for the final chip
   or product, e.g., wgp count</p>
-<h5 id="parameters_14">Parameters:<a class="headerlink" href="#parameters_14" title="Permanent link">link</a></h5>
+<h5 id="parameters_15">Parameters:<a class="headerlink" href="#parameters_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5748,7 +5797,7 @@ to solve a specific contraction problem.</p>
 Here a GPU chip means the hardware functionality scope where the whole
 software compute grid is scheduled onto. A chip typically contains many
 AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.</p>
-<h5 id="parameters_15">Parameters:<a class="headerlink" href="#parameters_15" title="Permanent link">link</a></h5>
+<h5 id="parameters_16">Parameters:<a class="headerlink" href="#parameters_16" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5795,7 +5844,7 @@ processor (WGP) level. Here a GPU workgroup processor means the basic
 hardware functionality unit where a software workgroup is scheduled onto;
 that is, a compute unit for AMD GPUs or a streaming multiprocessor for
 NVIDIA GPUs.</p>
-<h5 id="parameters_16">Parameters:<a class="headerlink" href="#parameters_16" title="Permanent link">link</a></h5>
+<h5 id="parameters_17">Parameters:<a class="headerlink" href="#parameters_17" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5889,7 +5938,7 @@ field represents different kinds of "Virtual" MMA Ops we found helpful.</p>
 <p>These interleaving and/or unrolling changes in the layout is especially
 useful to coalesce reads from shared memory to register or align layouts
 in a chained-matmul operation.</p>
-<h5 id="parameters_17">Parameters:<a class="headerlink" href="#parameters_17" title="Permanent link">link</a></h5>
+<h5 id="parameters_18">Parameters:<a class="headerlink" href="#parameters_18" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5918,7 +5967,7 @@ in a chained-matmul operation.</p>
 * VMFMA_F32_32x32x16_F16 (<code>VMFMA_F32_32x32x16_F16</code>)
 * VMFMA_F32_16x16x32_F8E4M3FNUZ (<code>VMFMA_F32_16x16x32_F8E4M3FNUZ</code>)
 * VMFMA_F32_32x32x16_F8E4M3FNUZ (<code>VMFMA_F32_32x32x16_F8E4M3FNUZ</code>)</p>
-<h5 id="parameters_18">Parameters:<a class="headerlink" href="#parameters_18" title="Permanent link">link</a></h5>
+<h5 id="parameters_19">Parameters:<a class="headerlink" href="#parameters_19" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
