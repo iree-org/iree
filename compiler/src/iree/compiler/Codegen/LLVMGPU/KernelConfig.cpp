@@ -1577,6 +1577,7 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
       return failure();
     }
   }
+  int numDynamicDims = llvm::count_if(bounds, ShapedType::isDynamic);
 
   // Distribution of multi-dim masked writes currently aren't fully supported.
   if (numDynamicReductionDims > 1) {
@@ -1617,9 +1618,9 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
 
-  // Without any bounds on dynamic reduction dims, we need specialization to
+  // Without any bounds on dynamic dims, we need specialization to
   // get peak performance. For now, just use the warp size.
-  if (numDynamicReductionDims) {
+  if (numDynamicDims > 0) {
     SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
     int64_t preferredSubgroupSize = target.getPreferredSubgroupSize();
     reductionTileSizes[reductionDims[0]] = preferredSubgroupSize;
