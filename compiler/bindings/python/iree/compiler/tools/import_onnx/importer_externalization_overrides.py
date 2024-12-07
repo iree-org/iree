@@ -5,17 +5,17 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import copy
-import sys
 import random
 import string
-import numpy
+import sys
 import warnings
-
-from ...dialects import util
 from typing import Optional, Tuple, Any, NamedTuple, Union
+
+import numpy
 
 try:
     import onnx
+    from onnx import numpy_helper
 except ModuleNotFoundError as e:
     raise ModuleNotFoundError(
         f"iree-import-onnx requires that the `onnx` Python package is installed "
@@ -29,7 +29,7 @@ except ModuleNotFoundError as e:
         "iree-import-onnx is only available if IREE was built with Torch support"
     ) from e
 
-from onnx import numpy_helper
+from ...dialects import util
 
 from ...ir import (
     Context,
@@ -322,7 +322,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
                         f"Single parameter {name} is {param_bits} bits, "
                         + f"which exceeds threshold of {self.param_data.param_bit_threshold} bits."
                     )
-                # flush the param archive to the param file if we exeed the threshold
+                # flush the param archive to the param file if we exceed the threshold
                 if in_memory_param_bits >= self.param_data.param_bit_threshold:
                     param_archive = param_archive.create_archive_file(
                         self.param_data.param_path

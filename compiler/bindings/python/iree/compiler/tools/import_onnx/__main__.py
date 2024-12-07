@@ -31,17 +31,18 @@ def main(args: argparse.Namespace):
 
     imp: Any = None
     if args.externalize_params:
-        is_stdout = (args.output_file is None) or (args.output_file == "-")
-        output_dir = (
-            Path(args.input_file).parent if is_stdout else Path(args.output_file).parent
-        )
-        output_stem = "imported_model" if is_stdout else Path(args.output_file).stem
-        default_param_path = output_dir / (output_stem + "_params.irpa")
-        param_path = (
-            str(default_param_path)
-            if args.save_params_to is None
-            else str(args.save_params_to)
-        )
+        if not args.save_params:
+            param_path = None
+        elif args.save_params_to:
+            param_path = args.save_params_to
+        elif (args.output_file is not None) and (args.output_file != "-"):
+            output_dir = Path(args.output_file).parent
+            output_stem = Path(args.output_file).stem
+            param_path = output_dir / (output_stem + "_params.irpa")
+        else:
+            raise ValueError(
+                "If `--externalize-params` is set and `--output-file` is stdout, either `--save-params-to` or `--no-save-params` must be set."
+            )
         data_dir = (
             args.data_dir
             if args.data_dir is not None
@@ -53,12 +54,12 @@ def main(args: argparse.Namespace):
             else int(args.param_gb_threshold * 8 * (10**9))
         )
         param_data = ParamData(
-            param_bit_threshold,
-            args.num_elements_threshold,
-            args.params_scope,
-            data_dir,
-            param_path,
-            args.externalize_inputs_threshold,
+            param_bit_threshold=param_bit_threshold,
+            num_elements_threshold=args.num_elements_threshold,
+            params_scope=args.params_scope,
+            data_dir=data_dir,
+            param_path=str(param_path),
+            input_index_threshold=args.externalize_inputs_threshold,
         )
         imp = IREENodeImporter.define_function(model_info.main_graph, m, param_data)
     else:
