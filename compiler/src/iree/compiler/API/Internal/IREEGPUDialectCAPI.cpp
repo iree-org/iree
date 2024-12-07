@@ -223,12 +223,17 @@ ireeGPUTileSizes ireeGPULoweringConfigAttrGetTileSizes(MlirAttribute attr) {
           unwrap(attr))
           .getAttributes();
 
-  constexpr mlir::StringLiteral workgroupName = "workgroup";
+  llvm::StringRef workgroupName =
+      mlir::iree_compiler::IREE::GPU::getTilingLevelName(
+          mlir::iree_compiler::IREE::GPU::TilingLevel::Workgroup);
+
   if (auto workgroupArray = dict.getAs<mlir::ArrayAttr>(workgroupName)) {
     tilesizes.workgroupAttr = wrap(workgroupArray);
   }
 
-  constexpr mlir::StringLiteral reductionName = "reduction";
+  llvm::StringRef reductionName =
+      mlir::iree_compiler::IREE::GPU::getTilingLevelName(
+          mlir::iree_compiler::IREE::GPU::TilingLevel::Reduction);
   if (auto reductionArray = dict.getAs<mlir::ArrayAttr>(reductionName)) {
     tilesizes.reductionAttr = wrap(reductionArray);
   }

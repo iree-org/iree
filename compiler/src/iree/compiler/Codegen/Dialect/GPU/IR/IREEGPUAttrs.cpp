@@ -1104,7 +1104,7 @@ constexpr StringLiteral kThreadLevelName = "thread";
 constexpr StringLiteral kSubgroupLevelName = "subgroup";
 constexpr StringLiteral kLaneLevelName = "lane";
 
-static StringRef getTilingLevelName(GPU::TilingLevel level) {
+StringRef getTilingLevelName(GPU::TilingLevel level) {
   switch (level) {
   case GPU::TilingLevel::Workgroup:
     return kWorkgroupLevelName;
@@ -1120,7 +1120,7 @@ static StringRef getTilingLevelName(GPU::TilingLevel level) {
     return kLaneLevelName;
   }
   assert(false && "Unknown tiling level");
-  return StringAttr();
+  return StringRef();
 }
 
 static SmallVector<int64_t> getIntegerVector(ArrayAttr array) {

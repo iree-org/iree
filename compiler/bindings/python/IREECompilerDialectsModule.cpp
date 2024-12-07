@@ -364,7 +364,7 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
 
             size_t len = mlirArrayAttrGetNumElements(workgroupAttr);
             std::vector<int64_t> workgroup(len);
-            for (size_t i = 0, e = len; i < e; ++i) {
+            for (size_t i = 0; i < len; ++i) {
               MlirAttribute attr = mlirArrayAttrGetElement(workgroupAttr, i);
               workgroup[i] = mlirIntegerAttrGetValueInt(attr);
             }
@@ -381,7 +381,7 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
 
             size_t len = mlirArrayAttrGetNumElements(reductionAttr);
             std::vector<int64_t> reduction(len);
-            for (size_t i = 0, e = len; i < e; ++i) {
+            for (size_t i = 0; i < len; ++i) {
               MlirAttribute attr = mlirArrayAttrGetElement(reductionAttr, i);
               reduction[i] = mlirIntegerAttrGetValueInt(attr);
             }
