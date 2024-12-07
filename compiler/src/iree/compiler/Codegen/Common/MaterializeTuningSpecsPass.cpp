@@ -210,9 +210,10 @@ struct MaterializeTuningSpecsPass final
       allSpecs.push_back(*defaultTuningSpec);
     }
 
-    Location loc = FusedLoc::get(
-        ctx,
-        llvm::map_to_vector(allSpecs, [](ModuleOp m) { return m.getLoc(); }));
+    Location loc =
+        FusedLoc::get(ctx, llvm::map_to_vector<2>(allSpecs, [](ModuleOp m) {
+                        return m.getLoc();
+                      }));
 
     // This module will always be released at the end of the pass.
     OwningOpRef<ModuleOp> linkedTuningSpec(
