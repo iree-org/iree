@@ -11,10 +11,12 @@
 
 namespace mlir::iree_compiler::IREE::Codegen {
 
-FailureOr<ModuleOp> IREECodegenDialect::getOrLoadTransformLibraryModule(
-    StringRef libraryPath, StringRef libraryMLIRSource /*= ""*/) {
-  // Acquire a lock on the map that will release once out of scope.
-  std::lock_guard<std::mutex> guard(libraryMutex);
+/// Helper function that implements the module lookup and validation.
+/// The caller is responsible for acquiring the mutex for `libraryModules`.
+static FailureOr<ModuleOp> getOrParseTransformLibraryModuleImpl(
+    StringRef libraryPath,
+    llvm::StringMap<OwningOpRef<ModuleOp>> &libraryModules,
+    llvm::function_ref<LogicalResult(OwningOpRef<ModuleOp> &)> loadModuleFn) {
 
   auto loadedLibrary = libraryModules.find(libraryPath);
   if (loadedLibrary != libraryModules.end()) {
@@ -29,22 +31,8 @@ FailureOr<ModuleOp> IREECodegenDialect::getOrLoadTransformLibraryModule(
   // succeeds so that other threads don't have to retry.
   OwningOpRef<ModuleOp> &parsedLibrary = libraryModules[libraryPath];
 
-  MLIRContext *ctx = getContext();
-
-  if (libraryMLIRSource.empty()) {
-    if (failed(transform::detail::parseTransformModuleFromFile(
-            ctx, libraryPath, parsedLibrary))) {
-      return failure();
-    }
-  } else {
-    // The MLIR source is provided by the caller, so we do not access the
-    // filesystem.
-    ParserConfig config(ctx);
-    parsedLibrary =
-        parseSourceString<ModuleOp>(libraryMLIRSource, ctx, libraryPath);
-    if (!parsedLibrary) {
-      return failure();
-    }
+  if (failed(loadModuleFn(parsedLibrary))) {
+    return failure();
   }
 
   if (!parsedLibrary.get()->hasAttr(
@@ -65,6 +53,34 @@ FailureOr<ModuleOp> IREECodegenDialect::getOrLoadTransformLibraryModule(
   }
 
   return parsedLibrary.get();
+}
+
+FailureOr<ModuleOp>
+IREECodegenDialect::getOrLoadTransformLibraryModule(StringRef libraryPath) {
+  // Acquire a lock on the map that will release once out of scope.
+  std::lock_guard<std::mutex> guard(libraryMutex);
+  MLIRContext *ctx = getContext();
+
+  return getOrParseTransformLibraryModuleImpl(
+      libraryPath, libraryModules, [=](OwningOpRef<ModuleOp> &parsedLibrary) {
+        return transform::detail::parseTransformModuleFromFile(ctx, libraryPath,
+                                                               parsedLibrary);
+      });
+}
+
+FailureOr<ModuleOp> IREECodegenDialect::getOrParseTransformLibraryModule(
+    StringRef libraryPath, StringRef libraryMLIRSource) {
+  // Acquire a lock on the map that will release once out of scope.
+  std::lock_guard<std::mutex> guard(libraryMutex);
+  MLIRContext *ctx = getContext();
+
+  return getOrParseTransformLibraryModuleImpl(
+      libraryPath, libraryModules, [=](OwningOpRef<ModuleOp> &parsedLibrary) {
+        ParserConfig config(ctx);
+        parsedLibrary =
+            parseSourceString<ModuleOp>(libraryMLIRSource, ctx, libraryPath);
+        return success(*parsedLibrary != nullptr);
+      });
 }
 
 } // namespace mlir::iree_compiler::IREE::Codegen
