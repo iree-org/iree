@@ -68,6 +68,10 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
 MMASingleSubgroupLayout getSingleSubgroupLayout(MmaInterfaceAttr mmaKind,
                                                 MMAFragment fragment);
 
+/// Returns the name of the tilling `level`, as used in the `lowering_config`
+/// attribute.
+StringRef getTilingLevelName(GPU::TilingLevel level);
+
 } // namespace mlir::iree_compiler::IREE::GPU
 
 // clang-format off
