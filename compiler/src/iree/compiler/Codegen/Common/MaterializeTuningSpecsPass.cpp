@@ -139,8 +139,8 @@ getDefaultTuningSpec(ModuleOp module,
 
   // Load the library through the codegen dialect so that we cache the parsed
   // module.
-  return dialect.getOrLoadTransformLibraryModule(defaultTuningSpecName,
-                                                 *defaultTuningSpecSource);
+  return dialect.getOrParseTransformLibraryModule(defaultTuningSpecName,
+                                                  *defaultTuningSpecSource);
 }
 
 static FailureOr<DenseElementsAttr>
