@@ -30,7 +30,6 @@ iree_cc_library(
     "IPO.cpp"
     "ImportResources.cpp"
     "OptimizeIntArithmetic.cpp"
-    "PassDetail.h"
     "Passes.cpp"
     "Patterns.cpp"
     "PropagateSubranges.cpp"

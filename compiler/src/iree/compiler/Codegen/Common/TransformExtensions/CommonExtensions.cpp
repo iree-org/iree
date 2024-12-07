@@ -1100,6 +1100,16 @@ class TestVectorLayoutOptions : public VectorLayoutOptions {
 public:
   TestVectorLayoutOptions(Operation *root)
       : VectorLayoutOptions(root, /*fullConversion=*/false) {}
+
+  VectorLayoutInterface getDefaultLayout(VectorType type) const override {
+    // We only allow a default layout for 0-d vectors for now.
+    if (type.getRank() > 0) {
+      return VectorLayoutInterface();
+    }
+    ArrayRef<int64_t> empty = {};
+    return IREE::VectorExt::NestedLayoutAttr::get(
+        type.getContext(), empty, empty, empty, empty, empty, empty, empty);
+  }
 };
 
 DiagnosedSilenceableFailure
@@ -1113,16 +1123,15 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
   rewriter.setInsertionPointToStart(&target.getFunctionBody().front());
   // This is a test op so we unsafely use thread_id x as the lane ID. In
   // general this should linearize the thread IDs based on the workgroup size
-  // and divide by the subgroup size. i.e.
+  // and take the modulo by the subgroup size. i.e.
   //
-  // lane_id = (tid_x + tid_y * dim_x + tid_z * dim_y * dim_x) / subgroup_size;
+  // lane_id = (tid_x + tid_y * dim_x + tid_z * dim_y * dim_x) % subgroup_size;
   Value laneId =
       rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::x);
+  int64_t subgroupSize = getSubgroupSize();
 
   populateGPUDistributionPatterns(patterns);
-  // For testing we use subgroup size = 64.
-  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId,
-                                                /*subgroupSize=*/64);
+  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize);
   populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultDefiniteFailure(target);

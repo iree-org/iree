@@ -108,10 +108,10 @@ setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
 
 /// Given a target and a matmul problem, try to find an MMA schedule for the
 /// problem based on the available mma intrinsics.
-static std::optional<GPUMMASchedule>
-getMmaScheduleFromProblemAndTarget(IREE::GPU::TargetAttr target,
-                                   GPUMatmulShapeType problem,
-                                   bool transposedLhs, bool transposedRhs) {
+static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
+    IREE::GPU::TargetAttr target, GPUMatmulShapeType problem,
+    bool transposedLhs, bool transposedRhs, bool mustBeAligned = true,
+    bool doCPromotion = false) {
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   SmallVector<GPUMatmulShapeType> intrinsics;
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
@@ -153,14 +153,16 @@ getMmaScheduleFromProblemAndTarget(IREE::GPU::TargetAttr target,
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
   // First try to find a schedule with an exactly matching intrinsic.
-  std::optional<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                        targetSubgroupSize, transposedLhs, transposedRhs);
+  std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
+      problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
+      transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
+      /*mustBeAligned*/ mustBeAligned, doCPromotion);
   if (!schedule) {
     // Then try again by allowing upcasting accumulator.
     schedule = deduceMMASchedule(
         problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
-        transposedLhs, transposedRhs, /*canUpcastAcc=*/true);
+        transposedLhs, transposedRhs, /*canUpcastAcc=*/true,
+        /*mustBeAligned*/ mustBeAligned, doCPromotion);
   }
   return schedule;
 }
@@ -173,7 +175,8 @@ static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
 getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
                                         ArrayRef<AffineMap> maps,
                                         ArrayRef<Value> operands,
-                                        IREE::GPU::TargetAttr target) {
+                                        IREE::GPU::TargetAttr target,
+                                        bool hasFusedLeadingOp) {
   if (target.getWgp().getMma().empty())
     return failure();
 
@@ -238,8 +241,25 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
       nDims.back() !=
       llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
+  bool mustBeAligned = true;
+  bool doCPromotion = false;
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
       target, problem, transposedLhs, transposedRhs);
+
+  // TODO (nirvedhmeshram, jerryyin): Support all GEMM types.
+  // TODO (nirvedhmeshram): Support fused leading op.
+  // TODO (nirvedhmeshram, qedawkins): The performance with this will be bad if
+  // the GEMM is accumulating (i.e doesnt have a zero fill dpsInit) as that
+  // buffer currently gets materialized as private memory. We need to add
+  // missing patterns to fix that.
+  if (!schedule && !contractionDims.batch.empty() && !hasFusedLeadingOp) {
+    LDBG("Attempting to deduce unaligned TileAndFuse MMA schedulee");
+    mustBeAligned = false;
+    doCPromotion = true;
+    schedule = getMmaScheduleFromProblemAndTarget(target, problem,
+                                                  transposedLhs, transposedRhs,
+                                                  mustBeAligned, doCPromotion);
+  }
 
   if (!schedule) {
     LDBG("Failed to deduce TileAndFuse MMA schedule");
@@ -269,14 +289,6 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   for (int64_t k : llvm::drop_end(contractionDims.k)) {
     reductionTileSizes[k] = 1;
   }
-
-  // Adjust the inner bound size for packing to intrinsic shapes, since tiling
-  // happens after packing.
-  assert(bounds[mDims.back()] % schedule->mSize == 0 &&
-         bounds[nDims.back()] % schedule->nSize == 0 &&
-         "expected inner bound to be evenly divisible by schedule sizes.");
-  bounds[mDims.back()] /= schedule->mSize;
-  bounds[nDims.back()] /= schedule->nSize;
 
   // Compute the M/N dimension tile sizes by multiplying subgroup information.
   for (auto [i, mDim] : llvm::enumerate(mDims)) {
@@ -318,7 +330,22 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   attrs.emplace_back(StringAttr::get(context, "subgroup"),
                      b.getI64ArrayAttr(subgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "mma_kind"), mmaKind);
-  GPU::setPromotedOperandList(context, attrs, {0, 1});
+  if (mustBeAligned) {
+    GPU::setPromotedOperandList(context, attrs, {0, 1});
+  } else {
+    // TODO (nirvedhmeshram, Max191, jerryyin) : Add support so that unaligned
+    // shapes do not require c promotion.
+    // TODO (nirvedhmeshram, jerryyin) : When using c promotion the heuristics
+    // used during finding a schedule need to be updated to account for the
+    // extra shared memory for the result.
+    GPU::setPromotedOperandList(context, attrs, {0, 1, 2});
+    SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
+    int64_t innerKDim = contractionDims.k.back();
+    int64_t kPackFactor = std::get<2>(mmaKind.getMNKShape());
+    paddingTileSizes[innerKDim] = reductionTileSizes[innerKDim] * kPackFactor;
+    attrs.emplace_back(StringAttr::get(context, "padding"),
+                       b.getI64ArrayAttr(paddingTileSizes));
+  }
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
   int64_t flatWorkgroupSize =
@@ -357,7 +384,8 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> bounds = igemmLoopBounds.value();
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulLoweringConfigAndWorkgroupSize(
-          bounds, igemmContractionMaps.value(), igemmOperands.value(), target);
+          bounds, igemmContractionMaps.value(), igemmOperands.value(), target,
+          /*hasFusedLeadingOp=*/true);
   if (failed(configAndWgSize)) {
     return failure();
   }
@@ -400,7 +428,8 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   LDBG("Matmul TileAndFuse Config");
 
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
-      getMatmulLoweringConfigAndWorkgroupSize(bounds, maps, operands, target);
+      getMatmulLoweringConfigAndWorkgroupSize(bounds, maps, operands, target,
+                                              hasFusedLeadingOp(linalgOp));
   if (failed(configAndWgSize)) {
     return failure();
   }

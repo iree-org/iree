@@ -67,6 +67,7 @@ iree_cc_library(
     "GPUMultiBuffering.cpp"
     "GPUNestedLayoutDistributionPatterns.cpp"
     "GPUPackToIntrinsics.cpp"
+    "GPUPadOperands.cpp"
     "GPUPatterns.cpp"
     "GPUPipelining.cpp"
     "GPUPromoteMatmulOperands.cpp"
@@ -123,6 +124,7 @@ iree_cc_library(
     MLIRTilingInterface
     MLIRTransformUtils
     MLIRTransforms
+    MLIRValueBoundsOpInterface
     MLIRVectorDialect
     MLIRVectorToSCF
     MLIRVectorTransforms

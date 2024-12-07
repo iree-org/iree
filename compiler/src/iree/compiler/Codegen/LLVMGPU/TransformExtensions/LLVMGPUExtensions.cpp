@@ -1463,6 +1463,10 @@ class TransformVectorLayoutOptions : public VectorLayoutOptions {
 public:
   TransformVectorLayoutOptions(Operation *root, bool fullConversion)
       : VectorLayoutOptions(root, fullConversion) {}
+
+  VectorLayoutInterface getDefaultLayout(VectorType type) const override {
+    return VectorLayoutInterface();
+  }
 };
 
 DiagnosedSilenceableFailure
@@ -1476,11 +1480,10 @@ transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(
   rewriter.setInsertionPointToStart(&target.getFunctionBody().front());
   Value laneId =
       rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::x);
+  int64_t subgroupSize = getSubgroupSize();
 
   populateGPUDistributionPatterns(patterns);
-  // For testing we use subgroup size = 64.
-  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId,
-                                                /*subgroupSize=*/64);
+  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize);
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultSilenceableFailure(target);
   }

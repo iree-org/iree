@@ -1,6 +1,7 @@
 # pjrt_c_api
 
-This directory contains a fork of C headers needed to build a PJRT plugin.
+This directory contains a fork of C headers and .proto files
+needed to build a PJRT plugin.
 
 It is intended to be sync'd with upstream for major/breaking changes and
 releases.

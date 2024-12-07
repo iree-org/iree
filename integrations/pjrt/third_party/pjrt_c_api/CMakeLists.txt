@@ -26,3 +26,12 @@ iree_cc_library(
     "xla/pjrt/c/pjrt_c_api.h"
   PUBLIC
 )
+
+iree_pjrt_protobuf_cc_library(
+  NAME
+    protos
+  SRCS
+    "xla/pjrt/compile_options.proto"
+    "xla/xla_data.proto"
+  PUBLIC
+)

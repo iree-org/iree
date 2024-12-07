@@ -41,6 +41,16 @@ public:
 
   RewritePatternSet &getPatterns() { return patterns; }
 
+  VectorLayoutInterface getDefaultLayout(VectorType type) const override {
+    // We only allow a default layout for 0-d vectors for now.
+    if (type.getRank() > 0) {
+      return VectorLayoutInterface();
+    }
+    ArrayRef<int64_t> empty = {};
+    return IREE::VectorExt::NestedLayoutAttr::get(
+        type.getContext(), empty, empty, empty, empty, empty, empty, empty);
+  }
+
 private:
   RewritePatternSet patterns;
 };
@@ -80,24 +90,18 @@ struct LLVMGPUVectorDistributePass final
       }
     }
 
-    AffineExpr x, y, z;
-    bindSymbols(func.getContext(), x, y, z);
-    // Construct the expression for linearizing the thread indices.
-    AffineExpr linearId =
-        x + workgroupSize[0] * y + workgroupSize[1] * workgroupSize[0] * z;
-
     IRRewriter rewriter(func);
     rewriter.setInsertionPointToStart(&func.getFunctionBody().front());
-    SmallVector<OpFoldResult> threadGrid = {
-        rewriter.createOrFold<gpu::ThreadIdOp>(func.getLoc(),
-                                               gpu::Dimension::x),
-        rewriter.createOrFold<gpu::ThreadIdOp>(func.getLoc(),
-                                               gpu::Dimension::y),
-        rewriter.createOrFold<gpu::ThreadIdOp>(func.getLoc(),
-                                               gpu::Dimension::z)};
+    SmallVector<Value> threadGrid = {rewriter.createOrFold<gpu::ThreadIdOp>(
+                                         func.getLoc(), gpu::Dimension::z),
+                                     rewriter.createOrFold<gpu::ThreadIdOp>(
+                                         func.getLoc(), gpu::Dimension::y),
+                                     rewriter.createOrFold<gpu::ThreadIdOp>(
+                                         func.getLoc(), gpu::Dimension::x)};
+    std::reverse(workgroupSize.begin(), workgroupSize.end());
 
-    Value linearThreadIdVal = affine::makeComposedAffineApply(
-        rewriter, func.getLoc(), linearId, threadGrid);
+    Value linearThreadIdVal = rewriter.create<affine::AffineLinearizeIndexOp>(
+        func.getLoc(), threadGrid, workgroupSize, /*disjoint=*/true);
 
     std::optional<int64_t> subgroupSize = getSubgroupSize(func);
     if (!subgroupSize) {

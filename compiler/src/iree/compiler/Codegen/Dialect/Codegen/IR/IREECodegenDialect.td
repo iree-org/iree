@@ -23,7 +23,7 @@ def IREECodegen_Dialect : Dialect {
   let description = [{
     This dialect is primarily meant to hold attributes that carry the
     state of the compilation when lowered to scalar code for an
-    architecture. Typically, a backend starts by analysing the entry
+    architecture. Typically, a backend starts by analyzing the entry
     point functions within the `hal.executable.variant` and deciding
     which compilation pipeline to chose. During this, even the values
     for parameters such as tile sizes, etc. are also decided. The rest

@@ -955,21 +955,11 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK:      #[[$LAYOUT:.+]] = #iree_vector_ext.nested_layout
-// CHECK-SAME:   subgroup_tile = [2, 2],
-// CHECK-SAME:   batch_tile = [4, 2]
-// CHECK-SAME:   outer_tile = [1, 2]
-// CHECK-SAME:   thread_tile = [16, 4]
-// CHECK-SAME:   element_tile = [2, 2]
-// CHECK-SAME:   subgroup_strides = [1, 2],
-// CHECK-SAME:   thread_strides = [1, 16]
-
 // CHECK-LABEL: func @transpose
 // CHECK: iree_vector_ext.to_simt %{{.*}} : vector<64x256xf16> -> vector<2x4x2x1x2x2xf16>
 // CHECK: vector.transpose %{{.*}}, [1, 0, 3, 2, 5, 4] : vector<2x4x2x1x2x2xf16> to vector<4x2x1x2x2x2xf16>
 // CHECK: math.sqrt %{{.*}} : vector<4x2x1x2x2x2xf16>
 // CHECK: iree_vector_ext.to_simd %{{.*}} : vector<4x2x1x2x2x2xf16> -> vector<256x64xf16>
-// CHECK: return {{.*}}#[[$LAYOUT]]
 
 // -----
 
@@ -1185,7 +1175,7 @@ func.func @distribute_scf_for(%arr: memref<32x32xf16>, %a: vector<32x32xf16>) ->
     %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<32x32xf16>
     %b = arith.addf %rootl, %a : vector<32x32xf16>
     %c = arith.extf %b : vector<32x32xf16> to vector<32x32xf32>
-    %init = vector.extractelement %arg0[] : vector<f32>
+    %init = vector.extract %arg0[] : f32 from vector<f32>
     %root_red = vector.multi_reduction<add>, %c, %init [0, 1]  : vector<32x32xf32> to f32
     %d = vector.broadcast %root_red : f32 to vector<f32>
     scf.yield %d : vector<f32>
@@ -1207,7 +1197,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[A:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<32x32xf16> -> vector<2x2x1x1x1x4xf16>
 // CHECK: %[[B:.*]] = arith.addf %{{.*}}, %[[A]]
 // CHECK: %[[C:.*]] = arith.extf %[[B]]
-// CHECK-NEXT: %[[D:.*]] = vector.extractelement %[[ARG0]][] : vector<f32>
+// CHECK-NEXT: %[[D:.*]] = vector.extract %[[ARG0]][]
 // Local reduction
 // CHECK: vector.multi_reduction <add>, %[[C]], %{{.*}} [0, 1, 2, 3, 4, 5] : vector<2x2x1x1x1x4xf32> to f32
 // Global reduction
@@ -1301,7 +1291,7 @@ func.func @distribute_scf_for_contraction(%arr: memref<32x32xf16>, %a: vector<32
     %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<32x32xf16>
     %b = arith.addf %rootl, %a : vector<32x32xf16>
     %c = arith.extf %b : vector<32x32xf16> to vector<32x32xf32>
-    %init = vector.extractelement %arg0[] : vector<f32>
+    %init = vector.extract %arg0[] : f32 from vector<f32>
     %root_red = vector.contract #contraction_trait %c, %c,  %init : vector<32x32xf32>, vector<32x32xf32> into f32
     %d = vector.broadcast %root_red : f32 to vector<f32>
     scf.yield %d : vector<f32>
@@ -1323,7 +1313,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[A:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<32x32xf16> -> vector<2x2x1x1x1x4xf16>
 // CHECK: %[[B:.*]] = arith.addf %{{.*}}, %[[A]]
 // CHECK: %[[C:.*]] = arith.extf %[[B]]
-// CHECK-NEXT: %[[D:.*]] = vector.extractelement %[[ARG0]][] : vector<f32>
+// CHECK-NEXT: %[[D:.*]] = vector.extract %[[ARG0]][]
 // Local contraction
 // CHECK: vector.contract {{.*}} vector<2x2x1x1x1x4xf32>, vector<2x2x1x1x1x4xf32> into f32
 // Global reduction
@@ -1405,3 +1395,42 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-NEXT: gpu.subgroup_reduce maxnumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
 // Accumulator reduction
 // CHECK: arith.maxnumf %{{.*}}, %{{.*}} : vector<2x1x1xf32>
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1],
+  batch_tile = [1],
+  outer_tile = [1],
+  thread_tile = [32],
+  element_tile = [2],
+
+  subgroup_strides = [1],
+  thread_strides = [1]
+>
+
+func.func @zero_d_vector_extract(%vec : vector<64xf32>, %acc : vector<f32>) -> f32 {
+  %layouted = iree_vector_ext.to_layout %vec to layout(#layout) : vector<64xf32>
+  %scalar = vector.extract %acc[] : f32 from vector<f32>
+  %out = vector.multi_reduction <add>, %layouted, %scalar [0] : vector<64xf32> to f32
+  return %out : f32
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @zero_d_vector_extract
+// CHECK-SAME:      %[[VEC:.+]]: vector<64xf32>, %[[ACC:.+]]: vector<f32>
+// CHECK-DAG:  %[[SIMT_ACC:.+]] = iree_vector_ext.to_simt %[[ACC]] : vector<f32> -> vector<f32>
+// CHECK-DAG:  %[[SCALAR:.+]] = vector.extract %[[SIMT_ACC]][] : f32 from vector<f32>
+// CHECK-DAG:  %[[SIMT:.+]] = iree_vector_ext.to_simt %[[VEC]] : vector<64xf32> -> vector<1x1x2xf32>
+// CHECK:      %[[LOCAL:.+]] = vector.multi_reduction <add>, %[[SIMT]], %{{.*}}
+// CHECK:      gpu.subgroup_reduce add %[[LOCAL]]
+// Accumulator addition
+// CHECK:      %[[BROADCASTED:.+]] = vector.broadcast %[[SCALAR]] : f32 to vector<1xf32>
+// CHECK:      arith.addf %{{.*}}, %[[BROADCASTED]]

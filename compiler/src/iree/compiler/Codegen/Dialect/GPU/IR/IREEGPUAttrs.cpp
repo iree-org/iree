@@ -276,6 +276,16 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
   return {};
 }
 
+// Struct describing the shape of a MMA operation, but not the detailed layout.
+struct OpaqueMmaLayout {
+  int64_t mSize = 0;
+  int64_t nSize = 0;
+  int64_t kSize = 0;
+  Type aType;
+  Type bType;
+  Type cType;
+};
+
 template <typename MMAIntrinsicType>
 static OpaqueMmaLayout getOpaqueMMALayout(MLIRContext *context,
                                           MMAIntrinsicType intrinsic) {
@@ -287,11 +297,6 @@ static OpaqueMmaLayout getOpaqueMMALayout(MLIRContext *context,
   o.kSize = lhs.outer[1] * lhs.thread[1] * lhs.element[1];
   o.nSize = rhs.outer[1] * rhs.thread[1] * rhs.element[1];
   return o;
-}
-
-OpaqueMmaLayout getOpaqueMMALayout(MLIRContext *context,
-                                   IREE::GPU::MMAIntrinsic intrinsic) {
-  return getOpaqueMMALayout<IREE::GPU::MMAIntrinsic>(context, intrinsic);
 }
 
 MMASingleSubgroupLayout getSingleSubgroupLayout(MmaInterfaceAttr mmaKind,
@@ -649,21 +654,16 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
         getSubgroupSize() / intrinsicLayoutThreadBound);
   }
 
-  // AffineDelinearizeIndexOp requires an in-bounds input index, so we bound it.
-  OpFoldResult threadIdBound =
-      builder.getIndexAttr(ShapedType::getNumElements(distributionThreadSizes));
-  AffineExpr d0 = builder.getAffineDimExpr(0), d1 = builder.getAffineDimExpr(1);
-  OpFoldResult boundedThreadId = affine::makeComposedFoldedAffineApply(
-      builder, loc, {d0 % d1}, {threadId, threadIdBound});
-
   // Obtain the offsets from delinearization along the distributionThreadSizes.
+  // Use a delinearize without outer bound and throw away its initial result
+  // to get clamping behavior.
   SmallVector<OpFoldResult> tileOffsets =
       builder
           .create<affine::AffineDelinearizeIndexOp>(
-              loc,
-              getValueOrCreateConstantIndexOp(builder, loc, boundedThreadId),
-              getAsIndexOpFoldResult(ctx, distributionThreadSizes))
-          ->getResults();
+              loc, getValueOrCreateConstantIndexOp(builder, loc, threadId),
+              distributionThreadSizes, /*hasOuterBound=*/false)
+          ->getResults()
+          .drop_front();
 
   if (hasDistributionOnlyDim) {
     // Erase the delinearized index that corresponds to the extra distribution

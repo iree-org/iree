@@ -107,7 +107,7 @@ def GPUInferMemorySpacePass :
 
 def GPULowerToUKernelsPass :
     Pass<"iree-codegen-gpu-lower-to-ukernels", ""> {
-  let summary = "Separate out parts of the IR that lower to a micro-kernel";
+  let summary = "Lower suitable ops to microkernels.";
   let dependentDialects = [
     "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
@@ -130,6 +130,16 @@ def GPUPackToIntrinsicsPass :
   let summary = "Packs matmul like operations and converts to iree_gpu.multi_mma";
   let dependentDialects = [
     "::mlir::tensor::TensorDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+  ];
+}
+
+def GPUPadOperandsPass :
+    InterfacePass<"iree-codegen-gpu-pad-operands",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Pass to pad operands of ops with padding configuration provided. ";
+  let dependentDialects = [
+    "::mlir::linalg::LinalgDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
 }
@@ -161,6 +171,8 @@ def GPUPromoteMatmulOperandsPass :
   let summary = "Pass to insert copies with a different thread configuration "
                 "on matmul operands";
   let dependentDialects = [
+    "::mlir::bufferization::BufferizationDialect",
+    "::mlir::gpu::GPUDialect",
     "::mlir::linalg::LinalgDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];

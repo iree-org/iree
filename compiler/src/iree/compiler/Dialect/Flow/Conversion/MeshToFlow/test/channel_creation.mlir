@@ -17,12 +17,9 @@ module @static_1d_mesh_grouping_along_axis_0 {
 module @static_2d_mesh_grouping_along_axis_1 {
   //      CHECK: util.global private @_mesh_mesh_2d_axes_1 {inlining_policy = #util.inline.never} : !flow.channel
   //      CHECK: util.initializer {
-  //  CHECK-DAG:   %[[AXIS_1_SIZE:.+]] = arith.constant 4 : index
-  //  CHECK-DAG:   %[[AXIS_0_SIZE:.+]] = arith.constant 3 : index
   //  CHECK-DAG:   %[[DEFAULT_CHANNEL:.+]] = flow.channel.default : !flow.channel
   //      CHECK:   %[[CHANNEL_RANK:.+]] = flow.channel.rank %[[DEFAULT_CHANNEL]] : index
-  //      CHECK:   %[[COLOR_AND_KEY:.+]]:2 = affine.delinearize_index %[[CHANNEL_RANK]] into
-  // CHECK-SAME:   (%[[AXIS_0_SIZE]], %[[AXIS_1_SIZE]]) : index, index
+  //      CHECK:   %[[COLOR_AND_KEY:.+]]:2 = affine.delinearize_index %[[CHANNEL_RANK]] into (3, 4) : index, index
   //      CHECK:   %[[CHANNEL:.+]] = flow.channel.split
   // CHECK-SAME:   %[[DEFAULT_CHANNEL]], %[[COLOR_AND_KEY]]#0, %[[COLOR_AND_KEY]]#1 : !flow.channel -> !flow.channel
   //      CHECK:   util.global.store %[[CHANNEL]], @_mesh_mesh_2d_axes_1 : !flow.channel
@@ -42,13 +39,10 @@ module @static_4d_mesh_grouping_along_axes_2_1 {
   //      CHECK: util.global private @_mesh_mesh_4d_axes_2_1 {inlining_policy = #util.inline.never} : !flow.channel
   //      CHECK: util.initializer {
   //  CHECK-DAG:   %[[AXIS_3_SIZE:.+]] = arith.constant 6 : index
-  //  CHECK-DAG:   %[[AXIS_2_SIZE:.+]] = arith.constant 5 : index
   //  CHECK-DAG:   %[[AXIS_1_SIZE:.+]] = arith.constant 4 : index
-  //  CHECK-DAG:   %[[AXIS_0_SIZE:.+]] = arith.constant 3 : index
   //  CHECK-DAG:   %[[DEFAULT_CHANNEL:.+]] = flow.channel.default : !flow.channel
-  //      CHECK:   %[[CHANNEL_RANK:.+]] = flow.channel.rank %[[DEFAULT_CHANNEL]] : index
-  //      CHECK:   %[[DEVICE_MULTI_IDX:.+]]:4 = affine.delinearize_index %[[CHANNEL_RANK]] into
-  // CHECK-SAME:       (%[[AXIS_0_SIZE]], %[[AXIS_1_SIZE]], %[[AXIS_2_SIZE]], %[[AXIS_3_SIZE]]) : index, index, index, index
+  //      CHECK:   %[[CHANNEL_RANK:.+]] = flow.channel.rank %[[DEFAULT_CHANNEL]]
+  //      CHECK:   %[[DEVICE_MULTI_IDX:.+]]:4 = affine.delinearize_index %[[CHANNEL_RANK]] into (3, 4, 5, 6) : index
   //      CHECK:   %[[IN_GROUP_IDX:.+]] = affine.apply
   // CHECK-SAME:       #map()[%[[DEVICE_MULTI_IDX]]#2, %[[AXIS_1_SIZE]], %[[DEVICE_MULTI_IDX]]#1]
   //      CHECK:   %[[GROUP_IDX:.+]] = affine.apply

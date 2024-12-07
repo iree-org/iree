@@ -250,46 +250,15 @@ private:
     return success();
   }
 
-  /// Clones |op| and call |callback| on the cloned op's operands as well as any
-  /// operands of nested ops that 1) aren't defined within the new op or 2) are
-  /// block arguments.
-  static Operation *
-  cloneAndUpdateOperands(RewriterBase &rewriter, Operation *op,
-                         function_ref<void(OpOperand *newOperand)> callback) {
-    Operation *clone = rewriter.clone(*op);
-    for (OpOperand &operand : clone->getOpOperands())
-      callback(&operand);
-    return clone;
-  }
-
   /// Creates all read stage ops for a loop iteration with |rewriter| and maps
   /// the original loop induction variable to |iv| in |mapping|.
-  SmallVector<Value> emitRead(IRMapping &mapping, RewriterBase &rewriter,
-                              Value iv) {
+  void emitRead(IRMapping &mapping, RewriterBase &rewriter, Value iv) {
     // Map the original loop induction variable to |iv| for later op rewrites.
     mapping.map(forOp.getInductionVar(), iv);
 
-    SmallVector<Value> results;
     for (Operation *op : readStage) {
-      // Clone the current read stage op and updates all its operands to
-      // reference newly created ops.
-      Operation *newOp =
-          cloneAndUpdateOperands(rewriter, op, [&](OpOperand *newOperand) {
-            if (mapping.contains(newOperand->get())) {
-              newOperand->set(mapping.lookup(newOperand->get()));
-            }
-          });
-
-      if (isa<vector::TransferReadOp>(newOp)) {
-        llvm::append_range(results, newOp->getResults());
-      }
-
-      // Update read stage op results mapping.
-      for (unsigned i = 0, e = op->getNumResults(); i != e; ++i) {
-        mapping.map(op->getResult(i), newOp->getResult(i));
-      }
+      rewriter.clone(*op, mapping);
     }
-    return results;
   }
 
   /// Creates all write stage ops for a loop iteration with |rewriter| and maps
@@ -299,22 +268,7 @@ private:
     mapping.map(forOp.getInductionVar(), iv);
 
     for (Operation *op : writeStage) {
-      // Clone the current read stage op and updates all its operands to
-      // reference newly created ops.
-      Operation *newOp =
-          cloneAndUpdateOperands(rewriter, op, [&](OpOperand *newOperand) {
-            if (mapping.contains(newOperand->get())) {
-              newOperand->set(mapping.lookup(newOperand->get()));
-            }
-          });
-
-      // If a mapping for any results already exists, move on, otherwise,
-      // add a new mapping.
-      for (unsigned i = 0, e = op->getNumResults(); i != e; ++i) {
-        if (!mapping.contains(op->getResult(i))) {
-          mapping.map(op->getResult(i), newOp->getResult(i));
-        }
-      }
+      rewriter.clone(*op, mapping);
     }
   }
 
@@ -341,18 +295,7 @@ private:
         break;
       }
 
-      Operation *newOp =
-          cloneAndUpdateOperands(rewriter, op, [&](OpOperand *newOperand) {
-            if (mapping.contains(newOperand->get())) {
-              newOperand->set(mapping.lookup(newOperand->get()));
-            }
-          });
-      results = newOp->getResults();
-
-      // Map compute operations to new compute operations.
-      for (unsigned i = 0, e = op->getNumResults(); i != e; ++i) {
-        mapping.map(op->getResult(i), newOp->getResult(i));
-      }
+      rewriter.clone(*op, mapping);
     }
 
     return results;
@@ -361,12 +304,7 @@ private:
   void updateYield(IRMapping &mapping, RewriterBase &rewriter) {
     for (Operation *op : computeStage) {
       if (auto yield = dyn_cast<scf::YieldOp>(op)) {
-        cloneAndUpdateOperands(rewriter, yield, [&](OpOperand *newOperand) {
-          if (mapping.contains(newOperand->get())) {
-            newOperand->set(mapping.lookup(newOperand->get()));
-          }
-        });
-
+        rewriter.clone(*op, mapping);
         break;
       }
     }

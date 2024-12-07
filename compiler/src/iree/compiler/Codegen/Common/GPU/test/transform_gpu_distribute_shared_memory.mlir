@@ -46,20 +46,19 @@ module attributes {transform.with_named_sequence} {
       transform.yield
     }
 }
-//   CHECK-DAG: #[[$MAP0:.*]] = affine_map<()[s0, s1, s2] -> (s1 * 8 + s2 * 32 + s0 floordiv 4)>
-//   CHECK-DAG: #[[$MAP1:.*]] = affine_map<()[s0] -> (s0 * 4 - (s0 floordiv 4) * 16)>
-//   CHECK-DAG: #[[$MAP2:.*]] = affine_map<()[s0, s1, s2] -> (s1 * 8 + s2 * 32 + s0 floordiv 4 + 32)>
+//   CHECK-DAG: #[[$MAP0:.*]] = affine_map<()[s0] -> (s0 * 4)>
+//   CHECK-DAG: #[[$MAP1:.*]] = affine_map<()[s0] -> (s0 + 32)>
 //   CHECK-DAG: #[[$MAP3:.*]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK-LABEL: @shared_mem_cpy(
 //   CHECK-DAG: %[[TX:.*]] = gpu.thread_id x
 //   CHECK-DAG: %[[TY:.*]] = gpu.thread_id y
-//   CHECK-DAG: %[[TZ:.*]] = gpu.thread_id z
 
-//   CHECK-DAG: %[[Y0:.*]] = affine.apply #[[$MAP0]]()[%[[TX]], %[[TY]], %[[TZ]]]
-//   CHECK-DAG: %[[X0:.*]] = affine.apply #[[$MAP1]]()[%[[TX]]]
-//       CHECK: %[[R0:.*]] = vector.transfer_read %{{.*}}[%[[Y0]], %[[X0]]], %{{.*}} {in_bounds = [true, true]} : memref<64x16xf32, #hal.descriptor_type<storage_buffer>>, vector<1x4xf32>
-//       CHECK: vector.transfer_write %[[R0]], %{{.*}}[%[[Y0]], %[[X0]]] {in_bounds = [true, true]} : vector<1x4xf32>, memref<64x16xf32, #gpu.address_space<workgroup>>
-//   CHECK-DAG: %[[Y1:.*]] = affine.apply #[[$MAP2]]()[%[[TX]], %[[TY]], %[[TZ]]]
+//   CHECK-DAG: %[[TFLAT:.*]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (4, 32)
+//   CHECK-DAG: %[[YX:.*]]:2 = affine.delinearize_index %[[TFLAT]] into (32, 4)
+//   CHECK-DAG: %[[X0:.*]] = affine.apply #[[$MAP0]]()[%[[YX]]#1]
+//       CHECK: %[[R0:.*]] = vector.transfer_read %{{.*}}[%[[YX]]#0, %[[X0]]], %{{.*}} {in_bounds = [true, true]} : memref<64x16xf32, #hal.descriptor_type<storage_buffer>>, vector<1x4xf32>
+//       CHECK: vector.transfer_write %[[R0]], %{{.*}}[%[[YX]]#0, %[[X0]]] {in_bounds = [true, true]} : vector<1x4xf32>, memref<64x16xf32, #gpu.address_space<workgroup>>
+//   CHECK-DAG: %[[Y1:.*]] = affine.apply #[[$MAP1]]()[%[[YX]]#0]
 //       CHECK: %[[R1:.*]] = vector.transfer_read %{{.*}}[%[[Y1]], %[[X0]]], %{{.*}} {in_bounds = [true, true]} : memref<64x16xf32, #hal.descriptor_type<storage_buffer>>, vector<1x4xf32>
 //       CHECK: vector.transfer_write %[[R1]], %{{.*}}[%[[Y1]], %[[X0]]] {in_bounds = [true, true]} : vector<1x4xf32>, memref<64x16xf32, #gpu.address_space<workgroup>>
 //       CHECK: linalg.generic

@@ -52,6 +52,7 @@ iree_cc_library(
     MLIRTransformDialect
     iree::base::internal::flatcc::building
     iree::compiler::Codegen
+    iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::TargetUtils::KnownTargets
     iree::compiler::Codegen::LLVMGPU

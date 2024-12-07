@@ -31,6 +31,7 @@ iree_compiler_cc_library(
     hdrs = [
         "ConversionUtils.h",
         "ElementPackingUtils.h",
+        "EmbeddedDataDirectory.h",
         "EquivalenceUtils.h",
         "FlatbufferUtils.h",
         "Folding.h",

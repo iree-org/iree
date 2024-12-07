@@ -272,7 +272,7 @@ func.func @early_bufferized_copy_cst_ops() {
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   %cst = arith.constant dense<0> : tensor<2x3xi32>
-  %0 = bufferization.to_memref %cst : memref<2x3xi32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
+  %0 = bufferization.to_memref %cst : tensor<2x3xi32> to memref<2x3xi32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<2x5xi32>
   memref.assume_alignment %1, 64 : memref<2x5xi32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<2x5xi32>>
@@ -1402,7 +1402,7 @@ func.func @bufferize_cst_output_tensor() {
 
 //       CHECK-DAG: %[[CST1:.+]] = arith.constant -2147483648 : i32
 //       CHECK-DAG: %[[CST5:.+]] = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
-//       CHECK: %[[CAST5:.+]] = bufferization.to_memref %[[CST5]] : memref<5xi32>
+//       CHECK: %[[CAST5:.+]] = bufferization.to_memref %[[CST5]] : tensor<5xi32> to memref<5xi32>
 //       CHECK: %[[INPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<5xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) : memref<i32, #hal.descriptor_type<storage_buffer>>
 //       CHECK: linalg.fill ins(%[[CST1]] : i32) outs(%[[OUTPUT]] : memref<i32{{.+}}>)

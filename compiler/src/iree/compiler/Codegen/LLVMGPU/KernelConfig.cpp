@@ -1577,6 +1577,7 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
       return failure();
     }
   }
+  int numDynamicDims = llvm::count_if(bounds, ShapedType::isDynamic);
 
   // Distribution of multi-dim masked writes currently aren't fully supported.
   if (numDynamicReductionDims > 1) {
@@ -1617,9 +1618,9 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
 
-  // Without any bounds on dynamic reduction dims, we need specialization to
+  // Without any bounds on dynamic dims, we need specialization to
   // get peak performance. For now, just use the warp size.
-  if (numDynamicReductionDims) {
+  if (numDynamicDims > 0) {
     SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
     int64_t preferredSubgroupSize = target.getPreferredSubgroupSize();
     reductionTileSizes[reductionDims[0]] = preferredSubgroupSize;
@@ -1824,18 +1825,25 @@ static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
 // UKernel Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
-/// Set the configuration for argmax that can be mapped to argmax uKernel.
+/// Set the configuration for argmax when ukernels are enabled.
 /// Distribute all parallel dim across different workgroups, and only use single
 /// subgroup per workgroup.
+///
+/// TODO(bjacob): This is fragile, as we can't know yet if this argmax will be
+/// lowered to a ukernel. We need instead a config that works regardless of
+/// ukernels. For now, we use the looser condition that the argmax ukernel is
+/// enabled, a necessary but not sufficient condition for this particular op to
+/// lower to the ukernel. This is good enough for now for a couple of reasons:
+/// 1. Even if a argmax does not actually lower to a ukernel, this config should
+///    still work.
+/// 2. Ukernels are not enabled by default.
 static LogicalResult
 setArgmaxUkernelConfig(IREE::GPU::TargetAttr target,
                        mlir::FunctionOpInterface entryPoint,
                        linalg::GenericOp op) {
   // Checks if UKernels are enabled.
   if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint)) {
-    const char ukernelName[] = "argmax";
-    if (!hasUkernel(target, ukernelName) ||
-        !hasUkernelSupportedGpuArch(target)) {
+    if (!hasUkernel(target, "argmax")) {
       return failure();
     }
   }

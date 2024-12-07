@@ -31,24 +31,42 @@ constexpr StringLiteral kVectorLayoutFetcherStorageAttrName =
 constexpr StringLiteral kVectorLayoutRedistributeAttrName =
     "__vector_layout_redistribute";
 
-static void setOpSignature(Operation *op, VectorLayoutAnalysis &analysis) {
+/// Set signature for the operation based on the analysis. Returns failure if
+/// an operation contains vectors that cannot be distributed i.e. they have no
+/// layout.
+LogicalResult setOpSignature(Operation *op, VectorLayoutAnalysis &analysis,
+                             const VectorLayoutOptions &options) {
   SmallVector<Attribute> operands;
   SmallVector<Attribute> results;
 
   for (Value operand : op->getOperands()) {
     if (auto vectorOperand = dyn_cast<VectorValue>(operand)) {
-      operands.push_back(
-          analysis.getLayout<VectorLayoutInterface>(vectorOperand));
-      continue;
+      if (auto layout =
+              analysis.getLayout<VectorLayoutInterface>(vectorOperand)) {
+        operands.push_back(layout);
+        continue;
+      }
+      if (auto layout = options.getDefaultLayout(vectorOperand.getType())) {
+        operands.push_back(layout);
+        continue;
+      }
+      return failure();
     }
     operands.push_back(UnitAttr::get(op->getContext()));
   }
 
   for (Value result : op->getResults()) {
     if (auto vectorResult = dyn_cast<VectorValue>(result)) {
-      results.push_back(
-          analysis.getLayout<VectorLayoutInterface>(vectorResult));
-      continue;
+      if (auto layout =
+              analysis.getLayout<VectorLayoutInterface>(vectorResult)) {
+        results.push_back(layout);
+        continue;
+      }
+      if (auto layout = options.getDefaultLayout(vectorResult.getType())) {
+        results.push_back(layout);
+        continue;
+      }
+      return failure();
     }
     results.push_back(UnitAttr::get(op->getContext()));
   }
@@ -58,6 +76,7 @@ static void setOpSignature(Operation *op, VectorLayoutAnalysis &analysis) {
   Attribute signature[] = {operandsAttr, resultsAttr};
   op->setAttr(kVectorLayoutFetcherStorageAttrName,
               ArrayAttr::get(op->getContext(), signature));
+  return success();
 }
 
 static bool hasOpSignature(Operation *op) {
@@ -264,21 +283,6 @@ static void applyVectorDistribution(Operation *root,
   }
 }
 
-static bool canDistribute(Operation *op, VectorLayoutAnalysis &analysis) {
-  auto values = llvm::to_vector_of<Value>(op->getOperands());
-  llvm::append_range(values, op->getResults());
-
-  // First check if any of them are vector values.
-  if (llvm::none_of(values, llvm::IsaPred<VectorValue>))
-    return false;
-
-  // Check if all operands and results of this operation have a layout.
-  return llvm::all_of(values, [&analysis](Value value) {
-    auto vectorValue = dyn_cast<VectorValue>(value);
-    return !vectorValue || analysis.getLayout<Attribute>(vectorValue);
-  });
-}
-
 LogicalResult distributeVectorOps(Operation *root,
                                   RewritePatternSet &distributionPatterns,
                                   VectorLayoutOptions &options) {
@@ -294,8 +298,12 @@ LogicalResult distributeVectorOps(Operation *root,
   LLVM_DEBUG(
       llvm::dbgs() << "Setting distribution signatures for operations\n");
   root->walk([&](Operation *op) {
-    if (canDistribute(op, analysis)) {
-      setOpSignature(op, analysis);
+    if (failed(setOpSignature(op, analysis, options))) {
+      LLVM_DEBUG({
+        llvm::dbgs() << "Skipping operation because not all vector "
+                        "operands/results have a layout:\n";
+        op->print(llvm::dbgs());
+      });
     }
   });
   LLVM_DEBUG(llvm::dbgs() << "Distribution signatures set\n");
@@ -313,6 +321,11 @@ LogicalResult distributeVectorOps(Operation *root,
   if (failed(applyPatternsAndFoldGreedily(root, std::move(patterns)))) {
     return failure();
   }
+
+  // Remove signature after distribution.
+  root->walk([](Operation *op) {
+    op->removeDiscardableAttr(kVectorLayoutFetcherStorageAttrName);
+  });
 
   if (options.verifyConversion()) {
     WalkResult hasConversionOp = root->walk([](Operation *op) {

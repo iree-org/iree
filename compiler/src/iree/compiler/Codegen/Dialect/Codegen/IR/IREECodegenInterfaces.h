@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_IREECODEGENINTERFACES_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_IREECODEGENINTERFACES_H_
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"

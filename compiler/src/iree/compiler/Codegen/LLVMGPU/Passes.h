@@ -17,6 +17,7 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {

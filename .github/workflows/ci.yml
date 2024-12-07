@@ -41,20 +41,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
   cancel-in-progress: true
 
-env:
-  # This needs to be in env instead of the outputs of setup because it contains
-  # the run attempt and we want that to be the current attempt, not whatever
-  # attempt the setup step last ran in.
-  GCS_URL: https://storage.googleapis.com/iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
-
 # Jobs are organized into groups and topologically sorted by dependencies
 jobs:
   setup:
     uses: ./.github/workflows/setup.yml
-
-  ############################### Configurations ###############################
-  # Jobs that build IREE in some non-default configuration
-  ##############################################################################
 
   runtime:
     needs: setup
@@ -80,8 +70,8 @@ jobs:
     env:
       BUILD_DIR: build-runtime
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-      - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
           python-version: "3.11"
 
@@ -136,7 +126,7 @@ jobs:
       CC: clang
       CXX: clang++
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Install requirements
         run: sudo apt update && sudo apt install -y ninja-build
       - name: Checkout runtime submodules
@@ -179,7 +169,7 @@ jobs:
       CXX: clang++
       TRACING_PROVIDER: ${{ matrix.provider }}
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Install requirements
         run: sudo apt update && sudo apt install -y ninja-build
       - name: Checkout runtime submodules
@@ -206,86 +196,6 @@ jobs:
       - name: CMake - build
         run: cmake --build ${BUILD_DIR} -- -k 0
 
-  ############################## Crosscompilation ##############################
-  # Jobs that cross-compile IREE for other platforms
-  ##############################################################################
-
-  # Disabled to reduce self-hosted runners needed. See #17957
-  # TODO(#17957): migrate to pkgci
-  # cross_compile_and_test:
-  #   needs: [setup, build_all]
-  #   if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'cross_compile_and_test')
-  #   runs-on:
-  #     - self-hosted # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   strategy:
-  #     matrix:
-  #       target:
-  #         - platform: linux
-  #           arch: riscv_32
-  #           abi: ilp32d
-  #           docker_image: "gcr.io/iree-oss/riscv@sha256:62e87bad3405d691ddba6f9be0ef44eeb60461a467c8d86f0842c81a1f97da79"
-  #           build_script: "./build_tools/cmake/build_riscv.sh"
-  #           test_script: "./build_tools/cmake/test_riscv.sh"
-  #         - platform: generic
-  #           arch: riscv_32
-  #           abi: ilp32
-  #           docker_image: "gcr.io/iree-oss/riscv@sha256:62e87bad3405d691ddba6f9be0ef44eeb60461a467c8d86f0842c81a1f97da79"
-  #           build_script: "./build_tools/cmake/build_riscv.sh"
-  #           test_script: "./tests/riscv32/smoke.sh"
-  #         - platform: emscripten
-  #           arch: wasm32
-  #           abi: wasm32
-  #           docker_image: "gcr.io/iree-oss/emscripten@sha256:2dd4c52f1bb499ab365aad0111fe5538b685d88af38636b409b0cf6a576ab214"
-  #           build_script: "./build_tools/cmake/build_runtime_emscripten.sh"
-  #           # No test script
-  #   env:
-  #     PLATFORM: ${{ matrix.target.platform }}
-  #     ARCH: ${{ matrix.target.arch }}
-  #     ABI: ${{ matrix.target.abi }}
-  #     DOCKER_IMAGE: ${{ matrix.target.docker_image }}
-  #     BUILD_SCRIPT: ${{ matrix.target.build_script }}
-  #     TEST_SCRIPT: ${{ matrix.target.test_script }}
-  #     INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
-  #     INSTALL_DIR_ARCHIVE: ${{ needs.build_all.outputs.install-dir-archive }}
-  #     INSTALL_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
-  #     TARGET_BUILD_DIR: build-${{ matrix.target.platform }}-${{ matrix.target.arch }}
-  #     IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-  #     - name: "Checking out runtime submodules"
-  #       run: ./build_tools/scripts/git/update_runtime_submodules.sh
-  #     - name: "Downloading install dir archive"
-  #       run: gcloud storage cp "${INSTALL_DIR_GCS_ARTIFACT}" "${INSTALL_DIR_ARCHIVE}"
-  #     - name: "Extracting install directory"
-  #       run: tar -xf "${INSTALL_DIR_ARCHIVE}"
-  #     - name: "Build cross-compiling target"
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-  #           --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-  #           --env "CCACHE_NAMESPACE=${DOCKER_IMAGE}" \
-  #           --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
-  #           --env "IREE_TARGET_ARCH=${ARCH}" \
-  #           --env "IREE_TARGET_ABI=${ABI}" \
-  #           --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
-  #           --env "IREE_HOST_BIN_DIR=${INSTALL_DIR}/bin" \
-  #           "${DOCKER_IMAGE}" \
-  #           "${BUILD_SCRIPT}"
-  #     - name: "Test cross-compiling target"
-  #       if: matrix.target.test_script
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
-  #           --env "IREE_TARGET_ARCH=${ARCH}" \
-  #           --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
-  #           "${DOCKER_IMAGE}" \
-  #           "${TEST_SCRIPT}"
-
   ##############################################################################
 
   # Depends on all the other jobs to provide a single anchor that indicates the
@@ -298,20 +208,12 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - setup
-
-      # Accelerators
-      # - test_nvidia_a100
-
-      # Runtime build variants
       - runtime
       - runtime_small
       - runtime_tracing
-
-      # Crosscompilation
-      # - cross_compile_and_test
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Getting failed jobs
         id: failed_jobs
         run: |

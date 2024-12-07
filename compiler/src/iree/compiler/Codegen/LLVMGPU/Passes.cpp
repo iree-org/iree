@@ -351,6 +351,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
                                /*convertToDpsOptions=*/std::nullopt);
 
   // Step 1. Promote matmul operands and pack to intrinsic shapes.
+  funcPassManager.addPass(createGPUPadOperandsPass());
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
   funcPassManager.addPass(createGPUPackToIntrinsicsPass());
   // Decompose packs and unpacks that are at the function boundary.
@@ -530,7 +531,7 @@ void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
 
 void addGPUMatmulSimtPassPipeline(OpPassManager &funcPassManager,
                                   const GPUPipelineOptions &options) {
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true);
+  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/false);
 
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
@@ -1177,6 +1178,7 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass);
     funcPassManager.addPass(createCSEPass);
   }
+  modulePassManager.addPass(createMaterializeTuningSpecsPass());
   modulePassManager.addPass(createMaterializeUserConfigsPass());
   modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
 }
@@ -1244,6 +1246,7 @@ static void buildROCDLCodegenConfigurationPassPipelineImpl(
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
   }
+  modulePassManager.addPass(createMaterializeTuningSpecsPass());
   modulePassManager.addPass(createMaterializeUserConfigsPass());
 
   modulePassManager.addPass(createROCDLSelectLoweringStrategyPass());

@@ -13,6 +13,7 @@
 
 #include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Utils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/Support/Debug.h"
@@ -1087,6 +1088,15 @@ void PropagateLinalgTransposePass::runOnOperation() {
     linalg::populateFoldReshapeOpsByExpansionPatterns(bubblingPatterns,
                                                       reshapePropagationFn);
     linalg::FillOp::getCanonicalizationPatterns(bubblingPatterns, context);
+    linalg::ControlFusionFn bubbleTransposeControlFn =
+        [](OpOperand *fusedOperand) {
+          Operation *producer = fusedOperand->get().getDefiningOp();
+          Operation *consumer = fusedOperand->getOwner();
+
+          return IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer});
+        };
+    IREE::LinalgExt::populateBubbleTransposeFromLinalgExtOps(
+        bubblingPatterns, bubbleTransposeControlFn);
     bubblingPatterns.insert<FuseTransposeWithProducerLinalgOp>(
         context, enableAggressivePropagation);
     bubblingPatterns.insert<BubbleTransposeThroughCollapseShape>(context);
@@ -1094,8 +1104,11 @@ void PropagateLinalgTransposePass::runOnOperation() {
         context, /*benefit=*/2);
     bubblingPatterns.insert<ComposeTransposes>(context);
     populateCommonCanonicalizationPatterns(context, bubblingPatterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                            std::move(bubblingPatterns)))) {
+
+    GreedyRewriteConfig config;
+    config.maxIterations = GreedyRewriteConfig::kNoLimit;
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(bubblingPatterns),
+                                            config))) {
       funcOp.emitError("Transpose bubbling patterns failed");
       return signalPassFailure();
     }

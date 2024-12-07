@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -121,36 +122,45 @@ static SmallVector<ReassociationIndices> getCollapsibleLoops(Operation *op) {
            (rDimsSet.count(prePos) && rDimsSet.count(nextPos));
   };
 
-  ReassociationIndices range;
-  AffineExpr preExpr;
   // Find the largest sequence of dimensions that are
   // - Either preserved in all maps, or
   // - are completely absent
   // This sequence can be collapsed. To find the sequence,
-  // 1) Take the result expressions of one of the indexing maps
-  // 2) Find a sequence of 2 that is found in all maps
+  // 1) For each indexing map, take the result expressions
+  // 2) Find a sequence of 2 that is found in all maps (or absent)
   // 3) Then take last element of this sequence and the next
   //    result expression, and check if this sequence of 2 is
   //    found in all maps. If so, add to sequence (to get a sequence of 3)
   //    and repeat till the last element of sequence and the next result
   //    expression is not found as a sequence in all maps.
-  for (auto nextExpr :
-       fusionInterfaceOp.getIndexingMapsArray().front().getResults()) {
-    unsigned position = cast<AffineDimExpr>(nextExpr).getPosition();
-    if (!range.empty()) {
+
+  llvm::SmallSetVector<unsigned, 8> seenLoops;
+  for (auto map : fusionInterfaceOp.getIndexingMapsArray()) {
+    ReassociationIndices range;
+    AffineExpr preExpr;
+
+    auto appendAndClearRange = [&]() {
+      if (range.size() > 1) {
+        contiguousLoops.push_back(range);
+      }
+      range.clear();
+    };
+
+    for (auto nextExpr : map.getResults()) {
+      unsigned position = cast<AffineDimExpr>(nextExpr).getPosition();
+      if (seenLoops.contains(position)) {
+        appendAndClearRange();
+        continue;
+      }
       if (!hasAllMapsSameSequence(preExpr, nextExpr) ||
           !hasSameIteratorType(preExpr, nextExpr)) {
-        if (range.size() > 1) {
-          contiguousLoops.push_back({range.begin(), range.end()});
-        }
-        range.clear();
+        appendAndClearRange();
       }
+      range.push_back(position);
+      seenLoops.insert(position);
+      preExpr = nextExpr;
     }
-    range.push_back(position);
-    preExpr = nextExpr;
-  }
-  if (range.size() > 1) {
-    contiguousLoops.push_back(range);
+    appendAndClearRange();
   }
 
   return contiguousLoops;
@@ -192,21 +202,20 @@ static bool isEligibleForCollapse(Operation *op) {
   }
 
   // TODO(#17948) GPU codegen fails when we collapse the dimensions of softmax.
-  if (llvm::any_of(genericOp.getDpsInputOperands(),
-                   [&](OpOperand *operand) -> bool {
-                     auto genericOperand =
-                         operand->get().getDefiningOp<linalg::GenericOp>();
-                     if (!genericOperand) {
-                       return false;
-                     }
+  auto isPossiblySoftmax = [&](OpOperand *operand) -> bool {
+    auto genericOperand = operand->get().getDefiningOp<linalg::GenericOp>();
+    if (!genericOperand) {
+      return false;
+    }
 
-                     if (genericOperand.getNumReductionLoops() == 0) {
-                       return false;
-                     }
+    if (genericOperand.getNumReductionLoops() == 0) {
+      return false;
+    }
 
-                     return genericOp.getMatchingIndexingMap(operand)
-                         .isProjectedPermutation();
-                   })) {
+    auto map = genericOp.getMatchingIndexingMap(operand);
+    return !map.isPermutation() && map.isProjectedPermutation();
+  };
+  if (llvm::any_of(genericOp.getDpsInputOperands(), isPossiblySoftmax)) {
     return false;
   }
 
@@ -615,6 +624,7 @@ hoistTensorReshapesOutOfDispatchRegion(
   // 1. Get the slice of operations within `dispatchOp` that produce the yielded
   // value.
   BackwardSliceOptions sliceOptions;
+  sliceOptions.omitBlockArguments = true;
   sliceOptions.filter = [&](Operation *op) {
     return op->getParentOfType<IREE::Flow::DispatchRegionOp>();
   };
@@ -868,6 +878,7 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
   BackwardSliceOptions sliceOptions;
   sliceOptions.inclusive = true;
   sliceOptions.omitBlockArguments = true;
+  sliceOptions.omitUsesFromAbove = false;
   sliceOptions.filter = [&](Operation *op) -> bool {
     auto parentOp = op->getParentOfType<IREE::Flow::DispatchRegionOp>();
     return isEligibleForCollapse(op) && parentOp == regionOp;

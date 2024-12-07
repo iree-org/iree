@@ -14,10 +14,16 @@ if(IREE_INPUT_TORCH)
   )
 endif()
 
-# FIXME: This test fails on python3.10.
-# iree_py_test(
-#   NAME
-#   concurrency_test
-#  SRCS
-#    "concurrency_test.py"
-#)
+iree_py_test(
+ NAME
+   basic_test
+ SRCS
+   "basic_test.py"
+)
+
+iree_py_test(
+ NAME
+   net_test
+ SRCS
+   "net_test.py"
+)

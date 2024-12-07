@@ -746,7 +746,7 @@ def HAL_BufferLoadOp : HAL_PureOp<"buffer.load"> {
     HAL_DeviceSize:$source_offset
   );
   let results = (outs
-    AnyTypeOf<[HAL_PrimitiveType, AnyVector]>:$result
+    AnyTypeOf<[HAL_PrimitiveType, AnyVectorOfNonZeroRank]>:$result
   );
 
   let assemblyFormat = [{
@@ -764,7 +764,7 @@ def HAL_BufferStoreOp : HAL_Op<"buffer.store"> {
   }];
 
   let arguments = (ins
-    AnyTypeOf<[HAL_PrimitiveType, AnyVector]>:$value,
+    AnyTypeOf<[HAL_PrimitiveType, AnyVectorOfNonZeroRank]>:$value,
     HAL_BufferType:$target_buffer,
     HAL_DeviceSize:$target_offset
   );

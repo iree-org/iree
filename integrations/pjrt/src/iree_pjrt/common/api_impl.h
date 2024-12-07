@@ -25,6 +25,7 @@
 #include "iree_pjrt/common/layout_utils.h"
 #include "iree_pjrt/common/platform.h"
 #include "xla/pjrt/c/pjrt_c_api.h"
+#include "xla/pjrt/compile_options.pb.h"
 
 namespace iree::pjrt {
 
@@ -451,9 +452,9 @@ class ClientInstance {
 
   // Compiles.
   // See TODOs in PJRT_Client_Compile.
-  PJRT_Error* Compile(
-      const PJRT_Program* program, /*xla::CompileOptions options, */
-      LoadedExecutableInstance** executable);
+  PJRT_Error* Compile(const PJRT_Program* program,
+                      xla::CompileOptionsProto options,
+                      LoadedExecutableInstance** executable);
 
   // ---------------------------------------------------------------------------
   // Subclass hooks.

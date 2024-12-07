@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/Util/Analysis/IntegerDivisibilityAnalysis.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
-#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
@@ -29,6 +28,9 @@ using llvm::dbgs;
 using namespace mlir::dataflow;
 
 namespace mlir::iree_compiler::IREE::Util {
+
+#define GEN_PASS_DEF_OPTIMIZEINTARITHMETICPASS
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc"
 
 namespace {
 
@@ -303,12 +305,7 @@ protected:
 };
 
 class OptimizeIntArithmeticPass
-    : public OptimizeIntArithmeticBase<OptimizeIntArithmeticPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect>();
-    registry.insert<IREE::Util::UtilDialect>();
-  }
-
+    : public impl::OptimizeIntArithmeticPassBase<OptimizeIntArithmeticPass> {
   void runOnOperation() override {
     Operation *op = getOperation();
     MLIRContext *ctx = op->getContext();
@@ -381,9 +378,5 @@ class OptimizeIntArithmeticPass
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<void>> createOptimizeIntArithmeticPass() {
-  return std::make_unique<OptimizeIntArithmeticPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Util

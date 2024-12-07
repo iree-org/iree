@@ -16,7 +16,7 @@ on:
       # Directly authored website source files.
       - "docs/website/**"
       # Python/pip release index page.
-      - "build_tools/scripts/generate_release_index.py"
+      - "build_tools/python_deploy/generate_release_index.py"
       # MLIR dialect definitions and .md generation using iree-tblgen.
       #   Technically this should also include the sources for Tablegen, but
       #   that rarely changes and we want to run this workflow conservatively.
@@ -26,8 +26,18 @@ on:
   release:
     types: [published, unpublished]
 
+  # Run periodically to pick up any documentation changes that were somehow
+  # missed by the above path filters as well as to scrape releases from other
+  # projects that are included on the release index page. Downstream projects
+  # typically build releases in the middle of the night (3AM PST, 11:00 UTC),
+  # so we'll run a bit later than that (6AM PST, 14:00 UTC).
+  schedule:
+    - cron: "0 14 * * *"
+
 jobs:
   publish_website:
+    if: ${{ github.repository_owner == 'iree-org' || github.event_name == 'workflow_dispatch' }}
+
     # Note: a clean build of `iree-tblgen` takes ~5 minutes on standard runners.
     runs-on: ubuntu-20.04
     env:
@@ -35,7 +45,7 @@ jobs:
       CXX: clang++
     steps:
       - name: Checkout out repository
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: true
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
@@ -43,7 +53,7 @@ jobs:
         # We have to explicitly fetch the gh-pages branch as well to preserve history
         run: git fetch --no-tags --prune --depth=1 origin "gh-pages:gh-pages"
       - name: Setting up Python
-        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
           python-version: 3.x
           cache: "pip"
@@ -53,11 +63,24 @@ jobs:
           pip install requests
           sudo apt update
           sudo apt install -y ninja-build
+
+      # Build a release index page by scraping release package URLs.
+      #
+      # This can scrape the release pages from any public GitHub repositories.
+      # Currently included repositories:
+      #   https://github.com/iree-org/iree
+      #   https://github.com/iree-org/iree-turbine
+      # Ecosystem projects for consideration:
+      #   https://github.com/nod-ai/shark-ai
+      #   https://github.com/openxla/stablehlo
+      #   https://github.com/llvm/torch-mlir (see below)
+      #   https://github.com/llvm/torch-mlir-release
       - name: Generating release index
         run: |
-          ./build_tools/scripts/generate_release_index.py \
-            --repo="${GITHUB_REPOSITORY}" \
+          ./build_tools/python_deploy/generate_release_index.py \
+            --repos="iree-org/iree,iree-org/iree-turbine" \
             --output=docs/website/docs/pip-release-links.html
+
       - name: ccache
         uses: hendrikmuhs/ccache-action@ed74d11c0b343532753ecead8a951bb09bb34bc9 # v1.2.14
         with:
