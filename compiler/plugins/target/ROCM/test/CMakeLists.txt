@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "default_tuning_specs_amdgpu.mlir"
     "gpu_lower_to_ukernels.mlir"
     "lowering_strategy_from_tuning_spec.mlir"
     "ukernel_pipeline_transform.mlir"
