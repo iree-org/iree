@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
@@ -66,13 +67,8 @@ getConfigStringAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
                     StringRef stringAttr) {
   if (!targetAttr)
     return std::nullopt;
-  auto config = targetAttr.getConfiguration();
-  if (!config)
-    return std::nullopt;
-  auto attr = config.getAs<StringAttr>(stringAttr);
-  if (!attr)
-    return std::nullopt;
-  return attr;
+  return IREE::CPU::getConfigStringAttr(targetAttr.getConfiguration(),
+                                        stringAttr);
 }
 
 std::optional<IntegerAttr>
@@ -105,10 +101,7 @@ getConfigBoolAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
 
 std::optional<llvm::Triple>
 getTargetTriple(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  auto triple = getConfigStringAttr(targetAttr, "target_triple");
-  if (!triple)
-    return std::nullopt;
-  return llvm::Triple(triple.value().str());
+  return IREE::CPU::getTargetTriple(targetAttr.getConfiguration());
 }
 
 const char *getIreeArchNameForTargetTriple(llvm::Triple triple) {
@@ -192,60 +185,30 @@ bool hasUkernel(IREE::HAL::ExecutableTargetAttr targetAttr,
   return false;
 }
 
-std::optional<StringRef>
-getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  auto cpuFeatures = getConfigStringAttr(targetAttr, "cpu_features");
-  if (!cpuFeatures)
-    return std::nullopt;
-  return cpuFeatures->getValue();
-}
-
-// TODO(dcaballe): If we have to check for a significantly large number of
-// features in the future, we may want to consider a persistent state to carry
-// over processed HAL information or keeping the TTI instance alive and query
-// subtarget features data structure.
 bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature) {
-  std::optional<StringRef> features = getCpuFeatures(targetAttr);
-  if (!features) {
+  if (!targetAttr)
     return false;
-  }
-
-  // Find feature string in list of features, making sure that we don't match a
-  // sub-string.
-  std::stringstream sstream(features->str());
-  std::string str;
-  while (std::getline(sstream, str, ',')) {
-    if (str == feature) {
-      return true;
-    }
-  }
-
-  return false;
+  return IREE::CPU::hasFeature(targetAttr.getConfiguration(), feature);
 }
 
 bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
-  return triple && triple.value().isX86();
+  return targetAttr && IREE::CPU::isX86(targetAttr.getConfiguration());
 }
 
 bool isX86_64(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
-  return triple && triple.value().getArch() == llvm::Triple::x86_64;
+  return targetAttr && IREE::CPU::isX86_64(targetAttr.getConfiguration());
 }
 
 bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
-  return triple && triple.value().isAArch64();
+  return targetAttr && IREE::CPU::isAArch64(targetAttr.getConfiguration());
 }
 
 bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
-  return triple && triple.value().isRISCV();
+  return targetAttr && IREE::CPU::isRISCV(targetAttr.getConfiguration());
 }
 
 bool isRISCV32(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
-  return triple && triple.value().isRISCV32();
+  return targetAttr && IREE::CPU::isRISCV32(targetAttr.getConfiguration());
 }
 
 bool isReadOnly(Value v) {

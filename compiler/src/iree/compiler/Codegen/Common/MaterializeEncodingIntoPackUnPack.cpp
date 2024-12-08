@@ -744,33 +744,16 @@ public:
 
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         this->getTypeConverter());
-
-    if (auto layoutAttr = converter->getLayoutAttr()) {
-      SmallVector<Type> convertedResTypes;
-      for (auto init : op.getDpsInits()) {
-        convertedResTypes.push_back(converter->convertType(init.getType()));
-      }
-      Operation *newOp =
-          layoutAttr.lowerOp(rewriter, op, convertedResTypes, operands);
-      rewriter.replaceOp(op, newOp->getResults());
-      return success();
+    auto layoutAttr = converter->getLayoutAttr();
+    assert(layoutAttr && "layoutAttr is not set, which is not expected. Are "
+                         "you adding new arch support?");
+    SmallVector<Type> convertedResTypes;
+    for (auto init : op.getDpsInits()) {
+      convertedResTypes.push_back(converter->convertType(init.getType()));
     }
-
-    // TODO(hanchung): This is a transition state for moving the implementation
-    // details to backend attributes. We won't need the function type argument
-    // after all the backends that support encodings implement the attribute.
-    auto getEncodingInfoWrapper =
-        [&](RankedTensorType type) -> FailureOr<MaterializeEncodingInfo> {
-      return converter->getEncodingInfo(type);
-    };
-    FailureOr<Operation *> convertedOp =
-        IREE::Codegen::lowerContractionOpWithEncoding(
-            rewriter, op, operands, converter->getTransposeNarrowN(),
-            getEncodingInfoWrapper);
-    if (failed(convertedOp)) {
-      return failure();
-    }
-    rewriter.replaceOp(op.getOperation(), convertedOp.value()->getResult(0));
+    Operation *newOp =
+        layoutAttr.lowerOp(rewriter, op, convertedResTypes, operands);
+    rewriter.replaceOp(op, newOp->getResults());
     return success();
   }
 

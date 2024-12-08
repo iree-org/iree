@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/Devices/LocalDevice.h"
@@ -77,9 +78,10 @@ public:
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Codegen::IREECodegenDialect, IREE::VM::VMDialect,
-                    IREE::VMVX::VMVXDialect,
-                    IREE::LinalgExt::IREELinalgExtDialect>();
+    registry
+        .insert<IREE::Codegen::IREECodegenDialect, IREE::CPU::IREECPUDialect,
+                IREE::VM::VMDialect, IREE::VMVX::VMVXDialect,
+                IREE::LinalgExt::IREELinalgExtDialect>();
   }
 
   IREE::VM::TargetOptions
@@ -232,8 +234,8 @@ public:
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<IREE::Codegen::IREECodegenDialect, IREE::VMVX::VMVXDialect>();
+    registry.insert<IREE::Codegen::IREECodegenDialect,
+                    IREE::CPU::IREECPUDialect, IREE::VMVX::VMVXDialect>();
   }
 
   void

@@ -1729,37 +1729,6 @@ func.func @matmul_lowering_f32f32f32_aarch64_sve(%lhs: tensor<?x?xf32>, %rhs: te
 
 // -----
 
-#map = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
-#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>
-#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>
-#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>
-func.func @matmul_lowering_f32f32f32_riscv(%lhs: tensor<?x?xf32>, %rhs: tensor<?x?xf32>, %acc: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {
-  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="riscv32-xyz-xyz"}>
-} {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %M = tensor.dim %acc, %c0 : tensor<?x?xf32>
-  %N = tensor.dim %acc, %c1 : tensor<?x?xf32>
-  %0 = iree_encoding.set_encoding %lhs : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_lhs>
-  %1 = iree_encoding.set_encoding %rhs : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_rhs>
-  %2 = iree_encoding.set_encoding %acc : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_result>
-  %3 = linalg.matmul
-      ins(%0, %1 : tensor<?x?xf32, #encoding_lhs>,
-                   tensor<?x?xf32, #encoding_rhs>)
-      outs(%2 : tensor<?x?xf32, #encoding_result>)
-      -> tensor<?x?xf32, #encoding_result>
-  %4 = iree_encoding.unset_encoding %3 : tensor<?x?xf32, #encoding_result> -> tensor<?x?xf32>{%M, %N}
-  return %4 : tensor<?x?xf32>
-}
-// RISC-V targets does not implement data-tiling yet.
-// CHECK-LABEL: func @matmul_lowering_f32f32f32_riscv
-//       CHECK:   %[[RES:.+]] = linalg.matmul
-//       CHECK:   return %[[RES]]
-
-// -----
-
 #pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -1771,8 +1740,8 @@ func.func @matmul_lowering_f32f32f32_riscv(%lhs: tensor<?x?xf32>, %rhs: tensor<?
 #encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>
-func.func @matmul_lowering_i8i8i32_riscv32_ukernel() attributes {
-  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="riscv32-xyz-xyz", ukernels = "all"}>
+func.func @matmul_lowering_i8i8i32_riscv32() attributes {
+  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="riscv32-xyz-xyz"}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -1805,7 +1774,7 @@ func.func @matmul_lowering_i8i8i32_riscv32_ukernel() attributes {
 }
 //   CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
 //   CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
-// CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv32_ukernel()
+// CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv32()
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0)
 //   CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1)
