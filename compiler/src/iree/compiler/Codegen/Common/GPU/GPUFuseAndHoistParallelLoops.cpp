@@ -11,8 +11,6 @@
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -22,7 +20,6 @@
 #include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
-#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-fuse-and-hoist-parallel-loops"
@@ -325,6 +322,24 @@ struct FuseTilableForallConsumers final
   }
 };
 
+struct FuseCollapseShapeConsumers final
+    : OpRewritePattern<tensor::CollapseShapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::CollapseShapeOp collapseOp,
+                                PatternRewriter &rewriter) const override {
+    auto forallOp = collapseOp.getSrc().getDefiningOp<scf::ForallOp>();
+    if (!forallOp) {
+      return rewriter.notifyMatchFailure(collapseOp, "No forall op producer");
+    }
+
+    if (failed(fuseCollapseShapeIntoProducerForall(rewriter, forallOp,
+                                                   collapseOp))) {
+      return failure();
+    }
+    return success();
+  }
+};
+
 void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
   MLIRContext *context = &getContext();
 
@@ -369,6 +384,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     patterns.add<FuseTilableDestinationProducers>(context);
     patterns.add<FuseUnitLoopDestination>(context);
     patterns.add<FuseTilableForallConsumers>(context);
+    patterns.add<FuseCollapseShapeConsumers>(context);
     tensor::populateFoldTensorEmptyPatterns(patterns);
     scf::ForallOp::getCanonicalizationPatterns(patterns, context);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
