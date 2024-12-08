@@ -12,6 +12,7 @@
 
 typedef struct iree_hal_null_buffer_t {
   iree_hal_buffer_t base;
+  iree_allocator_t host_allocator;
   iree_hal_buffer_release_callback_t release_callback;
 } iree_hal_null_buffer_t;
 
@@ -30,7 +31,7 @@ static const iree_hal_null_buffer_t* iree_hal_null_buffer_const_cast(
 }
 
 iree_status_t iree_hal_null_buffer_wrap(
-    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
@@ -44,10 +45,11 @@ iree_status_t iree_hal_null_buffer_wrap(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
       iree_allocator_malloc(host_allocator, sizeof(*buffer), (void**)&buffer));
-  iree_hal_buffer_initialize(host_allocator, allocator, &buffer->base,
-                             allocation_size, byte_offset, byte_length,
-                             memory_type, allowed_access, allowed_usage,
+  iree_hal_buffer_initialize(placement, &buffer->base, allocation_size,
+                             byte_offset, byte_length, memory_type,
+                             allowed_access, allowed_usage,
                              &iree_hal_null_buffer_vtable, &buffer->base);
+  buffer->host_allocator = host_allocator;
   buffer->release_callback = release_callback;
 
   // TODO(null): retain or take ownership of provided handles/pointers/etc.
@@ -68,7 +70,7 @@ iree_status_t iree_hal_null_buffer_wrap(
 
 static void iree_hal_null_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   iree_hal_null_buffer_t* buffer = iree_hal_null_buffer_cast(base_buffer);
-  iree_allocator_t host_allocator = base_buffer->host_allocator;
+  iree_allocator_t host_allocator = buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Optionally call a release callback when the buffer is destroyed. Not all

@@ -123,15 +123,15 @@ static iree_status_t iree_hal_vulkan_sparse_buffer_commit_sync(
 }
 
 iree_status_t iree_hal_vulkan_sparse_buffer_create_bound_sync(
-    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
     iree::hal::vulkan::VkDeviceHandle* logical_device, VkQueue queue,
     VkBuffer handle, VkMemoryRequirements requirements,
     uint32_t memory_type_index, VkDeviceSize max_allocation_size,
-    iree_hal_buffer_t** out_buffer) {
-  IREE_ASSERT_ARGUMENT(allocator);
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
+  IREE_ASSERT_ARGUMENT(placement.device);
   IREE_ASSERT_ARGUMENT(logical_device);
   IREE_ASSERT_ARGUMENT(handle);
   IREE_ASSERT_ARGUMENT(out_buffer);
@@ -151,8 +151,6 @@ iree_status_t iree_hal_vulkan_sparse_buffer_create_bound_sync(
       (iree_host_size_t)iree_device_size_ceil_div(requirements.size,
                                                   physical_block_size);
 
-  iree_allocator_t host_allocator =
-      iree_hal_allocator_host_allocator(allocator);
   iree_hal_vulkan_sparse_buffer_t* buffer = NULL;
   iree_host_size_t total_size =
       iree_host_align(sizeof(*buffer), iree_max_align_t) +
@@ -160,9 +158,10 @@ iree_status_t iree_hal_vulkan_sparse_buffer_create_bound_sync(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, total_size, (void**)&buffer));
   iree_hal_buffer_initialize(
-      host_allocator, allocator, &buffer->base.base, allocation_size,
-      byte_offset, byte_length, memory_type, allowed_access, allowed_usage,
+      placement, &buffer->base.base, allocation_size, byte_offset, byte_length,
+      memory_type, allowed_access, allowed_usage,
       &iree_hal_vulkan_sparse_buffer_vtable, &buffer->base.base);
+  buffer->base.host_allocator = host_allocator;
   buffer->base.handle = handle;
   buffer->logical_device = logical_device;
   buffer->physical_block_count = physical_block_count;
@@ -187,7 +186,7 @@ static void iree_hal_vulkan_sparse_buffer_destroy(
   iree_hal_vulkan_sparse_buffer_t* buffer =
       iree_hal_vulkan_sparse_buffer_cast(base_buffer);
   iree::hal::vulkan::VkDeviceHandle* logical_device = buffer->logical_device;
-  iree_allocator_t host_allocator = base_buffer->host_allocator;
+  iree_allocator_t host_allocator = buffer->base.host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(
       z0, (int64_t)iree_hal_buffer_allocation_size(base_buffer));

@@ -195,9 +195,14 @@ static iree_status_t iree_hal_webgpu_simple_allocator_allocate_buffer(
                             allocation_size);
   }
 
+  const iree_hal_buffer_placement_t placement = {
+      .device = allocator->device,
+      .queue_affinity = params->queue_affinity ? params->queue_affinity
+                                               : IREE_HAL_QUEUE_AFFINITY_ANY,
+      .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
+  };
   iree_status_t status = iree_hal_webgpu_buffer_wrap(
-      allocator->device, base_allocator, params->type, params->access,
-      params->usage, allocation_size,
+      placement, params->type, params->access, params->usage, allocation_size,
       /*byte_offset=*/0,
       /*byte_length=*/allocation_size, buffer_handle, allocator->host_allocator,
       out_buffer);

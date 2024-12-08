@@ -28,6 +28,8 @@ typedef struct iree_hal_vulkan_native_allocator_t {
   iree_hal_resource_t resource;
   VkDeviceHandle* logical_device;
   iree_allocator_t host_allocator;
+  // Parent device that this allocator is associated with. Unowned.
+  iree_hal_device_t* parent_device;
 
   // Cached from the API to avoid additional queries in hot paths.
   VkPhysicalDeviceProperties device_props;
@@ -56,9 +58,11 @@ static void iree_hal_vulkan_native_allocator_destroy(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator);
 
 extern "C" iree_status_t iree_hal_vulkan_native_allocator_create(
-    const iree_hal_vulkan_device_options_t* options, VkInstance instance,
+    const iree_hal_vulkan_device_options_t* options,
+    iree_hal_device_t* parent_device, VkInstance instance,
     VkPhysicalDevice physical_device, VkDeviceHandle* logical_device,
     iree_hal_allocator_t** out_allocator) {
+  IREE_ASSERT_ARGUMENT(parent_device);
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(physical_device);
   IREE_ASSERT_ARGUMENT(logical_device);
@@ -74,6 +78,7 @@ extern "C" iree_status_t iree_hal_vulkan_native_allocator_create(
                                &allocator->resource);
   allocator->logical_device = logical_device;
   allocator->host_allocator = host_allocator;
+  allocator->parent_device = parent_device;
 
   const auto& syms = logical_device->syms();
 
@@ -266,6 +271,13 @@ static iree_status_t iree_hal_vulkan_native_allocator_commit_and_wrap(
   VkQueue queue = VK_NULL_HANDLE;
   logical_device->syms()->vkGetDeviceQueue(*logical_device, 0, 0, &queue);
 
+  const iree_hal_buffer_placement_t placement = {
+      /*.device=*/allocator->parent_device,
+      /*.queue_affinity=*/params->queue_affinity ? params->queue_affinity
+                                                 : IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*.flags=*/IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
+  };
+
   // Ask Vulkan what the implementation requires of the allocation(s) for the
   // buffer. We should in most cases always get the same kind of values but
   // alignment and valid memory types will differ for dense and sparse buffers.
@@ -284,11 +296,12 @@ static iree_status_t iree_hal_vulkan_native_allocator_commit_and_wrap(
     // to allocate such buffers (synchronously from raw allocations) but this
     // path is primarily used by large persistent variables and constants.
     return iree_hal_vulkan_sparse_buffer_create_bound_sync(
-        (iree_hal_allocator_t*)allocator, params->type, params->access,
-        params->usage, allocation_size, /*byte_offset=*/0,
+        placement, params->type, params->access, params->usage, allocation_size,
+        /*byte_offset=*/0,
         /*byte_length=*/allocation_size, logical_device, queue, handle,
         requirements, memory_type_index,
-        allocator->device_props_11.maxMemoryAllocationSize, out_buffer);
+        allocator->device_props_11.maxMemoryAllocationSize,
+        allocator->host_allocator, out_buffer);
   }
 
   // Allocate the device memory we'll attach the buffer to.
@@ -321,12 +334,11 @@ static iree_status_t iree_hal_vulkan_native_allocator_commit_and_wrap(
       iree_hal_vulkan_native_allocator_native_buffer_release;
   internal_release_callback.user_data = NULL;
   iree_status_t status = iree_hal_vulkan_native_buffer_wrap(
-      (iree_hal_allocator_t*)allocator, params->type, params->access,
-      params->usage, allocation_size,
+      placement, params->type, params->access, params->usage, allocation_size,
       /*byte_offset=*/0,
       /*byte_length=*/allocation_size, logical_device, device_memory, handle,
       internal_release_callback, iree_hal_buffer_release_callback_null(),
-      out_buffer);
+      allocator->host_allocator, out_buffer);
   if (!iree_status_is_ok(status)) {
     logical_device->syms()->vkFreeMemory(*logical_device, device_memory,
                                          logical_device->allocator());
@@ -722,6 +734,12 @@ static iree_status_t iree_hal_vulkan_native_allocator_import_host_buffer(
   }
 
   // Wrap the device memory allocation and buffer handle in our own buffer type.
+  const iree_hal_buffer_placement_t placement = {
+      /*.device=*/allocator->parent_device,
+      /*.queue_affinity=*/params->queue_affinity ? params->queue_affinity
+                                                 : IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*.flags=*/IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
+  };
   iree_hal_vulkan_native_buffer_release_callback_t internal_release_callback = {
       0};
   internal_release_callback.fn =
@@ -729,11 +747,12 @@ static iree_status_t iree_hal_vulkan_native_allocator_import_host_buffer(
   internal_release_callback.user_data = NULL;
   iree_hal_buffer_t* buffer = NULL;
   status = iree_hal_vulkan_native_buffer_wrap(
-      (iree_hal_allocator_t*)allocator, params->type, params->access,
-      params->usage, (iree_device_size_t)allocation_size,
+      placement, params->type, params->access, params->usage,
+      (iree_device_size_t)allocation_size,
       /*byte_offset=*/0,
       /*byte_length=*/external_buffer->size, logical_device, device_memory,
-      handle, internal_release_callback, release_callback, &buffer);
+      handle, internal_release_callback, release_callback,
+      allocator->host_allocator, &buffer);
   if (!iree_status_is_ok(status)) {
     logical_device->syms()->vkDestroyBuffer(*logical_device, handle,
                                             logical_device->allocator());
@@ -809,17 +828,24 @@ static iree_status_t iree_hal_vulkan_native_allocator_import_device_buffer(
   }
 
   // Wrap the device memory allocation and buffer handle in our own buffer type.
+  const iree_hal_buffer_placement_t placement = {
+      /*.device=*/allocator->parent_device,
+      /*.queue_affinity=*/params->queue_affinity ? params->queue_affinity
+                                                 : IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*.flags=*/IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
+  };
   iree_hal_vulkan_native_buffer_release_callback_t internal_release_callback = {
       0};
   internal_release_callback.fn =
       iree_hal_vulkan_native_allocator_external_device_buffer_release;
   internal_release_callback.user_data = NULL;
   return iree_hal_vulkan_native_buffer_wrap(
-      (iree_hal_allocator_t*)allocator, params->type, params->access,
-      params->usage, (iree_device_size_t)external_buffer->size,
+      placement, params->type, params->access, params->usage,
+      (iree_device_size_t)external_buffer->size,
       /*byte_offset=*/0,
       /*byte_length=*/external_buffer->size, logical_device, device_memory,
-      handle, internal_release_callback, release_callback, out_buffer);
+      handle, internal_release_callback, release_callback,
+      allocator->host_allocator, out_buffer);
 }
 
 static iree_status_t iree_hal_vulkan_native_allocator_import_buffer(

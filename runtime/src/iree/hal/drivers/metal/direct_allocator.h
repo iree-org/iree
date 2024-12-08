@@ -26,7 +26,7 @@ extern "C" {
 // |out_allocator| must be released by the caller (see
 // iree_hal_allocator_release).
 iree_status_t iree_hal_metal_allocator_create(
-    id<MTLDevice> device,
+    iree_hal_device_t* parent_device, id<MTLDevice> device,
 #if defined(IREE_PLATFORM_MACOS)
     id<MTLCommandQueue> queue,
 #endif  // IREE_PLATFORM_MACOS

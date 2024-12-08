@@ -122,7 +122,7 @@ static iree_status_t iree_hal_metal_device_create_internal(
       initWithDispatchQueue:device->semaphore_notification_queue];  // +1
   device->capture_manager = NULL;
 
-  iree_status_t status = iree_hal_metal_allocator_create(metal_device,
+  iree_status_t status = iree_hal_metal_allocator_create((iree_hal_device_t*)device, metal_device,
 #if defined(IREE_PLATFORM_MACOS)
                                                          metal_queue,
 #endif  // IREE_PLATFORM_MACOS

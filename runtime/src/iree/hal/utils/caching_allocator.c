@@ -730,7 +730,12 @@ static iree_status_t iree_hal_caching_allocator_allocate_buffer(
       pool, &compat_params, allocation_size, out_buffer));
 
   // Point the buffer back to us for deallocation.
-  (*out_buffer)->device_allocator = base_allocator;
+  //
+  // TODO(#19159): remove iree_hal_allocator_deallocate_buffer when pooling no
+  // longer requires the pooling_allocator on iree_hal_buffer_t. We should
+  // instead be creating a new iree_hal_cached_buffer_t that we return as if it
+  // were an allocated buffer and that can store a reference back to the pool.
+  (*out_buffer)->pooling_allocator = base_allocator;
 
   return iree_ok_status();
 }
@@ -750,6 +755,9 @@ static void iree_hal_caching_allocator_deallocate_buffer(
           iree_hal_buffer_allowed_usage(buffer));
   IREE_ASSERT(pool, "pool to return cached buffer to not found");
   if (!pool) return;
+
+  // TODO(#19159): remove iree_hal_allocator_deallocate_buffer when pooling no
+  // longer requires the pooling_allocator on iree_hal_buffer_t.
 
   // Release back to pool (which may deallocate).
   iree_hal_caching_allocator_pool_release(pool, buffer);

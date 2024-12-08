@@ -22,6 +22,9 @@ typedef struct iree_hal_metal_allocator_t {
   // Abstract resource used for injecting reference counting and vtable; must be at offset 0.
   iree_hal_resource_t resource;
 
+  // Parent device that this allocator is associated with. Unowned.
+  iree_hal_device_t* parent_device;
+
   // The device that this allocator is attached to.
   id<MTLDevice> device;
   // The command queue that we can use to issue commands to make buffer contents visible to CPU.
@@ -51,7 +54,7 @@ static const iree_hal_metal_allocator_t* iree_hal_metal_allocator_const_cast(
 }
 
 iree_status_t iree_hal_metal_allocator_create(
-    id<MTLDevice> device,
+    iree_hal_device_t* parent_device, id<MTLDevice> device,
 #if defined(IREE_PLATFORM_MACOS)
     id<MTLCommandQueue> queue,
 #endif  // IREE_PLATFORM_MACOS
@@ -273,14 +276,22 @@ static iree_status_t iree_hal_metal_allocator_allocate_buffer(
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED, "unable to allocate buffer");
   }
+
+  const iree_hal_buffer_placement_t placement = {
+      .device = allocator->parent_device,
+      .queue_affinity =
+          params->queue_affinity ? params->queue_affinity : IREE_HAL_QUEUE_AFFINITY_ANY,
+      .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
+  };
   iree_hal_buffer_t* buffer = NULL;
   iree_status_t status = iree_hal_metal_buffer_wrap(
+      placement,
 #if defined(IREE_PLATFORM_MACOS)
       allocator->queue,
 #endif  // IREE_PLATFORM_MACOS
-      metal_buffer, base_allocator, compat_params.type, compat_params.access, compat_params.usage,
-      allocation_size, /*byte_offset=*/0, /*byte_length=*/allocation_size,
-      iree_hal_buffer_release_callback_null(), &buffer);  // +1
+      metal_buffer, compat_params.type, compat_params.access, compat_params.usage, allocation_size,
+      /*byte_offset=*/0, /*byte_length=*/allocation_size, iree_hal_buffer_release_callback_null(),
+      allocator->host_allocator, &buffer);  // +1
 
   if (iree_status_is_ok(status)) {
     IREE_TRACE_ALLOC_NAMED(IREE_HAL_METAL_ALLOCATOR_ID, (void*)iree_hal_metal_buffer_handle(buffer),
@@ -336,13 +347,20 @@ static iree_status_t iree_hal_metal_allocator_import_host_buffer(
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED, "unable to allocate buffer");
   }
 
-  return iree_hal_metal_buffer_wrap(
+  const iree_hal_buffer_placement_t placement = {
+      .device = allocator->parent_device,
+      .queue_affinity =
+          params->queue_affinity ? params->queue_affinity : IREE_HAL_QUEUE_AFFINITY_ANY,
+      .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
+  };
+  return iree_hal_metal_buffer_wrap(placement,
 #if defined(IREE_PLATFORM_MACOS)
-      allocator->queue,
+                                    allocator->queue,
 #endif  // IREE_PLATFORM_MACOS
-      metal_buffer, base_allocator, params->type, params->access, params->usage,
-      external_buffer->size, /*byte_offset=*/0, /*byte_length=*/external_buffer->size,
-      release_callback, out_buffer);  // +1
+                                    metal_buffer, params->type, params->access, params->usage,
+                                    external_buffer->size,
+                                    /*byte_offset=*/0, /*byte_length=*/external_buffer->size,
+                                    release_callback, allocator->host_allocator, out_buffer);  // +1
 }
 
 static iree_status_t iree_hal_metal_allocator_import_device_buffer(
@@ -352,7 +370,6 @@ static iree_status_t iree_hal_metal_allocator_import_device_buffer(
     iree_hal_buffer_release_callback_t release_callback,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_metal_allocator_t* allocator = iree_hal_metal_allocator_cast(base_allocator);
-  (void)allocator;
 
   // Device allocation is an unowned MTLBuffer; we need to retain it to keep it live.
   id<MTLBuffer> metal_buffer =
@@ -363,13 +380,20 @@ static iree_status_t iree_hal_metal_allocator_import_device_buffer(
 
   // Wrap the externally-provided buffer in a HAL buffer handle that will retain the MTLBuffer until
   // it has been released.
-  return iree_hal_metal_buffer_wrap(
+  const iree_hal_buffer_placement_t placement = {
+      .device = allocator->parent_device,
+      .queue_affinity =
+          params->queue_affinity ? params->queue_affinity : IREE_HAL_QUEUE_AFFINITY_ANY,
+      .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
+  };
+  return iree_hal_metal_buffer_wrap(placement,
 #if defined(IREE_PLATFORM_MACOS)
-      allocator->queue,
+                                    allocator->queue,
 #endif  // IREE_PLATFORM_MACOS
-      metal_buffer, base_allocator, params->type, params->access, params->usage,
-      external_buffer->size, /*byte_offset=*/0, /*byte_length=*/external_buffer->size,
-      release_callback, out_buffer);  // +1
+                                    metal_buffer, params->type, params->access, params->usage,
+                                    external_buffer->size, /*byte_offset=*/0,
+                                    /*byte_length=*/external_buffer->size, release_callback,
+                                    allocator->host_allocator, out_buffer);  // +1
 }
 
 static iree_status_t iree_hal_metal_allocator_import_buffer(
