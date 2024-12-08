@@ -9,7 +9,7 @@
 #map = affine_map<()[s0] -> (s0 * 2)>
 #map1 = affine_map<()[s0] -> (s0 * 256)>
 #map2 = affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulSimt workgroup_size = [64, 1, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @dot_dispatch_0() attributes {translation_info = #translation} {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
@@ -79,7 +79,7 @@ func.func @dot_dispatch_0() attributes {translation_info = #translation} {
 #map2 = affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>
 #map3 = affine_map<(d0, d1, d2)[s0] -> (d0 * 65536 + s0 + d1 * 64 + d2)>
 #map4 = affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulSimt workgroup_size = [8, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [8, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @batch_matmul_func() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
@@ -148,7 +148,7 @@ func.func @batch_matmul_func() attributes {translation_info = #translation} {
 #map = affine_map<()[s0] -> (s0 * 2)>
 #map1 = affine_map<()[s0] -> (s0 * 32)>
 #map2 = affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulSimt workgroup_size = [64, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @dot_dispatch_0() attributes {translation_info = #translation} {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
@@ -312,7 +312,7 @@ module {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 2, 256, 4]]>
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulSimt workgroup_size = [64, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #map = affine_map<()[s0] -> (s0 * 2)>
 #map1 = affine_map<()[s0] -> (s0 * 256)>
 #map2 = affine_map<(d0)[s0] -> (-d0 + s0, 2)>
