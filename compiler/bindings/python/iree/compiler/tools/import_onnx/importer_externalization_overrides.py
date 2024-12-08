@@ -7,13 +7,15 @@
 import copy
 import random
 import string
-import iree.runtime as rt
+import sys
+import warnings
+from typing import Optional, Tuple, Any, NamedTuple, Union
 
-from ...dialects import util
-from typing import Optional, Tuple, Any
+import numpy
 
 try:
     import onnx
+    from onnx import numpy_helper
 except ModuleNotFoundError as e:
     raise ModuleNotFoundError(
         f"iree-import-onnx requires that the `onnx` Python package is installed "
@@ -27,7 +29,7 @@ except ModuleNotFoundError as e:
         "iree-import-onnx is only available if IREE was built with Torch support"
     ) from e
 
-from onnx import numpy_helper
+from ...dialects import util
 
 from ...ir import (
     Context,
@@ -45,6 +47,15 @@ from ...ir import (
 )
 
 
+class ParamData(NamedTuple):
+    param_bit_threshold: Optional[int]
+    num_elements_threshold: int
+    params_scope: str
+    data_dir: str
+    param_path: str
+    input_index_threshold: Optional[int]
+
+
 class IREENodeImporter(onnx_importer.NodeImporter):
     def __init__(
         self,
@@ -55,8 +66,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         context_cache: "onnx_importer.ContextCache",
         module_op: Operation,
         module_cache: "onnx_importer.ModuleCache",
-        num_elements_threshold: int,
-        params_scope: str,
+        param_data: ParamData,
     ):
         super().__init__(
             graph_info,
@@ -69,9 +79,8 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         self.last_global_op = None
         self.symbol_table = SymbolTable(module_op)
         self.symbol_table.insert(parent_op)
-        self.num_elements_threshold = num_elements_threshold
-        self.param_archive = rt.ParameterIndex()
-        self.params_scope = params_scope
+        self.param_data = param_data
+        self.globals = []
 
     def sanitize_name(self, name: str) -> str:
         # There are often some initializers in the models that have no name
@@ -92,9 +101,17 @@ class IREENodeImporter(onnx_importer.NodeImporter):
             new_name = str(random.randrange(1, 1000)) + "__" + ch
         return new_name
 
+    def get_type_info_from_type(self, tp: onnx.TypeProto):
+        tt = tp.tensor_type
+        if tt.elem_type:
+            dims = tuple(
+                (d.dim_value if not d.dim_param else None) for d in tt.shape.dim
+            )
+        return dims, tt.elem_type
+
     def create_tensor_global(
         self,
-        t: onnx.TensorProto,
+        t: Union[onnx.TensorProto, onnx.ValueInfoProto],
     ) -> Tuple[str, IrType]:
         # Always create globals at the top. Then after created, if there was
         # a prior one, move the new one to after it to maintain declaration
@@ -106,8 +123,18 @@ class IREENodeImporter(onnx_importer.NodeImporter):
             # After lowering to linalg-on-tensors, the data type needs to be signless.
             # So, we construct the globals to have signless types, and use
             # torch_c.from_builtin_tensor to convert to the correct frontend type.
+            if isinstance(t, onnx.TensorProto):
+                dims = tuple(t.dims)
+                data_type = t.data_type
+            elif isinstance(t, onnx.ValueInfoProto):
+                dims, data_type = self.get_type_info_from_type(t.type)
+            else:
+                raise TypeError(
+                    f"Expected an onnx.TensorProto or an onnx.ValueInfoProto, recieved {type(t)} from {name}"
+                )
+
             vtensor_type = RankedTensorType.get(
-                tuple(t.dims), ELEM_TYPE_TO_SIGNLESS_IR_TYPE[t.data_type]()
+                dims, ELEM_TYPE_TO_SIGNLESS_IR_TYPE[data_type]()
             )
             ir_attrs = {
                 "sym_name": StringAttr.get(name),
@@ -115,7 +142,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
                 "type": TypeAttr.get(vtensor_type),
             }
 
-            external_scope_attr = StringAttr.get(self.params_scope)
+            external_scope_attr = StringAttr.get(self.param_data.params_scope)
             external_name_attr = StringAttr.get(name)
             ir_attrs["initial_value"] = Attribute.parse(
                 f"#stream.parameter.named<{external_scope_attr}::{external_name_attr}> : {vtensor_type}"
@@ -138,8 +165,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         cls,
         graph_info: onnx_importer.GraphInfo,
         module_op: Operation,
-        num_elements_threshold: int,
-        params_scope: str,
+        param_data: ParamData,
         context_cache: Optional["onnx_importer.ContextCache"] = None,
         module_cache: Optional["onnx_importer.ModuleCache"] = None,
         private: bool = False,
@@ -155,6 +181,16 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         # Recover per-module caches of various attributes.
         # Allows modification in the same module_op without
         # loss of current state.
+        all_input_map = copy.deepcopy(graph_info.input_map)
+        num_inputs = len(all_input_map.items())
+        if param_data.input_index_threshold is not None:
+            if param_data.input_index_threshold not in range(0, num_inputs):
+                raise ValueError(
+                    f"input_index_threshold must be in the range [0,num_inputs={num_inputs})"
+                )
+            for _index in range(param_data.input_index_threshold, num_inputs):
+                _discarded = graph_info.input_map.popitem()
+
         mc = (
             module_cache
             if module_cache is not None
@@ -187,32 +223,49 @@ class IREENodeImporter(onnx_importer.NodeImporter):
             context_cache=cc,
             module_op=module_op,
             module_cache=mc,
-            num_elements_threshold=num_elements_threshold,
-            params_scope=params_scope,
+            param_data=param_data,
         )
         for node_name, input_value in zip(graph_info.input_map.keys(), block.arguments):
             imp._nv_map[node_name] = input_value
         imp._populate_graph_attrs(func_op)
+        imp._gi.input_map = all_input_map
         return imp
 
+    def import_all(self, func=True):
+        num_inputs = len(self._gi.input_map.items())
+        if self.param_data.input_index_threshold is not None:
+            for i in range(self.param_data.input_index_threshold, num_inputs):
+                self.import_initializer(list(self._gi.input_map.values())[i])
+        super().import_all(func)
+
     def import_initializer(
-        self, initializer: onnx.TensorProto, extern_name: Optional[str] = None
+        self,
+        initializer: Union[onnx.TensorProto, onnx.ValueInfoProto],
+        extern_name: Optional[str] = None,
     ) -> Value:
         # If an explicitly specified name is given, use that; otherwise, pick
         # up the name from the tensor proto itself
         initializer_name = extern_name if extern_name else initializer.name
-        dims = list(initializer.dims)
-        num_elements = 1
-        for d in dims:
-            num_elements = num_elements * d
-        if num_elements < self.num_elements_threshold:
-            imported_tensor = super().import_initializer(initializer)
-            self._nv_map[initializer_name] = imported_tensor
-            return imported_tensor
+        if isinstance(initializer, onnx.TensorProto):
+            dims = tuple(initializer.dims)
+            num_elements = 1
+            for d in dims:
+                num_elements = num_elements * d
+            if num_elements < self.param_data.num_elements_threshold:
+                imported_tensor = super().import_initializer(initializer)
+                self._nv_map[initializer_name] = imported_tensor
+                return imported_tensor
+            data_type = initializer.data_type
+        elif isinstance(initializer, onnx.ValueInfoProto):
+            dims, data_type = self.get_type_info_from_type(initializer.type)
+        else:
+            raise TypeError(
+                f"Expected an onnx.TensorProto or an onnx.ValueInfoProto, recieved {type(initializer)} from {initializer_name}"
+            )
 
         actual_symbol_name, tensor_type = self.create_tensor_global(initializer)
         vtensor_type = self._cc.get_vtensor_type(
-            tuple(initializer.dims), self._cc.tensor_element_type(initializer.data_type)
+            dims, self._cc.tensor_element_type(data_type)
         )
 
         with InsertionPoint(self._b), Location.name(initializer_name):
@@ -224,9 +277,60 @@ class IREENodeImporter(onnx_importer.NodeImporter):
             ).result
 
         self._nv_map[initializer_name] = converted_value
-        tensor_as_array = numpy_helper.to_array(initializer)
-        self.param_archive.add_buffer(actual_symbol_name, tensor_as_array)
+        if isinstance(initializer, onnx.TensorProto):
+            self.globals.append((initializer_name, actual_symbol_name))
         return converted_value
+
+    def save_params(self):
+        """
+        Only gets called if the arg `--save-params` is set to `True`.
+        Saving params requires iree-runtime, so putting the import here will avoid requiring it uniformly for the importer.
+        """
+        try:
+            import iree.runtime as rt
+        except ModuleNotFoundError as e:
+            raise ModuleNotFoundError(
+                "iree-import-onnx requires iree runtime api for externalizing parameters. "
+                "For example: `pip install iree-base-runtime`"
+            ) from e
+        param_archive = rt.ParameterIndex()
+        in_memory_param_bits = 0
+        warnings.simplefilter("always", UserWarning)
+        for name, actual_symbol_name in self.globals:
+            initializer = self._gi.initializer_map[name]
+            tensor_as_array = numpy_helper.to_array(
+                initializer, base_dir=self.param_data.data_dir
+            )
+            param_archive.add_buffer(actual_symbol_name, tensor_as_array)
+            if self.param_data.param_bit_threshold is not None:
+                # get the new param size
+                elem_dtype = tensor_as_array.dtype
+                elem_kind = elem_dtype.kind
+                if elem_kind not in ["i", "f"]:
+                    raise TypeError(f"Unhandled numpy dtype: {elem_dtype}")
+                elem_info = (
+                    numpy.iinfo(elem_dtype)
+                    if elem_kind == "i"
+                    else numpy.finfo(elem_dtype)
+                )
+                elem_bits = elem_info.bits
+                param_bits = tensor_as_array.size * elem_bits
+                # update the running total memory use
+                in_memory_param_bits += param_bits
+                if param_bits >= self.param_data.param_bit_threshold:
+                    warnings.warn(
+                        f"Single parameter {name} is {param_bits} bits, "
+                        + f"which exceeds threshold of {self.param_data.param_bit_threshold} bits."
+                    )
+                # flush the param archive to the param file if we exceed the threshold
+                if in_memory_param_bits >= self.param_data.param_bit_threshold:
+                    param_archive = param_archive.create_archive_file(
+                        self.param_data.param_path
+                    )
+                    in_memory_param_bits = 0
+
+        # write any remaining params to the archive
+        param_archive = param_archive.create_archive_file(self.param_data.param_path)
 
 
 ELEM_TYPE_TO_SIGNLESS_IR_TYPE = copy.deepcopy(onnx_importer.ELEM_TYPE_TO_IR_TYPE_CB)
