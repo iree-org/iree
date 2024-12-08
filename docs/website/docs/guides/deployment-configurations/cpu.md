@@ -39,12 +39,12 @@ At runtime, CPU executables can be loaded using one of IREE's CPU HAL drivers:
 
 ### Get the IREE compiler
 
-#### :octicons-package-16: Download the compiler from a release
+#### :octicons-download-16: Download the compiler from a release
 
-Python packages are regularly published to
-[PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
+Python packages are distributed through multiple channels. See the
 [Python Bindings](../../reference/bindings/python.md) page for more details.
-The core `iree-base-compiler` package includes the LLVM-based CPU compiler:
+The core [`iree-base-compiler`](https://pypi.org/project/iree-base-compiler/)
+package includes the LLVM-based CPU compiler:
 
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-compiler-from-release.md"
 
@@ -77,12 +77,12 @@ drivers:
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md"
 ```
 
-#### :octicons-package-16: Download the runtime from a release
+#### :octicons-download-16: Download the runtime from a release
 
-Python packages are regularly published to
-[PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
+Python packages are distributed through multiple channels. See the
 [Python Bindings](../../reference/bindings/python.md) page for more details.
-The core `iree-base-runtime` package includes the local CPU HAL drivers:
+The core [`iree-base-runtime`](https://pypi.org/project/iree-base-runtime/)
+package includes the local CPU HAL drivers:
 
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-runtime-from-release.md"
 

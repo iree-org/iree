@@ -431,7 +431,7 @@ Extend your `PYTHONPATH` with IREE's `bindings/python` paths and try importing:
     python -c "import iree.runtime; help(iree.runtime)"
     ```
 
-Using IREE's ML framework importers requires a few extra steps:
+Using IREE's TensorFlow/TFLite importers requires a few extra steps:
 
 ``` shell
 # Install test requirements
