@@ -922,3 +922,35 @@ util.func @custom_op_no_producer_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<
 //  CHECK-SAME:         ins(%[[DISPATCH1]],
 //       CHECK:     flow.return %[[CUSTOM_OP]]
 //       CHECK:   util.return %[[DISPATCH2]]
+
+// -----
+
+util.func @fuse_transposed_op(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
+  %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.0: f32
+  %m = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+  %n = tensor.dim %arg1, %c1 : tensor<?x?xf32>
+  %empty = tensor.empty(%m, %n) : tensor<?x?xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %matmul = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%fill : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %empty2 = tensor.empty(%n, %m) : tensor<?x?xf32>
+  %generic = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%matmul, %arg2 : tensor<?x?xf32>, tensor<?x?xf32>)
+      outs(%empty2 : tensor<?x?xf32>) {
+    ^bb0(%b0: f32, %b1 : f32, %b2 : f32):
+      %0 = arith.addf %b0, %b1 : f32
+      linalg.yield %0 : f32
+  } -> tensor<?x?xf32>
+  util.return %generic : tensor<?x?xf32>
+}
+// CHECK-LABEL: func public @fuse_transposed_op
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[MATMUL:.+]] = linalg.matmul
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[MATMUL]],
+//       CHECK:     flow.return %[[GENERIC]]
+//       CHECK:   return %[[DISPATCH]]
