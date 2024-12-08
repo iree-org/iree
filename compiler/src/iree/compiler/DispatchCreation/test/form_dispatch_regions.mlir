@@ -304,38 +304,34 @@ util.func public @unset_encoding_elementwise_fusion(
 // -----
 
 #encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
-util.func public @unset_encoding_slice_elementwise_fusion(
+util.func public @unset_encoding_elementwise_fusion(
     %arg0: tensor<?x?xf32, #encoding>,
     %arg1: tensor<?xf32>, %arg2 : index, %arg3 : index) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %0 = iree_encoding.unset_encoding %arg0
       : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>{%arg2, %arg3}
-  %1 = tensor.extract_slice %0[0, 0] [%arg2, %arg3] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
-  %2 = tensor.dim %1, %c0 : tensor<?x?xf32>
-  %3 = tensor.dim %1, %c1 : tensor<?x?xf32>
-  %4 = tensor.empty(%2, %3) : tensor<?x?xf32>
-  %5 = linalg.generic {
+  %1 = tensor.empty(%arg2, %arg3) : tensor<?x?xf32>
+  %2 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                        affine_map<(d0, d1) -> (d0)>,
                        affine_map<(d0, d1) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel"]}
-      ins(%1, %arg1 : tensor<?x?xf32>, tensor<?xf32>)
-      outs(%4 : tensor<?x?xf32>) {
+      ins(%0, %arg1 : tensor<?x?xf32>, tensor<?xf32>)
+      outs(%1 : tensor<?x?xf32>) {
     ^bb0(%b0 : f32, %b1 : f32, %b2 : f32):
-      %6 = arith.addf %b0, %b1 : f32
-      linalg.yield %6 : f32
+      %3 = arith.addf %b0, %b1 : f32
+      linalg.yield %3 : f32
     } -> tensor<?x?xf32>
-  util.return %5 : tensor<?x?xf32>
+  util.return %2 : tensor<?x?xf32>
 }
 //       CHECK: #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
-// CHECK-LABEL: util.func public @unset_encoding_slice_elementwise_fusion(
+// CHECK-LABEL: util.func public @unset_encoding_elementwise_fusion(
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #[[$ENCODING]]>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>
 //       CHECK:   %[[RESULT0:.+]] = flow.dispatch.region
 //       CHECK:     %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[ARG0]]
-//       CHECK:     %[[SLICE:.+]] = tensor.extract_slice %[[UNSET_ENCODING]]
-//       CHECK:     %[[GENERIC:.+]] = linalg.generic {{.*}} ins(%[[SLICE]]
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic {{.*}} ins(%[[UNSET_ENCODING]]
 //       CHECK:     flow.return %[[GENERIC]]
 //       CHECK:   util.return %[[RESULT0]]
 
@@ -379,6 +375,22 @@ util.func public @unpack_elementwise_fusion(
 //  CHECK-SAME:         ins(%[[UNPACK]], %[[ARG1]]
 //       CHECK:     flow.return %[[GENERIC]]
 //       CHECK:   util.return %[[RESULT]]
+
+// -----
+
+#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32]>
+util.func public @unset_encoding_slice(%arg0: tensor<1x50x384xf32, #encoding>) -> tensor<384xf32> {
+  %0 = iree_encoding.unset_encoding %arg0 : tensor<1x50x384xf32, #encoding> -> tensor<1x50x384xf32>
+  %extracted_slice = tensor.extract_slice %0[0, 0, 0] [1, 1, 384] [1, 1, 1] : tensor<1x50x384xf32> to tensor<384xf32>
+  util.return %extracted_slice : tensor<384xf32>
+}
+// CHECK-LABEL: util.func public @unset_encoding_slice
+// CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK:         %[[RESULT:.+]] = flow.dispatch.region
+// CHECK:           %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding
+// CHECK:           flow.return %[[UNSET_ENCODING]]
+// CHECK:         %[[SLICE:.+]] = tensor.extract_slice %[[RESULT]]
+// CHECK:         util.return %[[SLICE]]
 
 // -----
 
