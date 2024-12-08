@@ -111,6 +111,15 @@ EncodingAttr EncodingAttr::clone(AffineMap bcastMap) {
              AffineMapAttr::get(bcastMap), getRoundDimsTo(), getLayouts());
 }
 
+bool EncodingAttr::i1PackedStorage() const {
+  return true;
+  /*
+  return llvm::any_of(getLayouts(), [&](Attribute &a) {
+    return llvm::isa<I1PackedStorageAttr>(a);
+  });
+  */
+}
+
 MatmulNarrowDim getMatmulNarrowDim(EncodingAttr encoding) {
   if (encoding.getOpType().getValue() != EncodingOpType::matmul) {
     return {};
@@ -140,6 +149,10 @@ bool isNarrowNResult(EncodingAttr encoding) {
 
 EncodingAttr getEncodingAttr(RankedTensorType type) {
   return dyn_cast_or_null<EncodingAttr>(type.getEncoding());
+}
+
+PackedStorageAttr getPackedStorageAttr(RankedTensorType type) {
+  return dyn_cast_or_null<PackedStorageAttr>(type.getEncoding());
 }
 
 FailureOr<linalg::ContractionDimensions>
