@@ -25,6 +25,7 @@ concurrency:
 
 jobs:
   setup:
+    if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
     uses: ./.github/workflows/setup.yml
 
   # This may run out of memory / disk space on standard GitHub-hosted runners,

@@ -25,6 +25,7 @@ concurrency:
 
 jobs:
   setup:
+    if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
     uses: ./.github/workflows/setup.yml
 
   linux_x64_clang_tsan:
