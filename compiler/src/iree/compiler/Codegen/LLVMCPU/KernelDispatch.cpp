@@ -865,9 +865,17 @@ getDefaultDistributedLevelTileSizes(Operation *op,
   SmallVector<int64_t> adjustedMinTileSizes(numLoops, 0);
   SmallVector<int64_t> adjustedMaxTileSizes(numLoops, 0);
   SmallVector<int64_t> adjustedVectorSizeHints(numLoops, 1);
+  // PartitionableLoopsInterface returns partitionable/parallelizable loops from
+  // the innermost to outermost dimensions in sorted order. Get all the
+  // partitionable loops and clamp it for max kNumMaxParallelDims. This
+  // effectively gives kNumMaxParallelDims from outermost to innermost
+  // dimensions.
   SmallVector<unsigned> partitionableLoops =
-      cast<PartitionableLoopsInterface>(op).getPartitionableLoops(
-          kNumMaxParallelDims);
+      cast<PartitionableLoopsInterface>(op).getPartitionableLoops(std::nullopt);
+  size_t clampParallelDims = partitionableLoops.size() < kNumMaxParallelDims
+                                 ? partitionableLoops.size()
+                                 : kNumMaxParallelDims;
+  partitionableLoops.resize(clampParallelDims);
   for (auto i : partitionableLoops) {
     adjustedMinTileSizes[i] =
         config.minTileSizes.empty() ? 1 : config.minTileSizes[i];
