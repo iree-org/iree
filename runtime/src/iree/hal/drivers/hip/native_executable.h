@@ -14,10 +14,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/hip_headers.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif  // __cplusplus
+#include "iree/hal/drivers/hip/per_device_information.h"
 
 // The max number of per-dispatch bindings allowed in the HIP HAL
 // implementation.
@@ -48,18 +45,16 @@ typedef struct iree_hal_hip_kernel_params_t {
 // Creates an IREE executable from a HSACO module. The module may contain
 // several kernels that can be extracted along with the associated block size.
 iree_status_t iree_hal_hip_native_executable_create(
-    const iree_hal_hip_dynamic_symbols_t* symbols, hipDevice_t device,
-    hipCtx_t context, const iree_hal_executable_params_t* executable_params,
+    const iree_hal_hip_dynamic_symbols_t* symbols,
+    const iree_hal_hip_device_topology_t* topology,
+    const iree_hal_executable_params_t* executable_params,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable);
 
 // Returns the kernel launch parameters for the given |entry_point| in the
 // |executable|.
 iree_status_t iree_hal_hip_native_executable_lookup_kernel_params(
     iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_hip_kernel_params_t** out_params);
-
-#ifdef __cplusplus
-}  // extern "C"
-#endif  // __cplusplus
 
 #endif  // IREE_HAL_DRIVERS_HIP_NATIVE_EXECUTABLE_H_

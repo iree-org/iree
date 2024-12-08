@@ -9,10 +9,11 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/drivers/hip/context_util.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/hip_buffer.h"
+#include "iree/hal/drivers/hip/per_device_information.h"
 #include "iree/hal/drivers/hip/status_util.h"
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
@@ -24,16 +25,9 @@ typedef struct iree_hal_hip_allocator_t {
   // must be at offset 0.
   iree_hal_resource_t resource;
 
-  // The device that this allocator allocates memory from.
-  hipDevice_t device;
+  iree_hal_hip_device_topology_t* topology;
 
-  // The HIP stream that allocations should be used in.
-  hipStream_t stream;
-
-  hipCtx_t hip_context;
-
-  // NOTE: optional depending on device support.
-  iree_hal_hip_memory_pools_t* pools;
+  bool supports_memory_pools;
 
   const iree_hal_hip_dynamic_symbols_t* symbols;
 
@@ -56,15 +50,18 @@ static iree_hal_hip_allocator_t* iree_hal_hip_allocator_cast(
 }
 
 iree_status_t iree_hal_hip_allocator_create(
-    const iree_hal_hip_dynamic_symbols_t* hip_symbols, hipDevice_t device,
-    hipCtx_t hip_context, hipStream_t stream,
-    iree_hal_hip_memory_pools_t* pools, iree_allocator_t host_allocator,
-    iree_hal_allocator_t** out_allocator) {
+    const iree_hal_hip_dynamic_symbols_t* hip_symbols,
+    iree_hal_hip_device_topology_t* topology, bool supports_memory_pools,
+    iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(hip_symbols);
   IREE_ASSERT_ARGUMENT(out_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_hip_set_context(hip_symbols, hip_context));
+  *out_allocator = NULL;
+  if (topology->count < 1) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "at least one device must be specified");
+  }
 
   // To support device-local + host-visible memory we need concurrent managed
   // access indicating that the host and devices can concurrently access the
@@ -74,11 +71,11 @@ iree_status_t iree_hal_hip_allocator_create(
   // buffers except for readback staging buffers.
   int supports_concurrent_managed_access = 0;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, IREE_HIP_RESULT_TO_STATUS(
+      z0, IREE_HIP_CALL_TO_STATUS(
               hip_symbols,
               hipDeviceGetAttribute(&supports_concurrent_managed_access,
                                     hipDeviceAttributeConcurrentManagedAccess,
-                                    device),
+                                    topology->devices[0].hip_device),
               "hipDeviceGetAttribute"));
 
   IREE_TRACE_ZONE_APPEND_TEXT(
@@ -93,14 +90,12 @@ iree_status_t iree_hal_hip_allocator_create(
                                 (void**)&allocator));
   iree_hal_resource_initialize(&iree_hal_hip_allocator_vtable,
                                &allocator->resource);
-  allocator->device = device;
-  allocator->stream = stream;
-  allocator->pools = pools;
+  allocator->supports_memory_pools = supports_memory_pools;
   allocator->symbols = hip_symbols;
   allocator->host_allocator = host_allocator;
   allocator->supports_concurrent_managed_access =
       supports_concurrent_managed_access != 0;
-  allocator->hip_context = hip_context;
+  allocator->topology = topology;
   *out_allocator = (iree_hal_allocator_t*)allocator;
 
   IREE_TRACE_ZONE_END(z0);
@@ -141,9 +136,12 @@ static void iree_hal_hip_allocator_query_statistics(
     iree_hal_hip_allocator_t* allocator =
         iree_hal_hip_allocator_cast(base_allocator);
     memcpy(out_statistics, &allocator->statistics, sizeof(*out_statistics));
-    if (allocator->pools) {
-      iree_hal_hip_memory_pools_merge_statistics(allocator->pools,
-                                                 out_statistics);
+
+    if (allocator->supports_memory_pools) {
+      for (iree_host_size_t i = 0; i < allocator->topology->count; ++i) {
+        iree_hal_hip_memory_pools_merge_statistics(
+            &allocator->topology->devices[i].memory_pools, out_statistics);
+      }
     }
   });
 }
@@ -323,6 +321,8 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
     iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  IREE_ASSERT_ARGUMENT(out_buffer);
+  *out_buffer = NULL;
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
 
@@ -359,10 +359,19 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
   void* host_ptr = NULL;
   hipDeviceptr_t device_ptr = NULL;
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_hal_hip_buffer_allocate");
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_hip_set_context(allocator->symbols, allocator->hip_context));
-
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, allocation_size);
+
+  int device_ordinal = 0;
+  if (params->queue_affinity) {
+    device_ordinal = iree_math_count_trailing_zeros_u64(params->queue_affinity);
+  }
+
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_HIP_CALL_TO_STATUS(
+              allocator->symbols,
+              hipCtxPushCurrent(
+                  allocator->topology->devices[device_ordinal].hip_context)));
+
   if (iree_all_bits_set(compat_params.type,
                         IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     // Device local case.
@@ -370,23 +379,26 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
                           IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
       // Device local and host visible.
       buffer_type = IREE_HAL_HIP_BUFFER_TYPE_DEVICE;
-      status = IREE_HIP_RESULT_TO_STATUS(
+      status = IREE_HIP_CALL_TO_STATUS(
           allocator->symbols,
           hipMallocManaged(&device_ptr, allocation_size, hipMemAttachGlobal));
       if (iree_status_is_ok(status) &&
           allocator->supports_concurrent_managed_access) {
         // Prefetch the buffer on the GPU device.
-        status = IREE_HIP_RESULT_TO_STATUS(
+        status = IREE_HIP_CALL_TO_STATUS(
             allocator->symbols,
-            hipMemPrefetchAsync(device_ptr, allocation_size, allocator->device,
-                                allocator->stream));
+            hipMemPrefetchAsync(
+                device_ptr, allocation_size,
+                allocator->topology->devices[device_ordinal].hip_device,
+                allocator->topology->devices[device_ordinal]
+                    .hip_dispatch_stream));
       }
       host_ptr = (void*)device_ptr;
     } else {
       // Device only.
       buffer_type = IREE_HAL_HIP_BUFFER_TYPE_DEVICE;
-      status = IREE_HIP_RESULT_TO_STATUS(
-          allocator->symbols, hipMalloc(&device_ptr, allocation_size));
+      status = IREE_HIP_CALL_TO_STATUS(allocator->symbols,
+                                       hipMalloc(&device_ptr, allocation_size));
     }
   } else {
     // Host local case.
@@ -396,10 +408,10 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
                            IREE_HAL_MEMORY_TYPE_HOST_CACHED)) {
       flags |= hipHostMallocWriteCombined;
     }
-    status = IREE_HIP_RESULT_TO_STATUS(
+    status = IREE_HIP_CALL_TO_STATUS(
         allocator->symbols, hipHostMalloc(&host_ptr, allocation_size, flags));
     if (iree_status_is_ok(status)) {
-      status = IREE_HIP_RESULT_TO_STATUS(
+      status = IREE_HIP_CALL_TO_STATUS(
           allocator->symbols,
           hipHostGetDevicePointer(&device_ptr, host_ptr, /*flags=*/0));
     }
@@ -432,6 +444,11 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
       iree_hal_buffer_release(buffer);
     }
   }
+
+  status = iree_status_join(
+      status,
+      IREE_HIP_CALL_TO_STATUS(allocator->symbols, hipCtxPopCurrent(NULL)));
+
   return status;
 }
 
@@ -440,9 +457,6 @@ static void iree_hal_hip_allocator_deallocate_buffer(
     iree_hal_buffer_t* IREE_RESTRICT base_buffer) {
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
-
-  IREE_IGNORE_ERROR(
-      iree_hal_hip_set_context(allocator->symbols, allocator->hip_context));
 
   const iree_hal_hip_buffer_type_t buffer_type =
       iree_hal_hip_buffer_type(base_buffer);
@@ -476,11 +490,10 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
     iree_hal_external_buffer_t* IREE_RESTRICT external_buffer,
     iree_hal_buffer_release_callback_t release_callback,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  IREE_ASSERT_ARGUMENT(out_buffer);
+  *out_buffer = NULL;
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
-
-  IREE_RETURN_IF_ERROR(
-      iree_hal_hip_set_context(allocator->symbols, allocator->hip_context));
 
   // Coerce options into those required by the current device.
   iree_hal_buffer_params_t compat_params = *params;
@@ -511,6 +524,16 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
 #endif  // IREE_STATUS_MODE
   }
 
+  int device_ordinal = 0;
+  if (params->queue_affinity) {
+    device_ordinal = iree_math_count_trailing_zeros_u64(params->queue_affinity);
+  }
+
+  IREE_RETURN_IF_ERROR(IREE_HIP_CALL_TO_STATUS(
+      allocator->symbols,
+      hipCtxPushCurrent(
+          allocator->topology->devices[device_ordinal].hip_context)));
+
   iree_status_t status = iree_ok_status();
   iree_hal_hip_buffer_type_t buffer_type = IREE_HAL_HIP_BUFFER_TYPE_DEVICE;
   void* host_ptr = NULL;
@@ -527,12 +550,12 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
       buffer_type = IREE_HAL_HIP_BUFFER_TYPE_HOST_REGISTERED;
       host_ptr = external_buffer->handle.host_allocation.ptr;
       uint32_t register_flags = hipHostRegisterMapped;
-      status = IREE_HIP_RESULT_TO_STATUS(
+      status = IREE_HIP_CALL_TO_STATUS(
           allocator->symbols,
           hipHostRegister(host_ptr, external_buffer->size, register_flags),
           "hipHostRegister");
       if (iree_status_is_ok(status)) {
-        status = IREE_HIP_RESULT_TO_STATUS(
+        status = IREE_HIP_CALL_TO_STATUS(
             allocator->symbols,
             hipHostGetDevicePointer(&device_ptr, host_ptr, 0),
             "hipHostGetDevicePointer");
@@ -575,7 +598,10 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
       iree_hal_buffer_release(buffer);
     }
   }
-  return status;
+
+  return iree_status_join(
+      status,
+      IREE_HIP_CALL_TO_STATUS(allocator->symbols, hipCtxPopCurrent(NULL)));
 }
 
 static iree_status_t iree_hal_hip_allocator_export_buffer(
@@ -616,15 +642,16 @@ iree_status_t iree_hal_hip_allocator_alloc_async(
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
 
-  IREE_RETURN_IF_ERROR(
-      iree_hal_hip_set_context(allocator->symbols, allocator->hip_context));
-
+  // In an ideal world we would use hipMallocAsync/hipFreeAsync,
+  // however the caching inside can cause lots of slack
+  // to the point of unusability depending on the memory allocation
+  // patterns of the host program, so instead we simply hipMalloc/hipFree.
   hipDeviceptr_t ptr = NULL;
-  iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
+  iree_status_t status = IREE_HIP_CALL_TO_STATUS(
       allocator->symbols,
-      hipMallocAsync(&ptr, (size_t)iree_hal_buffer_allocation_size(buffer),
-                     stream),
-      "hipMallocAsync");
+      hipMalloc(&ptr, (size_t)iree_hal_buffer_allocation_size(buffer)),
+      "hipMalloc");
+
   if (iree_status_is_ok(status)) {
     iree_hal_hip_buffer_set_device_pointer(buffer, ptr);
     IREE_TRACE_ALLOC_NAMED(IREE_HAL_HIP_ALLOCATOR_ID, (void*)ptr,
@@ -644,16 +671,13 @@ iree_status_t iree_hal_hip_allocator_free_async(
     iree_hal_buffer_t* buffer) {
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
-  IREE_RETURN_IF_ERROR(
-      iree_hal_hip_set_context(allocator->symbols, allocator->hip_context));
-
   hipDeviceptr_t device_ptr = iree_hal_hip_buffer_device_pointer(buffer);
   if (!device_ptr) {
     return iree_ok_status();
   }
 
-  IREE_RETURN_IF_ERROR(IREE_HIP_RESULT_TO_STATUS(
-      allocator->symbols, hipFreeAsync(device_ptr, stream), "hipFreeAsync"));
+  IREE_RETURN_IF_ERROR(IREE_HIP_CALL_TO_STATUS(allocator->symbols,
+                                               hipFree(device_ptr), "hipFree"));
   iree_hal_hip_buffer_set_allocation_empty(buffer);
 
   IREE_TRACE_FREE_NAMED(IREE_HAL_HIP_ALLOCATOR_ID, (void*)device_ptr);

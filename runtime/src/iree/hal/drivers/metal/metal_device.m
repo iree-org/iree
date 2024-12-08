@@ -256,8 +256,8 @@ static iree_status_t iree_hal_metal_device_create_command_buffer(
   // for argument buffer updates to pass in binding tables.
   if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT) || binding_capacity > 0) {
     return iree_hal_deferred_command_buffer_create(
-        device->device_allocator, mode, command_categories, binding_capacity, &device->block_pool,
-        device->host_allocator, out_command_buffer);
+        device->device_allocator, mode, command_categories, queue_affinity, binding_capacity,
+        &device->block_pool, device->host_allocator, out_command_buffer);
   }
 
   return iree_hal_metal_direct_command_buffer_create(
