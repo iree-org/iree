@@ -13,6 +13,7 @@
 
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -44,7 +45,8 @@ struct BufferizeCopyOnlyDispatchesPass final
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, bufferization::BufferizationDialect,
                     IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                    memref::MemRefDialect, tensor::TensorDialect>();
+                    memref::MemRefDialect, tensor::TensorDialect,
+                    IREE::Codegen::IREECodegenDialect>();
   }
 
   void runOnOperation() override;
