@@ -244,6 +244,12 @@ computeExecutionRegionLivenessIntervals(IREE::Stream::AsyncExecuteOp executeOp,
         for (auto value : op->getResults()) {
           if (!llvm::isa<IREE::Stream::ResourceType>(value.getType()))
             continue;
+          if (auto tiedOp = dyn_cast<Util::TiedOpInterface>(op)) {
+            // Skip tied results as their liveness is determined by the tied
+            // operand.
+            if (tiedOp.getTiedResultOperand(value))
+              continue;
+          }
           if (!value.use_empty())
             continue;
           LivenessInterval interval;
