@@ -136,9 +136,6 @@ private:
                              RegionBranchPoint branchPoint,
                              MutableArrayRef<OpOperand> operands);
 
-  void visitRegionBranchTerminatorOpInterface(RegionBranchOpInterface branch,
-                                              RegionBranchPoint branchPoint);
-
   DistributionLayout *getLatticeElement(Value val);
 
   MLIRContext *ctx;
@@ -1006,9 +1003,6 @@ void EnforceLayout::visitOperation(Operation *op) {
   if (auto branch = dyn_cast<RegionBranchOpInterface>(op)) {
     visitRegionSuccessors(branch, RegionBranchPoint::parent(),
                           branch->getOpOperands());
-
-    // Handle the propagation from scf.for to yield op.
-    visitRegionBranchTerminatorOpInterface(branch, RegionBranchPoint::parent());
     return;
   }
 
@@ -1099,43 +1093,6 @@ void EnforceLayout::visitRegionSuccessors(RegionBranchOpInterface branch,
       curr++;
     }
   }
-}
-
-void EnforceLayout::visitRegionBranchTerminatorOpInterface(
-    RegionBranchOpInterface branch, RegionBranchPoint branchPoint) {
-  SmallVector<RegionSuccessor> successors;
-  branch.getSuccessorRegions(branchPoint, successors);
-  if (!branch.hasLoop())
-    return;
-  SmallVector<DistributionLayout *> resultLattices;
-  for (Value result : branch->getResults()) {
-    DistributionLayout *resultLattice = getLatticeElement(result);
-    if (resultLattice->isUninitialized())
-      continue;
-    resultLattices.push_back(resultLattice);
-  }
-
-  // We do not support multiple results yet.
-  if (resultLattices.size() != 1)
-    return;
-
-  for (RegionSuccessor successor : successors) {
-    if (Region *succ = successor.getSuccessor()) {
-      Operation *terminator = succ->back().getTerminator();
-      if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(terminator)) {
-        for (Value operand : yieldOp.getOperands()) {
-          if (!isa<VectorType>(operand.getType())) {
-            continue;
-          }
-          DistributionLayout *forwardLattice = getLatticeElement(operand);
-          ChangeResult changed = forwardLattice->resolve(resultLattices[0]);
-          propagateIfChanged(forwardLattice, changed);
-        }
-      }
-    }
-  }
-
-  return;
 }
 
 DistributionLayout *EnforceLayout::getLatticeElement(Value val) {
