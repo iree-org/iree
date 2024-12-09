@@ -181,7 +181,7 @@ def parse_arguments(argv=None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--large-model",
-        help="Setting this to true is recommended for large models."
+        help="Setting this to true is recommended for large models that do not require --opset-version."
         " It will bypass loading external weights and running the onnx checker to determine the model size.",
         action=argparse.BooleanOptionalAction,
         default=False,
@@ -226,7 +226,8 @@ def parse_arguments(argv=None) -> argparse.Namespace:
     )
     externalization_args.add_argument(
         "--param-gb-threshold",
-        help="The maximum number of Gigabytes of param data to store in-memory before flushing to a param file.",
+        help="Setting this will flush params to a temp file when total in-memory param size exceeds the Gigabyte threshold."
+        " This is less efficient (about x2 slower) and only recommended for machines with limited RAM.",
         type=float,
     )
     externalization_args.add_argument(

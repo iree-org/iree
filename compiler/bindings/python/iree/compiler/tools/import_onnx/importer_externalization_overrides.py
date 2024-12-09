@@ -5,10 +5,13 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import copy
+import logging
 import random
 import string
 import sys
-import warnings
+import time
+import tempfile
+from pathlib import Path
 from typing import Optional, Tuple, Any, NamedTuple, Union
 
 import numpy
@@ -45,6 +48,8 @@ from ...ir import (
     SymbolTable,
     IntegerType,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ParamData(NamedTuple):
@@ -293,16 +298,37 @@ class IREENodeImporter(onnx_importer.NodeImporter):
                 "iree-import-onnx requires iree runtime api for externalizing parameters. "
                 "For example: `pip install iree-base-runtime`"
             ) from e
+
         param_archive = rt.ParameterIndex()
+        # if we don't need to save params in batches, gather all tensors in param_archive
+        if self.param_data.param_bit_threshold is None:
+            for name, actual_symbol_name in self.globals:
+                initializer = self._gi.initializer_map[name]
+                tensor_as_array = numpy_helper.to_array(
+                    initializer, base_dir=self.param_data.data_dir
+                )
+                param_archive.add_buffer(actual_symbol_name, tensor_as_array)
+            param_archive.create_archive_file(self.param_data.param_path)
+            return
+
+        # else we need to save in batches:
+        #    1. setup a temporary directory to save smaller param files
+        #    2. keep a target_index for storing references to saved tensors
+        #    3. create an archive file for target_index at param_path to gather all temp data
+        target_index = rt.ParameterIndex()
         in_memory_param_bits = 0
-        warnings.simplefilter("always", UserWarning)
-        for name, actual_symbol_name in self.globals:
-            initializer = self._gi.initializer_map[name]
-            tensor_as_array = numpy_helper.to_array(
-                initializer, base_dir=self.param_data.data_dir
-            )
-            param_archive.add_buffer(actual_symbol_name, tensor_as_array)
-            if self.param_data.param_bit_threshold is not None:
+        iter = 0
+        t00 = time.time()
+        with tempfile.TemporaryDirectory(
+            dir=Path(self.param_data.param_path).parent
+        ) as temp_dir_name:
+            get_curr_path = lambda: str(Path(temp_dir_name) / f"params_{iter}.irpa")
+            for name, actual_symbol_name in self.globals:
+                initializer = self._gi.initializer_map[name]
+                tensor_as_array = numpy_helper.to_array(
+                    initializer, base_dir=self.param_data.data_dir
+                )
+                param_archive.add_buffer(actual_symbol_name, tensor_as_array)
                 # get the new param size
                 elem_dtype = tensor_as_array.dtype
                 elem_kind = elem_dtype.kind
@@ -318,19 +344,38 @@ class IREENodeImporter(onnx_importer.NodeImporter):
                 # update the running total memory use
                 in_memory_param_bits += param_bits
                 if param_bits >= self.param_data.param_bit_threshold:
-                    warnings.warn(
+                    logger.warning(
                         f"Single parameter {name} is {param_bits} bits, "
                         + f"which exceeds threshold of {self.param_data.param_bit_threshold} bits."
                     )
-                # flush the param archive to the param file if we exceed the threshold
+                # flush the param archive to a temp file if the threshold is exceeded
                 if in_memory_param_bits >= self.param_data.param_bit_threshold:
-                    param_archive = param_archive.create_archive_file(
-                        self.param_data.param_path
+                    t0 = time.time()
+                    param_archive.create_archive_file(
+                        get_curr_path(),
+                        target_index=target_index,
                     )
+                    logger.info(
+                        f"iter {iter} with {in_memory_param_bits} bits took {time.time() - t0}s to flush"
+                    )
+                    iter += 1
+                    del param_archive
+                    param_archive = rt.ParameterIndex()
                     in_memory_param_bits = 0
 
-        # write any remaining params to the archive
-        param_archive = param_archive.create_archive_file(self.param_data.param_path)
+            # write any remaining params to a temp file
+            t0 = time.time()
+            param_archive.create_archive_file(
+                get_curr_path(), target_index=target_index
+            )
+            logger.info(
+                f"iter {iter} with {in_memory_param_bits} bits took {time.time() - t0}s to flush"
+            )
+            # combine all temporary param files into the final result
+            t0 = time.time()
+            target_index.create_archive_file(self.param_data.param_path)
+            logger.info(f"combining {iter + 1} irpa files took {time.time() - t0}s")
+            logger.info(f"total time to save params: {time.time()-t00}")
 
 
 ELEM_TYPE_TO_SIGNLESS_IR_TYPE = copy.deepcopy(onnx_importer.ELEM_TYPE_TO_IR_TYPE_CB)

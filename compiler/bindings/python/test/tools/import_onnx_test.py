@@ -131,7 +131,7 @@ class ImportOnnxwithExternalizationTest(unittest.TestCase):
             LARGE_WEIGHTS_ONNX_FILE_PATH,
             "--externalize-params",
             "--param-gb-threshold",
-            "0.25",
+            "0.0",
             "-o",
             self.outputPath,
         )
