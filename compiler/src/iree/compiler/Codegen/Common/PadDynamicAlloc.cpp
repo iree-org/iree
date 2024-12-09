@@ -65,7 +65,8 @@ static FailureOr<int64_t> getUpperBound(Value dim,
   return failure();
 }
 
-static LogicalResult padAlloc(MLIRContext *context, memref::AllocOp allocOp,
+template <typename AllocLikeOp>
+static LogicalResult padAlloc(MLIRContext *context, AllocLikeOp allocOp,
                               const DataFlowSolver &solver) {
   IRRewriter rewriter(context);
   rewriter.setInsertionPoint(allocOp);
@@ -94,7 +95,7 @@ static LogicalResult padAlloc(MLIRContext *context, memref::AllocOp allocOp,
   MemRefType allocType = MemRefType::get(shape, elType, AffineMap(),
                                          allocOp.getType().getMemorySpace());
   Location loc = allocOp.getLoc();
-  Value paddedAlloc = rewriter.create<memref::AllocOp>(loc, allocType);
+  Value paddedAlloc = rewriter.create<AllocLikeOp>(loc, allocType);
   SmallVector<OpFoldResult> offsets(shape.size(), rewriter.getIndexAttr(0));
   SmallVector<OpFoldResult> strides(shape.size(), rewriter.getIndexAttr(1));
   Value subview = rewriter.create<memref::SubViewOp>(loc, paddedAlloc, offsets,
@@ -111,7 +112,6 @@ struct PadDynamicAllocPass final
   void runOnOperation() override {
     auto funcOp = getOperation();
     MLIRContext *context = &getContext();
-    SmallVector<memref::AllocOp> sharedMemAllocs;
 
     DataFlowSolver solver;
     solver.load<dataflow::DeadCodeAnalysis>();
@@ -122,10 +122,19 @@ struct PadDynamicAllocPass final
     }
 
     // Collect all the alloc operations.
-    funcOp.walk(
-        [&](memref::AllocOp allocOp) { sharedMemAllocs.push_back(allocOp); });
-    for (memref::AllocOp alloc : sharedMemAllocs) {
+    SmallVector<memref::AllocOp> allocs;
+    funcOp.walk([&](memref::AllocOp allocOp) { allocs.push_back(allocOp); });
+    for (memref::AllocOp alloc : allocs) {
       if (failed(padAlloc(context, alloc, solver)))
+        return signalPassFailure();
+    }
+
+    // Collect all the alloca operations.
+    SmallVector<memref::AllocaOp> allocas;
+    funcOp.walk(
+        [&](memref::AllocaOp allocaOp) { allocas.push_back(allocaOp); });
+    for (memref::AllocaOp alloca : allocas) {
+      if (failed(padAlloc(context, alloca, solver)))
         return signalPassFailure();
     }
   }
