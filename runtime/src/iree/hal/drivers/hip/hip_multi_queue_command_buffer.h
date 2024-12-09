@@ -30,8 +30,8 @@ IREE_API_EXPORT iree_status_t iree_hal_hip_multi_queue_command_buffer_create(
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_hip_dynamic_symbols_t* hip_symbols,
-    const iree_hal_hip_device_topology_t* topology,
-    iree_host_size_t binding_capacity, iree_allocator_t host_allocator,
+    iree_hal_hip_device_topology_t topology, iree_host_size_t binding_capacity,
+    iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer);
 
 // Returns true if |command_buffer| is a multi command buffer.

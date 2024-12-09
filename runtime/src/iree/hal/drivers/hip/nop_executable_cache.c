@@ -21,7 +21,7 @@ typedef struct iree_hal_hip_nop_executable_cache_t {
   iree_allocator_t host_allocator;
 
   const iree_hal_hip_dynamic_symbols_t* symbols;
-  const iree_hal_hip_device_topology_t* topology;
+  iree_hal_hip_device_topology_t topology;
 } iree_hal_hip_nop_executable_cache_t;
 
 static const iree_hal_executable_cache_vtable_t
@@ -37,8 +37,7 @@ iree_hal_hip_nop_executable_cache_cast(
 iree_status_t iree_hal_hip_nop_executable_cache_create(
     iree_string_view_t identifier,
     const iree_hal_hip_dynamic_symbols_t* symbols,
-    const iree_hal_hip_device_topology_t* topology,
-    iree_allocator_t host_allocator,
+    iree_hal_hip_device_topology_t topology, iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache) {
   IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(out_executable_cache);
