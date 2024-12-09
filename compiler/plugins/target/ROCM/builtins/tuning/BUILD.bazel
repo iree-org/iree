@@ -34,7 +34,7 @@ tuning_spec_mlir_files = [
 ]
 
 iree_c_embed_data(
-    name = "iree_default_tuning_specs_amdgpu_bytecode",
+    name = "iree_default_tuning_specs_amdgpu",
     srcs = tuning_spec_mlir_files,
     c_file_output = "iree_default_tuning_specs_amdgpu.c",
     flatten = True,

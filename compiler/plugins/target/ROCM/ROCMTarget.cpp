@@ -916,10 +916,9 @@ static void addAMDGPUUkernelBitcodeToGlobalEmbeddedDataDirectory() {
 // the EmbeddedDataDirectory singleton.
 static void addAMDGPUDefaultTuningSpecsToGlobalEmbeddedDataDirectory() {
   EmbeddedDataDirectory::withGlobal([](EmbeddedDataDirectory &dir) {
-    const iree_file_toc_t *toc =
-        iree_default_tuning_specs_amdgpu_bytecode_create();
-    for (size_t i = 0, e = iree_default_tuning_specs_amdgpu_bytecode_size();
-         i != e; ++i) {
+    const iree_file_toc_t *toc = iree_default_tuning_specs_amdgpu_create();
+    for (size_t i = 0, e = iree_default_tuning_specs_amdgpu_size(); i != e;
+         ++i) {
       dir.addFile(toc[i].name, llvm::StringRef{toc[i].data, toc[i].size});
     }
   });

@@ -16,7 +16,7 @@ endif()
 
 iree_c_embed_data(
   NAME
-    iree_default_tuning_specs_amdgpu_bytecode
+    iree_default_tuning_specs_amdgpu
   SRCS
     "iree_default_tuning_spec_gfx942.mlir"
   C_FILE_OUTPUT
