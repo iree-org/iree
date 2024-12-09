@@ -7,10 +7,14 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -41,7 +45,7 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
              bcastMapAttr, roundDimsToAttr, layoutsAttr);
 }
 
-AffineMap EncodingAttr::getMapForOperandIndex() {
+AffineMap EncodingAttr::getMapForOperandIndex() const {
   auto index = getOperandIndex().getValue().getZExtValue();
   switch (index) {
   case MATMUL_LHS:
@@ -59,7 +63,8 @@ AffineMap EncodingAttr::getMapForOperandIndex() {
   }
 }
 
-std::optional<unsigned> EncodingAttr::mapDimToOperandIndex(int64_t dimPos) {
+std::optional<unsigned>
+EncodingAttr::mapDimToOperandIndex(int64_t dimPos) const {
   return getMapForOperandIndex().getResultPosition(
       getAffineDimExpr(dimPos, getContext()));
 }
@@ -91,7 +96,7 @@ MatmulNarrowDim getMatmulNarrowDim(linalg::LinalgOp linalgOp,
   return (narrowM && (!narrowN || mSize <= nSize)) ? narrowM : narrowN;
 }
 
-ArrayRef<int64_t> EncodingAttr::getRoundDimsToArray() {
+ArrayRef<int64_t> EncodingAttr::getRoundDimsToArray() const {
   auto roundDimsTo = getRoundDimsTo();
   if (!roundDimsTo) {
     return {};
@@ -109,6 +114,63 @@ EncodingAttr EncodingAttr::clone(AffineMap bcastMap) {
   return get(bcastMap.getContext(), getOperandIndex(), getOpType(),
              getElementTypes(), getUserIndexingMaps(),
              AffineMapAttr::get(bcastMap), getRoundDimsTo(), getLayouts());
+}
+
+Value EncodingAttr::calculateStorageSizeInBytes(Location loc,
+                                                OpBuilder &builder,
+                                                RankedTensorType type,
+                                                ValueRange dynamicDims) const {
+  SmallVector<OpFoldResult> shape =
+      getMixedValues(type.getShape(), dynamicDims, builder);
+  ArrayRef<int64_t> roundDimsTo = getRoundDimsToArray();
+  FailureOr<linalg::ContractionDimensions> cDims =
+      getEncodingContractionDims(*this);
+  auto pad = [&](int dim, int value) {
+    std::optional<unsigned> maybeMappedDim = mapDimToOperandIndex(dim);
+    if (!maybeMappedDim) {
+      return;
+    }
+    unsigned mappedDim = maybeMappedDim.value();
+    AffineExpr expr = builder.getAffineDimExpr(0);
+    shape[mappedDim] = affine::makeComposedFoldedAffineApply(
+        builder, loc, expr.ceilDiv(value) * value, {shape[mappedDim]});
+  };
+  for (auto m : cDims->m) {
+    pad(m, roundDimsTo[0]);
+  }
+  for (auto n : cDims->n) {
+    pad(n, roundDimsTo[1]);
+  }
+  for (auto k : cDims->k) {
+    pad(k, roundDimsTo[2]);
+  }
+
+  constexpr int64_t kNumBitsInByte = 8;
+  unsigned elementBits = IREE::Util::getTypeBitWidth(type.getElementType());
+  int64_t numBytesPerElem = 1;
+  if (elementBits > kNumBitsInByte) {
+    numBytesPerElem *=
+        IREE::Util::getRoundedElementByteWidth(type.getElementType());
+  }
+  OpFoldResult res = builder.getIndexAttr(numBytesPerElem);
+  AffineExpr d0 = builder.getAffineDimExpr(0);
+  AffineExpr d1 = builder.getAffineDimExpr(1);
+  for (auto dimSize : shape) {
+    res = affine::makeComposedFoldedAffineApply(builder, loc, d0 * d1,
+                                                {res, dimSize});
+  }
+  // Always pack the elements back-to-back for subtypes.
+  if (elementBits < kNumBitsInByte) {
+    if (kNumBitsInByte % elementBits) {
+      assert(false && "unsupported subtype");
+      return Value();
+    }
+    unsigned divisor = kNumBitsInByte / elementBits;
+    AffineExpr expr = builder.getAffineDimExpr(0);
+    res = affine::makeComposedFoldedAffineApply(
+        builder, loc, expr.ceilDiv(divisor) * divisor, {res});
+  }
+  return getValueOrCreateConstantIntOp(builder, loc, res);
 }
 
 MatmulNarrowDim getMatmulNarrowDim(EncodingAttr encoding) {
