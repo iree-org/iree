@@ -92,7 +92,7 @@ jobs:
       - name: "Setup emsdk"
         uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021 # v14
         with:
-          version: 3.1.44
+          version: 3.1.73
       - name: "Test experimental web samples"
         env:
           HOST_TOOLS_BINARY_DIR: ${{ env.VENV_DIR }}/bin
