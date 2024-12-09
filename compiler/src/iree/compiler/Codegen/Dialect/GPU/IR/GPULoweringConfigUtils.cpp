@@ -84,18 +84,15 @@ static StringLiteral getBasisLevelName(IREE::GPU::TilingLevel level) {
 }
 
 void setBasis(MLIRContext *context, SmallVector<NamedAttribute> &attrs,
-              IREE::GPU::TilingLevel level, ArrayRef<int64_t> basis,
-              ArrayRef<int64_t> mapping) {
+              IREE::GPU::TilingLevel level, const Basis &basis) {
   Builder b(context);
-  ArrayAttr basisAttr =
-      b.getArrayAttr({b.getI64ArrayAttr(basis), b.getI64ArrayAttr(mapping)});
+  ArrayAttr basisAttr = b.getArrayAttr(
+      {b.getI64ArrayAttr(basis.counts), b.getI64ArrayAttr(basis.mapping)});
   attrs.emplace_back(b.getNamedAttr(getBasisLevelName(level), basisAttr));
 }
 
-LogicalResult getBasis(IREE::GPU::LoweringConfigAttr config,
-                       IREE::GPU::TilingLevel level,
-                       SmallVector<int64_t> &basis,
-                       SmallVector<int64_t> &mapping) {
+FailureOr<Basis> getBasis(IREE::GPU::LoweringConfigAttr config,
+                          IREE::GPU::TilingLevel level) {
   auto basisAttr = dyn_cast_or_null<ArrayAttr>(
       config.getAttributes().get(getBasisLevelName(level)));
   if (!basisAttr) {
@@ -107,18 +104,16 @@ LogicalResult getBasis(IREE::GPU::LoweringConfigAttr config,
     return failure();
   }
 
-  std::optional<SmallVector<int64_t>> maybeBasis =
+  std::optional<SmallVector<int64_t>> maybeCounts =
       getIntegerVector(dyn_cast_or_null<ArrayAttr>(attrs[0]));
   std::optional<SmallVector<int64_t>> maybeMapping =
       getIntegerVector(dyn_cast_or_null<ArrayAttr>(attrs[1]));
 
-  if (!maybeBasis.has_value() || !maybeMapping.has_value()) {
+  if (!maybeCounts.has_value() || !maybeMapping.has_value()) {
     return failure();
   }
-  basis = std::move(maybeBasis.value());
-  mapping = std::move(maybeMapping.value());
 
-  return success();
+  return Basis{maybeCounts.value(), maybeMapping.value()};
 }
 
 constexpr StringLiteral kPromoteOperandsName = "promote_operands";

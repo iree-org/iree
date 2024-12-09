@@ -865,15 +865,16 @@ static LogicalResult distributeTilingSizes(linalg::LinalgOp candidate,
     return failure();
   }
 
-  SmallVector<int64_t> basis, mapping;
-  if (failed(getBasis(config, level, basis, mapping))) {
+  FailureOr<IREE::GPU::Basis> basis = IREE::GPU::getBasis(config, level);
+  if (failed(basis)) {
     candidate->emitError()
         << "Could not find a subgroup basis from lowering config";
     return failure();
   }
 
-  sizes = applyProjectedPermutation(basis, mapping);
-  strides = applyProjectedPermutation(getStridesFromBasis(basis), mapping);
+  sizes = applyProjectedPermutation(basis->counts, basis->mapping);
+  strides = applyProjectedPermutation(getStridesFromBasis(basis->counts),
+                                      basis->mapping);
 
   if (failed(divideTile(bounds, sizes))) {
     candidate->emitError()
