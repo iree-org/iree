@@ -47,7 +47,7 @@ bool GpuHello::runOnModule(llvm::Module &module) {
         if (!debugLocation) {
           sourceInfo = function.getName().str();
         } else {
-          sourceInfo = llvm::formatv("{0}\t{1}:{2}:{3}", function.getName(),
+          sourceInfo = llvm::formatv("{}\t{}:{}:{}", function.getName(),
                                      debugLocation->getFilename(),
                                      debugLocation->getLine(),
                                      debugLocation->getColumn())

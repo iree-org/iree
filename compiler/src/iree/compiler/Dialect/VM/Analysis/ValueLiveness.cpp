@@ -67,11 +67,10 @@ LogicalResult ValueLiveness::annotateIR(IREE::VM::FuncOp funcOp) {
       std::string str;
       if (auto blockArg = llvm::dyn_cast<BlockArgument>(value)) {
         if (blockArg.getOwner()->isEntryBlock()) {
-          str = llvm::formatv("%arg{0}", blockArg.getArgNumber());
+          str = llvm::formatv("%arg{}", blockArg.getArgNumber());
         } else {
-          str =
-              llvm::formatv("%bb{0}_arg{1}", blockOrdinals[blockArg.getOwner()],
-                            blockArg.getArgNumber());
+          str = llvm::formatv("%bb{}_arg{}", blockOrdinals[blockArg.getOwner()],
+                              blockArg.getArgNumber());
         }
       } else {
         llvm::raw_string_ostream os(str);

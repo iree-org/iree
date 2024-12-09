@@ -51,7 +51,7 @@ struct ConvertHalInterfaceBindingSubspan final
     if (!newResultType) {
       return rewriter.notifyMatchFailure(
           op->getLoc(),
-          llvm::formatv("failed to legalize memref type: {0}", op.getType()));
+          llvm::formatv("failed to legalize memref type: {}", op.getType()));
     }
     Location loc = op.getLoc();
     OpFoldResult zero = rewriter.getIndexAttr(0);

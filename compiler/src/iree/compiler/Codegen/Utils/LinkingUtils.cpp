@@ -56,7 +56,7 @@ renameWithDisambiguatedName(Operation *op, Operation *moduleOp,
   int uniqueingCounter = 0;
   do {
     disambiguatedName =
-        llvm::formatv("{0}_{1}", originalName, uniqueingCounter++).str();
+        llvm::formatv("{}_{}", originalName, uniqueingCounter++).str();
   } while (
       targetSymbolMap.lookup(disambiguatedName) ||
       (optionalSymbolTable && optionalSymbolTable->lookup(disambiguatedName)));

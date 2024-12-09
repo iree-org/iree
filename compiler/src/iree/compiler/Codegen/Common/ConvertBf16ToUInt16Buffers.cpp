@@ -88,7 +88,7 @@ struct ConvertHalInterfaceBindingSubspan final
     if (!newResultTy)
       return rewriter.notifyMatchFailure(
           op->getLoc(),
-          llvm::formatv("failed to legalize memref type: {0}", op.getType()));
+          llvm::formatv("failed to legalize memref type: {}", op.getType()));
 
     auto newOp =
         rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
@@ -111,7 +111,7 @@ struct ConvertMemRefAlloc final : OpConversionPattern<memref::AllocOp> {
     if (!newTy)
       return rewriter.notifyMatchFailure(
           op->getLoc(),
-          llvm::formatv("failed to convert memref type: {0}", op.getType()));
+          llvm::formatv("failed to convert memref type: {}", op.getType()));
 
     rewriter.replaceOpWithNewOp<memref::AllocOp>(
         op, newTy, adaptor.getDynamicSizes(), adaptor.getSymbolOperands(),
@@ -196,7 +196,7 @@ struct ConvertMemRefLoad final : OpConversionPattern<memref::LoadOp> {
     Type newResTy = getTypeConverter()->convertType(op.getType());
     if (!newResTy)
       return rewriter.notifyMatchFailure(
-          op->getLoc(), llvm::formatv("failed to convert memref type: {0}",
+          op->getLoc(), llvm::formatv("failed to convert memref type: {}",
                                       op.getMemRefType()));
 
     rewriter.replaceOpWithNewOp<memref::LoadOp>(
@@ -215,7 +215,7 @@ struct ConvertMemRefStore final : OpConversionPattern<memref::StoreOp> {
     Type newTy = getTypeConverter()->convertType(op.getMemRefType());
     if (!newTy)
       return rewriter.notifyMatchFailure(
-          op->getLoc(), llvm::formatv("failed to convert memref type: {0}",
+          op->getLoc(), llvm::formatv("failed to convert memref type: {}",
                                       op.getMemRefType()));
 
     rewriter.replaceOpWithNewOp<memref::StoreOp>(

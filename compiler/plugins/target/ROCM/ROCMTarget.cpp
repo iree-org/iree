@@ -348,7 +348,7 @@ public:
         return variantOp.emitError()
                << "found an unresolved external function '" << func.getName()
                << "' in the final bitcode. A remaining live user is\n"
-               << llvm::formatv("{0}", *liveUser);
+               << llvm::formatv("{}", *liveUser);
       }
     }
     return success();
