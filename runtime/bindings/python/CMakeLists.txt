@@ -4,15 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# nanobind
-include(FetchContent)
-FetchContent_Declare(
-  nanobind
-  GIT_REPOSITORY https://github.com/wjakob/nanobind.git
-  GIT_TAG        0f9ce749b257fdfe701edb3cf6f7027ba029434a # v2.4.0
-)
-FetchContent_MakeAvailable(nanobind)
-
 set(_EXTRA_INSTALL_TOOL_TARGETS)
 set(_TRACY_ENABLED OFF)
 
