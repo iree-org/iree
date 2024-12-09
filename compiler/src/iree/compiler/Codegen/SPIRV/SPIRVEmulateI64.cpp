@@ -57,7 +57,7 @@ struct ConvertHalInterfaceBindingSubspan final
     if (!newResultTy)
       return rewriter.notifyMatchFailure(
           op->getLoc(),
-          llvm::formatv("failed to legalize memref type: {0}", op.getType()));
+          llvm::formatv("failed to legalize memref type: {}", op.getType()));
 
     auto newOp =
         rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(

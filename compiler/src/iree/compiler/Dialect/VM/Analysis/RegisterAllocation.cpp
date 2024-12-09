@@ -68,7 +68,7 @@ LogicalResult RegisterAllocation::annotateIR(IREE::VM::FuncOp funcOp) {
             registerAllocation.remapSuccessorRegisters(terminatorOp, i);
         SmallVector<std::string, 8> remappingStrs;
         for (auto &srcDstReg : srcDstRegs) {
-          remappingStrs.push_back(llvm::formatv("{0}->{1}",
+          remappingStrs.push_back(llvm::formatv("{}->{}",
                                                 srcDstReg.first.toString(),
                                                 srcDstReg.second.toString())
                                       .str());

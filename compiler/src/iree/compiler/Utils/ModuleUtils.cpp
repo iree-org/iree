@@ -79,7 +79,7 @@ static void renameWithDisambiguatedName(Operation *op, Operation *moduleOp,
   int uniqueingCounter = 0;
   do {
     disambiguatedName =
-        llvm::formatv("{0}_{1}", originalName, uniqueingCounter++).str();
+        llvm::formatv("{}_{}", originalName, uniqueingCounter++).str();
   } while (symbolTable0.lookup(disambiguatedName) ||
            symbolTable1.lookup(disambiguatedName));
 
