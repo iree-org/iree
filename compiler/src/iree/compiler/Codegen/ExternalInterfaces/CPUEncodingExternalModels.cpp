@@ -31,7 +31,7 @@ namespace {
 // targeted. For narrow-{M,N} cases, this only enumerates on narrow M. The
 // narrow-N cases are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
-enumerateMatmulTilesVMVX(linalg::ContractionDimensions cDims,
+enumerateVMVXMatmulTiles(linalg::ContractionDimensions cDims,
                          IREE::Encoding::EncodingAttr encoding,
                          DictionaryAttr config) {
   bool hasUkernelSupport = hasUkernel(config);
@@ -78,7 +78,7 @@ struct VMVXDeviceEncodingLayoutAttrInterface
       return info;
     }
 
-    SmallVector<TileMxNxK> enumeratedTileMxNxK = enumerateMatmulTilesVMVX(
+    SmallVector<TileMxNxK> enumeratedTileMxNxK = enumerateVMVXMatmulTiles(
         cDims.value(), encoding, layoutAttr.getConfiguration());
     if (enumeratedTileMxNxK.empty()) {
       return info;
