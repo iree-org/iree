@@ -686,7 +686,8 @@ static IREE::VectorExt::VectorLayoutInterface
 getLayoutForMap(VectorLayoutInterface layout, AffineMap map) {
   // Project out unusued dims in layout.
   SmallVector<bool> projectedDims(layout.getRank(), false);
-  for (int dim : getUnusedDimsBitVector(map).set_bits()) {
+  llvm::SmallBitVector unusedBits = getUnusedDimsBitVector(map);
+  for (int dim : unusedBits.set_bits()) {
     projectedDims[dim] = true;
   }
   IREE::VectorExt::VectorLayoutInterface projectedLayout =
