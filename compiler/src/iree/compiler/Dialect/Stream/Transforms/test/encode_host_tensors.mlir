@@ -29,12 +29,34 @@ util.func public @sizeof_lhs_encoding_dynamic(%arg0: index, %arg1: index) -> ind
   %0 = stream.tensor.sizeof tensor<?x?xf32, #encoding>{%arg0, %arg1} : index
   util.return %0 : index
 }
-// CHECK-DAG:   #[[$MAP:.+]] = affine_map<()[s0, s1] -> (((s1 ceildiv 16) * ((s0 ceildiv 4) * 16)) * 16)>
 // CHECK-LABEL: @sizeof_lhs_encoding_dynamic
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
-// CHECK:         %[[RES:.+]] = affine.apply #[[$MAP]]()[%[[ARG0]], %[[ARG1]]]
-// CHECK:         return %[[RES]]
+// CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : index
+// CHECK-DAG:     %[[C16:.+]] = arith.constant 16 : index
+// CHECK:         %[[CEIL_DIV_D0:.+]] = arith.ceildivui %arg0, %[[C4]]
+// CHECK:         %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C4]]
+// CHECK:         %[[CEIL_DIV_D1:.+]] = arith.ceildivui %arg1, %[[C16]]
+// CHECK:         %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C16]]
+// CHECK:         %[[T0:.+]] = arith.muli %[[PAD_D0]], %[[C4]]
+// CHECK:         %[[T1:.+]] = arith.muli %[[T0]], %[[PAD_D1]]
+// CHECK:         return %[[T1]]
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 4, 8, 16>>
+util.func public @sizeof_lhs_encoding_partially_dynamic(%arg0: index) -> index {
+  %0 = stream.tensor.sizeof tensor<10x?xf32, #encoding>{%arg0} : index
+  util.return %0 : index
+}
+// CHECK-LABEL: @sizeof_lhs_encoding_partially_dynamic
+// CHECK-DAG:     %[[C48:.+]] = arith.constant 48 : index
+// CHECK-DAG:     %[[C16:.+]] = arith.constant 16 : index
+// CHECK:         %[[CEIL_DIV_D1:.+]] = arith.ceildivui %arg0, %[[C16]]
+// CHECK:         %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C16]]
+// CHECK:         %[[T0:.+]] = arith.muli %[[PAD_D1]], %[[C48]]
+// CHECK:         return %[[T0]]
 
 // -----
 
@@ -46,12 +68,17 @@ util.func public @sizeof_rhs_encoding_dynamic(%arg0: index, %arg1: index) -> ind
   %0 = stream.tensor.sizeof tensor<?x?xf32, #encoding>{%arg0, %arg1} : index
   util.return %0 : index
 }
-// CHECK-DAG:   #[[$MAP:.+]] = affine_map<()[s0, s1] -> (((s1 ceildiv 8) * ((s0 ceildiv 16) * 64)) * 8)>
 // CHECK-LABEL: @sizeof_rhs_encoding_dynamic
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
-// CHECK:         %[[RES:.+]] = affine.apply #[[$MAP]]()[%[[ARG0]], %[[ARG1]]]
-// CHECK:         return %[[RES]]
+// CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : index
+// CHECK-DAG:     %[[C8:.+]] = arith.constant 8 : index
+// CHECK-DAG:     %[[C16:.+]] = arith.constant 16 : index
+// CHECK:         %[[CEIL_DIV_D1:.+]] = arith.ceildivui %arg1, %[[C8]]
+// CHECK:         %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C8]]
+// CHECK:         %[[CEIL_DIV_D0:.+]] = arith.ceildivui %arg0, %[[C16]]
+// CHECK:         %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C16]]
+// CHECK:         %[[T0:.+]] = arith.muli %[[PAD_D0]], %[[C4]]
+// CHECK:         %[[T1:.+]] = arith.muli %[[T0]], %[[PAD_D1]]
+// CHECK:         return %[[T1]]
 
 // -----
 
@@ -63,12 +90,16 @@ util.func public @sizeof_result_encoding_dynamic(%arg0: index, %arg1: index) -> 
   %0 = stream.tensor.sizeof tensor<?x?xf32, #encoding>{%arg0, %arg1} : index
   util.return %0 : index
 }
-// CHECK-DAG:   #[[$MAP:.+]] = affine_map<()[s0, s1] -> (((s1 ceildiv 8) * ((s0 ceildiv 4) * 16)) * 8)>
 // CHECK-LABEL: @sizeof_result_encoding_dynamic
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
-// CHECK:         %[[RES:.+]] = affine.apply #[[$MAP]]()[%[[ARG0]], %[[ARG1]]]
-// CHECK:         return %[[RES]]
+// CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : index
+// CHECK-DAG:     %[[C8:.+]] = arith.constant 8 : index
+// CHECK:         %[[CEIL_DIV_D0:.+]] = arith.ceildivui %arg0, %[[C4]]
+// CHECK:         %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C4]]
+// CHECK:         %[[CEIL_DIV_D1:.+]] = arith.ceildivui %arg1, %[[C8]]
+// CHECK:         %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C8]]
+// CHECK:         %[[T0:.+]] = arith.muli %[[PAD_D0]], %[[C4]]
+// CHECK:         %[[T1:.+]] = arith.muli %[[T0]], %[[PAD_D1]]
+// CHECK:         return %[[T1]]
 
 // -----
 
@@ -81,12 +112,16 @@ util.func public @sizeof_lhs_encoding_with_bcast_across_batch_dim_dynamic(%arg0:
   %0 = stream.tensor.sizeof tensor<?x?xf32, #encoding>{%arg0, %arg1} : index
   util.return %0 : index
 }
-// CHECK-DAG:   #[[$MAP:.+]] = affine_map<()[s0, s1] -> (((s1 ceildiv 16) * ((s0 ceildiv 4) * 16)) * 16)>
 // CHECK-LABEL: @sizeof_lhs_encoding_with_bcast_across_batch_dim_dynamic
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
-// CHECK:         %[[RES:.+]] = affine.apply #[[$MAP]]()[%[[ARG0]], %[[ARG1]]]
-// CHECK:         return %[[RES]]
+// CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : index
+// CHECK-DAG:     %[[C16:.+]] = arith.constant 16 : index
+// CHECK:         %[[CEIL_DIV_D0:.+]] = arith.ceildivui %arg0, %[[C4]]
+// CHECK:         %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C4]]
+// CHECK:         %[[CEIL_DIV_D1:.+]] = arith.ceildivui %arg1, %[[C16]]
+// CHECK:         %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C16]]
+// CHECK:         %[[T0:.+]] = arith.muli %[[PAD_D0]], %[[C4]]
+// CHECK:         %[[T1:.+]] = arith.muli %[[T0]], %[[PAD_D1]]
+// CHECK:         return %[[T1]]
 
 // -----
 
@@ -99,12 +134,17 @@ util.func public @sizeof_lhs_encoding_with_bcast_across_m_dim_dynamic(%arg0: ind
   %0 = stream.tensor.sizeof tensor<?x?xf32, #encoding>{%arg0, %arg1} : index
   util.return %0 : index
 }
-// CHECK-DAG:   #[[$MAP:.+]] = affine_map<()[s0, s1] -> (((s1 ceildiv 16) * (s0 * 4)) * 16)>
 // CHECK-LABEL: @sizeof_lhs_encoding_with_bcast_across_m_dim_dynamic
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
-// CHECK:         %[[RES:.+]] = affine.apply #[[$MAP]]()[%[[ARG0]], %[[ARG1]]]
-// CHECK:         return %[[RES]]
+// CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : index
+// CHECK-DAG:     %[[C16:.+]] = arith.constant 16 : index
+// CHECK:         %[[CEIL_DIV_D1:.+]] = arith.ceildivui %arg1, %[[C16]]
+// CHECK:         %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C16]]
+//
+// Multiplied by 4 because f32 has 4 bytes.
+//
+// CHECK:         %[[T0:.+]] = arith.muli %arg0, %[[C4]]
+// CHECK:         %[[T1:.+]] = arith.muli %[[T0]], %[[PAD_D1]]
+// CHECK:         return %[[T1]]
 
 // -----
 
