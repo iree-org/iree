@@ -42,7 +42,7 @@ typedef struct iree_hal_hip_per_device_info_t {
 
 typedef struct iree_hal_hip_device_topology_t {
   iree_host_size_t count;
-  iree_hal_hip_per_device_info_t devices[/*count*/];
+  iree_hal_hip_per_device_info_t* devices;
 } iree_hal_hip_device_topology_t;
 
 #endif  // IREE_HAL_DRIVERS_HIP_PER_DEVICE_INFORMATION_H_

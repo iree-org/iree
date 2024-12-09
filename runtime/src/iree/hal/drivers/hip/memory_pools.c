@@ -270,12 +270,15 @@ iree_status_t iree_hal_hip_memory_pools_prepare_buffer(
       /*device_ptr*/ NULL, /*host_ptr=*/NULL, release_callback,
       pools->host_allocator, &buffer);
 
-  if (!iree_status_is_ok(status)) {
-    iree_hal_hip_buffer_set_allocation_empty(buffer);
+  if (iree_status_is_ok(status)) {
+    *out_buffer = buffer;
+  } else {
+    if (buffer) {
+      iree_hal_hip_buffer_set_allocation_empty(buffer);
+    }
     iree_hal_buffer_release(buffer);
   }
 
-  *out_buffer = buffer;
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

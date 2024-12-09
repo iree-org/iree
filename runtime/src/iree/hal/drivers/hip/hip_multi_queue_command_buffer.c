@@ -20,7 +20,7 @@ typedef struct iree_hal_hip_multi_queue_command_buffer_t {
   iree_hal_command_buffer_t base;
   iree_allocator_t host_allocator;
   iree_host_size_t command_buffer_count;
-  const iree_hal_hip_device_topology_t* topology;
+  iree_hal_hip_device_topology_t topology;
   const iree_hal_hip_dynamic_symbols_t* hip_symbols;
   iree_hal_command_buffer_t* child_buffers[];
 } iree_hal_hip_multi_queue_command_buffer_t;
@@ -43,15 +43,15 @@ IREE_API_EXPORT iree_status_t iree_hal_hip_multi_queue_command_buffer_create(
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_hip_dynamic_symbols_t* hip_symbols,
-    const iree_hal_hip_device_topology_t* topology,
-    iree_host_size_t binding_capacity, iree_allocator_t host_allocator,
+    iree_hal_hip_device_topology_t topology, iree_host_size_t binding_capacity,
+    iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
 
   if (iree_math_count_ones_u64(queue_affinity) != command_buffer_count) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "expected one command buffer per enabled queue.");
+                            "expected one command buffer per enabled queue");
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -71,16 +71,15 @@ IREE_API_EXPORT iree_status_t iree_hal_hip_multi_queue_command_buffer_create(
       (uint8_t*)command_buffer + sizeof(*command_buffer) +
           command_buffer_count * sizeof(iree_hal_command_buffer_t*),
       &iree_hal_hip_multi_queue_command_buffer_vtable, &command_buffer->base);
-  memcpy(command_buffer->child_buffers, in_command_buffers,
-         sizeof(iree_hal_command_buffer_t*) * command_buffer_count);
-
-  for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
-    iree_hal_resource_retain(command_buffer->child_buffers[i]);
-  }
   command_buffer->host_allocator = host_allocator;
   command_buffer->command_buffer_count = command_buffer_count;
   command_buffer->topology = topology;
   command_buffer->hip_symbols = hip_symbols;
+  for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
+    command_buffer->child_buffers[i] = in_command_buffers[i];
+    iree_hal_resource_retain(command_buffer->child_buffers[i]);
+  }
+
   *out_command_buffer = (iree_hal_command_buffer_t*)command_buffer;
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -91,10 +90,8 @@ static void iree_hal_hip_multi_queue_command_buffer_destroy(
   iree_hal_hip_multi_queue_command_buffer_t* command_buffer =
       iree_hal_hip_multi_queue_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
-  for (uint16_t i = 0; i < command_buffer->command_buffer_count; ++i) {
-    if (command_buffer->child_buffers[i]) {
-      iree_hal_resource_release(command_buffer->child_buffers[i]);
-    }
+  for (iree_host_size_t i = 0; i < command_buffer->command_buffer_count; ++i) {
+    iree_hal_resource_release(command_buffer->child_buffers[i]);
   }
   iree_allocator_free(command_buffer->host_allocator, command_buffer);
   IREE_TRACE_ZONE_END(z0);
@@ -130,27 +127,27 @@ IREE_API_EXPORT iree_status_t iree_hal_hip_multi_queue_command_buffer_get(
 }
 
 // Use |command_buffer_index| in the command to index into the correct
-// sub command buffer, within the given command
-#define CALL_COMMAND(status, command)                                     \
-  do {                                                                    \
-    iree_hal_queue_affinity_t queue_affinity =                            \
-        command_buffer->base.queue_affinity;                              \
-    int command_buffer_index = 0;                                         \
-    int device_ordinal = 0;                                               \
-    while (queue_affinity && IREE_LIKELY(iree_status_is_ok(status))) {    \
-      int count = iree_math_count_trailing_zeros_u64(queue_affinity);     \
-      device_ordinal += count;                                            \
-      status = iree_hal_hip_set_context(                                  \
-          command_buffer->hip_symbols,                                    \
-          command_buffer->topology->devices[device_ordinal].hip_context); \
-      if (!iree_status_is_ok(status)) {                                   \
-        break;                                                            \
-      }                                                                   \
-      status = command;                                                   \
-      queue_affinity >>= (count + 1);                                     \
-      device_ordinal += 1;                                                \
-      ++command_buffer_index;                                             \
-    }                                                                     \
+// command buffer, within the given command.
+#define CALL_COMMAND(status, command)                                    \
+  do {                                                                   \
+    iree_hal_queue_affinity_t queue_affinity =                           \
+        command_buffer->base.queue_affinity;                             \
+    int command_buffer_index = 0;                                        \
+    int device_ordinal = 0;                                              \
+    while (queue_affinity && IREE_LIKELY(iree_status_is_ok(status))) {   \
+      int count = iree_math_count_trailing_zeros_u64(queue_affinity);    \
+      device_ordinal += count;                                           \
+      status = iree_hal_hip_set_context(                                 \
+          command_buffer->hip_symbols,                                   \
+          command_buffer->topology.devices[device_ordinal].hip_context); \
+      if (!iree_status_is_ok(status)) {                                  \
+        break;                                                           \
+      }                                                                  \
+      status = command;                                                  \
+      queue_affinity >>= (count + 1);                                    \
+      device_ordinal += 1;                                               \
+      ++command_buffer_index;                                            \
+    }                                                                    \
   } while (false)
 
 static iree_status_t iree_hal_hip_multi_queue_command_buffer_begin(
