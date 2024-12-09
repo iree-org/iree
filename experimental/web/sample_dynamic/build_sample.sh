@@ -56,7 +56,7 @@ compile_sample() {
     --iree-input-type=stablehlo \
     --iree-hal-target-backends=llvm-cpu \
     --iree-llvmcpu-target-triple=wasm32-unknown-emscripten \
-    --iree-llvmcpu-target-cpu-features=+atomics,+bulk-memory,+simd128 \
+    --iree-llvmcpu-target-cpu-features=+atomics,+simd128 \
     --o "${BINARY_DIR}/$1.vmfb"
 }
 
