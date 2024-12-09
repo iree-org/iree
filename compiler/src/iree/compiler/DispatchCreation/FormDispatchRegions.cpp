@@ -409,24 +409,18 @@ static bool areOpsFusableAfterInterchangeOfConsumer(
   if (!linalg::isElementwise(genericOp) || genericOp.getNumResults() != 1) {
     return false;
   }
+
+  // The input map must be a permutation (i.e. this is not a broadcasting
+  // access), but not identity.
   AffineMap inputMap = genericOp.getMatchingIndexingMap(&fusableOperand);
   if (!inputMap.isPermutation() || inputMap.isIdentity()) {
     return false;
   }
+
+  // The output should also be a permutation. It should be for a parallel
+  // elementwise op, but checking here anyway.
   OpResult result = cast<OpResult>(genericOp.getResult(0));
   if (!genericOp.getIndexingMapMatchingResult(result).isPermutation()) {
-    return false;
-  }
-
-  // For now this is restricting that all indexing maps corresponding to the
-  // input are same as the indexing map of the fused operand. THat is
-  // overly conservative. Really just need to check that the indexing map
-  // are permutations.
-  if (!llvm::all_of(
-          genericOp.getDpsInputOperands(), [&](OpOperand *inputOperand) {
-            AffineMap map = genericOp.getMatchingIndexingMap(inputOperand);
-            return map == inputMap;
-          })) {
     return false;
   }
 
