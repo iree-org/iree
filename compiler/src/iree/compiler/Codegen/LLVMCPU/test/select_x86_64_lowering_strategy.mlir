@@ -194,7 +194,7 @@ func.func @add4D() attributes {hal.executable.target = #executable_target_embedd
   return
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 64, 64, 64], [1, 1, 1, 4], [0, 0, 0, 0], [0, 0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 64, 64], [1, 1, 1, 4], [0, 0, 0, 0], [0, 0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 //      CHECK: func.func @add4D()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -224,7 +224,7 @@ func.func @add_static() attributes {hal.executable.target = #executable_target_e
   return
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 2, 32, 64], [1, 1, 1, 4], [0, 0, 0, 0], [0, 0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[8, 16, 32, 64], [1, 1, 1, 4], [0, 0, 0, 0], [0, 0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 //      CHECK: func.func @add_static()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -457,7 +457,7 @@ func.func @conv_dynamic() attributes {hal.executable.target = #executable_target
   return
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 64, 64, 64, 0, 0, 0], [1, 1, 1, 1, 0, 0, 0], [0, 0, 0, 0, 1, 1, 1], [0, 0, 0, 0, 0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 64, 64, 0, 0, 0], [1, 1, 1, 1, 0, 0, 0], [0, 0, 0, 0, 1, 1, 1], [0, 0, 0, 0, 0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>
 //      CHECK: func.func @conv_dynamic()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -849,7 +849,7 @@ func.func @generic_unit_dims_dynamic() attributes {hal.executable.target = #exec
   flow.dispatch.tensor.store %8, %5, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [1, %0, 1, 1, %1, %2, 1, %3], strides = [1, 1, 1, 1, 1, 1, 1, 1] : tensor<1x?x1x1x?x?x1x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x?x1x1x?x?x1x?xf32>>{%0, %1, %2, %3}
   return
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0, 0, 64, 64, 0, 64], [1, 1, 1, 1, 1, 1, 1, 4], [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 64, 0, 0, 64, 64, 0, 64], [1, 1, 1, 1, 1, 1, 1, 4], [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 //      CHECK: func.func @generic_unit_dims_dynamic()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -1632,7 +1632,7 @@ func.func @pad_only() attributes {hal.executable.target = #executable_target_emb
   return
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 6, 57, 64], [1, 1, 1, 4], [0, 0, 0, 0], [0, 0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 6, 57, 64], [1, 1, 1, 4], [0, 0, 0, 0], [0, 0, 0, 0]]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 //      CHECK: func.func @pad_only()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -1660,7 +1660,7 @@ func.func @winograd_output_transform() attributes {hal.executable.target = #exec
   flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [2, 36, 36, 128], strides = [1, 1, 1, 1] : tensor<2x36x36x128xf16> -> !flow.dispatch.tensor<writeonly:tensor<2x36x36x128xf16>>
   return
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 1, 6, 64], [1, 1, 1, 1], [0, 0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 2, 6, 64], [1, 1, 1, 1], [0, 0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPULinalgExtTileAndVectorize>
 //      CHECK: func.func @winograd_output_transform()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -1687,7 +1687,7 @@ func.func @winograd_input_transform() attributes {hal.executable.target = #execu
   flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0, 0, 0], sizes = [8, 8, 2, 6, 6, 128], strides = [1, 1, 1, 1, 1, 1] : tensor<8x8x2x6x6x128xf16> -> !flow.dispatch.tensor<writeonly:tensor<8x8x2x6x6x128xf16>>
   return
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 1, 6, 64], [1, 1, 1, 1], [0, 0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 2, 6, 64], [1, 1, 1, 1], [0, 0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPULinalgExtTileAndVectorize>
 //      CHECK: func.func @winograd_input_transform()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]

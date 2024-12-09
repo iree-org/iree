@@ -15,6 +15,7 @@
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ArithToArmSME/ArithToArmSME.h"
 #include "mlir/Conversion/ArmSMEToLLVM/ArmSMEToLLVM.h"
 #include "mlir/Conversion/ArmSMEToSCF/ArmSMEToSCF.h"
@@ -818,6 +819,7 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
   }
 
   variantPassManager.addPass(createReconcileTranslationInfoPass());
+  variantPassManager.addPass(createLowerAffinePass());
   variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());
 
   // Run conversion to LLVM at `ModuleOp` granularity.
