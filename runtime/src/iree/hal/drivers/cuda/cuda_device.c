@@ -496,13 +496,13 @@ static iree_status_t iree_hal_cuda_device_create_internal(
   // Create memory pools first so that we can share them with the allocator.
   if (iree_status_is_ok(status) && device->supports_memory_pools) {
     status = iree_hal_cuda_memory_pools_initialize(
-        cuda_symbols, cu_device, &params->memory_pools, host_allocator,
-        &device->memory_pools);
+        (iree_hal_device_t*)device, cuda_symbols, cu_device,
+        &params->memory_pools, host_allocator, &device->memory_pools);
   }
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_allocator_create(
-        cuda_symbols, cu_device, dispatch_stream,
+        (iree_hal_device_t*)device, cuda_symbols, cu_device, dispatch_stream,
         device->supports_memory_pools ? &device->memory_pools : NULL,
         host_allocator, &device->device_allocator);
   }

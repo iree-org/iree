@@ -59,11 +59,13 @@ static iree_status_t iree_hal_hip_create_memory_pool(
 }
 
 iree_status_t iree_hal_hip_memory_pools_initialize(
+    iree_hal_device_t* parent_device,
     const iree_hal_hip_dynamic_symbols_t* hip_symbols, hipDevice_t hip_device,
     hipCtx_t hip_context,
     const iree_hal_hip_memory_pooling_params_t* pooling_params,
     iree_allocator_t host_allocator,
     iree_hal_hip_memory_pools_t* IREE_RESTRICT out_pools) {
+  IREE_ASSERT_ARGUMENT(parent_device);
   IREE_ASSERT_ARGUMENT(hip_symbols);
   IREE_ASSERT_ARGUMENT(pooling_params);
   IREE_ASSERT_ARGUMENT(out_pools);
@@ -72,6 +74,7 @@ iree_status_t iree_hal_hip_memory_pools_initialize(
       z0, iree_hal_hip_set_context(hip_symbols, hip_context));
 
   memset(out_pools, 0, sizeof(*out_pools));
+  out_pools->parent_device = parent_device;
   out_pools->hip_symbols = hip_symbols;
   out_pools->host_allocator = host_allocator;
   out_pools->hip_context = hip_context;
@@ -267,14 +270,20 @@ iree_status_t iree_hal_hip_memory_pools_prepare_buffer(
   // NOTE: we don't provide a device allocator because we didn't allocate from
   // one and instead we use a release callback to perform the free if the user
   // doesn't dealloca the buffer.
-  iree_hal_buffer_t* buffer = NULL;
+  const iree_hal_buffer_placement_t placement = {
+      .device = pools->parent_device,
+      .queue_affinity = params.queue_affinity ? params.queue_affinity
+                                              : IREE_HAL_QUEUE_AFFINITY_ANY,
+      .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS,
+  };
   iree_hal_buffer_release_callback_t release_callback = {
       .fn = iree_hal_hip_async_buffer_release_callback,
       .user_data = pools,
   };
+  iree_hal_buffer_t* buffer = NULL;
   iree_status_t status = iree_hal_hip_buffer_wrap(
-      /*device_allocator=*/NULL, params.type, params.access, params.usage,
-      allocation_size, /*byte_offset=*/0,
+      placement, params.type, params.access, params.usage, allocation_size,
+      /*byte_offset=*/0,
       /*byte_length=*/allocation_size, IREE_HAL_HIP_BUFFER_TYPE_ASYNC,
       /*device_ptr*/ NULL, /*host_ptr=*/NULL, release_callback,
       pools->host_allocator, &buffer);

@@ -34,7 +34,7 @@ typedef enum iree_hal_hip_buffer_type_e {
 
 // Wraps a HIP allocation in an iree_hal_buffer_t.
 iree_status_t iree_hal_hip_buffer_wrap(
-    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_device_size_t byte_offset, iree_device_size_t byte_length,

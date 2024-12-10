@@ -19,7 +19,7 @@
 
 typedef struct iree_hal_webgpu_buffer_t {
   iree_hal_buffer_t base;
-  iree_hal_device_t* device;  // unowned
+  iree_allocator_t host_allocator;
   WGPUBuffer handle;
   bool is_mapped;
 } iree_hal_webgpu_buffer_t;
@@ -33,14 +33,12 @@ static iree_hal_webgpu_buffer_t* iree_hal_webgpu_buffer_cast(
 }
 
 iree_status_t iree_hal_webgpu_buffer_wrap(
-    iree_hal_device_t* device, iree_hal_allocator_t* device_allocator,
-    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
     WGPUBuffer handle, iree_allocator_t host_allocator,
     iree_hal_buffer_t** out_buffer) {
-  IREE_ASSERT_ARGUMENT(device);
-  IREE_ASSERT_ARGUMENT(device_allocator);
   IREE_ASSERT_ARGUMENT(handle);
   IREE_ASSERT_ARGUMENT(out_buffer);
   *out_buffer = NULL;
@@ -50,11 +48,11 @@ iree_status_t iree_hal_webgpu_buffer_wrap(
   iree_status_t status =
       iree_allocator_malloc(host_allocator, sizeof(*buffer), (void**)&buffer);
   if (iree_status_is_ok(status)) {
-    iree_hal_buffer_initialize(host_allocator, device_allocator, &buffer->base,
-                               allocation_size, byte_offset, byte_length,
-                               memory_type, allowed_access, allowed_usage,
+    iree_hal_buffer_initialize(placement, &buffer->base, allocation_size,
+                               byte_offset, byte_length, memory_type,
+                               allowed_access, allowed_usage,
                                &iree_hal_webgpu_buffer_vtable, &buffer->base);
-    buffer->device = device;
+    buffer->host_allocator = host_allocator;
     buffer->handle = handle;
     *out_buffer = &buffer->base;
   }
@@ -65,7 +63,7 @@ iree_status_t iree_hal_webgpu_buffer_wrap(
 
 static void iree_hal_webgpu_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   iree_hal_webgpu_buffer_t* buffer = iree_hal_webgpu_buffer_cast(base_buffer);
-  iree_allocator_t host_allocator = base_buffer->host_allocator;
+  iree_allocator_t host_allocator = buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   if (buffer->is_mapped) {
@@ -99,7 +97,7 @@ static iree_status_t iree_hal_webgpu_buffer_map_range(
   // Use wgpuBufferMapAsync directly to avoid this emulation.
   iree_hal_webgpu_buffer_t* buffer = iree_hal_webgpu_buffer_cast(base_buffer);
   return iree_hal_buffer_emulated_map_range(
-      buffer->device, base_buffer, mapping_mode, memory_access,
+      buffer->placement.device, base_buffer, mapping_mode, memory_access,
       local_byte_offset, local_byte_length, mapping);
 }
 
@@ -109,8 +107,8 @@ static iree_status_t iree_hal_webgpu_buffer_unmap_range(
   // WebGPU does not allow for synchronous buffer mapping.
   // Use wgpuBufferMapAsync directly to avoid this emulation.
   iree_hal_webgpu_buffer_t* buffer = iree_hal_webgpu_buffer_cast(base_buffer);
-  return iree_hal_buffer_emulated_unmap_range(buffer->device, base_buffer,
-                                              local_byte_offset,
+  return iree_hal_buffer_emulated_unmap_range(buffer->placement.device,
+                                              base_buffer, local_byte_offset,
                                               local_byte_length, mapping);
 }
 

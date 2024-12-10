@@ -26,14 +26,14 @@ extern "C" {
 // This will eventually be replaced with HAL device APIs for controlling the
 // reserve/commit/decommit/release behavior of the virtual/physical storage.
 iree_status_t iree_hal_vulkan_sparse_buffer_create_bound_sync(
-    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
     iree::hal::vulkan::VkDeviceHandle* logical_device, VkQueue queue,
     VkBuffer handle, VkMemoryRequirements requirements,
     uint32_t memory_type_index, VkDeviceSize max_allocation_size,
-    iree_hal_buffer_t** out_buffer);
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
 
 #ifdef __cplusplus
 }  // extern "C"
