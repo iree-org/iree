@@ -15,7 +15,8 @@ iree_lit_test_suite(
     lit
   SRCS
     "default_tuning_specs_amdgpu.mlir"
-    "gpu_lower_to_ukernels.mlir"
+    "gpu_select_ukernels_gfx908.mlir"
+    "gpu_select_ukernels_gfx942.mlir"
     "lowering_strategy_from_tuning_spec.mlir"
     "ukernel_pipeline_transform.mlir"
   TOOLS
