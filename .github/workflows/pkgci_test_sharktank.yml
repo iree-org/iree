@@ -74,6 +74,6 @@ jobs:
               -rA \
               --log-cli-level=info \
               --override-ini=xfail_strict=false \
-              -m ${{ matrix.target }}
+              -m ${{ matrix.target }} \
               --timeout=120 \
               --durations=0
