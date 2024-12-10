@@ -1,7 +1,8 @@
-// RUN: iree-opt --split-input-file --iree-stream-encode-host-tensors --iree-experimental-packed-i1-storage %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-encode-host-tensors %s | FileCheck %s
 
+#packed = #iree_encoding.packed_storage
 func.func @unaligned_i1_size() -> index {
-  %0 = stream.tensor.sizeof tensor<12xi1> : index
+  %0 = stream.tensor.sizeof tensor<12xi1, #packed> : index
   return %0 : index
 }
 // CHECK: func @unaligned_i1_size() -> index {
@@ -10,8 +11,9 @@ func.func @unaligned_i1_size() -> index {
 
 // -----
 
+#packed = #iree_encoding.packed_storage
 func.func @aligned_i1_size() -> index {
-  %0 = stream.tensor.sizeof tensor<24xi1> : index
+  %0 = stream.tensor.sizeof tensor<24xi1, #packed> : index
   return %0 : index
 }
 

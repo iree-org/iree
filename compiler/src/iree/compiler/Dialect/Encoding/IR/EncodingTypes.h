@@ -38,6 +38,10 @@ namespace mlir::iree_compiler::IREE::Encoding {
 /// Otherwise, returns null.
 EncodingAttr getEncodingAttr(RankedTensorType type);
 
+/// Returns the packed_storage attribute from the type if there is one.
+/// Otherwise, returns null.
+PackedStorageAttr getPackedStorageAttr(RankedTensorType type);
+
 /// Returns the ContractionDimensions for the encoding user_indexing_maps.
 FailureOr<linalg::ContractionDimensions>
 getEncodingContractionDims(EncodingAttr encoding);

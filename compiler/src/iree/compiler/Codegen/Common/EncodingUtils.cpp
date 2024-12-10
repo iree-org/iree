@@ -83,7 +83,8 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
   }
   auto newEncoding = IREE::Encoding::EncodingAttr::get(
       context, operandIndex, encoding.getOpType().getValue(),
-      encoding.getElementTypesArray(), maps, newBcastMap, newRoundDimsTo);
+      encoding.getElementTypesArray(), maps, newBcastMap, newRoundDimsTo,
+      encoding.getLayouts());
   return RankedTensorType::get(newShape, elemType, newEncoding);
 }
 

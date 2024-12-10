@@ -15,15 +15,9 @@
 
 namespace mlir::iree_compiler {
 
-llvm::cl::opt<bool> clEnableI1Support(
-    "iree-experimental-packed-i1-storage",
-    llvm::cl::desc(
-        "Experimental feature: enable i1 data type support in codegen"),
-    llvm::cl::init(false));
-
-bool needToPackSubByteElementBitWidth(unsigned bitWidth) {
+bool needToPackSubByteElementBitWidth(unsigned bitWidth, bool isI1PackedStorage) {
   // Enable i1 support if requested.
-  if (clEnableI1Support && bitWidth == 1) {
+  if (isI1PackedStorage && bitWidth == 1) {
     return true;
   }
   // Require the original bit width to be some power of two for now to avoid
@@ -35,10 +29,12 @@ bool needToPackSubByteElementBitWidth(unsigned bitWidth) {
 
 bool needToPackSubByteElements(RankedTensorType shapedType) {
   unsigned bitWidth = IREE::Util::getTypeBitWidth(shapedType.getElementType());
-  return needToPackSubByteElementBitWidth(bitWidth);
+  auto encoding = IREE::Encoding::getEncodingAttr(shapedType);
+  bool isI1PackedStorage = encoding && encoding.i1PackedStorage();
+  return needToPackSubByteElementBitWidth(bitWidth, isI1PackedStorage);
 }
 
-Type legalizeStorageElementType(Type elementType) {
+Type legalizeStorageElementType(Type elementType, bool isI1PackedStorage) {
   // Only handle integers; floats in MLIR all have aligned widths (today).
   auto intType = dyn_cast<IntegerType>(elementType);
   if (!intType)
@@ -46,7 +42,7 @@ Type legalizeStorageElementType(Type elementType) {
 
   // For sub-byte elements, default to pack them into bytes.
   unsigned bitWidth = intType.getWidth();
-  if (needToPackSubByteElementBitWidth(bitWidth))
+  if (needToPackSubByteElementBitWidth(bitWidth, isI1PackedStorage))
     return elementType;
 
   // Otherwise, extend them to the next power-of-two bit width.
@@ -62,13 +58,16 @@ Value calculateStorageElementCountInBytes(Location loc,
                                           RankedTensorType shapedType,
                                           ValueRange dynamicDims,
                                           OpBuilder &builder) {
+  auto encoding = IREE::Encoding::getEncodingAttr(shapedType);
+  bool packedStorage = IREE::Encoding::getPackedStorageAttr(shapedType) != nullptr;
   Type alignedElementType =
-      legalizeStorageElementType(shapedType.getElementType());
+      legalizeStorageElementType(shapedType.getElementType(),
+                                 packedStorage);
   unsigned elementBits = IREE::Util::getTypeBitWidth(alignedElementType);
 
   // Calculate all static dims first, if any.
   int64_t staticCount = 1;
-  if (!needToPackSubByteElementBitWidth(elementBits)) {
+  if (!needToPackSubByteElementBitWidth(elementBits, packedStorage)) {
     staticCount *= IREE::Util::getRoundedElementByteWidth(alignedElementType);
   }
 
@@ -76,7 +75,6 @@ Value calculateStorageElementCountInBytes(Location loc,
   // computation an be much simpler.
   SmallVector<int64_t> paddedShape(shapedType.getShape());
   SmallVector<Value> paddedDynamicDims(dynamicDims.begin(), dynamicDims.end());
-  auto encoding = IREE::Encoding::getEncodingAttr(shapedType);
   if (encoding && !encoding.getRoundDimsToArray().empty()) {
     auto roundDimsTo = encoding.getRoundDimsToArray();
     FailureOr<linalg::ContractionDimensions> cDims =
@@ -121,13 +119,13 @@ Value calculateStorageElementCountInBytes(Location loc,
     value = builder.createOrFold<arith::MulIOp>(loc, value, dim);
   }
   // Sub-byte packing requires putting multiple elements in the same byte.
-  if (needToPackSubByteElementBitWidth(elementBits)) {
+  if (needToPackSubByteElementBitWidth(elementBits, packedStorage)) {
     assert(8 % elementBits == 0);
     unsigned byteElements = 8 / elementBits;
     // TODO(antiagainst): We may want to emit runtime check to make sure this is
     // divisible.
     auto divisor = builder.create<arith::ConstantIndexOp>(loc, byteElements);
-    if (!clEnableI1Support && paddedDynamicDims.empty() &&
+    if (!packedStorage && paddedDynamicDims.empty() &&
         (staticCount * elementBits) % 8 != 0) {
       return nullptr;
     }
@@ -145,8 +143,11 @@ Value calculateStorageElementOffsetInBytes(Location loc,
       legalizeStorageElementType(originalType.getElementType());
   unsigned elementBits = IREE::Util::getTypeBitWidth(alignedElementType);
 
+  auto encoding = IREE::Encoding::getEncodingAttr(originalType);
+  bool isI1PackedStorage = encoding && encoding.i1PackedStorage();
+
   // Sub-byte packing requires putting multiple elements in the same byte.
-  if (needToPackSubByteElementBitWidth(elementBits)) {
+  if (needToPackSubByteElementBitWidth(elementBits, isI1PackedStorage)) {
     Value byteElements =
         builder.create<arith::ConstantIndexOp>(loc, 8 / elementBits);
     // TODO(antiagainst): We may want to emit runtime check to make sure this is
