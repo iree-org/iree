@@ -93,6 +93,8 @@
 #include "iree/base/tracing.h"         // IWYU pragma: export
 #include "iree/base/wait_source.h"     // IWYU pragma: export
 
+#error "DO NOT SUBMIT - testing job failure alerting"
+
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
