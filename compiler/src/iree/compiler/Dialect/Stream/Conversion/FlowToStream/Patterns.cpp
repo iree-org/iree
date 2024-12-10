@@ -142,6 +142,30 @@ struct ConvertTensorCastLikeOp
   }
 };
 
+template <typename CastOpTy>
+struct ConvertTensorCastLike1toNOp
+    : public AffinityAwareConversionPattern<CastOpTy> {
+  using AffinityAwareConversionPattern<
+      CastOpTy>::AffinityAwareConversionPattern;
+  LogicalResult
+  matchAndRewrite(CastOpTy op, typename CastOpTy::OneToNOpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto resultAffinityAttr = this->lookupResultAffinity(op.getResult());
+    auto source = this->transferTensorOperand(op.getLoc(), op.getSource(),
+                                              adaptor.getSource(),
+                                              resultAffinityAttr, rewriter);
+    auto resultSize =
+        buildResultSizeOf(op.getLoc(), op.getResult(), op.getResultDims(),
+                          resultAffinityAttr, rewriter);
+    auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
+    rewriter.replaceOpWithNewOp<IREE::Stream::TensorCloneOp>(
+        op, unknownType, source.resource, op.getSource().getType(),
+        op.getSourceDims(), source.resourceSize, op.getResult().getType(),
+        adaptor.getResultDims(), resultSize, resultAffinityAttr);
+    return success();
+  }
+};
+
 struct ConvertTensorAllocaOp
     : public AffinityOpConversionPattern<IREE::Flow::TensorAllocaOp> {
   using AffinityOpConversionPattern::AffinityOpConversionPattern;
@@ -713,14 +737,21 @@ struct ConvertCollectiveSendRecvOp
 };
 
 struct ConvertDispatchOp
-    : public AffinityOpConversionPattern<IREE::Flow::DispatchOp> {
-  using AffinityOpConversionPattern::AffinityOpConversionPattern;
+    : public AffinityOp1toNConversionPattern<IREE::Flow::DispatchOp> {
+  using AffinityOp1toNConversionPattern::AffinityOp1toNConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
-      IREE::Flow::DispatchOp op, OpAdaptor adaptor,
+      IREE::Flow::DispatchOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
       ConversionPatternRewriter &rewriter) const override {
     // Zero is going to be used for each operand to start.
     auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
+    SmallVector<Value> adaptorOperands;
+    for (auto argumentRange: adaptor.getArguments()) {
+      for (auto argument: argumentRange) {
+        adaptorOperands.push_back(argument);
+        break;
+      }
+    }
 
     // Query and resolve all operands and their sizes.
     SmallVector<Value> dispatchOperands;
@@ -730,7 +761,7 @@ struct ConvertDispatchOp
     SmallVector<Value> dispatchOperandLengths;
     SmallVector<Value> operandSizes;
     for (auto [oldOperand, newOperand] :
-         llvm::zip_equal(op.getArguments(), adaptor.getArguments())) {
+         llvm::zip_equal(op.getArguments(), adaptorOperands)) {
       if (llvm::isa<ShapedType>(oldOperand.getType())) {
         auto newOperandCast =
             transferTensorOperand(op.getLoc(), oldOperand, newOperand,
@@ -774,7 +805,7 @@ struct ConvertDispatchOp
     }
 
     auto newOp = rewriter.replaceOpWithNewOp<IREE::Stream::AsyncDispatchOp>(
-        op, resultTypes, adaptor.getWorkload(), adaptor.getEntryPointsAttr(),
+        op, resultTypes, getOneToOneAdaptorOperands(adaptor.getWorkload()), adaptor.getEntryPointsAttr(),
         dispatchOperands, dispatchOperandSizes, dispatchOperandOffsets,
         dispatchOperandEnds, dispatchOperandLengths, resultSizes,
         adaptor.getTiedOperandsAttr(), executionAffinityAttr);

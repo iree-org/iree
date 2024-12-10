@@ -122,10 +122,10 @@ struct ConvertTensorImportOp
 // %1 = stream.tensor.export %0 : tensor<4xf32> in !stream.resource<*> ->
 //                                !hal.buffer_view
 struct ConvertTensorExportOp
-    : public AffinityOpConversionPattern<IREE::HAL::TensorExportOp> {
-  using AffinityOpConversionPattern::AffinityOpConversionPattern;
+    : public AffinityOp1toNConversionPattern<IREE::HAL::TensorExportOp> {
+  using AffinityOp1toNConversionPattern::AffinityOp1toNConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
-      IREE::HAL::TensorExportOp op, OpAdaptor adaptor,
+      IREE::HAL::TensorExportOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
       ConversionPatternRewriter &rewriter) const override {
     auto sourceType = op.getSourceEncoding();
@@ -134,14 +134,19 @@ struct ConvertTensorExportOp
         !llvm::isa<IREE::HAL::BufferViewType>(targetType)) {
       return rewriter.notifyMatchFailure(op, "unsupported HAL cast conversion");
     }
+    Value exportSource;
+    for (auto source: adaptor.getSource()) {
+      if (isa<mlir::UnrealizedConversionCastOp>(source.getDefiningOp()))
+        exportSource = source;
+    }
 
     auto source =
-        transferTensorOperand(op.getLoc(), op.getSource(), adaptor.getSource(),
+        transferTensorOperand(op.getLoc(), op.getSource(), exportSource,
                               executionAffinityAttr, rewriter);
 
     // Exporting a produced value - transfer our source value to an externally
     // usable resource and directly export it. This will cause an allocation.
-    auto exportSource = adaptor.getSource();
+    // auto exportSource = adaptor.getSource();
     auto externalType = rewriter.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::External);
     if (source.resource.getType() != externalType) {
@@ -154,7 +159,7 @@ struct ConvertTensorExportOp
     // Export (stream resource to buffer view).
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorExportOp>(
         op, targetType, exportSource, TypeAttr::get(sourceType),
-        adaptor.getSourceDims(), source.resourceSize, executionAffinityAttr);
+        getOneToOneAdaptorOperands(adaptor.getSourceDims()), source.resourceSize, executionAffinityAttr);
     return success();
   }
 };

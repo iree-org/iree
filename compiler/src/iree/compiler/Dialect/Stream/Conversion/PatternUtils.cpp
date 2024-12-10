@@ -56,13 +56,6 @@ resolveTensorOperand(Location loc, Value convertedOperand, OpBuilder &builder) {
     return std::make_pair(convertedOperand,
                           builder.createOrFold<IREE::Stream::ResourceSizeOp>(
                               loc, builder.getIndexType(), convertedOperand));
-  } else if (auto castOp =
-                 convertedOperand
-                     .getDefiningOp<mlir::UnrealizedConversionCastOp>()) {
-    // We only have a single tensor type conversion and it expands to (resource,
-    // size) so that's all we look for here.
-    assert(castOp.getNumOperands() == 2 && "expected (resource, size)");
-    return std::make_pair(castOp.getOperand(0), castOp.getOperand(1));
   }
   assert(false &&
          "unexpected operand; expected either a IREE::Stream::ResourceType or "

@@ -364,11 +364,20 @@ struct OptimizationBarrierOpConversion
     : public AffinityAwareConversionPattern<IREE::Util::OptimizationBarrierOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
-  matchAndRewrite(IREE::Util::OptimizationBarrierOp op, OpAdaptor adaptor,
+  matchAndRewrite(IREE::Util::OptimizationBarrierOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    SmallVector<Value> newOperands;
+    SmallVector<Value> newOperands, adaptorOperands;
+    // Get the stream.resource, first element, out of the `UnrealizedConversionCastOp`.
+    for (auto operand: adaptor.getOperands()) {
+      for (auto operandValue : operand) {
+        if (isa<mlir::UnrealizedConversionCastOp>(operandValue.getDefiningOp())) {
+          adaptorOperands.push_back(operandValue);
+          break;
+        }
+      }
+    }
     for (auto [originalOperand, convertedOperand] :
-         llvm::zip_equal(op.getOperands(), adaptor.getOperands())) {
+         llvm::zip_equal(op.getOperands(), adaptorOperands)) {
       if (isa<TensorType>(convertedOperand.getType())) {
         newOperands.push_back(resolveTensorOperand(op.getLoc(), originalOperand,
                                                    convertedOperand, rewriter)

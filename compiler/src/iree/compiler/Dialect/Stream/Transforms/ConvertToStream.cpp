@@ -261,24 +261,24 @@ struct ConvertToStreamPass final
           resultTypes.push_back(indexType);
           return success();
         });
-    typeConverter.addArgumentMaterialization([](OpBuilder &builder,
-                                                TensorType resultType,
-                                                ValueRange inputs,
-                                                Location loc) -> Value {
-      assert(inputs.size() >= 2);
-      auto resourceValue = inputs[0];
-      auto resourceSize = inputs[1];
-      assert(inputs.size() == 2 && "expecting 2 operands (resource + size)");
-      Value cast = builder
-                       .create<IREE::Stream::AsyncTransferOp>(
-                           loc, resourceValue.getType(), resourceValue,
-                           resourceSize, resourceSize,
-                           /*source_affinity=*/nullptr,
-                           /*result_affinity=*/nullptr)
-                       .getResult();
-      return builder.create<UnrealizedConversionCastOp>(loc, resultType, cast)
-          .getResult(0);
-    });
+    // typeConverter.addArgumentMaterialization([](OpBuilder &builder,
+    //                                             TensorType resultType,
+    //                                             ValueRange inputs,
+    //                                             Location loc) -> Value {
+    //   assert(inputs.size() >= 2);
+    //   auto resourceValue = inputs[0];
+    //   auto resourceSize = inputs[1];
+    //   assert(inputs.size() == 2 && "expecting 2 operands (resource + size)");
+    //   Value cast = builder
+    //                    .create<IREE::Stream::AsyncTransferOp>(
+    //                        loc, resourceValue.getType(), resourceValue,
+    //                        resourceSize, resourceSize,
+    //                        /*source_affinity=*/nullptr,
+    //                        /*result_affinity=*/nullptr)
+    //                    .getResult();
+    //   return builder.create<UnrealizedConversionCastOp>(loc, resultType, cast)
+    //       .getResult(0);
+    // });
 
     populateUtilConversionPatterns(context, conversionTarget, typeConverter,
                                    patterns);
