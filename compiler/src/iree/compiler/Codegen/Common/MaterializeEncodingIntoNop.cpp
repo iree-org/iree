@@ -38,9 +38,6 @@ struct MaterializeEncodingIntoNopPass final
     MLIRContext *context = &getContext();
     auto operation = getOperation();
 
-    auto materializeEncodingFn = [](RankedTensorType,
-                                    IREE::HAL::ExecutableTargetAttr)
-        -> FailureOr<MaterializeEncodingInfo> { return failure(); };
     auto materializeEncodingValueFn =
         [](RankedTensorType, OpBuilder &,
            Location) -> FailureOr<MaterializeEncodingValueInfo> {
@@ -49,7 +46,6 @@ struct MaterializeEncodingIntoNopPass final
 
     RewritePatternSet materializeEncodingPattern(context);
     MaterializeEncodingTypeConverter typeConverter(
-        materializeEncodingFn, IREE::HAL::ExecutableTargetAttr(),
         /*transposeNarrowN=*/false,
         IREE::Codegen::EncodingNopLayoutAttr::get(context));
     MaterializeEncodingConversionTarget target(*context);

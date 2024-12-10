@@ -37,12 +37,6 @@ namespace mlir::iree_compiler {
 using IREE::Codegen::MaterializeEncodingInfo;
 using IREE::Codegen::TileSwizzle;
 
-static FailureOr<MaterializeEncodingInfo>
-materializeEncodingForTarget(RankedTensorType tensorType,
-                             IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return failure();
-}
-
 namespace {
 
 // TODO(hanchung): Delete this pass and rely on tensor-based analysis to
@@ -297,7 +291,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
       gpuTargetAttr = getCLGPUTarget(ctx);
     }
     MaterializeEncodingTypeConverter typeConverter(
-        materializeEncodingForTarget, targetAttr, /*transposeNarrowN=*/false,
+        /*transposeNarrowN=*/false,
         cast<IREE::Codegen::LayoutAttrInterface>(
             IREE::GPU::GPUEncodingLayoutAttr::get(ctx, gpuTargetAttr)));
     MaterializeEncodingConversionTarget target(*ctx);
