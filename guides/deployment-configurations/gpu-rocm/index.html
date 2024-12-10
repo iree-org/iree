@@ -3929,16 +3929,15 @@ SDK for
 <a href="https://rocm.docs.amd.com/en/latest/deploy/windows/quick_start.html">Windows</a>
 or <a href="https://rocm.docs.amd.com/en/latest/deploy/linux/quick_start.html">Linux</a>.</p>
 <h3 id="get-the-iree-compiler">Get the IREE compiler<a class="headerlink" href="#get-the-iree-compiler" title="Permanent link">link</a></h3>
-<h4 id="download-the-compiler-from-a-release"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m8.878.392 5.25 3.045c.54.314.872.89.872 1.514v6.098a1.75 1.75 0 0 1-.872 1.514l-5.25 3.045a1.75 1.75 0 0 1-1.756 0l-5.25-3.045A1.75 1.75 0 0 1 1 11.049V4.951c0-.624.332-1.201.872-1.514L7.122.392a1.75 1.75 0 0 1 1.756 0ZM7.875 1.69l-4.63 2.685L8 7.133l4.755-2.758-4.63-2.685a.248.248 0 0 0-.25 0ZM2.5 5.677v5.372c0 .09.047.171.125.216l4.625 2.683V8.432Zm6.25 8.271 4.625-2.683a.25.25 0 0 0 .125-.216V5.677L8.75 8.432Z"/></svg></span> Download the compiler from a release<a class="headerlink" href="#download-the-compiler-from-a-release" title="Permanent link">link</a></h4>
-<p>Python packages are regularly published to
-<a href="https://pypi.org/user/google-iree-pypi-deploy/">PyPI</a>. See the
+<h4 id="download-the-compiler-from-a-release"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg></span> Download the compiler from a release<a class="headerlink" href="#download-the-compiler-from-a-release" title="Permanent link">link</a></h4>
+<p>Python packages are distributed through multiple channels. See the
 <a href="../../../reference/bindings/python/">Python Bindings</a> page for more details.
-The core <code>iree-base-compiler</code> package includes the ROCm compiler:</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Stable releases</label><label for="__tabbed_1_2"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 14h-2V9h2m0 9h-2v-2h2M1 21h22L12 2 1 21Z"/></svg></span> Nightly releases</label></div>
+The core <a href="https://pypi.org/project/iree-base-compiler/"><code>iree-base-compiler</code></a>
+package includes the ROCm compiler:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m8.878.392 5.25 3.045c.54.314.872.89.872 1.514v6.098a1.75 1.75 0 0 1-.872 1.514l-5.25 3.045a1.75 1.75 0 0 1-1.756 0l-5.25-3.045A1.75 1.75 0 0 1 1 11.049V4.951c0-.624.332-1.201.872-1.514L7.122.392a1.75 1.75 0 0 1 1.756 0ZM7.875 1.69l-4.63 2.685L8 7.133l4.755-2.758-4.63-2.685a.248.248 0 0 0-.25 0ZM2.5 5.677v5.372c0 .09.047.171.125.216l4.625 2.683V8.432Zm6.25 8.271 4.625-2.683a.25.25 0 0 0 .125-.216V5.677L8.75 8.432Z"/></svg></span> Stable releases</label><label for="__tabbed_1_2"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5 5.782V2.5h-.25a.75.75 0 0 1 0-1.5h6.5a.75.75 0 0 1 0 1.5H11v3.282l3.666 5.76C15.619 13.04 14.543 15 12.767 15H3.233c-1.776 0-2.852-1.96-1.899-3.458Zm-2.4 6.565a.75.75 0 0 0 .633 1.153h9.534a.75.75 0 0 0 .633-1.153L12.225 10.5h-8.45ZM9.5 2.5h-3V6c0 .143-.04.283-.117.403L4.73 9h6.54L9.617 6.403A.746.746 0 0 1 9.5 6Z"/></svg></span> Nightly releases</label><label for="__tabbed_1_3"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.493 2.493 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Zm-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Zm8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z"/></svg></span> Development packages</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<p>Stable release packages are
-<a href="https://pypi.org/user/google-iree-pypi-deploy/">published to PyPI</a>.</p>
+<p>Stable release packages are <a href="https://pypi.org/">published to PyPI</a>.</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-base-compiler
 </code></pre></div>
 </div>
@@ -3948,6 +3947,20 @@ The core <code>iree-base-compiler</code> package includes the ROCm compiler:</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--find-links<span class="w"> </span>https://iree.dev/pip-release-links.html<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--upgrade<span class="w"> </span>--pre<span class="w"> </span>iree-base-compiler
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>Development packages are built at every commit and on pull requests, for
+limited configurations.</p>
+<p>On <strong>Linux</strong> with <strong>Python 3.11</strong>, development packages can be installed
+into a <a href="https://docs.python.org/3/library/venv.html">Python <code>venv</code></a> using
+the
+<a href="https://github.com/iree-org/iree/blob/main/build_tools/pkgci/setup_venv.py"><code>build_tools/pkgci/setup_venv.py</code></a>
+script:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Install packages from a specific commit ref.</span>
+<span class="c1"># See also the `--fetch-latest-main` and `--fetch-gh-workflow` options.</span>
+python<span class="w"> </span>./build_tools/pkgci/setup_venv.py<span class="w"> </span>/tmp/.venv<span class="w"> </span>--fetch-git-ref<span class="o">=</span>8230f41d
+<span class="nb">source</span><span class="w"> </span>/tmp/.venv/bin/activate
 </code></pre></div>
 </div>
 </div>
@@ -3988,16 +4001,15 @@ may want to include this path in your system's <code>PATH</code> environment var
 </span><span class="go">  local-sync://</span>
 <span class="go">  local-task://</span>
 </code></pre></div>
-<h4 id="download-the-runtime-from-a-release"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m8.878.392 5.25 3.045c.54.314.872.89.872 1.514v6.098a1.75 1.75 0 0 1-.872 1.514l-5.25 3.045a1.75 1.75 0 0 1-1.756 0l-5.25-3.045A1.75 1.75 0 0 1 1 11.049V4.951c0-.624.332-1.201.872-1.514L7.122.392a1.75 1.75 0 0 1 1.756 0ZM7.875 1.69l-4.63 2.685L8 7.133l4.755-2.758-4.63-2.685a.248.248 0 0 0-.25 0ZM2.5 5.677v5.372c0 .09.047.171.125.216l4.625 2.683V8.432Zm6.25 8.271 4.625-2.683a.25.25 0 0 0 .125-.216V5.677L8.75 8.432Z"/></svg></span> Download the runtime from a release<a class="headerlink" href="#download-the-runtime-from-a-release" title="Permanent link">link</a></h4>
-<p>Python packages are regularly published to
-<a href="https://pypi.org/user/google-iree-pypi-deploy/">PyPI</a>. See the
+<h4 id="download-the-runtime-from-a-release"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg></span> Download the runtime from a release<a class="headerlink" href="#download-the-runtime-from-a-release" title="Permanent link">link</a></h4>
+<p>Python packages are distributed through multiple channels. See the
 <a href="../../../reference/bindings/python/">Python Bindings</a> page for more details.
-The core <code>iree-base-runtime</code> package includes the HIP HAL driver:</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Stable releases</label><label for="__tabbed_2_2"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 14h-2V9h2m0 9h-2v-2h2M1 21h22L12 2 1 21Z"/></svg></span> Nightly releases</label></div>
+The core <a href="https://pypi.org/project/iree-base-runtime/"><code>iree-base-runtime</code></a>
+package includes the HIP HAL driver:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:3"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><input id="__tabbed_2_3" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m8.878.392 5.25 3.045c.54.314.872.89.872 1.514v6.098a1.75 1.75 0 0 1-.872 1.514l-5.25 3.045a1.75 1.75 0 0 1-1.756 0l-5.25-3.045A1.75 1.75 0 0 1 1 11.049V4.951c0-.624.332-1.201.872-1.514L7.122.392a1.75 1.75 0 0 1 1.756 0ZM7.875 1.69l-4.63 2.685L8 7.133l4.755-2.758-4.63-2.685a.248.248 0 0 0-.25 0ZM2.5 5.677v5.372c0 .09.047.171.125.216l4.625 2.683V8.432Zm6.25 8.271 4.625-2.683a.25.25 0 0 0 .125-.216V5.677L8.75 8.432Z"/></svg></span> Stable releases</label><label for="__tabbed_2_2"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5 5.782V2.5h-.25a.75.75 0 0 1 0-1.5h6.5a.75.75 0 0 1 0 1.5H11v3.282l3.666 5.76C15.619 13.04 14.543 15 12.767 15H3.233c-1.776 0-2.852-1.96-1.899-3.458Zm-2.4 6.565a.75.75 0 0 0 .633 1.153h9.534a.75.75 0 0 0 .633-1.153L12.225 10.5h-8.45ZM9.5 2.5h-3V6c0 .143-.04.283-.117.403L4.73 9h6.54L9.617 6.403A.746.746 0 0 1 9.5 6Z"/></svg></span> Nightly releases</label><label for="__tabbed_2_3"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.493 2.493 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Zm-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Zm8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z"/></svg></span> Development packages</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<p>Stable release packages are
-<a href="https://pypi.org/user/google-iree-pypi-deploy/">published to PyPI</a>.</p>
+<p>Stable release packages are <a href="https://pypi.org/">published to PyPI</a>.</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-base-runtime
 </code></pre></div>
 </div>
@@ -4007,6 +4019,20 @@ The core <code>iree-base-runtime</code> package includes the HIP HAL driver:</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--find-links<span class="w"> </span>https://iree.dev/pip-release-links.html<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--upgrade<span class="w"> </span>--pre<span class="w"> </span>iree-base-runtime
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>Development packages are built at every commit and on pull requests, for
+limited configurations.</p>
+<p>On <strong>Linux</strong> with <strong>Python 3.11</strong>, development packages can be installed
+into a <a href="https://docs.python.org/3/library/venv.html">Python <code>venv</code></a> using
+the
+<a href="https://github.com/iree-org/iree/blob/main/build_tools/pkgci/setup_venv.py"><code>build_tools/pkgci/setup_venv.py</code></a>
+script:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Install packages from a specific commit ref.</span>
+<span class="c1"># See also the `--fetch-latest-main` and `--fetch-gh-workflow` options.</span>
+python<span class="w"> </span>./build_tools/pkgci/setup_venv.py<span class="w"> </span>/tmp/.venv<span class="w"> </span>--fetch-git-ref<span class="o">=</span>8230f41d
+<span class="nb">source</span><span class="w"> </span>/tmp/.venv/bin/activate
 </code></pre></div>
 </div>
 </div>

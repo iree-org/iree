@@ -4082,7 +4082,7 @@ for memory allocation and kernel lauches as instructed by the program; the other
 for issue host callback functions after dispatched command buffers completes.
 See <a href="#synchronization">synchronization</a> section regarding the details.</p>
 <h4 id="async-allocation">Async allocation<a class="headerlink" href="#async-allocation" title="Permanent link">link</a></h4>
-<p>The CUDA HAL drivers supports async allocation
+<p>The CUDA HAL driver supports async allocation
 (<code>iree_hal_device_queue_alloca()</code> and <code>iree_hal_device_queue_dealloca()</code>)
 via <a href="https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__MALLOC__ASYNC.html#group__CUDA__MALLOC__ASYNC">CUDA stream ordered memory allocation</a>.</p>
 <p>The <code>async_allocations</code> in the <code>iree_hal_cuda_device_params_t</code> struct allows
