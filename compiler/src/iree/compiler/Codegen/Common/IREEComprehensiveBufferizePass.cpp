@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -103,6 +104,7 @@ public:
                 bufferization::BufferizationDialect,
                 func::FuncDialect,
                 gpu::GPUDialect,
+                IREE::Codegen::IREECodegenDialect,
                 IREE::Flow::FlowDialect,
                 IREE::LinalgExt::IREELinalgExtDialect,
                 IREE::Util::UtilDialect,
