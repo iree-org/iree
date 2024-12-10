@@ -105,7 +105,8 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
         transposeNarrowN ? transposeIfNarrowNResult(type) : type;
     FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
         getEncodingInfo(tensorType);
-    if (failed(maybeEncodingInfo)) {
+    if (failed(maybeEncodingInfo) ||
+        IREE::Codegen::isIdentityLayout(maybeEncodingInfo.value())) {
       return dropEncoding(type);
     }
     auto encodingInfo = *maybeEncodingInfo;

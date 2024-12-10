@@ -539,7 +539,7 @@ lowerContractionOpWithEncoding(OpBuilder &builder, linalg::LinalgOp linalgOp,
       getEncodingInfo(cast<RankedTensorType>(linalgOp->getResultTypes()[0]));
 
   Operation *result;
-  if (failed(encodingInfo)) {
+  if (failed(encodingInfo) || isIdentityLayout(encodingInfo.value())) {
     result = dropEncodingAndCloneOp(builder, linalgOp,
                                     operands.take_front(inputs.size()),
                                     operands.drop_front(inputs.size()));

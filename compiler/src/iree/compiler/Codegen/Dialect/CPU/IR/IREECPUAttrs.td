@@ -15,6 +15,25 @@ include "mlir/IR/AttrTypeBase.td"
 // iree_cpu.encoding_layout_attr
 //===----------------------------------------------------------------------===//
 
+def IREECPU_CPUEncodingLayoutAttr :
+    AttrDef<IREECPU_Dialect, "CPUEncodingLayout"> {
+  let mnemonic = "cpu_encoding_layout";
+  let summary = "The encoding layout attribute for CPU backends.";
+  let description = [{
+    This attribute can implement any layout interface methods for data-tiling,
+    e.g., Codegen::LayoutAttrInterface, etc. They are implemented through
+    external model mechanism See the implementation in
+    compiler/Codegen/ExternalInterfaces/*.
+  }];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let parameters = (ins
+    OptionalParameter<"DictionaryAttr", "Executable target configuration. It is "
+    "expected to be used in a pass scope, but not the final IR output.">:$configuration
+  );
+}
+
 def IREECPU_VMVXEncodingLayoutAttr :
     AttrDef<IREECPU_Dialect, "VMVXEncodingLayout"> {
   let mnemonic = "vmvx_encoding_layout";

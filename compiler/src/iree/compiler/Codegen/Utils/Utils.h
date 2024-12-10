@@ -71,19 +71,18 @@ bool isROCMBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 // is enabled at all.
 bool hasUkernel(Attribute attr, StringRef ukernelName = "");
 
-/// Returns the CPU target features associated with the `targetAttr`, if set.
-std::optional<StringRef>
-getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr);
+/// Returns the CPU target features associated with the `attr`, if found.
+std::optional<StringRef> getCpuFeatures(Attribute attr);
 
-/// Returns true if `targetAttr` has `feature` in its CPU features.
-bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature);
+/// Returns true if `attr` has `feature` in its CPU features.
+bool hasFeature(Attribute attr, StringRef feature);
 
-// Architecture identification.
-bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr);
-bool isX86_64(IREE::HAL::ExecutableTargetAttr targetAttr);
-bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr);
-bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr);
-bool isRISCV32(IREE::HAL::ExecutableTargetAttr targetAttr);
+/// Architecture identification.
+bool isX86(Attribute attr);
+bool isX86_64(Attribute attr);
+bool isAArch64(Attribute attr);
+bool isRISCV(Attribute attr);
+bool isRISCV32(Attribute attr);
 
 /// Checks if a tensor value is generated from a read-only object, like
 /// and interface binding with read-only attribute or from an `arith.constant`

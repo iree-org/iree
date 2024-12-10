@@ -226,11 +226,11 @@ bool hasUkernel(Attribute attr, StringRef ukernelName) {
   return false;
 }
 
-std::optional<StringRef>
-getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  auto cpuFeatures = getConfigStringAttr(targetAttr, "cpu_features");
-  if (!cpuFeatures)
+std::optional<StringRef> getCpuFeatures(Attribute attr) {
+  auto cpuFeatures = getConfigStringAttr(attr, "cpu_features");
+  if (!cpuFeatures) {
     return std::nullopt;
+  }
   return cpuFeatures->getValue();
 }
 
@@ -238,8 +238,8 @@ getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr) {
 // features in the future, we may want to consider a persistent state to carry
 // over processed HAL information or keeping the TTI instance alive and query
 // subtarget features data structure.
-bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature) {
-  std::optional<StringRef> features = getCpuFeatures(targetAttr);
+bool hasFeature(Attribute attr, StringRef feature) {
+  std::optional<StringRef> features = getCpuFeatures(attr);
   if (!features) {
     return false;
   }
@@ -257,28 +257,28 @@ bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature) {
   return false;
 }
 
-bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+bool isX86(Attribute attr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(attr);
   return triple && triple.value().isX86();
 }
 
-bool isX86_64(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+bool isX86_64(Attribute attr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(attr);
   return triple && triple.value().getArch() == llvm::Triple::x86_64;
 }
 
-bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+bool isAArch64(Attribute attr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(attr);
   return triple && triple.value().isAArch64();
 }
 
-bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+bool isRISCV(Attribute attr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(attr);
   return triple && triple.value().isRISCV();
 }
 
-bool isRISCV32(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+bool isRISCV32(Attribute attr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(attr);
   return triple && triple.value().isRISCV32();
 }
 
