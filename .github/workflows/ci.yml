@@ -46,6 +46,9 @@ jobs:
   setup:
     uses: ./.github/workflows/setup.yml
 
+  ##############################################################################
+  # Runtime builds
+
   runtime:
     needs: setup
     name: "runtime :: ${{ matrix.name }}"
@@ -197,6 +200,27 @@ jobs:
         run: cmake --build ${BUILD_DIR} -- -k 0
 
   ##############################################################################
+  # Full project builds
+
+  linux_x64_bazel:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_bazel')
+    uses: ./.github/workflows/ci_linux_x64_bazel.yml
+    secrets: inherit
+
+  linux_x64_clang:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang')
+    uses: ./.github/workflows/ci_linux_x64_clang.yml
+    secrets: inherit
+
+  linux_x64_clang_asan:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_asan')
+    uses: ./.github/workflows/ci_linux_x64_clang_asan.yml
+    secrets: inherit
+
+  ##############################################################################
 
   # Depends on all the other jobs to provide a single anchor that indicates the
   # final status. Status reporting will become more sophisticated in the future
@@ -208,9 +232,16 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - setup
+
+      # Runtime builds.
       - runtime
       - runtime_small
       - runtime_tracing
+
+      # Full project builds.
+      - linux_x64_bazel
+      - linux_x64_clang
+      - linux_x64_clang_asan
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
