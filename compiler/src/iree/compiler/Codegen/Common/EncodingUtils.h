@@ -36,39 +36,23 @@ using MaterializeEncodingValueFn =
 class MaterializeEncodingTypeConverter : public TypeConverter {
 public:
   MaterializeEncodingTypeConverter(
-      MaterializeEncodingFn fn, IREE::HAL::ExecutableTargetAttr targetAttr,
       bool transposeNarrowN, IREE::Codegen::LayoutAttrInterface layoutAttr);
 
   const IREE::Codegen::LayoutAttrInterface &getLayoutAttr() const {
     return layoutAttr;
   }
 
-  const MaterializeEncodingFn &getMaterializeEncodingFn() const {
-    return materializeEncodingFn;
-  }
-
-  IREE::HAL::ExecutableTargetAttr getTargetAttr() const { return targetAttr; }
-
   FailureOr<IREE::Codegen::MaterializeEncodingInfo>
   getEncodingInfo(RankedTensorType type) const {
-    if (layoutAttr) {
-      return layoutAttr.getEncodingInfo(type);
-    }
-    return materializeEncodingFn(type, targetAttr);
+    return layoutAttr.getEncodingInfo(type);
   }
 
   bool getTransposeNarrowN() const { return transposeNarrowN; }
 
 private:
-  const MaterializeEncodingFn materializeEncodingFn;
-  const IREE::HAL::ExecutableTargetAttr targetAttr;
   bool transposeNarrowN = false;
-  // The `layoutAttr` implements the logic of encoding materialization. It has
-  // a higher priority when it is present.
-  // TODO(hanchung): Move the logic that takes `targetAttr` and
-  // `transposeNarrowN` into account to their own attribute implementation. It
-  // is in a transition state, so we have two paths atm. We're incrementally
-  // moving the logic to attributes.
+  // TODO(hanchung): Move the logic that takes `transposeNarrowN` into account
+  // to their own attribute implementation.
   const IREE::Codegen::LayoutAttrInterface layoutAttr;
 };
 
