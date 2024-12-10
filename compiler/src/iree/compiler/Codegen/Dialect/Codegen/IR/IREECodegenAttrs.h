@@ -179,10 +179,11 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workgroupSize = {},
     std::optional<int64_t> subgroupSize = {},
-    DictionaryAttr pipelineConfig = DictionaryAttr()) {
+    DictionaryAttr pipelineConfig = {},
+    IREE::Codegen::UKernelSpecAttr ukernelSpec = {}) {
   MLIRContext *context = entryPointFn.getContext();
-  auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes,
-                                                       scalableTileFlags);
+  auto config = IREE::Codegen::LoweringConfigAttr::get(
+      context, tileSizes, scalableTileFlags, {}, {}, ukernelSpec);
   return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, config,
                                                passPipeline, workgroupSize,
                                                subgroupSize, pipelineConfig);
@@ -196,10 +197,11 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workgroupSize = {},
     std::optional<int64_t> subgroupSize = {},
-    DictionaryAttr pipelineConfig = DictionaryAttr()) {
-  return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, tileSizes, {},
-                                               passPipeline, workgroupSize,
-                                               subgroupSize, pipelineConfig);
+    DictionaryAttr pipelineConfig = {},
+    IREE::Codegen::UKernelSpecAttr ukernelSpec = {}) {
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, op, tileSizes, {}, passPipeline, workgroupSize,
+      subgroupSize, pipelineConfig, ukernelSpec);
 }
 
 /// Function to erase lowering configs that are set on an operation.

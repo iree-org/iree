@@ -10,6 +10,7 @@
 #include <numeric>
 #include <optional>
 
+#include "compiler/src/iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUSelectUKernels.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
@@ -1828,28 +1829,15 @@ static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
 /// Set the configuration for argmax when ukernels are enabled.
 /// Distribute all parallel dim across different workgroups, and only use single
 /// subgroup per workgroup.
-///
-/// TODO(bjacob): This is fragile, as we can't know yet if this argmax will be
-/// lowered to a ukernel. We need instead a config that works regardless of
-/// ukernels. For now, we use the looser condition that the argmax ukernel is
-/// enabled, a necessary but not sufficient condition for this particular op to
-/// lower to the ukernel. This is good enough for now for a couple of reasons:
-/// 1. Even if a argmax does not actually lower to a ukernel, this config should
-///    still work.
-/// 2. Ukernels are not enabled by default.
 static LogicalResult
 setArgmaxUkernelConfig(IREE::GPU::TargetAttr target,
                        mlir::FunctionOpInterface entryPoint,
                        linalg::GenericOp op) {
   // Checks if UKernels are enabled.
-  if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint)) {
-    if (!hasUkernel(target, "argmax")) {
-      return failure();
-    }
-  }
-
-  if (!target.supportsSubgroupShuffle())
+  IREE::Codegen::UKernelSpecAttr ukernelSpec = selectUKernelForArgmax(op);
+  if (!ukernelSpec) {
     return failure();
+  }
 
   if (failed(isArgmaxOp(op)))
     return failure();
@@ -1880,7 +1868,7 @@ setArgmaxUkernelConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
-  // Tile all the parallel dimension to 1.
+  // Tile all the parallel dimension to 1. This is a requirement of the ukernel.
   SmallVector<unsigned> partitionedLoops =
       cast<PartitionableLoopsInterface>(op.getOperation())
           .getPartitionableLoops(kNumMaxParallelDims);
@@ -1900,7 +1888,7 @@ setArgmaxUkernelConfig(IREE::GPU::TargetAttr target,
   std::array<int64_t, 3> workgroupSize = {preferredSubgroupSize, 1, 1};
   if (failed(setOpConfigAndEntryPointFnTranslation(
           entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUDefault,
-          workgroupSize))) {
+          workgroupSize, {}, {}, ukernelSpec))) {
     return failure();
   }
   return success();

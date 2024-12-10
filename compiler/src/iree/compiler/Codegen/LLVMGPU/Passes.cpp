@@ -21,6 +21,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/STLForwardCompat.h"
@@ -1191,6 +1192,10 @@ void buildLLVMGPUCodegenConfigurationPassPipeline(
 
 void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
                                      bool useROCM) {
+  // LLVMGPUSelectLoweringStrategyPass may have created ExecutableObjectAttr.
+  // Hoisting them now deduplicates them and ensures that rewrite patterns don't
+  // need to think about explicitly copying them over to new ops.
+  variantPassManager.addPass(IREE::HAL::createHoistExecutableObjectsPass());
   {
     OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
     modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());

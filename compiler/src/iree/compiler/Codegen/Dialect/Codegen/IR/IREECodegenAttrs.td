@@ -262,6 +262,25 @@ def IREECodegen_TranslationInfoAttr :
 }
 
 //===---------------------------------------------------------------------===//
+// iree_codegen.ukernel_spec
+//===---------------------------------------------------------------------===//
+
+def IREECodegen_UKernelSpecAttr  :
+    AttrDef<IREECodegen_Dialect, "UKernelSpec", []> {
+  let mnemonic = "ukernel_spec";
+  let summary = "An attribute specifying a ukernel that an op can lower to.";
+  let description = [{
+    An attribute that can be applied to any operation to specify that it has
+    been match with a ukernel that is a legal lowering for it.
+  }];
+  let assemblyFormat = "`<` struct(params) `>`";
+  let parameters = (ins
+       "StringAttr":$name,
+       "DictionaryAttr":$def_attrs
+  );
+}
+
+//===---------------------------------------------------------------------===//
 // iree_codegen.lowering_config
 //===---------------------------------------------------------------------===//
 
@@ -314,23 +333,29 @@ def IREECodegen_LoweringConfigAttr :
 
   let assemblyFormat = [{
     `<` `tile_sizes` `=` $tilingLevels
-      (`,` `native_vector_size` `=` `[` $nativeVectorSize^ `]`)? `>`
+      (`,` `native_vector_size` `=` `[` $nativeVectorSize^ `]`)?
+      (`,` `ukernel` `=` `[` $ukernel^ `]`)? `>`
   }];
 
   let parameters = (ins
     AttrParameter<"LoweringConfigTilingLevelsAttr",
         "The lowering config at different levels">:$tilingLevels,
     OptionalArrayRefParameter<"int64_t",
-        "The native vector size to use for the given operation">:$nativeVectorSize
+        "The native vector size to use for the given operation">:$nativeVectorSize,
+    OptionalParameter<"UKernelSpecAttr", "If present, indicates that the op should be lowered to that ukernel">:$ukernel
   );
   let builders = [
+    AttrBuilder<(ins "LoweringConfigTilingLevelsAttr":$tileSizes,
+        CArg<"ArrayRef<int64_t>", "{}">:$nativeVectorSize)>,
     AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
         CArg<"TileSizesListTypeRef", "{}">:$tileInterchange,
-        CArg<"ArrayRef<int64_t>", "{}">:$nativeVectorSize)>,
+        CArg<"ArrayRef<int64_t>", "{}">:$nativeVectorSize,
+        CArg<"UKernelSpecAttr", "{}">:$ukernel)>,
     AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
         "ScalableTileFlagsListTypeRef":$scalableTileFlags,
         CArg<"TileSizesListTypeRef", "{}">:$tileInterchange,
-        CArg<"ArrayRef<int64_t>", "{}">:$nativeVectorSize)>
+        CArg<"ArrayRef<int64_t>", "{}">:$nativeVectorSize,
+        CArg<"UKernelSpecAttr", "{}">:$ukernel)>
   ];
   let extraClassDeclaration = [{
     // Returns the tile sizes for all levels set for the op.
