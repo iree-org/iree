@@ -34,6 +34,7 @@
 #include <memory>
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/Support/Debug.h"
@@ -707,6 +708,7 @@ struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
 };
 
 /// Erase alignment hints.
+/// TODO: Support alignment hints.
 struct RemoveAssumeAlignOp
     : public OpRewritePattern<memref::AssumeAlignmentOp> {
 public:
@@ -715,6 +717,18 @@ public:
   LogicalResult matchAndRewrite(memref::AssumeAlignmentOp op,
                                 PatternRewriter &rewriter) const override {
     rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+struct RemoveCodegenAssumeAlignOp
+    : public OpRewritePattern<IREE::Codegen::AssumeAlignmentOp> {
+public:
+  using OpRewritePattern<IREE::Codegen::AssumeAlignmentOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::Codegen::AssumeAlignmentOp op,
+                                PatternRewriter &rewriter) const override {
+    rewriter.replaceOp(op, op.getSource());
     return success();
   }
 };
@@ -756,7 +770,7 @@ struct FlattenMemRefSubspanPass final
 
     // This pass currently doesn't support alignment hints so remove them first.
     RewritePatternSet patterns(context);
-    patterns.add<RemoveAssumeAlignOp>(context);
+    patterns.add<RemoveAssumeAlignOp, RemoveCodegenAssumeAlignOp>(context);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
 
     RewritePatternSet flattenPatterns(context);

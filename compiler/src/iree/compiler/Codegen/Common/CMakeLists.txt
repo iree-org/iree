@@ -66,6 +66,22 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    LLVMLowerings
+  HDRS
+    "LLVMLowerings.h"
+  SRCS
+    "LLVMLowerings.cpp"
+  DEPS
+    IREELinalgTransformDialect
+    LLVMSupport
+    MLIRLLVMCommonConversion
+    MLIRLLVMDialect
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     Common
   HDRS
     "BufferizationAnalysis.h"

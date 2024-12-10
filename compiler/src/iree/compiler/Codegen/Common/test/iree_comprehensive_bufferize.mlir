@@ -46,9 +46,13 @@ func.func @matmul() {
 //  CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1)
 //  CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2)
 //  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//  CHECK-DAG:   %[[LHS_ASSUME:.+]] = iree_codegen.assume_alignment %[[LHS]]
 //  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//  CHECK-DAG:   %[[RHS_ASSUME:.+]] = iree_codegen.assume_alignment %[[RHS]]
 //  CHECK-DAG:   %[[INIT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//  CHECK-DAG:   %[[INIT_ASSUME:.+]] = iree_codegen.assume_alignment %[[INIT]]
 //  CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(3)
+//  CHECK-DAG:   %[[RESULT_ASSUME:.+]] = iree_codegen.assume_alignment %[[RESULT]]
 //  CHECK-DAG:   %[[WG_ID_Y:.+]] = hal.interface.workgroup.id[1]
 //  CHECK-DAG:   %[[WG_COUNT_Y:.+]] = hal.interface.workgroup.count[1]
 //  CHECK-DAG:   %[[WG_SIZE_Y:.+]] = hal.interface.workgroup.size[1]
@@ -63,15 +67,15 @@ func.func @matmul() {
 //      CHECK:     %[[TILESIZE_Y:.+]] = affine.min #[[MAP1]](%[[IV0]])[%[[WG_SIZE_Y]], %[[M]]]
 //      CHECK:     scf.for %[[IV1:.+]] = %[[OFFSET_X]] to %[[N]] step %[[STEP_X]]
 //      CHECK:       %[[TILESIZE_X:.+]] = affine.min #[[MAP1]](%[[IV1]])[%[[WG_SIZE_X]], %[[N]]]
-//  CHECK-DAG:       %[[LHS_TILE:.+]] = memref.subview %[[LHS]][%[[IV0]], 0] [%[[TILESIZE_Y]], %[[K]]]
-//  CHECK-DAG:       %[[RHS_TILE:.+]] = memref.subview %[[RHS]][0, %[[IV1]]] [%[[K]], %[[TILESIZE_X]]]
-//  CHECK-DAG:       %[[INIT_TILE:.+]] = memref.subview %[[INIT]][%[[IV0]], %[[IV1]]] [%[[TILESIZE_Y]], %[[TILESIZE_X]]]
+//  CHECK-DAG:       %[[LHS_TILE:.+]] = memref.subview %[[LHS_ASSUME]][%[[IV0]], 0] [%[[TILESIZE_Y]], %[[K]]]
+//  CHECK-DAG:       %[[RHS_TILE:.+]] = memref.subview %[[RHS_ASSUME]][0, %[[IV1]]] [%[[K]], %[[TILESIZE_X]]]
+//  CHECK-DAG:       %[[INIT_TILE:.+]] = memref.subview %[[INIT_ASSUME]][%[[IV0]], %[[IV1]]] [%[[TILESIZE_Y]], %[[TILESIZE_X]]]
 //      CHECK:       %[[ALLOC:.+]] = memref.alloc(%[[TILESIZE_Y]], %[[TILESIZE_X]])
 //      CHECK:       linalg.generic {{.*}} ins(%[[INIT_TILE]] {{.*}} outs(%[[ALLOC]]
 //      CHECK:       linalg.matmul
 // CHECK-SAME:           ins(%[[LHS_TILE]], %[[RHS_TILE]]
 // CHECK-SAME:           outs(%[[ALLOC]]
-//      CHECK:       %[[RESULT_TILE:.+]] = memref.subview %[[RESULT]][%[[IV0]], %[[IV1]]] [%[[TILESIZE_Y]], %[[TILESIZE_X]]]
+//      CHECK:       %[[RESULT_TILE:.+]] = memref.subview %[[RESULT_ASSUME]][%[[IV0]], %[[IV1]]] [%[[TILESIZE_Y]], %[[TILESIZE_X]]]
 //      CHECK:       linalg.generic {{.*}} ins(%[[ALLOC]] {{.*}} outs(%[[RESULT_TILE]]
 
 // -----
@@ -128,11 +132,11 @@ func.func @matmul_fill() {
 //  CHECK-DAG:   %[[BASE_OFFSET_I32:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(3)
 //  CHECK-DAG:   %[[BASE_OFFSET:.+]] = arith.index_castui %[[BASE_OFFSET_I32]]
 //  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(32)
-//  CHECK-DAG:   memref.assume_alignment %[[LHS]], 32
+//  CHECK-DAG:   %[[LHS_ASSUME:.+]] = iree_codegen.assume_alignment %[[LHS]], 32
 //  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[BASE_OFFSET]])
-//  CHECK-DAG:   memref.assume_alignment %[[RHS]], 8
+//  CHECK-DAG:   %[[RHS_ASSUME:.+]] = iree_codegen.assume_alignment %[[RHS]], 8
 //  CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%c1024)
-//  CHECK-DAG:   memref.assume_alignment %[[RESULT]], 64
+//  CHECK-DAG:   %[[RESULT_ASSUME:.+]] = iree_codegen.assume_alignment %[[RESULT]], 64
 //  CHECK-DAG:   %[[WG_ID_Y:.+]] = hal.interface.workgroup.id[1]
 //  CHECK-DAG:   %[[WG_COUNT_Y:.+]] = hal.interface.workgroup.count[1]
 //  CHECK-DAG:   %[[WG_SIZE_Y:.+]] = hal.interface.workgroup.size[1]
@@ -148,9 +152,9 @@ func.func @matmul_fill() {
 //      CHECK:     scf.for %[[IV1:.+]] = %[[OFFSET_X]] to %[[N]] step %[[STEP_X]]
 //  CHECK-NOT:       linalg.generic
 //      CHECK:       %[[TILESIZE_X:.+]] = affine.min #[[MAP1]](%[[IV1]])[%[[WG_SIZE_X]], %[[N]]]
-//  CHECK-DAG:       %[[LHS_TILE:.+]] = memref.subview %[[LHS]][%[[IV0]], 0] [%[[TILESIZE_Y]], %[[K]]]
-//  CHECK-DAG:       %[[RHS_TILE:.+]] = memref.subview %[[RHS]][0, %[[IV1]]] [%[[K]], %[[TILESIZE_X]]]
-//  CHECK-DAG:       %[[RESULT_TILE:.+]] = memref.subview %[[RESULT]][%[[IV0]], %[[IV1]]] [%[[TILESIZE_Y]], %[[TILESIZE_X]]]
+//  CHECK-DAG:       %[[LHS_TILE:.+]] = memref.subview %[[LHS_ASSUME]][%[[IV0]], 0] [%[[TILESIZE_Y]], %[[K]]]
+//  CHECK-DAG:       %[[RHS_TILE:.+]] = memref.subview %[[RHS_ASSUME]][0, %[[IV1]]] [%[[K]], %[[TILESIZE_X]]]
+//  CHECK-DAG:       %[[RESULT_TILE:.+]] = memref.subview %[[RESULT_ASSUME]][%[[IV0]], %[[IV1]]] [%[[TILESIZE_Y]], %[[TILESIZE_X]]]
 //      CHECK:       linalg.fill
 // CHECK-SAME:           ins(%[[CST]] :
 // CHECK-SAME:           outs(%[[RESULT_TILE]] :
@@ -208,10 +212,12 @@ func.func @elementwise() {
 //  CHECK-DAG:   %[[CST_TENSOR:.+]] = arith.constant dense_resource<__elided__> : tensor<1x10xf32>
 //  CHECK-DAG:   %[[CST_BUF:.+]] = bufferization.to_memref %[[CST_TENSOR]]
 //  CHECK-DAG:   %[[IN_BUF:.+]] = hal.interface.binding.subspan layout({{.+}})  binding(0) {{.+}} : memref<1x10xf32, strided<[10, 1], offset: 128>, #hal.descriptor_type<storage_buffer>>
+//  CHECK-DAG:   %[[IN_BUF_ASSUME:.+]] = iree_codegen.assume_alignment %[[IN_BUF]]
 //  CHECK-DAG:   %[[OUT_BUF:.+]] = hal.interface.binding.subspan layout({{.+}})  binding(1) {{.+}} : memref<1x10xf32, strided<[10, 1], offset: 16>, #hal.descriptor_type<storage_buffer>>
+//  CHECK-DAG:   %[[OUT_BUF_ASSUME:.+]] = iree_codegen.assume_alignment %[[OUT_BUF]]
 //      CHECK:   scf.for
-//  CHECK-DAG:     %[[SUB_IN1:.+]] = memref.subview %[[IN_BUF]]
-//  CHECK-DAG:     %[[SUB_OUT1:.+]] = memref.subview %[[OUT_BUF]]
+//  CHECK-DAG:     %[[SUB_IN1:.+]] = memref.subview %[[IN_BUF_ASSUME]]
+//  CHECK-DAG:     %[[SUB_OUT1:.+]] = memref.subview %[[OUT_BUF_ASSUME]]
 //      CHECK:     scf.for
 //  CHECK-DAG:       %[[SUB_IN2:.+]] = memref.subview %[[SUB_IN1]]
 //  CHECK-DAG:       %[[SUB_CST:.+]] = memref.subview %[[CST_BUF]]
@@ -250,10 +256,12 @@ func.func @rank_reduced_slice() {
 }
 //      CHECK: func.func @rank_reduced_slice()
 //  CHECK-DAG:   %[[SRC_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<1x40xf32, #hal.descriptor_type<storage_buffer>>
+//  CHECK-DAG:   %[[SRC_ASSUME:.+]] = iree_codegen.assume_alignment %[[SRC_BINDING]]
 //  CHECK-DAG:   %[[DST_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) : memref<10xf32, #hal.descriptor_type<storage_buffer>>
+//  CHECK-DAG:   %[[DST_ASSUME:.+]] = iree_codegen.assume_alignment %[[DST_BINDING]]
 //      CHECK:   scf.for %[[IV0:.+]] =
-//  CHECK-DAG:     %[[SRC_SUBVIEW:.+]] = memref.subview %[[SRC_BINDING]][0, %[[IV0]]] [1, 2] [1, 1] : memref<1x40xf32{{.+}}> to memref<2xf32
-//  CHECK-DAG:     %[[DST_SUBVIEW:.+]] = memref.subview %[[DST_BINDING]][%[[IV0]]] [2] [1] : memref<10xf32{{.+}}> to memref<2xf32
+//  CHECK-DAG:     %[[SRC_SUBVIEW:.+]] = memref.subview %[[SRC_ASSUME]][0, %[[IV0]]] [1, 2] [1, 1] : memref<1x40xf32{{.+}}> to memref<2xf32
+//  CHECK-DAG:     %[[DST_SUBVIEW:.+]] = memref.subview %[[DST_ASSUME]][%[[IV0]]] [2] [1] : memref<10xf32{{.+}}> to memref<2xf32
 //      CHECK:     linalg.generic
 // CHECK-SAME:         ins(%[[SRC_SUBVIEW]] :
 // CHECK-SAME:         outs(%[[DST_SUBVIEW]] :
@@ -320,13 +328,16 @@ func.func @tile_from_tensor_load_inplace() {
 
 // CHECK-LABEL: func.func @tile_from_tensor_load_inplace()
 //   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//   CHECK-DAG:   %[[LHS_ASSUME:.+]] = iree_codegen.assume_alignment %[[TENSOR_LHS]]
 //   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//   CHECK-DAG:   %[[RHS_ASSUME:.+]] = iree_codegen.assume_alignment %[[TENSOR_RHS]]
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//   CHECK-DAG:   %[[RETURN_ASSUME:.+]] = iree_codegen.assume_alignment %[[RETURN]]
 //       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
 //       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
-//   CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
-//   CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
-//   CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//   CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[LHS_ASSUME]][%[[IV0]], 0] [1, 3] [1, 1]
+//   CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[RHS_ASSUME]][0, %[[IV1]]] [3, 1] [1, 1]
+//   CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN_ASSUME]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         ins(%[[LHS]], %[[RHS]]
 //  CHECK-SAME:         outs(%[[RESULT]]
@@ -367,18 +378,22 @@ func.func @tile_from_tensor_load_inplace_and_copy() {
 
 // CHECK-LABEL: func.func @tile_from_tensor_load_inplace_and_copy()
 //   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//   CHECK-DAG:   %[[LHS_ASSUME:.+]] = iree_codegen.assume_alignment %[[TENSOR_LHS]]
 //   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//   CHECK-DAG:   %[[RHS_ASSUME:.+]] = iree_codegen.assume_alignment %[[TENSOR_RHS]]
 //   CHECK-DAG:   %[[RETURN1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//   CHECK-DAG:   %[[RETURN1_ASSUME:.+]] = iree_codegen.assume_alignment %[[RETURN1]]
 //   CHECK-DAG:   %[[RETURN2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(3)
+//   CHECK-DAG:   %[[RETURN2_ASSUME:.+]] = iree_codegen.assume_alignment %[[RETURN2]]
 //       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
 //       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
-//   CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
-//   CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
-//   CHECK-DAG:       %[[RESULT1:.+]] = memref.subview %[[RETURN1]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//   CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[LHS_ASSUME]][%[[IV0]], 0] [1, 3] [1, 1]
+//   CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[RHS_ASSUME]][0, %[[IV1]]] [3, 1] [1, 1]
+//   CHECK-DAG:       %[[RESULT1:.+]] = memref.subview %[[RETURN1_ASSUME]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         ins(%[[LHS]], %[[RHS]]
 //  CHECK-SAME:         outs(%[[RESULT1]]
-//       CHECK:       %[[RESULT2:.+]] = memref.subview %[[RETURN2]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//       CHECK:       %[[RESULT2:.+]] = memref.subview %[[RETURN2_ASSUME]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
 //     CHECK:       linalg.generic {{.*}} ins(%[[RESULT1]] {{.*}} outs(%[[RESULT2]]
 
 // -----
@@ -421,17 +436,20 @@ func.func @tile_from_pointwise_lhs_inplace() {
 
 // CHECK-LABEL: func.func @tile_from_pointwise_lhs_inplace()
 //   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//   CHECK-DAG:   %[[LHS_ASSUME:.+]] = iree_codegen.assume_alignment %[[TENSOR_LHS]]
 //   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//   CHECK-DAG:   %[[RHS_ASSUME:.+]] = iree_codegen.assume_alignment %[[TENSOR_RHS]]
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//   CHECK-DAG:   %[[RETURN_ASSUME:.+]] = iree_codegen.assume_alignment %[[RETURN]]
 //       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
 //       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
-//   CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
-//   CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
+//   CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[LHS_ASSUME]][%[[IV0]], 0] [1, 3] [1, 1]
+//   CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[RHS_ASSUME]][0, %[[IV1]]] [3, 1] [1, 1]
 //   CHECK-DAG:       %[[ALLOC:.+]] = memref.alloc() : memref<1x3xf32>
 //       CHECK:       linalg.generic
 //  CHECK-SAME:         ins(%[[LHS]] :
 //  CHECK-SAME:         outs(%[[ALLOC]]
-//   CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//   CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN_ASSUME]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         ins(%[[ALLOC]], %[[RHS]]
 //  CHECK-SAME:         outs(%[[RESULT]]
@@ -477,15 +495,19 @@ func.func @tile_from_pointwise_outs() {
 }
 // CHECK-LABEL: func.func @tile_from_pointwise_outs()
 //   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//   CHECK-DAG:   %[[LHS_ASSUME:.+]] = iree_codegen.assume_alignment %[[TENSOR_LHS]]
 //   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//   CHECK-DAG:   %[[RHS_ASSUME:.+]] = iree_codegen.assume_alignment %[[TENSOR_RHS]]
 //   CHECK-DAG:   %[[TENSOR_INIT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//   CHECK-DAG:   %[[INIT_ASSUME:.+]] = iree_codegen.assume_alignment %[[TENSOR_INIT]]
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(3)
+//   CHECK-DAG:   %[[RETURN_ASSUME:.+]] = iree_codegen.assume_alignment %[[TENSOR_RETURN]]
 //       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
 //       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
-//   CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
-//   CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
-//   CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
-//   CHECK-DAG:       %[[INIT:.+]] = memref.subview %[[TENSOR_INIT]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//   CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN_ASSUME]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//   CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[LHS_ASSUME]][%[[IV0]], 0] [1, 3] [1, 1]
+//   CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[RHS_ASSUME]][0, %[[IV1]]] [3, 1] [1, 1]
+//   CHECK-DAG:       %[[INIT:.+]] = memref.subview %[[INIT_ASSUME]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
 //       CHECK:       linalg.generic
 //  CHECK-SAME:         ins(%[[INIT]] :
 //  CHECK-SAME:         outs(%[[RESULT]]
