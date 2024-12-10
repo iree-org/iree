@@ -902,7 +902,8 @@ hal.executable public @main {
 
 // CHECK-LABEL: func @small_matvec
 //   CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//       CHECK:   scf.for %{{.*}} = %{{.*}} to %c1 step %c64
+//       CHECK:   %[[COND:.+]] = arith.cmpi slt, %{{.*}}, %c1
+//       CHECK:   scf.if %[[COND]]
 
 // Verify that the write does not get hoisted out of the single threaded
 // for loop.
