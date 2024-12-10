@@ -1107,7 +1107,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Tile remaining reduction dimensions to serial loops.
   SmallVector<int64_t> reductionTileSizes(opInfo.getDomainRank(), 0);
-  for (int64_t dim : reductionDims) {
+  for (int64_t dim : opInfo.getK2Dims()) {
     if (ShapedType::isDynamic(dim)) {
       reductionTileSizes[dim] = 1;
     }
