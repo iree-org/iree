@@ -372,7 +372,6 @@ static iree_status_t iree_hal_hip_event_semaphore_run_scheduled_callbacks(
     if (copy.cpu_event) {
       iree_event_set(&copy.cpu_event->event);
       iree_hal_resource_release(&copy.cpu_event->resource);
-      iree_allocator_free(copy.cpu_event->host_allocator, copy.cpu_event);
     }
 
     iree_hal_hip_semaphore_work_item_t* next_work_item = copy.work_item;
