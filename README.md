@@ -37,9 +37,11 @@ Python iree-base-runtime | [![PyPI version](https://badge.fury.io/py/iree-base-r
 [![CI](https://github.com/iree-org/iree/actions/workflows/ci.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/iree-org/iree/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
 [![PkgCI](https://github.com/iree-org/iree/actions/workflows/pkgci.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/iree-org/iree/actions/workflows/pkgci.yml?query=branch%3Amain+event%3Apush)
 
-| Host platform | Build status |
+#### Nightly build status
+
+| Operating system | Build status |
 | -- | --: |
-Linux | [![CI - Linux x64 clang](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang.yml?query=branch%3Amain+event%3Apush)<br>[![CI - Linux arm64 clang](https://github.com/iree-org/iree/actions/workflows/ci_linux_arm64_clang.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_linux_arm64_clang.yml?query=branch%3Amain+event%3Aschedule)
+Linux | [![CI - Linux arm64 clang](https://github.com/iree-org/iree/actions/workflows/ci_linux_arm64_clang.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_linux_arm64_clang.yml?query=branch%3Amain+event%3Aschedule)
 macOS | [![CI - macOS x64 clang](https://github.com/iree-org/iree/actions/workflows/ci_macos_x64_clang.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_macos_x64_clang.yml?query=branch%3Amain+event%3Aschedule)
 Windows | [![CI - Windows x64 MSVC](https://github.com/iree-org/iree/actions/workflows/ci_windows_x64_msvc.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_windows_x64_msvc.yml?query=branch%3Amain+event%3Aschedule)
 
