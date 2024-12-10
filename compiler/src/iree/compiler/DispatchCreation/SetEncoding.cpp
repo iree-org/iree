@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
@@ -25,6 +26,12 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+llvm::cl::opt<bool> clEnableI1Support(
+    "iree-experimental-packed-i1-storage",
+    llvm::cl::desc(
+        "Experimental feature: enable i1 data type support in codegen"),
+    llvm::cl::init(false));
+
 #define DEBUG_TYPE "iree-dispatch-creation-set-encoding"
 
 namespace mlir::iree_compiler::DispatchCreation {
@@ -32,10 +39,18 @@ namespace mlir::iree_compiler::DispatchCreation {
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 using IREE::Encoding::EncodingAttr;
+using IREE::Encoding::PackedStorageAttr;
 
 //===---------------------------------------------------------------------===//
 // Utility functions
 //===---------------------------------------------------------------------===//
+
+static std::optional<Attribute> getI1PackedStorageAttr(MLIRContext *context) {
+  if (clEnableI1Support) {
+    return PackedStorageAttr::get(context);
+  }
+  return {};
+}
 
 Value setEncoding(OpBuilder &builder, Location loc, Value source,
                   EncodingAttr encodingAttr) {
@@ -216,9 +231,12 @@ public:
       if (narrowDim.isN()) {
         roundDimsTo[1] = llvm::PowerOf2Ceil(narrowDim.size);
       }
-      auto encoding = EncodingAttr::get(linalgOp.getContext(), operandIndex,
-                                        opType, elemTypes, maps,
-                                        /*bcastMap=*/std::nullopt, roundDimsTo);
+      auto optI1PackedStorageAttr = getI1PackedStorageAttr(rewriter.getContext());
+      auto layouts = optI1PackedStorageAttr ? ArrayRef<Attribute>(*optI1PackedStorageAttr)
+                                            : ArrayRef<Attribute>{};
+      auto encoding = EncodingAttr::get(
+          linalgOp.getContext(), operandIndex, opType, elemTypes, maps,
+          /*bcastMap=*/std::nullopt, roundDimsTo, layouts);
       return setEncoding(rewriter, loc, src, encoding);
     };
     Value encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);
