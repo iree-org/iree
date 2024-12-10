@@ -135,7 +135,54 @@ struct GPUVectorAllocPass final
 
       VectorType inputTy = cast<VectorType>(op.getType());
       Value read = readVectorFromTensor(builder, inputTy, synced.getResult(0));
-      operand.set(read);
+
+      if (IREE::VectorExt::NestedLayoutAttr vectorLayout =
+              dyn_cast<IREE::VectorExt::NestedLayoutAttr>(op.getLayoutAttr())) {
+        // Re-arrange the layout to read large as possible vectors
+        // from shared memory. This is done by pulling in elements
+        // from in-thread tiles : batch & outer into element tile.
+        SmallVector<int64_t> elementTile =
+            llvm::to_vector(vectorLayout.getElementTile());
+        SmallVector<int64_t> batchTile =
+            llvm::to_vector(vectorLayout.getBatchTile());
+        SmallVector<int64_t> outerTile =
+            llvm::to_vector(vectorLayout.getOuterTile());
+        int64_t &elementTileLen = elementTile.back();
+        int64_t &batchTileLen = batchTile.back();
+        int64_t &outerTileLen = outerTile.back();
+        // TODO: maybe we should obtain this from somewhere ?
+        constexpr int64_t maxVecLenBits = 128;
+        // Pull in in-thread elements to reach max
+        // vector length.
+        Type elemType = op.getType().getElementType();
+        int64_t maxVecLen = maxVecLenBits / elemType.getIntOrFloatBitWidth();
+        int64_t remainingElementsForVec = maxVecLen / elementTileLen;
+        if (remainingElementsForVec <= outerTileLen) {
+          elementTileLen *= remainingElementsForVec;
+          outerTileLen = outerTileLen / remainingElementsForVec;
+        } else {
+          elementTileLen *= outerTileLen;
+          outerTileLen = 1;
+          remainingElementsForVec /= outerTileLen;
+          if (remainingElementsForVec <= batchTileLen) {
+            elementTileLen *= remainingElementsForVec;
+            batchTileLen = batchTileLen / remainingElementsForVec;
+          } else {
+            elementTileLen *= batchTileLen;
+            batchTileLen = 1;
+          }
+        }
+        auto betterVecLayout = IREE::VectorExt::NestedLayoutAttr::get(
+            op.getContext(), vectorLayout.getSubgroupTile(), batchTile,
+            vectorLayout.getOuterTile(), vectorLayout.getThreadTile(),
+            elementTile, vectorLayout.getSubgroupStrides(),
+            vectorLayout.getThreadStrides());
+        auto betterVecLayoutOp = builder.create<IREE::VectorExt::ToLayoutOp>(
+            op.getLoc(), read, betterVecLayout);
+        operand.set(betterVecLayoutOp);
+      } else {
+        operand.set(read);
+      }
 
       // Remove the shared_memory_conversion attribute from the to_layout
       // operation.
