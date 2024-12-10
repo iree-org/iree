@@ -20,6 +20,7 @@
 #          - job_1
 #          - job_2
 #        uses: ./.github/workflows/workflow_summary.yml
+#        secrets: inherit
 #        with:
 #          jobs-json: ${{ toJson(needs) }}
 #   ```

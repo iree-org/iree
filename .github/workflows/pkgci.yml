@@ -143,5 +143,6 @@ jobs:
       - test_tensorflow
       - test_pjrt
     uses: ./.github/workflows/workflow_summary.yml
+    secrets: inherit
     with:
       jobs-json: ${{ toJson(needs) }}
