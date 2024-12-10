@@ -598,6 +598,48 @@ util.func public @applyAsyncDispatchUnusedOp(%operand: !stream.resource<transien
 
 // -----
 
+// Tests that unused dispatch results that are tied do not get their own local
+// allocation.
+
+// CHECK-LABEL: @applyAsyncDispatchUnusedTiedOperand
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[END:.+]]: index, %[[LENGTH:.+]]: index)
+util.func public @applyAsyncDispatchUnusedTiedOperand(%operand: !stream.resource<transient>, %size: index, %offset: index, %end: index, %length: index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  // CHECK: %[[PACK:.+]]:2 = stream.resource.pack
+  // CHECK: %[[ALLOCA:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca uninitialized : !stream.resource<transient>{%[[PACK]]#0}
+  // CHECK: %[[TIMEPOINT:.+]] = stream.cmd.execute
+  // CHECK-SAME: await(%[[ALLOCA_TIMEPOINT]])
+  // CHECK-SAME: with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]},
+  // CHECK-SAME:      %[[ALLOCA]] as %[[ALLOCA_CAPTURE:.+]]: !stream.resource<transient>{%[[PACK]]#0})
+  %result, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> (%operand as !stream.resource<transient>{%size}) {
+    // CHECK: stream.cmd.concurrent
+    %alloca = stream.async.alloca : !stream.resource<transient>{%size}
+    %concurrent = stream.async.concurrent with(%capture as %concurrent_capture: !stream.resource<transient>{%size},
+        %alloca as %unused_capture: !stream.resource<transient>{%size}) -> (%capture as !stream.resource<transient>{%size}) {
+      // CHECK-NEXT: stream.cmd.dispatch @executable::@dispatch[%c1, %c1, %c1](%c4 : index) {
+      // CHECK-NEXT:   rw %[[OPERAND_CAPTURE]][%[[OFFSET]] for %[[LENGTH]]] : !stream.resource<transient>{%[[SIZE]]},
+      // CHECK-NEXT:   rw %[[ALLOCA_CAPTURE]][%[[PACK]]#1 for %[[SIZE]]] : !stream.resource<transient>{%[[PACK]]#0}
+      // CHECK-NEXT: }
+      %0:2 = stream.async.dispatch @executable::@dispatch[%c1, %c1, %c1](%concurrent_capture[%offset to %end for %length], %unused_capture[%c0 to %size for %size], %c4)
+        : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}, index) -> (%concurrent_capture{%size}, %unused_capture{%size})
+      // NOTE: %0#1 is unused.
+      stream.yield %0#0 : !stream.resource<transient>{%size}
+    }
+    stream.yield %concurrent : !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  // CHECK: %[[DEALLOCA:.+]] = stream.resource.dealloca await(%[[TIMEPOINT]]) => %[[ALLOCA]]
+  // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%[[DEALLOCA]], %[[TIMEPOINT]])
+  // CHECK: util.optimization_barrier %[[JOIN]]
+  util.optimization_barrier %result_timepoint : !stream.timepoint
+  // CHECK: util.optimization_barrier %[[OPERAND]]
+  util.optimization_barrier %result : !stream.resource<transient>
+  util.return
+}
+
+// -----
+
 // CHECK: stream.cmd.func private @asyncExtern(%arg0[%arg1 for %arg2]: !stream.resource<transient>, %arg3: index, %arg4[%arg5 for %arg6]: !stream.resource<transient>)
 stream.async.func private @asyncExtern(%arg0: !stream.resource<transient>, %arg1: index) -> (%arg0, !stream.resource<transient>)
 
