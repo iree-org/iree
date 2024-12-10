@@ -42,7 +42,7 @@ struct PromoteContractOperands final
     Value lhs =
         promoteToElementType(loc, rewriter, contractOp.getLhs(), resultElType);
     Value rhs =
-        promoteToElementType(loc, rewriter, contractOp.getLhs(), resultElType);
+        promoteToElementType(loc, rewriter, contractOp.getRhs(), resultElType);
 
     rewriter.replaceOpWithNewOp<vector::ContractionOp>(
         contractOp, lhs, rhs, contractOp.getAcc(), contractOp.getIndexingMaps(),
