@@ -1080,9 +1080,11 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
                                             CodeGenPipeline pipeline) {
     TileSizesListType tileSizes;
     unsigned numParallelLoops = op.getNumParallelLoops();
-    SmallVector<int64_t> workgroupTileSizes(numParallelLoops - 2, 1);
-    workgroupTileSizes.append({tileX, tileY});
-    workgroupTileSizes.append(op.getNumReductionLoops(), tileK);
+    unsigned numReductionLoops = op.getNumReductionLoops();
+    SmallVector<int64_t> workgroupTileSizes(
+        numParallelLoops + numReductionLoops, 1);
+    workgroupTileSizes[numParallelLoops - 2] = tileX;
+    workgroupTileSizes[numParallelLoops - 1] = tileY;
 
     SmallVector<unsigned> partitionedLoops =
         cast<PartitionableLoopsInterface>(op.getOperation())
@@ -1096,7 +1098,21 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
       }
     }
 
-    tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level.
+    // Split the parallel and reduction tile sizes.
+    if (pipeline == CodeGenPipeline::LLVMGPUTileAndFuse) {
+      SmallVector<int64_t> reductionTileSizes(
+          numParallelLoops + numReductionLoops, 0);
+      reductionTileSizes[numParallelLoops + numReductionLoops - 1] = tileK;
+      tileSizes.emplace_back(std::move(workgroupTileSizes));
+      tileSizes.emplace_back(std::move(reductionTileSizes));
+    }
+    // Other pipeline (MatmulTensorCore) expect the reduction tile size to be in
+    // the same list.
+    else {
+      workgroupTileSizes[numParallelLoops + numReductionLoops - 1] = tileK;
+      tileSizes.emplace_back(std::move(workgroupTileSizes));
+    }
+
     std::optional<int64_t> subgroupSize = std::nullopt;
     if (!subgroupSizes.empty())
       subgroupSize = subgroupSizes.front();
@@ -1175,7 +1191,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
       return setMatmulConfig(
           sizeN, sizeM, 4, {sizeM, sizeN, 1},
           target.getWgp().getSubgroupSizeChoices().asArrayRef(),
-          softwarePipelineDepthSimt, CodeGenPipeline::LLVMGPUMatmulSimt);
+          softwarePipelineDepthSimt, CodeGenPipeline::LLVMGPUTileAndFuse);
     }
 
     // SIMT matmul case. Query the best configuration.
@@ -1189,7 +1205,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
             config.tileSize[0], config.tileSize[1], config.tileSize[2],
             config.workgroupSize,
             target.getWgp().getSubgroupSizeChoices().asArrayRef(),
-            softwarePipelineDepthSimt, CodeGenPipeline::LLVMGPUMatmulSimt);
+            softwarePipelineDepthSimt, CodeGenPipeline::LLVMGPUTileAndFuse);
       }
     }
   }
@@ -1214,7 +1230,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
   return setMatmulConfig(tileX, tileY, tileK, workgroupSize,
                          target.getWgp().getSubgroupSizeChoices().asArrayRef(),
                          softwarePipelineDepthSimt,
-                         CodeGenPipeline::LLVMGPUMatmulSimt);
+                         CodeGenPipeline::LLVMGPUTileAndFuse);
 }
 
 //====---------------------------------------------------------------------===//
