@@ -229,20 +229,12 @@ std::unique_ptr<CompilerJob> IREECompiler::StartJob() {
   }
 
   // Propagate all options set via environment variable.
-  // TODO: Excise/translate to something that doesn't rely on LLVM.
-  // if (std::optional<std::string> env_value = llvm::sys::Process::GetEnv(
-  //         llvm::StringRef("IREE_COMPILER_OPTIONS"))) {
-  //   llvm::SmallVector<const char*, 20> new_argv;
-  //   llvm::BumpPtrAllocator a;
-  //   llvm::StringSaver saver(a);
-
-  //   llvm::cl::TokenizeGNUCommandLine(*env_value, saver, new_argv);
-  //   for (auto arg : new_argv)
-  //     if (!job->SetFlag(arg)) {
-  //       error_message_ = job->GetErrorMessage();
-  //       return nullptr;
-  //     }
-  // }
+  for (auto arg : extra_options_) {
+    if (!job->SetFlag(arg.c_str())) {
+      error_message_ = job->GetErrorMessage();
+      return nullptr;
+    }
+  }
 
   return job;
 }

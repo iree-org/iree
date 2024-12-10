@@ -14,11 +14,13 @@ iree_cc_library(
     "layout_utils.h"
     "platform.h"
     "tensor_utils.h"
+    "command_line_utils.h"
   SRCS
     "api_impl.cc"
     "layout_utils.cc"
     "platform.cc"
     "tensor_utils.cc"
+    "command_line_utils.cc"
   DEPS
     ::compiler
     iree::base
@@ -57,6 +59,17 @@ iree_cc_library(
       iree_pjrt::partitioner_api
       iree_pjrt::partitioner_api::loader
     PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    command_line_utils_test
+  SRCS
+    "command_line_utils_test.cc"
+  DEPS
+    ::common
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
