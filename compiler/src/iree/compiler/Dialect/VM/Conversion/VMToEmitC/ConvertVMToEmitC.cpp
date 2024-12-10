@@ -1532,7 +1532,8 @@ class FuncOpConversion : public EmitCConversionPattern<mlir::emitc::FuncOp> {
   LogicalResult
   matchAndRewrite(mlir::emitc::FuncOp funcOp, Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // Entry block
+    // Entry block arguments, i.e. function arguments get converted 1:1.
+    // VM::RefType arguments get replaced by iree_vm_ref_t*.
     {
       Block &block = funcOp.getBlocks().front();
       TypeConverter::SignatureConversion signatureConversion(
@@ -1552,8 +1553,8 @@ class FuncOpConversion : public EmitCConversionPattern<mlir::emitc::FuncOp> {
       });
     }
 
-    // other blocks: Remap ref arguments to replacement values from register
-    // allocation.
+    // Non-entry block arguments are handled differently between numeric types
+    // and VM::RefType.
     {
       for (Block &block : llvm::make_early_inc_range(
                llvm::drop_begin(funcOp.getBlocks(), 1))) {
@@ -1562,9 +1563,14 @@ class FuncOpConversion : public EmitCConversionPattern<mlir::emitc::FuncOp> {
 
         for (const auto &[index, arg] : llvm::enumerate(block.getArguments())) {
           if (isa<IREE::VM::RefType>(arg.getType())) {
+            // VM::RefType arguments are dropped and their uses are replaced.
+            // The replacement values are determined by the register allocation
+            // pass.
             Value ref = getModuleAnalysis().lookupRef(arg);
             signatureConversion.remapInput(index, ref);
           } else {
+            // Numerically typed arguments are kept as block arguments. These
+            // are automatically handled later in the emitter.
             signatureConversion.addInputs(index, arg.getType());
           }
         }
@@ -1572,6 +1578,10 @@ class FuncOpConversion : public EmitCConversionPattern<mlir::emitc::FuncOp> {
         Block *newBlock =
             rewriter.applySignatureConversion(&block, signatureConversion);
 
+        // The signatureConversion stores a mapping from the original block
+        // argument index to the replacement value. This information is needed
+        // in the conversion of branch ops to correctly map from branch operands
+        // to the replacement values.
         getModuleAnalysis().lookupFunction(funcOp).cacheBlockConversion(
             newBlock, signatureConversion);
       }
