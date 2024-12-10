@@ -242,6 +242,20 @@ static iree_status_t iree_hal_hip_driver_query_available_devices(
   return status;
 }
 
+iree_status_t iree_hal_hip_get_device_properties(
+    iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
+    hipDeviceProp_tR0000* out_props) {
+  iree_hal_hip_driver_t* driver = iree_hal_hip_driver_cast(base_driver);
+
+  hipDevice_t device = IREE_DEVICE_ID_TO_HIPDEVICE(device_id);
+
+  IREE_HIP_RETURN_IF_ERROR(&driver->hip_symbols,
+                           hipGetDeviceProperties(out_props, device),
+                           "hipGetDeviceProperties");
+
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_hip_driver_dump_device_info(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
     iree_string_builder_t* builder) {
