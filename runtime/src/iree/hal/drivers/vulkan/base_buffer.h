@@ -98,6 +98,7 @@ iree_status_t iree_hal_vulkan_query_memory_heaps(
 // to get access to the API VkBuffer handle.
 typedef struct iree_hal_vulkan_base_buffer_t {
   iree_hal_buffer_t base;
+  iree_allocator_t host_allocator;
   // NOTE: may be VK_NULL_HANDLE if sparse residency is used to back the buffer
   // with multiple device memory allocations.
   VkDeviceMemory device_memory;

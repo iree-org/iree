@@ -35,7 +35,7 @@ typedef struct {
 // HAL. The provided callback is made when the buffer is destroyed to allow the
 // caller to clean up as appropriate.
 iree_status_t iree_hal_vulkan_native_buffer_wrap(
-    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
@@ -43,7 +43,7 @@ iree_status_t iree_hal_vulkan_native_buffer_wrap(
     VkDeviceMemory device_memory, VkBuffer handle,
     iree_hal_vulkan_native_buffer_release_callback_t internal_release_callback,
     iree_hal_buffer_release_callback_t user_release_callback,
-    iree_hal_buffer_t** out_buffer);
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
 
 #ifdef __cplusplus
 }  // extern "C"

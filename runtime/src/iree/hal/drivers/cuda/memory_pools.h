@@ -25,6 +25,7 @@ typedef struct iree_hal_cuda_memory_pools_t {
   // Used for any host-visible/host-local memory types.
   CUmemoryPool other;
 
+  iree_hal_device_t* parent_device;
   const iree_hal_cuda_dynamic_symbols_t* cuda_symbols;
   iree_allocator_t host_allocator;
 
@@ -38,6 +39,7 @@ typedef struct iree_hal_cuda_memory_pools_t {
 
 // Initializes |out_pools| by configuring new CUDA memory pools.
 iree_status_t iree_hal_cuda_memory_pools_initialize(
+    iree_hal_device_t* parent_device,
     const iree_hal_cuda_dynamic_symbols_t* cuda_symbols, CUdevice cu_device,
     const iree_hal_cuda_memory_pooling_params_t* pooling_params,
     iree_allocator_t host_allocator,

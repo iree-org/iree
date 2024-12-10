@@ -34,7 +34,14 @@ typedef struct iree_hal_heap_buffer_t {
   // base.flags has the iree_hal_heap_buffer_storage_mode_t.
   iree_hal_buffer_t base;
 
+  // Host allocator this buffer metadata structure was allocated from. May be
+  // different than the data allocator used for the buffer payload.
+  iree_allocator_t host_allocator;
+
+  // TODO(benvanik): change to a raw pointer as the base.allocation_size is the
+  // same as the data_length.
   iree_byte_span_t data;
+
   union {
     // Used for IREE_HAL_HEAP_BUFFER_STORAGE_MODE_SPLIT.
     iree_allocator_t data_allocator;
@@ -45,9 +52,6 @@ typedef struct iree_hal_heap_buffer_t {
   // Optional statistics shared with the allocator.
   IREE_STATISTICS(iree_hal_heap_allocator_statistics_t* statistics;)
 } iree_hal_heap_buffer_t;
-static_assert(sizeof(iree_hal_heap_buffer_t) <= 128,
-              "header should be <= the minimum buffer alignment so that we "
-              "don't introduce internal waste");
 
 static const iree_hal_buffer_vtable_t iree_hal_heap_buffer_vtable;
 
@@ -111,12 +115,10 @@ static iree_status_t iree_hal_heap_buffer_allocate_slab(
 }
 
 iree_status_t iree_hal_heap_buffer_create(
-    iree_hal_allocator_t* allocator,
     iree_hal_heap_allocator_statistics_t* statistics,
     const iree_hal_buffer_params_t* params, iree_device_size_t allocation_size,
     iree_allocator_t data_allocator, iree_allocator_t host_allocator,
     iree_hal_buffer_t** out_buffer) {
-  IREE_ASSERT_ARGUMENT(allocator);
   IREE_ASSERT_ARGUMENT(params);
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -137,10 +139,11 @@ iree_status_t iree_hal_heap_buffer_create(
                                                 host_allocator, &buffer, &data);
 
   if (iree_status_is_ok(status)) {
-    iree_hal_buffer_initialize(host_allocator, allocator, &buffer->base,
-                               allocation_size, 0, allocation_size,
-                               params->type, params->access, params->usage,
-                               &iree_hal_heap_buffer_vtable, &buffer->base);
+    iree_hal_buffer_initialize(
+        iree_hal_buffer_placement_undefined(), &buffer->base, allocation_size,
+        0, allocation_size, params->type, params->access, params->usage,
+        &iree_hal_heap_buffer_vtable, &buffer->base);
+    buffer->host_allocator = host_allocator;
     buffer->data = data;
 
     if (same_allocator) {
@@ -169,12 +172,11 @@ iree_status_t iree_hal_heap_buffer_create(
 }
 
 iree_status_t iree_hal_heap_buffer_wrap(
-    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_byte_span_t data, iree_hal_buffer_release_callback_t release_callback,
-    iree_hal_buffer_t** out_buffer) {
-  IREE_ASSERT_ARGUMENT(allocator);
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -188,16 +190,15 @@ iree_status_t iree_hal_heap_buffer_wrap(
         (int)IREE_HAL_HEAP_BUFFER_ALIGNMENT, data.data);
   }
 
-  iree_allocator_t host_allocator =
-      iree_hal_allocator_host_allocator(allocator);
   iree_hal_heap_buffer_t* buffer = NULL;
   iree_status_t status =
       iree_allocator_malloc(host_allocator, sizeof(*buffer), (void**)&buffer);
   if (iree_status_is_ok(status)) {
-    iree_hal_buffer_initialize(host_allocator, allocator, &buffer->base,
-                               allocation_size, 0, data.data_length,
-                               memory_type, allowed_access, allowed_usage,
-                               &iree_hal_heap_buffer_vtable, &buffer->base);
+    iree_hal_buffer_initialize(placement, &buffer->base, allocation_size, 0,
+                               data.data_length, memory_type, allowed_access,
+                               allowed_usage, &iree_hal_heap_buffer_vtable,
+                               &buffer->base);
+    buffer->host_allocator = host_allocator;
     buffer->data = data;
 
     // Notify the provided callback when the external data is no longer needed.
@@ -213,7 +214,7 @@ iree_status_t iree_hal_heap_buffer_wrap(
 
 static void iree_hal_heap_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   iree_hal_heap_buffer_t* buffer = (iree_hal_heap_buffer_t*)base_buffer;
-  iree_allocator_t host_allocator = base_buffer->host_allocator;
+  iree_allocator_t host_allocator = buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   IREE_STATISTICS({

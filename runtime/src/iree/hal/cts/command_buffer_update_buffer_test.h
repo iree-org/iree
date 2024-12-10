@@ -116,8 +116,9 @@ TEST_F(CommandBufferUpdateBufferTest, UpdateBufferSubspan) {
   // Create a subspan.
   iree_device_size_t subspan_length = 8;
   iree_hal_buffer_t* buffer_subspan;
-  IREE_ASSERT_OK(iree_hal_buffer_subspan(device_buffer, /*byte_offset=*/4,
-                                         subspan_length, &buffer_subspan));
+  IREE_ASSERT_OK(
+      iree_hal_buffer_subspan(device_buffer, /*byte_offset=*/4, subspan_length,
+                              iree_allocator_system(), &buffer_subspan));
 
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_CHECK_OK(iree_hal_command_buffer_create(

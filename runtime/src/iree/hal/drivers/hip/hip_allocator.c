@@ -24,6 +24,9 @@ typedef struct iree_hal_hip_allocator_t {
   // must be at offset 0.
   iree_hal_resource_t resource;
 
+  // Parent device that this allocator is associated with. Unowned.
+  iree_hal_device_t* parent_device;
+
   // The device that this allocator allocates memory from.
   hipDevice_t device;
 
@@ -56,10 +59,12 @@ static iree_hal_hip_allocator_t* iree_hal_hip_allocator_cast(
 }
 
 iree_status_t iree_hal_hip_allocator_create(
+    iree_hal_device_t* parent_device,
     const iree_hal_hip_dynamic_symbols_t* hip_symbols, hipDevice_t device,
     hipCtx_t hip_context, hipStream_t stream,
     iree_hal_hip_memory_pools_t* pools, iree_allocator_t host_allocator,
     iree_hal_allocator_t** out_allocator) {
+  IREE_ASSERT_ARGUMENT(parent_device);
   IREE_ASSERT_ARGUMENT(hip_symbols);
   IREE_ASSERT_ARGUMENT(out_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -93,6 +98,7 @@ iree_status_t iree_hal_hip_allocator_create(
                                 (void**)&allocator));
   iree_hal_resource_initialize(&iree_hal_hip_allocator_vtable,
                                &allocator->resource);
+  allocator->parent_device = parent_device;
   allocator->device = device;
   allocator->stream = stream;
   allocator->pools = pools;
@@ -408,8 +414,14 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
 
   iree_hal_buffer_t* buffer = NULL;
   if (iree_status_is_ok(status)) {
+    const iree_hal_buffer_placement_t placement = {
+        .device = allocator->parent_device,
+        .queue_affinity = params->queue_affinity ? params->queue_affinity
+                                                 : IREE_HAL_QUEUE_AFFINITY_ANY,
+        .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
+    };
     status = iree_hal_hip_buffer_wrap(
-        base_allocator, compat_params.type, compat_params.access,
+        placement, compat_params.type, compat_params.access,
         compat_params.usage, allocation_size,
         /*byte_offset=*/0,
         /*byte_length=*/allocation_size, buffer_type, device_ptr, host_ptr,
@@ -556,8 +568,14 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
 
   iree_hal_buffer_t* buffer = NULL;
   if (iree_status_is_ok(status)) {
+    const iree_hal_buffer_placement_t placement = {
+        .device = allocator->parent_device,
+        .queue_affinity = params->queue_affinity ? params->queue_affinity
+                                                 : IREE_HAL_QUEUE_AFFINITY_ANY,
+        .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
+    };
     status = iree_hal_hip_buffer_wrap(
-        base_allocator, compat_params.type, compat_params.access,
+        placement, compat_params.type, compat_params.access,
         compat_params.usage, external_buffer->size,
         /*byte_offset=*/0,
         /*byte_length=*/external_buffer->size, buffer_type, device_ptr,

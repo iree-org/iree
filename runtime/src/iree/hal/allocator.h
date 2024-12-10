@@ -495,6 +495,8 @@ IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_allocator_vtable_t);
 IREE_API_EXPORT void iree_hal_allocator_destroy(
     iree_hal_allocator_t* IREE_RESTRICT allocator);
 
+// TODO(#19159): remove iree_hal_allocator_deallocate_buffer when pooling no
+// longer requires the pooling_allocator on iree_hal_buffer_t.
 IREE_API_EXPORT void iree_hal_allocator_deallocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT allocator,
     iree_hal_buffer_t* IREE_RESTRICT buffer);
