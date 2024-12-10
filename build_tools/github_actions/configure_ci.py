@@ -39,8 +39,8 @@ import enum
 import fnmatch
 import json
 import os
-import re
 import pathlib
+import re
 import string
 import subprocess
 import sys
@@ -111,7 +111,12 @@ SKIP_PATH_PATTERNS = [
 RUNNER_ENV_DEFAULT = "prod"
 RUNNER_ENV_OPTIONS = [RUNNER_ENV_DEFAULT, "testing"]
 
-CONTROL_JOBS = frozenset(["setup", "summary"])
+CONTROL_JOB_REGEXES = frozenset(
+    [
+        re.compile("setup"),
+        re.compile(".*summary"),
+    ]
+)
 
 # Jobs to run only on postsubmit by default.
 # They may also run on presubmit only under certain conditions.
@@ -380,7 +385,8 @@ def parse_jobs_from_workflow_file(workflow_file: pathlib.Path) -> Set[str]:
 
     workflow = yaml.load(workflow_file.read_text(), Loader=yaml.SafeLoader)
     all_jobs = set(workflow["jobs"].keys())
-    all_jobs -= CONTROL_JOBS
+    for regex in CONTROL_JOB_REGEXES:
+        all_jobs = [j for j in all_jobs if not regex.match(j)]
 
     if ALL_KEY in all_jobs:
         raise ValueError(f"Workflow has job with reserved name '{ALL_KEY}'")

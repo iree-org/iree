@@ -198,39 +198,14 @@ jobs:
 
   ##############################################################################
 
-  # Depends on all the other jobs to provide a single anchor that indicates the
-  # final status. Status reporting will become more sophisticated in the future
-  # and we can hopefully avoid the need to explicitly list every single job...
-  summary:
-    # Even if you have an explicit if condition, you still need to override
-    # GitHub's default behavior of not running if any dependencies failed.
+  # Aggregate job status and alerting on failures.
+  ci_summary:
     if: always()
-    runs-on: ubuntu-20.04
     needs:
       - setup
       - runtime
       - runtime_small
       - runtime_tracing
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Getting failed jobs
-        id: failed_jobs
-        run: |
-          echo '${{ toJson(needs) }}'
-          FAILED_JOBS="$(echo '${{ toJson(needs) }}' \
-            | jq --raw-output \
-            'map_values(select(.result!="success" and .result!="skipped")) | keys | join(",")' \
-          )"
-          echo "failed-jobs=${FAILED_JOBS}" >> $GITHUB_OUTPUT
-          if [[ "${FAILED_JOBS}" != "" ]]; then
-            echo "The following jobs failed: ${FAILED_JOBS}"
-            exit 1
-          fi
-      - name: Posting to Discord
-        uses: sarisia/actions-status-discord@ce8cc68e4e626000136b3c702d049a154243e490 # v1.14.7
-        if: failure() && github.ref_name == 'main'
-        with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          description: "The following jobs failed: ${{ steps.failed_jobs.outputs.failed-jobs }}"
-          url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}"
+    uses: ./.github/workflows/workflow_summary.yml
+    with:
+      jobs-json: ${{ toJson(needs) }}
