@@ -42,7 +42,7 @@ public:
     return layoutAttr;
   }
 
-  FailureOr<IREE::Codegen::MaterializeEncodingInfo>
+  IREE::Codegen::MaterializeEncodingInfo
   getEncodingInfo(RankedTensorType type) const {
     return layoutAttr.getEncodingInfo(type);
   }
