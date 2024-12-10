@@ -25,8 +25,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # CPU
-          - name: cpu_llvm_task
+          - name: cpu_task
+            target: target_cpu
+            gpu: none
+            runs-on: nodai-amdgpu-w7900-x86-64
+
+          - name: hip_task
+            target: target_hip
+            gpu: gfx1100
             runs-on: nodai-amdgpu-w7900-x86-64
 
     env:
@@ -64,9 +70,10 @@ jobs:
       - name: Run Sharktank models test suite
         run: |
           source ${VENV_DIR}/bin/activate
-          HIP_TARGET=gfx1100 pytest iree-test-suites/sharktank_models/ \
+          HIP_TARGET=${{ matrix.gpu }} pytest iree-test-suites/sharktank_models/ \
               -rA \
               --log-cli-level=info \
               --override-ini=xfail_strict=false \
+              -m ${{ matrix.target }}
               --timeout=120 \
               --durations=0
