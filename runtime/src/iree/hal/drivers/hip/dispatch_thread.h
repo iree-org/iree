@@ -11,10 +11,9 @@
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 
-// iree_hal_hip_dispatch_thread is used simply as a way to get
-// work off of the main thread. This is important to do for
-// a single reason. There are 2 types of command buffer that we
-// use in hip. One is a pre-recorded command buffer
+// iree_hal_hip_dispatch_thread is used to get work off of the main thread.
+// This is important to do for a single reason. There are 2 types of
+// command buffer that we use in hip. One is a pre-recorded command buffer
 // iree_hal_deferred_command_buffer_t, which when executed
 // calls all of the associated hipStream based commands.
 // The other is iree_hal_hip_graph_command_buffer_t which when executed
@@ -28,8 +27,8 @@
 // work off of the main thread. There are a couple of
 // caveats, as now we have to move async allocations and deallocations
 // to that thread as well, as they need to remain in-order.
-
 typedef struct iree_hal_hip_dispatch_thread_t iree_hal_hip_dispatch_thread_t;
+
 typedef struct iree_hal_hip_event_t iree_hal_hip_event_t;
 
 typedef iree_status_t (*iree_hal_hip_dispatch_callback_t)(void* user_data,

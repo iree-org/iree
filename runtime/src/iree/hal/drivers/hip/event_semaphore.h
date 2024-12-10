@@ -38,7 +38,7 @@ iree_status_t iree_hal_hip_semaphore_multi_wait(
     iree_allocator_t host_allocator);
 
 // Adds a work item to be executed once we have a forward progress
-// guarantee on this semaphore to reach a paritcular value.
+// guarantee on this semaphore to reach a particular value.
 // The event pool must be an event pool specifically
 // for the queue that will be doing the work.
 iree_status_t iree_hal_hip_semaphore_notify_work(
@@ -68,10 +68,9 @@ iree_status_t iree_hal_hip_semaphore_get_hip_event(
 
 iree_status_t iree_hal_hip_semaphore_create_event_and_record_if_necessary(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    hipStream_t dispatch_stream, iree_hal_hip_event_pool_t* event_pool,
-    iree_hal_hip_event_t** out_hip_event);
+    hipStream_t dispatch_stream, iree_hal_hip_event_pool_t* event_pool);
 
-static iree_status_t iree_hal_hip_event_semaphore_advance(
+iree_status_t iree_hal_hip_event_semaphore_advance(
     iree_hal_semaphore_t* semaphore);
 
 #endif  // IREE_HAL_DRIVERS_HIP_EVENT_SEMAPHORE_H_

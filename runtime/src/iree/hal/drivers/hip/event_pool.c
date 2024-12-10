@@ -172,7 +172,6 @@ iree_status_t iree_hal_hip_event_pool_allocate(
   event_pool->device_context = device_context;
 
   iree_status_t status = iree_hal_hip_set_context(symbols, device_context);
-
   if (iree_status_is_ok(status)) {
     for (iree_host_size_t i = 0; i < available_capacity; ++i) {
       status = iree_hal_hip_event_create(
@@ -253,22 +252,17 @@ iree_status_t iree_hal_hip_event_pool_acquire(
     IREE_TRACE_ZONE_APPEND_TEXT(z0, "unpooled acquire");
     IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)remaining_count);
 
-    iree_status_t status = iree_hal_hip_set_context(event_pool->symbols,
-                                                    event_pool->device_context);
-    if (iree_status_is_ok(status)) {
-      for (iree_host_size_t i = 0; i < remaining_count; ++i) {
-        status = iree_hal_hip_event_create(event_pool->symbols, event_pool,
-                                           event_pool->host_allocator,
-                                           &out_events[from_pool_count + i]);
-        if (!iree_status_is_ok(status)) {
-          // Must release all events we've acquired so far.
-          iree_hal_hip_event_pool_release_event(event_pool, from_pool_count + i,
-                                                out_events);
-          IREE_TRACE_ZONE_END(z0);
-          return status;
-        }
-      }
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_hal_hip_set_context(event_pool->symbols,
+                                     event_pool->device_context));
+    for (iree_host_size_t i = 0; i < remaining_count; ++i) {
+      iree_status_t status = iree_hal_hip_event_create(
+          event_pool->symbols, event_pool, event_pool->host_allocator,
+          &out_events[from_pool_count + i]);
       if (!iree_status_is_ok(status)) {
+        // Must release all events we've acquired so far.
+        iree_hal_hip_event_pool_release_event(event_pool, from_pool_count + i,
+                                              out_events);
         IREE_TRACE_ZONE_END(z0);
         return status;
       }

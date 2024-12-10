@@ -457,11 +457,9 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
     }
   }
 
-  status = iree_status_join(
+  return iree_status_join(
       status,
       IREE_HIP_CALL_TO_STATUS(allocator->symbols, hipCtxPopCurrent(NULL)));
-
-  return status;
 }
 
 static void iree_hal_hip_allocator_deallocate_buffer(
