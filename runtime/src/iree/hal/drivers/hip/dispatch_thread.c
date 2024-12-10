@@ -108,13 +108,15 @@ iree_status_t iree_hal_hip_dispatch_thread_initialize(
   iree_status_t status =
       iree_thread_create((iree_thread_entry_t)iree_hal_hip_dispatch_thread_main,
                          thread, params, host_allocator, &thread->thread);
-  if (!iree_status_is_ok(status)) {
+
+  if (iree_status_is_ok(status)) {
+    *out_thread = thread;
+  } else {
     iree_hal_hip_dispatch_queue_deinitialize(&thread->queue);
     iree_slim_mutex_deinitialize(&thread->mutex);
     iree_allocator_free(host_allocator, thread);
   }
   IREE_TRACE_ZONE_END(z0);
-  *out_thread = thread;
   return status;
 }
 
@@ -163,11 +165,10 @@ iree_status_t iree_hal_hip_dispatch_thread_add_dispatch(
   iree_slim_mutex_unlock(&thread->mutex);
   iree_notification_post(&thread->notification, IREE_ALL_WAITERS);
 
-  IREE_TRACE_ZONE_END(z0);
-
   if (!iree_status_is_ok(status)) {
     iree_status_ignore(dispatch(user_data, iree_status_clone(status)));
   }
+  IREE_TRACE_ZONE_END(z0);
 
   // If this was a failure then it was put into thread->failure_status.
   return status;

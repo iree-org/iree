@@ -41,6 +41,19 @@ typedef struct iree_hal_hip_semaphore_work_item_t {
   struct iree_hal_hip_semaphore_work_item_t* next;
 } iree_hal_hip_semaphore_work_item_t;
 
+// Work associated with a particular point in the semaphore timeline.
+//
+// The |work_item| is a set of callbacks to be made when the semaphore
+// is guaranteed to make forward progress the associated key value. They
+// will also be cleaned up at this time. If the semaphore is failed,
+// the callbacks will be called with the status code of the failure.
+// If the semaphore is destroyed while callbacks are active,
+// they will be called with the CANCELLED erorr.
+// The |cpu_event| is a value for the CPU to wait on when
+// we may not have to wait infinitely. For example with a multi
+// wait or a non-infinite timeout.
+// The |event| is a hip event that is used for GPU waits or
+// infinite CPU waits.
 typedef struct iree_hal_hip_semaphore_queue_item_t {
   iree_hal_hip_event_t* event;
   iree_hal_hip_cpu_event_t* cpu_event;
@@ -57,8 +70,11 @@ typedef struct iree_hal_hip_semaphore_t {
   // The symbols used to issue HIP API calls.
   const iree_hal_hip_dynamic_symbols_t* symbols;
 
+  // This queue represents the values in the timeline.
+  // The keys in the queue are the timeline values that
+  // are being signaled/waited on in the semaphore
+  // The values are |iree_hal_hip_semaphore_queue_item_t| values.
   struct {
-    // The queue of hip events that back any GPU signals of this semaphore.
     iree_hal_hip_util_tree_t tree;
     // Inline storage for this tree. We expect the normal number of
     // nodes in use for a single semaphore to be relatively small.
@@ -140,11 +156,21 @@ static void iree_hal_hip_semaphore_destroy(
   for (iree_hal_hip_util_tree_node_t* i =
            iree_hal_hip_util_tree_first(&semaphore->event_queue.tree);
        i != NULL; i = iree_hal_hip_util_tree_node_next(i)) {
-    iree_hal_hip_event_t* event = ((iree_hal_hip_semaphore_queue_item_t*)
-                                       iree_hal_hip_util_tree_node_get_value(i))
-                                      ->event;
-    if (event) {
-      iree_hal_hip_event_release(event);
+    iree_hal_hip_semaphore_queue_item_t* queue_item =
+        (iree_hal_hip_semaphore_queue_item_t*)
+            iree_hal_hip_util_tree_node_get_value(i);
+    iree_hal_hip_event_release(queue_item->event);
+    iree_hal_resource_release(queue_item->cpu_event);
+    iree_hal_hip_semaphore_work_item_t* work_item = queue_item->work_item;
+    while (work_item) {
+      work_item->scheduled_callback(
+          work_item->user_data, base_semaphore,
+          iree_make_status(
+              IREE_STATUS_CANCELLED,
+              "semaphore was destroyed while callback is in flight"));
+      iree_hal_hip_semaphore_work_item_t* next = work_item->next;
+      iree_allocator_free(host_allocator, work_item);
+      work_item = next;
     }
   }
   iree_hal_hip_util_tree_deinitialize(&semaphore->event_queue.tree);
@@ -160,11 +186,9 @@ static iree_status_t iree_hal_hip_semaphore_get_cpu_event(
   *out_event = NULL;
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
-  IREE_TRACE_ZONE_BEGIN(z0);
   iree_slim_mutex_lock(&semaphore->mutex);
   if (value <= semaphore->current_visible_value) {
     iree_slim_mutex_unlock(&semaphore->mutex);
-    IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
   }
   iree_status_t status = iree_ok_status();
@@ -211,7 +235,6 @@ static iree_status_t iree_hal_hip_semaphore_get_cpu_event(
       iree_allocator_free(semaphore->host_allocator, item->cpu_event);
     }
   }
-  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -310,11 +333,12 @@ iree_status_t iree_hal_hip_semaphore_multi_wait(
     iree_hal_resource_release(&cpu_events[i]->resource);
   }
   iree_allocator_free(host_allocator, cpu_events);
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
-static iree_status_t iree_hal_hip_event_semaphore_advance(
+static iree_status_t iree_hal_hip_event_semaphore_run_scheduled_callbacks(
     iree_hal_semaphore_t* base_semaphore) {
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
@@ -344,12 +368,11 @@ static iree_status_t iree_hal_hip_event_semaphore_advance(
             iree_hal_hip_util_tree_node_get_value(node);
     iree_hal_hip_util_tree_erase(&semaphore->event_queue.tree, node);
     iree_slim_mutex_unlock(&semaphore->mutex);
-    if (copy.event) {
-      iree_hal_hip_event_release(copy.event);
-    }
+    iree_hal_hip_event_release(copy.event);
     if (copy.cpu_event) {
       iree_event_set(&copy.cpu_event->event);
       iree_hal_resource_release(&copy.cpu_event->resource);
+      iree_allocator_free(copy.cpu_event->host_allocator, copy.cpu_event);
     }
 
     iree_hal_hip_semaphore_work_item_t* next_work_item = copy.work_item;
@@ -369,6 +392,7 @@ static iree_status_t iree_hal_hip_event_semaphore_advance(
   semaphore->max_value_to_be_signaled = iree_max(
       semaphore->max_value_to_be_signaled, semaphore->current_visible_value);
   iree_status_t status = iree_status_clone(semaphore->failure_status);
+
   iree_slim_mutex_unlock(&semaphore->mutex);
   // Now that we have accumulated all of the work items, and we have
   // unlocked the semaphore, start running through the work items.
@@ -392,7 +416,6 @@ iree_status_t iree_hal_hip_semaphore_notify_work(
     void* user_data) {
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
-  IREE_TRACE_ZONE_BEGIN(z0);
   iree_slim_mutex_lock(&semaphore->mutex);
   iree_status_t status = iree_status_clone(semaphore->failure_status);
 
@@ -436,7 +459,6 @@ iree_status_t iree_hal_hip_semaphore_notify_work(
   if (callback) {
     status = callback(user_data, base_semaphore, status);
   }
-  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -444,12 +466,10 @@ iree_status_t iree_hal_hip_semaphore_notify_forward_progress_to(
     iree_hal_semaphore_t* base_semaphore, uint64_t value) {
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
-  IREE_TRACE_ZONE_BEGIN(z0);
   iree_slim_mutex_lock(&semaphore->mutex);
   iree_status_t status = iree_status_clone(semaphore->failure_status);
   if (!iree_status_is_ok(status)) {
     iree_slim_mutex_unlock(&semaphore->mutex);
-    IREE_TRACE_ZONE_END(z0);
     return status;
   }
   iree_hal_hip_semaphore_work_item_t* work_item = NULL;
@@ -496,7 +516,6 @@ iree_status_t iree_hal_hip_semaphore_notify_forward_progress_to(
     iree_allocator_free(semaphore->host_allocator, work_item);
     work_item = next_work_item;
   }
-  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -507,11 +526,9 @@ iree_status_t iree_hal_hip_semaphore_get_hip_event(
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
   *out_hip_event = NULL;
-  IREE_TRACE_ZONE_BEGIN(z0);
   iree_slim_mutex_lock(&semaphore->mutex);
   if (value <= semaphore->current_visible_value) {
     iree_slim_mutex_unlock(&semaphore->mutex);
-    IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
   }
   iree_status_t status = iree_status_clone(semaphore->failure_status);
@@ -557,23 +574,17 @@ iree_status_t iree_hal_hip_semaphore_get_hip_event(
   }
   iree_slim_mutex_unlock(&semaphore->mutex);
 
-  IREE_TRACE_ZONE_END(z0);
-
   return status;
 }
 
 iree_status_t iree_hal_hip_semaphore_create_event_and_record_if_necessary(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    hipStream_t dispatch_stream, iree_hal_hip_event_pool_t* event_pool,
-    iree_hal_hip_event_t** out_hip_event) {
+    hipStream_t dispatch_stream, iree_hal_hip_event_pool_t* event_pool) {
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
-  *out_hip_event = NULL;
-  IREE_TRACE_ZONE_BEGIN(z0);
   iree_slim_mutex_lock(&semaphore->mutex);
   if (value <= semaphore->current_visible_value) {
     iree_slim_mutex_unlock(&semaphore->mutex);
-    IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
   }
   iree_status_t status = iree_status_clone(semaphore->failure_status);
@@ -614,23 +625,15 @@ iree_status_t iree_hal_hip_semaphore_create_event_and_record_if_necessary(
                              dispatch_stream));
         }
       }
-      if (event) {
-        iree_hal_hip_event_retain(event);
-      }
-      *out_hip_event = event;
     }
   }
   iree_slim_mutex_unlock(&semaphore->mutex);
-
-  IREE_TRACE_ZONE_END(z0);
 
   return status;
 }
 
 static iree_status_t iree_hal_hip_semaphore_query_locked(
     iree_hal_hip_semaphore_t* semaphore, uint64_t* out_value) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
   iree_status_t status = iree_ok_status();
   *out_value = semaphore->current_visible_value;
   iree_hal_hip_util_tree_node_t* node =
@@ -672,7 +675,6 @@ static iree_status_t iree_hal_hip_semaphore_query_locked(
     }
   }
 
-  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -680,7 +682,6 @@ static iree_status_t iree_hal_hip_semaphore_query(
     iree_hal_semaphore_t* base_semaphore, uint64_t* out_value) {
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
-  IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_slim_mutex_lock(&semaphore->mutex);
   *out_value = semaphore->current_visible_value;
@@ -694,9 +695,71 @@ static iree_status_t iree_hal_hip_semaphore_query(
     iree_status_ignore(status);
     status = iree_ok_status();
   }
+
+  return iree_status_join(
+      status,
+      iree_hal_hip_event_semaphore_run_scheduled_callbacks(base_semaphore));
+}
+
+iree_status_t iree_hal_hip_event_semaphore_advance(
+    iree_hal_semaphore_t* base_semaphore) {
+  iree_hal_hip_semaphore_t* semaphore =
+      iree_hal_hip_semaphore_cast(base_semaphore);
+
+  iree_slim_mutex_lock(&semaphore->mutex);
+
+  iree_status_t status = iree_ok_status();
+  iree_hal_hip_util_tree_node_t* node =
+      iree_hal_hip_util_tree_first(&semaphore->event_queue.tree);
+
+  iree_host_size_t highest_value = 0;
+  while (node) {
+    if (!((iree_hal_hip_semaphore_queue_item_t*)
+              iree_hal_hip_util_tree_node_get_value(node))
+             ->event) {
+      node = iree_hal_hip_util_tree_node_next(node);
+      continue;
+    }
+
+    hipError_t err =
+        semaphore->symbols->hipEventQuery(iree_hal_hip_event_handle(
+            ((iree_hal_hip_semaphore_queue_item_t*)
+                 iree_hal_hip_util_tree_node_get_value(node))
+                ->event));
+    if (err == hipErrorNotReady) {
+      break;
+    }
+    if (err != hipSuccess) {
+      status = IREE_HIP_RESULT_TO_STATUS(semaphore->symbols, err);
+      break;
+    }
+
+    highest_value = iree_hal_hip_util_tree_node_get_key(node);
+    node = iree_hal_hip_util_tree_node_next(node);
+  }
+
+  if (iree_status_is_ok(status)) {
+    if (semaphore->current_visible_value < highest_value) {
+      semaphore->current_visible_value = highest_value;
+      iree_notification_post(&semaphore->state_notification, IREE_ALL_WAITERS);
+    }
+
+    if (highest_value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
+      status =
+          iree_make_status(IREE_STATUS_ABORTED, "the semaphore was aborted");
+    }
+  }
+
+  iree_slim_mutex_unlock(&semaphore->mutex);
+  // If the status is aborted, we will pick up the real status from
+  // iree_hal_hip_event_semaphore_run_scheduled_callbacks.
+  if (iree_status_is_aborted(status)) {
+    iree_status_ignore(status);
+    status = iree_ok_status();
+  }
   status = iree_status_join(
-      status, iree_hal_hip_event_semaphore_advance(base_semaphore));
-  IREE_TRACE_ZONE_END(z0);
+      status,
+      iree_hal_hip_event_semaphore_run_scheduled_callbacks(base_semaphore));
   return status;
 }
 
@@ -704,8 +767,6 @@ static iree_status_t iree_hal_hip_semaphore_signal(
     iree_hal_semaphore_t* base_semaphore, uint64_t new_value) {
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
-  IREE_TRACE_ZONE_BEGIN(z0);
-
   iree_slim_mutex_lock(&semaphore->mutex);
 
   iree_status_t status = iree_ok_status();
@@ -727,9 +788,9 @@ static iree_status_t iree_hal_hip_semaphore_signal(
   iree_slim_mutex_unlock(&semaphore->mutex);
 
   if (iree_status_is_ok(status)) {
-    status = iree_hal_hip_event_semaphore_advance(base_semaphore);
+    status =
+        iree_hal_hip_event_semaphore_run_scheduled_callbacks(base_semaphore);
   }
-  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -737,7 +798,6 @@ static void iree_hal_hip_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
                                         iree_status_t status) {
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
-  IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_slim_mutex_lock(&semaphore->mutex);
 
@@ -745,9 +805,7 @@ static void iree_hal_hip_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
   // do this if we are going from a valid semaphore to a failed one.
   if (!iree_status_is_ok(semaphore->failure_status)) {
     // Previous sta-tus was not OK; drop our new status.
-    IREE_IGNORE_ERROR(status);
     iree_slim_mutex_unlock(&semaphore->mutex);
-    IREE_TRACE_ZONE_END(z0);
     return;
   }
 
@@ -756,8 +814,8 @@ static void iree_hal_hip_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
   semaphore->failure_status = status;
 
   iree_slim_mutex_unlock(&semaphore->mutex);
-  iree_status_ignore(iree_hal_hip_event_semaphore_advance(base_semaphore));
-  IREE_TRACE_ZONE_END(z0);
+  iree_status_ignore(
+      iree_hal_hip_event_semaphore_run_scheduled_callbacks(base_semaphore));
 }
 
 static iree_status_t iree_hal_hip_semaphore_wait(
@@ -786,7 +844,8 @@ static iree_status_t iree_hal_hip_semaphore_wait(
       iree_slim_mutex_unlock(&semaphore->mutex);
 
       // We are going to pick up the correct status from query_locked below.
-      iree_status_ignore(iree_hal_hip_event_semaphore_advance(base_semaphore));
+      iree_status_ignore(
+          iree_hal_hip_event_semaphore_run_scheduled_callbacks(base_semaphore));
 
       // We have to wait for the semaphore to catch up.
       bool committed =
@@ -812,7 +871,8 @@ static iree_status_t iree_hal_hip_semaphore_wait(
     // value, so we can return.
     if (semaphore->current_visible_value >= value) {
       iree_slim_mutex_unlock(&semaphore->mutex);
-      iree_hal_hip_event_semaphore_advance(base_semaphore);
+      iree_hal_hip_event_semaphore_run_scheduled_callbacks(base_semaphore);
+      iree_slim_mutex_lock(&semaphore->mutex);
     } else if (iree_timeout_is_infinite(timeout)) {
       // This is the fast-path. Since we have an infinite timeout, we can
       // wait directly on the hip event.
@@ -826,7 +886,7 @@ static iree_status_t iree_hal_hip_semaphore_wait(
       IREE_ASSERT(
           node,
           "We really should either have an event in the queue that will satisfy"
-          "this semaphore, (we checked max_value_to_be_signaled above), or we"
+          "this semaphore (we checked max_value_to_be_signaled above) or we"
           "should already have signaled (current_visible_value above)");
       iree_hal_hip_semaphore_queue_item_t* item =
           (iree_hal_hip_semaphore_queue_item_t*)
@@ -838,11 +898,12 @@ static iree_status_t iree_hal_hip_semaphore_wait(
       // while we sleep on the event.
       iree_hal_hip_event_retain(event);
       iree_slim_mutex_unlock(&semaphore->mutex);
-      iree_hal_hip_event_semaphore_advance(base_semaphore);
+      iree_hal_hip_event_semaphore_run_scheduled_callbacks(base_semaphore);
       status = IREE_HIP_CALL_TO_STATUS(
           semaphore->symbols,
           hipEventSynchronize(iree_hal_hip_event_handle(event)));
       iree_hal_hip_event_release(event);
+      iree_slim_mutex_lock(&semaphore->mutex);
     } else {
       // If we have a non-infinite timeout, this is the slow-path.
       // because we will end up having to wait for either the
@@ -859,17 +920,14 @@ static iree_status_t iree_hal_hip_semaphore_wait(
           iree_hal_resource_release(&cpu_event->resource);
         }
       }
+      iree_slim_mutex_lock(&semaphore->mutex);
     }
   }
 
-  // If we are ok status, we expect that the mutex was unlocked.
-  // If there was an error the mutex is still locked.
   if (iree_status_is_ok(status)) {
-    iree_slim_mutex_lock(&semaphore->mutex);
     if (semaphore->current_visible_value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
-      status = iree_status_join(
-          status,
-          iree_make_status(IREE_STATUS_ABORTED, "the semaphore was aborted"));
+      status =
+          iree_make_status(IREE_STATUS_ABORTED, "the semaphore was aborted");
     }
   }
   iree_slim_mutex_unlock(&semaphore->mutex);
