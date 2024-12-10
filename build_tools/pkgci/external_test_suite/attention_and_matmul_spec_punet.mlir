@@ -101,84 +101,6 @@ transform.named_sequence @match_attention_f8(%attention: !transform.any_op {tran
 // Matmul tuning
 //===----------------------------------------------------------------------===//
 
-transform.named_sequence @match_mmt_i8_i8_i32(%root: !transform.any_op {transform.readonly}) -> (!transform.any_op) {
-  transform.match.operation_name %root ["linalg.generic"] : !transform.any_op
-  // transform.print %root {name = "Generic"} : !transform.any_op
-  %ins, %outs = transform.iree.match.cast_compatible_dag_from_root %root {
-    ^bb0(%lhs: tensor<?x?xi8>, %rhs: tensor<?x?xi8>, %out: tensor<?x?xi32>):
-    %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
-                                          affine_map<(d0, d1, d2) -> (d1, d2)>,
-                                          affine_map<(d0, d1, d2) -> (d0, d1)>],
-                         iterator_types = ["parallel", "parallel", "reduction"]}
-        ins(%lhs, %rhs : tensor<?x?xi8>, tensor<?x?xi8>) outs(%out : tensor<?x?xi32>) {
-      ^bb0(%in: i8, %in_0: i8, %acc: i32):
-        %18 = arith.extsi %in : i8 to i32
-        %19 = arith.extsi %in_0 : i8 to i32
-        %20 = arith.muli %18, %19 : i32
-        %21 = arith.addi %acc, %20 : i32
-        linalg.yield %21 : i32
-      } -> tensor<?x?xi32>
-  } : (!transform.any_op) -> (!transform.any_value, !transform.any_value)
-  transform.yield %root : !transform.any_op
-}
-
-transform.named_sequence @match_mmt_2048x10240x1280(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
-   %mmt = transform.include @match_mmt_i8_i8_i32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
-  %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
-  %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
-  transform.iree.match.cast_compatible_type %lhs = tensor<2048x1280xi8> : !transform.any_value
-  transform.iree.match.cast_compatible_type %rhs = tensor<10240x1280xi8> : !transform.any_value
-  %config = transform.param.constant #iree_codegen.compilation_info<
-    lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
-                                                 mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>,
-                                                 subgroup_m_count = 4, subgroup_n_count = 2,
-                                                 reduction = [0, 0, 128],
-                                                 workgroup = [128, 320, 0]}>,
-    translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-      workgroup_size = [128, 4, 1] subgroup_size = 64,
-      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>
-      }>> -> !transform.any_param
-  transform.yield %matmul, %config : !transform.any_op, !transform.any_param
-}
-
-transform.named_sequence @match_mmt_2048x1280x5120(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
-   %mmt = transform.include @match_mmt_i8_i8_i32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
-  %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
-  %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
-  transform.iree.match.cast_compatible_type %lhs = tensor<2048x5120xi8> : !transform.any_value
-  transform.iree.match.cast_compatible_type %rhs = tensor<1280x5120xi8> : !transform.any_value
-  %config = transform.param.constant #iree_codegen.compilation_info<
-    lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
-                                                 mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>,
-                                                 subgroup_m_count = 4, subgroup_n_count = 1,
-                                                 reduction = [0, 0, 256],
-                                                 workgroup = [128, 80, 0]}>,
-    translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-      workgroup_size = [64, 4, 1] subgroup_size = 64,
-      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>
-      }>> -> !transform.any_param
-  transform.yield %matmul, %config : !transform.any_op, !transform.any_param
-}
-
-transform.named_sequence @match_mmt_2048x1280x1280(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
-   %mmt = transform.include @match_mmt_i8_i8_i32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
-  %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
-  %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
-  transform.iree.match.cast_compatible_type %lhs = tensor<2048x1280xi8> : !transform.any_value
-  transform.iree.match.cast_compatible_type %rhs = tensor<1280x1280xi8> : !transform.any_value
-  %config = transform.param.constant #iree_codegen.compilation_info<
-    lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
-                                                 mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>,
-                                                 subgroup_m_count = 2, subgroup_n_count = 2,
-                                                 reduction = [0, 0, 128],
-                                                 workgroup = [64, 160, 0]}>,
-    translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-      workgroup_size = [128, 2, 1] subgroup_size = 64,
-      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>
-      }>> -> !transform.any_param
-  transform.yield %matmul, %config : !transform.any_op, !transform.any_param
-}
-
 //===----------------------------------------------------------------------===//
 // Convolution tuning
 //===----------------------------------------------------------------------===//
@@ -430,9 +352,6 @@ transform.named_sequence @match_matmul_like_Bx20x64x64x2048_transposev_i8xi8xi32
         // TUNING_MATCH_BEGIN DO NOT REMOVE
 
         // Matmul.
-        , @match_mmt_2048x10240x1280 -> @apply_op_config
-        , @match_mmt_2048x1280x5120 -> @apply_op_config
-        , @match_mmt_2048x1280x1280 -> @apply_op_config
 
         // Convolution.
 
