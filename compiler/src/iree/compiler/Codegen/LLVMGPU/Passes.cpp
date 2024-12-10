@@ -1018,6 +1018,7 @@ void addGPUDefaultPassPipeline(OpPassManager &funcPassManager,
   tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/false,
                                /*convertToDpsOptions=*/dpsOptions);
   if (options.enableUkernels) {
+    funcPassManager.addPass(createGPUSelectUKernelsPass());
     funcPassManager.addPass(createGPULowerToUKernelsPass());
   }
   funcPassManager.addPass(createCanonicalizerPass());

@@ -438,4 +438,22 @@ def IREECodegen_EncodingNopLayoutAttr  :
   }];
 }
 
+//===---------------------------------------------------------------------===//
+// iree_codegen.ukernel_spec
+//===---------------------------------------------------------------------===//
+
+def IREECodegen_UKernelSpecAttr  :
+    AttrDef<IREECodegen_Dialect, "UKernelSpec", []> {
+  let mnemonic = "ukernel_spec";
+  let summary = "An attribute specifying a ukernel that an op can lower to.";
+  let description = [{
+    An attribute that can be applied to any operation to specify that it has
+    been match with a ukernel that is a legal lowering for it.
+  }];
+  let assemblyFormat = "`<` struct(params) `>`";
+  let parameters = (ins
+       "StringAttr":$name,
+       "DictionaryAttr":$def_attrs
+  );
+}
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS

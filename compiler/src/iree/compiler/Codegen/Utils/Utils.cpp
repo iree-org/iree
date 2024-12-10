@@ -1231,6 +1231,7 @@ LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
     if (!producer || producer->getNumOperands() == 0) {
       return failure();
     }
+
     auto producerCmpFOp = dyn_cast<arith::CmpFOp>(producer);
     if (!producerCmpFOp) {
       return failure();
