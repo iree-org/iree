@@ -51,20 +51,12 @@ static iree_status_t iree_hal_nonlocal_sync_driver_factory_try_create(
         host_allocator);
   }
 
-  iree_hal_allocator_t* device_allocator = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_allocator_create_heap(iree_make_cstring_view("local"),
-                                            host_allocator, host_allocator,
-                                            &device_allocator);
-  }
-
   if (iree_status_is_ok(status)) {
     status = iree_hal_nl_sync_driver_create(
-        driver_name, &default_params, loader_count, loaders, device_allocator,
+        driver_name, &default_params, loader_count, loaders,
         host_allocator, out_driver);
   }
 
-  iree_hal_allocator_release(device_allocator);
   for (iree_host_size_t i = 0; i < loader_count; ++i) {
     iree_hal_executable_loader_release(loaders[i]);
   }
