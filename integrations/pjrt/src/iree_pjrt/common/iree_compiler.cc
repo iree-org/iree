@@ -95,29 +95,25 @@ class IREECompilerJob : public CompilerJob {
     return true;
   }
 
-  // TODO: Excise: Cannot dep on an internal XLA structure.
-  // bool SetFlags(xla::CompileOptions options) override {
-  //   // Set extra options, overriding env variables if appropriate.
-  //   for (auto [option, option_override] : options.env_option_overrides) {
-  //     std::string override_string;
-  //     if (auto override_val = std::get_if<std::string>(&option_override)) {
-  //       override_string = *override_val;
-  //     } else if (auto override_val = std::get_if<bool>(&option_override)) {
-  //       override_string = *override_val ? "true" : "false";
-  //     } else if (auto override_val = std::get_if<int64_t>(&option_override))
-  //     {
-  //       override_string = std::to_string(*override_val);
-  //     } else {
-  //       assert(false &&
-  //              "option value should be of type string, bool, or int64");
-  //     }
-  //     if (!SetFlag(absl::StrCat("--", option, "=", override_string).c_str()))
-  //     {
-  //       return false;
-  //     }
-  //   }
-  //   return true;
-  // }
+  bool SetFlags(xla::CompileOptionsProto options) override {
+    // Set extra options, overriding env variables if appropriate.
+    for (auto [option, option_override] : options.env_option_overrides()) {
+      std::string override_string;
+      if (option_override.has_string_field()) {
+        override_string = option_override.string_field();
+      } else if (option_override.has_bool_field()) {
+        override_string = option_override.bool_field() ? "true" : "false";
+      } else if (option_override.has_int_field()) {
+        override_string = std::to_string(option_override.int_field());
+      } else {
+        assert(false && "option value should be of type string, bool, or int");
+      }
+      if (!SetFlag(("--" + option + "=" + override_string).c_str())) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   std::string GetFlags() override {
     std::string flags;
