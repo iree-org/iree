@@ -386,7 +386,7 @@ def parse_jobs_from_workflow_file(workflow_file: pathlib.Path) -> Set[str]:
     workflow = yaml.load(workflow_file.read_text(), Loader=yaml.SafeLoader)
     all_jobs = set(workflow["jobs"].keys())
     for regex in CONTROL_JOB_REGEXES:
-        all_jobs = [j for j in all_jobs if not regex.match(j)]
+        all_jobs = {j for j in all_jobs if not regex.match(j)}
 
     if ALL_KEY in all_jobs:
         raise ValueError(f"Workflow has job with reserved name '{ALL_KEY}'")
