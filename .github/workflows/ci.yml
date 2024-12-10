@@ -207,5 +207,6 @@ jobs:
       - runtime_small
       - runtime_tracing
     uses: ./.github/workflows/workflow_summary.yml
+    secrets: inherit
     with:
       jobs-json: ${{ toJson(needs) }}
