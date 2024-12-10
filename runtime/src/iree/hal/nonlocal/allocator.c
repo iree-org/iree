@@ -22,14 +22,6 @@ typedef struct iree_hal_nl_allocator_t {
 
   iree_allocator_t host_allocator;
 
-  // Whether the GPU and CPU can concurrently access NL managed data in a
-  // coherent way. We would need to explicitly perform flushing and invalidation
-  // between GPU and CPU if not.
-  bool supports_concurrent_managed_access;
-
-  // Whether host memory can be registered with CU_MEMHOSTREGISTER_READ_ONLY.
-  bool supports_read_only_host_register;
-
   IREE_STATISTICS(iree_hal_allocator_statistics_t statistics;)
 } iree_hal_nl_allocator_t;
 
@@ -46,15 +38,6 @@ iree_status_t iree_hal_nl_allocator_create(
   IREE_ASSERT_ARGUMENT(out_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // To support device-local + host-visible memory we need concurrent managed
-  // access indicating that the host and devices can concurrently access the
-  // device memory. If we don't have this feature then we fall back to forcing
-  // all device-local + host-visible memory into host-local + device-visible
-  // page-locked memory. The compiler tries to avoid this for high-traffic
-  // buffers except for readback staging buffers.
-  int supports_concurrent_managed_access = 0;
-  int supports_read_only_host_register = 0;
-
   iree_hal_nl_allocator_t* allocator = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, sizeof(*allocator),
@@ -63,10 +46,6 @@ iree_status_t iree_hal_nl_allocator_create(
   iree_hal_resource_initialize(&iree_hal_nl_allocator_vtable,
                                &allocator->resource);
   allocator->host_allocator = host_allocator;
-  allocator->supports_concurrent_managed_access =
-      supports_concurrent_managed_access != 0;
-  allocator->supports_read_only_host_register =
-      supports_read_only_host_register != 0;
   *out_allocator = (iree_hal_allocator_t*)allocator;
 
   IREE_TRACE_ZONE_END(z0);
@@ -114,15 +93,9 @@ static iree_status_t iree_hal_nl_allocator_query_memory_heaps(
   IREE_ASSERT_ARGUMENT(heaps);
   IREE_ASSERT_ARGUMENT(out_count);
 
-  iree_hal_nl_allocator_t* allocator =
-      iree_hal_nl_allocator_cast(base_allocator);
-
   // TODO(benvanik): check CU_DEVICE_ATTRIBUTE_INTEGRATED and return a unified
   // set of heaps (likely still a cached and uncached, at minimum).
   iree_host_size_t count = 3;
-  if (allocator->supports_concurrent_managed_access) {
-    ++count;  // device-local | host-visible
-  }
   if (out_count) *out_count = count;
   if (capacity < count) {
     // NOTE: lightweight as this is hit in normal pre-sizing usage.
@@ -146,28 +119,13 @@ static iree_status_t iree_hal_nl_allocator_query_memory_heaps(
       .min_alignment = min_alignment,
   };
 
-  if (allocator->supports_concurrent_managed_access) {
-    // Device-local managed memory with host mapping support:
-    heaps[i++] = (iree_hal_allocator_memory_heap_t){
-        .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
-                IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
-                IREE_HAL_MEMORY_TYPE_HOST_COHERENT,
-        .allowed_usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                         IREE_HAL_BUFFER_USAGE_DISPATCH |
-                         IREE_HAL_BUFFER_USAGE_MAPPING,
-        .max_allocation_size = max_allocation_size,
-        .min_alignment = min_alignment,
-    };
-  }
-
   // Write-combined page-locked host-local memory (upload):
   heaps[i++] = (iree_hal_allocator_memory_heap_t){
       .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE |
               IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
               IREE_HAL_MEMORY_TYPE_HOST_COHERENT,
       .allowed_usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                       IREE_HAL_BUFFER_USAGE_DISPATCH |
-                       IREE_HAL_BUFFER_USAGE_MAPPING,
+                       IREE_HAL_BUFFER_USAGE_DISPATCH,
       .max_allocation_size = max_allocation_size,
       .min_alignment = min_alignment,
   };
@@ -179,8 +137,7 @@ static iree_status_t iree_hal_nl_allocator_query_memory_heaps(
               IREE_HAL_MEMORY_TYPE_HOST_COHERENT |
               IREE_HAL_MEMORY_TYPE_HOST_CACHED,
       .allowed_usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                       IREE_HAL_BUFFER_USAGE_DISPATCH |
-                       IREE_HAL_BUFFER_USAGE_MAPPING,
+                       IREE_HAL_BUFFER_USAGE_DISPATCH,
       .max_allocation_size = max_allocation_size,
       .min_alignment = min_alignment,
   };
@@ -194,8 +151,6 @@ iree_hal_nl_allocator_query_buffer_compatibility(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     iree_hal_buffer_params_t* IREE_RESTRICT params,
     iree_device_size_t* IREE_RESTRICT allocation_size) {
-  iree_hal_nl_allocator_t* allocator =
-      iree_hal_nl_allocator_cast(base_allocator);
 
   // All buffers can be allocated on the heap.
   iree_hal_buffer_compatibility_t compatibility =
@@ -217,21 +172,6 @@ iree_hal_nl_allocator_query_buffer_compatibility(
                          IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE)) {
       compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH;
     }
-  }
-
-  // If concurrent managed access is not supported then make device-local +
-  // host-visible allocations fall back to host-local + device-visible
-  // page-locked memory. This will be significantly slower for the device to
-  // access but the compiler only uses this type for readback staging buffers
-  // and it's better to function than function fast.
-  if (!allocator->supports_concurrent_managed_access &&
-      iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
-                                          IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
-    compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_LOW_PERFORMANCE;
-    params->type &= ~(IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
-                      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE);
-    params->type |=
-        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
   }
 
   // We are now optimal.
@@ -326,11 +266,6 @@ static iree_status_t iree_hal_nl_allocator_allocate_buffer(
       // Device local + host visible.
       buffer_type = IREE_HAL_NL_BUFFER_TYPE_DEVICE;
       device_ptr = nl_mem_alloc(allocation_size);
-      if (iree_status_is_ok(status) &&
-          allocator->supports_concurrent_managed_access) {
-        // Prefetch the buffer to the GPU stream.
-        nl_mem_prefectch_async(device_ptr, allocation_size);
-      }
       host_ptr = (void*)device_ptr;
     } else {
       // Device only.
@@ -384,20 +319,6 @@ static void iree_hal_nl_allocator_deallocate_buffer(
   const iree_hal_nl_buffer_type_t buffer_type =
       iree_hal_nl_buffer_type(base_buffer);
 
-  // WARNING: we may be called from a random thread and need to ensure that we
-  // have an active NL context. Unfortunately NL is NL and trying to
-  // change the context here will result in full device synchronization. In the
-  // future we'll need to do something fairly complex such as having a dedicated
-  // thread with a persistently bound context that does nothing but free
-  // buffers. The load on this will be lighter when queue-ordered allocations
-  // are used or any sort of pooling policy is applied.
-  //
-  // WARNING: with NL's lazy error propagation it's possible that by the time
-  // this code is running something else has triggered device loss and we can't
-  // actually use the context. In that case we can't perform the frees and want
-  // to silently ignore them: whatever the user tries to do next will fail in
-  // the same way and if we were deallocating this buffer as part of a tear-down
-  // on failure we don't want to end up dying during cleanup.
   iree_hal_nl_buffer_free(buffer_type,
                             iree_hal_nl_buffer_device_pointer(base_buffer),
                             iree_hal_nl_buffer_host_pointer(base_buffer));
@@ -480,17 +401,6 @@ static iree_status_t iree_hal_nl_allocator_import_buffer(
       }
       buffer_type = IREE_HAL_NL_BUFFER_TYPE_HOST_REGISTERED;
       host_ptr = external_buffer->handle.host_allocation.ptr;
-      uint32_t register_flags = 0; //CU_MEMHOSTREGISTER_DEVICEMAP;
-#if 0
-      if (compat_params.access == IREE_HAL_MEMORY_ACCESS_READ &&
-          allocator->supports_read_only_host_register) {
-        register_flags |= CU_MEMHOSTREGISTER_READ_ONLY;
-      }
-#endif
-      nl_mem_register(host_ptr, external_buffer->size, register_flags);
-      if (iree_status_is_ok(status)) {
-         nl_mem_host_get_device_pointer(&device_ptr, host_ptr, 0);
-      }
       break;
     }
     case IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION: {
