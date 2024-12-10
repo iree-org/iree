@@ -54,6 +54,7 @@ iree_cc_library(
     MLIRTargetLLVMIRExport
     MLIRTransformDialect
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Dialect::CPU::IR::IREECPUDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::LLVMCPU
     iree::compiler::Codegen::Utils

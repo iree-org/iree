@@ -14,6 +14,7 @@
 
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
@@ -39,7 +40,8 @@ namespace mlir::iree_compiler {
 // Add all the IREE dialects to the provided registry.
 inline void registerIreeDialects(DialectRegistry &registry) {
   // clang-format off
-  registry.insert<IREE::Codegen::IREECodegenDialect,
+  registry.insert<IREE::CPU::IREECPUDialect,
+                  IREE::Codegen::IREECodegenDialect,
                   IREE::Flow::FlowDialect,
                   IREE::GPU::IREEGPUDialect,
                   IREE::HAL::HALDialect,
