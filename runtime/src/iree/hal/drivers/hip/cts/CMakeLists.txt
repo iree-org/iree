@@ -35,6 +35,13 @@ iree_hal_cts_test_suite(
   EXCLUDED_TESTS
     # HAL event is unimplemented for now.
     "event"
+    # These tests fail with:
+    #     UNAVAILABLE; missing hipDrvGraphAddMemcpyNode symbol;
+    #     cannot use graph-based command buffer
+    "command_buffer_copy_buffer"
+    "command_buffer_dispatch"
+    "command_buffer_update_buffer"
+    "file"
   LABELS
     driver=hip
     requires-gpu-amd
@@ -62,6 +69,13 @@ iree_hal_cts_test_suite(
   EXCLUDED_TESTS
     # HAL event is unimplemented for now.
     "event"
+    # These tests fail with:
+    #     UNAVAILABLE; missing hipDrvGraphAddMemcpyNode symbol;
+    #     cannot use graph-based command buffer
+    "command_buffer_copy_buffer"
+    "command_buffer_dispatch"
+    "command_buffer_update_buffer"
+    "file"
   LABELS
     driver=hip
 )
@@ -92,6 +106,13 @@ iree_hal_cts_test_suite(
   EXCLUDED_TESTS
     # HAL event is unimplemented for now.
     "event"
+    # These tests fail with:
+    #     UNAVAILABLE; missing hipDrvGraphAddMemcpyNode symbol;
+    #     cannot use graph-based command buffer
+    "command_buffer_copy_buffer"
+    "command_buffer_dispatch"
+    "command_buffer_update_buffer"
+    "file"
   LABELS
     driver=hip
     requires-gpu-amd
@@ -123,6 +144,13 @@ iree_hal_cts_test_suite(
   EXCLUDED_TESTS
     # HAL event is unimplemented for now.
     "event"
+    # These tests fail with:
+    #     UNAVAILABLE; missing hipDrvGraphAddMemcpyNode symbol;
+    #     cannot use graph-based command buffer
+    "command_buffer_copy_buffer"
+    "command_buffer_dispatch"
+    "command_buffer_update_buffer"
+    "file"
   LABELS
     driver=hip
 )
@@ -155,6 +183,13 @@ iree_hal_cts_test_suite(
   EXCLUDED_TESTS
     # HAL event is unimplemented for now.
     "event"
+    # These tests fail with:
+    #     UNAVAILABLE; missing hipDrvGraphAddMemcpyNode symbol;
+    #     cannot use graph-based command buffer
+    "command_buffer_copy_buffer"
+    "command_buffer_dispatch"
+    "command_buffer_update_buffer"
+    "file"
   LABELS
     driver=hip
     requires-gpu-amd
@@ -188,6 +223,13 @@ iree_hal_cts_test_suite(
   EXCLUDED_TESTS
     # HAL event is unimplemented for now.
     "event"
+    # These tests fail with:
+    #     UNAVAILABLE; missing hipDrvGraphAddMemcpyNode symbol;
+    #     cannot use graph-based command buffer
+    "command_buffer_copy_buffer"
+    "command_buffer_dispatch"
+    "command_buffer_update_buffer"
+    "file"
   LABELS
     driver=hip
 )
