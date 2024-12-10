@@ -56,8 +56,7 @@ graph LR
 
     === "Stable releases"
 
-        Stable release packages are
-        [published to PyPI](https://pypi.org/user/google-iree-pypi-deploy/).
+        Stable release packages are [published to PyPI](https://pypi.org/).
 
         ``` shell
         python -m pip install \

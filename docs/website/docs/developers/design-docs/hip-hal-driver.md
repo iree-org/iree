@@ -52,7 +52,7 @@ See synchronization section regarding the details.
 
 #### Async allocation
 
-The HIP HAL drivers supports async allocation
+The HIP HAL driver supports async allocation
 (`iree_hal_device_queue_alloca()` and `iree_hal_device_queue_dealloca()`)
 via HIP stream ordered memory allocation.
 

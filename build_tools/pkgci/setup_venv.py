@@ -148,19 +148,19 @@ def get_latest_workflow_run_id_for_main() -> int:
     workflow_run_output = subprocess.check_output(workflow_run_args)
     workflow_run_json_output = json.loads(workflow_run_output)
     latest_run = workflow_run_json_output["workflow_runs"][0]
-    print(f"Found workflow run: {latest_run['html_url']}")
+    print(f"\nFound workflow run: {latest_run['html_url']}")
     return latest_run["id"]
 
 
 def get_latest_workflow_run_id_for_ref(ref: str) -> int:
-    print(f"Normalizing ref: {ref}")
+    print(f"Finding workflow run for ref: {ref}")
     normalized_ref = (
         subprocess.check_output(["git", "rev-parse", ref], cwd=REPO_ROOT)
         .decode()
         .strip()
     )
 
-    print(f"Using normalized ref: {normalized_ref}")
+    print(f"  Using normalized ref: {normalized_ref}")
     workflow_run_args = [
         "gh",
         "api",
@@ -170,14 +170,14 @@ def get_latest_workflow_run_id_for_ref(ref: str) -> int:
         "X-GitHub-Api-Version: 2022-11-28",
         f"{BASE_API_PATH}/actions/workflows/pkgci.yml/runs?head_sha={normalized_ref}",
     ]
-    print(f"Running command to list workflow runs:\n  {' '.join(workflow_run_args)}")
+    print(f"\nRunning command to list workflow runs:\n  {' '.join(workflow_run_args)}")
     workflow_run_output = subprocess.check_output(workflow_run_args)
     workflow_run_json_output = json.loads(workflow_run_output)
     if workflow_run_json_output["total_count"] == 0:
         raise RuntimeError("Workflow did not run at this commit")
 
     latest_run = workflow_run_json_output["workflow_runs"][-1]
-    print(f"Found workflow run: {latest_run['html_url']}")
+    print(f"\nFound workflow run: {latest_run['html_url']}")
     return latest_run["id"]
 
 
@@ -203,7 +203,7 @@ def list_gh_artifacts(run_id: str) -> Dict[str, str]:
         rec["name"]: f"{BASE_API_PATH}/actions/artifacts/{rec['id']}/zip"
         for rec in data["artifacts"]
     }
-    print("Found artifacts:")
+    print("\nFound artifacts:")
     for k, v in artifacts.items():
         print(f"  {k}: {v}")
     return artifacts
@@ -309,7 +309,7 @@ def main(args):
         wheels.append(
             find_wheel_for_variants(args, artifact_prefix, package_stem, variant)
         )
-    print("Installing wheels:", wheels)
+    print("\nInstalling wheels:", wheels)
 
     # Set up venv.
     venv_path = args.venv_dir
@@ -340,6 +340,9 @@ def main(args):
         ]
         print(f"Running command: {' '.join([str(c) for c in cmd])}")
         subprocess.check_call(cmd)
+
+    print(f"\nvenv setup complete at '{venv_path}'. Activate it with")
+    print(f"  source {venv_path}/bin/activate")
 
     return 0
 

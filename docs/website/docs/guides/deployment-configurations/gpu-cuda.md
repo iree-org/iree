@@ -26,12 +26,12 @@ If `nvidia-smi` does not exist, you will need to
 
 ### Get the IREE compiler
 
-#### :octicons-package-16: Download the compiler from a release
+#### :octicons-download-16: Download the compiler from a release
 
-Python packages are regularly published to
-[PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
+Python packages are distributed through multiple channels. See the
 [Python Bindings](../../reference/bindings/python.md) page for more details.
-The core `iree-base-compiler` package includes the CUDA compiler:
+The core [`iree-base-compiler`](https://pypi.org/project/iree-base-compiler/)
+package includes the CUDA compiler:
 
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-compiler-from-release.md"
 
@@ -64,12 +64,12 @@ $ iree-run-module --list_devices
   local-task://
 ```
 
-#### :octicons-package-16: Download the runtime from a release
+#### :octicons-download-16: Download the runtime from a release
 
-Python packages are regularly published to
-[PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
+Python packages are distributed through multiple channels. See the
 [Python Bindings](../../reference/bindings/python.md) page for more details.
-The core `iree-base-runtime` package includes the CUDA HAL driver:
+The core [`iree-base-runtime`](https://pypi.org/project/iree-base-runtime/)
+package includes the CUDA HAL driver:
 
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-runtime-from-release.md"
 

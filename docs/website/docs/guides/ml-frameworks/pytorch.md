@@ -72,6 +72,9 @@ python -m pip install \
   --index-url https://download.pytorch.org/whl/test/cpu torch==2.4.1
 ```
 
+<!-- TODO(scotttodd): mention nightly releases after
+     https://github.com/iree-org/iree/issues/19193 is fixed -->
+
 Install iree-turbine:
 
 ``` shell
