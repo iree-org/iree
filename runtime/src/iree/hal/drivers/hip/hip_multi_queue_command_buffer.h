@@ -18,7 +18,7 @@ typedef struct iree_arena_block_pool_t iree_arena_block_pool_t;
 // iree_hal_command_buffer_t deferred record/replay wrapper
 //===----------------------------------------------------------------------===//
 
-// Records a command buffer that records into multiple command buffers
+// Creates a command buffer that records into multiple command buffers
 // at a time based on the given queue affinity.
 //
 // After recording the underlying command buffers can be retrieved with
