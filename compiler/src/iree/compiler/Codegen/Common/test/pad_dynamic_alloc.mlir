@@ -37,4 +37,14 @@ func.func @dynamic_bound_alloc(%id : index) {
   return
 }
 // CHECK-LABEL: func @dynamic_bound_alloc(
-//       CHECK:   %alloc = memref.alloc() : memref<4088xf32, 3>
+//       CHECK:   memref.alloc() : memref<4088xf32, 3>
+
+// -----
+
+func.func @dynamic_bound_alloca(%id : index) {
+  %0 = util.assume.int %id<umin = 0, umax =  4088> : index
+  %1 = memref.alloca(%0) : memref<?xf32, 3>
+  return
+}
+// CHECK-LABEL: func @dynamic_bound_alloca(
+//       CHECK:   memref.alloca() : memref<4088xf32, 3>
