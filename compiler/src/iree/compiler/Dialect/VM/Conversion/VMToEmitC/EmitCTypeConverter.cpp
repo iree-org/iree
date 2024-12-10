@@ -28,30 +28,6 @@ EmitCTypeConverter::EmitCTypeConverter(ModuleOp module)
     auto input = cast<TypedValue<IREE::VM::RefType>>(inputs[0]);
     return analysis.lookupRef(input);
   });
-
-  // We need a source materialization for refs because after running
-  // `applyFullConversion` there would be references to the original
-  // IREE::VM::Ref values in unused basic block arguments. As these are unused
-  // anyway we create dummy ops which get deleted after the conversion has
-  // finished.
-  addSourceMaterialization([this](OpBuilder &builder, IREE::VM::RefType type,
-                                  ValueRange inputs, Location loc) -> Value {
-    assert(inputs.size() == 1);
-    assert(isa<emitc::PointerType>(inputs[0].getType()));
-
-    Type objectType = IREE::VM::OpaqueType::get(builder.getContext());
-    Type refType = IREE::VM::RefType::get(objectType);
-
-    auto ctx = builder.getContext();
-    auto op = builder.create<emitc::VariableOp>(
-        /*location=*/loc,
-        /*resultType=*/refType,
-        /*value=*/emitc::OpaqueAttr::get(ctx, ""));
-
-    sourceMaterializations.insert(op.getOperation());
-
-    return op.getResult();
-  });
 }
 
 Type EmitCTypeConverter::convertTypeAsNonPointer(Type type) const {
