@@ -117,6 +117,7 @@ def VM_ExtF32OpcodeAttr :
     VM_OPC_CeilF32,
     VM_OPC_FloorF32,
     VM_OPC_RoundF32,
+    VM_OPC_RoundF32Even,
     VM_OPC_MinF32,
     VM_OPC_MaxF32,
 
