@@ -23,6 +23,7 @@ and hosted
 ## Flags
 
 Tuning specs are controlled with the following flags:
+
 * `--iree-codegen-enable-default-tuning-specs` -- enables or disabled the
   default tuning specs shipped with the compiler.
 * `--iree-codegen-tuning-spec-path` -- loads a user-specified tuning spec.
@@ -104,6 +105,7 @@ transform.named_sequence
 Tuning specs are
 [transform dialect](https://mlir.llvm.org/docs/Dialects/Transform/) libraries
 that conform to the following format:
+
 * All tuning spec entry points (named sequence ops) are marked with the
   `iree_codegen.tuning_spec_entrypoint` attribute. They have a single argument
   of type `!transform.any_op` and return a single value of type
