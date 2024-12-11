@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
@@ -107,25 +108,6 @@ static bool isEmptyFillContractionDAGRootOp(
   return true;
 }
 
-/// Check that a given operation is "horizontal" to the group. The operation
-/// is horizontal if the `slice` of the operation does not contain any op
-/// from the group.
-static bool isHorizontalToGroup(Operation *op,
-                                const llvm::SetVector<Operation *> &currGroup,
-                                const DominanceInfo &dominanceInfo,
-                                Operation *seedOp) {
-  BackwardSliceOptions options;
-  // Limit the slice to the seed to make sure the slice is small.
-  options.filter = [&](Operation *op) {
-    return !dominanceInfo.properlyDominates(op, seedOp);
-  };
-  llvm::SetVector<Operation *> slice;
-  getBackwardSlice(op, &slice, options);
-  return !llvm::any_of(currGroup, [&](Operation *groupedOp) {
-    return slice.contains(groupedOp);
-  });
-}
-
 /// Get user of operation that is a truncate operation.
 static std::optional<linalg::GenericOp>
 getTruncateOp(Operation *op,
@@ -149,8 +131,8 @@ getTruncateOp(Operation *op,
     if (!checkOperationEquivalence(genericOp, seedTruncateOp.value())) {
       return std::nullopt;
     }
-    if (!isHorizontalToGroup(genericOp, groupedOperations, dominanceInfo,
-                             seedTruncateOp.value())) {
+    if (!isHorizontalToGroup(genericOp, groupedOperations.getArrayRef(),
+                             dominanceInfo, seedTruncateOp.value())) {
       return std::nullopt;
     }
   }
@@ -226,7 +208,8 @@ static std::optional<HorizontalFusionGroup> getHorizontalFusionGroupMembers(
     if (!dominanceInfo.properlyDominates(seedOp, linalgOp)) {
       return false;
     }
-    if (!isHorizontalToGroup(linalgOp, allOps, dominanceInfo, seedOp)) {
+    if (!isHorizontalToGroup(linalgOp, allOps.getArrayRef(), dominanceInfo,
+                             seedOp)) {
       return false;
     }
     return true;
@@ -344,40 +327,6 @@ static AffineMap getConcatenatedIndexingMap(RewriterBase &rewriter,
     return newIndexingMap;
   }
   return newIndexingMap.insertResult(rewriter.getAffineDimExpr(0), 0);
-}
-
-/// During horizontal fusion, there might be operands of the fused operations
-/// whose definitions are interspersed between the fused operations. For groups
-/// chosen to fuse horizontally, such operations can be moved before the
-/// seed contraction operation (where the fused operation is generated).
-template <typename T>
-static LogicalResult
-moveOperandDefs(RewriterBase &rewriter, ArrayRef<T> operations,
-                Operation *insertionPoint, DominanceInfo &dominanceInfo,
-                ArrayRef<linalg::LinalgOp> ignoreOperations = {}) {
-  BackwardSliceOptions options;
-  llvm::DenseSet<Operation *> ignoreOperationsSet;
-  ignoreOperationsSet.insert(ignoreOperations.begin(), ignoreOperations.end());
-  options.filter = [&](Operation *op) {
-    return !dominanceInfo.properlyDominates(op, insertionPoint) &&
-           !ignoreOperationsSet.contains(op);
-  };
-  // Set inclusive to true cause the slice is computed from the operand, and
-  // we want to include the defining op (which is the point here)
-  options.inclusive = true;
-
-  llvm::SetVector<Operation *> slice;
-  for (auto op : operations) {
-    for (auto operand : op->getOperands()) {
-      getBackwardSlice(operand, &slice, options);
-    }
-  }
-
-  mlir::topologicalSort(slice);
-  for (auto op : slice) {
-    rewriter.moveOpBefore(op, insertionPoint);
-  }
-  return success();
 }
 
 /// On finding this pattern
