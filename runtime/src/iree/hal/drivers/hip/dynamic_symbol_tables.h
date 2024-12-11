@@ -8,8 +8,11 @@
 // HIP symbols
 //===----------------------------------------------------------------------===//
 
-IREE_HAL_HIP_REQUIRED_PFN_DECL(hipCtxGetCurrent, hipCtx_t *)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipCtxSetCurrent, hipCtx_t)
+IREE_HAL_HIP_REQUIRED_PFN_DECL(hipCtxGetCurrent, hipCtx_t *)
+IREE_HAL_HIP_REQUIRED_PFN_DECL(hipCtxPushCurrent, hipCtx_t)
+IREE_HAL_HIP_REQUIRED_PFN_DECL(hipCtxPopCurrent, hipCtx_t *)
+IREE_HAL_HIP_REQUIRED_PFN_DECL(hipDeviceEnablePeerAccess, int, unsigned int)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipDeviceGet, hipDevice_t *, int)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipDeviceGetAttribute, int *,
                                hipDeviceAttribute_t, int)

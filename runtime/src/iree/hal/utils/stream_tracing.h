@@ -133,13 +133,24 @@ void iree_hal_stream_tracing_context_free(
 // Collects in-flight timestamp queries from the stream and feeds them to tracy.
 // Must be called frequently (every submission, etc) to drain the backlog;
 // tracing may start failing if the internal ringbuffer is exceeded.
-void iree_hal_stream_tracing_context_collect(
+iree_status_t iree_hal_stream_tracing_context_collect(
     iree_hal_stream_tracing_context_t* context);
 
 // Notifies that the given list of events has been dispached on to the gpu.
 void iree_hal_stream_tracing_notify_submitted(
     iree_hal_stream_tracing_context_t* context,
     iree_hal_stream_tracing_context_event_list_t* event_list);
+
+// Manually collects the events for a specified event list.
+// Callers must free the `events` to release them back into the context.
+//
+// Use this instead of `iree_hal_stream_tracing_notify_submitted` if
+// you don't want the stream tracing to manually handle manually
+// handle collecting events, (because it may cause more blocking than
+// you would prefer)
+iree_status_t iree_hal_stream_tracing_context_collect_list(
+    iree_hal_stream_tracing_context_t* context,
+    iree_hal_stream_tracing_context_event_t* event_list_head);
 
 // Frees the events and returns them back into the tracing context.
 void iree_hal_stream_tracing_free(

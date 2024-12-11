@@ -10,10 +10,6 @@
 #include "iree/base/api.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif  // __cplusplus
-
 //===----------------------------------------------------------------------===//
 // iree_hal_hip_event_t
 //===----------------------------------------------------------------------===//
@@ -52,9 +48,9 @@ typedef struct iree_hal_hip_event_pool_t iree_hal_hip_event_pool_t;
 // Extra events requested beyond the capability are directly created and
 // destroyed without pooling.
 iree_status_t iree_hal_hip_event_pool_allocate(
-    const iree_hal_hip_dynamic_symbols_t* symbols, hipCtx_t hip_context,
+    const iree_hal_hip_dynamic_symbols_t* symbols,
     iree_host_size_t available_capacity, iree_allocator_t host_allocator,
-    iree_hal_hip_event_pool_t** out_event_pool);
+    hipCtx_t device_context, iree_hal_hip_event_pool_t** out_event_pool);
 
 // Retains the given |event_pool| by increasing its reference count.
 void iree_hal_hip_event_pool_retain(iree_hal_hip_event_pool_t* event_pool);
@@ -72,9 +68,5 @@ void iree_hal_hip_event_pool_release(iree_hal_hip_event_pool_t* event_pool);
 iree_status_t iree_hal_hip_event_pool_acquire(
     iree_hal_hip_event_pool_t* event_pool, iree_host_size_t event_count,
     iree_hal_hip_event_t** out_events);
-
-#ifdef __cplusplus
-}  // extern "C"
-#endif  // __cplusplus
 
 #endif  // IREE_HAL_DRIVERS_HIP_EVENT_POOL_H_
