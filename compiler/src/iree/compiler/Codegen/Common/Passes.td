@@ -445,6 +445,7 @@ def MaterializeDeviceEncodingPass :
   ];
 }
 
+// TODO(hanchung): Remove the pass after we deprecate MaterializeHomogeneousEncodingsPass.
 def MaterializeEncodingIntoNopPass :
     InterfacePass<"iree-codegen-materialize-encoding-into-nop", "mlir::FunctionOpInterface"> {
   let summary = "Drop the encodings from tensor types with encodings.";

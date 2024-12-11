@@ -119,7 +119,7 @@ iree_cc_library(
     "LowerUKernelsToCalls.cpp"
     "MaterializeEncoding.cpp"
     "MaterializeEncodingIntoNop.cpp"
-    "MaterializeEncodingIntoPackUnPack.cpp"
+    "MaterializeEncodingPatterns.cpp"
     "MaterializeTuningSpecsPass.cpp"
     "MemrefCopyToLinalg.cpp"
     "NormalizeLoopBounds.cpp"
