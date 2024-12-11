@@ -34,7 +34,7 @@ these specs.
 The use of tuning specs in `iree-compile` is controlled with the following
 flags:
 
-* `--iree-codegen-enable-default-tuning-specs` -- enables or disabled the
+* `--iree-codegen-enable-default-tuning-specs` -- enables or disables the
   default tuning specs shipped with the compiler.
 * `--iree-codegen-tuning-spec-path` -- loads a user-specified tuning spec.
 * `--iree-codegen-dump-tuning-specs-to` -- dumps final tuning specs to a
