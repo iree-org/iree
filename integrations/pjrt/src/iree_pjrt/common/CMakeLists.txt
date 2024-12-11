@@ -9,18 +9,18 @@ iree_cc_library(
     common
   HDRS
     "api_impl.h"
+    "command_line_utils.h"
     "dylib_entry_point.cc.inc"
     "iree_helpers.h"
     "layout_utils.h"
     "platform.h"
     "tensor_utils.h"
-    "command_line_utils.h"
   SRCS
     "api_impl.cc"
+    "command_line_utils.cc"
     "layout_utils.cc"
     "platform.cc"
     "tensor_utils.cc"
-    "command_line_utils.cc"
   DEPS
     ::compiler
     iree::base
