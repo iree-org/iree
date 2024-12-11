@@ -669,3 +669,39 @@ flow.executable private @ex {
     }
   }
 }
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
+
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @dispatch_matmul_like_16xDx8_f32
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !flow.dispatch.tensor<readwrite:tensor<16x?xf32>>, %arg1: index) {
+      %0 = tensor.empty() : tensor<16x8xf32>
+      %1 = tensor.empty(%arg1) : tensor<8x?xf32>
+      %init = flow.dispatch.tensor.load %arg0, offsets = [0, 0], sizes = [16, %arg1], strides = [1, 1] : !flow.dispatch.tensor<readwrite:tensor<16x?xf32>>{%arg1} -> tensor<16x?xf32>
+      %2 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]}
+              ins(%0, %1 : tensor<16x8xf32>, tensor<8x?xf32>) outs(%init : tensor<16x?xf32>) {
+      ^bb0(%in: f32, %in_0: f32, %out: f32):
+        %3 = arith.mulf %in, %in_0 : f32
+        %4 = arith.addf %out, %3 : f32
+        linalg.yield %4 : f32
+      } -> tensor<16x?xf32>
+      %3 = linalg.generic {
+        indexing_maps = [#map3, #map3],
+        iterator_types = ["parallel", "parallel"]
+      } ins(%2 : tensor<16x?xf32>) outs(%2 : tensor<16x?xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %4 = math.rsqrt %in : f32
+        linalg.yield %4 : f32
+      } -> tensor<16x?xf32>
+      flow.dispatch.tensor.store %3, %arg0, offsets = [0, 0], sizes = [16, %arg1], strides = [1, 1] : tensor<16x?xf32> -> !flow.dispatch.tensor<readwrite:tensor<16x?xf32>>{%arg1}
+      return
+    }
+  }
+}
