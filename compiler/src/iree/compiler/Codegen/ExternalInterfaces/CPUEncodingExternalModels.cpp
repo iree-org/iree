@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/ExternalInterfaces/CPUEncodingExternalModels.h"
 
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -308,12 +309,9 @@ struct CPUDeviceEncodingLayoutAttrInterface
       return nullptr;
     }
 
-    auto resolver =
-        [&](RankedTensorType type) -> FailureOr<MaterializeEncodingInfo> {
-      return getEncodingInfo(layoutAttr, type);
-    };
     FailureOr<Operation *> newOp = Codegen::lowerContractionOpWithEncoding(
-        b, linalgOp, convertedOperands, /*transposeNarrowN=*/true, resolver);
+        b, linalgOp, convertedOperands, /*transposeNarrowN=*/true,
+        cast<IREE::Codegen::LayoutAttrInterface>(layoutAttr));
     return newOp.value_or(nullptr);
   }
 };
@@ -395,12 +393,9 @@ struct VMVXDeviceEncodingLayoutAttrInterface
       return nullptr;
     }
 
-    auto resolver =
-        [&](RankedTensorType type) -> FailureOr<MaterializeEncodingInfo> {
-      return getEncodingInfo(layoutAttr, type);
-    };
     FailureOr<Operation *> newOp = Codegen::lowerContractionOpWithEncoding(
-        b, linalgOp, convertedOperands, /*transposeNarrowN=*/true, resolver);
+        b, linalgOp, convertedOperands, /*transposeNarrowN=*/true,
+        cast<IREE::Codegen::LayoutAttrInterface>(layoutAttr));
     return newOp.value_or(nullptr);
   }
 };
