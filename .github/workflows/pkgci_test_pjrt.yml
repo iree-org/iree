@@ -22,7 +22,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - runner: ubuntu-20.04
+          - runner: ubuntu-24.04
             pjrt_platform: cpu
         # TODO: cuda runner is not available yet, refer to #18814
         #   - runner: some-cuda-available-runner
