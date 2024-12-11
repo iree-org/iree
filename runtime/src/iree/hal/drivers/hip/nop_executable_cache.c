@@ -21,9 +21,7 @@ typedef struct iree_hal_hip_nop_executable_cache_t {
   iree_allocator_t host_allocator;
 
   const iree_hal_hip_dynamic_symbols_t* symbols;
-
-  hipDevice_t device;
-  hipCtx_t hip_context;
+  iree_hal_hip_device_topology_t topology;
 } iree_hal_hip_nop_executable_cache_t;
 
 static const iree_hal_executable_cache_vtable_t
@@ -38,8 +36,8 @@ iree_hal_hip_nop_executable_cache_cast(
 
 iree_status_t iree_hal_hip_nop_executable_cache_create(
     iree_string_view_t identifier,
-    const iree_hal_hip_dynamic_symbols_t* symbols, hipDevice_t device,
-    hipCtx_t hip_context, iree_allocator_t host_allocator,
+    const iree_hal_hip_dynamic_symbols_t* symbols,
+    iree_hal_hip_device_topology_t topology, iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache) {
   IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(out_executable_cache);
@@ -55,8 +53,8 @@ iree_status_t iree_hal_hip_nop_executable_cache_create(
                                &executable_cache->resource);
   executable_cache->host_allocator = host_allocator;
   executable_cache->symbols = symbols;
-  executable_cache->device = device;
-  executable_cache->hip_context = hip_context;
+
+  executable_cache->topology = topology;
 
   *out_executable_cache = (iree_hal_executable_cache_t*)executable_cache;
 
@@ -91,8 +89,7 @@ static iree_status_t iree_hal_hip_nop_executable_cache_prepare_executable(
   iree_hal_hip_nop_executable_cache_t* executable_cache =
       iree_hal_hip_nop_executable_cache_cast(base_executable_cache);
   return iree_hal_hip_native_executable_create(
-      executable_cache->symbols, executable_cache->device,
-      executable_cache->hip_context, executable_params,
+      executable_cache->symbols, executable_cache->topology, executable_params,
       executable_cache->host_allocator, out_executable);
 }
 

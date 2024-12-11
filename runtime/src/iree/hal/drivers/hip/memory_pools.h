@@ -14,10 +14,6 @@
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/hip_headers.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif  // __cplusplus
-
 // WARNING: hipMemPool API's are marked as beta in HIP library meaning
 // that while the feature is complete, it is still open to changes and may
 // have outstanding issues.
@@ -34,7 +30,6 @@ typedef struct iree_hal_hip_memory_pools_t {
 
   iree_hal_device_t* parent_device;
   const iree_hal_hip_dynamic_symbols_t* hip_symbols;
-  hipCtx_t hip_context;
   iree_allocator_t host_allocator;
 
   IREE_STATISTICS(struct {
@@ -49,7 +44,6 @@ typedef struct iree_hal_hip_memory_pools_t {
 iree_status_t iree_hal_hip_memory_pools_initialize(
     iree_hal_device_t* parent_device,
     const iree_hal_hip_dynamic_symbols_t* hip_symbols, hipDevice_t hip_device,
-    hipCtx_t hip_context,
     const iree_hal_hip_memory_pooling_params_t* pooling_params,
     iree_allocator_t host_allocator,
     iree_hal_hip_memory_pools_t* IREE_RESTRICT out_pools);
@@ -86,9 +80,5 @@ iree_status_t iree_hal_hip_memory_pools_prepare_buffer(
 iree_status_t iree_hal_hip_memory_pools_deallocate(
     iree_hal_hip_memory_pools_t* pools, hipStream_t stream,
     iree_hal_buffer_t* buffer);
-
-#ifdef __cplusplus
-}  // extern "C"
-#endif  // __cplusplus
 
 #endif  // IREE_HAL_DRIVERS_HIP_MEMORY_POOLS_H_
