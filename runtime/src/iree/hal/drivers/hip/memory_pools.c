@@ -264,11 +264,10 @@ iree_status_t iree_hal_hip_memory_pools_prepare_buffer(
   iree_hal_buffer_t* buffer = NULL;
 
   iree_status_t status = iree_hal_hip_buffer_wrap(
-      placement, params.type, params.access, params.usage,
-      allocation_size, /*byte_offset=*/0,
-      /*byte_length=*/allocation_size, IREE_HAL_HIP_BUFFER_TYPE_ASYNC,
-      /*device_ptr*/ NULL, /*host_ptr=*/NULL, release_callback,
-      pools->host_allocator, &buffer);
+      placement, params.type, params.access, params.usage, allocation_size,
+      /*byte_offset=*/0, /*byte_length=*/allocation_size,
+      IREE_HAL_HIP_BUFFER_TYPE_ASYNC, /*device_ptr*/ NULL, /*host_ptr=*/NULL,
+      release_callback, pools->host_allocator, &buffer);
 
   if (iree_status_is_ok(status)) {
     *out_buffer = buffer;
