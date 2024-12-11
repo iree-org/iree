@@ -68,7 +68,7 @@ struct GenericResourcePattern : public ConversionPattern {
         affinityAnalysis(affinityAnalysis) {}
 
   LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+  matchAndRewrite(Operation *op, ArrayRef<ValueRange> operands,
                   ConversionPatternRewriter &rewriter) const override {
     if (!doesOperationNeedWrapping(op)) {
       return failure();
@@ -77,11 +77,13 @@ struct GenericResourcePattern : public ConversionPattern {
     auto executionAffinityAttr = affinityAnalysis->inferExecutionAffinity(op);
 
     // Export resources into tensor operands for the op to consume.
+    SmallVector<Value> modifiedOperands =
+        getStreamResourcesFromOneToNOpOperandAdaptors(operands);
     SmallVector<Value> newOperands;
     newOperands.reserve(op->getNumOperands());
     rewriter.setInsertionPoint(op);
     for (auto [oldOperand, newOperand] :
-         llvm::zip_equal(op->getOperands(), operands)) {
+         llvm::zip_equal(op->getOperands(), modifiedOperands)) {
       if (!isa<IREE::Stream::ResourceType, TensorType>(newOperand.getType())) {
         newOperands.push_back(newOperand);
         continue;

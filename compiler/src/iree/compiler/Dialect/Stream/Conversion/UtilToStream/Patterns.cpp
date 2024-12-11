@@ -71,7 +71,7 @@ struct CallOpConversion
     : public AffinityAwareConversionPattern<IREE::Util::CallOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
-  matchAndRewrite(IREE::Util::CallOp op, OpAdaptor adaptor,
+  matchAndRewrite(IREE::Util::CallOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Create a new call that takes the expanded input operands and returns the
     // expanded output results. We can't directly replace the original call as
@@ -82,10 +82,12 @@ struct CallOpConversion
       Type newType;
     };
     SmallVector<Result> resultMap;
+    auto modifiedOperands =
+        getStreamResourcesFromOneToNOpOperandAdaptors(adaptor.getOperands());
     bool anyFailed = false;
     auto callOp = op.cloneAndExpand(
         [&](unsigned i, Value operand, SmallVectorImpl<Value> &newOperands) {
-          auto adaptorOperand = adaptor.getOperands()[i];
+          auto adaptorOperand = modifiedOperands[i];
           expandResourceOperand(op.getLoc(), adaptorOperand, newOperands,
                                 rewriter);
         },
@@ -127,11 +129,13 @@ struct ReturnOpConversion
     : public AffinityAwareConversionPattern<IREE::Util::ReturnOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
-  matchAndRewrite(IREE::Util::ReturnOp op, OpAdaptor adaptor,
+  matchAndRewrite(IREE::Util::ReturnOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
+    SmallVector<Value> convertedOperands =
+        getStreamResourcesFromOneToNOpOperandAdaptors(adaptor.getOperands());
     auto expandedOperands =
-        expandResourceOperands(op.getLoc(), adaptor.getOperands(), rewriter);
+        expandResourceOperands(op.getLoc(), convertedOperands, rewriter);
     rewriter.replaceOpWithNewOp<IREE::Util::ReturnOp>(op, expandedOperands);
     return success();
   }
@@ -325,7 +329,7 @@ struct GlobalStoreOpExpansion
     : public BaseGlobalConversionPattern<IREE::Util::GlobalStoreOp> {
   using BaseGlobalConversionPattern::BaseGlobalConversionPattern;
   LogicalResult
-  matchAndRewrite(IREE::Util::GlobalStoreOp storeOp, OpAdaptor adaptor,
+  matchAndRewrite(IREE::Util::GlobalStoreOp storeOp, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Only apply to expanded types (tensors/etc).
     if (!isExpandedType(storeOp.getValue().getType()))
@@ -340,9 +344,11 @@ struct GlobalStoreOpExpansion
 
     // Insert a transfer/store to the global with unknown lifetime. Lifetime
     // refinement will make this go away if possible.
+    Value convertedValue =
+        getStreamResourceFromOneToNOpOperandAdaptor(adaptor.getValue());
     auto value =
         resolveTensorOperand(storeOp.getLoc(), storeOp.getValue(),
-                             adaptor.getValue(), affinityAnalysis, rewriter);
+                             convertedValue, affinityAnalysis, rewriter);
     assert(expandedGlobal.resourceOp && "Missing resource op");
     auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
         storeOp.getLoc(), expandedGlobal.resourceOp.getType(), value.resource,
@@ -364,11 +370,13 @@ struct OptimizationBarrierOpConversion
     : public AffinityAwareConversionPattern<IREE::Util::OptimizationBarrierOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
-  matchAndRewrite(IREE::Util::OptimizationBarrierOp op, OpAdaptor adaptor,
+  matchAndRewrite(IREE::Util::OptimizationBarrierOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     SmallVector<Value> newOperands;
+    SmallVector<Value> convertedOperands =
+        getStreamResourcesFromOneToNOpOperandAdaptors(adaptor.getOperands());
     for (auto [originalOperand, convertedOperand] :
-         llvm::zip_equal(op.getOperands(), adaptor.getOperands())) {
+         llvm::zip_equal(op.getOperands(), convertedOperands)) {
       if (isa<TensorType>(convertedOperand.getType())) {
         newOperands.push_back(resolveTensorOperand(op.getLoc(), originalOperand,
                                                    convertedOperand, rewriter)

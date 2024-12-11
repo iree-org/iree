@@ -65,11 +65,14 @@ struct BranchOpConversion
     : public AffinityAwareConversionPattern<mlir::cf::BranchOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
-  matchAndRewrite(mlir::cf::BranchOp op, OpAdaptor adaptor,
+  matchAndRewrite(mlir::cf::BranchOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
-    auto expandedOperands = expandResourceOperands(
-        op.getLoc(), adaptor.getDestOperands(), rewriter);
+    SmallVector<Value> convertedDestOperands =
+        getStreamResourcesFromOneToNOpOperandAdaptors(
+            adaptor.getDestOperands());
+    auto expandedOperands =
+        expandResourceOperands(op.getLoc(), convertedDestOperands, rewriter);
     rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, op.getDest(),
                                                     expandedOperands);
     return success();
@@ -121,23 +124,27 @@ struct SelectOpConversion
     : public AffinityAwareConversionPattern<mlir::arith::SelectOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
-  matchAndRewrite(mlir::arith::SelectOp op, OpAdaptor adaptor,
+  matchAndRewrite(mlir::arith::SelectOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Only handle selects where the operands are tensors (resources).
     if (!llvm::isa<TensorType>(op.getTrueValue().getType()))
       return failure();
+    Value convertedTrueValue =
+        getStreamResourceFromOneToNOpOperandAdaptor(adaptor.getTrueValue());
     auto trueOperand = resolveTensorOperand(op.getLoc(), op.getTrueValue(),
-                                            adaptor.getTrueValue(), rewriter);
+                                            convertedTrueValue, rewriter);
+    Value convertedFalseValue =
+        getStreamResourceFromOneToNOpOperandAdaptor(adaptor.getFalseValue());
     auto falseOperand = resolveTensorOperand(op.getLoc(), op.getFalseValue(),
-                                             adaptor.getFalseValue(), rewriter);
+                                             convertedFalseValue, rewriter);
     auto resourceSelectOp = rewriter.create<mlir::arith::SelectOp>(
-        op.getLoc(), adaptor.getCondition(), trueOperand.resource,
+        op.getLoc(), adaptor.getCondition().front(), trueOperand.resource,
         falseOperand.resource);
     auto sizeSelectOp = rewriter.create<mlir::arith::SelectOp>(
-        op.getLoc(), adaptor.getCondition(), trueOperand.resourceSize,
+        op.getLoc(), adaptor.getCondition().front(), trueOperand.resourceSize,
         falseOperand.resourceSize);
     rewriter.replaceOpWithNewOp<mlir::UnrealizedConversionCastOp>(
-        op, adaptor.getTrueValue().getType(),
+        op, convertedTrueValue.getType(),
         ValueRange{resourceSelectOp.getResult(), sizeSelectOp.getResult()});
     return success();
   }
@@ -288,13 +295,15 @@ struct ScfWhileOpConversion
     : public AffinityAwareConversionPattern<mlir::scf::WhileOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
-  matchAndRewrite(mlir::scf::WhileOp op, OpAdaptor adaptor,
+  matchAndRewrite(mlir::scf::WhileOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto &typeConverter = *getTypeConverter();
 
     // Expand any resource operands to resource + size.
+    SmallVector<Value> convertedOperands =
+        getStreamResourcesFromOneToNOpOperandAdaptors(adaptor.getOperands());
     auto expandedOperands =
-        expandResourceOperands(op.getLoc(), adaptor.getOperands(), rewriter);
+        expandResourceOperands(op.getLoc(), convertedOperands, rewriter);
 
     // Expand any resource results to resource + size.
     SmallVector<Type> expandedTypes;
@@ -374,13 +383,15 @@ struct ScfConditionOpConversion
     : public AffinityAwareConversionPattern<mlir::scf::ConditionOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
-  matchAndRewrite(mlir::scf::ConditionOp op, OpAdaptor adaptor,
+  matchAndRewrite(mlir::scf::ConditionOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
+    SmallVector<Value> convertedArgs =
+        getStreamResourcesFromOneToNOpOperandAdaptors(adaptor.getArgs());
     auto expandedOperands =
-        expandResourceOperands(op.getLoc(), adaptor.getArgs(), rewriter);
+        expandResourceOperands(op.getLoc(), convertedArgs, rewriter);
     rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(
-        op, adaptor.getCondition(), expandedOperands);
+        op, adaptor.getCondition().front(), expandedOperands);
     return success();
   }
 };
@@ -389,11 +400,13 @@ struct ScfYieldOpConversion
     : public AffinityAwareConversionPattern<mlir::scf::YieldOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
-  matchAndRewrite(mlir::scf::YieldOp op, OpAdaptor adaptor,
+  matchAndRewrite(mlir::scf::YieldOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
+    SmallVector<Value> convertedOperands =
+        getStreamResourcesFromOneToNOpOperandAdaptors(adaptor.getOperands());
     auto expandedOperands =
-        expandResourceOperands(op.getLoc(), adaptor.getOperands(), rewriter);
+        expandResourceOperands(op.getLoc(), convertedOperands, rewriter);
     rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, expandedOperands);
     return success();
   }

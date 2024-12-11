@@ -120,4 +120,21 @@ ConvertedTensor transferTensorOperand(
   return {requiredAffinityAttr, resource, resourceSize};
 }
 
+Value getStreamResourceFromOneToNOpOperandAdaptor(ValueRange values) {
+  assert(values.size() >= 1 &&
+         "expected ValueRange from adaptor to have two entries");
+  if (auto castOp =
+          values.front().getDefiningOp<UnrealizedConversionCastOp>()) {
+    return castOp->getOperand(0);
+  }
+  return values.front();
+}
+
+SmallVector<Value>
+getStreamResourcesFromOneToNOpOperandAdaptors(ArrayRef<ValueRange> values) {
+  return llvm::map_to_vector(values, [](ValueRange r) -> Value {
+    return getStreamResourceFromOneToNOpOperandAdaptor(r);
+  });
+}
+
 } // namespace mlir::iree_compiler

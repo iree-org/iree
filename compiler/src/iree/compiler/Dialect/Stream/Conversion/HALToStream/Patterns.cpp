@@ -16,6 +16,14 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+/// Flatten the given value ranges into a single vector of values.
+static SmallVector<Value> flattenValues(ArrayRef<ValueRange> values) {
+  SmallVector<Value> result;
+  for (const auto &vals : values)
+    llvm::append_range(result, vals);
+  return result;
+}
+
 // %1 = hal.tensor.import %0 : !hal.buffer_view -> tensor<4xf32>
 // ->
 // %1 = stream.tensor.import %0 : !hal.buffer_view ->
@@ -122,10 +130,10 @@ struct ConvertTensorImportOp
 // %1 = stream.tensor.export %0 : tensor<4xf32> in !stream.resource<*> ->
 //                                !hal.buffer_view
 struct ConvertTensorExportOp
-    : public AffinityOpConversionPattern<IREE::HAL::TensorExportOp> {
-  using AffinityOpConversionPattern::AffinityOpConversionPattern;
+    : public AffinityOneToNOpConversionPattern<IREE::HAL::TensorExportOp> {
+  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
-      IREE::HAL::TensorExportOp op, OpAdaptor adaptor,
+      IREE::HAL::TensorExportOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
       ConversionPatternRewriter &rewriter) const override {
     auto sourceType = op.getSourceEncoding();
@@ -135,13 +143,15 @@ struct ConvertTensorExportOp
       return rewriter.notifyMatchFailure(op, "unsupported HAL cast conversion");
     }
 
+    Value convertedSource =
+        getStreamResourceFromOneToNOpOperandAdaptor(adaptor.getSource());
     auto source =
-        transferTensorOperand(op.getLoc(), op.getSource(), adaptor.getSource(),
+        transferTensorOperand(op.getLoc(), op.getSource(), convertedSource,
                               executionAffinityAttr, rewriter);
 
     // Exporting a produced value - transfer our source value to an externally
     // usable resource and directly export it. This will cause an allocation.
-    auto exportSource = adaptor.getSource();
+    Value exportSource = adaptor.getSource().front();
     auto externalType = rewriter.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::External);
     if (source.resource.getType() != externalType) {
@@ -154,7 +164,8 @@ struct ConvertTensorExportOp
     // Export (stream resource to buffer view).
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorExportOp>(
         op, targetType, exportSource, TypeAttr::get(sourceType),
-        adaptor.getSourceDims(), source.resourceSize, executionAffinityAttr);
+        flattenValues(adaptor.getSourceDims()), source.resourceSize,
+        executionAffinityAttr);
     return success();
   }
 };
