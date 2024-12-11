@@ -25,7 +25,8 @@ IREE_FLAG(float, expected_f32_threshold, 0.0001f,
 IREE_FLAG(double, expected_f64_threshold, 0.0001,
           "Threshold under which two f64 values are considered equal.");
 IREE_FLAG(string, equality_mode, "absolute",
-          "Choose between absolute, relative or exact comparison");
+          "Choose the type of comparison desired between buffers from "
+          "[`absolute`, `relative`, `exact`].");
 
 static iree_hal_buffer_equality_t iree_tooling_equality_from_flags(void) {
   iree_hal_buffer_equality_t equality;
