@@ -44,7 +44,7 @@ void buildVMVXConfigurationPassPipeline(OpPassManager &variantPassManager) {
   }
   modulePassManager.addPass(createMaterializeUserConfigsPass());
   FunctionLikeNest(modulePassManager)
-      .addPass(createCPUMaterializeDeviceEncodingPass)
+      .addPass(createMaterializeDeviceEncodingPass)
       // TODO: Remove the following pass the plumb support for
       // #hal.descriptor_type memory space through the stack.
       .addPass(createEraseHALDescriptorTypeFromMemRefPass);
