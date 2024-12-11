@@ -16,9 +16,8 @@ most powerful).
 ```
 pip install -r requirements.txt
 
-# Assume that you have the Jax repo checked out at JAX_REPO from
-# https://github.com/google/jax (must be paired with nightly jaxlib).
-pip install -e $JAX_REPO
+# a higher version of jax is highly recommended, e.g. 0.4.37
+pip install jax==0.4.37
 ```
 
 Verify that your Jax install is functional like:
@@ -78,14 +77,7 @@ The plugin `openxla_pjrt_artifacts` is in the `ctstools` directory and
 performs additional manipulation of the environment in order to save
 compilation artifacts, reproducers, etc.
 
-## Contacts
-
-* [GitHub issues](https://github.com/openxla/openxla-pjrt-plugin/issues):
-  Feature requests, bugs, and other work tracking
-* [OpenXLA discord](https://discord.gg/pvuUmVQa): Daily development discussions
-  with the core team and collaborators
-
 ## License
 
-OpenXLA PJRT plugin is licensed under the terms of the Apache 2.0 License with
-LLVM Exceptions. See [LICENSE](LICENSE) for more information.
+IREE PJRT plugin is licensed under the terms of the Apache 2.0 License with
+LLVM Exceptions. See [LICENSE](../../LICENSE) for more information.
