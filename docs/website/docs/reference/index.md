@@ -18,4 +18,5 @@ repository.
 
 * [Glossary](./glossary.md)
 * [Optimization options](./optimization-options.md)
+* [Tuning](./tuning.md)
 * [Extensions](./extensions.md)

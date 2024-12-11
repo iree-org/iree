@@ -188,6 +188,7 @@ nav:
       - "Other topics":
           - Glossary: "reference/glossary.md"
           - Optimization options: "reference/optimization-options.md"
+          - Tuning: "reference/tuning.md"
           - Extensions: "reference/extensions.md"
   - "Developers":
       - "developers/index.md"
