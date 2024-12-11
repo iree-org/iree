@@ -125,6 +125,64 @@ private:
   }
 };
 
+/// Get the converted !stream.resource<*> from the OneToNOpOperandAdaptor.
+///
+/// The type converter converts `tensor<...>` to a `stream.resource<*>` and
+/// `index`. As a result the operations that consume `stream.resource<*>` get
+/// from the adaptor a `ValueRange`, all of which are defined by the
+/// `builtin.unrealized_conversion_cast`. The real converted type is the operand
+/// to this operation. For example,
+///
+/// ```mlir
+/// %0 = flow.tensor.import
+/// ```
+///
+/// gets converted to
+///
+/// ```mlir
+/// %0 = stream.tensor.sizeof ... : index
+/// %1 = stream.tensor.import ... : !stream.resource<external>{%0}
+/// %2 = stream.async.transfer %1 : !stream.resource<*>{%0}
+/// %3:2 = builtin.unrealized_conversion_cast %2 :
+///     !stream.resource<*> to !stream.resource<*>, index
+/// ```
+///
+/// The `ValueRange` recieved from the `OneToNOperandAdaptor` is a `ValueRange
+/// {%3#0, %3#1}. The `Value` that is actually needed is `%2`. This is a utility
+/// method to retrieve that.
+Value getStreamResourceFromOneToNOpOperandAdaptor(ValueRange values);
+SmallVector<Value>
+getStreamResourcesFromOneToNOpOperandAdaptors(ArrayRef<ValueRange> values);
+
+template <typename OpT>
+struct AffinityOneToNOpConversionPattern
+    : public AffinityAwareConversionPattern<OpT> {
+public:
+  AffinityOneToNOpConversionPattern(
+      const TypeConverter &typeConverter, MLIRContext *context,
+      IREE::Stream::AffinityAnalysis *affinityAnalysis,
+      PatternBenefit benefit = 1)
+      : AffinityAwareConversionPattern<OpT>(typeConverter, context,
+                                            affinityAnalysis, benefit) {}
+
+protected:
+  virtual LogicalResult matchAndRewriteOnAffinity(
+      OpT op, typename OpConversionPattern<OpT>::OneToNOpAdaptor adaptor,
+      IREE::Stream::AffinityAttr executionAffinityAttr,
+      ConversionPatternRewriter &rewriter) const = 0;
+
+private:
+  LogicalResult
+  matchAndRewrite(OpT op,
+                  typename OpConversionPattern<OpT>::OneToNOpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override final {
+    auto executionAffinityAttr =
+        tryLookupExecutionAffinity(op, this->getAffinityAnalysis());
+    return matchAndRewriteOnAffinity(op, adaptor, executionAffinityAttr,
+                                     rewriter);
+  }
+};
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_STREAM_CONVERSION_PATTERN_UTILS_H_
