@@ -4,13 +4,20 @@
 // RUN:   --iree-codegen-notify-transform-strategy-application \
 // RUN:   --verify-diagnostics %s | FileCheck %s
 
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 \
+// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-hal-configure-target-executable-variants{target=rocm})))" \
+// RUN:   --iree-codegen-tuning-spec-path=%p/tuning_spec_mmt_tile_and_fuse.mlir \
+// RUN:   --iree-codegen-enable-default-tuning-specs \
+// RUN:   --iree-codegen-notify-transform-strategy-application \
+// RUN:   --verify-diagnostics %s | FileCheck %s
+
 // Make sure we can apply the lowering strategy from the specified tuning spec.
 
 // CHECK:      #translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64>
 // CHECK:      func.func @matmul_transpose_b
 // CHECK-SAME:   translation_info = #translation
 // CHECK:        linalg.generic
-// CHECK-SAME:     __tuning_spec_applied__
+// CHECK-SAME:     __custom_tuning_spec_applied__
 // CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
