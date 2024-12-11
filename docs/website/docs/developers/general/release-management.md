@@ -81,3 +81,35 @@ request that some feature make the cut.
 
 3. Complete any remaining checkbox items on the release tracking issue then
    close it and open a new one for the next release.
+
+## Creating a patch release
+
+1. Create a new branch.
+
+    Checkout the corresponding stable release and create a branch for the patch release:
+
+    ```shell
+    git checkout iree-3.0.0
+    git checkout -b iree-3.0.1
+    ```
+
+2. Apply and commit the patches.
+
+3. Set the patch level:
+
+    * Adjust `compiler/version.json` if patches are applied to the compiler.
+
+    * Adjust `runtime/version.json` if patches are applied to the runtime.
+
+4. Push all changes to the new branch.
+
+5. Run the _Oneshot candidate release_ workflow to create a release.
+
+    * Select to run the workflow from the patch branch.
+
+    * Set the type of build version to produce to "stable".
+
+        ![one_shot_patch](./one-shot-patch.png)
+
+6. Follow the documentation above to promote to stable.
+   The step to create a new tag can be skipped.
