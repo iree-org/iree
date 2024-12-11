@@ -11,8 +11,7 @@
 #include <string>
 
 #include "iree_pjrt/common/debugging.h"
-// TODO: Excise.
-// #include "xla/pjrt/pjrt_executable.h"
+#include "xla/pjrt/compile_options.pb.h"
 
 namespace iree::pjrt {
 
@@ -37,8 +36,7 @@ class CompilerJob {
   // setup of a job (or if the underlying session will not be re-used).
   // Returns false on failure.
   virtual bool SetFlag(const char* flag) = 0;
-  // TODO: Excise.
-  // virtual bool SetFlags(xla::CompileOptions options) = 0;
+  virtual bool SetFlags(xla::CompileOptionsProto options) = 0;
 
   // Gets all flags as a string. This is intended for debug printing a plausible
   // command line to reproduce compilation.

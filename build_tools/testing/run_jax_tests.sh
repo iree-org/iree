@@ -48,6 +48,13 @@ diff_jax_test test/test_add.py
 diff_jax_test test/test_degenerate.py
 diff_jax_test test/test_simple.py
 
+# here we test if the compile options is passed to IREE PJRT plugin successfully.
+# we pass --iree-scheduling-dump-statistics-format=csv via jax.jit,
+# and see if there's statistics in the output
+compile_options_test_tmp_out=$(mktemp /tmp/jax_test_result_compile_options.XXXXXX)
+JAX_PLATFORMS=$actual_jax_platform python test/test_compile_options.py 2>&1 | tee $compile_options_test_tmp_out
+cat $compile_options_test_tmp_out | grep '@main_dispatch'
+
 
 # FIXME: we can also utilize the native test cases from JAX,
 # e.g. `tests/nn_test.py` from the JAX repo, as below,
