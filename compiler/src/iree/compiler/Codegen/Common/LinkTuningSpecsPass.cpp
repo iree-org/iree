@@ -109,7 +109,7 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
 
   // Make sure spec names are unique to work around a transform dialect
   // interpreter bug (`transform.include` does not handle name collisions
-  // correctly).
+  // correctly): https://github.com/llvm/llvm-project/issues/119578.
   llvm::StringMap<unsigned> specNameCounts;
   // Reserve the name for the outermost entrypoint.
   specNameCounts[kKernelConfigSpecName] = 1;
