@@ -104,10 +104,11 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_onnx')
     uses: ./.github/workflows/pkgci_test_onnx.yml
 
+  # TODO(https://github.com/iree-org/iree-test-suites/issues/56): re-enable when git LFS quota is available
   test_sharktank:
     name: Test Sharktank
     needs: [setup, build_packages]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_sharktank')
+    if: false && contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_sharktank')
     uses: ./.github/workflows/pkgci_test_sharktank.yml
 
   test_tensorflow:
