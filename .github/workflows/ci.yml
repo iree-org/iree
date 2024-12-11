@@ -58,8 +58,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: ubuntu-20.04
-            runs-on: ubuntu-20.04
+          - name: ubuntu-24.04
+            runs-on: ubuntu-24.04
             driver-options: -DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON -DIREE_HAL_DRIVER_VULKAN=ON
           - name: windows-2022
             runs-on: windows-2022
@@ -120,7 +120,7 @@ jobs:
   runtime_small:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'runtime_small')
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     env:
       BUILD_DIR: build-runtime
       CC: clang
@@ -156,7 +156,7 @@ jobs:
     needs: setup
     name: "runtime_tracing :: ${{ matrix.provider }} provider"
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'runtime_tracing')
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:

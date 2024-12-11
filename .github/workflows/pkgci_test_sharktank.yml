@@ -28,7 +28,7 @@ jobs:
           - name: cpu_task
             target: target_cpu
             gpu: none
-            runs-on: ubuntu-20.04
+            runs-on: ubuntu-24.04
 
           - name: hip_task
             target: target_hip
