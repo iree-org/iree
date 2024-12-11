@@ -103,7 +103,9 @@ request that some feature make the cut.
 
 4. Push all changes to the new branch.
 
-5. Run the _Oneshot candidate release_ workflow to create a release.
+5. Trigger the
+    [_Oneshot candidate release_ workflow](https://github.com/iree-org/iree/actions/workflows/oneshot_candidate_release.yml)
+    to create a release.
 
     * Select to run the workflow from the patch branch.
 
