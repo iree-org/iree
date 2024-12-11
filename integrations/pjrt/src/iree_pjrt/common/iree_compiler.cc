@@ -105,8 +105,11 @@ class IREECompilerJob : public CompilerJob {
         override_string = option_override.bool_field() ? "true" : "false";
       } else if (option_override.has_int_field()) {
         override_string = std::to_string(option_override.int_field());
+      } else if (option_override.has_double_field()) {
+        override_string = std::to_string(option_override.double_field());
       } else {
-        assert(false && "option value should be of type string, bool, or int");
+        assert(false &&
+               "option value should be of type string, bool, int, or double");
       }
       if (!SetFlag(("--" + option + "=" + override_string).c_str())) {
         return false;
