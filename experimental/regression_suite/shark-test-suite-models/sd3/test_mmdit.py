@@ -134,10 +134,6 @@ def test_run_mmdit_cpu(SD3_MMDIT_COMMON_RUN_FLAGS, sd3_mmdit_real_weights):
 ###############################################################################
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Expected compilation to fail",
-)
 def test_compile_mmdit_rocm(sd3_mmdit_mlir):
     VmfbManager.sd3_mmdit_rocm_vmfb = iree_compile(
         sd3_mmdit_mlir,
@@ -148,6 +144,10 @@ def test_compile_mmdit_rocm(sd3_mmdit_mlir):
     )
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="Expected run to fail",
+)
 @pytest.mark.depends(on=["test_compile_mmdit_rocm"])
 def test_run_mmdit_rocm(SD3_MMDIT_COMMON_RUN_FLAGS, sd3_mmdit_real_weights):
     return iree_run_module(

@@ -104,10 +104,11 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_onnx')
     uses: ./.github/workflows/pkgci_test_onnx.yml
 
+  # TODO(https://github.com/iree-org/iree-test-suites/issues/56): re-enable when git LFS quota is available
   test_sharktank:
     name: Test Sharktank
     needs: [setup, build_packages]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_sharktank')
+    if: false && contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_sharktank')
     uses: ./.github/workflows/pkgci_test_sharktank.yml
 
   test_tensorflow:
@@ -121,3 +122,28 @@ jobs:
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_pjrt')
     uses: ./.github/workflows/pkgci_test_pjrt.yml
+
+  ##############################################################################
+
+  # Aggregate job status and alerting on failures.
+  pkgci_summary:
+    if: always()
+    needs:
+      - setup
+      - build_packages
+      - unit_test
+      - regression_test
+      - test_amd_mi250
+      - test_amd_mi300
+      - test_amd_w7900
+      # - test_nvidia_t4
+      - test_android
+      - test_riscv64
+      - test_onnx
+      - test_sharktank
+      - test_tensorflow
+      - test_pjrt
+    uses: ./.github/workflows/workflow_summary.yml
+    secrets: inherit
+    with:
+      jobs-json: ${{ toJson(needs) }}
