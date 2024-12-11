@@ -54,7 +54,7 @@ jobs:
             echo "The following jobs failed: ${FAILED_JOBS}"
             exit 1
           fi
-      - name: Posting to Discord
+      - name: Post to Discord on Failure
         uses: sarisia/actions-status-discord@ce8cc68e4e626000136b3c702d049a154243e490 # v1.14.7
         if: failure() && github.ref_name == 'main' && github.repository_owner == 'iree-org'
         with:
