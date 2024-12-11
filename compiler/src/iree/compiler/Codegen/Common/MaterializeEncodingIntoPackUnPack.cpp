@@ -237,6 +237,10 @@ static FailureOr<Operation *> lowerGenericOpWithEncoding(
     return rewriter.notifyMatchFailure(
         genericOp, "MaterializeEncodingInfo failed for output");
   }
+  if (outMaterializeEncodingInfo.swizzle) {
+    return rewriter.notifyMatchFailure(
+        genericOp, "generic op lowering does not support swizzle yet");
+  }
 
   auto convertedResultType =
       cast<RankedTensorType>(convertedOutputOperands[0].getType());
@@ -731,10 +735,7 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
   MLIRContext *context = patterns.getContext();
-  // TODO(hanchung): Move the generic op pattern to ShapeIndependent category
-  // after we add the support for tile swizzling variants.
-  patterns.insert<MaterializeDPSOperation<linalg::GenericOp>,
-                  MaterializeContractionOp, SetEncodingOpToPackOpConversion,
+  patterns.insert<MaterializeContractionOp, SetEncodingOpToPackOpConversion,
                   UnsetEncodingOpToUnPackOpConversion>(
       context, typeConverter, materializeEncodingValueFn);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
@@ -768,6 +769,7 @@ void populateShapeIndependentMaterializeEncodingPatterns(
 
   patterns.insert<
       MaterializeDPSOperation<linalg::FillOp>,
+      MaterializeDPSOperation<linalg::GenericOp>,
       MaterializeOperation<tensor::EmptyOp>, MaterializeOptimizationBarrierOp,
       MaterializeFlowDispatchTensorLoadOp, MaterializeFlowDispatchTensorStoreOp,
       MaterializeInterfaceBindingEncoding>(context, typeConverter,
