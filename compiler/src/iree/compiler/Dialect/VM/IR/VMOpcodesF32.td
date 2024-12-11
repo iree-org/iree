@@ -45,6 +45,7 @@ def VM_OPC_MinF32                : VM_OPC<0x37, "MinF32">;
 def VM_OPC_MaxF32                : VM_OPC<0x38, "MaxF32">;
 
 def VM_OPC_CastSI32F32           : VM_OPC<0x14, "CastSI32F32">;
+def VM_OPC_CastSI64F32           : VM_OPC<0x3C, "CastSI64F32">;
 def VM_OPC_CastUI32F32           : VM_OPC<0x15, "CastUI32F32">;
 def VM_OPC_CastF32SI32           : VM_OPC<0x16, "CastF32SI32">;
 def VM_OPC_CastF32SI64           : VM_OPC<0x3A, "CastF32SI64">;
@@ -120,6 +121,7 @@ def VM_ExtF32OpcodeAttr :
     VM_OPC_MaxF32,
 
     VM_OPC_CastSI32F32,
+    VM_OPC_CastSI64F32,
     VM_OPC_CastUI32F32,
     VM_OPC_CastF32SI32,
     VM_OPC_CastF32SI64,

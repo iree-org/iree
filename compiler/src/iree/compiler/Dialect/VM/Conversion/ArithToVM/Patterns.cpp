@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -539,6 +540,14 @@ struct IntToFPOpConversion : public OpConversionPattern<OpTy> {
       return rewriter.notifyMatchFailure(srcOp, "unsupported type");
     }
     Value input = srcOp.getIn();
+    auto resultType = this->getTypeConverter()->convertType(dstType);
+    if (llvm::isa<arith::SIToFPOp>(srcOp) &&
+        (srcType.isSignlessInteger(64) || srcType.isSignedInteger(64))) {
+      rewriter.replaceOpWithNewOp<IREE::VM::CastSI64F32Op>(srcOp, resultType,
+                                                           input);
+      return success();
+    }
+
     if (!(srcType.isSignlessInteger(32) || srcType.isSignedInteger(32))) {
       if (srcType.getIntOrFloatBitWidth() < 32) {
         input = rewriter.create<ExtOpTy>(
@@ -548,7 +557,6 @@ struct IntToFPOpConversion : public OpConversionPattern<OpTy> {
       }
     }
 
-    auto resultType = this->getTypeConverter()->convertType(dstType);
     rewriter.replaceOpWithNewOp<CastOpTy>(srcOp, resultType, input);
     return success();
   }
