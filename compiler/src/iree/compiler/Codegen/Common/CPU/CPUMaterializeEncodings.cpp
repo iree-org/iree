@@ -67,13 +67,6 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
                            IREE::HAL::ExecutableTargetAttr targetAttr) {
   MLIRContext *ctx = funcOp.getContext();
   RewritePatternSet materializeEncodingPattern(ctx);
-  // On CPU, we use transposeNarrowN=true for a combination of reasons:
-  // 1. As linalg.matmul materializes into linalg.mmt4d, which has a transposed
-  //    RHS and therefore LHS<->RHS symmetry, transposeNarrowN is easy to
-  //    implement at that level.
-  // 2. We use ukernels, and this allows writing 2x fewer narrow ukernels.
-  // 3. Heuristics for cache-friendly dispatch tiling can get complex on CPU,
-  //    so it is nice that they have fewer narrow cases to consider.
   DictionaryAttr targetConfig = targetAttr.getConfiguration();
   IREE::Codegen::LayoutAttrInterface layoutAttr;
   if (isVMVXBackend(targetAttr)) {
@@ -85,8 +78,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
         IREE::CPU::CPUEncodingLayoutAttr::get(ctx, targetConfig));
   }
-  MaterializeEncodingTypeConverter typeConverter(
-      /*transposeNarrowN=*/true, layoutAttr);
+  MaterializeEncodingTypeConverter typeConverter(layoutAttr);
   MaterializeEncodingConversionTarget target(*ctx);
   auto materializeEncodingValueFn = getMaterializeEncodingValueFn(targetAttr);
   populateMaterializeEncodingIntoPackUnPackPatterns(
