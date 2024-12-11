@@ -100,16 +100,13 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     // itself.
     RankedTensorType tensorType =
         transposeNarrowN ? transposeIfNarrowNResult(type) : type;
-    FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
-        getEncodingInfo(tensorType);
-    if (failed(maybeEncodingInfo) ||
-        IREE::Codegen::isIdentityLayout(maybeEncodingInfo.value())) {
+    MaterializeEncodingInfo encodingInfo = getEncodingInfo(tensorType);
+    if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
       return dropEncoding(type);
     }
-    auto encodingInfo = *maybeEncodingInfo;
     auto packedType = cast<RankedTensorType>(tensor::PackOp::inferPackedType(
-        tensorType, maybeEncodingInfo->innerTileSizes,
-        maybeEncodingInfo->innerDimsPos, maybeEncodingInfo->outerDimsPerm));
+        tensorType, encodingInfo.innerTileSizes, encodingInfo.innerDimsPos,
+        encodingInfo.outerDimsPerm));
 
     // There is no swizzle, we are already done. Typically the case on CPU.
     if (!encodingInfo.swizzle) {

@@ -510,7 +510,7 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
 FailureOr<Operation *>
 lowerContractionOpWithEncoding(OpBuilder &builder, linalg::LinalgOp linalgOp,
                                ValueRange operands, bool transposeNarrowN,
-                               ResolveEncodingInfoFn getEncodingInfo) {
+                               LayoutAttrInterface layoutAttr) {
   if (!linalgOp.hasPureTensorSemantics()) {
     return failure();
   }
@@ -535,42 +535,42 @@ lowerContractionOpWithEncoding(OpBuilder &builder, linalg::LinalgOp linalgOp,
     return failure();
   }
 
-  FailureOr<MaterializeEncodingInfo> encodingInfo =
-      getEncodingInfo(cast<RankedTensorType>(linalgOp->getResultTypes()[0]));
+  MaterializeEncodingInfo encodingInfo = layoutAttr.getEncodingInfo(
+      cast<RankedTensorType>(linalgOp->getResultTypes()[0]));
 
+  if (isIdentityLayout(encodingInfo)) {
+    return dropEncodingAndCloneOp(builder, linalgOp,
+                                  operands.take_front(inputs.size()),
+                                  operands.drop_front(inputs.size()));
+  }
+
+  bool transpose = transposeNarrowN && isNarrowNResult(resultEncoding);
+  SmallVector<Type> elemTypes = lhsEncoding.getElementTypesArray();
+  SmallVector<ReassociationIndices> ri;
+  Value newLhs = getMmt4dOperand(operands[0], linalgOp, transpose, builder, ri,
+                                 elemTypes, /*operandIdx=*/0);
+  Value newRhs = getMmt4dOperand(operands[1], linalgOp, transpose, builder, ri,
+                                 elemTypes, /*operandIdx=*/1);
+  Value newResult = getMmt4dOperand(operands[2], linalgOp, transpose, builder,
+                                    ri, elemTypes, /*operandIdx=*/2);
+  if (transpose) {
+    std::swap(newLhs, newRhs);
+  }
+  Type newResultType = newResult.getType();
+  auto cDims = IREE::Encoding::getEncodingContractionDims(lhsEncoding);
   Operation *result;
-  if (failed(encodingInfo) || isIdentityLayout(encodingInfo.value())) {
-    result = dropEncodingAndCloneOp(builder, linalgOp,
-                                    operands.take_front(inputs.size()),
-                                    operands.drop_front(inputs.size()));
+  if (cDims->batch.empty()) {
+    result = builder.create<linalg::Mmt4DOp>(linalgOp.getLoc(), newResultType,
+                                             ValueRange{newLhs, newRhs},
+                                             ValueRange{newResult});
   } else {
-    bool transpose = transposeNarrowN && isNarrowNResult(resultEncoding);
-    SmallVector<Type> elemTypes = lhsEncoding.getElementTypesArray();
-    SmallVector<ReassociationIndices> ri;
-    Value newLhs = getMmt4dOperand(operands[0], linalgOp, transpose, builder,
-                                   ri, elemTypes, /*operandIdx=*/0);
-    Value newRhs = getMmt4dOperand(operands[1], linalgOp, transpose, builder,
-                                   ri, elemTypes, /*operandIdx=*/1);
-    Value newResult = getMmt4dOperand(operands[2], linalgOp, transpose, builder,
-                                      ri, elemTypes, /*operandIdx=*/2);
-    if (transpose) {
-      std::swap(newLhs, newRhs);
-    }
-    Type newResultType = newResult.getType();
-    auto cDims = IREE::Encoding::getEncodingContractionDims(lhsEncoding);
-    if (cDims->batch.empty()) {
-      result = builder.create<linalg::Mmt4DOp>(linalgOp.getLoc(), newResultType,
-                                               ValueRange{newLhs, newRhs},
-                                               ValueRange{newResult});
-    } else {
-      result = builder.create<linalg::BatchMmt4DOp>(
-          linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
-          ValueRange{newResult});
-    }
-    if (!ri.empty()) {
-      result = builder.create<tensor::CollapseShapeOp>(
-          linalgOp->getLoc(), operands[2].getType(), result->getResult(0), ri);
-    }
+    result = builder.create<linalg::BatchMmt4DOp>(
+        linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
+        ValueRange{newResult});
+  }
+  if (!ri.empty()) {
+    result = builder.create<tensor::CollapseShapeOp>(
+        linalgOp->getLoc(), operands[2].getType(), result->getResult(0), ri);
   }
   return result;
 }

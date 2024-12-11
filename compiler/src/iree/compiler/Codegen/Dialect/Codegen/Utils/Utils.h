@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_UTILS_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_UTILS_H_
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "llvm/Support/raw_ostream.h"
@@ -95,7 +96,7 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
 FailureOr<Operation *>
 lowerContractionOpWithEncoding(OpBuilder &builder, linalg::LinalgOp linalgOp,
                                ValueRange operands, bool transposeNarrowN,
-                               ResolveEncodingInfoFn getEncodingInfo);
+                               LayoutAttrInterface layoutAttr);
 
 } // namespace mlir::iree_compiler::IREE::Codegen
 

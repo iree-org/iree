@@ -90,8 +90,5 @@ struct MaterializeEncodingInfo {
   std::optional<TileSwizzle> swizzle;
 };
 
-using ResolveEncodingInfoFn =
-    std::function<FailureOr<MaterializeEncodingInfo>(RankedTensorType type)>;
-
 } // namespace mlir::iree_compiler::IREE::Codegen
 #endif // IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_IR_IREECODEGENTYPES_H_

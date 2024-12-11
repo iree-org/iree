@@ -108,13 +108,9 @@ struct GPUSetEncodingOpLoweringConversion
       return success();
     }
 
-    FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
+    MaterializeEncodingInfo encodingInfo =
         converter->getEncodingInfo(encodingOp.getResultType());
-    if (failed(maybeEncodingInfo)) {
-      return rewriter.notifyMatchFailure(encodingOp,
-                                         "unhandled result encoding");
-    }
-    if (!maybeEncodingInfo->swizzle) {
+    if (!encodingInfo.swizzle) {
       rewriter.replaceOp(encodingOp, packedValue.value());
       return success();
     }
@@ -128,18 +124,18 @@ struct GPUSetEncodingOpLoweringConversion
             .getShape()
             .take_front(origRank));
     expandShapeShape.append(
-        getExpandedTileShape(maybeEncodingInfo->swizzle->expandShape));
+        getExpandedTileShape(encodingInfo.swizzle->expandShape));
     RankedTensorType expandShapeType =
         encodingOp.getSourceType().clone(expandShapeShape);
 
-    SmallVector<ReassociationIndices> reassociation = getReassociationIndices(
-        origRank, maybeEncodingInfo->swizzle->expandShape);
+    SmallVector<ReassociationIndices> reassociation =
+        getReassociationIndices(origRank, encodingInfo.swizzle->expandShape);
     auto expandShapeOp = rewriter.create<tensor::ExpandShapeOp>(
         loc, expandShapeType, packedValue.value(), reassociation);
 
     SmallVector<int64_t> transposePerm =
         llvm::to_vector(llvm::seq<int64_t>(0, origRank));
-    for (auto perm : maybeEncodingInfo->swizzle->permutation) {
+    for (auto perm : encodingInfo.swizzle->permutation) {
       transposePerm.push_back(origRank + perm);
     }
     SmallVector<OpFoldResult> transposeResultDims =
@@ -168,9 +164,9 @@ struct GPUUnsetEncodingOpLoweringConversion
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         getTypeConverter());
 
-    FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
+    MaterializeEncodingInfo encodingInfo =
         converter->getEncodingInfo(unsetEncodingOp.getSource().getType());
-    if (failed(maybeEncodingInfo)) {
+    if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
       Type targetType =
           getTypeConverter()->convertType(unsetEncodingOp.getSourceType());
       Value result = rewriter.createOrFold<tensor::CastOp>(
@@ -181,15 +177,14 @@ struct GPUUnsetEncodingOpLoweringConversion
 
     Location loc = unsetEncodingOp.getLoc();
     Value unpackSrc = adaptor.getSource();
-    if (maybeEncodingInfo->swizzle) {
+    if (encodingInfo.swizzle) {
       int targetRank = unsetEncodingOp.getResultType().getRank();
       auto srcConvertedType =
           cast<RankedTensorType>(adaptor.getSource().getType());
       SmallVector<OpFoldResult> emptyShape =
           tensor::getMixedSizes(rewriter, loc, adaptor.getSource());
       emptyShape.resize(targetRank);
-      for (auto i :
-           getExpandedTileShape(maybeEncodingInfo->swizzle->expandShape)) {
+      for (auto i : getExpandedTileShape(encodingInfo.swizzle->expandShape)) {
         emptyShape.push_back(rewriter.getIndexAttr(i));
       }
       auto emptyTensor = rewriter.create<tensor::EmptyOp>(
@@ -197,7 +192,7 @@ struct GPUUnsetEncodingOpLoweringConversion
 
       SmallVector<int64_t> transposePerm =
           llvm::to_vector(llvm::seq<int64_t>(0, targetRank));
-      for (auto perm : maybeEncodingInfo->swizzle->permutation) {
+      for (auto perm : encodingInfo.swizzle->permutation) {
         transposePerm.push_back(targetRank + perm);
       }
       auto invertedTransposePerm = invertPermutationVector(transposePerm);
@@ -205,11 +200,11 @@ struct GPUUnsetEncodingOpLoweringConversion
           loc, adaptor.getSource(), emptyTensor, invertedTransposePerm);
 
       SmallVector<ReassociationIndices> reassociation = getReassociationIndices(
-          targetRank, maybeEncodingInfo->swizzle->expandShape);
+          targetRank, encodingInfo.swizzle->expandShape);
       SmallVector<int64_t> unpackSrcShape(
           srcConvertedType.getShape().take_front(targetRank));
-      unpackSrcShape.append(maybeEncodingInfo->innerTileSizes.begin(),
-                            maybeEncodingInfo->innerTileSizes.end());
+      unpackSrcShape.append(encodingInfo.innerTileSizes.begin(),
+                            encodingInfo.innerTileSizes.end());
       RankedTensorType unpackSrcType =
           unsetEncodingOp.getResultType().clone(unpackSrcShape);
       unpackSrc = rewriter.create<tensor::CollapseShapeOp>(
