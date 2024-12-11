@@ -1,0 +1,63 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Checks the result status of each job provided by 'jobs-json' and sends an
+# alert if at least one job failed.
+#
+# Usage:
+#   ```yml
+#   jobs:
+#      job_1:
+#          ...
+#      job_2:
+#          ...
+#      my_summary:
+#        if: always()
+#        needs:
+#          - job_1
+#          - job_2
+#        uses: ./.github/workflows/workflow_summary.yml
+#        secrets: inherit
+#        with:
+#          jobs-json: ${{ toJson(needs) }}
+#   ```
+
+name: Workflow Summary
+
+on:
+  workflow_call:
+    inputs:
+        jobs-json:
+          type: string
+          description: The output of `toJson(needs)`
+
+permissions:
+  contents: read
+
+jobs:
+  summary:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Getting failed jobs
+        id: failed_jobs
+        run: |
+          echo '${{ inputs.jobs-json }}'
+          FAILED_JOBS="$(echo '${{ inputs.jobs-json }}' \
+            | jq --raw-output \
+            'map_values(select(.result!="success" and .result!="skipped")) | keys | join(",")' \
+          )"
+          echo "failed-jobs=${FAILED_JOBS}" >> $GITHUB_OUTPUT
+          if [[ "${FAILED_JOBS}" != "" ]]; then
+            echo "The following jobs failed: ${FAILED_JOBS}"
+            exit 1
+          fi
+      - name: Posting to Discord
+        uses: sarisia/actions-status-discord@ce8cc68e4e626000136b3c702d049a154243e490 # v1.14.7
+        if: failure() && github.ref_name == 'main' && github.repository_owner == 'iree-org'
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          description: "The following jobs failed: ${{ steps.failed_jobs.outputs.failed-jobs }}"
+          url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}"

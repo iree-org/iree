@@ -12,20 +12,17 @@
 #include "iree/hal/drivers/hip/memory_pools.h"
 #include "iree/hal/drivers/hip/status_util.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif  // __cplusplus
+typedef struct iree_hal_hip_device_topology_t iree_hal_hip_device_topology_t;
 
 // Creates a HIP memory allocator.
-// |device| |hip_context| and |stream| will be used for management operations.
+// |device| and |stream| will be used for management operations.
 // |pools| provides memory pools that may be shared across multiple allocators
 // and the pointer must remain valid for the lifetime of the allocator.
 iree_status_t iree_hal_hip_allocator_create(
     iree_hal_device_t* parent_device,
-    const iree_hal_hip_dynamic_symbols_t* hip_symbols, hipDevice_t device,
-    hipCtx_t hip_context, hipStream_t stream,
-    iree_hal_hip_memory_pools_t* pools, iree_allocator_t host_allocator,
-    iree_hal_allocator_t** out_allocator);
+    const iree_hal_hip_dynamic_symbols_t* hip_symbols,
+    iree_hal_hip_device_topology_t topology, bool supports_memory_pools,
+    iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator);
 
 bool iree_hal_hip_allocator_isa(iree_hal_allocator_t* base_value);
 

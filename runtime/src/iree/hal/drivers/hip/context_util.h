@@ -23,12 +23,12 @@ static inline iree_status_t iree_hal_hip_set_context(
     if (current_context != hip_context) {
       IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_hal_hip_set_context_switch");
       iree_status_t status =
-          IREE_HIP_RESULT_TO_STATUS(syms, hipCtxSetCurrent(hip_context));
+          IREE_HIP_CALL_TO_STATUS(syms, hipCtxSetCurrent(hip_context));
       IREE_TRACE_ZONE_END(z0);
       return status;
     }
   });
-  return IREE_HIP_RESULT_TO_STATUS(syms, hipCtxSetCurrent(hip_context));
+  return IREE_HIP_CALL_TO_STATUS(syms, hipCtxSetCurrent(hip_context));
 }
 
 #endif  // IREE_HAL_DRIVERS_HIP_CONTEXT_UTIL_H_
