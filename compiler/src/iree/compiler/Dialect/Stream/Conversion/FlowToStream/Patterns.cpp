@@ -13,12 +13,21 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler {
 
 namespace {
+
+static SmallVector<Value> flattenValues(ArrayRef<ValueRange> values) {
+  SmallVector<Value> vec;
+  for (auto v : values) {
+    vec.append(v.begin(), v.end());
+  }
+  return vec;
+}
 
 // Inserts a sizeof calculation for the given tensor value type and dims.
 // This should only be used to produce sizes for values produced by an op; the
@@ -713,10 +722,10 @@ struct ConvertCollectiveSendRecvOp
 };
 
 struct ConvertDispatchOp
-    : public AffinityOpConversionPattern<IREE::Flow::DispatchOp> {
-  using AffinityOpConversionPattern::AffinityOpConversionPattern;
+    : public AffinityOneToNOpConversionPattern<IREE::Flow::DispatchOp> {
+  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
-      IREE::Flow::DispatchOp op, OpAdaptor adaptor,
+      IREE::Flow::DispatchOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
       ConversionPatternRewriter &rewriter) const override {
     // Zero is going to be used for each operand to start.
@@ -729,8 +738,11 @@ struct ConvertDispatchOp
     SmallVector<Value> dispatchOperandEnds;
     SmallVector<Value> dispatchOperandLengths;
     SmallVector<Value> operandSizes;
+
+    SmallVector<Value> convertedArguments =
+        getStreamResourcesFromOneToNOpOperandAdaptors(adaptor.getArguments());
     for (auto [oldOperand, newOperand] :
-         llvm::zip_equal(op.getArguments(), adaptor.getArguments())) {
+         llvm::zip_equal(op.getArguments(), convertedArguments)) {
       if (llvm::isa<ShapedType>(oldOperand.getType())) {
         auto newOperandCast =
             transferTensorOperand(op.getLoc(), oldOperand, newOperand,
@@ -774,10 +786,10 @@ struct ConvertDispatchOp
     }
 
     auto newOp = rewriter.replaceOpWithNewOp<IREE::Stream::AsyncDispatchOp>(
-        op, resultTypes, adaptor.getWorkload(), adaptor.getEntryPointsAttr(),
-        dispatchOperands, dispatchOperandSizes, dispatchOperandOffsets,
-        dispatchOperandEnds, dispatchOperandLengths, resultSizes,
-        adaptor.getTiedOperandsAttr(), executionAffinityAttr);
+        op, resultTypes, flattenValues(adaptor.getWorkload()),
+        adaptor.getEntryPointsAttr(), dispatchOperands, dispatchOperandSizes,
+        dispatchOperandOffsets, dispatchOperandEnds, dispatchOperandLengths,
+        resultSizes, adaptor.getTiedOperandsAttr(), executionAffinityAttr);
     newOp->setDialectAttrs(op->getDialectAttrs());
     return success();
   }
