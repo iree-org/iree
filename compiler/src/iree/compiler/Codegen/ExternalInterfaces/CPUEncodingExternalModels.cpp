@@ -3,6 +3,30 @@
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//===- CPUEncodingExternalModels.cpp --------------------------------------===//
+//
+// This file implements the IREE::Codegen::LayoutAttrInterface for CPU backends
+// and the VMVX backend. In these backends, we transpose narrow-N into narrow-M
+// for a combination of reasons:
+//
+//   1. As linalg.matmul materializes into linalg.mmt4d, which has a transposed
+//      RHS and therefore LHS<->RHS symmetry, transposeNarrowN is easy to
+//      implement at that level.
+//   2. We use ukernels, and this allows writing 2x fewer narrow ukernels.
+//   3. Heuristics for cache-friendly dispatch tiling can get complex on CPU,
+//      so it is nice that they have fewer narrow cases to consider.
+//
+// This transposition is made easier by (and was all along part of the idea in)
+// the RHS-transposition in mmt4d (the t in mmt4d), as generally with matrix
+// multiplication
+//
+//   B * Transpose(A) == Transpose( A * Transpose(B) )
+//
+// so in mmt4d terms
+//
+//   mmt4d(B, A) == Transpose(mmt4d(A, B))
+//
+//===---------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/ExternalInterfaces/CPUEncodingExternalModels.h"
 
@@ -12,6 +36,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 
@@ -27,6 +52,22 @@ namespace {
 //===----------------------------------------------------------------------===//
 // Utilities.
 //===----------------------------------------------------------------------===//
+
+static void transposeInPlace(MaterializeEncodingInfo &info) {
+  // Vector cases: nothing to do.
+  if (info.innerTileSizes.size() < 2) {
+    return;
+  }
+  // Not a vector case, so all three arrays in `info` have size at least 2,
+  // outerDimsPerm may have size 3 if there is a batch dimension, but in all
+  // cases, the last 2 entries of each array are M and N, not batch.
+  auto transpose = [](SmallVector<int64_t> &a) {
+    std::swap(a[a.size() - 2], a[a.size() - 1]);
+  };
+  transpose(info.innerDimsPos);
+  transpose(info.innerTileSizes);
+  transpose(info.outerDimsPerm);
+}
 
 static RankedTensorType dropEncoding(RankedTensorType type) {
   return RankedTensorType::get(type.getShape(), type.getElementType());
@@ -576,7 +617,11 @@ struct CPUDeviceEncodingLayoutAttrInterface
     // taking narrow dimensions into account.
     TileMxNxK chosenTileMxNxK = chooseMatmulTile(
         enumeratedTileMxNxK, narrowDim, encoding.getRoundDimsToArray());
-    return getEncodingInfoForMatmul(encoding, chosenTileMxNxK);
+    info = getEncodingInfoForMatmul(encoding, chosenTileMxNxK);
+    if (Encoding::isNarrowNResult(encoding)) {
+      transposeInPlace(info);
+    }
+    return info;
   }
 
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
@@ -660,7 +705,11 @@ struct VMVXDeviceEncodingLayoutAttrInterface
     // taking narrow dimensions into account.
     TileMxNxK chosenTileMxNxK = chooseMatmulTile(
         enumeratedTileMxNxK, narrowDim, encoding.getRoundDimsToArray());
-    return getEncodingInfoForMatmul(encoding, chosenTileMxNxK);
+    info = getEncodingInfoForMatmul(encoding, chosenTileMxNxK);
+    if (Encoding::isNarrowNResult(encoding)) {
+      transposeInPlace(info);
+    }
+    return info;
   }
 
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,

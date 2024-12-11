@@ -101,22 +101,6 @@ getInnerTileSizesOfr(OpBuilder &rewriter, Location loc,
   return result;
 }
 
-static void transposeInPlace(MaterializeEncodingInfo &info) {
-  // Vector cases: nothing to do.
-  if (info.innerTileSizes.size() < 2) {
-    return;
-  }
-  // Not a vector case, so all three arrays in `info` have size at least 2,
-  // outerDimsPerm may have size 3 if there is a batch dimension, but in all
-  // cases, the last 2 entries of each array are M and N, not batch.
-  auto transpose = [](SmallVector<int64_t> &a) {
-    std::swap(a[a.size() - 2], a[a.size() - 1]);
-  };
-  transpose(info.innerDimsPos);
-  transpose(info.innerTileSizes);
-  transpose(info.outerDimsPerm);
-}
-
 //===---------------------------------------------------------------------===//
 // Methods to convert `set_encoding` and `unset_encoding` operations
 // to `pack` and `unpack` operations respectively.
@@ -138,9 +122,6 @@ FailureOr<Value> lowerSetEncodingOpToPackOp(
   auto encoding = IREE::Encoding::getEncodingAttr(resultType);
   if (!encoding) {
     return failure();
-  }
-  if (typeConverter.getTransposeNarrowN() && isNarrowNResult(encoding)) {
-    transposeInPlace(encodingInfo);
   }
 
   // Create `tensor.empty` operation for the result of the pack operation.
@@ -180,10 +161,6 @@ FailureOr<Value> lowerUnsetEncodingToUnpackOp(
     return packedValue;
   }
 
-  auto encoding = IREE::Encoding::getEncodingAttr(sourceType);
-  if (typeConverter.getTransposeNarrowN() && isNarrowNResult(encoding)) {
-    transposeInPlace(encodingInfo);
-  }
   // Create an `tensor.empty` for the result of the unpack operation.
   Location loc = encodingOp.getLoc();
   SmallVector<OpFoldResult> resultDims =
@@ -220,11 +197,6 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
         .create<tensor::EmptyOp>(loc, emptyOp.getMixedSizes(),
                                  emptyType.getElementType())
         .getOperation();
-  }
-
-  if (typeConverter.getTransposeNarrowN() &&
-      isNarrowNResult(IREE::Encoding::getEncodingAttr(emptyType))) {
-    transposeInPlace(encodingInfo);
   }
 
   FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr = getInnerTileSizesOfr(
@@ -388,10 +360,6 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
       typeConverter.getEncodingInfo(boundTensorType);
   if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
     return failure();
-  }
-  if (typeConverter.getTransposeNarrowN() &&
-      isNarrowNResult(IREE::Encoding::getEncodingAttr(boundTensorType))) {
-    transposeInPlace(encodingInfo);
   }
 
   SmallVector<OpFoldResult> targetShape =
