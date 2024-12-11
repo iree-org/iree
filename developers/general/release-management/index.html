@@ -2349,6 +2349,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#creating-a-patch-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      Creating a patch release
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3766,6 +3775,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#creating-a-patch-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      Creating a patch release
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3894,6 +3912,51 @@ request that some feature make the cut.</p>
 <li>
 <p>Complete any remaining checkbox items on the release tracking issue then
    close it and open a new one for the next release.</p>
+</li>
+</ol>
+<h2 id="creating-a-patch-release">Creating a patch release<a class="headerlink" href="#creating-a-patch-release" title="Permanent link">link</a></h2>
+<ol>
+<li>
+<p>Create a new branch.</p>
+<p>Checkout the corresponding stable release and create a branch for the patch release:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>checkout<span class="w"> </span>iree-3.0.0
+git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>iree-3.0.1
+</code></pre></div>
+</li>
+<li>
+<p>Apply and commit the patches.</p>
+</li>
+<li>
+<p>Set the patch level:</p>
+<ul>
+<li>
+<p>Adjust <code>compiler/version.json</code> if patches are applied to the compiler.</p>
+</li>
+<li>
+<p>Adjust <code>runtime/version.json</code> if patches are applied to the runtime.</p>
+</li>
+</ul>
+</li>
+<li>
+<p>Push all changes to the new branch.</p>
+</li>
+<li>
+<p>Trigger the
+    <a href="https://github.com/iree-org/iree/actions/workflows/oneshot_candidate_release.yml"><em>Oneshot candidate release</em> workflow</a>
+    to create a release.</p>
+<ul>
+<li>
+<p>Select to run the workflow from the patch branch.</p>
+</li>
+<li>
+<p>Set the type of build version to produce to "stable".</p>
+<p><img alt="one_shot_patch" src="../one-shot-patch.png" /></p>
+</li>
+</ul>
+</li>
+<li>
+<p>Follow the documentation above to promote to stable.
+   The step to create a new tag can be skipped.</p>
 </li>
 </ol>
 
