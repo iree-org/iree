@@ -29,6 +29,14 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+/// Flatten the given value ranges into a single vector of values.
+static SmallVector<Value> flattenValues(ArrayRef<ValueRange> values) {
+  SmallVector<Value> result;
+  for (const auto &vals : values)
+    llvm::append_range(result, vals);
+  return result;
+}
+
 struct ConvertTensorConstantOp
     : public AffinityOpConversionPattern<arith::ConstantOp> {
   using AffinityOpConversionPattern::AffinityOpConversionPattern;
@@ -53,10 +61,13 @@ struct ConvertTensorConstantOp
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto constantSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
         constantOp.getLoc(), rewriter.getIndexType(), newOp.getResult());
-    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncTransferOp>(
-        constantOp, unknownType, newOp.getResult(), constantSize, constantSize,
+    auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
+        constantOp.getLoc(), unknownType, newOp.getResult(), constantSize,
+        constantSize,
         /*source_affinity=*/executionAffinityAttr,
         /*result_affinity=*/executionAffinityAttr);
+    rewriter.replaceOpWithMultiple(constantOp,
+                                   {{transferOp.getResult(), constantSize}});
     return success();
   }
 };
@@ -68,13 +79,8 @@ struct BranchOpConversion
   matchAndRewrite(mlir::cf::BranchOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
-    SmallVector<Value> convertedDestOperands =
-        getStreamResourcesFromOneToNOpOperandAdaptors(
-            adaptor.getDestOperands());
-    auto expandedOperands =
-        expandResourceOperands(op.getLoc(), convertedDestOperands, rewriter);
-    rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, op.getDest(),
-                                                    expandedOperands);
+    rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(
+        op, op.getDest(), flattenValues(adaptor.getOperands()));
     return success();
   }
 };
@@ -83,15 +89,13 @@ struct CondBranchOpConversion
     : public AffinityAwareConversionPattern<mlir::cf::CondBranchOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
-  matchAndRewrite(mlir::cf::CondBranchOp op, OpAdaptor adaptor,
+  matchAndRewrite(mlir::cf::CondBranchOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
-    auto trueDestOperands = expandResourceOperands(
-        op.getLoc(), adaptor.getTrueDestOperands(), rewriter);
-    auto falseDestOperands = expandResourceOperands(
-        op.getLoc(), adaptor.getFalseDestOperands(), rewriter);
+    auto trueDestOperands = flattenValues(adaptor.getTrueDestOperands());
+    auto falseDestOperands = flattenValues(adaptor.getFalseDestOperands());
     rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
-        op, adaptor.getCondition(), op.getTrueDest(), trueDestOperands,
+        op, adaptor.getCondition().front(), op.getTrueDest(), trueDestOperands,
         op.getFalseDest(), falseDestOperands);
     return success();
   }
@@ -103,18 +107,17 @@ struct SwitchOpConversion
     : public AffinityAwareConversionPattern<mlir::cf::SwitchOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
-  matchAndRewrite(mlir::cf::SwitchOp op, OpAdaptor adaptor,
+  matchAndRewrite(mlir::cf::SwitchOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
-    auto defaultOperands = expandResourceOperands(
-        op.getLoc(), adaptor.getDefaultOperands(), rewriter);
-    auto caseOperands = llvm::to_vector(
-        llvm::map_range(adaptor.getCaseOperands(), [&](ValueRange operands) {
-          return expandResourceOperands(op.getLoc(), operands, rewriter);
+    auto defaultOperands = flattenValues(adaptor.getDefaultOperands());
+    auto caseOperands = llvm::to_vector(llvm::map_range(
+        adaptor.getCaseOperands(), [&](ArrayRef<ValueRange> operands) {
+          return flattenValues(operands);
         }));
     rewriter.replaceOpWithNewOp<mlir::cf::SwitchOp>(
-        op, adaptor.getFlag(), op.getDefaultDestination(), defaultOperands,
-        op.getCaseValuesAttr(), op.getCaseDestinations(),
+        op, adaptor.getFlag().front(), op.getDefaultDestination(),
+        defaultOperands, op.getCaseValuesAttr(), op.getCaseDestinations(),
         llvm::to_vector(llvm::map_range(caseOperands, asValueRange)));
     return success();
   }
@@ -129,14 +132,10 @@ struct SelectOpConversion
     // Only handle selects where the operands are tensors (resources).
     if (!llvm::isa<TensorType>(op.getTrueValue().getType()))
       return failure();
-    Value convertedTrueValue =
-        getStreamResourceFromOneToNOpOperandAdaptor(adaptor.getTrueValue());
-    auto trueOperand = resolveTensorOperand(op.getLoc(), op.getTrueValue(),
-                                            convertedTrueValue, rewriter);
-    Value convertedFalseValue =
-        getStreamResourceFromOneToNOpOperandAdaptor(adaptor.getFalseValue());
-    auto falseOperand = resolveTensorOperand(op.getLoc(), op.getFalseValue(),
-                                             convertedFalseValue, rewriter);
+    auto trueOperand = resolveTensorOperands(op.getLoc(), op.getTrueValue(),
+                                             adaptor.getTrueValue(), rewriter);
+    auto falseOperand = resolveTensorOperands(
+        op.getLoc(), op.getFalseValue(), adaptor.getFalseValue(), rewriter);
     auto resourceSelectOp = rewriter.create<mlir::arith::SelectOp>(
         op.getLoc(), adaptor.getCondition().front(), trueOperand.resource,
         falseOperand.resource);
@@ -192,21 +191,19 @@ struct ScfIfOpConversion
     // Tie all resource results together so we end up with 1:1 results with the
     // original op.
     SmallVector<Value> results;
+    SmallVector<Value> resultSizes;
     for (auto result : resultMap) {
       if (llvm::isa<IREE::Stream::ResourceType>(result.newType)) {
-        auto oldType = op.getResult(result.originalIndex).getType();
         auto resource = ifOp.getResult(result.newIndex + 0);
         auto resourceSize = ifOp.getResult(result.newIndex + 1);
-        results.push_back(rewriter
-                              .create<mlir::UnrealizedConversionCastOp>(
-                                  op.getLoc(), TypeRange{oldType},
-                                  ValueRange{resource, resourceSize})
-                              .getResult(0));
+        results.push_back(resource);
+        resultSizes.push_back(resourceSize);
       } else {
         results.push_back(ifOp.getResult(result.newIndex));
+        resultSizes.push_back(nullptr);
       }
     }
-    rewriter.replaceOp(op, results);
+    replaceOpWithMultiple(op, results, resultSizes, rewriter);
     return success();
   }
 };
@@ -215,13 +212,12 @@ struct ScfForOpConversion
     : public AffinityAwareConversionPattern<mlir::scf::ForOp> {
   using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
-  matchAndRewrite(mlir::scf::ForOp op, OpAdaptor adaptor,
+  matchAndRewrite(mlir::scf::ForOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto &typeConverter = *getTypeConverter();
 
     // Expand any resource operands to resource + size.
-    auto expandedOperands =
-        expandResourceOperands(op.getLoc(), adaptor.getInitArgs(), rewriter);
+    auto expandedOperands = flattenValues(adaptor.getInitArgs());
 
     // Expand any resource results to resource + size.
     SmallVector<Type> expandedTypes;
@@ -256,8 +252,9 @@ struct ScfForOpConversion
     // expanded output results. We can't directly replace the original loop as
     // the result counts differ.
     auto forOp = rewriter.create<mlir::scf::ForOp>(
-        op.getLoc(), adaptor.getLowerBound(), adaptor.getUpperBound(),
-        adaptor.getStep(), expandedOperands);
+        op.getLoc(), adaptor.getLowerBound().front(),
+        adaptor.getUpperBound().front(), adaptor.getStep().front(),
+        expandedOperands);
 
     // Inline the block and update the block arguments.
     rewriter.eraseBlock(forOp.getBody());
@@ -271,21 +268,19 @@ struct ScfForOpConversion
     // Tie all resource results together so we end up with 1:1 results with the
     // original op.
     SmallVector<Value> results;
+    SmallVector<Value> resultSizes;
     for (auto result : resultMap) {
       if (llvm::isa<IREE::Stream::ResourceType>(result.newType)) {
-        auto oldType = op.getResult(result.originalIndex).getType();
         auto resource = forOp.getResult(result.newIndex + 0);
         auto resourceSize = forOp.getResult(result.newIndex + 1);
-        results.push_back(rewriter
-                              .create<mlir::UnrealizedConversionCastOp>(
-                                  op.getLoc(), TypeRange{oldType},
-                                  ValueRange{resource, resourceSize})
-                              .getResult(0));
+        results.push_back(resource);
+        resultSizes.push_back(resourceSize);
       } else {
         results.push_back(forOp.getResult(result.newIndex));
+        resultSizes.push_back(nullptr);
       }
     }
-    rewriter.replaceOp(op, results);
+    replaceOpWithMultiple(op, results, resultSizes, rewriter);
     return success();
   }
 };
@@ -299,10 +294,7 @@ struct ScfWhileOpConversion
     auto &typeConverter = *getTypeConverter();
 
     // Expand any resource operands to resource + size.
-    SmallVector<Value> convertedOperands =
-        getStreamResourcesFromOneToNOpOperandAdaptors(adaptor.getOperands());
-    auto expandedOperands =
-        expandResourceOperands(op.getLoc(), convertedOperands, rewriter);
+    auto expandedOperands = flattenValues(adaptor.getOperands());
 
     // Expand any resource results to resource + size.
     SmallVector<Type> expandedTypes;
@@ -359,21 +351,19 @@ struct ScfWhileOpConversion
     // Tie all resource results together so we end up with 1:1 results with the
     // original op.
     SmallVector<Value> results;
+    SmallVector<Value> resultSizes;
     for (auto result : resultMap) {
       if (llvm::isa<IREE::Stream::ResourceType>(result.newType)) {
-        auto oldType = op.getResult(result.originalIndex).getType();
         auto resource = whileOp.getResult(result.newIndex + 0);
         auto resourceSize = whileOp.getResult(result.newIndex + 1);
-        results.push_back(rewriter
-                              .create<mlir::UnrealizedConversionCastOp>(
-                                  op.getLoc(), TypeRange{oldType},
-                                  ValueRange{resource, resourceSize})
-                              .getResult(0));
+        results.push_back(resource);
+        resultSizes.push_back(resourceSize);
       } else {
         results.push_back(whileOp.getResult(result.newIndex));
+        resultSizes.push_back(nullptr);
       }
     }
-    rewriter.replaceOp(op, results);
+    replaceOpWithMultiple(op, results, resultSizes, rewriter);
     return success();
   }
 };
@@ -385,10 +375,7 @@ struct ScfConditionOpConversion
   matchAndRewrite(mlir::scf::ConditionOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
-    SmallVector<Value> convertedArgs =
-        getStreamResourcesFromOneToNOpOperandAdaptors(adaptor.getArgs());
-    auto expandedOperands =
-        expandResourceOperands(op.getLoc(), convertedArgs, rewriter);
+    auto expandedOperands = flattenValues(adaptor.getArgs());
     rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(
         op, adaptor.getCondition().front(), expandedOperands);
     return success();
@@ -402,10 +389,7 @@ struct ScfYieldOpConversion
   matchAndRewrite(mlir::scf::YieldOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
-    SmallVector<Value> convertedOperands =
-        getStreamResourcesFromOneToNOpOperandAdaptors(adaptor.getOperands());
-    auto expandedOperands =
-        expandResourceOperands(op.getLoc(), convertedOperands, rewriter);
+    auto expandedOperands = flattenValues(adaptor.getOperands());
     rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, expandedOperands);
     return success();
   }

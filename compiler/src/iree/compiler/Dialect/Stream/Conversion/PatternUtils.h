@@ -42,21 +42,6 @@ struct ConvertedTensor {
   Value resourceSize;
 };
 
-void expandResourceOperand(Location loc, Value convertedOperand,
-                           SmallVectorImpl<Value> &newOperands,
-                           OpBuilder &builder);
-SmallVector<Value> expandResourceOperands(Location loc,
-                                          ValueRange convertedOperands,
-                                          ConversionPatternRewriter &rewriter);
-
-ConvertedTensor resolveTensorOperand(
-    Location loc, Value originalOperand, Value convertedOperand,
-    IREE::Stream::AffinityAnalysis *affinityAnalysis, OpBuilder &builder);
-ConvertedTensor transferTensorOperand(
-    Location loc, Value originalOperand, Value convertedOperand,
-    IREE::Stream::AffinityAttr requiredAffinityAttr,
-    IREE::Stream::AffinityAnalysis *affinityAnalysis, OpBuilder &builder);
-
 ConvertedTensor resolveTensorOperands(
     Location loc, Value originalOperand, ValueRange convertedOperand,
     IREE::Stream::AffinityAnalysis *affinityAnalysis, OpBuilder &builder);
@@ -64,7 +49,6 @@ ConvertedTensor transferTensorOperands(
     Location loc, Value originalOperand, ValueRange convertedOperand,
     IREE::Stream::AffinityAttr requiredAffinityAttr,
     IREE::Stream::AffinityAnalysis *affinityAnalysis, OpBuilder &builder);
-
 
 template <typename OpT>
 struct AffinityAwareConversionPattern : public OpConversionPattern<OpT> {
@@ -81,34 +65,18 @@ public:
   }
 
 protected:
-  ConvertedTensor resolveTensorOperand(Location loc, Value originalOperand,
-                                       Value convertedOperand,
-                                       OpBuilder &builder) const {
-    return mlir::iree_compiler::resolveTensorOperand(
-        loc, originalOperand, convertedOperand, affinityAnalysis, builder);
-  }
   ConvertedTensor resolveTensorOperands(Location loc, Value originalOperand,
-                                       ValueRange convertedOperand,
-                                       OpBuilder &builder) const {
+                                        ValueRange convertedOperand,
+                                        OpBuilder &builder) const {
     return mlir::iree_compiler::resolveTensorOperands(
         loc, originalOperand, convertedOperand, affinityAnalysis, builder);
   }
 
   ConvertedTensor
-  transferTensorOperand(Location loc, Value originalOperand,
-                        Value convertedOperand,
-                        IREE::Stream::AffinityAttr requiredAffinityAttr,
-                        OpBuilder &builder) const {
-    return mlir::iree_compiler::transferTensorOperand(
-        loc, originalOperand, convertedOperand, requiredAffinityAttr,
-        affinityAnalysis, builder);
-  }
-
-  ConvertedTensor
   transferTensorOperands(Location loc, Value originalOperand,
-                        ValueRange convertedOperand,
-                        IREE::Stream::AffinityAttr requiredAffinityAttr,
-                        OpBuilder &builder) const {
+                         ValueRange convertedOperand,
+                         IREE::Stream::AffinityAttr requiredAffinityAttr,
+                         OpBuilder &builder) const {
     return mlir::iree_compiler::transferTensorOperands(
         loc, originalOperand, convertedOperand, requiredAffinityAttr,
         affinityAnalysis, builder);
@@ -150,34 +118,12 @@ private:
   }
 };
 
-/// Get the converted !stream.resource<*> from the OneToNOpOperandAdaptor.
-///
-/// The type converter converts `tensor<...>` to a `stream.resource<*>` and
-/// `index`. As a result the operations that consume `stream.resource<*>` get
-/// from the adaptor a `ValueRange`, all of which are defined by the
-/// `builtin.unrealized_conversion_cast`. The real converted type is the operand
-/// to this operation. For example,
-///
-/// ```mlir
-/// %0 = flow.tensor.import
-/// ```
-///
-/// gets converted to
-///
-/// ```mlir
-/// %0 = stream.tensor.sizeof ... : index
-/// %1 = stream.tensor.import ... : !stream.resource<external>{%0}
-/// %2 = stream.async.transfer %1 : !stream.resource<*>{%0}
-/// %3:2 = builtin.unrealized_conversion_cast %2 :
-///     !stream.resource<*> to !stream.resource<*>, index
-/// ```
-///
-/// The `ValueRange` recieved from the `OneToNOperandAdaptor` is a `ValueRange
-/// {%3#0, %3#1}. The `Value` that is actually needed is `%2`. This is a utility
-/// method to retrieve that.
-Value getStreamResourceFromOneToNOpOperandAdaptor(ValueRange values);
-SmallVector<Value>
-getStreamResourcesFromOneToNOpOperandAdaptors(ArrayRef<ValueRange> values);
+void replaceOpWithMultiple(Operation *op,
+                           ArrayRef<SmallVector<Value>> replacements,
+                           ConversionPatternRewriter &rewriter);
+void replaceOpWithMultiple(Operation *op, ValueRange resources,
+                           ValueRange sizes,
+                           ConversionPatternRewriter &rewriter);
 
 template <typename OpT>
 struct AffinityOneToNOpConversionPattern

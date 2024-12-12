@@ -19,6 +19,14 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+/// Flatten the given value ranges into a single vector of values.
+static SmallVector<Value> flattenValues(ArrayRef<ValueRange> values) {
+  SmallVector<Value> result;
+  for (const auto &vals : values)
+    llvm::append_range(result, vals);
+  return result;
+}
+
 //===----------------------------------------------------------------------===//
 // Structural ops
 //===----------------------------------------------------------------------===//
@@ -82,14 +90,12 @@ struct CallOpConversion
       Type newType;
     };
     SmallVector<Result> resultMap;
-    auto modifiedOperands =
-        getStreamResourcesFromOneToNOpOperandAdaptors(adaptor.getOperands());
     bool anyFailed = false;
     auto callOp = op.cloneAndExpand(
         [&](unsigned i, Value operand, SmallVectorImpl<Value> &newOperands) {
-          auto adaptorOperand = modifiedOperands[i];
-          expandResourceOperand(op.getLoc(), adaptorOperand, newOperands,
-                                rewriter);
+          SmallVector<Value> appendNewOperands =
+              flattenValues(adaptor.getOperands()[i]);
+          newOperands.append(appendNewOperands);
         },
         [&](unsigned i, Type type, SmallVectorImpl<Type> &newTypes) {
           size_t newIndex = newTypes.size();
@@ -132,10 +138,7 @@ struct ReturnOpConversion
   matchAndRewrite(IREE::Util::ReturnOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
-    SmallVector<Value> convertedOperands =
-        getStreamResourcesFromOneToNOpOperandAdaptors(adaptor.getOperands());
-    auto expandedOperands =
-        expandResourceOperands(op.getLoc(), convertedOperands, rewriter);
+    auto expandedOperands = flattenValues(adaptor.getOperands());
     rewriter.replaceOpWithNewOp<IREE::Util::ReturnOp>(op, expandedOperands);
     return success();
   }
@@ -316,11 +319,12 @@ struct GlobalLoadOpExpansion
                                 loadOp.getLoc(), rewriter.getIndexType(),
                                 expandedGlobal.resourceSizeOp.getSymName())
                             .getResult();
-    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncTransferOp>(
-        loadOp, unknownType, resource, resourceSize, resourceSize,
+    auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
+        loadOp.getLoc(), unknownType, resource, resourceSize, resourceSize,
         /*source_affinity=*/expandedGlobal.affinityAttr,
         /*result_affinity=*/expandedGlobal.affinityAttr);
-
+    rewriter.replaceOpWithMultiple(loadOp,
+                                   {{transferOp.getResult(), resourceSize}});
     return success();
   }
 };
@@ -344,11 +348,9 @@ struct GlobalStoreOpExpansion
 
     // Insert a transfer/store to the global with unknown lifetime. Lifetime
     // refinement will make this go away if possible.
-    Value convertedValue =
-        getStreamResourceFromOneToNOpOperandAdaptor(adaptor.getValue());
     auto value =
-        resolveTensorOperand(storeOp.getLoc(), storeOp.getValue(),
-                             convertedValue, affinityAnalysis, rewriter);
+        resolveTensorOperands(storeOp.getLoc(), storeOp.getValue(),
+                              adaptor.getValue(), affinityAnalysis, rewriter);
     assert(expandedGlobal.resourceOp && "Missing resource op");
     auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
         storeOp.getLoc(), expandedGlobal.resourceOp.getType(), value.resource,
@@ -373,20 +375,24 @@ struct OptimizationBarrierOpConversion
   matchAndRewrite(IREE::Util::OptimizationBarrierOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     SmallVector<Value> newOperands;
-    SmallVector<Value> convertedOperands =
-        getStreamResourcesFromOneToNOpOperandAdaptors(adaptor.getOperands());
+    SmallVector<Value> operandSizes;
     for (auto [originalOperand, convertedOperand] :
-         llvm::zip_equal(op.getOperands(), convertedOperands)) {
-      if (isa<TensorType>(convertedOperand.getType())) {
-        newOperands.push_back(resolveTensorOperand(op.getLoc(), originalOperand,
-                                                   convertedOperand, rewriter)
-                                  .resource);
+         llvm::zip_equal(op.getOperands(), adaptor.getOperands())) {
+      if (isa<TensorType>(originalOperand.getType())) {
+        auto tensorOperands = resolveTensorOperands(
+            op.getLoc(), originalOperand, convertedOperand, rewriter);
+        newOperands.push_back(tensorOperands.resource);
+        operandSizes.push_back(tensorOperands.resourceSize);
       } else {
-        newOperands.push_back(convertedOperand);
+        assert(convertedOperand.size() == 1 &&
+               "all non-tensor type expected to have a 1-1 conversion");
+        newOperands.push_back(convertedOperand.front());
+        operandSizes.push_back(nullptr);
       }
     }
-    rewriter.replaceOpWithNewOp<IREE::Util::OptimizationBarrierOp>(op,
-                                                                   newOperands);
+    auto barrierOp = rewriter.create<IREE::Util::OptimizationBarrierOp>(
+        op.getLoc(), newOperands);
+    replaceOpWithMultiple(op, barrierOp->getResults(), operandSizes, rewriter);
     return success();
   }
 };
