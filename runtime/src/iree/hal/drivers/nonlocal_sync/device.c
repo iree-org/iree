@@ -193,7 +193,8 @@ static iree_status_t iree_hal_nl_sync_device_query_i64(
 
   if (iree_string_view_equal(category, IREE_SV("hal.device.id"))) {
     *out_value =
-        iree_string_view_match_pattern(device->identifier, key) ? 1 : 0;
+        iree_string_view_match_pattern(device->identifier, key) ? 1 :
+        iree_string_view_match_pattern(IREE_SV("local"), key) ? 1 : 0;
     return iree_ok_status();
   }
 
