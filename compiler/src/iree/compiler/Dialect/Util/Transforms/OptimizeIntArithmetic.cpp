@@ -306,6 +306,8 @@ protected:
 
 class OptimizeIntArithmeticPass
     : public impl::OptimizeIntArithmeticPassBase<OptimizeIntArithmeticPass> {
+  using Base::Base;
+
   void runOnOperation() override {
     Operation *op = getOperation();
     MLIRContext *ctx = op->getContext();
@@ -321,6 +323,9 @@ class OptimizeIntArithmeticPass
 
     // Populate upstream arith patterns.
     arith::populateIntRangeOptimizationsPatterns(patterns, solver);
+
+    if (narrowToI32)
+      arith::populateIntRangeNarrowingPatterns(patterns, solver, {32});
 
     // Populate canonicalization patterns.
     auto arithDialect = ctx->getOrLoadDialect<arith::ArithDialect>();
