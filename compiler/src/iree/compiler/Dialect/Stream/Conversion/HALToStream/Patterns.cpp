@@ -83,10 +83,11 @@ struct ConvertTensorImportOp
     }
 
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
-    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncTransferOp>(
-        op, unknownType, resource, resultSize, resultSize,
+    Value newImport = rewriter.create<IREE::Stream::AsyncTransferOp>(
+        op.getLoc(), unknownType, resource, resultSize, resultSize,
         /*source_affinity=*/executionAffinityAttr,
         /*target_affinity=*/executionAffinityAttr);
+    rewriter.replaceOpWithMultiple(op, {{newImport, resultSize}});
     return success();
   }
 

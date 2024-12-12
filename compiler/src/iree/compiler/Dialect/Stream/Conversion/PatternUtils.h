@@ -57,6 +57,15 @@ ConvertedTensor transferTensorOperand(
     IREE::Stream::AffinityAttr requiredAffinityAttr,
     IREE::Stream::AffinityAnalysis *affinityAnalysis, OpBuilder &builder);
 
+ConvertedTensor resolveTensorOperands(
+    Location loc, Value originalOperand, ValueRange convertedOperand,
+    IREE::Stream::AffinityAnalysis *affinityAnalysis, OpBuilder &builder);
+ConvertedTensor transferTensorOperands(
+    Location loc, Value originalOperand, ValueRange convertedOperand,
+    IREE::Stream::AffinityAttr requiredAffinityAttr,
+    IREE::Stream::AffinityAnalysis *affinityAnalysis, OpBuilder &builder);
+
+
 template <typename OpT>
 struct AffinityAwareConversionPattern : public OpConversionPattern<OpT> {
 public:
@@ -78,6 +87,12 @@ protected:
     return mlir::iree_compiler::resolveTensorOperand(
         loc, originalOperand, convertedOperand, affinityAnalysis, builder);
   }
+  ConvertedTensor resolveTensorOperands(Location loc, Value originalOperand,
+                                       ValueRange convertedOperand,
+                                       OpBuilder &builder) const {
+    return mlir::iree_compiler::resolveTensorOperands(
+        loc, originalOperand, convertedOperand, affinityAnalysis, builder);
+  }
 
   ConvertedTensor
   transferTensorOperand(Location loc, Value originalOperand,
@@ -85,6 +100,16 @@ protected:
                         IREE::Stream::AffinityAttr requiredAffinityAttr,
                         OpBuilder &builder) const {
     return mlir::iree_compiler::transferTensorOperand(
+        loc, originalOperand, convertedOperand, requiredAffinityAttr,
+        affinityAnalysis, builder);
+  }
+
+  ConvertedTensor
+  transferTensorOperands(Location loc, Value originalOperand,
+                        ValueRange convertedOperand,
+                        IREE::Stream::AffinityAttr requiredAffinityAttr,
+                        OpBuilder &builder) const {
+    return mlir::iree_compiler::transferTensorOperands(
         loc, originalOperand, convertedOperand, requiredAffinityAttr,
         affinityAnalysis, builder);
   }

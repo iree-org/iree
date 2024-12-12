@@ -778,13 +778,12 @@ struct ConvertDispatchOp
     SmallVector<Value> dispatchOperandLengths;
     SmallVector<Value> operandSizes;
 
-    SmallVector<Value> convertedArguments =
-        getStreamResourcesFromOneToNOpOperandAdaptors(adaptor.getArguments());
-    for (auto [oldOperand, newOperand] :
-         llvm::zip_equal(op.getArguments(), convertedArguments)) {
+    for (auto [oldOperand, convertedOperands] :
+         llvm::zip_equal(op.getArguments(), adaptor.getArguments())) {
+      Value newOperand;
       if (llvm::isa<ShapedType>(oldOperand.getType())) {
         auto newOperandCast =
-            transferTensorOperand(op.getLoc(), oldOperand, newOperand,
+            transferTensorOperands(op.getLoc(), oldOperand, convertedOperands,
                                   executionAffinityAttr, rewriter);
         newOperand = newOperandCast.resource;
         dispatchOperandSizes.push_back(newOperandCast.resourceSize);
@@ -794,6 +793,7 @@ struct ConvertDispatchOp
         dispatchOperandLengths.push_back(newOperandCast.resourceSize);
       } else {
         operandSizes.push_back({});
+        newOperand = convertedOperands.front();
       }
       dispatchOperands.push_back(newOperand);
     }

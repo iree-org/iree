@@ -143,9 +143,8 @@ struct SelectOpConversion
     auto sizeSelectOp = rewriter.create<mlir::arith::SelectOp>(
         op.getLoc(), adaptor.getCondition().front(), trueOperand.resourceSize,
         falseOperand.resourceSize);
-    rewriter.replaceOpWithNewOp<mlir::UnrealizedConversionCastOp>(
-        op, convertedTrueValue.getType(),
-        ValueRange{resourceSelectOp.getResult(), sizeSelectOp.getResult()});
+    rewriter.replaceOpWithMultiple(op, {ValueRange{resourceSelectOp.getResult(),
+                                                   sizeSelectOp.getResult()}});
     return success();
   }
 };
