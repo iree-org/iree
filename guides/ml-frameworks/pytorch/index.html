@@ -4012,15 +4012,13 @@
 <h1 id="pytorch-iree">PyTorch + IREE = <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m8 14.25.345.666a.75.75 0 0 1-.69 0l-.008-.004-.018-.01a7.152 7.152 0 0 1-.31-.17 22.055 22.055 0 0 1-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.066 22.066 0 0 1-3.744 2.584l-.018.01-.006.003h-.002ZM4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.58 20.58 0 0 0 8 13.393a20.58 20.58 0 0 0 3.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.749.749 0 0 1-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5Z"/></svg></span><a class="headerlink" href="#pytorch-iree" title="Permanent link">link</a></h1>
 <div class="admonition caution">
 <p class="admonition-title">Caution - under development</p>
-<p>We are still validating and fixing specific models. Between bug fixes in
-flight and releases running behind, we don't expect that you will be able
-to do a lot of advanced things without using nightly releases or working
-with us.</p>
+<p>We are still validating and fixing specific models. We don't expect that
+you will be able to do a lot of advanced things without working with us.</p>
 <p>Stay tuned and join the discussion in our
 <a href="https://discord.gg/wEWh6Z9nMU">Discord server</a>'s <code>#pytorch</code> channel.</p>
 </div>
 <h2 id="overview"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/></svg></span> Overview<a class="headerlink" href="#overview" title="Permanent link">link</a></h2>
-<p><a href="https://pypi.org/project/iree-turbine/">iree-turbine</a> offers a tight
+<p><a href="https://github.com/iree-org/iree-turbine">iree-turbine</a> offers a tight
 integration between compatible versions of IREE,
 <a href="https://github.com/llvm/torch-mlir">torch-mlir</a>, and
 <a href="https://pytorch.org/">PyTorch</a>.</p>
@@ -4057,17 +4055,32 @@ integration between compatible versions of IREE,
 
   aot -.-&gt; binary</code></pre>
 <h2 id="prerequisites"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg></span> Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
-<p>Install a recent version of PyTorch
-(<code>2.4.1</code>, latest stable release as of September 2024):</p>
+<p>We recommend first installing a recent version of PyTorch for CPU by following
+the <a href="https://pytorch.org/get-started/locally/">official instructions</a>.</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/test/cpu<span class="w"> </span><span class="nv">torch</span><span class="o">==</span><span class="m">2</span>.4.1
+<span class="w">  </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/test/cpu<span class="w"> </span>torch&gt;<span class="o">=</span><span class="m">2</span>.3.0
 </code></pre></div>
-<!-- TODO(scotttodd): mention nightly releases after
-     https://github.com/iree-org/iree/issues/19193 is fixed -->
-
 <p>Install iree-turbine:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m8.878.392 5.25 3.045c.54.314.872.89.872 1.514v6.098a1.75 1.75 0 0 1-.872 1.514l-5.25 3.045a1.75 1.75 0 0 1-1.756 0l-5.25-3.045A1.75 1.75 0 0 1 1 11.049V4.951c0-.624.332-1.201.872-1.514L7.122.392a1.75 1.75 0 0 1 1.756 0ZM7.875 1.69l-4.63 2.685L8 7.133l4.755-2.758-4.63-2.685a.248.248 0 0 0-.25 0ZM2.5 5.677v5.372c0 .09.047.171.125.216l4.625 2.683V8.432Zm6.25 8.271 4.625-2.683a.25.25 0 0 0 .125-.216V5.677L8.75 8.432Z"/></svg></span> Stable releases</label><label for="__tabbed_1_2"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5 5.782V2.5h-.25a.75.75 0 0 1 0-1.5h6.5a.75.75 0 0 1 0 1.5H11v3.282l3.666 5.76C15.619 13.04 14.543 15 12.767 15H3.233c-1.776 0-2.852-1.96-1.899-3.458Zm-2.4 6.565a.75.75 0 0 0 .633 1.153h9.534a.75.75 0 0 0 .633-1.153L12.225 10.5h-8.45ZM9.5 2.5h-3V6c0 .143-.04.283-.117.403L4.73 9h6.54L9.617 6.403A.746.746 0 0 1 9.5 6Z"/></svg></span> Nightly pre-releases</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Stable release packages are
+<a href="https://pypi.org/project/iree-turbine/">published to PyPI</a>.</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-turbine
 </code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>Nightly pre-releases are published on
+<a href="https://github.com/iree-org/iree-turbine/releases/tag/dev-wheels">GitHub releases</a>.</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">  </span>--find-links<span class="w"> </span>https://iree.dev/pip-release-links.html<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">  </span>--pre<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">  </span>--upgrade<span class="w"> </span><span class="se">\</span>
+</span><span class="w">  </span>iree-turbine
+</code></pre></div>
+</div>
+</div>
+</div>
 <h2 id="just-in-time-jit-execution"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M9.533.753V.752c.217 2.385 1.463 3.626 2.653 4.81C13.37 6.74 14.498 7.863 14.498 10c0 3.5-3 6-6.5 6S1.5 13.512 1.5 10c0-1.298.536-2.56 1.425-3.286.376-.308.862 0 1.035.454C4.46 8.487 5.581 8.419 6 8c.282-.282.341-.811-.003-1.5C4.34 3.187 7.035.75 8.77.146c.39-.137.726.194.763.607ZM7.998 14.5c2.832 0 5-1.98 5-4.5 0-1.463-.68-2.19-1.879-3.383l-.036-.037c-1.013-1.008-2.3-2.29-2.834-4.434-.322.256-.63.579-.864.953-.432.696-.621 1.58-.046 2.73.473.947.67 2.284-.278 3.232-.61.61-1.545.84-2.403.633a2.79 2.79 0 0 1-1.436-.874A3.198 3.198 0 0 0 3 10c0 2.53 2.164 4.5 4.998 4.5Z"/></svg></span> Just-in-time (JIT) execution<a class="headerlink" href="#just-in-time-jit-execution" title="Permanent link">link</a></h2>
 <p>Just-in-time integration allows for Python code using TorchDynamo to optimize
 PyTorch models/functions using IREE, all within an interactive Python session.</p>
@@ -4145,7 +4158,7 @@ computation graph and feeds that graph through to the selected backend compiler.
 </tr>
 <tr>
 <td>Simple MLP eager</td>
-<td><a href="https://github.com/iree-org/iree-turbine/tree/main/examples/eager_mlp/mlp_eager_simple.py"><code>core/examples/eager_mlp/mlp_eager_simple.py</code></a></td>
+<td><a href="https://github.com/iree-org/iree-turbine/tree/main/examples/eager_mlp/mlp_eager_simple.py">iree-turbine <code>core/examples/eager_mlp/mlp_eager_simple.py</code></a></td>
 </tr>
 </tbody>
 </table>
@@ -4228,7 +4241,7 @@ Python and then export deployment-ready artifacts that can be used in IREE's
 </tr>
 <tr>
 <td>Simple MLP export</td>
-<td><a href="https://github.com/iree-org/iree-turbine/tree/main/examples/aot_mlp/mlp_export_simple.py"><code>core/examples/aot_mlp/mlp_export_simple.py</code></a></td>
+<td><a href="https://github.com/iree-org/iree-turbine/tree/main/examples/aot_mlp/mlp_export_simple.py">iree-turbine <code>core/examples/aot_mlp/mlp_export_simple.py</code></a></td>
 </tr>
 </tbody>
 </table>
@@ -4358,7 +4371,7 @@ models parameters on disk, so that they can be loaded later during runtime.</p>
 <span class="n">input_np</span> <span class="o">=</span> <span class="nb">input</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
 <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;input.npy&quot;</span><span class="p">,</span> <span class="n">input_np</span><span class="p">)</span>
 </code></pre></div>
-<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Python runtime</label><label for="__tabbed_1_2">Command line tools</label></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Python runtime</label><label for="__tabbed_2_2">Command line tools</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <p>Runtime invocation now requires loading the parameters as a separate module.
@@ -4434,18 +4447,14 @@ compiled module.</p>
 </tr>
 <tr>
 <td>AOT unit tests</td>
-<td><a href="https://github.com/iree-org/iree-turbine/tree/main/tests/aot"><code>tests/aot/</code></a></td>
-</tr>
-<tr>
-<td>Dynamic MLP export</td>
-<td><a href="https://github.com/iree-org/iree-turbine/tree/main/examples/aot_mlp/mlp_export_dynamic.py"><code>core/examples/aot_mlp/mlp_export_dynamic.py</code></a></td>
-</tr>
-<tr>
-<td>stateless llama2</td>
-<td><a href="https://github.com/nod-ai/SHARK-ModelDev/blob/main/models/turbine_models/custom_models/stateless_llama.py"><code>models/turbine_models/custom_models/stateless_llama.py</code></a></td>
+<td><a href="https://github.com/iree-org/iree-turbine/tree/main/tests/aot">iree-turbine <code>tests/aot/</code></a></td>
 </tr>
 </tbody>
 </table>
+<p>The sharktank project hosted at
+<a href="https://github.com/nod-ai/shark-ai/tree/main/sharktank">https://github.com/nod-ai/shark-ai/tree/main/sharktank</a> also uses
+<code>iree-turbine</code> heavily to provide inference-optimized ops, layers, and models
+for popular gen-ai applications.</p>
 
 
 
