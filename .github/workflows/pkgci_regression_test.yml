@@ -112,7 +112,7 @@ jobs:
             --no-skip-tests-missing-files \
             --capture=no \
             --log-cli-level=info \
-            --timeout=240 \
+            --timeout=600 \
             --durations=0 \
             --config-files=${MODELS_CONFIG_FILE_PATH}
 

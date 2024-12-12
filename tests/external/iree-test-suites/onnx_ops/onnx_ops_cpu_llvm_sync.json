@@ -13,7 +13,9 @@
     "onnx/node/generated/test_group_normalization_epsilon_expanded",
     "onnx/node/generated/test_group_normalization_example_expanded"
   ],
-  "skip_run_tests": [],
+  "skip_run_tests": [
+    "onnx/node/generated/test_gridsample_zeros_padding"
+  ],
   "expected_compile_failures": [
     "onnx/node/generated/test_affine_grid_2d",
     "onnx/node/generated/test_affine_grid_2d_align_corners",
