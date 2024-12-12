@@ -143,7 +143,7 @@ static FailureOr<func::CallOp> lowerUKernelGenericToFunctionCall(
     if (failed(getCallOpType(rewriter.getContext(), microKernelOpOperandType,
                              stridedOuterDimsAttr, callArgumentTypes))) {
       return rewriter.notifyMatchFailure(
-          op, llvm::formatv("failed to lower operand type {0}",
+          op, llvm::formatv("failed to lower operand type {}",
                             microKernelOpOperandType));
     }
   }
@@ -156,7 +156,7 @@ static FailureOr<func::CallOp> lowerUKernelGenericToFunctionCall(
     if (failed(getCallOpType(rewriter.getContext(), resultType,
                              stridedOuterDimsAttr, callResultTypes))) {
       return rewriter.notifyMatchFailure(
-          op, llvm::formatv("failed to lower result type {0}", resultType));
+          op, llvm::formatv("failed to lower result type {}", resultType));
     }
   }
 
@@ -242,7 +242,7 @@ struct UKernelOpsBufferizationInterface
         FailureOr<Value> memrefOperand = getBuffer(rewriter, operand, options);
         if (failed(memrefOperand)) {
           return op->emitOpError(
-              llvm::formatv("failed to bufferize operand {0} ", index));
+              llvm::formatv("failed to bufferize operand {} ", index));
         }
         bufferOpOperands.push_back(memrefOperand.value());
         continue;

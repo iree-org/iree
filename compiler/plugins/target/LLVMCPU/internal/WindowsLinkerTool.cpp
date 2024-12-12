@@ -220,12 +220,12 @@ public:
       return std::nullopt;
     }
     flags.push_back(
-        llvm::formatv("/libpath:\"{0}\\lib\\{1}\"", "%VCToolsInstallDir%", arch)
+        llvm::formatv("/libpath:\"{}\\lib\\{}\"", "%VCToolsInstallDir%", arch)
             .str());
-    flags.push_back(llvm::formatv("/libpath:\"{0}\\Lib\\{1}\\ucrt\\{2}\"",
+    flags.push_back(llvm::formatv("/libpath:\"{}\\Lib\\{}\\ucrt\\{}\"",
                                   "%UniversalCRTSdkDir%", "%UCRTVersion%", arch)
                         .str());
-    flags.push_back(llvm::formatv("/libpath:\"{0}\\Lib\\{1}\\um\\{2}\"",
+    flags.push_back(llvm::formatv("/libpath:\"{}\\Lib\\{}\\um\\{}\"",
                                   "%UniversalCRTSdkDir%", "%UCRTVersion%", arch)
                         .str());
 

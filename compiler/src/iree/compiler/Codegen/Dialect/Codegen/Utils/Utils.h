@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_UTILS_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_UTILS_H_
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "llvm/Support/raw_ostream.h"
@@ -78,10 +79,24 @@ getEncodingInfoForMatmul(Encoding::EncodingAttr encoding, TileMxNxK tileMxNxK);
 // Operation Lowering Utilities.
 //===----------------------------------------------------------------------===//
 
+// TODO(hanchung): The below methods are exposed to public because they are
+// shared between MaterializeEncodingIntoPackUnPack.cpp.cpp and
+// CPUEncodingExternalModels.cpp. They will be moved to other places after all
+// the CPU backends implement their layout attributes.
+
+/// Returns the best TileMxNxK from `enumeratedTiles` pool. If the
+/// `hostDefinedUpperBound` is not empty, the chosen tile sizes can not be
+/// greater than the values.
+/// TODO(#16933): Remove `hostDefinedUpperBound` once we can propagate such
+/// information to host. For now, they are defined by host.
+TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
+                           IREE::Encoding::MatmulNarrowDim narrowDim,
+                           ArrayRef<int64_t> hostDefinedUpperBound = {});
+
 FailureOr<Operation *>
 lowerContractionOpWithEncoding(OpBuilder &builder, linalg::LinalgOp linalgOp,
                                ValueRange operands, bool transposeNarrowN,
-                               ResolveEncodingInfoFn getEncodingInfo);
+                               LayoutAttrInterface layoutAttr);
 
 } // namespace mlir::iree_compiler::IREE::Codegen
 

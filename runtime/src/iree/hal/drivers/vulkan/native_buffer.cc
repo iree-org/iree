@@ -32,7 +32,7 @@ static iree_hal_vulkan_native_buffer_t* iree_hal_vulkan_native_buffer_cast(
 }
 
 iree_status_t iree_hal_vulkan_native_buffer_wrap(
-    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
@@ -40,24 +40,23 @@ iree_status_t iree_hal_vulkan_native_buffer_wrap(
     VkDeviceMemory device_memory, VkBuffer handle,
     iree_hal_vulkan_native_buffer_release_callback_t internal_release_callback,
     iree_hal_buffer_release_callback_t user_release_callback,
-    iree_hal_buffer_t** out_buffer) {
-  IREE_ASSERT_ARGUMENT(allocator);
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
+  IREE_ASSERT_ARGUMENT(placement.device);
   IREE_ASSERT_ARGUMENT(logical_device);
   IREE_ASSERT_ARGUMENT(handle);
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)allocation_size);
 
-  iree_allocator_t host_allocator =
-      iree_hal_allocator_host_allocator(allocator);
   iree_hal_vulkan_native_buffer_t* buffer = NULL;
   iree_status_t status =
       iree_allocator_malloc(host_allocator, sizeof(*buffer), (void**)&buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_buffer_initialize(
-        host_allocator, allocator, &buffer->base.base, allocation_size,
-        byte_offset, byte_length, memory_type, allowed_access, allowed_usage,
+        placement, &buffer->base.base, allocation_size, byte_offset,
+        byte_length, memory_type, allowed_access, allowed_usage,
         &iree_hal_vulkan_native_buffer_vtable, &buffer->base.base);
+    buffer->base.host_allocator = host_allocator;
     buffer->base.device_memory = device_memory;
     buffer->base.handle = handle;
     buffer->logical_device = logical_device;
@@ -75,7 +74,7 @@ static void iree_hal_vulkan_native_buffer_destroy(
     iree_hal_buffer_t* base_buffer) {
   iree_hal_vulkan_native_buffer_t* buffer =
       iree_hal_vulkan_native_buffer_cast(base_buffer);
-  iree_allocator_t host_allocator = base_buffer->host_allocator;
+  iree_allocator_t host_allocator = buffer->base.host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(
       z0, (int64_t)iree_hal_buffer_allocation_size(base_buffer));

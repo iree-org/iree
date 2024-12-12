@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -14,6 +15,8 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
+
+#define DEBUG_TYPE "iree-codegen-dialect-codegen-utils"
 
 namespace mlir::iree_compiler::IREE::Codegen {
 
@@ -404,10 +407,110 @@ static Value getMmt4dOperand(Value value, linalg::LinalgOp linalgOp,
   return expandedValue;
 }
 
+TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
+                           IREE::Encoding::MatmulNarrowDim narrowDim,
+                           ArrayRef<int64_t> hostDefinedUpperBound) {
+  assert((hostDefinedUpperBound.empty() || hostDefinedUpperBound.size() >= 3) &&
+         "expected hostDefinedUpperBound is empty or has upper bound for {M, "
+         "N, K}");
+  // Handle narrow-N by transposing to reduce to narrow-M. Note: the
+  // enumeratedTiles currently only enumerate narrow-M cases.
+  if (narrowDim.isN()) {
+    SmallVector<int64_t> newHostDefinedUpperBound(hostDefinedUpperBound);
+    std::swap(newHostDefinedUpperBound[0], newHostDefinedUpperBound[1]);
+    narrowDim.dim = IREE::Encoding::MatmulNarrowDim::Dim::M;
+    TileMxNxK tile =
+        chooseMatmulTile(enumeratedTiles, narrowDim, newHostDefinedUpperBound);
+    std::swap(tile.M, tile.N);
+    return tile;
+  }
+  // Handle kDynamic: currently this is only used with VMVX, where there is only
+  // one enumerated tile and it has all three M/N/K dimensions dynamic, so for
+  // now we only support that. Generalize that as needed when more dynamic tile
+  // sizes are used outside of VMVX, e.g. perhaps some day with Arm SVE. Decide
+  // how to incorporate the handling of kDynamic in the cost-model evaluation
+  // below to decide when to prefer a dynamic vs a static tile shape.
+  for (auto tile : enumeratedTiles) {
+    if (ShapedType::isDynamic(tile.M) || ShapedType::isDynamic(tile.N) ||
+        ShapedType::isDynamic(tile.K)) {
+      assert(enumeratedTiles.size() == 1);
+      assert(ShapedType::isDynamic(tile.M) && ShapedType::isDynamic(tile.N) &&
+             ShapedType::isDynamic(tile.K));
+      return tile;
+    }
+  }
+  // We're going to "rate" the enumerated tiles.
+  struct RatedTileMxNxK : TileMxNxK {
+    RatedTileMxNxK() {}
+    RatedTileMxNxK(TileMxNxK tile) : TileMxNxK(tile) {}
+    // Penalize tiles that are wider in the M dimension than matmulNarrowM.
+    int64_t paddingPenalty = 0;
+    // Favor larger tiles, as long as they still minimize paddingPenalty.
+    int64_t productMxNxK = 0;
+  };
+  SmallVector<RatedTileMxNxK> ratedTiles;
+  ratedTiles.reserve(enumeratedTiles.size());
+  int64_t bestPaddingPenalty = INT64_MAX;
+  int64_t mUB = INT64_MAX;
+  int64_t nUB = INT64_MAX;
+  int64_t kUB = INT64_MAX;
+  if (!hostDefinedUpperBound.empty()) {
+    mUB = hostDefinedUpperBound[0];
+    nUB = hostDefinedUpperBound[1];
+    kUB = hostDefinedUpperBound[2];
+  }
+  for (auto tile : enumeratedTiles) {
+    if (tile.M > mUB || tile.N > nUB || tile.K > kUB) {
+      LLVM_DEBUG(llvm::dbgs() << "[" << DEBUG_TYPE << "]: tile (";
+                 llvm::interleaveComma(
+                     ArrayRef<int64_t>{tile.M, tile.N, tile.K}, llvm::dbgs());
+                 llvm::dbgs()
+                 << ") is skipped because it is not valid for upper_bound (";
+                 llvm::interleaveComma(ArrayRef<int64_t>{mUB, nUB, kUB},
+                                       llvm::dbgs());
+                 llvm::dbgs() << ")\n");
+      continue;
+    }
+    RatedTileMxNxK ratedTile(tile);
+    ratedTile.paddingPenalty = 0;
+    // If we are choosing a tile for a narrow-M case, we want to minimize
+    // padding along the M dimension.
+    // The PowerOf2Ceil is so that we are OK with padding up to the next
+    // power of two, we just try to avoid padding beyond that. For example,
+    // if matmulNarrowM==7 and we have enumerated tiles with M=8,4,2,1, we
+    // are OK with the tile that has M==8 even though it requires some padding.
+    // Otherwise, we would be penalizing the tiles with M==8,4,2 and we would
+    // end up selecting the vecmat tile (M==1) for that case!
+    if (narrowDim) {
+      ratedTile.paddingPenalty =
+          std::max<int64_t>(tile.M - llvm::PowerOf2Ceil(narrowDim.size), 0);
+    }
+    ratedTile.productMxNxK = tile.M * tile.N * tile.K;
+    ratedTiles.push_back(ratedTile);
+    LLVM_DEBUG(llvm::dbgs() << "candidate: "; llvm::interleaveComma(
+                   ArrayRef<int64_t>{tile.M, tile.N, tile.K}, llvm::dbgs());
+               llvm::dbgs() << " penalty:" << ratedTile.paddingPenalty << "\n");
+    bestPaddingPenalty = std::min(bestPaddingPenalty, ratedTile.paddingPenalty);
+  }
+  RatedTileMxNxK bestRatedTile;
+  for (auto ratedTile : ratedTiles) {
+    // Choose only among tiles that minimize paddingPenalty. Among those,
+    // maximize productMxNxK.
+    if (ratedTile.paddingPenalty == bestPaddingPenalty &&
+        bestRatedTile.productMxNxK < ratedTile.productMxNxK) {
+      bestRatedTile = ratedTile;
+    }
+  }
+  // Sanity check. This assert can only fail if there's a programming mistake
+  // locally here.
+  assert(bestRatedTile.paddingPenalty == bestPaddingPenalty);
+  return bestRatedTile;
+}
+
 FailureOr<Operation *>
 lowerContractionOpWithEncoding(OpBuilder &builder, linalg::LinalgOp linalgOp,
                                ValueRange operands, bool transposeNarrowN,
-                               ResolveEncodingInfoFn getEncodingInfo) {
+                               LayoutAttrInterface layoutAttr) {
   if (!linalgOp.hasPureTensorSemantics()) {
     return failure();
   }
@@ -432,42 +535,42 @@ lowerContractionOpWithEncoding(OpBuilder &builder, linalg::LinalgOp linalgOp,
     return failure();
   }
 
-  FailureOr<MaterializeEncodingInfo> encodingInfo =
-      getEncodingInfo(cast<RankedTensorType>(linalgOp->getResultTypes()[0]));
+  MaterializeEncodingInfo encodingInfo = layoutAttr.getEncodingInfo(
+      cast<RankedTensorType>(linalgOp->getResultTypes()[0]));
 
+  if (isIdentityLayout(encodingInfo)) {
+    return dropEncodingAndCloneOp(builder, linalgOp,
+                                  operands.take_front(inputs.size()),
+                                  operands.drop_front(inputs.size()));
+  }
+
+  bool transpose = transposeNarrowN && isNarrowNResult(resultEncoding);
+  SmallVector<Type> elemTypes = lhsEncoding.getElementTypesArray();
+  SmallVector<ReassociationIndices> ri;
+  Value newLhs = getMmt4dOperand(operands[0], linalgOp, transpose, builder, ri,
+                                 elemTypes, /*operandIdx=*/0);
+  Value newRhs = getMmt4dOperand(operands[1], linalgOp, transpose, builder, ri,
+                                 elemTypes, /*operandIdx=*/1);
+  Value newResult = getMmt4dOperand(operands[2], linalgOp, transpose, builder,
+                                    ri, elemTypes, /*operandIdx=*/2);
+  if (transpose) {
+    std::swap(newLhs, newRhs);
+  }
+  Type newResultType = newResult.getType();
+  auto cDims = IREE::Encoding::getEncodingContractionDims(lhsEncoding);
   Operation *result;
-  if (failed(encodingInfo)) {
-    result = dropEncodingAndCloneOp(builder, linalgOp,
-                                    operands.take_front(inputs.size()),
-                                    operands.drop_front(inputs.size()));
+  if (cDims->batch.empty()) {
+    result = builder.create<linalg::Mmt4DOp>(linalgOp.getLoc(), newResultType,
+                                             ValueRange{newLhs, newRhs},
+                                             ValueRange{newResult});
   } else {
-    bool transpose = transposeNarrowN && isNarrowNResult(resultEncoding);
-    SmallVector<Type> elemTypes = lhsEncoding.getElementTypesArray();
-    SmallVector<ReassociationIndices> ri;
-    Value newLhs = getMmt4dOperand(operands[0], linalgOp, transpose, builder,
-                                   ri, elemTypes, /*operandIdx=*/0);
-    Value newRhs = getMmt4dOperand(operands[1], linalgOp, transpose, builder,
-                                   ri, elemTypes, /*operandIdx=*/1);
-    Value newResult = getMmt4dOperand(operands[2], linalgOp, transpose, builder,
-                                      ri, elemTypes, /*operandIdx=*/2);
-    if (transpose) {
-      std::swap(newLhs, newRhs);
-    }
-    Type newResultType = newResult.getType();
-    auto cDims = IREE::Encoding::getEncodingContractionDims(lhsEncoding);
-    if (cDims->batch.empty()) {
-      result = builder.create<linalg::Mmt4DOp>(linalgOp.getLoc(), newResultType,
-                                               ValueRange{newLhs, newRhs},
-                                               ValueRange{newResult});
-    } else {
-      result = builder.create<linalg::BatchMmt4DOp>(
-          linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
-          ValueRange{newResult});
-    }
-    if (!ri.empty()) {
-      result = builder.create<tensor::CollapseShapeOp>(
-          linalgOp->getLoc(), operands[2].getType(), result->getResult(0), ri);
-    }
+    result = builder.create<linalg::BatchMmt4DOp>(
+        linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
+        ValueRange{newResult});
+  }
+  if (!ri.empty()) {
+    result = builder.create<tensor::CollapseShapeOp>(
+        linalgOp->getLoc(), operands[2].getType(), result->getResult(0), ri);
   }
   return result;
 }

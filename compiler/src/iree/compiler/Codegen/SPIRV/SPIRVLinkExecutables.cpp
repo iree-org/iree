@@ -140,7 +140,7 @@ struct SPIRVLinkExecutablesPass final
       std::string moduleName =
           executableBuckets.size() == 1
               ? baseModuleName
-              : llvm::formatv("{0}_{1}", baseModuleName, bucketIndex);
+              : llvm::formatv("{}_{}", baseModuleName, bucketIndex);
 
       LLVM_DEBUG({
         llvm::dbgs() << "executable bucket #" << bucketIndex << " targets:\n";
@@ -179,7 +179,7 @@ struct SPIRVLinkExecutablesPass final
       std::string linkedVariantName =
           executableTargetAttrs.size() == 1
               ? attr.getSymbolNameFragment()
-              : llvm::formatv("{0}_{1}", attr.getSymbolNameFragment(), index);
+              : llvm::formatv("{}_{}", attr.getSymbolNameFragment(), index);
       auto linkedTargetOp =
           executableBuilder.create<IREE::HAL::ExecutableVariantOp>(
               moduleOp.getLoc(), linkedVariantName, attr);

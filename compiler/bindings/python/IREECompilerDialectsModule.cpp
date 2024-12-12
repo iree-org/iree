@@ -352,7 +352,66 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
           "cls"_a, "value"_a, "ctx"_a = py::none(),
           "Gets an #iree_gpu.lowering_config from parameters.")
       .def_property_readonly("attributes",
-                             ireeGPULoweringConfigAttrGetAttributes);
+                             ireeGPULoweringConfigAttrGetAttributes)
+      .def_property_readonly(
+          "workgroup_tile_sizes",
+          [](MlirAttribute self) -> std::vector<int64_t> {
+            auto tilesizes = ireeGPULoweringConfigAttrGetTileSizes(self);
+            MlirAttribute workgroupAttr = tilesizes.workgroupAttr;
+            if (mlirAttributeIsNull(workgroupAttr)) {
+              return {};
+            }
+
+            size_t len = mlirArrayAttrGetNumElements(workgroupAttr);
+            std::vector<int64_t> workgroup(len);
+            for (size_t i = 0; i < len; ++i) {
+              MlirAttribute attr = mlirArrayAttrGetElement(workgroupAttr, i);
+              workgroup[i] = mlirIntegerAttrGetValueInt(attr);
+            }
+            return workgroup;
+          })
+      .def_property_readonly(
+          "reduction_tile_sizes",
+          [](MlirAttribute self) -> std::vector<int64_t> {
+            auto tilesizes = ireeGPULoweringConfigAttrGetTileSizes(self);
+            MlirAttribute reductionAttr = tilesizes.reductionAttr;
+            if (mlirAttributeIsNull(reductionAttr)) {
+              return {};
+            }
+
+            size_t len = mlirArrayAttrGetNumElements(reductionAttr);
+            std::vector<int64_t> reduction(len);
+            for (size_t i = 0; i < len; ++i) {
+              MlirAttribute attr = mlirArrayAttrGetElement(reductionAttr, i);
+              reduction[i] = mlirIntegerAttrGetValueInt(attr);
+            }
+            return reduction;
+          })
+      .def_property_readonly(
+          "subgroup_count_mn",
+          [](MlirAttribute self) -> py::tuple {
+            ireeGPUSubgroupCountInfo info =
+                ireeGPULoweringConfigAttrGetSubgroupCount(self);
+            MlirAttribute mCountAttr = info.subgroupMCountAttr;
+            MlirAttribute nCountAttr = info.subgroupNCountAttr;
+            std::optional<int64_t> mCount;
+            if (!mlirAttributeIsNull(mCountAttr)) {
+              mCount = mlirIntegerAttrGetValueInt(mCountAttr);
+            }
+
+            std::optional<int64_t> nCount;
+            if (!mlirAttributeIsNull(nCountAttr)) {
+              nCount = mlirIntegerAttrGetValueInt(nCountAttr);
+            }
+            return py::make_tuple(mCount, nCount);
+          })
+      .def_property_readonly(
+          "mma_kind", [](MlirAttribute self) -> std::optional<MlirAttribute> {
+            auto attr = ireeGPULoweringConfigAttrGetMmaKind(self);
+            if (!mlirAttributeIsNull(attr))
+              return attr;
+            return std::nullopt;
+          });
 
   //===-------------------------------------------------------------------===//
   // Binding to utility function getExecutableVariantOps
