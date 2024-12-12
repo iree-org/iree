@@ -81,7 +81,7 @@ compilation artifacts, reproducers, etc.
 
 * Please submit feature requests and bug reports about the plugin in [GitHub Issues](https://github.com/iree-org/iree/issues).
 * Discuss the development of the plugin at `#jax` or `#pjrt-plugin` channel of [IREE Discord server](https://discord.gg/wEWh6Z9nMU).
-* Check the [OpenXLA/XLA](https://github.com/openxla/xla) repo for PJRT APIs and clients.
+* Check the [OpenXLA/XLA](https://github.com/openxla/xla) repo and [its communication channels](https://github.com/openxla/community?tab=readme-ov-file#communication-channels) for PJRT APIs and clients.
 
 ## License
 
