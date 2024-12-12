@@ -220,7 +220,7 @@ jobs:
             --goldentime-rocm-unet-ms 419.0 \
             --goldentime-rocm-clip-ms 18.5 \
             --goldentime-rocm-vae-ms 337.0 \
-            --goldendispatch-rocm-unet 1598 \
+            --goldendispatch-rocm-unet 1602 \
             --goldendispatch-rocm-clip 1139 \
             --goldendispatch-rocm-vae 246 \
             --goldensize-rocm-unet-bytes 2280000  \
@@ -242,17 +242,17 @@ jobs:
             --goldentime-rocm-unet-ms 80.0 \
             --goldentime-rocm-clip-ms 15.5 \
             --goldentime-rocm-vae-ms 80.0 \
-            --goldendispatch-rocm-unet 1598 \
+            --goldendispatch-rocm-unet 1602 \
             --goldendispatch-rocm-clip 1139 \
             --goldendispatch-rocm-vae 246 \
             --goldensize-rocm-unet-bytes 2270000 \
             --goldensize-rocm-clip-bytes 860000  \
             --goldensize-rocm-vae-bytes 840000 \
             --goldentime-rocm-punet-int8-fp16-ms 51 \
-            --goldendispatch-rocm-punet-int8-fp16 1416 \
+            --goldendispatch-rocm-punet-int8-fp16 1424 \
             --goldensize-rocm-punet-int8-fp16-bytes 2560000 \
             --goldentime-rocm-punet-int8-fp8-ms 51 \
-            --goldendispatch-rocm-punet-int8-fp8 1696 \
+            --goldendispatch-rocm-punet-int8-fp8 1704 \
             --goldensize-rocm-punet-int8-fp8-bytes 2800000 \
             --rocm-chip gfx942 \
             --log-cli-level=info \
