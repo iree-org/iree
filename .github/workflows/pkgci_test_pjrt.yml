@@ -61,7 +61,7 @@ jobs:
           source ${VENV_DIR}/bin/activate
           python -m pip install -v --no-deps -e integrations/pjrt/python_packages/iree_${{ matrix.pjrt_platform }}_plugin
           # install
-          python -m pip install jax==0.4.35
+          python -m pip install jax==0.4.36
       - name: Run tests
         run: |
           source ${VENV_DIR}/bin/activate
