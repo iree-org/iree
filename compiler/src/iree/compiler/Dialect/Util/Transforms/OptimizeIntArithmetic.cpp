@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h"
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
 #include "mlir/Analysis/DataFlow/IntegerRangeAnalysis.h"
 #include "mlir/Analysis/DataFlowFramework.h"
@@ -315,6 +316,8 @@ class OptimizeIntArithmeticPass
     expandAffineOps(op);
 
     DataFlowSolver solver;
+    // Needed to make the dead code analyis not be too conservative.
+    solver.load<SparseConstantPropagation>();
     solver.load<DeadCodeAnalysis>();
     solver.load<IntegerRangeAnalysis>();
     solver.load<IntegerDivisibilityAnalysis>();
