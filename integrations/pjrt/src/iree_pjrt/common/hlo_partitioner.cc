@@ -97,41 +97,44 @@ class OpenXLAPartitionerJob : public CompilerJob {
     return true;
   }
 
-  // TODO: Find another way to deal with this.
-  // bool SetFlags(xla::CompileOptions options) override {
-  //   int num_partitions = options.executable_build_options.num_partitions();
-  //   int num_replicas = options.executable_build_options.num_replicas();
-  //   bool use_spmd_partitioning =
-  //       options.executable_build_options.use_spmd_partitioning();
-  //   auto allow_spmd_sharding_propagation_to_output =
-  //       options.executable_build_options
-  //           .allow_spmd_sharding_propagation_to_output();
-  //   if (!SetFlag(absl::StrCat("--openxla-partitioner-gspmd-num-partitions=",
-  //                             num_partitions)
-  //                    .c_str())) {
-  //     return false;
-  //   }
-  //   if (!SetFlag(absl::StrCat("--openxla-partitioner-gspmd-replica-count=",
-  //                             num_replicas)
-  //                    .c_str())) {
-  //     return false;
-  //   }
-  //   if (!SetFlag(
-  //           absl::StrCat("--openxla-partitioner-gspmd-use-spmd-partitioning=",
-  //                        use_spmd_partitioning)
-  //               .c_str())) {
-  //     return false;
-  //   }
-  //   if (!SetFlag(
-  //           absl::StrCat(
-  //               "--openxla-partitioner-gspmd-allow-spmd-"
-  //               "sharding-propagation-to-output=",
-  //               absl::StrJoin(allow_spmd_sharding_propagation_to_output,
-  //               ",")) .c_str())) {
-  //     return false;
-  //   }
-  //   return true;
-  // }
+  bool SetFlags(xla::CompileOptionsProto options) override {
+    int num_partitions = options.executable_build_options().num_partitions();
+    int num_replicas = options.executable_build_options().num_replicas();
+    bool use_spmd_partitioning =
+        options.executable_build_options().use_spmd_partitioning();
+    auto allow_spmd_sharding_propagation_to_output =
+        options.executable_build_options()
+            .allow_spmd_sharding_propagation_to_output();
+    if (!SetFlag(("--openxla-partitioner-gspmd-num-partitions=" +
+                  std::to_string(num_partitions))
+                     .c_str())) {
+      return false;
+    }
+    if (!SetFlag(("--openxla-partitioner-gspmd-replica-count=" +
+                  std::to_string(num_replicas))
+                     .c_str())) {
+      return false;
+    }
+    if (!SetFlag(("--openxla-partitioner-gspmd-use-spmd-partitioning=" +
+                  std::to_string(use_spmd_partitioning))
+                     .c_str())) {
+      return false;
+    }
+    std::string allow_spmd_sharding_propagation_to_output_str;
+    for (size_t i = 0; i < allow_spmd_sharding_propagation_to_output.size();
+         ++i) {
+      if (i != 0) allow_spmd_sharding_propagation_to_output_str += ",";
+      allow_spmd_sharding_propagation_to_output_str +=
+          std::to_string(allow_spmd_sharding_propagation_to_output[i]);
+    }
+    if (!SetFlag(("--openxla-partitioner-gspmd-allow-spmd-"
+                  "sharding-propagation-to-output=" +
+                  allow_spmd_sharding_propagation_to_output_str)
+                     .c_str())) {
+      return false;
+    }
+    return true;
+  }
 
   std::string GetFlags() override {
     std::string flags;
