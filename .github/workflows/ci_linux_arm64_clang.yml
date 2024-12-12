@@ -25,6 +25,7 @@ concurrency:
 
 jobs:
   linux_arm64_clang:
+    if: ${{ github.repository_owner == 'iree-org' }}
     # See https://gitlab.arm.com/tooling/gha-runner-docs
     runs-on: ah-ubuntu_22_04-c7g_4x-50
     container:
