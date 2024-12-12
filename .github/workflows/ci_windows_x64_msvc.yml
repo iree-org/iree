@@ -21,6 +21,7 @@ concurrency:
 
 jobs:
   windows_x64_msvc:
+    if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
     runs-on: azure-windows-scale
     env:
       BASE_BUILD_DIR_POWERSHELL: C:\mnt\azure\b

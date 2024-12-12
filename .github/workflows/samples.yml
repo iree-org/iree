@@ -28,6 +28,7 @@ concurrency:
 
 jobs:
   colab:
+    if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
     runs-on: ubuntu-24.04
     steps:
       - name: "Checking out repository"
@@ -40,6 +41,7 @@ jobs:
         run: ./samples/colab/test_notebooks.py
 
   samples:
+    if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
     runs-on: ubuntu-24.04
     env:
       CC: clang
@@ -59,6 +61,7 @@ jobs:
         run: ./build_tools/testing/test_samples.sh
 
   web:
+    if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
     runs-on: ubuntu-24.04
     env:
       VENV_DIR: ${{ github.workspace }}/.venv
