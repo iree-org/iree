@@ -275,6 +275,18 @@ module @sitofp_i8_f32 {
 
 // -----
 
+// CHECK-LABEL: @sitofp_i64_f32
+module @sitofp_i64_f32 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: i64)
+  func.func @fn(%arg0: i64) -> f32 {
+    // CHECK: vm.cast.si64.f32 %[[ARG0]] : i64 -> f32
+    %0 = arith.sitofp %arg0 : i64 to f32
+    return %0 : f32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @uitofp_i8_f32
 module @uitofp_i8_f32 {
   // CHECK: vm.func private @fn(%[[ARG0:.+]]: i32)

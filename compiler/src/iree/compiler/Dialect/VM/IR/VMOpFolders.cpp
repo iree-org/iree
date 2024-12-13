@@ -1683,6 +1683,16 @@ OpFoldResult CastSI32F32Op::fold(FoldAdaptor operands) {
       });
 }
 
+OpFoldResult CastSI64F32Op::fold(FoldAdaptor operands) {
+  return constFoldCastOp<IntegerAttr, FloatAttr>(
+      Float32Type::get(getContext()), operands.getOperand(),
+      [&](const APInt &a) {
+        APFloat b = APFloat(0.0f);
+        b.convertFromAPInt(a, /*IsSigned=*/true, APFloat::rmNearestTiesToAway);
+        return b;
+      });
+}
+
 OpFoldResult CastUI32F32Op::fold(FoldAdaptor operands) {
   return constFoldCastOp<IntegerAttr, FloatAttr>(
       Float32Type::get(getContext()), operands.getOperand(),
