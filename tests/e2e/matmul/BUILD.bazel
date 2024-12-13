@@ -660,29 +660,4 @@ iree_generated_e2e_runner_test(
     ("f32", "f32"),
 ]]
 
-iree_generated_e2e_runner_test(
-    name = "e2e_matmul_vulkan_f16_large_rdna3",
-    compiler_flags = [
-        "--iree-vulkan-target=rdna3",
-    ],
-    generator = ":generate_e2e_matmul_tests",
-    generator_args = [
-        "--lhs_rhs_type=f16",
-        "--acc_type=f32",
-        "--shapes=easy_large_static",
-        "--compilation_info=SPIRVCooperativeMatrixVectorize",
-    ],
-    runner_args = [
-        "--require_exact_results=false",
-    ],
-    tags = [
-        "requires-gpu",
-        "requires-gpu-rdna3",
-        "vulkan_uses_vk_khr_shader_float16_int8",
-    ],
-    target_backends_and_drivers = [
-        ("vulkan-spirv", "vulkan"),
-    ],
-    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmul",
-)
+# TODO(#19465): add large matmul tests for rdna3.

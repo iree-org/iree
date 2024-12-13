@@ -122,7 +122,7 @@ static iree_status_t iree_hal_metal_device_create_internal(
       initWithDispatchQueue:device->semaphore_notification_queue];  // +1
   device->capture_manager = NULL;
 
-  iree_status_t status = iree_hal_metal_allocator_create(metal_device,
+  iree_status_t status = iree_hal_metal_allocator_create((iree_hal_device_t*)device, metal_device,
 #if defined(IREE_PLATFORM_MACOS)
                                                          metal_queue,
 #endif  // IREE_PLATFORM_MACOS
@@ -256,8 +256,8 @@ static iree_status_t iree_hal_metal_device_create_command_buffer(
   // for argument buffer updates to pass in binding tables.
   if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT) || binding_capacity > 0) {
     return iree_hal_deferred_command_buffer_create(
-        device->device_allocator, mode, command_categories, binding_capacity, &device->block_pool,
-        device->host_allocator, out_command_buffer);
+        device->device_allocator, mode, command_categories, queue_affinity, binding_capacity,
+        &device->block_pool, device->host_allocator, out_command_buffer);
   }
 
   return iree_hal_metal_direct_command_buffer_create(

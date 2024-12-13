@@ -27,6 +27,7 @@ iree_cc_library(
     MLIRIR
     MLIRPass
     MLIRSupport
+    iree::compiler::Codegen::Dialect::CPU::IR::IREECPUDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::VMVX
     iree::compiler::Dialect::HAL::Target

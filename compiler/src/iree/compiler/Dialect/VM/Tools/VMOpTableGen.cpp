@@ -31,11 +31,11 @@ void emitOpTable(const llvm::RecordKeeper &recordKeeper, const Record &tableDef,
   os << "typedef enum {\n";
   for (int i = 0; i < 256; ++i) {
     if (auto *opcode = opEncodings[i]) {
-      os << formatv("  IREE_VM_OP_{0}_{1} = {2}",
+      os << formatv("  IREE_VM_OP_{}_{} = {}",
                     tableDef.getValueAsString("opcodeEnumTag"),
                     opcode->getValueAsString("symbol"), format_hex(i, 4, true));
     } else {
-      os << formatv("  IREE_VM_OP_{0}_RSV_{1}",
+      os << formatv("  IREE_VM_OP_{}_RSV_{}",
                     tableDef.getValueAsString("opcodeEnumTag"),
                     format_hex(i, 4, true));
     }
@@ -44,14 +44,14 @@ void emitOpTable(const llvm::RecordKeeper &recordKeeper, const Record &tableDef,
   os << "} " << tableDef.getValueAsString("opcodeEnumName") << ";\n";
   os << "\n";
 
-  os << formatv("#define IREE_VM_OP_{0}_TABLE(OPC, RSV) \\\n",
+  os << formatv("#define IREE_VM_OP_{}_TABLE(OPC, RSV) \\\n",
                 tableDef.getValueAsString("opcodeEnumTag"));
   for (int i = 0; i < 256; ++i) {
     if (auto *opcode = opEncodings[i]) {
-      os << formatv("    OPC({0}, {1})", format_hex(i, 4, true),
+      os << formatv("    OPC({}, {})", format_hex(i, 4, true),
                     opcode->getValueAsString("symbol"));
     } else {
-      os << formatv("    RSV({0})", format_hex(i, 4, true));
+      os << formatv("    RSV({})", format_hex(i, 4, true));
     }
     if (i != 255) {
       os << " \\\n";

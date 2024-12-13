@@ -165,7 +165,7 @@ public:
       auto entryPointFunc = dyn_cast<spirv::FuncOp>(
           SymbolTable::lookupSymbolIn(spvModuleOp, exportOp.getSymName()));
 
-      std::string symbolName = llvm::formatv("d{0}", exportOp.getOrdinal());
+      std::string symbolName = llvm::formatv("d{}", exportOp.getOrdinal());
       mlir::StringAttr nameAttr =
           mlir::StringAttr::get(variantOp->getContext(), symbolName);
 

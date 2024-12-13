@@ -39,7 +39,7 @@ jobs:
     if: ${{ github.repository_owner == 'iree-org' || github.event_name == 'workflow_dispatch' }}
 
     # Note: a clean build of `iree-tblgen` takes ~5 minutes on standard runners.
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     env:
       CC: clang
       CXX: clang++

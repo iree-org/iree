@@ -10,6 +10,7 @@
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
@@ -126,14 +127,11 @@ FailureOr<Value> lowerSetEncodingOpToPackOp(
     Value source, const MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
   RankedTensorType resultType = encodingOp.getResultType();
-  FailureOr<MaterializeEncodingInfo> encodingInfo =
+  MaterializeEncodingInfo encodingInfo =
       typeConverter.getEncodingInfo(resultType);
-  if (failed(encodingInfo)) {
-    return rewriter.notifyMatchFailure(encodingOp, "unhandled result encoding");
-  }
 
   // Shortcut to avoid creating new operations.
-  if (IREE::Codegen::isIdentityLayout(encodingInfo.value())) {
+  if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
     return source;
   }
 
@@ -142,13 +140,13 @@ FailureOr<Value> lowerSetEncodingOpToPackOp(
     return failure();
   }
   if (typeConverter.getTransposeNarrowN() && isNarrowNResult(encoding)) {
-    transposeInPlace(*encodingInfo);
+    transposeInPlace(encodingInfo);
   }
 
   // Create `tensor.empty` operation for the result of the pack operation.
   Location loc = encodingOp.getLoc();
   FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr = getInnerTileSizesOfr(
-      rewriter, loc, resultType, *encodingInfo, materializeEncodingValueFn);
+      rewriter, loc, resultType, encodingInfo, materializeEncodingValueFn);
   if (failed(innerTileSizesOfr)) {
     return rewriter.notifyMatchFailure(
         encodingOp, "failed to generate runtime tile size query");
@@ -158,14 +156,14 @@ FailureOr<Value> lowerSetEncodingOpToPackOp(
   SmallVector<OpFoldResult> sourceDims =
       tensor::getMixedSizes(rewriter, loc, source);
   SmallVector<OpFoldResult> resultDims = tensor::PackOp::getResultShape(
-      rewriter, loc, sourceDims, *innerTileSizesOfr, encodingInfo->innerDimsPos,
-      encodingInfo->outerDimsPerm);
+      rewriter, loc, sourceDims, *innerTileSizesOfr, encodingInfo.innerDimsPos,
+      encodingInfo.outerDimsPerm);
   auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
                                                   resultType.getElementType());
   return rewriter
-      .create<tensor::PackOp>(loc, source, emptyOp, encodingInfo->innerDimsPos,
+      .create<tensor::PackOp>(loc, source, emptyOp, encodingInfo.innerDimsPos,
                               *innerTileSizesOfr, paddingValue,
-                              encodingInfo->outerDimsPerm)
+                              encodingInfo.outerDimsPerm)
       .getResult();
 }
 
@@ -174,20 +172,17 @@ FailureOr<Value> lowerUnsetEncodingToUnpackOp(
     Value packedValue, const MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
   RankedTensorType sourceType = encodingOp.getSourceType();
-  FailureOr<MaterializeEncodingInfo> encodingInfo =
+  MaterializeEncodingInfo encodingInfo =
       typeConverter.getEncodingInfo(sourceType);
-  if (failed(encodingInfo)) {
-    return rewriter.notifyMatchFailure(encodingOp, "unhandled source encoding");
-  }
 
   // Shortcut to avoid creating new operations.
-  if (IREE::Codegen::isIdentityLayout(encodingInfo.value())) {
+  if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
     return packedValue;
   }
 
   auto encoding = IREE::Encoding::getEncodingAttr(sourceType);
   if (typeConverter.getTransposeNarrowN() && isNarrowNResult(encoding)) {
-    transposeInPlace(*encodingInfo);
+    transposeInPlace(encodingInfo);
   }
   // Create an `tensor.empty` for the result of the unpack operation.
   Location loc = encodingOp.getLoc();
@@ -197,15 +192,15 @@ FailureOr<Value> lowerUnsetEncodingToUnpackOp(
   auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
                                                   sourceType.getElementType());
   FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr = getInnerTileSizesOfr(
-      rewriter, loc, sourceType, *encodingInfo, materializeEncodingValueFn);
+      rewriter, loc, sourceType, encodingInfo, materializeEncodingValueFn);
   if (failed(innerTileSizesOfr)) {
     return rewriter.notifyMatchFailure(
         encodingOp, "failed to generate runtime tile size query");
   }
   return rewriter
       .create<tensor::UnPackOp>(loc, packedValue, emptyOp,
-                                encodingInfo->innerDimsPos, *innerTileSizesOfr,
-                                encodingInfo->outerDimsPerm)
+                                encodingInfo.innerDimsPos, *innerTileSizesOfr,
+                                encodingInfo.outerDimsPerm)
       .getResult();
 }
 
@@ -217,22 +212,23 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
                     const MaterializeEncodingTypeConverter &typeConverter,
                     MaterializeEncodingValueFn materializeEncodingValueFn) {
   auto emptyType = cast<RankedTensorType>(emptyOp->getResultTypes()[0]);
-  FailureOr<MaterializeEncodingInfo> encodingInfo =
+  MaterializeEncodingInfo encodingInfo =
       typeConverter.getEncodingInfo(emptyType);
   Location loc = emptyOp.getLoc();
-  if (failed(encodingInfo)) {
-    Operation *newEmptyOp = rewriter.create<tensor::EmptyOp>(
-        loc, emptyOp.getMixedSizes(), emptyType.getElementType());
-    return newEmptyOp;
+  if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
+    return rewriter
+        .create<tensor::EmptyOp>(loc, emptyOp.getMixedSizes(),
+                                 emptyType.getElementType())
+        .getOperation();
   }
 
   if (typeConverter.getTransposeNarrowN() &&
       isNarrowNResult(IREE::Encoding::getEncodingAttr(emptyType))) {
-    transposeInPlace(*encodingInfo);
+    transposeInPlace(encodingInfo);
   }
 
   FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr = getInnerTileSizesOfr(
-      rewriter, loc, emptyType, *encodingInfo, materializeEncodingValueFn);
+      rewriter, loc, emptyType, encodingInfo, materializeEncodingValueFn);
   if (failed(innerTileSizesOfr)) {
     return rewriter.notifyMatchFailure(
         emptyOp, "failed to generate runtime tile size query");
@@ -241,9 +237,9 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
   SmallVector<OpFoldResult> sourceDims = emptyOp.getMixedSizes();
   (void)foldDynamicIndexList(sourceDims);
   SmallVector<OpFoldResult> newShape = tensor::PackOp::getResultShape(
-      rewriter, loc, sourceDims, *innerTileSizesOfr, encodingInfo->innerDimsPos,
-      encodingInfo->outerDimsPerm);
-  newShape = getSwizzledShape(newShape, *encodingInfo);
+      rewriter, loc, sourceDims, *innerTileSizesOfr, encodingInfo.innerDimsPos,
+      encodingInfo.outerDimsPerm);
+  newShape = getSwizzledShape(newShape, encodingInfo);
   Operation *newEmptyOp = rewriter.create<tensor::EmptyOp>(
       loc, newShape, emptyType.getElementType());
   return newEmptyOp;
@@ -262,10 +258,10 @@ static FailureOr<Operation *> lowerGenericOpWithEncoding(
     return rewriter.notifyMatchFailure(genericOp,
                                        "Output indexing map is not identity");
   }
-  FailureOr<MaterializeEncodingInfo> outMaterializeEncodingInfo =
+  MaterializeEncodingInfo outMaterializeEncodingInfo =
       typeConverter.getEncodingInfo(
           cast<RankedTensorType>(outputOperand->get().getType()));
-  if (failed(outMaterializeEncodingInfo)) {
+  if (IREE::Codegen::isIdentityLayout(outMaterializeEncodingInfo)) {
     return rewriter.notifyMatchFailure(
         genericOp, "MaterializeEncodingInfo failed for output");
   }
@@ -277,20 +273,20 @@ static FailureOr<Operation *> lowerGenericOpWithEncoding(
   // Compute the new indexing maps for the packed layout. This assumes that
   // the output map is identity, and that all iterator types are parallel.
   SmallVector<int64_t> outInnerDimsPos =
-      outMaterializeEncodingInfo->innerDimsPos;
+      outMaterializeEncodingInfo.innerDimsPos;
   SmallVector<int64_t> outInverseOuterDimsPerm =
-      invertPermutationVector(outMaterializeEncodingInfo->outerDimsPerm);
+      invertPermutationVector(outMaterializeEncodingInfo.outerDimsPerm);
   SmallVector<AffineMap> packedIndexingMaps;
   for (OpOperand *inputOperand : genericOp.getDpsInputOperands()) {
-    FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
+    MaterializeEncodingInfo materializeEncodingInfo =
         typeConverter.getEncodingInfo(
             cast<RankedTensorType>(inputOperand->get().getType()));
-    if (failed(materializeEncodingInfo)) {
+    if (IREE::Codegen::isIdentityLayout(materializeEncodingInfo)) {
       return rewriter.notifyMatchFailure(
           genericOp, "MaterializeEncodingInfo failed for input");
     }
-    SmallVector<int64_t> innerDimsPos = materializeEncodingInfo->innerDimsPos;
-    SmallVector<int64_t> outerDimsPerm = materializeEncodingInfo->outerDimsPerm;
+    ArrayRef<int64_t> innerDimsPos = materializeEncodingInfo.innerDimsPos;
+    ArrayRef<int64_t> outerDimsPerm = materializeEncodingInfo.outerDimsPerm;
     AffineMap inputMap = genericOp.getMatchingIndexingMap(inputOperand);
     // Permute result dims to the input packed domain, and map dims to the
     // output packed domain.
@@ -388,28 +384,28 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
     return failure();
   }
 
-  FailureOr<MaterializeEncodingInfo> encodingInfo =
+  MaterializeEncodingInfo encodingInfo =
       typeConverter.getEncodingInfo(boundTensorType);
-  if (failed(encodingInfo)) {
+  if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
     return failure();
   }
   if (typeConverter.getTransposeNarrowN() &&
       isNarrowNResult(IREE::Encoding::getEncodingAttr(boundTensorType))) {
-    transposeInPlace(*encodingInfo);
+    transposeInPlace(encodingInfo);
   }
 
   SmallVector<OpFoldResult> targetShape =
       getMixedValues(boundTensorType.getShape(), dynamicDims, builder);
   auto innerTileSizes = getInnerTileSizesOfr(
-      builder, loc, boundTensorType, *encodingInfo, materializeEncodingValueFn);
+      builder, loc, boundTensorType, encodingInfo, materializeEncodingValueFn);
   if (failed(innerTileSizes)) {
     return failure();
   }
   SmallVector<OpFoldResult> convertedTargetShape =
       tensor::PackOp::getResultShape(builder, loc, targetShape, *innerTileSizes,
-                                     encodingInfo->innerDimsPos,
-                                     encodingInfo->outerDimsPerm);
-  return getSwizzledShape(convertedTargetShape, *encodingInfo);
+                                     encodingInfo.innerDimsPos,
+                                     encodingInfo.outerDimsPerm);
+  return getSwizzledShape(convertedTargetShape, encodingInfo);
 }
 
 /// For `dispatchTensorType` that bind a `RankedTensorType` with encoding,
@@ -745,32 +741,14 @@ public:
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         this->getTypeConverter());
 
-    if (auto layoutAttr = converter->getLayoutAttr()) {
-      SmallVector<Type> convertedResTypes;
-      for (auto init : op.getDpsInits()) {
-        convertedResTypes.push_back(converter->convertType(init.getType()));
-      }
-      Operation *newOp =
-          layoutAttr.lowerOp(rewriter, op, convertedResTypes, operands);
-      rewriter.replaceOp(op, newOp->getResults());
-      return success();
+    IREE::Codegen::LayoutAttrInterface layoutAttr = converter->getLayoutAttr();
+    SmallVector<Type> convertedResTypes;
+    for (auto init : op.getDpsInits()) {
+      convertedResTypes.push_back(converter->convertType(init.getType()));
     }
-
-    // TODO(hanchung): This is a transition state for moving the implementation
-    // details to backend attributes. We won't need the function type argument
-    // after all the backends that support encodings implement the attribute.
-    auto getEncodingInfoWrapper =
-        [&](RankedTensorType type) -> FailureOr<MaterializeEncodingInfo> {
-      return converter->getEncodingInfo(type);
-    };
-    FailureOr<Operation *> convertedOp =
-        IREE::Codegen::lowerContractionOpWithEncoding(
-            rewriter, op, operands, converter->getTransposeNarrowN(),
-            getEncodingInfoWrapper);
-    if (failed(convertedOp)) {
-      return failure();
-    }
-    rewriter.replaceOp(op.getOperation(), convertedOp.value()->getResult(0));
+    Operation *newOp =
+        layoutAttr.lowerOp(rewriter, op, convertedResTypes, operands);
+    rewriter.replaceOp(op, newOp->getResults());
     return success();
   }
 

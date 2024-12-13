@@ -28,7 +28,7 @@ static void emitLegalizationErrors(Location loc,
   errorMessages.reserve(opNameCounts.size());
   for (const auto &opInfo : opNameCounts) {
     errorMessages.push_back(
-        llvm::formatv("\t{0} (count: {1})", opInfo.first, opInfo.second));
+        llvm::formatv("\t{} (count: {})", opInfo.first, opInfo.second));
   }
   emitError(loc) << "The following illegal operations still remain: \n"
                  << llvm::join(errorMessages, "\n") << "\n";

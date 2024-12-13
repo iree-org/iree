@@ -666,6 +666,10 @@ static iree_status_t allocate_mappable_device_buffer(
                             "unable to allocate buffer of size %" PRIdsz,
                             data_length);
   }
+  const iree_hal_buffer_placement_t placement = {
+      .device = device,
+      .queue_affinity = IREE_HAL_QUEUE_AFFINITY_ANY,
+  };
   const iree_hal_buffer_params_t target_params = {
       .usage = IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
       .type =
@@ -673,8 +677,8 @@ static iree_status_t allocate_mappable_device_buffer(
       .access = IREE_HAL_MEMORY_ACCESS_ALL,
   };
   return iree_hal_webgpu_buffer_wrap(
-      device, iree_hal_device_allocator(device), target_params.type,
-      target_params.access, target_params.usage, data_length,
+      origin, target_params.type, target_params.access, target_params.usage,
+      data_length,
       /*byte_offset=*/0,
       /*byte_length=*/data_length, device_buffer_handle,
       iree_allocator_system(), out_buffer);

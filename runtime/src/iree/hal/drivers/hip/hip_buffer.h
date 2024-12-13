@@ -11,10 +11,6 @@
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/hip/hip_headers.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif  // __cplusplus
-
 typedef enum iree_hal_hip_buffer_type_e {
   // Device local buffer; allocated with hipMalloc/hipMallocManaged, freed
   // with hipFree.
@@ -34,7 +30,7 @@ typedef enum iree_hal_hip_buffer_type_e {
 
 // Wraps a HIP allocation in an iree_hal_buffer_t.
 iree_status_t iree_hal_hip_buffer_wrap(
-    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
@@ -68,9 +64,5 @@ void* iree_hal_hip_buffer_host_pointer(const iree_hal_buffer_t* buffer);
 // holding an allocation and the earliest the buffer could be destroyed is after
 // this call returns and the caller has released its reference.
 void iree_hal_hip_buffer_drop_release_callback(iree_hal_buffer_t* buffer);
-
-#ifdef __cplusplus
-}  // extern "C"
-#endif  // __cplusplus
 
 #endif  // IREE_HAL_DRIVERS_HIP_BUFFER_H_

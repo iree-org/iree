@@ -34,7 +34,7 @@ struct LLVMCPULinkExecutablesPass
 
     // Create our new "linked" hal.executable.
     SymbolTable moduleTable(moduleOp);
-    std::string linkedExecutableName = llvm::formatv("{0}_linked", moduleName);
+    std::string linkedExecutableName = llvm::formatv("{}_linked", moduleName);
     auto linkedExecutableOp = moduleBuilder.create<IREE::HAL::ExecutableOp>(
         moduleOp.getLoc(), linkedExecutableName);
     linkedExecutableOp.setVisibility(
@@ -55,7 +55,7 @@ struct LLVMCPULinkExecutablesPass
       std::string linkedVariantName =
           executableTargetAttrs.size() == 1
               ? targetAttr.getSymbolNameFragment()
-              : llvm::formatv("{0}_{1}", targetAttr.getSymbolNameFragment(),
+              : llvm::formatv("{}_{}", targetAttr.getSymbolNameFragment(),
                               index);
       auto linkedTargetOp =
           executableBuilder.create<IREE::HAL::ExecutableVariantOp>(

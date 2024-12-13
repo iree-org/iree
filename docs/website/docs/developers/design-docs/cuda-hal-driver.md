@@ -52,7 +52,7 @@ See [synchronization](#synchronization) section regarding the details.
 
 #### Async allocation
 
-The CUDA HAL drivers supports async allocation
+The CUDA HAL driver supports async allocation
 (`iree_hal_device_queue_alloca()` and `iree_hal_device_queue_dealloca()`)
 via [CUDA stream ordered memory allocation][cuda-stream-ordered-alloc].
 

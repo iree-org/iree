@@ -11,10 +11,12 @@
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Casting.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -28,6 +30,8 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExprVisitor.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/TilingInterface.h"
@@ -61,53 +65,77 @@ bool isEntryPoint(mlir::FunctionOpInterface func) {
   return func.isPublic() && getEntryPoint(func);
 }
 
-std::optional<StringAttr>
-getConfigStringAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
-                    StringRef stringAttr) {
-  if (!targetAttr)
+std::optional<StringAttr> getConfigStringAttr(Attribute srcAttr,
+                                              StringRef stringAttr) {
+  if (!srcAttr) {
     return std::nullopt;
-  auto config = targetAttr.getConfiguration();
-  if (!config)
+  }
+  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(srcAttr);
+  DictionaryAttr config;
+  if (targetAttr) {
+    config = targetAttr.getConfiguration();
+  } else {
+    config = dyn_cast<DictionaryAttr>(srcAttr);
+  }
+  if (!config) {
     return std::nullopt;
+  }
   auto attr = config.getAs<StringAttr>(stringAttr);
-  if (!attr)
+  if (!attr) {
     return std::nullopt;
+  }
   return attr;
 }
 
-std::optional<IntegerAttr>
-getConfigIntegerAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
-                     StringRef integerAttr) {
-  if (!targetAttr)
+std::optional<IntegerAttr> getConfigIntegerAttr(Attribute srcAttr,
+                                                StringRef integerAttr) {
+  if (!srcAttr) {
     return std::nullopt;
-  auto config = targetAttr.getConfiguration();
-  if (!config)
+  }
+  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(srcAttr);
+  DictionaryAttr config;
+  if (targetAttr) {
+    config = targetAttr.getConfiguration();
+  } else {
+    config = dyn_cast<DictionaryAttr>(srcAttr);
+  }
+  if (!config) {
     return std::nullopt;
+  }
   auto attr = config.getAs<IntegerAttr>(integerAttr);
-  if (!attr)
+  if (!attr) {
     return std::nullopt;
+  }
   return attr;
 }
 
-std::optional<BoolAttr>
-getConfigBoolAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
-                  StringRef integerAttr) {
-  if (!targetAttr)
+std::optional<BoolAttr> getConfigBoolAttr(Attribute srcAttr,
+                                          StringRef boolAttr) {
+  if (!srcAttr) {
     return std::nullopt;
-  auto config = targetAttr.getConfiguration();
-  if (!config)
+  }
+  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(srcAttr);
+  DictionaryAttr config;
+  if (targetAttr) {
+    config = targetAttr.getConfiguration();
+  } else {
+    config = dyn_cast<DictionaryAttr>(srcAttr);
+  }
+  if (!config) {
     return std::nullopt;
-  auto attr = config.getAs<BoolAttr>(integerAttr);
-  if (!attr)
+  }
+  auto attr = config.getAs<BoolAttr>(boolAttr);
+  if (!attr) {
     return std::nullopt;
+  }
   return attr;
 }
 
-std::optional<llvm::Triple>
-getTargetTriple(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  auto triple = getConfigStringAttr(targetAttr, "target_triple");
-  if (!triple)
+std::optional<llvm::Triple> getTargetTriple(Attribute attr) {
+  auto triple = getConfigStringAttr(attr, "target_triple");
+  if (!triple) {
     return std::nullopt;
+  }
   return llvm::Triple(triple.value().str());
 }
 
@@ -141,24 +169,30 @@ bool isROCMBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return targetAttr && targetAttr.getBackend().getValue().starts_with("rocm");
 }
 
-static const char *
-getDefaultEnabledUkernels(IREE::HAL::ExecutableTargetAttr targetAttr) {
+static const char *getDefaultEnabledUkernels(Attribute attr) {
+  const char *kNone = "none";
+  if (!attr) {
+    return kNone;
+  }
+  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(attr);
+  if (!targetAttr) {
+    return kNone;
+  }
   if (isX86_64(targetAttr)) {
     return "mmt4d";
   }
   if (isAArch64(targetAttr)) {
     if (hasFeature(targetAttr, "+sve") || hasFeature(targetAttr, "+sve2") ||
         hasFeature(targetAttr, "+sme")) {
-      return "none";
+      return kNone;
     }
     return "mmt4d";
   }
-  return "none";
+  return kNone;
 }
 
-bool hasUkernel(IREE::HAL::ExecutableTargetAttr targetAttr,
-                StringRef ukernelName) {
-  auto enabledUkernels = getConfigStringAttr(targetAttr, "ukernels");
+bool hasUkernel(Attribute attr, StringRef ukernelName) {
+  auto enabledUkernels = getConfigStringAttr(attr, "ukernels");
   StringRef enabledUkernelsStr;
   if (enabledUkernels) {
     enabledUkernelsStr = enabledUkernels->getValue();
@@ -167,7 +201,7 @@ bool hasUkernel(IREE::HAL::ExecutableTargetAttr targetAttr,
   }
   // Resolve `default`.
   if (enabledUkernelsStr == "default") {
-    enabledUkernelsStr = getDefaultEnabledUkernels(targetAttr);
+    enabledUkernelsStr = getDefaultEnabledUkernels(attr);
   }
   // Resolve `none`.
   if (enabledUkernelsStr == "none") {
@@ -192,11 +226,11 @@ bool hasUkernel(IREE::HAL::ExecutableTargetAttr targetAttr,
   return false;
 }
 
-std::optional<StringRef>
-getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  auto cpuFeatures = getConfigStringAttr(targetAttr, "cpu_features");
-  if (!cpuFeatures)
+std::optional<StringRef> getCpuFeatures(Attribute attr) {
+  auto cpuFeatures = getConfigStringAttr(attr, "cpu_features");
+  if (!cpuFeatures) {
     return std::nullopt;
+  }
   return cpuFeatures->getValue();
 }
 
@@ -204,8 +238,8 @@ getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr) {
 // features in the future, we may want to consider a persistent state to carry
 // over processed HAL information or keeping the TTI instance alive and query
 // subtarget features data structure.
-bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature) {
-  std::optional<StringRef> features = getCpuFeatures(targetAttr);
+bool hasFeature(Attribute attr, StringRef feature) {
+  std::optional<StringRef> features = getCpuFeatures(attr);
   if (!features) {
     return false;
   }
@@ -223,28 +257,28 @@ bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature) {
   return false;
 }
 
-bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+bool isX86(Attribute attr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(attr);
   return triple && triple.value().isX86();
 }
 
-bool isX86_64(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+bool isX86_64(Attribute attr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(attr);
   return triple && triple.value().getArch() == llvm::Triple::x86_64;
 }
 
-bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+bool isAArch64(Attribute attr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(attr);
   return triple && triple.value().isAArch64();
 }
 
-bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+bool isRISCV(Attribute attr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(attr);
   return triple && triple.value().isRISCV();
 }
 
-bool isRISCV32(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+bool isRISCV32(Attribute attr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(attr);
   return triple && triple.value().isRISCV32();
 }
 

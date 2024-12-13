@@ -24,12 +24,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  setup:
-    uses: ./.github/workflows/setup.yml
-
   linux_x64_clang_tsan:
-    needs: setup
-    runs-on: azure-linux-scale
+    if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
+    runs-on: ${{ github.repository_owner == 'iree-org' && 'azure-linux-scale' ||  'ubuntu-24.04'  }}
     container:
       image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:78a558b999b230f7e1da376639e14b44f095f30f1777d6a272ba48c0bbdd4ccb
       # TSan in particular needs some settings that this option includes:
@@ -61,3 +58,11 @@ jobs:
           source build_tools/cmake/setup_sccache.sh
           ./build_tools/cmake/build_and_test_tsan.sh
           sccache --show-stats
+
+      - name: Post to Discord on Failure
+        uses: sarisia/actions-status-discord@ce8cc68e4e626000136b3c702d049a154243e490 # v1.14.7
+        if: failure() && github.ref_name == 'main' && github.repository_owner == 'iree-org'
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          description: "The ${{ github.workflow }} workflow failed"
+          url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}"
