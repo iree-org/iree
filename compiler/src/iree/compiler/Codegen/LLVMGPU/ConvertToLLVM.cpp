@@ -472,7 +472,8 @@ struct ConvertIREEConstantOp final
 
     // If the constant has non-trivial assumptions placed on it about
     // its min and max values or divisibility, use that information to
-    // annotate the corresponding arguments.
+    // annotate the corresponding arguments. The hasOneUse() check prevents us
+    // from applying assumptions that don't hold at all usage sites.
     if (op.getResult().hasOneUse()) {
       OpOperand *operand = op.getResult().getUses().begin().getOperand();
       auto assumeOp = dyn_cast<IREE::Util::AssumeIntOp>(operand->getOwner());
@@ -559,6 +560,53 @@ struct ConvertIREEUtilAssumeIntOp final
     auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
     if (!llvmFuncOp)
       return failure();
+
+    Location loc = op.getLoc();
+    auto updateConds = [&](std::optional<Value> &conds, Value cond) {
+      if (!conds)
+        conds = cond;
+      else
+        conds = rewriter.create<LLVM::AndOp>(loc, *conds, cond);
+    };
+    // Materialize the assumptions that aren't atteched directly to arguments
+    // in order to account for the fact that i64 inputs get passed in as a pair
+    // of i32 constants.
+    for (auto [idx, mlirVal, llvmVal] :
+         llvm::enumerate(op.getOperands(), adaptor.getOperands())) {
+      if (mlirVal.getDefiningOp<IREE::HAL::InterfaceConstantLoadOp>())
+        continue;
+      std::optional<Value> conds;
+      Type type = llvmVal.getType();
+      auto [min, max] = op.getUnionedUnsignedRange(idx);
+      // This should be a range() bundle but LLVM doesn't understand those yet.
+      if (min.has_value() && *min > 0) {
+        Value minConst = createIndexAttrConstant(rewriter, loc, type, *min);
+        Value minCond = rewriter.create<LLVM::ICmpOp>(
+            loc, LLVM::ICmpPredicate::uge, llvmVal, minConst);
+        updateConds(conds, minCond);
+      }
+      if (max.has_value()) {
+        Value maxConst = createIndexAttrConstant(rewriter, loc, type, *max);
+        Value maxCond = rewriter.create<LLVM::ICmpOp>(
+            loc, LLVM::ICmpPredicate::ule, llvmVal, maxConst);
+        updateConds(conds, maxCond);
+      }
+      std::optional<uint64_t> divisor = op.getUnionedUnsignedDivisor(idx);
+      if (divisor && *divisor > 1) {
+        Value divisorConst =
+            createIndexAttrConstant(rewriter, loc, type, *divisor);
+        Value remainder =
+            rewriter.create<LLVM::URemOp>(loc, llvmVal, divisorConst);
+        Value zero = createIndexAttrConstant(rewriter, loc, type, 0);
+        Value divisorCond = rewriter.create<LLVM::ICmpOp>(
+            loc, LLVM::ICmpPredicate::eq, remainder, zero);
+        updateConds(conds, divisorCond);
+      }
+
+      if (conds.has_value()) {
+        rewriter.create<LLVM::AssumeOp>(loc, *conds);
+      }
+    }
     rewriter.replaceOp(op, adaptor.getOperands());
     return success();
   }
