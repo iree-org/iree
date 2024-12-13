@@ -77,6 +77,12 @@ llvm::cl::opt<bool> clGPUUnalignedGEMMVectorDistribution(
                    "unaligned GEMMs when supported"),
     llvm::cl::init(false));
 
+llvm::cl::opt<bool> clGPUUseTileAndFuseConvolution(
+    "iree-codegen-llvmgpu-use-tile-and-fuse-convolution",
+    llvm::cl::desc(
+        "enable the tile and fuse pipeline for supported convolutions"),
+    llvm::cl::init(true));
+
 /// Flag to force using WMMA tensorcore operations.
 llvm::cl::opt<bool>
     clGPUUseWMMA("iree-codegen-llvmgpu-use-wmma",
@@ -2196,11 +2202,18 @@ static bool distributeToSquare(const int64_t oh, const int64_t ow,
 // Convolution Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
-static LogicalResult setConvolutionConfig(IREE::GPU::TargetAttr target,
-                                          linalg::LinalgOp linalgOp,
-                                          const int64_t bestTilingFactor) {
+static LogicalResult setConvolutionConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPointFn,
+    linalg::LinalgOp linalgOp, const int64_t bestTilingFactor) {
   if (!isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp>(linalgOp)) {
     return failure();
+  }
+  if (clGPUUseTileAndFuseConvolution) {
+    if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(target, entryPointFn,
+                                                          linalgOp))) {
+      LDBG("Tile and fuse convolution config");
+      return success();
+    }
   }
   const bool isNCHW = isa<linalg::Conv2DNchwFchwOp>(*linalgOp);
   const bool isNHWC = isa<linalg::Conv2DNhwcHwcfOp>(*linalgOp);
@@ -2284,9 +2297,8 @@ static LogicalResult setConvolutionConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> windowTileSizes(4, 0);
   windowTileSizes[ohIndex] = 1;
   tileSizes.push_back(windowTileSizes);
-  auto funcOp = linalgOp->getParentOfType<mlir::FunctionOpInterface>();
-  return setOpConfigAndEntryPointFnTranslation(funcOp, linalgOp, tileSizes,
-                                               pipeline, workgroupSize);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, linalgOp, tileSizes, pipeline, workgroupSize);
 }
 
 //====---------------------------------------------------------------------===//
@@ -2340,7 +2352,7 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       LDBG("Warp Reduction Config");
       return success();
     }
-    if (succeeded(setConvolutionConfig(target, linalgOp, 16))) {
+    if (succeeded(setConvolutionConfig(target, entryPointFn, linalgOp, 16))) {
       LDBG("Convolution Config");
       return success();
     }
