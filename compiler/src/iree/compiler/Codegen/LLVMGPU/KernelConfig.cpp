@@ -47,6 +47,12 @@
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 namespace mlir::iree_compiler {
 
+llvm::cl::opt<bool> clGPUTestTileAndFuseConvolution(
+    "iree-codegen-llvmgpu-test-tile-and-fuse-convolution",
+    llvm::cl::desc(
+        "test the tile and fuse pipeline for all supported operations"),
+    llvm::cl::init(true));
+
 llvm::cl::opt<bool> clGPUTestTileAndFuseMatmul(
     "iree-codegen-llvmgpu-test-tile-and-fuse-matmul",
     llvm::cl::desc("test the the tile and fuse pipeline for matmul"),
@@ -2202,10 +2208,10 @@ static LogicalResult setConvolutionConfig(
   if (!isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp>(linalgOp)) {
     return failure();
   }
-  if (!clLLVMGPUVectorizePipeline) {
+  if (clGPUTestTileAndFuseConvolution) {
     if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(target, entryPointFn,
                                                           linalgOp))) {
-      LDBG("Tile and fuse default config");
+      LDBG("Tile and fuse convolution config");
       return success();
     }
   }
