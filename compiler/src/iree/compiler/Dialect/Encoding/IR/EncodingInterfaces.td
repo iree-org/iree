@@ -30,9 +30,10 @@ def IREEEncoding_EncodingLayoutAttrInterface :
         Returns the storage size (in bytes) for the tensor types with an
         optional encoding.
       }],
-      /*retTy=*/"::mlir::OpFoldResult",
+      /*retTy=*/"::mlir::Value",
       /*methodName=*/"calculateStorageSizeInBytes",
       /*args=*/(ins
+        "::mlir::Location":$loc,
         "::mlir::OpBuilder &":$builder,
         "RankedTensorType":$type,
         "ValueRange":$dynamicDims
