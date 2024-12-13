@@ -484,6 +484,9 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     options.redundantHoisting = false;
     funcPassManager.addPass(createOptimizeVectorTransferPass());
   }
+  // Step 10. Hoist statically bounded allocations. Need to pad dynamic
+  // allocations at this stage to make sure they can be hoisted.
+  funcPassManager.addPass(createPadDynamicAllocPass());
   funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
