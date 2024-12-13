@@ -56,6 +56,7 @@ iree_cc_library(
       iree::compiler::bindings::c::loader
       iree_pjrt::partitioner_api
       iree_pjrt::partitioner_api::loader
+      iree_pjrt_deps::protos
     PUBLIC
 )
 
