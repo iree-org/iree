@@ -7,7 +7,9 @@
 #include "iree/compiler/Utils/ElementPackingUtils.h"
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -62,6 +64,14 @@ Value calculateStorageElementCountInBytes(Location loc,
                                           RankedTensorType shapedType,
                                           ValueRange dynamicDims,
                                           OpBuilder &builder) {
+  Attribute encoding = shapedType.getEncoding();
+  if (auto encodingLayoutAttr =
+          dyn_cast_or_null<IREE::Encoding::EncodingLayoutAttrInterface>(
+              encoding)) {
+    return encodingLayoutAttr.calculateStorageSizeInBytes(
+        loc, builder, shapedType, dynamicDims);
+  }
+
   Type alignedElementType =
       legalizeStorageElementType(shapedType.getElementType());
   unsigned elementBits = IREE::Util::getTypeBitWidth(alignedElementType);
@@ -72,52 +82,14 @@ Value calculateStorageElementCountInBytes(Location loc,
     staticCount *= IREE::Util::getRoundedElementByteWidth(alignedElementType);
   }
 
-  // TODO: Do we use makeComposedFoldedAffineApply here, so the index
-  // computation an be much simpler.
-  SmallVector<int64_t> paddedShape(shapedType.getShape());
-  SmallVector<Value> paddedDynamicDims(dynamicDims.begin(), dynamicDims.end());
-  auto encoding = IREE::Encoding::getEncodingAttr(shapedType);
-  if (encoding && !encoding.getRoundDimsToArray().empty()) {
-    auto roundDimsTo = encoding.getRoundDimsToArray();
-    FailureOr<linalg::ContractionDimensions> cDims =
-        IREE::Encoding::getEncodingContractionDims(encoding);
-    auto pad = [&](int dim, int value) {
-      std::optional<unsigned> maybeMappedDim =
-          encoding.mapDimToOperandIndex(dim);
-      if (!maybeMappedDim) {
-        return;
-      }
-      unsigned mappedDim = maybeMappedDim.value();
-      if (shapedType.isDynamicDim(mappedDim)) {
-        auto alignment = builder.create<arith::ConstantIndexOp>(loc, value);
-        paddedDynamicDims[mappedDim] = builder.create<arith::CeilDivUIOp>(
-            loc, paddedDynamicDims[mappedDim], alignment);
-        paddedDynamicDims[mappedDim] = builder.create<arith::MulIOp>(
-            loc, paddedDynamicDims[mappedDim], alignment);
-      } else {
-        paddedShape[mappedDim] = llvm::alignTo(paddedShape[mappedDim], value);
-      }
-    };
-    for (auto m : cDims->m) {
-      pad(m, roundDimsTo[0]);
-    }
-    for (auto n : cDims->n) {
-      pad(n, roundDimsTo[1]);
-    }
-    for (auto k : cDims->k) {
-      pad(k, roundDimsTo[2]);
-    }
-  }
-
   for (unsigned i = 0; i < shapedType.getRank(); ++i) {
     if (!shapedType.isDynamicDim(i))
-      staticCount *= paddedShape[i];
+      staticCount *= shapedType.getDimSize(i);
   }
-
   // Scale by dynamic dims, if present.
   auto value =
       builder.create<arith::ConstantIndexOp>(loc, staticCount).getResult();
-  for (auto dim : paddedDynamicDims) {
+  for (auto dim : dynamicDims) {
     value = builder.createOrFold<arith::MulIOp>(loc, value, dim);
   }
   // Sub-byte packing requires putting multiple elements in the same byte.
@@ -127,7 +99,7 @@ Value calculateStorageElementCountInBytes(Location loc,
     // TODO(antiagainst): We may want to emit runtime check to make sure this is
     // divisible.
     auto divisor = builder.create<arith::ConstantIndexOp>(loc, byteElements);
-    if (!clEnableI1Support && paddedDynamicDims.empty() &&
+    if (!clEnableI1Support && dynamicDims.empty() &&
         (staticCount * elementBits) % 8 != 0) {
       return nullptr;
     }

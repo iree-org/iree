@@ -10,6 +10,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/Utils.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
@@ -41,7 +42,7 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
              bcastMapAttr, roundDimsToAttr, layoutsAttr);
 }
 
-AffineMap EncodingAttr::getMapForOperandIndex() {
+AffineMap EncodingAttr::getMapForOperandIndex() const {
   auto index = getOperandIndex().getValue().getZExtValue();
   switch (index) {
   case MATMUL_LHS:
@@ -59,7 +60,8 @@ AffineMap EncodingAttr::getMapForOperandIndex() {
   }
 }
 
-std::optional<unsigned> EncodingAttr::mapDimToOperandIndex(int64_t dimPos) {
+std::optional<unsigned>
+EncodingAttr::mapDimToOperandIndex(int64_t dimPos) const {
   return getMapForOperandIndex().getResultPosition(
       getAffineDimExpr(dimPos, getContext()));
 }
@@ -91,7 +93,7 @@ MatmulNarrowDim getMatmulNarrowDim(linalg::LinalgOp linalgOp,
   return (narrowM && (!narrowN || mSize <= nSize)) ? narrowM : narrowN;
 }
 
-ArrayRef<int64_t> EncodingAttr::getRoundDimsToArray() {
+ArrayRef<int64_t> EncodingAttr::getRoundDimsToArray() const {
   auto roundDimsTo = getRoundDimsTo();
   if (!roundDimsTo) {
     return {};
@@ -109,6 +111,105 @@ EncodingAttr EncodingAttr::clone(AffineMap bcastMap) {
   return get(bcastMap.getContext(), getOperandIndex(), getOpType(),
              getElementTypes(), getUserIndexingMaps(),
              AffineMapAttr::get(bcastMap), getRoundDimsTo(), getLayouts());
+}
+
+/// Returns the bit-width of the scalar type. If the type is complex, it returns
+/// the type of individual elements * 2 (1 for real and 1 for complex).
+static unsigned getTypeBitWidth(Type type) {
+  if (auto complexType = dyn_cast<ComplexType>(type)) {
+    return 2 * complexType.getElementType().getIntOrFloatBitWidth();
+  }
+  return type.getIntOrFloatBitWidth();
+}
+
+/// Returns the number of bytes an element of the given type occupies in memory.
+/// This is in the default dense conversion to machine words where sizes must be
+/// powers of two aligned to bytes.
+///
+/// Examples:
+///   getRoundedElementByteWidth(i1) = 1
+///   getRoundedElementByteWidth(i23) = 4
+///   getRoundedElementByteWidth(i32) = 4
+///   getRoundedElementByteWidth(bf16) = 2
+///   getRoundedElementByteWidth(i33) = 8
+///   getRoundedElementByteWidth(complex<f32>) = 8
+static int32_t getRoundedElementByteWidth(Type type) {
+  unsigned bitsUnaligned = getTypeBitWidth(type);
+  assert(bitsUnaligned > 0 && "0-width types unsupported");
+  // Round up to 8-bit aligned bytes.
+  unsigned byteAligned = (bitsUnaligned + 8 - 1) / 8;
+  // Round up to the next power of two (unless already a power of two).
+  return llvm::PowerOf2Ceil(byteAligned);
+}
+
+Value EncodingAttr::calculateStorageSizeInBytes(Location loc,
+                                                OpBuilder &builder,
+                                                RankedTensorType type,
+                                                ValueRange dynamicDims) const {
+  SmallVector<int64_t> paddedShape(type.getShape());
+  SmallVector<Value> paddedDynamicDims(dynamicDims.begin(), dynamicDims.end());
+  ArrayRef<int64_t> roundDimsTo = getRoundDimsToArray();
+  FailureOr<linalg::ContractionDimensions> cDims =
+      getEncodingContractionDims(*this);
+  auto pad = [&](int dim, int value) {
+    std::optional<unsigned> maybeMappedDim = mapDimToOperandIndex(dim);
+    if (!maybeMappedDim) {
+      return;
+    }
+    unsigned mappedDim = maybeMappedDim.value();
+    if (type.isDynamicDim(mappedDim)) {
+      mappedDim = type.getDynamicDimIndex(mappedDim);
+      auto alignment = builder.create<arith::ConstantIndexOp>(loc, value);
+      paddedDynamicDims[mappedDim] = builder.create<arith::CeilDivUIOp>(
+          loc, paddedDynamicDims[mappedDim], alignment);
+      paddedDynamicDims[mappedDim] = builder.create<arith::MulIOp>(
+          loc, paddedDynamicDims[mappedDim], alignment);
+    } else {
+      paddedShape[mappedDim] = llvm::alignTo(paddedShape[mappedDim], value);
+    }
+  };
+  for (auto m : cDims->m) {
+    pad(m, roundDimsTo[0]);
+  }
+  for (auto n : cDims->n) {
+    pad(n, roundDimsTo[1]);
+  }
+  for (auto k : cDims->k) {
+    pad(k, roundDimsTo[2]);
+  }
+
+  constexpr int64_t kNumBitsInByte = 8;
+  unsigned elementBits = getTypeBitWidth(type.getElementType());
+  int64_t numBytesPerElem = 1;
+  if (elementBits > kNumBitsInByte) {
+    numBytesPerElem *= getRoundedElementByteWidth(type.getElementType());
+  }
+
+  int64_t staticCount = numBytesPerElem;
+  for (unsigned i = 0, e = type.getRank(); i < e; ++i) {
+    if (!type.isDynamicDim(i)) {
+      staticCount *= paddedShape[i];
+    }
+  }
+
+  Value result =
+      builder.create<arith::ConstantIndexOp>(loc, staticCount).getResult();
+  for (auto dim : paddedDynamicDims) {
+    result = builder.create<arith::MulIOp>(loc, result, dim);
+  }
+
+  // Always pack the elements back-to-back for subtypes.
+  if (elementBits < kNumBitsInByte) {
+    if (kNumBitsInByte % elementBits) {
+      assert(false && "unsupported subtype");
+      return Value();
+    }
+    Value divisor = builder.create<arith::ConstantIndexOp>(
+        loc, kNumBitsInByte / elementBits);
+    result = builder.create<arith::CeilDivUIOp>(loc, result, divisor);
+  }
+
+  return result;
 }
 
 MatmulNarrowDim getMatmulNarrowDim(EncodingAttr encoding) {

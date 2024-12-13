@@ -8,6 +8,7 @@
 #define IREE_DIALECT_ENCODING_ATTRS
 
 include "iree/compiler/Dialect/Encoding/IR/EncodingBase.td"
+include "iree/compiler/Dialect/Encoding/IR/EncodingInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
 
@@ -41,10 +42,14 @@ def EncodingOpTypeAttr:
   IREEEncoding_EnumAttr<EncodingOpType, "optype">;
 
 def EncodingAttr :
-    IREEEncoding_Attr<"Encoding"> {
+    IREEEncoding_Attr<"Encoding", [
+      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutAttrInterface, [
+        "calculateStorageSizeInBytes",
+      ]>
+    ]> {
   let mnemonic = "encoding";
   let summary = [{information to decide how to data-tile a tensor}];
-   let description = [{
+  let description = [{
     This attribute describes the change in the layout for
     a given tensor to execute subsequent operations on
     the tiled layout. The encoding serves as a way to
@@ -93,15 +98,15 @@ def EncodingAttr :
     /// operand_index. The dimensions of the returned map are those of the
     /// data-tiled op's iteration space, and the results of the map are in
     /// the domain of the encoded tensor type.
-    AffineMap getMapForOperandIndex();
+    AffineMap getMapForOperandIndex() const;
 
     /// Given the dim position of the encoding `user_indexing_maps`, returns the
     /// matching index of the given encoding's tensor, using getMapForOperandIndex
     /// bcast_map and user_indexing_map.
-    std::optional<unsigned> mapDimToOperandIndex(int64_t dimPos);
+    std::optional<unsigned> mapDimToOperandIndex(int64_t dimPos) const;
 
     /// Returns an integer array with values in `round_dims_to`.
-    ArrayRef<int64_t> getRoundDimsToArray();
+    ArrayRef<int64_t> getRoundDimsToArray() const;
 
     /// Returns a vector with values in `element_types`.
     SmallVector<Type> getElementTypesArray();
