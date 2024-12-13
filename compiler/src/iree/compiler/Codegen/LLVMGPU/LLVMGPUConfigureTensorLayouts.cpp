@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/PatternMatch.h"
@@ -685,7 +686,8 @@ static IREE::VectorExt::VectorLayoutInterface
 getLayoutForMap(VectorLayoutInterface layout, AffineMap map) {
   // Project out unusued dims in layout.
   SmallVector<bool> projectedDims(layout.getRank(), false);
-  for (int dim : getUnusedDimsBitVector(map).set_bits()) {
+  llvm::SmallBitVector unusedBits = getUnusedDimsBitVector(map);
+  for (int dim : unusedBits.set_bits()) {
     projectedDims[dim] = true;
   }
   IREE::VectorExt::VectorLayoutInterface projectedLayout =
@@ -804,6 +806,153 @@ static LogicalResult setIntrinsicLoweringConfigLayout(
   return failure();
 }
 
+/// Given two arrays bounds and tile, compute bounds /= tile.
+///
+/// If "tile" contains 0, or is smaller than bounds, divide bounds by 1
+/// for those values.
+///
+/// Returns the actual divisor (without zeros or out of bounds) used to compute
+/// bounds /= divisor.
+FailureOr<SmallVector<int64_t>> divideTile(SmallVector<int64_t> &bounds,
+                                           ArrayRef<int64_t> tile) {
+  assert(bounds.size() >= tile.size() &&
+         "cannot divide bounds with a larger tile size");
+
+  SmallVector<int64_t> divisor(bounds.size(), 1);
+  for (auto [div, size] : llvm::zip(divisor, tile)) {
+    if (size == 0) {
+      continue;
+    }
+    div = size;
+  }
+
+  for (auto [bound, div] : llvm::zip_equal(bounds, divisor)) {
+    bound /= div;
+  }
+
+  return divisor;
+}
+
+SmallVector<int64_t> applyProjectedPermutation(ArrayRef<int64_t> input,
+                                               ArrayRef<int64_t> perm) {
+  SmallVector<int64_t> result;
+  result.reserve(perm.size());
+  for (int64_t dim : perm) {
+    result.push_back(input[dim]);
+  }
+  return result;
+}
+
+SmallVector<int64_t> getStridesFromBasis(ArrayRef<int64_t> basis) {
+  SmallVector<int64_t> strides(basis.size());
+  int64_t currStride = 1;
+  for (auto [stride, size] : llvm::reverse(llvm::zip_equal(strides, basis))) {
+    stride = currStride;
+    currStride *= size;
+  }
+  return strides;
+}
+
+static LogicalResult distributeTilingSizes(linalg::LinalgOp candidate,
+                                           IREE::GPU::LoweringConfigAttr config,
+                                           IREE::GPU::TilingLevel level,
+                                           SmallVector<int64_t> &bounds,
+                                           SmallVector<int64_t> &sizes,
+                                           SmallVector<int64_t> &strides) {
+  if (ShapedType::isDynamicShape(bounds)) {
+    candidate->emitError()
+        << "Cannot set layouts on a dynamically shaped iteration space";
+    return failure();
+  }
+
+  FailureOr<IREE::GPU::Basis> basis = IREE::GPU::getBasis(config, level);
+  if (failed(basis)) {
+    candidate->emitError()
+        << "Could not find a subgroup basis from lowering config";
+    return failure();
+  }
+
+  sizes = applyProjectedPermutation(basis->counts, basis->mapping);
+  strides = applyProjectedPermutation(getStridesFromBasis(basis->counts),
+                                      basis->mapping);
+
+  if (failed(divideTile(bounds, sizes))) {
+    candidate->emitError()
+        << "Could not divide bounds over given basis for level: "
+        << IREE::GPU::stringifyTilingLevel(level);
+    return failure();
+  }
+
+  return success();
+}
+
+static LogicalResult setGPULoweringConfigLayout(
+    IREE::GPU::LoweringConfigAttr config, linalg::LinalgOp candidate,
+    ArrayRef<int64_t> workgroupSize, RewriterBase &rewriter) {
+  MLIRContext *context = config.getContext();
+  Location loc = candidate.getLoc();
+
+  SmallVector<int64_t> bounds = candidate.getStaticLoopRanges();
+
+  // Subgroup distribution layouts.
+  SmallVector<int64_t> subgroupSizes, subgroupStrides;
+  if (failed(distributeTilingSizes(candidate, config,
+                                   IREE::GPU::TilingLevel::Subgroup, bounds,
+                                   subgroupSizes, subgroupStrides))) {
+    return failure();
+  }
+
+  // Thread distribution layouts.
+  SmallVector<int64_t> threadSizes, threadStrides;
+  if (failed(distributeTilingSizes(candidate, config,
+                                   IREE::GPU::TilingLevel::Thread, bounds,
+                                   threadSizes, threadStrides))) {
+    return failure();
+  }
+
+  // Use thread tile sizes as the vector width for each thread.
+  SmallVector<int64_t> threadTileSizes = config.getStaticTilingLevelSizes(
+      llvm::to_underlying(IREE::GPU::TilingLevel::Thread), candidate);
+  FailureOr<SmallVector<int64_t>> elementTile =
+      divideTile(bounds, threadTileSizes);
+  if (failed(elementTile)) {
+    candidate->emitError() << "Could not divide bounds over given thread tile";
+  }
+  // The remaining bounds become batch sizes. We could also use subgroup tile
+  // sizes, as a way of specifying batch size, but since it is a derived
+  // property, we choose to compute it.
+  ArrayRef<int64_t> batchTile = bounds;
+  SmallVector<int64_t> outerTile(bounds.size(), 1);
+
+  auto layout = IREE::VectorExt::NestedLayoutAttr::get(
+      context, subgroupSizes, batchTile, outerTile, threadSizes,
+      elementTile.value(), subgroupStrides, threadStrides);
+
+  SmallVector<bool> promotedOperands = getPromotedOperands(candidate);
+
+  rewriter.setInsertionPoint(candidate);
+  for (OpOperand &operand : candidate->getOpOperands()) {
+    VectorLayoutInterface operandLayout =
+        getLayoutForMap(layout, candidate.getMatchingIndexingMap(&operand));
+    auto toLayout =
+        rewriter.create<ToLayoutOp>(loc, operand.get(), operandLayout);
+    // Set shared memory promotion if requested.
+    toLayout.setSharedMemoryConversion(
+        promotedOperands[operand.getOperandNumber()]);
+    operand.set(toLayout);
+  }
+
+  rewriter.setInsertionPointAfter(candidate);
+  for (OpResult result : candidate->getResults()) {
+    VectorLayoutInterface resultLayout =
+        getLayoutForMap(layout, candidate.getIndexingMapMatchingResult(result));
+    auto toLayout = rewriter.create<ToLayoutOp>(loc, result, resultLayout);
+    rewriter.replaceAllUsesExcept(result, toLayout, toLayout);
+  }
+
+  return success();
+}
+
 static Operation *getOpWithAttr(Operation *root, StringRef attr) {
   Operation *result = nullptr;
   WalkResult walkResult = root->walk([&](Operation *op) {
@@ -900,10 +1049,8 @@ struct LLVMGPUConfigureTensorLayoutsPass final
                   return setIntrinsicLoweringConfigLayout(
                       config, candidate, workgroupSize, rewriter);
                 }
-                candidate->emitError() << "Unable to set layouts on operation "
-                                          "based on given lowering config: "
-                                       << config;
-                return failure();
+                return setGPULoweringConfigLayout(config, candidate,
+                                                  workgroupSize, rewriter);
               })
               .Default([](Attribute) -> LogicalResult { return failure(); });
 

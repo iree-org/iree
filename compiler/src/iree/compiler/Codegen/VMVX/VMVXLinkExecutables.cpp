@@ -33,7 +33,7 @@ struct VMVXLinkExecutablesPass
 
     // Create our new "linked" hal.executable.
     std::string linkedExecutableName =
-        llvm::formatv("{0}_linked_{1}", moduleName, "vmvx");
+        llvm::formatv("{}_linked_{}", moduleName, "vmvx");
     auto linkedExecutableOp = moduleBuilder.create<IREE::HAL::ExecutableOp>(
         moduleOp.getLoc(), linkedExecutableName);
     linkedExecutableOp.setVisibility(
@@ -48,7 +48,7 @@ struct VMVXLinkExecutablesPass
       std::string linkedVariantName =
           executableTargetAttrs.size() == 1
               ? targetAttr.getSymbolNameFragment()
-              : llvm::formatv("{0}_{1}", targetAttr.getSymbolNameFragment(),
+              : llvm::formatv("{}_{}", targetAttr.getSymbolNameFragment(),
                               index);
       auto linkedTargetOp =
           executableBuilder.create<IREE::HAL::ExecutableVariantOp>(

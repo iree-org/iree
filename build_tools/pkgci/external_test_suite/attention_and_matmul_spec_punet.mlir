@@ -123,7 +123,7 @@ transform.named_sequence @match_mmt_i8_i8_i32(%root: !transform.any_op {transfor
 }
 
 transform.named_sequence @match_mmt_2048x10240x1280(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
-   %mmt = transform.include @match_mmt_i8_i8_i32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
+  %mmt = transform.include @match_mmt_i8_i8_i32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
   %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
   transform.iree.match.cast_compatible_type %lhs = tensor<2048x1280xi8> : !transform.any_value
@@ -142,7 +142,7 @@ transform.named_sequence @match_mmt_2048x10240x1280(%matmul: !transform.any_op {
 }
 
 transform.named_sequence @match_mmt_2048x1280x5120(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
-   %mmt = transform.include @match_mmt_i8_i8_i32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
+  %mmt = transform.include @match_mmt_i8_i8_i32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
   %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
   transform.iree.match.cast_compatible_type %lhs = tensor<2048x5120xi8> : !transform.any_value
@@ -161,7 +161,7 @@ transform.named_sequence @match_mmt_2048x1280x5120(%matmul: !transform.any_op {t
 }
 
 transform.named_sequence @match_mmt_2048x1280x1280(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
-   %mmt = transform.include @match_mmt_i8_i8_i32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
+  %mmt = transform.include @match_mmt_i8_i8_i32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
   %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
   transform.iree.match.cast_compatible_type %lhs = tensor<2048x1280xi8> : !transform.any_value
@@ -173,9 +173,67 @@ transform.named_sequence @match_mmt_2048x1280x1280(%matmul: !transform.any_op {t
                                                  reduction = [0, 0, 128],
                                                  workgroup = [64, 160, 0]}>,
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-      workgroup_size = [128, 2, 1] subgroup_size = 64,
-      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>
-      }>> -> !transform.any_param
+      workgroup_size = [256, 1, 1] subgroup_size = 64,
+      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true,
+                                                         reorder_workgroups_strategy = <Transpose>>}>
+  > -> !transform.any_param
+  transform.yield %matmul, %config : !transform.any_op, !transform.any_param
+}
+
+transform.named_sequence @match_mmt_8192x640x640(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+  %mmt = transform.include @match_mmt_i8_i8_i32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
+  %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
+  %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
+  transform.iree.match.cast_compatible_type %lhs = tensor<8192x640xi8> : !transform.any_value
+  transform.iree.match.cast_compatible_type %rhs = tensor<640x640xi8> : !transform.any_value
+  %config = transform.param.constant #iree_codegen.compilation_info<
+    lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
+                                                 mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>,
+                                                 subgroup_m_count = 8, subgroup_n_count = 1,
+                                                 reduction = [0, 0, 64],
+                                                 workgroup = [256, 64, 0]}>,
+    translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+      workgroup_size = [512, 1, 1] subgroup_size = 64,
+      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
+  > -> !transform.any_param
+  transform.yield %matmul, %config : !transform.any_op, !transform.any_param
+}
+
+transform.named_sequence @match_mmt_8192x5120x640(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+  %mmt = transform.include @match_mmt_i8_i8_i32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
+  %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
+  %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
+  transform.iree.match.cast_compatible_type %lhs = tensor<8192x640xi8> : !transform.any_value
+  transform.iree.match.cast_compatible_type %rhs = tensor<5120x640xi8> : !transform.any_value
+  %config = transform.param.constant #iree_codegen.compilation_info<
+    lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
+                                                 mma_kind = #iree_gpu.mma_layout<MFMA_I32_32x32x16_I8>,
+                                                 subgroup_m_count = 2, subgroup_n_count = 4,
+                                                 reduction = [0, 0, 64],
+                                                 workgroup = [256, 128, 0]}>,
+    translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+      workgroup_size = [512, 1, 1] subgroup_size = 64,
+      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
+  > -> !transform.any_param
+  transform.yield %matmul, %config : !transform.any_op, !transform.any_param
+}
+
+transform.named_sequence @match_mmt_8192x640x2560 (%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+  %mmt = transform.include @match_mmt_i8_i8_i32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
+  %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
+  %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
+  transform.iree.match.cast_compatible_type %lhs = tensor<8192x2560xi8> : !transform.any_value
+  transform.iree.match.cast_compatible_type %rhs = tensor<640x2560xi8> : !transform.any_value
+  %config = transform.param.constant #iree_codegen.compilation_info<
+    lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
+                                                 mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>,
+                                                 subgroup_m_count = 8, subgroup_n_count = 1,
+                                                 reduction = [0, 0, 64],
+                                                 workgroup = [256, 64, 0]}>,
+    translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+      workgroup_size = [512, 1, 1] subgroup_size = 64,
+      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
+  > -> !transform.any_param
   transform.yield %matmul, %config : !transform.any_op, !transform.any_param
 }
 
@@ -226,6 +284,65 @@ transform.named_sequence @match_mmt_2048x1280x1280(%matmul: !transform.any_op {t
         workgroup_size = [256, 1, 1] subgroup_size = 64,
         {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true,
                                                            reorder_workgroups_strategy = <Transpose>>}>
+    > -> !transform.any_param
+    transform.yield %generic, %config : !transform.any_op, !transform.any_param
+  }
+
+  transform.named_sequence @match_broadcast_rhs_mmt_Bx64x1280x2480(%generic: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+    %mmt = transform.include @match_broadcast_rhs_mmt_i8_i8_i32 failures(propagate) (%generic) : (!transform.any_op) -> !transform.any_op
+    %lhs = transform.get_operand %generic[0] : (!transform.any_op) -> !transform.any_value
+    %rhs = transform.get_operand %generic[1] : (!transform.any_op) -> !transform.any_value
+    transform.iree.match.cast_compatible_type %lhs = tensor<?x64x2480xi8> : !transform.any_value
+    transform.iree.match.cast_compatible_type %rhs = tensor<1280x2480xi8> : !transform.any_value
+    %config = transform.param.constant #iree_codegen.compilation_info<
+      lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
+                                                   mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>,
+                                                   subgroup_m_count = 2, subgroup_n_count = 2,
+                                                   reduction = [0, 0, 0, 128],
+                                                   workgroup = [1, 64, 160, 0]}>,
+      translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+        workgroup_size = [256, 1, 1] subgroup_size = 64,
+        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true,
+                                                           reorder_workgroups_strategy = <Transpose>>
+        }>
+    > -> !transform.any_param
+    transform.yield %generic, %config : !transform.any_op, !transform.any_param
+  }
+
+  transform.named_sequence @match_broadcast_rhs_mmt_Bx4960x640x640(%generic: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+    %mmt = transform.include @match_broadcast_rhs_mmt_i8_i8_i32 failures(propagate) (%generic) : (!transform.any_op) -> !transform.any_op
+    %lhs = transform.get_operand %generic[0] : (!transform.any_op) -> !transform.any_value
+    %rhs = transform.get_operand %generic[1] : (!transform.any_op) -> !transform.any_value
+    transform.iree.match.cast_compatible_type %lhs = tensor<?x4960x640xi8> : !transform.any_value
+    transform.iree.match.cast_compatible_type %rhs = tensor<640x640xi8> : !transform.any_value
+    %config = transform.param.constant #iree_codegen.compilation_info<
+      lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
+                                                   mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>,
+                                                   subgroup_m_count = 8, subgroup_n_count = 1,
+                                                   reduction = [0, 0, 0, 64],
+                                                   workgroup = [1, 256, 64, 0]}>,
+      translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+        workgroup_size = [512, 1, 1] subgroup_size = 64,
+        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
+    > -> !transform.any_param
+    transform.yield %generic, %config : !transform.any_op, !transform.any_param
+  }
+
+  transform.named_sequence @match_broadcast_rhs_mmt_Bx64x640x2480(%generic: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+    %mmt = transform.include @match_broadcast_rhs_mmt_i8_i8_i32 failures(propagate) (%generic) : (!transform.any_op) -> !transform.any_op
+    %lhs = transform.get_operand %generic[0] : (!transform.any_op) -> !transform.any_value
+    %rhs = transform.get_operand %generic[1] : (!transform.any_op) -> !transform.any_value
+    transform.iree.match.cast_compatible_type %lhs = tensor<?x64x2480xi8> : !transform.any_value
+    transform.iree.match.cast_compatible_type %rhs = tensor<640x2480xi8> : !transform.any_value
+    %config = transform.param.constant #iree_codegen.compilation_info<
+      lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
+                                                   mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>,
+                                                   subgroup_m_count = 2, subgroup_n_count = 1,
+                                                   reduction = [0, 0, 0, 128],
+                                                   workgroup = [1, 32, 320, 0]}>,
+      translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+        workgroup_size = [128, 1, 1] subgroup_size = 64,
+        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
     > -> !transform.any_param
     transform.yield %generic, %config : !transform.any_op, !transform.any_param
   }
@@ -433,6 +550,9 @@ transform.named_sequence @match_matmul_like_Bx20x64x64x2048_transposev_i8xi8xi32
         , @match_mmt_2048x10240x1280 -> @apply_op_config
         , @match_mmt_2048x1280x5120 -> @apply_op_config
         , @match_mmt_2048x1280x1280 -> @apply_op_config
+        , @match_mmt_8192x640x640 -> @apply_op_config
+        , @match_mmt_8192x5120x640 -> @apply_op_config
+        //, @match_mmt_8192x640x2560 -> @apply_op_config
 
         // Convolution.
 
@@ -444,6 +564,10 @@ transform.named_sequence @match_matmul_like_Bx20x64x64x2048_transposev_i8xi8xi32
         // Carried over from SPX.
         , @match_broadcast_rhs_mmt_Bx1024x10240x1280 -> @apply_op_config
         , @match_broadcast_rhs_mmt_Bx1024x1280x1280 -> @apply_op_config
+        , @match_broadcast_rhs_mmt_Bx64x1280x2480 -> @apply_op_config
+        , @match_broadcast_rhs_mmt_Bx4960x640x640 -> @apply_op_config
+        //, @match_broadcast_rhs_mmt_Bx64x640x2480 -> @apply_op_config
+
 
         // Contration.
         , @match_matmul_like_Bx20x1024x64x1280_i8xi8xi32 -> @apply_op_config

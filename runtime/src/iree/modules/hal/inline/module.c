@@ -366,7 +366,7 @@ IREE_VM_ABI_EXPORT(iree_hal_inline_module_buffer_subspan,  //
   iree_hal_buffer_t* subspan_buffer = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_subspan(source_buffer, source_offset, length,
-                              &subspan_buffer),
+                              state->host_allocator, &subspan_buffer),
       "invalid subspan of an existing buffer (source_offset=%" PRIdsz
       ", length=%" PRIdsz ")",
       source_offset, length);
@@ -424,7 +424,7 @@ IREE_VM_ABI_EXPORT(iree_hal_inline_module_buffer_view_create,  //
       source_length != iree_hal_buffer_byte_length(source_buffer)) {
     IREE_RETURN_IF_ERROR(
         iree_hal_buffer_subspan(source_buffer, source_offset, source_length,
-                                &subspan_buffer),
+                                state->host_allocator, &subspan_buffer),
         "invalid subspan of an existing buffer (source_offset=%" PRIdsz
         ", length=%" PRIdsz ")",
         source_offset, source_length);

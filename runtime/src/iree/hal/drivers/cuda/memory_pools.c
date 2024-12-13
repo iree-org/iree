@@ -58,16 +58,19 @@ static iree_status_t iree_hal_cuda_create_memory_pool(
 }
 
 iree_status_t iree_hal_cuda_memory_pools_initialize(
+    iree_hal_device_t* parent_device,
     const iree_hal_cuda_dynamic_symbols_t* cuda_symbols, CUdevice cu_device,
     const iree_hal_cuda_memory_pooling_params_t* pooling_params,
     iree_allocator_t host_allocator,
     iree_hal_cuda_memory_pools_t* IREE_RESTRICT out_pools) {
+  IREE_ASSERT_ARGUMENT(parent_device);
   IREE_ASSERT_ARGUMENT(cuda_symbols);
   IREE_ASSERT_ARGUMENT(pooling_params);
   IREE_ASSERT_ARGUMENT(out_pools);
   IREE_TRACE_ZONE_BEGIN(z0);
 
   memset(out_pools, 0, sizeof(*out_pools));
+  out_pools->parent_device = parent_device;
   out_pools->cuda_symbols = cuda_symbols;
   out_pools->host_allocator = host_allocator;
 
@@ -241,13 +244,19 @@ iree_status_t iree_hal_cuda_memory_pools_alloca(
   // doesn't dealloca the buffer.
   iree_hal_buffer_t* buffer = NULL;
   if (iree_status_is_ok(status)) {
+    const iree_hal_buffer_placement_t placement = {
+        .device = pools->parent_device,
+        .queue_affinity = params.queue_affinity ? params.queue_affinity
+                                                : IREE_HAL_QUEUE_AFFINITY_ANY,
+        .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS,
+    };
     iree_hal_buffer_release_callback_t release_callback = {
         .fn = iree_hal_cuda_async_buffer_release_callback,
         .user_data = pools,
     };
     status = iree_hal_cuda_buffer_wrap(
-        /*device_allocator=*/NULL, params.type, params.access, params.usage,
-        allocation_size, /*byte_offset=*/0,
+        placement, params.type, params.access, params.usage, allocation_size,
+        /*byte_offset=*/0,
         /*byte_length=*/allocation_size, IREE_HAL_CUDA_BUFFER_TYPE_ASYNC,
         device_ptr, /*host_ptr=*/NULL, release_callback, pools->host_allocator,
         &buffer);

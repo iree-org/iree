@@ -38,7 +38,7 @@ TEST(EmbeddedDataDirectory, WithGlobal) {
   for (int i = 0; i < 3; ++i) {
     threads.emplace_back([i] {
       EmbeddedDataDirectory::withGlobal([i](EmbeddedDataDirectory &globalDir) {
-        EXPECT_TRUE(globalDir.addFile(llvm::formatv("filename{0}", i).str(),
+        EXPECT_TRUE(globalDir.addFile(llvm::formatv("filename{}", i).str(),
                                       "file contents xxx"));
       });
     });

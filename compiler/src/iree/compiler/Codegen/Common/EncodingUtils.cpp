@@ -88,11 +88,8 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
 }
 
 MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
-    MaterializeEncodingFn materializeEncodingFn,
-    IREE::HAL::ExecutableTargetAttr targetAttr, bool transposeNarrowN,
-    IREE::Codegen::LayoutAttrInterface layoutAttr)
-    : materializeEncodingFn(materializeEncodingFn), targetAttr(targetAttr),
-      transposeNarrowN(transposeNarrowN), layoutAttr(layoutAttr) {
+    bool transposeNarrowN, IREE::Codegen::LayoutAttrInterface layoutAttr)
+    : transposeNarrowN(transposeNarrowN), layoutAttr(layoutAttr) {
   addConversion([](IntegerType intType) { return intType; });
   addConversion([](IndexType indexType) { return indexType; });
   addConversion([](FloatType floatType) { return floatType; });
@@ -103,15 +100,13 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     // itself.
     RankedTensorType tensorType =
         transposeNarrowN ? transposeIfNarrowNResult(type) : type;
-    FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
-        getEncodingInfo(tensorType);
-    if (failed(maybeEncodingInfo)) {
+    MaterializeEncodingInfo encodingInfo = getEncodingInfo(tensorType);
+    if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
       return dropEncoding(type);
     }
-    auto encodingInfo = *maybeEncodingInfo;
     auto packedType = cast<RankedTensorType>(tensor::PackOp::inferPackedType(
-        tensorType, maybeEncodingInfo->innerTileSizes,
-        maybeEncodingInfo->innerDimsPos, maybeEncodingInfo->outerDimsPerm));
+        tensorType, encodingInfo.innerTileSizes, encodingInfo.innerDimsPos,
+        encodingInfo.outerDimsPerm));
 
     // There is no swizzle, we are already done. Typically the case on CPU.
     if (!encodingInfo.swizzle) {

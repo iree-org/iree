@@ -4,7 +4,7 @@ icon: octicons/code-16
 
 # C API bindings
 
-## Overview
+## :octicons-book-16: Overview
 
 The IREE compiler and IREE runtime both have their own C/C++ APIs. This page
 introduces the available APIs and describes how to use them from your

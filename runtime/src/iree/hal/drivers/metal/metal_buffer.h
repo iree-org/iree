@@ -20,15 +20,16 @@ extern "C" {
 //
 // |out_buffer| must be released by the caller (see iree_hal_buffer_release).
 iree_status_t iree_hal_metal_buffer_wrap(
+    iree_hal_buffer_placement_t placement,
 #if defined(IREE_PLATFORM_MACOS)
     id<MTLCommandQueue> queue,
 #endif  // IREE_PLATFORM_MACOS
-    id<MTLBuffer> metal_buffer, iree_hal_allocator_t* allocator,
-    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
+    id<MTLBuffer> metal_buffer, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
     iree_hal_buffer_release_callback_t release_callback,
-    iree_hal_buffer_t** out_buffer);
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
 
 // Returns true if the buffer was wrapped from an external handle instead of
 // allocated by the HAL allocator.

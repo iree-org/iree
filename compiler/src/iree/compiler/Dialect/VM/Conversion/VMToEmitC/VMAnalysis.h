@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
 #include "iree/compiler/Dialect/VM/Utils/TypeTable.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler::IREE::VM {
 
@@ -34,6 +35,7 @@ struct FuncAnalysis {
     originalFunctionType = funcOp.getFunctionType();
     callingConvention = makeCallingConventionString(funcOp).value();
     refs = DenseMap<int64_t, Value>{};
+    blockMap = DenseMap<Block *, TypeConverter::SignatureConversion>{};
   }
   FuncAnalysis(mlir::emitc::FuncOp funcOp) {
     originalFunctionType = funcOp.getFunctionType();
@@ -107,10 +109,26 @@ struct FuncAnalysis {
     refs.value()[ordinal] = ref;
   }
 
+  void cacheBlockConversion(Block *block,
+                            TypeConverter::SignatureConversion conversion) {
+    assert(blockMap.has_value());
+    assert(!blockMap.value().count(block) &&
+           "block conversion was already cached");
+    blockMap.value().try_emplace(block, conversion);
+  }
+
   Value lookupLocalRef(int64_t ordinal) {
     assert(refs.has_value());
     assert(refs.value().count(ordinal) && "ref not found in cache");
     return refs.value()[ordinal];
+  }
+
+  const TypeConverter::SignatureConversion &
+  lookupBlockConversion(Block *block) const {
+    assert(blockMap.has_value());
+    assert(blockMap.value().count(block) &&
+           "block conversion not found in cache");
+    return blockMap.value().at(block);
   }
 
   bool hasLocalRefs() { return refs.has_value(); }
@@ -128,6 +146,7 @@ private:
   std::optional<std::string> callingConvention;
   std::optional<std::string> exportName;
   std::optional<bool> emitAtEnd;
+  std::optional<DenseMap<Block *, TypeConverter::SignatureConversion>> blockMap;
 };
 
 struct ModuleAnalysis {

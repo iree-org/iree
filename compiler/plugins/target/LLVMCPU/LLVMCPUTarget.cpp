@@ -15,6 +15,7 @@
 #include "compiler/plugins/target/LLVMCPU/LibraryBuilder.h"
 #include "compiler/plugins/target/LLVMCPU/LinkerTool.h"
 #include "compiler/plugins/target/LLVMCPU/StaticLibraryGenerator.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -218,6 +219,7 @@ public:
     // TODO: make inclusion of ArmNeon conditional?
     // clang-format off
     registry.insert<IREE::Codegen::IREECodegenDialect,
+                    IREE::CPU::IREECPUDialect,
                     IREE::LinalgExt::IREELinalgExtDialect,
                     mlir::transform::TransformDialect,
                     pdl::PDLDialect,

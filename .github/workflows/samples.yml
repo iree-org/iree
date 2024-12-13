@@ -3,8 +3,8 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#
-# Workflow for running Examples of IREE usage against releases periodically.
+
+# Workflow for running in-tree samples against releases periodically.
 
 name: samples
 
@@ -28,7 +28,8 @@ concurrency:
 
 jobs:
   colab:
-    runs-on: ubuntu-20.04
+    if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
+    runs-on: ubuntu-24.04
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -40,7 +41,8 @@ jobs:
         run: ./samples/colab/test_notebooks.py
 
   samples:
-    runs-on: ubuntu-20.04
+    if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
+    runs-on: ubuntu-24.04
     env:
       CC: clang
       CXX: clang++
@@ -59,7 +61,8 @@ jobs:
         run: ./build_tools/testing/test_samples.sh
 
   web:
-    runs-on: ubuntu-20.04
+    if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
+    runs-on: ubuntu-24.04
     env:
       VENV_DIR: ${{ github.workspace }}/.venv
       CC: clang
@@ -100,3 +103,15 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           ./experimental/web/build_and_test_samples.sh ${HOST_TOOLS_BINARY_DIR}
+
+  # Aggregate job status and alerting on failures.
+  samples_summary:
+    if: always()
+    needs:
+      - colab
+      - samples
+      - web
+    uses: ./.github/workflows/workflow_summary.yml
+    secrets: inherit
+    with:
+      jobs-json: ${{ toJson(needs) }}

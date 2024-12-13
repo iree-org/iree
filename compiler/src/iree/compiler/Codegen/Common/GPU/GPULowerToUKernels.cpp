@@ -45,8 +45,7 @@ getUKernelBitcode(OpBuilder &builder,
     return {};
   }
   StringRef gpuArch = gpuTarget.getArch();
-  std::string bitcodeFilename =
-      llvm::formatv("{0}.{1}.bc", ukernelName, gpuArch);
+  std::string bitcodeFilename = llvm::formatv("{}.{}.bc", ukernelName, gpuArch);
 
   // Early-return if the source executable.objects already contain an object
   // with the expected file name. This happens with user-provided bitcode in the
@@ -121,7 +120,7 @@ getFnNameAndDefAttrs(const char *name, std::string &suffix,
                      IREE::HAL::ExecutableTargetAttr targetAttr) {
   FnNameAndDefAttrs result;
   if (isROCMBackend(targetAttr)) {
-    result.name = llvm::formatv("iree_uk_amdgpu_{0}_{1}", name, suffix);
+    result.name = llvm::formatv("iree_uk_amdgpu_{}_{}", name, suffix);
     result.defAttrs.emplace_back(rewriter.getStringAttr("vm.import.module"),
                                  rewriter.getStringAttr("rocm"));
   }
