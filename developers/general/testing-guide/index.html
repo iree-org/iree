@@ -4548,11 +4548,11 @@ tested in the IREE repo itself are stored in
 <span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_group_normalization_epsilon_expanded&quot;</span><span class="p">,</span>
 <span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_group_normalization_example_expanded&quot;</span>
 <span class="w">  </span><span class="p">],</span>
-<span class="w">  </span><span class="nt">&quot;skip_run_tests&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;skip_run_tests&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_gridsample_zeros_padding&quot;</span>
+<span class="w">  </span><span class="p">],</span>
 <span class="w">  </span><span class="nt">&quot;expected_compile_failures&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_affine_grid_2d&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_affine_grid_2d_align_corners&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_affine_grid_2d_align_corners_expanded&quot;</span><span class="p">,</span>
 </code></pre></div></td></tr></table></div>
 <h4 id="updating-config-files">Updating config files<a class="headerlink" href="#updating-config-files" title="Permanent link">link</a></h4>
 <p>If the ONNX operator tests fail on a GitHub Actions workflow, check the logs
