@@ -80,7 +80,7 @@ llvm::cl::opt<bool> clGPUUnalignedGEMMVectorDistribution(
 llvm::cl::opt<bool> clGPUUseTileAndFuseConvolution(
     "iree-codegen-llvmgpu-use-tile-and-fuse-convolution",
     llvm::cl::desc(
-        "test the tile and fuse pipeline for supported convolutions"),
+        "enable the tile and fuse pipeline for supported convolutions"),
     llvm::cl::init(true));
 
 /// Flag to force using WMMA tensorcore operations.
