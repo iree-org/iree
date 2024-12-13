@@ -612,12 +612,11 @@ func.func @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32() {
   return
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 8, 64, 1, 1, 4], [0, 1, 0, 0]{{\]}}
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorize workgroup_size = [16, 2, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1]
 //      CHECK: func.func @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK:   linalg.generic
-// CHECK-SAME:       lowering_config = #[[CONFIG]]
+//      CHECK:   linalg.conv_2d
+// CHECK-SAME:       lowering_config =  #iree_gpu.lowering_config<{promote_operands = [0, 1], reduction = [0, 0, 0, 0, 1, 7, 3], thread = [1, 1, 1, 1, 0, 0, 0], workgroup = [1, 1, 1, 32, 0, 0, 0]}>
 
 // -----
 

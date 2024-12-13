@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=sm_60 \
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=sm_60 --iree-codegen-llvmgpu-use-tile-and-fuse-convolution=false \
 // RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target,canonicalize)))))' \
 // RUN:   %s | FileCheck %s
 
