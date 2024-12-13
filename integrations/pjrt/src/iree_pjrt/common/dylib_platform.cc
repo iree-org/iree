@@ -14,6 +14,7 @@
 #include "iree/base/internal/path.h"
 #include "iree/compiler/embedding_api.h"
 #include "iree/compiler/loader.h"
+#include "iree_pjrt/common/command_line_utils.h"
 #include "iree_pjrt/partitioner_api/embedding_api.h"
 #include "iree_pjrt/partitioner_api/loader.h"
 
@@ -98,7 +99,15 @@ iree_status_t DylibPlatform::SubclassInitialize() {
     message.append(*loaded_compiler);
     logger().debug(message);
   }
-  compiler_ = std::make_unique<IREECompiler>();
+
+  std::vector<std::string> extra_compiler_options;
+  if (auto options_str = config_vars().Lookup("IREE_COMPILER_OPTIONS")) {
+    if (auto options = ParseOptionsFromCommandLine(*options_str)) {
+      extra_compiler_options = std::move(*options);
+      logger().debug("Extra compile options: " + *options_str);
+    }
+  }
+  compiler_ = std::make_unique<IREECompiler>(std::move(extra_compiler_options));
   {
     std::string message("Compiler Version: ");
     message.append(compiler_->GetRevision());

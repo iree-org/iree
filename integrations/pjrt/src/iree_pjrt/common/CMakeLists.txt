@@ -9,6 +9,7 @@ iree_cc_library(
     common
   HDRS
     "api_impl.h"
+    "command_line_utils.h"
     "dylib_entry_point.cc.inc"
     "iree_helpers.h"
     "layout_utils.h"
@@ -16,6 +17,7 @@ iree_cc_library(
     "tensor_utils.h"
   SRCS
     "api_impl.cc"
+    "command_line_utils.cc"
     "layout_utils.cc"
     "platform.cc"
     "tensor_utils.cc"
@@ -58,6 +60,17 @@ iree_cc_library(
       iree_pjrt::partitioner_api::loader
       iree_pjrt_deps::protos
     PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    command_line_utils_test
+  SRCS
+    "command_line_utils_test.cc"
+  DEPS
+    ::common
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
