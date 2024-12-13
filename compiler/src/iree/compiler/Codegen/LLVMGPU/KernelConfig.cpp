@@ -47,12 +47,6 @@
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 namespace mlir::iree_compiler {
 
-llvm::cl::opt<bool> clGPUTestTileAndFuseConvolution(
-    "iree-codegen-llvmgpu-test-tile-and-fuse-convolution",
-    llvm::cl::desc(
-        "test the tile and fuse pipeline for all supported operations"),
-    llvm::cl::init(true));
-
 llvm::cl::opt<bool> clGPUTestTileAndFuseMatmul(
     "iree-codegen-llvmgpu-test-tile-and-fuse-matmul",
     llvm::cl::desc("test the the tile and fuse pipeline for matmul"),
@@ -82,6 +76,12 @@ llvm::cl::opt<bool> clGPUUnalignedGEMMVectorDistribution(
     llvm::cl::desc("enable the usage of the vector distribution pipeline for "
                    "unaligned GEMMs when supported"),
     llvm::cl::init(false));
+
+llvm::cl::opt<bool> clGPUUseTileAndFuseConvolution(
+    "iree-codegen-llvmgpu-use-tile-and-fuse-convolution",
+    llvm::cl::desc(
+        "test the tile and fuse pipeline for supported convolutions"),
+    llvm::cl::init(true));
 
 /// Flag to force using WMMA tensorcore operations.
 llvm::cl::opt<bool>
@@ -2208,7 +2208,7 @@ static LogicalResult setConvolutionConfig(
   if (!isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp>(linalgOp)) {
     return failure();
   }
-  if (clGPUTestTileAndFuseConvolution) {
+  if (clGPUUseTileAndFuseConvolution) {
     if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(target, entryPointFn,
                                                           linalgOp))) {
       LDBG("Tile and fuse convolution config");
