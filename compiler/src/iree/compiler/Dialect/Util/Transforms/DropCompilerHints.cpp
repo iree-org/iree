@@ -29,10 +29,10 @@ struct DropCompilerHintsPass
         op.replaceAllUsesWith(op.getOperands());
         op.erase();
       } else if (auto op = dyn_cast<IREE::Util::AssumeIntOp>(genericOp)) {
-        if (!keepAssumeInt) {
-          op.replaceAllUsesWith(op.getOperands());
-          op.erase();
-        }
+        if (keepAssumeInt)
+          return;
+        op.replaceAllUsesWith(op.getOperands());
+        op.erase();
       }
     });
   }
