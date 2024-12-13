@@ -29,10 +29,10 @@ static SmallVector<Value> flattenValues(ArrayRef<ValueRange> values) {
 // %1 = stream.tensor.import %0 : !hal.buffer_view ->
 //                                tensor<4xf32> in !stream.resource<*>
 struct ConvertTensorImportOp
-    : public AffinityOpConversionPattern<IREE::HAL::TensorImportOp> {
-  using AffinityOpConversionPattern::AffinityOpConversionPattern;
+    : public AffinityOneToNOpConversionPattern<IREE::HAL::TensorImportOp> {
+  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
-      IREE::HAL::TensorImportOp op, OpAdaptor adaptor,
+      IREE::HAL::TensorImportOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
       ConversionPatternRewriter &rewriter) const override {
     auto sourceType = op.getSource().getType();
@@ -45,14 +45,17 @@ struct ConvertTensorImportOp
     // Assert the shape of the buffer view matches the expected encoding
     // shape. We can only do this when we are importing a buffer view as that's
     // what carries the information we need to validate.
+    auto convertedSource =
+        transferTensorOperands(op.getLoc(), op.getSource(), adaptor.getSource(),
+                               executionAffinityAttr, rewriter);
     if (llvm::isa<IREE::HAL::BufferViewType>(sourceType)) {
       // NOTE: we do this before the other checks as it's the most likely
       // mistake and it's better to know of a shape mismatch than just buffer
       // byte length difference.
       if (auto tensorType = llvm::dyn_cast<RankedTensorType>(targetType)) {
-        if (failed(buildEncodingAssertions(op.getLoc(), adaptor.getSource(),
-                                           op.getNameAttr(), tensorType,
-                                           op.getTargetDims(), rewriter))) {
+        if (failed(buildEncodingAssertions(
+                op.getLoc(), convertedSource.resource, op.getNameAttr(),
+                tensorType, op.getTargetDims(), rewriter))) {
           return rewriter.notifyMatchFailure(op, "unsupported tensor type");
         }
       }
@@ -63,11 +66,12 @@ struct ConvertTensorImportOp
         IREE::Stream::Lifetime::External);
     Value resultSize = rewriter.create<IREE::Stream::TensorSizeOfOp>(
         op.getLoc(), rewriter.getIndexType(),
-        TypeAttr::get(op.getTarget().getType()), adaptor.getTargetDims(),
-        executionAffinityAttr);
+        TypeAttr::get(op.getTarget().getType()),
+        flattenValues(adaptor.getTargetDims()), executionAffinityAttr);
     Value resource = rewriter.create<IREE::Stream::TensorImportOp>(
-        op.getLoc(), resultType, adaptor.getSource(), TypeAttr::get(targetType),
-        adaptor.getTargetDims(), resultSize, executionAffinityAttr);
+        op.getLoc(), resultType, convertedSource.resource,
+        TypeAttr::get(targetType), flattenValues(adaptor.getTargetDims()),
+        resultSize, executionAffinityAttr);
 
     // Await the fence, if needed. When not specified the resource is assumed to
     // be immediately available.
