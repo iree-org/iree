@@ -15,6 +15,9 @@ We periodically promote one of these candidates to a "stable" release by
 removing the "pre-release" status. This makes it show up as a "latest" release
 on GitHub. We also push the Python packages for this release to PyPI.
 
+All stable (non-prerelease) releases can be viewed at
+<https://github.com/iree-org/iree/releases?q=prerelease%3Afalse>.
+
 ## Release status
 
 | Package | Release status |
