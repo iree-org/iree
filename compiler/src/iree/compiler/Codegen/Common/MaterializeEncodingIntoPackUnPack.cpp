@@ -10,6 +10,7 @@
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
@@ -740,25 +741,14 @@ public:
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         this->getTypeConverter());
 
-    if (auto layoutAttr = converter->getLayoutAttr()) {
-      SmallVector<Type> convertedResTypes;
-      for (auto init : op.getDpsInits()) {
-        convertedResTypes.push_back(converter->convertType(init.getType()));
-      }
-      Operation *newOp =
-          layoutAttr.lowerOp(rewriter, op, convertedResTypes, operands);
-      rewriter.replaceOp(op, newOp->getResults());
-      return success();
+    IREE::Codegen::LayoutAttrInterface layoutAttr = converter->getLayoutAttr();
+    SmallVector<Type> convertedResTypes;
+    for (auto init : op.getDpsInits()) {
+      convertedResTypes.push_back(converter->convertType(init.getType()));
     }
-
-    FailureOr<Operation *> convertedOp =
-        IREE::Codegen::lowerContractionOpWithEncoding(
-            rewriter, op, operands, converter->getTransposeNarrowN(),
-            converter->getLayoutAttr());
-    if (failed(convertedOp)) {
-      return failure();
-    }
-    rewriter.replaceOp(op.getOperation(), convertedOp.value()->getResult(0));
+    Operation *newOp =
+        layoutAttr.lowerOp(rewriter, op, convertedResTypes, operands);
+    rewriter.replaceOp(op, newOp->getResults());
     return success();
   }
 
