@@ -10,14 +10,16 @@ include $(musldir)/Makefile
 IREE_BASE_SRCS = $(addprefix $(srcdir)/, \
 	src/fenv/fenv.c \
 	src/math/ceilf.c \
+	src/math/exp.c \
+	src/math/expf.c \
+	src/math/exp2f_data.c \
 	src/math/floorf.c \
 	src/math/fmaf.c \
 	src/math/fmodf.c \
+	src/math/log.c \
 	src/math/powf.c \
-	src/math/expf.c \
 	src/math/powf_data.c \
 	src/math/roundf.c \
-	src/math/exp2f_data.c \
 	src/math/__math_invalidf.c \
 	src/math/__math_oflowf.c \
 	src/math/__math_uflowf.c \
