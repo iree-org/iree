@@ -44,11 +44,11 @@ static Value buildResultSizeOf(Location loc, Value tensorValue,
 }
 
 struct ConvertTensorConstantOp
-    : public AffinityOpConversionPattern<IREE::Flow::TensorConstantOp> {
+    : public AffinityOneToNOpConversionPattern<IREE::Flow::TensorConstantOp> {
 public:
-  using AffinityOpConversionPattern::AffinityOpConversionPattern;
+  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
-      IREE::Flow::TensorConstantOp constantOp, OpAdaptor adaptor,
+      IREE::Flow::TensorConstantOp constantOp, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
       ConversionPatternRewriter &rewriter) const override {
     // Capture the tensor constant strongly typed with constant lifetime.
@@ -76,11 +76,12 @@ public:
 };
 
 struct ConvertTensorDynamicConstantOp
-    : public AffinityOpConversionPattern<IREE::Flow::TensorDynamicConstantOp> {
+    : public AffinityOneToNOpConversionPattern<
+          IREE::Flow::TensorDynamicConstantOp> {
 public:
-  using AffinityOpConversionPattern::AffinityOpConversionPattern;
+  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
-      IREE::Flow::TensorDynamicConstantOp constantOp, OpAdaptor adaptor,
+      IREE::Flow::TensorDynamicConstantOp constantOp, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
       ConversionPatternRewriter &rewriter) const override {
     auto attrType = dyn_cast<RankedTensorType>(constantOp.getValue().getType());
@@ -159,10 +160,10 @@ struct ConvertTensorCastLikeOp
 };
 
 struct ConvertTensorAllocaOp
-    : public AffinityOpConversionPattern<IREE::Flow::TensorAllocaOp> {
-  using AffinityOpConversionPattern::AffinityOpConversionPattern;
+    : public AffinityOneToNOpConversionPattern<IREE::Flow::TensorAllocaOp> {
+  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
-      IREE::Flow::TensorAllocaOp op, OpAdaptor adaptor,
+      IREE::Flow::TensorAllocaOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
       ConversionPatternRewriter &rewriter) const override {
     auto resultSize =
@@ -177,10 +178,10 @@ struct ConvertTensorAllocaOp
 };
 
 struct ConvertTensorEmptyOp
-    : public AffinityOpConversionPattern<IREE::Flow::TensorEmptyOp> {
-  using AffinityOpConversionPattern::AffinityOpConversionPattern;
+    : public AffinityOneToNOpConversionPattern<IREE::Flow::TensorEmptyOp> {
+  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
-      IREE::Flow::TensorEmptyOp op, OpAdaptor adaptor,
+      IREE::Flow::TensorEmptyOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
       ConversionPatternRewriter &rewriter) const override {
     auto resultSize =
@@ -189,17 +190,18 @@ struct ConvertTensorEmptyOp
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto emptyOp = rewriter.create<IREE::Stream::TensorEmptyOp>(
         op.getLoc(), unknownType, op.getResult().getType(),
-        adaptor.getResultDims(), resultSize, executionAffinityAttr);
+        flattenValues(adaptor.getResultDims()), resultSize,
+        executionAffinityAttr);
     rewriter.replaceOpWithMultiple(op, {{emptyOp.getResult(), resultSize}});
     return success();
   }
 };
 
 struct ConvertTensorSplatOp
-    : public AffinityOpConversionPattern<IREE::Flow::TensorSplatOp> {
-  using AffinityOpConversionPattern::AffinityOpConversionPattern;
+    : public AffinityOneToNOpConversionPattern<IREE::Flow::TensorSplatOp> {
+  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
-      IREE::Flow::TensorSplatOp op, OpAdaptor adaptor,
+      IREE::Flow::TensorSplatOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
       ConversionPatternRewriter &rewriter) const override {
     auto resultSize =
@@ -207,8 +209,9 @@ struct ConvertTensorSplatOp
                           executionAffinityAttr, rewriter);
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto splatOp = rewriter.create<IREE::Stream::TensorSplatOp>(
-        op.getLoc(), unknownType, adaptor.getValue(), op.getResult().getType(),
-        adaptor.getResultDims(), resultSize, executionAffinityAttr);
+        op.getLoc(), unknownType, adaptor.getValue().front(),
+        op.getResult().getType(), flattenValues(adaptor.getResultDims()),
+        resultSize, executionAffinityAttr);
     rewriter.replaceOpWithMultiple(op, {{splatOp, resultSize}});
     return success();
   }
@@ -474,10 +477,10 @@ struct ConvertTensorTraceOp
 };
 
 struct ConvertChannelDefaultOp
-    : public AffinityOpConversionPattern<IREE::Flow::ChannelDefaultOp> {
-  using AffinityOpConversionPattern::AffinityOpConversionPattern;
+    : public AffinityOneToNOpConversionPattern<IREE::Flow::ChannelDefaultOp> {
+  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
-      IREE::Flow::ChannelDefaultOp op, OpAdaptor adaptor,
+      IREE::Flow::ChannelDefaultOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::Stream::ChannelCreateOp>(
