@@ -36,6 +36,19 @@ pip install -v --no-deps -e python_packages/iree_cpu_plugin
 JAX_PLATFORMS=iree_cpu python -c "import jax; a = jax.numpy.asarray([1, 2, 3, 4, 5, 6, 7, 8, 9]); print(a + a);"
 ```
 
+## Advanced settings
+
+To pass additional compile options to IREE during JIT compilation, you can use
+the `IREE_PJRT_IREE_COMPILER_OPTIONS` environment variable. This variable can
+be set to a space-delimited list of flags that would be passed to the
+`iree-compile` command-line tool.
+
+For example:
+```shell
+export IREE_PJRT_IREE_COMPILER_OPTIONS=--iree-scheduling-dump-statistics-format=csv
+JAX_PLATFORMS=iree_cpu python -c "import jax; a = jax.numpy.asarray([1, 2, 3, 4, 5, 6, 7, 8, 9]); print(a + a);"
+```
+
 ## Incrementally developing
 
 If you did an editable install (`-e`) above, then you should be able to incrementally
