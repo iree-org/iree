@@ -10,7 +10,6 @@
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassManager.h"
-#include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #include "stablehlo/dialect/VhloOps.h"
 
@@ -65,7 +64,6 @@ struct StableHLOSession
 
   void onRegisterDialects(DialectRegistry &registry) override {
     registry.insert<mlir::shape::ShapeDialect>();
-    registry.insert<mlir::chlo::ChloDialect>();
     registry.insert<mlir::stablehlo::StablehloDialect>();
     registry.insert<mlir::vhlo::VhloDialect>();
   }
@@ -99,7 +97,6 @@ struct StableHLOSession
       ModuleOp &module, StringSet<> &typeMnemonics) override {
 
     auto *ctx = module.getContext();
-    const Dialect *chloDialect = ctx->getLoadedDialect("chlo");
     const Dialect *stablehloDialect = ctx->getLoadedDialect("stablehlo");
     const Dialect *vhloDialect = ctx->getLoadedDialect("vhlo");
 
@@ -111,7 +108,7 @@ struct StableHLOSession
     bool hasTuples = false;
     module.walk([&](Operation *op) {
       Dialect *d = op->getDialect();
-      if (d == chloDialect || d == stablehloDialect || d == vhloDialect) {
+      if (d == stablehloDialect || d == vhloDialect) {
         hasStableHLO = true;
         if (checkOpForTuples(op)) {
           hasTuples = true;
