@@ -114,7 +114,6 @@ struct CallOpConversion
     SmallVector<Value> resourceSizes;
     for (auto result : resultMap) {
       if (llvm::isa<IREE::Stream::ResourceType>(result.newType)) {
-        auto oldType = op.getResult(result.originalIndex).getType();
         auto resource = callOp.getResult(result.newIndex + 0);
         auto resourceSize = callOp.getResult(result.newIndex + 1);
         results.push_back(resource);
