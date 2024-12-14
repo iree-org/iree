@@ -111,21 +111,20 @@ struct CallOpConversion
     // Tie all resource results together so we end up with 1:1 results with the
     // original op.
     SmallVector<Value> results;
+    SmallVector<Value> resourceSizes;
     for (auto result : resultMap) {
       if (llvm::isa<IREE::Stream::ResourceType>(result.newType)) {
         auto oldType = op.getResult(result.originalIndex).getType();
         auto resource = callOp.getResult(result.newIndex + 0);
         auto resourceSize = callOp.getResult(result.newIndex + 1);
-        results.push_back(rewriter
-                              .create<mlir::UnrealizedConversionCastOp>(
-                                  op.getLoc(), TypeRange{oldType},
-                                  ValueRange{resource, resourceSize})
-                              .getResult(0));
+        results.push_back(resource);
+        resourceSizes.push_back(resourceSize);
       } else {
         results.push_back(callOp.getResult(result.newIndex));
+        resourceSizes.push_back(nullptr);
       }
     }
-    rewriter.replaceOp(op, results);
+    replaceOpWithMultiple(op, results, resourceSizes, rewriter);
 
     return success();
   }
