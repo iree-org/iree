@@ -29,8 +29,8 @@ static SmallVector<Value> flattenValues(ArrayRef<ValueRange> values) {
 // %1 = stream.tensor.import %0 : !hal.buffer_view ->
 //                                tensor<4xf32> in !stream.resource<*>
 struct ConvertTensorImportOp
-    : public AffinityOneToNOpConversionPattern<IREE::HAL::TensorImportOp> {
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+    : public AffinityOpConversionPattern<IREE::HAL::TensorImportOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::HAL::TensorImportOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
@@ -45,16 +45,13 @@ struct ConvertTensorImportOp
     // Assert the shape of the buffer view matches the expected encoding
     // shape. We can only do this when we are importing a buffer view as that's
     // what carries the information we need to validate.
-    auto convertedSource =
-        transferTensorOperands(op.getLoc(), op.getSource(), adaptor.getSource(),
-                               executionAffinityAttr, rewriter);
     if (llvm::isa<IREE::HAL::BufferViewType>(sourceType)) {
       // NOTE: we do this before the other checks as it's the most likely
       // mistake and it's better to know of a shape mismatch than just buffer
       // byte length difference.
       if (auto tensorType = llvm::dyn_cast<RankedTensorType>(targetType)) {
         if (failed(buildEncodingAssertions(
-                op.getLoc(), convertedSource.resource, op.getNameAttr(),
+                op.getLoc(), adaptor.getSource().front(), op.getNameAttr(),
                 tensorType, op.getTargetDims(), rewriter))) {
           return rewriter.notifyMatchFailure(op, "unsupported tensor type");
         }
@@ -69,7 +66,7 @@ struct ConvertTensorImportOp
         TypeAttr::get(op.getTarget().getType()),
         flattenValues(adaptor.getTargetDims()), executionAffinityAttr);
     Value resource = rewriter.create<IREE::Stream::TensorImportOp>(
-        op.getLoc(), resultType, convertedSource.resource,
+        op.getLoc(), resultType, adaptor.getSource().front(),
         TypeAttr::get(targetType), flattenValues(adaptor.getTargetDims()),
         resultSize, executionAffinityAttr);
 
@@ -135,8 +132,8 @@ struct ConvertTensorImportOp
 // %1 = stream.tensor.export %0 : tensor<4xf32> in !stream.resource<*> ->
 //                                !hal.buffer_view
 struct ConvertTensorExportOp
-    : public AffinityOneToNOpConversionPattern<IREE::HAL::TensorExportOp> {
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+    : public AffinityOpConversionPattern<IREE::HAL::TensorExportOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::HAL::TensorExportOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
@@ -185,8 +182,8 @@ struct ConvertTensorExportOp
 //   %update = stream.async.update %0, %storage[...]
 //   %2 = stream.async.slice %update[...]
 struct ConvertTensorAliasOp
-    : public AffinityOneToNOpConversionPattern<IREE::HAL::TensorAliasOp> {
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+    : public AffinityOpConversionPattern<IREE::HAL::TensorAliasOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::HAL::TensorAliasOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,

@@ -103,41 +103,6 @@ public:
 
 protected:
   virtual LogicalResult matchAndRewriteOnAffinity(
-      OpT op, typename OpConversionPattern<OpT>::OpAdaptor adaptor,
-      IREE::Stream::AffinityAttr executionAffinityAttr,
-      ConversionPatternRewriter &rewriter) const = 0;
-
-private:
-  LogicalResult
-  matchAndRewrite(OpT op, typename OpConversionPattern<OpT>::OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override final {
-    auto executionAffinityAttr =
-        tryLookupExecutionAffinity(op, this->getAffinityAnalysis());
-    return matchAndRewriteOnAffinity(op, adaptor, executionAffinityAttr,
-                                     rewriter);
-  }
-};
-
-void replaceOpWithMultiple(Operation *op,
-                           ArrayRef<SmallVector<Value>> replacements,
-                           ConversionPatternRewriter &rewriter);
-void replaceOpWithMultiple(Operation *op, ValueRange resources,
-                           ValueRange sizes,
-                           ConversionPatternRewriter &rewriter);
-
-template <typename OpT>
-struct AffinityOneToNOpConversionPattern
-    : public AffinityAwareConversionPattern<OpT> {
-public:
-  AffinityOneToNOpConversionPattern(
-      const TypeConverter &typeConverter, MLIRContext *context,
-      IREE::Stream::AffinityAnalysis *affinityAnalysis,
-      PatternBenefit benefit = 1)
-      : AffinityAwareConversionPattern<OpT>(typeConverter, context,
-                                            affinityAnalysis, benefit) {}
-
-protected:
-  virtual LogicalResult matchAndRewriteOnAffinity(
       OpT op, typename OpConversionPattern<OpT>::OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
       ConversionPatternRewriter &rewriter) const = 0;
@@ -153,6 +118,13 @@ private:
                                      rewriter);
   }
 };
+
+void replaceOpWithMultiple(Operation *op,
+                           ArrayRef<SmallVector<Value>> replacements,
+                           ConversionPatternRewriter &rewriter);
+void replaceOpWithMultiple(Operation *op, ValueRange resources,
+                           ValueRange sizes,
+                           ConversionPatternRewriter &rewriter);
 
 } // namespace mlir::iree_compiler
 

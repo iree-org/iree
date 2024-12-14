@@ -44,9 +44,9 @@ static Value buildResultSizeOf(Location loc, Value tensorValue,
 }
 
 struct ConvertTensorConstantOp
-    : public AffinityOneToNOpConversionPattern<IREE::Flow::TensorConstantOp> {
+    : public AffinityOpConversionPattern<IREE::Flow::TensorConstantOp> {
 public:
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::Flow::TensorConstantOp constantOp, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
@@ -76,10 +76,9 @@ public:
 };
 
 struct ConvertTensorDynamicConstantOp
-    : public AffinityOneToNOpConversionPattern<
-          IREE::Flow::TensorDynamicConstantOp> {
+    : public AffinityOpConversionPattern<IREE::Flow::TensorDynamicConstantOp> {
 public:
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::Flow::TensorDynamicConstantOp constantOp, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
@@ -160,8 +159,8 @@ struct ConvertTensorCastLikeOp
 };
 
 struct ConvertTensorAllocaOp
-    : public AffinityOneToNOpConversionPattern<IREE::Flow::TensorAllocaOp> {
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+    : public AffinityOpConversionPattern<IREE::Flow::TensorAllocaOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::Flow::TensorAllocaOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
@@ -178,8 +177,8 @@ struct ConvertTensorAllocaOp
 };
 
 struct ConvertTensorEmptyOp
-    : public AffinityOneToNOpConversionPattern<IREE::Flow::TensorEmptyOp> {
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+    : public AffinityOpConversionPattern<IREE::Flow::TensorEmptyOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::Flow::TensorEmptyOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
@@ -198,8 +197,8 @@ struct ConvertTensorEmptyOp
 };
 
 struct ConvertTensorSplatOp
-    : public AffinityOneToNOpConversionPattern<IREE::Flow::TensorSplatOp> {
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+    : public AffinityOpConversionPattern<IREE::Flow::TensorSplatOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::Flow::TensorSplatOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
@@ -218,8 +217,8 @@ struct ConvertTensorSplatOp
 };
 
 struct ConvertTensorCloneOp
-    : public AffinityOneToNOpConversionPattern<IREE::Flow::TensorCloneOp> {
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+    : public AffinityOpConversionPattern<IREE::Flow::TensorCloneOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::Flow::TensorCloneOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
@@ -239,8 +238,8 @@ struct ConvertTensorCloneOp
 };
 
 struct ConvertTensorTransferOp
-    : public AffinityOneToNOpConversionPattern<IREE::Flow::TensorTransferOp> {
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+    : public AffinityOpConversionPattern<IREE::Flow::TensorTransferOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::Flow::TensorTransferOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
@@ -262,8 +261,8 @@ struct ConvertTensorTransferOp
 };
 
 struct ConvertTensorSliceOp
-    : public AffinityOneToNOpConversionPattern<IREE::Flow::TensorSliceOp> {
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+    : public AffinityOpConversionPattern<IREE::Flow::TensorSliceOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::Flow::TensorSliceOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
@@ -288,8 +287,8 @@ struct ConvertTensorSliceOp
 };
 
 struct ConvertTensorUpdateOp
-    : public AffinityOneToNOpConversionPattern<IREE::Flow::TensorUpdateOp> {
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+    : public AffinityOpConversionPattern<IREE::Flow::TensorUpdateOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::Flow::TensorUpdateOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
@@ -477,8 +476,8 @@ struct ConvertTensorTraceOp
 };
 
 struct ConvertChannelDefaultOp
-    : public AffinityOneToNOpConversionPattern<IREE::Flow::ChannelDefaultOp> {
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+    : public AffinityOpConversionPattern<IREE::Flow::ChannelDefaultOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::Flow::ChannelDefaultOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
@@ -529,9 +528,9 @@ struct ConvertChannelCountOp
   }
 };
 
-struct ConvertAllGatherOp : public AffinityOneToNOpConversionPattern<
-                                IREE::Flow::CollectiveAllGatherOp> {
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+struct ConvertAllGatherOp
+    : public AffinityOpConversionPattern<IREE::Flow::CollectiveAllGatherOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::Flow::CollectiveAllGatherOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
@@ -572,9 +571,9 @@ struct ConvertAllGatherOp : public AffinityOneToNOpConversionPattern<
   }
 };
 
-struct ConvertAllReduceOp : public AffinityOneToNOpConversionPattern<
-                                IREE::Flow::CollectiveAllReduceOp> {
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+struct ConvertAllReduceOp
+    : public AffinityOpConversionPattern<IREE::Flow::CollectiveAllReduceOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::Flow::CollectiveAllReduceOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
@@ -615,9 +614,9 @@ struct ConvertAllReduceOp : public AffinityOneToNOpConversionPattern<
   }
 };
 
-struct ConvertAllToAllOp : public AffinityOneToNOpConversionPattern<
-                               IREE::Flow::CollectiveAllToAllOp> {
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+struct ConvertAllToAllOp
+    : public AffinityOpConversionPattern<IREE::Flow::CollectiveAllToAllOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::Flow::CollectiveAllToAllOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
@@ -658,9 +657,9 @@ struct ConvertAllToAllOp : public AffinityOneToNOpConversionPattern<
   }
 };
 
-struct ConvertReduceScatterOp : public AffinityOneToNOpConversionPattern<
+struct ConvertReduceScatterOp : public AffinityOpConversionPattern<
                                     IREE::Flow::CollectiveReduceScatterOp> {
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::Flow::CollectiveReduceScatterOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
@@ -701,9 +700,9 @@ struct ConvertReduceScatterOp : public AffinityOneToNOpConversionPattern<
   }
 };
 
-struct ConvertCollectiveSendRecvOp : public AffinityOneToNOpConversionPattern<
-                                         IREE::Flow::CollectiveSendRecvOp> {
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+struct ConvertCollectiveSendRecvOp
+    : public AffinityOpConversionPattern<IREE::Flow::CollectiveSendRecvOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::Flow::CollectiveSendRecvOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
@@ -759,8 +758,8 @@ struct ConvertCollectiveSendRecvOp : public AffinityOneToNOpConversionPattern<
 };
 
 struct ConvertDispatchOp
-    : public AffinityOneToNOpConversionPattern<IREE::Flow::DispatchOp> {
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+    : public AffinityOpConversionPattern<IREE::Flow::DispatchOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::Flow::DispatchOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
@@ -874,9 +873,8 @@ struct ConvertFuncOp : public OpConversionPattern<IREE::Flow::FuncOp> {
   }
 };
 
-struct ConvertCallOp
-    : public AffinityOneToNOpConversionPattern<IREE::Flow::CallOp> {
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+struct ConvertCallOp : public AffinityOpConversionPattern<IREE::Flow::CallOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       IREE::Flow::CallOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,

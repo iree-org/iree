@@ -38,8 +38,8 @@ static SmallVector<Value> flattenValues(ArrayRef<ValueRange> values) {
 }
 
 struct ConvertTensorConstantOp
-    : public AffinityOneToNOpConversionPattern<arith::ConstantOp> {
-  using AffinityOneToNOpConversionPattern::AffinityOneToNOpConversionPattern;
+    : public AffinityOpConversionPattern<arith::ConstantOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult matchAndRewriteOnAffinity(
       arith::ConstantOp constantOp, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
