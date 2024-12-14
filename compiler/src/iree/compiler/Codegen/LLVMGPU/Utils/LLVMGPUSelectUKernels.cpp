@@ -5,9 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUSelectUKernels.h"
-
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Utils/EmbeddedDataDirectory.h"
@@ -21,7 +18,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-static StringLiteral executableObjectsAttrName = "hal.executable.objects";
+constexpr StringLiteral executableObjectsAttrName = "hal.executable.objects";
 
 // Returns a ExecutableObjectAttr carrying the bitcode for the given ukernel.
 //
