@@ -8,10 +8,9 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Utils/EmbeddedDataDirectory.h"
-#include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -41,12 +40,12 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
   std::string suffix;
   llvm::raw_string_ostream(suffix)
       << inputType.getElementType() << indexType.getElementType();
-  auto loweringConfig =
-      getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op);
+  auto loweringConfig = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
   if (!loweringConfig) {
     return rewriter.notifyMatchFailure(op, "no lowering_config on this op");
   }
-  IREE::Codegen::UKernelSpecAttr ukernelAttr = loweringConfig.getUkernel();
+  IREE::GPU::UKernelSpecAttr ukernelAttr =
+      IREE::GPU::getUkernelSpec(loweringConfig);
   if (!ukernelAttr) {
     return rewriter.notifyMatchFailure(op, "no ukernel selected for this op");
   }

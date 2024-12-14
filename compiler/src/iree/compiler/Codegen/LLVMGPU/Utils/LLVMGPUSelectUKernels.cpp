@@ -21,7 +21,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-static const char executableObjectsAttrName[] = "hal.executable.objects";
+static StringLiteral executableObjectsAttrName = "hal.executable.objects";
 
 // Returns a ExecutableObjectAttr carrying the bitcode for the given ukernel.
 //
@@ -102,8 +102,8 @@ static ArrayAttr lookUpExecutableObjects(Operation *op) {
 
 /// Returns the function name and attributes to use for a ukernel with given
 /// `name` and `suffix` on the target described by `targetAttr`.
-static IREE::Codegen::UKernelSpecAttr
-getUKernelSpec(const char *name, std::string &suffix, MLIRContext *context,
+static IREE::GPU::UKernelSpecAttr
+getUKernelSpec(StringRef name, StringRef suffix, MLIRContext *context,
                IREE::HAL::ExecutableTargetAttr targetAttr) {
   if (isROCMBackend(targetAttr)) {
     auto nameAttr = StringAttr::get(
@@ -111,14 +111,14 @@ getUKernelSpec(const char *name, std::string &suffix, MLIRContext *context,
     auto defsAttr = DictionaryAttr::get(
         context, {{StringAttr::get(context, "vm.import.module"),
                    StringAttr::get(context, "rocm")}});
-    return IREE::Codegen::UKernelSpecAttr::get(context, nameAttr, defsAttr);
+    return IREE::GPU::UKernelSpecAttr::get(context, nameAttr, defsAttr);
   }
   return {};
 }
 
 } // namespace
 
-IREE::Codegen::UKernelSpecAttr selectUKernelForArgmax(linalg::GenericOp op) {
+IREE::GPU::UKernelSpecAttr selectUKernelForArgmax(linalg::GenericOp op) {
   if (failed(isArgmaxOp(op))) {
     return {};
   }
@@ -135,7 +135,7 @@ IREE::Codegen::UKernelSpecAttr selectUKernelForArgmax(linalg::GenericOp op) {
   llvm::raw_string_ostream(suffix)
       << inputType.getElementType() << indexType.getElementType();
   MLIRContext *context = op->getContext();
-  IREE::Codegen::UKernelSpecAttr ukernelSpec =
+  IREE::GPU::UKernelSpecAttr ukernelSpec =
       getUKernelSpec(ukernelName, suffix, context, targetAttr);
   if (!ukernelSpec) {
     return {};

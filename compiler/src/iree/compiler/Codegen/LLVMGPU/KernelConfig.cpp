@@ -1834,7 +1834,7 @@ setArgmaxUkernelConfig(IREE::GPU::TargetAttr target,
                        mlir::FunctionOpInterface entryPoint,
                        linalg::GenericOp op) {
   // Checks if UKernels are enabled.
-  IREE::Codegen::UKernelSpecAttr ukernelSpec = selectUKernelForArgmax(op);
+  IREE::GPU::UKernelSpecAttr ukernelSpec = selectUKernelForArgmax(op);
   if (!ukernelSpec) {
     return failure();
   }
@@ -1875,20 +1875,29 @@ setArgmaxUkernelConfig(IREE::GPU::TargetAttr target,
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
 
-  // Currently Argmax Ukernel let's every thread reduce reductionDim/WarpSize
+  // Currently Argmax Ukernel lets every thread reduce reductionDim/WarpSize
   // number of elements, and then it does a single step butterfly warp reduce.
   // Hence it expects workgroupSize to be warpSize(subgroupSize), and
   // reductionTileSize to be size of the reduction dim.
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
   int64_t preferredSubgroupSize = target.getPreferredSubgroupSize();
   reductionTileSizes[reductionDims[0]] = preferredSubgroupSize;
-  TileSizesListType tileSizes;
-  tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
-  tileSizes.emplace_back(std::move(reductionTileSizes)); // Reduction level
   std::array<int64_t, 3> workgroupSize = {preferredSubgroupSize, 1, 1};
+
+  MLIRContext *context = op->getContext();
+  Builder b(context);
+  SmallVector<NamedAttribute, 2> attrs;
+  attrs.emplace_back(StringAttr::get(context, "workgroup"),
+                     b.getI64ArrayAttr(workgroupTileSizes));
+  attrs.emplace_back(StringAttr::get(context, "reduction"),
+                     b.getI64ArrayAttr(reductionTileSizes));
+  attrs.emplace_back(StringAttr::get(context, "ukernel"), ukernelSpec);
+  IREE::GPU::setPromotedOperandList(context, attrs, {0, 1});
+  auto configDict = DictionaryAttr::get(context, attrs);
+  auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
   if (failed(setOpConfigAndEntryPointFnTranslation(
-          entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUDefault,
-          workgroupSize, {}, {}, ukernelSpec))) {
+          entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUDefault,
+          workgroupSize))) {
     return failure();
   }
   return success();

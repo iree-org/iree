@@ -226,18 +226,10 @@ LogicalResult LoweringConfigTilingLevelAttr::verify(
 //===----------------------------------------------------------------------===//
 
 LoweringConfigAttr
-LoweringConfigAttr::get(MLIRContext *context,
-                        LoweringConfigTilingLevelsAttr tileSizes,
-                        ArrayRef<int64_t> nativeVectorSize) {
-  return get(context, tileSizes, nativeVectorSize, {});
-}
-
-LoweringConfigAttr
 LoweringConfigAttr::get(MLIRContext *context, TileSizesListTypeRef tileSizes,
                         ScalableTileFlagsListTypeRef scalableTileFlags,
                         TileSizesListTypeRef tileInterchange,
-                        ArrayRef<int64_t> nativeVectorSize,
-                        UKernelSpecAttr ukernel) {
+                        ArrayRef<int64_t> nativeVectorSize) {
   SmallVector<LoweringConfigTilingLevelAttr> tilinglevels;
   for (auto [level, sizes] : llvm::enumerate(tileSizes)) {
     ArrayRef<int64_t> interchange = level < tileInterchange.size()
@@ -251,17 +243,15 @@ LoweringConfigAttr::get(MLIRContext *context, TileSizesListTypeRef tileSizes,
   }
   return get(context,
              LoweringConfigTilingLevelsAttr::get(context, tilinglevels),
-             nativeVectorSize, ukernel);
+             nativeVectorSize);
 }
 
 LoweringConfigAttr LoweringConfigAttr::get(MLIRContext *context,
                                            TileSizesListTypeRef tileSizes,
                                            TileSizesListTypeRef tileInterchange,
-                                           ArrayRef<int64_t> nativeVectorSize,
-                                           UKernelSpecAttr ukernel) {
+                                           ArrayRef<int64_t> nativeVectorSize) {
 
-  return get(context, tileSizes, {}, tileInterchange, nativeVectorSize,
-             ukernel);
+  return get(context, tileSizes, {}, tileInterchange, nativeVectorSize);
 }
 
 TileSizesListType LoweringConfigAttr::getTileSizeVals() const {
@@ -342,8 +332,7 @@ bool LoweringConfigAttr::hasWorkgroupTilingLevel() const {
 LogicalResult
 LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                            LoweringConfigTilingLevelsAttr levels,
-                           ArrayRef<int64_t> nativeVectorSizes,
-                           UKernelSpecAttr /*ukernel*/) {
+                           ArrayRef<int64_t> nativeVectorSizes) {
   (void)nativeVectorSizes;
   if (!levels)
     return emitError() << "missing lowering config levels";
@@ -364,7 +353,7 @@ CompilationInfoAttr::verify(function_ref<InFlightDiagnostic()> emitError,
   if (auto defaultConfig = llvm::dyn_cast<LoweringConfigAttr>(loweringConfig)) {
     if (failed(LoweringConfigAttr::verify(
             emitError, defaultConfig.getTilingLevels(),
-            defaultConfig.getNativeVectorSize(), defaultConfig.getUkernel()))) {
+            defaultConfig.getNativeVectorSize()))) {
       return emitError() << "invalid lowering config: " << defaultConfig;
     }
   }
