@@ -44,46 +44,25 @@ tryLookupResultAffinity(Value value,
   return affinityAnalysis->lookupResourceAffinity(value);
 }
 
-static std::pair<Value, Value>
-resolveTensorOperands(Location loc, ValueRange convertedOperand,
-                      OpBuilder &builder) {
-  if (convertedOperand.size() == 2) {
-    return {convertedOperand[0], convertedOperand[1]};
-  }
-
-  auto operandType = convertedOperand.front().getType();
-  if (llvm::isa<IREE::Stream::ResourceType>(operandType)) {
-    // Prior to https://reviews.llvm.org/D111620 this is the path we'd take;
-    // the tensor operands would be remapped into their new resource types.
-    // This is still possible during rewriting if we ourselves produce a new
-    // resource type, but the automatic materialization will go down the
-    // unrealized_conversion_cast path below.
-    return std::make_pair(
-        convertedOperand.front(),
-        builder.createOrFold<IREE::Stream::ResourceSizeOp>(
-            loc, builder.getIndexType(), convertedOperand.front()));
-  }
-  assert(0 &&
-         "unexpected operand; expected either a IREE::Stream::ResourceType or "
-         "the result of a mlir::UnrealizedConversionCastOp");
-  return std::make_pair(Value{}, Value{});
-}
-
 ConvertedTensor resolveTensorOperands(
     Location loc, Value originalOperand, ValueRange convertedOperand,
     IREE::Stream::AffinityAnalysis *affinityAnalysis, OpBuilder &builder) {
-  auto [resource, resourceSize] =
-      resolveTensorOperands(loc, convertedOperand, builder);
+  assert(convertedOperand.size() == 2 &&
+         "expected tensor operands to be converted to `!stream.resource<*>, "
+         "index`");
   auto affinityAttr = affinityAnalysis->lookupResourceAffinity(originalOperand);
-  return {affinityAttr, resource, resourceSize};
+  return {affinityAttr, convertedOperand[0], convertedOperand[1]};
 }
 
 ConvertedTensor transferTensorOperands(
     Location loc, Value originalOperand, ValueRange convertedOperand,
     IREE::Stream::AffinityAttr requiredAffinityAttr,
     IREE::Stream::AffinityAnalysis *affinityAnalysis, OpBuilder &builder) {
-  auto [resource, resourceSize] =
-      resolveTensorOperands(loc, convertedOperand, builder);
+  assert(convertedOperand.size() == 2 &&
+         "expected tensor operands to be converted to `!stream.resource<*>, "
+         "index`");
+  Value resource = convertedOperand[0];
+  Value resourceSize = convertedOperand[1];
   auto affinityAttr = affinityAnalysis->lookupResourceAffinity(originalOperand);
   if (affinityAttr != requiredAffinityAttr) {
     resource = builder.create<IREE::Stream::AsyncTransferOp>(
