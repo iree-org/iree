@@ -520,6 +520,25 @@ def IREEGPU_LaneIdAttr : AttrDef<IREEGPU_Dialect, "LaneId", [
   }];
 }
 
+//===---------------------------------------------------------------------===//
+// iree_gpu.ukernel_spec
+//===---------------------------------------------------------------------===//
+
+def IREEGPU_UKernelSpecAttr  :
+    AttrDef<IREEGPU_Dialect, "UKernelSpec", []> {
+  let mnemonic = "ukernel_spec";
+  let summary = "An attribute specifying a ukernel that an op can lower to.";
+  let description = [{
+    An attribute that can be applied to any operation to specify that it has
+    been match with a ukernel that is a legal lowering for it.
+  }];
+  let assemblyFormat = "`<` struct(params) `>`";
+  let parameters = (ins
+       "StringAttr":$name,
+       "DictionaryAttr":$def_attrs
+  );
+}
+
 //===----------------------------------------------------------------------===//
 // GPU Pipeline Options
 //===----------------------------------------------------------------------===//

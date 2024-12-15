@@ -44,7 +44,7 @@ func.func @argmax_1d_f16i64() attributes {
 //       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUDefault workgroup_size = [32, 1, 1]>
 //       CHECK: func.func @argmax_1d_f16i64()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   iree_codegen.ukernel.generic {hal.executable.objects = [{{.*}}]} "iree_uk_amdgpu_argmax_f16i64"
+//       CHECK:   iree_codegen.ukernel.generic "iree_uk_amdgpu_argmax_f16i64"
 
 // -----
 
@@ -94,7 +94,7 @@ func.func @argmax_2d_f32i64() attributes {
 // CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK:   %[[SUBVIEW:.*]] = memref.subview{{.*}} memref<16x?xf32
 // CHECK-SAME:        to memref<1x?xf32
-//      CHECK:   iree_codegen.ukernel.generic {hal.executable.objects = [{{.*}}]} "iree_uk_amdgpu_argmax_f32i64" ins(%[[SUBVIEW]]
+//      CHECK:   iree_codegen.ukernel.generic "iree_uk_amdgpu_argmax_f32i64" ins(%[[SUBVIEW]]
 
 // -----
 
