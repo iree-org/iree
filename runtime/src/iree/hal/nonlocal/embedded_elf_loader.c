@@ -16,6 +16,7 @@
 #include "iree/hal/local/executable_library_util.h"
 #include "iree/hal/local/executable_plugin_manager.h"
 #include "iree/hal/local/local_executable.h"
+#include "nl_api.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_nonlocal_elf_executable_t
@@ -25,62 +26,16 @@ typedef struct iree_hal_nonlocal_elf_executable_t {
   iree_hal_local_executable_t base;
 
   // Loaded ELF module.
-  iree_elf_module_t module;
+  iree_elf_module_t *module;
 
   // Name used for the file field in tracy and debuggers.
   iree_string_view_t identifier;
 
   // Queried metadata from the library.
-  union {
-    const iree_hal_executable_library_header_t** header;
-    const iree_hal_executable_library_v0_t* v0;
-  } library;
+  iree_hal_executable_library_v0_t *library;
 } iree_hal_nonlocal_elf_executable_t;
 
 static const iree_hal_local_executable_vtable_t iree_hal_nonlocal_elf_executable_vtable;
-
-static iree_status_t iree_hal_nonlocal_elf_executable_query_library(
-    iree_hal_nonlocal_elf_executable_t* executable) {
-  // Get the exported symbol used to get the library metadata.
-  iree_hal_executable_library_query_fn_t query_fn = NULL;
-  IREE_RETURN_IF_ERROR(iree_elf_module_lookup_export(
-      &executable->module, IREE_HAL_EXECUTABLE_LIBRARY_EXPORT_NAME,
-      (void**)&query_fn));
-
-  // Query for a compatible version of the library.
-  executable->library.header =
-      (const iree_hal_executable_library_header_t**)iree_elf_call_p_ip(
-          query_fn, IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST,
-          &executable->base.environment);
-  if (!executable->library.header) {
-    return iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "executable does not support this version of the runtime (%08X)",
-        IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST);
-  }
-  const iree_hal_executable_library_header_t* header =
-      *executable->library.header;
-
-  // Ensure that if the library is built for a particular sanitizer that we also
-  // were compiled with that sanitizer enabled.
-  switch (header->sanitizer) {
-    case IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_NONE:
-      // Always safe even if the host has a sanitizer enabled; it just means
-      // that we won't be able to catch anything from within the executable,
-      // however checks outside will (often) still trigger when guard pages are
-      // dirtied/etc.
-      break;
-    default:
-      return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                              "executable requires sanitizer but they are not "
-                              "yet supported with embedded libraries: %u",
-                              (uint32_t)header->sanitizer);
-  }
-
-  executable->identifier = iree_make_cstring_view(header->name);
-  executable->base.dispatch_attrs = executable->library.v0->exports.attrs;
-  return iree_ok_status();
-}
 
 static iree_status_t iree_hal_nonlocal_elf_executable_create(
     const iree_hal_executable_params_t* executable_params,
@@ -120,35 +75,33 @@ static iree_status_t iree_hal_nonlocal_elf_executable_create(
   }
 
   // Attempt to load the ELF module.
-  if (iree_status_is_ok(status)) {
-    status = iree_elf_module_initialize_from_memory(
-        executable_params->executable_data, /*import_table=*/NULL,
-        host_allocator, &executable->module);
-  }
+  executable->module = nl_elf_executable_load( executable_params->executable_data.data, executable_params->executable_data.data_length);
 
   // Query metadata and get the entry point function pointers.
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_nonlocal_elf_executable_query_library(executable);
-  }
+  executable->library = nl_elf_executable_init(executable->module);
 
+  executable->base.dispatch_attrs = executable->library->exports.attrs;
+
+#if 0
   // Resolve imports, if any.
   if (iree_status_is_ok(status)) {
     status = iree_hal_executable_library_initialize_imports(
         &executable->base.environment, import_provider,
-        &executable->library.v0->imports,
+        &executable->library->imports,
         (iree_hal_executable_import_thunk_v0_t)iree_elf_thunk_i_ppp,
         host_allocator);
   }
+#endif
 
   // Verify that the library matches the executable params.
   if (iree_status_is_ok(status)) {
     status = iree_hal_executable_library_verify(executable_params,
-                                                executable->library.v0);
+                                                executable->library);
   }
 
   // Publish the executable sources with the tracing infrastructure.
   if (iree_status_is_ok(status)) {
-    iree_hal_executable_library_publish_source_files(executable->library.v0);
+    iree_hal_executable_library_publish_source_files(executable->library);
   }
 
   if (iree_status_is_ok(status)) {
@@ -167,7 +120,7 @@ static void iree_hal_nonlocal_elf_executable_destroy(
   iree_allocator_t host_allocator = executable->base.host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_elf_module_deinitialize(&executable->module);
+  nl_elf_executable_destroy(executable->module);
 
   iree_hal_executable_library_deinitialize_imports(
       &executable->base.environment, host_allocator);
@@ -186,23 +139,9 @@ static iree_status_t iree_hal_nonlocal_elf_executable_issue_call(
     uint32_t worker_id) {
   iree_hal_nonlocal_elf_executable_t* executable =
       (iree_hal_nonlocal_elf_executable_t*)base_executable;
-  const iree_hal_executable_library_v0_t* library = executable->library.v0;
 
-  if (IREE_UNLIKELY(ordinal >= library->exports.count)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "entry point ordinal out of bounds");
-  }
-
-  IREE_HAL_EXECUTABLE_LIBRARY_CALL_TRACE_ZONE_BEGIN(z0, executable->identifier,
-                                                    library, ordinal);
-  IREE_HAL_EXECUTABLE_LIBRARY_CALL_HOOK_BEGIN(executable->identifier, library,
-                                              ordinal);
-  int ret = iree_elf_call_i_ppp(library->exports.ptrs[ordinal],
-                                (void*)&base_executable->environment,
+  int ret = nl_elf_executable_call(executable->library, ordinal,
                                 (void*)dispatch_state, (void*)workgroup_state);
-  IREE_HAL_EXECUTABLE_LIBRARY_CALL_HOOK_END(executable->identifier, library,
-                                            ordinal);
-  IREE_TRACE_ZONE_END(z0);
 
   return ret == 0 ? iree_ok_status()
                   : iree_make_status(
