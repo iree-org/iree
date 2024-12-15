@@ -1937,6 +1937,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#ukernelspecattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      UKernelSpecAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#virtualmmaattr" class="md-nav__link">
     <span class="md-ellipsis">
       VirtualMMAAttr
@@ -4468,6 +4477,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#ukernelspecattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      UKernelSpecAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#virtualmmaattr" class="md-nav__link">
     <span class="md-ellipsis">
       VirtualMMAAttr
@@ -4832,6 +4850,7 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#targetattr">TargetAttr</a></li>
 <li><a href="#targetchipattr">TargetChipAttr</a></li>
 <li><a href="#targetwgpattr">TargetWgpAttr</a></li>
+<li><a href="#ukernelspecattr">UKernelSpecAttr</a></li>
 <li><a href="#virtualmmaattr">VirtualMMAAttr</a></li>
 <li><a href="#virtualmmaintrinsicattr">VirtualMMAIntrinsicAttr</a></li>
 </ul>
@@ -5951,6 +5970,38 @@ NVIDIA GPUs.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="ukernelspecattr">UKernelSpecAttr<a class="headerlink" href="#ukernelspecattr" title="Permanent link">link</a></h3>
+<p>An attribute specifying a ukernel that an op can lower to.</p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_gpu.ukernel_spec&lt;
+  StringAttr,   # name
+  DictionaryAttr   # def_attrs
+&gt;
+</code></pre></div>
+<p>An attribute that can be applied to any operation to specify that it has
+been match with a ukernel that is a legal lowering for it.</p>
+<h5 id="parameters_18">Parameters:<a class="headerlink" href="#parameters_18" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">name</td>
+<td style="text-align: center;"><code>StringAttr</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">def_attrs</td>
+<td style="text-align: center;"><code>DictionaryAttr</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
 <h3 id="virtualmmaattr">VirtualMMAAttr<a class="headerlink" href="#virtualmmaattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.virtual_mma_layout&lt;
@@ -5963,7 +6014,7 @@ field represents different kinds of "Virtual" MMA Ops we found helpful.</p>
 <p>These interleaving and/or unrolling changes in the layout is especially
 useful to coalesce reads from shared memory to register or align layouts
 in a chained-matmul operation.</p>
-<h5 id="parameters_18">Parameters:<a class="headerlink" href="#parameters_18" title="Permanent link">link</a></h5>
+<h5 id="parameters_19">Parameters:<a class="headerlink" href="#parameters_19" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5992,7 +6043,7 @@ in a chained-matmul operation.</p>
 * VMFMA_F32_32x32x16_F16 (<code>VMFMA_F32_32x32x16_F16</code>)
 * VMFMA_F32_16x16x32_F8E4M3FNUZ (<code>VMFMA_F32_16x16x32_F8E4M3FNUZ</code>)
 * VMFMA_F32_32x32x16_F8E4M3FNUZ (<code>VMFMA_F32_32x32x16_F8E4M3FNUZ</code>)</p>
-<h5 id="parameters_19">Parameters:<a class="headerlink" href="#parameters_19" title="Permanent link">link</a></h5>
+<h5 id="parameters_20">Parameters:<a class="headerlink" href="#parameters_20" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
