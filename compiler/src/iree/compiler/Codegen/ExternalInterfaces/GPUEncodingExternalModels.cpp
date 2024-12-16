@@ -3,6 +3,21 @@
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//===- GPUEncodingExternalModels.cpp --------------------------------------===//
+//
+// This file implements the IREE::Codegen::LayoutAttrInterface for GPU backends.
+// Different from CPU backends, we do not tranpose narrow-N to narrow-M for a
+// combination of reasons:
+//
+//   1. As linalg.matmul materializes into iree_gpu.multi_mma, which inherits
+//      its semantics from the wrapped intrinsic, we can't rely on any kind of
+//      LHS<->RHS symmetry.
+//   2. We do not currently use ukernels, which would be one of the main areas
+//      to benefit from transposeNarrowN.
+//   3. Heuristics for cache-friendly dispatch tiling are internal to the GPU
+//      runtime, so we don't need a simplification at that level either.
+//
+//===---------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/ExternalInterfaces/GPUEncodingExternalModels.h"
 
