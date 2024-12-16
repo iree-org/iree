@@ -69,8 +69,6 @@ def IREECodegen_Dialect : Dialect {
   }];
   let useDefaultAttributePrinterParser = 1;
   let hasOperationAttrVerify = 1;
-  let hasRegionArgAttrVerify = 1;
-  let hasRegionResultAttrVerify = 1;
 }
 
 def AnyRankedTensorOrMemRefType : AnyTypeOf<[AnyRankedTensor, AnyMemRef]>;
