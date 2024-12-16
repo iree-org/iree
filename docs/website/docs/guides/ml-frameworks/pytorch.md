@@ -62,37 +62,56 @@ graph LR
 
 ## :octicons-download-16: Prerequisites
 
-We recommend first installing a recent version of PyTorch for CPU by following
-the [official instructions](https://pytorch.org/get-started/locally/).
+1. First install a recent version of PyTorch by following
+   the [official instructions](https://pytorch.org/get-started/locally/):
 
-``` shell
-python -m pip install \
-  --index-url https://download.pytorch.org/whl/test/cpu torch>=2.3.0
-```
+    === ":fontawesome-brands-linux: Linux"
 
-Install iree-turbine:
+        ``` shell
+        python -m pip install torch --index-url https://download.pytorch.org/whl/test/cpu
+        ```
 
-=== ":octicons-package-16: Stable releases"
+    === ":fontawesome-brands-apple: macOS"
 
-    Stable release packages are
-    [published to PyPI](https://pypi.org/project/iree-turbine/).
+        ``` shell
+        python -m pip install torch
+        ```
 
-    ``` shell
-    python -m pip install iree-turbine
-    ```
+    === ":fontawesome-brands-windows: Windows"
 
-=== ":octicons-beaker-16: Nightly pre-releases"
+        ``` shell
+        python -m pip install torch
+        ```
 
-    Nightly pre-releases are published on
-    [GitHub releases](https://github.com/iree-org/iree-turbine/releases/tag/dev-wheels).
+    !!! tip
 
-    ``` shell hl_lines="2-4"
-    python -m pip install \
-      --find-links https://iree.dev/pip-release-links.html \
-      --pre \
-      --upgrade \
-      iree-turbine
-    ```
+        IREE includes its own GPU support, so we recommend the CPU versions of
+        PyTorch. You can install CUDA or ROCm as you wish, but those packages
+        can be quite large.
+
+2. Then install iree-turbine:
+
+    === ":octicons-package-16: Stable releases"
+
+        Stable release packages are
+        [published to PyPI](https://pypi.org/project/iree-turbine/).
+
+        ``` shell
+        python -m pip install iree-turbine
+        ```
+
+    === ":octicons-beaker-16: Nightly pre-releases"
+
+        Nightly pre-releases are published on
+        [GitHub releases](https://github.com/iree-org/iree-turbine/releases/tag/dev-wheels).
+
+        ``` shell hl_lines="2-4"
+        python -m pip install \
+          --find-links https://iree.dev/pip-release-links.html \
+          --pre \
+          --upgrade \
+          iree-turbine
+        ```
 
 ## :octicons-flame-16: Just-in-time (JIT) execution
 
