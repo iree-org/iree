@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -255,6 +256,66 @@ struct RemoveIndexCastForAssumeOfI32
 };
 
 //===----------------------------------------------------------------------===//
+// scf.for induction variable range narrowing
+// If the induction variable of an scf.for can be represented as an I32,
+// make that change to save on registers etc.
+//===----------------------------------------------------------------------===//
+struct NarrowSCFForIvToI32 : public OpRewritePattern<scf::ForOp> {
+  NarrowSCFForIvToI32(MLIRContext *context, DataFlowSolver &solver)
+      : OpRewritePattern(context), solver(solver) {}
+
+  LogicalResult matchAndRewrite(scf::ForOp forOp,
+                                PatternRewriter &rewriter) const override {
+    Location loc = forOp.getLoc();
+    Value iv = forOp.getInductionVar();
+    Type srcType = iv.getType();
+    if (!srcType.isIndex() && !srcType.isInteger(64))
+      return rewriter.notifyMatchFailure(forOp, "IV isn't an index or i64");
+    if (!staticallyLegalToConvertToUnsigned(solver, iv))
+      return rewriter.notifyMatchFailure(forOp, "IV isn't non-negative");
+    if (!staticallyLegalToConvertToUnsigned(solver, forOp.getStep()))
+      return rewriter.notifyMatchFailure(forOp, "Step isn't non-negative");
+    auto *ivState = solver.lookupState<IntegerValueRangeLattice>(iv);
+    if (ivState->getValue().getValue().smax().getActiveBits() > 31)
+      return rewriter.notifyMatchFailure(forOp, "IV won't fit in signed int32");
+
+    Type i32 = rewriter.getI32Type();
+    auto doCastDown = [&](Value v) -> Value {
+      if (srcType.isIndex())
+        return rewriter.create<arith::IndexCastUIOp>(loc, i32, v);
+      else
+        return rewriter.create<arith::TruncIOp>(loc, i32, v);
+    };
+    Value newLb = doCastDown(forOp.getLowerBound());
+    Value newUb = doCastDown(forOp.getUpperBound());
+    Value newStep = doCastDown(forOp.getStep());
+    {
+      PatternRewriter::InsertionGuard g(rewriter);
+      rewriter.setInsertionPointToStart(&forOp.getRegion().front());
+      Value castBackOp;
+      if (srcType.isIndex())
+        castBackOp =
+            rewriter.create<arith::IndexCastUIOp>(iv.getLoc(), srcType, iv);
+      else
+        castBackOp = rewriter.create<arith::ExtUIOp>(iv.getLoc(), srcType, iv);
+      (void)solver.getOrCreateState<IntegerValueRangeLattice>(castBackOp)
+          ->join(*ivState);
+      rewriter.replaceAllUsesExcept(iv, castBackOp, castBackOp.getDefiningOp());
+    }
+    solver.eraseState(iv);
+    rewriter.modifyOpInPlace(forOp, [&]() {
+      iv.setType(i32);
+      forOp.getLowerBoundMutable().assign(newLb);
+      forOp.getUpperBoundMutable().assign(newUb);
+      forOp.getStepMutable().assign(newStep);
+    });
+    return success();
+  }
+
+  DataFlowSolver &solver;
+};
+
+//===----------------------------------------------------------------------===//
 // Divisibility
 //===----------------------------------------------------------------------===//
 
@@ -396,7 +457,8 @@ class OptimizeIntArithmeticPass
 
     if (narrowToI32) {
       arith::populateIntRangeNarrowingPatterns(patterns, solver, {32});
-      patterns.add<RemoveIndexCastForAssumeOfI32>(ctx, solver);
+      patterns.add<NarrowSCFForIvToI32, RemoveIndexCastForAssumeOfI32>(ctx,
+                                                                       solver);
     }
 
     // Populate canonicalization patterns.
