@@ -47,7 +47,34 @@ void IREECodegenDialect::initialize() {
 
 LogicalResult
 IREECodegenDialect::verifyOperationAttribute(Operation *op,
-                                             NamedAttribute namedAttr) {
+                                             NamedAttribute attribute) {
+  StringRef symbol = attribute.getName().strref();
+  Attribute attr = attribute.getValue();
+
+  if (symbol == kTuningSpecEntrypointAttrName) {
+    if (!llvm::isa<UnitAttr>(attr)) {
+      return op->emitError("'") << symbol << "' attribute must be a UnitAttr";
+    }
+  } else {
+    return op->emitError("found unsupported '")
+           << symbol << "' attribute on operation";
+  }
+  return success();
+}
+
+LogicalResult IREECodegenDialect::verifyRegionArgAttribute(
+    Operation *op, unsigned regionIndex, unsigned argIndex,
+    NamedAttribute attribute) {
+  StringRef symbol = attribute.getName().strref();
+  llvm::outs() << "symbol Arg " << symbol << "\n";
+  return success();
+}
+
+LogicalResult IREECodegenDialect::verifyRegionResultAttribute(
+    Operation *op, unsigned /*regionIndex*/, unsigned /*resultIndex*/,
+    NamedAttribute attribute) {
+  StringRef symbol = attribute.getName().strref();
+  llvm::outs() << "symbol Res " << symbol << "\n";
   return success();
 }
 
