@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -78,6 +79,9 @@ protected:
 
 /// Returns the RankedTensorType without encodings.
 RankedTensorType dropEncoding(RankedTensorType type);
+
+/// Returns the RankedTensorType without packed storage encoding (if any).
+RankedTensorType dropPackedStorageEncodingIfAny(RankedTensorType type);
 
 /// Utility method to convert from `set_encoding` op to `pack` operation.
 /// NOTE: `source` could be returned when packing is not needed.
