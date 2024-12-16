@@ -93,17 +93,9 @@ FailureOr<Value> lowerUnsetEncodingToUnpackOp(
     Value packedValue, const MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn);
 
-/// Pouplates the set of patterns that lowers set_encoding, unset_encoding, and
-/// upstream dialect ops with encoding types to pack/unpack ops.
-void populateMaterializeEncodingIntoPackUnPackPatterns(
-    RewritePatternSet &patterns,
-    MaterializeEncodingTypeConverter &typeConverter,
-    MaterializeEncodingValueFn materializeEncodingValueFn);
-
-/// Pouplates the set of patterns that lowers shape-like operations (e.g., Flow
-/// ops, Hal ops, tensor.empty, linalg.fill, etc) with encoding types to the
-/// same op with materialized shapes.
-void populateShapeIndependentMaterializeEncodingPatterns(
+/// Pouplates the set of patterns that lowers operations with encoding types to
+/// operations without encodings.
+void populateMaterializeEncodingPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn);

@@ -161,6 +161,10 @@ const char *getIreeArchNameForTargetTriple(llvm::Triple triple) {
   return "unknown";
 }
 
+bool isLLVMCPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return targetAttr && targetAttr.getBackend().getValue() == "llvm-cpu";
+}
+
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return targetAttr && targetAttr.getBackend().getValue().starts_with("vmvx");
 }

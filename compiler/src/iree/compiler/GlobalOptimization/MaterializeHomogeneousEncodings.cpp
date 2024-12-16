@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/CPU/Passes.h"
-#include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
@@ -82,10 +80,10 @@ public:
     // Only llvm-cpu and rocm backends handle encodings for now, others just go
     // with nop.
     if (executableTarget.getBackend() == "llvm-cpu") {
-      passManager.addPass(createCPUMaterializeHostEncodingPass());
+      passManager.addPass(createMaterializeHostEncodingPass());
     } else if (clEnableExperimentalRocmDataTiling &&
                executableTarget.getBackend() == "rocm") {
-      passManager.addPass(createGPUMaterializeHostEncodingPass());
+      passManager.addPass(createMaterializeHostEncodingPass());
       FunctionLikeNest(passManager).addPass([&]() {
         return createDecomposePackUnPackOpsPass(
             DecomposePackUnPackOpsPassOptions{/*tileOuterToOne=*/false,
