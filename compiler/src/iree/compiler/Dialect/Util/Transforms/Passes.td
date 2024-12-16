@@ -70,7 +70,7 @@ def OptimizeIntArithmeticPass : Pass<"iree-util-optimize-int-arithmetic", ""> {
     Option<"narrowToI32", "narrow-to-i32", "bool",
       /*default=*/"false",
       "Flag indicating if computations that can be performed with 32 bits shuld be."
-      " Mainly used for GPU code generation to not waste registers">
+      " Mainly used for GPU code generation to not waste registers.">
   ];
 }
 
