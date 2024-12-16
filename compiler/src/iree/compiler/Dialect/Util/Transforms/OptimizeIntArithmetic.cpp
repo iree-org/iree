@@ -449,7 +449,6 @@ class OptimizeIntArithmeticPass
 
       if (!changed)
         break;
-      llvm::errs() << op << "\n";
     }
   }
 };
