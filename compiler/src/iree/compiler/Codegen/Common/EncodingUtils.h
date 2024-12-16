@@ -36,7 +36,7 @@ using MaterializeEncodingValueFn =
 class MaterializeEncodingTypeConverter : public TypeConverter {
 public:
   MaterializeEncodingTypeConverter(
-      bool transposeNarrowN, IREE::Codegen::LayoutAttrInterface layoutAttr);
+      IREE::Codegen::LayoutAttrInterface layoutAttr);
 
   const IREE::Codegen::LayoutAttrInterface &getLayoutAttr() const {
     return layoutAttr;
@@ -47,12 +47,7 @@ public:
     return layoutAttr.getEncodingInfo(type);
   }
 
-  bool getTransposeNarrowN() const { return transposeNarrowN; }
-
 private:
-  bool transposeNarrowN = false;
-  // TODO(hanchung): Move the logic that takes `transposeNarrowN` into account
-  // to their own attribute implementation.
   const IREE::Codegen::LayoutAttrInterface layoutAttr;
 };
 
