@@ -45,4 +45,10 @@ void IREECodegenDialect::initialize() {
       >();
 }
 
+LogicalResult
+IREECodegenDialect::verifyOperationAttribute(Operation *op,
+                                             NamedAttribute namedAttr) {
+  return success();
+}
+
 } // namespace mlir::iree_compiler::IREE::Codegen
