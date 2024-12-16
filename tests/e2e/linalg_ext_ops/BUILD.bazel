@@ -42,24 +42,6 @@ iree_check_single_backend_test_suite(
     target_backend = "llvm-cpu",
 )
 
-iree_check_single_backend_test_suite(
-    name = "check_llvm-cpu_local-task_i1",
-    srcs = [
-        "attention_i1_mask.mlir",
-    ],
-    compiler_flags = [
-        "--iree-llvmcpu-target-cpu=generic",
-        "--iree-experimental-packed-i1-storage",
-    ],
-    driver = "local-task",
-    tags = [
-        # attention fails with a wasm target, just disable the tests there for now
-        #   error: Yield operand #2 is not equivalent to the corresponding iter bbArg
-        "nowasm",
-    ],
-    target_backend = "llvm-cpu",
-)
-
 VMVX_SRCS = enforce_glob(
     # keep sorted
     [

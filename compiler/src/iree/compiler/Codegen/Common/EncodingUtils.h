@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -76,6 +77,9 @@ protected:
 
 /// Returns the RankedTensorType without encodings.
 RankedTensorType dropEncoding(RankedTensorType type);
+
+/// Returns the RankedTensorType without packed storage encoding (if any).
+RankedTensorType dropPackedStorageEncodingIfAny(RankedTensorType type);
 
 /// Returns the deserialized MaterializeEncodingInfo if the `layouts` field is
 /// present in encodings and it only has a single layout. Otherwise, returns

@@ -43,7 +43,7 @@ namespace mlir::iree_compiler::IREE::Encoding {
 EncodingAttr getEncodingAttr(RankedTensorType type);
 
 /// Returns true if the type contains packed_storage attribute.
-bool hasPackedStorageAttr(RankedTensorType type);
+bool hasPackedStorageAttr(Type type);
 
 /// Returns the ContractionDimensions for the encoding user_indexing_maps.
 FailureOr<linalg::ContractionDimensions>

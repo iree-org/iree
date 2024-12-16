@@ -19,16 +19,15 @@ package(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_llvm-cpu_subbyte_emulation",
+    name = "check_llvm-cpu_subbyte_emulation_attr",
     srcs = enforce_glob(
         [
-            "subbyte_types.mlir",
+            "subbyte_types_attr.mlir",
         ],
         include = ["*.mlir"],
     ),
     compiler_flags = [
         "--iree-llvmcpu-target-cpu=generic",
-        "--iree-experimental-packed-i1-storage",
     ],
     driver = "local-task",
     tags = [
@@ -41,6 +40,6 @@ iree_check_single_backend_test_suite(
 test_suite(
     name = "check",
     tests = [
-        ":check_llvm-cpu_subbyte_emulation",
+        ":check_llvm-cpu_subbyte_emulation_attr",
     ],
 )
