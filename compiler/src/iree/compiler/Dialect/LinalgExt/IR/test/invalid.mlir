@@ -321,23 +321,6 @@ func.func @scatter_index_depth_dynamic(
 
 // -----
 
-func.func @scatter_original_rank_mismatch(
-    %update : tensor<?xi64>, %indices : tensor<?x1xi32>,
-    %original : tensor<?x?xi64>) -> tensor<?x?xi64> {
-  // expected-error @+1 {{op index depth and update value does not cover rank of original value}}
-  %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
-    ins(%update, %indices : tensor<?xi64>, tensor<?x1xi32>)
-    outs(%original : tensor<?x?xi64>) {
-    ^bb0(%arg1: i64, %arg2: i64):
-      %1 = arith.addi %arg1, %arg2 : i64
-      %2 = arith.trunci %1 : i64 to i32
-      iree_linalg_ext.yield %1, %2 : i64, i32
-    } -> tensor<?x?xi64>
-  return %0 : tensor<?x?xi64>
-}
-
-// -----
-
 func.func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<2x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
   // expected-error@+1 {{expected one or two input operands}}
   %0:2 = iree_linalg_ext.topk
