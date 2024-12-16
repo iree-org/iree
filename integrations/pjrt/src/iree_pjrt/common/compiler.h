@@ -76,12 +76,16 @@ class AbstractCompiler {
 // An AbstractCompiler based on IREE.
 class IREECompiler : public AbstractCompiler {
  public:
+  IREECompiler(std::vector<std::string> extra_options = {})
+      : extra_options_(std::move(extra_options)) {}
+
   std::unique_ptr<CompilerJob> StartJob() override;
   std::string GetRevision() override;
   std::string GetErrorMessage() override { return error_message_; }
 
  private:
   std::string error_message_;
+  std::vector<std::string> extra_options_;
 };
 
 // An AbstractCompiler based on the HLO partitioner.

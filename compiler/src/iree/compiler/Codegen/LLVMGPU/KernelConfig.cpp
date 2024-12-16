@@ -10,6 +10,7 @@
 #include <numeric>
 #include <optional>
 
+#include "compiler/src/iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUSelectUKernels.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
@@ -76,6 +77,12 @@ llvm::cl::opt<bool> clGPUUnalignedGEMMVectorDistribution(
     llvm::cl::desc("enable the usage of the vector distribution pipeline for "
                    "unaligned GEMMs when supported"),
     llvm::cl::init(false));
+
+llvm::cl::opt<bool> clGPUUseTileAndFuseConvolution(
+    "iree-codegen-llvmgpu-use-tile-and-fuse-convolution",
+    llvm::cl::desc(
+        "enable the tile and fuse pipeline for supported convolutions"),
+    llvm::cl::init(true));
 
 /// Flag to force using WMMA tensorcore operations.
 llvm::cl::opt<bool>
@@ -2036,28 +2043,15 @@ static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
 /// Set the configuration for argmax when ukernels are enabled.
 /// Distribute all parallel dim across different workgroups, and only use single
 /// subgroup per workgroup.
-///
-/// TODO(bjacob): This is fragile, as we can't know yet if this argmax will be
-/// lowered to a ukernel. We need instead a config that works regardless of
-/// ukernels. For now, we use the looser condition that the argmax ukernel is
-/// enabled, a necessary but not sufficient condition for this particular op to
-/// lower to the ukernel. This is good enough for now for a couple of reasons:
-/// 1. Even if a argmax does not actually lower to a ukernel, this config should
-///    still work.
-/// 2. Ukernels are not enabled by default.
 static LogicalResult
 setArgmaxUkernelConfig(IREE::GPU::TargetAttr target,
                        mlir::FunctionOpInterface entryPoint,
                        linalg::GenericOp op) {
   // Checks if UKernels are enabled.
-  if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint)) {
-    if (!hasUkernel(target, "argmax")) {
-      return failure();
-    }
-  }
-
-  if (!target.supportsSubgroupShuffle())
+  IREE::GPU::UKernelSpecAttr ukernelSpec = selectUKernelForArgmax(op);
+  if (!ukernelSpec) {
     return failure();
+  }
 
   if (failed(isArgmaxOp(op)))
     return failure();
@@ -2088,26 +2082,35 @@ setArgmaxUkernelConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
-  // Tile all the parallel dimension to 1.
+  // Tile all the parallel dimension to 1. This is a requirement of the ukernel.
   SmallVector<unsigned> partitionedLoops =
       cast<PartitionableLoopsInterface>(op.getOperation())
           .getPartitionableLoops(kNumMaxParallelDims);
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
 
-  // Currently Argmax Ukernel let's every thread reduce reductionDim/WarpSize
+  // Currently Argmax Ukernel lets every thread reduce reductionDim/WarpSize
   // number of elements, and then it does a single step butterfly warp reduce.
   // Hence it expects workgroupSize to be warpSize(subgroupSize), and
   // reductionTileSize to be size of the reduction dim.
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
   int64_t preferredSubgroupSize = target.getPreferredSubgroupSize();
   reductionTileSizes[reductionDims[0]] = preferredSubgroupSize;
-  TileSizesListType tileSizes;
-  tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
-  tileSizes.emplace_back(std::move(reductionTileSizes)); // Reduction level
   std::array<int64_t, 3> workgroupSize = {preferredSubgroupSize, 1, 1};
+
+  MLIRContext *context = op->getContext();
+  Builder b(context);
+  SmallVector<NamedAttribute, 2> attrs;
+  attrs.emplace_back(StringAttr::get(context, "workgroup"),
+                     b.getI64ArrayAttr(workgroupTileSizes));
+  attrs.emplace_back(StringAttr::get(context, "reduction"),
+                     b.getI64ArrayAttr(reductionTileSizes));
+  attrs.emplace_back(StringAttr::get(context, "ukernel"), ukernelSpec);
+  IREE::GPU::setPromotedOperandList(context, attrs, {0, 1});
+  auto configDict = DictionaryAttr::get(context, attrs);
+  auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
   if (failed(setOpConfigAndEntryPointFnTranslation(
-          entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUDefault,
+          entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUDefault,
           workgroupSize))) {
     return failure();
   }
@@ -2196,11 +2199,18 @@ static bool distributeToSquare(const int64_t oh, const int64_t ow,
 // Convolution Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
-static LogicalResult setConvolutionConfig(IREE::GPU::TargetAttr target,
-                                          linalg::LinalgOp linalgOp,
-                                          const int64_t bestTilingFactor) {
+static LogicalResult setConvolutionConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPointFn,
+    linalg::LinalgOp linalgOp, const int64_t bestTilingFactor) {
   if (!isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp>(linalgOp)) {
     return failure();
+  }
+  if (clGPUUseTileAndFuseConvolution) {
+    if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(target, entryPointFn,
+                                                          linalgOp))) {
+      LDBG("Tile and fuse convolution config");
+      return success();
+    }
   }
   const bool isNCHW = isa<linalg::Conv2DNchwFchwOp>(*linalgOp);
   const bool isNHWC = isa<linalg::Conv2DNhwcHwcfOp>(*linalgOp);
@@ -2284,9 +2294,8 @@ static LogicalResult setConvolutionConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> windowTileSizes(4, 0);
   windowTileSizes[ohIndex] = 1;
   tileSizes.push_back(windowTileSizes);
-  auto funcOp = linalgOp->getParentOfType<mlir::FunctionOpInterface>();
-  return setOpConfigAndEntryPointFnTranslation(funcOp, linalgOp, tileSizes,
-                                               pipeline, workgroupSize);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, linalgOp, tileSizes, pipeline, workgroupSize);
 }
 
 //====---------------------------------------------------------------------===//
@@ -2340,7 +2349,7 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       LDBG("Warp Reduction Config");
       return success();
     }
-    if (succeeded(setConvolutionConfig(target, linalgOp, 16))) {
+    if (succeeded(setConvolutionConfig(target, entryPointFn, linalgOp, 16))) {
       LDBG("Convolution Config");
       return success();
     }

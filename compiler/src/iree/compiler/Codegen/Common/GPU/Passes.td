@@ -107,7 +107,7 @@ def GPUInferMemorySpacePass :
 
 def GPULowerToUKernelsPass :
     Pass<"iree-codegen-gpu-lower-to-ukernels", ""> {
-  let summary = "Lower suitable ops to microkernels.";
+  let summary = "Lower suitable ops to previously-selected microkernels";
   let dependentDialects = [
     "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
@@ -176,6 +176,11 @@ def GPUPromoteMatmulOperandsPass :
     "::mlir::linalg::LinalgDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
+}
+
+def GPUPropagateDispatchSizeBoundsPass :
+    InterfacePass<"iree-codegen-gpu-propagate-dispatch-size-bounds", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to annotate workitem and workgroup IDs with known bounds";
 }
 
 def GPUReduceBankConflictsPass :
