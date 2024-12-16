@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Util/Analysis/IntegerDivisibilityAnalysis.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h"
@@ -188,6 +189,72 @@ struct ConvertUnsignedI64IndexCastProducerToIndex
 };
 
 //===----------------------------------------------------------------------===//
+// Index -> int32 assumption narrowing
+// If we're narrowing `index` values to `i32`, a `util.assume.int` on `index`
+// introduces unnecessary zero-extensions and truncations to/from `index`
+// when introducing assumptions.
+//===----------------------------------------------------------------------===//
+struct RemoveIndexCastForAssumeOfI32
+    : public OpRewritePattern<Util::AssumeIntOp> {
+  RemoveIndexCastForAssumeOfI32(MLIRContext *context, DataFlowSolver &solver)
+      : OpRewritePattern(context), solver(solver) {}
+
+  LogicalResult matchAndRewrite(Util::AssumeIntOp op,
+                                PatternRewriter &rewriter) const override {
+    llvm::SmallBitVector needNarrowing(op.getNumOperands(), false);
+    for (auto [idx, arg] : llvm::enumerate(op.getOperands())) {
+      if (!arg.getType().isIndex())
+        continue;
+      auto castOp = arg.getDefiningOp<arith::IndexCastUIOp>();
+      if (!castOp)
+        continue;
+      Value castIn = castOp.getIn();
+      Type intType = castIn.getType();
+      if (intType.getIntOrFloatBitWidth() > 32)
+        continue;
+
+      needNarrowing[idx] = true;
+    }
+    if (needNarrowing.none())
+      return failure();
+
+    SmallVector<Value> newArgs;
+    newArgs.reserve(op.getNumOperands());
+    for (auto [idx, arg] : llvm::enumerate(op.getOperands())) {
+      if (!needNarrowing[idx]) {
+        newArgs.push_back(arg);
+        continue;
+      }
+      newArgs.push_back(arg.getDefiningOp<arith::IndexCastUIOp>().getIn());
+    }
+    ArrayRef<Attribute> assumptions = op.getAssumptions().getValue();
+    // Ugly hack to avoid recreating the assumptions array.
+    ArrayRef<ArrayAttr> castAssumptions = ArrayRef(
+        static_cast<const ArrayAttr *>(assumptions.data()), assumptions.size());
+    auto newOp = rewriter.create<Util::AssumeIntOp>(op.getLoc(), newArgs,
+                                                    castAssumptions);
+    SmallVector<Value> replacements(newOp.getResults());
+    for (auto [newRes, oldRes] :
+         llvm::zip_equal(replacements, op.getResults())) {
+      if (newRes.getType() != oldRes.getType()) {
+        newRes = rewriter.create<arith::IndexCastUIOp>(
+            op.getLoc(), oldRes.getType(), newRes);
+      }
+      // Preserve assumption state.
+      auto *oldState = solver.lookupState<IntegerValueRangeLattice>(oldRes);
+      if (oldState) {
+        (void)solver.getOrCreateState<IntegerValueRangeLattice>(newRes)->join(
+            *oldState);
+      }
+    }
+    rewriter.replaceOp(op, replacements);
+    return success();
+  }
+
+  DataFlowSolver &solver;
+};
+
+//===----------------------------------------------------------------------===//
 // Divisibility
 //===----------------------------------------------------------------------===//
 
@@ -327,8 +394,10 @@ class OptimizeIntArithmeticPass
     // Populate upstream arith patterns.
     arith::populateIntRangeOptimizationsPatterns(patterns, solver);
 
-    if (narrowToI32)
+    if (narrowToI32) {
       arith::populateIntRangeNarrowingPatterns(patterns, solver, {32});
+      patterns.add<RemoveIndexCastForAssumeOfI32>(ctx, solver);
+    }
 
     // Populate canonicalization patterns.
     auto arithDialect = ctx->getOrLoadDialect<arith::ArithDialect>();
@@ -380,6 +449,7 @@ class OptimizeIntArithmeticPass
 
       if (!changed)
         break;
+      llvm::errs() << op << "\n";
     }
   }
 };
