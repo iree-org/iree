@@ -71,6 +71,13 @@ static LogicalResult validateTuningSpec(NamedSequenceOp op) {
                                "single any_op argument";
   }
 
+  // Validate that the attribute is present.
+  if (!op->hasAttr(kTuningSpecEntrypointAttrName)) {
+    return op.emitError()
+           << "Expected the `iree_codegen.tuning_spec_entrypoint` attribute on "
+              "tuning specs";
+  }
+
   return success();
 }
 
