@@ -32,6 +32,7 @@
 namespace mlir::iree_compiler {
 
 using IREE::Codegen::MaterializeEncodingInfo;
+using IREE::Codegen::TileSwizzle;
 
 //===---------------------------------------------------------------------===//
 // Utility methods
@@ -236,6 +237,10 @@ static FailureOr<Operation *> lowerGenericOpWithEncoding(
   if (IREE::Codegen::isIdentityLayout(outMaterializeEncodingInfo)) {
     return rewriter.notifyMatchFailure(
         genericOp, "MaterializeEncodingInfo failed for output");
+  }
+  if (outMaterializeEncodingInfo.swizzle) {
+    return rewriter.notifyMatchFailure(
+        genericOp, "generic op lowering does not support swizzle yet");
   }
 
   auto convertedResultType =
@@ -561,60 +566,6 @@ struct MaterializeFlowDispatchTensorStoreOp
 // the core conversion utilities.
 //===---------------------------------------------------------------------===//
 
-/// Convert `set_encoding` op to `pack` op.
-struct SetEncodingOpToPackOpConversion
-    : public OpMaterializeEncodingPattern<IREE::Encoding::SetEncodingOp> {
-  using OpMaterializeEncodingPattern<
-      IREE::Encoding::SetEncodingOp>::OpMaterializeEncodingPattern;
-
-  LogicalResult
-  matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
-        getTypeConverter());
-    auto packOp = lowerSetEncodingOpToPackOp(rewriter, encodingOp,
-                                             adaptor.getSource(), *converter,
-                                             this->materializeEncodingValueFn);
-    if (failed(packOp)) {
-      Type targetType =
-          getTypeConverter()->convertType(encodingOp.getResultType());
-      Value result = rewriter.createOrFold<tensor::CastOp>(
-          encodingOp.getLoc(), targetType, adaptor.getSource());
-      rewriter.replaceOp(encodingOp, result);
-      return success();
-    }
-    rewriter.replaceOp(encodingOp, packOp.value());
-    return success();
-  }
-};
-
-/// Convert `unset_encoding` op to `unpack` op.
-struct UnsetEncodingOpToUnPackOpConversion
-    : public OpMaterializeEncodingPattern<IREE::Encoding::UnsetEncodingOp> {
-  using OpMaterializeEncodingPattern<
-      IREE::Encoding::UnsetEncodingOp>::OpMaterializeEncodingPattern;
-
-  LogicalResult
-  matchAndRewrite(IREE::Encoding::UnsetEncodingOp encodingOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
-        this->getTypeConverter());
-    auto unpackedValue = lowerUnsetEncodingToUnpackOp(
-        rewriter, encodingOp, adaptor.getSource(), *converter,
-        this->materializeEncodingValueFn);
-    if (failed(unpackedValue)) {
-      Type targetType =
-          getTypeConverter()->convertType(encodingOp.getResultType());
-      Value result = rewriter.createOrFold<tensor::CastOp>(
-          encodingOp.getLoc(), targetType, adaptor.getSource());
-      rewriter.replaceOp(encodingOp, result);
-      return success();
-    }
-    rewriter.replaceOp(encodingOp, unpackedValue.value());
-    return success();
-  }
-};
-
 /// Generic pattern to convert operation that is in Destination Passing Style.
 template <typename OpTy>
 struct MaterializeDPSOperation : public OpMaterializeEncodingPattern<OpTy> {
@@ -685,6 +636,166 @@ struct MaterializeOptimizationBarrierOp
   }
 };
 
+static SmallVector<ReassociationIndices>
+getReassociationIndices(int outerDims,
+                        const TileSwizzle::ExpandShapeType &expandShape) {
+  SmallVector<ReassociationIndices> result;
+  int expandedIdx = 0;
+  for (int i = 0; i < outerDims; ++i) {
+    result.push_back({expandedIdx++});
+  }
+  for (auto expandShapeDim : expandShape) {
+    result.push_back({});
+    for (int i = 0, e = expandShapeDim.size(); i < e; ++i) {
+      result.back().push_back(expandedIdx++);
+    }
+  }
+  return result;
+}
+
+/// Convert iree_linalg_ext.set_encoding op to pack + tile swizzling ops. We use
+/// expand_shape + linalg.transpose to represent a tile swizzling op.
+struct SetEncodingOpLoweringConversion
+    : public OpMaterializeEncodingPattern<IREE::Encoding::SetEncodingOp> {
+  using OpMaterializeEncodingPattern<
+      IREE::Encoding::SetEncodingOp>::OpMaterializeEncodingPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
+        getTypeConverter());
+    auto packedValue = lowerSetEncodingOpToPackOp(
+        rewriter, encodingOp, adaptor.getSource(), *converter,
+        this->materializeEncodingValueFn);
+    if (failed(packedValue)) {
+      Type targetType =
+          getTypeConverter()->convertType(encodingOp.getResultType());
+      Value result = rewriter.createOrFold<tensor::CastOp>(
+          encodingOp.getLoc(), targetType, adaptor.getSource());
+      rewriter.replaceOp(encodingOp, result);
+      return success();
+    }
+
+    MaterializeEncodingInfo encodingInfo =
+        converter->getEncodingInfo(encodingOp.getResultType());
+    if (!encodingInfo.swizzle) {
+      rewriter.replaceOp(encodingOp, packedValue.value());
+      return success();
+    }
+
+    Location loc = encodingOp.getLoc();
+
+    // Create expand_shape op to tile the innermost two dimensions.
+    int origRank = encodingOp.getSourceType().getRank();
+    SmallVector<int64_t> expandShapeShape(
+        cast<ShapedType>(packedValue->getType())
+            .getShape()
+            .take_front(origRank));
+    expandShapeShape.append(
+        getExpandedTileShape(encodingInfo.swizzle->expandShape));
+    RankedTensorType expandShapeType =
+        encodingOp.getSourceType().clone(expandShapeShape);
+
+    SmallVector<ReassociationIndices> reassociation =
+        getReassociationIndices(origRank, encodingInfo.swizzle->expandShape);
+    auto expandShapeOp = rewriter.create<tensor::ExpandShapeOp>(
+        loc, expandShapeType, packedValue.value(), reassociation);
+
+    SmallVector<int64_t> transposePerm =
+        llvm::to_vector(llvm::seq<int64_t>(0, origRank));
+    for (auto perm : encodingInfo.swizzle->permutation) {
+      transposePerm.push_back(origRank + perm);
+    }
+    SmallVector<OpFoldResult> transposeResultDims =
+        tensor::getMixedSizes(rewriter, loc, expandShapeOp.getResult());
+    applyPermutationToVector(transposeResultDims, transposePerm);
+
+    auto emptyTensor = rewriter.create<tensor::EmptyOp>(
+        loc, transposeResultDims, encodingOp.getSourceType().getElementType());
+    auto transposeOp = rewriter.create<linalg::TransposeOp>(
+        loc, expandShapeOp, emptyTensor, transposePerm);
+    rewriter.replaceOp(encodingOp, transposeOp->getResult(0));
+
+    return success();
+  }
+};
+
+struct UnsetEncodingOpLoweringConversion
+    : public OpMaterializeEncodingPattern<IREE::Encoding::UnsetEncodingOp> {
+  using OpMaterializeEncodingPattern<
+      IREE::Encoding::UnsetEncodingOp>::OpMaterializeEncodingPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::Encoding::UnsetEncodingOp unsetEncodingOp,
+                  OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
+        getTypeConverter());
+
+    MaterializeEncodingInfo encodingInfo =
+        converter->getEncodingInfo(unsetEncodingOp.getSource().getType());
+    if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
+      Type targetType =
+          getTypeConverter()->convertType(unsetEncodingOp.getSourceType());
+      Value result = rewriter.createOrFold<tensor::CastOp>(
+          unsetEncodingOp.getLoc(), targetType, adaptor.getSource());
+      rewriter.replaceOp(unsetEncodingOp, result);
+      return success();
+    }
+
+    Location loc = unsetEncodingOp.getLoc();
+    Value unpackSrc = adaptor.getSource();
+    if (encodingInfo.swizzle) {
+      int targetRank = unsetEncodingOp.getResultType().getRank();
+      auto srcConvertedType =
+          cast<RankedTensorType>(adaptor.getSource().getType());
+      SmallVector<OpFoldResult> emptyShape =
+          tensor::getMixedSizes(rewriter, loc, adaptor.getSource());
+      emptyShape.resize(targetRank);
+      for (auto i : getExpandedTileShape(encodingInfo.swizzle->expandShape)) {
+        emptyShape.push_back(rewriter.getIndexAttr(i));
+      }
+      auto emptyTensor = rewriter.create<tensor::EmptyOp>(
+          loc, emptyShape, unsetEncodingOp.getSourceType().getElementType());
+
+      SmallVector<int64_t> transposePerm =
+          llvm::to_vector(llvm::seq<int64_t>(0, targetRank));
+      for (auto perm : encodingInfo.swizzle->permutation) {
+        transposePerm.push_back(targetRank + perm);
+      }
+      auto invertedTransposePerm = invertPermutationVector(transposePerm);
+      auto transposeOp = rewriter.create<linalg::TransposeOp>(
+          loc, adaptor.getSource(), emptyTensor, invertedTransposePerm);
+
+      SmallVector<ReassociationIndices> reassociation = getReassociationIndices(
+          targetRank, encodingInfo.swizzle->expandShape);
+      SmallVector<int64_t> unpackSrcShape(
+          srcConvertedType.getShape().take_front(targetRank));
+      unpackSrcShape.append(encodingInfo.innerTileSizes.begin(),
+                            encodingInfo.innerTileSizes.end());
+      RankedTensorType unpackSrcType =
+          unsetEncodingOp.getResultType().clone(unpackSrcShape);
+      unpackSrc = rewriter.create<tensor::CollapseShapeOp>(
+          loc, unpackSrcType, transposeOp->getResult(0), reassociation);
+    }
+
+    auto unpackedValue = lowerUnsetEncodingToUnpackOp(
+        rewriter, unsetEncodingOp, unpackSrc, *converter,
+        this->materializeEncodingValueFn);
+    if (failed(unpackedValue)) {
+      Type targetType =
+          getTypeConverter()->convertType(unsetEncodingOp.getResultType());
+      Value result = rewriter.createOrFold<tensor::CastOp>(loc, targetType,
+                                                           adaptor.getSource());
+      rewriter.replaceOp(unsetEncodingOp, result);
+      return success();
+    }
+    rewriter.replaceOp(unsetEncodingOp, unpackedValue.value());
+    return success();
+  }
+};
+
 /// Pattern to convert contraction operations.
 class MaterializeContractionOp
     : public OpInterfaceConversionPattern<linalg::LinalgOp> {
@@ -726,21 +837,7 @@ protected:
 
 } // namespace
 
-void populateMaterializeEncodingIntoPackUnPackPatterns(
-    RewritePatternSet &patterns,
-    MaterializeEncodingTypeConverter &typeConverter,
-    MaterializeEncodingValueFn materializeEncodingValueFn) {
-  MLIRContext *context = patterns.getContext();
-  // TODO(hanchung): Move the generic op pattern to ShapeIndependent category
-  // after we add the support for tile swizzling variants.
-  patterns.insert<MaterializeDPSOperation<linalg::GenericOp>,
-                  MaterializeContractionOp, SetEncodingOpToPackOpConversion,
-                  UnsetEncodingOpToUnPackOpConversion>(
-      context, typeConverter, materializeEncodingValueFn);
-  memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
-}
-
-void populateShapeIndependentMaterializeEncodingPatterns(
+void populateMaterializeEncodingPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
@@ -767,7 +864,10 @@ void populateShapeIndependentMaterializeEncodingPatterns(
       });
 
   patterns.insert<
+      MaterializeContractionOp, SetEncodingOpLoweringConversion,
+      UnsetEncodingOpLoweringConversion,
       MaterializeDPSOperation<linalg::FillOp>,
+      MaterializeDPSOperation<linalg::GenericOp>,
       MaterializeOperation<tensor::EmptyOp>, MaterializeOptimizationBarrierOp,
       MaterializeFlowDispatchTensorLoadOp, MaterializeFlowDispatchTensorStoreOp,
       MaterializeInterfaceBindingEncoding>(context, typeConverter,
