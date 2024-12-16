@@ -186,10 +186,11 @@ static void addBufferizePasses(OpPassManager &funcPassManager) {
 static void tileAndDistributeToWorkgroup(
     OpPassManager &funcPassManager, bool useForall,
     std::optional<ConvertToDestinationPassingStylePassOptions>
-        convertToDpsOptions = ConvertToDestinationPassingStylePassOptions{}) {
+        convertToDpsOptions = ConvertToDestinationPassingStylePassOptions{},
+    ReorderWorkgroupsStrategy strategy = ReorderWorkgroupsStrategy::None) {
   if (useForall) {
     funcPassManager.addPass(
-        createTileAndDistributeToWorkgroupsUsingForallOpPass());
+        createTileAndDistributeToWorkgroupsWithReordering(strategy));
   } else {
     funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass(
         kNumMaxParallelDims,
@@ -775,10 +776,11 @@ static void addVectorBufferizePasses(OpPassManager &funcPassManager) {
 void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
                                         const GPUPipelineOptions &options,
                                         bool usePadToModelSharedMemcpy) {
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true);
-
   ReorderWorkgroupsStrategy reorderStrategy =
       getReorderWorkgroupsStrategy(options.reorderStrategy);
+  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true,
+                               std::nullopt, reorderStrategy);
+
   funcPassManager.addPass(
       createReorderWorkgroups(reorderStrategy, canReorderWorkgroups));
 
