@@ -2099,15 +2099,9 @@ static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
 /// Set the configuration for argmax when ukernels are enabled.
 /// Distribute all parallel dim across different workgroups, and only use single
 /// subgroup per workgroup.
-static LogicalResult
-setArgmaxUkernelConfig(IREE::GPU::TargetAttr target,
-                       mlir::FunctionOpInterface entryPoint,
-                       linalg::GenericOp op) {
-  IREE::GPU::UKernelConfigAttr ukernelConfig = selectUKernel(op);
-  if (!ukernelConfig) {
-    return failure();
-  }
-
+static LogicalResult setArgmaxUkernelConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
+    linalg::GenericOp op, IREE::GPU::UKernelConfigAttr ukernelConfig) {
   SmallVector<unsigned> parallelDims;
   SmallVector<unsigned> reductionDims;
   op.getParallelDims(parallelDims);
@@ -2168,15 +2162,6 @@ setArgmaxUkernelConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
   return success();
-}
-
-/// Make UKernels take the LLVMGPUDefault lowering pipeline.
-static LogicalResult
-setUKernelConfig(mlir::FunctionOpInterface entryPoint,
-                 IREE::Codegen::UKernelOpInterface ukernelOp) {
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPoint->getContext(), CodeGenPipeline::LLVMGPUDefault);
-  return setTranslationInfo(entryPoint, translationInfo);
 }
 
 /// Decides the tiling and distribution parameters for one convolution
@@ -2358,13 +2343,14 @@ static LogicalResult setConvolutionConfig(
 static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
                                    mlir::FunctionOpInterface entryPointFn,
                                    Operation *computeOp) {
+  IREE::GPU::UKernelConfigAttr ukernelConfig = selectUKernel(computeOp);
   LLVM_DEBUG({
     DBGS() << "Selecting root config for: ";
     computeOp->print(llvm::dbgs(), OpPrintingFlags().skipRegions());
     llvm::dbgs() << "\n";
   });
   if (succeeded(setDataTiledMultiMmaLoweringConfig(target, entryPointFn,
-                                                   computeOp))) {
+                                                   computeOp, ukernelConfig))) {
     LDBG("Tile and fuse data tiled multi_mma config");
     return success();
   }
@@ -2410,8 +2396,9 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     if (genericOp && succeeded(setTransposeConfig(entryPointFn, genericOp))) {
       LDBG("Transpose Config");
       return success();
-    } else if (genericOp && succeeded(setArgmaxUkernelConfig(
-                                target, entryPointFn, genericOp))) {
+    } else if (genericOp && ukernelConfig &&
+               succeeded(setArgmaxUkernelConfig(target, entryPointFn, genericOp,
+                                                ukernelConfig))) {
       LDBG("Argmax Ukernel Config");
       return success();
     }
@@ -2434,10 +2421,6 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       .Case<tensor::PackOp>([&](auto packOp) {
         LDBG("Pack Config");
         return setPackConfig(target, entryPointFn, packOp);
-      })
-      .Case<IREE::Codegen::UKernelOpInterface>([&](auto ukernelOp) {
-        LDBG("Ukernel Config");
-        return setUKernelConfig(entryPointFn, ukernelOp);
       })
       .Case<IREE::LinalgExt::CustomOp>([&](auto customOp) {
         LDBG("CustomOp Config");
