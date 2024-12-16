@@ -267,12 +267,11 @@ func.func @not_vmt() {
   return
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 128, 8]{{\]}}>
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulSimt workgroup_size = [32, 1, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 //       CHECK: func.func @not_vmt()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+//  CHECK-SAME:       lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1], reduction = [0, 0, 8], thread = [1, 128, 0], workgroup = [1, 128, 1]}>
 
 // -----
 
