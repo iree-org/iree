@@ -209,7 +209,7 @@ See how IREE is used:
 
 ## :octicons-project-24: Project operations
 
-### :octicons-file-code-24: Developer documentation
+### :octicons-book-24: Developer documentation
 
 Interested in contributing to IREE? Check out our developer documentation:
 
