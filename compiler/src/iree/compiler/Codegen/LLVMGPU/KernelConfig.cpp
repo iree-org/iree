@@ -2047,14 +2047,11 @@ static LogicalResult
 setArgmaxUkernelConfig(IREE::GPU::TargetAttr target,
                        mlir::FunctionOpInterface entryPoint,
                        linalg::GenericOp op) {
-  // Checks if UKernels are enabled.
-  IREE::GPU::UKernelSpecAttr ukernelSpec = selectUKernelForArgmax(op);
-  if (!ukernelSpec) {
+  IREE::GPU::UKernelConfigAttr ukernelConfig = selectUKernel(op);
+  if (!ukernelConfig) {
     return failure();
   }
 
-  if (failed(isArgmaxOp(op)))
-    return failure();
   SmallVector<unsigned> parallelDims;
   SmallVector<unsigned> reductionDims;
   op.getParallelDims(parallelDims);
@@ -2105,7 +2102,7 @@ setArgmaxUkernelConfig(IREE::GPU::TargetAttr target,
                      b.getI64ArrayAttr(workgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "reduction"),
                      b.getI64ArrayAttr(reductionTileSizes));
-  attrs.emplace_back(StringAttr::get(context, "ukernel"), ukernelSpec);
+  attrs.emplace_back(StringAttr::get(context, "ukernel"), ukernelConfig);
   IREE::GPU::setPromotedOperandList(context, attrs, {0, 1});
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);

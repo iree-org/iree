@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-lower-to-ukernels,cse,canonicalize))" %s | FileCheck %s
 
-#config = #iree_gpu.lowering_config<{ukernel = #iree_gpu.ukernel_spec<name = "some_ukernel", def_attrs = {vm.import.module = "rocm"}>}>
+#config = #iree_gpu.lowering_config<{ukernel = #iree_gpu.ukernel_config<name = "some_ukernel", def_attrs = {vm.import.module = "rocm"}>}>
 func.func @argmax_f32i64_with_selected_ukernel(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes {
   hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "all"}>
 } {

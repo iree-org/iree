@@ -43,7 +43,7 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
   if (!loweringConfig) {
     return rewriter.notifyMatchFailure(op, "no lowering_config on this op");
   }
-  IREE::GPU::UKernelSpecAttr ukernelAttr =
+  IREE::GPU::UKernelConfigAttr ukernelAttr =
       IREE::GPU::getUkernelSpec(loweringConfig);
   if (!ukernelAttr) {
     return rewriter.notifyMatchFailure(op, "no ukernel selected for this op");
