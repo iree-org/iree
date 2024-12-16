@@ -866,8 +866,7 @@ getDefaultDistributedLevelTileSizes(Operation *op,
   SmallVector<int64_t> adjustedMaxTileSizes(numLoops, 0);
   SmallVector<int64_t> adjustedVectorSizeHints(numLoops, 1);
   SmallVector<unsigned> partitionableLoops =
-      cast<PartitionableLoopsInterface>(op).getPartitionableLoops(
-          kNumMaxParallelDims);
+      cast<PartitionableLoopsInterface>(op).getPartitionableLoops(std::nullopt);
   for (auto i : partitionableLoops) {
     adjustedMinTileSizes[i] =
         config.minTileSizes.empty() ? 1 : config.minTileSizes[i];

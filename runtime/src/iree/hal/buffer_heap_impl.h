@@ -31,7 +31,6 @@ typedef struct iree_hal_heap_allocator_statistics_t {
 // |data_allocator| and |host_allocator| are the same the buffer will be created
 // as a flat slab. |out_buffer| must be released by the caller.
 iree_status_t iree_hal_heap_buffer_create(
-    iree_hal_allocator_t* allocator,
     iree_hal_heap_allocator_statistics_t* statistics,
     const iree_hal_buffer_params_t* params, iree_device_size_t allocation_size,
     iree_allocator_t data_allocator, iree_allocator_t host_allocator,

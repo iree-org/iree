@@ -29,7 +29,7 @@ jobs:
           - name: cpu_llvm_sync
             config-file: onnx_ops_cpu_llvm_sync.json
             numprocesses: auto
-            runs-on: ubuntu-20.04
+            runs-on: ubuntu-24.04
 
           # AMD GPU
           - name: amdgpu_rocm_rdna3
@@ -130,7 +130,7 @@ jobs:
         include:
           # CPU
           - name: cpu_llvm_task
-            runs-on: ubuntu-20.04
+            runs-on: ubuntu-24.04
 
           # TODO(scotttodd): test other backends (parameterize the test suite)
     env:

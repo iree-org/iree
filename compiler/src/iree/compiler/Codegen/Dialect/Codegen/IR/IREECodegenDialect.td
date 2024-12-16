@@ -36,8 +36,23 @@ def IREECodegen_Dialect : Dialect {
   let extraClassDeclaration = [{
     void initializeCodegenAttrs();
 
+    /// Returns the loaded module for the `libraryPath` transform dialect
+    /// library MLIR input. If the module has already been loaded in the
+    /// past, returns the memoized module without parsing the file again.
+    /// This function is thead-safe.
     FailureOr<::mlir::ModuleOp>
-    getOrLoadTransformLibraryModule(std::string libraryPath);
+    getOrLoadTransformLibraryModule(StringRef libraryPath);
+
+    /// Returns the parsed module for the `libraryPath` transform dialect
+    /// library MLIR input `libraryMLIRSource`. If the module has already
+    /// been parsed in the past, returns the memoized module without parsing
+    /// the source again. Note that this function does not access
+    /// `libraryPath` and only uses it as the key associated with the
+    /// matching parsed module.
+    /// This function is thead-safe.
+    FailureOr<::mlir::ModuleOp>
+    getOrParseTransformLibraryModule(StringRef libraryPath,
+                                     StringRef libraryMLIRSource);
 
     private:
 

@@ -755,8 +755,8 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
   // Create the device memory allocator that will service all buffer
   // allocation requests.
   iree_status_t status = iree_hal_vulkan_native_allocator_create(
-      options, instance, physical_device, logical_device,
-      &device->device_allocator);
+      options, (iree_hal_device_t*)device, instance, physical_device,
+      logical_device, &device->device_allocator);
 
   // Create command pools for each queue family. If we don't have a transfer
   // queue then we'll ignore that one and just use the dispatch pool.
@@ -1540,7 +1540,7 @@ static iree_status_t iree_hal_vulkan_device_create_command_buffer(
   if (binding_capacity > 0) {
     return iree_hal_deferred_command_buffer_create(
         iree_hal_device_allocator(base_device), mode, command_categories,
-        binding_capacity, &device->block_pool,
+        queue_affinity, binding_capacity, &device->block_pool,
         iree_hal_device_host_allocator(base_device), out_command_buffer);
   }
 

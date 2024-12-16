@@ -37,57 +37,51 @@ bool isEntryPoint(mlir::FunctionOpInterface func);
 std::optional<IREE::HAL::ExecutableExportOp>
 getEntryPoint(mlir::FunctionOpInterface funcOp);
 
-/// Returns the StringAttr with the name `stringAttr` in the `targetAttr`, if
-/// found.
-std::optional<StringAttr>
-getConfigStringAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
-                    StringRef stringAttr);
+/// Returns the StringAttr with the name `stringAttr` in the `srcAttr`, if
+/// found. The `srcAttr` can be either IREE::HAL::ExecutableTargetAttr or
+/// DictionaryAttr.
+std::optional<StringAttr> getConfigStringAttr(Attribute srcAttr,
+                                              StringRef stringAttr);
 
-/// Returns the IntegerAttr with the name `integerAttr` in the `targetAttr`, if
+/// Returns the IntegerAttr with the name `integerAttr` in the `srcAttr`, if
 /// found.
-std::optional<IntegerAttr>
-getConfigIntegerAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
-                     StringRef integerAttr);
+std::optional<IntegerAttr> getConfigIntegerAttr(Attribute srcAttr,
+                                                StringRef integerAttr);
 
-/// Returns the BoolAttr with the name `integerAttr` in the `targetAttr`, if
+/// Returns the BoolAttr with the name `boolAttr` in the `srcAttr`, if
 /// found.
-std::optional<BoolAttr>
-getConfigBoolAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
-                  StringRef integerAttr);
+std::optional<BoolAttr> getConfigBoolAttr(Attribute srcAttr,
+                                          StringRef boolAttr);
 
-/// Returns the LLVM Target triple associated with the `targetAttr`, if set.
-std::optional<llvm::Triple>
-getTargetTriple(IREE::HAL::ExecutableTargetAttr targetAttr);
+/// Returns the LLVM Target triple associated with the `attr`, if set.
+std::optional<llvm::Triple> getTargetTriple(Attribute attr);
 
 /// Returns the target architecture name, in IREE_ARCH convention, from the
 /// given target triple.
 const char *getIreeArchNameForTargetTriple(llvm::Triple triple);
 
 /// Methods to get target information.
+bool isLLVMCPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
-
-/// Methods to get target information.
 bool isROCMBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 // Returns true if the ukernel with given `ukernelName` is enabled.
 // If `ukernelName` is empty (the default), returns true if any ukernel
 // is enabled at all.
-bool hasUkernel(IREE::HAL::ExecutableTargetAttr targetAttr,
-                StringRef ukernelName = "");
+bool hasUkernel(Attribute attr, StringRef ukernelName = "");
 
-/// Returns the CPU target features associated with the `targetAttr`, if set.
-std::optional<StringRef>
-getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr);
+/// Returns the CPU target features associated with the `attr`, if found.
+std::optional<StringRef> getCpuFeatures(Attribute attr);
 
-/// Returns true if `targetAttr` has `feature` in its CPU features.
-bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature);
+/// Returns true if `attr` has `feature` in its CPU features.
+bool hasFeature(Attribute attr, StringRef feature);
 
-// Architecture identification.
-bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr);
-bool isX86_64(IREE::HAL::ExecutableTargetAttr targetAttr);
-bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr);
-bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr);
-bool isRISCV32(IREE::HAL::ExecutableTargetAttr targetAttr);
+/// Architecture identification.
+bool isX86(Attribute attr);
+bool isX86_64(Attribute attr);
+bool isAArch64(Attribute attr);
+bool isRISCV(Attribute attr);
+bool isRISCV32(Attribute attr);
 
 /// Checks if a tensor value is generated from a read-only object, like
 /// and interface binding with read-only attribute or from an `arith.constant`

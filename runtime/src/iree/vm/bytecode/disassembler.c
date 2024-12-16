@@ -2111,6 +2111,16 @@ iree_status_t iree_vm_bytecode_disassemble_op(
       EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);
       break;
     }
+    DISASM_OP(EXT_F32, CastSI64F32) {
+      uint16_t operand_reg = VM_ParseOperandRegI64("operand");
+      uint16_t result_reg = VM_ParseResultRegF32("result");
+      EMIT_F32_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.cast.si64.f32 "));
+      EMIT_I64_REG_NAME(operand_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);
+      break;
+    }
     DISASM_OP(EXT_F32, CastUI32F32) {
       uint16_t operand_reg = VM_ParseOperandRegI32("operand");
       uint16_t result_reg = VM_ParseResultRegF32("result");

@@ -19,6 +19,7 @@ extern "C" {
 #endif  // __cplusplus
 
 typedef struct iree_hal_allocator_t iree_hal_allocator_t;
+typedef struct iree_hal_device_t iree_hal_device_t;
 
 //===----------------------------------------------------------------------===//
 // Types and Enums
@@ -458,6 +459,65 @@ enum iree_hal_mapping_mode_bits_t {
 typedef uint32_t iree_hal_mapping_mode_t;
 
 //===----------------------------------------------------------------------===//
+// iree_hal_buffer_placement_t
+//===----------------------------------------------------------------------===//
+
+// Flags describing the placement of a buffer on a device and its allocation
+// semantics. This information is only valid on allocated buffers and not
+// wrappers that may hold references to them.
+typedef uint32_t iree_hal_buffer_placement_flags_t;
+enum iree_hal_buffer_placement_flag_bits_t {
+  IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE = 0u,
+  // Buffer was allocated with an asynchronous allocation API such as
+  // iree_hal_device_queue_alloca and/or can be deallocated with an asynchronous
+  // deallocation API such as iree_hal_device_queue_dealloca.
+  IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS = 1u << 0,
+  // TODO(benvanik): flags for discrete/external to allow for quick export
+  // checks.
+};
+
+// Describes the origin of an allocated buffer.
+// This is used internally to route buffers back to pools and can be used by
+// hosting layers to route deallocations to appropriate devices/queues.
+// This information is generally only valid for allocated buffers (the result of
+// an iree_hal_buffer_allocated_buffer query).
+typedef struct iree_hal_buffer_placement_t {
+  // The device the buffer was allocated from. Unretained.
+  // Only valid for allocated buffers and not any intermediates (subspans, etc).
+  // May be NULL if the buffer is not associated with any particular device such
+  // as a free-floating heap-allocated buffer on the host.
+  iree_hal_device_t* device;
+  // Queues on the device to which the buffer is available. Depending on the
+  // device this may indicate which queues have exclusive access to the buffer
+  // or which queues have optimal access. This may be broader than the original
+  // request if the buffer is able to be accessed by other queues without
+  // penalty. Usage of the buffer for queue read/write or asynchronous
+  // deallocation via iree_hal_device_queue_dealloca is only legal with a queue
+  // affinity that is a subset of this affinity set.
+  iree_hal_queue_affinity_t queue_affinity;
+  // Describes the placement behavior of a buffer on a device and its allocation
+  // semantics.
+  iree_hal_buffer_placement_flags_t flags;
+  uint32_t reserved;
+} iree_hal_buffer_placement_t;
+
+// Returns a placement indicating that the buffer has no direct device it is
+// associated with. Commonly used for free-floating buffer handles such as heap
+// wrapped or allocated buffers that come from outside of the HAL.
+static inline iree_hal_buffer_placement_t iree_hal_buffer_placement_undefined(
+    void) {
+  iree_hal_buffer_placement_t placement = {0};
+  return placement;
+}
+
+// Returns true if the |placement| is undefined and the buffer has no direct
+// device it is associated with.
+static inline bool iree_hal_buffer_placement_is_undefined(
+    const iree_hal_buffer_placement_t placement) {
+  return placement.device == NULL;
+}
+
+//===----------------------------------------------------------------------===//
 // iree_hal_buffer_params_t
 //===----------------------------------------------------------------------===//
 
@@ -699,7 +759,8 @@ IREE_API_EXPORT iree_hal_buffer_overlap_t iree_hal_buffer_test_overlap(
 // |out_buffer| must be released by the caller.
 IREE_API_EXPORT iree_status_t iree_hal_buffer_subspan(
     iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
-    iree_device_size_t byte_length, iree_hal_buffer_t** out_buffer);
+    iree_device_size_t byte_length, iree_allocator_t host_allocator,
+    iree_hal_buffer_t** out_buffer);
 
 // Retains the given |buffer| for the caller.
 IREE_API_EXPORT void iree_hal_buffer_retain(iree_hal_buffer_t* buffer);
@@ -719,6 +780,20 @@ IREE_API_EXPORT iree_hal_buffer_t* iree_hal_buffer_allocated_buffer(
 // size for the resource based on device restrictions.
 IREE_API_EXPORT iree_device_size_t
 iree_hal_buffer_allocation_size(const iree_hal_buffer_t* buffer);
+
+// Returns the original placement of the allocated buffer.
+// The placement applies to the entire underlying allocated buffer and not the
+// potential subspan of the |buffer| handle. Many buffer handles may be backed
+// by the same allocation. It's possible for placements to change over the
+// lifetime of a buffer as it is moved across devices but the origin will always
+// accept actions on the buffer such as deallocation.
+//
+// Note that not all buffers have a placement: e.g. host buffers allocated as
+// free-floating objects will have no device assigned.
+// iree_hal_buffer_placement_is_undefined can be used to check for this case
+// explicitly.
+IREE_API_EXPORT iree_hal_buffer_placement_t
+iree_hal_buffer_allocation_placement(const iree_hal_buffer_t* buffer);
 
 // Returns the offset in bytes of the buffer within its allocated_buffer.
 IREE_API_EXPORT iree_device_size_t
@@ -916,61 +991,13 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_mapping_subspan(
 // iree_hal_subspan_buffer_t
 //===----------------------------------------------------------------------===//
 
-// Initializes in-place a subspan buffer stored in |out_buffer|.
-// The reference count of the buffer will be set to 1.
-//
-// This is intended to be used for provably on-stack transient subspans or
-// buffer wrapping where ownership is controlled externally. If the lifetime of
-// the subspan may extend beyond the lifetime of the |out_buffer| storage then
-// iree_hal_subspan_buffer_create must be used instead.
-//
-// iree_hal_subspan_buffer_deinitialize must be used to deinitialize the buffer.
-IREE_API_EXPORT void iree_hal_subspan_buffer_initialize(
-    iree_hal_buffer_t* allocated_buffer, iree_device_size_t byte_offset,
-    iree_device_size_t byte_length, iree_hal_allocator_t* device_allocator,
-    iree_allocator_t host_allocator, iree_hal_buffer_t* out_buffer);
-
-// Deinitializes a subspan buffer that was initialized with
-// iree_hal_subspan_buffer_initialize.
-IREE_API_EXPORT void iree_hal_subspan_buffer_deinitialize(
-    iree_hal_buffer_t* buffer);
-
 // Creates a buffer referencing a subspan of some base allocation.
 // Optionally |device_allocator| can be provided if this subspan references
 // managed buffers that need deallocation callbacks.
 IREE_API_EXPORT iree_status_t iree_hal_subspan_buffer_create(
     iree_hal_buffer_t* allocated_buffer, iree_device_size_t byte_offset,
-    iree_device_size_t byte_length, iree_hal_allocator_t* device_allocator,
-    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
-
-//===----------------------------------------------------------------------===//
-// iree_hal_deferred_buffer_t
-//===----------------------------------------------------------------------===//
-
-// Creates a buffer with the given properties that has no backing storage.
-// The buffer can be passed around/retained/etc with just the reservation and
-// committed/decommitted on demand. All usage of the buffer beyond metadata
-// queries requires that it be committed.
-//
-// WARNING: commit/decommit are thread-compatible. Callers must ensure that no
-// threads try to use the buffer contents before a commit has completed and that
-// no threads still have access to the buffer contents prior to a decommit.
-IREE_API_EXPORT iree_status_t iree_hal_deferred_buffer_create_reserved(
-    iree_hal_allocator_t* device_allocator, iree_device_size_t allocation_size,
-    iree_device_size_t byte_offset, iree_device_size_t byte_length,
-    iree_hal_buffer_params_t params, iree_allocator_t host_allocator,
+    iree_device_size_t byte_length, iree_allocator_t host_allocator,
     iree_hal_buffer_t** out_buffer);
-
-// Commits the backing storage of the |buffer| from its device allocator.
-// Ignored if the buffer is already committed.
-IREE_API_EXPORT iree_status_t
-iree_hal_deferred_buffer_commit(iree_hal_buffer_t* buffer);
-
-// Decommits the backing storage of the |buffer| and returns it to a
-// metadata-only state. No other threads must still have access to the buffer
-// contents.
-IREE_API_EXPORT iree_status_t
-iree_hal_deferred_buffer_decommit(iree_hal_buffer_t* buffer);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_heap_buffer_t
@@ -985,11 +1012,11 @@ iree_hal_deferred_buffer_decommit(iree_hal_buffer_t* buffer);
 // |out_buffer| must be released by the caller. |data| must be kept live for the
 // lifetime of the wrapping buffer.
 iree_status_t iree_hal_heap_buffer_wrap(
-    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_byte_span_t data, iree_hal_buffer_release_callback_t release_callback,
-    iree_hal_buffer_t** out_buffer);
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_buffer_t implementation details
@@ -1024,41 +1051,81 @@ static_assert(offsetof(iree_hal_buffer_vtable_t, recycle) == 0,
               "iree_hal_resource_vtable_t expects destroy at offset 0, we want "
               "to recycle instead");
 
+// NOTE: this shared data structure may be a mistake. If vtables were free we
+// would not provide this and rely on each buffer implementation to implement
+// all of the accessor methods. Indirection through vtables costs, though, so
+// we hoist the common information that every buffer implementation needs here.
+// Since this adds a fixed cost to every buffer on every implementation we
+// should keep the structure as small as reasonable.
+//
+// NOTE: the internals of this structure are an implementation detail and may
+// change at any time. If there's no API accessor for a field then assume it
+// should not be used except by HAL buffer implementations.
 struct iree_hal_buffer_t {
-  // Frequently accessed:
   iree_hal_resource_t resource;  // must be at 0
+  // Underlying buffer allocation. If this points back at this buffer structure
+  // then the buffer is an allocated buffer itself and otherwise the underlying
+  // allocation is referenced and retained.
   iree_hal_buffer_t* allocated_buffer;
+  // Total size of the buffer allocation in its underlying storage.
+  // This is captured on each buffer including non-allocated buffers so that
+  // internal pooling/suballocation costs can be represented.
   iree_device_size_t allocation_size;
+  // Offset into the underlying allocated buffer this buffer range starts at.
   iree_device_size_t byte_offset;
+  // Length of the buffer range in the underlying allocated buffer. This is the
+  // logical length exposed to users.
   iree_device_size_t byte_length;
 
-  // Rarely accessed:
-  iree_allocator_t host_allocator;
-  iree_hal_allocator_t* device_allocator;
+  // Placement of the buffer on a device/queue set. Captured only for allocated
+  // buffers.
+  iree_hal_buffer_placement_t placement;
+
+  // Hacky back reference to an allocator that should be notified when the
+  // buffer is released. This is a hack to support interception of buffers by
+  // pooling layers and is slated for removal.
+  //
+  // TODO(#19159): remove iree_hal_allocator_deallocate_buffer when pooling no
+  // longer requires the pooling_allocator on iree_hal_buffer_t.
+  iree_hal_allocator_t* pooling_allocator;
+
   // TODO(benvanik): bit pack these; could be ~4 bytes vs 12.
   iree_hal_memory_type_t memory_type;
   iree_hal_buffer_usage_t allowed_usage;
   iree_hal_memory_access_t allowed_access;
 
-  // Implementation-defined flags.
-  uint16_t flags;
+  // Unused padding that more flags or identifiers can be placed in, such as
+  // which implementation pool owns the buffer.
+  uint16_t reserved;
+
+  // Implementation-defined flags used for additional bookkeeping or routing
+  // by the buffer implementation.
+  uint32_t flags;
 };
 
 IREE_API_EXPORT void iree_hal_buffer_initialize(
-    iree_allocator_t host_allocator, iree_hal_allocator_t* device_allocator,
-    iree_hal_buffer_t* allocated_buffer, iree_device_size_t allocation_size,
-    iree_device_size_t byte_offset, iree_device_size_t byte_length,
-    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_placement_t placement, iree_hal_buffer_t* allocated_buffer,
+    iree_device_size_t allocation_size, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage,
     const iree_hal_buffer_vtable_t* vtable, iree_hal_buffer_t* buffer);
 
-// Recycles |buffer| by returning it to its allocator (or destroying it).
+// TODO(#19159): remove iree_hal_allocator_deallocate_buffer when pooling no
+// longer requires the pooling_allocator on iree_hal_buffer_t. When buffers can
+// use their normal destroy callback to return themselves to pools then we won't
+// need this extra recycle thunk.
+//
+// Recycles |buffer| by releasing it to the origin it is associated with via the
+// release callback (or destroying it, if none was specified).
 // The |buffer| pointer may remain valid if it is returned to a pool but callers
-// must assume its contents are undefined.
+// must assume its contents are undefined as if it had been freed.
 IREE_API_EXPORT void iree_hal_buffer_recycle(iree_hal_buffer_t* buffer);
 
 // Destroys |buffer| and frees its memory.
-// Implementations should use iree_hal_buffer_recycle in their vtables.
+// Implementations must use iree_hal_buffer_recycle in their vtables for the
+// common iree_hal_resource_t destroy callback as this is only to be used by
+// release callbacks that want to free the buffer.
 IREE_API_EXPORT void iree_hal_buffer_destroy(iree_hal_buffer_t* buffer);
 
 #ifdef __cplusplus
