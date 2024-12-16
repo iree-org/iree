@@ -857,7 +857,7 @@ struct DistributeTranspose final : OpDistributionPattern<vector::TransposeOp> {
   }
 };
 
-struct DistributeBatchOuterToLayoutConversions final
+struct DistributeInThreadToLayoutConversions final
     : OpDistributionPattern<IREE::VectorExt::ToLayoutOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
@@ -874,7 +874,7 @@ struct DistributeBatchOuterToLayoutConversions final
       return rewriter.notifyMatchFailure(toLayoutOp, "non-nested layout");
     }
 
-    // Check if everything other than batch and outer tile matches.
+    // Check if everything other out-of-thread tiles matches.
     if (layoutA.getSubgroupTile() != layoutB.getSubgroupTile()) {
       return failure();
     }
@@ -885,9 +885,6 @@ struct DistributeBatchOuterToLayoutConversions final
       return failure();
     }
     if (layoutA.getThreadStrides() != layoutB.getThreadStrides()) {
-      return failure();
-    }
-    if (layoutA.getElementTile() != layoutB.getElementTile()) {
       return failure();
     }
 
@@ -906,17 +903,19 @@ struct DistributeBatchOuterToLayoutConversions final
     SmallVector<int64_t> shapeB = layoutB.getDistributedShape();
     int64_t rank = layoutA.getRank();
 
-    // Interleave batch and outer dims by transposing.
+    // Interleave in-thread elements by transposing.
 
     // Build a permutation for interleaving.
     auto interleavePermutation =
         llvm::to_vector(llvm::seq<int64_t>(shapeA.size()));
     for (int i = 0; i < rank; ++i) {
       // Batch tile : [0...rank]
-      // OuterTile : [rank+1...2*rank]
-      // Interleave : [batch0, outer0, batch1, outer1,...]
-      interleavePermutation[2 * i] = i;
-      interleavePermutation[2 * i + 1] = i + rank;
+      // OuterTile :  [rank+1...2*rank]
+      // ElementTile :[2*rank+1...3*rank]
+      // Interleave : [batch0, outer0, element0, batch1, outer1, element1, ...]
+      interleavePermutation[3 * i] = i;
+      interleavePermutation[3 * i + 1] = i + rank;
+      interleavePermutation[3 * i + 2] = i + 2 * rank;
     }
 
     auto interleaved = rewriter.create<vector::TransposeOp>(
@@ -1153,7 +1152,7 @@ void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
                                          maxBitsPerShuffle);
   patterns.add<DistributeContract>(patterns.getContext(), subgroupSize,
                                    maxBitsPerShuffle);
-  patterns.add<DistributeBatchOuterToLayoutConversions>(patterns.getContext());
+  patterns.add<DistributeInThreadToLayoutConversions>(patterns.getContext());
   patterns.add<DistributeStep>(patterns.getContext(), threadId, subgroupSize);
 }
 
