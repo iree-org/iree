@@ -1,6 +1,5 @@
 ---
 icon: octicons/file-symlink-file-16
-status: new
 ---
 
 # Parameters

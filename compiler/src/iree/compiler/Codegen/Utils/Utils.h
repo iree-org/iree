@@ -61,9 +61,8 @@ std::optional<llvm::Triple> getTargetTriple(Attribute attr);
 const char *getIreeArchNameForTargetTriple(llvm::Triple triple);
 
 /// Methods to get target information.
+bool isLLVMCPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
-
-/// Methods to get target information.
 bool isROCMBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 // Returns true if the ukernel with given `ukernelName` is enabled.

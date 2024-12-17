@@ -145,4 +145,9 @@ std::optional<SmallVector<int64_t>> getPaddingList(LoweringConfigAttr config) {
   return getIntegerVector(array);
 }
 
+IREE::GPU::UKernelConfigAttr
+getUkernelSpec(IREE::GPU::LoweringConfigAttr config) {
+  return config.getAttributes().getAs<IREE::GPU::UKernelConfigAttr>("ukernel");
+}
+
 } // namespace mlir::iree_compiler::IREE::GPU

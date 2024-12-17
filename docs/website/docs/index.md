@@ -11,7 +11,7 @@ lowers Machine Learning (ML) models to a unified IR that scales up to meet the
 needs of the datacenter and down to satisfy the constraints and special
 considerations of mobile and edge deployments.
 
-## Key features
+## :octicons-sparkles-fill-16: Key features
 
 <div class="grid cards" markdown>
 
@@ -61,7 +61,7 @@ considerations of mobile and edge deployments.
 
 </div>
 
-## Support matrix
+## :material-table-star: Support matrix
 
 IREE supports importing from a variety of ML frameworks:
 
@@ -97,7 +97,7 @@ Support for hardware accelerators and APIs is also included:
 - [ ] AMD AIE (experimental)
 - [ ] WebGPU (experimental)
 
-## Project architecture
+## :octicons-telescope-fill-24: Project architecture
 
 IREE adopts a _holistic_ approach towards ML model compilation: the IR produced
 contains both the _scheduling_ logic, required to communicate data dependencies
@@ -109,7 +109,7 @@ like [SPIR-V](https://www.khronos.org/spir/).
 ![IREE Architecture](./assets/images/iree_architecture_dark.svg#gh-dark-mode-only)
 ![IREE Architecture](./assets/images/iree_architecture.svg#gh-light-mode-only)
 
-## Workflow overview
+## :octicons-book-16: Workflow overview
 
 Using IREE involves the following general steps:
 
@@ -132,7 +132,7 @@ Using IREE involves the following general steps:
 
     Use IREE's runtime components to execute your compiled model
 
-### Importing models from ML frameworks
+### :octicons-package-dependents-16: Importing models from ML frameworks
 
 IREE supports importing models from a growing list of
 [ML frameworks](./guides/ml-frameworks/index.md) and model formats:
@@ -143,7 +143,7 @@ IREE supports importing models from a growing list of
 * [:simple-tensorflow: TensorFlow](./guides/ml-frameworks/tensorflow.md) and
   [:simple-tensorflow: TensorFlow Lite](./guides/ml-frameworks/tflite.md)
 
-### Selecting deployment configurations
+### :octicons-rocket-24: Selecting deployment configurations
 
 IREE provides a flexible set of tools for various
 [deployment scenarios](./guides/deployment-configurations/index.md). Fully
@@ -159,7 +159,7 @@ runtime entirely or interface with custom accelerators.
 IREE supports the full set of these configurations using the same underlying
 technology.
 
-### Compiling models
+### :octicons-file-code-24: Compiling models
 
 Model compilation is performed ahead-of-time on a _host_ machine for any
 combination of _targets_. The compilation process converts from layers and
@@ -172,13 +172,27 @@ SPIR-V kernels and Vulkan API calls. For
 [CPU execution](./guides/deployment-configurations/cpu.md), native code with
 static or dynamic linkage and the associated function calls are generated.
 
-### Running models
+### :octicons-terminal-24: Running models
 
 IREE offers a low level C API, as well as several sets of
 [API bindings](./reference/bindings/index.md) for compiling and running programs
 using various languages.
 
-## Communication channels
+## :octicons-people-24: Community
+
+IREE is a [sandbox-stage project](https://lfaidata.foundation/projects/iree/)
+of [LF AI & Data Foundation](https://lfaidata.foundation/) made possible thanks
+to a growing community of developers.
+
+See how IREE is used:
+
+[:octicons-arrow-right-24: Community](./community/index.md)
+
+### :material-newspaper: Project news
+
+* 2024-05-23: [IREE joins the LF AI & Data Foundation as a sandbox-stage project](https://lfaidata.foundation/blog/2024/05/23/announcing-iree-a-new-initiative-for-machine-learning-deployment/)
+
+### :octicons-broadcast-24: Communication channels
 
 * :fontawesome-brands-github:
   [GitHub issues](https://github.com/iree-org/iree/issues): Feature requests,
@@ -193,10 +207,19 @@ using various languages.
 * :fontawesome-solid-envelope: (Legacy) [iree-discuss email list](https://groups.google.com/forum/#!forum/iree-discuss):
   Announcements, general and low-priority discussion
 
-## Roadmap
+## :octicons-project-24: Project operations
 
-IREE is in the early stages of development and is not yet ready for broad
-adoption. We use both
+### :octicons-book-24: Developer documentation
+
+Interested in contributing to IREE? Check out our developer documentation:
+
+[:octicons-arrow-right-24: Developers](./developers/index.md)
+
+### :octicons-project-roadmap-24: Roadmap
+
+IREE uses
+[GitHub Issues](https://github.com/iree-org/iree/issues) for most work
+planning. Some subprojects use both
 [GitHub Projects](https://github.com/iree-org/iree/projects) and
 [GitHub Milestones](https://github.com/iree-org/iree/milestones) to track
 progress.
