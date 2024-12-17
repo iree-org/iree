@@ -155,6 +155,8 @@ struct ConvertToNVVMPass final
       vector::populateVectorInsertExtractStridedSliceTransforms(llvmPatterns);
       vector::populateVectorStepLoweringPatterns(llvmPatterns);
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
+      vector::populateVectorTransferLoweringPatterns(llvmPatterns,
+                                                     /*maxTransferRank=*/1);
       populateGpuToNVVMConversionPatterns(converter, llvmPatterns);
       populateNVGPUToNVVMConversionPatterns(converter, llvmPatterns);
       populateGpuWMMAToNVVMConversionPatterns(converter, llvmPatterns);

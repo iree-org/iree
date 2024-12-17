@@ -226,6 +226,8 @@ struct ConvertToROCDLPass final
       vector::populateVectorInsertExtractStridedSliceTransforms(llvmPatterns);
       vector::populateVectorStepLoweringPatterns(llvmPatterns);
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
+      vector::populateVectorTransferLoweringPatterns(llvmPatterns,
+                                                     /*maxTransferRank=*/1);
       populateGpuToROCDLConversionPatterns(converter, llvmPatterns,
                                            gpu::amd::Runtime::Unknown);
       LLVMConversionTarget target(getContext());
