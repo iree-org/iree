@@ -113,6 +113,10 @@ def EncodingAttr :
 
     /// Clones an encoding with a new bcast_map
     EncodingAttr clone(AffineMap bcastMap);
+
+    /// Clones an encoding with a new layout list and drops other optional
+    /// parameters (because they are resolved).
+    EncodingAttr cloneWithLayouts(SmallVector<Attribute> layouts);
   }];
 
   let genVerifyDecl = 0;
