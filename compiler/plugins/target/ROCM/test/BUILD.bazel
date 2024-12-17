@@ -17,6 +17,7 @@ iree_lit_test_suite(
     srcs = [
         "config_ukernel_argmax_gfx908.mlir",
         "config_ukernel_argmax_gfx942.mlir",
+        "config_ukernel_multi_mma_gfx942.mlir",
         "default_tuning_specs_amdgpu.mlir",
         "lowering_strategy_from_tuning_spec.mlir",
         "ukernel_pipeline_transform.mlir",

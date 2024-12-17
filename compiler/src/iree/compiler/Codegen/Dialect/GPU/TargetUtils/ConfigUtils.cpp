@@ -33,10 +33,9 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
 
-LogicalResult
-setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
-                                   mlir::FunctionOpInterface entryPoint,
-                                   Operation *op) {
+LogicalResult setDataTiledMultiMmaLoweringConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
+    Operation *op, IREE::GPU::UKernelConfigAttr ukernelConfig) {
   auto multiMmaOp = dyn_cast<IREE::GPU::MultiMmaOp>(op);
   if (!multiMmaOp) {
     return failure();
@@ -70,7 +69,7 @@ setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> reductionTileSizes(iterationRank, 0);
   for (int64_t kDim : contractionDims.k) {
     workgroupTileSizes[kDim] = 0;
-    reductionTileSizes[kDim] = 1;
+    reductionTileSizes[kDim] = ukernelConfig ? 0 : 1;
   }
 
   // Set tile sizes.
@@ -81,8 +80,16 @@ setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
                      b.getI64ArrayAttr(workgroupTileSizes));
   attrs.emplace_back(b.getStringAttr("reduction"),
                      b.getI64ArrayAttr(reductionTileSizes));
-  // Promote operands to use shared memory for LHS and RHS.
-  GPU::setPromotedOperandList(context, attrs, {0, 1});
+  if (ukernelConfig) {
+    attrs.emplace_back(b.getStringAttr("ukernel"), ukernelConfig);
+  } else {
+    // Promote operands to use shared memory for LHS and RHS.
+    // Don't do that with ukernels: their untiled reduction dimension is too
+    // large to fit in shared memory, so they just want global memory and they
+    // will take care of moving small chunks at a time into a shared memory
+    // operand that will be created together with the ukernel op.
+    GPU::setPromotedOperandList(context, attrs, {0, 1});
+  }
   auto configDict = b.getDictionaryAttr(attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 

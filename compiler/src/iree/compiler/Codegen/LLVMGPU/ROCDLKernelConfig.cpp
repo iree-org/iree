@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLKernelConfig.h"
 
+#include "compiler/src/iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUSelectUKernels.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
@@ -272,8 +273,9 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
 static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
                                    mlir::FunctionOpInterface entryPointFn,
                                    Operation *computeOp) {
+  IREE::GPU::UKernelConfigAttr ukernelConfig = selectUKernel(computeOp);
   if (succeeded(setDataTiledMultiMmaLoweringConfig(target, entryPointFn,
-                                                   computeOp))) {
+                                                   computeOp, ukernelConfig))) {
     return success();
   }
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {

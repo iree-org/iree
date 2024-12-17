@@ -46,8 +46,8 @@ argmax_types = [
 [iree_amdgpu_bitcode_library(
     name = "iree_uk_amdgpu_argmax_%s_%s" % (type, gpu_arch),
     srcs = [
-        "iree_uk_amdgpu_argmax_%s.c" % type,
         "common.h",
+        "iree_uk_amdgpu_argmax_%s.c" % type,
     ],
     out = "iree_uk_amdgpu_argmax_%s.%s.bc" % (type, gpu_arch),
     gpu_arch = gpu_arch,
@@ -59,9 +59,21 @@ argmax_bc_files = [
     for gpu_arch in gpu_archs
 ]
 
+iree_amdgpu_bitcode_library(
+    name = "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8_unroll8x2x2_subgroups1x4_gfx942",
+    srcs = [
+        "common.h",
+        "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8_unroll8x2x2_subgroups1x4.c",
+    ],
+    out = "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8_unroll8x2x2_subgroups1x4.gfx942.bc",
+    gpu_arch = "gfx942",
+)
+
 iree_c_embed_data(
     name = "iree_uk_amdgpu_bitcode",
-    srcs = argmax_bc_files,
+    srcs = argmax_bc_files + [
+        "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8_unroll8x2x2_subgroups1x4.gfx942.bc",
+    ],
     c_file_output = "iree_uk_amdgpu_bitcode.c",
     flatten = True,
     h_file_output = "iree_uk_amdgpu_bitcode.h",
