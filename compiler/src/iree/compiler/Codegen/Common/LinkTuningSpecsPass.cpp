@@ -18,6 +18,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Location.h"
+#include "mlir/IR/Verifier.h"
 
 #define DEBUG_TYPE "iree-codegen-link-tuning-specs"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
@@ -51,27 +52,6 @@ static SmallVector<NamedSequenceOp> findTuningSpecs(ModuleOp module) {
       body->getOps<NamedSequenceOp>(), [](NamedSequenceOp op) {
         return op->hasAttr(kTuningSpecEntrypointAttrName);
       });
-}
-
-// Returns true iff the entrypoint has the following signature:
-// ```
-// transform.named_sequence @name(%arg0: !transform.any_op) ->
-// (!transform.any_op)
-// ```
-static LogicalResult validateTuningSpec(NamedSequenceOp op) {
-  ArrayRef<Type> resTypes = op.getFunctionType().getResults();
-  if (resTypes.size() != 1 || !isa<transform::AnyOpType>(resTypes[0])) {
-    return op.emitWarning()
-           << "Tuning spec entry point expected to return any_op";
-  }
-
-  ArrayRef<Type> argTypes = op.getArgumentTypes();
-  if (argTypes.size() != 1 || !isa<transform::AnyOpType>(argTypes[0])) {
-    return op.emitWarning() << "Tuning spec entry point expected to have a "
-                               "single any_op argument";
-  }
-
-  return success();
 }
 
 static bool consumesInputOp(NamedSequenceOp op) {
@@ -165,15 +145,11 @@ struct LinkTuningSpecsPass final
 FailureOr<NamedSequenceOp> linkTuningSpecs(ModuleOp module) {
   SmallVector<NamedSequenceOp> tuningSpecs;
 
+  if (failed(mlir::verify(module)))
+    return failure();
+
   for (ModuleOp nested : findNestedModulesWithNamedSequences(module)) {
     llvm::append_range(tuningSpecs, findTuningSpecs(nested));
-  }
-
-  for (NamedSequenceOp spec : tuningSpecs) {
-    LDBG("Found tuning spec: " << spec.getSymName());
-    if (failed(validateTuningSpec(spec))) {
-      return failure();
-    }
   }
 
   size_t numConsumedSpecs = llvm::count_if(tuningSpecs, consumesInputOp);

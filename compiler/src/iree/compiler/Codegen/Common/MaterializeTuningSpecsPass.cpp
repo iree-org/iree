@@ -27,6 +27,7 @@
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/OwningOpRef.h"
+#include "mlir/IR/Verifier.h"
 #include "mlir/Support/FileUtilities.h"
 
 #define DEBUG_TYPE "iree-codegen-materialize-tuning-specs"
@@ -107,16 +108,6 @@ getUserTuningSpec(ModuleOp module, IREE::Codegen::IREECodegenDialect &dialect) {
            << clCodegenTuningSpecPath;
   }
 
-  // Iterate through all operations in the module to verify attributes
-  for (Operation &op : (*maybeTransformLibrary).getBody()->getOperations()) {
-    for (NamedAttribute attr : op.getAttrs()) {
-      if (failed(dialect.verifyOperationAttribute(&op, attr))) {
-        return op.emitError() << "Attribute verification failed for operation "
-                                 "in the user tuning spec";
-      }
-    }
-  }
-
   return *maybeTransformLibrary;
 }
 
@@ -151,20 +142,12 @@ getDefaultTuningSpec(ModuleOp module,
   FailureOr<ModuleOp> defaultTransformLibrary =
       dialect.getOrParseTransformLibraryModule(defaultTuningSpecName,
                                                *defaultTuningSpecSource);
-  if (failed(defaultTransformLibrary)) {
-    return module->emitError()
-           << "Failed to parse default tuning spec transform library for '"
-           << arch << "'";
-  }
-  // Iterate through operations and validate their attributes
-  for (Operation &op : (*defaultTransformLibrary).getBody()->getOperations()) {
-    for (NamedAttribute attr : op.getAttrs()) {
-      if (failed(dialect.verifyOperationAttribute(&op, attr))) {
-        return op.emitError() << "Attribute verification failed for operation "
-                                 "in default tuning spec";
-      }
-    }
-  }
+
+#ifndef NDEBUG
+  if (failed(mlir::verify(*defaultTransformLibrary)))
+    return (*defaultTransformLibrary).emitError()
+           << "Verification failed for default tuning spec";
+#endif
 
   return *defaultTransformLibrary;
 }
@@ -267,15 +250,11 @@ struct MaterializeTuningSpecsPass final
       return signalPassFailure();
     }
 
-    // Iterate through operations in the linked module and verify attributes
-    for (Operation &op : (linkedTuningSpec.get()).getBody()->getOperations()) {
-      for (NamedAttribute attr : op.getAttrs()) {
-        if (failed(dialect->verifyOperationAttribute(&op, attr))) {
-          op.emitError("Attribute verification failed for operation in linked "
-                       "tuning spec");
-          return signalPassFailure();
-        }
-      }
+    if (failed(mlir::verify(linkedTuningSpec.get()))) {
+      linkedTuningSpec.get().emitError(
+          "Attribute verification failed for operation in linked "
+          "tuning spec");
+      return signalPassFailure();
     }
 
     if (failed(dumpFinalTuningSpecToDir(linkedTuningSpec.get()))) {

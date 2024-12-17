@@ -52,25 +52,35 @@ IREECodegenDialect::verifyOperationAttribute(Operation *op,
   StringRef symbol = attribute.getName().strref();
   Attribute attr = attribute.getValue();
 
-  // Early return if the symbol is not "iree_codegen.tuning_spec_entrypoint"
+  // This function verifies the validity of a specific operation attribute.
+  // - If the attribute's name matches `kTuningSpecEntrypointAttrName`
+  // ("iree_codegen.tuning_spec_entrypoint"):
+  //   1. The attribute value must be a UnitAttr.
+  //   2. If the operation is a transform::NamedSequenceOp:
+  //      - The operation's function signature must satisfy the following:
+  //         a. It must have exactly one result type, and the result must be of
+  //         type `transform::AnyOpType`.
+  //         b. It must have exactly one argument type, and the argument must be
+  //         of type `transform::AnyOpType`.
+
   if (symbol != kTuningSpecEntrypointAttrName)
     return success();
 
-  // Verify that the attribute is a UnitAttr
-  if (!llvm::isa<UnitAttr>(attr)) {
+  // Verify that the attribute is a UnitAttr.
+  if (!isa<UnitAttr>(attr)) {
     return op->emitError("'") << symbol << "' attribute must be a UnitAttr";
   }
 
   if (auto namedSeqOp = dyn_cast<transform::NamedSequenceOp>(op)) {
     ArrayRef<Type> resTypes = namedSeqOp.getFunctionType().getResults();
     if (resTypes.size() != 1 || !isa<transform::AnyOpType>(resTypes[0])) {
-      return namedSeqOp.emitWarning()
+      return namedSeqOp.emitError()
              << "Tuning spec entry point expected to return any_op";
     }
 
     ArrayRef<Type> argTypes = namedSeqOp.getArgumentTypes();
     if (argTypes.size() != 1 || !isa<transform::AnyOpType>(argTypes[0])) {
-      return namedSeqOp.emitWarning()
+      return namedSeqOp.emitError()
              << "Tuning spec entry point expected to have a "
                 "single any_op argument";
     }
