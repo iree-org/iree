@@ -38,7 +38,8 @@ TEST(SafetensorsFormatTest, Empty) {
       iree_io_parameter_index_create(iree_allocator_system(), &index));
 
   iree_io_file_handle_t* file_handle = OpenTestFile("empty.safetensors");
-  IREE_ASSERT_OK(iree_io_parse_safetensors_index(file_handle, index));
+  IREE_ASSERT_OK(iree_io_parse_safetensors_index(file_handle, index,
+                                                 iree_allocator_system()));
   iree_io_file_handle_release(file_handle);
 
   iree_io_parameter_index_release(index);
@@ -50,7 +51,8 @@ TEST(SafetensorsFormatTest, SingleTensor) {
       iree_io_parameter_index_create(iree_allocator_system(), &index));
 
   iree_io_file_handle_t* file_handle = OpenTestFile("single.safetensors");
-  IREE_ASSERT_OK(iree_io_parse_safetensors_index(file_handle, index));
+  IREE_ASSERT_OK(iree_io_parse_safetensors_index(file_handle, index,
+                                                 iree_allocator_system()));
   iree_io_file_handle_release(file_handle);
 
   const iree_io_parameter_index_entry_t* entry0 = NULL;
@@ -70,7 +72,8 @@ TEST(SafetensorsFormatTest, MultipleTensors) {
       iree_io_parameter_index_create(iree_allocator_system(), &index));
 
   iree_io_file_handle_t* file_handle = OpenTestFile("multiple.safetensors");
-  IREE_ASSERT_OK(iree_io_parse_safetensors_index(file_handle, index));
+  IREE_ASSERT_OK(iree_io_parse_safetensors_index(file_handle, index,
+                                                 iree_allocator_system()));
   iree_io_file_handle_release(file_handle);
 
   const iree_io_parameter_index_entry_t* entry0 = NULL;

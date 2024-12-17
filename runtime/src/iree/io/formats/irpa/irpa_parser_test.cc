@@ -38,7 +38,8 @@ TEST(IrpaFormatTest, Empty) {
       iree_io_parameter_index_create(iree_allocator_system(), &index));
 
   iree_io_file_handle_t* file_handle = OpenTestFile("empty.irpa");
-  IREE_ASSERT_OK(iree_io_parse_irpa_index(file_handle, index));
+  IREE_ASSERT_OK(
+      iree_io_parse_irpa_index(file_handle, index, iree_allocator_system()));
   EXPECT_EQ(0, iree_io_parameter_index_count(index));
   iree_io_file_handle_release(file_handle);
 
@@ -51,7 +52,8 @@ TEST(IrpaFormatTest, SingleParameters) {
       iree_io_parameter_index_create(iree_allocator_system(), &index));
 
   iree_io_file_handle_t* file_handle = OpenTestFile("single.irpa");
-  IREE_ASSERT_OK(iree_io_parse_irpa_index(file_handle, index));
+  IREE_ASSERT_OK(
+      iree_io_parse_irpa_index(file_handle, index, iree_allocator_system()));
   EXPECT_EQ(1, iree_io_parameter_index_count(index));
   iree_io_file_handle_release(file_handle);
 
@@ -73,7 +75,8 @@ TEST(IrpaFormatTest, MultipleParameters) {
       iree_io_parameter_index_create(iree_allocator_system(), &index));
 
   iree_io_file_handle_t* file_handle = OpenTestFile("multiple.irpa");
-  IREE_ASSERT_OK(iree_io_parse_irpa_index(file_handle, index));
+  IREE_ASSERT_OK(
+      iree_io_parse_irpa_index(file_handle, index, iree_allocator_system()));
   EXPECT_EQ(2, iree_io_parameter_index_count(index));
   iree_io_file_handle_release(file_handle);
 
@@ -104,7 +107,8 @@ TEST(IrpaFormatTest, MixedDataAndSplats) {
       iree_io_parameter_index_create(iree_allocator_system(), &index));
 
   iree_io_file_handle_t* file_handle = OpenTestFile("mixed.irpa");
-  IREE_ASSERT_OK(iree_io_parse_irpa_index(file_handle, index));
+  IREE_ASSERT_OK(
+      iree_io_parse_irpa_index(file_handle, index, iree_allocator_system()));
   EXPECT_EQ(4, iree_io_parameter_index_count(index));
   iree_io_file_handle_release(file_handle);
 
