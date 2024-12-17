@@ -1913,9 +1913,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#ukernelspecattr" class="md-nav__link">
+  <a href="#ukernelconfigattr" class="md-nav__link">
     <span class="md-ellipsis">
-      UKernelSpecAttr
+      UKernelConfigAttr
     </span>
   </a>
   
@@ -4469,9 +4469,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#ukernelspecattr" class="md-nav__link">
+  <a href="#ukernelconfigattr" class="md-nav__link">
     <span class="md-ellipsis">
-      UKernelSpecAttr
+      UKernelConfigAttr
     </span>
   </a>
   
@@ -4842,7 +4842,7 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#targetattr">TargetAttr</a></li>
 <li><a href="#targetchipattr">TargetChipAttr</a></li>
 <li><a href="#targetwgpattr">TargetWgpAttr</a></li>
-<li><a href="#ukernelspecattr">UKernelSpecAttr</a></li>
+<li><a href="#ukernelconfigattr">UKernelConfigAttr</a></li>
 <li><a href="#virtualmmaattr">VirtualMMAAttr</a></li>
 <li><a href="#virtualmmaintrinsicattr">VirtualMMAIntrinsicAttr</a></li>
 </ul>
@@ -5962,10 +5962,10 @@ NVIDIA GPUs.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="ukernelspecattr">UKernelSpecAttr<a class="headerlink" href="#ukernelspecattr" title="Permanent link">link</a></h3>
+<h3 id="ukernelconfigattr">UKernelConfigAttr<a class="headerlink" href="#ukernelconfigattr" title="Permanent link">link</a></h3>
 <p>An attribute specifying a ukernel that an op can lower to.</p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.ukernel_spec&lt;
+<div class="highlight"><pre><span></span><code>#iree_gpu.ukernel_config&lt;
   StringAttr,   # name
   DictionaryAttr   # def_attrs
 &gt;
