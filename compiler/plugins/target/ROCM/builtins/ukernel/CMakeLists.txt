@@ -206,6 +206,18 @@ iree_amdgpu_bitcode_library(
     "iree_uk_amdgpu_argmax_f32i64.gfx1100.bc"
 )
 
+iree_amdgpu_bitcode_library(
+  NAME
+    iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8_unroll8x2x2_subgroups1x4_gfx942
+  GPU_ARCH
+    gfx942
+  SRCS
+    "common.h"
+    "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8_unroll8x2x2_subgroups1x4.c"
+  OUT
+    "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8_unroll8x2x2_subgroups1x4.gfx942.bc"
+)
+
 iree_c_embed_data(
   NAME
     iree_uk_amdgpu_bitcode
@@ -226,6 +238,7 @@ iree_c_embed_data(
     "iree_uk_amdgpu_argmax_f32i64.gfx1100.bc"
     "iree_uk_amdgpu_argmax_f32i64.gfx90a.bc"
     "iree_uk_amdgpu_argmax_f32i64.gfx942.bc"
+    "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8_unroll8x2x2_subgroups1x4.gfx942.bc"
   C_FILE_OUTPUT
     "iree_uk_amdgpu_bitcode.c"
   H_FILE_OUTPUT

@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUSelectUKernels.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Utils/EmbeddedDataDirectory.h"
@@ -18,8 +19,13 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+struct UKernelNameAndSuffix {
+  std::string name;
+  std::string suffix;
+};
+
 // Returns ukernel name and suffix for argmax. Empty name = no ukernel.
-static std::tuple<std::string, std::string>
+static UKernelNameAndSuffix
 getUKernelNameAndSuffixForArgmax(linalg::GenericOp op) {
   Value input = op.getDpsInputOperand(0)->get();
   auto inputType = cast<ShapedType>(input.getType());
@@ -29,13 +35,34 @@ getUKernelNameAndSuffixForArgmax(linalg::GenericOp op) {
                                   indexType.getElementType())};
 }
 
+// Returns ukernel name and suffix for multi_mma. Empty name = no ukernel.
+static UKernelNameAndSuffix
+getUKernelNameAndSuffixForMultiMma(IREE::GPU::MultiMmaOp op) {
+  auto mma = dyn_cast<IREE::GPU::DataTiledMMAAttr>(op.getKind());
+  if (!mma) {
+    return {}; // Only handling DataTiledMMAAttr for now.
+  }
+  std::string suffix{
+      stringifyMMAIntrinsic(mma.getIntrinsic().getValue()).lower()};
+  if (mma.getUnrollM() != 1 || mma.getUnrollN() != 1 || mma.getUnrollK() != 1) {
+    suffix += llvm::formatv("_unroll{}x{}x{}", mma.getUnrollM(),
+                            mma.getUnrollN(), mma.getUnrollK());
+  }
+  if (mma.getSubgroupsM() != 1 || mma.getSubgroupsN() != 1) {
+    suffix += llvm::formatv("_subgroups{}x{}", mma.getSubgroupsM(),
+                            mma.getSubgroupsN());
+  }
+  return {"multi_mma", suffix};
+}
+
 // Returns ukernel name and suffix for any op. Empty name = no ukernel.
-static std::tuple<std::string, std::string>
-getUKernelNameAndSuffix(Operation *op) {
+static UKernelNameAndSuffix getUKernelNameAndSuffix(Operation *op) {
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
     if (succeeded(isArgmaxOp(genericOp))) {
       return getUKernelNameAndSuffixForArgmax(genericOp);
     }
+  } else if (auto multiMmaOp = dyn_cast<IREE::GPU::MultiMmaOp>(op)) {
+    return getUKernelNameAndSuffixForMultiMma(multiMmaOp);
   }
   return {};
 }
@@ -44,7 +71,7 @@ getUKernelNameAndSuffix(Operation *op) {
 static IREE::GPU::UKernelConfigAttr getUKernelConfig(Operation *op) {
   MLIRContext *context = op->getContext();
   auto [name, suffix] = getUKernelNameAndSuffix(op);
-  if (name.empty() || suffix.empty()) {
+  if (name.empty()) {
     return {};
   }
   auto target = IREE::HAL::ExecutableTargetAttr::lookup(op);
