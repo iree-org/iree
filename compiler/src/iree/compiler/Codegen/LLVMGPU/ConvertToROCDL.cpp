@@ -31,6 +31,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-convert-to-rocdl"
@@ -221,6 +222,9 @@ struct ConvertToROCDLPass final
       FailureOr<amdgpu::Chipset> maybeChipset = amdgpu::Chipset::parse(chipset);
       populateAMDGPUToROCDLConversionPatterns(
           converter, llvmPatterns, maybeChipset.value_or(amdgpu::Chipset()));
+      vector::populateVectorRankReducingFMAPattern(llvmPatterns);
+      vector::populateVectorInsertExtractStridedSliceTransforms(llvmPatterns);
+      vector::populateVectorStepLoweringPatterns(llvmPatterns);
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
       populateGpuToROCDLConversionPatterns(converter, llvmPatterns,
                                            gpu::amd::Runtime::Unknown);

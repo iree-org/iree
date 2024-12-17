@@ -31,6 +31,7 @@
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
@@ -150,6 +151,9 @@ struct ConvertToNVVMPass final
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
       arith::populateCeilFloorDivExpandOpsPatterns(llvmPatterns);
       arith::populateArithToLLVMConversionPatterns(converter, llvmPatterns);
+      vector::populateVectorRankReducingFMAPattern(llvmPatterns);
+      vector::populateVectorInsertExtractStridedSliceTransforms(llvmPatterns);
+      vector::populateVectorStepLoweringPatterns(llvmPatterns);
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
       populateGpuToNVVMConversionPatterns(converter, llvmPatterns);
       populateNVGPUToNVVMConversionPatterns(converter, llvmPatterns);
