@@ -10,6 +10,6 @@
 
 namespace mlir::iree_compiler {
 
-IREE::GPU::UKernelSpecAttr selectUKernelForArgmax(linalg::GenericOp op);
+IREE::GPU::UKernelConfigAttr selectUKernel(Operation *op);
 
 } // namespace mlir::iree_compiler

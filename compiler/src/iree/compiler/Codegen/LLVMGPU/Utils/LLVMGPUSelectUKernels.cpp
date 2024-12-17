@@ -18,7 +18,49 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-constexpr StringLiteral executableObjectsAttrName = "hal.executable.objects";
+// Returns ukernel name and suffix for argmax. Empty name = no ukernel.
+static std::tuple<std::string, std::string>
+getUKernelNameAndSuffixForArgmax(linalg::GenericOp op) {
+  Value input = op.getDpsInputOperand(0)->get();
+  auto inputType = cast<ShapedType>(input.getType());
+  Value index = op.getDpsInitOperand(1)->get();
+  auto indexType = cast<ShapedType>(index.getType());
+  return {"argmax", llvm::formatv("{}{}", inputType.getElementType(),
+                                  indexType.getElementType())};
+}
+
+// Returns ukernel name and suffix for any op. Empty name = no ukernel.
+static std::tuple<std::string, std::string>
+getUKernelNameAndSuffix(Operation *op) {
+  if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+    if (succeeded(isArgmaxOp(genericOp))) {
+      return getUKernelNameAndSuffixForArgmax(genericOp);
+    }
+  }
+  return {};
+}
+
+// Returns the UKernelConfigAttr for any op. Returns {} if no ukernel.
+static IREE::GPU::UKernelConfigAttr getUKernelConfig(Operation *op) {
+  MLIRContext *context = op->getContext();
+  auto [name, suffix] = getUKernelNameAndSuffix(op);
+  if (name.empty() || suffix.empty()) {
+    return {};
+  }
+  auto target = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  if (!hasUkernel(target, name)) {
+    return {};
+  }
+  if (isROCMBackend(target)) {
+    auto nameAttr = StringAttr::get(
+        context, llvm::formatv("iree_uk_amdgpu_{}_{}", name, suffix));
+    auto defsAttr = DictionaryAttr::get(
+        context, {{StringAttr::get(context, "vm.import.module"),
+                   StringAttr::get(context, "rocm")}});
+    return IREE::GPU::UKernelConfigAttr::get(context, nameAttr, defsAttr);
+  }
+  return {};
+}
 
 // Returns a ExecutableObjectAttr carrying the bitcode for the given ukernel.
 //
@@ -77,7 +119,8 @@ getUKernelBitcode(MLIRContext *context,
 // array attribute. If the parent hal.executable.variant is reached, its objects
 // attribute is returned.
 // Adapted from ExecutableTargetAttr::lookup.
-static ArrayAttr lookUpExecutableObjects(Operation *op) {
+static ArrayAttr lookUpExecutableObjects(Operation *op,
+                                         StringRef executableObjectsAttrName) {
   MLIRContext *context = op->getContext();
   auto attrId = StringAttr::get(context, executableObjectsAttrName);
   while (op) {
@@ -97,56 +140,39 @@ static ArrayAttr lookUpExecutableObjects(Operation *op) {
   return {};
 }
 
-/// Returns the function name and attributes to use for a ukernel with given
-/// `name` and `suffix` on the target described by `targetAttr`.
-static IREE::GPU::UKernelSpecAttr
-getUKernelSpec(StringRef name, StringRef suffix, MLIRContext *context,
-               IREE::HAL::ExecutableTargetAttr targetAttr) {
-  if (isROCMBackend(targetAttr)) {
-    auto nameAttr = StringAttr::get(
-        context, llvm::formatv("iree_uk_amdgpu_{}_{}", name, suffix));
-    auto defsAttr = DictionaryAttr::get(
-        context, {{StringAttr::get(context, "vm.import.module"),
-                   StringAttr::get(context, "rocm")}});
-    return IREE::GPU::UKernelSpecAttr::get(context, nameAttr, defsAttr);
+// Ensures that the op has ukernel bitcode as a hal.executable.object, stored
+// as a hal.executable.objects attribute on the op itself, ready to be hoisted
+// by the HoistExecutableObjects pass.
+// Returns failure if no bitcode was found for the configured ukernel.
+static LogicalResult
+ensureUKernelBitcode(Operation *op,
+                     IREE::GPU::UKernelConfigAttr ukernelConfig) {
+  constexpr StringLiteral executableObjectsAttrName = "hal.executable.objects";
+  auto target = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  ArrayAttr sourceExecutableObjects =
+      lookUpExecutableObjects(op, executableObjectsAttrName);
+  MLIRContext *context = op->getContext();
+  IREE::HAL::ExecutableObjectAttr bitcodeObject = getUKernelBitcode(
+      context, target, sourceExecutableObjects, ukernelConfig.getName());
+  if (!bitcodeObject) {
+    return failure();
   }
-  return {};
+  op->setAttr(executableObjectsAttrName,
+              ArrayAttr::get(context, bitcodeObject));
+  return success();
 }
 
 } // namespace
 
-IREE::GPU::UKernelSpecAttr selectUKernelForArgmax(linalg::GenericOp op) {
-  if (failed(isArgmaxOp(op))) {
+IREE::GPU::UKernelConfigAttr selectUKernel(Operation *op) {
+  IREE::GPU::UKernelConfigAttr ukernelConfig = getUKernelConfig(op);
+  if (!ukernelConfig) {
     return {};
   }
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  const char ukernelName[] = "argmax";
-  if (!hasUkernel(targetAttr, ukernelName)) {
+  if (failed(ensureUKernelBitcode(op, ukernelConfig))) {
     return {};
   }
-  Value input = op.getDpsInputOperand(0)->get();
-  auto inputType = cast<ShapedType>(input.getType());
-  Value index = op.getDpsInitOperand(1)->get();
-  auto indexType = cast<ShapedType>(index.getType());
-  std::string suffix;
-  llvm::raw_string_ostream(suffix)
-      << inputType.getElementType() << indexType.getElementType();
-  MLIRContext *context = op->getContext();
-  IREE::GPU::UKernelSpecAttr ukernelSpec =
-      getUKernelSpec(ukernelName, suffix, context, targetAttr);
-  if (!ukernelSpec) {
-    return {};
-  }
-  auto execTarget = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  ArrayAttr sourceExecutableObjects = lookUpExecutableObjects(op);
-  IREE::HAL::ExecutableObjectAttr bitcodeObject = getUKernelBitcode(
-      context, execTarget, sourceExecutableObjects, ukernelSpec.getName());
-  if (!bitcodeObject) {
-    return {};
-  }
-  op->setAttr(executableObjectsAttrName,
-              ArrayAttr::get(context, bitcodeObject));
-  return ukernelSpec;
+  return ukernelConfig;
 }
 
 } // namespace mlir::iree_compiler

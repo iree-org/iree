@@ -59,7 +59,8 @@ void setPromotedOperandList(MLIRContext *context,
 /// Helper to retrieve  list of operand to pad.
 std::optional<SmallVector<int64_t>> getPaddingList(LoweringConfigAttr config);
 
-IREE::GPU::UKernelSpecAttr getUkernelSpec(IREE::GPU::LoweringConfigAttr config);
+IREE::GPU::UKernelConfigAttr
+getUkernelSpec(IREE::GPU::LoweringConfigAttr config);
 
 } // namespace mlir::iree_compiler::IREE::GPU
 

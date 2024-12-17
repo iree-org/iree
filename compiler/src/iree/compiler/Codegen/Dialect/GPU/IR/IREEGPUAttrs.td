@@ -521,12 +521,12 @@ def IREEGPU_LaneIdAttr : AttrDef<IREEGPU_Dialect, "LaneId", [
 }
 
 //===---------------------------------------------------------------------===//
-// iree_gpu.ukernel_spec
+// iree_gpu.ukernel_config
 //===---------------------------------------------------------------------===//
 
-def IREEGPU_UKernelSpecAttr  :
-    AttrDef<IREEGPU_Dialect, "UKernelSpec", []> {
-  let mnemonic = "ukernel_spec";
+def IREEGPU_UKernelConfigAttr  :
+    AttrDef<IREEGPU_Dialect, "UKernelConfig", []> {
+  let mnemonic = "ukernel_config";
   let summary = "An attribute specifying a ukernel that an op can lower to.";
   let description = [{
     An attribute that can be applied to any operation to specify that it has
