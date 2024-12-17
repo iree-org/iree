@@ -128,6 +128,22 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    files
+  HDRS
+    "file_registry.h"
+    "memory_file.h"
+  SRCS
+    "file_registry.c"
+    "memory_file.c"
+  DEPS
+    iree::base
+    iree::hal
+    iree::io::file_handle
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     libmpi
   HDRS
     "libmpi.h"
@@ -151,20 +167,6 @@ iree_cc_test(
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    memory_file
-  HDRS
-    "memory_file.h"
-  SRCS
-    "memory_file.c"
-  DEPS
-    iree::base
-    iree::hal
-    iree::io::file_handle
-  PUBLIC
 )
 
 iree_cc_library(
