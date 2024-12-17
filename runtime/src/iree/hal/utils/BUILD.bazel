@@ -99,7 +99,6 @@ iree_runtime_cc_library(
     srcs = ["file_transfer.c"],
     hdrs = ["file_transfer.h"],
     deps = [
-        ":memory_file",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/hal",

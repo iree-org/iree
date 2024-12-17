@@ -120,7 +120,6 @@ iree_cc_library(
   SRCS
     "file_transfer.c"
   DEPS
-    ::memory_file
     iree::base
     iree::base::internal
     iree::hal
