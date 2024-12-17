@@ -6,7 +6,6 @@ tags:
   - Python
   - PyTorch
 icon: simple/onnx
-status: new
 ---
 
 # ONNX support
