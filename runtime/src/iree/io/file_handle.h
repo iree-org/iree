@@ -46,7 +46,10 @@ typedef enum iree_io_file_handle_type_e {
   // as long as the file handle referencing it.
   IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION = 0u,
 
-  // TODO(benvanik): file descriptor, FILE*, HANDLE, etc.
+  // Platform file descriptor (fd).
+  IREE_IO_FILE_HANDLE_TYPE_FD,
+
+  // TODO(benvanik): FILE*, HANDLE, etc.
 } iree_io_file_handle_type_t;
 
 // A platform handle to a file primitive.
@@ -55,6 +58,8 @@ typedef enum iree_io_file_handle_type_e {
 typedef union iree_io_file_handle_primitive_value_t {
   // IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION
   iree_byte_span_t host_allocation;
+  // IREE_IO_FILE_HANDLE_TYPE_FD
+  int fd;
 } iree_io_file_handle_primitive_value_t;
 
 // A (type, value) pair describing a system file primitive handle.
