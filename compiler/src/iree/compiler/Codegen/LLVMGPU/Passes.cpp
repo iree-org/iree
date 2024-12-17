@@ -484,9 +484,6 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     options.redundantHoisting = false;
     funcPassManager.addPass(createOptimizeVectorTransferPass());
   }
-  // Step 10. Hoist statically bounded allocations. Need to pad dynamic
-  // allocations at this stage to make sure they can be hoisted.
-  funcPassManager.addPass(createPadDynamicAllocPass());
   funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -1095,6 +1092,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       // Pad allocations with dynamic dimension after linalg lowering but before
       // lowering SCF and affine ops.
       .addPass(createPadDynamicAllocPass)
+      // Hoist any newly static allocations from PadDynamicAlloc.
+      .addPass(createHoistStaticallyBoundAllocationsPass)
 
       .addPass(createLowerAffinePass)
       .addPass(createCanonicalizerPass)
