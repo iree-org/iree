@@ -5,7 +5,6 @@ tags:
   - Python
   - PyTorch
 icon: simple/pytorch
-status: new
 ---
 
 # PyTorch + IREE = :octicons-heart-16:
