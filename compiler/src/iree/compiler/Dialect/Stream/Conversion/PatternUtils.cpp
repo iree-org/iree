@@ -44,73 +44,25 @@ tryLookupResultAffinity(Value value,
   return affinityAnalysis->lookupResourceAffinity(value);
 }
 
-static std::pair<Value, Value>
-resolveTensorOperand(Location loc, Value convertedOperand, OpBuilder &builder) {
-  auto operandType = convertedOperand.getType();
-  if (llvm::isa<IREE::Stream::ResourceType>(operandType)) {
-    // Prior to https://reviews.llvm.org/D111620 this is the path we'd take;
-    // the tensor operands would be remapped into their new resource types.
-    // This is still possible during rewriting if we ourselves produce a new
-    // resource type, but the automatic materialization will go down the
-    // unrealized_conversion_cast path below.
-    return std::make_pair(convertedOperand,
-                          builder.createOrFold<IREE::Stream::ResourceSizeOp>(
-                              loc, builder.getIndexType(), convertedOperand));
-  } else if (auto castOp =
-                 convertedOperand
-                     .getDefiningOp<mlir::UnrealizedConversionCastOp>()) {
-    // We only have a single tensor type conversion and it expands to (resource,
-    // size) so that's all we look for here.
-    assert(castOp.getNumOperands() == 2 && "expected (resource, size)");
-    return std::make_pair(castOp.getOperand(0), castOp.getOperand(1));
-  }
-  assert(false &&
-         "unexpected operand; expected either a IREE::Stream::ResourceType or "
-         "the result of a mlir::UnrealizedConversionCastOp");
-  return std::make_pair(Value{}, Value{});
-}
-
-void expandResourceOperand(Location loc, Value operand,
-                           SmallVectorImpl<Value> &newOperands,
-                           OpBuilder &builder) {
-  if (llvm::isa<TensorType>(operand.getType())) {
-    auto [resource, resourceSize] = resolveTensorOperand(loc, operand, builder);
-    newOperands.push_back(resource);
-    newOperands.push_back(resourceSize);
-  } else if (llvm::isa<IREE::Stream::ResourceType>(operand.getType())) {
-    newOperands.push_back(operand);
-    newOperands.push_back(
-        builder.createOrFold<IREE::Stream::ResourceSizeOp>(loc, operand));
-  } else {
-    newOperands.push_back(operand);
-  }
-}
-
-SmallVector<Value> expandResourceOperands(Location loc, ValueRange operands,
-                                          ConversionPatternRewriter &rewriter) {
-  SmallVector<Value> expandedOperands;
-  expandedOperands.reserve(operands.size());
-  for (auto operand : operands) {
-    expandResourceOperand(loc, operand, expandedOperands, rewriter);
-  }
-  return expandedOperands;
-}
-
-ConvertedTensor resolveTensorOperand(
-    Location loc, Value originalOperand, Value convertedOperand,
+ConvertedTensor resolveTensorOperands(
+    Location loc, Value originalOperand, ValueRange convertedOperand,
     IREE::Stream::AffinityAnalysis *affinityAnalysis, OpBuilder &builder) {
-  auto [resource, resourceSize] =
-      resolveTensorOperand(loc, convertedOperand, builder);
+  assert(convertedOperand.size() == 2 &&
+         "expected tensor operands to be converted to `!stream.resource<*>, "
+         "index`");
   auto affinityAttr = affinityAnalysis->lookupResourceAffinity(originalOperand);
-  return {affinityAttr, resource, resourceSize};
+  return {affinityAttr, convertedOperand[0], convertedOperand[1]};
 }
 
-ConvertedTensor transferTensorOperand(
-    Location loc, Value originalOperand, Value convertedOperand,
+ConvertedTensor transferTensorOperands(
+    Location loc, Value originalOperand, ValueRange convertedOperand,
     IREE::Stream::AffinityAttr requiredAffinityAttr,
     IREE::Stream::AffinityAnalysis *affinityAnalysis, OpBuilder &builder) {
-  auto [resource, resourceSize] =
-      resolveTensorOperand(loc, convertedOperand, builder);
+  assert(convertedOperand.size() == 2 &&
+         "expected tensor operands to be converted to `!stream.resource<*>, "
+         "index`");
+  Value resource = convertedOperand[0];
+  Value resourceSize = convertedOperand[1];
   auto affinityAttr = affinityAnalysis->lookupResourceAffinity(originalOperand);
   if (affinityAttr != requiredAffinityAttr) {
     resource = builder.create<IREE::Stream::AsyncTransferOp>(
@@ -118,6 +70,27 @@ ConvertedTensor transferTensorOperand(
         affinityAttr, requiredAffinityAttr);
   }
   return {requiredAffinityAttr, resource, resourceSize};
+}
+
+void replaceOpWithMultiple(Operation *op,
+                           ArrayRef<SmallVector<Value>> replacements,
+                           ConversionPatternRewriter &rewriter) {
+  auto r = llvm::map_to_vector(
+      replacements, [](ArrayRef<Value> v) -> ValueRange { return v; });
+  rewriter.replaceOpWithMultiple(op, r);
+}
+
+void replaceOpWithMultiple(Operation *op, ValueRange resources,
+                           ValueRange sizes,
+                           ConversionPatternRewriter &rewriter) {
+  SmallVector<SmallVector<Value>> replacements = llvm::map_to_vector(
+      llvm::zip_equal(resources, sizes), [](auto it) -> SmallVector<Value> {
+        if (std::get<1>(it)) {
+          return {std::get<0>(it), std::get<1>(it)};
+        }
+        return {std::get<0>(it)};
+      });
+  replaceOpWithMultiple(op, replacements, rewriter);
 }
 
 } // namespace mlir::iree_compiler
