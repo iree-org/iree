@@ -71,11 +71,15 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
         vectorLayout.getSubgroupTile()[i], vectorLayout.getBatchTile()[i],
         vectorLayout.getOuterTile()[i], vectorLayout.getThreadTile()[i],
         elementCount};
-    // The offset is often tot an offset within the thread ID. Fixing this
-    // to allow for linearize everywhere might be nice to do in the future.
-    // For now, mark this not disjoint so we don't misoptimize.
-    slicedIndices[pos] = b.create<affine::AffineLinearizeIndexOp>(
-        loc, ids, sizes, /*disjoint=*/false);
+    // The offset is often not an offset within `elementCount`, so, in general,
+    // we can't mark this `disjoint`. However, if `offset` is known to be
+    // a constant less than `elementCount`, we can do this, unlocking
+    // potential optimizations.
+    bool disjoint = false;
+    if (std::optional<int64_t> offsetConst = getConstantIntValue(offset))
+      disjoint = *offsetConst < elementCount;
+    slicedIndices[pos] =
+        b.create<affine::AffineLinearizeIndexOp>(loc, ids, sizes, disjoint);
   }
   return slicedIndices;
 }
