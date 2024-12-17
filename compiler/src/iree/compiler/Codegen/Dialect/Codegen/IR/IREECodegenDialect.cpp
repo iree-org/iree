@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.cpp.inc"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
+#include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/IR/DialectImplementation.h"
 
 namespace mlir::iree_compiler::IREE::Codegen {
@@ -50,14 +51,33 @@ IREECodegenDialect::verifyOperationAttribute(Operation *op,
                                              NamedAttribute attribute) {
   StringRef symbol = attribute.getName().strref();
   Attribute attr = attribute.getValue();
-  if (symbol == kTuningSpecEntrypointAttrName) {
-    if (!llvm::isa<UnitAttr>(attr)) {
-      return op->emitError("'") << symbol << "' attribute must be a UnitAttr";
-    }
-  } else {
-    return op->emitError("found unsupported '")
-           << symbol << "' attribute on operation";
+
+  // Early return if the symbol is not "iree_codegen.tuning_spec_entrypoint"
+  if (symbol != kTuningSpecEntrypointAttrName)
+    return success();
+
+  // Verify that the attribute is a UnitAttr
+  if (!llvm::isa<UnitAttr>(attr)) {
+    return op->emitError("'") << symbol << "' attribute must be a UnitAttr";
   }
+
+  if (auto namedSeqOp = dyn_cast<transform::NamedSequenceOp>(op)) {
+    ArrayRef<Type> resTypes = namedSeqOp.getFunctionType().getResults();
+    if (resTypes.size() != 1 || !isa<transform::AnyOpType>(resTypes[0])) {
+      return namedSeqOp.emitWarning()
+             << "Tuning spec entry point expected to return any_op";
+    }
+
+    ArrayRef<Type> argTypes = namedSeqOp.getArgumentTypes();
+    if (argTypes.size() != 1 || !isa<transform::AnyOpType>(argTypes[0])) {
+      return namedSeqOp.emitWarning()
+             << "Tuning spec entry point expected to have a "
+                "single any_op argument";
+    }
+
+    return success();
+  }
+
   return success();
 }
 
