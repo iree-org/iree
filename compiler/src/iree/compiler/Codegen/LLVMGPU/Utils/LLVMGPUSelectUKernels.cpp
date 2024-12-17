@@ -19,8 +19,13 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+struct UKernelNameAndSuffix {
+  std::string name;
+  std::string suffix;
+};
+
 // Returns ukernel name and suffix for argmax. Empty name = no ukernel.
-static std::tuple<std::string, std::string>
+static UKernelNameAndSuffix
 getUKernelNameAndSuffixForArgmax(linalg::GenericOp op) {
   Value input = op.getDpsInputOperand(0)->get();
   auto inputType = cast<ShapedType>(input.getType());
@@ -31,7 +36,7 @@ getUKernelNameAndSuffixForArgmax(linalg::GenericOp op) {
 }
 
 // Returns ukernel name and suffix for multi_mma. Empty name = no ukernel.
-static std::tuple<std::string, std::string>
+static UKernelNameAndSuffix
 getUKernelNameAndSuffixForMultiMma(IREE::GPU::MultiMmaOp op) {
   auto mma = dyn_cast<IREE::GPU::DataTiledMMAAttr>(op.getKind());
   if (!mma) {
@@ -51,8 +56,7 @@ getUKernelNameAndSuffixForMultiMma(IREE::GPU::MultiMmaOp op) {
 }
 
 // Returns ukernel name and suffix for any op. Empty name = no ukernel.
-static std::tuple<std::string, std::string>
-getUKernelNameAndSuffix(Operation *op) {
+static UKernelNameAndSuffix getUKernelNameAndSuffix(Operation *op) {
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
     if (succeeded(isArgmaxOp(genericOp))) {
       return getUKernelNameAndSuffixForArgmax(genericOp);
@@ -67,7 +71,7 @@ getUKernelNameAndSuffix(Operation *op) {
 static IREE::GPU::UKernelConfigAttr getUKernelConfig(Operation *op) {
   MLIRContext *context = op->getContext();
   auto [name, suffix] = getUKernelNameAndSuffix(op);
-  if (name.empty() || suffix.empty()) {
+  if (name.empty()) {
     return {};
   }
   auto target = IREE::HAL::ExecutableTargetAttr::lookup(op);

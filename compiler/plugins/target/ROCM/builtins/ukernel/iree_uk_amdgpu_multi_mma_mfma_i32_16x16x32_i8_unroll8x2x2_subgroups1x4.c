@@ -12,12 +12,10 @@
 //    passed down here as a `T [[clang::address_space(3)]] *` parameter.
 // 2. Better scheduling via either barrier intrinsics or inline assemby.
 // 3. Subgroups1x4 being asymmetric is a historical accident... should be 2x2.
-[[clang::always_inline, clang::convergent]] void
+[[clang::always_inline]] void
 iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8_unroll8x2x2_subgroups1x4(
     const int8_t *a_buffer, int64_t a_offset, const int8_t *b_buffer,
     int64_t b_offset, int32_t *c_buffer, int64_t c_offset, int64_t k_size) {
-  typedef __attribute__((__vector_size__(8 * 2))) int64_t int64x2_t;
-  typedef __attribute__((__vector_size__(4 * 4))) int32_t int32x4_t;
   int tid = __builtin_amdgcn_workitem_id_x();
 
   // Load existing accumulators.
