@@ -21,13 +21,13 @@ extern "C" {
 //===----------------------------------------------------------------------===//
 
 // Bits defining which operations are allowed on a file.
+typedef uint32_t iree_io_file_access_t;
 enum iree_io_file_access_bits_t {
   // Allows operations that read from the file.
   IREE_IO_FILE_ACCESS_READ = 1u << 0,
   // Allows operations that write to the file.
   IREE_IO_FILE_ACCESS_WRITE = 1u << 1,
 };
-typedef uint32_t iree_io_file_access_t;
 
 //===----------------------------------------------------------------------===//
 // iree_io_file_handle_primitive_t
@@ -155,6 +155,107 @@ static inline iree_io_file_handle_primitive_value_t iree_io_file_handle_value(
 // Flushes pending writes of |handle| to its backing storage.
 IREE_API_EXPORT iree_status_t
 iree_io_file_handle_flush(iree_io_file_handle_t* handle);
+
+//===----------------------------------------------------------------------===//
+// iree_io_file_mapping_t
+//===----------------------------------------------------------------------===//
+// EXPERIMENTAL: this API may change once proper memory objects and views are
+// added to iree/base/. This may just end up as a thin wrapper around that
+// lower-level API with more fancy features (address placement, commit/decommit,
+// etc) left to the lower-level API. We may add new APIs here for flush/sync
+// as required.
+
+// Flags used to control the behavior of mapped file views.
+typedef uint64_t iree_io_file_mapping_flags_t;
+enum iree_io_file_mapping_flag_bits_t {
+  IREE_IO_FILE_MAPPING_FLAG_NONE = 0u,
+
+  // Indicates that the memory access pattern of the view is mostly sequential.
+  // Hints to the system that an LRU page cache and sequential prefetching are
+  // likely to be worth it.
+  //
+  // Implemented by MADV_SEQUENTIAL.
+  IREE_IO_FILE_MAPPING_FLAG_SEQUENTIAL_ACCESS = 1ull << 0,
+
+  // Enables large page support for the given view, if available.
+  // Certain mapping modes such as mapping of existing files or opening
+  // mappings from another process where the allocation was not made with large
+  // pages may not support large pages and the flag will be silently ignored.
+  // In either case the memory view will be padded to the
+  // iree_memory_info_t::large_page_size regardless of whether the pages are
+  // actually large to the system.
+  //
+  // Use large pages to reduce the overhead involved in accessing
+  // hot-but-non-localized memory views that may otherwise spend a significant
+  // amount of time/capacity maintaining the TLB. As the platform and
+  // machine-dependent large page size is often several orders of magnitude
+  // larger than the normal page size (MB vs. KB) care should be used to only
+  // apply this to large allocations.
+  //
+  // Implemented by FILE_MAP_LARGE_PAGES/MAP_HUGETLB, where available.
+  IREE_IO_FILE_MAPPING_FLAG_LARGE_PAGES = 1ull << 1,
+
+  // Excludes the view memory from minidumps/coredumps.
+  // This is a hint that the memory in the ranges are not useful to include in
+  // dumps, such as large chunks of read-only file data (model weights, images,
+  // etc).
+  //
+  // Implemented by WerRegisterExcludedMemoryBlock/MADV_DONTDUMP, where
+  // available.
+  IREE_IO_FILE_MAPPING_FLAG_EXCLUDE_FROM_DUMPS = 1ull << 2,
+
+  // Privately map the memory into the calling process.
+  // Other processes that may hold a reference to the file will not see changes.
+  // This is not a guarantee but an optimization to possibly avoid non-trivial
+  // kernel overheads.
+  //
+  // Implemented by MAP_PRIVATE, where available.
+  IREE_IO_FILE_MAPPING_FLAG_PRIVATE = 1ull << 3,
+};
+
+// A mapped file view into host memory.
+//
+// Thread-safe; the mapping is immutable and may be accessed from any thread.
+// The **contents** of the mapping in the file should be coherent across threads
+// within the same process but may not be across threads in different processes.
+typedef struct iree_io_file_mapping_t iree_io_file_mapping_t;
+
+// Maps a view of a file into host-accessible memory.
+// The provided file |handle| is retained for the lifetime of the view.
+// To map the entire file specify a range of [0, IREE_HOST_SIZE_MAX].
+//
+// If the provided file |handle| is already available for use as a host pointer
+// it is returned directly.
+IREE_API_EXPORT iree_status_t iree_io_file_map_view(
+    iree_io_file_handle_t* handle, iree_io_file_access_t access,
+    uint64_t offset, iree_host_size_t length,
+    iree_io_file_mapping_flags_t flags, iree_allocator_t host_allocator,
+    iree_io_file_mapping_t** out_mapping);
+
+// Retains the file |mapping| for the caller. The backing file handle will be
+// retained as well.
+IREE_API_EXPORT void iree_io_file_mapping_retain(
+    iree_io_file_mapping_t* mapping);
+
+// Releases the file |mapping| and its reference to the backing file handle.
+// If the mapping was the last remaining retainer of the handle it will be
+// closed.
+IREE_API_EXPORT void iree_io_file_mapping_release(
+    iree_io_file_mapping_t* mapping);
+
+// Returns the length of the mapped view in bytes.
+IREE_API_EXPORT iree_host_size_t
+iree_io_file_mapping_length(const iree_io_file_mapping_t* mapping);
+
+// Returns a host-accessible read-only pointer to the file mapping memory.
+// Returns iree_const_byte_span_empty if the mapping is not readable.
+IREE_API_EXPORT iree_const_byte_span_t
+iree_io_file_mapping_contents_ro(const iree_io_file_mapping_t* mapping);
+
+// Returns a host-accessible read-write pointer to the file mapping memory.
+// Returns iree_byte_span_empty if the mapping is not writable.
+IREE_API_EXPORT iree_byte_span_t
+iree_io_file_mapping_contents_rw(iree_io_file_mapping_t* mapping);
 
 //===----------------------------------------------------------------------===//
 // iree_io_stream_t utilities

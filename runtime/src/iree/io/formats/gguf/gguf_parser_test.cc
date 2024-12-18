@@ -38,7 +38,8 @@ TEST(GgufFormatTest, Empty) {
       iree_io_parameter_index_create(iree_allocator_system(), &index));
 
   iree_io_file_handle_t* file_handle = OpenTestFile("empty.gguf");
-  IREE_ASSERT_OK(iree_io_parse_gguf_index(file_handle, index));
+  IREE_ASSERT_OK(
+      iree_io_parse_gguf_index(file_handle, index, iree_allocator_system()));
   iree_io_file_handle_release(file_handle);
 
   iree_io_parameter_index_release(index);
@@ -50,7 +51,8 @@ TEST(GgufFormatTest, SingleTensor) {
       iree_io_parameter_index_create(iree_allocator_system(), &index));
 
   iree_io_file_handle_t* file_handle = OpenTestFile("single.gguf");
-  IREE_ASSERT_OK(iree_io_parse_gguf_index(file_handle, index));
+  IREE_ASSERT_OK(
+      iree_io_parse_gguf_index(file_handle, index, iree_allocator_system()));
   iree_io_file_handle_release(file_handle);
 
   const iree_io_parameter_index_entry_t* entry0 = NULL;
@@ -71,7 +73,8 @@ TEST(GgufFormatTest, SingleTensorV2) {
       iree_io_parameter_index_create(iree_allocator_system(), &index));
 
   iree_io_file_handle_t* file_handle = OpenTestFile("single_v2.gguf");
-  IREE_ASSERT_OK(iree_io_parse_gguf_index(file_handle, index));
+  IREE_ASSERT_OK(
+      iree_io_parse_gguf_index(file_handle, index, iree_allocator_system()));
   iree_io_file_handle_release(file_handle);
 
   const iree_io_parameter_index_entry_t* entry0 = NULL;
@@ -91,7 +94,8 @@ TEST(GgufFormatTest, MultipleTensors) {
       iree_io_parameter_index_create(iree_allocator_system(), &index));
 
   iree_io_file_handle_t* file_handle = OpenTestFile("multiple.gguf");
-  IREE_ASSERT_OK(iree_io_parse_gguf_index(file_handle, index));
+  IREE_ASSERT_OK(
+      iree_io_parse_gguf_index(file_handle, index, iree_allocator_system()));
   iree_io_file_handle_release(file_handle);
 
   const iree_io_parameter_index_entry_t* entry0 = NULL;

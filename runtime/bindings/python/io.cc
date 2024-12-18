@@ -98,10 +98,11 @@ void ParameterIndexAddFromFileHandle(ParameterIndex &self, std::string &key,
 void ParameterIndexParseFileHandle(ParameterIndex &self,
                                    FileHandle &file_handle,
                                    std::string &format) {
-  CheckApiStatus(iree_io_parse_file_index(
-                     iree_make_string_view(format.data(), format.size()),
-                     file_handle.raw_ptr(), self.raw_ptr()),
-                 "Could not parse parameter file index");
+  CheckApiStatus(
+      iree_io_parse_file_index(
+          iree_make_string_view(format.data(), format.size()),
+          file_handle.raw_ptr(), self.raw_ptr(), iree_allocator_system()),
+      "Could not parse parameter file index");
 }
 
 void ParameterIndexLoadFile(ParameterIndex &self, std::string &file_path,
