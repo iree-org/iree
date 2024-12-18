@@ -19,7 +19,7 @@ on:
 
 jobs:
   test_mi300:
-    runs-on: nodai-amdgpu-mi300-x86-64
+    runs-on: arc-iree-gpu-1
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       BUILD_DIR: build-tests
