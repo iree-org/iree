@@ -59,7 +59,7 @@ func.func @nchw_conv_mfma() {
 
 // -----
 
-func.func @nhwc_conv_no_mfma() {
+func.func @nhwc_conv_unaligned_mfma() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<2x33x33x128xf32>>
@@ -74,12 +74,22 @@ func.func @nhwc_conv_no_mfma() {
   return
 }
 
-// CHECK-LABEL: func.func @nhwc_conv_no_mfma
-//   CHECK-NOT:   use_igemm_convolution = true
+// CHECK-LABEL: func.func @nhwc_conv_unaligned_mfma
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   use_igemm_convolution = true
+
+//       CHECK:   linalg.conv_2d_nhwc_hwcf {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
+//  CHECK-SAME:     padding = [2, 1, 32, 64, 32]
+//  CHECK-SAME:     promote_operands = [0, 1, 2]
+//  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
+//  CHECK-SAME:     subgroup = [2, 1, 2, 1, 0]
+//  CHECK-SAME:     workgroup = [2, 1, 32, 64, 0]
 
 // -----
 
-func.func @nchw_conv_no_mfma() {
+func.func @nchw_conv_unaligned_mfma() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<2x128x34x34xf32>>
@@ -94,5 +104,15 @@ func.func @nchw_conv_no_mfma() {
   return
 }
 
-// CHECK-LABEL: func.func @nchw_conv_no_mfma
-//   CHECK-NOT:   use_igemm_convolution = true
+// CHECK-LABEL: func.func @nchw_conv_unaligned_mfma
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   use_igemm_convolution = true
+
+//       CHECK:   linalg.conv_2d_nchw_fchw {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
+//  CHECK-SAME:     padding = [1, 64, 2, 32, 32]
+//  CHECK-SAME:     promote_operands = [0, 1, 2]
+//  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
+//  CHECK-SAME:     subgroup = [1, 2, 2, 1, 0]
+//  CHECK-SAME:     workgroup = [1, 64, 2, 32, 0]
