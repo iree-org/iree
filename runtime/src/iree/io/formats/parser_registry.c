@@ -13,7 +13,7 @@
 
 IREE_API_EXPORT iree_status_t iree_io_parse_file_index(
     iree_string_view_t path, iree_io_file_handle_t* file_handle,
-    iree_io_parameter_index_t* index) {
+    iree_io_parameter_index_t* index, iree_allocator_t host_allocator) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_TEXT(z0, path.data, path.size);
 
@@ -28,11 +28,12 @@ IREE_API_EXPORT iree_status_t iree_io_parse_file_index(
 
   iree_status_t status = iree_ok_status();
   if (iree_string_view_equal_case(extension, IREE_SV("irpa"))) {
-    status = iree_io_parse_irpa_index(file_handle, index);
+    status = iree_io_parse_irpa_index(file_handle, index, host_allocator);
   } else if (iree_string_view_equal_case(extension, IREE_SV("gguf"))) {
-    status = iree_io_parse_gguf_index(file_handle, index);
+    status = iree_io_parse_gguf_index(file_handle, index, host_allocator);
   } else if (iree_string_view_equal_case(extension, IREE_SV("safetensors"))) {
-    status = iree_io_parse_safetensors_index(file_handle, index);
+    status =
+        iree_io_parse_safetensors_index(file_handle, index, host_allocator);
   } else {
     status = iree_make_status(
         IREE_STATUS_UNIMPLEMENTED,

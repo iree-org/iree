@@ -19,9 +19,12 @@ extern "C" {
 // |path| is used for logging and file format identification. It may either be
 // the original file path of |file_handle| or an extension (such as `irpa`).
 // Upon return any parameters in the file are appended to the |index|.
+//
+// The provided |host_allocator| may be used for allocations during parsing and
+// is allowed to be an arena.
 IREE_API_EXPORT iree_status_t iree_io_parse_file_index(
     iree_string_view_t path, iree_io_file_handle_t* file_handle,
-    iree_io_parameter_index_t* index);
+    iree_io_parameter_index_t* index, iree_allocator_t host_allocator);
 
 #ifdef __cplusplus
 }  // extern "C"

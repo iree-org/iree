@@ -106,7 +106,8 @@ static iree_status_t iree_io_append_parameter_file_to_index(
       z0, iree_io_open_parameter_file(path, host_allocator, &file_handle));
 
   // Index the file based on its (inferred) format.
-  iree_status_t status = iree_io_parse_file_index(path, file_handle, index);
+  iree_status_t status =
+      iree_io_parse_file_index(path, file_handle, index, host_allocator);
 
   // Release our file reference - it's still retained by the index if it had any
   // parameters in it.

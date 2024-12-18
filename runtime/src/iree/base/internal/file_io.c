@@ -466,7 +466,9 @@ iree_status_t iree_file_create_mapped(const char* path, uint64_t file_size,
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_file_contents_t* contents = NULL;
-  iree_allocator_malloc(allocator, sizeof(*contents), (void**)&contents);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_allocator_malloc(allocator, sizeof(*contents), (void**)&contents));
   contents->allocator = allocator;
 
   iree_status_t status = iree_file_create_mapped_platform(

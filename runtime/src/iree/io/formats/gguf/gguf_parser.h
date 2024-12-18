@@ -19,8 +19,12 @@ extern "C" {
 //
 // Specification:
 // https://github.com/ggerganov/ggml/blob/master/docs/gguf.md
+//
+// The provided |host_allocator| may be used for allocations during parsing and
+// is allowed to be an arena.
 IREE_API_EXPORT iree_status_t iree_io_parse_gguf_index(
-    iree_io_file_handle_t* file_handle, iree_io_parameter_index_t* index);
+    iree_io_file_handle_t* file_handle, iree_io_parameter_index_t* index,
+    iree_allocator_t host_allocator);
 
 #ifdef __cplusplus
 }  // extern "C"
