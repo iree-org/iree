@@ -1051,8 +1051,13 @@ void ConvertToLLVMPass::runOnOperation() {
   // unroll them to 1-D before converting to the LLVM dialect.
   vector::populateVectorBitCastLoweringPatterns(patterns);
   populateVectorToLLVMMatrixConversionPatterns(typeConverter, patterns);
+  vector::populateVectorRankReducingFMAPattern(patterns);
+  vector::populateVectorInsertExtractStridedSliceTransforms(patterns);
+  vector::populateVectorStepLoweringPatterns(patterns);
   populateVectorToLLVMConversionPatterns(typeConverter, patterns,
                                          reassociateFpReductions);
+  vector::populateVectorTransferLoweringPatterns(patterns,
+                                                 /*maxTransferRank=*/1);
 
   if (isAArch64(targetAttr) &&
       (hasAnySVEFeature(targetAttr) || hasSMEFeature(targetAttr))) {
