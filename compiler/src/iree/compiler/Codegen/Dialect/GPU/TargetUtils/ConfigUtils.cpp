@@ -164,13 +164,9 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
       transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
       /*mustBeAligned*/ mustBeAligned, doCPromotion);
-  if (!schedule) {
-    // Then try again by allowing upcasting accumulator.
-    schedule = deduceMMASchedule(
-        problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
-        transposedLhs, transposedRhs, /*canUpcastAcc=*/true,
-        /*mustBeAligned*/ mustBeAligned, doCPromotion);
-  }
+  // TODO (nirvedhmeshram) : Add support for upcasting accumulator schedule.
+  // Currently we dont have this for TileAndFuse path, see
+  // https://github.com/iree-org/iree/issues/19532
   return schedule;
 }
 
