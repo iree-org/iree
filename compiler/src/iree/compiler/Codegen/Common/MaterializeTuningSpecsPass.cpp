@@ -143,15 +143,12 @@ getDefaultTuningSpec(ModuleOp module,
       dialect.getOrParseTransformLibraryModule(defaultTuningSpecName,
                                                *defaultTuningSpecSource);
 
-  if (failed(defaultTransformLibrary)) {
-    return module->emitError()
-           << "Failed to load  default tuning spec" << defaultTuningSpecName;
-  }
-
 #ifndef NDEBUG
-  if (failed(mlir::verify(*defaultTransformLibrary)))
+  if (succeeded(defaultTransformLibrary) &&
+      failed(mlir::verify(*defaultTransformLibrary)))
     return (*defaultTransformLibrary).emitError()
-           << "Verification failed for default tuning spec";
+           << "Default tuning spec " << defaultTuningSpecName
+           << " failed to verify";
 #endif
 
   return *defaultTransformLibrary;

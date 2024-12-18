@@ -61,7 +61,7 @@ static bool consumesInputOp(NamedSequenceOp op) {
   return false;
 }
 
-static NamedSequenceOp
+static FailureOr<NamedSequenceOp>
 emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
   OpBuilder builder(module->getContext());
   builder.setInsertionPointToEnd(module.getBody());
@@ -126,8 +126,8 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
   builder.create<transform::YieldOp>(loc, operand);
 
   if (failed(mlir::verify(module))) {
-    module.emitError("verification failed for operation in linked "
-                     "tuning spec");
+    module.emitError("Linked tuning spec failed to verify");
+    return failure();
   }
 
   return newSpec;
