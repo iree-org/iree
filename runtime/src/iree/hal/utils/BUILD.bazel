@@ -106,6 +106,23 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "files",
+    srcs = [
+        "file_registry.c",
+        "memory_file.c",
+    ],
+    hdrs = [
+        "file_registry.h",
+        "memory_file.h",
+    ],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/io:file_handle",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "libmpi",
     srcs = ["libmpi.c"],
     hdrs = [
@@ -127,17 +144,6 @@ iree_runtime_cc_test(
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-iree_runtime_cc_library(
-    name = "memory_file",
-    srcs = ["memory_file.c"],
-    hdrs = ["memory_file.h"],
-    deps = [
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/io:file_handle",
     ],
 )
 

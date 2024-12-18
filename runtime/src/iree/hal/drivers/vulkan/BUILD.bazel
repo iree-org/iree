@@ -81,7 +81,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/utils:deferred_command_buffer",
         "//runtime/src/iree/hal/utils:executable_debug_info",
         "//runtime/src/iree/hal/utils:file_transfer",
-        "//runtime/src/iree/hal/utils:memory_file",
+        "//runtime/src/iree/hal/utils:files",
         "//runtime/src/iree/hal/utils:resource_set",
         "//runtime/src/iree/hal/utils:semaphore_base",
         "//runtime/src/iree/schemas:executable_debug_info_c_fbs",

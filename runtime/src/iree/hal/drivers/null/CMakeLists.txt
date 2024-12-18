@@ -41,7 +41,7 @@ iree_cc_library(
     iree::base::internal
     iree::hal
     iree::hal::utils::file_transfer
-    iree::hal::utils::memory_file
+    iree::hal::utils::files
     iree::hal::utils::semaphore_base
   PUBLIC
 )

@@ -24,9 +24,10 @@ extern "C" {
 // If the memory can be imported into a usable staging buffer |device_allocator|
 // will be used to do so.
 IREE_API_EXPORT iree_status_t iree_hal_memory_file_wrap(
+    iree_hal_allocator_t* device_allocator,
     iree_hal_queue_affinity_t queue_affinity, iree_hal_memory_access_t access,
-    iree_io_file_handle_t* handle, iree_hal_allocator_t* device_allocator,
-    iree_allocator_t host_allocator, iree_hal_file_t** out_file);
+    iree_io_file_handle_t* handle, iree_allocator_t host_allocator,
+    iree_hal_file_t** out_file);
 
 #ifdef __cplusplus
 }  // extern "C"

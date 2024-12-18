@@ -76,7 +76,7 @@ iree_cc_library(
     iree::hal::utils::deferred_command_buffer
     iree::hal::utils::executable_debug_info
     iree::hal::utils::file_transfer
-    iree::hal::utils::memory_file
+    iree::hal::utils::files
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::schemas::executable_debug_info_c_fbs
