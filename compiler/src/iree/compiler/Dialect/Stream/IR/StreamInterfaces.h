@@ -16,7 +16,7 @@
 
 namespace mlir::iree_compiler::IREE::Stream {
 
-using LayoutAttrSolverFn = std::function<LogicalResult(
+using ResolveLayoutAttrFn = std::function<LogicalResult(
     AffinityAttr, Operation *, SetVector<Attribute> &)>;
 
 class AffinityAnalysisDialectInterface
@@ -24,7 +24,11 @@ class AffinityAnalysisDialectInterface
 public:
   AffinityAnalysisDialectInterface(Dialect *dialect) : Base(dialect) {}
 
-  virtual LayoutAttrSolverFn makeLayoutAttrSolver(ModuleOp moduleOp) const = 0;
+  /// The `moduleOp` must remain live and unmodified for as long as the returned
+  /// capture is. Otherwise, it will likely be incorrect or crash if the module
+  /// op is mutated, especially when module scope analysis is run.
+  virtual ResolveLayoutAttrFn
+  makeLayoutAttrResolver(ModuleOp moduleOp) const = 0;
 };
 
 } // namespace mlir::iree_compiler::IREE::Stream

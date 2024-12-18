@@ -114,7 +114,7 @@ EncodingAttr EncodingAttr::clone(AffineMap bcastMap) {
              AffineMapAttr::get(bcastMap), getRoundDimsTo(), getLayouts());
 }
 
-EncodingAttr EncodingAttr::cloneWithLayouts(SmallVector<Attribute> layouts) {
+EncodingAttr EncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) {
   MLIRContext *ctx = getContext();
   return get(ctx, getOperandIndex(), getOpType(), getElementTypes(),
              /*user_indexing_maps=*/ArrayAttr(),

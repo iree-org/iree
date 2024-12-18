@@ -54,16 +54,16 @@ SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
 
 // TODO(hanchung): Add "cloneWithEncoding" method to RankedTensorType.
 static RankedTensorType cloneWithEncoding(RankedTensorType type,
-                                          Attribute encoding) {
+                                          Attribute encodingAttr) {
   return RankedTensorType::get(type.getShape(), type.getElementType(),
-                               encoding);
+                               encodingAttr);
 }
 
-static LogicalResult
-addLayoutsToTensorPhaseOps(ModuleOp moduleOp, FunctionOpInterface funcOp,
-                           LayoutAttrSolverFn makeLayoutAttrFn) {
-  SmallVector<AffinityOpInterface> candidates;
-  funcOp.walk([&](AffinityOpInterface affinityOp) {
+static LogicalResult addLayoutsToTensorPhaseOps(
+    ModuleOp moduleOp, FunctionOpInterface funcOp,
+    IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr) {
+  SmallVector<IREE::Stream::AffinityOpInterface> candidates;
+  funcOp.walk([&](IREE::Stream::AffinityOpInterface affinityOp) {
     // Only need to update encoding types for ops that have TensorPhaseOp trait.
     if (!affinityOp->hasTrait<OpTrait::IREE::Stream::TensorPhaseOp>()) {
       return;
@@ -73,8 +73,8 @@ addLayoutsToTensorPhaseOps(ModuleOp moduleOp, FunctionOpInterface funcOp,
     // TODO(hanchung): We should use the default device in this case. However,
     // it is not guaranteed that default device attribute will always be set in
     // the IR. (Is the statement correct?)
-    auto affAttr = affinityOp.getAffinityAttr();
-    if (!affAttr) {
+    auto affinityAttr = affinityOp.getAffinityAttr();
+    if (!affinityAttr) {
       return;
     }
     candidates.push_back(affinityOp);
@@ -86,47 +86,48 @@ addLayoutsToTensorPhaseOps(ModuleOp moduleOp, FunctionOpInterface funcOp,
 
   IRRewriter rewriter(funcOp.getContext());
   for (auto affinityOp : candidates) {
-    auto affAttr = affinityOp.getAffinityAttr();
+    auto affinityAttr = affinityOp.getAffinityAttr();
     SetVector<Attribute> layouts;
-    if (failed(makeLayoutAttrFn(affAttr, moduleOp, layouts))) {
-      affinityOp.emitError("failed on making layouts");
-      return failure();
+    if (failed(resolveLayoutAttr(affinityAttr, moduleOp, layouts))) {
+      return affinityOp.emitError("failed on making layouts");
     }
 
+    // Returns an updated encoding attribute if an encoding attribute is present
+    // in the type. Otherwise, returns std::nullopt.
     auto getEncodingWithNewLayouts =
         [=](Type type) -> std::optional<IREE::Encoding::EncodingAttr> {
       auto rankedTensorType = dyn_cast<RankedTensorType>(type);
       if (!rankedTensorType) {
         return std::nullopt;
       }
-      auto encoding = IREE::Encoding::getEncodingAttr(rankedTensorType);
-      if (!encoding) {
+      auto encodingAttr = IREE::Encoding::getEncodingAttr(rankedTensorType);
+      if (!encodingAttr) {
         return std::nullopt;
       }
-      SmallVector<Attribute> attrs(layouts.begin(), layouts.end());
-      return encoding.cloneWithLayouts(attrs);
+      return encodingAttr.cloneWithLayouts(layouts.getArrayRef());
     };
+
     // TODO(hanchung): Update other Stream operations.
     LogicalResult result =
         TypeSwitch<Operation *, LogicalResult>(affinityOp)
-            .Case<Stream::TensorSizeOfOp>([&](auto sizeOfOp) {
+            .Case<IREE::Stream::TensorSizeOfOp>([&](auto sizeOfOp) {
               auto encodingType =
                   dyn_cast<RankedTensorType>(sizeOfOp.getEncoding());
               if (!encodingType) {
                 return success();
               }
-              std::optional<IREE::Encoding::EncodingAttr> encoding =
+              std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
                   getEncodingWithNewLayouts(encodingType);
-              if (!encoding.has_value()) {
+              if (!encodingAttr.has_value()) {
                 return success();
               }
               rewriter.modifyOpInPlace(sizeOfOp, [&] {
                 sizeOfOp.setEncoding(
-                    cloneWithEncoding(encodingType, encoding.value()));
+                    cloneWithEncoding(encodingType, encodingAttr.value()));
               });
               return success();
             })
-            .Default([](auto *op) { return success(); });
+            .Default([](auto *op) { return failure(); });
 
     if (failed(result)) {
       return failure();
@@ -140,25 +141,24 @@ struct SpecializeEncodingsPass
     : public impl::SpecializeEncodingsPassBase<SpecializeEncodingsPass> {
   void runOnOperation() override {
     ModuleOp moduleOp = getOperation();
-    auto usedDialects =
-        gatherUsedDialectInterfaces<AffinityAnalysisDialectInterface>(moduleOp);
+    auto usedDialects = gatherUsedDialectInterfaces<
+        IREE::Stream::AffinityAnalysisDialectInterface>(moduleOp);
     if (usedDialects.size() != 1) {
       moduleOp.emitError("expected only one dialect implementing "
                          "AffinityAnalysisDialectInterface");
       return signalPassFailure();
     }
 
-    SymbolTable symbolTable(moduleOp);
     llvm::MapVector<StringRef, IREE::Stream::ExecutableOp> executableOps;
     for (auto executableOp : moduleOp.getOps<IREE::Stream::ExecutableOp>()) {
       executableOps[executableOp.getName()] = executableOp;
     }
 
-    LayoutAttrSolverFn makeLayoutAttrFn =
-        usedDialects[0]->makeLayoutAttrSolver(moduleOp);
-    for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-      if (failed(
-              addLayoutsToTensorPhaseOps(moduleOp, funcOp, makeLayoutAttrFn))) {
+    IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr =
+        usedDialects[0]->makeLayoutAttrResolver(moduleOp);
+    for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
+      if (failed(addLayoutsToTensorPhaseOps(moduleOp, funcOp,
+                                            resolveLayoutAttr))) {
         funcOp.emitError(
             "failed on adding layouts to Stream::TensorPhaseOp with encodings");
         return signalPassFailure();

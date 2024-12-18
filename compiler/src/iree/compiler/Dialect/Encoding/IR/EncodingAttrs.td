@@ -116,7 +116,7 @@ def EncodingAttr :
 
     /// Clones an encoding with a new layout list and drops other optional
     /// parameters (because they are resolved).
-    EncodingAttr cloneWithLayouts(SmallVector<Attribute> layouts);
+    EncodingAttr cloneWithLayouts(ArrayRef<Attribute> layouts);
   }];
 
   let genVerifyDecl = 0;

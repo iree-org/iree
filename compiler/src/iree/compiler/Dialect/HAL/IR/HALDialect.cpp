@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/LogicalResult.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
@@ -121,19 +122,18 @@ class HALAffinityAnalysisDialectInterface
     : public IREE::Stream::AffinityAnalysisDialectInterface {
 public:
   using AffinityAnalysisDialectInterface::AffinityAnalysisDialectInterface;
-  IREE::Stream::LayoutAttrSolverFn
-  makeLayoutAttrSolver(ModuleOp moduleOp) const {
-    return [=](IREE::Stream::AffinityAttr aff, Operation *op,
-               SetVector<Attribute> &layoutAttrs) {
-      // TODO: This needs to be in the lambda. Otherwise, it could crash because
-      // the root op (i.e., the original moduleOp) could be outdated.
+  IREE::Stream::ResolveLayoutAttrFn
+  makeLayoutAttrResolver(ModuleOp moduleOp) const {
+    return [=](IREE::Stream::AffinityAttr affinityAttr, Operation *op,
+               SetVector<Attribute> &layoutAttrs) -> LogicalResult {
+      // This needs to be in the lambda because the moduleOp could be modified..
       IREE::HAL::DeviceAnalysis deviceAnalysis(moduleOp);
       if (failed(deviceAnalysis.run())) {
-        op->emitError("failed to run DeviceAnalysis");
-        return failure();
+        return op->emitError("failed to run DeviceAnalysis");
       }
       SetVector<IREE::HAL::ExecutableTargetAttr> resultSet;
-      deviceAnalysis.gatherRequiredExecutableTargets(aff, op, resultSet);
+      deviceAnalysis.gatherRequiredExecutableTargets(affinityAttr, op,
+                                                     resultSet);
       // TODO(hanchung): Populate the EncodingLayoutAttr when it is ready.
       layoutAttrs.insert(resultSet.begin(), resultSet.end());
       return success();
