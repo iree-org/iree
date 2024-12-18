@@ -20,6 +20,8 @@ on:
 jobs:
   test_mi300:
     runs-on: linux-mi300-gpu-1
+    container:
+      image: rocm/dev-ubuntu-22.04:6.3
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       BUILD_DIR: build-tests
