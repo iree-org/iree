@@ -955,17 +955,17 @@ iree_status_t DeviceInstance::TransposeBroadcastDeviceBuffer(
 
   auto arrayBuilder = [](const int64_t* vals, int64_t sz) {
     std::stringstream ss;
-    ss << " {permutation = dense<[" << vals[0];
+    ss << " {permutation = array<i64: " << vals[0];
     for (int i = 1; i < sz; ++i) ss << ", " << vals[i];
-    ss << "]> : tensor<" << sz << "xi64>}";
+    ss << ">}";
     return ss.str();
   };
 
   auto broadcastBuilder = [](int64_t sz) {
     std::stringstream ss;
-    ss << "{broadcast_dimensions = dense<[0";
+    ss << "{broadcast_dimensions = array<i64: 0";
     for (int i = 1; i < sz; ++i) ss << ", " << i;
-    ss << "]> : tensor<" << sz << "xi64>}";
+    ss << ">}";
     return ss.str();
   };
 
