@@ -168,14 +168,6 @@ iree_io_file_handle_flush(iree_io_file_handle_t* handle) {
 
 #if IREE_FILE_IO_ENABLE
 
-// Creates a new platform file at |path| for usage as defined by |mode|.
-// The file will be extended to |initial_size| upon creation.
-// Returns IREE_STATUS_ALREADY_EXISTS if the file already exists.
-// Returns IREE_STATUS_PERMISSION_DENIED if the file cannot be created.
-// Opens an existing platform file at |path| for usage as defined by |mode|.
-// Returns IREE_STATUS_NOT_FOUND if the file does not exist.
-// Returns IREE_STATUS_PERMISSION_DENIED if the specified |mode| is disallowed.
-
 #if defined(IREE_PLATFORM_WINDOWS)
 
 static iree_status_t iree_io_file_handle_platform_open(
@@ -185,9 +177,15 @@ static iree_status_t iree_io_file_handle_platform_open(
   IREE_ASSERT_ARGUMENT(out_handle_primitive);
   memset(out_handle_primitive, 0, sizeof(*out_handle_primitive));
 
-  // MAX_PATH is 260 but most systems nowadays have long paths enabled.
-  char path_str[2048] = {0};
-  iree_string_view_to_cstring(path, path_str, sizeof(path_str));
+  // Convert path from a string view to a NUL-terminated C string.
+  if (path.size >= IREE_MAX_PATH) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "path length %" PRIhsz
+                            " exceeds maximum character length of %d",
+                            path.size, IREE_MAX_PATH);
+  }
+  char* path_str = iree_alloca(path.size + 1);
+  iree_string_view_to_cstring(path, path_str, path.size + 1);
 
   DWORD desired_access = 0;
   if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_READ)) {
@@ -282,8 +280,15 @@ static iree_status_t iree_io_file_handle_platform_open(
   IREE_ASSERT_ARGUMENT(out_handle_primitive);
   memset(out_handle_primitive, 0, sizeof(*out_handle_primitive));
 
-  char path_str[2048] = {0};
-  iree_string_view_to_cstring(path, path_str, sizeof(path_str));
+  // Convert path from a string view to a NUL-terminated C string.
+  if (path.size >= IREE_MAX_PATH) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "path length %" PRIhsz
+                            " exceeds maximum character length of %d",
+                            path.size, IREE_MAX_PATH);
+  }
+  char* path_str = iree_alloca(path.size + 1);
+  iree_string_view_to_cstring(path, path_str, path.size + 1);
 
   int flags = 0;
   // TODO(benvanik): add a flag for forking behavior.
@@ -353,7 +358,13 @@ static iree_status_t iree_io_file_handle_create_or_open(
     iree_io_file_mode_t mode, iree_string_view_t path, bool open_existing,
     uint64_t initial_size, iree_allocator_t host_allocator,
     iree_io_file_handle_t** out_handle) {
-  iree_io_file_handle_primitive_t handle_primitive;
+  if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_RANDOM_ACCESS |
+                                  IREE_IO_FILE_MODE_SEQUENTIAL_SCAN)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "at most one access pattern hint may be specified");
+  }
+
+  iree_io_file_handle_primitive_t handle_primitive = {0};
   IREE_RETURN_IF_ERROR(iree_io_file_handle_platform_open(
       mode, path, open_existing, initial_size, &handle_primitive));
 

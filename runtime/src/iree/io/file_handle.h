@@ -168,9 +168,13 @@ enum iree_io_file_mode_bits_t {
   // Allow writes.
   IREE_IO_FILE_MODE_WRITE = 1ull << 1,
   // Hints that the file will be accessed at random (more-so than not).
+  // Mutually exclusive with IREE_IO_FILE_MODE_SEQUENTIAL_SCAN. If no access
+  // hint is specified the platform will use its default behavior.
   IREE_IO_FILE_MODE_RANDOM_ACCESS = 1ull << 2,
   // Hints that the file will be accessed sequentially (contiguous reads/writes
   // or small skips forward only).
+  // Mutually exclusive with IREE_IO_FILE_MODE_RANDOM_ACCESS. If no access
+  // hint is specified the platform will use its default behavior.
   IREE_IO_FILE_MODE_SEQUENTIAL_SCAN = 1ull << 3,
   // Hints that the library and system caching are not required. May hurt
   // performance more than it helps unless the file is very large and
