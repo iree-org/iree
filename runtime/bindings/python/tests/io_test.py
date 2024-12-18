@@ -96,6 +96,47 @@ class ParameterApiTest(unittest.TestCase):
             verify_archive(file_path)
             gc.collect()
 
+    def testParameterIndexEntryFromToNumpy(self):
+        array = np.array([[1, 2], [3, 4]], dtype=np.int32)
+        index = rt.ParameterIndex()
+        key = "key"
+        rt.parameter_index_add_numpy_ndarray(index, key, array)
+        assert index.items()[0][0] == key
+        index_entry_as_array = rt.parameter_index_entry_as_numpy_ndarray(
+            index.items()[0][1]
+        )
+        np.testing.assert_equal(index_entry_as_array, array)
+
+    def testParameterIndexEntryFromToNumpyZeroDims(self):
+        array = np.array(1234, dtype=np.int32)
+        index = rt.ParameterIndex()
+        key = "key"
+        rt.parameter_index_add_numpy_ndarray(index, key, array)
+        assert index.items()[0][0] == key
+        index_entry_as_array = rt.parameter_index_entry_as_numpy_ndarray(
+            index.items()[0][1]
+        )
+        np.testing.assert_equal(index_entry_as_array, array)
+
+    def testParameterIndexEntryFromIreeTurbine(self):
+        """Verify that we are able to load a tensor from IRPA generated with IREE
+        Turbine.
+        We want to maintain backward compatibility with existing IRPA files."""
+        index = rt.ParameterIndex()
+        irpa_path = str(
+            Path(__file__).resolve().parent
+            / "testdata"
+            / "tensor_saved_with_iree_turbine.irpa"
+        )
+        index.load(irpa_path)
+        items = index.items()
+        assert len(items) == 1
+        key, entry = items[0]
+        assert key == "the_torch_tensor"
+        index_entry_as_array = rt.parameter_index_entry_as_numpy_ndarray(entry)
+        expected_array = np.array([1, 2, 3, 4], dtype=np.uint8)
+        np.testing.assert_array_equal(index_entry_as_array, expected_array, strict=True)
+
     def testFileHandleWrap(self):
         fh = rt.FileHandle.wrap_memory(b"foobar")
         view = fh.host_allocation

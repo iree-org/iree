@@ -294,7 +294,6 @@ _DTYPE_TO_HAL_ELEMENT_TYPE = (
     (np.float16, HalElementType.FLOAT_16),
     (np.float32, HalElementType.FLOAT_32),
     (np.float64, HalElementType.FLOAT_64),
-    (np.float16, HalElementType.FLOAT_16),
     (np.int32, HalElementType.SINT_32),
     (np.int64, HalElementType.SINT_64),
     (np.int16, HalElementType.SINT_16),
