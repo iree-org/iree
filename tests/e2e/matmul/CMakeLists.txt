@@ -1018,6 +1018,32 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
+    e2e_matmul_cuda_f32_large_simt
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=easy_large_static"
+    "--compilation_info=LLVMGPUMatmulSimt"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "cuda"
+  DRIVERS
+    "cuda"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
     e2e_matmul_cuda_f32_large_tensorcore
   TEST_TYPE
     matmul

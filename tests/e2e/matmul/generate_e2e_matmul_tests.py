@@ -50,6 +50,7 @@ class ShapesId(enum.Enum):
 @enum.unique
 class CompilationInfoId(enum.Enum):
     NONE = ""
+    LLVMGPUMatmulSimt = "LLVMGPUMatmulSimt"
     LLVMGPUMatmulTensorCore = "LLVMGPUMatmulTensorCore"
     LLVMGPUMatmulTensorCoreMmaSync = "LLVMGPUMatmulTensorCoreMmaSync"
     LLVMGPUVectorDistributeMFMA = "LLVMGPUVectorDistributeMFMA"
@@ -460,7 +461,18 @@ def get_test_compilation_infos(
 
     software_pipeline_depth = 0
     tile_workgroup_size_pairs = []
-    if compilation_info_id == CompilationInfoId.SPIRVCooperativeMatrixVectorize:
+    if compilation_info_id == CompilationInfoId.LLVMGPUMatmulSimt:
+        tile_workgroup_size_pairs = [
+            TileWorkgroupSizePair([[32, 128, 32]], [32, 8, 1]),
+            TileWorkgroupSizePair([[128, 64, 8]], [16, 8, 1]),
+            TileWorkgroupSizePair([[16, 256, 32]], [64, 2, 1]),
+            TileWorkgroupSizePair([[8, 32, 32]], [8, 8, 1]),
+            TileWorkgroupSizePair([[8, 128, 4]], [32, 1, 1]),
+            TileWorkgroupSizePair([[16, 64, 4]], [16, 2, 1]),
+            TileWorkgroupSizePair([[1, 128, 8]], [32, 1, 1]),
+        ]
+        software_pipeline_depth = 3
+    elif compilation_info_id == CompilationInfoId.SPIRVCooperativeMatrixVectorize:
         tile_workgroup_size_pairs = [
             TileWorkgroupSizePair(
                 [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]], [64, 2, 1]
