@@ -157,6 +157,53 @@ IREE_API_EXPORT iree_status_t
 iree_io_file_handle_flush(iree_io_file_handle_t* handle);
 
 //===----------------------------------------------------------------------===//
+// iree_io_file_handle_t platform files
+//===----------------------------------------------------------------------===//
+
+// Bits indicating how a file is opened.
+typedef uint64_t iree_io_file_mode_t;
+enum iree_io_file_mode_bits_t {
+  // Allow reads of both existing and new content.
+  IREE_IO_FILE_MODE_READ = 1ull << 0,
+  // Allow writes.
+  IREE_IO_FILE_MODE_WRITE = 1ull << 1,
+  // Hints that the file will be accessed at random (more-so than not).
+  IREE_IO_FILE_MODE_RANDOM_ACCESS = 1ull << 2,
+  // Hints that the file will be accessed sequentially (contiguous reads/writes
+  // or small skips forward only).
+  IREE_IO_FILE_MODE_SEQUENTIAL_SCAN = 1ull << 3,
+  // Hints that the library and system caching are not required. May hurt
+  // performance more than it helps unless the file is very large and
+  // exclusively accessed as part of bulk transfer operations that are
+  // page-aligned.
+  IREE_IO_FILE_MODE_DIRECT = 1ull << 4,
+  // Ensures the file is deleted when it is closed. Platforms may use this as a
+  // hint to avoid writing the file contents when cache is available.
+  IREE_IO_FILE_MODE_TEMPORARY = 1ull << 5,
+  // Allows subsequent operations to open the file for read access while the
+  // file is open by the creator.
+  IREE_IO_FILE_MODE_SHARE_READ = 1ull << 6,
+  // Allows subsequent operations to open the file for write access while the
+  // file is open by the creator.
+  IREE_IO_FILE_MODE_SHARE_WRITE = 1ull << 7,
+};
+
+// Creates a new platform file at |path| for usage as defined by |mode|.
+// The file will be extended to |initial_size| upon creation.
+// Returns IREE_STATUS_ALREADY_EXISTS if the file already exists.
+// Returns IREE_STATUS_PERMISSION_DENIED if the file cannot be created.
+IREE_API_EXPORT iree_status_t iree_io_file_handle_create(
+    iree_io_file_mode_t mode, iree_string_view_t path, uint64_t initial_size,
+    iree_allocator_t host_allocator, iree_io_file_handle_t** out_handle);
+
+// Opens an existing platform file at |path| for usage as defined by |mode|.
+// Returns IREE_STATUS_NOT_FOUND if the file does not exist.
+// Returns IREE_STATUS_PERMISSION_DENIED if the specified |mode| is disallowed.
+IREE_API_EXPORT iree_status_t iree_io_file_handle_open(
+    iree_io_file_mode_t mode, iree_string_view_t path,
+    iree_allocator_t host_allocator, iree_io_file_handle_t** out_handle);
+
+//===----------------------------------------------------------------------===//
 // iree_io_file_mapping_t
 //===----------------------------------------------------------------------===//
 // EXPERIMENTAL: this API may change once proper memory objects and views are
