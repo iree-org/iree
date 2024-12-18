@@ -922,3 +922,35 @@ util.func @custom_op_no_producer_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<
 //  CHECK-SAME:         ins(%[[DISPATCH1]],
 //       CHECK:     flow.return %[[CUSTOM_OP]]
 //       CHECK:   util.return %[[DISPATCH2]]
+
+// -----
+
+util.func @scatter_index_producer_fusion(%arg0 : tensor<?x1xi64>,
+    %arg1 : index, %arg2 : tensor<?x1x32x8x128xf16>,
+    %arg3 : tensor<?x32x8x128xf16>) -> tensor<?x32x8x128xf16> {
+  %empty = tensor.empty(%arg1) : tensor<?x1xi32>
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<?x1xi64>) outs(%empty : tensor<?x1xi32>) {
+  ^bb0(%in: i64, %out: i32):
+    %1 = arith.trunci %in : i64 to i32
+    linalg.yield %1 : i32
+  } -> tensor<?x1xi32>
+  %1 = iree_linalg_ext.scatter
+      dimension_map = [0] unique_indices(true)
+      ins(%arg2, %0 : tensor<?x1x32x8x128xf16>, tensor<?x1xi32>)
+      outs(%arg3 : tensor<?x32x8x128xf16>) {
+  ^bb0(%arg6: f16, %arg7: f16):
+    iree_linalg_ext.yield %arg6 : f16
+  } -> tensor<?x32x8x128xf16>
+  util.return %1 : tensor<?x32x8x128xf16>
+}
+// CHECK-LABEL: func public @scatter_index_producer_fusion
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//       CHECK:     %[[SCATTER:.+]] = iree_linalg_ext.scatter
+//  CHECK-SAME:         ins(%{{.+}}, %[[GENERIC]] :
+//       CHECK:     flow.return %[[SCATTER]]
+//       CHECK:   util.return %[[DISPATCH]]
