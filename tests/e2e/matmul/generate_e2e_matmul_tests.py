@@ -196,6 +196,7 @@ def get_test_shapes(shapes_id: ShapesId):
     #    disabled to improve the trade-off between test coverage and build
     #    latency.
     if shapes_id == ShapesId.DEFAULT:
+        return [TestShape(m=128, k=128, n=128, accumulate=True)]
         return get_test_shapes(ShapesId.SMALL) + get_test_shapes(ShapesId.LARGE)
     if shapes_id == ShapesId.SMALL:
         return [

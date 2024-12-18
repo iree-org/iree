@@ -42,17 +42,8 @@ getUKernelNameAndSuffixForMultiMma(IREE::GPU::MultiMmaOp op) {
   if (!mma) {
     return {}; // Only handling DataTiledMMAAttr for now.
   }
-  std::string suffix{
-      stringifyMMAIntrinsic(mma.getIntrinsic().getValue()).lower()};
-  if (mma.getUnrollM() != 1 || mma.getUnrollN() != 1 || mma.getUnrollK() != 1) {
-    suffix += llvm::formatv("_unroll{}x{}x{}", mma.getUnrollM(),
-                            mma.getUnrollN(), mma.getUnrollK());
-  }
-  if (mma.getSubgroupsM() != 1 || mma.getSubgroupsN() != 1) {
-    suffix += llvm::formatv("_subgroups{}x{}", mma.getSubgroupsM(),
-                            mma.getSubgroupsN());
-  }
-  return {"multi_mma", suffix};
+  return {"multi_mma",
+          stringifyMMAIntrinsic(mma.getIntrinsic().getValue()).lower()};
 }
 
 // Returns ukernel name and suffix for any op. Empty name = no ukernel.
