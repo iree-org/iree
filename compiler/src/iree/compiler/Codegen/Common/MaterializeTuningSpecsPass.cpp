@@ -143,6 +143,11 @@ getDefaultTuningSpec(ModuleOp module,
       dialect.getOrParseTransformLibraryModule(defaultTuningSpecName,
                                                *defaultTuningSpecSource);
 
+  if (failed(defaultTransformLibrary)) {
+    return module->emitError()
+           << "Failed to load  default tuning spec" << defaultTuningSpecName;
+  }
+
 #ifndef NDEBUG
   if (failed(mlir::verify(*defaultTransformLibrary)))
     return (*defaultTransformLibrary).emitError()
@@ -247,13 +252,6 @@ struct MaterializeTuningSpecsPass final
         linkTuningSpecs(linkedTuningSpec.get());
     if (failed(newEntrypoint)) {
       module->emitError("Failed to link tuning specs");
-      return signalPassFailure();
-    }
-
-    if (failed(mlir::verify(linkedTuningSpec.get()))) {
-      linkedTuningSpec.get().emitError(
-          "Attribute verification failed for operation in linked "
-          "tuning spec");
       return signalPassFailure();
     }
 

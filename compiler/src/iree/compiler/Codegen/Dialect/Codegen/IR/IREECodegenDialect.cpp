@@ -84,8 +84,6 @@ IREECodegenDialect::verifyOperationAttribute(Operation *op,
              << "Tuning spec entry point expected to have a "
                 "single any_op argument";
     }
-
-    return success();
   }
 
   return success();

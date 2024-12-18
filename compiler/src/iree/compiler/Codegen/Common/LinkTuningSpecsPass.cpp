@@ -124,6 +124,12 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
   }
 
   builder.create<transform::YieldOp>(loc, operand);
+
+  if (failed(mlir::verify(module))) {
+    module.emitError("verification failed for operation in linked "
+                     "tuning spec");
+  }
+
   return newSpec;
 }
 
@@ -144,9 +150,6 @@ struct LinkTuningSpecsPass final
 
 FailureOr<NamedSequenceOp> linkTuningSpecs(ModuleOp module) {
   SmallVector<NamedSequenceOp> tuningSpecs;
-
-  if (failed(mlir::verify(module)))
-    return failure();
 
   for (ModuleOp nested : findNestedModulesWithNamedSequences(module)) {
     llvm::append_range(tuningSpecs, findTuningSpecs(nested));
