@@ -18,6 +18,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Location.h"
+#include "mlir/IR/Verifier.h"
 
 #define DEBUG_TYPE "iree-codegen-link-tuning-specs"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
@@ -53,27 +54,6 @@ static SmallVector<NamedSequenceOp> findTuningSpecs(ModuleOp module) {
       });
 }
 
-// Returns true iff the entrypoint has the following signature:
-// ```
-// transform.named_sequence @name(%arg0: !transform.any_op) ->
-// (!transform.any_op)
-// ```
-static LogicalResult validateTuningSpec(NamedSequenceOp op) {
-  ArrayRef<Type> resTypes = op.getFunctionType().getResults();
-  if (resTypes.size() != 1 || !isa<transform::AnyOpType>(resTypes[0])) {
-    return op.emitWarning()
-           << "Tuning spec entry point expected to return any_op";
-  }
-
-  ArrayRef<Type> argTypes = op.getArgumentTypes();
-  if (argTypes.size() != 1 || !isa<transform::AnyOpType>(argTypes[0])) {
-    return op.emitWarning() << "Tuning spec entry point expected to have a "
-                               "single any_op argument";
-  }
-
-  return success();
-}
-
 static bool consumesInputOp(NamedSequenceOp op) {
   if (op.getArgAttr(0, kArgConsumedAttrName)) {
     return true;
@@ -81,7 +61,7 @@ static bool consumesInputOp(NamedSequenceOp op) {
   return false;
 }
 
-static NamedSequenceOp
+static FailureOr<NamedSequenceOp>
 emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
   OpBuilder builder(module->getContext());
   builder.setInsertionPointToEnd(module.getBody());
@@ -144,6 +124,11 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
   }
 
   builder.create<transform::YieldOp>(loc, operand);
+
+  if (failed(mlir::verify(module))) {
+    return module.emitError("Linked tuning spec failed to verify");
+  }
+
   return newSpec;
 }
 
@@ -167,13 +152,6 @@ FailureOr<NamedSequenceOp> linkTuningSpecs(ModuleOp module) {
 
   for (ModuleOp nested : findNestedModulesWithNamedSequences(module)) {
     llvm::append_range(tuningSpecs, findTuningSpecs(nested));
-  }
-
-  for (NamedSequenceOp spec : tuningSpecs) {
-    LDBG("Found tuning spec: " << spec.getSymName());
-    if (failed(validateTuningSpec(spec))) {
-      return failure();
-    }
   }
 
   size_t numConsumedSpecs = llvm::count_if(tuningSpecs, consumesInputOp);
