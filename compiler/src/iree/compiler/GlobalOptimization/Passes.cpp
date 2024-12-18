@@ -4,6 +4,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/GlobalOptimization/Passes.h"
+#include "iree/compiler/Preprocessing/Passes.h"
+#include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
@@ -102,7 +104,9 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(createRemoveZeroExtentTensorsPass)
       .addPass(createDetachElementwiseFromNamedOpsPass)
-      .addPass(mlir::createLinalgNamedOpConversionPass);
+      .addPass(mlir::createLinalgNamedOpConversionPass)
+      .addPass(Preprocessing::createConvertConvToChannelsLastPass)
+      .addPass(GlobalOptimization::createConvert1X1FilterConv2DToMatmulPass);
   mainPassManager.addPass(createEraseUnusedLinalgOperandsPass());
 
   // Expand tensor shapes into SSA values and optimize the whole program.

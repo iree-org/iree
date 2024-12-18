@@ -125,11 +125,12 @@ Value multiplyDims(ImplicitLocOpBuilder &builder, Value value,
 //
 // This is implementing the math explained in Section 2.3 of
 // https://arxiv.org/abs/1712.05877.
+template <typename Conv2DQOpType, typename Conv2DOpType, typename ConvPoolingType>
 struct QuantizedConvToConv
-    : public OpRewritePattern<linalg::Conv2DNhwcHwcfQOp> {
-  using OpRewritePattern<linalg::Conv2DNhwcHwcfQOp>::OpRewritePattern;
+    : public OpRewritePattern<Conv2DQOpType> {
+  using OpRewritePattern<Conv2DQOpType>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfQOp op,
+  LogicalResult matchAndRewrite(Conv2DQOpType op,
                                 PatternRewriter &rewriter) const override {
     ImplicitLocOpBuilder builder(op.getLoc(), rewriter);
     auto input = op.getInputs()[0];
@@ -151,7 +152,7 @@ struct QuantizedConvToConv
 
     // First implement the convolution without the zero point.
     Value newConv = builder
-                        .create<linalg::Conv2DNhwcHwcfOp>(
+                        .create<Conv2DOpType>(
                             resultTy, ValueRange{input, filter},
                             op.getOutputs(), strides, dilations)
                         .getResult(0);
@@ -211,7 +212,7 @@ struct QuantizedConvToConv
       Value poolInit = builder.create<tensor::EmptyOp>(kDims, accETy, kDyn);
 
       inputSum = builder
-                     .create<linalg::PoolingNhwcSumOp>(
+                     .create<ConvPoolingType>(
                          ArrayRef<Type>{poolTy}, ValueRange{inputSum, poolInit},
                          poolTensor, strides, dilations)
                      .getResult(0);
@@ -347,7 +348,9 @@ public:
     MLIRContext *context = op->getContext();
     RewritePatternSet patterns(context);
     linalg::populateLinalgNamedOpConversionPatterns(patterns);
-    patterns.add<QuantizedConvToConv, QuantizedDepthwiseConvToDepthwiseConv>(
+    patterns.add<QuantizedConvToConv<linalg::Conv2DNhwcHwcfQOp, linalg::Conv2DNhwcHwcfOp, linalg::PoolingNhwcSumOp>,
+                 QuantizedConvToConv<linalg::Conv2DNchwFchwQOp, linalg::Conv2DNchwFchwOp, linalg::PoolingNchwSumOp>,
+    QuantizedDepthwiseConvToDepthwiseConv>(
         context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
