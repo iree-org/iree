@@ -52,8 +52,9 @@ typedef struct iree_hal_file_transfer_options_t {
 // The provided |options.loop| is used for any asynchronous host operations
 // performed as part of the transfer.
 //
-// WARNING: this only works with memory files as created via
-// iree_hal_memory_file_wrap.
+// Only files that support synchronous I/O are supported. Callers must use
+// iree_hal_file_supports_synchronous_io and route asynchronous files to native
+// implementations.
 IREE_API_EXPORT iree_status_t iree_hal_device_queue_read_streaming(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -75,8 +76,9 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_read_streaming(
 // The provided |options.loop| is used for any asynchronous host operations
 // performed as part of the transfer.
 //
-// WARNING: this only works with memory files as created via
-// iree_hal_memory_file_wrap.
+// Only files that support synchronous I/O are supported. Callers must use
+// iree_hal_file_supports_synchronous_io and route asynchronous files to native
+// implementations.
 IREE_API_EXPORT iree_status_t iree_hal_device_queue_write_streaming(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,

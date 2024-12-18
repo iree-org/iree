@@ -123,17 +123,18 @@ IREE_API_EXPORT iree_status_t iree_hal_memory_file_wrap(
     iree_allocator_t host_allocator, iree_hal_file_t** out_file) {
   IREE_ASSERT_ARGUMENT(out_file);
   *out_file = NULL;
-  IREE_TRACE_ZONE_BEGIN(z0);
 
   // For now we only support host allocations but could open other types that
   // may be backed by memory if desired.
   if (iree_io_file_handle_type(handle) !=
       IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
-    IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "support for wrapping non-host-allocation file "
                             "handles with memory files is not yet implemented");
   }
+
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   iree_byte_span_t contents = iree_io_file_handle_value(handle).host_allocation;
 
   // Note that iree_device_size_t (for device offsets/sizes) may be smaller than
@@ -274,90 +275,55 @@ static void iree_hal_memory_file_try_import_buffer(
   iree_status_ignore(status);
 }
 
-static const iree_hal_file_vtable_t iree_hal_memory_file_vtable = {
-    .destroy = iree_hal_memory_file_destroy,
-};
-
-//===----------------------------------------------------------------------===//
-// EXPERIMENTAL: synchronous file read/write API
-//===----------------------------------------------------------------------===//
-// This is incomplete and may not appear like this on the iree_hal_file_t
-// vtable; this does work for memory files though.
-
-IREE_API_EXPORT iree_hal_memory_access_t
-iree_hal_file_allowed_access(iree_hal_file_t* base_file) {
-  IREE_ASSERT_ARGUMENT(base_file);
-
-  // EXPERIMENTAL: today only memory files. This should be on the file vtable
-  // (if supported - not all implementations need to support it).
-  iree_hal_memory_file_t* file = (iree_hal_memory_file_t*)base_file;
-
+static iree_hal_memory_access_t iree_hal_memory_file_allowed_access(
+    iree_hal_file_t* base_file) {
+  iree_hal_memory_file_t* file = iree_hal_memory_file_cast(base_file);
   return file->access;
 }
 
-IREE_API_EXPORT uint64_t iree_hal_file_length(iree_hal_file_t* base_file) {
-  IREE_ASSERT_ARGUMENT(base_file);
-
-  // EXPERIMENTAL: today only memory files. This should be on the file vtable
-  // (if supported - not all implementations need to support it).
-  iree_hal_memory_file_t* file = (iree_hal_memory_file_t*)base_file;
-
+static uint64_t iree_hal_memory_file_length(iree_hal_file_t* base_file) {
+  iree_hal_memory_file_t* file = iree_hal_memory_file_cast(base_file);
   return file->storage->contents.data_length;
 }
 
-IREE_API_EXPORT iree_hal_buffer_t* iree_hal_file_storage_buffer(
+static iree_hal_buffer_t* iree_hal_memory_file_storage_buffer(
     iree_hal_file_t* base_file) {
-  IREE_ASSERT_ARGUMENT(base_file);
-
-  // EXPERIMENTAL: today only memory files. This should be on the file vtable
-  // (if supported - not all implementations need to support it).
-  iree_hal_memory_file_t* file = (iree_hal_memory_file_t*)base_file;
-
+  iree_hal_memory_file_t* file = iree_hal_memory_file_cast(base_file);
   return file->imported_buffer;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_file_read(
-    iree_hal_file_t* base_file, uint64_t file_offset, iree_hal_buffer_t* buffer,
-    iree_device_size_t buffer_offset, iree_device_size_t length) {
-  IREE_ASSERT_ARGUMENT(base_file);
-  IREE_ASSERT_ARGUMENT(buffer);
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, file_offset);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)buffer_offset);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)length);
-
-  // EXPERIMENTAL: today only memory files. This should be on the file vtable
-  // (if supported - not all implementations need to support it).
-  iree_hal_memory_file_t* file = (iree_hal_memory_file_t*)base_file;
-
-  // Copy from the file contents to the staging buffer.
-  iree_byte_span_t file_contents = file->storage->contents;
-  iree_status_t status = iree_hal_buffer_map_write(
-      buffer, buffer_offset, file_contents.data + file_offset, length);
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
+static bool iree_hal_memory_file_supports_synchronous_io(
+    iree_hal_file_t* base_file) {
+  // Memory files always support synchronous IO.
+  return true;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_file_write(
+static iree_status_t iree_hal_memory_file_read(iree_hal_file_t* base_file,
+                                               uint64_t file_offset,
+                                               iree_hal_buffer_t* buffer,
+                                               iree_device_size_t buffer_offset,
+                                               iree_device_size_t length) {
+  iree_hal_memory_file_t* file = iree_hal_memory_file_cast(base_file);
+  iree_byte_span_t file_contents = file->storage->contents;
+  return iree_hal_buffer_map_write(buffer, buffer_offset,
+                                   file_contents.data + file_offset, length);
+}
+
+static iree_status_t iree_hal_memory_file_write(
     iree_hal_file_t* base_file, uint64_t file_offset, iree_hal_buffer_t* buffer,
     iree_device_size_t buffer_offset, iree_device_size_t length) {
-  IREE_ASSERT_ARGUMENT(base_file);
-  IREE_ASSERT_ARGUMENT(buffer);
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, file_offset);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)buffer_offset);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)length);
-
-  // EXPERIMENTAL: today only memory files. This should be on the file vtable
-  // (if supported - not all implementations need to support it).
-  iree_hal_memory_file_t* file = (iree_hal_memory_file_t*)base_file;
-
-  // Copy from the staging buffer to the file contents.
+  iree_hal_memory_file_t* file = iree_hal_memory_file_cast(base_file);
   iree_byte_span_t file_contents = file->storage->contents;
-  iree_status_t status = iree_hal_buffer_map_read(
-      buffer, buffer_offset, file_contents.data + file_offset, length);
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_hal_buffer_map_read(buffer, buffer_offset,
+                                  file_contents.data + file_offset, length);
 }
+
+static const iree_hal_file_vtable_t iree_hal_memory_file_vtable = {
+    .destroy = iree_hal_memory_file_destroy,
+    .allowed_access = iree_hal_memory_file_allowed_access,
+    .length = iree_hal_memory_file_length,
+    .storage_buffer = iree_hal_memory_file_storage_buffer,
+    .supports_synchronous_io = iree_hal_memory_file_supports_synchronous_io,
+    .read = iree_hal_memory_file_read,
+    .write = iree_hal_memory_file_write,
+};

@@ -31,3 +31,56 @@ IREE_API_EXPORT iree_status_t iree_hal_file_import(
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
+
+IREE_API_EXPORT iree_hal_memory_access_t
+iree_hal_file_allowed_access(iree_hal_file_t* file) {
+  IREE_ASSERT_ARGUMENT(file);
+  return _VTABLE_DISPATCH(file, allowed_access)(file);
+}
+
+IREE_API_EXPORT uint64_t iree_hal_file_length(iree_hal_file_t* file) {
+  IREE_ASSERT_ARGUMENT(file);
+  return _VTABLE_DISPATCH(file, length)(file);
+}
+
+IREE_API_EXPORT iree_hal_buffer_t* iree_hal_file_storage_buffer(
+    iree_hal_file_t* file) {
+  IREE_ASSERT_ARGUMENT(file);
+  return _VTABLE_DISPATCH(file, storage_buffer)(file);
+}
+
+IREE_API_EXPORT bool iree_hal_file_supports_synchronous_io(
+    iree_hal_file_t* file) {
+  IREE_ASSERT_ARGUMENT(file);
+  return _VTABLE_DISPATCH(file, supports_synchronous_io)(file);
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_file_read(
+    iree_hal_file_t* file, uint64_t file_offset, iree_hal_buffer_t* buffer,
+    iree_device_size_t buffer_offset, iree_device_size_t length) {
+  IREE_ASSERT_ARGUMENT(file);
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, file_offset);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)buffer_offset);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)length);
+  iree_status_t status = _VTABLE_DISPATCH(file, read)(file, file_offset, buffer,
+                                                      buffer_offset, length);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_file_write(
+    iree_hal_file_t* file, uint64_t file_offset, iree_hal_buffer_t* buffer,
+    iree_device_size_t buffer_offset, iree_device_size_t length) {
+  IREE_ASSERT_ARGUMENT(file);
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, file_offset);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)buffer_offset);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)length);
+  iree_status_t status = _VTABLE_DISPATCH(file, write)(
+      file, file_offset, buffer, buffer_offset, length);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}

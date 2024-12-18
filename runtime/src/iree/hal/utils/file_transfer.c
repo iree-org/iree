@@ -7,7 +7,6 @@
 #include "iree/hal/utils/file_transfer.h"
 
 #include "iree/base/internal/math.h"
-#include "iree/hal/utils/memory_file.h"
 
 //===----------------------------------------------------------------------===//
 // Configuration
@@ -39,8 +38,6 @@
 //===----------------------------------------------------------------------===//
 // iree_hal_transfer_operation_t
 //===----------------------------------------------------------------------===//
-
-// TODO(benvanik): move to utils/ without relying on iree_hal_memory_file_t.
 
 // Maximum number of transfer workers that can be used; common usage should be
 // 1-4 but on very large systems with lots of bandwidth we may be able to
@@ -876,6 +873,15 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_read_streaming(
         target_offset, length, IREE_HAL_COPY_FLAG_NONE);
   }
 
+  // This host-side transfer utility requires synchronous I/O.
+  // HAL implementations are expected to handle asynchronous files themselves.
+  if (!iree_hal_file_supports_synchronous_io(source_file)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "provided source file does not support synchronous I/O and cannot be "
+        "used with streaming file transfer");
+  }
+
   // Allocate full transfer operation.
   iree_hal_transfer_operation_t* operation = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_transfer_operation_create(
@@ -915,6 +921,15 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_write_streaming(
         device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
         source_buffer, source_offset, storage_buffer,
         (iree_device_size_t)target_offset, length, IREE_HAL_COPY_FLAG_NONE);
+  }
+
+  // This host-side transfer utility requires synchronous I/O.
+  // HAL implementations are expected to handle asynchronous files themselves.
+  if (!iree_hal_file_supports_synchronous_io(target_file)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "provided target file does not support synchronous I/O and cannot be "
+        "used with streaming file transfer");
   }
 
   // Allocate full transfer operation.
