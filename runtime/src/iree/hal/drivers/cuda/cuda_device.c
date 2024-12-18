@@ -27,8 +27,8 @@
 #include "iree/hal/drivers/cuda/timepoint_pool.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/deferred_work_queue.h"
+#include "iree/hal/utils/file_registry.h"
 #include "iree/hal/utils/file_transfer.h"
-#include "iree/hal/utils/memory_file.h"
 #include "iree/hal/utils/stream_tracing.h"
 
 //===----------------------------------------------------------------------===//
@@ -897,14 +897,8 @@ static iree_status_t iree_hal_cuda_device_import_file(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
     iree_hal_external_file_flags_t flags, iree_hal_file_t** out_file) {
-  if (iree_io_file_handle_type(handle) !=
-      IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
-    return iree_make_status(
-        IREE_STATUS_UNAVAILABLE,
-        "implementation does not support the external file type");
-  }
-  return iree_hal_memory_file_wrap(
-      queue_affinity, access, handle, iree_hal_device_allocator(base_device),
+  return iree_hal_file_from_handle(
+      iree_hal_device_allocator(base_device), queue_affinity, access, handle,
       iree_hal_device_host_allocator(base_device), out_file);
 }
 
