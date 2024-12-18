@@ -59,7 +59,7 @@ func.func @dot_dispatch_1() {
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.fill
 //      CHECK:   linalg.matmul
-// CHECK-SAME:       lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1], reduction = [0, 0, 4], thread = [2, 1, 0], workgroup = [4, 2, 1]}>
+// CHECK-SAME:       lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 4], thread = [2, 1, 0], workgroup = [4, 2, 1]}>
 
 // -----
 
@@ -86,7 +86,7 @@ func.func @unaligned_k() {
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.fill
 //      CHECK:   linalg.matmul
-// CHECK-SAME:       lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1], reduction = [0, 0, 2], thread = [1, 16, 0], workgroup = [32, 128, 1]}>
+// CHECK-SAME:       lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 2], thread = [1, 16, 0], workgroup = [32, 128, 1]}>
 
 // -----
 
@@ -656,7 +656,7 @@ func.func @_main_dispatch_15_generic_512x4x42x42x64_f32() {
 //  CHECK-SAME:    translation_info = #[[TRANSLATION]]
 //       CHECK:  linalg.fill
 //       CHECK:  linalg.generic
-//  CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1], reduction = [0, 0, 0, 0, 32], thread = [1, 1, 1, 16, 0], workgroup = [1, 1, 32, 128, 1]}>
+//  CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 0, 0, 32], thread = [1, 1, 1, 16, 0], workgroup = [1, 1, 32, 128, 1]}>
 
 // -----
 

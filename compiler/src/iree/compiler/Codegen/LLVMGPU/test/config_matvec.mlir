@@ -271,7 +271,7 @@ func.func @not_vmt() {
 //       CHECK: func.func @not_vmt()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1], reduction = [0, 0, 8], thread = [1, 128, 0], workgroup = [1, 128, 1]}>
+//  CHECK-SAME:       lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 8], thread = [1, 128, 0], workgroup = [1, 128, 1]}>
 
 // -----
 

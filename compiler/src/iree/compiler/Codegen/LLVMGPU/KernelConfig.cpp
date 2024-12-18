@@ -1346,8 +1346,6 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
       attrs.emplace_back(b.getStringAttr("reduction"),
                          b.getI64ArrayAttr(reductionTileSizes));
 
-      // Promote operands to use shared memory for LHS and RHS.
-      IREE::GPU::setPromotedOperandList(context, attrs, {0, 1});
       auto configDict = b.getDictionaryAttr(attrs);
       auto loweringConfig =
           IREE::GPU::LoweringConfigAttr::get(context, configDict);

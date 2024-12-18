@@ -87,8 +87,8 @@ hal.executable @dot_dispatch_0 {
 //            CHECK:   hal.executable.variant public @cuda
 //        CHECK-NOT:   llvm.store
 //            CHECK:   llvm.br
-//            CHECK:    llvm.load {{.*}} : !llvm.ptr<3> -> vector<32xf32>
-//   CHECK-COUNT-32:    llvm.load {{.*}} : !llvm.ptr<3> -> vector<16xf32>
+//            CHECK:    llvm.load {{.*}} : !llvm.ptr<1> -> vector<32xf32>
+//   CHECK-COUNT-32:    llvm.load {{.*}} : !llvm.ptr<1> -> vector<16xf32>
 //   CHECK-COUNT-32:    llvm.intr.fmuladd({{.*}}) : (vector<16xf32>, vector<16xf32>, vector<16xf32>) -> vector<16xf32>
 //            CHECK:    llvm.store {{.*}} : vector<16xf32>, !llvm.ptr<1>
 
