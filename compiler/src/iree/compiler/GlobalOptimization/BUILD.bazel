@@ -48,6 +48,7 @@ iree_compiler_cc_library(
         "Convert1X1FilterConv2DToMatmul.cpp",
         "DataLayoutPropagation.cpp",
         "DecomposeConcat.cpp",
+        "DecomposeLowParallelismAttentionPass.cpp",
         "DemoteContractionInputsToBF16.cpp",
         "DetachElementwiseFromNamedOps.cpp",
         "EraseUnusedLinalgOperands.cpp",
