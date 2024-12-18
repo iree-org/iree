@@ -19,7 +19,7 @@ on:
 
 jobs:
   test_mi300:
-    runs-on: arc-iree-gpu-1
+    runs-on: linux-mi300-gpu-1
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       BUILD_DIR: build-tests
