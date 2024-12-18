@@ -130,9 +130,11 @@ iree_cc_library(
   NAME
     files
   HDRS
+    "fd_file.h"
     "file_registry.h"
     "memory_file.h"
   SRCS
+    "fd_file.c"
     "file_registry.c"
     "memory_file.c"
   DEPS
