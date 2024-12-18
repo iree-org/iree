@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
@@ -33,8 +34,34 @@ namespace {
 struct TileAndDistributeToWorkgroupsUsingForallOpPass final
     : public impl::TileAndDistributeToWorkgroupsUsingForallOpPassBase<
           TileAndDistributeToWorkgroupsUsingForallOpPass> {
+  TileAndDistributeToWorkgroupsUsingForallOpPass(
+      ReorderWorkgroupsStrategy strategy)
+      : reorderingStrategy(strategy) {}
+
   using Base::Base;
   void runOnOperation() override;
+
+  LogicalResult initializeOptions(
+      StringRef options,
+      function_ref<LogicalResult(const Twine &)> errorHandler) override {
+    if (failed(Pass::initializeOptions(options, errorHandler))) {
+      return failure();
+    }
+    auto selectedStrategy =
+        llvm::StringSwitch<FailureOr<ReorderWorkgroupsStrategy>>(strategy)
+            .Case("", ReorderWorkgroupsStrategy::None)
+            .Case("transpose", ReorderWorkgroupsStrategy::Transpose)
+            .Default(failure());
+    if (failed(selectedStrategy))
+      return failure();
+
+    reorderingStrategy = *selectedStrategy;
+    return success();
+  }
+
+private:
+  ReorderWorkgroupsStrategy reorderingStrategy =
+      ReorderWorkgroupsStrategy::None;
 };
 
 } // namespace
@@ -188,6 +215,28 @@ pruneDroppedLoops(ArrayRef<Attribute> inputs,
     }
   }
   return prunedAttrs;
+}
+
+// Checks whether we have static dimension for all the loop bounds and steps.
+// This is a requirement if the reordering strategy is set to `transpose`.
+static bool checkStaticLoopBounds(scf::ForallOp forallOp) {
+
+  SmallVector<OpFoldResult> mixedLbs = forallOp.getMixedLowerBound();
+  SmallVector<OpFoldResult> mixedUbs = forallOp.getMixedUpperBound();
+  SmallVector<OpFoldResult> mixedSteps = forallOp.getMixedStep();
+
+  for (auto [index, lb, ub, step] :
+       llvm::enumerate(mixedLbs, mixedUbs, mixedSteps)) {
+
+    std::optional<int64_t> lbVal = getConstantIntValue(lb);
+    std::optional<int64_t> ubVal = getConstantIntValue(ub);
+    std::optional<int64_t> stepVal = getConstantIntValue(step);
+
+    if (!(lbVal && ubVal && stepVal)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /// Find dimensions of the loop that are unit-trip count and drop them from the
@@ -516,6 +565,20 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
       // TODO: run producer and consumer fusion in one worklist.
       fuseProducersOfSlices(rewriter, newFusionOpportunities,
                             tileAndFuseOptions, newLoop);
+      forallOp = newLoop;
+    }
+
+    // Reorder the workgroups if the strategy is set to `transpose`.
+    // This just transposes the first two dimensions of the workgroup i.e., the
+    // #iree.codegen.workgroup_id_x and #iree.codegen.workgroup_id_y.
+    // Only reorders if the loop bounds are static.
+    if (reorderingStrategy == ReorderWorkgroupsStrategy::Transpose) {
+      SmallVector<Attribute> mappingAttrs(forallOp.getMappingAttr().getValue());
+      int64_t mappingSize = mappingAttrs.size();
+      if (checkStaticLoopBounds(forallOp) && mappingAttrs.size() >= 2) {
+        std::swap(mappingAttrs[mappingSize - 1], mappingAttrs[mappingSize - 2]);
+        forallOp.setMappingAttr(ArrayAttr::get(context, mappingAttrs));
+      }
     }
   }
 
@@ -537,5 +600,11 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   }
 
   return;
+}
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createTileAndDistributeToWorkgroupsWithReordering(
+    ReorderWorkgroupsStrategy strategy) {
+  return std::make_unique<TileAndDistributeToWorkgroupsUsingForallOpPass>(
+      strategy);
 }
 } // namespace mlir::iree_compiler

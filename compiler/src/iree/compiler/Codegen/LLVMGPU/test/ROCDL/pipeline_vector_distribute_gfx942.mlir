@@ -1084,14 +1084,15 @@ hal.executable private @attention_multiple_m_transpose {
 
 // CHECK-LABEL: func.func @attention_multiple_m_transpose()
 // CHECK: scf.for %{{.*}} = %c0 to %c4608 step %c64
-// CHECK-SAME: -> (vector<2x1x1xf32>, vector<2x1x1xf32>, vector<2x8x1x1x1x4xf32>)
+// CHECK-SAME: -> (vector<2x1x1xf32>, vector<2x1x1xf32>, vector<2x4x1x1x1x4xf32>)
 // CHECK-COUNT-96:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 // CHECK: scf.yield
 
 // Check that we only use alloc for Q, K, and V. No shared memory for S is
 // needed because the intrinsic layout mathes.
+// TODO: With forall distribution it's allocating memory for S.
 // MEMORY-LABEL: func.func @attention_multiple_m_transpose()
-// MEMORY-COUNT-3: memref.alloc
+// MEMORY-COUNT-4: memref.alloc
 // MEMORY-NOT: memref.alloc
 
 // -----
@@ -1152,14 +1153,14 @@ hal.executable private @attention_mfma_32x32x8 {
 
 // CHECK-LABEL: func.func @attention_mfma_32x32x8()
 // CHECK: scf.for %{{.*}} = %c0 to %c4608 step %c32
-// CHECK-SAME: -> (vector<1x1x1xf32>, vector<1x1x1xf32>, vector<1x4x1x4x1x4xf32>)
-// CHECK-COUNT-32:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 8 : i32, m = 32 : i32, n = 32 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<16xf32>
+// CHECK-SAME: -> (vector<1x1x1xf32>, vector<1x1x1xf32>, vector<1x2x1x4x1x4xf32>)
+// CHECK-COUNT-24:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 8 : i32, m = 32 : i32, n = 32 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<16xf32>
 // CHECK: scf.yield
 
 // Check that we only use alloc for Q, K, and V. No shared memory for S is
 // needed because the intrinsic layout mathes.
 // MEMORY-LABEL: func.func @attention_mfma_32x32x8()
-// MEMORY-COUNT-3: memref.alloc
+// MEMORY-COUNT-4: memref.alloc
 // MEMORY-NOT: memref.alloc
 
 // -----
@@ -1311,3 +1312,4 @@ module {
 
 // MEMORY-LABEL: func.func @attention_gather_k
 // MEMORY-COUNT-3: memref.alloc
+// MEMORY-NOT:     memref.alloc
