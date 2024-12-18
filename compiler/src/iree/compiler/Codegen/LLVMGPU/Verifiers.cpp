@@ -38,6 +38,10 @@ getInstructionShape(Operation *op, CodeGenPipeline pipeline,
                     Type inputElementType,
                     SmallVector<int64_t> &instructionShape) {
   switch (pipeline) {
+  case CodeGenPipeline::LLVMGPUMatmulSimt:
+    // SIMT Pipeline / CUDA Cores
+    instructionShape = {1, 1, 1};
+    break;
   case CodeGenPipeline::LLVMGPUMatmulTensorCore:
     // Tensor Core Pipeline / WMMA API
     if (inputElementType.isF16() || inputElementType.isBF16()) {
@@ -77,7 +81,8 @@ verifyGPUMatmulPipeline(Operation *op,
                         ArrayRef<int64_t> workgroupSize) {
   // This verifier only applies to matmul.
   CodeGenPipeline pipeline = translationInfo.getDispatchLoweringPassPipeline();
-  if (pipeline != CodeGenPipeline::LLVMGPUMatmulTensorCore &&
+  if (pipeline != CodeGenPipeline::LLVMGPUMatmulSimt &&
+      pipeline != CodeGenPipeline::LLVMGPUMatmulTensorCore &&
       pipeline != CodeGenPipeline::LLVMGPUMatmulTensorCoreMmaSync) {
     return success();
   }
@@ -174,6 +179,10 @@ verifyGPUMatmulPipeline(Operation *op,
            << workgroupSize[kDimZ] << " with compilation pipeline "
            << pipelineName;
   }
+
+  // Return success for SIMT/CUDA cores.
+  if (pipeline == CodeGenPipeline::LLVMGPUMatmulSimt)
+    return success();
 
   //
   // Additional verification Tensor Core pipelines.

@@ -385,6 +385,30 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
 ##
 ###########################################################################
 
+iree_generated_e2e_runner_test(
+    name = "e2e_matmul_cuda_f32_large_simt",
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f32",
+        "--acc_type=f32",
+        "--shapes=easy_large_static",
+        "--compilation_info=LLVMGPUMatmulSimt",
+    ],
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+    target_backends_and_drivers = [
+        ("cuda", "cuda"),
+    ],
+    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+    test_type = "matmul",
+)
+
 # Testing Ampere + TensorCore path.
 # WMMA TensorCore(F32): wmma.161616.f32.tf32
 iree_generated_e2e_runner_test(

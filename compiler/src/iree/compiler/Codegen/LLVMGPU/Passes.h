@@ -28,6 +28,10 @@ using IREE::GPU::GPUPipelineOptions;
 // LLVMGPU Backend Pass Pipelines
 //----------------------------------------------------------------------------//
 
+/// Lowering using SIMT CUDA core operations.
+void addGPUMatmulSimtPassPipeline(OpPassManager &funcPassManager,
+                                  const GPUPipelineOptions &options);
+
 /// Lowering using mma.sync Tensor Core operations.
 void addGPUMatmulTensorCoreMmaSyncPassPipeline(
     OpPassManager &funcPassManager, const GPUPipelineOptions &options,
