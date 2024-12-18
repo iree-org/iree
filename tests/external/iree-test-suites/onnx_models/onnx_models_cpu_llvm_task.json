@@ -1,0 +1,35 @@
+{
+  "config_name": "cpu_llvm_task",
+  "iree_compile_flags": [
+    "--iree-hal-target-backends=llvm-cpu",
+    "--iree-llvmcpu-target-cpu=host"
+  ],
+  "iree_run_module_flags": [
+    "--device=local-task"
+  ],
+  "tests_and_expected_outcomes": {
+    "default": "skip",
+    "tests/model_zoo/validated/vision/body_analysis_models_test.py::test_age_gender_age_googlenet": "pass",
+    "tests/model_zoo/validated/vision/body_analysis_models_test.py::test_age_gender_gender_googlenet": "pass",
+    "tests/model_zoo/validated/vision/body_analysis_models_test.py::test_emotion_ferplus": "pass",
+    "tests/model_zoo/validated/vision/body_analysis_models_test.py::test_ultraface": "pass",
+    "tests/model_zoo/validated/vision/classification_models_test.py::test_alexnet": "pass",
+    "tests/model_zoo/validated/vision/classification_models_test.py::test_caffenet": "pass",
+    "tests/model_zoo/validated/vision/classification_models_test.py::test_densenet_121": "pass",
+    "tests/model_zoo/validated/vision/classification_models_test.py::test_googlenet": "pass",
+    "tests/model_zoo/validated/vision/classification_models_test.py::test_inception_v2": "pass",
+    "tests/model_zoo/validated/vision/classification_models_test.py::test_mnist": "pass",
+    "tests/model_zoo/validated/vision/classification_models_test.py::test_mobilenet": "pass",
+    "tests/model_zoo/validated/vision/classification_models_test.py::test_resnet50_v1": "pass",
+    "tests/model_zoo/validated/vision/classification_models_test.py::test_resnet50_v2": "pass",
+    "tests/model_zoo/validated/vision/classification_models_test.py::test_shufflenet": "pass",
+    "tests/model_zoo/validated/vision/classification_models_test.py::test_shufflenet_v2": "pass",
+    "tests/model_zoo/validated/vision/classification_models_test.py::test_squeezenet": "pass",
+    "tests/model_zoo/validated/vision/object_detection_segmentation_models_test.py::test_ssd_mobilenetv1": "pass",
+    "tests/model_zoo/validated/vision/object_detection_segmentation_models_test.py::test_tiny_yolov2": "pass",
+    "tests/model_zoo/validated/vision/object_detection_segmentation_models_test.py::test_tiny_yolov3": "pass",
+    "tests/model_zoo/validated/vision/object_detection_segmentation_models_test.py::test_yolov2_coco": "pass",
+    "tests/model_zoo/validated/vision/object_detection_segmentation_models_test.py::test_yolov3": "pass",
+    "tests/model_zoo/validated/vision/super_resolution_models_test.py::test_fast_neural_style": "pass"
+  }
+}
