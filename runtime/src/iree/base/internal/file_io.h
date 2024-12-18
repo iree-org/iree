@@ -48,6 +48,8 @@ void iree_file_contents_free(iree_file_contents_t* contents);
 
 typedef enum iree_file_read_flag_bits_t {
   IREE_FILE_READ_FLAG_PRELOAD = (1u << 0),
+  // TODO(benvanik): drop this (and possibly all file utilities) in favor of
+  // iree_io_file_handle_t + iree_io_file_map_view.
   IREE_FILE_READ_FLAG_MMAP = (1u << 1),
   IREE_FILE_READ_FLAG_DEFAULT = IREE_FILE_READ_FLAG_PRELOAD,
 } iree_file_read_flags_t;

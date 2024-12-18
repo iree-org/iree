@@ -12,11 +12,13 @@
 #if IREE_FILE_IO_ENABLE
 #if defined(IREE_PLATFORM_WINDOWS)
 
+#include <fcntl.h>   // _open_osfhandle constants
 #include <io.h>      // _commit
 #include <werapi.h>  // WerRegisterExcludedMemoryBlock
 
 #else
 
+#include <fcntl.h>     // open
 #include <sys/mman.h>  // mmap
 #include <sys/stat.h>  // fstat
 #include <unistd.h>    // fsync
@@ -159,6 +161,287 @@ iree_io_file_handle_flush(iree_io_file_handle_t* handle) {
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
+
+//===----------------------------------------------------------------------===//
+// iree_io_file_handle_t utilities
+//===----------------------------------------------------------------------===//
+
+#if IREE_FILE_IO_ENABLE
+
+#if defined(IREE_PLATFORM_WINDOWS)
+
+static iree_status_t iree_io_file_handle_platform_open(
+    iree_io_file_mode_t mode, iree_string_view_t path, bool open_existing,
+    uint64_t initial_size,
+    iree_io_file_handle_primitive_t* out_handle_primitive) {
+  IREE_ASSERT_ARGUMENT(out_handle_primitive);
+  memset(out_handle_primitive, 0, sizeof(*out_handle_primitive));
+
+  // Convert path from a string view to a NUL-terminated C string.
+  if (path.size >= IREE_MAX_PATH) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "path length %" PRIhsz
+                            " exceeds maximum character length of %d",
+                            path.size, IREE_MAX_PATH);
+  }
+  char* path_str = iree_alloca(path.size + 1);
+  iree_string_view_to_cstring(path, path_str, path.size + 1);
+
+  DWORD desired_access = 0;
+  if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_READ)) {
+    desired_access |= GENERIC_READ;
+  }
+  if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_WRITE)) {
+    desired_access |= GENERIC_WRITE;
+  }
+
+  DWORD share_mode = 0;
+  if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_SHARE_READ)) {
+    share_mode |= FILE_SHARE_READ;
+  }
+  if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_SHARE_WRITE)) {
+    share_mode |= FILE_SHARE_WRITE;
+  }
+
+  DWORD creation_disposition = open_existing ? OPEN_EXISTING : CREATE_ALWAYS;
+
+  DWORD flags = FILE_ATTRIBUTE_NORMAL;
+  if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_RANDOM_ACCESS)) {
+    flags |= FILE_FLAG_RANDOM_ACCESS;
+  } else if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_SEQUENTIAL_SCAN)) {
+    flags |= FILE_FLAG_SEQUENTIAL_SCAN;
+  }
+  if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_TEMPORARY)) {
+    flags |= FILE_FLAG_DELETE_ON_CLOSE;
+  }
+
+  // Create or open the file.
+  HANDLE handle = CreateFileA(path_str, desired_access, share_mode, NULL,
+                              creation_disposition, flags, NULL);
+  if (handle == INVALID_HANDLE_VALUE) {
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "failed to open file '%.*s'", (int)path.size,
+                            path.data);
+  }
+
+  // If we were provided an initialize size and are creating the file then
+  // adjust the file length.
+  if (!open_existing) {
+    // Zeroish-extend the file up to the total file size specified by the
+    // caller. This may be larger than the virtual address space can handle but
+    // so long as the length requested for mapping is under the size_t limit
+    // this will succeed.
+    LARGE_INTEGER file_size = {0};
+    file_size.QuadPart = initial_size;
+    if (!SetFilePointerEx(handle, file_size, NULL, FILE_BEGIN) ||
+        !SetEndOfFile(handle)) {
+      CloseHandle(handle);
+      return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                              "failed to extend file '%.*s' to %" PRIu64
+                              " bytes (out of disk space or permission denied)",
+                              (int)path.size, path.data, initial_size);
+    }
+  }
+
+  // Transfer ownership of the handle to a CRT file descriptor.
+  // After this succeeds we cannot call CloseHandle as the CRT owns it.
+  int open_flags = 0;
+  if (!iree_all_bits_set(mode, IREE_IO_FILE_MODE_WRITE)) {
+    open_flags |= _O_RDONLY;
+  }
+  int fd = _open_osfhandle((intptr_t)handle, open_flags);
+  if (fd == -1) {
+    CloseHandle(handle);  // must close since we didn't transfer
+    return iree_make_status(
+        IREE_STATUS_INTERNAL,
+        "unable to transfer Win32 HANDLE to a CRT file descriptor");
+  }
+
+  out_handle_primitive->type = IREE_IO_FILE_HANDLE_TYPE_FD;
+  out_handle_primitive->value.fd = fd;
+  return iree_ok_status();
+}
+
+static void iree_io_file_handle_platform_close(
+    void* user_data, iree_io_file_handle_primitive_t handle_primitive) {
+  // NOTE: we opened the file using Win32 APIs but it's safe to _close since we
+  // transferred ownership to the CRT with _open_osfhandle. If we used
+  // IREE_IO_FILE_HANDLE_TYPE_WIN32_HANDLE we'd want to switch on that instead.
+  IREE_ASSERT_EQ(handle_primitive.type, IREE_IO_FILE_HANDLE_TYPE_FD);
+  _close(handle_primitive.value.fd);
+}
+
+#else
+
+static iree_status_t iree_io_file_handle_platform_open(
+    iree_io_file_mode_t mode, iree_string_view_t path, bool open_existing,
+    uint64_t initial_size,
+    iree_io_file_handle_primitive_t* out_handle_primitive) {
+  IREE_ASSERT_ARGUMENT(out_handle_primitive);
+  memset(out_handle_primitive, 0, sizeof(*out_handle_primitive));
+
+  // Convert path from a string view to a NUL-terminated C string.
+  if (path.size >= IREE_MAX_PATH) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "path length %" PRIhsz
+                            " exceeds maximum character length of %d",
+                            path.size, IREE_MAX_PATH);
+  }
+  char* path_str = iree_alloca(path.size + 1);
+  iree_string_view_to_cstring(path, path_str, path.size + 1);
+
+  int flags = 0;
+  // TODO(benvanik): add a flag for forking behavior.
+  flags |= O_CLOEXEC;
+  if (!open_existing) {
+    // If the file exists open anyway and truncate as if it had been recreated.
+    // This matches Win32 CREATE_ALWAYS behavior.
+    flags |= O_CREAT | O_TRUNC;
+  }
+  if (iree_all_bits_set(mode,
+                        IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_WRITE)) {
+    // NOTE: O_RDWR != O_RDONLY | O_WRONLY!
+    flags |= O_RDWR;
+  } else if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_READ)) {
+    flags |= O_RDONLY;
+  } else if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_WRITE)) {
+    flags |= O_WRONLY;
+  }
+#if defined(O_DIRECT)
+  if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_DIRECT)) {
+    flags |= O_DIRECT;
+  }
+#endif  // O_DIRECT
+#if defined(O_TMPFILE)
+  if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_TEMPORARY)) {
+    flags |= O_TMPFILE;
+  }
+#endif  // O_TMPFILE
+
+  // I don't know, unix file permissions are dumb. User and group seems fine?
+  const mode_t open_mode = (S_IRUSR | S_IWUSR) | (S_IRGRP | S_IWGRP);
+
+  int fd = open(path_str, flags, open_mode);
+  if (fd == -1) {
+    return iree_make_status(iree_status_code_from_errno(errno),
+                            "failed to open file '%.*s'", (int)path.size,
+                            path.data);
+  }
+
+  // If we were provided an initialize size and are creating the file then
+  // adjust the file length.
+  if (!open_existing) {
+    // Zero-extend the file up to the total file size specified by the
+    // caller. Note that `ftruncate` extends too.
+    if (ftruncate(fd, (off_t)initial_size) == -1) {
+      return iree_make_status(iree_status_code_from_errno(errno),
+                              "failed to extend file '%.*s' to %" PRIu64
+                              " bytes (out of disk space or permission denied)",
+                              (int)path.size, path.data, initial_size);
+    }
+  }
+
+  out_handle_primitive->type = IREE_IO_FILE_HANDLE_TYPE_FD;
+  out_handle_primitive->value.fd = fd;
+  return iree_ok_status();
+}
+
+static void iree_io_file_handle_platform_close(
+    void* user_data, iree_io_file_handle_primitive_t handle_primitive) {
+  IREE_ASSERT_EQ(handle_primitive.type, IREE_IO_FILE_HANDLE_TYPE_FD);
+  close(handle_primitive.value.fd);
+}
+
+#endif  // IREE_PLATFORM_WINDOWS
+
+static iree_status_t iree_io_file_handle_create_or_open(
+    iree_io_file_mode_t mode, iree_string_view_t path, bool open_existing,
+    uint64_t initial_size, iree_allocator_t host_allocator,
+    iree_io_file_handle_t** out_handle) {
+  if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_RANDOM_ACCESS |
+                                  IREE_IO_FILE_MODE_SEQUENTIAL_SCAN)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "at most one access pattern hint may be specified");
+  }
+
+  iree_io_file_handle_primitive_t handle_primitive = {0};
+  IREE_RETURN_IF_ERROR(iree_io_file_handle_platform_open(
+      mode, path, open_existing, initial_size, &handle_primitive));
+
+  iree_io_file_access_t allowed_access = 0;
+  if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_READ)) {
+    allowed_access |= IREE_IO_FILE_ACCESS_READ;
+  }
+  if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_WRITE)) {
+    allowed_access |= IREE_IO_FILE_ACCESS_WRITE;
+  }
+  iree_io_file_handle_release_callback_t release_callback = {
+      .fn = iree_io_file_handle_platform_close,
+      .user_data = NULL,
+  };
+  iree_io_file_handle_t* handle = NULL;
+  iree_status_t status =
+      iree_io_file_handle_wrap(allowed_access, handle_primitive,
+                               release_callback, host_allocator, &handle);
+
+  if (iree_status_is_ok(status)) {
+    *out_handle = handle;
+  } else {
+    release_callback.fn(release_callback.user_data, handle_primitive);
+  }
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_io_file_handle_create(
+    iree_io_file_mode_t mode, iree_string_view_t path, uint64_t initial_size,
+    iree_allocator_t host_allocator, iree_io_file_handle_t** out_handle) {
+  IREE_ASSERT_ARGUMENT(out_handle);
+  *out_handle = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_TEXT(z0, path.data, path.size);
+  iree_status_t status = iree_io_file_handle_create_or_open(
+      mode, path, /*open_existing=*/false, initial_size, host_allocator,
+      out_handle);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_io_file_handle_open(
+    iree_io_file_mode_t mode, iree_string_view_t path,
+    iree_allocator_t host_allocator, iree_io_file_handle_t** out_handle) {
+  IREE_ASSERT_ARGUMENT(out_handle);
+  *out_handle = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_TEXT(z0, path.data, path.size);
+  iree_status_t status = iree_io_file_handle_create_or_open(
+      mode, path, /*open_existing=*/true, 0ull, host_allocator, out_handle);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+#else
+
+IREE_API_EXPORT iree_status_t iree_io_file_handle_create(
+    iree_io_file_mode_t mode, iree_string_view_t path, uint64_t initial_size,
+    iree_allocator_t host_allocator, iree_io_file_handle_t** out_handle) {
+  IREE_ASSERT_ARGUMENT(out_handle);
+  *out_handle = NULL;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "file support has been compiled out of this binary; "
+                          "set IREE_FILE_IO_ENABLE=1 to include it");
+}
+
+IREE_API_EXPORT iree_status_t iree_io_file_handle_open(
+    iree_io_file_mode_t mode, iree_string_view_t path,
+    iree_allocator_t host_allocator, iree_io_file_handle_t** out_handle) {
+  IREE_ASSERT_ARGUMENT(out_handle);
+  *out_handle = NULL;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "file support has been compiled out of this binary; "
+                          "set IREE_FILE_IO_ENABLE=1 to include it");
+}
+
+#endif  // IREE_FILE_IO_ENABLE
 
 //===----------------------------------------------------------------------===//
 // iree_io_file_mapping_t support

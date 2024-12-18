@@ -53,8 +53,6 @@
 // iree_io_stdio_stream_t
 //===----------------------------------------------------------------------===//
 
-#define IREE_MAX_PATH ((size_t)2048)
-
 typedef struct iree_io_stdio_stream_t {
   iree_io_stream_t base;
   iree_allocator_t host_allocator;
@@ -148,13 +146,15 @@ IREE_API_EXPORT iree_status_t iree_io_stdio_stream_open(
   // We could heap allocate instead but a few thousand chars is quite long and
   // since Windows doesn't support more than ~256 we generally keep them short
   // anyway.
-  if (path.size > IREE_MAX_PATH) {
+  if (path.size >= IREE_MAX_PATH) {
     IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "path exceeds reasonable maximum (%" PRIhsz
-                            " > %" PRIhsz ")",
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "path length %" PRIhsz
+                            " exceeds maximum character length of %d",
                             path.size, IREE_MAX_PATH);
   }
+  char* path_str = iree_alloca(path.size + 1);
+  iree_string_view_to_cstring(path, path_str, path.size + 1);
   char* fopen_path = (char*)iree_alloca(path.size + 1);
   memcpy(fopen_path, path.data, path.size);
   fopen_path[path.size] = 0;  // NUL
