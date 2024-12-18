@@ -7,27 +7,11 @@
 name: CI - Linux x64 clang
 
 on:
+  workflow_call:
   workflow_dispatch:
-  pull_request:
-  push:
-    branches:
-      - main
-
-concurrency:
-  # A PR number if a pull request and otherwise the commit hash. This cancels
-  # queued and in-progress runs for the same PR (presubmit) or commit
-  # (postsubmit). The workflow name is prepended to avoid conflicts between
-  # different workflows.
-  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
-  cancel-in-progress: true
 
 jobs:
-  setup:
-    uses: ./.github/workflows/setup.yml
-
   linux_x64_clang:
-    needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang')
     runs-on: azure-linux-scale
     container:
       image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:78a558b999b230f7e1da376639e14b44f095f30f1777d6a272ba48c0bbdd4ccb
@@ -71,10 +55,4 @@ jobs:
       - name: Test iree-dialects
         run: ./build_tools/cmake/test_iree_dialects.sh "${BUILD_DIR}"
 
-      - name: Post to Discord on Failure
-        uses: sarisia/actions-status-discord@ce8cc68e4e626000136b3c702d049a154243e490 # v1.14.7
-        if: failure() && github.ref_name == 'main' && github.repository_owner == 'iree-org'
-        with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          description: "The ${{ github.workflow }} workflow failed"
-          url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}"
+      # Alerting on failure is the responsibility of the calling job.
