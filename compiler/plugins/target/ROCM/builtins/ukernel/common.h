@@ -61,7 +61,6 @@ typedef __UINT64_TYPE__ uint64_t;
 // Vector typedefs
 //===----------------------------------------------------------------------===//
 
-typedef __attribute__((__vector_size__(8 * 2))) int64_t int64x2_t;
 typedef __attribute__((__vector_size__(4 * 4))) int32_t int32x4_t;
 
 //===----------------------------------------------------------------------===//
