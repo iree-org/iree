@@ -126,8 +126,7 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
   builder.create<transform::YieldOp>(loc, operand);
 
   if (failed(mlir::verify(module))) {
-    module.emitError("Linked tuning spec failed to verify");
-    return failure();
+    return module.emitError("Linked tuning spec failed to verify");
   }
 
   return newSpec;

@@ -151,7 +151,7 @@ getDefaultTuningSpec(ModuleOp module,
            << " failed to verify";
 #endif
 
-  return *defaultTransformLibrary;
+  return defaultTransformLibrary;
 }
 
 static FailureOr<DenseElementsAttr>

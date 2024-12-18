@@ -66,7 +66,6 @@ IREECodegenDialect::verifyOperationAttribute(Operation *op,
   if (symbol != kTuningSpecEntrypointAttrName)
     return success();
 
-  // Verify that the attribute is a UnitAttr.
   if (!isa<UnitAttr>(attr)) {
     return op->emitError("'") << symbol << "' attribute must be a UnitAttr";
   }
