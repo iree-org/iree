@@ -6,6 +6,7 @@
 
 #include "iree/hal/utils/file_registry.h"
 
+#include "iree/hal/utils/fd_file.h"
 #include "iree/hal/utils/memory_file.h"
 
 IREE_API_EXPORT iree_status_t iree_hal_file_from_handle(
@@ -24,6 +25,10 @@ IREE_API_EXPORT iree_status_t iree_hal_file_from_handle(
       status =
           iree_hal_memory_file_wrap(device_allocator, queue_affinity, access,
                                     handle, host_allocator, out_file);
+      break;
+    case IREE_IO_FILE_HANDLE_TYPE_FD:
+      status = iree_hal_fd_file_from_handle(access, handle, host_allocator,
+                                            out_file);
       break;
     default:
       status = iree_make_status(

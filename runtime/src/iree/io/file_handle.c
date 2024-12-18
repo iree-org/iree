@@ -9,6 +9,18 @@
 #include "iree/base/internal/atomics.h"
 #include "iree/io/memory_stream.h"
 
+#if IREE_FILE_IO_ENABLE
+#if defined(IREE_PLATFORM_WINDOWS)
+
+#include <io.h>  // _commit
+
+#else
+
+#include <unistd.h>  // fsync
+
+#endif  // IREE_PLATFORM_WINDOWS
+#endif  // IREE_FILE_IO_ENABLE
+
 //===----------------------------------------------------------------------===//
 // iree_io_file_handle_t
 //===----------------------------------------------------------------------===//
@@ -101,6 +113,25 @@ iree_io_file_handle_primitive(const iree_io_file_handle_t* handle) {
   return handle->primitive;
 }
 
+static iree_status_t iree_io_platform_fd_flush(int fd) {
+#if IREE_FILE_IO_ENABLE
+
+#if defined(IREE_PLATFORM_WINDOWS)
+  int ret = _commit(fd);
+#else
+  int ret = fsync(fd);
+#endif  // IREE_PLATFORM_WINDOWS
+  return ret != -1 ? iree_ok_status()
+                   : iree_make_status(iree_status_code_from_errno(errno),
+                                      "unable to sync file writes");
+
+#else
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "file support has been compiled out of this binary; "
+                          "set IREE_FILE_IO_ENABLE=1 to include it");
+#endif  // IREE_FILE_IO_ENABLE
+}
+
 IREE_API_EXPORT iree_status_t
 iree_io_file_handle_flush(iree_io_file_handle_t* handle) {
   IREE_ASSERT_ARGUMENT(handle);
@@ -109,6 +140,10 @@ iree_io_file_handle_flush(iree_io_file_handle_t* handle) {
   switch (handle->primitive.type) {
     case IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION: {
       // No-op (though we could flush when known mapped).
+      break;
+    }
+    case IREE_IO_FILE_HANDLE_TYPE_FD: {
+      status = iree_io_platform_fd_flush(handle->primitive.value.fd);
       break;
     }
     default: {

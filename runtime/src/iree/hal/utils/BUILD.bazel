@@ -108,10 +108,12 @@ iree_runtime_cc_library(
 iree_runtime_cc_library(
     name = "files",
     srcs = [
+        "fd_file.c",
         "file_registry.c",
         "memory_file.c",
     ],
     hdrs = [
+        "fd_file.h",
         "file_registry.h",
         "memory_file.h",
     ],
