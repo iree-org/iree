@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-codegen-llvmgpu-configuration-pipeline)" \
-// RUN:   --iree-gpu-test-target=sm_60 %s | FileCheck %s
+// RUN:   --iree-gpu-test-target=sm_60 --iree-codegen-llvmgpu-enable-tile-and-fuse-matmul=false %s | FileCheck %s
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-codegen-llvmgpu-configuration-pipeline)" \
-// RUN:   --iree-gpu-test-target=sm_80 %s | FileCheck %s --check-prefix=SM80
+// RUN:   --iree-gpu-test-target=sm_80 --iree-codegen-llvmgpu-enable-tile-and-fuse-matmul=false %s | FileCheck %s --check-prefix=SM80
 
 // Transform dialect attributes are tested separately.
 
