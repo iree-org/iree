@@ -93,7 +93,7 @@ table ExecutableDef {
   descriptor_set_layouts:[DescriptorSetLayoutDef];
 
   // A list of pipeline layouts. Exports reference layouts in this list and
-  // multiple exports present in mutliple shader modules may share layouts.
+  // multiple exports present in multiple shader modules may share layouts.
   // This list may not have the same size as the pipelines list.
   pipeline_layouts:[PipelineLayoutDef];
 
