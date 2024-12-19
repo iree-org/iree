@@ -183,11 +183,11 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
     if (mma.getUnrollN() > 1) {
       expand(swizzle, 1, {Kind::CrossIntrinsic, mma.getUnrollN()});
     }
-    if (mma.getSubgroupsN() > 1) {
-      expand(swizzle, 1, {Kind::CrossThread, mma.getSubgroupsN()});
-    }
     if (mma.getUnrollM() > 1) {
       expand(swizzle, 0, {Kind::CrossIntrinsic, mma.getUnrollM()});
+    }
+    if (mma.getSubgroupsN() > 1) {
+      expand(swizzle, 1, {Kind::CrossThread, mma.getSubgroupsN()});
     }
     if (mma.getSubgroupsM() > 1) {
       expand(swizzle, 0, {Kind::CrossThread, mma.getSubgroupsM()});
