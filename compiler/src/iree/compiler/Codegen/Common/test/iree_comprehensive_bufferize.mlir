@@ -2172,7 +2172,7 @@ func.func @operand_fusion() {
 #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map4 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map5 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-func.func @dot_general_nontrivial_batching_mutliple_parallel_dimension() {
+func.func @dot_general_nontrivial_batching_multiple_parallel_dimension() {
   %cst = arith.constant dense<0.000000e+00> : vector<1x4x2xf32>
   %c1 = arith.constant 1 : index
   %c6 = arith.constant 6 : index
@@ -2217,7 +2217,7 @@ func.func @dot_general_nontrivial_batching_mutliple_parallel_dimension() {
   }
   return
 }
-// CHECK-LABEL: func.func @dot_general_nontrivial_batching_mutliple_parallel_dimension()
+// CHECK-LABEL: func.func @dot_general_nontrivial_batching_multiple_parallel_dimension()
 //   CHECK-NOT:   memref.alloc
 
 // -----
