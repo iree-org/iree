@@ -64,7 +64,7 @@ IREECodegenDialect::verifyOperationAttribute(Operation *op,
   //         b. It must have exactly one argument type, and the argument must be
   //         of type `transform::AnyOpType`.
 
-  if (symbol == kTuningDefaultSpecAttrName) {
+  if (symbol == kTuningSpecDefaultEntrypointAttrName) {
     if (auto moduleOp = dyn_cast<ModuleOp>(op)) {
       if (!llvm::any_of(moduleOp.getOps(), [](auto &op) {
             if (auto namedSeqOp = dyn_cast<transform::NamedSequenceOp>(&op)) {
@@ -75,8 +75,8 @@ IREECodegenDialect::verifyOperationAttribute(Operation *op,
             return false;
           })) {
         return moduleOp.emitError()
-               << "The default tuning specification must include an "
-                  "operation with the symbol name '"
+               << "The tuning specification must include a named "
+                  "sequence with the symbol name '"
                << kKernelConfigSpecName << "'.";
       }
     }
