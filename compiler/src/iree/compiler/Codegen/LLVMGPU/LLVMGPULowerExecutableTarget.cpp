@@ -114,9 +114,6 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWinogradVectorize:
     addGPUWinogradVectorizePassPipeline(pipeline);
     break;
-  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
-    addGPUMatmulSimtPassPipeline(pipeline, pipelineOptions);
-    break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore: {
     FailureOr<int64_t> maybeDepth =
         getSoftwarePipelineDepth(translationInfo.getConfiguration());
