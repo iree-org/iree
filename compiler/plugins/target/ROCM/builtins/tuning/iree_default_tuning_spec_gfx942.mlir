@@ -5,7 +5,7 @@
 // TODO(https://github.com/iree-org/iree/issues/19214): Add missing
 // configurations to this spec.
 
-module @iree_default_tuning_spec_gfx942 attributes { transform.with_named_sequence, iree_codegen.default_tuning_spec } {
+module @iree_default_tuning_spec_gfx942 attributes { transform.with_named_sequence, iree_codegen.tuning_spec_with_default_entrypoint } {
 
 transform.named_sequence @apply_op_config(%op: !transform.any_op {transform.readonly},
                                         %config: !transform.any_param {transform.readonly}) {

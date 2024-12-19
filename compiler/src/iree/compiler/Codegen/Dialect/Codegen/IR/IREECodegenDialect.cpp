@@ -52,10 +52,8 @@ IREECodegenDialect::verifyOperationAttribute(Operation *op,
   StringRef symbol = attribute.getName().strref();
   Attribute attr = attribute.getValue();
   // This function verifies the validity of a specific operation attribute.
-  // - If the attribute's name matches `kTuningDefaultSpecAttrName` :
-  //   - For the `ModuleOp` operation ( representing the default spec):
-  //     - Ensure the module contains one operation with the symbol
-  //       name `__kernel_config`. If not, emit an error.
+  // - If the attribute's name matches `kTuningDefaultSpecAttrName`, make
+  //   sure it contains a single named sequence op with name `__kernel_config`.
   // - If the attribute's name matches `kTuningSpecEntrypointAttrName`
   // ("iree_codegen.tuning_spec_entrypoint"):
   //   1. The attribute value must be a UnitAttr.
@@ -69,12 +67,17 @@ IREECodegenDialect::verifyOperationAttribute(Operation *op,
   if (symbol == kTuningDefaultSpecAttrName) {
     if (auto moduleOp = dyn_cast<ModuleOp>(op)) {
       if (!llvm::any_of(moduleOp.getOps(), [](auto &op) {
-            return SymbolTable::getSymbolName(&op).getValue() ==
-                   kKernelConfigSpecName;
+            if (auto namedSeqOp = dyn_cast<transform::NamedSequenceOp>(&op)) {
+              return SymbolTable::getSymbolName(namedSeqOp)
+                  .getValue()
+                  .contains(kKernelConfigSpecName);
+            }
+            return false;
           })) {
         return moduleOp.emitError()
                << "The default tuning specification must include an "
-                  "operation with the symbol name '__kernel_config'.";
+                  "operation with the symbol name '"
+               << kKernelConfigSpecName << "'.";
       }
     }
   }
