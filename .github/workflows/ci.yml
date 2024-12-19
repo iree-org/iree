@@ -46,6 +46,9 @@ jobs:
   setup:
     uses: ./.github/workflows/setup.yml
 
+  ##############################################################################
+  # Runtime builds
+
   runtime:
     needs: setup
     name: "runtime :: ${{ matrix.name }}"
@@ -197,15 +200,43 @@ jobs:
         run: cmake --build ${BUILD_DIR} -- -k 0
 
   ##############################################################################
+  # Full project builds
+
+  linux_x64_bazel:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_bazel')
+    uses: ./.github/workflows/ci_linux_x64_bazel.yml
+    secrets: inherit
+
+  linux_x64_clang:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang')
+    uses: ./.github/workflows/ci_linux_x64_clang.yml
+    secrets: inherit
+
+  linux_x64_clang_asan:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_asan')
+    uses: ./.github/workflows/ci_linux_x64_clang_asan.yml
+    secrets: inherit
+
+  ##############################################################################
 
   # Aggregate job status and alerting on failures.
   ci_summary:
     if: always()
     needs:
       - setup
+
+      # Runtime builds.
       - runtime
       - runtime_small
       - runtime_tracing
+
+      # Full project builds.
+      - linux_x64_bazel
+      - linux_x64_clang
+      - linux_x64_clang_asan
     uses: ./.github/workflows/workflow_summary.yml
     secrets: inherit
     with:
