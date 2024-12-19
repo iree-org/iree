@@ -51,4 +51,23 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_binary(
+  NAME
+    elf_module_server
+  HDRS
+    "../../nonlocal/nl_api.h"
+    "../../nonlocal/command_data.h"
+  SRCS
+    "../../nonlocal/command_data.c"
+    "../../nonlocal/nl_api.c"
+    "../../nonlocal/elf_module_server.c"
+  DEPS
+    iree::hal::local::elf::elf_module
+    iree::base
+    iree::base::internal::cpu
+    iree::hal::local::elf::testdata::elementwise_mul
+    iree::hal::local::executable_environment
+    iree::hal::local::executable_library
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
