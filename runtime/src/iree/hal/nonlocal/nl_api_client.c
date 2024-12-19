@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "iree/hal/local/elf/elf_module.h"
 #include "iree/hal/local/executable_environment.h"
@@ -7,6 +8,7 @@
 #include "command_data.h"
 #include "command_op.h"
 #include "nl_api.h"
+#include "debug.h"
 
 static command_data_t *get_command_data() {
 	static command_data_t command_data;
@@ -26,10 +28,12 @@ nl_mem_device_ptr_t nl_mem_alloc(size_t size) {
 	command.size = size;
 	command_data_write(command_data, &command, sizeof(command));
 	command_data_read(command_data, &p, sizeof(p));
+	DEBUG_PRINTF("ALLOC %zu = %p\n", size, p);
 	return p;
 }
 
 void nl_mem_free(nl_mem_device_ptr_t ptr) {
+	DEBUG_PRINTF("FREE %p\n", ptr);
 	command_data_t *command_data = get_command_data();
 	struct __attribute__((packed)) { command_op_t op; command_ptr_t ptr; } command;
 	command.op = OP_DEVICE_FREE;
@@ -46,7 +50,7 @@ void nl_mem_copy_in(nl_mem_device_ptr_t dest, const void *src, size_t size) {
 	command.op = OP_COPY_IN;
 	command.dest = dest;
 	command.size = size;
-	printf("COPY IN %p\n", dest);
+	DEBUG_PRINTF("COPY IN %p %zu\n", dest, size);
 	command_data_write(command_data, &command, sizeof(command));
 	command_data_write(command_data, src, size);
 }
@@ -57,7 +61,7 @@ void nl_mem_copy_out(void *dest, const nl_mem_device_ptr_t src, size_t size) {
 	command.op = OP_COPY_OUT;
 	command.src = src;
 	command.size = size;
-	printf("COPY OUT %p\n", src);
+	DEBUG_PRINTF("COPY OUT %p %zu\n", src, size);
 	command_data_write(command_data, &command, sizeof(command));
 	command_data_read_full(command_data, dest, size);
 }
@@ -69,11 +73,13 @@ void nl_mem_copy(nl_mem_device_ptr_t dest, const nl_mem_device_ptr_t src, size_t
 	command.src = src;
 	command.dest = dest;
 	command.size = size;
+	DEBUG_PRINTF("COPY %p %p %zu\n", src, dest, size);
 	command_data_write(command_data, &command, sizeof(command));
 }
 
 // load elf data, return elf module
 nl_elf_module_handle_t nl_elf_executable_load(const uint8_t *elf_data, int elf_data_length) {
+	DEBUG_PRINTF("LOAD ELF %p %d\n", elf_data, elf_data_length);
 	command_data_t *command_data = get_command_data();
 	struct __attribute__((packed)) { command_op_t op; command_value_t data_length; } command;
 	command_ptr_t p;
@@ -82,11 +88,13 @@ nl_elf_module_handle_t nl_elf_executable_load(const uint8_t *elf_data, int elf_d
 	command_data_write(command_data, &command, sizeof(command));
 	command_data_write(command_data, (void *)elf_data, elf_data_length);
 	command_data_read(command_data, &p, sizeof(p));
+	DEBUG_PRINTF("LOADEd ELF %p\n", p);
 	return p;
 }
 
 // init elf module, return module data
 void *nl_elf_executable_init(nl_elf_module_handle_t module) {
+	DEBUG_PRINTF("ELF INIT %p\n", module);
 	command_data_t *command_data = get_command_data();
 	struct __attribute__((packed)) { command_op_t op; command_ptr_t module; } command;
 	command_ptr_t p;
@@ -94,11 +102,12 @@ void *nl_elf_executable_init(nl_elf_module_handle_t module) {
 	command.module = module;
 	command_data_write(command_data, &command, sizeof(command));
 	command_data_read(command_data, &p, sizeof(p));
+	DEBUG_PRINTF("INITED ELF %p\n", p);
 	return p;
 }
 
 void nl_elf_executable_get_attrs(void *module_data, void **attrs, int *count) {
-	printf("ELF GET ATTRS %p\n", module_data);
+	DEBUG_PRINTF("ELF GET ATTRS %p\n", module_data);
 	command_data_t *command_data = get_command_data();
 	command_value_t n;
 	struct __attribute__((packed)) { command_op_t op; command_ptr_t module_data; } command;
@@ -113,6 +122,7 @@ void nl_elf_executable_get_attrs(void *module_data, void **attrs, int *count) {
 
 // call function
 int nl_elf_executable_call(void *module_data, int ordinal, void *dispatch_state, void *workgroup_state) {
+	DEBUG_PRINTF("ELF CALL %p %d\n", module_data, ordinal);
 	command_data_t *command_data = get_command_data();
 	struct __attribute__((packed)) { command_op_t op; command_ptr_t module_data; command_value_t ordinal; } command;
 	command_value_t n;
@@ -131,10 +141,12 @@ int nl_elf_executable_call(void *module_data, int ordinal, void *dispatch_state,
 	}
 
 	command_data_read(command_data, &n, sizeof(n));
+	DEBUG_PRINTF("CALLED ELF %llu\n", (long long unsigned int)n);
 	return n;
 }
 
 void nl_elf_executable_destroy(nl_elf_module_handle_t module) {
+	DEBUG_PRINTF("ELF FREE %p\n", module);
 	command_data_t *command_data = get_command_data();
 	struct __attribute__((packed)) { command_op_t op; command_ptr_t module; } command;
 	command.op = OP_ELF_FREE;

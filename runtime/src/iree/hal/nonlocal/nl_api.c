@@ -5,6 +5,9 @@
 #include "iree/hal/local/executable_library.h"
 
 #include "nl_api.h"
+#include "debug.h"
+
+#include "debug.h"
 
 nl_mem_device_ptr_t nl_mem_alloc(size_t size) { return malloc(size); }
 void nl_mem_free(nl_mem_device_ptr_t ptr) { free(ptr); }
@@ -48,6 +51,11 @@ void nl_elf_executable_get_attrs(void *module_data, void ** attrs, int *count) {
 // call function
 int nl_elf_executable_call(void *module_data, int ordinal, void *dispatch_state, void *workgroup_state) {
   if(ordinal >= ((iree_hal_executable_library_v0_t *)module_data)->exports.count) return -1;
+
+#ifdef DEBUG
+  if(((iree_hal_executable_library_v0_t *)module_data)->exports.names)
+    DEBUG_PRINTF("calling %p %s\n", (const void*)(((iree_hal_executable_library_v0_t *)module_data)->exports.ptrs[ordinal]), ((iree_hal_executable_library_v0_t *)module_data)->exports.names[ordinal]);
+#endif
 
   return iree_elf_call_i_ppp((const void*)(((iree_hal_executable_library_v0_t *)module_data)->exports.ptrs[ordinal]),
                                 NULL, dispatch_state,

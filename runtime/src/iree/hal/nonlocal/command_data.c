@@ -8,6 +8,12 @@
 
 #include "command_data.h"
 
+// Only debug in this file if debug is > 1
+#if defined(DEBUG) && DEBUG < 2
+#undef DEBUG
+#endif
+
+#include "debug.h"
 
 int command_data_init(command_data_t *command_data, int port) {
 	struct sockaddr_in address;
@@ -48,7 +54,7 @@ int command_data_open(command_data_t *command_data, char *server, int port) {
 	struct sockaddr_in serv_addr;
 
 	if ((command_data->fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		printf("\n Socket creation error \n");
+		fprintf(stderr, "\n Socket creation error \n");
 		return -1;
 	}
 
@@ -62,12 +68,12 @@ int command_data_open(command_data_t *command_data, char *server, int port) {
 	serv_addr.sin_port = htons(port);
 
 	if (inet_pton(AF_INET, server, &serv_addr.sin_addr) <= 0) {
-		printf("\nInvalid address/ Address not supported \n");
+		fprintf(stderr, "\nInvalid address/ Address not supported \n");
 		return -1;
 	}
 
 	if (connect(command_data->fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-		printf("\nConnection Failed \n");
+		fprintf(stderr, "\nConnection Failed \n");
 		return -1;
 	}
 	command_data->connection_count = 0;
@@ -76,6 +82,7 @@ int command_data_open(command_data_t *command_data, char *server, int port) {
 }
 
 int command_data_read(command_data_t *command_data, void *buffer, int size) {
+	DEBUG_PRINTF("read %d\n", size);
 	return recv(command_data->fd, buffer, size, 0);
 }
 
@@ -97,6 +104,7 @@ int command_data_read_full(command_data_t *command_data, void *buffer, int size)
 }
 
 int command_data_write(command_data_t *command_data, const void *buffer, int size) {
+	DEBUG_PRINTF("write %d\n", size);
 	return send(command_data->fd, buffer, size, 0);
 }
 
@@ -132,7 +140,7 @@ int command_data_process_connections(command_data_t *command_data) {
 			return -1;
 		}
 
-		printf("New connection: socket fd is %d, ip is : %s, port : %d\n", new_socket, inet_ntoa(address.sin_addr), ntohs(address.sin_port));
+		DEBUG_PRINTF("New connection: socket fd is %d, ip is : %s, port : %d\n", new_socket, inet_ntoa(address.sin_addr), ntohs(address.sin_port));
 
 		if (command_data->connection_count < MAX_CLIENTS) {
 			command_data->fds[command_data->connection_count + 1].fd = new_socket;
@@ -151,6 +159,7 @@ int command_data_connection_read(command_data_t *command_data, int i, void *buff
 	i++;
 
 	if(!(command_data->fds[i].revents & POLLIN)) return 0;
+	DEBUG_PRINTF("connection %d read %d\n", i, size);
 
 	int n = recv(command_data->fds[i].fd, buffer, size, 0);
 	if ( n <= 0 ) {
@@ -164,7 +173,7 @@ int command_data_connection_read_full(command_data_t *command_data, int i, void 
 	i++;
 
 	if(!(command_data->fds[i].revents & POLLIN)) return 0;
-	printf("connection %d read %d\n", i, size);
+	DEBUG_PRINTF("connection %d read %d\n", i, size);
 
 	int remain = size;
 	int n;
@@ -185,7 +194,9 @@ int command_data_connection_read_full(command_data_t *command_data, int i, void 
 int command_data_connection_write(command_data_t *command_data, int i, const void *buffer, int size) {
 	i++;
 
+	DEBUG_PRINTF("connection %d write %d\n", i, size);
 	int n = send(command_data->fds[i].fd, buffer, size, 0);
+
 	if ( n <= 0 ) {
 		close(command_data->fds[i].fd);
 		command_data->fds[i].fd = -1;

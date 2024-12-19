@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 typedef void *nl_mem_device_ptr_t;
 typedef void *nl_elf_module_handle_t;
 
