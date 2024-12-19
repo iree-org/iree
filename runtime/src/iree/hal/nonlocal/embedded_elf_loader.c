@@ -80,7 +80,10 @@ static iree_status_t iree_hal_nonlocal_elf_executable_create(
   // Query metadata and get the entry point function pointers.
   executable->library = nl_elf_executable_init(executable->module);
 
-  executable->base.dispatch_attrs = executable->library->exports.attrs;
+  void *p;
+  int n;
+  nl_elf_executable_get_attrs(executable->library, &p, &n);
+  executable->base.dispatch_attrs = (iree_hal_executable_dispatch_attrs_v0_t *)p;
 
 #if 0
   // Resolve imports, if any.
@@ -91,7 +94,6 @@ static iree_status_t iree_hal_nonlocal_elf_executable_create(
         (iree_hal_executable_import_thunk_v0_t)iree_elf_thunk_i_ppp,
         host_allocator);
   }
-#endif
 
   // Verify that the library matches the executable params.
   if (iree_status_is_ok(status)) {
@@ -103,6 +105,7 @@ static iree_status_t iree_hal_nonlocal_elf_executable_create(
   if (iree_status_is_ok(status)) {
     iree_hal_executable_library_publish_source_files(executable->library);
   }
+#endif
 
   if (iree_status_is_ok(status)) {
     *out_executable = (iree_hal_executable_t*)executable;
