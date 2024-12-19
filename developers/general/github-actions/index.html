@@ -2303,27 +2303,18 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#package-tests" class="md-nav__link">
+  <a href="#ci-core-builds-and-tests" class="md-nav__link">
     <span class="md-ellipsis">
-      Package tests
+      "CI" - Core builds and tests
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#platform-builds" class="md-nav__link">
+  <a href="#pkgci-package-builds-and-tests" class="md-nav__link">
     <span class="md-ellipsis">
-      Platform builds
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#other-build-configurations" class="md-nav__link">
-    <span class="md-ellipsis">
-      Other build configurations
+      "PkgCI" - Package builds and tests
     </span>
   </a>
   
@@ -3868,27 +3859,18 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#package-tests" class="md-nav__link">
+  <a href="#ci-core-builds-and-tests" class="md-nav__link">
     <span class="md-ellipsis">
-      Package tests
+      "CI" - Core builds and tests
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#platform-builds" class="md-nav__link">
+  <a href="#pkgci-package-builds-and-tests" class="md-nav__link">
     <span class="md-ellipsis">
-      Platform builds
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#other-build-configurations" class="md-nav__link">
-    <span class="md-ellipsis">
-      Other build configurations
+      "PkgCI" - Package builds and tests
     </span>
   </a>
   
@@ -4074,7 +4056,76 @@ build and test coverage across a variety of platforms and hardware accelerators.
     ")
   end</code></pre>
 <h2 id="workflow-descriptions-and-status"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M16.5 11 13 7.5l1.4-1.4 2.1 2.1L20.7 4l1.4 1.4zM11 7H2v2h9zm10 6.4L19.6 12 17 14.6 14.4 12 13 13.4l2.6 2.6-2.6 2.6 1.4 1.4 2.6-2.6 2.6 2.6 1.4-1.4-2.6-2.6zM11 15H2v2h9z"/></svg></span> Workflow descriptions and status<a class="headerlink" href="#workflow-descriptions-and-status" title="Permanent link">link</a></h2>
-<h3 id="package-tests">Package tests<a class="headerlink" href="#package-tests" title="Permanent link">link</a></h3>
+<h3 id="ci-core-builds-and-tests">"CI" - Core builds and tests<a class="headerlink" href="#ci-core-builds-and-tests" title="Permanent link">link</a></h3>
+<p>These workflows build the project from source then run unit tests.</p>
+<ul>
+<li>To keep these workflows focused, they should not need any special hardware
+  (e.g. GPUs).</li>
+<li>Some workflows in this category use sanitizers, debug builds, alternate
+  compilers, and other features that maintainers want automated coverage for.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Workflow file</th>
+<th style="text-align: right;">Build status</th>
+<th>Event triggers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci.yml"><code>ci.yml</code></a></td>
+<td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush"><img alt="cI" src="https://github.com/iree-org/iree/actions/workflows/ci.yml/badge.svg?query=branch%3Amain+event%3Apush" /></a></td>
+<td><code>pull_request</code>, <code>push</code></td>
+</tr>
+<tr>
+<td></td>
+<td style="text-align: right;"></td>
+<td></td>
+</tr>
+<tr>
+<td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_arm64_clang.yml"><code>ci_linux_arm64_clang.yml</code></a></td>
+<td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/ci_linux_arm64_clang.yml?query=branch%3Amain+event%3Aschedule"><img alt="CI - Linux arm64 clang" src="https://github.com/iree-org/iree/actions/workflows/ci_linux_arm64_clang.yml/badge.svg?query=branch%3Amain+event%3Aschedule" /></a></td>
+<td><code>schedule</code></td>
+</tr>
+<tr>
+<td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci_macos_x64_clang.yml"><code>ci_macos_x64_clang.yml</code></a></td>
+<td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/ci_macos_x64_clang.yml?query=branch%3Amain+event%3Aschedule"><img alt="CI - macOS x64 clang" src="https://github.com/iree-org/iree/actions/workflows/ci_macos_x64_clang.yml/badge.svg?query=branch%3Amain+event%3Aschedule" /></a></td>
+<td><code>schedule</code></td>
+</tr>
+<tr>
+<td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci_windows_x64_msvc.yml"><code>ci_windows_x64_msvc.yml</code></a></td>
+<td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/ci_windows_x64_msvc.yml?query=branch%3Amain+event%3Aschedule"><img alt="CI - Windows x64 MSVC" src="https://github.com/iree-org/iree/actions/workflows/ci_windows_x64_msvc.yml/badge.svg?query=branch%3Amain+event%3Aschedule" /></a></td>
+<td><code>schedule</code></td>
+</tr>
+<tr>
+<td></td>
+<td style="text-align: right;"></td>
+<td></td>
+</tr>
+<tr>
+<td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_byollvm.yml"><code>ci_linux_x64_clang_byollvm.yml</code></a></td>
+<td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_byollvm.yml?query=branch%3Amain+event%3Aschedule"><img alt="CI - Linux x64 clang_byollvm" src="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_byollvm.yml/badge.svg?query=branch%3Amain+event%3Aschedule" /></a></td>
+<td><code>schedule</code></td>
+</tr>
+<tr>
+<td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_debug.yml"><code>ci_linux_x64_clang_debug.yml</code></a></td>
+<td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_debug.yml?query=branch%3Amain+event%3Aschedule"><img alt="CI - Linux x64 clang debug" src="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_debug.yml/badge.svg?query=branch%3Amain+event%3Aschedule" /></a></td>
+<td><code>schedule</code></td>
+</tr>
+<tr>
+<td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_tsan.yml"><code>ci_linux_x64_clang_tsan.yml</code></a></td>
+<td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_tsan.yml?query=branch%3Amain+event%3Aschedule"><img alt="CI - Linux x64 clang TSan" src="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_tsan.yml/badge.svg?query=branch%3Amain+event%3Aschedule" /></a></td>
+<td><code>schedule</code></td>
+</tr>
+<tr>
+<td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_gcc.yml"><code>ci_linux_x64_gcc.yml</code></a></td>
+<td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_gcc.yml?query=branch%3Amain+event%3Aschedule"><img alt="CI - Linux x64 gcc" src="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_gcc.yml/badge.svg?query=branch%3Amain+event%3Aschedule" /></a></td>
+<td><code>schedule</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="pkgci-package-builds-and-tests">"PkgCI" - Package builds and tests<a class="headerlink" href="#pkgci-package-builds-and-tests" title="Permanent link">link</a></h3>
 <p>These workflows build packages from source then run test suites using them.</p>
 <pre class="mermaid"><code>graph LR
   accTitle: Package tests
@@ -4119,97 +4170,6 @@ build and test coverage across a variety of platforms and hardware accelerators.
 </tr>
 </tbody>
 </table>
-<h3 id="platform-builds">Platform builds<a class="headerlink" href="#platform-builds" title="Permanent link">link</a></h3>
-<p>These workflows build the full project from source using standard options then
-run basic tests.</p>
-<ul>
-<li>To keep these workflows focused, they should not need any special hardware
-  (e.g. GPUs).</li>
-</ul>
-<table>
-<thead>
-<tr>
-<th>Workflow file</th>
-<th style="text-align: right;">Build status</th>
-<th>Event triggers</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang.yml"><code>ci_linux_x64_clang.yml</code></a></td>
-<td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang.yml?query=branch%3Amain+event%3Apush"><img alt="CI - Linux x64 clang" src="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang.yml/badge.svg?query=branch%3Amain+event%3Apush" /></a></td>
-<td><code>pull_request</code>, <code>push</code></td>
-</tr>
-<tr>
-<td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_arm64_clang.yml"><code>ci_linux_arm64_clang.yml</code></a></td>
-<td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/ci_linux_arm64_clang.yml?query=branch%3Amain+event%3Aschedule"><img alt="CI - Linux arm64 clang" src="https://github.com/iree-org/iree/actions/workflows/ci_linux_arm64_clang.yml/badge.svg?query=branch%3Amain+event%3Aschedule" /></a></td>
-<td><code>schedule</code></td>
-</tr>
-<tr>
-<td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci_macos_x64_clang.yml"><code>ci_macos_x64_clang.yml</code></a></td>
-<td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/ci_macos_x64_clang.yml?query=branch%3Amain+event%3Aschedule"><img alt="CI - macOS x64 clang" src="https://github.com/iree-org/iree/actions/workflows/ci_macos_x64_clang.yml/badge.svg?query=branch%3Amain+event%3Aschedule" /></a></td>
-<td><code>schedule</code></td>
-</tr>
-<tr>
-<td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci_windows_x64_msvc.yml"><code>ci_windows_x64_msvc.yml</code></a></td>
-<td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/ci_windows_x64_msvc.yml?query=branch%3Amain+event%3Aschedule"><img alt="CI - Windows x64 MSVC" src="https://github.com/iree-org/iree/actions/workflows/ci_windows_x64_msvc.yml/badge.svg?query=branch%3Amain+event%3Aschedule" /></a></td>
-<td><code>schedule</code></td>
-</tr>
-</tbody>
-</table>
-<!-- TODO(scotttodd): macos_arm64_clang -->
-
-<h3 id="other-build-configurations">Other build configurations<a class="headerlink" href="#other-build-configurations" title="Permanent link">link</a></h3>
-<p>These workflows build the full project from source using optional settings
-then run basic tests.</p>
-<ul>
-<li>Workflows in this category can use sanitizers, debug builds, alternate
-  compilers, and other features that maintainers want automated coverage for.</li>
-</ul>
-<table>
-<thead>
-<tr>
-<th>Workflow file</th>
-<th style="text-align: right;">Build status</th>
-<th>Event triggers</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_asan.yml"><code>ci_linux_x64_clang_asan.yml</code></a></td>
-<td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_asan.yml?query=branch%3Amain+event%3Apush"><img alt="CI - Linux x64 clang ASan" src="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_asan.yml/badge.svg?query=branch%3Amain+event%3Apush" /></a></td>
-<td><code>pull_request</code>, <code>push</code></td>
-</tr>
-<tr>
-<td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_tsan.yml"><code>ci_linux_x64_clang_tsan.yml</code></a></td>
-<td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_tsan.yml?query=branch%3Amain+event%3Aschedule"><img alt="CI - Linux x64 clang TSan" src="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_tsan.yml/badge.svg?query=branch%3Amain+event%3Aschedule" /></a></td>
-<td><code>schedule</code></td>
-</tr>
-<tr>
-<td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_debug.yml"><code>ci_linux_x64_clang_debug.yml</code></a></td>
-<td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_debug.yml?query=branch%3Amain+event%3Aschedule"><img alt="CI - Linux x64 clang debug" src="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_debug.yml/badge.svg?query=branch%3Amain+event%3Aschedule" /></a></td>
-<td><code>schedule</code></td>
-</tr>
-<tr>
-<td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_gcc.yml"><code>ci_linux_x64_gcc.yml</code></a></td>
-<td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_gcc.yml?query=branch%3Amain+event%3Aschedule"><img alt="CI - Linux x64 gcc" src="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_gcc.yml/badge.svg?query=branch%3Amain+event%3Aschedule" /></a></td>
-<td><code>schedule</code></td>
-</tr>
-<tr>
-<td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_byollvm.yml"><code>ci_linux_x64_clang_byollvm.yml</code></a></td>
-<td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_byollvm.yml?query=branch%3Amain+event%3Aschedule"><img alt="CI - Linux x64 clang_byollvm" src="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_byollvm.yml/badge.svg?query=branch%3Amain+event%3Aschedule" /></a></td>
-<td><code>schedule</code></td>
-</tr>
-<tr>
-<td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_bazel.yml"><code>ci_linux_x64_bazel.yml</code></a></td>
-<td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_bazel.yml?query=branch%3Amain+event%3Apush"><img alt="CI - Linux x64 bazel" src="https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_bazel.yml/badge.svg?query=branch%3Amain+event%3Apush" /></a></td>
-<td><code>pull_request</code>, <code>push</code></td>
-</tr>
-</tbody>
-</table>
-<!-- TODO(scotttodd): the remains of ci.yml (runtime builds, etc.) -->
-<!-- TODO(scotttodd): cross-compilation jobs -->
-
 <h3 id="other-workflows">Other workflows<a class="headerlink" href="#other-workflows" title="Permanent link">link</a></h3>
 <table>
 <thead>
@@ -4221,11 +4181,6 @@ then run basic tests.</p>
 </thead>
 <tbody>
 <tr>
-<td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci.yml"><code>ci.yml</code></a></td>
-<td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush"><img alt="cI" src="https://github.com/iree-org/iree/actions/workflows/ci.yml/badge.svg?query=branch%3Amain+event%3Apush" /></a></td>
-<td><code>pull_request</code>, <code>push</code></td>
-</tr>
-<tr>
 <td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/build_package.yml"><code>build_package.yml</code></a></td>
 <td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/build_package.yml"><img alt="Build Release Packages" src="https://github.com/iree-org/iree/actions/workflows/build_package.yml/badge.svg" /></a></td>
 <td><code>schedule</code></td>
@@ -4233,7 +4188,7 @@ then run basic tests.</p>
 <tr>
 <td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/publish_website.yml"><code>publish_website.yml</code></a></td>
 <td style="text-align: right;"><a href="https://github.com/iree-org/iree/actions/workflows/publish_website.yml?query=branch%3Amain+event%3Apush"><img alt="publish_website" src="https://github.com/iree-org/iree/actions/workflows/publish_website.yml/badge.svg?query=branch%3Amain+event%3Apush" /></a></td>
-<td><code>push</code></td>
+<td><code>push</code>, <code>release</code>, <code>schedule</code></td>
 </tr>
 <tr>
 <td><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/samples.yml"><code>samples.yml</code></a></td>
