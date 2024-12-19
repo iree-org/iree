@@ -126,7 +126,7 @@ func.func @large_dot_general() {
   return
 }
 
-func.func @dot_general_nontrivial_batching_mutliple_parallel_dimension() {
+func.func @dot_general_nontrivial_batching_multiple_parallel_dimension() {
   %lhs = util.unfoldable_constant dense<[
     [[[0.0], [1.0]], [[2.0], [3.0]], [[ 4.0], [ 5.0]]],
     [[[6.0], [7.0]], [[8.0], [9.0]], [[10.0], [11.0]]]
