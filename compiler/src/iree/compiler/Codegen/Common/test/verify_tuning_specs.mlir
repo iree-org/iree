@@ -51,3 +51,9 @@ module @foo_module attributes { transform.with_named_sequence } {
   transform.named_sequence @foo(%arg0: !transform.any_op {transform.readonly})
     attributes { iree_codegen.tuning_spec_entrypoint } {}
 }
+
+// -----
+
+// expected-error @+1{{The default tuning specification must include an operation with the symbol name '__kernel_config'}}
+module @iree_default_tuning_spec attributes { iree_codegen.default_tuning_spec } {
+}
