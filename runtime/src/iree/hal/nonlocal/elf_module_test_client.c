@@ -10,12 +10,13 @@
 #include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/executable_library.h"
 
+#include "nl_api.h"
+
 // ELF modules for various platforms embedded in the binary:
 #include "iree/hal/local/elf/testdata/elementwise_mul.h"
 
-static iree_status_t query_arch_test_file_data(
-    iree_const_byte_span_t* out_file_data) {
-  *out_file_data = iree_make_const_byte_span(NULL, 0);
+static int query_arch_test_file_data(
+    void ** out_file_data, int *out_file_size) {
 
   iree_string_view_t pattern = iree_string_view_empty();
 #if defined(IREE_ARCH_ARM_32)
@@ -34,69 +35,33 @@ static iree_status_t query_arch_test_file_data(
 #warning "No architecture pattern specified; ELF linker will not be tested"
 #endif  // IREE_ARCH_*
 
-  if (!iree_string_view_is_empty(pattern)) {
+   printf("pattern %.*s\n", (int)pattern.size, pattern.data);
+
+   if (!iree_string_view_is_empty(pattern)) {
     for (size_t i = 0; i < elementwise_mul_size(); ++i) {
       const struct iree_file_toc_t* file_toc = &elementwise_mul_create()[i];
+      printf("file_toc name %s\n", file_toc->name);
       if (iree_string_view_match_pattern(iree_make_cstring_view(file_toc->name),
                                          pattern)) {
-        *out_file_data =
-            iree_make_const_byte_span(file_toc->data, file_toc->size);
-        return iree_ok_status();
+        *out_file_data = (void *)file_toc->data;
+        *out_file_size = file_toc->size;
+        return 0;
       }
     }
   }
-
-  return iree_make_status(IREE_STATUS_NOT_FOUND,
+  printf(
                           "no architecture-specific ELF binary embedded into "
-                          "the application for the current target platform");
+                          "the application for the current target platform\n");
+  return -1;
 }
 
-static iree_status_t run_test() {
-  iree_const_byte_span_t file_data;
-  IREE_RETURN_IF_ERROR(query_arch_test_file_data(&file_data));
+static int run_test() {
+  void *file_data;
+  int file_size;
+  query_arch_test_file_data(&file_data, &file_size);
+  void *module = nl_elf_executable_load(file_data, file_size);
 
-  iree_elf_import_table_t import_table;
-  memset(&import_table, 0, sizeof(import_table));
-  iree_elf_module_t module;
-  IREE_RETURN_IF_ERROR(iree_elf_module_initialize_from_memory(
-      file_data, &import_table, iree_allocator_system(), &module));
-
-  iree_hal_executable_environment_v0_t environment;
-  iree_hal_executable_environment_initialize(iree_allocator_system(),
-                                             &environment);
-
-  void* query_fn_ptr = NULL;
-  IREE_RETURN_IF_ERROR(iree_elf_module_lookup_export(
-      &module, IREE_HAL_EXECUTABLE_LIBRARY_EXPORT_NAME, &query_fn_ptr));
-
-  union {
-    const iree_hal_executable_library_header_t** header;
-    const iree_hal_executable_library_v0_t* v0;
-  } library;
-  library.header =
-      (const iree_hal_executable_library_header_t**)iree_elf_call_p_ip(
-          query_fn_ptr, IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST,
-          &environment);
-  if (library.header == NULL) {
-    return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "library header is empty (version mismatch?)");
-  }
-
-  const iree_hal_executable_library_header_t* header = *library.header;
-  if (header->version != IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "library version error");
-  }
-
-  if (strncmp(header->name, "ex", strlen(header->name)) != 0) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "library name mismatches");
-  }
-
-  if (library.v0->exports.count != 1) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "entry point count mismatches");
-  }
+  void *module_data = nl_elf_executable_init(module);
 
   // ret0 = arg0 * arg1
   float arg0[4] = {1.0f, 2.0f, 3.0f, 4.0f};
@@ -132,35 +97,20 @@ static iree_status_t run_test() {
       .workgroup_id_z = 0,
       .processor_id = iree_cpu_query_processor_id(),
   };
-  int ret = iree_elf_call_i_ppp((const void*)library.v0->exports.ptrs[0],
-                                (void*)&environment, (void*)&dispatch_state,
-                                (void*)&workgroup_state);
-  if (ret != 0) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            "dispatch function returned failure: %d", ret);
-  }
+  int ret = nl_elf_executable_call(module_data, 0, (void*)&dispatch_state, (void*)&workgroup_state);
 
-  iree_status_t status = iree_ok_status();
   for (int i = 0; i < IREE_ARRAYSIZE(expected); ++i) {
     if (ret0[i] != expected[i]) {
-      status =
-          iree_make_status(IREE_STATUS_INTERNAL,
-                           "output mismatch: ret[%d] = %.1f, expected %.1f", i,
+      ret = -1;
+      printf("output mismatch: ret[%d] = %.1f, expected %.1f", i,
                            ret0[i], expected[i]);
-      break;
     }
   }
 
-  iree_elf_module_deinitialize(&module);
-  return status;
+  nl_elf_executable_destroy(module);
+  return ret;
 }
 
 int main() {
-  const iree_status_t result = run_test();
-  int ret = (int)iree_status_code(result);
-  if (!iree_status_is_ok(result)) {
-    iree_status_fprint(stderr, result);
-    iree_status_free(result);
-  }
-  return ret;
+  run_test();
 }

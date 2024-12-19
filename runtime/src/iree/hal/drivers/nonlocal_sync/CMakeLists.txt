@@ -78,7 +78,7 @@ iree_cc_binary(
     "../../nonlocal/command_data.h"
   SRCS
     "../../nonlocal/command_data.c"
-    "../../nonlocal/nl_api.c"
+    "../../nonlocal/nl_api_client.c"
     "../../nonlocal/elf_module_test_client.c"
   DEPS
     iree::hal::local::elf::elf_module
