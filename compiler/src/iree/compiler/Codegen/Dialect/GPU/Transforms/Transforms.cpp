@@ -620,16 +620,11 @@ distributeMultiMmaOp(RewriterBase &rewriter, IREE::GPU::MultiMmaOp mmaOp,
       accStrides);
 
   // Step 3. Create the new multi_mma op.
-  auto newKind = mmaOp.getKind();
-  if (auto dataTiledMma = dyn_cast<DataTiledMMAAttr>(newKind)) {
-    newKind = DataTiledMMAAttr::get(
-        context, dataTiledMma.getIntrinsic(), dataTiledMma.getUnrollM(),
-        /*subgroups_m=*/1, dataTiledMma.getUnrollN(),
-        /*subgroups_n=*/1, dataTiledMma.getUnrollK());
-  }
   auto newMmaOp = rewriter.create<IREE::GPU::MultiMmaOp>(
       loc, lhsSlice, rhsSlice, accSlice, mmaOp.getIndexingMaps(),
-      mmaOp.getIteratorTypes(), newKind);
+      mmaOp.getIteratorTypes(), mmaOp.getKind());
+
+  newMmaOp->setDiscardableAttrs(mmaOp->getDiscardableAttrDictionary());
 
   // Step 4. Insert the result of the multi_mma using the same offsets/sizes as
   // the accumulator slice.

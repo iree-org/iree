@@ -1,9 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-lower-to-ukernels,cse,canonicalize))" %s | FileCheck %s
 
 #config = #iree_gpu.lowering_config<{ukernel = #iree_gpu.ukernel_config<name = "some_ukernel", def_attrs = {vm.import.module = "rocm"}>}>
-func.func @argmax_f32i64_with_selected_ukernel(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "all"}>
-} {
+func.func @argmax_f32i64_with_selected_ukernel(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0xFF800000 : f32
   %0 = tensor.empty() : tensor<1xi64>
@@ -42,9 +40,7 @@ func.func @argmax_f32i64_with_selected_ukernel(%arg0 : tensor<1x?xf32>) -> tenso
 
 // -----
 
-func.func @argmax_f32i64_without_selected_ukernel(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "all"}>
-} {
+func.func @argmax_f32i64_without_selected_ukernel(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0xFF800000 : f32
   %0 = tensor.empty() : tensor<1xi64>
@@ -70,3 +66,27 @@ func.func @argmax_f32i64_without_selected_ukernel(%arg0 : tensor<1x?xf32>) -> te
 //CHECK-LABEL: func @argmax_f32i64_without_selected_ukernel(
 //      CHECK-NOT: iree_codegen.ukernel.generic
 //      CHECK: linalg.generic
+
+// -----
+
+func.func @multi_mma_mfma_i32_16x16x32_i8(%a : tensor<1x2x8x1x1x2x8xi8>, %b : tensor<1x2x1x2x1x1x2x8xi8>, %c : tensor<1x1x1x8x2x1x1x4xi32>) -> tensor<1x1x1x8x2x1x1x4xi32> {
+  %d = iree_gpu.multi_mma %a, %b, %c {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
+    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
+    kind = #iree_gpu.data_tiled_mma_layout<intrinsic =  MFMA_I32_16x16x32_I8, unroll_m = 8, unroll_n = 2, subgroups_n = 4, unroll_k = 2>,
+    lowering_config = #iree_gpu.lowering_config<{
+      reduction = [0, 0, 0],
+      ukernel = #iree_gpu.ukernel_config<name = "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8", def_attrs = {vm.import.module = "rocm"}>,
+      workgroup = [1, 1, 0]}>
+  } : tensor<1x2x8x1x1x2x8xi8>, tensor<1x2x1x2x1x1x2x8xi8> into tensor<1x1x1x8x2x1x1x4xi32>
+  return %d : tensor<1x1x1x8x2x1x1x4xi32>
+}
+
+// CHECK-LABEL: func @multi_mma_mfma_i32_16x16x32_i8(
+//   CHECK-DAG:    %c2_i32 = arith.constant 2 : i32
+//   CHECK-DAG:    %c8_i32 = arith.constant 8 : i32
+//   CHECK-DAG:    %c1_i32 = arith.constant 1 : i32
+//   CHECK-DAG:    %c4_i32 = arith.constant 4 : i32
+//       CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic
+//  CHECK-SAME:      "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8"
+//  CHECK-SAME:      (%c2_i32, %c8_i32, %c1_i32, %c2_i32, %c4_i32, %c2_i32 : i32, i32, i32, i32, i32, i32)
