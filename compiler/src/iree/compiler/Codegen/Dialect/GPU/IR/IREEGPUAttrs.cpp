@@ -503,9 +503,11 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   for (auto [splitResultIdx, element] :
        llvm::zip_equal(dimToVtid, subgroupLayout.element)) {
     Value vtid = splitLaneId.getResult(splitResultIdx);
+    int64_t vtidLen = vtidBasis[splitResultIdx - 1];
     if (element != 1)
       vtid = builder.create<affine::AffineLinearizeIndexOp>(
-          loc, ValueRange{vtid, cZero}, ArrayRef<int64_t>{element});
+          loc, ValueRange{vtid, cZero}, ArrayRef<int64_t>{vtidLen, element},
+          /*disjoint=*/true);
     vtids.push_back(vtid);
   }
 
