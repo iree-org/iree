@@ -920,40 +920,23 @@ static iree_status_t iree_hal_hip_device_prepare_async_alloc(
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
-typedef enum iree_hal_hip_device_semaphore_buffer_operation_type_e {
-  IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_ALLOC,
-  IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_DEALLOC,
-  IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_MAX =
-      IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_DEALLOC,
-} iree_hal_hip_device_semaphore_buffer_operation_type_t;
 
-typedef struct iree_hal_hip_device_semaphore_buffer_operation_callback_data_t {
+typedef struct iree_hal_hip_semaphore_callback_data_t {
   iree_allocator_t host_allocator;
   iree_atomic_int64_t wait_semaphore_count;
   iree_hal_hip_device_t* device;
   iree_hal_queue_affinity_t queue_affinity;
+  iree_hal_hip_dispatch_callback_t dispatch_fn;
   iree_hal_semaphore_list_t wait_semaphore_list;
   iree_hal_semaphore_list_t signal_semaphore_list;
-  iree_hal_buffer_t* buffer;
-  iree_hal_hip_device_semaphore_buffer_operation_type_t type;
   iree_slim_mutex_t status_mutex;
   iree_status_t status;
-} iree_hal_hip_device_semaphore_buffer_operation_callback_data_t;
+} iree_hal_hip_semaphore_callback_data_t;
 
-static iree_status_t iree_hal_hip_device_make_buffer_callback_data(
-    iree_hal_hip_device_t* device, iree_allocator_t host_allocator,
-    iree_hal_queue_affinity_t queue_affinity,
-    const iree_hal_semaphore_list_t wait_semaphore_list,
-    const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_buffer_t* buffer,
-    iree_hal_hip_device_semaphore_buffer_operation_type_t type,
-    iree_hal_hip_device_semaphore_buffer_operation_callback_data_t** out_data) {
-  *out_data = NULL;
-  IREE_TRACE_ZONE_BEGIN(z0);
-  // Embed captured tables in the action allocation.
-  iree_hal_hip_device_semaphore_buffer_operation_callback_data_t*
-      callback_data = NULL;
-
+iree_host_size_t iree_hal_hip_semaphore_callback_data_get_additional_allocation_size(
+  iree_hal_semaphore_list_t wait_semaphore_list,
+  iree_hal_semaphore_list_t signal_semaphore_list
+) {
   const iree_host_size_t wait_semaphore_list_size =
       wait_semaphore_list.count * sizeof(*wait_semaphore_list.semaphores) +
       wait_semaphore_list.count * sizeof(*wait_semaphore_list.payload_values);
@@ -961,34 +944,41 @@ static iree_status_t iree_hal_hip_device_make_buffer_callback_data(
       signal_semaphore_list.count * sizeof(*signal_semaphore_list.semaphores) +
       signal_semaphore_list.count *
           sizeof(*signal_semaphore_list.payload_values);
+  return wait_semaphore_list_size + signal_semaphore_list_size;
+}
 
-  const iree_host_size_t total_callback_size = sizeof(*callback_data) +
-                                               wait_semaphore_list_size +
-                                               signal_semaphore_list_size;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(host_allocator, total_callback_size,
-                                (void**)&callback_data));
-  uint8_t* callback_ptr = (uint8_t*)callback_data + sizeof(*callback_data);
-
-  iree_atomic_store(&callback_data->wait_semaphore_count,
+void iree_hal_hip_semaphore_callback_data_init(iree_allocator_t host_allocator,
+  iree_hal_hip_device_t* device,
+  iree_hal_queue_affinity_t queue_affinity,
+  iree_hal_hip_dispatch_callback_t dispatch_fn,
+  iree_hal_semaphore_list_t wait_semaphore_list,
+  iree_hal_semaphore_list_t signal_semaphore_list,
+  void* additional_data_offset,
+  iree_hal_hip_semaphore_callback_data_t* data) {
+  data->host_allocator = host_allocator;
+  iree_atomic_store(&data->wait_semaphore_count,
                     wait_semaphore_list.count, iree_memory_order_relaxed);
 
-  callback_data->host_allocator = host_allocator;
-  callback_data->device = device;
-  callback_data->queue_affinity = queue_affinity;
+  data->device = device;
+  data->queue_affinity = queue_affinity;
+  data->dispatch_fn = dispatch_fn;
 
-  // Copy wait list for later access.
-  callback_data->wait_semaphore_list.count = wait_semaphore_list.count;
-  callback_data->wait_semaphore_list.semaphores =
+  uint8_t* callback_ptr = (uint8_t*)additional_data_offset;
+
+  const iree_host_size_t wait_semaphore_list_size =
+      wait_semaphore_list.count * sizeof(*wait_semaphore_list.semaphores) +
+      wait_semaphore_list.count * sizeof(*wait_semaphore_list.payload_values);
+  data->wait_semaphore_list.count = wait_semaphore_list.count;
+  data->wait_semaphore_list.semaphores =
       (iree_hal_semaphore_t**)callback_ptr;
-  memcpy(callback_data->wait_semaphore_list.semaphores,
+  memcpy(data->wait_semaphore_list.semaphores,
          wait_semaphore_list.semaphores,
          wait_semaphore_list.count * sizeof(*wait_semaphore_list.semaphores));
-  callback_data->wait_semaphore_list.payload_values =
+  data->wait_semaphore_list.payload_values =
       (uint64_t*)(callback_ptr + wait_semaphore_list.count *
                                      sizeof(*wait_semaphore_list.semaphores));
   memcpy(
-      callback_data->wait_semaphore_list.payload_values,
+      data->wait_semaphore_list.payload_values,
       wait_semaphore_list.payload_values,
       wait_semaphore_list.count * sizeof(*wait_semaphore_list.payload_values));
   for (iree_host_size_t i = 0; i < wait_semaphore_list.count; ++i) {
@@ -997,41 +987,30 @@ static iree_status_t iree_hal_hip_device_make_buffer_callback_data(
   callback_ptr += wait_semaphore_list_size;
 
   // Copy signal list for later access.
-  callback_data->signal_semaphore_list.count = signal_semaphore_list.count;
-  callback_data->signal_semaphore_list.semaphores =
+  data->signal_semaphore_list.count = signal_semaphore_list.count;
+  data->signal_semaphore_list.semaphores =
       (iree_hal_semaphore_t**)callback_ptr;
   memcpy(
-      callback_data->signal_semaphore_list.semaphores,
+      data->signal_semaphore_list.semaphores,
       signal_semaphore_list.semaphores,
       signal_semaphore_list.count * sizeof(*signal_semaphore_list.semaphores));
-  callback_data->signal_semaphore_list.payload_values =
+  data->signal_semaphore_list.payload_values =
       (uint64_t*)(callback_ptr + signal_semaphore_list.count *
                                      sizeof(*signal_semaphore_list.semaphores));
-  memcpy(callback_data->signal_semaphore_list.payload_values,
+  memcpy(data->signal_semaphore_list.payload_values,
          signal_semaphore_list.payload_values,
          signal_semaphore_list.count *
              sizeof(*signal_semaphore_list.payload_values));
   for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
     iree_hal_resource_retain(signal_semaphore_list.semaphores[i]);
   }
-  callback_ptr += signal_semaphore_list_size;
 
-  callback_data->buffer = buffer;
-  iree_hal_buffer_retain(buffer);
-  callback_data->type = type;
-
-  iree_slim_mutex_initialize(&callback_data->status_mutex);
-  callback_data->status = iree_ok_status();
-  *out_data = callback_data;
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  iree_slim_mutex_initialize(&data->status_mutex);
+  data->status = iree_ok_status();
 }
 
-void iree_hal_hip_device_destroy_buffer_callback_data(
-    iree_hal_hip_device_semaphore_buffer_operation_callback_data_t* data) {
-  if (!data) {
-    return;
-  }
+void iree_hal_hip_semaphore_callback_data_deinit(
+  iree_hal_hip_semaphore_callback_data_t* data) {
   iree_slim_mutex_deinitialize(&data->status_mutex);
   for (iree_host_size_t i = 0; i < data->wait_semaphore_list.count; ++i) {
     iree_hal_resource_release(data->wait_semaphore_list.semaphores[i]);
@@ -1039,10 +1018,14 @@ void iree_hal_hip_device_destroy_buffer_callback_data(
   for (iree_host_size_t i = 0; i < data->signal_semaphore_list.count; ++i) {
     iree_hal_resource_release(data->signal_semaphore_list.semaphores[i]);
   }
-  iree_hal_buffer_release(data->buffer);
-
-  iree_allocator_free(data->host_allocator, data);
 }
+
+typedef enum iree_hal_hip_device_semaphore_buffer_operation_type_e {
+  IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_ALLOC,
+  IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_DEALLOC,
+  IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_MAX =
+      IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_DEALLOC,
+} iree_hal_hip_device_semaphore_buffer_operation_type_t;
 
 static iree_status_t
 iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
@@ -1155,10 +1138,25 @@ static iree_status_t iree_hal_hip_async_free_buffer(void* user_data,
   return status;
 }
 
+typedef struct iree_hal_hip_device_semaphore_buffer_operation_callback_data_t {
+  iree_hal_hip_semaphore_callback_data_t base;
+  iree_hal_buffer_t* buffer;
+  iree_hal_hip_device_semaphore_buffer_operation_type_t type;
+} iree_hal_hip_device_semaphore_buffer_operation_callback_data_t;
+
+void iree_hal_hip_device_destroy_buffer_callback_data(
+    iree_hal_hip_device_semaphore_buffer_operation_callback_data_t* data) {
+  if (!data) {
+    return;
+  }
+  iree_hal_buffer_release(data->buffer);
+  iree_hal_hip_semaphore_callback_data_deinit(&data->base);
+  iree_allocator_free(data->base.host_allocator, data);
+}
+
 static iree_status_t iree_hal_hip_device_complete_buffer_operation(
     void* user_data, iree_hal_hip_event_t* event, iree_status_t status) {
   IREE_TRACE_ZONE_BEGIN(z0);
-
   iree_hal_hip_device_semaphore_buffer_operation_callback_data_t* data =
       (iree_hal_hip_device_semaphore_buffer_operation_callback_data_t*)
           user_data;
@@ -1167,27 +1165,27 @@ static iree_status_t iree_hal_hip_device_complete_buffer_operation(
   iree_hal_hip_event_release(event);
 
   // Notify all of the signal semaphores that they have been incremented.
-  for (iree_host_size_t i = 0; i < data->signal_semaphore_list.count; ++i) {
+  for (iree_host_size_t i = 0; i < data->base.signal_semaphore_list.count; ++i) {
     iree_status_ignore(iree_hal_hip_event_semaphore_advance(
-        data->signal_semaphore_list.semaphores[i]));
+        data->base.signal_semaphore_list.semaphores[i]));
   }
 
   if (data->buffer &&
       data->type == IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_DEALLOC) {
     int device_ordinal =
-        iree_math_count_trailing_zeros_u64(data->queue_affinity);
-    if (data->device->supports_memory_pools) {
+        iree_math_count_trailing_zeros_u64(data->base.queue_affinity);
+    if (data->base.device->supports_memory_pools) {
       status = iree_status_join(
           status, iree_hal_hip_memory_pools_deallocate(
-                      &data->device->devices[device_ordinal].memory_pools,
-                      data->device->devices[device_ordinal].hip_dispatch_stream,
+                      &data->base.device->devices[device_ordinal].memory_pools,
+                      data->base.device->devices[device_ordinal].hip_dispatch_stream,
                       data->buffer));
     } else {
       status = iree_status_join(
           status,
           iree_hal_hip_allocator_free_async(
-              iree_hal_device_allocator((iree_hal_device_t*)data->device),
-              data->device->devices[device_ordinal].hip_dispatch_stream,
+              iree_hal_device_allocator((iree_hal_device_t*)data->base.device),
+              data->base.device->devices[device_ordinal].hip_dispatch_stream,
               data->buffer));
     }
   }
@@ -1245,26 +1243,26 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
           user_data;
   IREE_ASSERT_LE(data->type, IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_MAX);
 
-  iree_hal_hip_device_t* device = data->device;
+  iree_hal_hip_device_t* device = data->base.device;
 
   // If we had a semaphore failure then we should propagate it
   // but not run anything.
-  if (!iree_status_is_ok(data->status)) {
-    status = iree_status_join(data->status, status);
+  if (!iree_status_is_ok(data->base.status)) {
+    status = iree_status_join(data->base.status, status);
   }
 
-  int device_ordinal = iree_math_count_trailing_zeros_u64(data->queue_affinity);
+  int device_ordinal = iree_math_count_trailing_zeros_u64(data->base.queue_affinity);
 
   if (iree_status_is_ok(status)) {
     status = IREE_HIP_CALL_TO_STATUS(
-        data->device->hip_symbols,
-        hipCtxPushCurrent(data->device->devices[device_ordinal].hip_context));
+        device->hip_symbols,
+        hipCtxPushCurrent(device->devices[device_ordinal].hip_context));
   }
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, device_ordinal);
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_hip_device_stream_wait_for_semaphores(
-        data->device, data->wait_semaphore_list, device_ordinal);
+        device, data->base.wait_semaphore_list, device_ordinal);
   }
 
   // We have satisfied all of the waits.
@@ -1281,7 +1279,7 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
           break;
         }
         status = iree_hal_hip_allocator_alloc_async(
-            iree_hal_device_allocator((iree_hal_device_t*)data->device),
+            iree_hal_device_allocator((iree_hal_device_t*)device),
             device->devices[device_ordinal].hip_dispatch_stream, data->buffer);
         break;
       case IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_DEALLOC: {
@@ -1293,17 +1291,17 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
   }
   IREE_TRACE_ZONE_END(z3);
 
-  const iree_hal_hip_dynamic_symbols_t* symbols = data->device->hip_symbols;
+  const iree_hal_hip_dynamic_symbols_t* symbols = device->hip_symbols;
   if (iree_status_is_ok(status)) {
     // Data may get deleted any time after adding it to the cleanup,
     // so retain the symbols here.
     status = iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
-        data->device, data->device->cleanup_thread, data->signal_semaphore_list,
+        device, device->cleanup_thread, data->base.signal_semaphore_list,
         device_ordinal, &iree_hal_hip_device_complete_buffer_operation, data);
   } else {
-    for (iree_host_size_t i = 0; i < data->signal_semaphore_list.count; ++i) {
-      iree_hal_semaphore_fail(data->signal_semaphore_list.semaphores[i],
-                              iree_status_clone(data->status));
+    for (iree_host_size_t i = 0; i < data->base.signal_semaphore_list.count; ++i) {
+      iree_hal_semaphore_fail(data->base.signal_semaphore_list.semaphores[i],
+                              iree_status_clone(data->base.status));
     }
     iree_hal_hip_device_destroy_buffer_callback_data(data);
   }
@@ -1313,11 +1311,45 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
       status, IREE_HIP_CALL_TO_STATUS(symbols, hipCtxPopCurrent(NULL)));
 }
 
-static iree_status_t iree_hal_hip_device_semaphore_buffer_operation_callback(
+static iree_status_t iree_hal_hip_device_make_buffer_callback_data(
+    iree_hal_hip_device_t* device, iree_allocator_t host_allocator,
+    iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* buffer,
+    iree_hal_hip_device_semaphore_buffer_operation_type_t type,
+    iree_hal_hip_device_semaphore_buffer_operation_callback_data_t** out_data) {
+  *out_data = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  // Embed captured tables in the action allocation.
+  iree_hal_hip_device_semaphore_buffer_operation_callback_data_t*
+      callback_data = NULL;
+
+  const iree_host_size_t additional_data_for_base = 
+    iree_hal_hip_semaphore_callback_data_get_additional_allocation_size(wait_semaphore_list, signal_semaphore_list);
+
+  const iree_host_size_t total_callback_size = sizeof(*callback_data) + additional_data_for_base;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(host_allocator, total_callback_size,
+                                (void**)&callback_data));
+  iree_hal_hip_semaphore_callback_data_init(host_allocator, 
+    device, queue_affinity, &iree_hal_hip_device_perform_buffer_operation_now, wait_semaphore_list, signal_semaphore_list,
+    (void*)((uint8_t*)callback_data + sizeof(*callback_data)), &callback_data->base);
+  
+  callback_data->buffer = buffer;
+  iree_hal_buffer_retain(buffer);
+  callback_data->type = type;
+
+  *out_data = callback_data;
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_hip_device_semaphore_callback(
     void* user_context, iree_hal_semaphore_t* semaphore, iree_status_t status) {
-  iree_hal_hip_device_semaphore_buffer_operation_callback_data_t* data =
-      (iree_hal_hip_device_semaphore_buffer_operation_callback_data_t*)
-          user_context;
+  iree_hal_hip_semaphore_callback_data_t* data =
+      (iree_hal_hip_semaphore_callback_data_t*)user_context;
+
   if (!iree_status_is_ok(status)) {
     iree_slim_mutex_lock(&data->status_mutex);
     data->status = iree_status_join(data->status, status);
@@ -1329,12 +1361,13 @@ static iree_status_t iree_hal_hip_device_semaphore_buffer_operation_callback(
   }
 
   int device_ordinal = iree_math_count_trailing_zeros_u64(data->queue_affinity);
-  // Now the actual buffer_operation happens, as all semaphore have been
-  // satisfied (by satisfied here, we specifically mean that the semaphore has
-  // been scheduled, not necessarily completed).
+
+  // Now the actual submit happens, as all semaphore have been satisfied
+  // (by satisfied here, we specifically mean that the semaphore has been
+  // scheduled, not necessarily completed)
   return iree_hal_hip_dispatch_thread_add_dispatch(
       data->device->devices[device_ordinal].dispatch_thread,
-      &iree_hal_hip_device_perform_buffer_operation_now, data);
+      data->dispatch_fn, data);
 }
 
 // TODO: implement multiple streams; today we only have one and queue_affinity
@@ -1391,7 +1424,7 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
                 wait_semaphore_list.semaphores[i],
                 wait_semaphore_list.payload_values[i],
                 device->devices[device_ordinal].device_event_pool,
-                &iree_hal_hip_device_semaphore_buffer_operation_callback,
+                &iree_hal_hip_device_semaphore_callback,
                 callback_data));
       }
     } else {
@@ -1482,7 +1515,7 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
                 wait_semaphore_list.semaphores[i],
                 wait_semaphore_list.payload_values[i],
                 device->devices[device_ordinal].device_event_pool,
-                &iree_hal_hip_device_semaphore_buffer_operation_callback,
+                &iree_hal_hip_device_semaphore_callback,
                 callback_data));
       }
     } else {
@@ -1572,153 +1605,20 @@ static iree_status_t iree_hal_hip_device_queue_write(
 }
 
 typedef struct iree_hal_hip_device_semaphore_submit_callback_data_t {
-  iree_allocator_t host_allocator;
-  iree_atomic_int64_t wait_semaphore_count;
-  iree_hal_hip_device_t* device;
-  iree_hal_queue_affinity_t queue_affinity;
+  iree_hal_hip_semaphore_callback_data_t base;
   iree_hal_command_buffer_t* command_buffer;
   iree_hal_buffer_binding_table_t binding_table;
-  iree_hal_semaphore_list_t wait_semaphore_list;
-  iree_hal_semaphore_list_t signal_semaphore_list;
   iree_hal_resource_set_t* resource_set;
-  iree_slim_mutex_t status_mutex;
-  iree_status_t status;
 } iree_hal_hip_device_semaphore_submit_callback_data_t;
-
-static iree_status_t iree_hal_hip_device_make_callback_data(
-    iree_hal_hip_device_t* device, iree_allocator_t host_allocator,
-    iree_arena_block_pool_t* block_pool,
-    iree_hal_queue_affinity_t queue_affinity,
-    const iree_hal_semaphore_list_t wait_semaphore_list,
-    const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_buffer_binding_table_t binding_table,
-    iree_hal_hip_device_semaphore_submit_callback_data_t** out_data) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  *out_data = NULL;
-
-  // Embed captured tables in the action allocation.
-  iree_hal_hip_device_semaphore_submit_callback_data_t* callback_data = NULL;
-
-  const iree_host_size_t wait_semaphore_list_size =
-      wait_semaphore_list.count * sizeof(*wait_semaphore_list.semaphores) +
-      wait_semaphore_list.count * sizeof(*wait_semaphore_list.payload_values);
-  const iree_host_size_t signal_semaphore_list_size =
-      signal_semaphore_list.count * sizeof(*signal_semaphore_list.semaphores) +
-      signal_semaphore_list.count *
-          sizeof(*signal_semaphore_list.payload_values);
-
-  const iree_host_size_t payload_size =
-      binding_table.count * sizeof(*binding_table.bindings);
-
-  const iree_host_size_t total_callback_size =
-      sizeof(*callback_data) + wait_semaphore_list_size +
-      signal_semaphore_list_size + payload_size;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(host_allocator, total_callback_size,
-                                (void**)&callback_data));
-  uint8_t* callback_ptr = (uint8_t*)callback_data + sizeof(*callback_data);
-
-  callback_data->host_allocator = host_allocator;
-  callback_data->device = device;
-
-  iree_atomic_store(&callback_data->wait_semaphore_count,
-                    wait_semaphore_list.count, iree_memory_order_relaxed);
-  // Copy wait list for later access.
-  callback_data->wait_semaphore_list.count = wait_semaphore_list.count;
-  callback_data->wait_semaphore_list.semaphores =
-      (iree_hal_semaphore_t**)callback_ptr;
-  memcpy(callback_data->wait_semaphore_list.semaphores,
-         wait_semaphore_list.semaphores,
-         wait_semaphore_list.count * sizeof(*wait_semaphore_list.semaphores));
-  callback_data->wait_semaphore_list.payload_values =
-      (uint64_t*)(callback_ptr + wait_semaphore_list.count *
-                                     sizeof(*wait_semaphore_list.semaphores));
-  memcpy(
-      callback_data->wait_semaphore_list.payload_values,
-      wait_semaphore_list.payload_values,
-      wait_semaphore_list.count * sizeof(*wait_semaphore_list.payload_values));
-  for (iree_host_size_t i = 0; i < wait_semaphore_list.count; ++i) {
-    iree_hal_resource_retain(wait_semaphore_list.semaphores[i]);
-  }
-  callback_ptr += wait_semaphore_list_size;
-
-  // Copy signal list for later access.
-  callback_data->signal_semaphore_list.count = signal_semaphore_list.count;
-  callback_data->signal_semaphore_list.semaphores =
-      (iree_hal_semaphore_t**)callback_ptr;
-  memcpy(
-      callback_data->signal_semaphore_list.semaphores,
-      signal_semaphore_list.semaphores,
-      signal_semaphore_list.count * sizeof(*signal_semaphore_list.semaphores));
-  callback_data->signal_semaphore_list.payload_values =
-      (uint64_t*)(callback_ptr + signal_semaphore_list.count *
-                                     sizeof(*signal_semaphore_list.semaphores));
-  memcpy(callback_data->signal_semaphore_list.payload_values,
-         signal_semaphore_list.payload_values,
-         signal_semaphore_list.count *
-             sizeof(*signal_semaphore_list.payload_values));
-  for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
-    iree_hal_resource_retain(signal_semaphore_list.semaphores[i]);
-  }
-  callback_ptr += signal_semaphore_list_size;
-
-  // Copy the execution resources for later access.
-  callback_data->queue_affinity = queue_affinity;
-  callback_data->command_buffer = command_buffer;
-
-  // Retain all command buffers and semaphores.
-  iree_status_t status =
-      iree_hal_resource_set_allocate(block_pool, &callback_data->resource_set);
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_resource_set_insert(callback_data->resource_set,
-                                          wait_semaphore_list.count,
-                                          wait_semaphore_list.semaphores);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_resource_set_insert(callback_data->resource_set,
-                                          signal_semaphore_list.count,
-                                          signal_semaphore_list.semaphores);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_resource_set_insert(callback_data->resource_set, 1,
-                                          &command_buffer);
-  }
-
-  callback_data->binding_table = binding_table;
-  iree_hal_buffer_binding_t* binding_element_ptr =
-      (iree_hal_buffer_binding_t*)callback_ptr;
-  callback_data->binding_table.bindings = binding_element_ptr;
-  memcpy(binding_element_ptr, binding_table.bindings,
-         sizeof(*binding_element_ptr) * binding_table.count);
-  status = iree_hal_resource_set_insert_strided(
-      callback_data->resource_set, binding_table.count,
-      callback_data->binding_table.bindings,
-      offsetof(iree_hal_buffer_binding_t, buffer),
-      sizeof(iree_hal_buffer_binding_t));
-
-  callback_data->status = iree_ok_status();
-  iree_slim_mutex_initialize(&callback_data->status_mutex);
-  *out_data = callback_data;
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
 
 void iree_hal_hip_device_destroy_callback_data(
     iree_hal_hip_device_semaphore_submit_callback_data_t* data) {
   if (!data) {
     return;
   }
-  iree_slim_mutex_deinitialize(&data->status_mutex);
   iree_hal_resource_set_free(data->resource_set);
-  for (iree_host_size_t i = 0; i < data->wait_semaphore_list.count; ++i) {
-    iree_hal_resource_release(data->wait_semaphore_list.semaphores[i]);
-  }
-  for (iree_host_size_t i = 0; i < data->signal_semaphore_list.count; ++i) {
-    iree_hal_resource_release(data->signal_semaphore_list.semaphores[i]);
-  }
-  iree_allocator_free(data->host_allocator, data);
+  iree_hal_hip_semaphore_callback_data_deinit(&data->base);
+  iree_allocator_free(data->base.host_allocator, data);
 }
 
 static iree_status_t iree_hal_hip_device_complete_submission(
@@ -1727,10 +1627,10 @@ static iree_status_t iree_hal_hip_device_complete_submission(
 
   iree_hal_hip_device_semaphore_submit_callback_data_t* data =
       (iree_hal_hip_device_semaphore_submit_callback_data_t*)user_data;
-  iree_hal_hip_device_t* device = data->device;
+  iree_hal_hip_device_t* device = data->base.device;
 
   // Get the device_context from the queue_affinity.
-  int device_ordinal = iree_math_count_trailing_zeros_u64(data->queue_affinity);
+  int device_ordinal = iree_math_count_trailing_zeros_u64(data->base.queue_affinity);
 
   // Read any tracing events that were submitted.
 
@@ -1738,7 +1638,7 @@ static iree_status_t iree_hal_hip_device_complete_submission(
     iree_hal_command_buffer_t* command_buffer = data->command_buffer;
     if (iree_hal_hip_multi_queue_command_buffer_isa(command_buffer)) {
       status = iree_hal_hip_multi_queue_command_buffer_get(
-          command_buffer, data->queue_affinity, &command_buffer);
+          command_buffer, data->base.queue_affinity, &command_buffer);
     }
 
     if (iree_status_is_ok(status)) {
@@ -1764,9 +1664,9 @@ static iree_status_t iree_hal_hip_device_complete_submission(
   iree_hal_hip_event_release(event);
 
   // Notify all of the signal semaphores that they have been incremented.
-  for (iree_host_size_t i = 0; i < data->signal_semaphore_list.count; ++i) {
+  for (iree_host_size_t i = 0; i < data->base.signal_semaphore_list.count; ++i) {
     iree_status_ignore(iree_hal_hip_event_semaphore_advance(
-        data->signal_semaphore_list.semaphores[i]));
+        data->base.signal_semaphore_list.semaphores[i]));
   }
   iree_hal_hip_device_destroy_callback_data(data);
 
@@ -1780,27 +1680,27 @@ static iree_status_t iree_hal_hip_device_execute_now(void* user_data,
 
   iree_hal_hip_device_semaphore_submit_callback_data_t* data =
       (iree_hal_hip_device_semaphore_submit_callback_data_t*)user_data;
-  IREE_ASSERT_EQ(iree_math_count_ones_u64(data->queue_affinity), 1,
+  IREE_ASSERT_EQ(iree_math_count_ones_u64(data->base.queue_affinity), 1,
                  "Cannot execute a command buffer on more than one queue");
 
-  iree_hal_hip_device_t* device = data->device;
+  iree_hal_hip_device_t* device = data->base.device;
 
   // If we had a semaphore failure then we should propagate it
   // but not run anything.
-  status = iree_status_join(status, data->status);
+  status = iree_status_join(status, data->base.status);
 
-  int device_ordinal = iree_math_count_trailing_zeros_u64(data->queue_affinity);
+  int device_ordinal = iree_math_count_trailing_zeros_u64(data->base.queue_affinity);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, device_ordinal);
 
   if (iree_status_is_ok(status)) {
     status = IREE_HIP_CALL_TO_STATUS(
-        data->device->hip_symbols,
-        hipCtxPushCurrent(data->device->devices[device_ordinal].hip_context));
+        device->hip_symbols,
+        hipCtxPushCurrent(device->devices[device_ordinal].hip_context));
   }
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_hip_device_stream_wait_for_semaphores(
-        data->device, data->wait_semaphore_list, device_ordinal);
+        device, data->base.wait_semaphore_list, device_ordinal);
   }
 
   // We have satisfied all of the waits.
@@ -1809,7 +1709,7 @@ static iree_status_t iree_hal_hip_device_execute_now(void* user_data,
   if (iree_status_is_ok(status)) {
     if (iree_hal_hip_multi_queue_command_buffer_isa(command_buffer)) {
       status = iree_hal_hip_multi_queue_command_buffer_get(
-          command_buffer, data->queue_affinity, &command_buffer);
+          command_buffer, data->base.queue_affinity, &command_buffer);
     }
   }
   if (iree_status_is_ok(status)) {
@@ -1825,8 +1725,8 @@ static iree_status_t iree_hal_hip_device_execute_now(void* user_data,
                ? IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED
                : 0);
       status = iree_hal_hip_device_create_stream_command_buffer(
-          (iree_hal_device_t*)data->device, mode,
-          command_buffer->allowed_categories, data->queue_affinity, 0,
+          (iree_hal_device_t*)device, mode,
+          command_buffer->allowed_categories, data->base.queue_affinity, 0,
           &stream_command_buffer);
       if (iree_status_is_ok(status)) {
         status = iree_hal_resource_set_insert(data->resource_set, 1,
@@ -1850,7 +1750,7 @@ static iree_status_t iree_hal_hip_device_execute_now(void* user_data,
         hipGraphExec_t exec =
             iree_hal_hip_graph_command_buffer_handle(command_buffer);
         status = IREE_HIP_CALL_TO_STATUS(
-            data->device->hip_symbols,
+            device->hip_symbols,
             hipGraphLaunch(
                 exec, device->devices[device_ordinal].hip_dispatch_stream));
         IREE_TRACE_ZONE_END(z2);
@@ -1865,18 +1765,18 @@ static iree_status_t iree_hal_hip_device_execute_now(void* user_data,
 
   // Store symbols, because the cleanup may trigger off-thread
   // before it returns.
-  const iree_hal_hip_dynamic_symbols_t* symbols = data->device->hip_symbols;
+  const iree_hal_hip_dynamic_symbols_t* symbols = device->hip_symbols;
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
-        data->device, data->device->cleanup_thread, data->signal_semaphore_list,
+        device, device->cleanup_thread, data->base.signal_semaphore_list,
         device_ordinal, iree_hal_hip_device_complete_submission, data);
   }
 
   if (!iree_status_is_ok(status)) {
-    for (iree_host_size_t i = 0; i < data->signal_semaphore_list.count; ++i) {
-      iree_hal_semaphore_fail(data->signal_semaphore_list.semaphores[i],
-                              iree_status_clone(data->status));
+    for (iree_host_size_t i = 0; i < data->base.signal_semaphore_list.count; ++i) {
+      iree_hal_semaphore_fail(data->base.signal_semaphore_list.semaphores[i],
+                              iree_status_clone(data->base.status));
     }
     iree_hal_hip_device_destroy_callback_data(data);
   }
@@ -1886,29 +1786,74 @@ static iree_status_t iree_hal_hip_device_execute_now(void* user_data,
       status, IREE_HIP_CALL_TO_STATUS(symbols, hipCtxPopCurrent(NULL)));
 }
 
-static iree_status_t iree_hal_hip_device_semaphore_submit_callback(
-    void* user_context, iree_hal_semaphore_t* semaphore, iree_status_t status) {
-  iree_hal_hip_device_semaphore_submit_callback_data_t* data =
-      (iree_hal_hip_device_semaphore_submit_callback_data_t*)user_context;
+static iree_status_t iree_hal_hip_device_make_callback_data(
+    iree_hal_hip_device_t* device, iree_allocator_t host_allocator,
+    iree_arena_block_pool_t* block_pool,
+    iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_binding_table_t binding_table,
+    iree_hal_hip_device_semaphore_submit_callback_data_t** out_data) {
+  IREE_TRACE_ZONE_BEGIN(z0);
 
-  if (!iree_status_is_ok(status)) {
-    iree_slim_mutex_lock(&data->status_mutex);
-    data->status = iree_status_join(data->status, status);
-    iree_slim_mutex_unlock(&data->status_mutex);
+  *out_data = NULL;
+
+  // Embed captured tables in the action allocation.
+  iree_hal_hip_device_semaphore_submit_callback_data_t* callback_data = NULL;
+
+  const iree_host_size_t payload_size =
+      binding_table.count * sizeof(*binding_table.bindings);
+
+  const iree_host_size_t additional_data_for_base = 
+    iree_hal_hip_semaphore_callback_data_get_additional_allocation_size(wait_semaphore_list, signal_semaphore_list);
+
+  const iree_host_size_t total_callback_size =
+      sizeof(*callback_data) + additional_data_for_base + payload_size;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(host_allocator, total_callback_size,
+                                (void**)&callback_data));
+  
+  iree_hal_hip_semaphore_callback_data_init(host_allocator, 
+    device, queue_affinity, &iree_hal_hip_device_execute_now, wait_semaphore_list, signal_semaphore_list,
+    (void*)((uint8_t*)callback_data + sizeof(*callback_data)), &callback_data->base);
+
+  // Copy the execution resources for later access.
+  callback_data->command_buffer = command_buffer;
+
+  // Retain all command buffers and semaphores.
+  iree_status_t status =
+      iree_hal_resource_set_allocate(block_pool, &callback_data->resource_set);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_resource_set_insert(callback_data->resource_set,
+                                          wait_semaphore_list.count,
+                                          wait_semaphore_list.semaphores);
   }
-  if (iree_atomic_fetch_sub(&data->wait_semaphore_count, 1,
-                            iree_memory_order_acq_rel) != 1) {
-    return iree_ok_status();
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_resource_set_insert(callback_data->resource_set,
+                                          signal_semaphore_list.count,
+                                          signal_semaphore_list.semaphores);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_resource_set_insert(callback_data->resource_set, 1,
+                                          &command_buffer);
   }
 
-  int device_ordinal = iree_math_count_trailing_zeros_u64(data->queue_affinity);
+  callback_data->binding_table = binding_table;
+  iree_hal_buffer_binding_t* binding_element_ptr =
+      (iree_hal_buffer_binding_t*)((uint8_t*)callback_data + sizeof(*callback_data) + additional_data_for_base);
+  callback_data->binding_table.bindings = binding_element_ptr;
+  memcpy(binding_element_ptr, binding_table.bindings,
+         sizeof(*binding_element_ptr) * binding_table.count);
+  status = iree_hal_resource_set_insert_strided(
+      callback_data->resource_set, binding_table.count,
+      callback_data->binding_table.bindings,
+      offsetof(iree_hal_buffer_binding_t, buffer),
+      sizeof(iree_hal_buffer_binding_t));
 
-  // Now the actual submit happens, as all semaphore have been satisfied
-  // (by satisfied here, we specifically mean that the semaphore has been
-  // scheduled, not necessarily completed)
-  return iree_hal_hip_dispatch_thread_add_dispatch(
-      data->device->devices[device_ordinal].dispatch_thread,
-      &iree_hal_hip_device_execute_now, data);
+  *out_data = callback_data;
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 static iree_status_t iree_hal_hip_device_queue_execute(
@@ -1958,7 +1903,7 @@ static iree_status_t iree_hal_hip_device_queue_execute(
               wait_semaphore_list.semaphores[i],
               wait_semaphore_list.payload_values[i],
               device->devices[device_ordinal].device_event_pool,
-              &iree_hal_hip_device_semaphore_submit_callback, callback_data));
+              &iree_hal_hip_device_semaphore_callback, callback_data));
     }
   } else {
     iree_hal_hip_device_destroy_callback_data(callback_data);
