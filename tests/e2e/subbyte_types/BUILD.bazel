@@ -42,9 +42,24 @@ iree_check_single_backend_test_suite(
     target_backend = "llvm-cpu",
 )
 
+iree_check_single_backend_test_suite(
+    name = "check_llvm-cpu_subbyte_emulation_attr",
+    srcs = ["subbyte_types_attr.mlir"],
+    compiler_flags = [
+        "--iree-llvmcpu-target-cpu=generic",
+    ],
+    driver = "local-task",
+    tags = [
+        # subbyte support for wasm is not on priorities.
+        "nowasm",
+    ],
+    target_backend = "llvm-cpu",
+)
+
 test_suite(
     name = "check",
     tests = [
         ":check_llvm-cpu_subbyte_emulation",
+        ":check_llvm-cpu_subbyte_emulation_attr",
     ],
 )
