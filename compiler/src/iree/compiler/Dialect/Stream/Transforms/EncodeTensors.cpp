@@ -46,7 +46,8 @@ static LogicalResult checkEncoding(Operation *op, RankedTensorType encodingType,
                                    ValueRange encodingDims,
                                    PatternRewriter &rewriter) {
   auto encoding = encodingType.getEncoding();
-  if (encoding && !llvm::isa<IREE::Encoding::EncodingAttr>(encoding)) {
+  if (encoding && !llvm::isa<IREE::Encoding::EncodingAttr,
+                             IREE::Encoding::PackedStorageAttr>(encoding)) {
     return rewriter.notifyMatchFailure(op, [=](Diagnostic &d) {
       d << "unsupported tensor encoding: " << encodingType;
     });
