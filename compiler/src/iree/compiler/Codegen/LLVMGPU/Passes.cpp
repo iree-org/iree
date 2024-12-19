@@ -410,6 +410,9 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   }
   funcPassManager.addPass(IREE::GPU::createDistributeMmaToLanesPass());
 
+  // Step 4.5. Things that need to happen right after distribution to threads.
+  funcPassManager.addPass(createGPULowerToUKernelsPass());
+
   // Normalize loop bounds for later lowerings.
   funcPassManager.addPass(iree_compiler::createNormalizeLoopBoundsPass(
       NormalizeLoopBoundsPassOptions{/*normalizeFor=*/false,

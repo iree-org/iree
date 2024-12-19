@@ -111,6 +111,7 @@ def GPULowerToUKernelsPass :
   let dependentDialects = [
     "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+    "::mlir::tensor::TensorDialect",
   ];
 }
 
