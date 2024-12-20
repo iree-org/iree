@@ -19,7 +19,7 @@
 
 // Check that the default tuning spec gets materialized without linking.
 
-// DEFAULT-LABEL: module @iree_default_tuning_spec_gfx942 attributes {transform.with_named_sequence}
+// DEFAULT-LABEL: module @iree_default_tuning_spec_gfx942 attributes {iree_codegen.tuning_spec_with_default_entrypoint, transform.with_named_sequence}
 // DEFAULT-LABEL:   transform.named_sequence @__kernel_config
 // DEFAULT-SAME:      attributes {iree_codegen.tuning_spec_entrypoint}
 
@@ -37,7 +37,7 @@
 // BOTH-LABEL:   module @mmt_tile_and_fuse_spec_0 attributes {transform.with_named_sequence}
 // BOTH-LABEL:     transform.named_sequence @main
 // BOTH-SAME:        attributes {iree_codegen.tuning_spec_entrypoint}
-// BOTH-LABEL:   module @iree_default_tuning_spec_gfx942_1 attributes {transform.with_named_sequence}
+// BOTH-LABEL:   module @iree_default_tuning_spec_gfx942_1 attributes {iree_codegen.tuning_spec_with_default_entrypoint, transform.with_named_sequence}
 // BOTH:           transform.named_sequence @__kernel_config
 // BOTH-SAME:        attributes {iree_codegen.tuning_spec_entrypoint}
 // BOTH:         transform.named_sequence @__kernel_config
