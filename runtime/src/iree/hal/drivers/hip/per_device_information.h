@@ -7,6 +7,7 @@
 #ifndef IREE_HAL_DRIVERS_HIP_PER_DEVICE_INFORMATION_H_
 #define IREE_HAL_DRIVERS_HIP_PER_DEVICE_INFORMATION_H_
 
+#include "iree/base/internal/synchronization.h"
 #include "iree/hal/drivers/hip/dispatch_thread.h"
 #include "iree/hal/drivers/hip/hip_headers.h"
 #include "iree/hal/drivers/hip/memory_pools.h"
@@ -25,6 +26,12 @@ typedef struct iree_hal_hip_per_device_info_t {
   iree_hal_hip_event_pool_t* device_event_pool;
 
   iree_hal_hip_dispatch_thread_t* dispatch_thread;
+
+  iree_hal_buffer_t* file_transfer_staging_buffer;
+  iree_host_size_t file_transfer_staging_buffer_head;
+  iree_host_size_t file_transfer_staging_buffer_tail;
+  iree_slim_mutex_t file_transfer_staging_buffer_lock;
+  iree_notification_t file_transfer_staging_buffer_notify;
 
   iree_hal_hip_memory_pools_t memory_pools;
 } iree_hal_hip_per_device_info_t;
