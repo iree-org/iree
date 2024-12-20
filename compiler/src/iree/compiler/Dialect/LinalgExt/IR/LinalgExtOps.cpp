@@ -166,20 +166,14 @@ LogicalResult ScatterOp::verify() {
         "update value rank exceeds the rank of the original value");
   }
 
-  // indexDepth + update dims should cover the original dims. The first dim of
-  // update is the number of updates.
-  if (originalType.getRank() > indexDepth + updateType.getRank() - 1) {
-    return op->emitOpError(
-        "index depth and update value does not cover rank of original value");
-  }
-
   // Validate the non-indexed update dims cover the full slice size of the
   // original tensor.
   int64_t fullSliceDims = originalType.getRank() - indexDepth;
-  for (auto it :
-       llvm::zip_equal(llvm::seq<unsigned>(indexDepth, originalType.getRank()),
-                       llvm::seq<unsigned>(updateType.getRank() - fullSliceDims,
-                                           updateType.getRank()))) {
+  for (auto it : llvm::zip(
+           llvm::reverse(
+               llvm::seq<unsigned>(indexDepth, originalType.getRank())),
+           llvm::reverse(llvm::seq<unsigned>(
+               updateType.getRank() - fullSliceDims, updateType.getRank())))) {
     int64_t originalDim = std::get<0>(it);
     int64_t updateDim = std::get<1>(it);
     if (!originalType.isDynamicDim(originalDim) &&
@@ -187,23 +181,6 @@ LogicalResult ScatterOp::verify() {
             originalType.getDimSize(originalDim)) {
       return op->emitOpError("shape of update value dim#")
              << updateDim << " exceeds original value at dim#" << originalDim;
-    }
-  }
-
-  // Check that the remaining update indices do not exceed the update length.
-  int64_t insertDims = originalType.getRank() - updateType.getRank() + 1;
-  for (auto it : llvm::zip_equal(
-           llvm::seq<unsigned>(insertDims, indexDepth),
-           llvm::seq<unsigned>(1, updateType.getRank() - fullSliceDims))) {
-    int64_t originalDim = std::get<0>(it);
-    int64_t updateDim = std::get<1>(it);
-    if (!originalType.isDynamicDim(originalDim) &&
-        updateType.getDimSize(updateDim) >
-            originalType.getDimSize(originalDim)) {
-      return op->emitOpError("indexed shape of update value dim#")
-             << updateDim << " exceeds original value at dim#" << originalDim
-             << " " << updateType.getDimSize(updateDim) << " "
-             << originalType.getDimSize(originalDim);
     }
   }
 
