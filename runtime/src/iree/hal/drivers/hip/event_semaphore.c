@@ -393,11 +393,9 @@ static iree_status_t iree_hal_hip_event_semaphore_run_scheduled_callbacks(
   iree_status_t status = iree_status_clone(semaphore->failure_status);
 
   iree_slim_mutex_unlock(&semaphore->mutex);
-  bool made_forward_progress = false;
   // Now that we have accumulated all of the work items, and we have
   // unlocked the semaphore, start running through the work items.
   while (work_item) {
-    made_forward_progress = true;
     iree_hal_hip_semaphore_work_item_t* next_work_item = work_item->next;
     iree_status_ignore(work_item->scheduled_callback(
         work_item->user_data, base_semaphore, iree_status_clone(status)));
@@ -405,10 +403,7 @@ static iree_status_t iree_hal_hip_event_semaphore_run_scheduled_callbacks(
     work_item = next_work_item;
   }
 
-  if (made_forward_progress) {
-    iree_notification_post(&semaphore->state_notification, IREE_ALL_WAITERS);
-  }
-
+  iree_notification_post(&semaphore->state_notification, IREE_ALL_WAITERS);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -846,10 +841,6 @@ static iree_status_t iree_hal_hip_semaphore_wait(
       iree_wait_token_t wait =
           iree_notification_prepare_wait(&semaphore->state_notification);
       iree_slim_mutex_unlock(&semaphore->mutex);
-
-      // We are going to pick up the correct status from query_locked below.
-      iree_status_ignore(
-          iree_hal_hip_event_semaphore_run_scheduled_callbacks(base_semaphore));
 
       // We have to wait for the semaphore to catch up.
       bool committed =
