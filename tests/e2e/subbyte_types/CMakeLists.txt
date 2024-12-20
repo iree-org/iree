@@ -26,4 +26,19 @@ iree_check_single_backend_test_suite(
     "nowasm"
 )
 
+iree_check_single_backend_test_suite(
+  NAME
+    check_llvm-cpu_subbyte_emulation_attr
+  SRCS
+    "subbyte_types_attr.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-target-cpu=generic"
+  LABELS
+    "nowasm"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
