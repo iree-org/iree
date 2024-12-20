@@ -132,7 +132,7 @@ LogicalResult splitReductionImpl(Operation *op, int64_t size,
     LLVM_DEBUG(llvm::dbgs() << "failed on step 1 (SCFTiling)\n");
     return failure();
   }
-  rewriter.replaceOp(linalgOp, tileResFirst->replacements);
+  rewriter.replaceOp(linalgOp, tileResFirst->mergeResult.replacements);
 
   // 2) Apply splitReduction on the single vector-length array.
   // splitReduction already replaces the op.
@@ -159,7 +159,8 @@ LogicalResult splitReductionImpl(Operation *op, int64_t size,
     LLVM_DEBUG(llvm::dbgs() << "failed on step 3 (SCFTiling)\n");
     return failure();
   }
-  rewriter.replaceOp(splitRes->splitLinalgOp, tileRes->replacements);
+  rewriter.replaceOp(splitRes->splitLinalgOp,
+                     tileRes->mergeResult.replacements);
   return success();
 }
 
