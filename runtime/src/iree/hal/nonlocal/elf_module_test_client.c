@@ -122,7 +122,7 @@ static iree_status_t run_test() {
       .workgroup_count_y = 1,
       .workgroup_count_z = 1,
       .max_concurrency = 1,
-      .binding_count = 1,
+      .binding_count = 3,
       .binding_lengths = binding_lengths,
       .binding_ptrs = binding_ptrs,
   };
