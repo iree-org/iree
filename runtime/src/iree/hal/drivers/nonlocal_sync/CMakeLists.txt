@@ -18,23 +18,11 @@ iree_cc_library(
     "driver.h"
     "event.h"
     "semaphore.h"
-    "../../nonlocal/buffer.h"
-    "../../nonlocal/allocator.h"
-    "../../nonlocal/inline_command_buffer.h"
-    "../../nonlocal/local_executable.h"
-    "../../nonlocal/embedded_elf_loader.h"
-    "../../nonlocal/nl_api.h"
   SRCS
     "device.c"
     "driver.c"
     "event.c"
     "semaphore.c"
-    "../../nonlocal/buffer.c"
-    "../../nonlocal/allocator.c"
-    "../../nonlocal/inline_command_buffer.c"
-    "../../nonlocal/local_executable.c"
-    "../../nonlocal/embedded_elf_loader.c"
-    "../../nonlocal/nl_api.c"
   DEPS
     iree::base
     iree::base::internal
@@ -42,51 +30,13 @@ iree_cc_library(
     iree::base::internal::cpu
     iree::base::internal::synchronization
     iree::hal
-    iree::hal::local
+    iree::hal::nonlocal
     iree::hal::local::executable_environment
     iree::hal::utils::deferred_command_buffer
     iree::hal::utils::file_transfer
     iree::hal::utils::memory_file
     iree::hal::utils::semaphore_base
   PUBLIC
-)
-
-iree_cc_binary(
-  NAME
-    elf_module_server
-  HDRS
-    "../../nonlocal/nl_api.h"
-    "../../nonlocal/command_data.h"
-  SRCS
-    "../../nonlocal/command_data.c"
-    "../../nonlocal/nl_api.c"
-    "../../nonlocal/elf_module_server.c"
-  DEPS
-    iree::hal::local::elf::elf_module
-    iree::base
-    iree::base::internal::cpu
-    iree::hal::local::elf::testdata::elementwise_mul
-    iree::hal::local::executable_environment
-    iree::hal::local::executable_library
-)
-
-iree_cc_binary(
-  NAME
-    elf_module_test_client
-  HDRS
-    "../../nonlocal/nl_api.h"
-    "../../nonlocal/command_data.h"
-  SRCS
-    "../../nonlocal/command_data.c"
-    "../../nonlocal/nl_api_client.c"
-    "../../nonlocal/elf_module_test_client.c"
-  DEPS
-    iree::hal::local::elf::elf_module
-    iree::base
-    iree::base::internal::cpu
-    iree::hal::local::elf::testdata::elementwise_mul
-    iree::hal::local::executable_environment
-    iree::hal::local::executable_library
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

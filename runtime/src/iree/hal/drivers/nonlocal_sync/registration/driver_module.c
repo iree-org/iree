@@ -10,8 +10,8 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
-#include "driver.h"
-#include "embedded_elf_loader.h"
+#include "iree/hal/drivers/nonlocal_sync/driver.h"
+#include "iree/hal/nonlocal/embedded_elf_loader.h"
 #include "iree/hal/local/plugins/registration/init.h"
 
 static iree_status_t iree_hal_nonlocal_sync_driver_factory_enumerate(

@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "device.h"
+#include "iree/hal/drivers/nonlocal_sync/device.h"
 
-#include "allocator.h"
+#include "iree/hal/nonlocal/allocator.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -17,7 +17,7 @@
 #include "event.h"
 #include "semaphore.h"
 #include "iree/hal/local/executable_environment.h"
-#include "inline_command_buffer.h"
+#include "iree/hal/nonlocal/inline_command_buffer.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/file_transfer.h"

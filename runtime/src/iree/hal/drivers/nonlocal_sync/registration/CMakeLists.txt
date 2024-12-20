@@ -20,7 +20,7 @@ iree_cc_library(
   DEPS
     iree::base
     iree::hal
-    drivers::nonlocal_sync
+    iree::hal::drivers::nonlocal_sync::sync_driver
     iree::hal::local::loaders::registration
     iree::hal::local::plugins::registration
   DEFINES
