@@ -351,7 +351,7 @@ public:
         context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
-      signalPassFailure();
+      return signalPassFailure();
     }
   }
 };
