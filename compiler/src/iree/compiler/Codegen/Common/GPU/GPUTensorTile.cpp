@@ -90,7 +90,7 @@ public:
     }
 
     // Replace the tiled op with replacements.
-    rewriter.replaceOp(op, tilingResult->replacements);
+    rewriter.replaceOp(op, tilingResult->mergeResult.replacements);
     filter.replaceLinalgTransformationFilter(rewriter,
                                              tilingResult->tiledOps.front());
 
@@ -292,7 +292,7 @@ static LogicalResult tileParallelDims(mlir::FunctionOpInterface funcOp,
     if (failed(tilingResult)) {
       return tilingOp->emitOpError("failed to tile to scf.forall");
     }
-    rewriter.replaceOp(tilingOp, tilingResult->replacements);
+    rewriter.replaceOp(tilingOp, tilingResult->mergeResult.replacements);
   }
   return success();
 }

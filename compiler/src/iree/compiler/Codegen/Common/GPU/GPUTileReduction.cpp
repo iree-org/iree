@@ -38,7 +38,7 @@ static LogicalResult tileReduction(linalg::LinalgOp op) {
     sizes.push_back(rewriter.getIndexAttr(size));
   }
   rewriter.setInsertionPoint(op);
-  FailureOr<scf::SCFReductionTilingResult> results = scf::tileReductionUsingScf(
+  FailureOr<scf::SCFTilingResult> results = scf::tileReductionUsingScf(
       rewriter, cast<PartialReductionOpInterface>(op.getOperation()), sizes);
   if (failed(results))
     return failure();
