@@ -842,10 +842,6 @@ static iree_status_t iree_hal_hip_semaphore_wait(
           iree_notification_prepare_wait(&semaphore->state_notification);
       iree_slim_mutex_unlock(&semaphore->mutex);
 
-      // We are going to pick up the correct status from query_locked below.
-      iree_status_ignore(
-          iree_hal_hip_event_semaphore_run_scheduled_callbacks(base_semaphore));
-
       // We have to wait for the semaphore to catch up.
       bool committed =
           iree_notification_commit_wait(&semaphore->state_notification, wait,
