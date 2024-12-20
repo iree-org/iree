@@ -23,6 +23,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -383,6 +384,64 @@ static bool areOpsFusable(Operation *producer, Operation *consumer,
   return true;
 }
 
+/// The logic to decide fusability (using the `hasCompatibleOuterParallelLoops`)
+/// currently works when the indexing map corresponding to result of the
+/// producer and indexing map corresponding to operand in the result are not
+/// transposed with respect to each other. To find more fusion opportunities for
+/// consumer elementwise operation, the indexing maps in the consumer can be
+/// made to "align" with the indexing map of the producer to enhance fusion.
+static bool areOpsFusableAfterInterchangeOfConsumer(
+    OpOperand &fusableOperand,
+    const llvm::SmallBitVector &rootOuterParallelLoops) {
+  Operation *producer = fusableOperand.get().getDefiningOp();
+  if (!producer) {
+    return false;
+  }
+
+  Operation *consumer = fusableOperand.getOwner();
+  auto genericOp = dyn_cast<linalg::GenericOp>(consumer);
+  if (!genericOp) {
+    return false;
+  }
+  assert(genericOp.getNumDpsInputs() > 0 &&
+         "expected consumer to have at least one input");
+
+  if (!linalg::isElementwise(genericOp) || genericOp.getNumResults() != 1) {
+    return false;
+  }
+
+  // The input map must be a permutation (i.e. this is not a broadcasting
+  // access), but not identity.
+  AffineMap inputMap = genericOp.getMatchingIndexingMap(&fusableOperand);
+  if (!inputMap.isPermutation() || inputMap.isIdentity()) {
+    return false;
+  }
+
+  // The output should also be a permutation. It should be for a parallel
+  // elementwise op, but checking here anyway.
+  OpResult result = cast<OpResult>(genericOp.getResult(0));
+  if (!genericOp.getIndexingMapMatchingResult(result).isPermutation()) {
+    return false;
+  }
+
+  // Make the input map identity.
+  auto perm =
+      llvm::map_to_vector(inputMap.getResults(), [](AffineExpr e) -> unsigned {
+        return cast<AffineDimExpr>(e).getPosition();
+      });
+  IRRewriter rewriter(consumer->getContext());
+  FailureOr<linalg::GenericOp> interchangedOp =
+      linalg::interchangeGenericOp(rewriter, genericOp, perm);
+  (void)interchangedOp;
+  assert(succeeded(interchangedOp) && "expected interchange to succeed");
+  assert(interchangedOp.value() == genericOp &&
+         "expected interchange to happen in place");
+  assert(
+      areOpsFusable(producer, interchangedOp.value(), rootOuterParallelLoops) &&
+      "expected the interchanged op to be fusable");
+  return true;
+}
+
 /// For the fusion of root op -> elementwise operation to be bufferized
 /// in-place without use of extra memory, the result of the root operation
 /// must be able to reuse the buffer for the result of the elementwise
@@ -531,7 +590,10 @@ isFusableWithConsumer(OpOperand &fusedOperand,
   }
 
   if (!areOpsFusable(producer, consumer, rootOuterParallelLoops)) {
-    return false;
+    if (!areOpsFusableAfterInterchangeOfConsumer(fusedOperand,
+                                                 rootOuterParallelLoops)) {
+      return false;
+    }
   }
 
   // Check if the iteration spaces of the producer and consumer are same.
