@@ -11,7 +11,7 @@
 // Total number of events per tracing context. This translates to the maximum
 // number of outstanding timestamp queries before collection is required.
 // To prevent spilling pages we leave some room for the context structure.
-#define IREE_HAL_TRACING_DEFAULT_QUERY_CAPACITY (32 * 1024 - 256)
+#define IREE_HAL_TRACING_DEFAULT_QUERY_CAPACITY (128 * 1024 - 256)
 
 // iree_hal_stream_tracing_context_event_t contains a native event that is used
 // to record timestamps for tracing GPU execution. In this struct, there are
