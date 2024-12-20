@@ -27,11 +27,13 @@ typedef struct iree_hal_hip_per_device_info_t {
 
   iree_hal_hip_dispatch_thread_t* dispatch_thread;
 
-  iree_hal_buffer_t* file_transfer_staging_buffer;
-  iree_host_size_t file_transfer_staging_buffer_head;
-  iree_host_size_t file_transfer_staging_buffer_tail;
-  iree_slim_mutex_t file_transfer_staging_buffer_lock;
-  iree_notification_t file_transfer_staging_buffer_notify;
+  struct {
+    iree_hal_buffer_t* buffer;
+    iree_host_size_t head;
+    iree_host_size_t tail;
+    iree_slim_mutex_t mutex;
+    iree_notification_t notify;
+  } file_transfer_staging_buffer;
 
   iree_hal_hip_memory_pools_t memory_pools;
 } iree_hal_hip_per_device_info_t;
