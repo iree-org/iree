@@ -393,9 +393,11 @@ static iree_status_t iree_hal_hip_event_semaphore_run_scheduled_callbacks(
   iree_status_t status = iree_status_clone(semaphore->failure_status);
 
   iree_slim_mutex_unlock(&semaphore->mutex);
+  bool made_forward_progress = false;
   // Now that we have accumulated all of the work items, and we have
   // unlocked the semaphore, start running through the work items.
   while (work_item) {
+    made_forward_progress = true;
     iree_hal_hip_semaphore_work_item_t* next_work_item = work_item->next;
     iree_status_ignore(work_item->scheduled_callback(
         work_item->user_data, base_semaphore, iree_status_clone(status)));
@@ -403,7 +405,10 @@ static iree_status_t iree_hal_hip_event_semaphore_run_scheduled_callbacks(
     work_item = next_work_item;
   }
 
-  iree_notification_post(&semaphore->state_notification, IREE_ALL_WAITERS);
+  if (made_forward_progress) {
+    iree_notification_post(&semaphore->state_notification, IREE_ALL_WAITERS);
+  }
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
