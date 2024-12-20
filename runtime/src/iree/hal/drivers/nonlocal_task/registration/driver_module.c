@@ -11,7 +11,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
-#include "driver.h"
+#include "iree/hal/drivers/nonlocal_task/driver.h"
 #include "iree/hal/nonlocal/embedded_elf_loader.h"
 #include "iree/hal/local/plugins/registration/init.h"
 #include "iree/task/api.h"
