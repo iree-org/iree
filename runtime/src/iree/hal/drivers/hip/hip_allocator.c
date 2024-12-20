@@ -692,14 +692,15 @@ iree_status_t iree_hal_hip_allocator_free_async(
     return iree_ok_status();
   }
 
-  IREE_RETURN_IF_ERROR(IREE_HIP_CALL_TO_STATUS(allocator->symbols,
-                                               hipFree(device_ptr), "hipFree"));
-  iree_hal_hip_buffer_set_allocation_empty(buffer);
-
   IREE_TRACE_FREE_NAMED(IREE_HAL_HIP_ALLOCATOR_ID, (void*)device_ptr);
   IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
       &allocator->statistics, iree_hal_buffer_memory_type(buffer),
       iree_hal_buffer_allocation_size(buffer)));
+
+  IREE_RETURN_IF_ERROR(IREE_HIP_CALL_TO_STATUS(allocator->symbols,
+                                               hipFree(device_ptr), "hipFree"));
+  iree_hal_hip_buffer_set_allocation_empty(buffer);
+
   return iree_ok_status();
 }
 
