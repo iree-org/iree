@@ -16,6 +16,7 @@ namespace mlir::iree_compiler {
 /// Returns true if the given |bitWidth|, if appearing at runtime-kernel
 /// interface, is less than a byte that should be tightly packed together.
 bool needToPackSubByteElementBitWidth(unsigned bitWidth);
+
 /// Returns true if the given |shapedType|, if appearing at runtime-kernel
 /// interface, has sub-byte element types that should be tightly packed
 /// together.
