@@ -76,15 +76,16 @@ int command_data_open(command_data_t *command_data, char *server, int port) {
 }
 
 int command_data_read(command_data_t *command_data, void *buffer, int size) {
-	return read(command_data->fd, buffer, size);
+	return recv(command_data->fd, buffer, size, 0);
 }
 
 int command_data_read_full(command_data_t *command_data, void *buffer, int size) {
 	int remain = size;
 	int n;
 	do {
-		n = read(command_data->fd, buffer, remain);
+		n = recv(command_data->fd, buffer, remain, 0);
 		if ( n <= 0 ) {
+			perror("recv");
 			close(command_data->fd);
 			command_data->fd = -1;
 			return -1;
@@ -151,7 +152,7 @@ int command_data_connection_read(command_data_t *command_data, int i, void *buff
 
 	if(!(command_data->fds[i].revents & POLLIN)) return 0;
 
-	int n = read(command_data->fds[i].fd, buffer, size);
+	int n = recv(command_data->fds[i].fd, buffer, size, 0);
 	if ( n <= 0 ) {
 		close(command_data->fds[i].fd);
 		command_data->fds[i].fd = -1;
@@ -168,8 +169,9 @@ int command_data_connection_read_full(command_data_t *command_data, int i, void 
 	int remain = size;
 	int n;
 	do {
-		n = read(command_data->fds[i].fd, buffer, remain);
+		n = recv(command_data->fds[i].fd, buffer, remain, 0);
 		if ( n <= 0 ) {
+			perror("recv");
 			close(command_data->fds[i].fd);
 			command_data->fds[i].fd = -1;
 			return -1;
