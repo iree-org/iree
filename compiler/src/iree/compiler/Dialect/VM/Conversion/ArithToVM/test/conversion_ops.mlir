@@ -312,6 +312,18 @@ module @uitofp_i32_f32 {
 
 // -----
 
+// CHECK-LABEL: @uitofp_i64_f32
+module @uitofp_i64_f32 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: i64)
+  func.func @fn(%arg0: i64) -> f32 {
+    // CHECK: vm.cast.ui64.f32 %[[ARG0]] : i64 -> f32
+    %0 = arith.uitofp %arg0 : i64 to f32
+    return %0 : f32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @fptosi_fp32_i8
 module @fptosi_fp32_i8 {
   // CHECK: vm.func private @fn(%[[ARG0:.+]]: f32)
