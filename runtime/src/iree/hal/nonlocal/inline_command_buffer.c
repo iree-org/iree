@@ -16,6 +16,7 @@
 #include "iree/base/internal/math.h"
 #include "iree/hal/local/executable_library.h"
 #include "local_executable.h"
+#include "buffer.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_nonlocal_inline_command_buffer_t
@@ -327,9 +328,27 @@ static iree_status_t iree_hal_nonlocal_inline_command_buffer_update_buffer(
 static iree_status_t iree_hal_nonlocal_inline_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref) {
-  return iree_hal_buffer_map_copy(source_ref.buffer, source_ref.offset,
-                                  target_ref.buffer, target_ref.offset,
-                                  target_ref.length);
+  void *source_ptr = NULL;
+  void *target_ptr = NULL;
+  iree_status_t status = iree_ok_status();
+
+  if(iree_all_bits_set(iree_hal_buffer_memory_type(source_ref.buffer),
+                                           IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+    source_ptr = (void *)((unsigned char *) iree_hal_nl_buffer_device_pointer(source_ref.buffer) + source_ref.offset);
+  } else {
+    source_ptr = (void *)((unsigned char *) iree_hal_nl_buffer_host_pointer(source_ref.buffer) + source_ref.offset);
+  }
+
+  if(iree_all_bits_set(iree_hal_buffer_memory_type(target_ref.buffer),
+                                           IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+    target_ptr = (void *)((unsigned char *)iree_hal_nl_buffer_device_pointer(target_ref.buffer) + target_ref.offset);
+  } else {
+    target_ptr = (void *)((unsigned char *)iree_hal_nl_buffer_host_pointer(target_ref.buffer) + target_ref.offset);
+  }
+
+  memcpy(target_ptr, source_ptr, target_ref.length);
+
+  return status;
 }
 
 //===----------------------------------------------------------------------===//
