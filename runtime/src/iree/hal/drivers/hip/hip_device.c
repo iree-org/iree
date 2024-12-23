@@ -455,13 +455,16 @@ iree_status_t iree_hal_hip_device_create(
     }
 
     if (iree_status_is_ok(status)) {
-      for (iree_host_size_t j = 0;
-           j < device_count && iree_status_is_ok(status); ++j) {
-        if (i == j) {
+      int hip_device_count = 0;
+      status = IREE_HIP_CALL_TO_STATUS(
+          symbols, hipGetDeviceCount(&hip_device_count), "hipGetDeviceCount");
+
+      for (int j = 0; j < hip_device_count && iree_status_is_ok(status); ++j) {
+        if (j == device->devices[i].hip_device) {
           continue;
         }
-        status = IREE_HIP_CALL_TO_STATUS(
-            symbols, hipDeviceEnablePeerAccess(devices[j], 0));
+        status =
+            IREE_HIP_CALL_TO_STATUS(symbols, hipDeviceEnablePeerAccess(j, 0));
       }
     }
   }
