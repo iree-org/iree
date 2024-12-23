@@ -598,7 +598,9 @@ struct UIToFPOpConversion : public OpConversionPattern<arith::UIToFPOp> {
     }
     if (srcType.isUnsignedInteger(64) || srcType.isSignlessInteger(64)) {
       if (dstType.isF32()) {
-        return rewriter.notifyMatchFailure(srcOp, "unsupported type");
+        rewriter.replaceOpWithNewOp<IREE::VM::CastUI64F32Op>(srcOp, resultType,
+                                                             input);
+        return success();
       }
 
       rewriter.replaceOpWithNewOp<IREE::VM::CastUI64F64Op>(srcOp, resultType,

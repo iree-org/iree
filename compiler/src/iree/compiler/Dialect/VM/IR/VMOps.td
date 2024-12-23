@@ -3174,6 +3174,14 @@ def VM_CastSI64F32Op :
   let hasFolder = 1;
 }
 
+def VM_CastUI64F32Op :
+    VM_ConversionOp<I64, F32, "cast.ui64.f32", VM_OPC_CastUI64F32,
+                    [VM_ExtF32]> {
+  let summary = [{cast from an unsigned integer to a float-point value}];
+  let hasFolder = 1;
+}
+
+
 def VM_CastUI64F64Op :
     VM_ConversionOp<I64, F64, "cast.ui64.f64", VM_OPC_CastUI64F64,
                     [VM_ExtF64]> {
