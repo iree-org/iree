@@ -95,7 +95,7 @@ static iree_status_t iree_hal_nl_allocator_query_memory_heaps(
 
   // TODO(benvanik): check CU_DEVICE_ATTRIBUTE_INTEGRATED and return a unified
   // set of heaps (likely still a cached and uncached, at minimum).
-  iree_host_size_t count = 3;
+  iree_host_size_t count = 1;
   if (out_count) *out_count = count;
   if (capacity < count) {
     // NOTE: lightweight as this is hit in normal pre-sizing usage.
@@ -115,29 +115,6 @@ static iree_status_t iree_hal_nl_allocator_query_memory_heaps(
       .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
       .allowed_usage =
           IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH,
-      .max_allocation_size = max_allocation_size,
-      .min_alignment = min_alignment,
-  };
-
-  // Write-combined page-locked host-local memory (upload):
-  heaps[i++] = (iree_hal_allocator_memory_heap_t){
-      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE |
-              IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-              IREE_HAL_MEMORY_TYPE_HOST_COHERENT,
-      .allowed_usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                       IREE_HAL_BUFFER_USAGE_DISPATCH,
-      .max_allocation_size = max_allocation_size,
-      .min_alignment = min_alignment,
-  };
-
-  // Cached page-locked host-local memory (download):
-  heaps[i++] = (iree_hal_allocator_memory_heap_t){
-      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE |
-              IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-              IREE_HAL_MEMORY_TYPE_HOST_COHERENT |
-              IREE_HAL_MEMORY_TYPE_HOST_CACHED,
-      .allowed_usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                       IREE_HAL_BUFFER_USAGE_DISPATCH,
       .max_allocation_size = max_allocation_size,
       .min_alignment = min_alignment,
   };
@@ -173,9 +150,6 @@ iree_hal_nl_allocator_query_buffer_compatibility(
       compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH;
     }
   }
-
-  // Always ensure we are host-visible.
-  params->type |= IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
 
   // We are now optimal.
   params->type &= ~IREE_HAL_MEMORY_TYPE_OPTIMAL;
