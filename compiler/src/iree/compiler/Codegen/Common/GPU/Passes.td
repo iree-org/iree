@@ -13,6 +13,7 @@ include "mlir/Pass/PassBase.td"
 // Common Passes used for GPU-like backends (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
+
 def GPUCheckResourceUsagePass :
     InterfacePass<"iree-codegen-gpu-check-resource-usage", "mlir::FunctionOpInterface"> {
   let summary = "Checks GPU specific resource usage constraints like shared memory limits";
