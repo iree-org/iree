@@ -486,6 +486,68 @@ struct FoldAttentionWithProducerReshapeByExpansion final
   linalg::ControlFusionFn controlFoldingReshapes;
 };
 
+/// Remove the unit dims from `iree_linalg_ext.scatter` 's `update` operand.
+/// The `update` tensor is scanned from left to right, starting from the second
+/// element. The number of unit dimensions are counted until reaching a non unit
+/// dim.
+struct FoldScatterUnitDims final : public OpRewritePattern<ScatterOp> {
+  FoldScatterUnitDims(MLIRContext *context, linalg::ControlDropUnitDims options,
+                      PatternBenefit benefit = 1)
+      : OpRewritePattern<ScatterOp>(context, benefit),
+        options(std::move(options)) {}
+
+  LogicalResult matchAndRewrite(ScatterOp scatterOp,
+                                PatternRewriter &rewriter) const override {
+    if (options.rankReductionStrategy !=
+        linalg::ControlDropUnitDims::RankReductionStrategy::
+            ReassociativeReshape) {
+      return rewriter.notifyMatchFailure(
+          scatterOp, "Only reassociative reshape strategy supported");
+    }
+    llvm::SmallVector<unsigned> canDrop = options.controlFn(scatterOp);
+    const ArrayRef<int64_t> updateShape = scatterOp.getUpdateType().getShape();
+
+    // Find the first `numDimsToDrop` unit dimensions in the update tensor,
+    // these are the ones that can be dropped.
+    int64_t numDimsToDrop =
+        llvm::find_if(scatterOp.getUpdateSliceShape(),
+                      [](int64_t val) { return val != 1; }) -
+        updateShape.begin() - 1;
+
+    int64_t batchRank = scatterOp.getBatchRank();
+    llvm::erase_if(canDrop, [&](unsigned dimPos) {
+      return dimPos < batchRank || dimPos >= batchRank + numDimsToDrop;
+    });
+    if (canDrop.empty()) {
+      return failure();
+    }
+
+    SmallVector<int64_t> droppedUpdateShape;
+    droppedUpdateShape.reserve(updateShape.size() - canDrop.size());
+    for (auto [idx, dimLen] : llvm::enumerate(updateShape)) {
+      if (!llvm::is_contained(canDrop, idx)) {
+        droppedUpdateShape.push_back(dimLen);
+      }
+    }
+
+    auto reassoc =
+        getReassociationIndicesForCollapse(updateShape, droppedUpdateShape);
+    assert(reassoc.has_value() && "expected reassociation to be valid");
+    auto collapseOp = rewriter.create<tensor::CollapseShapeOp>(
+        scatterOp.getLoc(),
+        RankedTensorType::get(droppedUpdateShape,
+                              scatterOp.getUpdateType().getElementType()),
+        scatterOp.getUpdates(), reassoc.value());
+
+    rewriter.modifyOpInPlace(scatterOp, [&]() {
+      scatterOp.setOperand(ScatterOp::kUpdatesOpNum, collapseOp.getResult());
+    });
+    return success();
+  }
+
+  linalg::ControlDropUnitDims options;
+};
+
 } // namespace
 
 /// Return the `reassociation` indices to use to collapse the operand when the
@@ -706,6 +768,16 @@ void populateFoldReshapeOpsByExpansionPatterns(
       patterns.getContext(), controlFoldingReshapes);
   patterns.add<FoldAttentionWithProducerReshapeByExpansion>(
       patterns.getContext(), controlFoldingReshapes);
+}
+
+SmallVector<unsigned> defaultControlDropUnitDims(Operation *op) {
+  auto fusionOp = cast<LinalgFusionOpInterface>(op);
+  return llvm::to_vector(llvm::seq<unsigned>(0, fusionOp.getNumLoops()));
+}
+
+void populateFoldUnitExtentDimsPatterns(
+    RewritePatternSet &patterns, const linalg::ControlDropUnitDims &options) {
+  patterns.add<FoldScatterUnitDims>(patterns.getContext(), options);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
