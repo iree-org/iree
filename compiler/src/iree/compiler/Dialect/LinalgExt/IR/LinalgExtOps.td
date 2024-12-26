@@ -111,34 +111,52 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     current value with the value in `updates` using the computation
     specified in `region`. The `region` specifies a binary operation
     of signature (T, T) -> T, where `T` is the element-type of
-    `updates` (and `original`). The first argument correspond the
-    value to be updated (i.e. from `updates`), and the second the
-    current value (i.e. value from `original`).
+    `updates` (and `original`). The first argument is from `updates`,
+    and the second is from `original`.
 
-    The `indices` is a 2D tensor/memref type. The first dim is the number of
-    updates, and the second dim is index depth. The index depth should always be
-    static.
+    The operand `indices` is a N-D tensor/memref type that is composed
+    of two logical parts:
+    - The first `N-1` dimensions represent the batch of updates.
+    - The last dim (at index `N-1`) is the `index_depth`, which should
+      always be static.
 
-    The first dim of `updates` and `indices` is identical, since they represent
-    the number of updates.
+    For example, given `indices` of shape `[4, 3, 2]`, the batch dimensions
+    are `[4, 3]` and the `index_depth` is `2`.
 
-    The rank of the `original`/`result` is at least
-    `index_depth + rank(%updates) - 1`. The first `index_depth` indices are
-    derived from `indices` and the shape of update value has the last
-    rank(%original) - index_depth values match %(originals) last dimensions,
-    with the previous dims extending from the index offsets.
+    The operand `update` is a M-D tensor/memref type and similarly
+    consists of two parts:
+    - The first `N-1` dimensions represent the batch of updates. This
+      must exactly match to the first `N-1` dimensions in `indices`
+      (from the example above: `indices` must start with `[4, 3]`)
+    - Dimensions `N..M-1` represent the slice scattered into `original`.
+      The first part of this tensor represents the dimensions indexed
+      by `indices`. This must be no larger than `index_depth` but can be
+      less if unit dimensions are omitted.
+
+      The second part represents a contiguous slice to be inserted into
+      `original`.
+
+    The operand `original` is a DPS init representing the destination that
+    `update` gets scattered to.
+
+
+    The rank of the `original` is at least `rank(%updates) - batch_rank`.
+    The first `index_depth` indices are derived from `indices` and the
+    shape of update value has the last rank(%original) - index_depth values
+    match %(originals) last dimensions, with the previous dims extending
+    from the index offsets.
 
     The dimension_map attributes describes which index value maps to which
-    dimension in the destionation. It cannot contain duplicate values, must
-    have as many entries as index depth, and values must be within the rank of
-    the destination.
+    dimension in the destionation. It's rank must equal `index_depth` as
+    represents a permutation of the indices before indexing into `original``.
 
-    The unique_indices attribute carries the information whether all the indices
-    are unique. If there are repeated indices, the first iteration loop will be
-    marked as reduction.
+    The unique_indices attribute carries the information whether all the
+    indices are unique. If `unique_indices` is `true` and two or more updates
+    scatter to the same location in `original` the final value in `original` is
+    not guaranteed. If `unique_indices` is set to false, the first
+    `batch_rank` iteration loops will be marked as reduction.
 
-    The shapes definition follows tensorflow operations execept that it force
-    batch dims to be 1D. See more information in
+    The shapes definition follows tensorflow operations. See more information in
       https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update
   }];
   let arguments = (ins
@@ -157,6 +175,9 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     $region (`->` type($results)^)?
   }];
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    static constexpr unsigned kUpdatesOpNum = 0;
+    static constexpr unsigned kIndicesOpNum = 1;
+    static constexpr unsigned kOriginalOpNum = 2;
 
     int64_t getIndexDepth() {
       return cast<ShapedType>(getDpsInputOperand(1)->get().getType())
@@ -188,8 +209,51 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
       return cast<ShapedType>(getOriginal().getType());
     }
 
+    /// Utility to get the rank of the portion of `indices` that
+    /// represents the batch dimensions
+    int64_t getBatchRank() {
+      return getIndicesType().getRank() - 1;
+    }
+
+    /// Utility to get the shape of the portion of `indices` that
+    /// represents the batch dimensions.
+    ArrayRef<int64_t> getBatchShape() {
+      return getIndicesType().getShape().slice(0, getBatchRank());
+    }
+
+    /// Utility to get the rank of the portion of `updates` that
+    /// is scattered into `original`.
     int64_t getUpdateSliceRank() {
-      return cast<ShapedType>(getUpdates().getType()).getRank() - 1;
+      return getUpdateType().getRank() - getBatchRank();
+    }
+
+    /// Utility to get the shape of the portion of `updates` that
+    /// is scattered into `original`.
+    ArrayRef<int64_t> getUpdateSliceShape() {
+      return getUpdateType().getShape().slice(getBatchRank(),
+                                              getUpdateSliceRank());
+    }
+
+    /// Utility to get the dimension in `updates` the corresponds
+    /// to the given dimension in `original`
+    int64_t convertOriginalDimToUpdatesDim(uint64_t dim) {
+      assert(dim >= 0 && dim < getOriginalType().getRank() &&
+             "expected dimension to be within original rank");
+      int64_t updateDim =
+          getUpdateType().getRank() - getOriginalType().getRank() + dim;
+      assert(updateDim >= getBatchRank() &&
+             "dim doesn't map to a dim in updates");
+      return updateDim;
+    }
+
+    /// Get the dimension in `original` that corresponds to the given
+    /// dimension in `original`.
+    int64_t convertUpdatesDimToOriginalDim(uint64_t dim) {
+      assert(dim >= getBatchRank() &&
+             "update batch dim doesn't map to original");
+      assert(dim < getUpdateType().getRank() &&
+             "expected dimension to be within updates rank");
+      return getOriginalType().getRank() - getUpdateType().getRank() + dim;
     }
 
     bool isScalarUpdate() {
