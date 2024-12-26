@@ -74,10 +74,15 @@ static int run_test() {
       sizeof(arg1),
       sizeof(ret0),
   };
+  void *arg0_device = nl_mem_alloc(sizeof(arg0));
+  void *arg1_device = nl_mem_alloc(sizeof(arg1));
+  void *ret0_device = nl_mem_alloc(sizeof(ret0));
+  nl_mem_copy_in(arg0_device, arg0, sizeof(arg0));
+  nl_mem_copy_in(arg1_device, arg1, sizeof(arg1));
   void* binding_ptrs[3] = {
-      arg0,
-      arg1,
-      ret0,
+      arg0_device,
+      arg1_device,
+      ret0_device,
   };
   const iree_hal_executable_dispatch_state_v0_t dispatch_state = {
       .workgroup_size_x = 1,
@@ -99,18 +104,27 @@ static int run_test() {
   };
   int ret = nl_elf_executable_call(module_data, 0, (void*)&dispatch_state, (void*)&workgroup_state);
 
+  nl_mem_copy_out(ret0, ret0_device, sizeof(ret0));
+
   for (int i = 0; i < IREE_ARRAYSIZE(expected); ++i) {
     if (ret0[i] != expected[i]) {
       ret = -1;
-      printf("output mismatch: ret[%d] = %.1f, expected %.1f", i,
+      printf("output mismatch: ret[%d] = %.1f, expected %.1f\n", i,
                            ret0[i], expected[i]);
     }
   }
+  if(0 == ret) {
+    printf("success.\n");
+  }
+
+  nl_mem_free(arg0_device);
+  nl_mem_free(arg1_device);
+  nl_mem_free(ret0_device);
 
   nl_elf_executable_destroy(module);
   return ret;
 }
 
 int main() {
-  run_test();
+  return run_test();
 }
