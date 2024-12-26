@@ -10,6 +10,9 @@ nl_mem_device_ptr_t nl_mem_alloc(size_t size) { return malloc(size); }
 void nl_mem_free(nl_mem_device_ptr_t ptr) { free(ptr); }
 nl_mem_device_ptr_t nl_mem_host_alloc(size_t size) { return malloc(size); }
 void nl_mem_host_free(void *ptr) { free(ptr); }
+void nl_mem_copy_in(nl_mem_device_ptr_t dest, const void *src, size_t size) { memcpy(dest, src, size); }
+void nl_mem_copy_out(void *dest, const nl_mem_device_ptr_t src, size_t size) { memcpy(dest, src, size); }
+void nl_mem_copy(nl_mem_device_ptr_t dest, const nl_mem_device_ptr_t src, size_t size) { memcpy(dest, src, size); }
 
 // load elf data, return elf module
 nl_elf_module_handle_t nl_elf_executable_load(const uint8_t *elf_data, int elf_data_length) {
@@ -38,6 +41,11 @@ void *nl_elf_executable_init(nl_elf_module_handle_t module) {
   return iree_elf_call_p_ip(
           query_fn_ptr, IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST,
           &environment);
+}
+
+void nl_elf_executable_get_attrs(void *module_data, void ** attrs, int *count) {
+	*attrs = (void *)(((iree_hal_executable_library_v0_t *)module_data)->exports.attrs);
+	*count = ((iree_hal_executable_library_v0_t *)module_data)->exports.count;
 }
 
 // call function
