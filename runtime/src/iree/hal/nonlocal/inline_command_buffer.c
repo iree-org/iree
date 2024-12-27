@@ -433,12 +433,14 @@ static iree_status_t iree_hal_nonlocal_inline_command_buffer_dispatch(
   dispatch_state->binding_count = bindings.count;
   for (iree_host_size_t i = 0; i < bindings.count; ++i) {
     // TODO(benvanik): track mapping so we can properly map/unmap/flush/etc.
-    iree_hal_buffer_mapping_t buffer_mapping = {{0}};
+    void *binding_ptr = NULL;
     if (IREE_LIKELY(bindings.values[i].buffer)) {
-      IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-          bindings.values[i].buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
-          IREE_HAL_MEMORY_ACCESS_ANY, bindings.values[i].offset,
-          bindings.values[i].length, &buffer_mapping));
+      if(iree_all_bits_set(iree_hal_buffer_memory_type(bindings.values[i].buffer),
+                                           IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+        binding_ptr = (void *)((unsigned char *) iree_hal_nl_buffer_device_pointer(bindings.values[i].buffer) + bindings.values[i].offset);
+      } else {
+        binding_ptr = (void *)((unsigned char *) iree_hal_nl_buffer_host_pointer(bindings.values[i].buffer) + bindings.values[i].offset);
+      }
     } else {
       return iree_make_status(
           IREE_STATUS_FAILED_PRECONDITION,
@@ -446,9 +448,9 @@ static iree_status_t iree_hal_nonlocal_inline_command_buffer_dispatch(
           " is NULL; all bindings must have a valid pointer",
           i);
     }
-    command_buffer->state.binding_ptr_storage[i] = buffer_mapping.contents.data;
+    command_buffer->state.binding_ptr_storage[i] = binding_ptr;
     command_buffer->state.binding_length_storage[i] =
-        buffer_mapping.contents.data_length;
+        bindings.values[i].length;
   }
 
   // TODO(benvanik): plumb through an arena or fixed-size reservation to use.
