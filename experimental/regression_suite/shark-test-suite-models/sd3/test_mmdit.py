@@ -48,7 +48,7 @@ sd3_mmdit_real_weights = fetch_source_fixture(
 )
 
 sd3_mmdit_mlir = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/model.mlirbc",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/model.mlir",
     group="sd3_mmdit",
 )
 

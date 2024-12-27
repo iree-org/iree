@@ -53,7 +53,7 @@ sdxl_clip_real_weights = fetch_source_fixture(
 )
 
 sdxl_clip_mlir = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/model.mlirbc",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/model.mlir",
     group="sdxl_clip",
 )
 
