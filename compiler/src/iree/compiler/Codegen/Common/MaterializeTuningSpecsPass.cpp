@@ -27,6 +27,7 @@
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/OwningOpRef.h"
+#include "mlir/IR/Verifier.h"
 #include "mlir/Support/FileUtilities.h"
 
 #define DEBUG_TYPE "iree-codegen-materialize-tuning-specs"
@@ -138,8 +139,19 @@ getDefaultTuningSpec(ModuleOp module,
 
   // Load the library through the codegen dialect so that we cache the parsed
   // module.
-  return dialect.getOrParseTransformLibraryModule(defaultTuningSpecName,
-                                                  *defaultTuningSpecSource);
+  FailureOr<ModuleOp> defaultTransformLibrary =
+      dialect.getOrParseTransformLibraryModule(defaultTuningSpecName,
+                                               *defaultTuningSpecSource);
+
+#ifndef NDEBUG
+  if (succeeded(defaultTransformLibrary) &&
+      failed(mlir::verify(*defaultTransformLibrary)))
+    return (*defaultTransformLibrary).emitError()
+           << "Default tuning spec " << defaultTuningSpecName
+           << " failed to verify";
+#endif
+
+  return defaultTransformLibrary;
 }
 
 static FailureOr<DenseElementsAttr>

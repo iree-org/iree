@@ -1,47 +1,46 @@
-// Copyright 2023 The IREE Authors
+// Copyright 2024 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
+#include "iree/compiler/Codegen/Common/PassUtils.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/MathExtras.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
-#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
-#include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/BuiltinTypeInterfaces.h"
-#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/Passes.h"
 
-#define DEBUG_TYPE "cpu-materialize-encoding"
+#define DEBUG_TYPE "iree-codegen--materialize-encoding"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
-using IREE::Codegen::MaterializeEncodingInfo;
-using IREE::Codegen::TileMxNxK;
+#define GEN_PASS_DEF_MATERIALIZEDEVICEENCODINGPASS
+#define GEN_PASS_DEF_MATERIALIZEHOSTENCODINGPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
-#define GEN_PASS_DEF_CPUMATERIALIZEDEVICEENCODINGPASS
-#define GEN_PASS_DEF_CPUMATERIALIZEHOSTENCODINGPASS
-#include "iree/compiler/Codegen/Common/CPU/Passes.h.inc"
+using namespace IREE::Encoding;
+
+namespace {
 
 static FailureOr<MaterializeEncodingValueInfo>
 chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
@@ -64,41 +63,46 @@ getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
 
 static LogicalResult
 materializeFuncOpEncodings(FunctionOpInterface funcOp,
-                           IREE::HAL::ExecutableTargetAttr targetAttr) {
+                           IREE::HAL::ExecutableTargetAttr targetAttr,
+                           bool testCLGPUTarget = false) {
   MLIRContext *ctx = funcOp.getContext();
-  RewritePatternSet materializeEncodingPattern(ctx);
-  // On CPU, we use transposeNarrowN=true for a combination of reasons:
-  // 1. As linalg.matmul materializes into linalg.mmt4d, which has a transposed
-  //    RHS and therefore LHS<->RHS symmetry, transposeNarrowN is easy to
-  //    implement at that level.
-  // 2. We use ukernels, and this allows writing 2x fewer narrow ukernels.
-  // 3. Heuristics for cache-friendly dispatch tiling can get complex on CPU,
-  //    so it is nice that they have fewer narrow cases to consider.
-  DictionaryAttr targetConfig = targetAttr.getConfiguration();
-  IREE::Codegen::LayoutAttrInterface layoutAttr;
-  if (isVMVXBackend(targetAttr)) {
-    LDBG("Select VMVXEncodingLayoutAttr attribute as the layout attribute.");
-    layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
-        IREE::CPU::VMVXEncodingLayoutAttr::get(ctx, targetConfig));
-  } else {
-    LDBG("Select CPUEncodingLayoutAttr attribute as the layout attribute.");
-    layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
-        IREE::CPU::CPUEncodingLayoutAttr::get(ctx, targetConfig));
-  }
-  MaterializeEncodingTypeConverter typeConverter(
-      /*transposeNarrowN=*/true, layoutAttr);
-  MaterializeEncodingConversionTarget target(*ctx);
-  auto materializeEncodingValueFn = getMaterializeEncodingValueFn(targetAttr);
-  populateMaterializeEncodingIntoPackUnPackPatterns(
-      materializeEncodingPattern, typeConverter, materializeEncodingValueFn);
-  populateShapeIndependentMaterializeEncodingPatterns(
-      materializeEncodingPattern, target, typeConverter,
-      materializeEncodingValueFn);
+  {
+    RewritePatternSet patterns(ctx);
+    IREE::Codegen::LayoutAttrInterface layoutAttr;
+    if (isVMVXBackend(targetAttr)) {
+      LDBG("Select VMVXEncodingLayoutAttr attribute as the layout attribute.");
+      layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
+          IREE::CPU::VMVXEncodingLayoutAttr::get(
+              ctx, targetAttr.getConfiguration()));
+    } else if (isLLVMCPUBackend(targetAttr)) {
+      LDBG("Select CPUEncodingLayoutAttr attribute as the layout attribute.");
+      layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
+          IREE::CPU::CPUEncodingLayoutAttr::get(ctx,
+                                                targetAttr.getConfiguration()));
+    } else if (isROCMBackend(targetAttr)) {
+      LDBG("Select GPUEncodingLayoutAttr attribute as the layout attribute.");
+      layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
+          IREE::GPU::GPUEncodingLayoutAttr::get(ctx,
+                                                getGPUTargetAttr(targetAttr)));
+    } else if (testCLGPUTarget) {
+      LDBG("Select GPUEncodingLayoutAttr attribute as the layout attribute. "
+           "(testCLGPUTarget)");
+      layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
+          IREE::GPU::GPUEncodingLayoutAttr::get(ctx, getCLGPUTarget(ctx)));
+    } else {
+      LDBG("Select EncodingNopLayoutAttr attribute as the layout attribute.");
+      layoutAttr = IREE::Codegen::EncodingNopLayoutAttr::get(ctx);
+    }
+    MaterializeEncodingTypeConverter typeConverter(layoutAttr);
+    MaterializeEncodingConversionTarget target(*ctx);
+    auto materializeEncodingValueFn = getMaterializeEncodingValueFn(targetAttr);
+    populateMaterializeEncodingPatterns(patterns, target, typeConverter,
+                                        materializeEncodingValueFn);
 
-  if (failed(applyPartialConversion(funcOp, target,
-                                    std::move(materializeEncodingPattern)))) {
-    funcOp.emitOpError("materialization failed");
-    return failure();
+    if (failed(applyPartialConversion(funcOp, target, std::move(patterns)))) {
+      funcOp.emitOpError("materialization failed");
+      return failure();
+    }
   }
 
   // Add patterns to fold pack/unpack ops with pad/extract_slice ops and
@@ -146,13 +150,13 @@ getFuncExecutableTargetAttrs(FunctionOpInterface funcOp,
   return executableTargetAttrs;
 }
 
-struct CPUMaterializeHostEncodingPass
-    : public impl::CPUMaterializeHostEncodingPassBase<
-          CPUMaterializeHostEncodingPass> {
+struct MaterializeHostEncodingPass
+    : public impl::MaterializeHostEncodingPassBase<
+          MaterializeHostEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<arith::ArithDialect, tensor::TensorDialect,
-                IREE::Codegen::IREECodegenDialect, IREE::CPU::IREECPUDialect>();
+    registry.insert<arith::ArithDialect, tensor::TensorDialect,
+                    IREE::Codegen::IREECodegenDialect,
+                    IREE::CPU::IREECPUDialect, IREE::GPU::IREEGPUDialect>();
   }
 
   void runOnOperation() override {
@@ -207,22 +211,27 @@ struct CPUMaterializeHostEncodingPass
 // that. It should _not_ be running on both - target-specific codegen passes
 // are not allowed on host programs and it's a big violation of layering that
 // this exists.
-struct CPUMaterializeDeviceEncodingPass
-    : public impl::CPUMaterializeDeviceEncodingPassBase<
-          CPUMaterializeDeviceEncodingPass> {
+struct MaterializeDeviceEncodingPass
+    : public impl::MaterializeDeviceEncodingPassBase<
+          MaterializeDeviceEncodingPass> {
+  using impl::MaterializeDeviceEncodingPassBase<
+      MaterializeDeviceEncodingPass>::MaterializeDeviceEncodingPassBase;
+
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<arith::ArithDialect, tensor::TensorDialect,
-                IREE::Codegen::IREECodegenDialect, IREE::CPU::IREECPUDialect>();
+    registry.insert<arith::ArithDialect, tensor::TensorDialect,
+                    IREE::Codegen::IREECodegenDialect,
+                    IREE::CPU::IREECPUDialect, IREE::GPU::IREEGPUDialect>();
   }
 
   void runOnOperation() override {
     auto funcOp = getOperation();
     auto executableTargetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
-    if (failed(materializeFuncOpEncodings(funcOp, executableTargetAttr))) {
+    if (failed(materializeFuncOpEncodings(funcOp, executableTargetAttr,
+                                          testCLGPUTarget))) {
       return signalPassFailure();
     }
   }
 };
+} // namespace
 
 } // namespace mlir::iree_compiler

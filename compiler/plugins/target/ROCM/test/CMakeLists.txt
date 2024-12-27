@@ -14,8 +14,10 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "config_ukernel_argmax_gfx908.mlir"
+    "config_ukernel_argmax_gfx942.mlir"
+    "config_ukernel_multi_mma_gfx942.mlir"
     "default_tuning_specs_amdgpu.mlir"
-    "gpu_lower_to_ukernels.mlir"
     "lowering_strategy_from_tuning_spec.mlir"
     "ukernel_pipeline_transform.mlir"
   TOOLS

@@ -5,24 +5,21 @@ tags:
   - Python
   - PyTorch
 icon: simple/pytorch
-status: new
 ---
 
 # PyTorch + IREE = :octicons-heart-16:
 
 !!! caution "Caution - under development"
 
-    We are still validating and fixing specific models. Between bug fixes in
-    flight and releases running behind, we don't expect that you will be able
-    to do a lot of advanced things without using nightly releases or working
-    with us.
+    We are still validating and fixing specific models. We don't expect that
+    you will be able to do a lot of advanced things without working with us.
 
     Stay tuned and join the discussion in our
     [Discord server](https://discord.gg/wEWh6Z9nMU)'s `#pytorch` channel.
 
 ## :octicons-book-16: Overview
 
-[iree-turbine](https://pypi.org/project/iree-turbine/) offers a tight
+[iree-turbine](https://github.com/iree-org/iree-turbine) offers a tight
 integration between compatible versions of IREE,
 [torch-mlir](https://github.com/llvm/torch-mlir), and
 [PyTorch](https://pytorch.org/).
@@ -64,22 +61,56 @@ graph LR
 
 ## :octicons-download-16: Prerequisites
 
-Install a recent version of PyTorch
-(`2.4.1`, latest stable release as of September 2024):
+1. First install a recent version of PyTorch by following
+   the [official instructions](https://pytorch.org/get-started/locally/):
 
-``` shell
-python -m pip install \
-  --index-url https://download.pytorch.org/whl/test/cpu torch==2.4.1
-```
+    === ":fontawesome-brands-linux: Linux"
 
-<!-- TODO(scotttodd): mention nightly releases after
-     https://github.com/iree-org/iree/issues/19193 is fixed -->
+        ``` shell
+        python -m pip install torch --index-url https://download.pytorch.org/whl/test/cpu
+        ```
 
-Install iree-turbine:
+    === ":fontawesome-brands-apple: macOS"
 
-``` shell
-python -m pip install iree-turbine
-```
+        ``` shell
+        python -m pip install torch
+        ```
+
+    === ":fontawesome-brands-windows: Windows"
+
+        ``` shell
+        python -m pip install torch
+        ```
+
+    !!! tip
+
+        IREE includes its own GPU support, so we recommend the CPU versions of
+        PyTorch. You can install CUDA or ROCm as you wish, but those packages
+        can be quite large.
+
+2. Then install iree-turbine:
+
+    === ":octicons-package-16: Stable releases"
+
+        Stable release packages are
+        [published to PyPI](https://pypi.org/project/iree-turbine/).
+
+        ``` shell
+        python -m pip install iree-turbine
+        ```
+
+    === ":octicons-beaker-16: Nightly pre-releases"
+
+        Nightly pre-releases are published on
+        [GitHub releases](https://github.com/iree-org/iree-turbine/releases/tag/dev-wheels).
+
+        ``` shell hl_lines="2-4"
+        python -m pip install \
+          --find-links https://iree.dev/pip-release-links.html \
+          --pre \
+          --upgrade \
+          iree-turbine
+        ```
 
 ## :octicons-flame-16: Just-in-time (JIT) execution
 
@@ -158,7 +189,7 @@ turbine_output = opt_linear_module(args)
 | Code samples |  |
 | -- | -- |
 JIT compilation notebook | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/pytorch_jit.ipynb)
-Simple MLP eager | [`core/examples/eager_mlp/mlp_eager_simple.py`](https://github.com/iree-org/iree-turbine/tree/main/examples/eager_mlp/mlp_eager_simple.py)
+Simple MLP eager | [iree-turbine `core/examples/eager_mlp/mlp_eager_simple.py`](https://github.com/iree-org/iree-turbine/tree/main/examples/eager_mlp/mlp_eager_simple.py)
 
 ## :octicons-package-dependents-16: Ahead-of-time (AOT) export
 
@@ -235,7 +266,7 @@ print(result.to_host())
 | -- | -- |
 Simple AOT export notebook | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/pytorch_aot_simple.ipynb)
 Import [Whisper](https://huggingface.co/openai/whisper-small) from [:hugging: Hugging Face](https://huggingface.co/) notebook | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/pytorch_huggingface_whisper.ipynb)
-Simple MLP export | [`core/examples/aot_mlp/mlp_export_simple.py`](https://github.com/iree-org/iree-turbine/tree/main/examples/aot_mlp/mlp_export_simple.py)
+Simple MLP export | [iree-turbine `core/examples/aot_mlp/mlp_export_simple.py`](https://github.com/iree-org/iree-turbine/tree/main/examples/aot_mlp/mlp_export_simple.py)
 
 ### :octicons-tools-16: Advanced API
 
@@ -451,6 +482,9 @@ np.save("input.npy", input_np)
 | -- | -- |
 Advanced AOT export notebook | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/pytorch_aot_advanced.ipynb)
 PyTorch dynamic shapes notebook | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/dynamic_shapes/pytorch_dynamic_shapes.ipynb)
-AOT unit tests | [`tests/aot/`](https://github.com/iree-org/iree-turbine/tree/main/tests/aot)
-Dynamic MLP export | [`core/examples/aot_mlp/mlp_export_dynamic.py`](https://github.com/iree-org/iree-turbine/tree/main/examples/aot_mlp/mlp_export_dynamic.py)
-stateless llama2 | [`models/turbine_models/custom_models/stateless_llama.py`](https://github.com/nod-ai/SHARK-ModelDev/blob/main/models/turbine_models/custom_models/stateless_llama.py)
+AOT unit tests | [iree-turbine `tests/aot/`](https://github.com/iree-org/iree-turbine/tree/main/tests/aot)
+
+The sharktank project hosted at
+<https://github.com/nod-ai/shark-ai/tree/main/sharktank> also uses
+`iree-turbine` heavily to provide inference-optimized ops, layers, and models
+for popular gen-ai applications.

@@ -68,7 +68,7 @@ struct GenericResourcePattern : public ConversionPattern {
         affinityAnalysis(affinityAnalysis) {}
 
   LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+  matchAndRewrite(Operation *op, ArrayRef<ValueRange> operands,
                   ConversionPatternRewriter &rewriter) const override {
     if (!doesOperationNeedWrapping(op)) {
       return failure();
@@ -80,10 +80,10 @@ struct GenericResourcePattern : public ConversionPattern {
     SmallVector<Value> newOperands;
     newOperands.reserve(op->getNumOperands());
     rewriter.setInsertionPoint(op);
-    for (auto [oldOperand, newOperand] :
+    for (auto [oldOperand, convertedOperands] :
          llvm::zip_equal(op->getOperands(), operands)) {
-      if (!isa<IREE::Stream::ResourceType, TensorType>(newOperand.getType())) {
-        newOperands.push_back(newOperand);
+      if (!isa<IREE::Stream::ResourceType, TensorType>(oldOperand.getType())) {
+        newOperands.push_back(convertedOperands.front());
         continue;
       }
       auto tensorType = dyn_cast<TensorType>(oldOperand.getType());
@@ -94,7 +94,7 @@ struct GenericResourcePattern : public ConversionPattern {
       auto dynamicDims = IREE::Util::buildDynamicDimsForValue(
           op->getLoc(), oldOperand, rewriter);
       newOperands.push_back(buildTensorExportOp(
-          op->getLoc(), oldOperand, newOperand, tensorType, dynamicDims,
+          op->getLoc(), oldOperand, convertedOperands, tensorType, dynamicDims,
           exportAffinityAttr ? exportAffinityAttr : executionAffinityAttr,
           rewriter));
     }
@@ -127,13 +127,13 @@ struct GenericResourcePattern : public ConversionPattern {
   // Builds a stream.tensor.export op that exports a stream resource into an
   // external tensor value.
   Value buildTensorExportOp(Location loc, Value originalValue,
-                            Value convertedValue, TensorType targetType,
+                            ValueRange convertedValue, TensorType targetType,
                             ValueRange dynamicDims,
                             IREE::Stream::AffinityAttr executionAffinityAttr,
                             OpBuilder &builder) const {
-    auto source =
-        transferTensorOperand(loc, originalValue, convertedValue,
-                              executionAffinityAttr, affinityAnalysis, builder);
+    auto source = transferTensorOperands(loc, originalValue, convertedValue,
+                                         executionAffinityAttr,
+                                         affinityAnalysis, builder);
 
     // If needed insert a transfer to external resource lifetime.
     auto externalType = builder.getType<IREE::Stream::ResourceType>(

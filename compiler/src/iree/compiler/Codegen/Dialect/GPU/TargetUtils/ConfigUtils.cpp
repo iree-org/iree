@@ -33,10 +33,9 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
 
-LogicalResult
-setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
-                                   mlir::FunctionOpInterface entryPoint,
-                                   Operation *op) {
+LogicalResult setDataTiledMultiMmaLoweringConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
+    Operation *op, IREE::GPU::UKernelConfigAttr ukernelConfig) {
   auto multiMmaOp = dyn_cast<IREE::GPU::MultiMmaOp>(op);
   if (!multiMmaOp) {
     return failure();
@@ -70,7 +69,7 @@ setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> reductionTileSizes(iterationRank, 0);
   for (int64_t kDim : contractionDims.k) {
     workgroupTileSizes[kDim] = 0;
-    reductionTileSizes[kDim] = 1;
+    reductionTileSizes[kDim] = ukernelConfig ? 0 : 1;
   }
 
   // Set tile sizes.
@@ -81,8 +80,16 @@ setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
                      b.getI64ArrayAttr(workgroupTileSizes));
   attrs.emplace_back(b.getStringAttr("reduction"),
                      b.getI64ArrayAttr(reductionTileSizes));
-  // Promote operands to use shared memory for LHS and RHS.
-  GPU::setPromotedOperandList(context, attrs, {0, 1});
+  if (ukernelConfig) {
+    attrs.emplace_back(b.getStringAttr("ukernel"), ukernelConfig);
+  } else {
+    // Promote operands to use shared memory for LHS and RHS.
+    // Don't do that with ukernels: their untiled reduction dimension is too
+    // large to fit in shared memory, so they just want global memory and they
+    // will take care of moving small chunks at a time into a shared memory
+    // operand that will be created together with the ukernel op.
+    GPU::setPromotedOperandList(context, attrs, {0, 1});
+  }
   auto configDict = b.getDictionaryAttr(attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
@@ -175,8 +182,7 @@ static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
 getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
                                         ArrayRef<AffineMap> maps,
                                         ArrayRef<Value> operands,
-                                        IREE::GPU::TargetAttr target,
-                                        bool hasFusedLeadingOp) {
+                                        IREE::GPU::TargetAttr target) {
   if (target.getWgp().getMma().empty())
     return failure();
 
@@ -246,13 +252,11 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
       target, problem, transposedLhs, transposedRhs);
 
-  // TODO (nirvedhmeshram, jerryyin): Support all GEMM types.
-  // TODO (nirvedhmeshram): Support fused leading op.
   // TODO (nirvedhmeshram, qedawkins): The performance with this will be bad if
   // the GEMM is accumulating (i.e doesnt have a zero fill dpsInit) as that
   // buffer currently gets materialized as private memory. We need to add
   // missing patterns to fix that.
-  if (!schedule && !contractionDims.batch.empty() && !hasFusedLeadingOp) {
+  if (!schedule) {
     LDBG("Attempting to deduce unaligned TileAndFuse MMA schedulee");
     mustBeAligned = false;
     doCPromotion = true;
@@ -335,9 +339,6 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   } else {
     // TODO (nirvedhmeshram, Max191, jerryyin) : Add support so that unaligned
     // shapes do not require c promotion.
-    // TODO (nirvedhmeshram, jerryyin) : When using c promotion the heuristics
-    // used during finding a schedule need to be updated to account for the
-    // extra shared memory for the result.
     GPU::setPromotedOperandList(context, attrs, {0, 1, 2});
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
     int64_t innerKDim = contractionDims.k.back();
@@ -384,8 +385,7 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> bounds = igemmLoopBounds.value();
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulLoweringConfigAndWorkgroupSize(
-          bounds, igemmContractionMaps.value(), igemmOperands.value(), target,
-          /*hasFusedLeadingOp=*/true);
+          bounds, igemmContractionMaps.value(), igemmOperands.value(), target);
   if (failed(configAndWgSize)) {
     return failure();
   }
@@ -428,8 +428,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   LDBG("Matmul TileAndFuse Config");
 
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
-      getMatmulLoweringConfigAndWorkgroupSize(bounds, maps, operands, target,
-                                              hasFusedLeadingOp(linalgOp));
+      getMatmulLoweringConfigAndWorkgroupSize(bounds, maps, operands, target);
   if (failed(configAndWgSize)) {
     return failure();
   }

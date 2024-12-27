@@ -37,9 +37,9 @@ util.func public @linalgext_scatter_dispatch() -> tensor<8192x16x8x128xf32> {
 }
 
 // CHECK-LABEL:     util.func public @linalgext_scatter_dispatch
+//   CHECK-DAG:       %[[INDICES:.+]] = flow.dispatch.region
+//   CHECK-DAG:       %[[UPDATE:.+]] = flow.dispatch.region
 //       CHECK:       %[[RESULT:.+]] = flow.dispatch.region
-//       CHECK:         %[[INDICES:.+]] = linalg.generic
-//       CHECK:         %[[UPDATE:.+]] = linalg.generic
 //       CHECK:         %[[SCATTER_RESULT:.+]] = iree_linalg_ext.scatter
 //  CHECK-SAME:           ins(%[[UPDATE]], %[[INDICES]] : tensor<4x1x16x8x128xf32>, tensor<4x1xi32>)
 //       CHECK:         flow.return %[[SCATTER_RESULT]]

@@ -58,6 +58,12 @@ typedef __UINT64_TYPE__ uint64_t;
 #define FLT_MAX __FLT_MAX__
 
 //===----------------------------------------------------------------------===//
+// Vector typedefs
+//===----------------------------------------------------------------------===//
+
+typedef __attribute__((__vector_size__(4 * 4))) int32_t int32x4_t;
+
+//===----------------------------------------------------------------------===//
 // Declarations for Clangd, which may be slightly older than actual clang.
 // Drop these as clangd versions used in practice gain these builtins.
 // Unconditionally declaring these, regardless of clang version, ensures that

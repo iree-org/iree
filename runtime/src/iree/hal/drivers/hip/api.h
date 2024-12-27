@@ -91,6 +91,14 @@ typedef struct iree_hal_hip_device_params_t {
   // device. Defaults to true when the device supports it.
   bool async_allocations;
 
+  // The reserved buffer size for asynchronous file transfers.
+  iree_device_size_t file_transfer_buffer_size;
+
+  // The maximum chunk size for any single asynchronous file transfer.
+  // This should be smaller than the full buffer size to allow overlapping
+  // cpu and gpu workloads.
+  iree_device_size_t file_transfer_chunk_size;
+
   // Parameters for each hipMemPool_t used for queue-ordered allocations.
   iree_hal_hip_memory_pooling_params_t memory_pools;
 

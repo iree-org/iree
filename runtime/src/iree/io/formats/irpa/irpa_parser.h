@@ -16,8 +16,12 @@ extern "C" {
 #endif  // __cplusplus
 
 // Parses an IREE archive file and merges its contained resources into |index|.
+//
+// The provided |host_allocator| may be used for allocations during parsing and
+// is allowed to be an arena.
 IREE_API_EXPORT iree_status_t iree_io_parse_irpa_index(
-    iree_io_file_handle_t* file_handle, iree_io_parameter_index_t* index);
+    iree_io_file_handle_t* file_handle, iree_io_parameter_index_t* index,
+    iree_allocator_t host_allocator);
 
 #ifdef __cplusplus
 }  // extern "C"

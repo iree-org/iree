@@ -18,18 +18,55 @@
 // Parameter file I/O
 //===----------------------------------------------------------------------===//
 
+#if IREE_FILE_IO_ENABLE
+#define FLAG_PARAMETER_MODE_DEFAULT "file"
+#else
+#define FLAG_PARAMETER_MODE_DEFAULT "mmap"
+#endif  // IREE_FILE_IO_ENABLE
+
 IREE_FLAG(
-    string, parameter_mode, "mmap",
-    "A parameter I/O mode of ['preload', 'mmap'].\n"
+    string, parameter_mode, FLAG_PARAMETER_MODE_DEFAULT,
+    "A parameter I/O mode of ['preload', 'mmap', 'file'].\n"
     "  preload: read entire parameter files into wired memory on startup.\n"
     "  mmap: maps the parameter files into discardable memory - can increase\n"
     "        warm-up time and variance as mapped pages are swapped\n"
-    "        by the OS.");
+    "        by the OS.\n"
+    "  file: uses platform file APIs to read/write the file as needed.");
 
 static void iree_file_contents_release_callback(
     void* user_data, iree_io_file_handle_primitive_t handle_primitive) {
   iree_file_contents_t* file_contents = (iree_file_contents_t*)user_data;
   iree_file_contents_free(file_contents);
+}
+
+// Legacy parameter file open path. We should be able to replace this usage with
+// iree_io_file_handle_t-based logic.
+static iree_status_t iree_io_open_parameter_file_legacy(
+    iree_string_view_t path, iree_file_read_flags_t read_flags,
+    iree_allocator_t host_allocator, iree_io_file_handle_t** out_file_handle) {
+  IREE_ASSERT_ARGUMENT(out_file_handle);
+  *out_file_handle = NULL;
+
+  char path_str[2048] = {0};
+  iree_string_view_to_cstring(path, path_str, sizeof(path_str));
+
+  // Read (or map) the entire file into host memory.
+  iree_file_contents_t* file_contents = NULL;
+  IREE_RETURN_IF_ERROR(iree_file_read_contents(path_str, read_flags,
+                                               host_allocator, &file_contents));
+
+  // Wrap the loaded memory file in a file handle.
+  const iree_io_file_handle_release_callback_t release_callback = {
+      .fn = iree_file_contents_release_callback,
+      .user_data = file_contents,
+  };
+  iree_status_t status = iree_io_file_handle_wrap_host_allocation(
+      IREE_IO_FILE_ACCESS_READ, file_contents->buffer, release_callback,
+      host_allocator, out_file_handle);
+  if (!iree_status_is_ok(status)) {
+    iree_file_contents_free(file_contents);
+  }
+  return status;
 }
 
 // Opens the parameter file at |path| with the mode specified by the
@@ -42,37 +79,25 @@ static iree_status_t iree_io_open_parameter_file(
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_TEXT(z0, path.data, path.size);
 
-  char path_str[2048] = {0};
-  iree_string_view_to_cstring(path, path_str, sizeof(path_str));
-  iree_file_read_flags_t read_flags = 0;
+  iree_status_t status = iree_ok_status();
+  iree_io_file_handle_t* file_handle = NULL;
   if (strcmp(FLAG_parameter_mode, "mmap") == 0) {
-    read_flags |= IREE_FILE_READ_FLAG_MMAP;
+    status = iree_io_open_parameter_file_legacy(path, IREE_FILE_READ_FLAG_MMAP,
+                                                host_allocator, &file_handle);
   } else if (strcmp(FLAG_parameter_mode, "preload") == 0) {
-    read_flags |= IREE_FILE_READ_FLAG_PRELOAD;
+    status = iree_io_open_parameter_file_legacy(
+        path, IREE_FILE_READ_FLAG_PRELOAD, host_allocator, &file_handle);
+  } else if (strcmp(FLAG_parameter_mode, "file") == 0) {
+    status = iree_io_file_handle_open(IREE_IO_FILE_MODE_READ, path,
+                                      host_allocator, &file_handle);
   } else {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "unrecognized --parameter_mode= value '%s'",
-                            FLAG_parameter_mode);
+    status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "unrecognized --parameter_mode= value '%s'",
+                              FLAG_parameter_mode);
   }
 
-  iree_file_contents_t* file_contents = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_file_read_contents(path_str, read_flags, host_allocator,
-                                  &file_contents));
-
-  iree_io_file_handle_release_callback_t release_callback = {
-      .fn = iree_file_contents_release_callback,
-      .user_data = file_contents,
-  };
-  iree_io_file_handle_t* file_handle = NULL;
-  iree_status_t status = iree_io_file_handle_wrap_host_allocation(
-      IREE_IO_FILE_ACCESS_READ, file_contents->buffer, release_callback,
-      host_allocator, &file_handle);
   if (iree_status_is_ok(status)) {
     *out_file_handle = file_handle;
-  } else {
-    iree_file_contents_free(file_contents);
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -106,7 +131,8 @@ static iree_status_t iree_io_append_parameter_file_to_index(
       z0, iree_io_open_parameter_file(path, host_allocator, &file_handle));
 
   // Index the file based on its (inferred) format.
-  iree_status_t status = iree_io_parse_file_index(path, file_handle, index);
+  iree_status_t status =
+      iree_io_parse_file_index(path, file_handle, index, host_allocator);
 
   // Release our file reference - it's still retained by the index if it had any
   // parameters in it.

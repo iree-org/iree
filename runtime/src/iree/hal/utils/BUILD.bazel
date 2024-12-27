@@ -99,10 +99,28 @@ iree_runtime_cc_library(
     srcs = ["file_transfer.c"],
     hdrs = ["file_transfer.h"],
     deps = [
-        ":memory_file",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "files",
+    srcs = [
+        "fd_file.c",
+        "file_registry.c",
+        "memory_file.c",
+    ],
+    hdrs = [
+        "fd_file.h",
+        "file_registry.h",
+        "memory_file.h",
+    ],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/io:file_handle",
     ],
 )
 
@@ -128,17 +146,6 @@ iree_runtime_cc_test(
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-iree_runtime_cc_library(
-    name = "memory_file",
-    srcs = ["memory_file.c"],
-    hdrs = ["memory_file.h"],
-    deps = [
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/io:file_handle",
     ],
 )
 

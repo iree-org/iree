@@ -101,7 +101,7 @@ void LLVMCPUTilePass::runOnOperation() {
         scf::tileUsingSCF(rewriter, op, options);
     if (failed(tiledResults))
       continue;
-    rewriter.replaceOp(op, tiledResults->replacements);
+    rewriter.replaceOp(op, tiledResults->mergeResult.replacements);
   }
 
   RewritePatternSet patterns =

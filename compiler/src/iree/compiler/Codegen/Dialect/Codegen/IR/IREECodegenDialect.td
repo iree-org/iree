@@ -68,6 +68,7 @@ def IREECodegen_Dialect : Dialect {
     std::mutex libraryMutex;
   }];
   let useDefaultAttributePrinterParser = 1;
+  let hasOperationAttrVerify = 1;
 }
 
 def AnyRankedTensorOrMemRefType : AnyTypeOf<[AnyRankedTensor, AnyMemRef]>;

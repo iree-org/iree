@@ -40,6 +40,7 @@ IREE_API_EXPORT iree_status_t iree_io_scope_map_lookup(
     if (iree_string_view_equal(scope, entry->scope)) {
       IREE_TRACE_ZONE_APPEND_TEXT(z0, "hit");
       *out_index = entry->index;
+      IREE_TRACE_ZONE_END(z0);
       return iree_ok_status();
     }
   }

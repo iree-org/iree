@@ -43,12 +43,17 @@ iree_lit_test_suite(
     "fold_tensor_extract_op.mlir"
     "forop_canonicalization.mlir"
     "generic_vectorization.mlir"
+    "gpu_materialize_encoding_gfx1100.mlir"
+    "gpu_materialize_encoding_gfx908.mlir"
+    "gpu_materialize_encoding_gfx90a.mlir"
+    "gpu_materialize_encoding_gfx942.mlir"
     "hoist_statically_bound_allocations.mlir"
     "hoist_unrolled_vector_extract_insert_slice.mlir"
     "iree_comprehensive_bufferize.mlir"
     "iree_expand_strided_metadata.mlir"
     "iree_loop_invariant_code_motion.mlir"
     "link_tuning_specs.mlir"
+    "llvmcpu_materialize_encoding.mlir"
     "lower_ukernel_to_calls.mlir"
     "materialize_encoding_into_nop.mlir"
     "materialize_tuning_specs.mlir"
@@ -87,7 +92,9 @@ iree_lit_test_suite(
     "vector_layout_analysis.mlir"
     "vectorize_memref_copy.mlir"
     "vectorize_tensor_pad.mlir"
+    "verify_tuning_specs.mlir"
     "verify_workgroup_distribution.mlir"
+    "vmvx_materialize_encoding.mlir"
   TOOLS
     FileCheck
     iree-opt

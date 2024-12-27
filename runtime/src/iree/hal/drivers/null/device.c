@@ -14,8 +14,8 @@
 #include "iree/hal/drivers/null/executable.h"
 #include "iree/hal/drivers/null/executable_cache.h"
 #include "iree/hal/drivers/null/semaphore.h"
+#include "iree/hal/utils/file_registry.h"
 #include "iree/hal/utils/file_transfer.h"
-#include "iree/hal/utils/memory_file.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_null_device_t
@@ -273,14 +273,8 @@ static iree_status_t iree_hal_null_device_import_file(
   // definitely prefer that. The emulated file I/O present here as a default is
   // inefficient. The queue affinity specifies which queues may access the file
   // via read and write queue operations.
-  if (iree_io_file_handle_type(handle) !=
-      IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
-    return iree_make_status(
-        IREE_STATUS_UNAVAILABLE,
-        "implementation does not support the external file type");
-  }
-  return iree_hal_memory_file_wrap(
-      queue_affinity, access, handle, iree_hal_device_allocator(base_device),
+  return iree_hal_file_from_handle(
+      iree_hal_device_allocator(base_device), queue_affinity, access, handle,
       iree_hal_device_host_allocator(base_device), out_file);
 }
 
