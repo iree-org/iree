@@ -316,9 +316,17 @@ static iree_status_t iree_hal_nonlocal_inline_command_buffer_fill_buffer(
 static iree_status_t iree_hal_nonlocal_inline_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
     iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref) {
-  return iree_hal_buffer_map_write(
-      target_ref.buffer, target_ref.offset,
-      (const uint8_t*)source_buffer + source_offset, target_ref.length);
+
+  uint8_t *target_ptr;
+  if(iree_all_bits_set(iree_hal_buffer_memory_type(target_ref.buffer),
+                                           IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+    target_ptr = (uint8_t *) iree_hal_nl_buffer_device_pointer(target_ref.buffer) + target_ref.offset;
+  } else {
+    target_ptr = (uint8_t *) iree_hal_nl_buffer_host_pointer(target_ref.buffer) + target_ref.offset;
+  }
+  iree_status_t status = iree_ok_status();
+  memcpy(target_ptr, (const uint8_t*)source_buffer + source_offset, target_ref.length);
+  return status;
 }
 
 //===----------------------------------------------------------------------===//
