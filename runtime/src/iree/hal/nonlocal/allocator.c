@@ -133,6 +133,8 @@ iree_hal_nl_allocator_query_buffer_compatibility(
   iree_hal_buffer_compatibility_t compatibility =
       IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE;
 
+  compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_LOW_PERFORMANCE;
+
   // Buffers are importable in NL under most cases, though performance may
   // vary wildly. We don't fully verify that the buffer parameters are
   // self-consistent and just look at whether we can get a device pointer.
