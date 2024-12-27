@@ -504,6 +504,8 @@ struct ConvertStableHloToIreeInputDialects final
     std::unique_ptr<TypeConverter> typeConverter =
         createStableHloToLinalgTypeConverter();
     typeConverter->addArgumentMaterialization(scalarToTensor);
+    typeConverter->addSourceMaterialization(scalarToTensor);
+    typeConverter->addTargetMaterialization(scalarToTensor);
 
     // Run stablehlo canonicalization patterns with a high benefit to avoid some
     // expensive expansions.
