@@ -79,6 +79,13 @@ static std::optional<Type> getLegalizedType(Type t) {
 
 namespace {
 
+/// Materialize
+Value materializeAsConvertElementType(OpBuilder &builder, Type type,
+                                  ValueRange inputs, Location loc) {
+  assert(inputs.size() == 1 && "expected exactly one input");
+  return convertElementType(builder, loc, type, inputs[0]);
+}
+
 /// Type converter to use for type propagation.
 struct TypePropagationTypeConverter : public TypeConverter {
   TypePropagationTypeConverter() {
@@ -526,11 +533,9 @@ struct TypePropagationPass final
     RewritePatternSet patterns(context);
 
     TypePropagationTypeConverter typeConverter;
-    typeConverter.addArgumentMaterialization(
-        [&](OpBuilder &builder, Type type, ValueRange inputs, Location loc) {
-          assert(inputs.size() == 1 && "expected exactly one input");
-          return convertElementType(builder, loc, type, inputs[0]);
-        });
+    typeConverter.addArgumentMaterialization(materializeAsConvertElementType);
+    typeConverter.addSourceMaterialization(materializeAsConvertElementType);
+    typeConverter.addTargetMaterialization(materializeAsConvertElementType);
 
     patterns.insert<
         ConstantOpTypeConversion, ForwardSourceType<arith::ExtUIOp>,
