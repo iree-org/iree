@@ -52,7 +52,7 @@ sdxl_unet_fp16_real_weights = fetch_source_fixture(
 )
 
 sdxl_unet_fp16_mlir = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/model.mlirbc",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/model.mlir",
     group="sdxl_unet_fp16",
 )
 

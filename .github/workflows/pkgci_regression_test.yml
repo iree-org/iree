@@ -85,7 +85,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: nod-ai/SHARK-TestSuite
-          ref: f5615ab29da491c0047146258dfa3a0c40c735e5
+          ref: 601db0e472600a94ddb69b37d05cd7d4a17f89b2
           path: SHARK-TestSuite
           submodules: false
           lfs: true

@@ -33,7 +33,7 @@ sdxl_vae_real_weights = fetch_source_fixture(
 )
 
 sdxl_vae_mlir = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-vae-decode/model.mlirbc",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-vae-decode/model.mlir",
     group="sdxl_vae",
 )
 

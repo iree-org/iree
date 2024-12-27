@@ -33,7 +33,7 @@ sd3_vae_real_weights = fetch_source_fixture(
 )
 
 sd3_vae_mlir = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-vae/model.mlirbc",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-vae/model.mlir",
     group="sd3_vae",
 )
 
