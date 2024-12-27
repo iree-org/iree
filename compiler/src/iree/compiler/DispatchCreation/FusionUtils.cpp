@@ -65,7 +65,9 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   // (except for bit-extend ops). If the consumer has only one use, then this
   // fusion is fine since cloning wont result in redundant computation of the
   // producer. (Also note that the producer is always an elementwise operation).
-  if (IREE::LinalgExt::isBitExtendOp(consumerOp) && !consumerOp->hasOneUse()) {
+  if (IREE::LinalgExt::isBitExtendOp(consumerOp) &&
+      (!consumerOp->hasOneUse() ||
+       IREE::LinalgExt::isBitTruncateOp(producerOp))) {
     return false;
   }
 
