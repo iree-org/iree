@@ -318,14 +318,21 @@ static iree_status_t iree_hal_nonlocal_inline_command_buffer_update_buffer(
     iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref) {
 
   uint8_t *target_ptr;
+  int target_device = 1;
   if(iree_all_bits_set(iree_hal_buffer_memory_type(target_ref.buffer),
                                            IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     target_ptr = (uint8_t *) iree_hal_nl_buffer_device_pointer(target_ref.buffer) + target_ref.offset;
   } else {
+    target_device = 0;
     target_ptr = (uint8_t *) iree_hal_nl_buffer_host_pointer(target_ref.buffer) + target_ref.offset;
   }
+  uint8_t *source_ptr = (uint8_t*)source_buffer + source_offset;
   iree_status_t status = iree_ok_status();
-  memcpy(target_ptr, (const uint8_t*)source_buffer + source_offset, target_ref.length);
+  if(target_device) {
+    nl_mem_copy_in(target_ptr, source_ptr, target_ref.length);
+  } else {
+    memcpy(target_ptr, source_ptr, target_ref.length);
+  }
   return status;
 }
 
@@ -338,11 +345,13 @@ static iree_status_t iree_hal_nonlocal_inline_command_buffer_copy_buffer(
     iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref) {
   void *source_ptr = NULL;
   void *target_ptr = NULL;
+  int source_target_device = 0;
   iree_status_t status = iree_ok_status();
 
   if(iree_all_bits_set(iree_hal_buffer_memory_type(source_ref.buffer),
                                            IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     source_ptr = (void *)((unsigned char *) iree_hal_nl_buffer_device_pointer(source_ref.buffer) + source_ref.offset);
+    source_target_device |= 1;
   } else {
     source_ptr = (void *)((unsigned char *) iree_hal_nl_buffer_host_pointer(source_ref.buffer) + source_ref.offset);
   }
@@ -350,11 +359,25 @@ static iree_status_t iree_hal_nonlocal_inline_command_buffer_copy_buffer(
   if(iree_all_bits_set(iree_hal_buffer_memory_type(target_ref.buffer),
                                            IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     target_ptr = (void *)((unsigned char *)iree_hal_nl_buffer_device_pointer(target_ref.buffer) + target_ref.offset);
+    source_target_device |= 2;
   } else {
     target_ptr = (void *)((unsigned char *)iree_hal_nl_buffer_host_pointer(target_ref.buffer) + target_ref.offset);
   }
 
-  memcpy(target_ptr, source_ptr, target_ref.length);
+  switch(source_target_device) {
+    case 1:
+      nl_mem_copy_out(target_ptr, source_ptr, target_ref.length);
+      break;
+    case 2:
+      nl_mem_copy_in(target_ptr, source_ptr, target_ref.length);
+      break;
+    case 3:
+      nl_mem_copy(target_ptr, source_ptr, target_ref.length);
+      break;
+    default:
+      memcpy(target_ptr, source_ptr, target_ref.length);
+      break;
+  }
 
   return status;
 }
