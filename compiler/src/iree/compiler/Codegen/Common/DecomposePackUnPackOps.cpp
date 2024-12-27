@@ -200,7 +200,7 @@ static LogicalResult commonRunOnOperation(
             unpackTilingOptions);
         if (failed(tilingResult))
           return WalkResult::interrupt();
-        rewriter.replaceOp(op, tilingResult->replacements);
+        rewriter.replaceOp(op, tilingResult->mergeResult.replacements);
         return WalkResult::advance();
       });
       if (status.wasInterrupted()) {
