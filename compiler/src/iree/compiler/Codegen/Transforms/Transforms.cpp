@@ -1256,7 +1256,7 @@ LogicalResult tileLinalgOpsWithFilter(mlir::FunctionOpInterface funcOp,
     for (auto tiledOp : tiledResults->tiledOps) {
       filter.replaceLinalgTransformationFilter(rewriter, tiledOp);
     }
-    rewriter.replaceOp(op, tiledResults->replacements);
+    rewriter.replaceOp(op, tiledResults->mergeResult.replacements);
   }
 
   return success();
