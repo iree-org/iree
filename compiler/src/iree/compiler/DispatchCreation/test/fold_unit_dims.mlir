@@ -136,3 +136,17 @@ util.func public @scatter1(%arg0: tensor<?x1x1x16x4x128xf16>, %arg1: tensor<?x2x
 //  CHECK-SAME:     to tensor<?x16x4x128xf16>
 //       CHECK:   %[[SCATTER:.+]] = iree_linalg_ext.scatter
 //  CHECK-SAME:     ins(%[[COLLAPSE]]
+
+// -----
+
+// TODO: remove other unit dims.
+util.func public @scatter_noop(%arg0: tensor<1x?x1x1x4x128xf16>, %arg1: tensor<1x?x1x2xi32>, %arg2: tensor<?x2x1x4x128xf16>) -> tensor<?x2x1x4x128xf16> {
+  %0 = iree_linalg_ext.scatter dimension_map = [0, 1] unique_indices(true) ins(%arg0, %arg1 : tensor<1x?x1x1x4x128xf16>, tensor<1x?x1x2xi32>) outs(%arg2 : tensor<?x2x1x4x128xf16>) {
+  ^bb0(%arg3: f16, %arg4: f16):
+    iree_linalg_ext.yield %arg3 : f16
+  } -> tensor<?x2x1x4x128xf16>
+  util.return %0 : tensor<?x2x1x4x128xf16>
+}
+// CHECK-LABEL: func public @scatter_noop
+//   CHECK-NOT:   tensor.collapse_shape
+//       CHECK:   %[[SCATTER:.+]] = iree_linalg_ext.scatter

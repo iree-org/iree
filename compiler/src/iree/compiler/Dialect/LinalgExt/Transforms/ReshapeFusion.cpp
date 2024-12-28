@@ -487,12 +487,14 @@ struct FoldAttentionWithProducerReshapeByExpansion final
 };
 
 /// Remove the unit dims from `iree_linalg_ext.scatter` 's `update` operand.
-/// The `update` tensor is scanned from left to right, starting from the second
-/// element. The number of unit dimensions are counted until reaching a non unit
-/// dim.
-struct FoldScatterUnitDims final : public OpRewritePattern<ScatterOp> {
-  FoldScatterUnitDims(MLIRContext *context, linalg::ControlDropUnitDims options,
-                      PatternBenefit benefit = 1)
+/// The dims in `update` between the batch dims and the continuous slice
+/// represent the indexed dimensions. Remove the leading unit dims from the
+/// indexed dims.
+struct FoldScatterNonIterationUnitDims final
+    : public OpRewritePattern<ScatterOp> {
+  FoldScatterNonIterationUnitDims(MLIRContext *context,
+                                  linalg::ControlDropUnitDims options,
+                                  PatternBenefit benefit = 1)
       : OpRewritePattern<ScatterOp>(context, benefit),
         options(std::move(options)) {}
 
@@ -507,16 +509,18 @@ struct FoldScatterUnitDims final : public OpRewritePattern<ScatterOp> {
     llvm::SmallVector<unsigned> canDrop = options.controlFn(scatterOp);
     const ArrayRef<int64_t> updateShape = scatterOp.getUpdateType().getShape();
 
-    // Find the first `numDimsToDrop` unit dimensions in the update tensor,
-    // these are the ones that can be dropped.
+    // Find the number of leading unit dimensions
+    int64_t rankOfContiguousSlice =
+        scatterOp.getOriginalType().getRank() - scatterOp.getIndexDepth();
+    ArrayRef<int64_t> indexedDims =
+        scatterOp.getUpdateSliceShape().drop_back(rankOfContiguousSlice);
     int64_t numDimsToDrop =
-        llvm::find_if(scatterOp.getUpdateSliceShape(),
-                      [](int64_t val) { return val != 1; }) -
-        updateShape.begin() - 1;
+        llvm::find_if(indexedDims, [](int64_t val) { return val != 1; }) -
+        scatterOp.getUpdateSliceShape().begin() - 1;
 
     int64_t batchRank = scatterOp.getBatchRank();
     llvm::erase_if(canDrop, [&](unsigned dimPos) {
-      return dimPos < batchRank || dimPos >= batchRank + numDimsToDrop;
+      return dimPos < batchRank || dimPos > batchRank + numDimsToDrop;
     });
     if (canDrop.empty()) {
       return failure();
@@ -777,7 +781,7 @@ SmallVector<unsigned> defaultControlDropUnitDims(Operation *op) {
 
 void populateFoldUnitExtentDimsPatterns(
     RewritePatternSet &patterns, const linalg::ControlDropUnitDims &options) {
-  patterns.add<FoldScatterUnitDims>(patterns.getContext(), options);
+  patterns.add<FoldScatterNonIterationUnitDims>(patterns.getContext(), options);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
