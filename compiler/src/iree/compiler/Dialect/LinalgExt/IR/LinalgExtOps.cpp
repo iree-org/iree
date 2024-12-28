@@ -258,12 +258,10 @@ FailureOr<SmallVector<int64_t>> ScatterOp::getStaticLoopRanges() {
 }
 
 SmallVector<AffineMap> ScatterOp::getIndexingMapsForOperands() {
-  // TODO: Enable once backends can support scatter fusion.
-  // Builder builder(getContext());
-  // return {builder.getMultiDimIdentityMap(getUpdateType().getRank()),
-  //         builder.getMultiDimIdentityMap(getIndicesType().getRank()),
-  //         /*output=*/AffineMap(nullptr)};
-  return SmallVector<AffineMap>(3);
+  Builder builder(getContext());
+  return {builder.getMultiDimIdentityMap(getUpdateType().getRank()),
+          builder.getMultiDimIdentityMap(getIndicesType().getRank()),
+          /*output=*/AffineMap(nullptr)};
 }
 
 SmallVector<AffineMap> ScatterOp::getIndexingMapsForResults() {
