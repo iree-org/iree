@@ -60,9 +60,11 @@ static Type legalizeStorageElementTypeImpl(Type elementType,
 }
 
 Type legalizeTensorStorageElementType(Type type) {
-  auto tensorType = llvm::dyn_cast<RankedTensorType>(type);
+  auto tensorType = llvm::cast<TensorType>(type);
   return legalizeStorageElementTypeImpl(
-      type, tensorType && IREE::Encoding::hasPackedStorageAttr(type));
+      tensorType.getElementType(),
+      isa<RankedTensorType>(tensorType) &&
+          IREE::Encoding::hasPackedStorageAttr(type));
 }
 
 Value calculateStorageElementCountInBytes(Location loc,
