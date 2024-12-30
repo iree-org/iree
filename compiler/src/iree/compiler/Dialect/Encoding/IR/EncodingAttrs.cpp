@@ -249,8 +249,7 @@ bool hasPackedStorageAttr(Type type) {
     if (!encoding) {
       return false;
     }
-    return dyn_cast_or_null<PackedStorageAttr>(encoding) !=
-           nullptr;
+    return dyn_cast_or_null<PackedStorageAttr>(encoding) != nullptr;
   }
   return false;
 }

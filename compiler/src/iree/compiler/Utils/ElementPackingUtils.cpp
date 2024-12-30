@@ -28,7 +28,7 @@ bool needToPackSubByteElementBitWidth(unsigned bitWidth) {
 bool needToPackSubByteElements(RankedTensorType shapedType) {
   unsigned bitWidth = IREE::Util::getTypeBitWidth(shapedType.getElementType());
   // i1 with packed memory layout does not need to be extended.
-  if (bitWidth == 1 && !IREE::Encoding::hasPackedStorageAttr(shapedType)) {
+  if (bitWidth == 1 && IREE::Encoding::hasPackedStorageAttr(shapedType)) {
     return true;
   }
   return needToPackSubByteElementBitWidth(bitWidth);
