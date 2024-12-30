@@ -12,22 +12,6 @@ iree_add_all_subdirs()
 
 iree_check_single_backend_test_suite(
   NAME
-    check_llvm-cpu_subbyte_emulation
-  SRCS
-    "subbyte_types.mlir"
-  TARGET_BACKEND
-    "llvm-cpu"
-  DRIVER
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-llvmcpu-target-cpu=generic"
-    "--iree-experimental-packed-i1-storage"
-  LABELS
-    "nowasm"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
     check_llvm-cpu_subbyte_emulation_attr
   SRCS
     "subbyte_types_attr.mlir"

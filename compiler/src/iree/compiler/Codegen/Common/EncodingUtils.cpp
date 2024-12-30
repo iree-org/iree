@@ -33,7 +33,8 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     // type to use for it. If no encoding is set, then return the tensor type
     // itself.
     MaterializeEncodingInfo encodingInfo = getEncodingInfo(type);
-    if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
+    if (IREE::Codegen::isIdentityLayout(encodingInfo) &&
+        !IREE::Encoding::hasPackedStorageAttr(type)) {
       return dropEncoding(type);
     }
     auto packedType = cast<RankedTensorType>(tensor::PackOp::inferPackedType(
@@ -80,6 +81,8 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
 }
 
 RankedTensorType dropEncoding(RankedTensorType type) {
+  assert(!IREE::Encoding::hasPackedStorageAttr(type) &&
+         "not expected `packed_storage` attribute.");
   return RankedTensorType::get(type.getShape(), type.getElementType());
 }
 

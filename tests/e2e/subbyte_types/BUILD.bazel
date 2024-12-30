@@ -13,26 +13,6 @@
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
-package(
-    features = ["layering_check"],
-    licenses = ["notice"],  # Apache 2.0
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_llvm-cpu_subbyte_emulation",
-    srcs = ["subbyte_types.mlir"],
-    compiler_flags = [
-        "--iree-llvmcpu-target-cpu=generic",
-        "--iree-experimental-packed-i1-storage",
-    ],
-    driver = "local-task",
-    tags = [
-        # subbyte support for wasm is not on priorities.
-        "nowasm",
-    ],
-    target_backend = "llvm-cpu",
-)
-
 iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_subbyte_emulation_attr",
     srcs = ["subbyte_types_attr.mlir"],
@@ -50,7 +30,6 @@ iree_check_single_backend_test_suite(
 test_suite(
     name = "check",
     tests = [
-        ":check_llvm-cpu_subbyte_emulation",
         ":check_llvm-cpu_subbyte_emulation_attr",
     ],
 )
