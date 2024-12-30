@@ -612,7 +612,7 @@ struct ConvertStableHloToIreeInputDialects final
       RewritePatternSet removeUnusedOperandsResultsPatterns(context);
       linalg::populateEraseUnusedOperandsAndResultsPatterns(
           removeUnusedOperandsResultsPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
+      if (failed(applyPatternsGreedily(
               getOperation(),
               std::move(removeUnusedOperandsResultsPatterns)))) {
         return signalPassFailure();

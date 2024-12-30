@@ -228,7 +228,7 @@ void ConcretizeMmaShapesPass::runOnOperation() {
   if (concretizeResult) {
     patterns.insert<ConcretizeMmaOperandShape>(context, MMAFragment::Acc);
   }
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+  if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
   }
 }

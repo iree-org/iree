@@ -89,8 +89,7 @@ struct Convert1X1FilterConv2DToMatmulPass
     patterns.insert<Convert1x1FilterConvToMatmul<linalg::Conv2DNhwcHwcfOp>,
                     Convert1x1FilterConvToMatmul<linalg::Conv2DNchwFchwOp>>(
         context);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

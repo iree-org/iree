@@ -161,8 +161,7 @@ struct FusionPreprocessingPass final
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     memref::populateResolveShapedTypeResultDimsPatterns(patterns);
     tensor::populateFoldIntoPackAndUnpackPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

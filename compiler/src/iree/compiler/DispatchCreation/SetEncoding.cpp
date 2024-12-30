@@ -277,8 +277,7 @@ struct SetEncodingPass final
     linalg::FillOp::getCanonicalizationPatterns(patterns, context);
     patterns.insert<FoldFillWithSetEncoding>(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }
