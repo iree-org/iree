@@ -42,7 +42,7 @@ static Type legalizeStorageElementTypeImpl(Type elementType,
     return elementType;
 
   unsigned bitWidth = intType.getWidth();
-  if (bitWidth == 1 && !isPackedStorage) {
+  if (bitWidth == 1 && isPackedStorage) {
     return elementType;
   }
 
@@ -62,9 +62,7 @@ static Type legalizeStorageElementTypeImpl(Type elementType,
 Type legalizeTensorStorageElementType(Type type) {
   auto tensorType = llvm::cast<TensorType>(type);
   return legalizeStorageElementTypeImpl(
-      tensorType.getElementType(),
-      isa<RankedTensorType>(tensorType) &&
-          IREE::Encoding::hasPackedStorageAttr(type));
+      tensorType.getElementType(), IREE::Encoding::hasPackedStorageAttr(type));
 }
 
 Value calculateStorageElementCountInBytes(Location loc,
