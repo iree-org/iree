@@ -28,7 +28,6 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRTransformUtils
     MLIRTransforms
-    iree::compiler::Codegen::Common
     iree::compiler::Dialect::HAL::Analysis
     iree::compiler::Dialect::HAL::Conversion
     iree::compiler::Dialect::HAL::IR
