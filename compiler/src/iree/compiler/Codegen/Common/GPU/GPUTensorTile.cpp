@@ -211,8 +211,7 @@ LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
     // same size.
     RewritePatternSet wgTilingPatterns(funcOp.getContext());
     populateTilingPatterns(wgTilingPatterns, fuseInputProducer, coalesceLoops);
-    if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                            std::move(wgTilingPatterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(wgTilingPatterns)))) {
       return failure();
     }
   }
@@ -224,7 +223,7 @@ LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
         wgTilingCanonicalizationPatterns);
     scf::populateSCFForLoopCanonicalizationPatterns(
         wgTilingCanonicalizationPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
+    if (failed(applyPatternsGreedily(
             funcOp, std::move(wgTilingCanonicalizationPatterns)))) {
       return failure();
     }

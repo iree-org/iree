@@ -195,8 +195,7 @@ class TestLLVMGPULegalizeOpPass final
     RewritePatternSet patterns(&getContext());
     populateScalarizeMathOps(patterns);
     populateConvertSharedMemoryAllocOps(patterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

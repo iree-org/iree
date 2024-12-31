@@ -21,7 +21,7 @@ class DropCompilerHintsPass
     : public impl::DropCompilerHintsPassBase<DropCompilerHintsPass> {
 public:
   void runOnOperation() override {
-    // We can't use patterns and applyPatternsAndFoldGreedily because that
+    // We can't use patterns and applyPatternsGreedily because that
     // automatically does canonicalization.
     getOperation()->walk([&](Operation *genericOp) {
       if (auto op = dyn_cast<IREE::Util::OptimizationBarrierOp>(genericOp)) {

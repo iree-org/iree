@@ -440,7 +440,7 @@ LogicalResult gpuDistributeSharedMemoryCopy(mlir::FunctionOpInterface funcOp) {
         linalg::getLinalgTilingCanonicalizationPatterns(context);
     populateAffineMinSCFCanonicalizationPattern(
         threadTilingCanonicalizationPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
+    if (failed(applyPatternsGreedily(
             funcOp, std::move(threadTilingCanonicalizationPatterns)))) {
       return failure();
     }

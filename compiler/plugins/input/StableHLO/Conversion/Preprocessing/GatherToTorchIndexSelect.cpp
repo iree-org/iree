@@ -127,8 +127,7 @@ struct GatherToTorchIndexSelect final
     MLIRContext *ctx = &getContext();
     RewritePatternSet patterns(ctx);
     populatePreprocessingGatherToTorchIndexSelectPatterns(ctx, &patterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

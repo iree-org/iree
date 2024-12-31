@@ -38,8 +38,7 @@ struct SplitFullPartialTransferPass final
                   vector::VectorTransferSplit::VectorTransfer)
             .Default(vector::VectorTransferSplit::None));
     populateVectorTransferFullPartialPatterns(patterns, options);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

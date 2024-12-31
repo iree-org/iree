@@ -300,8 +300,7 @@ void PropagateReshapesByExpansionPass::runOnOperation() {
     // Preemptively attempt to fold any reshapes into interface bindings if
     // possible to simplify subsequent reshape propagation.
     populateReshapeToInterfaceTensorPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }
@@ -335,8 +334,8 @@ void PropagateReshapesByExpansionPass::runOnOperation() {
   populateReshapeToInterfaceTensorPatterns(bubbleExpandShapePatterns);
   bubbleExpandShapePatterns.add<ExpandDestinationForallOp>(context);
 
-  if (failed(applyPatternsAndFoldGreedily(
-          getOperation(), std::move(bubbleExpandShapePatterns)))) {
+  if (failed(applyPatternsGreedily(getOperation(),
+                                   std::move(bubbleExpandShapePatterns)))) {
     getOperation()->emitOpError("Failed to propagate reshapes");
     return signalPassFailure();
   }

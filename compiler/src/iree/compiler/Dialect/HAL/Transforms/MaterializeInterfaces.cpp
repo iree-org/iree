@@ -560,7 +560,7 @@ convertDispatchWorkgroupInfoOps(IREE::HAL::ExecutableOp executableOp) {
       ConvertDispatchWorkgroupInfoPattern<IREE::Stream::DispatchWorkgroupSizeOp,
                                           IREE::HAL::InterfaceWorkgroupSizeOp>,
       InlineConstantWorkgroupSizePattern>(executableOp.getContext());
-  return applyPatternsAndFoldGreedily(executableOp, std::move(patterns));
+  return applyPatternsGreedily(executableOp, std::move(patterns));
 }
 
 //===----------------------------------------------------------------------===//
