@@ -420,8 +420,7 @@ struct ConvertConv2DToWinogradPass final
     patterns.insert<ConvertConvToWinograd<linalg::Conv2DNhwcHwcfOp>,
                     ConvertConvToWinograd<linalg::Conv2DNchwFchwOp>>(
         context, /*replaceAllConvs=*/replaceAllConvs);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

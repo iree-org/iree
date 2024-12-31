@@ -143,8 +143,7 @@ public:
     {
       RewritePatternSet patterns(context);
       populateConcretizePadResultShapePatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns),
-                                              config))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns), config))) {
         return signalPassFailure();
       }
     }

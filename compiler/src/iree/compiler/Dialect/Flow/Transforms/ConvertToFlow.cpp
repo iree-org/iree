@@ -30,8 +30,8 @@ struct ConvertToFlowPass
                                                        convertToFlowPatterns);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(
         convertToFlowPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
-            getOperation(), std::move(convertToFlowPatterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(),
+                                     std::move(convertToFlowPatterns)))) {
       return signalPassFailure();
     }
   }

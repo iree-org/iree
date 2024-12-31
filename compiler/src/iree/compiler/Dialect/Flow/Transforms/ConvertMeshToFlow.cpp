@@ -268,7 +268,7 @@ convertCollectives(ModuleOp moduleOp,
                                            useNamedDefaultChannels, builder);
         }
       });
-  return applyPatternsAndFoldGreedily(moduleOp, std::move(patterns));
+  return applyPatternsGreedily(moduleOp, std::move(patterns));
 }
 
 static void removeMeshOps(MeshAndAxesSet &meshAndAxesSet) {

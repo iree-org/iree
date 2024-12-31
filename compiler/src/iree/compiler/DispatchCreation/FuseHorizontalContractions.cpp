@@ -652,8 +652,8 @@ void FuseHorizontalContractionsPass::runOnOperation() {
     RewritePatternSet foldReshapePatterns(context);
     tensor::populateFoldTensorEmptyPatterns(foldReshapePatterns);
     linalg::FillOp::getCanonicalizationPatterns(foldReshapePatterns, context);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(foldReshapePatterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(),
+                                     std::move(foldReshapePatterns)))) {
       getOperation()->emitOpError("failed during reshape folding patterns");
       return signalPassFailure();
     }
@@ -661,8 +661,8 @@ void FuseHorizontalContractionsPass::runOnOperation() {
     RewritePatternSet foldPatterns(context);
     tensor::populateFoldTensorEmptyPatterns(foldPatterns);
     linalg::FillOp::getCanonicalizationPatterns(foldPatterns, context);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(foldPatterns)))) {
+    if (failed(
+            applyPatternsGreedily(getOperation(), std::move(foldPatterns)))) {
       getOperation()->emitOpError("failed to fold empty/fill with concats");
       return signalPassFailure();
     }
@@ -673,8 +673,7 @@ void FuseHorizontalContractionsPass::runOnOperation() {
   // these patterns should be dropped.
   RewritePatternSet patterns(context);
   tensor::populateDecomposeTensorConcatPatterns(patterns);
-  if (failed(
-          applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+  if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
   }
 }

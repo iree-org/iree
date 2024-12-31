@@ -141,7 +141,7 @@ void ElementwiseOpFusionPass::runOnOperation() {
 
   GreedyRewriteConfig rewriteConfig;
   rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
-  if (failed(applyPatternsAndFoldGreedily(
+  if (failed(applyPatternsGreedily(
           getOperation(), std::move(linalgFusionPatterns), rewriteConfig))) {
     getOperation()->emitOpError(
         "Failed to fuse elementwise ops with upstream patterns.");
@@ -159,7 +159,7 @@ void ElementwiseOpFusionPass::runOnOperation() {
   IREE::LinalgExt::populateFuseLinalgExtOpsWithTransposes(
       linalgExtFusionPatterns, foldTransposeControlFn);
   linalgExtFusionPatterns.insert<GatherFusionPattern>(context);
-  if (failed(applyPatternsAndFoldGreedily(
+  if (failed(applyPatternsGreedily(
           getOperation(), std::move(linalgExtFusionPatterns), rewriteConfig))) {
     getOperation()->emitOpError(
         "Failed to fuse elementwise ops with linalgExt patterns.");

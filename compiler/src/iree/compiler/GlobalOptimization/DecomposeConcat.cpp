@@ -127,8 +127,7 @@ struct DecomposeConcatPass
     if (enableConcatTransposition) {
       patterns.insert<TransposeInnerConcatenation>(context, /*benefit=*/2);
     }
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

@@ -25,8 +25,7 @@ struct TransposeMatmulPass
 
     RewritePatternSet patterns(&getContext());
     linalg::populateTransposeMatmulPatterns(patterns, transposeLHS);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

@@ -363,8 +363,7 @@ class OptimizeIntArithmeticPass
       LLVM_DEBUG(
           dbgs() << "  * Finished Running Solver -- Applying Patterns\n");
       bool changed = false;
-      if (failed(applyPatternsAndFoldGreedily(op, frozenPatterns, config,
-                                              &changed))) {
+      if (failed(applyPatternsGreedily(op, frozenPatterns, config, &changed))) {
         emitError(op->getLoc())
             << "int arithmetic optimization failed to converge on iteration "
             << i;

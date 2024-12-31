@@ -359,8 +359,7 @@ struct FlattenTuplesInCFG final
     patterns.insert<DetupleCallOp, DetupleIndirectCallOp, DetupleConditionOp,
                     DetupleReturnOp, DetupleBranchOp>(ctx);
     populateCanonicalizationPatterns(ctx, &patterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

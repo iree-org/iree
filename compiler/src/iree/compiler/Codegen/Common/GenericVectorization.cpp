@@ -399,8 +399,7 @@ void GenericVectorizationPass::runOnOperation() {
                                                         funcOp.getContext());
     vector::MaskOp::getCanonicalizationPatterns(maskCanonPatterns,
                                                 funcOp.getContext());
-    if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                            std::move(maskCanonPatterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(maskCanonPatterns)))) {
       return signalPassFailure();
     }
   }
@@ -431,7 +430,7 @@ void GenericVectorizationPass::runOnOperation() {
     vector::TransferWriteOp::getCanonicalizationPatterns(vectorizationPatterns,
                                                          funcOp.getContext());
   }
-  (void)applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
+  (void)applyPatternsGreedily(funcOp, std::move(vectorizationPatterns));
 
   // Apply the pad tensor op vectorization separately to avoid running the
   // GenericPadOpVectorizationPattern too early.
@@ -440,7 +439,7 @@ void GenericVectorizationPass::runOnOperation() {
   if (vectorizePadding) {
     RewritePatternSet patterns(funcOp.getContext());
     linalg::populatePadOpVectorizationPatterns(patterns);
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+    (void)applyPatternsGreedily(funcOp, std::move(patterns));
   }
 }
 

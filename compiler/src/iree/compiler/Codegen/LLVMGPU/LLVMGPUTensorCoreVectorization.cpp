@@ -97,8 +97,8 @@ public:
           contractionPatterns);
       vector::populateVectorReductionToContractPatterns(contractionPatterns);
       vector::populateSinkVectorOpsPatterns(contractionPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(contractionPatterns)))) {
+      if (failed(
+              applyPatternsGreedily(funcOp, std::move(contractionPatterns)))) {
         return signalPassFailure();
       }
       LLVM_DEBUG({
@@ -112,8 +112,8 @@ public:
       // This pattern folds the arithmetic extensions into the vector.contract.
       RewritePatternSet foldArithExtPatterns(context);
       vector::populateFoldArithExtensionPatterns(foldArithExtPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(foldArithExtPatterns)))) {
+      if (failed(
+              applyPatternsGreedily(funcOp, std::move(foldArithExtPatterns)))) {
         return signalPassFailure();
       }
 
@@ -123,8 +123,8 @@ public:
           canonicalizationPatterns, context);
       populateCombineVectorTransferReadBroadcastPatterns(
           canonicalizationPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(canonicalizationPatterns)))) {
+      if (failed(applyPatternsGreedily(funcOp,
+                                       std::move(canonicalizationPatterns)))) {
         return signalPassFailure();
       }
       LLVM_DEBUG({
@@ -141,8 +141,8 @@ public:
             vectorContractPatterns);
         mlir::populatePrepareVectorToMMAPatterns(vectorContractPatterns,
                                                  /*useMMASync=*/true);
-        if (failed(applyPatternsAndFoldGreedily(
-                getOperation(), std::move(vectorContractPatterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(),
+                                         std::move(vectorContractPatterns)))) {
           return signalPassFailure();
         }
       }
@@ -157,8 +157,8 @@ public:
       // Step 4. Break and unroll warp tile size to native math and load sizes.
       RewritePatternSet vectorUnrollPatterns(context);
       populateVectorUnrollPatterns(vectorUnrollPatterns, useMmaSyncShape);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(vectorUnrollPatterns)))) {
+      if (failed(
+              applyPatternsGreedily(funcOp, std::move(vectorUnrollPatterns)))) {
         return signalPassFailure();
       }
       LLVM_DEBUG({

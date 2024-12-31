@@ -28,8 +28,7 @@ void LowerIREEGPUOpsPass::runOnOperation() {
   RewritePatternSet patterns(context);
   populateIREEGPULowerValueBarrierPatterns(patterns);
   populateIREEGPULowerMultiMmaPatterns(patterns);
-  if (failed(
-          applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+  if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
   }
 }

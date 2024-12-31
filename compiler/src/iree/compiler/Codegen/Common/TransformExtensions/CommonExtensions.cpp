@@ -930,7 +930,7 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     // Manually gather list of ops because the other GreedyPatternRewriteDriver
     // overloads only accepts ops that are isolated from above.
     LogicalResult result =
-        applyOpPatternsAndFold(target, std::move(patterns), config);
+        applyOpPatternsGreedily(target, std::move(patterns), config);
     if (failed(result)) {
       return mlir::emitDefiniteFailure(target,
                                        "greedy pattern application failed");

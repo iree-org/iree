@@ -35,7 +35,7 @@ struct DataLayoutPropagationPass
           }
           return false;
         });
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError("folding patterns failed");
       return signalPassFailure();
     }

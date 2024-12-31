@@ -82,7 +82,7 @@ void LLVMCPUVectorTransposeLoweringPass::runOnOperation() {
     x86vector::avx2::populateSpecializedTransposeLoweringPatterns(
         patterns, avx2LoweringOptions, kSpecializedBenefit);
   }
-  (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  (void)applyPatternsGreedily(funcOp, std::move(patterns));
 }
 } // namespace
 } // namespace mlir::iree_compiler

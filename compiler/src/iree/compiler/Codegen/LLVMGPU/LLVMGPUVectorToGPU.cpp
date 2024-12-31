@@ -57,16 +57,14 @@ struct LLVMGPUVectorToGPUPass final
     bool targetMmaSync = tensorCoreType == GPUTensorCoreType::MMA_SYNC;
     RewritePatternSet flatternpatterns(funcOp.getContext());
     populateVectorTransferToGPUMMAPreparationPatterns(flatternpatterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                            std::move(flatternpatterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(flatternpatterns)))) {
       return signalPassFailure();
     }
 
     RewritePatternSet patterns(funcOp.getContext());
     mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
     populatePrepareVectorToMMAPatterns(patterns, targetMmaSync);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
 
@@ -79,8 +77,8 @@ struct LLVMGPUVectorToGPUPass final
       RewritePatternSet f32ToTF32patterns(funcOp.getContext());
       nvgpu::populateMmaSyncF32ToTF32Patterns(f32ToTF32patterns,
                                               nvgpu::MmaSyncF32Lowering::TF32);
-      if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                              std::move(f32ToTF32patterns)))) {
+      if (failed(applyPatternsGreedily(getOperation(),
+                                       std::move(f32ToTF32patterns)))) {
         return signalPassFailure();
       }
     } else {
@@ -95,7 +93,7 @@ struct LLVMGPUVectorToGPUPass final
       // swizzling optimization.
       RewritePatternSet pattern(funcOp.getContext());
       memref::populateFoldMemRefAliasOpPatterns(pattern);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(pattern)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(pattern)))) {
         return signalPassFailure();
       }
       swizzleSharedMemory(funcOp);

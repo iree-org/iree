@@ -239,7 +239,7 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
 
   RewritePatternSet fusionPatterns(context);
   linalg::populateEraseUnusedOperandsAndResultsPatterns(fusionPatterns);
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(fusionPatterns)))) {
+  if (failed(applyPatternsGreedily(funcOp, std::move(fusionPatterns)))) {
     return funcOp->emitOpError("multi use producer -> consumer fusion failed");
   }
   return fusedOps.size();

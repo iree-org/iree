@@ -92,8 +92,7 @@ struct VectorExtFoldUnitExtentDimsPass final
     MLIRContext *ctx = &getContext();
     RewritePatternSet patterns(ctx);
     patterns.add<DropToLayoutUnitDims>(ctx);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

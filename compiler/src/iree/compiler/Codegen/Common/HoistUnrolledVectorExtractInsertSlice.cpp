@@ -224,7 +224,7 @@ void HoistUnrolledVectorExtractInsertSlicePass::runOnOperation() {
   scf::ForOp::getCanonicalizationPatterns(patterns, ctx);
   vector::InsertStridedSliceOp::getCanonicalizationPatterns(patterns, ctx);
   vector::ExtractStridedSliceOp::getCanonicalizationPatterns(patterns, ctx);
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+  if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
     LLVM_DEBUG(llvm::dbgs() << "----- cleanup failed -----\n");
     return signalPassFailure();
   }

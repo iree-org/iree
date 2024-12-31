@@ -86,6 +86,8 @@ RemoveSignTypeConverter::RemoveSignTypeConverter() {
 
 LinalgTypeConverter::LinalgTypeConverter() : RemoveSignTypeConverter() {
   addArgumentMaterialization(scalarToTensor);
+  addSourceMaterialization(scalarToTensor);
+  addTargetMaterialization(scalarToTensor);
 }
 
 } // namespace mlir::iree_compiler::stablehlo

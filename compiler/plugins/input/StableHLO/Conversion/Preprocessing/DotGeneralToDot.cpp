@@ -419,8 +419,7 @@ struct DotGeneralToDot final : impl::DotGeneralToDotBase<DotGeneralToDot> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populatePreprocessingDotGeneralToDotPatterns(&getContext(), &patterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

@@ -117,7 +117,7 @@ void DistributeMmaToLanesPass::runOnOperation() {
     tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, context);
     tensor::ExtractSliceOp::getCanonicalizationPatterns(patterns, context);
     scf::ForOp::getCanonicalizationPatterns(patterns, context);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitError() << "cleanup failed\n";
       return signalPassFailure();
     }

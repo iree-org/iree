@@ -97,7 +97,7 @@ void RemoveZeroExtentTensorsPass::runOnOperation() {
   RewritePatternSet patterns(context);
   patterns.insert<FoldZeroExtentInserts, ReplaceZeroExtentOperands>(context);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+  if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
     funcOp->emitOpError("failed to run canonicalizations (proxy for DCE)");
     return signalPassFailure();
   }

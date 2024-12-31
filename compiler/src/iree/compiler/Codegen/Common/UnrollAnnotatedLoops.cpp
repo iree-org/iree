@@ -67,7 +67,7 @@ struct UnrollAnnotatedLoopsPass final
       MLIRContext *context = &getContext();
       RewritePatternSet patterns(context);
       scf::ForOp::getCanonicalizationPatterns(patterns, context);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         funcOp->emitError("Failed to apply post unroll cleanup");
         return signalPassFailure();
       }

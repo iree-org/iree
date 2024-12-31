@@ -3227,7 +3227,7 @@ LogicalResult initCPULaunchConfig(FunctionOpInterface funcOp) {
   // Resolve those away.
   RewritePatternSet patterns(funcOp.getContext());
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
-  return applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  return applyPatternsGreedily(funcOp, std::move(patterns));
 }
 
 } // namespace mlir::iree_compiler

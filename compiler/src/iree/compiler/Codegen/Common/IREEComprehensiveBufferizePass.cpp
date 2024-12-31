@@ -183,7 +183,7 @@ void EliminateEmptyTensorsPass::runOnOperation() {
   {
     RewritePatternSet patterns(context);
     linalg::populateConvertToDestinationStylePatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       funcOp->emitOpError("Failed in conversion to destination style patterns");
       return signalPassFailure();
     }
@@ -235,7 +235,7 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   {
     RewritePatternSet patterns(&getContext());
     linalg::populateEraseUnusedOperandsAndResultsPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }

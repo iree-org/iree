@@ -37,7 +37,7 @@ struct ExpandGPUOpsPass final : impl::ExpandGPUOpsPassBase<ExpandGPUOpsPass> {
         patterns, /* maxShuffleBitwidth=*/32, PatternBenefit(2));
     populateGpuLowerClusteredSubgroupReduceToShufflePatterns(
         patterns, *subgroupSize, /* shuffleBitwidth=*/32, PatternBenefit(1));
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   };

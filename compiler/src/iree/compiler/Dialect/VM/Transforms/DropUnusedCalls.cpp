@@ -87,8 +87,7 @@ public:
     patterns.insert<EraseUnusedCallOp<IREE::VM::CallOp>,
                     EraseUnusedCallOp<IREE::VM::CallVariadicOp>>(
         &getContext(), noSideEffectsSymbols);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       signalPassFailure();
     }
   }

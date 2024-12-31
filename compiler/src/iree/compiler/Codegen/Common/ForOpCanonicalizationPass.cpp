@@ -302,12 +302,12 @@ struct ForOpCanonicalizationPass final
     // so we apply that first.
     RewritePatternSet canonPatterns(&getContext());
     canonPatterns.insert<CanonicalizeForOpInductionVarShape>(fn.getContext());
-    if (failed(applyPatternsAndFoldGreedily(fn, std::move(canonPatterns)))) {
+    if (failed(applyPatternsGreedily(fn, std::move(canonPatterns)))) {
       return signalPassFailure();
     }
     RewritePatternSet packPatterns(&getContext());
     packPatterns.insert<PackForOpInductionVarVector>(fn.getContext());
-    if (failed(applyPatternsAndFoldGreedily(fn, std::move(packPatterns)))) {
+    if (failed(applyPatternsGreedily(fn, std::move(packPatterns)))) {
       return signalPassFailure();
     }
   }

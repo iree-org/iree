@@ -189,8 +189,7 @@ void HoistEncodingOpsPass::runOnOperation() {
 
   RewritePatternSet bubblingPatterns(ctx);
   bubblingPatterns.insert<BubbleUpSetEncodingOp>(ctx);
-  if (failed(
-          applyPatternsAndFoldGreedily(funcOp, std::move(bubblingPatterns)))) {
+  if (failed(applyPatternsGreedily(funcOp, std::move(bubblingPatterns)))) {
     return signalPassFailure();
   }
 
@@ -210,7 +209,7 @@ void HoistEncodingOpsPass::runOnOperation() {
   RewritePatternSet cleanPatterns(ctx);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(cleanPatterns);
   IREE::Flow::DispatchRegionOp::getCanonicalizationPatterns(cleanPatterns, ctx);
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(cleanPatterns)))) {
+  if (failed(applyPatternsGreedily(funcOp, std::move(cleanPatterns)))) {
     return signalPassFailure();
   }
 }

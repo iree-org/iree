@@ -300,7 +300,7 @@ public:
       RewritePatternSet patterns(context);
       // Pull in additional vectorization patterns in IREE.
       populateVectorizePadPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -323,7 +323,7 @@ public:
       // Fold transpose ops if possible as we cannot unroll it later.
       vector::TransposeOp::getCanonicalizationPatterns(patterns, context);
 
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -359,7 +359,7 @@ public:
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
       populateVectorTransferTensorSliceTransforms(patterns);
 
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -383,7 +383,7 @@ public:
       RewritePatternSet patterns(context);
       vector::populateVectorMultiReductionLoweringPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerParallel);
-      if (failed(applyOpPatternsAndFold(reductionOps, std::move(patterns)))) {
+      if (failed(applyOpPatternsGreedily(reductionOps, std::move(patterns)))) {
         funcOp.emitOpError("vector lowering failed");
         return signalPassFailure();
       }
@@ -396,7 +396,7 @@ public:
       RewritePatternSet patterns(context);
       vector::populateVectorContractCanonicalizeMatmulToMMT(
           patterns, detectI8ToI32Matmul);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
 
@@ -408,7 +408,7 @@ public:
     {
       RewritePatternSet patterns(context);
       populateVectorUnrollPatterns(patterns, emitIntegerDotProdOps);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -430,7 +430,7 @@ public:
       // It also generates broadcast/extract ops. Clean up them too.
       vector::BroadcastOp::getCanonicalizationPatterns(patterns, context);
       vector::ExtractOp::getCanonicalizationPatterns(patterns, context);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -448,7 +448,7 @@ public:
               vector::VectorTransposeLowering::EltWise);
       vector::populateVectorTransposeLoweringPatterns(patterns, options);
       vector::populateVectorShapeCastLoweringPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -484,7 +484,7 @@ public:
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
       populateVectorTransferTensorSliceTransforms(patterns);
 
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -495,7 +495,7 @@ public:
     if (emitIntegerDotProdOps) {
       RewritePatternSet patterns(context);
       populateVectorReductionToSPIRVDotProductPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
 

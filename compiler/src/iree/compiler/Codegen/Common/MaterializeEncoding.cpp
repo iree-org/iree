@@ -112,7 +112,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     tensor::CastOp::getCanonicalizationPatterns(patterns, ctx);
     tensor::populateFoldIntoPackAndUnpackPatterns(patterns);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError("folding patterns failed");
       return failure();
     }

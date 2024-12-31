@@ -44,7 +44,7 @@ struct VectorizeMemrefCopyPass final
     RewritePatternSet patterns(ctx);
     patterns.add<linalg::CopyVectorizationPattern>(&getContext());
     patterns.add<ConvertLinalgCopyToMemrefCopy>(&getContext());
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+    (void)applyPatternsGreedily(funcOp, std::move(patterns));
   }
 };
 

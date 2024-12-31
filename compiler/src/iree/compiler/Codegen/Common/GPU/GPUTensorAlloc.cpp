@@ -202,7 +202,7 @@ public:
       MLIRContext *context = &getContext();
       RewritePatternSet patterns(context);
       patterns.add<SwapAllocTensorPattern>(context);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }

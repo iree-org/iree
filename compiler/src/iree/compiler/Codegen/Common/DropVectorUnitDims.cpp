@@ -47,7 +47,7 @@ void DropVectorUnitDimsPass::runOnOperation() {
   vector::populateDropUnitDimWithShapeCastPatterns(patterns);
   vector::InsertOp::getCanonicalizationPatterns(patterns, ctx);
   vector::ExtractOp::getCanonicalizationPatterns(patterns, ctx);
-  (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  (void)applyPatternsGreedily(funcOp, std::move(patterns));
 }
 } // namespace
 } // namespace mlir::iree_compiler

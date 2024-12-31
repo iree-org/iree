@@ -504,6 +504,8 @@ struct ConvertStableHloToIreeInputDialects final
     std::unique_ptr<TypeConverter> typeConverter =
         createStableHloToLinalgTypeConverter();
     typeConverter->addArgumentMaterialization(scalarToTensor);
+    typeConverter->addSourceMaterialization(scalarToTensor);
+    typeConverter->addTargetMaterialization(scalarToTensor);
 
     // Run stablehlo canonicalization patterns with a high benefit to avoid some
     // expensive expansions.
@@ -610,7 +612,7 @@ struct ConvertStableHloToIreeInputDialects final
       RewritePatternSet removeUnusedOperandsResultsPatterns(context);
       linalg::populateEraseUnusedOperandsAndResultsPatterns(
           removeUnusedOperandsResultsPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
+      if (failed(applyPatternsGreedily(
               getOperation(),
               std::move(removeUnusedOperandsResultsPatterns)))) {
         return signalPassFailure();

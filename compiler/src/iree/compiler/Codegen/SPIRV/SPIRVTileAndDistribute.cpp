@@ -160,8 +160,8 @@ void SPIRVTileAndDistributePass::runOnOperation() {
     populateFoldAffineMinInDistributedLoopsPatterns(canonicalizationPatterns,
                                                     numWorkgroups);
 
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(canonicalizationPatterns)))) {
+    if (failed(applyPatternsGreedily(funcOp,
+                                     std::move(canonicalizationPatterns)))) {
       // TODO(#4759): This does not converge after the max number of iterations.
       // It indicates that some pattern upstream is generating ops even when the
       // pattern failed to match. Not related to correctness, but would be good
@@ -185,8 +185,8 @@ void SPIRVTileAndDistributePass::runOnOperation() {
     RewritePatternSet canonicalizationPatterns =
         linalg::getLinalgTilingCanonicalizationPatterns(context);
     scf::populateSCFForLoopCanonicalizationPatterns(canonicalizationPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(canonicalizationPatterns)))) {
+    if (failed(applyPatternsGreedily(funcOp,
+                                     std::move(canonicalizationPatterns)))) {
       funcOp.emitOpError() << "failing canonicalizing after tile reduction";
       return signalPassFailure();
     }

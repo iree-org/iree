@@ -92,8 +92,7 @@ struct ExtractAddressComputationGPUPass final
 void ExtractAddressComputationGPUPass::runOnOperation() {
   RewritePatternSet patterns(&getContext());
   populateExtractAddressComputationGPUPatterns(patterns);
-  if (failed(
-          applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+  if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
   }
 }

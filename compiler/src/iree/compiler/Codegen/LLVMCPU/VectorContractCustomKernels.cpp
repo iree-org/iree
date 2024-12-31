@@ -1130,7 +1130,7 @@ public:
     auto funcOp = getOperation();
     auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
     populateVectorContractCustomKernelsPatterns(target, patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       signalPassFailure();
     }
   }

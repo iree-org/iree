@@ -121,7 +121,7 @@ void GPUPackToIntrinsicsPass::runOnOperation() {
   {
     RewritePatternSet patterns(context);
     patterns.add<ConvertToMultiMma>(context);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitError() << "failed to convert linalg to multi_mma";
       return signalPassFailure();
     }
@@ -137,8 +137,7 @@ void GPUPackToIntrinsicsPass::runOnOperation() {
   };
 
   linalg::populateDataLayoutPropagationPatterns(patterns, control);
-  if (failed(
-          applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+  if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
   }
 }

@@ -105,8 +105,8 @@ struct LLVMGPUVectorLoweringPass final
       vector::populateVectorMultiReductionLoweringPatterns(
           contractLoweringPatterns,
           vector::VectorMultiReductionLowering::InnerParallel);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(contractLoweringPatterns)))) {
+      if (failed(applyPatternsGreedily(funcOp,
+                                       std::move(contractLoweringPatterns)))) {
         return signalPassFailure();
       }
     }
@@ -118,8 +118,8 @@ struct LLVMGPUVectorLoweringPass final
                                           vectorToSCFOptions);
     memref::populateFoldMemRefAliasOpPatterns(vectorToLoopsPatterns);
     vector::populateVectorTransferLoweringPatterns(vectorToLoopsPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(vectorToLoopsPatterns)))) {
+    if (failed(
+            applyPatternsGreedily(funcOp, std::move(vectorToLoopsPatterns)))) {
       return signalPassFailure();
     }
   }

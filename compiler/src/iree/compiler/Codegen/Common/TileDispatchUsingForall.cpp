@@ -530,7 +530,7 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
         ->getCanonicalizationPatterns(patterns);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     scf::ForallOp::getCanonicalizationPatterns(patterns, context);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError("tiling canonicalization failed");
       return signalPassFailure();
     }

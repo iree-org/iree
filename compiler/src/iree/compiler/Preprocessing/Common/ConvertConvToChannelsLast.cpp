@@ -671,7 +671,7 @@ public:
         patterns.insert<ConvertLinalgConvNchwFchw>(context);
       }
       patterns.insert<ConvertLinalgConvOp>(context, tilingFactor);
-      if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(op, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -687,8 +687,7 @@ public:
       config.maxIterations = GreedyRewriteConfig::kNoLimit;
       linalg::populateDataLayoutPropagationPatterns(
           patterns, [](OpOperand *opOperand) { return true; });
-      if (failed(
-              applyPatternsAndFoldGreedily(op, std::move(patterns), config))) {
+      if (failed(applyPatternsGreedily(op, std::move(patterns), config))) {
         return signalPassFailure();
       }
     }
@@ -701,7 +700,7 @@ public:
       tensor::PackOp::getCanonicalizationPatterns(patterns, context);
       tensor::UnPackOp::getCanonicalizationPatterns(patterns, context);
       linalg::FillOp::getCanonicalizationPatterns(patterns, context);
-      if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(op, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -715,7 +714,7 @@ public:
       RewritePatternSet patterns(context);
       patterns.insert<GeneralizeOuterUnitDimsPackOp>(context);
       patterns.insert<GeneralizeOuterUnitDimsUnPackOp>(context);
-      if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(op, std::move(patterns)))) {
         return signalPassFailure();
       }
     }

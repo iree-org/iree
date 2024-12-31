@@ -348,7 +348,7 @@ struct ScheduleExecutionPass
       op.getCanonicalizationPatterns(patterns, context);
     }
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
-    if (failed(applyPatternsAndFoldGreedily(getOperation(), frozenPatterns))) {
+    if (failed(applyPatternsGreedily(getOperation(), frozenPatterns))) {
       return signalPassFailure();
     }
   }

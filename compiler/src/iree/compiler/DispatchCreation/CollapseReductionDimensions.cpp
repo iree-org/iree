@@ -74,8 +74,7 @@ struct CollapseReductionDimensionsPass final
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     linalg::populateCollapseDimensions(patterns, collapseDimensions);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

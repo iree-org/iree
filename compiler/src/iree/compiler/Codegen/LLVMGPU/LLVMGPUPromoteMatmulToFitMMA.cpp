@@ -104,7 +104,7 @@ public:
       ctx->getLoadedDialect<tensor::TensorDialect>()
           ->getCanonicalizationPatterns(patterns);
       tensor::PadOp::getCanonicalizationPatterns(patterns, ctx);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         LLVM_DEBUG(llvm::dbgs() << "----- cleanup failed -----\n");
         return signalPassFailure();
       }

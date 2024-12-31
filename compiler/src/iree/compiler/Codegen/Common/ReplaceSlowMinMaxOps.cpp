@@ -79,8 +79,7 @@ void populateReplaceSlowMinMaxOpsPatterns(RewritePatternSet &patterns) {
 void ReplaceSlowMinMaxOpsPass::runOnOperation() {
   RewritePatternSet patterns(&getContext());
   populateReplaceSlowMinMaxOpsPatterns(patterns);
-  if (failed(
-          applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+  if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
   }
 }

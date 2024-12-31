@@ -372,7 +372,7 @@ public:
     beforeFoldingGlobals = globalTable.size();
     for (int i = 0; i < 10; ++i) {
       // TODO(benvanik): determine if we need this expensive folding.
-      if (failed(applyPatternsAndFoldGreedily(moduleOp, frozenPatterns))) {
+      if (failed(applyPatternsGreedily(moduleOp, frozenPatterns))) {
         signalPassFailure();
         return;
       }

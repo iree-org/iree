@@ -162,8 +162,7 @@ struct FoldAffineMinInDistributedLoopsPass final
     RewritePatternSet patterns(&getContext());
     SmallVector<int64_t> numWorkgroups = getStaticNumWorkgroups(getOperation());
     populateFoldAffineMinInDistributedLoopsPatterns(patterns, numWorkgroups);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       // TODO(#4759): This does not converge after the max number of iterations.
       // It indicates that some pattern upstream is generating ops even when the
       // pattern failed to match. Not related to correctness, but would be good

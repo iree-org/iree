@@ -558,7 +558,7 @@ public:
 
     // Apply the patterns.
     auto operation = getOperation();
-    if (failed(applyPatternsAndFoldGreedily(operation, patterns))) {
+    if (failed(applyPatternsGreedily(operation, patterns))) {
       operation->emitOpError("failed to apply patterns specified in ")
           << patternsFile;
       return signalPassFailure();

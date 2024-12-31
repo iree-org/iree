@@ -66,8 +66,7 @@ struct ExpandF16OpToF32Pass
     // TODO(#15661): Remove the expansion for math.powf op after fixing
     // approximation issue.
     patterns.insert<ExpandF16OpToF32Pattern<math::PowFOp>>(context);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

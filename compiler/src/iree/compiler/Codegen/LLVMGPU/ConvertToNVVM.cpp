@@ -114,14 +114,14 @@ struct ConvertToNVVMPass final
           patterns, vector::VectorTransformsOptions());
       vector::populateVectorTransferLoweringPatterns(patterns);
       arith::populateExpandBFloat16Patterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
     {
       RewritePatternSet patterns(&getContext());
       populateGpuRewritePatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -134,7 +134,7 @@ struct ConvertToNVVMPass final
       if (!cc || cc.value() < 80) {
         RewritePatternSet patterns(&getContext());
         populateReplaceSlowMinMaxOpsPatterns(patterns);
-        if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
           return signalPassFailure();
         }
       }
@@ -184,7 +184,7 @@ struct ConvertToNVVMPass final
     {
       RewritePatternSet patterns(&getContext());
       populateNVVMToLLVMConversionPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
       }
     }

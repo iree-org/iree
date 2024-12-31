@@ -32,16 +32,14 @@ struct SPIRVVectorToGPUSubgroupMMAPass final
 
     RewritePatternSet flatternpatterns(funcOp.getContext());
     populateVectorTransferToGPUMMAPreparationPatterns(flatternpatterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                            std::move(flatternpatterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(flatternpatterns)))) {
       return signalPassFailure();
     }
 
     RewritePatternSet patterns(funcOp.getContext());
     mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
     populatePrepareVectorToMMAPatterns(patterns, /*useNvGpu=*/false);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
 

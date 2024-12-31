@@ -255,8 +255,7 @@ struct FlattenTuplesInSCF final
     patterns
         .add<DetupleYieldOp, DetupleConditionOp, DetupleIfOp, DetupleWhileOp>(
             ctx);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

@@ -191,8 +191,7 @@ void ConvertTensorToFlowPass::runOnOperation() {
       convertToFlowPatterns, context);
   IREE::Flow::TensorBitCastOp::getCanonicalizationPatterns(
       convertToFlowPatterns, context);
-  if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                          std::move(convertToFlowPatterns)))) {
+  if (failed(applyPatternsGreedily(funcOp, std::move(convertToFlowPatterns)))) {
     funcOp->emitOpError("failed conversion to flow.tensor ops");
     return signalPassFailure();
   }
@@ -202,8 +201,8 @@ void ConvertTensorToFlowPass::runOnOperation() {
   RewritePatternSet foldExtractInsertSliceOps(context);
   IREE::Flow::populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
       foldExtractInsertSliceOps, context);
-  if (failed(applyPatternsAndFoldGreedily(
-          funcOp, std::move(foldExtractInsertSliceOps)))) {
+  if (failed(applyPatternsGreedily(funcOp,
+                                   std::move(foldExtractInsertSliceOps)))) {
     funcOp->emitOpError("failed to insert/extract_slice with "
                         "flow.dispatch.tensor.load/store");
     return signalPassFailure();

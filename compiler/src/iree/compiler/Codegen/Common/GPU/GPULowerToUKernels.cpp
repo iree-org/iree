@@ -144,8 +144,7 @@ struct GPULowerToUKernelsPass final
     // fusions for these ops.
     patterns.add<LowerArgmaxToUKernelPattern, LowerMultiMmaToUKernelPattern>(
         context);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

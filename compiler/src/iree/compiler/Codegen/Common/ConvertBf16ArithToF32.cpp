@@ -304,8 +304,7 @@ struct ConvertBf16ArithToF32Pass final
     cleanupPatterns
         .insert<PropagateCastF<arith::TruncFOp>, PropagateCastF<arith::ExtFOp>>(
             context);
-    if (applyPatternsAndFoldGreedily(this->getOperation(),
-                                     std::move(cleanupPatterns))
+    if (applyPatternsGreedily(this->getOperation(), std::move(cleanupPatterns))
             .failed()) {
       return this->signalPassFailure();
     }

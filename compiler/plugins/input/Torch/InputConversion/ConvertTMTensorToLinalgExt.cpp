@@ -214,8 +214,7 @@ public:
     patterns.add<ScatterOpConversion>(context);
     patterns.add<AttentionOpConversion>(context);
 
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       signalPassFailure();
     }
   }

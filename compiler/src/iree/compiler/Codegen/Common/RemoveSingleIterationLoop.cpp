@@ -107,7 +107,7 @@ static LogicalResult removeOneTripTiledLoops(mlir::FunctionOpInterface funcOp,
   };
   RewritePatternSet patterns(funcOp.getContext());
   populateRemoveSingleIterationLoopPattern(patterns, getWorkgroupRangeFn);
-  return applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  return applyPatternsGreedily(funcOp, std::move(patterns));
 }
 
 namespace {

@@ -123,8 +123,7 @@ void EraseStorageBufferStaticShapePass::runOnOperation() {
   {
     RewritePatternSet patterns(&getContext());
     populateRemoveDeadMemAllocPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

@@ -116,8 +116,7 @@ void CombineBarrierRegionsPass::runOnOperation() {
   // These two patterns are run to a fixed point, allowing fusion within
   // potentially nested loops, hoisting from said loops, and continued fusion.
   patterns.add<CombineAdjacentBarrierRegions>(context);
-  if (failed(
-          applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+  if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
   }
 

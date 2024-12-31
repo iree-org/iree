@@ -38,7 +38,7 @@ void LLVMCPUVectorShapeCastLoweringPass::runOnOperation() {
 
   RewritePatternSet patterns(ctx);
   vector::populateVectorShapeCastLoweringPatterns(patterns);
-  (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  (void)applyPatternsGreedily(funcOp, std::move(patterns));
 }
 } // namespace
 } // namespace mlir::iree_compiler

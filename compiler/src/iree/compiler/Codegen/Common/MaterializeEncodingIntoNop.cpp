@@ -64,8 +64,7 @@ struct MaterializeEncodingIntoNopPass final
       memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
       context->getOrLoadDialect<tensor::TensorDialect>()
           ->getCanonicalizationPatterns(patterns);
-      if (failed(
-              applyPatternsAndFoldGreedily(operation, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(operation, std::move(patterns)))) {
         operation.emitOpError("folding patterns failed");
         return signalPassFailure();
       }

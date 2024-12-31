@@ -353,8 +353,8 @@ void BlockDynamicDimensionsPass::runOnOperation() {
     memref::populateResolveRankedShapedTypeResultDimsPatterns(
         bubbleExpandShapePatterns);
     populateRemoveDeadMemAllocPatterns(bubbleExpandShapePatterns);
-    if (failed(applyPatternsAndFoldGreedily(
-            operation, std::move(bubbleExpandShapePatterns)))) {
+    if (failed(applyPatternsGreedily(operation,
+                                     std::move(bubbleExpandShapePatterns)))) {
       operation->emitOpError(
           "failed in application of bubble up expand shape patterns");
       return signalPassFailure();
@@ -380,8 +380,8 @@ void BlockDynamicDimensionsPass::runOnOperation() {
                                                 context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(
         removeBarrierOpsPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
-            operation, std::move(removeBarrierOpsPatterns)))) {
+    if (failed(applyPatternsGreedily(operation,
+                                     std::move(removeBarrierOpsPatterns)))) {
       operation->emitOpError("failed in cleanup patterns");
       return signalPassFailure();
     }

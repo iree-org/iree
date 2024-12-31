@@ -89,8 +89,7 @@ void DecomposeIm2colPass::runOnOperation() {
 
   RewritePatternSet patterns(context);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
-  if (failed(
-          applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+  if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
   }
 }

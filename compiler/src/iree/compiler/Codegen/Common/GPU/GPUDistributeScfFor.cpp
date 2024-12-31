@@ -103,8 +103,7 @@ struct GPUDistributeScfForPass final
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
     patterns.add<DistributeLoop>(context, useBlockDims);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

@@ -1042,7 +1042,7 @@ void CollapseDimensionsPass::runOnOperation() {
       }
     });
     if (failed(
-            applyOpPatternsAndFold(candidateOps, std::move(moveReshapeOps)))) {
+            applyOpPatternsGreedily(candidateOps, std::move(moveReshapeOps)))) {
       funcOp.emitOpError(
           "failed to propagate reshape ops introduced during collapse");
       return signalPassFailure();

@@ -383,8 +383,8 @@ public:
       SmallVector<int64_t> numWorkgroups = getStaticNumWorkgroups(funcOp);
       populateFoldAffineMinInDistributedLoopsPatterns(canonicalizationPatterns,
                                                       numWorkgroups);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(canonicalizationPatterns)))) {
+      if (failed(applyPatternsGreedily(funcOp,
+                                       std::move(canonicalizationPatterns)))) {
         return signalPassFailure();
       }
     }
@@ -424,7 +424,7 @@ public:
       populateCombineVectorTransferReadBroadcastPatterns(patterns);
       populatePrepareVectorToMMAPatterns(patterns,
                                          /*useNvGPU=*/false);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -434,7 +434,7 @@ public:
     {
       RewritePatternSet patterns(context);
       populateVectorUnrollPatterns(cooperativeOpSize, patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -447,7 +447,7 @@ public:
     {
       RewritePatternSet patterns(context);
       patterns.add<CombineContractTranspose>(context);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }

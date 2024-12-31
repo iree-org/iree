@@ -504,8 +504,7 @@ LogicalResult setDefaultCustomOpLoweringConfig(
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   GreedyRewriteConfig config;
   config.listener = &customOpConfigListener;
-  if (failed(applyPatternsAndFoldGreedily(dummyFuncOp, std::move(patterns),
-                                          config))) {
+  if (failed(applyPatternsGreedily(dummyFuncOp, std::move(patterns), config))) {
     return customOp.emitOpError(
         "failed to canonicalize during custom op configuration setting");
   }
