@@ -415,8 +415,10 @@ struct IREELinalgExtSortTypePropagation
     for (auto [index, arg] : llvm::enumerate(modifiedOpRegion.getArguments())) {
       // Refer to input types of the original operation to determine the
       // corresponding legal arg type.
+      auto convertType = index % 2 == 0 ? sortOp->getOperandTypes()[index / 2]
+                                        : sortOp->getResultTypes()[index / 2];
       std::optional<Type> legalizedArgType =
-          legalizeTensorStorageElementType(sortOp->getOperandTypes()[index]);
+          legalizeTensorStorageElementType(convertType);
       if (!legalizedArgType) {
         return sortOp.emitOpError("failed to get legalized type for argument");
       }
