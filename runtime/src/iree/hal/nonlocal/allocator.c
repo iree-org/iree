@@ -177,14 +177,6 @@ static void iree_hal_nl_buffer_free(
       nl_mem_host_free(host_ptr);
       break;
     }
-    case IREE_HAL_NL_BUFFER_TYPE_HOST_REGISTERED: {
-      nl_mem_host_unregister(host_ptr);
-      break;
-    }
-    case IREE_HAL_NL_BUFFER_TYPE_ASYNC: {
-      IREE_TRACE_ZONE_APPEND_TEXT(z0, "(ignored; async)");
-      break;
-    }
     case IREE_HAL_NL_BUFFER_TYPE_EXTERNAL: {
       IREE_TRACE_ZONE_APPEND_TEXT(z0, "(ignored; external)");
       break;
@@ -240,17 +232,10 @@ static iree_status_t iree_hal_nl_allocator_allocate_buffer(
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, allocation_size);
   if (iree_all_bits_set(compat_params.type,
                         IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
-    if (iree_all_bits_set(compat_params.type,
-                          IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
-      // Device local + host visible.
-      buffer_type = IREE_HAL_NL_BUFFER_TYPE_DEVICE;
-      device_ptr = nl_mem_alloc(allocation_size);
-      host_ptr = (void*)device_ptr;
-    } else {
-      // Device only.
-      buffer_type = IREE_HAL_NL_BUFFER_TYPE_DEVICE;
-      device_ptr = nl_mem_alloc(allocation_size);
-    }
+    // Device local
+    buffer_type = IREE_HAL_NL_BUFFER_TYPE_DEVICE;
+    device_ptr = nl_mem_alloc(allocation_size);
+    host_ptr = (void*)device_ptr;
   } else {
     // Host local cases.
     buffer_type = IREE_HAL_NL_BUFFER_TYPE_HOST;
@@ -378,7 +363,7 @@ static iree_status_t iree_hal_nl_allocator_import_buffer(
             IREE_STATUS_INVALID_ARGUMENT,
             "unable to register host allocations as device-local memory");
       }
-      buffer_type = IREE_HAL_NL_BUFFER_TYPE_HOST_REGISTERED;
+      buffer_type = IREE_HAL_NL_BUFFER_TYPE_EXTERNAL;
       host_ptr = external_buffer->handle.host_allocation.ptr;
       break;
     }

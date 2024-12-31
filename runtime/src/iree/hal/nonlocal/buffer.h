@@ -21,12 +21,6 @@ typedef enum iree_hal_nl_buffer_type_e {
   IREE_HAL_NL_BUFFER_TYPE_DEVICE = 0,
   // Host local buffer; allocated with nl_mem_host_alloc, freed with nl_mem_freeHost.
   IREE_HAL_NL_BUFFER_TYPE_HOST,
-  // Host local buffer; registered with nl_mem_register, freed with
-  // nl_mem_host_unregister.
-  IREE_HAL_NL_BUFFER_TYPE_HOST_REGISTERED,
-  // Device local buffer, allocated with nl_mem_allocFromPoolAsync, freed with
-  // nl_mem_free.
-  IREE_HAL_NL_BUFFER_TYPE_ASYNC,
   // Externally registered buffer whose providence is unknown.
   // Must be freed by the user.
   IREE_HAL_NL_BUFFER_TYPE_EXTERNAL,
