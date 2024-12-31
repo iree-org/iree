@@ -63,6 +63,11 @@ static llvm::cl::opt<int> clPadFactor(
                    "encodings."),
     llvm::cl::init(32));
 
+static llvm::cl::opt<bool> clEnablePackStorageForI1(
+    "iree-global-opt-enable-pack-storage",
+    llvm::cl::desc("Enables packed storage for i1 tensors."),
+    llvm::cl::init(true));
+
 void buildGlobalOptExprHoistingPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
   IREE::Util::ExprHoistingOptions options;
@@ -248,6 +253,10 @@ void buildGlobalOptimizationPassPipeline(
     mainPassManager.addPass(
         IREE::IO::Parameters::createGenerateSplatParameterArchivePass(
             generateSplatOptions));
+  }
+
+  if (clEnablePackStorageForI1) {
+    mainPassManager.addPass(createPackStoragePass());
   }
 }
 
