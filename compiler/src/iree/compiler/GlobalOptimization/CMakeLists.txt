@@ -55,6 +55,7 @@ iree_cc_library(
     "InferNumericNarrowing.cpp"
     "MaterializeHomogeneousEncodings.cpp"
     "OptimizeNumerics.cpp"
+    "PackedStorage.cpp"
     "Passes.cpp"
     "PropagateLinalgTranspose.cpp"
     "QuantizedConvToConv.cpp"
