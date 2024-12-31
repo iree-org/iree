@@ -30,6 +30,8 @@ bool needToPackSubByteElements(RankedTensorType shapedType);
 /// cases.
 Type legalizeStorageElementType(Type elementType);
 
+Type legalizeTensorStorageElementType(Type tensorType);
+
 /// Emits IR with the given |builder| to calculate the total number of bytes
 /// required for the given |shapedType| in storage. Returns the value for the
 /// final count on success; returns nullptr on failure. Dynamic dimensions in

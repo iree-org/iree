@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Patterns.h"
 
+#include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Dialect/HAL/Analysis/Captures.h"
 #include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
@@ -478,7 +479,8 @@ struct TensorExportBufferViewOpPattern
     }
 
     auto loc = exportOp.getLoc();
-    auto tensorType = llvm::cast<RankedTensorType>(adaptor.getSourceEncoding());
+    auto tensorType = dropPackedStorageEncodingIfAny(
+        llvm::cast<RankedTensorType>(adaptor.getSourceEncoding()));
     auto dynamicDims = adaptor.getSourceEncodingDims();
 
     // NOTE: we should have verified supported encodings/types at entry into the
