@@ -146,7 +146,7 @@ def DataLayoutPropagationPass : InterfacePass<"iree-global-opt-data-layout-propa
   let summary = "Propagate pack/unpack ops across other ops to improve fusion";
 }
 
-def PackStoragePass : Pass<"iree-global-opt-pack-storage", ""> {
+def PackStoragePass : InterfacePass<"iree-global-opt-pack-storage", "mlir::FunctionOpInterface"> {
   let summary = "Pack sub-byte tensor ops to improve memory access patterns";
 }
 
