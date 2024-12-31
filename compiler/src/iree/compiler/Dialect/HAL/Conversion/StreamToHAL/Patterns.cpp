@@ -7,7 +7,6 @@
 #include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Patterns.h"
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
-#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/Analysis/Captures.h"
 #include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
