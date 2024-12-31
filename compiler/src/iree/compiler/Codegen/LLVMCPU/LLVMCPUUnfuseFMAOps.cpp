@@ -56,7 +56,7 @@ void LLVMCPUUnfuseFMAOpsPass::runOnOperation() {
   auto context = funcOp.getContext();
   RewritePatternSet patterns(&getContext());
   populateUnfusedFMAOpsPassPatterns(context, patterns);
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+  if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
   }
 }

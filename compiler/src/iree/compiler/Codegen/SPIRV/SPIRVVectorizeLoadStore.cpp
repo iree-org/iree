@@ -1099,8 +1099,7 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
                         ScalarizeVectorTransferWrite>(context);
   rewritingPatterns.add<ReifyExtractOfCreateMask>(context);
 
-  if (failed(
-          applyPatternsAndFoldGreedily(funcOp, std::move(rewritingPatterns)))) {
+  if (failed(applyPatternsGreedily(funcOp, std::move(rewritingPatterns)))) {
     return signalPassFailure();
   }
 }

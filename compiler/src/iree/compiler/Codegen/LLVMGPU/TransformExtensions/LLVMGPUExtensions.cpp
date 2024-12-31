@@ -606,8 +606,8 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   });
   GreedyRewriteConfig config;
   config.listener = &listener;
-  if (failed(applyPatternsAndFoldGreedily(
-          target, std::move(preProcessingPatterns), config))) {
+  if (failed(applyPatternsGreedily(target, std::move(preProcessingPatterns),
+                                   config))) {
     return mlir::emitDefiniteFailure(target,
                                      "multi-reduce patterns failed to apply");
   }
@@ -618,8 +618,7 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   unsigned subgroupSizeU = static_cast<unsigned>(subgroupSize.value());
   populatePropagateVectorDistribution(target, patterns,
                                       /*benefit=*/1, subgroupSizeU);
-  if (failed(
-          applyPatternsAndFoldGreedily(target, std::move(patterns), config))) {
+  if (failed(applyPatternsGreedily(target, std::move(patterns), config))) {
     return mlir::emitDefiniteFailure(
         target, "warp distribution patterns failed to apply");
   }
@@ -630,8 +629,7 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   options.warpSyncronizationFn = warpSyncronizationFn;
   populateWarpExecuteOnLane0ToScf(target, endPatterns, options,
                                   /*benefit=*/0);
-  if (failed(applyPatternsAndFoldGreedily(target, std::move(endPatterns),
-                                          config))) {
+  if (failed(applyPatternsGreedily(target, std::move(endPatterns), config))) {
     return mlir::emitDefiniteFailure(
         target, "warp execute on lane 0 to scf patterns failed to apply");
   }
@@ -681,8 +679,7 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
   RewritePatternSet patterns(ctx);
   mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
   populatePrepareVectorToMMAPatterns(patterns, getUseMmaSync());
-  if (failed(
-          applyPatternsAndFoldGreedily(target, std::move(patterns), config))) {
+  if (failed(applyPatternsGreedily(target, std::move(patterns), config))) {
     target->emitOpError("vector to mma preparation patterns failed to apply");
     return emitDefaultDefiniteFailure(target);
   }
@@ -715,8 +712,8 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
   RewritePatternSet f32ToTF32patterns(funcOp.getContext());
   nvgpu::populateMmaSyncF32ToTF32Patterns(f32ToTF32patterns,
                                           nvgpu::MmaSyncF32Lowering::TF32);
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(f32ToTF32patterns),
-                                          config)))
+  if (failed(
+          applyPatternsGreedily(funcOp, std::move(f32ToTF32patterns), config)))
     return mlir::emitDefiniteFailure(
         target, "vector to mma F32ToTF32 patterns failed to apply");
 
@@ -1414,8 +1411,7 @@ transform_dialect::EliminateGpuBarriersOp::applyToOne(
   });
   GreedyRewriteConfig config;
   config.listener = &listener;
-  if (failed(
-          applyPatternsAndFoldGreedily(target, std::move(patterns), config))) {
+  if (failed(applyPatternsGreedily(target, std::move(patterns), config))) {
     return emitDefaultSilenceableFailure(target);
   }
 

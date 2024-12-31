@@ -70,8 +70,7 @@ struct RematerializeParallelOpsPass final
     RewritePatternSet fusionPatterns(funcOp.getContext());
     fusionPatterns.insert<RematerializeParallelOpsPattern>(funcOp.getContext());
     linalg::populateEraseUnusedOperandsAndResultsPatterns(fusionPatterns);
-    if (failed(
-            applyPatternsAndFoldGreedily(funcOp, std::move(fusionPatterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(fusionPatterns)))) {
       return signalPassFailure();
     }
   }

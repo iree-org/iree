@@ -62,8 +62,8 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
     RewritePatternSet canonicalizationPatterns(context);
     vector::ContractionOp::getCanonicalizationPatterns(canonicalizationPatterns,
                                                        context);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(canonicalizationPatterns)))) {
+    if (failed(applyPatternsGreedily(funcOp,
+                                     std::move(canonicalizationPatterns)))) {
       return signalPassFailure();
     }
 
@@ -80,8 +80,8 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
     RewritePatternSet castAwayUnitDimPatterns(&getContext());
     vector::populateCastAwayVectorLeadingOneDimPatterns(
         castAwayUnitDimPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(castAwayUnitDimPatterns)))) {
+    if (failed(applyPatternsGreedily(funcOp,
+                                     std::move(castAwayUnitDimPatterns)))) {
       return signalPassFailure();
     }
 
@@ -90,8 +90,8 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
         reductionToContractPatterns);
     vector::ExtractOp::getCanonicalizationPatterns(reductionToContractPatterns,
                                                    context);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(reductionToContractPatterns)))) {
+    if (failed(applyPatternsGreedily(funcOp,
+                                     std::move(reductionToContractPatterns)))) {
       return signalPassFailure();
     }
   }
@@ -102,7 +102,7 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
     RewritePatternSet patterns(context);
     auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
     populateVectorContractCustomKernelsPatterns(target, patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }

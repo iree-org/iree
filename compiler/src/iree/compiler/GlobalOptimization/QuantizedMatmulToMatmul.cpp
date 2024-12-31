@@ -186,7 +186,7 @@ public:
     RewritePatternSet patterns(context);
     patterns.add<QuantizedMatmulToMatmul>(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(op, std::move(patterns)))) {
       signalPassFailure();
     }
   }

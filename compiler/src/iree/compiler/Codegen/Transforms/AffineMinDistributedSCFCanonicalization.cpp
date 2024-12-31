@@ -205,7 +205,7 @@ struct AffineMinDistributedSCFCanonicalizationPass
     funcOp.walk([&minOps](affine::AffineMinOp minOp) {
       minOps.push_back(minOp.getOperation());
     });
-    (void)applyOpPatternsAndFold(minOps, frozenPatterns);
+    (void)applyOpPatternsGreedily(minOps, frozenPatterns);
   }
 };
 } // namespace

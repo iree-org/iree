@@ -757,7 +757,7 @@ struct FlattenMemRefSubspanPass final
     // This pass currently doesn't support alignment hints so remove them first.
     RewritePatternSet patterns(context);
     patterns.add<RemoveAssumeAlignOp>(context);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    (void)applyPatternsGreedily(getOperation(), std::move(patterns));
 
     RewritePatternSet flattenPatterns(context);
 
@@ -879,8 +879,8 @@ struct FlattenMemRefSubspanPass final
     // Fold subviews if any new oportuinity has been created.
     RewritePatternSet foldSubviewPatterns(context);
     memref::populateFoldMemRefAliasOpPatterns(foldSubviewPatterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(foldSubviewPatterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(),
+                                     std::move(foldSubviewPatterns)))) {
       return signalPassFailure();
     }
 
@@ -894,8 +894,8 @@ struct FlattenMemRefSubspanPass final
     memref::SubViewOp::getCanonicalizationPatterns(cleanupPatterns, context);
     cleanupPatterns.add<RemoveDynamicCastOp>(context);
 
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(cleanupPatterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(),
+                                     std::move(cleanupPatterns)))) {
       return signalPassFailure();
     }
   }

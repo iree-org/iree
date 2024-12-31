@@ -560,8 +560,7 @@ class ConvertConv2DToImg2ColPass
     RewritePatternSet patterns(&getContext());
     patterns.insert<ConvertConv2DNhwcHwcf, ConvertDepthwiseConv2DNhwcHwc,
                     ConvertConv2DNchwFchw>(context);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }
