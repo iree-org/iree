@@ -22,8 +22,6 @@ static void populateEscapingProducers(Operation *parentOp,
                                       ConstExprOpInfo &info) {
   SmallPtrSet<Operation *, 8> containedOps;
   parentOp->walk<WalkOrder::PreOrder>([&](Operation *itOp) {
-    containedOps.insert(parentOp);
-
     // For the outer-most op, consider that all operands escape.
     if (itOp == parentOp) {
       info.producers.insert(itOp->getOperands().begin(),
@@ -33,8 +31,9 @@ static void populateEscapingProducers(Operation *parentOp,
                  : WalkResult::advance();
     }
 
-    // For nested operations, only consider that they escape if they are
-    // defined outside of the parent.
+    containedOps.insert(itOp->getParentOp());
+    // A nested operation escapes if every operand is defined outside contained
+    // ops.
     for (Value operand : itOp->getOperands()) {
       Block *block = operand.getParentBlock();
       if (!containedOps.contains(block->getParentOp())) {

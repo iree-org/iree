@@ -103,17 +103,15 @@ public:
         continue;
       auto walkRes = funcOp.walk<WalkOrder::PreOrder>([&](Operation *iterOp) {
         // We only want to look at const-expr ops (non roots) since they may
-        // have interesting escapes. Early exit here for efficiency.
+        // have interesting escapes. Early exit here if the op has no
+        // ConstValueInfo or its first result cannot be hoisted.
         auto *iterInfo = constExprs.lookup(iterOp);
-        if (!iterInfo)
+        if (!iterInfo || policy.getDecision(iterInfo)->getOutcome() !=
+                             ConstExprHoistingPolicy::ENABLE_HOIST)
           return WalkResult::advance();
         for (Value constExprResult : iterOp->getResults()) {
           auto *resultInfo = constExprs.lookup(constExprResult);
           assert(resultInfo && "must have const-expr info");
-          if (policy.getDecision(resultInfo)->getOutcome() !=
-              ConstExprHoistingPolicy::ENABLE_HOIST) {
-            continue;
-          }
           if (failed(hoistConstExpr(constExprResult, hoistedMap, moduleSymbols,
                                     constExprs))) {
             return WalkResult::interrupt();
