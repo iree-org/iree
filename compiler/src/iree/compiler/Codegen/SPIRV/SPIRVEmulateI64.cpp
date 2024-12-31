@@ -219,7 +219,7 @@ struct SPIRVEmulateI64Pass final
       vector::InsertStridedSliceOp::getCanonicalizationPatterns(patterns, ctx);
       vector::ShapeCastOp::getCanonicalizationPatterns(patterns, ctx);
 
-      if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns))))
+      if (failed(applyPatternsGreedily(op, std::move(patterns))))
         return signalPassFailure();
     }
   }

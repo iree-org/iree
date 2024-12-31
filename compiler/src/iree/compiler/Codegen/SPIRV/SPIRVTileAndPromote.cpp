@@ -164,7 +164,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
     RewritePatternSet patterns =
         linalg::getLinalgTilingCanonicalizationPatterns(context);
     scf::populateSCFForLoopCanonicalizationPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
@@ -203,8 +203,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
 
     RewritePatternSet promotionPatterns(context);
     populatePromotionPatterns(promotionPatterns, workgroupMarker);
-    if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                            std::move(promotionPatterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(promotionPatterns)))) {
       return signalPassFailure();
     }
 
@@ -254,7 +253,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
         linalg::getLinalgTilingCanonicalizationPatterns(context);
     SmallVector<int64_t> numWorkgroups = getStaticNumWorkgroups(funcOp);
     populateFoldAffineMinInDistributedLoopsPatterns(patterns, numWorkgroups);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       // TODO(#4759): This does not converge after the max number of iterations.
       // It indicates that some pattern upstream is generating ops even when the
       // pattern failed to match. Not related to correctness, but would be good
@@ -319,7 +318,7 @@ LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
   // Finally do promote C matrix.
   RewritePatternSet patterns(context);
   populateContractPromotionPatterns(patterns, {2});
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+  if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
     return failure();
   }
   LLVM_DEBUG({

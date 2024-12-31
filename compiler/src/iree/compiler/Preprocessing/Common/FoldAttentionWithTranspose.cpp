@@ -192,8 +192,7 @@ struct FoldAttentionWithTransposePass
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
     patterns.insert<FoldAttentionAndTranspose>(context);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

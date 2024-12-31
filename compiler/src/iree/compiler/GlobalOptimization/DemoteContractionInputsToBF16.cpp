@@ -148,8 +148,7 @@ public:
     RewritePatternSet patterns(context);
     patterns.insert<DemoteContractionInputsToBF16Pattern>(
         context, demoteOnly.getValue());
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

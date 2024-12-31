@@ -110,7 +110,7 @@ static LogicalResult commonRunOnOperation(
     RewritePatternSet patterns(ctx);
     patterns.add<linalg::DecomposeOuterUnitDimsPackOpPattern,
                  linalg::DecomposeOuterUnitDimsUnPackOpPattern>(ctx);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitError(
           "failed to apply generalization patterns on pack/unpack ops for "
           "outer unit dims cases");
@@ -123,7 +123,7 @@ static LogicalResult commonRunOnOperation(
   if (!tileOuterToOne) {
     RewritePatternSet patterns(ctx);
     patterns.add<LowerPackPattern, LowerUnPackPattern>(ctx, controlFn);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitError(
           "failed to apply generalization patterns on pack/unpack ops for "
           "general cases.");
@@ -200,7 +200,7 @@ static LogicalResult commonRunOnOperation(
             unpackTilingOptions);
         if (failed(tilingResult))
           return WalkResult::interrupt();
-        rewriter.replaceOp(op, tilingResult->replacements);
+        rewriter.replaceOp(op, tilingResult->mergeResult.replacements);
         return WalkResult::advance();
       });
       if (status.wasInterrupted()) {
@@ -223,7 +223,7 @@ static LogicalResult commonRunOnOperation(
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     ctx->getOrLoadDialect<tensor::TensorDialect>()->getCanonicalizationPatterns(
         patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return failure();
     }
   }
@@ -242,7 +242,7 @@ static LogicalResult commonRunOnOperation(
       patterns.add<linalg::DecomposeOuterUnitDimsPackOpPattern,
                    linalg::DecomposeOuterUnitDimsUnPackOpPattern>(ctx);
     }
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return failure();
     }
   }

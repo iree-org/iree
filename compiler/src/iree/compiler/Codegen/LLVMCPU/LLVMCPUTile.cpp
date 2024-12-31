@@ -101,7 +101,7 @@ void LLVMCPUTilePass::runOnOperation() {
         scf::tileUsingSCF(rewriter, op, options);
     if (failed(tiledResults))
       continue;
-    rewriter.replaceOp(op, tiledResults->replacements);
+    rewriter.replaceOp(op, tiledResults->mergeResult.replacements);
   }
 
   RewritePatternSet patterns =
@@ -111,7 +111,7 @@ void LLVMCPUTilePass::runOnOperation() {
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   context->getLoadedDialect<tensor::TensorDialect>()
       ->getCanonicalizationPatterns(patterns);
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+  if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
     LLVM_DEBUG(llvm::dbgs() << "----- cleanup failed -----\n");
     return signalPassFailure();
   }

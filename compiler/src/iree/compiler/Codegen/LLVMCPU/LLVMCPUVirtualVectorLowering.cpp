@@ -60,7 +60,7 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
     if (enableArmI8mm) {
       RewritePatternSet patterns(ctx);
       arm_neon::populateLowerContractionToSMMLAPatternPatterns(patterns);
-      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+      (void)applyPatternsGreedily(funcOp, std::move(patterns));
     }
   }
 
@@ -82,7 +82,7 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
     vector::populateVectorMultiReductionLoweringPatterns(
         patterns, vectorMultiReductionLowering);
     populateVectorTransferFullPartialPatterns(patterns, vectorTransformOptions);
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+    (void)applyPatternsGreedily(funcOp, std::move(patterns));
   }
 }
 } // namespace

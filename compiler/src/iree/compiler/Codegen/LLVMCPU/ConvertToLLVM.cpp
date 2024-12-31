@@ -983,8 +983,7 @@ void ConvertToLLVMPass::runOnOperation() {
     vector::populateVectorTransposeLoweringPatterns(
         patterns, vector::VectorTransformsOptions());
     populateConvertArmNeon2dToIntrPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }
@@ -992,8 +991,8 @@ void ConvertToLLVMPass::runOnOperation() {
     RewritePatternSet vectorToLoopsPatterns(&getContext());
     populateVectorToSCFConversionPatterns(
         vectorToLoopsPatterns, VectorTransferToSCFOptions().enableFullUnroll());
-    if (failed(applyPatternsAndFoldGreedily(
-            getOperation(), std::move(vectorToLoopsPatterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(),
+                                     std::move(vectorToLoopsPatterns)))) {
       return signalPassFailure();
     }
   }
@@ -1103,7 +1102,7 @@ void ConvertToLLVMPass::runOnOperation() {
     RewritePatternSet patterns(&getContext());
     patterns.insert<RewriteExternCallOpToDynamicImportCallOp, RewriteCallOpABI,
                     RewriteFuncOpABI>(abi, typeConverter);
-    if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns))))
+    if (failed(applyPatternsGreedily(module, std::move(patterns))))
       return signalPassFailure();
   }
 
@@ -1115,7 +1114,7 @@ void ConvertToLLVMPass::runOnOperation() {
     if (triple.isWasm()) {
       populateUnfusedFMAOpsPassPatterns(&getContext(), postPatterns);
     }
-    if (failed(applyPatternsAndFoldGreedily(module, std::move(postPatterns)))) {
+    if (failed(applyPatternsGreedily(module, std::move(postPatterns)))) {
       return signalPassFailure();
     }
   }

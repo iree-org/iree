@@ -254,7 +254,7 @@ struct LegalizeStableHLOCustomCalls final
 
     RewritePatternSet patterns(ctx);
     patterns.add<HouseholderReflectorRewriter, ShapeAssertionDrop>(ctx);
-    if (failed(applyPatternsAndFoldGreedily(f, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(f, std::move(patterns)))) {
       signalPassFailure();
     }
   }
