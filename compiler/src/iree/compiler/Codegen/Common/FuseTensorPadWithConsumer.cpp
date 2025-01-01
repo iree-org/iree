@@ -25,7 +25,7 @@ struct FuseTensorPadWithConsumerPass final
     RewritePatternSet patterns(context);
     patterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
         context, [](tensor::ExtractSliceOp) { return false; });
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }

@@ -119,8 +119,7 @@ struct TransposeGenericOpsPass final
     RewritePatternSet patterns(&getContext());
     patterns.add<MakeReductionInnermostPattern, TransposeGenericOpPattern>(
         &getContext());
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

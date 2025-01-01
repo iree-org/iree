@@ -265,7 +265,7 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
     patterns.add<CastLikeExtractSliceOpFolder>(context);
     patterns.add<CastLikeInsertSliceOpFolder>(context);
   }
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+  if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
   }
 

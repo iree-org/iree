@@ -201,9 +201,9 @@ void BubbleUpExpandShapesPass::runOnOperation() {
 
   GreedyRewriteConfig rewriteConfig;
   rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
-  if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                          std::move(bubbleExpandShapePatterns),
-                                          rewriteConfig))) {
+  if (failed(applyPatternsGreedily(getOperation(),
+                                   std::move(bubbleExpandShapePatterns),
+                                   rewriteConfig))) {
     getOperation()->emitOpError("Failed to perform elementwise operations");
     return signalPassFailure();
   }
