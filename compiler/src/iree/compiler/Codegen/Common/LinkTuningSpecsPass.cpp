@@ -81,6 +81,10 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
       0, hasConsumedSequences ? kArgConsumedAttrName : kArgReadOnlyAttrName,
       builder.getUnitAttr());
   newSpec->setAttr(kTuningSpecEntrypointAttrName, builder.getUnitAttr());
+  // As the newSpec is a named sequence operation with the symbol name
+  // '__kernel_config', the module should add the unit attribute
+  // 'iree_codegen.tuning_spec_with_default_entrypoint' to indicate this change.
+  module->setAttr(kTuningDefaultSpecAttrName, builder.getUnitAttr());
 
   Region &region = newSpec.getRegion();
   Block *body = builder.createBlock(&region, region.begin(),

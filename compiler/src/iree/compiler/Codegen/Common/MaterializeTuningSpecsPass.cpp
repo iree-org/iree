@@ -234,6 +234,11 @@ struct MaterializeTuningSpecsPass final
         UnitAttr::get(ctx));
     for (auto [idx, spec] : llvm::enumerate(allSpecs)) {
       ModuleOp clonedSpec = spec.clone();
+      // Drop the module-level attribute due to renamed entrypoints during
+      // linking.
+      if (clonedSpec->hasAttr(kTuningDefaultSpecAttrName)) {
+        clonedSpec->removeAttr(kTuningDefaultSpecAttrName);
+      }
       // Make sure there are no symbol name collisions.
       clonedSpec.setSymName(
           llvm::formatv("{}_{}", clonedSpec.getSymName().value(), idx).str());

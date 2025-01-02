@@ -68,9 +68,8 @@ IREECodegenDialect::verifyOperationAttribute(Operation *op,
     if (auto moduleOp = dyn_cast<ModuleOp>(op)) {
       if (!llvm::any_of(moduleOp.getOps(), [](auto &op) {
             if (auto namedSeqOp = dyn_cast<transform::NamedSequenceOp>(&op)) {
-              return SymbolTable::getSymbolName(namedSeqOp)
-                  .getValue()
-                  .contains(kKernelConfigSpecName);
+              return SymbolTable::getSymbolName(namedSeqOp).getValue() ==
+                     kKernelConfigSpecName;
             }
             return false;
           })) {

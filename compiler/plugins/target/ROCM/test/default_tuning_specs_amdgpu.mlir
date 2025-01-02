@@ -33,11 +33,11 @@
 // Check that both the user tuning spec and the default spec get linked and
 // materialized. The user spec should have precedence over the default one.
 
-// BOTH-LABEL: module @iree_linked_tuning_spec attributes {transform.with_named_sequence}
+// BOTH-LABEL: module @iree_linked_tuning_spec attributes {iree_codegen.tuning_spec_with_default_entrypoint, transform.with_named_sequence}
 // BOTH-LABEL:   module @mmt_tile_and_fuse_spec_0 attributes {transform.with_named_sequence}
 // BOTH-LABEL:     transform.named_sequence @main
 // BOTH-SAME:        attributes {iree_codegen.tuning_spec_entrypoint}
-// BOTH-LABEL:   module @iree_default_tuning_spec_gfx942_1 attributes {iree_codegen.tuning_spec_with_default_entrypoint, transform.with_named_sequence}
+// BOTH-LABEL:   module @iree_default_tuning_spec_gfx942_1 attributes {transform.with_named_sequence}
 // BOTH:           transform.named_sequence @__kernel_config
 // BOTH-SAME:        attributes {iree_codegen.tuning_spec_entrypoint}
 // BOTH:         transform.named_sequence @__kernel_config
