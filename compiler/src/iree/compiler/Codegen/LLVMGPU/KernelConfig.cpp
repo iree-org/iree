@@ -2506,10 +2506,11 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
 
   Operation *rootOperation = nullptr;
 
-  // Find the root operation. linalg.generic and linalg.fill are not root
-  // operations if there are other compute operations present.
+  // Find the root operation. linalg.generic, linalg.fill, and scatter are not
+  // root operations if there are other compute operations present.
   for (Operation *op : llvm::reverse(computeOps)) {
-    if (!isa<linalg::GenericOp, linalg::FillOp>(op)) {
+    if (!isa<linalg::GenericOp, linalg::FillOp, IREE::LinalgExt::ScatterOp>(
+            op)) {
       rootOperation = op;
       break;
     }
@@ -2522,9 +2523,19 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
     }
   }
 
+  // Generic ops take priority over scatter and fill ops as the root op.
   if (!rootOperation) {
     for (Operation *op : llvm::reverse(computeOps)) {
-      if (isa<linalg::GenericOp, linalg::FillOp>(op)) {
+      if (isa<linalg::GenericOp>(op)) {
+        rootOperation = op;
+        break;
+      }
+    }
+  }
+
+  if (!rootOperation) {
+    for (Operation *op : llvm::reverse(computeOps)) {
+      if (isa<IREE::LinalgExt::ScatterOp, linalg::FillOp>(op)) {
         rootOperation = op;
         break;
       }
