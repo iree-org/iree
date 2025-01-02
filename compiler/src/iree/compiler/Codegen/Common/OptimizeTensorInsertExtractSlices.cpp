@@ -85,7 +85,11 @@ hoistLoopInvariantSubsetAtIterArg(RewriterBase &rewriter,
   }
 
   bool changed = true;
-  while (changed) {
+  // The below `while` loop is a WAR for the core issue that is unidentified.
+  // To avoid infinite loops, limit number of iterations to 10.
+  int numIterations = 0;
+  while (changed && numIterations < 10) {
+    numIterations++;
     changed = false;
     // Get all subset extraction uses of this iter_arg and try to hoist them
     // out of the loop.
