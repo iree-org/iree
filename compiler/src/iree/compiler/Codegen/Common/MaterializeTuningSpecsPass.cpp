@@ -236,8 +236,8 @@ struct MaterializeTuningSpecsPass final
       ModuleOp clonedSpec = spec.clone();
       // Drop the module-level attribute due to renamed entrypoints during
       // linking.
-      if (clonedSpec->hasAttr(kTuningDefaultSpecAttrName)) {
-        clonedSpec->removeAttr(kTuningDefaultSpecAttrName);
+      if (clonedSpec->hasAttr(kTuningSpecDefaultEntrypointAttrName)) {
+        clonedSpec->removeAttr(kTuningSpecDefaultEntrypointAttrName);
       }
       // Make sure there are no symbol name collisions.
       clonedSpec.setSymName(
