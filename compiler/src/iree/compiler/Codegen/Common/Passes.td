@@ -66,6 +66,11 @@ def ConcretizePadResultShapePass :
       "implements OffsetSizeAndStrideOpInterface.";
 }
 
+def ConvertAccGEMMToGEMMPass :
+    Pass<"iree-convert-accgemm-to-gemm", ""> {
+  let summary = "Convert accumulating GEMMs to GEMMs post dispatch creation.";
+}
+
 def ConvertBf16ArithToF32Pass : Pass<"iree-convert-bf16-arith-to-f32", ""> {
   let summary = "Convert bf16 arithmetic operations to f32";
 }
