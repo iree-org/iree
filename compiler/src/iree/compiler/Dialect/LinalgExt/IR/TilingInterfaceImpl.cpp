@@ -193,8 +193,8 @@ LogicalResult ScatterOp::getIterationDomainTileFromOperandTile(
   if (!getUniqueIndices()) {
     return failure();
   }
-  // Fusion with a producer is only possible if fusing along the |input|
-  // operand.
+  // TODO: Support fusion along the index operand. For the index operand, the
+  // offset + size must be the full size for the inner most dim.
   if (getInputs().getBeginOperandIndex() != operandNumber) {
     return failure();
   }
