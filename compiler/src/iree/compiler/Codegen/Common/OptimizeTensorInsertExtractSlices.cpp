@@ -127,8 +127,9 @@ hoistLoopInvariantSubsetAtIterArg(RewriterBase &rewriter,
           loopLike.replaceWithAdditionalYields(
               rewriter, extraction.getResult(),
               /*replaceInitOperandUsesInLoop=*/true, newYieldValuesFn);
-      if (failed(newLoop))
+      if (failed(newLoop)) {
         return loopLike;
+      }
       loopLike = *newLoop;
 
       BlockArgument iterArg = loopLike.getRegionIterArgs()[idx];
@@ -136,12 +137,12 @@ hoistLoopInvariantSubsetAtIterArg(RewriterBase &rewriter,
       OpResult newLoopResult = loopLike.getLoopResults()->back();
       rewriter.moveOpBefore(extraction, loopLike);
 
-      // Hoist the extraction/insertion ops
+      // Hoist the extraction/insertion ops.
       extraction.getSourceOperand().set(
           loopLike.getTiedLoopInit(iterArg)->get());
 
       // Clone the insertion to outside the not removing the final insertion, as
-      // it still can be used by other extraction ops. loop.
+      // it still can be used by other extraction ops loop.
       rewriter.setInsertionPointAfter(loopLike);
       SubsetInsertionOpInterface newInsertion =
           cast<SubsetInsertionOpInterface>(
