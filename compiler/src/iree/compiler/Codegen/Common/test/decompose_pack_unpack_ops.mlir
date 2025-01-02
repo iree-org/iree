@@ -30,8 +30,11 @@ func.func @simple_pad_and_pack(%input: tensor<5x1xf32>, %output: tensor<1x1x8x2x
 // CHECK-ALL-SAME:    %[[PAD_VAL:[A-Za-z0-9]+]]:
 // CHECK-ALL:         %[[PAD:.+]] = tensor.pad %[[IN]] low[0, 0] high[3, 1]
 // CHECK-ALL:           tensor.yield %[[PAD_VAL]]
-// CHECK-ALL:         %[[INSERT:.+]] = tensor.insert_slice %[[PAD]] into %[[OUT]][0, 0, 0, 0] [1, 1, 8, 2] [1, 1, 1, 1]
-// CHECK-ALL:         return %[[INSERT]]
+// CHECK:             %[[INSERT:.+]] = tensor.insert_slice %[[PAD]] into %[[OUT]][0, 0, 0, 0] [1, 1, 8, 2] [1, 1, 1, 1]
+// CHECK-RESHAPE:     %[[EXPAND:.+]] = tensor.expand_shape %[[PAD]] {{\[}}[0, 1], [2, 3]] output_shape [1, 8, 1, 2] : tensor<8x2xf32> into tensor<1x8x1x2xf32>
+// CHECK-RESHAPE:     %[[TRANS:.+]] = linalg.transpose ins(%[[EXPAND]] : tensor<1x8x1x2xf32>) outs(%[[OUT]] : tensor<1x1x8x2xf32>) permutation = [0, 2, 1, 3]
+// CHECK:             return %[[INSERT]]
+// CHECK_RESHAPE:     return %[[TRANS]]
 
 // -----
 
@@ -42,8 +45,11 @@ func.func @simple_NC_to_CNnc(%arg0: tensor<32x8xf32>, %arg1: tensor<1x1x32x8xf32
 // CHECK-ALL-LABEL: func.func @simple_NC_to_CNnc
 // CHECK-ALL-SAME:    %[[IN:[A-Za-z0-9]+]]:
 // CHECK-ALL-SAME:    %[[OUT:[A-Za-z0-9]+]]:
-// CHECK-ALL:         %[[INSERT:.+]] = tensor.insert_slice %[[IN]] into %[[OUT]][0, 0, 0, 0] [1, 1, 32, 8] [1, 1, 1, 1]
-// CHECK-ALL:         return %[[INSERT]]
+// CHECK:             %[[INSERT:.+]] = tensor.insert_slice %[[IN]] into %[[OUT]][0, 0, 0, 0] [1, 1, 32, 8] [1, 1, 1, 1]
+// CHECK-RESHAPE:     %[[EXPAND:.+]] = tensor.expand_shape %[[IN]] {{\[}}[0, 1], [2, 3]] output_shape [1, 32, 1, 8] : tensor<32x8xf32> into tensor<1x32x1x8xf32>
+// CHECK-RESHAPE      %[[TRANS:.+]] = linalg.transpose ins(%[[EXPAND]] : tensor<1x32x1x8xf32>) outs(%[[OUT]] : tensor<1x1x32x8xf32>) permutation = [2, 0, 1, 3]
+// CHECK:             return %[[INSERT]]
+// CHECKa-RESHAPE:    return %[[TRANS]]
 
 // -----
 
