@@ -4212,7 +4212,7 @@ versioned API functions.</p>
     C API's exported symbols.
   }
 
-  subgraph compiler[libIREECompiler.so / IREECompiler.dll]
+  subgraph compiler[libIREECompiler.so]
     pipelines("Pipelines
 
     • Flow
@@ -4283,10 +4283,13 @@ artifacts. These are modeled via <em>sessions</em>, <em>invocations</em>, <em>so
   InputBuffer --&gt; Source2 : wrap buffer
 
   state Session {
+    Invocation1: Invocation1&lt;br&gt;(run pipelines on this)
     Source1 --&gt; Invocation1
+
+    --
+
+    Invocation2: Invocation2&lt;br&gt;(run pipelines on this)
     Source2 --&gt; Invocation2
-    Invocation1 --&gt; Invocation1 : run pipeline
-    Invocation2 --&gt; Invocation2 : run pipeline
   }
 
   Invocation1 --&gt; Output1File   : write file
@@ -4467,7 +4470,6 @@ system.</p>
   subgraph iree_runtime[IREE Runtime]
     subgraph base
       base_types("Types
-
       • allocator
       • status
       • etc.")
@@ -4475,13 +4477,11 @@ system.</p>
 
     subgraph hal[HAL]
       hal_types("Types
-
       • buffer
       • device
       • etc.")
 
       hal_drivers("Drivers
-
       • local-*
       • vulkan
       • etc.")
@@ -4489,7 +4489,6 @@ system.</p>
 
     subgraph vm[VM]
       vm_types("Types
-
       • context
       • invocation
       • etc.")
@@ -4517,7 +4516,6 @@ systems.</p>
   subgraph iree_runtime[IREE Runtime]
     subgraph base
       base_types("Types
-
       • allocator
       • status
       • etc.")
@@ -4525,13 +4523,11 @@ systems.</p>
 
     subgraph hal[HAL]
       hal_types("Types
-
       • buffer
       • device
       • etc.")
 
       hal_drivers("Drivers
-
       • local-*
       • vulkan
       • etc.")
@@ -4539,14 +4535,12 @@ systems.</p>
 
     subgraph vm[VM]
       vm_types("Types
-
       • context
       • invocation
       • etc.")
     end
 
     runtime_api("Runtime API
-
     • instance
     • session
     • call")
