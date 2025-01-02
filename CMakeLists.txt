@@ -641,7 +641,6 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # seems to be robust generally.
   # See: https://reviews.llvm.org/D118148
   # If building Python packages, we have a hard requirement on 3.9+.
-  find_package(Python3 3.9 COMPONENTS Interpreter Development NumPy)
   find_package(Python3 3.9 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
   # Some parts of the build use FindPython instead of FindPython3. Why? No
   # one knows, but they are different. So make sure to bootstrap this one too.
