@@ -34,7 +34,7 @@ graph TD
     C API's exported symbols.
   }
 
-  subgraph compiler[libIREECompiler.so / IREECompiler.dll]
+  subgraph compiler[libIREECompiler.so]
     pipelines("Pipelines
 
     • Flow
@@ -95,10 +95,13 @@ stateDiagram-v2
   InputBuffer --> Source2 : wrap buffer
 
   state Session {
+    Invocation1: Invocation1<br>(run pipelines on this)
     Source1 --> Invocation1
+
+    --
+
+    Invocation2: Invocation2<br>(run pipelines on this)
     Source2 --> Invocation2
-    Invocation1 --> Invocation1 : run pipeline
-    Invocation2 --> Invocation2 : run pipeline
   }
 
   Invocation1 --> Output1File   : write file
@@ -238,7 +241,6 @@ API.
       subgraph iree_runtime[IREE Runtime]
         subgraph base
           base_types("Types
-
           • allocator
           • status
           • etc.")
@@ -246,13 +248,11 @@ API.
 
         subgraph hal[HAL]
           hal_types("Types
-
           • buffer
           • device
           • etc.")
 
           hal_drivers("Drivers
-
           • local-*
           • vulkan
           • etc.")
@@ -260,7 +260,6 @@ API.
 
         subgraph vm[VM]
           vm_types("Types
-
           • context
           • invocation
           • etc.")
@@ -292,7 +291,6 @@ API.
       subgraph iree_runtime[IREE Runtime]
         subgraph base
           base_types("Types
-
           • allocator
           • status
           • etc.")
@@ -300,13 +298,11 @@ API.
 
         subgraph hal[HAL]
           hal_types("Types
-
           • buffer
           • device
           • etc.")
 
           hal_drivers("Drivers
-
           • local-*
           • vulkan
           • etc.")
@@ -314,14 +310,12 @@ API.
 
         subgraph vm[VM]
           vm_types("Types
-
           • context
           • invocation
           • etc.")
         end
 
         runtime_api("Runtime API
-
         • instance
         • session
         • call")
