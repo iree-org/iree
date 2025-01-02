@@ -463,8 +463,11 @@ iree_status_t iree_hal_hip_device_create(
         if (j == device->devices[i].hip_device) {
           continue;
         }
-        status =
-            IREE_HIP_CALL_TO_STATUS(symbols, hipDeviceEnablePeerAccess(j, 0));
+        hipError_t hip_error = symbols->hipDeviceEnablePeerAccess(j, 0);
+        if (hip_error == hipErrorPeerAccessAlreadyEnabled) {
+          continue;
+        }
+        status = IREE_HIP_RESULT_TO_STATUS(symbols, hip_error);
       }
     }
   }
