@@ -14,6 +14,7 @@
 
 #include <limits>
 
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -93,6 +94,11 @@ std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createTileAndDistributeToWorkgroupsPass(
     int32_t maxWorkgroupParallelDims,
     linalg::DistributionMethod distributionMethod);
+
+// Pass to tile and distribute using scf.forall with workgroup reordering.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createTileAndDistributeToWorkgroupsWithReordering(
+    ReorderWorkgroupsStrategy strategy);
 
 //----------------------------------------------------------------------------//
 // CodeGen Common Patterns
