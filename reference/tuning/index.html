@@ -3834,7 +3834,7 @@ The compiler will link them together and invoke the user-provided spec before
 attempting the default one.</p>
 <h2 id="anatomy-of-a-tuning-spec">Anatomy of a tuning spec<a class="headerlink" href="#anatomy-of-a-tuning-spec" title="Permanent link">link</a></h2>
 <h3 id="example">Example<a class="headerlink" href="#example" title="Permanent link">link</a></h3>
-<div class="highlight"><pre><span></span><code>module @my_spec attributes { transform.with_named_sequence } {
+<div class="highlight"><pre><span></span><code>module @my_spec attributes { transform.with_named_sequence, iree_codegen.tuning_spec_with_default_entrypoint } {
 transform.named_sequence @apply_op_config(%op: !transform.any_op {transform.readonly},
                                           %config: !transform.any_param {transform.readonly}) {
   transform.annotate %op &quot;compilation_info&quot; = %config : !transform.any_op, !transform.any_param
@@ -3905,6 +3905,8 @@ that conform to the following format:</p>
   <code>!transform.any_op</code>.</li>
 <li>All entry points in the final tuning specs must either read
   (<code>transform.readonly</code>) or consume (<code>transform.consumed</code>) the argument.</li>
+<li>The <code>iree_codegen.tuning_spec_with_default_entrypoint</code> attribute ensures that
+  the tuning spec includes a named sequence op with name <code>__kernel_config</code>.</li>
 </ul>
 <p>The tuning spec above attempts to match <code>linalg.generic</code> ops that correspond to the
 matmul operation with the RHS operand transposed (a.k.a. mmt) of shape
