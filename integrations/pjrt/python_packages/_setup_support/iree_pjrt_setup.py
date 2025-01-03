@@ -121,6 +121,42 @@ class PjrtPluginBuild(_build):
         self.run_command("build_py")
 
 
+def maybe_nuke_cmake_cache(cmake_build_dir):
+    # From run to run under pip, we can end up with different paths to ninja,
+    # which isn't great and will confuse cmake. Detect if the location of
+    # ninja changes and force a cache flush.
+    ninja_path = ""
+    try:
+        import ninja
+    except ModuleNotFoundError:
+        pass
+    else:
+        ninja_path = ninja.__file__
+    expected_stamp_contents = f"{ninja_path}"
+
+    # In order to speed things up on CI and not rebuild everything, we nuke
+    # the CMakeCache.txt file if the path to ninja changed.
+    # Ideally, CMake would let us reconfigure this dynamically... but it does
+    # not (and gets very confused).
+    NINJA_STAMP_FILE = os.path.join(cmake_build_dir, "ninja_stamp.txt")
+    if os.path.exists(NINJA_STAMP_FILE):
+        with open(NINJA_STAMP_FILE, "rt") as f:
+            actual_stamp_contents = f.read()
+            if actual_stamp_contents == expected_stamp_contents:
+                # All good.
+                return
+
+    # Mismatch or not found. Clean it.
+    cmake_cache_file = os.path.join(cmake_build_dir, "CMakeCache.txt")
+    if os.path.exists(cmake_cache_file):
+        print("Removing CMakeCache.txt because Ninja path changed", file=sys.stderr)
+        os.remove(cmake_cache_file)
+
+    # And write.
+    with open(NINJA_STAMP_FILE, "wt") as f:
+        f.write(expected_stamp_contents)
+
+
 class BaseCMakeBuildPy(_build_py):
     def run(self):
         self.build_default_configuration()
@@ -131,6 +167,7 @@ class BaseCMakeBuildPy(_build_py):
 
     def build_configuration(self, cmake_build_dir, extra_cmake_args=()):
         subprocess.check_call(["cmake", "--version"])
+        maybe_nuke_cmake_cache(cmake_build_dir)
 
         cfg = os.getenv("IREE_CMAKE_BUILD_TYPE", "Release")
 
