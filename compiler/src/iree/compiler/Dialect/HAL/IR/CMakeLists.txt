@@ -79,8 +79,10 @@ iree_cc_library(
     MLIRParser
     MLIRSCFDialect
     MLIRTransformUtils
+    iree::compiler::Dialect::HAL::Analysis
     iree::compiler::Dialect::HAL::Conversion::HALToVM
     iree::compiler::Dialect::HAL::hal_imports
+    iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::Conversion
   PUBLIC
