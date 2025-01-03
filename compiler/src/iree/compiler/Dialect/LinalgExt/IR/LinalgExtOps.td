@@ -102,7 +102,9 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
          "getIterationDomain",
          "getLoopIteratorTypes",
          "getResultTilePosition",
-         "getTiledImplementation"]>]> {
+         "getTiledImplementation",
+         "getIterationDomainTileFromOperandTile",
+         "getTiledImplementationFromOperandTile"]>]> {
   let summary = "Scatter operator";
   let description = [{
     Based on XLA operation semantics, takes two `inputs` (`update` and
