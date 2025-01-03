@@ -649,6 +649,11 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # can be troublesome. Note that nanobind requires FindPython.
   set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
   find_package(Python 3.9 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
+  if(APPLE)
+    # workaround for upstream using PyClassMethod_New but nanobind not being aware
+    # see https://github.com/iree-org/iree/issues/19591
+    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -Wl,-U -Wl,_PyClassMethod_New")
+  endif()
 elseif(IREE_BUILD_COMPILER OR IREE_BUILD_TESTS)
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
   set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
