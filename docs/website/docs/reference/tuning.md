@@ -50,7 +50,7 @@ attempting the default one.
 ### Example
 
 ```mlir
-module @my_spec attributes { transform.with_named_sequence } {
+module @my_spec attributes { transform.with_named_sequence, iree_codegen.tuning_spec_with_default_entrypoint } {
 transform.named_sequence @apply_op_config(%op: !transform.any_op {transform.readonly},
                                           %config: !transform.any_param {transform.readonly}) {
   transform.annotate %op "compilation_info" = %config : !transform.any_op, !transform.any_param
@@ -123,6 +123,8 @@ that conform to the following format:
   `!transform.any_op`.
 * All entry points in the final tuning specs must either read
   (`transform.readonly`) or consume (`transform.consumed`) the argument.
+* The `iree_codegen.tuning_spec_with_default_entrypoint` attribute ensures that
+  the tuning spec includes a named sequence op with name `__kernel_config`.
 
 The tuning spec above attempts to match `linalg.generic` ops that correspond to the
 matmul operation with the RHS operand transposed (a.k.a. mmt) of shape
