@@ -62,8 +62,9 @@ static int iree_hal_hip_dispatch_thread_main(void* param) {
       iree_hal_hip_dispatch_queue_pop_front(&thread->queue, 1);
       iree_slim_mutex_unlock(&thread->mutex);
 
-      status = iree_status_join(status,
-                                dispatch.dispatch(dispatch.user_data, status));
+      // We pass the status in. So we don't have to join with it
+      // as it will be passed back if there was an error.
+      status = dispatch.dispatch(dispatch.user_data, status);
       iree_slim_mutex_lock(&thread->mutex);
       if (!iree_status_is_ok(status)) {
         // We don't join here as the failure status was already
