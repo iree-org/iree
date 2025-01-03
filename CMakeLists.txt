@@ -782,6 +782,12 @@ if(IREE_BUILD_PYTHON_BINDINGS OR IREE_BUILD_COMPILER)
     GIT_TAG        0f9ce749b257fdfe701edb3cf6f7027ba029434a # v2.4.0
   )
   FetchContent_MakeAvailable(nanobind)
+  set(nanobind_DIR "${nanobind_SOURCE_DIR}/cmake")
+  include(CMakePackageConfigHelpers)
+  write_basic_package_version_file(
+    "${nanobind_SOURCE_DIR}/cmake/nanobind-config-version.cmake"
+    VERSION 2.4.0
+    COMPATIBILITY SameMajorVersion)
 endif()
 
 # Both the IREE and MLIR Python bindings require pybind11. We initialize it here
