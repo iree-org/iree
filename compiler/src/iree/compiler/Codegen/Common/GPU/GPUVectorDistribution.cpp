@@ -186,8 +186,8 @@ void DistributionPattern::setSignatureForRedistribution(
   });
 }
 
-static void
-debugPrintUniqueOperationNames(const std::deque<Operation *> &worklist) {
+template <typename ContainerType>
+static void debugPrintUniqueOperationNames(const ContainerType &worklist) {
   DenseSet<StringRef> uniqueNames;
   for (Operation *op : worklist) {
     uniqueNames.insert(op->getName().getStringRef());
@@ -210,19 +210,19 @@ struct VectorDistributionListener : public RewriterBase::Listener {
 
   void clearOpsToBeDistributed() { return toBeDistributed.clear(); }
 
-  const std::deque<Operation *> &getOpsToBeDistributed() const {
+  const llvm::SmallDenseSet<Operation *> &getOpsToBeDistributed() const {
     return toBeDistributed;
   }
 
   void notifyOperationModified(Operation *op) override {
     if (op->hasAttr(kVectorLayoutRedistributeAttrName) &&
         op->hasAttrOfType<ArrayAttr>(kVectorLayoutFetcherStorageAttrName)) {
-      toBeDistributed.push_back(op);
+      toBeDistributed.insert(op);
     }
   }
 
 private:
-  std::deque<Operation *> toBeDistributed;
+  llvm::SmallDenseSet<Operation *> toBeDistributed;
 };
 
 static void applyVectorDistribution(Operation *root,
@@ -235,11 +235,11 @@ static void applyVectorDistribution(Operation *root,
   applicator.applyDefaultCostModel();
 
   // Collect all the operations to be distributed.
-  std::deque<Operation *> worklist;
+  llvm::SmallDenseSet<Operation *> worklist;
   LLVM_DEBUG(llvm::dbgs() << "Collecting operations to be distributed\n");
   root->walk([&](Operation *op) {
     if (hasOpSignature(op)) {
-      worklist.push_back(op);
+      worklist.insert(op);
     }
   });
   LLVM_DEBUG(llvm::dbgs() << "Operations to be distributed:\n");
@@ -249,8 +249,8 @@ static void applyVectorDistribution(Operation *root,
   // operation. It always runs on an existing operation. This ensures that no
   // invalidated state of the analysis is ever used.
   while (!worklist.empty()) {
-    Operation *op = worklist.front();
-    worklist.pop_front();
+    Operation *op = *worklist.begin();
+    worklist.erase(op);
     if (op == nullptr)
       continue;
 
@@ -273,8 +273,7 @@ static void applyVectorDistribution(Operation *root,
                  << "Recently emitted operations to be distributed:\n");
       LLVM_DEBUG(debugPrintUniqueOperationNames(opstoBeDistributed));
 
-      worklist.insert(worklist.end(), opstoBeDistributed.begin(),
-                      opstoBeDistributed.end());
+      worklist.insert(opstoBeDistributed.begin(), opstoBeDistributed.end());
       listener.clearOpsToBeDistributed();
     }
 
