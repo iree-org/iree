@@ -201,9 +201,15 @@ LogicalResult ScatterOp::verify() {
            << originalType.getRank() << ")";
   }
 
+  // TODO: make it illegal for `numImplicitDims` to be non-zero.
+  auto numImplicitDims = originalType.getRank() - getUpdateSliceRank();
+  if (numImplicitDims > indexDepth) {
+    return op->emitOpError(
+        "update and index depth does not fully index original");
+  }
+
   // updateSlice[0..indexDepth] <= original[0..indexDepth]
   // updateSlice[indexDepth..] == original[indexDepth..]
-  auto numImplicitDims = originalType.getRank() - getUpdateSliceRank();
   auto updateSliceShape = getUpdateSliceShape();
   for (uint64_t fullSliceIdx :
        llvm::seq<uint64_t>(numImplicitDims, indexDepth)) {

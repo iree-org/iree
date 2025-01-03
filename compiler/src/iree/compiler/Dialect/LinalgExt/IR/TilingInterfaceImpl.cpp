@@ -73,8 +73,8 @@ SmallVector<utils::IteratorType> ScatterOp::getLoopIteratorTypes() {
   SmallVector<utils::IteratorType> iteratorTypes(getUpdateType().getRank(),
                                                  utils::IteratorType::parallel);
   if (!getUniqueIndices()) {
-    int64_t numReductionLoops = getBatchRank();
-    for (auto i : llvm::seq<int64_t>(0, numReductionLoops)) {
+    int64_t batchRank = getBatchRank();
+    for (auto i : llvm::seq<int64_t>(0, batchRank)) {
       iteratorTypes[i] = utils::IteratorType::reduction;
     }
   }
