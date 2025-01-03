@@ -57,7 +57,7 @@ struct LowerPackPattern : public OpRewritePattern<tensor::PackOp> {
       return failure();
     }
     FailureOr<linalg::LowerPackResult> res =
-        linalg::lowerPack(rewriter, op, false);
+        linalg::lowerPack(rewriter, op, /*lowerPadLikeWithInsertSlice=*/false);
     if (failed(res)) {
       return rewriter.notifyMatchFailure(
           op, "cannot lower to pad + expand + transpose");
@@ -84,8 +84,8 @@ struct LowerUnPackPattern : public OpRewritePattern<tensor::UnPackOp> {
     if (controlFn && failed(controlFn.value()(op))) {
       return failure();
     }
-    FailureOr<linalg::LowerUnPackOpResult> res =
-        linalg::lowerUnPack(rewriter, op, false);
+    FailureOr<linalg::LowerUnPackOpResult> res = linalg::lowerUnPack(
+        rewriter, op, /*lowerUnpadLikeWithExtractSlice=*/false);
     if (failed(res)) {
       return rewriter.notifyMatchFailure(
           op, "cannot lower to empty + transpose + reshape + extract_slice");
