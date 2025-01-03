@@ -364,3 +364,30 @@ module @nested_program_const_expr {
     }
   }
 }
+
+// -----
+
+// Prior to this patch, a bug caused %3#0 to be considered an escaping producer for %1.
+// This means that %3#0 got assigned a ConstValueInfo when expanding, but %3#1 did not (it is unused).
+// HoistIntoGlobalsPass includes an assertion that, for each *op* succeeding ConstValueInfo lookup,
+// every result of the op also has ConstValueInfo. This assert caused the compiler to abort when checking %3#1.
+// This lit test simply verifies that the pass does not crash.
+
+// CHECK-LABEL: @nested_bodies_unused_result_no_crash
+module @nested_bodies_unused_result_no_crash {
+  util.func public @main() -> tensor<i32> {
+    %c0_i32 = arith.constant 0 : i32
+    %c1_i32 = arith.constant 1 : i32
+    %c10_i32 = arith.constant 10 : i32
+    %0 = tensor.empty() : tensor<i32>
+    %1 = scf.for %arg0 = %c0_i32 to %c10_i32 step %c1_i32 iter_args(%arg1 = %0) -> (tensor<i32>)  : i32 {
+      %2 = scf.for %arg2 = %c0_i32 to %c10_i32 step %c1_i32 iter_args(%arg3 = %arg1) -> (tensor<i32>)  : i32 {
+        %3:2 = "iree_unregistered.const_expr"(%arg0, %arg2) : (i32, i32) -> (i32, i32)
+        %inserted = tensor.insert %3#0 into %arg3[] : tensor<i32>
+        scf.yield %inserted : tensor<i32>
+      }
+      scf.yield %2 : tensor<i32>
+    }
+    util.return %1 : tensor<i32>
+  }
+}
