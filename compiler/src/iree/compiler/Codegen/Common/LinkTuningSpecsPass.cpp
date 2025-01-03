@@ -72,6 +72,8 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
   Type anyOpType = builder.getType<transform::AnyOpType>();
   FunctionType specType =
       builder.getFunctionType(TypeRange{anyOpType}, TypeRange{anyOpType});
+  // This code creates a named sequence operation that conforms to the
+  // requirements for tuning specifications with a default entry point.
   auto newSpec = builder.create<NamedSequenceOp>(
       loc, kKernelConfigSpecName, TypeAttr::get(specType),
       /*sym_visibility=*/StringAttr{},
@@ -81,6 +83,7 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
       0, hasConsumedSequences ? kArgConsumedAttrName : kArgReadOnlyAttrName,
       builder.getUnitAttr());
   newSpec->setAttr(kTuningSpecEntrypointAttrName, builder.getUnitAttr());
+  module->setAttr(kTuningSpecDefaultEntrypointAttrName, builder.getUnitAttr());
 
   Region &region = newSpec.getRegion();
   Block *body = builder.createBlock(&region, region.begin(),

@@ -45,6 +45,8 @@ namespace mlir::iree_compiler {
 // Constant names.
 //===----------------------------------------------------------------------===//
 constexpr StringLiteral kConfigAttrName = "lowering_config";
+constexpr StringLiteral kTuningSpecDefaultEntrypointAttrName =
+    "iree_codegen.tuning_spec_with_default_entrypoint";
 constexpr StringLiteral kTuningSpecEntrypointAttrName =
     "iree_codegen.tuning_spec_entrypoint";
 constexpr StringLiteral kSerializedTuningSpecAttrName =
