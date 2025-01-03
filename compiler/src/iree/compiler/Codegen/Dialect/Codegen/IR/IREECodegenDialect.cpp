@@ -66,12 +66,10 @@ IREECodegenDialect::verifyOperationAttribute(Operation *op,
 
   if (symbol == kTuningSpecDefaultEntrypointAttrName) {
     if (auto moduleOp = dyn_cast<ModuleOp>(op)) {
-      if (!llvm::any_of(moduleOp.getOps(), [](auto &op) {
-            if (auto namedSeqOp = dyn_cast<transform::NamedSequenceOp>(&op)) {
-              return namedSeqOp.getName() == kKernelConfigSpecName;
-            }
-            return false;
-          })) {
+      if (!llvm::any_of(moduleOp.getOps<transform::NamedSequenceOp>(),
+                        [](transform::NamedSequenceOp op) {
+                          return op.getName() == kKernelConfigSpecName;
+                        })) {
         return moduleOp.emitError()
                << "The tuning specification must include a named "
                   "sequence with the symbol name '"

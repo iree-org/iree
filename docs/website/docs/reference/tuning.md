@@ -124,7 +124,7 @@ that conform to the following format:
 * All entry points in the final tuning specs must either read
   (`transform.readonly`) or consume (`transform.consumed`) the argument.
 * The `iree_codegen.tuning_spec_with_default_entrypoint` attribute ensures that
-  the tuning spec includes a named sequence op marked with `__kernel_config`.
+  the tuning spec includes a named sequence op with name `__kernel_config`.
 
 The tuning spec above attempts to match `linalg.generic` ops that correspond to the
 matmul operation with the RHS operand transposed (a.k.a. mmt) of shape
