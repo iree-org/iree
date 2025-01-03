@@ -114,13 +114,13 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(IREE::Flow::createVerifyInputLegalityPass());
 
   FunctionLikeNest(passManager)
-      .addPass(IREE::Flow::createCaptureDynamicDimsPass)
-      .addPass(IREE::Flow::createCanonicalizerPass)
-      .addPass(mlir::createCSEPass)
       .addPass([&]() {
         return IREE::Flow::createInitializeEmptyTensorsPass(
             InitializeEmptyTensorsPassOptions{clZeroFillEmptyTensors});
-      });
+      })
+      .addPass(IREE::Flow::createCaptureDynamicDimsPass)
+      .addPass(IREE::Flow::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass);
 
   // Module pass to outline dispatch regions (and similar ops) into their own
   // functions wrapped in executables.
