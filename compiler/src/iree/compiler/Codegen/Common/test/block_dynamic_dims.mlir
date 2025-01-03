@@ -66,11 +66,11 @@ func.func @block_attention_dims() {
 //   CHECK-DAG:   %[[C16:.+]] = arith.constant 16 : index
 //   CHECK-DAG:   %[[M:.+]] = flow.dispatch.workload.ordinal %{{.+}}, 0 : index
 //   CHECK-DAG:   %[[K2:.+]] = flow.dispatch.workload.ordinal %{{.+}}, 1 : index
-//   CHECK-DAG:   %[[M_DYNAMIC:.+]] = arith.divui %[[M]], %[[C16]]
+//   CHECK-DAG:   %[[M_DYNAMIC:.+]] = arith.divsi %[[M]], %[[C16]]
 //       CHECK:   %[[Q_BINDING:.+]] = hal.interface.binding.subspan
 //  CHECK-SAME:       binding(0)
 //  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<4x?x16x32x128xf16>>{%[[M_DYNAMIC]]}
-//       CHECK:   %[[K2_DYNAMIC:.+]] = arith.divui %[[K2]], %[[C32]]
+//       CHECK:   %[[K2_DYNAMIC:.+]] = arith.divsi %[[K2]], %[[C32]]
 //       CHECK:   %[[K_BINDING:.+]] = hal.interface.binding.subspan
 //  CHECK-SAME:       binding(1)
 //  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<4x?x32x32x128xf16>>{%[[K2_DYNAMIC]]}
