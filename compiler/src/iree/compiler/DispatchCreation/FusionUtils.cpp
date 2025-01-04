@@ -69,6 +69,12 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
     return false;
   }
 
+  // Do not fuse truncate-like with consumer, they should be fused with their
+  // producer.
+  if (IREE::LinalgExt::isBitTruncateOp(producerOp)) {
+    return false;
+  }
+
   auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp);
   if (!linalgConsumerOp) {
     return false;
