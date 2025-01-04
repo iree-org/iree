@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "drop_multi_mma_unit_dims.mlir"
     "lower_multi_mma.mlir"
     "lower_vector_barrier.mlir"
+    "transform_fuse_collapse_shape_with_forall.mlir"
     "transform_fuse_forall.mlir"
     "transform_lower_barrier_region.mlir"
     "unroll_multi_mma.mlir"
