@@ -321,7 +321,8 @@ public:
   // `consumerInfo`, they must be collapsable into the same dimension in
   // `consumerInfo` to be collapsable into the same dimension in `this`.
   // Returns true if the operation modified the number of collapsable loops.
-  bool updateFromConsumer(OpOperand *operand, const CollapseInfo &consumerInfo);
+  bool updateFromConsumer(FailureOr<AffineMap> consumerToProducerMap,
+                          const CollapseInfo &consumerInfo);
 
   // Update `collapsableLoops` by subtracting `uncollapsable` and update the
   // reassociation indicies accordingly.
@@ -460,10 +461,9 @@ CollapseInfo::getTransformedReassociation(AffineMap map) const {
   return transformedReassociation;
 }
 
-bool CollapseInfo::updateFromConsumer(OpOperand *operand,
-                                      const CollapseInfo &consumerInfo) {
-  FailureOr<AffineMap> consumerToProducerMap =
-      getConsumerLoopToProducerLoopsMap(*operand);
+bool CollapseInfo::updateFromConsumer(
+    FailureOr<AffineMap> consumerToProducerMap,
+    const CollapseInfo &consumerInfo) {
   if (failed(consumerToProducerMap)) {
     return this->clear();
   }
@@ -525,6 +525,8 @@ bool CollapseInfo::updateFromConsumer(OpOperand *operand,
         }
         newIndicies.clear();
         collapseIntoIdx = kUninitialized;
+      } else if (!consumerCollapseMap.contains(index)) {
+        newIndicies.push_back(index);
       } else if (collapseIntoIdx == kUninitialized) {
         // (2) First occurance of collapsable loop, set collapseIntoIdx.
         collapseIntoIdx = consumerCollapseMap.at(index);
@@ -814,12 +816,11 @@ updateConsumersFromProducers(ArrayRef<Operation *> slice,
       }
 
       const CollapseInfo &producerInfo = opMap.at(producerOp);
-      CollapseInfo::CollapsableLoopsSet producerCollapsable =
-          producerInfo.getTransformedCollapsableLoops(mapping.value());
-      producerUncollapsable.set_subtract(producerCollapsable);
+      // CollapseInfo::CollapsableLoopsSet producerCollapsable =
+      //     producerInfo.getTransformedCollapsableLoops(mapping.value());
+      // producerUncollapsable.set_subtract(producerCollapsable);
 
-      didChange |=
-          consumerInfo.updateCollapseViaSubtract(producerUncollapsable);
+      didChange |= consumerInfo.updateFromConsumer(mapping, producerInfo);
     }
   }
   return didChange;
@@ -851,7 +852,10 @@ updateProducersFromConsumers(ArrayRef<Operation *> slice,
 
       // Only loops collapsable in both the consumer and producer may be
       // collapsed.
-      didChange |= producerInfo.updateFromConsumer(operand, consumerInfo);
+      FailureOr<AffineMap> consumerToProducerMap =
+          getConsumerLoopToProducerLoopsMap(*operand);
+      didChange |=
+          producerInfo.updateFromConsumer(consumerToProducerMap, consumerInfo);
     }
   }
   return didChange;
