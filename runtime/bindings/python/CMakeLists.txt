@@ -231,13 +231,6 @@ iree_py_test(
 
 iree_py_test(
   NAME
-    hal_test
-  SRCS
-    "tests/hal_test.py"
-)
-
-iree_py_test(
-  NAME
     io_test
   SRCS
     "tests/io_test.py"
@@ -260,6 +253,13 @@ if(IREE_BUILD_COMPILER AND IREE_BUILD_BUNDLED_LLVM)
       benchmark_test
     SRCS
       "tests/benchmark_test.py"
+  )
+
+  iree_py_test(
+    NAME
+      hal_test
+    SRCS
+      "tests/hal_test.py"
   )
 
   iree_py_test(
