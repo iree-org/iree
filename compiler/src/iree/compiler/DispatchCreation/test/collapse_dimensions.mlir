@@ -656,3 +656,45 @@ util.func public @collapse(%10: tensor<2x32x32x1280xi8>, %11 : tensor<10240x1280
 //       CHECK:   %[[GEN1:.*]] = linalg.generic
 //  CHECK-SAME:      iterator_types = ["parallel", "parallel"]
 //       CHECK:   flow.return %[[GEN1]] : tensor<2048x10240xf16>
+
+// -----
+
+util.func public @update_from_producer(%arg0: tensor<2x1x256x16x16xi8>, %arg1: tensor<2x1x256xf32>) -> tensor<1x256x16x16xi8> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = flow.dispatch.region -> (tensor<1x256x16x16xi8>) {
+    %1 = tensor.empty() : tensor<1x256x16x16xi8>
+    %2 = tensor.empty() : tensor<1x256x16x16xf32>
+    %3 = tensor.empty() : tensor<2x1x256x16x16xf32>
+    %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} ins(%arg0 : tensor<2x1x256x16x16xi8>) outs(%3 : tensor<2x1x256x16x16xf32>) {
+    ^bb0(%in: i8, %out: f32):
+      %8 = arith.extsi %in : i8 to i32
+      %9 = arith.sitofp %8 : i32 to f32
+      linalg.yield %9 : f32
+    } -> tensor<2x1x256x16x16xf32>
+    %5 = linalg.fill ins(%cst : f32) outs(%2 : tensor<1x256x16x16xf32>) -> tensor<1x256x16x16xf32>
+    %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d4, d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3, d4) -> (d4, d0, d1)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]} ins(%4, %arg1 : tensor<2x1x256x16x16xf32>, tensor<2x1x256xf32>) outs(%5 : tensor<1x256x16x16xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %8 = arith.mulf %in, %in_0 : f32
+      %9 = arith.addf %8, %out : f32
+      linalg.yield %9 : f32
+    } -> tensor<1x256x16x16xf32>
+    %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%6 : tensor<1x256x16x16xf32>) outs(%1 : tensor<1x256x16x16xi8>) {
+    ^bb0(%in: f32, %out: i8):
+      %8 = arith.fptosi %in : f32 to i8
+      linalg.yield %8 : i8
+    } -> tensor<1x256x16x16xi8>
+    flow.return %7 : tensor<1x256x16x16xi8>
+  }
+  util.return %0 : tensor<1x256x16x16xi8>
+}
+
+// CHECK-LABEL: util.func public @update_from_producer
+//       CHECK:   %[[GEN0:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel"]
+//       CHECK:   %[[GEN1:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel", "parallel", "reduction"]
+//  CHECK-SAME:      ins(%[[GEN0]]
+//       CHECK:   %[[GEN2:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel", "parallel"]
+//  CHECK-SAME:      ins(%[[GEN1]]
+//       CHECK:   flow.return %[[GEN2]] : tensor<256x256xi8>
