@@ -40,6 +40,7 @@ declare_mlir_dialect_extension_python_bindings(
 declare_mlir_python_extension(IREEDialectsPythonExtensions.Main
   MODULE_NAME _ireeDialects
   ADD_TO_PARENT IREEDialectsPythonExtensions
+  PYTHON_BINDINGS_LIBRARY nanobind
   SOURCES
     IREEDialectsModule.cpp
   EMBED_CAPI_LINK_LIBS
