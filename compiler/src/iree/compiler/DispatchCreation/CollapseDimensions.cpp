@@ -483,10 +483,21 @@ bool CollapseInfo::updateFromConsumer(
     }
   }
 
-  // Remove all collapsable loops in `producer` that are not collapsable in
-  // `consumer` (set intersect)
-  bool didChange = collapsableLoops.remove_if(
-      [&](long elem) -> bool { return !consumerCollapsable.contains(elem); });
+  // Remove all collapsable loops in `producer` that both exist and are not
+  // collapsable in `consumer` (set intersect)
+  bool didChange = collapsableLoops.remove_if([&](long elem) -> bool {
+    // Exists and is collapsable
+    if (consumerCollapsable.contains(elem)) {
+      return false;
+    }
+
+    // Does not exist in consumer.
+    if (!consumerToProducerMap->isFunctionOfDim(elem)) {
+      return false;
+    }
+
+    return true;
+  });
 
   // Now update the reassociation indicies given the updated `collapsableLoops`
   // and `consumerCollapsableMap`.
@@ -526,13 +537,14 @@ bool CollapseInfo::updateFromConsumer(
         newIndicies.clear();
         collapseIntoIdx = kUninitialized;
       } else if (!consumerCollapseMap.contains(index)) {
+        // (2) `index` does not exist in consumer.
         newIndicies.push_back(index);
       } else if (collapseIntoIdx == kUninitialized) {
-        // (2) First occurance of collapsable loop, set collapseIntoIdx.
+        // (3) First occurance of collapsable loop, set collapseIntoIdx.
         collapseIntoIdx = consumerCollapseMap.at(index);
         newIndicies.push_back(index);
       } else if (consumerCollapseMap.at(index) != collapseIntoIdx) {
-        // (3) `index` is collapsable but not collapsable into the other loops.
+        // (4) `index` is collapsable but not collapsable into the other loops.
         // So, split them and look for other loops to collapse `index` into.
         didChange = true;
         if (newIndicies.size() > 1) {
@@ -542,7 +554,7 @@ bool CollapseInfo::updateFromConsumer(
         collapseIntoIdx = consumerCollapseMap[index];
         newIndicies.push_back(index);
       } else {
-        // (4) `index` is collapsable and can be collapsed into
+        // (5) `index` is collapsable and can be collapsed into
         // `collapseIntoIndex`.
         newIndicies.push_back(index);
       }
