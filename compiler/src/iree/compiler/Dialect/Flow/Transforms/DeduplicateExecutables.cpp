@@ -87,13 +87,16 @@ static int deduplicateObjects(Operation *scopeOp,
   // 5 was randomly chosen to be small enough to not increase overhead much,
   // but giving at least enough of a sample that there is some bucketing. This
   // was not empirically determined.
+  constexpr int kMaxHashedOps = 5;
   llvm::MapVector<uint32_t, SmallVector<SymbolOpInterface>> objectMap;
   for (auto objectOp : allObjectOps) {
     int count = 0;
     llvm::hash_code hash(1);
     objectOp->walk([&](Operation *it) {
       hash = llvm::hash_combine(hash, it->getName());
-      return (++count >= 5) ? WalkResult::interrupt() : WalkResult::advance();
+      hash = llvm::hash_combine(hash, it->getResultTypes());
+      return (++count >= kMaxHashedOps) ? WalkResult::interrupt()
+                                        : WalkResult::advance();
     });
     objectMap[hash_value(hash)].push_back(cast<SymbolOpInterface>(objectOp));
   }
