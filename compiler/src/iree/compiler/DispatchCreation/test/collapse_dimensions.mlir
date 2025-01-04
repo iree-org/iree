@@ -725,3 +725,31 @@ util.func public @uncollapsable_consumer(%arg0: tensor<1x1x2304xf32>) {
 // CHECK-SAME:         ins(%[[ARG0]], %[[CST]]
 //     CHECK:        %[[BARRIER:.+]] = util.optimization_barrier %[[RES]]
 //     CHECK:        flow.return %[[RES]]
+
+// -----
+
+#map0 = affine_map<(d0, d1, d2, d3) -> (d2, d3, d0, d1)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+util.func public @uncollapsable_consumer_partial(%arg0: tensor<10x20x30x2304xf32>) {
+  %cst = arith.constant dense<0.000000e+00> : tensor<10x20x30x2304xf32>
+  %0 = tensor.empty() : tensor<30x2304xf32>
+  %1 = flow.dispatch.region -> (tensor<30x2304xf32>) {
+    %2 = tensor.empty() : tensor<30x2304xf32>
+    %3 = linalg.generic {indexing_maps = [#map0, #map0, #map1], iterator_types = ["parallel", "parallel", "reduction", "reduction"]} ins(%arg0, %cst : tensor<10x20x30x2304xf32>, tensor<10x20x30x2304xf32>) outs(%2 : tensor<30x2304xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %4 = arith.addf %in, %in_0 : f32
+      linalg.yield %4 : f32
+    } -> tensor<30x2304xf32>
+    %10 = util.optimization_barrier %3 : tensor<30x2304xf32>
+    flow.return %3 : tensor<30x2304xf32>
+  }
+  util.return
+}
+// CHECK-LABEL: util.func public @uncollapsable_consumer_partial
+// CHECK-SAME:    %[[ARG0:[0-9a-zA-Z]+]]
+//  CHECK-DAG:    %[[CST:.+]] = arith.constant
+//      CHECK:     %{{.+}} = flow.dispatch.region
+//      CHECK:        %[[RES:.+]] = linalg.generic
+// CHECK-SAME:         iterator_types = ["parallel", "parallel", "reduction"]
+//     CHECK:        %[[BARRIER:.+]] = util.optimization_barrier %[[RES]]
+//     CHECK:        flow.return %[[RES]]
