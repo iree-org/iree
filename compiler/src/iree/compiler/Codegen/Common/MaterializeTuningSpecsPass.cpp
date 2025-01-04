@@ -197,14 +197,30 @@ struct MaterializeTuningSpecsPass final
       return;
     }
 
-    // If only the default tuning spec is available, use it directly and skip
-    // the linking stage.
-    if (!hasUserTuningSpec) {
-      if (failed(dumpFinalTuningSpecToDir(*defaultTuningSpec))) {
+    // Check if the user-provided tuning spec has the default entry point
+    // attribute.
+    bool userTuningSpecWithDefaultAttr =
+        hasUserTuningSpec &&
+        (*userTuningSpec)->hasAttr(kTuningSpecDefaultEntrypointAttrName);
+
+    // Determine if the linking pass should be skipped.
+    // Skip if there is a user-provided spec with the default attribute but no
+    // default tuning spec, or if there is no user-provided spec but a default
+    // tuning spec is available.
+    bool skipLinkPass = (hasUserTuningSpec && !hasDefaultTuningSpec &&
+                         userTuningSpecWithDefaultAttr) ||
+                        (!hasUserTuningSpec && hasDefaultTuningSpec);
+
+    if (skipLinkPass) {
+      // Use the appropriate tuning spec (user or default) for further
+      // processing.
+      ModuleOp tuningSpecwithDefaultAttr =
+          hasUserTuningSpec ? *userTuningSpec : *defaultTuningSpec;
+      if (failed(dumpFinalTuningSpecToDir(tuningSpecwithDefaultAttr))) {
         return signalPassFailure();
       }
       FailureOr<DenseElementsAttr> serializedSpec =
-          serializeTuningSpecToAttr(*defaultTuningSpec);
+          serializeTuningSpecToAttr(tuningSpecwithDefaultAttr);
       if (failed(serializedSpec)) {
         module->emitError("Failed to serialize default tuning specs");
         return signalPassFailure();
