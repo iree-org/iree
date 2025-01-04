@@ -314,18 +314,19 @@ public:
   void dump() const;
 
   // Update CollapseInfo to ensure that all dimensions collapsable in `this` are
-  // also collapsable in `consumerInfo`. This means:
-  // 1. Any dimension not collapsable in `consumerInfo` should not be
+  // also collapsable in `otherInfo`. This means:
+  // 1. Any dimension not collapsable in `otherInfo` should not be
   // collapsable in `this`
   // 2. For any pair of dimensions in `this`, if they are collapsable in
-  // `consumerInfo`, they must be collapsable into the same dimension in
-  // `consumerInfo` to be collapsable into the same dimension in `this`.
+  // `otherInfo`, they must be collapsable into the same dimension in
+  // `otherInfo` to be collapsable into the same dimension in `this`.
   // Returns true if the operation modified the number of collapsable loops.
-  bool updateFromConsumer(FailureOr<AffineMap> consumerToProducerMap,
-                          const CollapseInfo &consumerInfo);
+  bool updateFromOther(FailureOr<AffineMap> otherToThisMap,
+                       const CollapseInfo &otherInfo);
 
   // Update `this` (which is the info for `op`) when either a producer or
-  // consumer is not collapsible.
+  // consumer is not collapsible. This is done by considering all the dims
+  // accessed by other to be uncollapsible.
   bool updateFromUncollapsible(Operation *op, OpOperand *operand);
 
   // Get `collapsableLoops` after applying the transformation provided by `map`.
@@ -460,38 +461,36 @@ CollapseInfo::getTransformedReassociation(AffineMap map) const {
   return transformedReassociation;
 }
 
-bool CollapseInfo::updateFromConsumer(
-    FailureOr<AffineMap> consumerToProducerMap,
-    const CollapseInfo &consumerInfo) {
-  if (failed(consumerToProducerMap)) {
+bool CollapseInfo::updateFromOther(FailureOr<AffineMap> otherToThisMap,
+                                   const CollapseInfo &otherInfo) {
+  if (failed(otherToThisMap)) {
     return this->clear();
   }
 
-  CollapsableLoopsSet consumerCollapsable =
-      consumerInfo.getTransformedCollapsableLoops(
-          consumerToProducerMap.value());
+  CollapsableLoopsSet otherCollapsible =
+      otherInfo.getTransformedCollapsableLoops(otherToThisMap.value());
 
-  SmallVector<ReassociationIndices> consumerReassoc =
-      consumerInfo.getTransformedReassociation(consumerToProducerMap.value());
+  SmallVector<ReassociationIndices> otherReassoc =
+      otherInfo.getTransformedReassociation(otherToThisMap.value());
 
   // Get a map from original index to the index it gets collapsed into
-  llvm::DenseMap<long, long> consumerCollapseMap;
-  for (const auto &[idx, indicies] : llvm::enumerate(consumerReassoc)) {
+  llvm::DenseMap<long, long> otherCollapseMap;
+  for (const auto &[idx, indicies] : llvm::enumerate(otherReassoc)) {
     for (const auto elem : indicies) {
-      consumerCollapseMap[elem] = idx;
+      otherCollapseMap[elem] = idx;
     }
   }
 
-  // Remove all collapsable loops in `producer` that both exist and are not
-  // collapsable in `consumer` (set intersect)
+  // Remove all collapsable loops in `this` that both exist and are not
+  // collapsable in `other` (set intersect)
   bool didChange = collapsableLoops.remove_if([&](long elem) -> bool {
     // Exists and is collapsable
-    if (consumerCollapsable.contains(elem)) {
+    if (otherCollapsible.contains(elem)) {
       return false;
     }
 
-    // Does not exist in consumer.
-    if (!consumerToProducerMap->isFunctionOfDim(elem)) {
+    // Does not exist in `other`.
+    if (!otherToThisMap->isFunctionOfDim(elem)) {
       return false;
     }
 
@@ -499,19 +498,19 @@ bool CollapseInfo::updateFromConsumer(
   });
 
   // Now update the reassociation indicies given the updated `collapsableLoops`
-  // and `consumerCollapsableMap`.
+  // and `otherCollapsableMap`.
   // The idea is to reconstruct the reassociation indicies, and at each index:
   // (1) If `index` IS NOT in `collapsableLoops`, split `indicies` and don't add
   // `index` to either.
   //
-  // (2) If `index` IS in `collapsableLoops` but `consumerCollapseMap` maps
+  // (2) If `index` IS in `collapsableLoops` but `otherCollapseMap` maps
   // `index` to a different collapsed loop then the other indicies,  split
   // `indicies` and insert `index` into the new one.
   //
   // For example:
-  // producer reassociation = [[0, 1], [2, 3]]
-  // consumer reassociation = [0, 1, 2, 3]
-  // then, consumer reassociation gets updated to [[0, 1], [2, 3]] because
+  // `this` reassociation = [[0, 1], [2, 3]]
+  // `other` reassociation = [0, 1, 2, 3]
+  // then, `other` reassociation gets updated to [[0, 1], [2, 3]] because
   // [0, 1] and [2, 3] get collapsed into different loops
   //
   // (3) Otherwise, keep the index
@@ -535,14 +534,14 @@ bool CollapseInfo::updateFromConsumer(
         }
         newIndicies.clear();
         collapseIntoIdx = kUninitialized;
-      } else if (!consumerCollapseMap.contains(index)) {
-        // (2) `index` does not exist in consumer.
+      } else if (!otherCollapseMap.contains(index)) {
+        // (2) `index` does not exist in `other`.
         newIndicies.push_back(index);
       } else if (collapseIntoIdx == kUninitialized) {
         // (3) First occurance of collapsable loop, set collapseIntoIdx.
-        collapseIntoIdx = consumerCollapseMap.at(index);
+        collapseIntoIdx = otherCollapseMap.at(index);
         newIndicies.push_back(index);
-      } else if (consumerCollapseMap.at(index) != collapseIntoIdx) {
+      } else if (otherCollapseMap.at(index) != collapseIntoIdx) {
         // (4) `index` is collapsable but not collapsable into the other loops.
         // So, split them and look for other loops to collapse `index` into.
         didChange = true;
@@ -550,7 +549,7 @@ bool CollapseInfo::updateFromConsumer(
           newReassociation.push_back(std::move(newIndicies));
         }
         newIndicies.clear();
-        collapseIntoIdx = consumerCollapseMap[index];
+        collapseIntoIdx = otherCollapseMap[index];
         newIndicies.push_back(index);
       } else {
         // (5) `index` is collapsable and can be collapsed into
@@ -822,7 +821,7 @@ updateConsumersFromProducers(ArrayRef<Operation *> slice,
       FailureOr<AffineMap> consumerToProducerMap =
           getProducerLoopToConsumerLoopsMap(*operand);
       didChange |=
-          consumerInfo.updateFromConsumer(consumerToProducerMap, producerInfo);
+          consumerInfo.updateFromOther(consumerToProducerMap, producerInfo);
     }
   }
   return didChange;
@@ -864,7 +863,7 @@ updateProducersFromConsumers(ArrayRef<Operation *> slice,
       FailureOr<AffineMap> consumerToProducerMap =
           getConsumerLoopToProducerLoopsMap(operand);
       didChange |=
-          producerInfo.updateFromConsumer(consumerToProducerMap, consumerInfo);
+          producerInfo.updateFromOther(consumerToProducerMap, consumerInfo);
     }
   }
   return didChange;
