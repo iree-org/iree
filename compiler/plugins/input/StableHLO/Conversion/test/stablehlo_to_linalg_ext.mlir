@@ -344,27 +344,6 @@ func.func @scatter_add_slice_2D(%arg0: tensor<6x3xi32>, %arg1: tensor<2x1xi32>,
 
 // -----
 
-// CHECK-LABEL: func.func @scatter_partial
-func.func @scatter_partial(%arg0: tensor<10x5xf32>, %arg1: tensor<3x1xi32>, %arg2: tensor<3x3xf32>) -> tensor<10x5xf32> {
-  %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ( {
-  ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):  // no predecessors
-    %1 = stablehlo.add %arg3, %arg4 : tensor<f32>
-    "stablehlo.return"(%1) : (tensor<f32>) -> ()
-  }) {indices_are_sorted = false, scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [1], inserted_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 1>, unique_indices = false} : (tensor<10x5xf32>, tensor<3x1xi32>, tensor<3x3xf32>) -> tensor<10x5xf32>
-  return %0 : tensor<10x5xf32>
-}
-
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
-// CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
-// CHECK-SAME:      unique_indices(false)
-// CHECK-SAME:      ins(%[[ARG2]], %[[ARG1]] : tensor<3x3xf32>, tensor<3x1xi32>)
-// CHECK-SAME:      outs(%[[ARG0]] : tensor<10x5xf32>)
-// CHECK:         return %[[SCATTER]]
-
-// -----
-
 // CHECK-LABEL: func.func @scatter_ui32
 func.func @scatter_ui32(%arg0: tensor<1xui32>, %arg1: tensor<1x1xi32>, %arg2: tensor<1xui32>) -> tensor<1xui32> {
   %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ({

@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
@@ -246,8 +247,7 @@ getReassociationForExpansion(AffineMap indexingMap,
   return reassociation;
 }
 
-template <typename OpTy>
-static bool isFusableWithReshapeByDimExpansion(OpTy op,
+static bool isFusableWithReshapeByDimExpansion(AttentionOp op,
                                                OpOperand *fusableOpOperand) {
   // Is fusable only if:
   // - All the indexing maps for operands and results are projected
@@ -256,10 +256,11 @@ static bool isFusableWithReshapeByDimExpansion(OpTy op,
   // - All the loops for the reshaped operand are parallel loops.
   SmallVector<utils::IteratorType> iteratorTypes = op.getLoopIteratorTypes();
   AffineMap operandMap = op.getMatchingIndexingMap(fusableOpOperand);
-  return op.hasPureTensorSemantics() &&
-         llvm::all_of(
-             op.getIndexingMapsArray(),
-             [](AffineMap map) { return map.isProjectedPermutation(); }) &&
+  return operandMap && op.hasPureTensorSemantics() &&
+         llvm::all_of(op.getIndexingMapsArray(),
+                      [](AffineMap map) {
+                        return map && map.isProjectedPermutation();
+                      }) &&
          operandMap.getNumResults() > 0;
 }
 
@@ -392,6 +393,201 @@ static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
 }
 
 namespace {
+class ScatterExpansionInfo {
+public:
+  // Helper class similar to `ExpansionInfo` but only for`LinalgExt::ScatterOp`
+  // due to its special semantics (i.e. not all dims map to the iteration space)
+  LogicalResult compute(LinalgExt::ScatterOp scatterOp,
+                        OpOperand *fusableOpOperand,
+                        ArrayRef<ReassociationIndices> reassociationIndices,
+                        ArrayRef<int64_t> expandedShape,
+                        ArrayRef<int64_t> collapsedShape,
+                        PatternRewriter &rewriter);
+
+  SmallVector<ReassociationIndices> updatesReassoc;
+  SmallVector<SmallVector<int64_t>> updatesShapeMap;
+  SmallVector<ReassociationIndices> indicesReassoc;
+  SmallVector<SmallVector<int64_t>> indicesShapeMap;
+  SmallVector<ReassociationIndices> originalReassoc;
+  SmallVector<SmallVector<int64_t>> originalShapeMap;
+};
+
+} // namespace
+
+// Use the innermost indices in `reassoc` to construct a shape map out of
+// `shape`
+static SmallVector<SmallVector<int64_t>>
+computeShapeMapFromReassoc(ArrayRef<ReassociationIndices> reassoc,
+                           ArrayRef<int64_t> shape) {
+  SmallVector<SmallVector<int64_t>> shapeMap;
+  for (auto &indices : reassoc) {
+    shapeMap.emplace_back(shape.slice(indices.front(), indices.size()));
+  }
+  return shapeMap;
+}
+
+static SmallVector<ReassociationIndices>
+computeReassocFromShapeMap(ArrayRef<SmallVector<int64_t>> shapeMap) {
+  SmallVector<ReassociationIndices> reassoc;
+  int64_t dimCount = 0;
+  for (auto &shape : shapeMap) {
+    reassoc.emplace_back(
+        llvm::to_vector(llvm::seq<int64_t>(dimCount, dimCount + shape.size())));
+    dimCount += shape.size();
+  }
+  return reassoc;
+}
+
+LogicalResult ScatterExpansionInfo::compute(
+    LinalgExt::ScatterOp scatterOp, OpOperand *fusableOpOperand,
+    ArrayRef<ReassociationIndices> reassociationIndices,
+    ArrayRef<int64_t> expandedShape, ArrayRef<int64_t> collapsedShape,
+    PatternRewriter &rewriter) {
+  if (reassociationIndices.empty())
+    return failure();
+  assert(fusableOpOperand->getOwner() == scatterOp);
+
+  auto updatesShape = scatterOp.getUpdateType().getShape();
+  auto indicesShape = scatterOp.getIndicesType().getShape();
+  auto originalShape = scatterOp.getOriginalType().getShape();
+  auto rankOfContiguousSlice =
+      scatterOp.getOriginalType().getRank() - scatterOp.getIndexDepth();
+
+  // Helper lambda to convert a shape to an identity shape map.
+  auto shapeToIdentShapeMap = [](ArrayRef<int64_t> shape) {
+    return llvm::map_to_vector(
+        shape, [](int64_t dim) { return SmallVector<int64_t>{dim}; });
+  };
+
+  // Set `batchShapeMap` and `sliceShapeMap` based on the specific operand.
+  int64_t operandNum = fusableOpOperand->getOperandNumber();
+
+  // In the case of `original`, no chenge to the iteration space
+  SmallVector<SmallVector<int64_t>> batchShapeMap =
+      operandNum == ScatterOp::kOriginalOpNum
+          ? shapeToIdentShapeMap(
+                originalShape.take_front(scatterOp.getBatchRank()))
+          : computeShapeMapFromReassoc(
+                reassociationIndices.take_front(scatterOp.getBatchRank()),
+                expandedShape);
+  // In the case of `indices`, no chenge to the iteration space
+  SmallVector<SmallVector<int64_t>> sliceShapeMap =
+      operandNum == ScatterOp::kIndicesOpNum
+          ? shapeToIdentShapeMap(originalShape.take_back(rankOfContiguousSlice))
+          : computeShapeMapFromReassoc(
+                reassociationIndices.take_back(rankOfContiguousSlice),
+                expandedShape);
+
+  // Early exit if iteration space is unchanged
+  if (llvm::all_of(batchShapeMap, [&](auto vec) { return vec.size() == 1; }) &&
+      llvm::all_of(sliceShapeMap, [&](auto vec) { return vec.size() == 1; })) {
+    return failure();
+  }
+
+  updatesShapeMap = llvm::to_vector(llvm::concat<SmallVector<int64_t>>(
+      batchShapeMap,
+      shapeToIdentShapeMap(updatesShape.slice(scatterOp.getBatchRank(),
+                                              scatterOp.getUpdateSliceRank() -
+                                                  rankOfContiguousSlice)),
+      sliceShapeMap));
+  indicesShapeMap = llvm::to_vector(llvm::concat<SmallVector<int64_t>>(
+      batchShapeMap, shapeToIdentShapeMap(scatterOp.getIndexDepth())));
+  originalShapeMap = llvm::to_vector(llvm::concat<SmallVector<int64_t>>(
+      shapeToIdentShapeMap(originalShape.drop_back(rankOfContiguousSlice)),
+      sliceShapeMap));
+
+  updatesReassoc = computeReassocFromShapeMap(updatesShapeMap);
+  indicesReassoc = computeReassocFromShapeMap(indicesShapeMap);
+  originalReassoc = computeReassocFromShapeMap(originalShapeMap);
+  assert(updatesReassoc.size() == updatesShape.size());
+  assert(indicesReassoc.size() == indicesShape.size());
+  assert(originalReassoc.size() == originalShape.size());
+  return success();
+}
+
+static std::optional<Value>
+fuseScatterWithReshapeByExpansion(ScatterOp scatterOp, Operation *reshapeOp,
+                                  OpOperand *fusableOpOperand,
+                                  PatternRewriter &rewriter) {
+  Location loc = scatterOp.getLoc();
+  // Check if reshape is expanding or collapsing.
+  auto expandingReshapeOp = dyn_cast<tensor::ExpandShapeOp>(*reshapeOp);
+  auto collapsingReshapeOp = dyn_cast<tensor::CollapseShapeOp>(*reshapeOp);
+  bool isExpanding = (expandingReshapeOp != nullptr);
+  RankedTensorType expandedType = isExpanding
+                                      ? expandingReshapeOp.getResultType()
+                                      : collapsingReshapeOp.getSrcType();
+  RankedTensorType collapsedType = isExpanding
+                                       ? expandingReshapeOp.getSrcType()
+                                       : collapsingReshapeOp.getResultType();
+  ScatterExpansionInfo info;
+  if (failed(info.compute(
+          scatterOp, fusableOpOperand,
+          isExpanding ? expandingReshapeOp.getReassociationIndices()
+                      : collapsingReshapeOp.getReassociationIndices(),
+          expandedType.getShape(), collapsedType.getShape(), rewriter))) {
+    return std::nullopt;
+  }
+
+  // Returns `reassociation` with indices modified so that they are a contiguous
+  // grouping of indices.
+  auto getType = [&](SmallVector<SmallVector<int64_t>> &shapeMap,
+                     ShapedType type) {
+    SmallVector<int64_t> flattenedArray;
+    for (auto &shape : shapeMap) {
+      flattenedArray.append(shape.begin(), shape.end());
+    }
+    return RankedTensorType::get(flattenedArray, type.getElementType());
+  };
+
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(scatterOp);
+
+  auto isIdentityReassoc = [](SmallVector<ReassociationIndices> &indices) {
+    for (auto &index : indices) {
+      if (index.size() != 1)
+        return false;
+    }
+    return true;
+  };
+
+  Value newUpdates = rewriter.create<tensor::ExpandShapeOp>(
+      loc, getType(info.updatesShapeMap, scatterOp.getUpdateType()),
+      scatterOp.getUpdates(), info.updatesReassoc);
+  Value newIndices =
+      isIdentityReassoc(info.indicesReassoc)
+          ? scatterOp.getIndices()
+          : rewriter.create<tensor::ExpandShapeOp>(
+                loc, getType(info.indicesShapeMap, scatterOp.getIndicesType()),
+                scatterOp.getIndices(), info.indicesReassoc);
+  Value newOriginal =
+      isIdentityReassoc(info.originalReassoc)
+          ? scatterOp.getOriginal()
+          : rewriter.create<tensor::ExpandShapeOp>(
+                loc,
+                getType(info.originalShapeMap, scatterOp.getOriginalType()),
+                scatterOp.getOriginal(), info.originalReassoc);
+
+  auto newScatter = rewriter.create<ScatterOp>(
+      loc, newOriginal.getType(), ValueRange{newUpdates, newIndices},
+      ValueRange{newOriginal}, scatterOp.getDimensionMap(),
+      scatterOp.getUniqueIndices());
+  rewriter.inlineRegionBefore(scatterOp.getRegion(), newScatter.getRegion(),
+                              newScatter.getRegion().begin());
+
+  // Collapse back to originanl shape.
+  auto newCollapse = rewriter.create<tensor::CollapseShapeOp>(
+      loc, scatterOp.getOriginalType(), newScatter.getResult(0),
+      info.originalReassoc);
+
+  return {newCollapse};
+}
+
+//===----------------------------------------------------------------------===//
+// Fuse By Expansion Patterns
+//===----------------------------------------------------------------------===//
+
+namespace {
 
 // Fold attention with its consumer expand_shape op.
 struct FoldAttentionWithConsumerReshapeByExpansion
@@ -481,6 +677,140 @@ struct FoldAttentionWithProducerReshapeByExpansion final
       return success();
     }
     return failure();
+  }
+
+  linalg::ControlFusionFn controlFoldingReshapes;
+};
+
+/// Remove the unit dims from `iree_linalg_ext.scatter` 's `update` operand.
+/// The dims in `update` between the batch dims and the continuous slice
+/// represent the indexed dimensions. Remove the leading unit dims from the
+/// indexed dims.
+struct FoldScatterNonIterationUnitDims final
+    : public OpRewritePattern<ScatterOp> {
+  FoldScatterNonIterationUnitDims(MLIRContext *context,
+                                  linalg::ControlDropUnitDims options,
+                                  PatternBenefit benefit = 1)
+      : OpRewritePattern<ScatterOp>(context, benefit),
+        options(std::move(options)) {}
+
+  LogicalResult matchAndRewrite(ScatterOp scatterOp,
+                                PatternRewriter &rewriter) const override {
+    if (options.rankReductionStrategy !=
+        linalg::ControlDropUnitDims::RankReductionStrategy::
+            ReassociativeReshape) {
+      return rewriter.notifyMatchFailure(
+          scatterOp, "Only reassociative reshape strategy supported");
+    }
+    llvm::SmallVector<unsigned> canDrop = options.controlFn(scatterOp);
+    const ArrayRef<int64_t> updateShape = scatterOp.getUpdateType().getShape();
+
+    // Find the number of leading unit dimensions
+    int64_t rankOfContiguousSlice =
+        scatterOp.getOriginalType().getRank() - scatterOp.getIndexDepth();
+    ArrayRef<int64_t> indexedDims =
+        scatterOp.getUpdateSliceShape().drop_back(rankOfContiguousSlice);
+    int64_t numDimsToDrop =
+        llvm::find_if(indexedDims, [](int64_t val) { return val != 1; }) -
+        scatterOp.getUpdateSliceShape().begin() - 1;
+
+    int64_t batchRank = scatterOp.getBatchRank();
+    llvm::erase_if(canDrop, [&](unsigned dimPos) {
+      return dimPos < batchRank || dimPos > batchRank + numDimsToDrop;
+    });
+    if (canDrop.empty()) {
+      return failure();
+    }
+
+    SmallVector<int64_t> droppedUpdateShape;
+    droppedUpdateShape.reserve(updateShape.size() - canDrop.size());
+    for (auto [idx, dimLen] : llvm::enumerate(updateShape)) {
+      if (!llvm::is_contained(canDrop, idx)) {
+        droppedUpdateShape.push_back(dimLen);
+      }
+    }
+
+    auto reassoc =
+        getReassociationIndicesForCollapse(updateShape, droppedUpdateShape);
+    assert(reassoc.has_value() && "expected reassociation to be valid");
+    auto collapseOp = rewriter.create<tensor::CollapseShapeOp>(
+        scatterOp.getLoc(),
+        RankedTensorType::get(droppedUpdateShape,
+                              scatterOp.getUpdateType().getElementType()),
+        scatterOp.getUpdates(), reassoc.value());
+
+    rewriter.modifyOpInPlace(scatterOp, [&]() {
+      scatterOp.setOperand(ScatterOp::kUpdatesOpNum, collapseOp.getResult());
+    });
+    return success();
+  }
+
+  linalg::ControlDropUnitDims options;
+};
+
+struct FoldScatterWithProducerReshapeByExpansion final
+    : public OpRewritePattern<ScatterOp> {
+  FoldScatterWithProducerReshapeByExpansion(
+      MLIRContext *context, linalg::ControlFusionFn controlFoldingReshapes,
+      PatternBenefit benefit = 1)
+      : OpRewritePattern<ScatterOp>(context, benefit),
+        controlFoldingReshapes(std::move(controlFoldingReshapes)) {}
+
+  LogicalResult matchAndRewrite(ScatterOp scatterOp,
+                                PatternRewriter &rewriter) const override {
+    for (OpOperand &opOperand : scatterOp->getOpOperands()) {
+      tensor::CollapseShapeOp reshapeOp =
+          opOperand.get().getDefiningOp<tensor::CollapseShapeOp>();
+      if (!reshapeOp)
+        continue;
+      if (!controlFoldingReshapes(&opOperand))
+        continue;
+
+      std::optional<Value> replacementValue = fuseScatterWithReshapeByExpansion(
+          scatterOp, reshapeOp, &opOperand, rewriter);
+      if (!replacementValue)
+        return failure();
+      rewriter.replaceOp(scatterOp, *replacementValue);
+      return success();
+    }
+    return failure();
+  }
+
+  linalg::ControlFusionFn controlFoldingReshapes;
+};
+
+struct FoldScatterWithConsumerReshapeByExpansion final
+    : public OpRewritePattern<tensor::ExpandShapeOp> {
+  FoldScatterWithConsumerReshapeByExpansion(
+      MLIRContext *context, linalg::ControlFusionFn controlFoldingReshapes,
+      PatternBenefit benefit = 1)
+      : OpRewritePattern<tensor::ExpandShapeOp>(context, benefit),
+        controlFoldingReshapes(std::move(controlFoldingReshapes)) {}
+
+  LogicalResult matchAndRewrite(tensor::ExpandShapeOp expandOp,
+                                PatternRewriter &rewriter) const override {
+    auto producerResult = dyn_cast<OpResult>(expandOp.getSrc());
+    if (!producerResult) {
+      return rewriter.notifyMatchFailure(expandOp,
+                                         "source not produced by an operation");
+    }
+
+    auto scatterOp = producerResult.getDefiningOp<LinalgExt::ScatterOp>();
+    if (!scatterOp) {
+      return failure();
+    }
+
+    if (!controlFoldingReshapes(&expandOp.getSrcMutable())) {
+      return failure();
+    }
+
+    std::optional<Value> replacementValue = fuseScatterWithReshapeByExpansion(
+        scatterOp, expandOp, scatterOp.getTiedOpOperand(producerResult),
+        rewriter);
+    if (!replacementValue)
+      return failure();
+    rewriter.replaceOp(scatterOp, *replacementValue);
+    return success();
   }
 
   linalg::ControlFusionFn controlFoldingReshapes;
@@ -706,6 +1036,20 @@ void populateFoldReshapeOpsByExpansionPatterns(
       patterns.getContext(), controlFoldingReshapes);
   patterns.add<FoldAttentionWithProducerReshapeByExpansion>(
       patterns.getContext(), controlFoldingReshapes);
+  patterns.add<FoldScatterWithProducerReshapeByExpansion>(
+      patterns.getContext(), controlFoldingReshapes);
+  patterns.add<FoldScatterWithConsumerReshapeByExpansion>(
+      patterns.getContext(), controlFoldingReshapes);
+}
+
+SmallVector<unsigned> defaultControlDropUnitDims(Operation *op) {
+  auto fusionOp = cast<LinalgFusionOpInterface>(op);
+  return llvm::to_vector(llvm::seq<unsigned>(0, fusionOp.getNumLoops()));
+}
+
+void populateFoldUnitExtentDimsPatterns(
+    RewritePatternSet &patterns, const linalg::ControlDropUnitDims &options) {
+  patterns.add<FoldScatterNonIterationUnitDims>(patterns.getContext(), options);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
