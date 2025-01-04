@@ -324,10 +324,9 @@ public:
   bool updateFromConsumer(FailureOr<AffineMap> consumerToProducerMap,
                           const CollapseInfo &consumerInfo);
 
-  // Update `collapsableLoops` by subtracting `uncollapsable` and update the
-  // reassociation indicies accordingly.
-  // Returns true if the operation modified the number of collapsable loops.
-  bool updateCollapseViaSubtract(const CollapsableLoopsSet &uncollapsable);
+  // Update `this` (which is the info for `op`) when either a producer or
+  // consumer is not collapsible.
+  bool updateFromUncollapsible(Operation *op, OpOperand *operand);
 
   // Get `collapsableLoops` after applying the transformation provided by `map`.
   // Note: doesn't modify `collapsableLoops`, the tranformation is applied to a
@@ -568,10 +567,17 @@ bool CollapseInfo::updateFromConsumer(
   return didChange;
 }
 
-// Update `collapsableLoops` by subtracting `uncollapsable` and update the
-// reassociation indicies accordingly.
-bool CollapseInfo::updateCollapseViaSubtract(
-    const CollapsableLoopsSet &uncollapsable) {
+bool CollapseInfo::updateFromUncollapsible(Operation *op, OpOperand *operand) {
+  auto fusionOp = cast<LinalgFusionOpInterface>(op);
+  AffineMap map = operand->getOwner() == op
+                      ? fusionOp.getMatchingIndexingMap(operand)
+                      : fusionOp.getIndexingMapMatchingResult(
+                            cast<OpResult>(operand->get()));
+
+  CollapseInfo::CollapsableLoopsSet uncollapsable;
+  for (auto expr : map.getResults()) {
+    uncollapsable.insert(cast<AffineDimExpr>(expr).getPosition());
+  }
   auto initialSize = collapsableLoops.size();
   collapsableLoops.set_subtract(uncollapsable);
   updateReassociation();
@@ -805,34 +811,18 @@ updateConsumersFromProducers(ArrayRef<Operation *> slice,
         continue;
       }
 
-      // Track the dimensions that are not collapsable by this current op.
-      // Initialize this with all loops in thel producer. Note: the dims are
-      // relative to the consumers iteration space, not the producers. This
-      // cannot be done via union of producer and consumer collapsable loops
-      // because the consumer may have loops that the producer does not.
-      CollapseInfo::CollapsableLoopsSet producerUncollapsable;
-      for (auto expr :
-           consumerOp.getMatchingIndexingMap(operand).getResults()) {
-        producerUncollapsable.insert(cast<AffineDimExpr>(expr).getPosition());
-      }
-
-      FailureOr<AffineMap> mapping =
-          getProducerLoopToConsumerLoopsMap(*operand);
-
-      // If there is no mapping or we can't find the op, the tensor is
-      // not collapsable. So, all dimensions of the producer are uncollapsable.
-      if (!opMap.contains(producerOp) || failed(mapping)) {
-        didChange |=
-            consumerInfo.updateCollapseViaSubtract(producerUncollapsable);
+      // If we can't find the op, the tensor is not collapsable. So, consider
+      // all the dimensions of the producer to be uncollapsable.
+      if (!opMap.contains(producerOp)) {
+        didChange |= consumerInfo.updateFromUncollapsible(consumerOp, operand);
         continue;
       }
 
       const CollapseInfo &producerInfo = opMap.at(producerOp);
-      // CollapseInfo::CollapsableLoopsSet producerCollapsable =
-      //     producerInfo.getTransformedCollapsableLoops(mapping.value());
-      // producerUncollapsable.set_subtract(producerCollapsable);
-
-      didChange |= consumerInfo.updateFromConsumer(mapping, producerInfo);
+      FailureOr<AffineMap> consumerToProducerMap =
+          getProducerLoopToConsumerLoopsMap(*operand);
+      didChange |=
+          consumerInfo.updateFromConsumer(consumerToProducerMap, producerInfo);
     }
   }
   return didChange;
@@ -850,22 +840,29 @@ updateProducersFromConsumers(ArrayRef<Operation *> slice,
   // Iterate over `slice` in reverse so that we visit each `op` 's consumer
   // before visiting `op`.
   for (auto op : llvm::reverse(slice)) {
-    auto consumerOp = cast<DestinationStyleOpInterface>(op);
-    const CollapseInfo &consumerInfo = opMap.at(consumerOp);
+    auto producerOp = cast<LinalgFusionOpInterface>(op);
+    CollapseInfo &producerInfo = opMap.find(producerOp)->second;
 
-    for (auto *operand : consumerOp.getDpsInputOperands()) {
-      auto definingOp = operand->get().getDefiningOp();
-      if (!definingOp || !opMap.contains(definingOp)) {
+    for (auto &operand : producerOp->getUses()) {
+      auto *consumerOp = operand.getOwner();
+      if (consumerOp->hasTrait<OpTrait::IsTerminator>()) {
+        continue;
+      }
+
+      // If we can't find the op, the tensor is not collapsable. So, consider
+      // all the dimensions of the consumer to be uncollapsable.
+      if (!opMap.contains(consumerOp)) {
+        didChange |= producerInfo.updateFromUncollapsible(producerOp, &operand);
         continue;
       }
 
       // Get a mapping from the consumer's iteration space to the producer's.
-      CollapseInfo &producerInfo = opMap.find(definingOp)->second;
+      const CollapseInfo &consumerInfo = opMap.at(consumerOp);
 
       // Only loops collapsable in both the consumer and producer may be
       // collapsed.
       FailureOr<AffineMap> consumerToProducerMap =
-          getConsumerLoopToProducerLoopsMap(*operand);
+          getConsumerLoopToProducerLoopsMap(operand);
       didChange |=
           producerInfo.updateFromConsumer(consumerToProducerMap, consumerInfo);
     }

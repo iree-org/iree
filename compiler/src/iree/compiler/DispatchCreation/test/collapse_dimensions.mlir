@@ -16,7 +16,7 @@ util.func public @do_not_collapse_cst_in_place(%arg0: tensor<1x1x2304xf32>) {
   util.return
 }
 // CHECK-LABEL: util.func public @do_not_collapse_cst_in_place
-// CHECK-SAME:    %[[ARG0:[0-9a-zA-Z]]]
+// CHECK-SAME:    %[[ARG0:[0-9a-zA-Z]+]]
 // CHECK-DAG:     %[[CST:.+]] = arith.constant
 // CHECK-DAG:     %[[COLLAPSED_ARG0:.+]] = tensor.collapse_shape %[[ARG0]]
 // CHECK-DAG:     %[[COLLAPSED_CST:.+]] = tensor.collapse_shape %[[CST]]
@@ -698,3 +698,30 @@ util.func public @update_from_producer(%arg0: tensor<2x1x256x16x16xi8>, %arg1: t
 //  CHECK-SAME:      iterator_types = ["parallel", "parallel"]
 //  CHECK-SAME:      ins(%[[GEN1]]
 //       CHECK:   flow.return %[[GEN2]] : tensor<256x256xi8>
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+util.func public @uncollapsable_consumer(%arg0: tensor<1x1x2304xf32>) {
+  %cst = arith.constant dense<0.000000e+00> : tensor<1x1x2304xf32>
+  %0 = tensor.empty() : tensor<1x1x2304xf32>
+  %1 = flow.dispatch.region -> (tensor<1x1x2304xf32>) {
+    %2 = tensor.empty() : tensor<1x1x2304xf32>
+    %3 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0, %cst : tensor<1x1x2304xf32>, tensor<1x1x2304xf32>) outs(%2 : tensor<1x1x2304xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %4 = arith.addf %in, %in_0 : f32
+      linalg.yield %4 : f32
+    } -> tensor<1x1x2304xf32>
+    %10 = util.optimization_barrier %3 : tensor<1x1x2304xf32>
+    flow.return %3 : tensor<1x1x2304xf32>
+  }
+  util.return
+}
+// CHECK-LABEL: util.func public @uncollapsable_consumer
+// CHECK-SAME:    %[[ARG0:[0-9a-zA-Z]+]]
+//  CHECK-DAG:    %[[CST:.+]] = arith.constant
+//      CHECK:     %{{.+}} = flow.dispatch.region
+//      CHECK:        %[[RES:.+]] = linalg.generic
+// CHECK-SAME:         ins(%[[ARG0]], %[[CST]]
+//     CHECK:        %[[BARRIER:.+]] = util.optimization_barrier %[[RES]]
+//     CHECK:        flow.return %[[RES]]
