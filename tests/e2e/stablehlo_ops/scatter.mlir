@@ -87,33 +87,6 @@ func.func @scatter_update_slice_2D() {
   return
 }
 
-func.func @scatter_update_slice_partial_2D() {
-  %arg0 = util.unfoldable_constant dense<0> : tensor<6x3xi32>
-  %arg1 = util.unfoldable_constant dense<[[2], [4]]> : tensor<2x1xi32>
-  %arg2 = util.unfoldable_constant dense<[[1, 2],
-                                          [4, 5]]> : tensor<2x2xi32>
-  %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ( {
-  ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):  // no predecessors
-    "stablehlo.return"(%arg4) : (tensor<i32>) -> ()
-  }) {
-    indices_are_sorted = false,
-    scatter_dimension_numbers = #stablehlo.scatter<
-      update_window_dims = [1],
-      inserted_window_dims = [0],
-      scatter_dims_to_operand_dims = [0],
-      index_vector_dim = 1,
-    >,
-    unique_indices = true
-  } : (tensor<6x3xi32>, tensor<2x1xi32>, tensor<2x2xi32>) -> tensor<6x3xi32>
-  check.expect_eq_const(%0, dense<[[0, 0, 0],
-                                   [0, 0, 0],
-                                   [1, 2, 0],
-                                   [0, 0, 0],
-                                   [4, 5, 0],
-                                   [0, 0, 0]]> : tensor<6x3xi32>) : tensor<6x3xi32>
-  return
-}
-
 func.func @scatter_add_slice_2D() {
   %arg0 = util.unfoldable_constant dense<1> : tensor<6x3xi32>
   %arg1 = util.unfoldable_constant dense<[[2], [4]]> : tensor<2x1xi32>
@@ -201,38 +174,6 @@ func.func @scatter_2D_large() {
     >,
     unique_indices = true
   } : (tensor<200x300xi32>, tensor<200x1xi32>, tensor<200x300xi32>) -> tensor<200x300xi32>
-  check.expect_eq_const(%result, dense<2> : tensor<200x300xi32>) : tensor<200x300xi32>
-  return
-}
-
-func.func @scatter_2D_large_permuted() {
-  %original = util.unfoldable_constant dense<1> : tensor<200x300xi32>
-  %update = util.unfoldable_constant dense<2> : tensor<300x200xi32>
-  %init = tensor.empty() : tensor<300xi32>
-  %indices = linalg.generic {
-      indexing_maps = [affine_map<(d0) -> (d0)>],
-      iterator_types = ["parallel"]}
-      outs(%init : tensor<300xi32>) {
-      ^bb0(%arg0: i32):
-        %0 = linalg.index 0 : index
-        %1 = arith.index_cast %0 : index to i32
-        linalg.yield %1 : i32
-      } -> tensor<300xi32>
-  %indices_reshaped = tensor.expand_shape %indices [[0, 1]] output_shape [300, 1] :
-      tensor<300xi32> into tensor<300x1xi32>
-  %result = "stablehlo.scatter"(%original, %indices_reshaped, %update)({
-    ^bb0(%arg3 : tensor<i32>, %arg4 : tensor<i32>):
-      "stablehlo.return"(%arg4) : (tensor<i32>) -> ()
-    }) {
-    indices_are_sorted = false,
-    scatter_dimension_numbers = #stablehlo.scatter<
-      update_window_dims = [1],
-      inserted_window_dims = [1],
-      scatter_dims_to_operand_dims = [1],
-      index_vector_dim = 1,
-    >,
-    unique_indices = true
-  } : (tensor<200x300xi32>, tensor<300x1xi32>, tensor<300x200xi32>) -> tensor<200x300xi32>
   check.expect_eq_const(%result, dense<2> : tensor<200x300xi32>) : tensor<200x300xi32>
   return
 }

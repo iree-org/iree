@@ -24,7 +24,6 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
-#include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -97,6 +96,26 @@ static bool isInvalid(ArrayRef<int64_t> dimsPos, int64_t rank) {
       dimsPos, [rank](int64_t dimPos) { return dimPos < 0 || dimPos >= rank; });
 }
 
+/// Emit an error and return failure when `seq` is invalid. It is only valid
+/// when it is a permutation of the sequence 0...length(seq) - 1.
+static LogicalResult
+isPermSequence(function_ref<InFlightDiagnostic()> emitError,
+               ArrayRef<int64_t> seq) {
+  BitVector seen(seq.size(), false);
+  for (auto [idx, dim] : llvm::enumerate(seq)) {
+    if (dim < 0 || dim >= seq.size()) {
+      return emitError().attachNote() << "element (" << dim << ") at index#"
+                                      << idx << " is out of bounds";
+    }
+    if (seen.test(dim)) {
+      return emitError().attachNote()
+             << "element (" << dim << ") at index#" << idx << " is a duplicate";
+    }
+    seen.set(dim);
+  }
+  return success();
+}
+
 /// Returns true if the dimension of `sourceShape` is smaller than the dimension
 /// of the `limitShape`.
 static bool isSmallerThan(ArrayRef<int64_t> sourceShape,
@@ -126,15 +145,12 @@ LogicalResult ScatterOp::verify() {
   if (getOutputs().size() != 1) {
     return op->emitOpError("expected one output operand");
   }
-  auto checkDimensionsMatch = [&](ShapedType t1, ShapedType t2, unsigned dim) {
-    return t1.getShape()[dim] == t2.getShape()[dim];
-  };
 
   auto indicesType = getIndicesType();
-  if (indicesType.getRank() != 2 ||
+  if (indicesType.getRank() < 2 ||
       !isa<IntegerType>(indicesType.getElementType())) {
-    return op->emitOpError(
-        "expected indices to be of rank 2 of integer element type");
+    return op->emitOpError("expected indices to be of rank 2 or greater and of "
+                           "integer element type");
   }
   auto indexDepth = getIndexDepth();
   if (ShapedType::isDynamic(indexDepth)) {
@@ -143,67 +159,75 @@ LogicalResult ScatterOp::verify() {
 
   ArrayRef<int64_t> dimMap = getDimensionMap();
   if (dimMap.size() != indexDepth) {
-    return op->emitOpError("invalid number of dimension map entries ");
+    return op->emitOpError("invalid number of dimension map entries");
   }
 
   auto originalType = getOriginalType();
-  if (isInvalid(dimMap, originalType.getRank())) {
-    return op->emitOpError("dimension map is invalid");
+  if (failed(isPermSequence(
+          [&]() { return this->emitOpError("dimension map is invalid."); },
+          dimMap))) {
+    return failure();
   }
 
-  // The first dimension of the indices should match the first dimension of the
-  // output. They indicate to the number of updates.
+  if (indexDepth > originalType.getShape().size()) {
+    return op->emitOpError(
+        "index depth is greater than the rank of the original value");
+  }
+
   auto updateType = getUpdateType();
-  if (updateType.getRank() < 1) {
-    return op->emitOpError("expected update value to be at least rank 1");
-  }
-  if (!checkDimensionsMatch(indicesType, updateType, 0)) {
-    return op->emitOpError(
-        "mismatch in shape of indices and update value at dim#0");
-  }
-  if (updateType.getRank() - 1 > originalType.getRank()) {
-    return op->emitOpError(
-        "update value rank exceeds the rank of the original value");
+  auto batchRank = indicesType.getRank() - 1;
+  if (updateType.getRank() < batchRank) {
+    return op->emitOpError("expected update value to be of rank greater than "
+                           "or equal to rank(indices) - 1")
+           << batchRank;
   }
 
-  // indexDepth + update dims should cover the original dims. The first dim of
-  // update is the number of updates.
-  if (originalType.getRank() > indexDepth + updateType.getRank() - 1) {
+  // Validate the shape of indices and update value match for the first
+  // `batchRank` dims.
+  auto [indicesIt, updateIt] =
+      llvm::mismatch(indicesType.getShape().take_front(batchRank),
+                     updateType.getShape().take_front(batchRank));
+  if (indicesIt != indicesType.getShape().take_front(batchRank).end()) {
     return op->emitOpError(
-        "index depth and update value does not cover rank of original value");
+               "mismatch in shape of indices and update value at dim#")
+           << (indicesIt - indicesType.getShape().begin());
   }
 
-  // Validate the non-indexed update dims cover the full slice size of the
-  // original tensor.
-  int64_t fullSliceDims = originalType.getRank() - indexDepth;
-  for (auto it :
-       llvm::zip_equal(llvm::seq<unsigned>(indexDepth, originalType.getRank()),
-                       llvm::seq<unsigned>(updateType.getRank() - fullSliceDims,
-                                           updateType.getRank()))) {
-    int64_t originalDim = std::get<0>(it);
-    int64_t updateDim = std::get<1>(it);
+  if (updateType.getRank() - batchRank > originalType.getRank()) {
+    return op->emitOpError("update operand's slice rank (")
+           << updateType.getRank() - batchRank
+           << " = rank(updates) - batch rank) exceeds the rank of the original "
+              "value ("
+           << originalType.getRank() << ")";
+  }
+
+  // updateSlice[0..indexDepth] <= original[0..indexDepth]
+  // updateSlice[indexDepth..] == original[indexDepth..]
+  auto numImplicitDims = originalType.getRank() - getUpdateSliceRank();
+  auto updateSliceShape = getUpdateSliceShape();
+  for (uint64_t fullSliceIdx :
+       llvm::seq<uint64_t>(numImplicitDims, indexDepth)) {
+    int64_t originalDim = fullSliceIdx;
+    int64_t updateSliceDim = fullSliceIdx - numImplicitDims;
     if (!originalType.isDynamicDim(originalDim) &&
-        updateType.getDimSize(updateDim) >
+        updateSliceShape[updateSliceDim] >
             originalType.getDimSize(originalDim)) {
       return op->emitOpError("shape of update value dim#")
-             << updateDim << " exceeds original value at dim#" << originalDim;
+             << updateSliceDim + batchRank << " exceeds original value at dim#"
+             << originalDim;
     }
   }
 
-  // Check that the remaining update indices do not exceed the update length.
-  int64_t insertDims = originalType.getRank() - updateType.getRank() + 1;
-  for (auto it : llvm::zip_equal(
-           llvm::seq<unsigned>(insertDims, indexDepth),
-           llvm::seq<unsigned>(1, updateType.getRank() - fullSliceDims))) {
-    int64_t originalDim = std::get<0>(it);
-    int64_t updateDim = std::get<1>(it);
+  for (auto fullSliceIdx :
+       llvm::seq<int64_t>(indexDepth, originalType.getRank())) {
+    int64_t originalDim = fullSliceIdx;
+    int64_t updateSliceDim = fullSliceIdx - numImplicitDims;
     if (!originalType.isDynamicDim(originalDim) &&
-        updateType.getDimSize(updateDim) >
+        updateSliceShape[updateSliceDim] !=
             originalType.getDimSize(originalDim)) {
-      return op->emitOpError("indexed shape of update value dim#")
-             << updateDim << " exceeds original value at dim#" << originalDim
-             << " " << updateType.getDimSize(updateDim) << " "
-             << originalType.getDimSize(originalDim);
+      return op->emitOpError("shape of update value dim#")
+             << updateSliceDim + batchRank
+             << " must match original value at dim#" << originalDim;
     }
   }
 
