@@ -506,17 +506,30 @@ void moveLoopInvariantCodeFromGuaranteedLoops(Operation *target) {
         loopLike.getLoopLowerBounds();
     std::optional<SmallVector<OpFoldResult>> maybeUpperBounds =
         loopLike.getLoopUpperBounds();
-    if (!maybeLowerBounds || !maybeUpperBounds) {
+    std::optional<SmallVector<Value>> maybeIvs =
+        loopLike.getLoopInductionVars();
+    if (!maybeLowerBounds || !maybeUpperBounds || !maybeIvs) {
       return;
     }
 
     // If any lower + upper bound pair cannot be definitely verified as lb < ub
     // then the loop may have a zero trip count.
-    for (auto [lb, ub] :
-         llvm::zip_equal(*maybeLowerBounds, *maybeUpperBounds)) {
-      if (!ValueBoundsConstraintSet::compare(lb, ValueBoundsConstraintSet::LT,
-                                             ub)) {
-        return;
+    for (auto [lb, ub, iv] :
+         llvm::zip_equal(*maybeLowerBounds, *maybeUpperBounds, *maybeIvs)) {
+      if (iv.getType().isIndex()) {
+        if (!ValueBoundsConstraintSet::compare(lb, ValueBoundsConstraintSet::LT,
+                                               ub)) {
+          return;
+        }
+      } else {
+        // Weaker test for non-`index` operands to some loops
+        // like scf.for, since the value bounds interface requires index types.
+        auto maybeLb = getConstantIntValue(lb);
+        auto maybeUb = getConstantIntValue(ub);
+        if (!maybeLb || !maybeUb)
+          return;
+        if (*maybeLb >= *maybeUb)
+          return;
       }
     }
 
