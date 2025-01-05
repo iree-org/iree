@@ -5,11 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "iree/compiler/Dialect/VM/Transforms/Passes.h"
+
+#define DEBUG_TYPE "iree-global-opt-pack-storage"
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
@@ -18,11 +21,11 @@ namespace mlir::iree_compiler::GlobalOptimization {
 
 static RankedTensorType appendAttributeToTensor(RankedTensorType type) {
   IREE::Encoding::PackedStorageAttr packedAttr;
-  return RankedTensorType::get(type.getShape(), type.getElementType(), packedAttr);
+  return RankedTensorType::get(type.getShape(), type.getElementType(),
+                               packedAttr);
 }
 
-struct PackStoragePass
-    : impl::PackStoragePassBase<PackStoragePass> {
+struct PackStoragePass : impl::PackStoragePassBase<PackStoragePass> {
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<tensor::TensorDialect>();
@@ -31,16 +34,19 @@ struct PackStoragePass
 };
 
 void PackStoragePass::runOnOperation() {
-  [[maybe_unused]]
   auto funcOp = getOperation();
+  LLVM_DEBUG(llvm::dbgs() << "== Running PackStoragePass on "
+                          << funcOp.getName() << "\n");
+  /*
   for (auto & arg : funcOp.getArguments()) {
     if(auto tensorType = dyn_cast<RankedTensorType>(arg.getType())) {
       auto elementType = tensorType.getElementType();
-      if (elementType.isIntOrFloat() && elementType.getIntOrFloatBitWidth() == 1) {
-        arg.setType(appendAttributeToTensor(tensorType));
+      if (elementType.isIntOrFloat() && elementType.getIntOrFloatBitWidth() ==
+  1) { arg.setType(appendAttributeToTensor(tensorType));
       }
     }
   }
+  */
 }
 
 } // namespace mlir::iree_compiler::GlobalOptimization
