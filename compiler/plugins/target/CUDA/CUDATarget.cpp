@@ -657,7 +657,7 @@ public:
       auto ordinalAttr = exportOp.getOrdinalAttr();
       if (!ordinalAttr) {
         return mlir::emitError(exportOp.getLoc())
-               << "could not compile rocm binary: export op is missing ordinal";
+               << "could not compile cuda binary: export op is missing ordinal";
       }
       int64_t ordinal = ordinalAttr.getInt();
 
