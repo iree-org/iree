@@ -117,7 +117,7 @@ IREE_API_EXPORT iree_status_t iree_hal_hip_multi_queue_command_buffer_get(
   if (!(command_buffer->base.queue_affinity & queue_affinity)) {
     return iree_make_status(IREE_STATUS_NOT_FOUND,
                             "no command buffer for affinity %lu",
-                            queue_affinity);
+                            (unsigned long)queue_affinity);
   }
   int index = iree_math_count_ones_u64(command_buffer->base.queue_affinity &
                                        (queue_affinity - 1));
