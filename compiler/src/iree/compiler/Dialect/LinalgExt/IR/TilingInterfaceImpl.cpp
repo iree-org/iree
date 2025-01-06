@@ -73,7 +73,10 @@ SmallVector<utils::IteratorType> ScatterOp::getLoopIteratorTypes() {
   SmallVector<utils::IteratorType> iteratorTypes(getUpdateType().getRank(),
                                                  utils::IteratorType::parallel);
   if (!getUniqueIndices()) {
-    iteratorTypes[0] = utils::IteratorType::reduction;
+    int64_t batchRank = getBatchRank();
+    for (auto i : llvm::seq<int64_t>(0, batchRank)) {
+      iteratorTypes[i] = utils::IteratorType::reduction;
+    }
   }
   return iteratorTypes;
 }
@@ -84,7 +87,7 @@ SmallVector<Range> ScatterOp::getIterationDomain(OpBuilder &builder) {
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   SmallVector<Range> ranges;
   for (auto dim : llvm::seq<int64_t>(0, getUpdateType().getRank())) {
-    Value ub = getDimValue(builder, loc, getUpdates(), dim);
+    OpFoldResult ub = getDim(builder, loc, getUpdates(), dim);
     ranges.emplace_back(Range{zero, ub, one});
   }
   return ranges;
@@ -113,14 +116,12 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
 
   // Slice of indices.
   auto indicesRank = getIndicesType().getRank();
-  SmallVector<OpFoldResult> indicesOffsets(indicesRank, zeroAttr);
-  SmallVector<OpFoldResult> indicesSizes(indicesRank);
-  indicesOffsets[0] = offsets[0];
-  indicesSizes[0] = sizes[0];
-  for (auto dim : llvm::seq<int64_t>(1, indicesRank)) {
-    indicesSizes[dim] = getDim(builder, loc, getIndices(), dim);
-  }
+  SmallVector<OpFoldResult> indicesOffsets(offsets.take_front(getBatchRank()));
+  indicesOffsets.push_back(zeroAttr);
+  SmallVector<OpFoldResult> indicesSizes(sizes.take_front(getBatchRank()));
+  indicesSizes.push_back(builder.getIndexAttr(getIndexDepth()));
   SmallVector<OpFoldResult> indicesStrides(indicesRank, oneAttr);
+
   Operation *indicesSlice = getSlice(builder, loc, getIndices(), indicesOffsets,
                                      indicesSizes, indicesStrides);
   if (!indicesSlice) {
@@ -170,15 +171,53 @@ LogicalResult ScatterOp::getResultTilePosition(
 
   auto updateRank = getUpdateType().getRank();
   Location loc = getLoc();
-  for (auto dim : llvm::seq<int64_t>(0, originalRank - updateRank + 1)) {
+  for (auto dim : llvm::seq<int64_t>(0, originalRank - getUpdateSliceRank())) {
     resultSizes[dim] = getDim(builder, loc, getOriginal(), dim);
   }
   for (auto dim :
-       llvm::seq<int64_t>(originalRank - updateRank + 1, originalRank)) {
+       llvm::seq<int64_t>(originalRank - getUpdateSliceRank(), originalRank)) {
     resultOffsets[dim] = offsets[dim - (originalRank - updateRank)];
     resultSizes[dim] = sizes[dim - (originalRank - updateRank)];
   }
   return success();
+}
+
+/// Method to return the position of the result tile computed by the tiled
+/// operation.
+LogicalResult ScatterOp::getIterationDomainTileFromOperandTile(
+    OpBuilder &b, unsigned operandNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes,
+    SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
+    SmallVectorImpl<OpFoldResult> &iterDomainSizes) {
+  // Fusion with producers is not possible in general if `unique_indices` is not
+  // true as reductions along the scattered indices are not tilable in parallel.
+  if (!getUniqueIndices()) {
+    return failure();
+  }
+  // TODO: Support fusion along the index operand. For the index operand, the
+  // offset + size must be the full size for the inner most dim.
+  if (getInputs().getBeginOperandIndex() != operandNumber) {
+    return failure();
+  }
+
+  // The iteration domain is defined in terms of the |input|, so simply
+  // use the given offsets/sizes.
+  iterDomainOffsets.assign(offsets.begin(), offsets.end());
+  iterDomainSizes.assign(sizes.begin(), sizes.end());
+  return success();
+}
+
+/// Method to generate the tiled implementation of an operation from the tile
+/// of the operand.
+FailureOr<TilingResult> ScatterOp::getTiledImplementationFromOperandTile(
+    OpBuilder &b, unsigned operandNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) {
+  SmallVector<OpFoldResult> mappedOffsets, mappedSizes;
+  if (failed(getIterationDomainTileFromOperandTile(
+          b, operandNumber, offsets, sizes, mappedOffsets, mappedSizes))) {
+    return failure();
+  }
+  return getTiledImplementation(b, mappedOffsets, mappedSizes);
 }
 
 LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
@@ -188,13 +227,13 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
   Value update = b.create<memref::LoadOp>(loc, getUpdates(), ivs);
   SmallVector<Value> starts;
   SmallVector<Value> loadIndices;
-  loadIndices.push_back(ivs.front());
+  append_range(loadIndices, ivs.take_front(getBatchRank()));
   loadIndices.push_back(Value());
 
   // Populate with empty values.
-  auto originalTy = cast<ShapedType>(getOriginal().getType());
+  auto originalTy = getOriginalType();
   starts.resize(originalTy.getRank(), Value());
-  auto updateIvs = ivs.drop_front(1);
+  auto updateIvs = ivs.drop_front(getBatchRank());
 
   int64_t offset = starts.size() - updateIvs.size();
   for (auto [idx, iv] : llvm::enumerate(updateIvs)) {
