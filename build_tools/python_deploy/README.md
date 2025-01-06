@@ -56,6 +56,23 @@ source .venv/bin/activate
 python -m pip install -r ./pypi_deploy_requirements.txt
 ```
 
+### Release index publication
+
+The [`generate_release_index.py`](./generate_release_index.py) script,
+run as part of
+[`.github/workflows/publish_website.yml`](../../.github/workflows/publish_website.yml),
+scrapes release artifact URLs from https://github.com/iree-org/iree/releases
+(and the release pages for other ecosystem projects) to generate the release
+index published at https://iree.dev/pip-release-links.html.
+
+The release index can be used like so:
+
+```bash
+python -m pip install \
+  --pre --find-links https://iree.dev/pip-release-links.html \
+  iree-base-compiler iree-base-runtime
+```
+
 ## Debugging manylinux builds
 
 We build releases under a manylinux derived docker image. When all goes well,

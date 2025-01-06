@@ -51,7 +51,7 @@ struct ConvertHalInterfaceBindingSubspan final
     if (!newResultType) {
       return rewriter.notifyMatchFailure(
           op->getLoc(),
-          llvm::formatv("failed to legalize memref type: {0}", op.getType()));
+          llvm::formatv("failed to legalize memref type: {}", op.getType()));
     }
     Location loc = op.getLoc();
     OpFoldResult zero = rewriter.getIndexAttr(0);
@@ -147,8 +147,8 @@ struct EmulateNarrowTypePass final
 
     RewritePatternSet sinkBroadcast(ctx);
     vector::populateSinkVectorOpsPatterns(sinkBroadcast);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(sinkBroadcast)))) {
+    if (failed(
+            applyPatternsGreedily(getOperation(), std::move(sinkBroadcast)))) {
       getOperation()->emitOpError("failed in sinking of broadcasts");
       return signalPassFailure();
     }
@@ -156,8 +156,8 @@ struct EmulateNarrowTypePass final
     // Also do the `bitcast -> extui/extsi` rewrite.
     RewritePatternSet foldExtPatterns(ctx);
     vector::populateVectorNarrowTypeRewritePatterns(foldExtPatterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(foldExtPatterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(),
+                                     std::move(foldExtPatterns)))) {
       return signalPassFailure();
     }
   }

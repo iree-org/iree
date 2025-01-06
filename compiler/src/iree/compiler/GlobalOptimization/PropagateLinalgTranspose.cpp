@@ -1038,8 +1038,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
     populateCommonCanonicalizationPatterns(context, sinkingPatterns);
     sinkingPatterns.add<SinkTransposeThroughUnaryElementwiseInput>(
         context, /*benefit=*/2);
-    if (failed(
-            applyPatternsAndFoldGreedily(funcOp, std::move(sinkingPatterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(sinkingPatterns)))) {
       funcOp.emitError("Transpose initial sinking patterns failed");
       return signalPassFailure();
     }
@@ -1107,8 +1106,8 @@ void PropagateLinalgTransposePass::runOnOperation() {
 
     GreedyRewriteConfig config;
     config.maxIterations = GreedyRewriteConfig::kNoLimit;
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(bubblingPatterns),
-                                            config))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(bubblingPatterns),
+                                     config))) {
       funcOp.emitError("Transpose bubbling patterns failed");
       return signalPassFailure();
     }
@@ -1166,8 +1165,8 @@ void PropagateLinalgTransposePass::runOnOperation() {
     // TODO: This is inefficient. Consider rewriting this pass to use a
     // worklist of just the transpose operations.
     config.maxIterations = GreedyRewriteConfig::kNoLimit;
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(sinkingPatterns),
-                                            config))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(sinkingPatterns),
+                                     config))) {
       funcOp.emitError("Transpose sinking patterns failed");
       return signalPassFailure();
     }

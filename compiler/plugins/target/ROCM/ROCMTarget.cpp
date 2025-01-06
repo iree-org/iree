@@ -8,7 +8,9 @@
 
 #include <cstdint>
 
+#include "compiler/plugins/target/ROCM/builtins/tuning/iree_default_tuning_specs_amdgpu.h"
 #include "compiler/plugins/target/ROCM/builtins/ukernel/iree_uk_amdgpu_bitcode.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
@@ -268,6 +270,8 @@ public:
     registry.insert<IREE::Codegen::IREECodegenDialect>();
     registry.insert<IREE::VectorExt::IREEVectorExtDialect>();
     registry.insert<IREE::GPU::IREEGPUDialect>();
+    // Configuration may load and manipulate transform dialect libraries.
+    registerTransformDialectTranslationDependentDialects(registry);
   }
 
   void
@@ -345,7 +349,7 @@ public:
         return variantOp.emitError()
                << "found an unresolved external function '" << func.getName()
                << "' in the final bitcode. A remaining live user is\n"
-               << llvm::formatv("{0}", *liveUser);
+               << llvm::formatv("{}", *liveUser);
       }
     }
     return success();
@@ -897,14 +901,9 @@ struct ROCMSession final
   }
 };
 
-} // namespace
-
-} // namespace mlir::iree_compiler::IREE::HAL
-
 // Iterate over ukernel bitcode embedded-data files, and insert them into the
 // EmbeddedDataDirectory singleton.
 static void addAMDGPUUkernelBitcodeToGlobalEmbeddedDataDirectory() {
-  using mlir::iree_compiler::EmbeddedDataDirectory;
   EmbeddedDataDirectory::withGlobal([](EmbeddedDataDirectory &dir) {
     const iree_file_toc_t *toc = iree_uk_amdgpu_bitcode_create();
     for (size_t i = 0; i < iree_uk_amdgpu_bitcode_size(); ++i) {
@@ -913,11 +912,30 @@ static void addAMDGPUUkernelBitcodeToGlobalEmbeddedDataDirectory() {
   });
 }
 
+// Iterate over default tuning spec embedded-data files, and insert them into
+// the EmbeddedDataDirectory singleton.
+static void addAMDGPUDefaultTuningSpecsToGlobalEmbeddedDataDirectory() {
+  EmbeddedDataDirectory::withGlobal([](EmbeddedDataDirectory &dir) {
+    const iree_file_toc_t *toc = iree_default_tuning_specs_amdgpu_create();
+    for (size_t i = 0, e = iree_default_tuning_specs_amdgpu_size(); i != e;
+         ++i) {
+      dir.addFile(toc[i].name, llvm::StringRef{toc[i].data, toc[i].size});
+    }
+  });
+}
+
+} // namespace
+
+} // namespace mlir::iree_compiler::IREE::HAL
+
 extern "C" bool iree_register_compiler_plugin_hal_target_rocm(
     mlir::iree_compiler::PluginRegistrar *registrar) {
   registrar->registerPlugin<mlir::iree_compiler::IREE::HAL::ROCMSession>(
       "hal_target_rocm");
-  addAMDGPUUkernelBitcodeToGlobalEmbeddedDataDirectory();
+  mlir::iree_compiler::IREE::HAL::
+      addAMDGPUUkernelBitcodeToGlobalEmbeddedDataDirectory();
+  mlir::iree_compiler::IREE::HAL::
+      addAMDGPUDefaultTuningSpecsToGlobalEmbeddedDataDirectory();
   return true;
 }
 

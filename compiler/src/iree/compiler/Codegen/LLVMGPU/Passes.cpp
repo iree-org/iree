@@ -21,6 +21,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/STLForwardCompat.h"
@@ -409,6 +410,9 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   }
   funcPassManager.addPass(IREE::GPU::createDistributeMmaToLanesPass());
 
+  // Step 4.5. Things that need to happen right after distribution to threads.
+  funcPassManager.addPass(createGPULowerToUKernelsPass());
+
   // Normalize loop bounds for later lowerings.
   funcPassManager.addPass(iree_compiler::createNormalizeLoopBoundsPass(
       NormalizeLoopBoundsPassOptions{/*normalizeFor=*/false,
@@ -523,72 +527,6 @@ void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createOptimizeVectorTransferPass());
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
-}
-
-//===---------------------------------------------------------------------===//
-// MatmulSIMT
-//===---------------------------------------------------------------------===//
-
-void addGPUMatmulSimtPassPipeline(OpPassManager &funcPassManager,
-                                  const GPUPipelineOptions &options) {
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/false);
-
-  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  funcPassManager.addPass(createGPUTensorTileToSerialLoopsPass());
-  funcPassManager.addPass(createGPUTensorAlloc());
-  funcPassManager.addPass(createGPUTensorTilePass());
-
-  // Linalg -> vector
-  addGPUVectorizationPasses(funcPassManager);
-
-  // tensor to memref
-  addBufferizePasses(funcPassManager);
-
-  // distribute foreach threads
-  funcPassManager.addPass(createGPUDistributePass());
-
-  funcPassManager.addPass(createMemrefCopyToLinalgPass());
-  funcPassManager.addPass(createGPUDistributeSharedMemoryCopyPass());
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  if (options.enableReduceSharedMemoryBankConflicts) {
-    funcPassManager.addPass(createGPUReduceBankConflictsPass());
-  }
-
-  ReorderWorkgroupsStrategy reorderStrategy =
-      getReorderWorkgroupsStrategy(options.reorderStrategy);
-  funcPassManager.addPass(
-      createReorderWorkgroups(reorderStrategy, canReorderWorkgroups));
-
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
-  funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  // Even though we vectorize before bufferization we are not able to hoist
-  // accumulator load/store out of the K loop until distribution. This is
-  // because we materialize the fill and the matmul in two different scf.forall
-  // regions, when they should be in the same scf.forall. Newer pipelines
-  // like TileAndFuse don't have this problem, because they coalesce these
-  // scf.forall regions into a single scf.forall.
-  //
-  // Therefore we still rely on buffer level transformations for transfer ops
-  // hoisting and store to load forwarding. This relies on shacky alias
-  // analysis and we need to move this to tensor level once we have better
-  // abstractions.
-  funcPassManager.addPass(createOptimizeVectorTransferPass());
-
-  // Hoist loop invariant code to avoid pipelining it.
-  funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
-  // Pipeline memory operations.
-  funcPassManager.addPass(createGPUPipeliningPass());
 }
 
 //===---------------------------------------------------------------------===//
@@ -1067,7 +1005,13 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       .addPass(createCSEPass)
       // Hoist the resulting decompositions.
       .addPass(createIREELoopInvariantCodeMotionPass)
-      .addPass(createLowerAffinePass);
+      .addPass(affine::createAffineExpandIndexOpsPass)
+      .addPass(createLowerAffinePass)
+      .addPass(IREE::Util::createOptimizeIntArithmeticPass)
+      // Do another round of LICM now that we've lowered and optimized
+      // arithmetic
+      .addPass(createCSEPass)
+      .addPass(createIREELoopInvariantCodeMotionPass);
 }
 
 static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
@@ -1092,6 +1036,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       // Pad allocations with dynamic dimension after linalg lowering but before
       // lowering SCF and affine ops.
       .addPass(createPadDynamicAllocPass)
+      // Hoist any newly static allocations from PadDynamicAlloc.
+      .addPass(createHoistStaticallyBoundAllocationsPass)
 
       .addPass(createLowerAffinePass)
       .addPass(createCanonicalizerPass)
@@ -1103,7 +1049,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   FunctionLikeNest funcPassManager(modulePassManager);
   funcPassManager.addPass(createFoldTensorExtractOpPass)
       .addPass(createLLVMGPUVectorLoweringPass)
-      .addPass(createExpandGPUOpsPass);
+      .addPass(createExpandGPUOpsPass)
+      // Expose workitem and workgroup counts to range inference later.
+      .addPass(createGPUPropagateDispatchSizeBoundsPass);
 
   // This pass needs to run before SCF -> CF.
   addLowerAndOptimizeAddressComputationPasses(funcPassManager);
@@ -1130,9 +1078,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(memref::createExpandStridedMetadataPass)
       .addPass(createEmulateNarrowTypePass)
       .addPass(affine::createAffineExpandIndexOpsPass)
-      .addPass(createLowerAffinePass)
-      .addPass(createCanonicalizerPass)
-      .addPass(createCSEPass);
+      .addPass(createLowerAffinePass);
 
   // Strip out the debug info for the kernel.
   modulePassManager.addPass(createStripDebugInfoPass());
@@ -1178,6 +1124,7 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass);
     funcPassManager.addPass(createCSEPass);
   }
+  modulePassManager.addPass(createMaterializeTuningSpecsPass());
   modulePassManager.addPass(createMaterializeUserConfigsPass());
   modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
 }
@@ -1190,6 +1137,10 @@ void buildLLVMGPUCodegenConfigurationPassPipeline(
 
 void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
                                      bool useROCM) {
+  // LLVMGPUSelectLoweringStrategyPass may have created ExecutableObjectAttr.
+  // Hoisting them now deduplicates them and ensures that rewrite patterns don't
+  // need to think about explicitly copying them over to new ops.
+  variantPassManager.addPass(IREE::HAL::createHoistExecutableObjectsPass());
   {
     OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
     modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
@@ -1245,6 +1196,7 @@ static void buildROCDLCodegenConfigurationPassPipelineImpl(
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
   }
+  modulePassManager.addPass(createMaterializeTuningSpecsPass());
   modulePassManager.addPass(createMaterializeUserConfigsPass());
 
   modulePassManager.addPass(createROCDLSelectLoweringStrategyPass());

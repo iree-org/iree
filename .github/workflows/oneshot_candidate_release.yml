@@ -2,23 +2,45 @@ name: Oneshot candidate release
 
 on:
   workflow_dispatch:
+    inputs:
+      build_type:
+        description: The type of build version to produce ("stable", "rc", or "dev")
+        type: string
+        default: "rc"
 
 jobs:
   tag_release:
     name: "Tag candidate release"
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checking out repository
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+
+      # Compute version suffix based on inputs (default to 'rc')
+      - name: Compute stable version suffix
+        if: ${{ inputs.build_type == 'stable' }}
+        run: |
+          version_suffix=""
+          echo "version_suffix=${version_suffix}" >> $GITHUB_ENV
+      - name: Compute rc version suffix
+        if: ${{ inputs.build_type == 'rc' || inputs.build_type == '' }}
+        run: |
+          version_suffix="$(printf 'rc%(%Y%m%d)T')"
+          echo "version_suffix=${version_suffix}" >> $GITHUB_ENV
+      - name: Compute dev version suffix
+        if: ${{ inputs.build_type == 'dev' }}
+        run: |
+          version_suffix=".dev0+${{ github.sha }}"
+          echo "version_suffix=${version_suffix}" >> $GITHUB_ENV
 
       - name: Compute version
         run: |
           git fetch --depth=1 origin +refs/tags/*:refs/tags/*
 
           # common version + tag
-          package_version="$(python3 build_tools/python_deploy/compute_common_version.py -rc)"
+          package_version="$(python3 build_tools/python_deploy/compute_common_version.py --version-suffix=${version_suffix})"
           tag_name="iree-${package_version}"
           echo "package_version=${package_version}" >> $GITHUB_ENV
           echo "tag_name=${tag_name}" >> $GITHUB_ENV
@@ -28,11 +50,11 @@ jobs:
           echo "legacy_package_version=${legacy_package_version}" >> $GITHUB_ENV
 
           # iree-base-compiler version
-          compiler_package_version="$(python3 build_tools/python_deploy/compute_local_version.py compiler -rc)"
+          compiler_package_version="$(python3 build_tools/python_deploy/compute_local_version.py compiler --version-suffix=${version_suffix})"
           echo "compiler_package_version=${compiler_package_version}" >> $GITHUB_ENV
 
           # iree-base-runtime version
-          runtime_package_version="$(python3 build_tools/python_deploy/compute_local_version.py runtime -rc)"
+          runtime_package_version="$(python3 build_tools/python_deploy/compute_local_version.py runtime --version-suffix=${version_suffix})"
           echo "runtime_package_version=${runtime_package_version}" >> $GITHUB_ENV
 
       - name: Updating candidate tag

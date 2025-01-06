@@ -63,10 +63,10 @@ jobs:
       VENV_DIR: ${{ github.workspace }}/venv
     steps:
       - name: Checking out IREE repository
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: false
-      - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
@@ -82,10 +82,10 @@ jobs:
 
       # Out of tree tests
       - name: Check out external TestSuite repository
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: nod-ai/SHARK-TestSuite
-          ref: f5615ab29da491c0047146258dfa3a0c40c735e5
+          ref: 601db0e472600a94ddb69b37d05cd7d4a17f89b2
           path: SHARK-TestSuite
           submodules: false
           lfs: true
@@ -112,7 +112,7 @@ jobs:
             --no-skip-tests-missing-files \
             --capture=no \
             --log-cli-level=info \
-            --timeout=240 \
+            --timeout=600 \
             --durations=0 \
             --config-files=${MODELS_CONFIG_FILE_PATH}
 
@@ -152,10 +152,10 @@ jobs:
       TEST_OUTPUT_ARTIFACTS: ${{ github.workspace }}/model_output_artifacts
     steps:
       - name: Checking out IREE repository
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: false
-      - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
@@ -189,7 +189,7 @@ jobs:
             -rpfE \
             --capture=no \
             --log-cli-level=info \
-            --timeout=240 \
+            --timeout=600 \
             --durations=0
         env:
           ROCM_CHIP: ${{ matrix.rocm-chip }}
@@ -203,7 +203,7 @@ jobs:
             -rpfE \
             --capture=no \
             --log-cli-level=info \
-            --timeout=240 \
+            --timeout=600 \
             --durations=0
         env:
           ROCM_CHIP: ${{ matrix.rocm-chip }}
@@ -227,7 +227,7 @@ jobs:
             --goldensize-rocm-clip-bytes 860000 \
             --goldensize-rocm-vae-bytes 840000 \
             --rocm-chip gfx90a \
-            --timeout=240 \
+            --timeout=600 \
             --log-cli-level=info \
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
@@ -248,14 +248,14 @@ jobs:
             --goldensize-rocm-unet-bytes 2270000 \
             --goldensize-rocm-clip-bytes 860000  \
             --goldensize-rocm-vae-bytes 840000 \
-            --goldentime-rocm-punet-int8-fp16-ms 53 \
+            --goldentime-rocm-punet-int8-fp16-ms 51 \
             --goldendispatch-rocm-punet-int8-fp16 1424 \
             --goldensize-rocm-punet-int8-fp16-bytes 2560000 \
-            --goldentime-rocm-punet-int8-fp8-ms 53 \
+            --goldentime-rocm-punet-int8-fp8-ms 51 \
             --goldendispatch-rocm-punet-int8-fp8 1704 \
             --goldensize-rocm-punet-int8-fp8-bytes 2800000 \
             --rocm-chip gfx942 \
             --log-cli-level=info \
-            --timeout=240 \
+            --timeout=600 \
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY

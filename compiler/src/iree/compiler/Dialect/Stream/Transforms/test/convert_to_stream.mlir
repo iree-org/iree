@@ -130,8 +130,7 @@ util.func public @while_test() {
   // CHECK: %[[INITIAL_DNO:.+]] = util.optimization_barrier %[[INITIAL]] : !stream.resource<*>
   %0 = util.optimization_barrier %cst : tensor<i32>
 
-  // CHECK: %[[VAR_SIZE:.+]] = stream.resource.size %[[INITIAL_DNO]] : !stream.resource<*>
-  // CHECK: cf.br ^bb1(%[[INITIAL_DNO]], %[[VAR_SIZE]] : !stream.resource<*>, index)
+  // CHECK: cf.br ^bb1(%[[INITIAL_DNO]], %[[CONSTANT_SIZE]] : !stream.resource<*>, index)
   cf.br ^bb1(%0 : tensor<i32>)
 
 // CHECK: ^bb1(%[[BB1_ARG:.+]]: !stream.resource<*>, %[[BB1_ARG_SIZE:.+]]: index):

@@ -96,6 +96,23 @@ func.func @distribute_scf_for_0d(%a: vector<i32>, %b: vector<i32>) -> vector<i32
   return %out : vector<i32>
 }
 
+// CHECK-LABEL: @distribute_scalar_extract
+func.func @distribute_scalar_extract(%a: f16, %b: vector<f16>) -> f16 {
+  %c0 = arith.constant 0 : index
+  %cst_0 = arith.constant 0.0 : f16
+  // CHECK: %[[ROOT:.*]] = arith.constant dense<0.000000e+00> : vector<f16>
+  %root = arith.constant dense<0.0> : vector<f16>
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout_0d) : vector<f16>
+  // CHECK-DAG: %[[B:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<f16> -> vector<f16>
+  // CHECK-DAG: %[[C:.*]] = arith.mulf %[[B]], %[[ROOT]] : vector<f16>
+  // CHECK-DAG: %[[SCALAR:.*]] = vector.extract %[[C]][] : f16 from vector<f16>
+  %c = arith.mulf %rootl, %b : vector<f16>
+  %scalar = vector.extract %c[] : f16 from vector<f16>
+  // CHECK-DAG: %[[D:.*]] = arith.addf %[[SCALAR]], %{{.*}} : f16
+  %d = arith.addf %scalar, %a : f16
+  return %d : f16
+}
+
 builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op

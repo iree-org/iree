@@ -3,8 +3,8 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#
-# Workflow for running Examples of IREE usage against releases periodically.
+
+# Workflow for running in-tree samples against releases periodically.
 
 name: samples
 
@@ -28,38 +28,41 @@ concurrency:
 
 jobs:
   colab:
-    runs-on: ubuntu-20.04
+    if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
+    runs-on: ubuntu-24.04
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: "Setting up Python"
-        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
           python-version: "3.11"
       - name: "Testing Colab Notebooks"
         run: ./samples/colab/test_notebooks.py
 
   samples:
-    runs-on: ubuntu-20.04
+    if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
+    runs-on: ubuntu-24.04
     env:
       CC: clang
       CXX: clang++
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Installing build dependencies"
         run: sudo apt update && sudo apt install -y ninja-build
       - name: "Setting up Python"
-        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
           python-version: "3.11"
       - name: "Testing Samples"
         run: ./build_tools/testing/test_samples.sh
 
   web:
-    runs-on: ubuntu-20.04
+    if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
+    runs-on: ubuntu-24.04
     env:
       VENV_DIR: ${{ github.workspace }}/.venv
       CC: clang
@@ -69,14 +72,14 @@ jobs:
         shell: bash
     steps:
       - name: "Check out repository"
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: "Mark git safe.directory"
         run: git config --global --add safe.directory '*'
       - name: "Check out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Installing build dependencies"
         run: sudo apt update && sudo apt install -y ninja-build
-      - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
           python-version: "3.11"
       - name: "Setup Python venv"
@@ -92,7 +95,7 @@ jobs:
       - name: "Setup emsdk"
         uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021 # v14
         with:
-          version: 3.1.44
+          version: 3.1.74
       - name: "Test experimental web samples"
         env:
           HOST_TOOLS_BINARY_DIR: ${{ env.VENV_DIR }}/bin
@@ -100,3 +103,15 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           ./experimental/web/build_and_test_samples.sh ${HOST_TOOLS_BINARY_DIR}
+
+  # Aggregate job status and alerting on failures.
+  samples_summary:
+    if: always()
+    needs:
+      - colab
+      - samples
+      - web
+    uses: ./.github/workflows/workflow_summary.yml
+    secrets: inherit
+    with:
+      jobs-json: ${{ toJson(needs) }}

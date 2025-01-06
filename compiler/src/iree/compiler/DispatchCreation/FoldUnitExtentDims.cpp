@@ -155,8 +155,8 @@ void FoldUnitExtentDimsPass::runOnOperation() {
   };
   linalg::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns, options);
   linalg::populateMoveInitOperandsToInputPattern(foldUnitDimsPatterns);
-  if (failed(applyPatternsAndFoldGreedily(moduleOp,
-                                          std::move(foldUnitDimsPatterns)))) {
+  if (failed(
+          applyPatternsGreedily(moduleOp, std::move(foldUnitDimsPatterns)))) {
     return signalPassFailure();
   }
 }

@@ -42,7 +42,6 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "CPULowerToUKernels.cpp"
-    "CPUMaterializeEncodings.cpp"
     "CPUPrepareUkernels.cpp"
     "Passes.cpp"
   DEPS
@@ -84,9 +83,7 @@ iree_cc_library(
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Encoding::IR
-    iree::compiler::Dialect::HAL::Analysis
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::Stream::Analysis
   PUBLIC
 )
 

@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   linux_x64_gcc:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     container: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:78a558b999b230f7e1da376639e14b44f095f30f1777d6a272ba48c0bbdd4ccb
     defaults:
       run:
@@ -34,7 +34,7 @@ jobs:
       BUILD_DIR: build-gcc
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: true
       - name: "Building IREE with gcc"
@@ -45,3 +45,11 @@ jobs:
           IREE_TARGET_BACKEND_WEBGPU_SPIRV: OFF
           IREE_BUILD_SETUP_PYTHON_VENV: ${{ env.BUILD_DIR }}/.venv
         run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+
+      - name: Post to Discord on Failure
+        uses: sarisia/actions-status-discord@ce8cc68e4e626000136b3c702d049a154243e490 # v1.14.7
+        if: failure() && github.ref_name == 'main' && github.repository_owner == 'iree-org'
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          description: "The ${{ github.workflow }} workflow failed"
+          url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}"

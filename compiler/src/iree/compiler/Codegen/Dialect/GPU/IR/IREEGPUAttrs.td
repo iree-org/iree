@@ -315,6 +315,32 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
 }
 
 //===----------------------------------------------------------------------===//
+// iree_gpu.gpu_encoding_layout
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_GPUEncodingLayoutAttr :
+    AttrDef<IREEGPU_Dialect, "GPUEncodingLayout"> {
+  let mnemonic = "gpu_encoding_layout";
+  let summary = "The encoding layout attribute for GPU backend";
+  let description = [{
+    This attribute can implement any layout interface methods for data-tiling,
+    e.g., Codegen::LayoutAttrInterface, etc. They should be implemented
+    through external model mechanism because we do not want to relocate
+    domain-specific logic to the dialect implementation, and we can have better
+    code structure. See the implementation in
+    compiler/Codegen/ExternalInterfaces/*.
+  }];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let parameters = (ins
+    OptionalParameter<"::mlir::iree_compiler::IREE::GPU::TargetAttr",
+     "IREE GPU target attribute. It is expected to be used in a pass scope, "
+     "but not the final IR output.">:$targetAttr
+  );
+}
+
+//===----------------------------------------------------------------------===//
 // Workgroup processor level description
 //===----------------------------------------------------------------------===//
 
@@ -492,6 +518,25 @@ def IREEGPU_LaneIdAttr : AttrDef<IREEGPU_Dialect, "LaneId", [
   let description = [{
     An attribute for mapping scf.forall ops to subgroup lanes.
   }];
+}
+
+//===---------------------------------------------------------------------===//
+// iree_gpu.ukernel_config
+//===---------------------------------------------------------------------===//
+
+def IREEGPU_UKernelConfigAttr  :
+    AttrDef<IREEGPU_Dialect, "UKernelConfig", []> {
+  let mnemonic = "ukernel_config";
+  let summary = "An attribute specifying a ukernel that an op can lower to.";
+  let description = [{
+    An attribute that can be applied to any operation to specify that it has
+    been match with a ukernel that is a legal lowering for it.
+  }];
+  let assemblyFormat = "`<` struct(params) `>`";
+  let parameters = (ins
+       "StringAttr":$name,
+       "DictionaryAttr":$def_attrs
+  );
 }
 
 //===----------------------------------------------------------------------===//

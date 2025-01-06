@@ -930,7 +930,7 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     // Manually gather list of ops because the other GreedyPatternRewriteDriver
     // overloads only accepts ops that are isolated from above.
     LogicalResult result =
-        applyOpPatternsAndFold(target, std::move(patterns), config);
+        applyOpPatternsGreedily(target, std::move(patterns), config);
     if (failed(result)) {
       return mlir::emitDefiniteFailure(target,
                                        "greedy pattern application failed");
@@ -1100,6 +1100,16 @@ class TestVectorLayoutOptions : public VectorLayoutOptions {
 public:
   TestVectorLayoutOptions(Operation *root)
       : VectorLayoutOptions(root, /*fullConversion=*/false) {}
+
+  VectorLayoutInterface getDefaultLayout(VectorType type) const override {
+    // We only allow a default layout for 0-d vectors for now.
+    if (type.getRank() > 0) {
+      return VectorLayoutInterface();
+    }
+    ArrayRef<int64_t> empty = {};
+    return IREE::VectorExt::NestedLayoutAttr::get(
+        type.getContext(), empty, empty, empty, empty, empty, empty, empty);
+  }
 };
 
 DiagnosedSilenceableFailure

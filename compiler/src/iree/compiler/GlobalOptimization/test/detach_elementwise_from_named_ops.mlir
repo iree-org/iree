@@ -101,6 +101,27 @@ util.func public @conv(%input: tensor<1x225x225x3xf32>, %filter: tensor<3x3x3x32
 
 // -----
 
+util.func public @depthwise_conv(%arg0: tensor<1x96x62x62xf32>, %arg1: tensor<96x7x7xf32>, %arg2: tensor<96xf32>) -> tensor<1x96x56x56xf32> {
+  %0 = tensor.empty() : tensor<1x96x56x56xf32>
+  %broadcasted = linalg.broadcast ins(%arg2 : tensor<96xf32>) outs(%0 : tensor<1x96x56x56xf32>) dimensions = [0, 2, 3]
+  %1 = linalg.depthwise_conv_2d_nchw_chw {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%arg0, %arg1 : tensor<1x96x62x62xf32>, tensor<96x7x7xf32>) outs(%broadcasted : tensor<1x96x56x56xf32>) -> tensor<1x96x56x56xf32>
+  util.return %1 : tensor<1x96x56x56xf32>
+}
+
+// CHECK-LABEL: util.func public @depthwise_conv
+//  CHECK-SAME: (%[[INPUT:.+]]: tensor<1x96x62x62xf32>, %[[FILTER:.+]]: tensor<96x7x7xf32>, %[[BIAS:.+]]: tensor<96xf32>)
+//       CHECK:   %[[INIT:.+]] = linalg.broadcast
+//  CHECK-SAME:     ins(%[[BIAS]] :
+//       CHECK:   %[[FILL:.+]] = linalg.fill
+//       CHECK:   %[[CONV:.+]] = linalg.depthwise_conv_2d_nchw_chw
+//  CHECK-SAME:     ins(%[[INPUT]], %[[FILTER]]
+//  CHECK-SAME:     outs(%[[FILL]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     ins(%[[CONV]], %[[INIT]]
+//  CHECK-SAME:     outs(%[[FILL]]
+
+// -----
+
 util.func public @keep_fill(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index

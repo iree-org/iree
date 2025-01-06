@@ -122,20 +122,13 @@ struct LLVMGPUCastTypeToFitMMAPass final
     auto func = getOperation();
 
     // Set MMA type from config embedded in toLayoutOp of contraction.
-    func.walk([&](vector::ContractionOp contract) {
-      inferMmaKind(contract);
-      if (!contract->hasAttr("iree.amdgpu.mma")) {
-        func.emitOpError("Failed to detect valid to_layout consumer of "
-                         "vector.contract to infer MMA kind.");
-        return signalPassFailure();
-      }
-    });
+    func.walk([&](vector::ContractionOp contract) { inferMmaKind(contract); });
 
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
     patterns.add<UpcastContractOutput>(context);
 
-    if (failed(applyPatternsAndFoldGreedily(func, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(func, std::move(patterns)))) {
       return signalPassFailure();
     }
   }

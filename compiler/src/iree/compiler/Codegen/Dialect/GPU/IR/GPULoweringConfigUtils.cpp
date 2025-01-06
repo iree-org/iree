@@ -8,9 +8,9 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-static SmallVector<int64_t> getIntegerVector(ArrayAttr array) {
+static std::optional<SmallVector<int64_t>> getIntegerVector(ArrayAttr array) {
   if (!array || !llvm::all_of(array.getValue(), llvm::IsaPred<IntegerAttr>)) {
-    return {};
+    return std::nullopt;
   }
   return llvm::map_to_vector(array.getValue(), [](Attribute s) -> int64_t {
     return cast<IntegerAttr>(s).getInt();
@@ -68,6 +68,54 @@ void setSubgroupNCount(MLIRContext *context,
       IntegerAttr::get(IntegerType::get(context, 64), subgroup_n_count));
 }
 
+const StringLiteral kSubgroupBasisName = "subgroup_basis";
+const StringLiteral kThreadBasisName = "thread_basis";
+
+static StringLiteral getBasisLevelName(IREE::GPU::TilingLevel level) {
+  switch (level) {
+  case GPU::TilingLevel::Thread:
+    return kThreadBasisName;
+  case GPU::TilingLevel::Subgroup:
+    return kSubgroupBasisName;
+  default:
+    assert(false && "Unknown tiling level for distribution");
+    return "";
+  }
+}
+
+void setBasis(MLIRContext *context, SmallVector<NamedAttribute> &attrs,
+              IREE::GPU::TilingLevel level, const Basis &basis) {
+  Builder b(context);
+  ArrayAttr basisAttr = b.getArrayAttr(
+      {b.getI64ArrayAttr(basis.counts), b.getI64ArrayAttr(basis.mapping)});
+  attrs.emplace_back(b.getNamedAttr(getBasisLevelName(level), basisAttr));
+}
+
+FailureOr<Basis> getBasis(IREE::GPU::LoweringConfigAttr config,
+                          IREE::GPU::TilingLevel level) {
+  auto basisAttr = dyn_cast_or_null<ArrayAttr>(
+      config.getAttributes().get(getBasisLevelName(level)));
+  if (!basisAttr) {
+    return failure();
+  }
+
+  ArrayRef<Attribute> attrs = basisAttr.getValue();
+  if (attrs.size() != 2) {
+    return failure();
+  }
+
+  std::optional<SmallVector<int64_t>> maybeCounts =
+      getIntegerVector(dyn_cast_or_null<ArrayAttr>(attrs[0]));
+  std::optional<SmallVector<int64_t>> maybeMapping =
+      getIntegerVector(dyn_cast_or_null<ArrayAttr>(attrs[1]));
+
+  if (!maybeCounts.has_value() || !maybeMapping.has_value()) {
+    return failure();
+  }
+
+  return Basis{maybeCounts.value(), maybeMapping.value()};
+}
+
 constexpr StringLiteral kPromoteOperandsName = "promote_operands";
 
 std::optional<SmallVector<int64_t>>
@@ -95,6 +143,11 @@ std::optional<SmallVector<int64_t>> getPaddingList(LoweringConfigAttr config) {
     return std::nullopt;
   }
   return getIntegerVector(array);
+}
+
+IREE::GPU::UKernelConfigAttr
+getUkernelSpec(IREE::GPU::LoweringConfigAttr config) {
+  return config.getAttributes().getAs<IREE::GPU::UKernelConfigAttr>("ukernel");
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

@@ -412,7 +412,7 @@ def LinkTuningSpecsPass : Pass<"iree-codegen-link-tuning-specs", "ModuleOp"> {
   let description = [{
     Given a module with multiple nested tuning specs, introduce a new named sequence
     that includes all the other tuning spec entry points. The order of inclusion is the same
-    as the in which these nested tuning specs appear in the IR.
+    as the order in which these nested tuning specs appear in the IR.
 
     A tuning spec entry point is a `transform.named_sequence` op annotated with the
     `iree_codegen.tuning_spec` unit attribute. We require it to perform in-place op
@@ -431,6 +431,21 @@ def LowerUKernelOpsToCallsPass :
   let summary = "Lower micro-kernel wrapper ops into function calls";
 }
 
+def MaterializeHostEncodingPass :
+    Pass<"iree-codegen-materialize-host-encoding", "mlir::ModuleOp"> {
+  let summary = "Materialize the encoding for tensor as specified by the backend.";
+}
+
+def MaterializeDeviceEncodingPass :
+    InterfacePass<"iree-codegen-materialize-device-encoding", "mlir::FunctionOpInterface"> {
+  let summary = "Materialize the encoding for tensor as specified by the backend.";
+  let options = [
+    Option<"testCLGPUTarget", "test-cl-gpu-target", "bool", /*default=*/"false",
+           "Flag used for lit-testing GPU target only. Not for general usage">,
+  ];
+}
+
+// TODO(hanchung): Remove the pass after we deprecate MaterializeHomogeneousEncodingsPass.
 def MaterializeEncodingIntoNopPass :
     InterfacePass<"iree-codegen-materialize-encoding-into-nop", "mlir::FunctionOpInterface"> {
   let summary = "Drop the encodings from tensor types with encodings.";

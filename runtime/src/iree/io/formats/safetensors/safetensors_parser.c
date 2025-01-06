@@ -501,26 +501,28 @@ static iree_status_t iree_io_parse_safetensors_index_from_memory(
 }
 
 IREE_API_EXPORT iree_status_t iree_io_parse_safetensors_index(
-    iree_io_file_handle_t* file_handle, iree_io_parameter_index_t* index) {
+    iree_io_file_handle_t* file_handle, iree_io_parameter_index_t* index,
+    iree_allocator_t host_allocator) {
   IREE_ASSERT_ARGUMENT(index);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Today we only support memory files.
-  // TODO(benvanik): support iree_io_stream_t wrapping for parsing the index.
-  if (iree_io_file_handle_type(file_handle) !=
-      IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "non-memory safetensors files not yet supported");
-  }
-  iree_byte_span_t host_allocation =
-      iree_io_file_handle_primitive(file_handle).value.host_allocation;
+  // The parser requires a host pointer but will only reference the file handle
+  // in the index. It'd be easy to change this parser to use stream-based
+  // reading as we could just read the header bytes and JSON blob into transient
+  // memory but the intent is that parameter parsing should not allocate large
+  // amounts of memory and this keeps the behavior consistent with other
+  // implementations.
+  iree_io_file_mapping_t* file_mapping = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_io_file_map_view(file_handle, IREE_IO_FILE_ACCESS_READ, 0,
+                                IREE_HOST_SIZE_MAX,
+                                IREE_IO_FILE_MAPPING_FLAG_EXCLUDE_FROM_DUMPS,
+                                host_allocator, &file_mapping));
 
   iree_status_t status = iree_io_parse_safetensors_index_from_memory(
-      file_handle,
-      iree_make_const_byte_span(host_allocation.data,
-                                host_allocation.data_length),
-      index);
+      file_handle, iree_io_file_mapping_contents_ro(file_mapping), index);
+
+  iree_io_file_mapping_release(file_mapping);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

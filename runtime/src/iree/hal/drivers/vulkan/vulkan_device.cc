@@ -31,8 +31,8 @@
 #include "iree/hal/drivers/vulkan/util/arena.h"
 #include "iree/hal/drivers/vulkan/util/ref_ptr.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
+#include "iree/hal/utils/file_registry.h"
 #include "iree/hal/utils/file_transfer.h"
-#include "iree/hal/utils/memory_file.h"
 
 using namespace iree::hal::vulkan;
 
@@ -755,8 +755,8 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
   // Create the device memory allocator that will service all buffer
   // allocation requests.
   iree_status_t status = iree_hal_vulkan_native_allocator_create(
-      options, instance, physical_device, logical_device,
-      &device->device_allocator);
+      options, (iree_hal_device_t*)device, instance, physical_device,
+      logical_device, &device->device_allocator);
 
   // Create command pools for each queue family. If we don't have a transfer
   // queue then we'll ignore that one and just use the dispatch pool.
@@ -1540,7 +1540,7 @@ static iree_status_t iree_hal_vulkan_device_create_command_buffer(
   if (binding_capacity > 0) {
     return iree_hal_deferred_command_buffer_create(
         iree_hal_device_allocator(base_device), mode, command_categories,
-        binding_capacity, &device->block_pool,
+        queue_affinity, binding_capacity, &device->block_pool,
         iree_hal_device_host_allocator(base_device), out_command_buffer);
   }
 
@@ -1599,14 +1599,8 @@ static iree_status_t iree_hal_vulkan_device_import_file(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
     iree_hal_external_file_flags_t flags, iree_hal_file_t** out_file) {
-  if (iree_io_file_handle_type(handle) !=
-      IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
-    return iree_make_status(
-        IREE_STATUS_UNAVAILABLE,
-        "implementation does not support the external file type");
-  }
-  return iree_hal_memory_file_wrap(
-      queue_affinity, access, handle, iree_hal_device_allocator(base_device),
+  return iree_hal_file_from_handle(
+      iree_hal_device_allocator(base_device), queue_affinity, access, handle,
       iree_hal_device_host_allocator(base_device), out_file);
 }
 

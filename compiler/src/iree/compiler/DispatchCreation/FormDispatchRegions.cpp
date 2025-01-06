@@ -182,28 +182,9 @@ static bool isPackLikeOp(Operation *op) {
   return isa<IREE::Encoding::SetEncodingOp, tensor::PackOp>(op);
 }
 
-/// Returns true if the operation is an `unpack` op or an `unset_encoding` op,
-/// or an `extract_slice` op whose source operand matches those criteria,
-/// recursively.
-/// The idea is that we want to ensure that `extract_slice` ops can't prevent
-/// fusion between a `unset_encoding` producer and some linalg consumer. In
-///   %0 = unset_encoding ...
-///   %1 = extract_slice %0 ...
-///   %2 = linalg.generic ins(%1) ...
-/// we are not content to be fusing %1 into %0, we also want to be fusing %2,
-/// so we want to prevent %1 from acting as a consumer fusion barrier.
-static bool isUnpackLikeOpViaExtractSliceOps(Operation *op) {
-  if (isa<IREE::Encoding::UnsetEncodingOp, tensor::UnPackOp>(op)) {
-    return true;
-  }
-  if (isa<tensor::ExtractSliceOp>(op)) {
-    Value source = op->getOperand(0);
-    Operation *producer = source.getDefiningOp();
-    if (isUnpackLikeOpViaExtractSliceOps(producer)) {
-      return true;
-    }
-  }
-  return false;
+/// Returns true if the operation is an `unpack` op or an `unset_encoding` op.
+static bool isUnpackLikeOp(Operation *op) {
+  return isa<IREE::Encoding::UnsetEncodingOp, tensor::UnPackOp>(op);
 }
 
 /// Since `iree_encoding.set_encoding` doesnt have padding semantics a
@@ -476,18 +457,7 @@ isFusableWithConsumer(OpOperand &fusedOperand,
 
   // Fuse unset_encoding operations with `tensor.extract_slice` and elementwise
   // generic ops.
-  if (isUnpackLikeOpViaExtractSliceOps(producer)) {
-    // Fuse `unset_encoding` -> `extract_slice` op since they get folded into
-    // `unpack` on materialization.
-    if (isa<tensor::ExtractSliceOp>(consumer)) {
-      auto sliceOp = cast<tensor::ExtractSliceOp>(consumer);
-      return llvm::all_of(
-                 sliceOp.getMixedOffsets(),
-                 [](OpFoldResult ofr) { return isConstantIntValue(ofr, 0); }) &&
-             llvm::all_of(sliceOp.getMixedStrides(), [](OpFoldResult ofr) {
-               return isConstantIntValue(ofr, 1);
-             });
-    }
+  if (isUnpackLikeOp(producer)) {
     // Fuse `unset_encoding/unpack` -> elementwise operations. Fuse unpack with
     // non-overlapping reductions (i.e., the reduction dimension is not packed).
     if (auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer)) {
@@ -681,7 +651,8 @@ isFusableWithProducer(OpOperand &operand,
   }
 
   // Don't fuse attention with it's producer
-  if (isa<IREE::LinalgExt::AttentionOp>(consumer)) {
+  // TODO: Enable scatter fusion when supported by backends.
+  if (isa<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::ScatterOp>(consumer)) {
     return false;
   }
 

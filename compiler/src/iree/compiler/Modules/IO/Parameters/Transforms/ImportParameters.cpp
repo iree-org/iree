@@ -80,10 +80,12 @@ loadParameterIndex(ModuleOp moduleOp, StringRef path,
     return failure();
 
   // Parse the archive as a particular format.
+  iree_allocator_t hostAllocator = iree_allocator_system();
   return handleRuntimeError(
       moduleOp,
       iree_io_parse_file_index(iree_make_string_view(path.data(), path.size()),
-                               fileHandle->get(), parameterIndex),
+                               fileHandle->get(), parameterIndex,
+                               hostAllocator),
       "parsing parameter archive");
 }
 

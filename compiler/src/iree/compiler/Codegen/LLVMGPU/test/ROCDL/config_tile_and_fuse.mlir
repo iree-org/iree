@@ -278,3 +278,59 @@ func.func @unaligned_to_intrinsic_batched_matmul(%lhs : tensor<12x577x577xf32>, 
 //  CHECK-SAME:     reduction = [0, 0, 0, 1]
 //  CHECK-SAME:     subgroup = [0, 1, 1, 0]
 //  CHECK-SAME:     workgroup = [1, 16, 16, 0]
+
+// -----
+
+module {
+func.func @unaligned_to_intrinsic_batched_matmul_tiling_check(%lhs : tensor<12x577x577xf32>, %rhs : tensor<12x577x1024xf32>) -> tensor<12x577x1024xf32> {
+    %c0 = arith.constant 0.0 : f32
+    %empty = tensor.empty() : tensor<12x577x1024xf32>
+    %fill = linalg.fill ins(%c0 : f32) outs(%empty : tensor<12x577x1024xf32>) -> tensor<12x577x1024xf32>
+    %mm = linalg.batch_matmul ins(%lhs, %rhs : tensor<12x577x577xf32>, tensor<12x577x1024xf32>) outs(%fill : tensor<12x577x1024xf32>) -> tensor<12x577x1024xf32>
+    return %mm :  tensor<12x577x1024xf32>
+}
+}
+
+// Note this test is used to check if a tuning parameter of right size can be
+// derived through deduceMMASchedule() in the case of unaligned shapes.
+// For existing unaligned shapes, C promotion always happens and failure in
+// considering this will severely underestimates the required shared memory.
+// In this unit test, if C promotion is not considered, it will deduce a MMA
+// schedule with nTileSize of 16 while in reality it should be 8.
+
+// CHECK-LABEL: func.func @unaligned_to_intrinsic_batched_matmul_tiling_check
+// CHECK-SAME:    #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+// CHECK-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
+//      CHECK:    linalg.batch_matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     padding = [1, 16, 512, 4]
+//  CHECK-SAME:     promote_operands = [0, 1, 2]
+//  CHECK-SAME:     reduction = [0, 0, 0, 1]
+//  CHECK-SAME:     subgroup = [0, 1, 8, 0]
+//  CHECK-SAME:     workgroup = [1, 16, 512, 0]
+
+// -----
+
+func.func @elementwise_scatter(%arg0: tensor<3x2048x2048xf32>,
+                               %arg1: tensor<3x2048x2048xf32>,
+                               %arg2: tensor<3x1xi32>) -> tensor<3x2048x2048xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<3x2048x2048xf32>
+  %1 = linalg.add ins(%arg0, %arg1 : tensor<3x2048x2048xf32>, tensor<3x2048x2048xf32>)
+    outs(%0 : tensor<3x2048x2048xf32>) -> tensor<3x2048x2048xf32>
+  %2 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%1, %arg2 : tensor<3x2048x2048xf32>, tensor<3x1xi32>) outs(%0 : tensor<3x2048x2048xf32>) {
+  ^bb0(%arg3: f32, %arg4: f32):
+    iree_linalg_ext.yield %arg3 : f32
+  } -> tensor<3x2048x2048xf32>
+  return %2 : tensor<3x2048x2048xf32>
+}
+
+// CHECK-LABEL: func.func @elementwise_scatter
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+
+//       CHECK:   linalg.add {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1, 4]
+//  CHECK-SAME:     workgroup = [1, 1, 256]
+
+// Verify that the scatter does not get a lowering config
+//       CHECK:   linalg_ext.scatter dimension_map

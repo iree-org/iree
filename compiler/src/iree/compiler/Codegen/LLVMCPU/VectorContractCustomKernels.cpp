@@ -831,8 +831,8 @@ private:
         // Perform the code replacement for the operand.
         // Example:   $(lhs:1)   =>   $5
         replaceAllSubstrsInPlace(
-            code, llvm::formatv("$({0}:{1})", name, unprocessedIdx),
-            llvm::formatv("${0}", processedIdx));
+            code, llvm::formatv("$({}:{})", name, unprocessedIdx),
+            llvm::formatv("${}", processedIdx));
       }
     };
     processOperands(Constraints::Kind::InputOutput, "acc", kernel.accRegs);
@@ -1130,7 +1130,7 @@ public:
     auto funcOp = getOperation();
     auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
     populateVectorContractCustomKernelsPatterns(target, patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       signalPassFailure();
     }
   }

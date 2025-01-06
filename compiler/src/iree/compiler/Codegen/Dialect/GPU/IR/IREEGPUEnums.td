@@ -92,7 +92,7 @@ def IREEGPU_DotProductOps : I32BitEnumAttr<
 //===----------------------------------------------------------------------===//
 // MMA intrinsic
 
-class IREEGPU_I32MmaEnumAttr<string name, string summary, list<I32EnumAttrCase> cases>
+class IREEGPU_I32EnumAttr<string name, string summary, list<I32EnumAttrCase> cases>
     : I32EnumAttr<name, summary, cases> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
   let genSpecializedAttr = 0;
@@ -176,7 +176,7 @@ def WMMA_I32_16x16x16_I8 : I32EnumAttrCase<"WMMA_I32_16x16x16_I8", 0x18C0>;
 def NV_WMMA_F32_16x16x16_F16 : I32EnumAttrCase<"NV_WMMA_F32_16x16x16_F16", 0x2020>;
 def NV_WMMA_F16_16x16x16_F16 : I32EnumAttrCase<"NV_WMMA_F16_16x16x16_F16", 0x2021>;
 
-def IREEGPU_MMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MMAIntrinsic",
+def IREEGPU_MMAIntrinsic : IREEGPU_I32EnumAttr<"MMAIntrinsic",
     "Descriptor for different MMA intrinsics", [
       // Introduced in CDNA1
       MFMA_F32_16x16x4_F32,
@@ -221,7 +221,7 @@ def VMFMA_F32_32x32x16_F16  : I32EnumAttrCase<"VMFMA_F32_32x32x16_F16", 1>;
 def VMFMA_F32_16x16x32_F8E4M3FNUZ  : I32EnumAttrCase<"VMFMA_F32_16x16x32_F8E4M3FNUZ", 2>;
 def VMFMA_F32_32x32x16_F8E4M3FNUZ  : I32EnumAttrCase<"VMFMA_F32_32x32x16_F8E4M3FNUZ", 3>;
 
-def IREEGPU_VirtualMMAIntrinsic : IREEGPU_I32MmaEnumAttr<"VirtualMMAIntrinsic",
+def IREEGPU_VirtualMMAIntrinsic : IREEGPU_I32EnumAttr<"VirtualMMAIntrinsic",
     "Descriptor for different Virtual MMA intrinsics", [
       VMFMA_F32_16x16x32_F16,
       VMFMA_F32_32x32x16_F16,
@@ -233,7 +233,7 @@ def MMA_LHS : I32EnumAttrCase<"Lhs", 0>;
 def MMA_RHS : I32EnumAttrCase<"Rhs", 1>;
 def MMA_ACC : I32EnumAttrCase<"Acc", 2>;
 
-def IREEGPU_MMAFragment : IREEGPU_I32MmaEnumAttr<"MMAFragment",
+def IREEGPU_MMAFragment : IREEGPU_I32EnumAttr<"MMAFragment",
     "Descriptor for a particular fragment of an MMA operation", [
       MMA_LHS,
       MMA_RHS,
@@ -243,7 +243,7 @@ def IREEGPU_MMAFragment : IREEGPU_I32MmaEnumAttr<"MMAFragment",
 def MMA_Workgroup : I32EnumAttrCase<"Workgroup", 0>;
 def MMA_Subgroup : I32EnumAttrCase<"Subgroup", 1>;
 
-def IREEGPU_MMAScope : IREEGPU_I32MmaEnumAttr<"MMAScope",
+def IREEGPU_MMAScope : IREEGPU_I32EnumAttr<"MMAScope",
     "Descriptor for a particular scope of an MMA operation", [
       MMA_Workgroup,
       MMA_Subgroup
@@ -263,7 +263,7 @@ def Lane : I32EnumAttrCase<"Lane", 5>;
 /// Note that `Thread` tiling is mutually exclusive with `Subgroup` and
 /// `Lane` tiling, and `Lane` tiling is only legal if the same operation
 /// is also tiled or fused to subgroups.
-def IREEGPU_TilingLevel : IREEGPU_I32MmaEnumAttr<"TilingLevel",
+def IREEGPU_TilingLevel : IREEGPU_I32EnumAttr<"TilingLevel",
     "Descriptor for tiling levels for GPU lowering configs", [
       Workgroup,
       Reduction,

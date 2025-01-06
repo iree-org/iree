@@ -39,7 +39,7 @@ permissions:
 
 jobs:
   setup:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     env:
       # The commit being checked out is the merge commit for the PR. Its first
       # parent will be the tip of main.
@@ -52,7 +52,7 @@ jobs:
       write-caches: ${{ steps.configure.outputs.write-caches }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           # We need the parent commit to do a diff
           fetch-depth: 2

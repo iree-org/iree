@@ -18,8 +18,8 @@
 #include "iree/hal/local/inline_command_buffer.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
+#include "iree/hal/utils/file_registry.h"
 #include "iree/hal/utils/file_transfer.h"
-#include "iree/hal/utils/memory_file.h"
 
 typedef struct iree_hal_sync_device_t {
   iree_hal_resource_t resource;
@@ -241,8 +241,8 @@ static iree_status_t iree_hal_sync_device_create_command_buffer(
     iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
     return iree_hal_deferred_command_buffer_create(
         iree_hal_device_allocator(base_device), mode, command_categories,
-        binding_capacity, &device->large_block_pool, device->host_allocator,
-        out_command_buffer);
+        queue_affinity, binding_capacity, &device->large_block_pool,
+        device->host_allocator, out_command_buffer);
   }
 }
 
@@ -267,14 +267,8 @@ static iree_status_t iree_hal_sync_device_import_file(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
     iree_hal_external_file_flags_t flags, iree_hal_file_t** out_file) {
-  if (iree_io_file_handle_type(handle) !=
-      IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
-    return iree_make_status(
-        IREE_STATUS_UNAVAILABLE,
-        "implementation does not support the external file type");
-  }
-  return iree_hal_memory_file_wrap(
-      queue_affinity, access, handle, iree_hal_device_allocator(base_device),
+  return iree_hal_file_from_handle(
+      iree_hal_device_allocator(base_device), queue_affinity, access, handle,
       iree_hal_device_host_allocator(base_device), out_file);
 }
 

@@ -267,9 +267,39 @@ func.func @not_vmt() {
   return
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 128, 8]{{\]}}>
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulSimt workgroup_size = [32, 1, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 //       CHECK: func.func @not_vmt()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+//  CHECK-SAME:       lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 8], thread = [1, 128, 0], workgroup = [1, 128, 1]}>
+
+// -----
+
+func.func @dynamic_parallel_dims(%dynsize : index, %input : tensor<4x?x4096xf16>) -> tensor<4x?xf32> {
+  %cst = arith.constant 0.0 : f32
+  %0 = tensor.empty(%dynsize) : tensor<4x?xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<4x?xf32>) -> tensor<4x?xf32>
+  %2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel", "reduction"]}
+      ins(%input : tensor<4x?x4096xf16>) outs(%1 : tensor<4x?xf32>) {
+    ^bb0(%in: f16, %out: f32):
+      %3 = arith.extf %in : f16 to f32
+      %4 = arith.addf %3, %out : f32
+      linalg.yield %4 : f32
+    } -> tensor<4x?xf32>
+  return %2 : tensor<4x?xf32>
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 64]{{\]}}
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1]>
+//      CHECK: func @dynamic_parallel_dims
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+//  CDNA3-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 32]{{\]}}
+//  CDNA3-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [32, 1, 1]>
+//      CDNA3: func @dynamic_parallel_dims
+// CDNA3-SAME:     translation_info = #[[TRANSLATION]]
+//      CDNA3:   linalg.generic
+// CDNA3-SAME:       lowering_config = #[[CONFIG]]

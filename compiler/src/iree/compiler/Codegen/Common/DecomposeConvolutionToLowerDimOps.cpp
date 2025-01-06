@@ -152,8 +152,7 @@ class DecomposeConvolutionToLowerDimOpsPass final
     // 2. Run the patterns. This is the key part of this pass.
     RewritePatternSet patterns(context);
     linalg::populateDecomposeConvolutionPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
 

@@ -96,15 +96,15 @@ createResourceVariable(Location loc, const SubspanResourceInfo &resource,
   OpBuilder builder(moduleOp.getContext());
   spirv::GlobalVariableOp variable;
   if (!isIndirect) {
-    std::string name = llvm::formatv("__resource_var_{0}_{1}_", resource.set,
-                                     resource.binding);
+    std::string name =
+        llvm::formatv("__resource_var_{}_{}_", resource.set, resource.binding);
     variable = builder.create<spirv::GlobalVariableOp>(
         loc, globalVariableType, name, resource.set, resource.binding);
     if (resource.aliased)
       variable->setAttr("aliased", builder.getUnitAttr());
   } else {
     std::string name =
-        llvm::formatv("__resource_var_indirect_{0}_", resource.set);
+        llvm::formatv("__resource_var_indirect_{}_", resource.set);
     variable = builder.create<spirv::GlobalVariableOp>(
         loc, globalVariableType, name, kIndirectBindingsSetIndex, resource.set);
   }
@@ -541,8 +541,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
     RewritePatternSet shapePatterns(context);
     shapePatterns.add<RemoveStaticDynamicCast>(context);
-    if (failed(
-            applyPatternsAndFoldGreedily(funcOp, std::move(shapePatterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(shapePatterns)))) {
       funcOp.emitOpError() << "failed running shape patterns";
       return signalPassFailure();
     }
@@ -562,8 +561,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
     RewritePatternSet narrowingPatterns(context);
     vector::populateVectorNarrowTypeRewritePatterns(narrowingPatterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                            std::move(narrowingPatterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(narrowingPatterns)))) {
       funcOp.emitOpError() << "failed running narrowing patterns";
       return signalPassFailure();
     }
@@ -574,7 +572,7 @@ void ConvertToSPIRVPass::runOnOperation() {
     RewritePatternSet patterns(context);
     arith::populateExpandBFloat16Patterns(patterns);
     arith::BitcastOp::getCanonicalizationPatterns(patterns, context);
-    if (failed(applyPatternsAndFoldGreedily(moduleOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(moduleOp, std::move(patterns)))) {
       moduleOp.emitOpError() << "failed running bf16 extf/trunc patterns";
       return signalPassFailure();
     }

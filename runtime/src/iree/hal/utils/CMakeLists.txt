@@ -120,10 +120,27 @@ iree_cc_library(
   SRCS
     "file_transfer.c"
   DEPS
-    ::memory_file
     iree::base
     iree::base::internal
     iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    files
+  HDRS
+    "fd_file.h"
+    "file_registry.h"
+    "memory_file.h"
+  SRCS
+    "fd_file.c"
+    "file_registry.c"
+    "memory_file.c"
+  DEPS
+    iree::base
+    iree::hal
+    iree::io::file_handle
   PUBLIC
 )
 
@@ -152,20 +169,6 @@ iree_cc_test(
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    memory_file
-  HDRS
-    "memory_file.h"
-  SRCS
-    "memory_file.c"
-  DEPS
-    iree::base
-    iree::hal
-    iree::io::file_handle
-  PUBLIC
 )
 
 iree_cc_library(

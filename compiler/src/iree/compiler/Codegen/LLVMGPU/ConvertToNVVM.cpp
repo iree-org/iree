@@ -31,6 +31,7 @@
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
@@ -113,14 +114,14 @@ struct ConvertToNVVMPass final
           patterns, vector::VectorTransformsOptions());
       vector::populateVectorTransferLoweringPatterns(patterns);
       arith::populateExpandBFloat16Patterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
     {
       RewritePatternSet patterns(&getContext());
       populateGpuRewritePatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -133,7 +134,7 @@ struct ConvertToNVVMPass final
       if (!cc || cc.value() < 80) {
         RewritePatternSet patterns(&getContext());
         populateReplaceSlowMinMaxOpsPatterns(patterns);
-        if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
           return signalPassFailure();
         }
       }
@@ -150,7 +151,12 @@ struct ConvertToNVVMPass final
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
       arith::populateCeilFloorDivExpandOpsPatterns(llvmPatterns);
       arith::populateArithToLLVMConversionPatterns(converter, llvmPatterns);
+      vector::populateVectorRankReducingFMAPattern(llvmPatterns);
+      vector::populateVectorInsertExtractStridedSliceTransforms(llvmPatterns);
+      vector::populateVectorStepLoweringPatterns(llvmPatterns);
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
+      vector::populateVectorTransferLoweringPatterns(llvmPatterns,
+                                                     /*maxTransferRank=*/1);
       populateGpuToNVVMConversionPatterns(converter, llvmPatterns);
       populateNVGPUToNVVMConversionPatterns(converter, llvmPatterns);
       populateGpuWMMAToNVVMConversionPatterns(converter, llvmPatterns);
@@ -178,7 +184,7 @@ struct ConvertToNVVMPass final
     {
       RewritePatternSet patterns(&getContext());
       populateNVVMToLLVMConversionPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
       }
     }

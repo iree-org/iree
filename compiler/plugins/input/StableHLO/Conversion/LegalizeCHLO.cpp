@@ -2182,8 +2182,7 @@ struct LegalizeChlo final : impl::LegalizeChloBase<LegalizeChlo> {
       mlir::shape::CstrBroadcastableOp::getCanonicalizationPatterns(patterns,
                                                                     ctx);
       mlir::tensor::CastOp::getCanonicalizationPatterns(patterns, ctx);
-      if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                              std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
         return signalPassFailure();
       }
     }

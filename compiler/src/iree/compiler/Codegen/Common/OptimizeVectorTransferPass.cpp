@@ -80,7 +80,7 @@ struct OptimizeVectorTransferPass final
       mlir::vector::
           populateVectorTransferCollapseInnerMostContiguousDimsPatterns(
               patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -104,7 +104,7 @@ struct OptimizeVectorTransferPass final
     {
       RewritePatternSet patterns(&getContext());
       vector::populateBubbleVectorBitCastOpPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -115,7 +115,7 @@ struct OptimizeVectorTransferPass final
     if (flatten) {
       RewritePatternSet patterns(&getContext());
       mlir::vector::populateFlattenVectorTransferPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }

@@ -24,11 +24,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  setup:
-    uses: ./.github/workflows/setup.yml
-
   linux_arm64_clang:
-    needs: setup
+    if: ${{ github.repository_owner == 'iree-org' }}
     # See https://gitlab.arm.com/tooling/gha-runner-docs
     runs-on: ah-ubuntu_22_04-c7g_4x-50
     container:
@@ -40,7 +37,7 @@ jobs:
       BUILD_DIR: build-arm64
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: true
       - name: Install Python requirements
@@ -71,3 +68,11 @@ jobs:
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
       - name: Test iree-dialects
         run: ./build_tools/cmake/test_iree_dialects.sh "${BUILD_DIR}"
+
+      - name: Post to Discord on Failure
+        uses: sarisia/actions-status-discord@ce8cc68e4e626000136b3c702d049a154243e490 # v1.14.7
+        if: failure() && github.ref_name == 'main' && github.repository_owner == 'iree-org'
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          description: "The ${{ github.workflow }} workflow failed"
+          url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}"

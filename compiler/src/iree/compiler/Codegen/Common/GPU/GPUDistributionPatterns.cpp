@@ -303,10 +303,37 @@ struct DistributeGather final : OpDistributionPattern<vector::GatherOp> {
   }
 };
 
+/// Distribute a 0-rank vector to scalar vector.extract conversion.
+struct DistributeTrivialExtract final
+    : OpDistributionPattern<vector::ExtractOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult matchAndRewrite(vector::ExtractOp extractOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    if (extractOp.getSourceVectorType().getRank() != 0) {
+      return rewriter.notifyMatchFailure(
+          extractOp, "Only 0-rank vector extractions supported");
+    }
+
+    VectorValue source = extractOp.getVector();
+    VectorLayoutInterface sourceLayout = signature[source];
+
+    Value distributed = rewriter.create<vector::ExtractOp>(
+        extractOp.getLoc(), getDistributed(rewriter, source, sourceLayout),
+        ArrayRef<int64_t>{});
+
+    replaceOpWithDistributedValues(rewriter, extractOp, distributed);
+
+    return success();
+  }
+};
+
 } // namespace
 
 void populateGPUDistributionPatterns(RewritePatternSet &patterns) {
-  patterns.add<DistributeConstants, DistributeScfFor>(patterns.getContext());
+  patterns.add<DistributeConstants, DistributeScfFor, DistributeTrivialExtract>(
+      patterns.getContext());
   // Elementwise patterns.
   patterns.add<DistributeElementwise>(patterns.getContext());
   patterns.add<DistributeTrivialLayoutConversions>(patterns.getContext());

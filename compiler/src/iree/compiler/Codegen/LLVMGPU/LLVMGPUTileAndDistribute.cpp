@@ -81,7 +81,7 @@ static LogicalResult tileToSerialLoops(mlir::FunctionOpInterface funcOp) {
         wgTilingCanonicalizationPatterns);
     scf::populateSCFForLoopCanonicalizationPatterns(
         wgTilingCanonicalizationPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
+    if (failed(applyPatternsGreedily(
             funcOp, std::move(wgTilingCanonicalizationPatterns)))) {
       return failure();
     }
@@ -220,8 +220,7 @@ public:
     {
       RewritePatternSet promotionPatterns(&getContext());
       populateContractPromotionPatterns(promotionPatterns, {2});
-      if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                              std::move(promotionPatterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(promotionPatterns)))) {
         return signalPassFailure();
       }
       propagateSharedMemoryCopy(funcOp);
@@ -256,8 +255,7 @@ public:
 
       populateContractPromotionPatterns(promotionPatterns, {0, 1});
 
-      if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                              std::move(promotionPatterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(promotionPatterns)))) {
         return signalPassFailure();
       }
       // Insert barriers before and after copies to workgroup memory.
@@ -267,8 +265,8 @@ public:
     {
       RewritePatternSet promotionCanonicalization =
           linalg::getLinalgTilingCanonicalizationPatterns(context);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(promotionCanonicalization)))) {
+      if (failed(applyPatternsGreedily(funcOp,
+                                       std::move(promotionCanonicalization)))) {
         return signalPassFailure();
       }
     }
@@ -296,7 +294,7 @@ public:
           linalg::getLinalgTilingCanonicalizationPatterns(context);
       populateAffineMinSCFCanonicalizationPattern(
           threadTilingCanonicalizationPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
+      if (failed(applyPatternsGreedily(
               funcOp, std::move(threadTilingCanonicalizationPatterns)))) {
         return signalPassFailure();
       }

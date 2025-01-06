@@ -46,6 +46,9 @@ jobs:
   setup:
     uses: ./.github/workflows/setup.yml
 
+  ##############################################################################
+  # Runtime builds
+
   runtime:
     needs: setup
     name: "runtime :: ${{ matrix.name }}"
@@ -58,8 +61,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: ubuntu-20.04
-            runs-on: ubuntu-20.04
+          - name: ubuntu-24.04
+            runs-on: ubuntu-24.04
             driver-options: -DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON -DIREE_HAL_DRIVER_VULKAN=ON
           - name: windows-2022
             runs-on: windows-2022
@@ -70,8 +73,8 @@ jobs:
     env:
       BUILD_DIR: build-runtime
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-      - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
           python-version: "3.11"
 
@@ -120,13 +123,13 @@ jobs:
   runtime_small:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'runtime_small')
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     env:
       BUILD_DIR: build-runtime
       CC: clang
       CXX: clang++
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Install requirements
         run: sudo apt update && sudo apt install -y ninja-build
       - name: Checkout runtime submodules
@@ -156,7 +159,7 @@ jobs:
     needs: setup
     name: "runtime_tracing :: ${{ matrix.provider }} provider"
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'runtime_tracing')
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -169,7 +172,7 @@ jobs:
       CXX: clang++
       TRACING_PROVIDER: ${{ matrix.provider }}
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Install requirements
         run: sudo apt update && sudo apt install -y ninja-build
       - name: Checkout runtime submodules
@@ -197,40 +200,44 @@ jobs:
         run: cmake --build ${BUILD_DIR} -- -k 0
 
   ##############################################################################
+  # Full project builds
 
-  # Depends on all the other jobs to provide a single anchor that indicates the
-  # final status. Status reporting will become more sophisticated in the future
-  # and we can hopefully avoid the need to explicitly list every single job...
-  summary:
-    # Even if you have an explicit if condition, you still need to override
-    # GitHub's default behavior of not running if any dependencies failed.
+  linux_x64_bazel:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_bazel')
+    uses: ./.github/workflows/ci_linux_x64_bazel.yml
+    secrets: inherit
+
+  linux_x64_clang:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang')
+    uses: ./.github/workflows/ci_linux_x64_clang.yml
+    secrets: inherit
+
+  linux_x64_clang_asan:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_asan')
+    uses: ./.github/workflows/ci_linux_x64_clang_asan.yml
+    secrets: inherit
+
+  ##############################################################################
+
+  # Aggregate job status and alerting on failures.
+  ci_summary:
     if: always()
-    runs-on: ubuntu-20.04
     needs:
       - setup
+
+      # Runtime builds.
       - runtime
       - runtime_small
       - runtime_tracing
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-      - name: Getting failed jobs
-        id: failed_jobs
-        run: |
-          echo '${{ toJson(needs) }}'
-          FAILED_JOBS="$(echo '${{ toJson(needs) }}' \
-            | jq --raw-output \
-            'map_values(select(.result!="success" and .result!="skipped")) | keys | join(",")' \
-          )"
-          echo "failed-jobs=${FAILED_JOBS}" >> $GITHUB_OUTPUT
-          if [[ "${FAILED_JOBS}" != "" ]]; then
-            echo "The following jobs failed: ${FAILED_JOBS}"
-            exit 1
-          fi
-      - name: Posting to Discord
-        uses: sarisia/actions-status-discord@ce8cc68e4e626000136b3c702d049a154243e490 # v1.14.7
-        if: failure() && github.ref_name == 'main'
-        with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          description: "The following jobs failed: ${{ steps.failed_jobs.outputs.failed-jobs }}"
-          url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}"
+
+      # Full project builds.
+      - linux_x64_bazel
+      - linux_x64_clang
+      - linux_x64_clang_asan
+    uses: ./.github/workflows/workflow_summary.yml
+    secrets: inherit
+    with:
+      jobs-json: ${{ toJson(needs) }}

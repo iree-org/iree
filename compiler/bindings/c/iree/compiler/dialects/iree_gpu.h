@@ -93,6 +93,25 @@ MLIR_CAPI_EXPORTED MlirAttribute ireeGPULoweringConfigAttrGet(
 MLIR_CAPI_EXPORTED MlirAttribute
 ireeGPULoweringConfigAttrGetAttributes(MlirAttribute attr);
 
+struct ireeGPUTileSizes {
+  MlirAttribute workgroupAttr;
+  MlirAttribute reductionAttr;
+};
+
+MLIR_CAPI_EXPORTED ireeGPUTileSizes
+ireeGPULoweringConfigAttrGetTileSizes(MlirAttribute attr);
+
+struct ireeGPUSubgroupCountInfo {
+  MlirAttribute subgroupMCountAttr;
+  MlirAttribute subgroupNCountAttr;
+};
+
+MLIR_CAPI_EXPORTED ireeGPUSubgroupCountInfo
+ireeGPULoweringConfigAttrGetSubgroupCount(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeGPULoweringConfigAttrGetMmaKind(MlirAttribute attr);
+
 #ifdef __cplusplus
 }
 #endif

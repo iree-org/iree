@@ -1018,32 +1018,6 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_matmul_cuda_f32_large_simt
-  TEST_TYPE
-    matmul
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=f32"
-    "--acc_type=f32"
-    "--shapes=easy_large_static"
-    "--compilation_info=LLVMGPUMatmulSimt"
-  TEST_RUNNER
-    iree_tools_testing_e2e_iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "cuda"
-  DRIVERS
-    "cuda"
-  LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
-    "requires-gpu-nvidia"
-)
-
-iree_generated_e2e_runner_test(
-  NAME
     e2e_matmul_cuda_f32_large_tensorcore
   TEST_TYPE
     matmul
@@ -1382,34 +1356,6 @@ iree_generated_e2e_runner_test(
     "vulkan_uses_vk_khr_shader_float16_int8"
 )
 
-iree_generated_e2e_runner_test(
-  NAME
-    e2e_matmul_vulkan_f16_large_rdna3
-  TEST_TYPE
-    matmul
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=f16"
-    "--acc_type=f32"
-    "--shapes=easy_large_static"
-    "--compilation_info=SPIRVCooperativeMatrixVectorize"
-  TEST_RUNNER
-    iree_tools_testing_e2e_iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "vulkan-spirv"
-  DRIVERS
-    "vulkan"
-  COMPILER_FLAGS
-    "--iree-vulkan-target=rdna3"
-  RUNNER_ARGS
-    "--require_exact_results=false"
-  LABELS
-    "requires-gpu"
-    "requires-gpu-rdna3"
-    "vulkan_uses_vk_khr_shader_float16_int8"
-)
-
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 # To distinguish between CDNA(gfx9) and RDNA3(gfx11)
@@ -1646,6 +1592,36 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-global-opt-experimental-rocm-data-tiling"
     "--iree-global-opt-enable-early-materialization=true"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna3"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cdna3_dt_uk_i8
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=i8"
+    "--acc_type=i32"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+    "--iree-opt-data-tiling"
+    "--iree-global-opt-experimental-rocm-data-tiling"
+    "--iree-global-opt-enable-early-materialization=true"
+    "--iree-hip-enable-ukernels=multi_mma"
   LABELS
     "noasan"
     "nomsan"
