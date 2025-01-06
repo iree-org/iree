@@ -104,6 +104,7 @@ iree_lit_test_suite(
     reductions_codegen_spec.mlir
     reductions_match_spec.mlir
     tuning_spec.mlir
+    tuning_spec_default.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

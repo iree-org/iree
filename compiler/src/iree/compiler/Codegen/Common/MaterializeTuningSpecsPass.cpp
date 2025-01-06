@@ -197,28 +197,36 @@ struct MaterializeTuningSpecsPass final
       return;
     }
 
-    // If only the default tuning spec is available, use it directly and skip
-    // the linking stage.
-    if (!hasUserTuningSpec) {
-      if (failed(dumpFinalTuningSpecToDir(*defaultTuningSpec))) {
+    // When the user tuning spec and default spec are available, link all
+    // available libraries into a single module. We insert the default tuning
+    // spec last, so that any user-specified tuning configurations take
+    // precedence.
+    SmallVector<ModuleOp, 2> allSpecs;
+    if (hasUserTuningSpec) {
+      allSpecs.push_back(*userTuningSpec);
+    }
+    if (hasDefaultTuningSpec) {
+      allSpecs.push_back(*defaultTuningSpec);
+    }
+
+    // Determine if the linking pass should be skipped.
+    // Skip if there is only one tuning spec (either user-provided or default)
+    // with the default attribute.
+    if (allSpecs.size() == 1 &&
+        allSpecs[0]->hasAttr(kTuningSpecDefaultEntrypointAttrName)) {
+      // Use the appropriate tuning spec (user or default).
+      ModuleOp tuningSpecWithDefaultAttr = allSpecs[0];
+      if (failed(dumpFinalTuningSpecToDir(tuningSpecWithDefaultAttr))) {
         return signalPassFailure();
       }
       FailureOr<DenseElementsAttr> serializedSpec =
-          serializeTuningSpecToAttr(*defaultTuningSpec);
+          serializeTuningSpecToAttr(tuningSpecWithDefaultAttr);
       if (failed(serializedSpec)) {
         module->emitError("Failed to serialize default tuning specs");
         return signalPassFailure();
       }
       module->setAttr(kSerializedTuningSpecAttrName, *serializedSpec);
       return;
-    }
-
-    // When the user tuning spec is available, link all available libraries into
-    // a single module. We insert the default tuning spec last, so that any
-    // user-specified tuning configurations take precedence.
-    SmallVector<ModuleOp, 2> allSpecs = {*userTuningSpec};
-    if (hasDefaultTuningSpec) {
-      allSpecs.push_back(*defaultTuningSpec);
     }
 
     Location loc =
