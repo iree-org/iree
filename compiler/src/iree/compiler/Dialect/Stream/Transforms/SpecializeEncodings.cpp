@@ -1,4 +1,4 @@
-// Copyright 2024 The IREE Authors
+// Copyright 2025 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -118,7 +118,7 @@ static LogicalResult addLayoutsToTensorPhaseOps(
               }
               std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
                   getEncodingWithNewLayouts(encodingType);
-              if (!encodingAttr.has_value()) {
+              if (!encodingAttr) {
                 return success();
               }
               rewriter.modifyOpInPlace(sizeOfOp, [&] {
@@ -149,10 +149,11 @@ struct SpecializeEncodingsPass
       return signalPassFailure();
     }
 
-    llvm::MapVector<StringRef, IREE::Stream::ExecutableOp> executableOps;
-    for (auto executableOp : moduleOp.getOps<IREE::Stream::ExecutableOp>()) {
-      executableOps[executableOp.getName()] = executableOp;
-    }
+    llvm::MapVector<StringRef, IREE::Stream::ExecutableOp> executableOp(
+        llvm::map_range(moduleOp.getOps<IREE::Stream::ExecutableOp>(),
+                        [](auto op) {
+                          return {op.getName(), op};
+                        }));
 
     IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr =
         usedDialects[0]->makeLayoutAttrResolver(moduleOp);
