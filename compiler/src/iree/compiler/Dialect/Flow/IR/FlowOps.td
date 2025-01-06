@@ -986,16 +986,7 @@ def FLOW_CallOp : FLOW_Op<"call", [
       "TypeRange":$resultTypes, "ValueRange":$resultDims,
       "ValueRange":$arguments,
       "ArrayAttr":$tiedOperands,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes),
-    [{
-      build($_builder, $_state,
-          callee,
-          resultTypes, resultDims,
-          arguments,
-          IREE::Util::buildDynamicDimsForValues($_state.location, arguments, $_builder),
-          tiedOperands,
-          attributes);
-    }]>,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
     OpBuilder<(ins
       "SymbolRefAttr":$callee,
       "TypeRange":$resultTypes, "ValueRange":$resultDims,
