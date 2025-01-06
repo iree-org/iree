@@ -3858,7 +3858,7 @@ layout" here, which will be the key difference with <code>mmt4d</code> below.</p
 workgroup tile is tiled to fit some level of CPU cache, and finally each tile is
 further tiled to fit target architecture registers (e.g. 8x8).</p>
 <p>That multi-level tiling means that the code works like the following loop nest:</p>
-<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">tiled_matmul</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">,</span> <span class="n">C</span><span class="p">,</span> <span class="n">tile_m</span><span class="p">,</span> <span class="n">tile_n</span><span class="p">,</span> <span class="n">tile_k</span><span class="p">,</span> <span class="n">tile_m_v</span><span class="p">,</span> <span class="n">tile_n_v</span><span class="p">,</span> <span class="n">tile_k_v</span><span class="p">):</span>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tiled_matmul</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">,</span> <span class="n">C</span><span class="p">,</span> <span class="n">tile_m</span><span class="p">,</span> <span class="n">tile_n</span><span class="p">,</span> <span class="n">tile_k</span><span class="p">,</span> <span class="n">tile_m_v</span><span class="p">,</span> <span class="n">tile_n_v</span><span class="p">,</span> <span class="n">tile_k_v</span><span class="p">):</span>
  <span class="n">m</span> <span class="o">=</span> <span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
  <span class="n">k</span> <span class="o">=</span> <span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
  <span class="n">n</span> <span class="o">=</span> <span class="n">B</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
@@ -3954,7 +3954,7 @@ written as a reshape followed by a transpose as in the following digram:</p>
 tile position in the overall matrix, and the innermost two as the element
 position within one tile. Hopefully the following Python pseudocode makes it
 more concrete:</p>
-<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">pack_2d_4d</span><span class="p">(</span><span class="n">operand</span><span class="p">,</span> <span class="n">parallel_size</span><span class="p">,</span> <span class="n">reduction_size</span><span class="p">):</span>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">pack_2d_4d</span><span class="p">(</span><span class="n">operand</span><span class="p">,</span> <span class="n">parallel_size</span><span class="p">,</span> <span class="n">reduction_size</span><span class="p">):</span>
  <span class="n">i1</span> <span class="o">=</span> <span class="n">operand</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">//</span> <span class="n">parallel_size</span> <span class="c1"># M1</span>
  <span class="n">i2</span> <span class="o">=</span> <span class="n">parallel_size</span>    <span class="c1"># M0</span>
  <span class="n">j1</span> <span class="o">=</span> <span class="n">operand</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">//</span> <span class="n">reduction_size</span> <span class="c1"># K1</span>
@@ -3965,7 +3965,7 @@ more concrete:</p>
 <p>Now the mmt4d operation will follow a structure as the multi level tiling, for
 simplicity we considered the case here where no L1 tiling is required only first
 level of distribution to workgroups:</p>
-<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">mmt4d</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">,</span> <span class="n">C</span><span class="p">,</span> <span class="n">M0</span><span class="p">,</span> <span class="n">N0</span><span class="p">,</span> <span class="n">K0</span><span class="p">):</span>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">mmt4d</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">,</span> <span class="n">C</span><span class="p">,</span> <span class="n">M0</span><span class="p">,</span> <span class="n">N0</span><span class="p">,</span> <span class="n">K0</span><span class="p">):</span>
  <span class="n">M</span> <span class="o">=</span> <span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
  <span class="n">N</span> <span class="o">=</span> <span class="n">B</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
  <span class="n">Bt</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
@@ -3988,7 +3988,7 @@ level of distribution to workgroups:</p>
 </code></pre></div>
 <p>The resulting 4D tiled matrix still needs be rearranged back to the original
 layout as 2D tensor:</p>
-<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">unpack_4d_2d</span><span class="p">(</span><span class="n">operand</span><span class="p">):</span>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">unpack_4d_2d</span><span class="p">(</span><span class="n">operand</span><span class="p">):</span>
  <span class="n">i1</span> <span class="o">=</span> <span class="n">operand</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="c1"># M1</span>
  <span class="n">j1</span> <span class="o">=</span> <span class="n">operand</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="c1"># N1</span>
  <span class="n">i2</span> <span class="o">=</span> <span class="n">operand</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="c1"># M0</span>

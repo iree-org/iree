@@ -3932,17 +3932,17 @@ tested independently using the MLIR lit framework.</p>
 <p>Kernels are encoded in a FlatBuffer containing the PTX code as well as the
 workgroup size to use for the dispatch. This allows serialization of the kernels
 in the IR, it is then de-serialized by the HAL layer.</p>
-<div class="highlight"><pre><span></span><code>table CUDAExecutableDef {
-  // A map of entry point ordinals to string names as used in the shader
-  // library.
-  entry_points:[string];
+<div class="highlight"><pre><span></span><code><span class="n">table</span><span class="w"> </span><span class="n">CUDAExecutableDef</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c c-SingleLine">// A map of entry point ordinals to string names as used in the shader</span>
+<span class="w">  </span><span class="c c-SingleLine">// library.</span>
+<span class="w">  </span><span class="n">entry_points</span><span class="p">:[</span><span class="kt">string</span><span class="p">];</span>
 
-  // Block sizes for each entry point.
-  block_sizes:[CUDABlockSize];
+<span class="w">  </span><span class="c c-SingleLine">// Block sizes for each entry point.</span>
+<span class="w">  </span><span class="n">block_sizes</span><span class="p">:[</span><span class="n">CUDABlockSize</span><span class="p">];</span>
 
-  // PTX string of the module.
-  ptx_image:string;
-}
+<span class="w">  </span><span class="c c-SingleLine">// PTX string of the module.</span>
+<span class="w">  </span><span class="n">ptx_image</span><span class="p">:</span><span class="kt">string</span><span class="p">;</span>
+<span class="p">}</span>
 </code></pre></div>
 <h3 id="hello-world">Hello world<a class="headerlink" href="#hello-world" title="Permanent link">link</a></h3>
 <p>Together those 3 steps are enough to provide most of the functionality and we

@@ -3952,13 +3952,13 @@ variables, download the sample module, and download the sample inputs.</p>
 <p>Declaration of absolute paths for the sample repo and import all required
 libraries. The default setup uses the CPU backend as the only target. This can
 be reconfigured to select alternative targets.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">iree.compiler.tflite</span> <span class="k">as</span> <span class="nn">iree_tflite_compile</span>
-<span class="kn">import</span> <span class="nn">iree.runtime</span> <span class="k">as</span> <span class="nn">iree_rt</span>
-<span class="kn">import</span> <span class="nn">numpy</span>
-<span class="kn">import</span> <span class="nn">os</span>
-<span class="kn">import</span> <span class="nn">urllib.request</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">iree.compiler.tflite</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">iree_tflite_compile</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">iree.runtime</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">iree_rt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">urllib.request</span>
 
-<span class="kn">from</span> <span class="nn">PIL</span> <span class="kn">import</span> <span class="n">Image</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">PIL</span><span class="w"> </span><span class="kn">import</span> <span class="n">Image</span>
 
 <span class="n">workdir</span> <span class="o">=</span> <span class="s2">&quot;/tmp/workdir&quot;</span>
 <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">workdir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>

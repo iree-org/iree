@@ -3981,7 +3981,7 @@ iree-run-module<span class="w"> </span><span class="se">\</span>
 <p>The operator is implemented but only for a more recent ONNX version. You can
    try upgrading your .onnx file using the
    <a href="https://github.com/onnx/onnx/blob/main/docs/VersionConverter.md">ONNX Version Converter</a>:</p>
-<div class="highlight"><span class="filename">convert_onnx_model.py</span><pre><span></span><code><span class="kn">import</span> <span class="nn">onnx</span>
+<div class="highlight"><span class="filename">convert_onnx_model.py</span><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">onnx</span>
 <span class="n">original_model</span> <span class="o">=</span> <span class="n">onnx</span><span class="o">.</span><span class="n">load_model</span><span class="p">(</span><span class="s2">&quot;model.onnx&quot;</span><span class="p">)</span>
 <span class="n">converted_model</span> <span class="o">=</span> <span class="n">onnx</span><span class="o">.</span><span class="n">version_converter</span><span class="o">.</span><span class="n">convert_version</span><span class="p">(</span><span class="n">original_model</span><span class="p">,</span> <span class="mi">17</span><span class="p">)</span>
 <span class="n">onnx</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">converted_model</span><span class="p">,</span> <span class="s2">&quot;model_17.onnx&quot;</span><span class="p">)</span>

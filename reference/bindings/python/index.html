@@ -4059,7 +4059,7 @@ page for instructions for building from source.</p>
 </div>
 <h3 id="compile-a-program">Compile a program<a class="headerlink" href="#compile-a-program" title="Permanent link">link</a></h3>
 <p><a href="https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/low_level_invoke_function.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">iree</span> <span class="kn">import</span> <span class="n">compiler</span> <span class="k">as</span> <span class="n">ireec</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">iree</span><span class="w"> </span><span class="kn">import</span> <span class="n">compiler</span> <span class="k">as</span> <span class="n">ireec</span>
 
 <span class="c1"># Compile a module.</span>
 <span class="n">INPUT_MLIR</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
@@ -4078,8 +4078,8 @@ page for instructions for building from source.</p>
 </code></pre></div>
 <h3 id="run-a-compiled-program">Run a compiled program<a class="headerlink" href="#run-a-compiled-program" title="Permanent link">link</a></h3>
 <p><a href="https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/low_level_invoke_function.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">iree</span> <span class="kn">import</span> <span class="n">runtime</span> <span class="k">as</span> <span class="n">ireert</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">iree</span><span class="w"> </span><span class="kn">import</span> <span class="n">runtime</span> <span class="k">as</span> <span class="n">ireert</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
 <span class="c1"># Register the module with a runtime context.</span>
 <span class="c1"># Use the &quot;local-task&quot; CPU driver, which can load the vmvx executable:</span>

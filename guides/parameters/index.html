@@ -4139,8 +4139,8 @@ value (taking up storage space in the final archive) or a splatted value
 </ul>
 <p>Parameter archives can also be created using IREE's
 <a href="../../reference/bindings/python/">Python bindings</a>:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">iree.runtime</span> <span class="k">as</span> <span class="nn">rt</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">iree.runtime</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
 <span class="n">parameter_index</span> <span class="o">=</span> <span class="n">rt</span><span class="o">.</span><span class="n">ParameterIndex</span><span class="p">()</span>
 <span class="n">parameter_index</span><span class="o">.</span><span class="n">add_buffer</span><span class="p">(</span><span class="s2">&quot;weight&quot;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="mi">32</span><span class="p">,</span> <span class="mi">16</span><span class="p">])</span> <span class="o">+</span> <span class="mf">2.0</span><span class="p">)</span>

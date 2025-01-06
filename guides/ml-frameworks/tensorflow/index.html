@@ -3974,7 +3974,7 @@ IREE compilers.</p>
 <h4 id="using-the-command-line-tool">Using the command-line tool<a class="headerlink" href="#using-the-command-line-tool" title="Permanent link">link</a></h4>
 <p>First download the SavedModel and load it to get the serving signature, which
 is used as the entry point for IREE compilation flow:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">tensorflow.compat.v2</span> <span class="k">as</span> <span class="nn">tf</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">tensorflow.compat.v2</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tf</span>
 <span class="n">loaded_model</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">saved_model</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;/path/to/downloaded/model/&#39;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">loaded_model</span><span class="o">.</span><span class="n">signatures</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
 </code></pre></div>
@@ -4051,7 +4051,7 @@ signatures. For example, for
 <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">MobileNet v2</a>,
 assuming we want the serving signature to be <code>predict</code> and operating on a
 224x224 RGB image:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">tensorflow.compat.v2</span> <span class="k">as</span> <span class="nn">tf</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">tensorflow.compat.v2</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tf</span>
 <span class="n">loaded_model</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">saved_model</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;/path/to/downloaded/model/&#39;</span><span class="p">)</span>
 <span class="n">call</span> <span class="o">=</span> <span class="n">loaded_model</span><span class="o">.</span><span class="fm">__call__</span><span class="o">.</span><span class="n">get_concrete_function</span><span class="p">(</span>
          <span class="n">tf</span><span class="o">.</span><span class="n">TensorSpec</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="n">tf</span><span class="o">.</span><span class="n">float32</span><span class="p">))</span>
