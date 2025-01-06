@@ -600,12 +600,8 @@ static inline float vm_erf_f32(float operand) { return erff(operand); }
 
 static inline float vm_cast_si32f32(int32_t operand) { return (float)operand; }
 static inline float vm_cast_si64f32(int64_t operand) { return (float)operand; }
-static inline float vm_cast_ui64f32(int64_t operand) {
-  return (float)(uint64_t)operand;
-}
-static inline float vm_cast_ui32f32(int32_t operand) {
-  return (float)(uint32_t)operand;
-}
+static inline float vm_cast_ui64f32(uint64_t operand) { return (float)operand; }
+static inline float vm_cast_ui32f32(uint32_t operand) { return (float)operand; }
 static inline int32_t vm_cast_f32si32(float operand) {
   return (int32_t)lroundf(operand);
 }
