@@ -12,6 +12,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
@@ -151,9 +153,14 @@ void FoldUnitExtentDimsPass::runOnOperation() {
     if (!IREE::Flow::isNonNullAndOutsideDispatch(op)) {
       return SmallVector<unsigned>{};
     }
+    if (isa<IREE::LinalgExt::LinalgExtOp>(op)) {
+      return IREE::LinalgExt::defaultControlDropUnitDims(op);
+    }
     return defaultFn(op);
   };
   linalg::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns, options);
+  IREE::LinalgExt::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns,
+                                                      options);
   linalg::populateMoveInitOperandsToInputPattern(foldUnitDimsPatterns);
   if (failed(
           applyPatternsGreedily(moduleOp, std::move(foldUnitDimsPatterns)))) {
