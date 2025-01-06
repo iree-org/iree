@@ -19,6 +19,10 @@ if(NOT EXISTS ${LLVM_DIR})
   message(FATAL_ERROR "LLVM_DIR (${LLVM_DIR}) does not exist")
 endif()
 
+# TODO: Fixes needed to allow setting to `ON` to allow that
+# all the tools will use libMLIR shared library
+set(MLIR_LINK_MLIR_DYLIB OFF CACHE BOOL "")
+
 # When exceptions are disabled, unwind tables are large and useless
 set(LLVM_ENABLE_UNWIND_TABLES OFF CACHE BOOL "")
 
