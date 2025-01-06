@@ -5018,28 +5018,42 @@ the value at the slices specified by <code>indices</code> by combining the
 current value with the value in <code>updates</code> using the computation
 specified in <code>region</code>. The <code>region</code> specifies a binary operation
 of signature (T, T) -&gt; T, where <code>T</code> is the element-type of
-<code>updates</code> (and <code>original</code>). The first argument correspond the
-value to be updated (i.e. from <code>updates</code>), and the second the
-current value (i.e. value from <code>original</code>).</p>
-<p>The <code>indices</code> is a 2D tensor/memref type. The first dim is the number of
-updates, and the second dim is index depth. The index depth should always be
-static.</p>
-<p>The first dim of <code>updates</code> and <code>indices</code> is identical, since they represent
-the number of updates.</p>
-<p>The rank of the <code>original</code>/<code>result</code> is at least
-<code>index_depth + rank(%updates) - 1</code>. The first <code>index_depth</code> indices are
-derived from <code>indices</code> and the shape of update value has the last
-rank(%original) - index_depth values match %(originals) last dimensions,
-with the previous dims extending from the index offsets.</p>
+<code>updates</code> (and <code>original</code>). The first argument is from <code>updates</code>,
+and the second is from <code>original</code>.</p>
+<p>The operand <code>indices</code> is a N-D tensor/memref type that is composed
+of two logical parts:
+- The first <code>N-1</code> dimensions represent the batch of updates.
+- The last dim (at index <code>N-1</code>) is the <code>index_depth</code>, which should
+  always be static.</p>
+<p>For example, given <code>indices</code> of shape <code>[4, 3, 2]</code>, the batch dimensions
+are <code>[4, 3]</code> and the <code>index_depth</code> is <code>2</code>.</p>
+<p>The operand <code>update</code> is a M-D tensor/memref type and similarly
+consists of two parts:
+- The first <code>N-1</code> dimensions represent the batch of updates. This
+  must exactly match to the first <code>N-1</code> dimensions in <code>indices</code>
+  (from the example above: <code>indices</code> must start with <code>[4, 3]</code>)
+- Dimensions <code>N..M-1</code> represent the slice scattered into <code>original</code>.
+  The first part of this tensor represents the dimensions indexed
+  by <code>indices</code>. This must be no larger than <code>index_depth</code> but can be
+  less if unit dimensions are omitted.</p>
+<p>The second part represents a contiguous slice to be inserted into
+  <code>original</code>.</p>
+<p>The operand <code>original</code> is a DPS init representing the destination that
+<code>update</code> gets scattered to.</p>
+<p>The rank of the <code>original</code> is at least <code>rank(%updates) - batch_rank</code>.
+The first <code>index_depth</code> indices are derived from <code>indices</code> and the
+shape of update value has the last rank(%original) - index_depth values
+match %(originals) last dimensions, with the previous dims extending
+from the index offsets.</p>
 <p>The dimension_map attributes describes which index value maps to which
-dimension in the destionation. It cannot contain duplicate values, must
-have as many entries as index depth, and values must be within the rank of
-the destination.</p>
-<p>The unique_indices attribute carries the information whether all the indices
-are unique. If there are repeated indices, the first iteration loop will be
-marked as reduction.</p>
-<p>The shapes definition follows tensorflow operations execept that it force
-batch dims to be 1D. See more information in
+dimension in the destionation. It's rank must equal <code>index_depth</code> as
+represents a permutation of the indices before indexing into `original``.</p>
+<p>The unique_indices attribute carries the information whether all the
+indices are unique. If <code>unique_indices</code> is <code>true</code> and two or more updates
+scatter to the same location in <code>original</code> the final value in <code>original</code> is
+not guaranteed. If <code>unique_indices</code> is set to false, the first
+<code>batch_rank</code> iteration loops will be marked as reduction.</p>
+<p>The shapes definition follows tensorflow operations. See more information in
   <a href="https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update">https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update</a></p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgFusionOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
