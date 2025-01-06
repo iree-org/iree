@@ -259,31 +259,6 @@ func.func @unaligned_m_batch_matmul_64x72x1280x1280() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
-func.func @narrow_n_batch_matmul_64x968x4x320_f16() {
-  %cst = arith.constant 0.000000e+00 : f16
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x968x320xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x320x4xf16>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<64x968x4xf16>>
-  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [64, 968, 320], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x968x320xf16>> -> tensor<64x968x320xf16>
-  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [64, 320, 4], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x320x4xf16>> -> tensor<64x320x4xf16>
-  %5 = tensor.empty() : tensor<64x968x4xf16>
-  %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<64x968x4xf16>) -> tensor<64x968x4xf16>
-  %7 = linalg.batch_matmul ins(%3, %4 : tensor<64x968x320xf16>, tensor<64x320x4xf16>) outs(%6 : tensor<64x968x4xf16>) -> tensor<64x968x4xf16>
-  flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [64, 968, 4], strides = [1, 1, 1] : tensor<64x968x4xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x968x4xf16>>
-  return
-}
-// Check that we don't support LLVMGPUPadAndVectorDistribute for narrow N/M atm.
-// CHECK-NOT:      #iree_codegen.translation_info<pipeline = LLVMGPUPadAndVectorDistribute
-// CHECK-LABEL: func.func @narrow_n_batch_matmul_64x968x4x320_f16()
-
-// -----
-
 #pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,

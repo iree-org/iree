@@ -246,14 +246,6 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
     return failure(); // Cannot use this intrinsic for misaligned cases.
   }
 
-  // Cannot use the intrinsic when the tile size is greater than problem size.
-  // Because tiling is a no-op, and we can't infer tiling sizes from IR.
-  if (!mustBeAligned && (problem.mSizes.back() < intrinsic.mSizes[0] ||
-                         problem.nSizes.back() < intrinsic.nSizes[0] ||
-                         problem.kSizes.back() < intrinsic.kSizes[0])) {
-    return failure();
-  }
-
   return success();
 }
 
