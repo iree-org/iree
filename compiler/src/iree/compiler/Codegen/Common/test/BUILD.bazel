@@ -107,6 +107,7 @@ iree_lit_test_suite(
             "reductions_codegen_spec.mlir",
             "reductions_match_spec.mlir",
             "tuning_spec.mlir",
+            "tuning_spec_default.mlir",
         ],
     ),
     cfg = "//compiler:lit.cfg.py",
@@ -118,6 +119,7 @@ iree_lit_test_suite(
         "reductions_codegen_spec.mlir",
         "reductions_match_spec.mlir",
         "tuning_spec.mlir",
+        "tuning_spec_default.mlir",
     ],
     tools = [
         "//tools:iree-opt",
