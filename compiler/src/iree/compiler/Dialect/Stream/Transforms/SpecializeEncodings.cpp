@@ -149,11 +149,10 @@ struct SpecializeEncodingsPass
       return signalPassFailure();
     }
 
-    llvm::MapVector<StringRef, IREE::Stream::ExecutableOp> executableOp(
-        llvm::map_range(moduleOp.getOps<IREE::Stream::ExecutableOp>(),
-                        [](auto op) {
-                          return {op.getName(), op};
-                        }));
+    llvm::MapVector<StringRef, IREE::Stream::ExecutableOp> executableOps;
+    for (auto executableOp : moduleOp.getOps<IREE::Stream::ExecutableOp>()) {
+      executableOps[executableOp.getName()] = executableOp;
+    }
 
     IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr =
         usedDialects[0]->makeLayoutAttrResolver(moduleOp);
