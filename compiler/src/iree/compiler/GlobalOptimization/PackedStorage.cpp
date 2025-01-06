@@ -9,11 +9,15 @@
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#include "mlir/Parser/Parser.h"
+#include "mlir/AsmParser/AsmParser.h"
 
 #define DEBUG_TYPE "iree-global-opt-pack-storage"
 
@@ -26,24 +30,20 @@ static RankedTensorType appendAttributeToTensor(RankedTensorType type) {
   // IntegerAttr bitwidthAttr =
   //     IntegerAttr::get(IntegerType::get(type.getContext(), 32),
   //                      type.getElementType().getIntOrFloatBitWidth());
-  IREE::Encoding::PackedStorageAttr packedAttr;
+  IREE::Encoding::PackedStorageAttr packedAttr = IREE::Encoding::PackedStorageAttr::get(type.getContext());
   //    IREE::Encoding::PackedStorageAttr::get(type.getContext(), bitwidthAttr);
-  auto newType =
-      RankedTensorType::get(type.getShape(), type.getElementType(), packedAttr);
 
-  assert(mlir::iree_compiler::IREE::Encoding::hasPackedStorageAttr(newType));
+  //auto context = type.getContext();
+  //size_t numRead = 0;
+  //mlir::Attribute packedAttr = mlir::parseAttribute("#iree_encoding.packed_storage", context, Type(), &numRead);
+  auto newType =
+      RankedTensorType::get(type.getShape(), type.getElementType(),
+                            packedAttr);
+
+  //assert(mlir::iree_compiler::IREE::Encoding::hasPackedStorageAttr(newType));
   LLVM_DEBUG(llvm::dbgs() << " appending packed tensor type: " << newType
                           << "\n");
   return newType;
-}
-
-static bool isPackStorageCandidate(Type type) {
-  if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
-    auto elementType = tensorType.getElementType();
-    return elementType.isIntOrFloat() &&
-           elementType.getIntOrFloatBitWidth() == 1;
-  }
-  return false;
 }
 
 class PackedStorageConverter : public TypeConverter {
@@ -67,7 +67,8 @@ struct PackAttributeSignaturePattern
 
     for (const auto [index, arg] : llvm::enumerate(funcOp.getArguments())) {
       if (isPackStorageCandidate(arg.getType())) {
-        converter.addInputs(index, arg.getType());
+        auto tensorType = cast<RankedTensorType>(arg.getType());
+        converter.addInputs(index, appendAttributeToTensor(tensorType));
       }
     }
     rewriter.applySignatureConversion(&funcOp.getFunctionBody().front(),
@@ -78,6 +79,15 @@ struct PackAttributeSignaturePattern
                                               std::nullopt));
     });
     return success();
+  }
+
+  static bool isPackStorageCandidate(Type type) {
+    if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
+      auto elementType = tensorType.getElementType();
+      return elementType.isIntOrFloat() &&
+             elementType.getIntOrFloatBitWidth() == 1;
+    }
+    return false;
   }
 };
 
