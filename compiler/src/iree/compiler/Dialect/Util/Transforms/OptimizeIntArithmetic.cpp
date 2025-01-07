@@ -290,14 +290,15 @@ struct NarrowSCFForIvToI32 : public OpRewritePattern<scf::ForOp> {
     Value newUb = doCastDown(forOp.getUpperBound());
     Value newStep = doCastDown(forOp.getStep());
     {
-      PatternRewriter::InsertionGuard g(rewriter);
+      OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPointToStart(&forOp.getRegion().front());
       Value castBackOp;
-      if (srcType.isIndex())
+      if (srcType.isIndex()) {
         castBackOp =
             rewriter.create<arith::IndexCastUIOp>(iv.getLoc(), srcType, iv);
-      else
+      } else {
         castBackOp = rewriter.create<arith::ExtUIOp>(iv.getLoc(), srcType, iv);
+      }
       (void)solver.getOrCreateState<IntegerValueRangeLattice>(castBackOp)
           ->join(*ivState);
       rewriter.replaceAllUsesExcept(iv, castBackOp, castBackOp.getDefiningOp());
