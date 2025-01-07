@@ -2425,6 +2425,11 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
         return setDefaultCustomOpLoweringConfig(entryPointFn, customOp,
                                                 initGPULaunchConfig);
       })
+      .Case<IREE::LinalgExt::ScatterOp>([&](auto scatterOp) {
+        LDBG("ScatterOp Config");
+        return IREE::GPU::setScatterLoweringConfig(target, entryPointFn,
+                                                   scatterOp);
+      })
       .Default([&](auto op) {
         LDBG("Default Config");
         if (!clLLVMGPUVectorizePipeline) {
