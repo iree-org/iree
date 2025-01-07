@@ -39,9 +39,7 @@ jobs:
         with:
           submodules: false
       - name: "Install depencies"
-        run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake ninja-build clang lld git
+        run: sudo apt-get update & sudo apt-get install -y cmake ninja-build clang lld git
       - name: Check out runtime submodules
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
