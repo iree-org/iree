@@ -30,8 +30,8 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct ConvertAccGEMMtoGEMM
-    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+struct ConvertAccGEMMtoGEMM final
+    : OpInterfaceRewritePattern<linalg::LinalgOp> {
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
