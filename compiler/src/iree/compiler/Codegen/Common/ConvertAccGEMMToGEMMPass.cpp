@@ -47,8 +47,7 @@ struct ConvertAccGEMMtoGEMM
     SmallVector<OpOperand *> outputOperands;
     if (!linalgOp.hasPureBufferSemantics()) {
       outputOperands = llvm::to_vector(
-          llvm::map_range(linalgOp.getDpsInitsMutable(),
-                          [](OpOperand &opOperand) { return &opOperand; }));
+          llvm::make_pointer_range(linalgOp.getDpsInitsMutable()));
     }
 
     Value outputOperand = outputOperands.front()->get();
@@ -59,7 +58,7 @@ struct ConvertAccGEMMtoGEMM
       // If not DispatchTensorLoadOp then do nothing.
       return failure();
     }
-    auto outputType = llvm::cast<RankedTensorType>(outputOperand.getType());
+    auto outputType = cast<RankedTensorType>(outputOperand.getType());
     if (!outputType.getElementType().isIntOrFloat())
       return failure();
     auto elementType = outputType.getElementType();
@@ -113,8 +112,8 @@ struct ConvertAccGEMMtoGEMM
   }
 };
 
-struct ConvertAccGEMMToGEMMPass
-    : public impl::ConvertAccGEMMToGEMMPassBase<ConvertAccGEMMToGEMMPass> {
+struct ConvertAccGEMMToGEMMPass final
+    : impl::ConvertAccGEMMToGEMMPassBase<ConvertAccGEMMToGEMMPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns.add<ConvertAccGEMMtoGEMM>(&getContext());
