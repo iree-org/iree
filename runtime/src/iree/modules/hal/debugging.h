@@ -30,12 +30,23 @@ typedef struct iree_hal_module_buffer_view_trace_callback_t {
   void* user_data;
 } iree_hal_module_buffer_view_trace_callback_t;
 
+typedef iree_status_t(
+    IREE_API_PTR* iree_hal_module_debug_sink_destroy_callback_fn_t)(
+    void* user_data);
+
+// Called by the runtime when the HAL module no longer needs the debug sink.
+typedef struct iree_hal_module_debug_sink_destroy_callback_t {
+  iree_hal_module_debug_sink_destroy_callback_fn_t fn;
+  void* user_data;
+} iree_hal_module_debug_sink_destroy_callback_t;
+
 // Interface for a HAL module debug event sink.
 // Any referenced user data must remain live for the lifetime of the HAL module
 // the sink is provided to.
 typedef struct iree_hal_module_debug_sink_t {
   // Called on each hal.buffer_view.trace.
   iree_hal_module_buffer_view_trace_callback_t buffer_view_trace;
+  iree_hal_module_debug_sink_destroy_callback_t destroy;
 } iree_hal_module_debug_sink_t;
 
 // Returns a default debug sink that outputs nothing.

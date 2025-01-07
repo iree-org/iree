@@ -4,7 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <nanobind/intrusive/counter.h>
+
 #include <memory>
+#include <nanobind/intrusive/counter.inl>
 
 #include "./binding.h"
 #include "./hal.h"
@@ -78,6 +81,16 @@ NB_MODULE(_runtime, m) {
   });
 
   m.def("disable_leak_checker", []() { py::set_leak_warnings(false); });
+
+  py::intrusive_init(
+      [](PyObject *o) noexcept {
+        py::gil_scoped_acquire guard;
+        Py_INCREF(o);
+      },
+      [](PyObject *o) noexcept {
+        py::gil_scoped_acquire guard;
+        Py_DECREF(o);
+      });
 }
 
 }  // namespace python

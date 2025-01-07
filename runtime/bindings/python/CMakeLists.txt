@@ -118,6 +118,7 @@ iree_py_library(
     "iree/runtime/io.py"
     "iree/runtime/system_api.py"
     "iree/runtime/system_setup.py"
+    "iree/runtime/typing.py"
     "iree/runtime/version.py"
     "iree/_runtime/__init__.py"
     "iree/_runtime/libs.py"
@@ -231,13 +232,6 @@ iree_py_test(
 
 iree_py_test(
   NAME
-    hal_test
-  SRCS
-    "tests/hal_test.py"
-)
-
-iree_py_test(
-  NAME
     io_test
   SRCS
     "tests/io_test.py"
@@ -260,6 +254,13 @@ if(IREE_BUILD_COMPILER AND IREE_BUILD_BUNDLED_LLVM)
       benchmark_test
     SRCS
       "tests/benchmark_test.py"
+  )
+
+  iree_py_test(
+    NAME
+      hal_test
+    SRCS
+      "tests/hal_test.py"
   )
 
   iree_py_test(

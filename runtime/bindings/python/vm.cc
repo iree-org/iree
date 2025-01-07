@@ -20,6 +20,7 @@
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/modules/resolver.h"
 #include "iree/vm/api.h"
+#include "nanobind/nanobind.h"
 
 using namespace nanobind::literals;
 
