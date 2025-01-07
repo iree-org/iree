@@ -16,6 +16,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
@@ -50,6 +51,175 @@ SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
                    b->getDialect()->getNamespace()) < 0;
       });
   return results;
+}
+
+/// Returns the affinities of the `dispatchOp`'s resource operands. An empty
+/// array attribute indicates that the resource operand affinity is not found.
+/// Usually, it happens when it fails on affinity analysis.
+/// Note that the size of the result might not equal to the number of resource
+/// operands. If a resource operand type is not AffinityType, it is skipped.
+static SmallVector<Attribute>
+getResourceOperandsAffinities(IREE::Stream::AffinityAnalysis &affinityAnalysis,
+                              IREE::Stream::AsyncDispatchOp dispatchOp) {
+  SmallVector<Attribute> result;
+  Builder b(dispatchOp.getContext());
+  auto emptyArray = b.getArrayAttr({});
+  for (auto operand : dispatchOp.getResourceOperands()) {
+    // Skip if the operand type is not AffinityType.
+    if (!isa<IREE::Stream::AffinityTypeInterface>(operand.getType())) {
+      continue;
+    }
+    SmallVector<IREE::Stream::AffinityAttr> affinities;
+    if (!affinityAnalysis.tryLookupResourceAffinity(operand, affinities)) {
+      result.push_back(emptyArray);
+      continue;
+    }
+    result.push_back(b.getArrayAttr(llvm::to_vector_of<Attribute>(affinities)));
+  }
+  return result;
+}
+
+/// Duplicates stream.executables based on the affinity analysis of
+/// stream.async.dispatch ops. Some executables can be launched by different
+/// devices. It can produce wrong codegen artifacts when bindings types are
+/// encoded (i.e., the tensor type has an encoding attribute). Because they can
+/// result in different layouts, especially when multi-device is involved. E.g.,
+/// say that device_a and device_b interpret a tensor type with encodings in
+/// different layouts, and there is an executable that can be launch with
+/// resources from either device_a or device_b. It is confusing what the input
+/// layouts for the executable because there are two possibilities. In this
+/// case, we have to duplicate the executable with updated encoding, and modify
+/// the dispatch to launch proper executable based on device analysis.
+static LogicalResult duplicateExecutablesPerAffinityVariant(
+    ModuleOp moduleOp, SymbolTable symbolTable, FunctionOpInterface funcOp,
+    IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr) {
+  MLIRContext *ctx = moduleOp.getContext();
+  IRRewriter rewriter(ctx);
+
+  // 1. Gather per-export [execution affinity -> [resource affinities]] map.
+  IREE::Stream::AffinityAnalysis affinityAnalysis(moduleOp);
+  if (failed(affinityAnalysis.run())) {
+    return moduleOp.emitError("failed on running affinity analysis");
+  }
+  SmallVector<IREE::Stream::AsyncDispatchOp> candidates;
+  funcOp.walk(
+      [&](IREE::Stream::AsyncDispatchOp op) { candidates.push_back(op); });
+
+  // export -> [affinity -> array per resource of affinities PVS].
+  DenseMap<IREE::Stream::ExecutableExportOp,
+           SetVector<std::pair<IREE::Stream::AffinityAttr, ArrayAttr>>>
+      exportToDispatchSites;
+
+  llvm::MapVector<IREE::Stream::AsyncDispatchOp, SmallVector<Attribute>>
+      resourceAffinities;
+  for (auto dispatchOp : candidates) {
+    SmallVector<IREE::Stream::AffinityAttr> execAffinities;
+    if (!affinityAnalysis.tryLookupExecutionAffinity(dispatchOp,
+                                                     execAffinities)) {
+      return dispatchOp.emitError("failed on execution affinity lookup");
+    }
+    assert(execAffinities.size() == 1 &&
+           "We should only have a single execution "
+           "affinity when running the pass.");
+
+    SmallVector<Attribute> operandAffinityAttrs =
+        getResourceOperandsAffinities(affinityAnalysis, dispatchOp);
+    resourceAffinities[dispatchOp] = operandAffinityAttrs;
+
+    dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPoint) {
+      auto exportOp = cast<IREE::Stream::ExecutableExportOp>(
+          symbolTable.lookupSymbolIn(moduleOp, entryPoint));
+      exportToDispatchSites[exportOp].insert(std::make_pair(
+          execAffinities[0], rewriter.getArrayAttr(operandAffinityAttrs)));
+    });
+  }
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "Dump of exportToDispatchSites\n";
+    for (auto [exportOp, affinities] : exportToDispatchSites) {
+      llvm::dbgs() << "  ExportOp: " << exportOp.getSymName() << "\n";
+      for (auto [execAffinity, resourceAffinities] : affinities) {
+        llvm::dbgs() << "    executaion affinity: " << execAffinity << "\n";
+        llvm::dbgs() << "    resource affinities: " << resourceAffinities
+                     << "\n";
+      }
+    }
+  });
+
+  // 2. Duplicate executables for each unqiue resource affinities.
+
+  // Mapping from [execution affinity, resource operands affinities, export] to
+  // the executable op.
+  using DispatchSiteInfo = std::tuple<IREE::Stream::AffinityAttr, ArrayAttr,
+                                      IREE::Stream::ExecutableExportOp>;
+  DenseMap<DispatchSiteInfo, IREE::Stream::ExecutableOp>
+      dispatchSiteToExecutableOp;
+  for (auto [exportOp, execAndResourceAffinities] : exportToDispatchSites) {
+    auto executableOp = exportOp->getParentOfType<IREE::Stream::ExecutableOp>();
+    // No need to duplicate the executable if all the uses have the same
+    // affinities.
+    // TODO(hanchung): Do not duplicate the executables if bindings are not
+    // encoded. I.e., all the tensor types do not have encodings.
+    if (execAndResourceAffinities.size() == 1) {
+      auto [execAffinity, resourceAffinities] = execAndResourceAffinities[0];
+      dispatchSiteToExecutableOp[DispatchSiteInfo(
+          execAffinity, resourceAffinities, exportOp)] = executableOp;
+      continue;
+    }
+
+    int64_t dupId = -1;
+    for (auto [execAffinity, resourceAffinities] : execAndResourceAffinities) {
+      rewriter.setInsertionPointAfter(executableOp);
+      IREE::Stream::ExecutableOp dupOp = executableOp;
+      if (dupId != -1) {
+        auto symName = std::string(executableOp.getSymName());
+        symName += "_dup" + std::to_string(dupId);
+        dupOp = rewriter.cloneWithoutRegions(executableOp);
+        rewriter.modifyOpInPlace(dupOp, [&] {
+          dupOp.setSymName(symName);
+          IRMapping mapping;
+          executableOp.getRegion().cloneInto(&dupOp.getRegion(), mapping);
+        });
+      }
+      dispatchSiteToExecutableOp[DispatchSiteInfo(
+          execAffinity, resourceAffinities, exportOp)] = dupOp;
+      dupId++;
+    }
+  }
+
+  // 3. Update dispatch sites, i.e., point dispatch entry points to
+  // corresponding cloned executables.
+  for (auto dispatchOp : candidates) {
+    SmallVector<Attribute> newEntryPoints;
+    SmallVector<IREE::Stream::AffinityAttr> execAffinities;
+    // Sanity checks. It should already meet the requirement because they are
+    // checked in step 1.
+    assert(affinityAnalysis.tryLookupExecutionAffinity(dispatchOp,
+                                                       execAffinities));
+    assert(execAffinities.size() == 1);
+    SmallVector<Attribute> operandAttrs = resourceAffinities[dispatchOp];
+    dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPoint) {
+      auto exportOp = cast<IREE::Stream::ExecutableExportOp>(
+          symbolTable.lookupSymbolIn(moduleOp, entryPoint));
+      auto info = DispatchSiteInfo(
+          execAffinities[0], rewriter.getArrayAttr(operandAttrs), exportOp);
+      assert(dispatchSiteToExecutableOp.count(info));
+
+      auto executableOp = dispatchSiteToExecutableOp[info];
+      auto newSym = SymbolRefAttr::get(executableOp->getAttrOfType<StringAttr>(
+                                           SymbolTable::getSymbolAttrName()),
+                                       entryPoint.getNestedReferences());
+      newEntryPoints.push_back(newSym);
+    });
+
+    rewriter.modifyOpInPlace(dispatchOp, [&] {
+      dispatchOp.setEntryPointsAttr(rewriter.getArrayAttr(newEntryPoints));
+    });
+  }
+
+  // TODO(hanchung): Update encodings in executables.
+
+  return success();
 }
 
 // TODO(hanchung): Add "cloneWithEncoding" method to RankedTensorType.
@@ -156,6 +326,7 @@ struct SpecializeEncodingsPass
       return signalPassFailure();
     }
 
+    SymbolTable symbolTable(moduleOp);
     llvm::MapVector<StringRef, IREE::Stream::ExecutableOp> executableOps;
     for (auto executableOp : moduleOp.getOps<IREE::Stream::ExecutableOp>()) {
       executableOps[executableOp.getName()] = executableOp;
@@ -171,7 +342,11 @@ struct SpecializeEncodingsPass
         return signalPassFailure();
       }
 
-      // TODO(hanchung): Duplicate executables and update dispatch ops.
+      if (failed(duplicateExecutablesPerAffinityVariant(
+              moduleOp, symbolTable, funcOp, resolveLayoutAttr))) {
+        funcOp.emitError("failed on executable duplication");
+        return signalPassFailure();
+      }
     }
   }
 };
