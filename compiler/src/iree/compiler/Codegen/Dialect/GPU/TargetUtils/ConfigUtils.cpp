@@ -32,6 +32,7 @@
 namespace mlir::iree_compiler::IREE::GPU {
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
+constexpr int64_t kPreferredCopyNumBits = 128;
 
 LogicalResult setDataTiledMultiMmaLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
@@ -730,6 +731,90 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
       entryPoint, op, loweringConfig,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
       {flatWorkgroupSize, 1, 1}, subgroupSize, DictionaryAttr());
+}
+
+LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
+                                       mlir::FunctionOpInterface entryPoint,
+                                       Operation *op) {
+  auto scatter = dyn_cast<IREE::LinalgExt::ScatterOp>(op);
+  if (!scatter) {
+    return failure();
+  }
+
+  // TODO: Support non-unique indices.
+  if (!scatter.getUniqueIndices()) {
+    return failure();
+  }
+
+  // Various problem parameters.
+  int64_t loopDepth = scatter.getLoopIteratorTypes().size();
+  int64_t elemBits = scatter.getOriginalType().getElementTypeBitWidth();
+  SmallVector<int64_t> loopBounds = scatter.getStaticLoopRanges().value_or(
+      SmallVector<int64_t>(loopDepth, ShapedType::kDynamic));
+
+  // Configurations we need to decide.
+  int64_t flatWorkgroupSize = target.getPreferredSubgroupSize();
+  SmallVector<int64_t> workgroupTileSizes(loopDepth, 1);
+  SmallVector<int64_t> threadTileSizes(loopDepth, 1);
+  int64_t vectorSize = kPreferredCopyNumBits / elemBits;
+
+  bool innerDynamic = ShapedType::isDynamic(loopBounds.back());
+
+  // Do not bother trying to vectorize if there are no vectorizable dims.
+  if (loopDepth == 1) {
+    vectorSize = 1;
+  } else if (!innerDynamic) {
+    // Use the largest power of 2 that divides the inner most non-scattered dim.
+    vectorSize = std::gcd(vectorSize, loopBounds.back());
+  }
+
+  threadTileSizes.back() = vectorSize;
+  int64_t residualInnerSize =
+      innerDynamic ? loopBounds.back() : loopBounds.back() / vectorSize;
+
+  // If the inner most dim is dynamic or exceeds the expected number of threads,
+  // Only distribute threads along the inner most dimension.
+  if (ShapedType::isDynamic(residualInnerSize) ||
+      residualInnerSize >= flatWorkgroupSize) {
+    workgroupTileSizes.back() = vectorSize * flatWorkgroupSize;
+  } else { // residualInnerSize < flatWorkgroupSize
+    // Floordiv to overestimate the required number of threads.
+    int64_t residualThreads = flatWorkgroupSize / residualInnerSize;
+    workgroupTileSizes.back() = residualInnerSize * vectorSize;
+    for (int64_t i = loopDepth - 2, e = 0; i >= e; --i) {
+      if (residualThreads <= 1) {
+        break;
+      }
+
+      bool dynamicDim = ShapedType::isDynamic(loopBounds[i]);
+      workgroupTileSizes[i] = dynamicDim
+                                  ? residualThreads
+                                  : std::min(residualThreads, loopBounds[i]);
+      residualThreads = dynamicDim ? 1 : residualThreads / loopBounds[i];
+    }
+  }
+
+  // Attach the MMA schedule as an attribute to the entry point export function
+  // for later access in the pipeline.
+  MLIRContext *context = scatter.getContext();
+  SmallVector<NamedAttribute, 1> attrs;
+  Builder b(context);
+  attrs.emplace_back(StringAttr::get(context, "workgroup"),
+                     b.getI64ArrayAttr(workgroupTileSizes));
+
+  attrs.emplace_back(StringAttr::get(context, "thread"),
+                     b.getI64ArrayAttr(threadTileSizes));
+
+  auto configDict = DictionaryAttr::get(context, attrs);
+  auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
+
+  LDBG("Selected tile and fuse lowering config: " << loweringConfig << "\n");
+
+  // TODO(qedawkins): Use a shared pipeline identifier here.
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, scatter, loweringConfig,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
+      {flatWorkgroupSize, 1, 1}, flatWorkgroupSize, DictionaryAttr());
 }
 
 //===----------------------------------------------------------------------===//
