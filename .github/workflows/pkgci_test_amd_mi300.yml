@@ -39,9 +39,7 @@ jobs:
         with:
           submodules: false
       - name: Check out runtime submodules
-        run:
-        sudo apt install -y cmake ninja-build clang lld git
-        ./build_tools/scripts/git/update_runtime_submodules.sh
+        run: sudo apt install -y cmake ninja-build clang lld git & ./build_tools/scripts/git/update_runtime_submodules.sh
       - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
@@ -55,7 +53,7 @@ jobs:
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
-
+          sudo apt install -y cmake ninja-build clang lld git
 
       - name: Build tests
         run: ./build_tools/pkgci/build_tests_using_package.sh ${VENV_DIR}/bin
