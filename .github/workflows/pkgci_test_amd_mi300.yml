@@ -38,8 +38,12 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: false
+      - name: "Install depencies"
+        run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake ninja-build clang lld git
       - name: Check out runtime submodules
-        run: sudo apt update & sudo apt install -y git & ./build_tools/scripts/git/update_runtime_submodules.sh
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
@@ -53,7 +57,6 @@ jobs:
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
-          sudo apt install -y cmake ninja-build clang lld git
 
       - name: Build tests
         run: ./build_tools/pkgci/build_tests_using_package.sh ${VENV_DIR}/bin
