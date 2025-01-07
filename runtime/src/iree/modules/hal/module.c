@@ -48,6 +48,11 @@ typedef struct iree_hal_module_t {
 
 static void IREE_API_PTR iree_hal_module_destroy(void* base_module) {
   iree_hal_module_t* module = IREE_HAL_MODULE_CAST(base_module);
+
+  if (module->debug_sink.destroy.fn) {
+    module->debug_sink.destroy.fn(module->debug_sink.destroy.user_data);
+  }
+
   for (iree_host_size_t i = 0; i < module->device_count; ++i) {
     iree_hal_device_release(module->devices[i]);
   }
