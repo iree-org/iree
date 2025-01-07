@@ -26,8 +26,8 @@ func.func @accumulate_gemm(%1 : tensor<512x128xi8>, %2 : tensor<512x128xi8>) {
 }
 
 // CHECK-LABEL: func.func @accumulate_gemm
-//       CHECK: %[[C0:.+]] = arith.constant 0 : i32
-//       CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<512x512xi32>
+//   CHECK-DAG: %[[C0:.+]] = arith.constant 0 : i32
+//   CHECK-DAG: %[[EMPTY:.+]] = tensor.empty() : tensor<512x512xi32>
 //       CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[EMPTY]] : tensor<512x512xi32>) -> tensor<512x512xi32>
 //       CHECK: %[[GEMM:.+]] = linalg.generic {{.*}} outs(%[[FILL]] : tensor<512x512xi32>) {
 //       CHECK: %[[ADD:.+]] = linalg.generic {{.+}} ins(%[[GEMM]]
@@ -51,8 +51,8 @@ func.func @acc_conv_nchw(%1 : tensor<1x64x58x58xf32>, %2 : tensor<64x64x3x3xf32>
 }
 
 // CHECK-LABEL: func.func @acc_conv_nchw
-//       CHECK: %[[C0:.+]] = arith.constant 0.000000e+00 : f32
-//       CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<1x64x56x56xf32>
+//   CHECK-DAG: %[[C0:.+]] = arith.constant 0.000000e+00 : f32
+//   CHECK-DAG: %[[EMPTY:.+]] = tensor.empty() : tensor<1x64x56x56xf32>
 //       CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : f32) outs(%[[EMPTY]] : tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
 //       CHECK: %[[CONV:.+]] = linalg.conv_2d_nchw_fchw {{.*}} outs(%[[FILL]] : tensor<1x64x56x56xf32>)
 //       CHECK: %[[ADD:.+]] = linalg.generic {{.+}} ins(%[[CONV]]

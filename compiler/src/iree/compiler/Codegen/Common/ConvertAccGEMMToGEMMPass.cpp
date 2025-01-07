@@ -21,7 +21,7 @@
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/WalkPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
 
@@ -115,17 +115,10 @@ struct ConvertAccGEMMtoGEMM
 
 struct ConvertAccGEMMToGEMMPass
     : public impl::ConvertAccGEMMToGEMMPassBase<ConvertAccGEMMToGEMMPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, linalg::LinalgDialect,
-                    tensor::TensorDialect>();
-  }
-
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns.add<ConvertAccGEMMtoGEMM>(&getContext());
-    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
-      return signalPassFailure();
-    }
+    walkAndApplyPatterns(getOperation(), std::move(patterns));
   }
 };
 
