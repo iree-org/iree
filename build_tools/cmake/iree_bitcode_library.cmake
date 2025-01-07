@@ -62,7 +62,7 @@ function(iree_bitcode_library)
     # Enable inline asm.
     "-fasm"
 
-    # Object file only in bitcode format:
+    # Object file only in bitcode format.
     "-c"
     "-emit-llvm"
 
@@ -175,7 +175,7 @@ function(iree_cuda_bitcode_library)
     # Optimized and unstamped.
     "-O3"
 
-    # Object file only in bitcode format:
+    # Object file only in bitcode format.
     "-c"
     "-emit-llvm"
   )
@@ -239,7 +239,6 @@ endfunction()
 #       supported.
 # COPTS: Additional flags to pass to clang.
 # OUT: Output file name. Defaults to {source.c}.{gpu_arch}.bc.
-#
 function(iree_amdgpu_bitcode_library)
   cmake_parse_arguments(
     _RULE
