@@ -223,17 +223,16 @@ IREE_API_EXPORT iree_status_t iree_hal_fd_file_from_handle(
   // Verify that the requested access can be satisfied.
   if (iree_all_bits_set(access, IREE_HAL_MEMORY_ACCESS_READ) &&
       !iree_all_bits_set(allowed_access, IREE_HAL_MEMORY_ACCESS_READ)) {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0,
-        iree_make_status(
-            IREE_STATUS_PERMISSION_DENIED,
-            "read access requested on a file descriptor that is not readable"));
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_PERMISSION_DENIED,
+        "read access requested on a file descriptor that is not readable");
   } else if (iree_all_bits_set(access, IREE_HAL_MEMORY_ACCESS_WRITE) &&
              !iree_all_bits_set(allowed_access, IREE_HAL_MEMORY_ACCESS_WRITE)) {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_make_status(IREE_STATUS_PERMISSION_DENIED,
-                             "write access requested on a file descriptor that "
-                             "is not writable"));
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_PERMISSION_DENIED,
+                            "write access requested on a file descriptor that "
+                            "is not writable");
   }
 
   // Allocate object that retains the underlying file handle and our opened
