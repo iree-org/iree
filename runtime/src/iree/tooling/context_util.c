@@ -66,10 +66,10 @@ static iree_status_t iree_tooling_load_bytecode_module(
     } else if (strcmp(FLAG_module_mode, "preload") == 0) {
       read_flags |= IREE_FILE_READ_FLAG_PRELOAD;
     } else {
-      IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                               "unrecognized --module_mode= value '%s'",
-                               FLAG_module_mode));
+      IREE_TRACE_ZONE_END(z0);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "unrecognized --module_mode= value '%s'",
+                              FLAG_module_mode);
     }
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_file_read_contents(path_str, read_flags, host_allocator,
