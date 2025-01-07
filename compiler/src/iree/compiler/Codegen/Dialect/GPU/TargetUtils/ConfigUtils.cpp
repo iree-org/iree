@@ -34,7 +34,7 @@
 namespace mlir::iree_compiler::IREE::GPU {
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
-static constexpr int64_t kPreferredCopyNumBits = 128;
+constexpr int64_t kPreferredCopyNumBits = 128;
 
 LogicalResult setDataTiledMultiMmaLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,

@@ -2427,8 +2427,11 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       })
       .Case<IREE::LinalgExt::ScatterOp>([&](auto scatterOp) {
         LDBG("ScatterOp Config");
-        return IREE::GPU::setScatterLoweringConfig(target, entryPointFn,
-                                                   scatterOp);
+        if (failed(IREE::GPU::setScatterLoweringConfig(target, entryPointFn,
+                                                       scatterOp))) {
+          return setRootDefaultConfig(target, entryPointFn, computeOp);
+        }
+        return success();
       })
       .Default([&](auto op) {
         LDBG("Default Config");
