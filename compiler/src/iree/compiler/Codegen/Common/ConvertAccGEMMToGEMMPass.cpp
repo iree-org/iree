@@ -50,10 +50,7 @@ struct ConvertAccGEMMtoGEMM
           llvm::map_range(linalgOp.getDpsInitsMutable(),
                           [](OpOperand &opOperand) { return &opOperand; }));
     }
-    // Right now all the cases we see have one output. This can be relaxed once
-    // we see multiple output ops.
-    if (outputOperands.size() != 1)
-      return failure();
+
     Value outputOperand = outputOperands.front()->get();
 
     auto outsDefiningOp =
