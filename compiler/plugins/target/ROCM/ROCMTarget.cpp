@@ -665,7 +665,9 @@ protected:
       }
       int64_t ordinal = ordinalAttr.getInt();
 
-      auto symbolNameRef = builder.createString(exportOp.getName());
+      // Symbol names include a `.kd` suffix as that's what HSA expects.
+      auto symbolNameKd = (exportOp.getName() + ".kd").str();
+      auto symbolNameRef = builder.createString(symbolNameKd);
 
       iree_hal_amdgpu_Dims_t workgroupSize = {0};
       if (auto workgroupSizeAttr = exportOp.getWorkgroupSize()) {
