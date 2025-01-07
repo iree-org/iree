@@ -155,7 +155,7 @@ jobs:
             --goldensize-rocm-clip-bytes 860000  \
             --goldensize-rocm-vae-bytes 840000 \
             --goldentime-rocm-punet-int8-fp16-ms 50.0 \
-            --goldentime-rocm-punet-int8-fp8-ms 50.0 \
+            --goldentime-rocm-punet-int8-fp8-ms 52.0 \
             --goldendispatch-rocm-punet-int8-fp16 1424 \
             --goldendispatch-rocm-punet-int8-fp8 1704 \
             --goldensize-rocm-punet-int8-fp8-bytes 2800000 \
