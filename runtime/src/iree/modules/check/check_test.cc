@@ -231,7 +231,7 @@ TEST_F(CheckTest, HalModuleDebugSinkDestroyCallbackIsCalled) {
     bool is_callback_called = false;
   };
 
-  iree_hal_module_debug_sink_t sink = {0};
+  iree_hal_module_debug_sink_t sink = {};
   sink.destroy.fn = [](void* user_data) {
     reinterpret_cast<UserData*>(user_data)->is_callback_called = true;
     return iree_ok_status();
