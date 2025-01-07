@@ -64,6 +64,13 @@ typedef __UINT64_TYPE__ uint64_t;
 typedef __attribute__((__vector_size__(4 * 4))) int32_t int32x4_t;
 
 //===----------------------------------------------------------------------===//
+// Address spaces
+//===----------------------------------------------------------------------===//
+
+#define GLOBAL [[clang::address_space(1)]]
+#define LOCAL [[clang::address_space(3)]]
+
+//===----------------------------------------------------------------------===//
 // Declarations for Clangd, which may be slightly older than actual clang.
 // Drop these as clangd versions used in practice gain these builtins.
 // Unconditionally declaring these, regardless of clang version, ensures that
