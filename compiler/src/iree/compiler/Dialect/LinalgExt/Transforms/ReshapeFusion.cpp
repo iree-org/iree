@@ -549,6 +549,7 @@ struct FoldScatterNonIterationUnitDims final
     return success();
   }
 
+private:
   linalg::ControlDropUnitDims options;
 };
 
