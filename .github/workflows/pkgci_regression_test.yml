@@ -111,17 +111,18 @@ jobs:
           ROCM_CHIP: ${{ matrix.rocm-chip }}
 
       # Note: mi250 benchmark times are more lenient than mi300 (allowing about
-      # 20% deviation from observed averages), since the mi250 runners we use
+      # 30% deviation from observed averages), since the mi250 runners we use
       # are more unstable and we care most about peak performance on mi300.
       - name: "Running SDXL rocm pipeline benchmark (mi250)"
         if: contains(matrix.name, 'rocm_mi250_gfx90a')
         run: |
           source ${VENV_DIR}/bin/activate
           pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
-            --goldentime-rocm-e2e-ms 1300.0 \
-            --goldentime-rocm-unet-ms 310.0 \
-            --goldentime-rocm-clip-ms 18.0 \
-            --goldentime-rocm-vae-ms 370.0 \
+            --goldentime-tolerance-multiplier 1.3 \
+            --goldentime-rocm-e2e-ms 1100.0 \
+            --goldentime-rocm-unet-ms 255.0 \
+            --goldentime-rocm-clip-ms 14.5 \
+            --goldentime-rocm-vae-ms 310.0 \
             --goldendispatch-rocm-unet 1602 \
             --goldendispatch-rocm-clip 1139 \
             --goldendispatch-rocm-vae 246 \
@@ -135,25 +136,26 @@ jobs:
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
           rm job_summary.md
 
-      # Note: allowing 10% deviation, rounded up based on significant digits,
-      # from observed averages here to account for different runner conditions.
+      # Note: allowing 10% deviation from observed averages here to account for
+      # different runner conditions.
       - name: "Running SDXL rocm pipeline benchmark (mi300)"
         if: contains(matrix.name, 'rocm_mi300_gfx942')
         run: |
           source ${VENV_DIR}/bin/activate
           pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
-            --goldentime-rocm-e2e-ms 360.0 \
-            --goldentime-rocm-unet-ms 90.0 \
-            --goldentime-rocm-clip-ms 17.0 \
-            --goldentime-rocm-vae-ms 90.0 \
+            --goldentime-tolerance-multiplier 1.1 \
+            --goldentime-rocm-e2e-ms 325.0 \
+            --goldentime-rocm-unet-ms 80.0 \
+            --goldentime-rocm-clip-ms 15.0 \
+            --goldentime-rocm-vae-ms 75.0 \
             --goldendispatch-rocm-unet 1602 \
             --goldendispatch-rocm-clip 1139 \
             --goldendispatch-rocm-vae 246 \
             --goldensize-rocm-unet-bytes 2270000 \
             --goldensize-rocm-clip-bytes 860000  \
             --goldensize-rocm-vae-bytes 840000 \
-            --goldentime-rocm-punet-int8-fp16-ms 55.0 \
-            --goldentime-rocm-punet-int8-fp8-ms 55.0 \
+            --goldentime-rocm-punet-int8-fp16-ms 50.0 \
+            --goldentime-rocm-punet-int8-fp8-ms 50.0 \
             --goldendispatch-rocm-punet-int8-fp16 1424 \
             --goldendispatch-rocm-punet-int8-fp8 1704 \
             --goldensize-rocm-punet-int8-fp8-bytes 2800000 \
