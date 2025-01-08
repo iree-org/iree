@@ -141,3 +141,23 @@ func.func @bubble_up_extract_slice_single_use(%arg0: tensor<131072xi64>, %arg1: 
 //  CHECK-SAME:       ins(%[[SLICE0]], %[[SLICE1]] :
 //  CHECK-SAME:       outs(%[[EMPTY]] :
 //       CHECK:   return %[[GENERIC]]
+
+// -----
+
+func.func @fold_extract_of_expand_of_fill(%arg0 : index, %arg1 : index, %arg2 : index) -> tensor<?xf16> {
+  %cst0 = arith.constant 0.0 : f16
+  %0 = tensor.empty(%arg0) : tensor<?xf16>
+  %2 = linalg.fill ins(%cst0 : f16) outs(%0 : tensor<?xf16>) -> tensor<?xf16>
+  %3 = tensor.expand_shape %2 [[0, 1]] output_shape[1, %arg1] : tensor<?xf16> into tensor<1x?xf16>
+  %4 = tensor.extract_slice %3 [0, 0] [1, %arg2] [1, 1] : tensor<1x?xf16> to tensor<?xf16>
+  func.return %4 : tensor<?xf16>
+}
+
+// CHECK-LABEL: func @fold_extract_of_expand_of_fill
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index
+//   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[ARG2]])
+//   CHECK-DAG:   %[[CST0:.+]] = arith.constant 0.0
+//       CHECK:   %[[FILL:.+]] = linalg.fill ins(%[[CST0]] : f16) outs(%[[EMPTY]]
+//       CHECK:   return %[[FILL]]
