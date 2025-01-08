@@ -34,14 +34,14 @@ jobs:
       IREE_HIP_ENABLE: 1
       IREE_HIP_TEST_TARGET_CHIP: "gfx942"
     steps:
-      - name: Check out repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          submodules: false
       - name: "Install dependencies"
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build clang lld git
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          submodules: false
       - name: Check out runtime submodules
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
