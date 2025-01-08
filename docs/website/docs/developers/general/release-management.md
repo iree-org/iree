@@ -63,9 +63,18 @@ request that some feature make the cut.
 
     * Set the tag to be created and select a target commit. For example, if the
         candidate release was tagged `iree-3.1.0rc20241119` at commit `3ed07da`,
-        set the new release tag `iree-3.1.0` and use the same commit.
+        set the new release tag `v3.1.0` and use the same commit.
 
         ![rename_tag](./release-tag.png)
+
+        If the commit does not appear in the list, create and push a tag
+        manually:
+
+        ```bash
+        git checkout iree-3.1.0rc20250107
+        git tag -a v3.1.0 -m "Version 3.1.0 release."
+        git push upstream v3.1.0
+        ```
 
     * Set the title to `Release vX.Y.Z`.
 
