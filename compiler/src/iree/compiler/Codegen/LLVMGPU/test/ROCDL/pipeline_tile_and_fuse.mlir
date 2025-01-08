@@ -908,6 +908,7 @@ hal.executable public @main {
 // for loop.
 //       CHECK:       vector.transfer_write %{{.*}}, %[[B2]]{{.*}} memref<10x1xf32, #hal.descriptor_type<storage_buffer>>
 //  CHECK-NEXT:     }
+//  CHECK-NEXT:   gpu.barrier
 //  CHECK-NEXT:   } {mapping = [#iree_codegen.workgroup_mapping<x>]}
 //  CHECK-NEXT:   return
 
