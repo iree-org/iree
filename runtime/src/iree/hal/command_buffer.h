@@ -550,8 +550,12 @@ static inline iree_status_t iree_hal_buffer_binding_table_resolve_ref(
     out_resolved_ref->reserved = buffer_ref.reserved;
     out_resolved_ref->buffer_slot = 0;
     out_resolved_ref->buffer = binding->buffer;
+    const iree_device_size_t max_length =
+        binding->length != IREE_WHOLE_BUFFER
+            ? binding->length
+            : iree_hal_buffer_byte_length(binding->buffer) - binding->offset;
     return iree_hal_buffer_calculate_range(
-        binding->offset, binding->length, buffer_ref.offset, buffer_ref.length,
+        binding->offset, max_length, buffer_ref.offset, buffer_ref.length,
         &out_resolved_ref->offset, &out_resolved_ref->length);
   }
 }
