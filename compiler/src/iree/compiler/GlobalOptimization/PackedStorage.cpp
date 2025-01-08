@@ -19,6 +19,8 @@
 #include "mlir/Parser/Parser.h"
 #include "mlir/AsmParser/AsmParser.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
+
 #define DEBUG_TYPE "iree-global-opt-pack-storage"
 
 namespace mlir::iree_compiler::GlobalOptimization {
@@ -93,7 +95,7 @@ struct PackAttributeSignaturePattern
 
 struct PackStoragePass : impl::PackStoragePassBase<PackStoragePass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<tensor::TensorDialect>();
+    registry.insert<tensor::TensorDialect, mlir::iree_compiler::IREE::Encoding::IREEEncodingDialect>();
   }
   void runOnOperation() override {
     auto funcOp = getOperation();

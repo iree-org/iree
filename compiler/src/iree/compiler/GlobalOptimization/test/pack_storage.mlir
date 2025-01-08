@@ -3,7 +3,7 @@
 // RUN:          %s | FileCheck %s
 
 
-func.func @hloElementwiseOps(%arg0 : tensor<4xi1>, %arg1 : tensor<4xi1>) -> tensor<4xi1> {
+func.func @addition(%arg0 : tensor<4xi1>, %arg1 : tensor<4xi1>) -> tensor<4xi1> {
   %0 = arith.xori %arg0, %arg1 : tensor<4xi1>
   return %0 : tensor<4xi1>
 }
