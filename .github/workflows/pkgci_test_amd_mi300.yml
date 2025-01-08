@@ -43,7 +43,9 @@ jobs:
         with:
           submodules: false
       - name: Check out runtime submodules
-        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+        run: |
+          git config --global --add safe.directory /__w/iree/iree
+          ./build_tools/scripts/git/update_runtime_submodules.sh
       - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
