@@ -3,8 +3,8 @@
 // RUN:          %s | FileCheck %s
 
 
-func.func @addition(%arg0 : tensor<4xi1>, %arg1 : tensor<4xi1>) -> tensor<4xi1> {
-  %0 = arith.xori %arg0, %arg1 : tensor<4xi1>
-  return %0 : tensor<4xi1>
+func.func @addition(%arg0 : tensor<4xi8>, %arg1 : tensor<4xi8>, %unused : tensor<4xi1>) -> tensor<4xi8> {
+  %0 = arith.xori %arg0, %arg1 : tensor<4xi8>
+  return %0 : tensor<4xi8>
 }
 

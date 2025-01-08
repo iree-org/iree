@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/Support/Casting.h"
@@ -28,21 +29,22 @@ namespace mlir::iree_compiler::GlobalOptimization {
 #define GEN_PASS_DEF_PACKSTORAGEPASS
 #include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
-static RankedTensorType appendAttributeToTensor(RankedTensorType type) {
-  // IntegerAttr bitwidthAttr =
-  //     IntegerAttr::get(IntegerType::get(type.getContext(), 32),
-  //                      type.getElementType().getIntOrFloatBitWidth());
-  IREE::Encoding::PackedStorageAttr packedAttr = IREE::Encoding::PackedStorageAttr::get(type.getContext());
-  //    IREE::Encoding::PackedStorageAttr::get(type.getContext(), bitwidthAttr);
+static bool isPackStorageCandidate(Type type) {
+  if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
+    auto elementType = tensorType.getElementType();
+    return elementType.isIntOrFloat() &&
+           elementType.getIntOrFloatBitWidth() == 1;
+  }
+  return false;
+}
 
-  //auto context = type.getContext();
-  //size_t numRead = 0;
-  //mlir::Attribute packedAttr = mlir::parseAttribute("#iree_encoding.packed_storage", context, Type(), &numRead);
+static RankedTensorType appendAttributeToTensor(RankedTensorType type) {
+  if (!isPackStorageCandidate(type))
+    return type;
+  IREE::Encoding::PackedStorageAttr packedAttr = IREE::Encoding::PackedStorageAttr::get(type.getContext());
   auto newType =
       RankedTensorType::get(type.getShape(), type.getElementType(),
                             packedAttr);
-
-  //assert(mlir::iree_compiler::IREE::Encoding::hasPackedStorageAttr(newType));
   LLVM_DEBUG(llvm::dbgs() << " appending packed tensor type: " << newType
                           << "\n");
   return newType;
@@ -52,7 +54,9 @@ class PackedStorageConverter : public TypeConverter {
 public:
   explicit PackedStorageConverter() {
     addConversion([](RankedTensorType ty) -> Type {
-      return appendAttributeToTensor(ty);
+      if (isPackStorageCandidate(ty))
+        return appendAttributeToTensor(ty);
+      return ty;
     });
   }
 };
@@ -65,31 +69,46 @@ struct PackAttributeSignaturePattern
   matchAndRewrite(func::FuncOp funcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
 
-    TypeConverter::SignatureConversion converter(funcOp.getNumArguments());
+    auto converter = getTypeConverter();
+    //auto &funcBlock = funcOp.getFunctionBody().front();
+    TypeConverter::SignatureConversion newSignature(funcOp.getNumArguments());
 
     for (const auto [index, arg] : llvm::enumerate(funcOp.getArguments())) {
-      if (isPackStorageCandidate(arg.getType())) {
+      if (true || isPackStorageCandidate(arg.getType())) {
         auto tensorType = cast<RankedTensorType>(arg.getType());
-        converter.addInputs(index, appendAttributeToTensor(tensorType));
+        newSignature.addInputs(index, appendAttributeToTensor(tensorType));
       }
     }
-    rewriter.applySignatureConversion(&funcOp.getFunctionBody().front(),
-                                      converter);
-    // TODO: check this
+    //rewriter.applySignatureConversion(&funcBlock, newSignature, converter);
     rewriter.modifyOpInPlace(funcOp, [&] {
-      funcOp.setType(rewriter.getFunctionType(converter.getConvertedTypes(),
-                                              std::nullopt));
+      funcOp.setType(rewriter.getFunctionType(newSignature.getConvertedTypes(),
+                                              funcOp.getFunctionType().getResults()));
     });
-    return success();
-  }
 
-  static bool isPackStorageCandidate(Type type) {
-    if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
-      auto elementType = tensorType.getElementType();
-      return elementType.isIntOrFloat() &&
-             elementType.getIntOrFloatBitWidth() == 1;
+    // Create a new FuncOp with the modified signature
+    auto newFuncType =
+        rewriter.getFunctionType(newSignature.getConvertedTypes(),
+                                 funcOp.getFunctionType().getResults());
+    auto newFuncOp = rewriter.create<func::FuncOp>(
+        funcOp.getLoc(), funcOp.getName(), newFuncType);
+
+      // Copy attributes from the old FuncOp to the new one
+    for (const auto &namedAttr : funcOp->getAttrs()) {
+      if (namedAttr.getName() != "function_type")
+        newFuncOp->setAttr(namedAttr.getName(), namedAttr.getValue());
     }
-    return false;
+
+    // Convert the function body
+    rewriter.inlineRegionBefore(funcOp.getBody(), newFuncOp.getBody(),
+                                newFuncOp.end());
+    if (failed(rewriter.convertRegionTypes(&newFuncOp.getBody(), *converter,
+                                           &newSignature)))
+      return failure();
+
+    // Replace the old FuncOp with the new one
+    rewriter.replaceOp(funcOp, newFuncOp);
+    rewriter.eraseOp(funcOp);
+    return success();
   }
 };
 
@@ -103,13 +122,13 @@ struct PackStoragePass : impl::PackStoragePassBase<PackStoragePass> {
                             << funcOp->getName() << "\n");
     auto context = &getContext();
 
-    ConversionTarget target(*context);
     PackedStorageConverter typeConverter;
 
     RewritePatternSet conversionPatterns(context);
     conversionPatterns.add<PackAttributeSignaturePattern>(typeConverter,
                                                           context);
 
+    ConversionTarget target(*context);
     if (failed(applyPartialConversion(funcOp, target,
                                       std::move(conversionPatterns)))) {
       signalPassFailure();
