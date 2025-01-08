@@ -106,7 +106,7 @@ typedef struct iree_hal_buffer_ref_t {
   // the base offset of the bound buffer.
   iree_device_size_t offset;
   // Length, in bytes, of the buffer after the offset that is accessed.
-  // This can be IREE_WHOLE_BUFFER, however note that if the entire buffer
+  // This can be IREE_HAL_WHOLE_BUFFER, however note that if the entire buffer
   // contents are larger than supported by the device (~128MiB, usually) this
   // will fail.
   iree_device_size_t length;
@@ -495,7 +495,7 @@ typedef struct iree_hal_buffer_binding_t {
   // This will be added to the offset specified on each usage of the slot.
   iree_device_size_t offset;
   // Length, in bytes, of the buffer that is available to the executable.
-  // This can be IREE_WHOLE_BUFFER, however note that if the entire buffer
+  // This can be IREE_HAL_WHOLE_BUFFER, however note that if the entire buffer
   // contents are larger than supported by the device (~128MiB, usually) this
   // will fail. If the descriptor type is dynamic this will be used for all
   // ranges regardless of offset.
@@ -551,7 +551,7 @@ static inline iree_status_t iree_hal_buffer_binding_table_resolve_ref(
     out_resolved_ref->buffer_slot = 0;
     out_resolved_ref->buffer = binding->buffer;
     const iree_device_size_t max_length =
-        binding->length != IREE_WHOLE_BUFFER
+        binding->length != IREE_HAL_WHOLE_BUFFER
             ? binding->length
             : iree_hal_buffer_byte_length(binding->buffer) - binding->offset;
     return iree_hal_buffer_calculate_range(
