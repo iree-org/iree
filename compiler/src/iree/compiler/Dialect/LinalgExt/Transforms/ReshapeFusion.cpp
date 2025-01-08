@@ -12,8 +12,6 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/Sequence.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
@@ -23,17 +21,14 @@
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
-// Use the innermost indices in `reassoc` to construct a shape map out of
-// `shape`
-static SmallVector<SmallVector<int64_t>>
-computeShapeMapFromReassoc(ArrayRef<ReassociationIndices> reassoc,
-                           ArrayRef<int64_t> shape) {
-  SmallVector<SmallVector<int64_t>> shapeMap;
-  for (auto &indices : reassoc) {
-    shapeMap.emplace_back(shape.slice(indices.front(), indices.size()));
+static bool
+isIdentityReassoc(const SmallVector<ReassociationIndices> &indices) {
+  for (auto &index : indices) {
+    if (index.size() != 1)
+      return false;
   }
-  return shapeMap;
-}
+  return true;
+};
 
 static SmallVector<ReassociationIndices>
 computeReassocFromShapeMap(ArrayRef<SmallVector<int64_t>> shapeMap) {
@@ -52,7 +47,6 @@ namespace {
 /// Helper class that supports fusing reshapes with operands when not all of the
 /// shape dims map to the iteration space.
 struct ReshapeOperandInfo {
-public:
   static constexpr int64_t kNoMapping = -1;
 
   // Original shape of this operand.
@@ -78,6 +72,25 @@ public:
                         ArrayRef<ReassociationIndices> operandReassoc,
                         ArrayRef<int64_t> expandedShape);
 
+  Value getOrCreateExpanded(Location loc, OpOperand *operand,
+                            RewriterBase &rewriter) {
+    auto shapeMap = this->getShapeMap(operand);
+    auto reassoc = computeReassocFromShapeMap(shapeMap);
+    if (isIdentityReassoc(reassoc)) {
+      return operand->get();
+    }
+    SmallVector<int64_t> flattenedArray;
+    for (auto &shape : shapeMap) {
+      flattenedArray.append(shape.begin(), shape.end());
+    }
+    auto newType = RankedTensorType::get(
+        flattenedArray,
+        cast<ShapedType>(operand->get().getType()).getElementType());
+    return rewriter.create<tensor::ExpandShapeOp>(loc, newType, operand->get(),
+                                                  reassoc);
+  };
+
+  /// Get the shape map for the operand.
   SmallVector<SmallVector<int64_t>> getShapeMap(OpOperand *operand) const {
     auto info = reshapeInfos[operand->getOperandNumber()];
     SmallVector<SmallVector<int64_t>> shapeMap;
@@ -100,10 +113,6 @@ public:
   }
   ArrayRef<int64_t> getExpandedShapeOfLoop(unsigned i) const {
     return loopShapeMap[i];
-  }
-
-  SmallVector<ReassociationIndices> getReassoc(OpOperand *operand) const {
-    return computeReassocFromShapeMap(getShapeMap(operand));
   }
 
 private:
@@ -537,52 +546,15 @@ fuseScatterWithReshapeByExpansion(ScatterOp scatterOp, Operation *reshapeOp,
     return std::nullopt;
   }
 
-  // Returns `reassociation` with indices modified so that they are a contiguous
-  // grouping of indices.
-  auto getType = [&](const SmallVector<SmallVector<int64_t>> &shapeMap,
-                     ShapedType type) {
-    SmallVector<int64_t> flattenedArray;
-    for (auto &shape : shapeMap) {
-      flattenedArray.append(shape.begin(), shape.end());
-    }
-    return RankedTensorType::get(flattenedArray, type.getElementType());
-  };
-
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(scatterOp);
-
-  auto isIdentityReassoc =
-      [](const SmallVector<ReassociationIndices> &indices) {
-        for (auto &index : indices) {
-          if (index.size() != 1)
-            return false;
-        }
-        return true;
-      };
 
   OpOperand *update = scatterOp.getDpsInputOperand(0);
   OpOperand *indices = scatterOp.getDpsInputOperand(1);
   OpOperand *original = scatterOp.getDpsInitOperand(0);
-  RankedTensorType newIndicesType =
-      getType(info.getShapeMap(indices), scatterOp.getIndicesType());
-  RankedTensorType newOriginalType =
-      getType(info.getShapeMap(original), scatterOp.getOriginalType());
-  SmallVector<ReassociationIndices> indicesReassoc = info.getReassoc(indices);
-  SmallVector<ReassociationIndices> originalReassoc = info.getReassoc(original);
-
-  Value newUpdates = rewriter.create<tensor::ExpandShapeOp>(
-      loc, getType(info.getShapeMap(update), scatterOp.getUpdateType()),
-      scatterOp.getUpdates(), info.getReassoc(update));
-  Value newIndices =
-      isIdentityReassoc(indicesReassoc)
-          ? scatterOp.getIndices()
-          : rewriter.create<tensor::ExpandShapeOp>(
-                loc, newIndicesType, scatterOp.getIndices(), indicesReassoc);
-  Value newOriginal =
-      isIdentityReassoc(originalReassoc)
-          ? scatterOp.getOriginal()
-          : rewriter.create<tensor::ExpandShapeOp>(
-                loc, newOriginalType, scatterOp.getOriginal(), originalReassoc);
+  Value newUpdates = info.getOrCreateExpanded(loc, update, rewriter);
+  Value newIndices = info.getOrCreateExpanded(loc, indices, rewriter);
+  Value newOriginal = info.getOrCreateExpanded(loc, original, rewriter);
 
   auto newScatter = rewriter.create<ScatterOp>(
       loc, newOriginal.getType(), ValueRange{newUpdates, newIndices},
@@ -592,9 +564,15 @@ fuseScatterWithReshapeByExpansion(ScatterOp scatterOp, Operation *reshapeOp,
                               newScatter.getRegion().begin());
 
   // Collapse back to original shape.
+  auto originalShapeMap = info.getShapeMap(original);
+  SmallVector<ReassociationIndices> originalReassoc =
+      computeReassocFromShapeMap(originalShapeMap);
+  if (isIdentityReassoc(originalReassoc)) {
+    return {newScatter.getResult(0)};
+  }
   auto newCollapse = rewriter.create<tensor::CollapseShapeOp>(
       loc, scatterOp.getOriginalType(), newScatter.getResult(0),
-      info.getReassoc(original));
+      originalReassoc);
 
   return {newCollapse};
 }
