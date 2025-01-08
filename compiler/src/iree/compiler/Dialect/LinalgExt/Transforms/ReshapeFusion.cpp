@@ -72,8 +72,8 @@ public:
                         ArrayRef<ReassociationIndices> operandReassoc,
                         ArrayRef<int64_t> expandedShape);
 
-  Value getOrCreateExpanded(Location loc, OpOperand *operand,
-                            RewriterBase &rewriter) {
+  std::optional<Value> getOrCreateExpanded(Location loc, OpOperand *operand,
+                                           RewriterBase &rewriter) {
     auto shapeMap = this->getShapeMap(operand);
     auto reassoc = computeReassocFromShapeMap(shapeMap);
     if (isIdentityReassoc(reassoc)) {
@@ -83,9 +83,17 @@ public:
     for (auto &shape : shapeMap) {
       flattenedArray.append(shape.begin(), shape.end());
     }
-    auto newType = RankedTensorType::get(
-        flattenedArray,
-        cast<ShapedType>(operand->get().getType()).getElementType());
+    auto oldType = cast<ShapedType>(operand->get().getType());
+    auto newType =
+        RankedTensorType::get(flattenedArray, oldType.getElementType());
+    if (failed(reshapeLikeShapesAreCompatible(
+            [&](const Twine &msg) {
+              return rewriter.notifyMatchFailure(loc, msg);
+            },
+            oldType.getShape(), newType.getShape(), reassoc,
+            /*isExpandingReshape=*/true))) {
+      return {};
+    }
     return rewriter.create<tensor::ExpandShapeOp>(loc, newType, operand->get(),
                                                   reassoc);
   };
@@ -104,6 +112,11 @@ public:
       }
     }
     return shapeMap;
+  }
+
+  SmallVector<ReassociationIndices> getReassoc(OpOperand *operand) const {
+    auto shapeMap = this->getShapeMap(operand);
+    return computeReassocFromShapeMap(shapeMap);
   }
 
   unsigned getOrigNumLoops() const { return loopReassoc.size(); }
@@ -354,34 +367,6 @@ getIndexingMapInExpandedOp(OpBuilder &builder, AffineMap indexingMap,
                         builder.getContext());
 }
 
-static RankedTensorType getExpandedType(RankedTensorType originalType,
-                                        AffineMap indexingMap,
-                                        const ExpansionInfo &expansionInfo) {
-  SmallVector<int64_t> expandedShape;
-  for (AffineExpr expr : indexingMap.getResults()) {
-    unsigned dim = cast<AffineDimExpr>(expr).getPosition();
-    auto dimExpansion = expansionInfo.getExpandedShapeOfLoop(dim);
-    expandedShape.append(dimExpansion.begin(), dimExpansion.end());
-  }
-  return RankedTensorType::get(expandedShape, originalType.getElementType());
-}
-
-static SmallVector<ReassociationIndices>
-getReassociationForExpansion(AffineMap indexingMap,
-                             const ExpansionInfo &expansionInfo) {
-  SmallVector<ReassociationIndices> reassociation;
-  unsigned numReshapeDims = 0;
-  for (AffineExpr expr : indexingMap.getResults()) {
-    unsigned dim = cast<AffineDimExpr>(expr).getPosition();
-    auto numExpandedDims = expansionInfo.getExpandedLoops(dim).size();
-    SmallVector<int64_t, 2> indices = llvm::to_vector<2>(
-        llvm::seq<int64_t>(numReshapeDims, numReshapeDims + numExpandedDims));
-    reassociation.emplace_back(std::move(indices));
-    numReshapeDims += numExpandedDims;
-  }
-  return reassociation;
-}
-
 static bool isFusableWithReshapeByDimExpansion(AttentionOp op,
                                                OpOperand *fusableOpOperand) {
   // Is fusable only if:
@@ -438,54 +423,23 @@ static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
                                                : collapsingReshapeOp.getSrc());
       continue;
     }
-    if (auto opOperandType =
-            dyn_cast<RankedTensorType>(opOperand->get().getType())) {
-      AffineMap indexingMap = attentionOp.getMatchingIndexingMap(opOperand);
-      RankedTensorType expandedOperandType =
-          getExpandedType(opOperandType, indexingMap, expansionInfo);
-      if (expandedOperandType != opOperand->get().getType()) {
-        // Reshape the operand to get the right type.
-        SmallVector<ReassociationIndices> reassociation =
-            getReassociationForExpansion(indexingMap, expansionInfo);
-        if (failed(reshapeLikeShapesAreCompatible(
-                [&](const Twine &msg) {
-                  return rewriter.notifyMatchFailure(attentionOp, msg);
-                },
-                opOperandType.getShape(), expandedOperandType.getShape(),
-                reassociation,
-                /*isExpandingReshape=*/true)))
-          return std::nullopt;
-        expandedOpOperands.push_back(rewriter.create<tensor::ExpandShapeOp>(
-            loc, expandedOperandType, opOperand->get(), reassociation));
-        continue;
-      }
-    }
-    expandedOpOperands.push_back(opOperand->get());
+    // Reshape the operand to get the right type.
+    std::optional<Value> expanded =
+        expansionInfo.getOrCreateExpanded(loc, opOperand, rewriter);
+    if (!expanded)
+      return std::nullopt;
+    expandedOpOperands.push_back(*expanded);
+    continue;
   }
 
   Value output;
   OpOperand &outOperand = attentionOp.getOutputMutable();
 
-  AffineMap indexingMap = attentionOp.getMatchingIndexingMap(&outOperand);
-  auto opOperandType = cast<RankedTensorType>(outOperand.get().getType());
-  RankedTensorType expandedOutputType =
-      getExpandedType(opOperandType, indexingMap, expansionInfo);
-  if (expandedOutputType != outOperand.get().getType()) {
-    SmallVector<ReassociationIndices> reassociation =
-        getReassociationForExpansion(indexingMap, expansionInfo);
-    if (failed(reshapeLikeShapesAreCompatible(
-            [&](const Twine &msg) {
-              return rewriter.notifyMatchFailure(attentionOp, msg);
-            },
-            opOperandType.getShape(), expandedOutputType.getShape(),
-            reassociation,
-            /*isExpandingReshape=*/true)))
-      return std::nullopt;
-    output = rewriter.create<tensor::ExpandShapeOp>(
-        loc, expandedOutputType, outOperand.get(), reassociation);
-  } else {
-    output = outOperand.get();
-  }
+  std::optional<Value> maybeOutput =
+      expansionInfo.getOrCreateExpanded(loc, &outOperand, rewriter);
+  if (!maybeOutput)
+    return std::nullopt;
+  output = *maybeOutput;
 
   Value maskOperand;
   if (expandedOpOperands.size() > 4) {
@@ -510,9 +464,7 @@ static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
     int64_t resultNumber = opResult.getResultNumber();
     if (resultTypes[resultNumber] != opResult.getType()) {
       SmallVector<ReassociationIndices> reassociation =
-          getReassociationForExpansion(
-              attentionOp.getIndexingMapsForResults()[resultNumber],
-              expansionInfo);
+          expansionInfo.getReassoc(attentionOp.getTiedOpOperand(opResult));
       resultVals.push_back(rewriter.create<tensor::CollapseShapeOp>(
           attentionOp.getLoc(), opResult.getType(),
           fusedOp->getResult(resultNumber), reassociation));
@@ -552,9 +504,9 @@ fuseScatterWithReshapeByExpansion(ScatterOp scatterOp, Operation *reshapeOp,
   OpOperand *update = scatterOp.getDpsInputOperand(0);
   OpOperand *indices = scatterOp.getDpsInputOperand(1);
   OpOperand *original = scatterOp.getDpsInitOperand(0);
-  Value newUpdates = info.getOrCreateExpanded(loc, update, rewriter);
-  Value newIndices = info.getOrCreateExpanded(loc, indices, rewriter);
-  Value newOriginal = info.getOrCreateExpanded(loc, original, rewriter);
+  auto newUpdates = info.getOrCreateExpanded(loc, update, rewriter).value();
+  auto newIndices = info.getOrCreateExpanded(loc, indices, rewriter).value();
+  auto newOriginal = info.getOrCreateExpanded(loc, original, rewriter).value();
 
   auto newScatter = rewriter.create<ScatterOp>(
       loc, newOriginal.getType(), ValueRange{newUpdates, newIndices},
@@ -563,10 +515,11 @@ fuseScatterWithReshapeByExpansion(ScatterOp scatterOp, Operation *reshapeOp,
   rewriter.inlineRegionBefore(scatterOp.getRegion(), newScatter.getRegion(),
                               newScatter.getRegion().begin());
 
-  // Collapse back to original shape.
   auto originalShapeMap = info.getShapeMap(original);
   SmallVector<ReassociationIndices> originalReassoc =
       computeReassocFromShapeMap(originalShapeMap);
+
+  // Collapse back to original shape.
   if (isIdentityReassoc(originalReassoc)) {
     return {newScatter.getResult(0)};
   }
