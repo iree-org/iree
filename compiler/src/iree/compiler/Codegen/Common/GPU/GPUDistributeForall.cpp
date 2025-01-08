@@ -127,7 +127,12 @@ LogicalResult resolveGPUMappedForallOp(RewriterBase &rewriter,
   Value ub = getValueOrCreateConstantIndexOp(rewriter, loc, totalLoopTripCount);
   Value step =
       rewriter.create<arith::ConstantIndexOp>(loc, flatTotalNumWorkers);
+  // We need to add barriers before and after the distributed loop because the
+  // loop might have reads/writes to shared memory that can have a different
+  // layout compared to rest of the program.
+  rewriter.create<gpu::BarrierOp>(loc);
   auto forLoop = rewriter.create<scf::ForOp>(loc, lb, ub, step, ValueRange{});
+  rewriter.create<gpu::BarrierOp>(loc);
   Block *loopBody = forLoop.getBody();
 
   // Get the replacement IDs for the forall iterator ids.

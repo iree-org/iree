@@ -16,9 +16,11 @@ func.func @distribute_thread_forall(%out : memref<?xi32>)
 //   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
 //   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
 //       CHECK:   %[[TFLAT:.+]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (2, 64)
+//       CHECK:   gpu.barrier
 //       CHECK:   scf.for %[[I:.+]] = %c0 to %c1024 step %c128 {
 //       CHECK:     %[[LINID:.+]] = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%[[I]])[%[[TFLAT]]]
 //       CHECK:     memref.store {{.*}}[%[[LINID]]]
+//       CHECK:   gpu.barrier
 
 // -----
 
@@ -38,9 +40,11 @@ func.func @distribute_warp_forall(%out : memref<?xi32>)
 //   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
 //       CHECK:   %[[TFLAT:.+]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (2, 64)
 //       CHECK:   %[[WARPSPLIT:.+]]:2 = affine.delinearize_index %[[TFLAT]] into (4, 32)
+//       CHECK:   gpu.barrier
 //       CHECK:   scf.for %[[I:.+]] = %c0 to %c32 step %c4 {
 //       CHECK:     %[[LINID:.+]] = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%[[I]])[%[[WARPSPLIT]]#0]
 //       CHECK:     memref.store {{.*}}[%[[LINID]]]
+//       CHECK:   gpu.barrier
 
 // -----
 
@@ -76,7 +80,9 @@ func.func @distribute_thread_forall_drop_for_loop(%out : memref<?xi32>)
 //   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
 //   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
 //       CHECK:   %[[LINID:.+]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (2, 64)
+//       CHECK:   gpu.barrier
 //       CHECK:   memref.store {{.*}}[%[[LINID]]]
+//       CHECK:   gpu.barrier
 
 // -----
 
@@ -96,8 +102,10 @@ func.func @distribute_thread_forall_single_thread(%out : memref<?xi32>)
 //   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
 //   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
 //       CHECK:   %[[TFLAT:.+]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (2, 64)
+//       CHECK:   gpu.barrier
 //       CHECK:   scf.for %[[I:.+]] = %[[TFLAT]] to %c1 step %c128 {
 //       CHECK:     memref.store {{.*}}[%[[I]]]
+//       CHECK:   gpu.barrier
 
 // -----
 
@@ -117,8 +125,10 @@ func.func @distribute_thread_forall_overhang(%out : memref<?xi32>)
 //   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
 //   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
 //       CHECK:   %[[TFLAT:.+]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (2, 64)
+//       CHECK:   gpu.barrier
 //       CHECK:   scf.for %[[I:.+]] = %[[TFLAT]] to %[[C513]] step %c128 {
 //       CHECK:     memref.store {{.*}}[%[[I]]]
+//       CHECK:   gpu.barrier
 
 // -----
 
@@ -137,11 +147,12 @@ func.func @distribute_thread_forall_multi_dim(%out : memref<?x?x?xi32>)
 //   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
 //   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
 //       CHECK:   %[[TFLAT:.+]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (2, 64)
+//       CHECK:   gpu.barrier
 //       CHECK:   scf.for %[[I:.+]] = %c0 to %c512 step %c128 {
 //       CHECK:     %[[LINID:.+]] = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%[[I]])[%[[TFLAT]]]
 //       CHECK:     %[[DELIN:.+]]:3 = affine.delinearize_index %[[LINID]] into (16, 8, 4) : index
 //       CHECK:     memref.store {{.*}}[%[[DELIN]]#0, %[[DELIN]]#1, %[[DELIN]]#2]
-
+//       CHECK:   gpu.barrier
 
 // -----
 
@@ -157,5 +168,7 @@ func.func @distribute_thread_forall_small_workgroup(%out : memref<?xi32>)
 }
 
 // CHECK-LABEL: func @distribute_thread_forall_small_workgroup
-//   CHECK:   %[[TX:.+]] = gpu.thread_id x
-//   CHECK:   memref.store {{.*}}[%[[TX]]]
+//       CHECK:   %[[TX:.+]] = gpu.thread_id x
+//       CHECK:   gpu.barrier
+//       CHECK:   memref.store {{.*}}[%[[TX]]]
+//       CHECK:   gpu.barrier
