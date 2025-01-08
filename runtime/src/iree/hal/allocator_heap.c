@@ -277,9 +277,10 @@ static iree_status_t iree_hal_heap_allocator_export_buffer(
 
   // Map the entire buffer persistently, if possible.
   iree_hal_buffer_mapping_t mapping;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
-      iree_hal_buffer_allowed_access(buffer), 0, IREE_WHOLE_BUFFER, &mapping));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_map_range(buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
+                                iree_hal_buffer_allowed_access(buffer), 0,
+                                IREE_HAL_WHOLE_BUFFER, &mapping));
 
   // Note that the returned pointer is unowned.
   out_external_buffer->type = requested_type;

@@ -26,7 +26,7 @@ typedef struct iree_hal_device_t iree_hal_device_t;
 //===----------------------------------------------------------------------===//
 
 // Whole length of the underlying buffer.
-#define IREE_WHOLE_BUFFER ((iree_device_size_t)(-1))
+#define IREE_HAL_WHOLE_BUFFER ((iree_device_size_t)(-1))
 
 // A bitfield specifying properties for a memory type.
 enum iree_hal_memory_type_bits_t {
@@ -740,16 +740,16 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_calculate_range(
     iree_device_size_t* out_adjusted_length);
 
 // Tests whether the given buffers overlap, including support for subspans.
-// IREE_WHOLE_BUFFER may be used for |lhs_length| and/or |rhs_length| to use the
-// lengths of those buffers, respectively.
+// IREE_HAL_WHOLE_BUFFER may be used for |lhs_length| and/or |rhs_length| to use
+// the lengths of those buffers, respectively.
 IREE_API_EXPORT iree_hal_buffer_overlap_t iree_hal_buffer_test_overlap(
     iree_hal_buffer_t* lhs_buffer, iree_device_size_t lhs_offset,
     iree_device_size_t lhs_length, iree_hal_buffer_t* rhs_buffer,
     iree_device_size_t rhs_offset, iree_device_size_t rhs_length);
 
 // Returns a reference to a subspan of the |buffer|.
-// If |byte_length| is IREE_WHOLE_BUFFER the remaining bytes in the buffer after
-// |byte_offset| (possibly 0) will be selected.
+// If |byte_length| is IREE_HAL_WHOLE_BUFFER the remaining bytes in the buffer
+// after |byte_offset| (possibly 0) will be selected.
 //
 // The parent buffer will remain alive for the lifetime of the subspan
 // returned. If the subspan is a small portion this may cause additional
@@ -975,7 +975,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_mapping_flush_range(
 
 // Calculates and returns a byte subspan range within a buffer mapping.
 // The byte range provided is local to the mapping. May return a 0-length span.
-// IREE_WHOLE_BUFFER can be used for |byte_length|.
+// IREE_HAL_WHOLE_BUFFER can be used for |byte_length|.
 //
 // Note that the access requirements of the mapping still hold: if the memory is
 // not host coherent and writeable then the caller must use the
