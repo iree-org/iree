@@ -12,6 +12,8 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/Sequence.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
@@ -21,7 +23,46 @@
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
+// Use the innermost indices in `reassoc` to construct a shape map out of
+// `shape`
+static SmallVector<SmallVector<int64_t>>
+computeShapeMapFromReassoc(ArrayRef<ReassociationIndices> reassoc,
+                           ArrayRef<int64_t> shape) {
+  SmallVector<SmallVector<int64_t>> shapeMap;
+  for (auto &indices : reassoc) {
+    shapeMap.emplace_back(shape.slice(indices.front(), indices.size()));
+  }
+  return shapeMap;
+}
+
+static SmallVector<ReassociationIndices>
+computeReassocFromShapeMap(ArrayRef<SmallVector<int64_t>> shapeMap) {
+  SmallVector<ReassociationIndices> reassoc;
+  int64_t dimCount = 0;
+  for (auto &shape : shapeMap) {
+    reassoc.emplace_back(
+        llvm::to_vector(llvm::seq<int64_t>(dimCount, dimCount + shape.size())));
+    dimCount += shape.size();
+  }
+  return reassoc;
+}
+
 namespace {
+
+/// Helper class that supports fusing reshapes with operands when not all of the
+/// shape dims map to the iteration space.
+struct ReshapeOperandInfo {
+public:
+  static constexpr int64_t kNoMapping = -1;
+
+  // Original shape of this operand.
+  ArrayRef<int64_t> originalShape;
+
+  // Similar to the results of the operand's `AffineMap` except `kNoMapping` if
+  // that dim doesn't map to the iteration space. For example, the indexed
+  // dimensions in a LinalgExt::ScatterOp.
+  SmallVector<int64_t> operandToIterationSpace;
+};
 
 /// Information needed to expand an operation to fold the reshape with
 /// it.
@@ -31,32 +72,50 @@ public:
   // of the expanded op given the `indexingMap` of the fused operand/result of
   // the op, the `reassocationMaps` of the reshape op and the shape of
   // the expanded op.
-  template <typename OpTy>
-  LogicalResult compute(OpTy op, OpOperand *fusableOpOperand,
-                        ArrayRef<AffineMap> reassociationMaps,
-                        ArrayRef<int64_t> expandedShape,
-                        ArrayRef<int64_t> collapsedShape,
-                        PatternRewriter &rewriter);
-  unsigned getOrigOpNumDims() const { return reassociation.size(); }
-  unsigned getExpandedOpNumDims() const { return expandedOpNumDims; }
-  ReassociationIndicesRef getExpandedDims(unsigned i) const {
-    return reassociation[i];
+  LogicalResult compute(SmallVector<ReshapeOperandInfo> infos,
+                        SmallVector<int64_t> loopRanges,
+                        OpOperand *fusableOpOperand,
+                        ArrayRef<ReassociationIndices> operandReassoc,
+                        ArrayRef<int64_t> expandedShape);
+
+  SmallVector<SmallVector<int64_t>> getShapeMap(OpOperand *operand) const {
+    auto info = reshapeInfos[operand->getOperandNumber()];
+    SmallVector<SmallVector<int64_t>> shapeMap;
+    for (auto [operandIdx, loopIdx] :
+         llvm::enumerate(info.operandToIterationSpace)) {
+      if (loopIdx == ReshapeOperandInfo::kNoMapping) {
+        shapeMap.push_back(
+            SmallVector<int64_t>{info.originalShape[operandIdx]});
+      } else {
+        shapeMap.push_back(loopShapeMap[loopIdx]);
+      }
+    }
+    return shapeMap;
   }
-  ArrayRef<int64_t> getExpandedShapeOfDim(unsigned i) const {
-    return expandedShapeMap[i];
+
+  unsigned getOrigNumLoops() const { return loopReassoc.size(); }
+  unsigned getExpandedNumLoops() const { return expandedOpNumDims; }
+  ReassociationIndicesRef getExpandedLoops(unsigned i) const {
+    return loopReassoc[i];
   }
-  ArrayRef<int64_t> getOriginalShape() const { return originalLoopExtent; }
+  ArrayRef<int64_t> getExpandedShapeOfLoop(unsigned i) const {
+    return loopShapeMap[i];
+  }
+
+  SmallVector<ReassociationIndices> getReassoc(OpOperand *operand) const {
+    return computeReassocFromShapeMap(getShapeMap(operand));
+  }
 
 private:
-  /// Reassociation from the dimensions in the original operation to the
-  /// dimension of the expanded operation.
-  SmallVector<ReassociationIndices> reassociation;
+  /// Extent of the iteration space in the original operation.
+  SmallVector<int64_t> loopRanges;
+  SmallVector<ReassociationIndices> loopReassoc;
   /// Mapping from extent of loops in the original operation, to the extent of
   /// loops in the expanded operation.
-  SmallVector<SmallVector<int64_t>> expandedShapeMap;
-  /// Extent of the loop in the original operation.
-  SmallVector<int64_t> originalLoopExtent;
+  SmallVector<SmallVector<int64_t>> loopShapeMap;
   unsigned expandedOpNumDims;
+  /// Info about the reassociation and original shape for each operand.
+  SmallVector<ReshapeOperandInfo> reshapeInfos;
 };
 
 class CollapsingInfo {
@@ -110,50 +169,46 @@ private:
 
 } // namespace
 
-template <typename OpTy>
-LogicalResult ExpansionInfo::compute(OpTy op, OpOperand *fusableOpOperand,
-                                     ArrayRef<AffineMap> reassociationMaps,
-                                     ArrayRef<int64_t> expandedShape,
-                                     ArrayRef<int64_t> collapsedShape,
-                                     PatternRewriter &rewriter) {
-  if (reassociationMaps.empty())
+LogicalResult ExpansionInfo::compute(
+    SmallVector<ReshapeOperandInfo> infos, SmallVector<int64_t> loopRanges,
+    OpOperand *fusableOpOperand, ArrayRef<ReassociationIndices> operandReassoc,
+    ArrayRef<int64_t> expandedShape) {
+  if (operandReassoc.empty())
     return failure();
-  AffineMap fusedIndexMap = op.getMatchingIndexingMap(fusableOpOperand);
-  FailureOr<SmallVector<int64_t>> originalLoopRange = op.getStaticLoopRanges();
-  if (failed(originalLoopRange)) {
+
+  int64_t operandNum = fusableOpOperand->getOperandNumber();
+  ReshapeOperandInfo &fusionOperandInfo = infos[operandNum];
+  this->loopShapeMap.clear();
+  this->loopShapeMap.resize(loopRanges.size());
+  for (auto [operandIdx, loopIdx] :
+       llvm::enumerate(fusionOperandInfo.operandToIterationSpace)) {
+    if (loopIdx == ReshapeOperandInfo::kNoMapping) {
+      continue;
+    }
+
+    // Compute the shape map at element `loopIdx`
+    ReassociationIndicesRef indices = operandReassoc[operandIdx];
+    for (auto [dimIdx, shapeIdx] : llvm::enumerate(indices)) {
+      this->loopShapeMap[loopIdx].push_back(expandedShape[shapeIdx]);
+    }
+  }
+
+  // Fill in the remaining elements with `loopRanges`
+  this->expandedOpNumDims = 0;
+  for (const auto &[loopIdx, shapeMap] : llvm::enumerate(this->loopShapeMap)) {
+    if (shapeMap.empty()) {
+      this->loopShapeMap[loopIdx] = SmallVector<int64_t>{loopRanges[loopIdx]};
+    }
+    this->expandedOpNumDims += shapeMap.size();
+  }
+
+  if (llvm::all_of(this->loopShapeMap,
+                   [&](auto vec) { return vec.size() == 1; })) {
     return failure();
   }
-  originalLoopExtent.assign(originalLoopRange->begin(),
-                            originalLoopRange->end());
-
-  reassociation.clear();
-  expandedShapeMap.clear();
-  // Compute the number of dimension in the expanded op that correspond to each
-  // dimension of the original op.
-  SmallVector<unsigned> numExpandedDims(fusedIndexMap.getNumDims(), 1);
-  expandedShapeMap.resize(fusedIndexMap.getNumDims());
-  for (const auto &resultExpr : llvm::enumerate(fusedIndexMap.getResults())) {
-    unsigned pos = cast<AffineDimExpr>(resultExpr.value()).getPosition();
-    AffineMap foldedDims = reassociationMaps[resultExpr.index()];
-    numExpandedDims[pos] = foldedDims.getNumResults();
-    ArrayRef<int64_t> shape =
-        expandedShape.slice(foldedDims.getDimPosition(0), numExpandedDims[pos]);
-    expandedShapeMap[pos].assign(shape.begin(), shape.end());
-  }
-  // The remaining dimensions remain the same.
-  for (unsigned i : llvm::seq<unsigned>(0, fusedIndexMap.getNumDims()))
-    if (expandedShapeMap[i].empty())
-      expandedShapeMap[i] = {originalLoopExtent[i]};
-
-  // Compute reassociation map from the original op to the expanded op.
-  unsigned sum = 0;
-  reassociation.reserve(fusedIndexMap.getNumDims());
-  for (const auto &numFoldedDim : llvm::enumerate(numExpandedDims)) {
-    auto seq = llvm::seq<int64_t>(sum, sum + numFoldedDim.value());
-    reassociation.emplace_back(seq.begin(), seq.end());
-    sum += numFoldedDim.value();
-  }
-  expandedOpNumDims = sum;
+  this->loopReassoc = computeReassocFromShapeMap(this->loopShapeMap);
+  this->reshapeInfos = std::move(infos);
+  this->loopRanges = std::move(loopRanges);
   return success();
 }
 
@@ -202,6 +257,77 @@ CollapsingInfo::initialize(unsigned origNumLoops,
   return success();
 }
 
+static SmallVector<ReshapeOperandInfo>
+getAttentionReshapeInfo(LinalgExt::AttentionOp attentionOp) {
+  return llvm::map_to_vector(
+      attentionOp->getOpOperands(), [&](OpOperand &opOperand) {
+        ReshapeOperandInfo operandInfo;
+        auto operandType = dyn_cast<ShapedType>(opOperand.get().getType());
+        if (!operandType) {
+          assert(
+              attentionOp.getMatchingIndexingMap(&opOperand).getNumResults() ==
+                  0 &&
+              "expected non-shaped type to have no results in indexing map");
+          return operandInfo;
+        }
+
+        operandInfo.originalShape = operandType.getShape();
+        for (auto result :
+             attentionOp.getMatchingIndexingMap(&opOperand).getResults()) {
+          operandInfo.operandToIterationSpace.push_back(
+              cast<AffineDimExpr>(result).getPosition());
+        }
+        return operandInfo;
+      });
+}
+
+static SmallVector<ReshapeOperandInfo>
+getScatterReshapeInfo(LinalgExt::ScatterOp scatterOp) {
+  SmallVector<ReshapeOperandInfo> infos;
+  auto rankOfContiguousSlice =
+      scatterOp.getOriginalType().getRank() - scatterOp.getIndexDepth();
+  auto updateRank = scatterOp.getUpdateType().getRank();
+
+  // Operand #0 Updates
+  {
+    ReshapeOperandInfo updateInfo;
+    updateInfo.originalShape = scatterOp.getUpdateType().getShape();
+    llvm::append_range(updateInfo.operandToIterationSpace,
+                       llvm::seq<int64_t>(0, scatterOp.getBatchRank()));
+    updateInfo.operandToIterationSpace.append(
+        updateRank - (rankOfContiguousSlice + scatterOp.getBatchRank()),
+        ReshapeOperandInfo::kNoMapping);
+    llvm::append_range(
+        updateInfo.operandToIterationSpace,
+        llvm::seq(updateRank - rankOfContiguousSlice, updateRank));
+    infos.push_back(std::move(updateInfo));
+  }
+
+  // Operand#1 Indices
+  {
+    ReshapeOperandInfo indicesInfo;
+    indicesInfo.originalShape = scatterOp.getIndicesType().getShape();
+    llvm::append_range(indicesInfo.operandToIterationSpace,
+                       llvm::seq<int64_t>(0, scatterOp.getBatchRank()));
+    indicesInfo.operandToIterationSpace.push_back(
+        ReshapeOperandInfo::kNoMapping);
+    infos.push_back(std::move(indicesInfo));
+  }
+
+  // Operand #2 Original
+  {
+    ReshapeOperandInfo originalInfo;
+    originalInfo.originalShape = scatterOp.getOriginalType().getShape();
+    originalInfo.operandToIterationSpace.append(scatterOp.getIndexDepth(),
+                                                ReshapeOperandInfo::kNoMapping);
+    llvm::append_range(
+        originalInfo.operandToIterationSpace,
+        llvm::seq(updateRank - rankOfContiguousSlice, updateRank));
+    infos.push_back(std::move(originalInfo));
+  }
+  return infos;
+};
+
 static AffineMap
 getIndexingMapInExpandedOp(OpBuilder &builder, AffineMap indexingMap,
                            const ExpansionInfo &expansionInfo) {
@@ -209,12 +335,12 @@ getIndexingMapInExpandedOp(OpBuilder &builder, AffineMap indexingMap,
   for (AffineExpr expr : indexingMap.getResults()) {
     unsigned pos = cast<AffineDimExpr>(expr).getPosition();
     auto expandedExprs = llvm::to_vector_of<AffineExpr, 6>(
-        llvm::map_range(expansionInfo.getExpandedDims(pos), [&](int64_t v) {
+        llvm::map_range(expansionInfo.getExpandedLoops(pos), [&](int64_t v) {
           return builder.getAffineDimExpr(static_cast<unsigned>(v));
         }));
     newExprs.append(expandedExprs.begin(), expandedExprs.end());
   }
-  return AffineMap::get(expansionInfo.getExpandedOpNumDims(),
+  return AffineMap::get(expansionInfo.getExpandedNumLoops(),
                         indexingMap.getNumSymbols(), newExprs,
                         builder.getContext());
 }
@@ -225,7 +351,7 @@ static RankedTensorType getExpandedType(RankedTensorType originalType,
   SmallVector<int64_t> expandedShape;
   for (AffineExpr expr : indexingMap.getResults()) {
     unsigned dim = cast<AffineDimExpr>(expr).getPosition();
-    auto dimExpansion = expansionInfo.getExpandedShapeOfDim(dim);
+    auto dimExpansion = expansionInfo.getExpandedShapeOfLoop(dim);
     expandedShape.append(dimExpansion.begin(), dimExpansion.end());
   }
   return RankedTensorType::get(expandedShape, originalType.getElementType());
@@ -238,7 +364,7 @@ getReassociationForExpansion(AffineMap indexingMap,
   unsigned numReshapeDims = 0;
   for (AffineExpr expr : indexingMap.getResults()) {
     unsigned dim = cast<AffineDimExpr>(expr).getPosition();
-    auto numExpandedDims = expansionInfo.getExpandedDims(dim).size();
+    auto numExpandedDims = expansionInfo.getExpandedLoops(dim).size();
     SmallVector<int64_t, 2> indices = llvm::to_vector<2>(
         llvm::seq<int64_t>(numReshapeDims, numReshapeDims + numExpandedDims));
     reassociation.emplace_back(std::move(indices));
@@ -278,16 +404,13 @@ static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
   RankedTensorType expandedType = isExpanding
                                       ? expandingReshapeOp.getResultType()
                                       : collapsingReshapeOp.getSrcType();
-  RankedTensorType collapsedType = isExpanding
-                                       ? expandingReshapeOp.getSrcType()
-                                       : collapsingReshapeOp.getResultType();
-
   ExpansionInfo expansionInfo;
   if (failed(expansionInfo.compute(
-          attentionOp, fusableOpOperand,
-          isExpanding ? expandingReshapeOp.getReassociationMaps()
-                      : collapsingReshapeOp.getReassociationMaps(),
-          expandedType.getShape(), collapsedType.getShape(), rewriter)))
+          getAttentionReshapeInfo(attentionOp),
+          attentionOp.getStaticLoopRanges().value(), fusableOpOperand,
+          isExpanding ? expandingReshapeOp.getReassociationIndices()
+                      : collapsingReshapeOp.getReassociationIndices(),
+          expandedType.getShape())))
     return std::nullopt;
   auto expandedOpIndexingMaps = llvm::to_vector_of<AffineMap, 6>(
       llvm::map_range(attentionOp.getIndexingMapsArray(), [&](AffineMap m) {
@@ -392,115 +515,6 @@ static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
   return resultVals;
 }
 
-namespace {
-class ScatterExpansionInfo {
-public:
-  // Helper class similar to `ExpansionInfo` but only for`LinalgExt::ScatterOp`
-  // due to its special semantics (i.e. not all dims map to the iteration space)
-  LogicalResult compute(LinalgExt::ScatterOp scatterOp,
-                        OpOperand *fusableOpOperand,
-                        ArrayRef<ReassociationIndices> reassociationIndices,
-                        ArrayRef<int64_t> expandedShape,
-                        ArrayRef<int64_t> collapsedShape,
-                        PatternRewriter &rewriter);
-
-  SmallVector<ReassociationIndices> updatesReassoc;
-  SmallVector<SmallVector<int64_t>> updatesShapeMap;
-  SmallVector<ReassociationIndices> indicesReassoc;
-  SmallVector<SmallVector<int64_t>> indicesShapeMap;
-  SmallVector<ReassociationIndices> originalReassoc;
-  SmallVector<SmallVector<int64_t>> originalShapeMap;
-};
-
-} // namespace
-
-// Use the innermost indices in `reassoc` to construct a shape map out of
-// `shape`
-static SmallVector<SmallVector<int64_t>>
-computeShapeMapFromReassoc(ArrayRef<ReassociationIndices> reassoc,
-                           ArrayRef<int64_t> shape) {
-  SmallVector<SmallVector<int64_t>> shapeMap;
-  for (auto &indices : reassoc) {
-    shapeMap.emplace_back(shape.slice(indices.front(), indices.size()));
-  }
-  return shapeMap;
-}
-
-static SmallVector<ReassociationIndices>
-computeReassocFromShapeMap(ArrayRef<SmallVector<int64_t>> shapeMap) {
-  SmallVector<ReassociationIndices> reassoc;
-  int64_t dimCount = 0;
-  for (auto &shape : shapeMap) {
-    reassoc.emplace_back(
-        llvm::to_vector(llvm::seq<int64_t>(dimCount, dimCount + shape.size())));
-    dimCount += shape.size();
-  }
-  return reassoc;
-}
-
-LogicalResult ScatterExpansionInfo::compute(
-    LinalgExt::ScatterOp scatterOp, OpOperand *fusableOpOperand,
-    ArrayRef<ReassociationIndices> reassociationIndices,
-    ArrayRef<int64_t> expandedShape, ArrayRef<int64_t> collapsedShape,
-    PatternRewriter &rewriter) {
-  if (reassociationIndices.empty())
-    return failure();
-  assert(fusableOpOperand->getOwner() == scatterOp);
-
-  auto updatesShape = scatterOp.getUpdateType().getShape();
-  auto originalShape = scatterOp.getOriginalType().getShape();
-  auto rankOfContiguousSlice =
-      scatterOp.getOriginalType().getRank() - scatterOp.getIndexDepth();
-
-  // Helper lambda to convert a shape to an identity shape map.
-  auto shapeToIdentShapeMap = [](ArrayRef<int64_t> shape) {
-    return llvm::map_to_vector(
-        shape, [](int64_t dim) { return SmallVector<int64_t>{dim}; });
-  };
-
-  // Set `batchShapeMap` and `sliceShapeMap` based on the specific operand.
-  int64_t operandNum = fusableOpOperand->getOperandNumber();
-
-  // In the case of `original`, no chenge to the iteration space
-  SmallVector<SmallVector<int64_t>> batchShapeMap =
-      operandNum == ScatterOp::kOriginalOpNum
-          ? shapeToIdentShapeMap(
-                originalShape.take_front(scatterOp.getBatchRank()))
-          : computeShapeMapFromReassoc(
-                reassociationIndices.take_front(scatterOp.getBatchRank()),
-                expandedShape);
-  // In the case of `indices`, no chenge to the iteration space
-  SmallVector<SmallVector<int64_t>> sliceShapeMap =
-      operandNum == ScatterOp::kIndicesOpNum
-          ? shapeToIdentShapeMap(originalShape.take_back(rankOfContiguousSlice))
-          : computeShapeMapFromReassoc(
-                reassociationIndices.take_back(rankOfContiguousSlice),
-                expandedShape);
-
-  // Early exit if iteration space is unchanged
-  if (llvm::all_of(batchShapeMap, [&](auto vec) { return vec.size() == 1; }) &&
-      llvm::all_of(sliceShapeMap, [&](auto vec) { return vec.size() == 1; })) {
-    return failure();
-  }
-
-  updatesShapeMap = llvm::to_vector(llvm::concat<SmallVector<int64_t>>(
-      batchShapeMap,
-      shapeToIdentShapeMap(updatesShape.slice(scatterOp.getBatchRank(),
-                                              scatterOp.getUpdateSliceRank() -
-                                                  rankOfContiguousSlice)),
-      sliceShapeMap));
-  indicesShapeMap = llvm::to_vector(llvm::concat<SmallVector<int64_t>>(
-      batchShapeMap, shapeToIdentShapeMap(scatterOp.getIndexDepth())));
-  originalShapeMap = llvm::to_vector(llvm::concat<SmallVector<int64_t>>(
-      shapeToIdentShapeMap(originalShape.drop_back(rankOfContiguousSlice)),
-      sliceShapeMap));
-
-  updatesReassoc = computeReassocFromShapeMap(updatesShapeMap);
-  indicesReassoc = computeReassocFromShapeMap(indicesShapeMap);
-  originalReassoc = computeReassocFromShapeMap(originalShapeMap);
-  return success();
-}
-
 static std::optional<Value>
 fuseScatterWithReshapeByExpansion(ScatterOp scatterOp, Operation *reshapeOp,
                                   OpOperand *fusableOpOperand,
@@ -513,21 +527,19 @@ fuseScatterWithReshapeByExpansion(ScatterOp scatterOp, Operation *reshapeOp,
   RankedTensorType expandedType = isExpanding
                                       ? expandingReshapeOp.getResultType()
                                       : collapsingReshapeOp.getSrcType();
-  RankedTensorType collapsedType = isExpanding
-                                       ? expandingReshapeOp.getSrcType()
-                                       : collapsingReshapeOp.getResultType();
-  ScatterExpansionInfo info;
+  ExpansionInfo info;
   if (failed(info.compute(
-          scatterOp, fusableOpOperand,
+          getScatterReshapeInfo(scatterOp),
+          scatterOp.getStaticLoopRanges().value(), fusableOpOperand,
           isExpanding ? expandingReshapeOp.getReassociationIndices()
                       : collapsingReshapeOp.getReassociationIndices(),
-          expandedType.getShape(), collapsedType.getShape(), rewriter))) {
+          expandedType.getShape()))) {
     return std::nullopt;
   }
 
   // Returns `reassociation` with indices modified so that they are a contiguous
   // grouping of indices.
-  auto getType = [&](SmallVector<SmallVector<int64_t>> &shapeMap,
+  auto getType = [&](const SmallVector<SmallVector<int64_t>> &shapeMap,
                      ShapedType type) {
     SmallVector<int64_t> flattenedArray;
     for (auto &shape : shapeMap) {
@@ -539,30 +551,38 @@ fuseScatterWithReshapeByExpansion(ScatterOp scatterOp, Operation *reshapeOp,
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(scatterOp);
 
-  auto isIdentityReassoc = [](SmallVector<ReassociationIndices> &indices) {
-    for (auto &index : indices) {
-      if (index.size() != 1)
-        return false;
-    }
-    return true;
-  };
+  auto isIdentityReassoc =
+      [](const SmallVector<ReassociationIndices> &indices) {
+        for (auto &index : indices) {
+          if (index.size() != 1)
+            return false;
+        }
+        return true;
+      };
+
+  OpOperand *update = scatterOp.getDpsInputOperand(0);
+  OpOperand *indices = scatterOp.getDpsInputOperand(1);
+  OpOperand *original = scatterOp.getDpsInitOperand(0);
+  RankedTensorType newIndicesType =
+      getType(info.getShapeMap(indices), scatterOp.getIndicesType());
+  RankedTensorType newOriginalType =
+      getType(info.getShapeMap(original), scatterOp.getOriginalType());
+  SmallVector<ReassociationIndices> indicesReassoc = info.getReassoc(indices);
+  SmallVector<ReassociationIndices> originalReassoc = info.getReassoc(original);
 
   Value newUpdates = rewriter.create<tensor::ExpandShapeOp>(
-      loc, getType(info.updatesShapeMap, scatterOp.getUpdateType()),
-      scatterOp.getUpdates(), info.updatesReassoc);
+      loc, getType(info.getShapeMap(update), scatterOp.getUpdateType()),
+      scatterOp.getUpdates(), info.getReassoc(update));
   Value newIndices =
-      isIdentityReassoc(info.indicesReassoc)
+      isIdentityReassoc(indicesReassoc)
           ? scatterOp.getIndices()
           : rewriter.create<tensor::ExpandShapeOp>(
-                loc, getType(info.indicesShapeMap, scatterOp.getIndicesType()),
-                scatterOp.getIndices(), info.indicesReassoc);
+                loc, newIndicesType, scatterOp.getIndices(), indicesReassoc);
   Value newOriginal =
-      isIdentityReassoc(info.originalReassoc)
+      isIdentityReassoc(originalReassoc)
           ? scatterOp.getOriginal()
           : rewriter.create<tensor::ExpandShapeOp>(
-                loc,
-                getType(info.originalShapeMap, scatterOp.getOriginalType()),
-                scatterOp.getOriginal(), info.originalReassoc);
+                loc, newOriginalType, scatterOp.getOriginal(), originalReassoc);
 
   auto newScatter = rewriter.create<ScatterOp>(
       loc, newOriginal.getType(), ValueRange{newUpdates, newIndices},
@@ -571,10 +591,10 @@ fuseScatterWithReshapeByExpansion(ScatterOp scatterOp, Operation *reshapeOp,
   rewriter.inlineRegionBefore(scatterOp.getRegion(), newScatter.getRegion(),
                               newScatter.getRegion().begin());
 
-  // Collapse back to originanl shape.
+  // Collapse back to original shape.
   auto newCollapse = rewriter.create<tensor::CollapseShapeOp>(
       loc, scatterOp.getOriginalType(), newScatter.getResult(0),
-      info.originalReassoc);
+      info.getReassoc(original));
 
   return {newCollapse};
 }
