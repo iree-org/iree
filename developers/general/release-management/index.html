@@ -3879,8 +3879,14 @@ request that some feature make the cut.</p>
 <li>
 <p>Set the tag to be created and select a target commit. For example, if the
     candidate release was tagged <code>iree-3.1.0rc20241119</code> at commit <code>3ed07da</code>,
-    set the new release tag <code>iree-3.1.0</code> and use the same commit.</p>
+    set the new release tag <code>v3.1.0</code> and use the same commit.</p>
 <p><img alt="rename_tag" src="../release-tag.png" /></p>
+<p>If the commit does not appear in the list, create and push a tag
+manually:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>checkout<span class="w"> </span>iree-3.1.0rc20250107
+git<span class="w"> </span>tag<span class="w"> </span>-a<span class="w"> </span>v3.1.0<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;Version 3.1.0 release.&quot;</span>
+git<span class="w"> </span>push<span class="w"> </span>upstream<span class="w"> </span>v3.1.0
+</code></pre></div>
 </li>
 <li>
 <p>Set the title to <code>Release vX.Y.Z</code>.</p>
