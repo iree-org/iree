@@ -175,9 +175,10 @@ static StringRef getABI(IREE::HAL::ExecutableTargetAttr targetAttr) {
 
 static void dumpModuleToPath(StringRef path, StringRef baseName,
                              StringRef suffix, StringRef extension,
-                             llvm::Module &module) {
+                             llvm::Module &module, StringRef header = {}) {
   llvm::SmallVector<char, 0> data;
   llvm::raw_svector_ostream ostream(data);
+  ostream << header;
   module.print(ostream, nullptr);
   dumpDataToPath(path, baseName, suffix, extension,
                  StringRef(data.data(), data.size()));
@@ -295,7 +296,8 @@ public:
   static void optimizeModule(llvm::Module &module,
                              llvm::TargetMachine &targetMachine,
                              ArrayRef<std::string> passPlugins,
-                             bool slpVectorization) {
+                             bool slpVectorization,
+                             std::string &outPassesString) {
     llvm::LoopAnalysisManager lam;
     llvm::FunctionAnalysisManager fam;
     llvm::CGSCCAnalysisManager cgam;
@@ -336,7 +338,11 @@ public:
     mpm.addPass(llvm::VerifierPass());
     mpm.addPass(pb.buildPerModuleDefaultPipeline(ol));
     mpm.addPass(llvm::VerifierPass());
-
+    llvm::raw_string_ostream os(outPassesString);
+    mpm.printPipeline(os, [&pic](StringRef className) {
+      auto passName = pic.getPassNameForClassName(className);
+      return passName.empty() ? className : passName;
+    });
     mpm.run(module, mam);
   }
 
@@ -566,12 +572,19 @@ public:
       }
 
       // Run LLVM optimization passes.
+      std::string passesString;
       optimizeModule(*llvmModule, *targetMachine, options.passPlugins,
-                     options.slpVectorization);
+                     options.slpVectorization, passesString);
       if (!serializationOptions.dumpIntermediatesPath.empty()) {
+        std::string header = llvm::formatv(R"TXT(
+; To reproduce the .optimized.ll from the .linked.ll, run:
+; opt --passes='{}'
+
+)TXT",
+                                           passesString);
         dumpModuleToPath(serializationOptions.dumpIntermediatesPath,
                          serializationOptions.dumpBaseName, variantOp.getName(),
-                         ".optimized.ll", *llvmModule);
+                         ".optimized.ll", *llvmModule, header);
       }
 
       if (failed(validateFinalizedModule(variantOp, *llvmModule))) {
