@@ -40,7 +40,7 @@ static void PopulateDescriptorSetWriteInfos(
                              : VK_NULL_HANDLE;
     buffer_info.offset =
         iree_hal_buffer_byte_offset(binding.buffer) + binding.offset;
-    if (binding.length == IREE_WHOLE_BUFFER) {
+    if (binding.length == IREE_HAL_WHOLE_BUFFER) {
       buffer_info.range = VK_WHOLE_SIZE;
     } else {
       // Round up to a multiple of 32-bit. 32-bit is the defacto native bitwidth
