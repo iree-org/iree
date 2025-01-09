@@ -32,13 +32,26 @@ static constexpr int64_t kMaxCost = INT64_MAX;
 
 namespace {
 
+// This op estimates the cost of a list of perfectly nested loop ranges simply
+// as the product of ranges. Note that this does not take into account the cost
+// of the body of the op whose domain this computes.
 static int64_t costOfDomain(ArrayRef<int64_t> domain) {
   int64_t product = 1;
   for (int64_t size : domain) {
+    int64_t multiplier = size;
     if (ShapedType::isDynamic(size)) {
+      // HACK: Use a placeholder value for dynamic sizes. In practice, because
+      // we tend to require that iteration spaces of linalg ops line up for
+      // fusion to occur, more dynamic dims => a larger iteration domain.
+      // TODO: Query the upper bound of the dynamic size range instead.
+      multiplier = 1024;
+    }
+
+    // Preform saturating multiplication
+    if (product > kMaxCost / multiplier) {
       return kMaxCost;
     }
-    product *= size;
+    product *= multiplier;
   }
   return product;
 }
