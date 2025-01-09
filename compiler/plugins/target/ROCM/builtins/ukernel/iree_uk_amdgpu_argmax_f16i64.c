@@ -36,14 +36,18 @@ iree_uk_amdgpu_argmax_f16i64(const _Float16 *inputBuffer, int64_t input_offset,
   uint64_t laneHasMaxValmask = __ballot(wgMax == laneMax);
   // if there is only one max value holder, write and exit.
   if (__builtin_popcountll(laneHasMaxValmask) == 1) {
-    if (wgMax == laneMax)
+    if (wgMax == laneMax) {
       outputBuffer[output_offset] = laneResult;
-    return;
+    }
+  } else {
+    // if there are multiple max value holder, find smallest index (argmax
+    // semantics).
+    int64_t indexVal = wgMax == laneMax ? laneResult : INT64_MAX;
+    laneResult = __ockl_wfred_min_i64(indexVal);
+    if (laneID == 0) {
+      outputBuffer[output_offset] = laneResult;
+    }
   }
-  // if there are multiple max value holder, find smallest index (argmax
-  // semantics).
-  int64_t indexVal = wgMax == laneMax ? laneResult : INT64_MAX;
-  laneResult = __ockl_wfred_min_i64(indexVal);
-  if (laneID == 0)
-    outputBuffer[output_offset] = laneResult;
+  // TODO(bjacob): this fence should be on the caller side. Move to TileAndFuse?
+  __threadfence_block();
 }
