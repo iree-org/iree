@@ -66,6 +66,7 @@ iree_lit_test_suite(
     "optimize_tensor_insert_extract_slices.mlir"
     "pad_dynamic_alloc.mlir"
     "polynomial_approximation.mlir"
+    "propagate_dispatch_size_bounds.mlir"
     "propagate_reshapes_by_expansion.mlir"
     "reconcile_translation_info.mlir"
     "reductions.mlir"
