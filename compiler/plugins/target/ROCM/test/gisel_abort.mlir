@@ -1,4 +1,5 @@
-// RUN: iree-opt --iree-hal-transformation-pipeline --iree-gpu-test-target=gfx90a %s 2>&1  | FileCheck %s
+// RUN: not not iree-opt --iree-hip-llvm-global-isel --iree-hal-transformation-pipeline --iree-gpu-test-target=gfx90a %s 2>&1  | FileCheck %s
+// For some reason, 2 `not`s are required to convert the abort error code from 134 to 0
 
 module attributes {
   hal.device.targets = [
