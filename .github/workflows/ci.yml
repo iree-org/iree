@@ -199,7 +199,7 @@ jobs:
       - name: ccache
         uses: hendrikmuhs/ccache-action@ed74d11c0b343532753ecead8a951bb09bb34bc9 # v1.2.14
         with:
-          key: ${{ github.job }}-${{ matrix.provider }}
+          key: ${{ github.job }}-${{ matrix.runs-on}}-${{ matrix.provider }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
       - name: CMake - configure
         run: |
