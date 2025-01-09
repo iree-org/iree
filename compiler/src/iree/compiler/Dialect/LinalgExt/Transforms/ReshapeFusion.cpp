@@ -696,6 +696,15 @@ private:
   linalg::ControlDropUnitDims options;
 };
 
+struct DropScatterUnitIndexDepth final : public OpRewritePattern<ScatterOp> {
+  LogicalResult matchAndRewrite(ScatterOp scatterOp,
+                                PatternRewriter &rewriter) const override {
+    auto indicesShape = scatterOp.getIndicesType().getShape();
+    (void)indicesShape;
+    return failure();
+  }
+};
+
 struct FoldScatterWithProducerReshapeByExpansion final
     : public OpRewritePattern<ScatterOp> {
   FoldScatterWithProducerReshapeByExpansion(
