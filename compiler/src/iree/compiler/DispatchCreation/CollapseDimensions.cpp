@@ -29,11 +29,14 @@
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/Iterators.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Visitors.h"
 #include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -174,13 +177,6 @@ static bool isEligibleForCollapse(Operation *op) {
 
   auto genericOp = dyn_cast<linalg::GenericOp>(op);
   if (!genericOp) {
-    return false;
-  }
-
-  // TODO(guray) There is no mechanism to tell the collapsed indexes to
-  // `tensor.expand_shape`. Once we have this support in MLIR, we can enable
-  // dynamic tensor shapes.
-  if (genericOp.hasDynamicShape()) {
     return false;
   }
 
@@ -684,12 +680,15 @@ hoistTensorReshapesOutOfDispatchRegion(
   SmallVector<SmallVector<ReassociationIndices>> allReassociationIndices;
   ValueRange dynamicDimsList = dispatchOp.getResultDims();
   Location loc = dispatchOp.getLoc();
-  for (Value yieldedValue : returnOp->getOperands()) {
+  for (auto [resultIndex, yieldedValue] :
+       llvm::enumerate(returnOp->getOperands())) {
     auto expandShapeOp = yieldedValue.getDefiningOp<tensor::ExpandShapeOp>();
     if (!expandShapeOp) {
       // 4a. Keep the same yield value if the producer is not a
       // `tensor.expand_shape` op.
       newReturnTypes.push_back(yieldedValue.getType());
+      ValueRange resultDims = dispatchOp.getResultDynamicDims(resultIndex);
+      newDynamicDims.append(resultDims.begin(), resultDims.end());
       newYieldVals.push_back(yieldedValue);
       continue;
     }
@@ -774,9 +773,24 @@ hoistTensorReshapesOutOfDispatchRegion(
       rewriter.replaceAllUsesWith(origResult, returnValue);
       continue;
     }
+
+    auto shapedType = dyn_cast<ShapedType>(origResult.getType());
+    assert(shapedType && "result should be shaped type");
+
+    SmallVector<OpFoldResult> outputShape;
+    ValueRange dynamicDims = dispatchOp.getResultDynamicDims(index);
+    for (int64_t dim : shapedType.getShape()) {
+      if (ShapedType::isDynamic(dim)) {
+        outputShape.push_back(dynamicDims.front());
+        dynamicDims.drop_front();
+        continue;
+      }
+      outputShape.push_back(rewriter.getIndexAttr(dim));
+    }
+
     auto newExpandShapeOp = rewriter.create<tensor::ExpandShapeOp>(
         loc, origResult.getType(), returnValue,
-        allReassociationIndicesRef.front());
+        allReassociationIndicesRef.front(), outputShape);
     allReassociationIndicesRef = allReassociationIndicesRef.drop_front();
     rewriter.replaceAllUsesWith(origResult, newExpandShapeOp.getResult());
   }
@@ -1059,6 +1073,18 @@ void CollapseDimensionsPass::runOnOperation() {
           "failed to propagate reshape ops introduced during collapse");
       return signalPassFailure();
     }
+
+    // Expand affine.apply ops from dynamic dims
+    newDispatchOp->walk([&](affine::AffineApplyOp op) {
+      rewriter.setInsertionPoint(op);
+      auto maybeExpanded = mlir::affine::expandAffineMap(
+          rewriter, op.getLoc(), op.getAffineMap(),
+          llvm::to_vector<4>(op.getOperands()));
+      if (!maybeExpanded) {
+        return;
+      }
+      rewriter.replaceOp(op, *maybeExpanded);
+    });
   }
 }
 
