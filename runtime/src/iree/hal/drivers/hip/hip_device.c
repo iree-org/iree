@@ -1632,6 +1632,7 @@ void iree_hal_hip_device_destroy_queue_read_callback_data(
   if (!data) {
     return;
   }
+  iree_hal_file_release(data->source_file);
   iree_hal_resource_release(data->target_buffer);
   iree_hal_hip_semaphore_callback_data_deinitialize(&data->base);
   iree_allocator_free(data->base.host_allocator, data);
@@ -1890,6 +1891,9 @@ static iree_status_t iree_hal_hip_device_perform_queue_read_now(
             device, device->cleanup_thread, data->base.signal_semaphore_list,
             device_ordinal, &iree_hal_hip_device_complete_queue_read_operation,
             data);
+        // Break here because data could immediately be cleaned up before the
+        // next loop iteration.
+        break;
       } else {
         status = iree_hal_hip_device_stream_add_cleanup(
             device, device->cleanup_thread, device_ordinal,
@@ -1962,6 +1966,7 @@ static iree_status_t iree_hal_hip_device_make_queue_read_callback_data(
   callback_data->source_offset = source_offset;
   callback_data->target_buffer = target_buffer;
   iree_hal_resource_retain(target_buffer);
+  iree_hal_file_retain(source_file);
   callback_data->target_offset = target_offset;
   callback_data->length = length;
   callback_data->flags = flags;
