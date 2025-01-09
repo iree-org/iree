@@ -565,9 +565,9 @@ std::tuple<Type, Type, Type> DataTiledMMAAttr::getABCElementTypes() const {
 std::tuple<int64_t, int64_t, int64_t> DataTiledMMAAttr::getMNKShape() const {
   MLIRContext *ctx = getContext();
   auto opaqueLayout = getOpaqueMMALayout(ctx, getIntrinsic().getValue());
-  return {opaqueLayout.mSize * getUnrollM() * getSubgroupsM(),
-          opaqueLayout.nSize * getUnrollN() * getSubgroupsN(),
-          opaqueLayout.kSize * getUnrollK()};
+  return {opaqueLayout.mSize * getIntrinsicsM() * getSubgroupsM(),
+          opaqueLayout.nSize * getIntrinsicsN() * getSubgroupsN(),
+          opaqueLayout.kSize * getIntrinsicsK()};
 }
 
 std::tuple<VectorType, VectorType, VectorType>
@@ -791,12 +791,12 @@ FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
       getVectorType(builder.getContext(), intrinsic, MMAFragment::Acc);
 
   // Loop over the 3 unroll_{m,n,k} dimensions to create the intrinsics.
-  for (int mu = 0; mu < getUnrollM(); ++mu) {
-    for (int nu = 0; nu < getUnrollN(); ++nu) {
-      for (int ku = 0; ku < getUnrollK(); ++ku) {
-        Value lhs = intrinsicsLhs[mu * getUnrollK() + ku];
-        Value rhs = intrinsicsRhs[nu * getUnrollK() + ku];
-        Value &acc = intrinsicsAcc[mu * getUnrollN() + nu];
+  for (int mu = 0; mu < getIntrinsicsM(); ++mu) {
+    for (int nu = 0; nu < getIntrinsicsN(); ++nu) {
+      for (int ku = 0; ku < getIntrinsicsK(); ++ku) {
+        Value lhs = intrinsicsLhs[mu * getIntrinsicsK() + ku];
+        Value rhs = intrinsicsRhs[nu * getIntrinsicsK() + ku];
+        Value &acc = intrinsicsAcc[mu * getIntrinsicsN() + nu];
         acc = createMmaOp(builder, loc, intrinsic, intrinCType, lhs, rhs, acc);
       }
     }
@@ -926,7 +926,7 @@ LogicalResult VirtualMMAAttr::populateOperandOffsetsSizesStrides(
   return success();
 }
 
-int64_t VirtualMMAAttr::getUnrollK() const {
+int64_t VirtualMMAAttr::getIntrinsicsK() const {
   switch (getIntrinsic().getValue()) {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16: {
@@ -963,7 +963,7 @@ FailureOr<Value> VirtualMMAAttr::buildMmaOperation(OpBuilder &builder,
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16: {
     // Generate mfma's for K with unrolled kernels.
-    const int64_t unrollKFactor = getUnrollK();
+    const int64_t unrollKFactor = getIntrinsicsK();
     auto [m, n, k] = getMNKShape();
     // Compute actual/native intrinsic's K size.
     int64_t nativeKSize = k / unrollKFactor;

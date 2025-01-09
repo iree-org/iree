@@ -96,13 +96,13 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   };
 
   auto [intrinsicA, intrinsicB, intrinsicC] = intrinsicMma.getABCVectorTypes();
-  // The unrollK factor serves to allow loads from the A and B matrices to use
-  // the target ISA's vector loads. For instance, if the ISA has 128-bit loads
-  // and each intrinsic consumes only 32 bits from A and B, then we want to set
-  // unrollK=4 to turn 4 separate 32-bit loads into one 128-bit load.
+  // The intrinsicsK factor serves to allow loads from the A and B matrices to
+  // use the target ISA's vector loads. For instance, if the ISA has 128-bit
+  // loads and each intrinsic consumes only 32 bits from A and B, then we want
+  // to set intrinsicsK=4 to turn 4 separate 32-bit loads into one 128-bit load.
   int intrinsicLoadBits =
       std::min(sizeInBits(intrinsicA), sizeInBits(intrinsicB));
-  const int unrollK =
+  const int intrinsicsK =
       std::max(1, *wgp.getMaxLoadInstructionBits() / intrinsicLoadBits);
 
   // The total amount of unrolling along the M and N dimensions is normally
@@ -113,25 +113,25 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   // correspondingly divides the available register space between this many
   // subgroups, making it cancel out of the equation here.
   //
-  // We need to solve for two variables here, unroll_m and unroll_n, constrained
-  // by one quadratic equation expressing that the A, B and C tiles must fit in
-  // VGPR space. Since we have only 1 constraint for two variables, we
-  // self-impose a second constraint for now: that the unrolling shape should be
-  // square, i.e. unrollM == unrollN.
+  // We need to solve for two variables here, intrinsics_m and intrinsics_n,
+  // constrained by one quadratic equation expressing that the A, B and C tiles
+  // must fit in VGPR space. Since we have only 1 constraint for two variables,
+  // we self-impose a second constraint for now: that the unrolling shape should
+  // be square, i.e. intrinsicsM == intrinsicsN.
   // TODO(#18850): that is suboptimal for narrow cases.
   //
   // Now we have only one variable, call it x, to solve for.
 
   // The register space taken is:
-  //     A-tile: x * unrollK * sizeInBits(intrinsicA)
-  //     B-tile: x * unrollK * sizeInBits(intrinsicB)
+  //     A-tile: x * intrinsicsK * sizeInBits(intrinsicA)
+  //     B-tile: x * intrinsicsK * sizeInBits(intrinsicB)
   //     C-tile: x^2 * sizeInBits(intrinsicC)
   // So the equation to solve is:
   //       x^2 * sizeInBits(intrinsicC)
-  //     + x   * unrollK * (sizeInBits(intrinsicA) + sizeInBits(intrinsicB))
+  //     + x   * intrinsicsK * (sizeInBits(intrinsicA) + sizeInBits(intrinsicB))
   //    == wgp.getVgprSpaceBits()
   float c2 = sizeInBits(intrinsicC);
-  float c1 = unrollK * (sizeInBits(intrinsicA) + sizeInBits(intrinsicB));
+  float c1 = intrinsicsK * (sizeInBits(intrinsicA) + sizeInBits(intrinsicB));
   float c0 = -*wgp.getVgprSpaceBits(); // negative by construction.
   // Now the equation to solve is: c2 * x^2 + c1 * x + c0 == 0.
   float discriminant = c1 * c1 - 4 * c0 * c2; // positive, because c0 < 0.
@@ -185,8 +185,8 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   // to think about unroll-to-subgroups when making the narrowing adjustment.
   int subgroupsM = 1;
   int subgroupsN = *wgp.getSimdsPerWgp();
-  int unrollM = totalUnrollM / subgroupsM;
-  int unrollN = totalUnrollN / subgroupsN;
+  int intrinsicsM = totalUnrollM / subgroupsM;
+  int intrinsicsN = totalUnrollN / subgroupsN;
 
   //
   // Step 3: Adjust the unrolling factors when there is a narrow dimension.
@@ -195,19 +195,22 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   IREE::Encoding::MatmulNarrowDim narrowDim =
       IREE::Encoding::getMatmulNarrowDim(encoding);
   if (narrowDim.isM()) {
-    unrollM = std::min(unrollM, static_cast<int>(llvm::divideCeil(
-                                    narrowDim.size, intrinsicMma.getMSize())));
+    intrinsicsM =
+        std::min(intrinsicsM, static_cast<int>(llvm::divideCeil(
+                                  narrowDim.size, intrinsicMma.getMSize())));
   }
   if (narrowDim.isN()) {
-    std::swap(unrollM, unrollN);
+    std::swap(intrinsicsM, intrinsicsN);
     std::swap(subgroupsM, subgroupsN);
     assert(subgroupsN == 1);
-    unrollN = std::min(unrollN, static_cast<int>(llvm::divideCeil(
-                                    narrowDim.size, intrinsicMma.getNSize())));
+    intrinsicsN =
+        std::min(intrinsicsN, static_cast<int>(llvm::divideCeil(
+                                  narrowDim.size, intrinsicMma.getNSize())));
   }
 
-  return DataTiledMMAAttr::get(ctx, intrinsicMma.getIntrinsic(), unrollM,
-                               subgroupsM, unrollN, subgroupsN, unrollK);
+  return DataTiledMMAAttr::get(ctx, intrinsicMma.getIntrinsic(), intrinsicsM,
+                               subgroupsM, intrinsicsN, subgroupsN,
+                               intrinsicsK);
 }
 
 static Operation *lowerContractionOpToMultiMmaOp(OpBuilder &builder,

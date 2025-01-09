@@ -232,11 +232,11 @@ def IREEGPU_DataTiledMMAAttr :
 
   let parameters = (ins
     "::mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr":$intrinsic,
-    DefaultValuedParameter<"int64_t", "1", "Unrolling along the M dimension, on the same thread.">:$unroll_m,
-    DefaultValuedParameter<"int64_t", "1", "Unrolling along the M dimension, distributed across this many more threads.">:$subgroups_m,
-    DefaultValuedParameter<"int64_t", "1", "Unrolling along the N dimension, on the same thread.">:$unroll_n,
-    DefaultValuedParameter<"int64_t", "1", "Unrolling along the N dimension, distributed across this many more threads.">:$subgroups_n,
-    DefaultValuedParameter<"int64_t", "1", "Unrolling along the K dimension, on the same thread, with interleaved layout.">:$unroll_k
+    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the M dimension.">:$intrinsics_m,
+    DefaultValuedParameter<"int64_t", "1", "Subgroup count along the M dimension.">:$subgroups_m,
+    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the N dimension.">:$intrinsics_n,
+    DefaultValuedParameter<"int64_t", "1", "Subgroup count along the N dimension.">:$subgroups_n,
+    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the K dimension, with interleaved layout.">:$intrinsics_k
   );
 }
 
@@ -260,7 +260,7 @@ def IREEGPU_VirtualMMAAttr :
 
   let description = [{
     This mma variant represents "virtual" MMA ops that has modification to
-    its native layouts by unrollK and/or interleave reads. The |intrinsic|
+    its native layouts by intrinsicsK and/or interleave reads. The |intrinsic|
     field represents different kinds of "Virtual" MMA Ops we found helpful.
 
     These interleaving and/or unrolling changes in the layout is especially
@@ -282,8 +282,8 @@ def IREEGPU_VirtualMMAAttr :
 
     // Factor to unroll K from native MMA/intrinsic size to virtual size.
     // e.g MFMA_F32_16x16x16 has K of 16, while VMFMA_F32_16x16x32 has K of 32
-    // in this example, unrollK = 32/16 = 2.
-    int64_t getUnrollK() const;
+    // in this example, intrinsicsK = 32/16 = 2.
+    int64_t getIntrinsicsK() const;
   }];
 }
 

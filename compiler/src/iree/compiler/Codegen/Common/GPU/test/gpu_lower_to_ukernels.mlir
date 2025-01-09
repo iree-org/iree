@@ -73,7 +73,7 @@ func.func @multi_mma_mfma_i32_16x16x32_i8(%a : tensor<1x2x8x1x1x2x8xi8>, %b : te
   %d = iree_gpu.multi_mma %a, %b, %c {
     indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-    kind = #iree_gpu.data_tiled_mma_layout<intrinsic =  MFMA_I32_16x16x32_I8, unroll_m = 8, unroll_n = 2, subgroups_n = 4, unroll_k = 2>,
+    kind = #iree_gpu.data_tiled_mma_layout<intrinsic =  MFMA_I32_16x16x32_I8, intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 2>,
     lowering_config = #iree_gpu.lowering_config<{
       reduction = [0, 0, 0],
       ukernel = #iree_gpu.ukernel_config<name = "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8", def_attrs = {vm.import.module = "rocm"}>,

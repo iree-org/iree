@@ -62,7 +62,7 @@ util.func public @multi_mma(
                          affine_map<(d0, d1, d2) -> (d1, d2)>,
                          affine_map<(d0, d1, d2) -> (d0, d1)>],
         iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-        kind = #iree_gpu.data_tiled_mma_layout<intrinsic =  MFMA_F32_16x16x16_F16, unroll_m = 8, unroll_n = 2, subgroups_n = 4, unroll_k = 2>}
+        kind = #iree_gpu.data_tiled_mma_layout<intrinsic =  MFMA_F32_16x16x16_F16, intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 2>}
         : tensor<4x16x8x4x16x2x4xf16>, tensor<4x16x4x2x4x16x2x4xf16> into tensor<4x4x8x4x2x4x16x4xf32>
     flow.return %13 : tensor<4x4x8x4x2x4x16x4xf32>
   }
