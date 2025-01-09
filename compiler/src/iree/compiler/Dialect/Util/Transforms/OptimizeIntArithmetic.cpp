@@ -228,12 +228,9 @@ struct RemoveIndexCastForAssumeOfI32
       }
       newArgs.push_back(arg.getDefiningOp<arith::IndexCastUIOp>().getIn());
     }
-    ArrayRef<Attribute> assumptions = op.getAssumptions().getValue();
-    // Ugly hack to avoid recreating the assumptions array.
-    ArrayRef<ArrayAttr> castAssumptions = ArrayRef(
-        static_cast<const ArrayAttr *>(assumptions.data()), assumptions.size());
-    auto newOp = rewriter.create<Util::AssumeIntOp>(op.getLoc(), newArgs,
-                                                    castAssumptions);
+    ArrayAttr assumptions = op.getAssumptionsAttr();
+    auto newOp =
+        rewriter.create<Util::AssumeIntOp>(op.getLoc(), newArgs, assumptions);
     SmallVector<Value> replacements(newOp.getResults());
     for (auto [newRes, oldRes] :
          llvm::zip_equal(replacements, op.getResults())) {
