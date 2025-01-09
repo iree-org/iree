@@ -10,6 +10,7 @@
 #include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -38,15 +39,20 @@ namespace {
 static int64_t costOfDomain(ArrayRef<int64_t> domain) {
   int64_t product = 1;
   for (int64_t size : domain) {
+    int64_t multiplier = size;
     if (ShapedType::isDynamic(size)) {
       // HACK: Use a placeholder value for dynamic sizes. In practice, because
       // we tend to require that iteration spaces of linalg ops line up for
       // fusion to occur, more dynamic dims => a larger iteration domain.
       // TODO: Query the upper bound of the dynamic size range instead.
-      product *= 1024;
-    } else {
-      product *= size;
+      multiplier = 1024;
     }
+
+    // Preform saturating multiplication
+    if (product > kMaxCost / multiplier) {
+      return kMaxCost;
+    }
+    product *= multiplier;
   }
   return product;
 }
