@@ -22,6 +22,7 @@ jobs:
     runs-on: linux-mi300-gpu-1
     container:
       image: rocm/dev-ubuntu-22.04:6.3
+      options: --user root --device=/dev/kfd --device=/dev/dri --ipc=host --group-add video --group-add $render_gid --cap-add=SYS_PTRACE --security-opt seccomp=unconfined
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       BUILD_DIR: build-tests
