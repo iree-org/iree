@@ -6,10 +6,12 @@
 
 #include "iree/compiler/Dialect/Stream/Analysis/Partitioning.h"
 #include "iree/compiler/Dialect/Stream/Analysis/ResourceHazards.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/PatternMatch.h"
 
@@ -138,6 +140,8 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
 
   auto asmState = getRootAsmState(block);
 
+  llvm::DenseMap<Operation *, llvm::SmallVector<Operation *>> syncOps;
+
   for (auto &op : llvm::reverse(*block)) {
     // Skip constants; they just add noise (and since they are heavily CSE'd
     // they have lots of users to test).
@@ -161,6 +165,20 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
         usableBuilders.reset();
       }
       // Even though not a streamable op we still want to track it below.
+    }
+
+    // Synchronizing operations should join with their producers if the producer
+    // is streamable.
+    if (dyn_cast<IREE::Stream::AsyncBarrierOp>(op) ||
+        dyn_cast<IREE::Stream::AsyncTransferOp>(op)) {
+      auto producer = op.getOperand(0).getDefiningOp();
+      auto streamable = dyn_cast<IREE::Stream::StreamableOpInterface>(producer);
+      if (streamable) {
+        if (!syncOps.contains(producer))
+          syncOps[producer] = llvm::SmallVector<Operation *>();
+        syncOps[producer].push_back(&op);
+        continue;
+      }
     }
 
     // Initialize op info for this op - whether streamable or not. We track
@@ -202,6 +220,21 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
       opInfo.hazards |= userInfo.membership;
       opInfo.hazards |= userInfo.hazards;
     }
+
+    for (auto syncOp : syncOps[&op]) {
+      for (auto user : syncOp->getUsers()) {
+        auto userInfoIt = opInfos.find(user);
+        if (userInfoIt == opInfos.end())
+          continue;
+        auto &userInfo = userInfoIt->second;
+        opInfo.hazards |= userInfo.membership;
+        opInfo.hazards |= userInfo.hazards;
+        consumers.reset();
+      }
+    }
+
+    // For any sync ops not use this ops results we need to put in a
+    // non-consumer block:
     llvm::BitVector candidates(builders.size(), /*t=*/true);
     candidates ^= opInfo.hazards;
     candidates |= consumers;
@@ -216,6 +249,16 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
       }
     }
 
+    for (auto syncOp : syncOps[&op]) {
+      for (auto ordinal : candidates.set_bits()) {
+        if (!canAddOpToPartition(*syncOp, opInfo, ordinal)) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "Candidate partition " << ordinal << " incompatible\n");
+          candidates.reset(ordinal);
+        }
+      }
+    }
+
     // If this op is not streamable then bail here; we've still setup the hazard
     // map for following iteration.
     auto streamableOp = dyn_cast<IREE::Stream::StreamableOpInterface>(op);
@@ -227,63 +270,60 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
     // First see which partitions are consuming this that we can also safely
     // move in to.
     consumers &= candidates;
+    if (consumers.any())
+      candidates = consumers;
 
     opInfo.membership.reserve(builders.size() + 1);
     opInfo.membership.resize(builders.size(), /*t=*/false);
 
-    // If we have one or more consumers we should go into those first.
-    if (consumers.any()) {
-      // If we are a clonable op (like splat) clone us into every partition.
-      // Otherwise we just pick the first we find (probably a bad heuristic).
-      if (streamableOp.preferCloneToConsumers() && consumers.count() > 1) {
-        for (auto consumerOrdinal : consumers.set_bits()) {
-          LLVM_DEBUG(llvm::dbgs() << "Cloning into consumer partition "
-                                  << consumerOrdinal << "\n");
-          auto &consumerBuilder = builders[consumerOrdinal];
-          consumerBuilder->insert(&op, opInfo);
-          consumerBuilder->clonedOps.insert(&op);
-        }
-      } else {
-        int consumerOrdinal = consumers.find_last();
-        LLVM_DEBUG(llvm::dbgs() << "Moving into consumer partition "
+    // No consumers - if there's any candidate then we'll go into that.
+    int firstCandidateOrdinal = candidates.find_first();
+    if (firstCandidateOrdinal == -1) {
+      // Mark the op as having hazards against all other partitions.
+      // It is better to be safe than incorrect, especially with our current
+      // minimal test coverage. It's not always safe to reorder things - if
+      // anything we are unlikely to be conservative enough here - for example,
+      // if there's a stream.resource.load of a resource or a global we can't
+      // move anything that may affect that resource or global. This
+      // partitioning was designed to be conservative because debugging such
+      // issues is really difficult.
+      if (!builders.empty()) {
+        opInfo.hazards.set(0, builders.size() - 1);
+      }
+
+      // Create a new partition just for this op.
+      opInfo.membership.resize(opInfo.membership.size() + 1, /*t=*/true);
+      auto builder = std::make_unique<PartitionBuilder>();
+      builder->ordinal = builders.size();
+      builders.push_back(std::move(builder));
+      usableBuilders.resize(builders.size(), /*t=*/true);
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Created partition " << builder->ordinal << "\n");
+      firstCandidateOrdinal = builders.size() - 1;
+    }
+
+    auto &builder = builders[firstCandidateOrdinal];
+
+    // If we have synchronization operations we can place in the last block:
+    for (auto syncOp : syncOps[&op]) {
+      builder->insert(syncOp, opInfo);
+    }
+
+    LLVM_DEBUG(llvm::dbgs() << "Moving to first candidate partition "
+                            << firstCandidateOrdinal << " (continue)\n");
+    // If we are a clonable op (like splat) clone us into every partition.
+    // Otherwise we just pick the first we find (probably a bad heuristic).
+    if (consumers.count() > 1 && streamableOp.preferCloneToConsumers()) {
+      for (auto consumerOrdinal : consumers.set_bits()) {
+        LLVM_DEBUG(llvm::dbgs() << "Cloning into consumer partition "
                                 << consumerOrdinal << "\n");
         auto &consumerBuilder = builders[consumerOrdinal];
         consumerBuilder->insert(&op, opInfo);
+        consumerBuilder->clonedOps.insert(&op);
       }
-      LLVM_DEBUG(llvm::dbgs() << "Handled streamable (continue)\n");
-      continue;
+    } else {
+      builder->insert(&op, opInfo);
     }
-
-    // No consumers - if there's any candidate then we'll go into that.
-    int firstCandidateOrdinal = candidates.find_first();
-    if (firstCandidateOrdinal != -1) {
-      LLVM_DEBUG(llvm::dbgs() << "Moving to first candidate partition "
-                              << firstCandidateOrdinal << " (continue)\n");
-      builders[firstCandidateOrdinal]->insert(&op, opInfo);
-      continue;
-    }
-
-    // Mark the op as having hazards against all other partitions.
-    // It is better to be safe than incorrect, especially with our current
-    // minimal test coverage. It's not always safe to reorder things - if
-    // anything we are unlikely to be conservative enough here - for example,
-    // if there's a stream.resource.load of a resource or a global we can't
-    // move anything that may affect that resource or global. This partitioning
-    // was designed to be conservative because debugging such issues is really
-    // difficult.
-    if (!builders.empty()) {
-      opInfo.hazards.set(0, builders.size() - 1);
-    }
-
-    // Create a new partition just for this op.
-    opInfo.membership.resize(opInfo.membership.size() + 1, /*t=*/true);
-    auto builder = std::make_unique<PartitionBuilder>();
-    builder->ordinal = builders.size();
-    builder->insert(&op, opInfo);
-    LLVM_DEBUG(llvm::dbgs()
-               << "Created partition " << builder->ordinal << "\n");
-    builders.push_back(std::move(builder));
-    usableBuilders.resize(builders.size(), /*t=*/true);
   }
 
   // Ops cloned into multiple partitions may still escape if there are
