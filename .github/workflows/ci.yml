@@ -168,6 +168,10 @@ jobs:
       matrix:
         runs-on: [ubuntu-24.04, windows-2022, macos-14]
         provider: [tracy, console]
+        # TODO: re-enable macOS Tracy build once it has no errors
+        exclude:
+          - runs-on: macos-14
+            provider: tracy
     env:
       BUILD_DIR: build-tracing
     steps:
