@@ -5259,11 +5259,11 @@ produces.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.data_tiled_mma_layout&lt;
   ::mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr,   # intrinsic
-  int64_t,   # unroll_m
+  int64_t,   # intrinsics_m
   int64_t,   # subgroups_m
-  int64_t,   # unroll_n
+  int64_t,   # intrinsics_n
   int64_t,   # subgroups_n
-  int64_t   # unroll_k
+  int64_t   # intrinsics_k
 &gt;
 </code></pre></div>
 <p>This mma variant represents MMA ops with data-tiling details. The
@@ -5290,29 +5290,29 @@ data at an offset that's as simple as possible a mapping from the thread ID.</p>
 <td></td>
 </tr>
 <tr>
-<td style="text-align: center;">unroll_m</td>
+<td style="text-align: center;">intrinsics_m</td>
 <td style="text-align: center;"><code>int64_t</code></td>
-<td>Unrolling along the M dimension, on the same thread.</td>
+<td>Intrinsic count along the M dimension.</td>
 </tr>
 <tr>
 <td style="text-align: center;">subgroups_m</td>
 <td style="text-align: center;"><code>int64_t</code></td>
-<td>Unrolling along the M dimension, distributed across this many more threads.</td>
+<td>Subgroup count along the M dimension.</td>
 </tr>
 <tr>
-<td style="text-align: center;">unroll_n</td>
+<td style="text-align: center;">intrinsics_n</td>
 <td style="text-align: center;"><code>int64_t</code></td>
-<td>Unrolling along the N dimension, on the same thread.</td>
+<td>Intrinsic count along the N dimension.</td>
 </tr>
 <tr>
 <td style="text-align: center;">subgroups_n</td>
 <td style="text-align: center;"><code>int64_t</code></td>
-<td>Unrolling along the N dimension, distributed across this many more threads.</td>
+<td>Subgroup count along the N dimension.</td>
 </tr>
 <tr>
-<td style="text-align: center;">unroll_k</td>
+<td style="text-align: center;">intrinsics_k</td>
 <td style="text-align: center;"><code>int64_t</code></td>
-<td>Unrolling along the K dimension, on the same thread, with interleaved layout.</td>
+<td>Intrinsic count along the K dimension, with interleaved layout.</td>
 </tr>
 </tbody>
 </table>
@@ -6001,7 +6001,7 @@ been match with a ukernel that is a legal lowering for it.</p>
 &gt;
 </code></pre></div>
 <p>This mma variant represents "virtual" MMA ops that has modification to
-its native layouts by unrollK and/or interleave reads. The |intrinsic|
+its native layouts by intrinsicsK and/or interleave reads. The |intrinsic|
 field represents different kinds of "Virtual" MMA Ops we found helpful.</p>
 <p>These interleaving and/or unrolling changes in the layout is especially
 useful to coalesce reads from shared memory to register or align layouts
