@@ -452,7 +452,7 @@ void* iree_tracing_obscure_ptr(void* ptr) { return ptr; }
 #if IREE_TRACING_EXPERIMENTAL_CONTEXT_API
 
 struct iree_tracing_context_t {
-  static std::atomic<uint32_t> next_tracing_thread_id;
+  inline static std::atomic<uint32_t> next_tracing_thread_id{0x80000000u};
   tracy::moodycamel::ProducerToken token_detail;
   tracy::ProducerWrapper token;
   uint32_t thread_id = 0;
@@ -463,10 +463,6 @@ struct iree_tracing_context_t {
     token.ptr->threadId = thread_id;
   }
 };
-
-// static
-std::atomic<uint32_t> iree_tracing_context_t::next_tracing_thread_id{
-    0x80000000u};
 
 #define IREE_TRACING_CONTEXT_BEGIN_WRITE(context, queue_type)             \
   tracy::moodycamel::ConcurrentQueueDefaultTraits::index_t __magic;       \
