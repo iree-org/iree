@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/Conversion/HALToVM/Patterns.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -134,8 +135,19 @@ public:
       SetVector<IREE::HAL::ExecutableTargetAttr> resultSet;
       deviceAnalysis.gatherRequiredExecutableTargets(affinityAttr, op,
                                                      resultSet);
-      // TODO(hanchung): Populate the EncodingLayoutAttr when it is ready.
-      layoutAttrs.insert(resultSet.begin(), resultSet.end());
+      for (auto targetAttr : resultSet) {
+        Attribute result = targetAttr;
+        if (auto attr =
+                targetAttr.getConfiguration().getNamed("encoding")) {
+          if (auto encodingLayoutAttr =
+                  dyn_cast<IREE::Encoding::EncodingLayoutAttrInterface>(
+                      attr->getValue())) {
+            result = encodingLayoutAttr.cloneWithSimplifiedConfig(
+                targetAttr.getConfiguration());
+          }
+        }
+        layoutAttrs.insert(result);
+      }
       return success();
     };
   };

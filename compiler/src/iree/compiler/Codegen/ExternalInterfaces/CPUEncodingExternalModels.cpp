@@ -34,13 +34,14 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
+#include "iree/compiler/Codegen/ExternalInterfaces/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 
-#define DEBUG_TYPE "iree-gpu-encoding-external-models"
+#define DEBUG_TYPE "iree-cpu-encoding-external-models"
 
 namespace mlir::iree_compiler::IREE::CPU {
 
@@ -52,6 +53,17 @@ namespace {
 //===----------------------------------------------------------------------===//
 // Utilities.
 //===----------------------------------------------------------------------===//
+
+/// Appends the NamedAttribute into `config` if there is a `name` NamedAttribute
+/// in the `dictAttr`.
+static void storeNamedAttrIfPresent(SmallVectorImpl<NamedAttribute> &config,
+                                    DictionaryAttr dictAttr, StringRef name) {
+  auto attr = dictAttr.getNamed(name);
+  if (!attr) {
+    return;
+  }
+  config.push_back(attr.value());
+}
 
 static void transposeInPlace(MaterializeEncodingInfo &info) {
   // Vector cases: nothing to do.
@@ -640,6 +652,25 @@ struct CPUDeviceEncodingLayoutAttrInterface
   }
 };
 
+struct CPUHostEncodingLayoutAttrInterface
+    : public IREE::Encoding::EncodingLayoutAttrInterface::ExternalModel<
+          CPUHostEncodingLayoutAttrInterface, CPUEncodingLayoutAttr> {
+  Attribute cloneWithSimplifiedConfig(Attribute attr,
+                                      DictionaryAttr config) const {
+    MLIRContext *ctx = attr.getContext();
+    SmallVector<NamedAttribute> configItems;
+    storeNamedAttrIfPresent(configItems, config, "cpu_features");
+    storeNamedAttrIfPresent(configItems, config, "target_triple");
+    return CPUEncodingLayoutAttr::get(ctx,
+                                      DictionaryAttr::get(ctx, configItems));
+  }
+
+  Attribute getLayout(Attribute attr, RankedTensorType type) const {
+    MLIRContext *ctx = attr.getContext();
+    return CPUEncodingLayoutAttr::get(ctx, getLayoutImpl(attr, type));
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Interface methods implementaion for iree_cpu.vmvx_encoding_layout.
 //===----------------------------------------------------------------------===//
@@ -728,15 +759,35 @@ struct VMVXDeviceEncodingLayoutAttrInterface
   }
 };
 
+struct VMVXHostEncodingLayoutAttrInterface
+    : public IREE::Encoding::EncodingLayoutAttrInterface::ExternalModel<
+          VMVXHostEncodingLayoutAttrInterface, VMVXEncodingLayoutAttr> {
+  Attribute cloneWithSimplifiedConfig(Attribute attr,
+                                      DictionaryAttr config) const {
+    MLIRContext *ctx = attr.getContext();
+    SmallVector<NamedAttribute> configItems;
+    storeNamedAttrIfPresent(configItems, config, "ukernels");
+    return VMVXEncodingLayoutAttr::get(ctx,
+                                      DictionaryAttr::get(ctx, configItems));
+  }
+
+  Attribute getLayout(Attribute attr, RankedTensorType type) const {
+    MLIRContext *ctx = attr.getContext();
+    return VMVXEncodingLayoutAttr::get(ctx, getLayoutImpl(attr, type));
+  }
+};
+
 } // namespace
 
 void registerCPUEncodingExternalModels(DialectRegistry &registry) {
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::CPU::IREECPUDialect *dialect) {
         IREE::CPU::CPUEncodingLayoutAttr::attachInterface<
-            CPUDeviceEncodingLayoutAttrInterface>(*ctx);
+            CPUDeviceEncodingLayoutAttrInterface,
+            CPUHostEncodingLayoutAttrInterface>(*ctx);
         IREE::CPU::VMVXEncodingLayoutAttr::attachInterface<
-            VMVXDeviceEncodingLayoutAttrInterface>(*ctx);
+            VMVXDeviceEncodingLayoutAttrInterface,
+            VMVXHostEncodingLayoutAttrInterface>(*ctx);
       });
 }
 
