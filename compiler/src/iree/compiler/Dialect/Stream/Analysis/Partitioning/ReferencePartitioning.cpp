@@ -172,7 +172,8 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
     if (dyn_cast<IREE::Stream::AsyncBarrierOp>(op) ||
         dyn_cast<IREE::Stream::AsyncTransferOp>(op)) {
       auto producer = op.getOperand(0).getDefiningOp();
-      auto streamable = dyn_cast<IREE::Stream::StreamableOpInterface>(producer);
+      auto streamable =
+          dyn_cast_or_null<IREE::Stream::StreamableOpInterface>(producer);
       if (streamable) {
         if (!syncOps.contains(producer))
           syncOps[producer] = llvm::SmallVector<Operation *>();
