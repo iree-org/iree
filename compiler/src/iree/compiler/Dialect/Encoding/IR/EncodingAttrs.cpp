@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Support/LLVM.h"
@@ -111,6 +112,15 @@ EncodingAttr EncodingAttr::clone(AffineMap bcastMap) {
   return get(bcastMap.getContext(), getOperandIndex(), getOpType(),
              getElementTypes(), getUserIndexingMaps(),
              AffineMapAttr::get(bcastMap), getRoundDimsTo(), getLayouts());
+}
+
+EncodingAttr EncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) {
+  MLIRContext *ctx = getContext();
+  return get(ctx, getOperandIndex(), getOpType(), getElementTypes(),
+             /*user_indexing_maps=*/ArrayAttr(),
+             /*bcast_map=*/AffineMapAttr(),
+             /*round_dims_to=*/DenseI64ArrayAttr(),
+             ArrayAttr::get(ctx, layouts));
 }
 
 /// Returns the bit-width of the scalar type. If the type is complex, it returns

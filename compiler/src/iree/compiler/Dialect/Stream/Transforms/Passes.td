@@ -414,6 +414,16 @@ def SpecializeDispatchesPass :
   ];
 }
 
+def SpecializeEncodingsPass :
+    Pass<"iree-stream-specialize-encodings", "mlir::ModuleOp"> {
+  let summary = "Specializes data-tiling encodings based on device analysis.";
+  let description = [{
+    Attaches layouts to encodings and duplicates executables based on device
+    analysis.
+    TODO: Unpack the context. The pass is not fully implemented yet.
+  }];
+}
+
 def AnnotateDispatchArgumentsPass :
     Pass<"iree-stream-annotate-dispatch-arguments", "mlir::ModuleOp"> {
   let summary = "Annotates dispatch arguments with potential values derived from dispatch sites.";
