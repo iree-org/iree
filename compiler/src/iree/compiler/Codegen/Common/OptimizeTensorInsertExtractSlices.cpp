@@ -84,63 +84,78 @@ hoistLoopInvariantSubsetAtIterArg(RewriterBase &rewriter,
     return loopLike;
   }
 
-  // Get all subset extraction uses of this iter_arg and try to hoist them
-  // out of the loop.
-  for (Operation *op : loopLike.getRegionIterArgs()[idx].getUsers()) {
-    auto extraction = dyn_cast<SubsetExtractionOpInterface>(op);
-    if (!extraction) {
-      continue;
+  bool changed = true;
+  // The below `while` loop is a WAR for the core issue that is unidentified.
+  // To avoid infinite loops, limit number of iterations to 10.
+  int numIterations = 0;
+  while (changed && numIterations < 10) {
+    numIterations++;
+    changed = false;
+    // Get all subset extraction uses of this iter_arg and try to hoist them
+    // out of the loop.
+    for (Operation *op : loopLike.getRegionIterArgs()[idx].getUsers()) {
+      auto extraction = dyn_cast<SubsetExtractionOpInterface>(op);
+      if (!extraction) {
+        continue;
+      }
+
+      // Check if this extraction is operating on the same subset as the
+      // insertion.
+      bool equivalent = extraction.operatesOnEquivalentSubset(
+          insertion, [](Value v1, Value v2) {
+            // The callback to this method checks if the given two values are
+            // aliasing tensors/buffers from which the subset slice comes from.
+            // For our case, we only care if the slices are same, so we can
+            // always return true.
+            return true;
+          });
+
+      if (!equivalent) {
+        continue;
+      }
+
+      // Hoist out the extraction/insertion ops.
+      NewYieldValuesFn newYieldValuesFn =
+          [&](OpBuilder &b, Location loc,
+              ArrayRef<BlockArgument> innerNewBBArgs) -> SmallVector<Value> {
+        return {insertion.getSourceOperand().get()};
+      };
+
+      // replaceInitOperandUsesInLoop is set to true S.T we will use new IV
+      // instead of hoisted out extract.
+      FailureOr<LoopLikeOpInterface> newLoop =
+          loopLike.replaceWithAdditionalYields(
+              rewriter, extraction.getResult(),
+              /*replaceInitOperandUsesInLoop=*/true, newYieldValuesFn);
+      if (failed(newLoop)) {
+        return loopLike;
+      }
+      loopLike = *newLoop;
+
+      BlockArgument iterArg = loopLike.getRegionIterArgs()[idx];
+      OpResult loopResult = loopLike.getTiedLoopResult(iterArg);
+      OpResult newLoopResult = loopLike.getLoopResults()->back();
+      rewriter.moveOpBefore(extraction, loopLike);
+
+      // Hoist the extraction/insertion ops.
+      extraction.getSourceOperand().set(
+          loopLike.getTiedLoopInit(iterArg)->get());
+
+      // Clone the insertion to outside the not removing the final insertion, as
+      // it still can be used by other extraction ops loop.
+      rewriter.setInsertionPointAfter(loopLike);
+      SubsetInsertionOpInterface newInsertion =
+          cast<SubsetInsertionOpInterface>(
+              rewriter.clone(*insertion.getOperation()));
+
+      rewriter.replaceAllUsesWith(loopResult,
+                                  newInsertion.getUpdatedDestination());
+      newInsertion.getSourceOperand().set(newLoopResult);
+
+      // loopLike changed, restart the check.
+      changed = true;
+      break;
     }
-
-    // Check if this extraction is operating on the same subset as the
-    // insertion.
-    bool equivalent = extraction.operatesOnEquivalentSubset(
-        insertion, [](Value v1, Value v2) {
-          // The callback to this method checks if the given two values are
-          // aliasing tensors/buffers from which the subset slice comes from.
-          // For our case, we only care if the slices are same, so we can always
-          // return true.
-          return true;
-        });
-
-    if (!equivalent) {
-      continue;
-    }
-
-    // Hoist out the extraction/insertion ops.
-    NewYieldValuesFn newYieldValuesFn =
-        [&](OpBuilder &b, Location loc,
-            ArrayRef<BlockArgument> innerNewBBArgs) -> SmallVector<Value> {
-      return {insertion.getSourceOperand().get()};
-    };
-
-    // replaceInitOperandUsesInLoop is set to true S.T we will use new IV
-    // instead of hoisted out extract.
-    FailureOr<LoopLikeOpInterface> newLoop =
-        loopLike.replaceWithAdditionalYields(
-            rewriter, extraction.getResult(),
-            /*replaceInitOperandUsesInLoop=*/true, newYieldValuesFn);
-    if (failed(newLoop))
-      return loopLike;
-    loopLike = *newLoop;
-
-    BlockArgument iterArg = loopLike.getRegionIterArgs()[idx];
-    OpResult loopResult = loopLike.getTiedLoopResult(iterArg);
-    OpResult newLoopResult = loopLike.getLoopResults()->back();
-    rewriter.moveOpBefore(extraction, loopLike);
-
-    // Hoist the extraction/insertion ops
-    extraction.getSourceOperand().set(loopLike.getTiedLoopInit(iterArg)->get());
-
-    // Clone the insertion to outside the not removing the final insertion, as
-    // it still can be used by other extraction ops. loop.
-    rewriter.setInsertionPointAfter(loopLike);
-    SubsetInsertionOpInterface newInsertion = cast<SubsetInsertionOpInterface>(
-        rewriter.clone(*insertion.getOperation()));
-
-    rewriter.replaceAllUsesWith(loopResult,
-                                newInsertion.getUpdatedDestination());
-    newInsertion.getSourceOperand().set(newLoopResult);
   }
 
   return loopLike;
@@ -265,7 +280,7 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
     patterns.add<CastLikeExtractSliceOpFolder>(context);
     patterns.add<CastLikeInsertSliceOpFolder>(context);
   }
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+  if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
   }
 

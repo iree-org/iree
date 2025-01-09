@@ -48,6 +48,11 @@ typedef struct iree_hal_module_t {
 
 static void IREE_API_PTR iree_hal_module_destroy(void* base_module) {
   iree_hal_module_t* module = IREE_HAL_MODULE_CAST(base_module);
+
+  if (module->debug_sink.destroy.fn) {
+    module->debug_sink.destroy.fn(module->debug_sink.destroy.user_data);
+  }
+
   for (iree_host_size_t i = 0; i < module->device_count; ++i) {
     iree_hal_device_release(module->devices[i]);
   }
@@ -462,7 +467,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_subspan,  //
   iree_hal_buffer_t* subspan_buffer = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_subspan(source_buffer, source_offset, length,
-                              &subspan_buffer),
+                              state->host_allocator, &subspan_buffer),
       "invalid subspan of an existing buffer (source_offset=%" PRIdsz
       ", length=%" PRIdsz ")",
       source_offset, length);
@@ -549,7 +554,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_create,  //
       source_length != iree_hal_buffer_byte_length(source_buffer)) {
     IREE_RETURN_IF_ERROR(
         iree_hal_buffer_subspan(source_buffer, source_offset, source_length,
-                                &subspan_buffer),
+                                state->host_allocator, &subspan_buffer),
         "invalid subspan of an existing buffer (source_offset=%" PRIdsz
         ", length=%" PRIdsz ")",
         source_offset, source_length);

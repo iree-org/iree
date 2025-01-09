@@ -604,7 +604,7 @@ struct EncodeHostTensorsPass
         EncodeTensorUpdateOp, EncodeTensorLoadOp, EncodeTensorStoreOp>(
         &getContext());
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
-    if (failed(applyPatternsAndFoldGreedily(getOperation(), frozenPatterns))) {
+    if (failed(applyPatternsGreedily(getOperation(), frozenPatterns))) {
       return signalPassFailure();
     }
   }
@@ -735,7 +735,7 @@ struct EncodeDeviceTensorsPass
     patterns.insert<EncodeBindingSubspanOp, EncodeDispatchTensorLoadOp,
                     EncodeDispatchTensorStoreOp>(&getContext());
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
-    if (failed(applyPatternsAndFoldGreedily(getOperation(), frozenPatterns))) {
+    if (failed(applyPatternsGreedily(getOperation(), frozenPatterns))) {
       return signalPassFailure();
     }
   }

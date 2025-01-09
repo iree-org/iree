@@ -139,15 +139,17 @@ TEST_F(DriverTest, QueryAndCreateAvailableDevicesByPath) {
   std::cout << "Driver has " << device_info_count << " device(s)\n";
   if (device_info_count == 0) GTEST_SKIP() << "No available devices";
 
-  // Check creation via empty path.
-  iree_string_view_t name = device_infos[0].name;
-  CheckCreateDeviceViaPath(device_infos[0].name, iree_string_view_empty());
-
-  // Check creation via index path.
+  // Check creation via explicit path.
+  bool tested_empty_path = false;
   for (iree_host_size_t i = 0; i < device_info_count; ++i) {
-    char index[8];
-    snprintf(index, 8, "%d", i);
-    CheckCreateDeviceViaPath(device_infos[i].name, IREE_SV(index));
+    tested_empty_path |= iree_string_view_is_empty(device_infos[i].path);
+    CheckCreateDeviceViaPath(device_infos[i].name, device_infos[i].path);
+  }
+
+  // Check creation via empty path if we didn't already.
+  if (!tested_empty_path) {
+    iree_string_view_t name = device_infos[0].name;
+    CheckCreateDeviceViaPath(device_infos[0].name, iree_string_view_empty());
   }
 
   iree_allocator_free(iree_allocator_system(), device_infos);

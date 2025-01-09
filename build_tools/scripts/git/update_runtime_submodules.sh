@@ -13,6 +13,6 @@ set -xeuo pipefail
 SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")"
 
 # Read lines from runtime_submodules.txt, stripping \r characters on Windows.
-readarray -t RUNTIME_SUBMODULES < <(cat build_tools/scripts/git/runtime_submodules.txt | tr -d '\r')
+readarray -t RUNTIME_SUBMODULES < <(cat ${SCRIPT_DIR}/runtime_submodules.txt | tr -d '\r')
 
-git submodule sync && git submodule update --init --jobs 8 --depth 1 ${RUNTIME_SUBMODULES[@]}
+git submodule sync && git submodule update --init --force --jobs 8 --depth 1 ${RUNTIME_SUBMODULES[@]}

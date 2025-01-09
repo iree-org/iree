@@ -134,12 +134,8 @@ void BubbleUpExpandShapesPass::runOnOperation() {
           return false;
         }
 
-        // Do not fuse producer generic op if it has more than one user
-        // or any reduction iterators.
         if (auto producerGenericOp = dyn_cast<linalg::GenericOp>(producer)) {
-          return producerGenericOp->hasOneUse() &&
-                 llvm::all_of(producerGenericOp.getIteratorTypesArray(),
-                              linalg::isParallelIterator);
+          return true;
         }
 
         // Do not fuse with any producer linalg named ops for now.
@@ -147,11 +143,9 @@ void BubbleUpExpandShapesPass::runOnOperation() {
           return false;
         }
 
-        // Do not fuse with consumer linalg named ops or reductions.
+        // Do not fuse with consumer linalg named ops.
         if (auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer)) {
-          return isa<linalg::GenericOp>(consumerLinalgOp) &&
-                 llvm::all_of(consumerLinalgOp.getIteratorTypesArray(),
-                              linalg::isParallelIterator);
+          return isa<linalg::GenericOp>(consumerLinalgOp);
         }
         // Fuse in all other cases.
         return true;
@@ -207,9 +201,9 @@ void BubbleUpExpandShapesPass::runOnOperation() {
 
   GreedyRewriteConfig rewriteConfig;
   rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
-  if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                          std::move(bubbleExpandShapePatterns),
-                                          rewriteConfig))) {
+  if (failed(applyPatternsGreedily(getOperation(),
+                                   std::move(bubbleExpandShapePatterns),
+                                   rewriteConfig))) {
     getOperation()->emitOpError("Failed to perform elementwise operations");
     return signalPassFailure();
   }

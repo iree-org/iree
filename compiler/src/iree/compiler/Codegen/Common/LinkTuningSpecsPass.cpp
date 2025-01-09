@@ -8,8 +8,8 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallVectorExtras.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Transform/IR/TransformAttrs.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
@@ -18,6 +18,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Location.h"
+#include "mlir/IR/Verifier.h"
 
 #define DEBUG_TYPE "iree-codegen-link-tuning-specs"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
@@ -31,6 +32,10 @@ namespace mlir::iree_compiler {
 namespace {
 
 using mlir::transform::NamedSequenceOp;
+constexpr StringLiteral kArgConsumedAttrName =
+    mlir::transform::TransformDialect::kArgConsumedAttrName;
+constexpr StringLiteral kArgReadOnlyAttrName =
+    mlir::transform::TransformDialect::kArgReadOnlyAttrName;
 
 static SmallVector<ModuleOp>
 findNestedModulesWithNamedSequences(ModuleOp module) {
@@ -49,49 +54,48 @@ static SmallVector<NamedSequenceOp> findTuningSpecs(ModuleOp module) {
       });
 }
 
-static LogicalResult validateTuningSpec(NamedSequenceOp op) {
-  if (!op.getResultTypes().empty()) {
-    op->emitWarning() << "Tuning spec expected to have no results";
-    return failure();
+static bool consumesInputOp(NamedSequenceOp op) {
+  if (op.getArgAttr(0, kArgConsumedAttrName)) {
+    return true;
   }
-
-  ArrayRef<Type> argTypes = op.getArgumentTypes();
-  if (argTypes.size() != 1 || !isa<transform::AnyOpType>(argTypes[0])) {
-    op->emitWarning() << "Tuning spec expected to have one argument of type "
-                         "'!transform.any_op'";
-    return failure();
-  }
-
-  if (!op.getArgAttr(0, transform::TransformDialect::kArgReadOnlyAttrName)) {
-    op->emitWarning() << "Tuning spec expected to have one readonly argument";
-    return failure();
-  }
-
-  return success();
+  return false;
 }
 
-static NamedSequenceOp
+static FailureOr<NamedSequenceOp>
 emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
   OpBuilder builder(module->getContext());
   builder.setInsertionPointToEnd(module.getBody());
 
+  const bool hasConsumedSequences = llvm::any_of(specsToLink, consumesInputOp);
   Location loc = builder.getFusedLoc(llvm::map_to_vector(
       specsToLink, [](NamedSequenceOp op) { return op->getLoc(); }));
-  FunctionType specType = builder.getFunctionType(
-      TypeRange{builder.getType<transform::AnyOpType>()}, TypeRange{});
+  Type anyOpType = builder.getType<transform::AnyOpType>();
+  FunctionType specType =
+      builder.getFunctionType(TypeRange{anyOpType}, TypeRange{anyOpType});
+  // This code creates a named sequence operation that conforms to the
+  // requirements for tuning specifications with a default entry point.
   auto newSpec = builder.create<NamedSequenceOp>(
       loc, kKernelConfigSpecName, TypeAttr::get(specType),
       /*sym_visibility=*/StringAttr{},
       /*arg_attrs=*/ArrayAttr{},
       /*res_attrs*/ ArrayAttr{});
-  newSpec.setArgAttr(0, transform::TransformDialect::kArgReadOnlyAttrName,
-                     builder.getUnitAttr());
+  newSpec.setArgAttr(
+      0, hasConsumedSequences ? kArgConsumedAttrName : kArgReadOnlyAttrName,
+      builder.getUnitAttr());
   newSpec->setAttr(kTuningSpecEntrypointAttrName, builder.getUnitAttr());
+  module->setAttr(kTuningSpecDefaultEntrypointAttrName, builder.getUnitAttr());
 
   Region &region = newSpec.getRegion();
   Block *body = builder.createBlock(&region, region.begin(),
                                     newSpec.getArgumentTypes(), loc);
   builder.setInsertionPointToStart(body);
+
+  // Make sure spec names are unique to work around a transform dialect
+  // interpreter bug (`transform.include` does not handle name collisions
+  // correctly): https://github.com/llvm/llvm-project/issues/119578.
+  llvm::StringMap<unsigned> specNameCounts;
+  // Reserve the name for the outermost entrypoint.
+  specNameCounts[kKernelConfigSpecName] = 1;
 
   // Emit one `transform.include` op per child tuning spec. In the future,
   // we may want to switch to a custom transform op for this to perform
@@ -102,17 +106,32 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
     assert(parentModule);
     StringAttr parentSymbol = parentModule.getSymNameAttr();
     assert(parentSymbol);
+    StringRef specName = spec.getSymName();
+    unsigned specNameSeenCount = specNameCounts[specName]++;
+    if (specNameSeenCount > 0) {
+      spec.setSymName(
+          llvm::formatv("{}_{}", specName, specNameSeenCount).str());
+    }
+
     auto symbol = SymbolRefAttr::get(
         parentSymbol, FlatSymbolRefAttr::get(spec.getSymNameAttr()));
 
     // Surpress silenceable errors so that failures to match in child tuning
     // specs can be ignored.
-    builder.create<transform::IncludeOp>(
-        loc, TypeRange{}, symbol, transform::FailurePropagationMode::Suppress,
-        operand);
+    operand = builder
+                  .create<transform::IncludeOp>(
+                      loc, anyOpType, symbol,
+                      transform::FailurePropagationMode::Suppress, operand)
+                  .getResults()
+                  .front();
   }
 
-  builder.create<transform::YieldOp>(loc);
+  builder.create<transform::YieldOp>(loc, operand);
+
+  if (failed(mlir::verify(module))) {
+    return module.emitError("Linked tuning spec failed to verify");
+  }
+
   return newSpec;
 }
 
@@ -138,11 +157,12 @@ FailureOr<NamedSequenceOp> linkTuningSpecs(ModuleOp module) {
     llvm::append_range(tuningSpecs, findTuningSpecs(nested));
   }
 
-  for (NamedSequenceOp spec : tuningSpecs) {
-    LDBG("Found tuning spec: " << spec.getSymName());
-    if (failed(validateTuningSpec(spec))) {
-      return failure();
-    }
+  size_t numConsumedSpecs = llvm::count_if(tuningSpecs, consumesInputOp);
+  if (numConsumedSpecs > 0 && numConsumedSpecs != tuningSpecs.size()) {
+    LDBG("Only " << numConsumedSpecs << " tuning specs out of "
+                 << tuningSpecs.size() << " total consume the input op");
+    return module.emitWarning() << "Expected the argument in all tuning specs "
+                                   "to be consistently readonly or consumed";
   }
 
   if (tuningSpecs.empty()) {

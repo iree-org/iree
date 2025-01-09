@@ -157,8 +157,7 @@ struct SPIRVBreakDownLargeVectorPass final
         });
     vector::InsertOp::getCanonicalizationPatterns(patterns, context);
     vector::ExtractOp::getCanonicalizationPatterns(patterns, context);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

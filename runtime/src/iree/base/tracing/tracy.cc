@@ -13,6 +13,13 @@
 #include "TracyClient.cpp"
 #endif  // IREE_TRACING_FEATURES
 
+#if defined(TRACY_ENABLE) && IREE_TRACING_EXPERIMENTAL_CONTEXT_API
+// HACK: tracy doesn't let us at this but we need it in order to create new
+// queue contexts. It's an implementation detail we have to take a dependency on
+// because tracy does not have an API for what we're doing (yet).
+extern tracy::moodycamel::ConcurrentQueue<tracy::QueueItem> tracy::s_queue;
+#endif  // TRACY_ENABLE && IREE_TRACING_EXPERIMENTAL_CONTEXT_API
+
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
@@ -437,6 +444,236 @@ void iree_tracing_gpu_zone_notify(uint8_t context_id, uint16_t query_id,
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 void* iree_tracing_obscure_ptr(void* ptr) { return ptr; }
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+
+//===----------------------------------------------------------------------===//
+// Experimental Tracing Interop API
+//===----------------------------------------------------------------------===//
+
+#if IREE_TRACING_EXPERIMENTAL_CONTEXT_API
+
+struct iree_tracing_context_t {
+  static std::atomic<uint32_t> next_tracing_thread_id;
+  tracy::moodycamel::ProducerToken token_detail;
+  tracy::ProducerWrapper token;
+  uint32_t thread_id = 0;
+  iree_tracing_context_t()
+      : token_detail(tracy::s_queue),
+        token({tracy::s_queue.get_explicit_producer(token_detail)}),
+        thread_id(iree_tracing_context_t::next_tracing_thread_id++) {
+    token.ptr->threadId = thread_id;
+  }
+};
+
+// static
+std::atomic<uint32_t> iree_tracing_context_t::next_tracing_thread_id{
+    0x80000000u};
+
+#define IREE_TRACING_CONTEXT_BEGIN_WRITE(context, queue_type)             \
+  tracy::moodycamel::ConcurrentQueueDefaultTraits::index_t __magic;       \
+  tracy::moodycamel::ConcurrentQueue<tracy::QueueItem>::ExplicitProducer* \
+      __token = (context)->token.ptr;                                     \
+  auto& __tail = __token->get_tail_index();                               \
+  auto item = __token->enqueue_begin(__magic);                            \
+  tracy::MemWrite(&item->hdr.type, (queue_type));
+
+#define IREE_TRACING_CONTEXT_END_WRITE(context) \
+  __tail.store(__magic + 1, std::memory_order_release);
+
+iree_tracing_context_t* iree_tracing_context_allocate(
+    const char* name, iree_host_size_t name_length) {
+  iree_tracing_context_t* context = new iree_tracing_context_t();
+
+  // TODO(benvanik): upstream a tracy::Profiler::SetThreadNameWithHint that
+  // only updates the GetThreadNameData() linked list with a new entry. Today
+  // there's no way to set the thread name explicitly.
+
+  return context;
+}
+
+void iree_tracing_context_free(iree_tracing_context_t* context) {
+  if (context) delete context;
+}
+
+void iree_tracing_context_calibrate_executor(
+    iree_tracing_context_t* context, iree_tracing_executor_id_t executor_id,
+    int64_t cpu_delta, uint64_t host_timestamp, uint64_t executor_timestamp) {
+  IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::GpuCalibration);
+  tracy::MemWrite(&item->gpuCalibration.gpuTime, executor_timestamp);
+  tracy::MemWrite(&item->gpuCalibration.cpuTime, host_timestamp);
+  tracy::MemWrite(&item->gpuCalibration.cpuDelta, cpu_delta);
+  tracy::MemWrite(&item->gpuCalibration.context, executor_id);
+  IREE_TRACING_CONTEXT_END_WRITE(context);
+}
+
+void iree_tracing_context_zone_begin(iree_tracing_context_t* context,
+                                     uint64_t timestamp,
+                                     const iree_tracing_location_t* src_loc) {
+  IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::ZoneBegin);
+  tracy::MemWrite(&item->zoneBegin.time, timestamp);
+  tracy::MemWrite(&item->zoneBegin.srcloc, reinterpret_cast<uint64_t>(src_loc));
+  IREE_TRACING_CONTEXT_END_WRITE(context);
+}
+
+void iree_tracing_context_zone_end(iree_tracing_context_t* context,
+                                   uint64_t timestamp) {
+  IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::ZoneEnd);
+  tracy::MemWrite(&item->zoneEnd.time, timestamp);
+  IREE_TRACING_CONTEXT_END_WRITE(context);
+}
+
+void iree_tracing_context_zone_value_i64(iree_tracing_context_t* context,
+                                         uint64_t value) {
+  IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::ZoneValue);
+  tracy::MemWrite(&item->zoneValue.value, value);
+  IREE_TRACING_CONTEXT_END_WRITE(context);
+}
+
+void iree_tracing_context_zone_value_text_literal(
+    iree_tracing_context_t* context, const char* value) {
+  // NOTE: no literal tracing support, have to use the slow path.
+  iree_tracing_context_zone_value_text_dynamic(context, value, strlen(value));
+}
+
+void iree_tracing_context_zone_value_text_dynamic(
+    iree_tracing_context_t* context, const char* value,
+    iree_host_size_t value_length) {
+  auto ptr = (char*)tracy::tracy_malloc(value_length);
+  memcpy(ptr, value, value_length);
+  IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::ZoneText);
+  tracy::MemWrite(&item->zoneTextFat.text, (uint64_t)ptr);
+  tracy::MemWrite(&item->zoneTextFat.size, (uint16_t)value_length);
+  IREE_TRACING_CONTEXT_END_WRITE(context);
+}
+
+// TODO(benvanik): figure out why serial recording works with GPU zones and
+// thread-local recording doesn't (sometimes?). May be timing related.
+#define IREE_TRACING_CONTEXT_SERIAL_FALLBACK 1
+
+void iree_tracing_context_execution_zone_begin(
+    iree_tracing_context_t* context, uint64_t timestamp,
+    const iree_tracing_location_t* src_loc,
+    iree_tracing_executor_id_t executor_id, iree_tracing_query_id_t query_id) {
+#if IREE_TRACING_CONTEXT_SERIAL_FALLBACK
+  auto* item = tracy::Profiler::QueueSerial();
+  tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuZoneBeginSerial);
+  tracy::MemWrite(&item->gpuZoneBegin.cpuTime, timestamp);
+  tracy::MemWrite(&item->gpuZoneBegin.srcloc, src_loc);
+  tracy::MemWrite(&item->gpuZoneBegin.thread, context->thread_id);
+  tracy::MemWrite(&item->gpuZoneBegin.queryId, query_id);
+  tracy::MemWrite(&item->gpuZoneBegin.context, executor_id);
+  tracy::Profiler::QueueSerialFinish();
+#else
+  IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::GpuZoneBegin);
+  tracy::MemWrite(&item->gpuZoneBegin.cpuTime, timestamp);
+  tracy::MemWrite(&item->gpuZoneBegin.thread, context->thread_id);
+  tracy::MemWrite(&item->gpuZoneBegin.queryId, query_id);
+  tracy::MemWrite(&item->gpuZoneBegin.context, executor_id);
+  tracy::MemWrite(&item->gpuZoneBegin.srcloc, src_loc);
+  IREE_TRACING_CONTEXT_END_WRITE(context);
+#endif  // IREE_TRACING_CONTEXT_SERIAL_FALLBACK
+}
+
+void iree_tracing_context_execution_zone_end(
+    iree_tracing_context_t* context, uint64_t timestamp,
+    iree_tracing_executor_id_t executor_id, iree_tracing_query_id_t query_id) {
+#if IREE_TRACING_CONTEXT_SERIAL_FALLBACK
+  auto* item = tracy::Profiler::QueueSerial();
+  tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuZoneEndSerial);
+  tracy::MemWrite(&item->gpuZoneEnd.cpuTime, timestamp);
+  tracy::MemWrite(&item->gpuZoneEnd.thread, context->thread_id);
+  tracy::MemWrite(&item->gpuZoneEnd.queryId, query_id);
+  tracy::MemWrite(&item->gpuZoneEnd.context, executor_id);
+  tracy::Profiler::QueueSerialFinish();
+#else
+  IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::GpuZoneEnd);
+  tracy::MemWrite(&item->gpuZoneEnd.cpuTime, timestamp);
+  tracy::MemWrite(&item->gpuZoneEnd.thread, context->thread_id);
+  tracy::MemWrite(&item->gpuZoneEnd.queryId, query_id);
+  tracy::MemWrite(&item->gpuZoneEnd.context, executor_id);
+  IREE_TRACING_CONTEXT_END_WRITE(context);
+#endif  // IREE_TRACING_CONTEXT_SERIAL_FALLBACK
+}
+
+void iree_tracing_context_execution_zone_notify(
+    iree_tracing_context_t* context, iree_tracing_executor_id_t executor_id,
+    iree_tracing_query_id_t query_id, uint64_t query_timestamp) {
+#if IREE_TRACING_CONTEXT_SERIAL_FALLBACK
+  iree_tracing_gpu_zone_notify(executor_id, query_id, query_timestamp);
+  auto* item = tracy::Profiler::QueueSerial();
+  tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuTime);
+  tracy::MemWrite(&item->gpuTime.gpuTime, query_timestamp);
+  tracy::MemWrite(&item->gpuTime.queryId, query_id);
+  tracy::MemWrite(&item->gpuTime.context, executor_id);
+  tracy::Profiler::QueueSerialFinish();
+#else
+  IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::GpuTime);
+  tracy::MemWrite(&item->gpuTime.gpuTime, query_timestamp);
+  tracy::MemWrite(&item->gpuTime.queryId, query_id);
+  tracy::MemWrite(&item->gpuTime.context, executor_id);
+  IREE_TRACING_CONTEXT_END_WRITE(context);
+#endif  // IREE_TRACING_CONTEXT_SERIAL_FALLBACK
+}
+
+void iree_tracing_context_memory_alloc(iree_tracing_context_t* context,
+                                       uint64_t timestamp, const char* pool,
+                                       uint64_t ptr, uint64_t size) {
+  // TODO(benvanik): add a thread override to MemAllocNamed - it does shady
+  // things with m_memNamePayload that we can't easily replicate outside of the
+  // tracy implementation.
+}
+
+void iree_tracing_context_memory_free(iree_tracing_context_t* context,
+                                      uint64_t timestamp, const char* pool,
+                                      uint64_t ptr) {
+  // TODO(benvanik): add a thread override to MemFreeNamed- it does shady
+  // things with m_memNamePayload that we can't easily replicate outside of the
+  // tracy implementation.
+}
+
+void iree_tracing_context_message_literal(iree_tracing_context_t* context,
+                                          uint64_t timestamp,
+                                          const char* value) {
+  IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::MessageLiteral);
+  tracy::MemWrite(&item->messageLiteral.time, timestamp);
+  tracy::MemWrite(&item->messageLiteral.text, (uint64_t)value);
+  IREE_TRACING_CONTEXT_END_WRITE(context);
+}
+
+void iree_tracing_context_message_dynamic(iree_tracing_context_t* context,
+                                          uint64_t timestamp, const char* value,
+                                          iree_host_size_t value_length) {
+  auto ptr = (char*)tracy::tracy_malloc(value_length);
+  memcpy(ptr, value, value_length);
+  IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::Message);
+  tracy::MemWrite(&item->messageFat.time, timestamp);
+  tracy::MemWrite(&item->messageFat.text, (uint64_t)ptr);
+  tracy::MemWrite(&item->messageFat.size, (uint16_t)value_length);
+  IREE_TRACING_CONTEXT_END_WRITE(context);
+}
+
+void iree_tracing_context_plot_config(iree_tracing_context_t* context,
+                                      const char* name_literal, uint8_t type,
+                                      bool step, bool fill, uint32_t color) {
+  IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::PlotConfig);
+  tracy::MemWrite(&item->plotConfig.name, (uint64_t)name_literal);
+  tracy::MemWrite(&item->plotConfig.type, (uint8_t)type);
+  tracy::MemWrite(&item->plotConfig.step, (uint8_t)step);
+  tracy::MemWrite(&item->plotConfig.fill, (uint8_t)fill);
+  tracy::MemWrite(&item->plotConfig.color, color);
+  IREE_TRACING_CONTEXT_END_WRITE(context);
+}
+
+void iree_tracing_context_plot_value_i64(iree_tracing_context_t* context,
+                                         uint64_t timestamp,
+                                         const char* plot_name, int64_t value) {
+  IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::PlotDataInt);
+  tracy::MemWrite(&item->plotDataInt.name, (uint64_t)plot_name);
+  tracy::MemWrite(&item->plotDataInt.time, timestamp);
+  tracy::MemWrite(&item->plotDataInt.val, value);
+  IREE_TRACING_CONTEXT_END_WRITE(context);
+}
+
+#endif  // IREE_TRACING_EXPERIMENTAL_CONTEXT_API
 
 #endif  // IREE_TRACING_FEATURES
 

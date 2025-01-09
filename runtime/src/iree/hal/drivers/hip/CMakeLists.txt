@@ -21,7 +21,10 @@ iree_cc_library(
     "api.h"
   SRCS
     "api.h"
-    "context_util.h"
+    "cleanup_thread.c"
+    "cleanup_thread.h"
+    "dispatch_thread.c"
+    "dispatch_thread.h"
     "event_pool.c"
     "event_pool.h"
     "event_semaphore.c"
@@ -32,21 +35,22 @@ iree_cc_library(
     "hip_allocator.h"
     "hip_buffer.c"
     "hip_buffer.h"
-    "hip_device.c"
-    "hip_device.h"
     "hip_driver.c"
+    "hip_device.h"
+    "hip_device.c"
+    "hip_multi_queue_command_buffer.h"
+    "hip_multi_queue_command_buffer.c"
     "memory_pools.c"
     "memory_pools.h"
     "native_executable.c"
     "native_executable.h"
     "nop_executable_cache.c"
     "nop_executable_cache.h"
+    "per_device_information.h"
     "rccl_channel.c"
     "rccl_channel.h"
     "stream_command_buffer.c"
     "stream_command_buffer.h"
-    "timepoint_pool.c"
-    "timepoint_pool.h"
   INCLUDES
     "${HIP_API_HEADERS_ROOT}"
   DEPS
@@ -65,12 +69,12 @@ iree_cc_library(
     iree::hal::utils::collective_batch
     iree::hal::utils::executable_debug_info
     iree::hal::utils::deferred_command_buffer
-    iree::hal::utils::deferred_work_queue
     iree::hal::utils::file_transfer
-    iree::hal::utils::memory_file
+    iree::hal::utils::files
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::hal::utils::stream_tracing
+    iree::hal::drivers::hip::util::hip_util
     iree::schemas::executable_debug_info_c_fbs
     iree::schemas::hip_executable_def_c_fbs
   PUBLIC

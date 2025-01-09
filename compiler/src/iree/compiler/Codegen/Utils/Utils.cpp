@@ -161,6 +161,10 @@ const char *getIreeArchNameForTargetTriple(llvm::Triple triple) {
   return "unknown";
 }
 
+bool isLLVMCPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return targetAttr && targetAttr.getBackend().getValue() == "llvm-cpu";
+}
+
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return targetAttr && targetAttr.getBackend().getValue().starts_with("vmvx");
 }
@@ -500,8 +504,7 @@ LogicalResult setDefaultCustomOpLoweringConfig(
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   GreedyRewriteConfig config;
   config.listener = &customOpConfigListener;
-  if (failed(applyPatternsAndFoldGreedily(dummyFuncOp, std::move(patterns),
-                                          config))) {
+  if (failed(applyPatternsGreedily(dummyFuncOp, std::move(patterns), config))) {
     return customOp.emitOpError(
         "failed to canonicalize during custom op configuration setting");
   }

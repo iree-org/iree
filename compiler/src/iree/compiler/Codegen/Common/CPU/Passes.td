@@ -13,26 +13,6 @@ include "mlir/Pass/PassBase.td"
 // Common Passes used for CPU-like backends (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
-def CPUMaterializeHostEncodingPass :
-    Pass<"iree-codegen-cpu-materialize-host-encoding", "mlir::ModuleOp"> {
-  let summary = "Convert encoding-specific operations based on target attributes.";
-  let description = [{
-    Examples:
-      encoding.set_encoding   -> tensor.pack
-      encoding.unset_encoding -> tensor.unpack
-      linalg.matmul             -> linalg.mmt4d  "}];
-}
-
-def CPUMaterializeDeviceEncodingPass :
-    InterfacePass<"iree-codegen-cpu-materialize-device-encoding", "mlir::FunctionOpInterface"> {
-  let summary = "Convert encoding-specific operations based on target attributes.";
-  let description = [{
-    Examples:
-      encoding.set_encoding   -> tensor.pack
-      encoding.unset_encoding -> tensor.unpack
-      linalg.matmul             -> linalg.mmt4d  "}];
-}
-
 def CPULowerToUKernelsPass :
     Pass<"iree-codegen-cpu-lower-to-ukernels", ""> {
   let summary =

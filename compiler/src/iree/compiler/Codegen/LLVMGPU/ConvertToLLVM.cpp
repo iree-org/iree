@@ -195,8 +195,7 @@ class TestLLVMGPULegalizeOpPass final
     RewritePatternSet patterns(&getContext());
     populateScalarizeMathOps(patterns);
     populateConvertSharedMemoryAllocOps(patterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }
@@ -505,7 +504,10 @@ struct HALInterfaceWorkgroupOpsConverter final
     int32_t index = static_cast<int32_t>(op.getDimension().getSExtValue());
     std::array<gpu::Dimension, 3> dimAttr{gpu::Dimension::x, gpu::Dimension::y,
                                           gpu::Dimension::z};
-    rewriter.replaceOpWithNewOp<NewOpTy>(op, op.getType(), dimAttr[index]);
+    NewOpTy newOp =
+        rewriter.replaceOpWithNewOp<NewOpTy>(op, op.getType(), dimAttr[index]);
+    if (IntegerAttr bound = op.getUpperBoundAttr())
+      newOp.setUpperBoundAttr(bound);
     return success();
   }
 };

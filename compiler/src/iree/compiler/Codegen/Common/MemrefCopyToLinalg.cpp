@@ -42,8 +42,7 @@ struct MemrefCopyToLinalgPass final
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());
     patterns.insert<MemrefCopyOpToLinalg>(context);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

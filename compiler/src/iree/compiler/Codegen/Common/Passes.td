@@ -66,6 +66,11 @@ def ConcretizePadResultShapePass :
       "implements OffsetSizeAndStrideOpInterface.";
 }
 
+def ConvertAccGEMMToGEMMPass :
+    Pass<"iree-convert-accgemm-to-gemm", ""> {
+  let summary = "Convert accumulating GEMMs to GEMMs post dispatch creation.";
+}
+
 def ConvertBf16ArithToF32Pass : Pass<"iree-convert-bf16-arith-to-f32", ""> {
   let summary = "Convert bf16 arithmetic operations to f32";
 }
@@ -431,6 +436,21 @@ def LowerUKernelOpsToCallsPass :
   let summary = "Lower micro-kernel wrapper ops into function calls";
 }
 
+def MaterializeHostEncodingPass :
+    Pass<"iree-codegen-materialize-host-encoding", "mlir::ModuleOp"> {
+  let summary = "Materialize the encoding for tensor as specified by the backend.";
+}
+
+def MaterializeDeviceEncodingPass :
+    InterfacePass<"iree-codegen-materialize-device-encoding", "mlir::FunctionOpInterface"> {
+  let summary = "Materialize the encoding for tensor as specified by the backend.";
+  let options = [
+    Option<"testCLGPUTarget", "test-cl-gpu-target", "bool", /*default=*/"false",
+           "Flag used for lit-testing GPU target only. Not for general usage">,
+  ];
+}
+
+// TODO(hanchung): Remove the pass after we deprecate MaterializeHomogeneousEncodingsPass.
 def MaterializeEncodingIntoNopPass :
     InterfacePass<"iree-codegen-materialize-encoding-into-nop", "mlir::FunctionOpInterface"> {
   let summary = "Drop the encodings from tensor types with encodings.";

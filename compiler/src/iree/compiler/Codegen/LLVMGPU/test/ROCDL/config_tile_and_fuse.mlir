@@ -307,3 +307,114 @@ func.func @unaligned_to_intrinsic_batched_matmul_tiling_check(%lhs : tensor<12x5
 //  CHECK-SAME:     reduction = [0, 0, 0, 1]
 //  CHECK-SAME:     subgroup = [0, 1, 8, 0]
 //  CHECK-SAME:     workgroup = [1, 16, 512, 0]
+
+// -----
+
+func.func @large_scatter(%arg0: tensor<3x2048x2048xf32>,
+                   %arg1: tensor<3x1xi32>) -> tensor<3x2048x2048xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<3x2048x2048xf32>
+  %1 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%arg0, %arg1 : tensor<3x2048x2048xf32>, tensor<3x1xi32>) outs(%0 : tensor<3x2048x2048xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    iree_linalg_ext.yield %arg2 : f32
+  } -> tensor<3x2048x2048xf32>
+  return %1 : tensor<3x2048x2048xf32>
+}
+
+// CHECK-LABEL: func.func @large_scatter
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+
+//       CHECK:   linalg_ext.scatter {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1, 4]
+//  CHECK-SAME:     workgroup = [1, 1, 256]
+
+// -----
+
+func.func @small_scatter(%arg0: tensor<3x32x16xf32>,
+                         %arg1: tensor<3x1xi32>) -> tensor<3x32x16xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<3x32x16xf32>
+  %1 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%arg0, %arg1 : tensor<3x32x16xf32>, tensor<3x1xi32>) outs(%0 : tensor<3x32x16xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    iree_linalg_ext.yield %arg2 : f32
+  } -> tensor<3x32x16xf32>
+  return %1 : tensor<3x32x16xf32>
+}
+
+// CHECK-LABEL: func.func @small_scatter
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+
+//       CHECK:   linalg_ext.scatter {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1, 4]
+//  CHECK-SAME:     workgroup = [1, 16, 16]
+
+// -----
+
+func.func @only_scattered_dim(%arg0: tensor<48xf32>,
+                              %arg1: tensor<48x2xi32>) -> tensor<100x100xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<100x100xf32>
+  %1 = iree_linalg_ext.scatter dimension_map = [0, 1] unique_indices(true)
+    ins(%arg0, %arg1 : tensor<48xf32>, tensor<48x2xi32>) outs(%0 : tensor<100x100xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    iree_linalg_ext.yield %arg2 : f32
+  } -> tensor<100x100xf32>
+  return %1 : tensor<100x100xf32>
+}
+
+// CHECK-LABEL: func.func @only_scattered_dim
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+
+//       CHECK:   linalg_ext.scatter {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1]
+//  CHECK-SAME:     workgroup = [48]
+
+// -----
+
+func.func @dynamic_scatter(%arg0: tensor<3x32x?xf32>,
+                           %arg1: tensor<3x1xi32>,
+                           %arg2: tensor<3x32x?xf32>) -> tensor<3x32x?xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %1 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%arg0, %arg1 : tensor<3x32x?xf32>, tensor<3x1xi32>) outs(%arg2 : tensor<3x32x?xf32>) {
+  ^bb0(%arg3: f32, %arg4: f32):
+    iree_linalg_ext.yield %arg3 : f32
+  } -> tensor<3x32x?xf32>
+  return %1 : tensor<3x32x?xf32>
+}
+
+// CHECK-LABEL: func.func @dynamic_scatter
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+
+//       CHECK:   linalg_ext.scatter {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1, 4]
+//  CHECK-SAME:     workgroup = [1, 1, 256]
+
+// -----
+
+func.func @elementwise_scatter(%arg0: tensor<3x2048x2048xf32>,
+                               %arg1: tensor<3x2048x2048xf32>,
+                               %arg2: tensor<3x1xi32>) -> tensor<3x2048x2048xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<3x2048x2048xf32>
+  %1 = linalg.add ins(%arg0, %arg1 : tensor<3x2048x2048xf32>, tensor<3x2048x2048xf32>)
+    outs(%0 : tensor<3x2048x2048xf32>) -> tensor<3x2048x2048xf32>
+  %2 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%1, %arg2 : tensor<3x2048x2048xf32>, tensor<3x1xi32>) outs(%0 : tensor<3x2048x2048xf32>) {
+  ^bb0(%arg3: f32, %arg4: f32):
+    iree_linalg_ext.yield %arg3 : f32
+  } -> tensor<3x2048x2048xf32>
+  return %2 : tensor<3x2048x2048xf32>
+}
+
+// CHECK-LABEL: func.func @elementwise_scatter
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+
+//       CHECK:   linalg.add {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1, 4]
+//  CHECK-SAME:     workgroup = [1, 1, 256]
+
+// Verify that the scatter does not get a lowering config
+//       CHECK:   linalg_ext.scatter dimension_map

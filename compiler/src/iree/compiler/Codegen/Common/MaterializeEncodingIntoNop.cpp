@@ -46,14 +46,11 @@ struct MaterializeEncodingIntoNopPass final
 
     RewritePatternSet materializeEncodingPattern(context);
     MaterializeEncodingTypeConverter typeConverter(
-        /*transposeNarrowN=*/false,
         IREE::Codegen::EncodingNopLayoutAttr::get(context));
     MaterializeEncodingConversionTarget target(*context);
-    populateMaterializeEncodingIntoPackUnPackPatterns(
-        materializeEncodingPattern, typeConverter, materializeEncodingValueFn);
-    populateShapeIndependentMaterializeEncodingPatterns(
-        materializeEncodingPattern, target, typeConverter,
-        materializeEncodingValueFn);
+    populateMaterializeEncodingPatterns(materializeEncodingPattern, target,
+                                        typeConverter,
+                                        materializeEncodingValueFn);
 
     if (failed(applyPartialConversion(operation, target,
                                       std::move(materializeEncodingPattern)))) {
@@ -67,8 +64,7 @@ struct MaterializeEncodingIntoNopPass final
       memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
       context->getOrLoadDialect<tensor::TensorDialect>()
           ->getCanonicalizationPatterns(patterns);
-      if (failed(
-              applyPatternsAndFoldGreedily(operation, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(operation, std::move(patterns)))) {
         operation.emitOpError("folding patterns failed");
         return signalPassFailure();
       }

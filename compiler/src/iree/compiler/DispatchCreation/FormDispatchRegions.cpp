@@ -651,7 +651,8 @@ isFusableWithProducer(OpOperand &operand,
   }
 
   // Don't fuse attention with it's producer
-  if (isa<IREE::LinalgExt::AttentionOp>(consumer)) {
+  // TODO: Enable scatter fusion when supported by backends.
+  if (isa<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::ScatterOp>(consumer)) {
     return false;
   }
 

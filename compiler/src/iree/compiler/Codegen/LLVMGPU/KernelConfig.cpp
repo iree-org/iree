@@ -10,6 +10,7 @@
 #include <numeric>
 #include <optional>
 
+#include "compiler/src/iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUSelectUKernels.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
@@ -76,6 +77,12 @@ llvm::cl::opt<bool> clGPUUnalignedGEMMVectorDistribution(
     llvm::cl::desc("enable the usage of the vector distribution pipeline for "
                    "unaligned GEMMs when supported"),
     llvm::cl::init(false));
+
+llvm::cl::opt<bool> clGPUUseTileAndFuseConvolution(
+    "iree-codegen-llvmgpu-use-tile-and-fuse-convolution",
+    llvm::cl::desc(
+        "enable the tile and fuse pipeline for supported convolutions"),
+    llvm::cl::init(true));
 
 /// Flag to force using WMMA tensorcore operations.
 llvm::cl::opt<bool>
@@ -717,10 +724,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       targetSubgroupSize, pipelineConfig);
 }
 
-static LogicalResult
-setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
-                                     mlir::FunctionOpInterface entryPoint,
-                                     IREE::LinalgExt::AttentionOp op) {
+static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
+    IREE::LinalgExt::AttentionOp op) {
   if (target.getWgp().getMma().empty())
     return failure();
 
@@ -753,8 +759,10 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
-  // TODO: Do we need a matvec-like attention pipeline? Probably not,
-  // considering M is generally the largest dimension.
+  // Bail out on skinny attention.
+  if (bounds[mDim] <= kVerySkinnyDimThreshold) {
+    return failure();
+  }
 
   Value qMatrix = op.getQuery();
   Value kMatrix = op.getKey();
@@ -974,6 +982,209 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       workgroupSize, targetSubgroupSize, pipelineConfig);
 }
 
+static IREE::GPU::Basis projectBasis(const IREE::GPU::Basis &basis,
+                                     ArrayRef<int64_t> projectedDims) {
+  // Projection simply involves projecting the mapping and keeping the counts.
+  IREE::GPU::Basis projectedBasis;
+  projectedBasis.counts = basis.counts;
+  SetVector<int64_t> projected(projectedDims.begin(), projectedDims.end());
+  for (auto [dim, map] : llvm::enumerate(basis.mapping)) {
+    if (projected.contains(dim)) {
+      continue;
+    }
+    projectedBasis.mapping.push_back(map);
+  }
+  return projectedBasis;
+}
+
+static LogicalResult
+setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
+                                     mlir::FunctionOpInterface entryPoint,
+                                     IREE::LinalgExt::AttentionOp op) {
+  // This configuration is not really smart right now. It just makes sure that
+  // attention always compiles and tries to distribute workload on threads,
+  // subgroups and workgroups as much as it can.
+  // TODO: Update this configuration with target information, like the
+  // WarpReduction pipeline does.
+  const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
+
+  // Get iteration domain bounds.
+  OpBuilder b(op);
+  FailureOr<SmallVector<int64_t>> maybeBounds = op.getStaticLoopRanges();
+  if (failed(maybeBounds)) {
+    return failure();
+  }
+
+  SmallVector<int64_t> bounds = maybeBounds.value();
+
+  auto opInfo =
+      IREE::LinalgExt::AttentionOpDetail::get(
+          op.getQueryMap(), op.getKeyMap(), op.getValueMap(), op.getOutputMap())
+          .value();
+
+  SmallVector<int64_t> parallelDims;
+  SmallVector<int64_t> reductionDims;
+  for (auto [dim, itType] : llvm::enumerate(op.getLoopIteratorTypes())) {
+    switch (itType) {
+    case utils::IteratorType::parallel:
+      parallelDims.push_back(dim);
+      break;
+    case utils::IteratorType::reduction:
+      reductionDims.push_back(dim);
+      break;
+    }
+  }
+
+  auto distributeDimensionsToBasis = [&bounds](int64_t available,
+                                               ArrayRef<int64_t> dims,
+                                               IREE::GPU::Basis &basis) {
+    for (int64_t dim : dims) {
+      basis.mapping[dim] = dim;
+      int64_t dimSize = bounds[dim];
+      if (ShapedType::isDynamic(dimSize)) {
+        basis.counts[dim] = 1;
+        continue;
+      }
+      int64_t used = std::gcd(available, dimSize);
+      available /= used;
+      bounds[dim] /= used;
+      basis.counts[dim] = used;
+    }
+    return available;
+  };
+
+  SmallVector<int64_t> workgroupTileSizes(opInfo.getDomainRank(), 0);
+  // Distribute all batch dimensions to workgroups.
+  for (int64_t dim : opInfo.getBatchDims()) {
+    workgroupTileSizes[dim] = 1;
+    bounds[dim] = 1;
+  }
+
+  IREE::GPU::Basis threadBasis = {
+      SmallVector<int64_t>(opInfo.getDomainRank(), 1),
+      SmallVector<int64_t>(opInfo.getDomainRank())};
+  int64_t remainingThreads = targetSubgroupSize;
+  if (!target.supportsSubgroupShuffle()) {
+    // If target does not support subgroup shuffles, don't distribute threads on
+    // reduction dimensions.
+    distributeDimensionsToBasis(1, reductionDims, threadBasis);
+  } else {
+    remainingThreads = distributeDimensionsToBasis(remainingThreads,
+                                                   reductionDims, threadBasis);
+  }
+  remainingThreads =
+      distributeDimensionsToBasis(remainingThreads, parallelDims, threadBasis);
+
+  IREE::GPU::Basis subgroupBasis = {
+      SmallVector<int64_t>(opInfo.getDomainRank(), 1),
+      SmallVector<int64_t>(opInfo.getDomainRank())};
+  int64_t remainingSubgroups = target.getWgp().getSimdsPerWgp().value_or(1);
+  // TODO: We cannot distribute subgroups on reduction dimensions yet, because
+  // VectorDistribution does not know how to do workgroup reduction right now.
+  distributeDimensionsToBasis(1, reductionDims, subgroupBasis);
+  remainingSubgroups = distributeDimensionsToBasis(remainingSubgroups,
+                                                   parallelDims, subgroupBasis);
+
+  LDBG("Thread Basis");
+  LLVM_DEBUG({
+    llvm::interleaveComma(threadBasis.counts, llvm::dbgs());
+    llvm::dbgs() << "\n";
+    llvm::interleaveComma(threadBasis.mapping, llvm::dbgs());
+    llvm::dbgs() << "\n";
+  });
+  LDBG("Subgroup Basis");
+  LLVM_DEBUG({
+    llvm::interleaveComma(subgroupBasis.counts, llvm::dbgs());
+    llvm::dbgs() << "\n";
+    llvm::interleaveComma(subgroupBasis.mapping, llvm::dbgs());
+    llvm::dbgs() << "\n";
+  });
+
+  // Tile remaining parallel dimensions to workgroups.
+  for (int64_t dim : parallelDims) {
+    if (ShapedType::isDynamic(dim)) {
+      workgroupTileSizes[dim] = 1;
+    }
+    if (bounds[dim] != 1) {
+      int64_t threadCount = threadBasis.counts[threadBasis.mapping[dim]];
+      int64_t subgroupCount = subgroupBasis.counts[subgroupBasis.mapping[dim]];
+      workgroupTileSizes[dim] = threadCount * subgroupCount;
+    }
+  }
+
+  // Tile remaining reduction dimensions to serial loops.
+  SmallVector<int64_t> reductionTileSizes(opInfo.getDomainRank(), 0);
+  for (int64_t dim : opInfo.getK2Dims()) {
+    if (ShapedType::isDynamic(dim)) {
+      reductionTileSizes[dim] = 1;
+    }
+    if (bounds[dim] != 1) {
+      int64_t threadCount = threadBasis.counts[threadBasis.mapping[dim]];
+      int64_t subgroupCount = subgroupBasis.counts[subgroupBasis.mapping[dim]];
+      reductionTileSizes[dim] = threadCount * subgroupCount;
+    }
+  }
+
+  int64_t flatWorkgroupSize =
+      targetSubgroupSize * ShapedType::getNumElements(subgroupBasis.counts);
+  std::array<int64_t, 3> workgroupSize{flatWorkgroupSize, 1, 1};
+
+  MLIRContext *context = op.getContext();
+
+  SmallVector<NamedAttribute, 2> attrs;
+  attrs.emplace_back(StringAttr::get(context, "workgroup"),
+                     b.getI64ArrayAttr(workgroupTileSizes));
+  attrs.emplace_back(StringAttr::get(context, "reduction"),
+                     b.getI64ArrayAttr(reductionTileSizes));
+
+  SmallVector<NamedAttribute> qkConfig;
+  IREE::GPU::setBasis(context, qkConfig, IREE::GPU::TilingLevel::Subgroup,
+                      projectBasis(subgroupBasis, opInfo.getNDims()));
+  IREE::GPU::setBasis(context, qkConfig, IREE::GPU::TilingLevel::Thread,
+                      projectBasis(threadBasis, opInfo.getNDims()));
+
+  SmallVector<NamedAttribute> pvConfig;
+  IREE::GPU::setBasis(context, pvConfig, IREE::GPU::TilingLevel::Subgroup,
+                      projectBasis(subgroupBasis, opInfo.getK1Dims()));
+  IREE::GPU::setBasis(context, pvConfig, IREE::GPU::TilingLevel::Thread,
+                      projectBasis(threadBasis, opInfo.getK1Dims()));
+
+  SmallVector<NamedAttribute, 2> qkAttrs;
+  SmallVector<NamedAttribute, 2> pvAttrs;
+
+  auto qkConfigDict = b.getDictionaryAttr(qkConfig);
+  auto pvConfigDict = b.getDictionaryAttr(pvConfig);
+
+  auto qkLoweringConfig =
+      IREE::GPU::LoweringConfigAttr::get(context, qkConfigDict);
+  auto pvLoweringConfig =
+      IREE::GPU::LoweringConfigAttr::get(context, pvConfigDict);
+
+  qkAttrs.emplace_back(b.getNamedAttr("lowering_config", qkLoweringConfig));
+  pvAttrs.emplace_back(b.getNamedAttr("lowering_config", pvLoweringConfig));
+
+  auto qkAttrDict = b.getDictionaryAttr(qkAttrs);
+  auto pvAttrDict = b.getDictionaryAttr(pvAttrs);
+
+  SmallVector<NamedAttribute, 2> decompositionConfig;
+  decompositionConfig.emplace_back(
+      b.getNamedAttr(IREE::LinalgExt::AttentionOp::getQKAttrStr(), qkAttrDict));
+  decompositionConfig.emplace_back(
+      b.getNamedAttr(IREE::LinalgExt::AttentionOp::getPVAttrStr(), pvAttrDict));
+
+  // Set attention decomposition control config.
+  op.setDecompositionConfigAttr(b.getDictionaryAttr(decompositionConfig));
+
+  auto configDict = b.getDictionaryAttr(attrs);
+  auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUVectorDistribute,
+      workgroupSize, targetSubgroupSize);
+
+  return success();
+}
+
 static LogicalResult
 setVectorDistributionConfig(IREE::GPU::TargetAttr target,
                             mlir::FunctionOpInterface entryPoint,
@@ -1004,6 +1215,10 @@ setVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   if (auto attnOp = dyn_cast<IREE::LinalgExt::AttentionOp>(computeOp)) {
     LDBG("VectorDistribution: trying to find a suitable attention config");
+    if (succeeded(setAttentionIntrinsicBasedVectorDistributionConfig(
+            target, entryPoint, attnOp))) {
+      return success();
+    }
     return setAttentionVectorDistributionConfig(target, entryPoint, attnOp);
   }
 
@@ -1080,9 +1295,11 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
                                             CodeGenPipeline pipeline) {
     TileSizesListType tileSizes;
     unsigned numParallelLoops = op.getNumParallelLoops();
-    SmallVector<int64_t> workgroupTileSizes(numParallelLoops - 2, 1);
-    workgroupTileSizes.append({tileX, tileY});
-    workgroupTileSizes.append(op.getNumReductionLoops(), tileK);
+    unsigned numReductionLoops = op.getNumReductionLoops();
+    SmallVector<int64_t> workgroupTileSizes(
+        numParallelLoops + numReductionLoops, 1);
+    workgroupTileSizes[numParallelLoops - 2] = tileX;
+    workgroupTileSizes[numParallelLoops - 1] = tileY;
 
     SmallVector<unsigned> partitionedLoops =
         cast<PartitionableLoopsInterface>(op.getOperation())
@@ -1096,10 +1313,62 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
       }
     }
 
-    tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level.
     std::optional<int64_t> subgroupSize = std::nullopt;
     if (!subgroupSizes.empty())
       subgroupSize = subgroupSizes.front();
+
+    // For the LLVMGPUTileAndFuse pipeline, we need to split tile sizes
+    // for workgroup, thread, and reduction.
+    if (pipeline == CodeGenPipeline::LLVMGPUTileAndFuse) {
+
+      auto context = op.getContext();
+      Builder b(context);
+      SmallVector<NamedAttribute, 1> attrs;
+
+      SmallVector<int64_t> threadTileSizes(numParallelLoops + numReductionLoops,
+                                           0);
+      std::fill(threadTileSizes.begin(),
+                threadTileSizes.begin() + numParallelLoops, 1);
+
+      threadTileSizes[numParallelLoops - 2] =
+          (tileX / workgroupSize[0]) < 1 ? 1 : (tileX / workgroupSize[0]);
+      threadTileSizes[numParallelLoops - 1] =
+          (tileY / workgroupSize[1]) < 1 ? 1 : (tileY / workgroupSize[1]);
+
+      SmallVector<int64_t> reductionTileSizes(
+          numParallelLoops + numReductionLoops, 0);
+      reductionTileSizes[numParallelLoops + numReductionLoops - 1] = tileK;
+
+      attrs.emplace_back(b.getStringAttr("workgroup"),
+                         b.getI64ArrayAttr(workgroupTileSizes));
+      attrs.emplace_back(b.getStringAttr("thread"),
+                         b.getI64ArrayAttr(threadTileSizes));
+      attrs.emplace_back(b.getStringAttr("reduction"),
+                         b.getI64ArrayAttr(reductionTileSizes));
+
+      auto configDict = b.getDictionaryAttr(attrs);
+      auto loweringConfig =
+          IREE::GPU::LoweringConfigAttr::get(context, configDict);
+      SmallVector<NamedAttribute, 1> pipelineAttrs;
+      auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
+          context, /*prefetchSharedMemory=*/false,
+          /*no_reduce_shared_memory_bank_conflicts=*/true,
+          /*use_igemm_convolution=*/false,
+          /*reorder_workgroups_strategy=*/std::nullopt);
+      pipelineAttrs.emplace_back(
+          b.getStringAttr(IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
+          pipelineOptions);
+      auto pipelineConfig = b.getDictionaryAttr(pipelineAttrs);
+
+      return setOpConfigAndEntryPointFnTranslation(
+          entryPoint, op, loweringConfig, pipeline, workgroupSize, subgroupSize,
+          pipelineConfig);
+    }
+
+    // Other pipeline (MatmulTensorCore) expect the reduction tile size to be in
+    // the same list.
+    workgroupTileSizes[numParallelLoops + numReductionLoops - 1] = tileK;
+    tileSizes.emplace_back(std::move(workgroupTileSizes));
 
     return setOpConfigAndEntryPointFnTranslation(
         entryPoint, op, tileSizes, pipeline, workgroupSize, subgroupSize,
@@ -1175,7 +1444,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
       return setMatmulConfig(
           sizeN, sizeM, 4, {sizeM, sizeN, 1},
           target.getWgp().getSubgroupSizeChoices().asArrayRef(),
-          softwarePipelineDepthSimt, CodeGenPipeline::LLVMGPUMatmulSimt);
+          softwarePipelineDepthSimt, CodeGenPipeline::LLVMGPUTileAndFuse);
     }
 
     // SIMT matmul case. Query the best configuration.
@@ -1189,7 +1458,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
             config.tileSize[0], config.tileSize[1], config.tileSize[2],
             config.workgroupSize,
             target.getWgp().getSubgroupSizeChoices().asArrayRef(),
-            softwarePipelineDepthSimt, CodeGenPipeline::LLVMGPUMatmulSimt);
+            softwarePipelineDepthSimt, CodeGenPipeline::LLVMGPUTileAndFuse);
       }
     }
   }
@@ -1214,7 +1483,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
   return setMatmulConfig(tileX, tileY, tileK, workgroupSize,
                          target.getWgp().getSubgroupSizeChoices().asArrayRef(),
                          softwarePipelineDepthSimt,
-                         CodeGenPipeline::LLVMGPUMatmulSimt);
+                         CodeGenPipeline::LLVMGPUTileAndFuse);
 }
 
 //====---------------------------------------------------------------------===//
@@ -1828,31 +2097,9 @@ static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
 /// Set the configuration for argmax when ukernels are enabled.
 /// Distribute all parallel dim across different workgroups, and only use single
 /// subgroup per workgroup.
-///
-/// TODO(bjacob): This is fragile, as we can't know yet if this argmax will be
-/// lowered to a ukernel. We need instead a config that works regardless of
-/// ukernels. For now, we use the looser condition that the argmax ukernel is
-/// enabled, a necessary but not sufficient condition for this particular op to
-/// lower to the ukernel. This is good enough for now for a couple of reasons:
-/// 1. Even if a argmax does not actually lower to a ukernel, this config should
-///    still work.
-/// 2. Ukernels are not enabled by default.
-static LogicalResult
-setArgmaxUkernelConfig(IREE::GPU::TargetAttr target,
-                       mlir::FunctionOpInterface entryPoint,
-                       linalg::GenericOp op) {
-  // Checks if UKernels are enabled.
-  if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint)) {
-    if (!hasUkernel(target, "argmax")) {
-      return failure();
-    }
-  }
-
-  if (!target.supportsSubgroupShuffle())
-    return failure();
-
-  if (failed(isArgmaxOp(op)))
-    return failure();
+static LogicalResult setArgmaxUkernelConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
+    linalg::GenericOp op, IREE::GPU::UKernelConfigAttr ukernelConfig) {
   SmallVector<unsigned> parallelDims;
   SmallVector<unsigned> reductionDims;
   op.getParallelDims(parallelDims);
@@ -1880,39 +2127,39 @@ setArgmaxUkernelConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
-  // Tile all the parallel dimension to 1.
+  // Tile all the parallel dimension to 1. This is a requirement of the ukernel.
   SmallVector<unsigned> partitionedLoops =
       cast<PartitionableLoopsInterface>(op.getOperation())
           .getPartitionableLoops(kNumMaxParallelDims);
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
 
-  // Currently Argmax Ukernel let's every thread reduce reductionDim/WarpSize
+  // Currently Argmax Ukernel lets every thread reduce reductionDim/WarpSize
   // number of elements, and then it does a single step butterfly warp reduce.
   // Hence it expects workgroupSize to be warpSize(subgroupSize), and
   // reductionTileSize to be size of the reduction dim.
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
   int64_t preferredSubgroupSize = target.getPreferredSubgroupSize();
   reductionTileSizes[reductionDims[0]] = preferredSubgroupSize;
-  TileSizesListType tileSizes;
-  tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
-  tileSizes.emplace_back(std::move(reductionTileSizes)); // Reduction level
   std::array<int64_t, 3> workgroupSize = {preferredSubgroupSize, 1, 1};
+
+  MLIRContext *context = op->getContext();
+  Builder b(context);
+  SmallVector<NamedAttribute, 2> attrs;
+  attrs.emplace_back(StringAttr::get(context, "workgroup"),
+                     b.getI64ArrayAttr(workgroupTileSizes));
+  attrs.emplace_back(StringAttr::get(context, "reduction"),
+                     b.getI64ArrayAttr(reductionTileSizes));
+  attrs.emplace_back(StringAttr::get(context, "ukernel"), ukernelConfig);
+  IREE::GPU::setPromotedOperandList(context, attrs, {0, 1});
+  auto configDict = DictionaryAttr::get(context, attrs);
+  auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
   if (failed(setOpConfigAndEntryPointFnTranslation(
-          entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUDefault,
+          entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUDefault,
           workgroupSize))) {
     return failure();
   }
   return success();
-}
-
-/// Make UKernels take the LLVMGPUDefault lowering pipeline.
-static LogicalResult
-setUKernelConfig(mlir::FunctionOpInterface entryPoint,
-                 IREE::Codegen::UKernelOpInterface ukernelOp) {
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPoint->getContext(), CodeGenPipeline::LLVMGPUDefault);
-  return setTranslationInfo(entryPoint, translationInfo);
 }
 
 /// Decides the tiling and distribution parameters for one convolution
@@ -1988,11 +2235,18 @@ static bool distributeToSquare(const int64_t oh, const int64_t ow,
 // Convolution Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
-static LogicalResult setConvolutionConfig(IREE::GPU::TargetAttr target,
-                                          linalg::LinalgOp linalgOp,
-                                          const int64_t bestTilingFactor) {
+static LogicalResult setConvolutionConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPointFn,
+    linalg::LinalgOp linalgOp, const int64_t bestTilingFactor) {
   if (!isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp>(linalgOp)) {
     return failure();
+  }
+  if (clGPUUseTileAndFuseConvolution) {
+    if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(target, entryPointFn,
+                                                          linalgOp))) {
+      LDBG("Tile and fuse convolution config");
+      return success();
+    }
   }
   const bool isNCHW = isa<linalg::Conv2DNchwFchwOp>(*linalgOp);
   const bool isNHWC = isa<linalg::Conv2DNhwcHwcfOp>(*linalgOp);
@@ -2076,9 +2330,8 @@ static LogicalResult setConvolutionConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> windowTileSizes(4, 0);
   windowTileSizes[ohIndex] = 1;
   tileSizes.push_back(windowTileSizes);
-  auto funcOp = linalgOp->getParentOfType<mlir::FunctionOpInterface>();
-  return setOpConfigAndEntryPointFnTranslation(funcOp, linalgOp, tileSizes,
-                                               pipeline, workgroupSize);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, linalgOp, tileSizes, pipeline, workgroupSize);
 }
 
 //====---------------------------------------------------------------------===//
@@ -2088,13 +2341,14 @@ static LogicalResult setConvolutionConfig(IREE::GPU::TargetAttr target,
 static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
                                    mlir::FunctionOpInterface entryPointFn,
                                    Operation *computeOp) {
+  IREE::GPU::UKernelConfigAttr ukernelConfig = selectUKernel(computeOp);
   LLVM_DEBUG({
     DBGS() << "Selecting root config for: ";
     computeOp->print(llvm::dbgs(), OpPrintingFlags().skipRegions());
     llvm::dbgs() << "\n";
   });
   if (succeeded(setDataTiledMultiMmaLoweringConfig(target, entryPointFn,
-                                                   computeOp))) {
+                                                   computeOp, ukernelConfig))) {
     LDBG("Tile and fuse data tiled multi_mma config");
     return success();
   }
@@ -2132,7 +2386,7 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       LDBG("Warp Reduction Config");
       return success();
     }
-    if (succeeded(setConvolutionConfig(target, linalgOp, 16))) {
+    if (succeeded(setConvolutionConfig(target, entryPointFn, linalgOp, 16))) {
       LDBG("Convolution Config");
       return success();
     }
@@ -2140,8 +2394,9 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     if (genericOp && succeeded(setTransposeConfig(entryPointFn, genericOp))) {
       LDBG("Transpose Config");
       return success();
-    } else if (genericOp && succeeded(setArgmaxUkernelConfig(
-                                target, entryPointFn, genericOp))) {
+    } else if (genericOp && ukernelConfig &&
+               succeeded(setArgmaxUkernelConfig(target, entryPointFn, genericOp,
+                                                ukernelConfig))) {
       LDBG("Argmax Ukernel Config");
       return success();
     }
@@ -2165,14 +2420,18 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
         LDBG("Pack Config");
         return setPackConfig(target, entryPointFn, packOp);
       })
-      .Case<IREE::Codegen::UKernelOpInterface>([&](auto ukernelOp) {
-        LDBG("Ukernel Config");
-        return setUKernelConfig(entryPointFn, ukernelOp);
-      })
       .Case<IREE::LinalgExt::CustomOp>([&](auto customOp) {
         LDBG("CustomOp Config");
         return setDefaultCustomOpLoweringConfig(entryPointFn, customOp,
                                                 initGPULaunchConfig);
+      })
+      .Case<IREE::LinalgExt::ScatterOp>([&](auto scatterOp) {
+        LDBG("ScatterOp Config");
+        if (failed(IREE::GPU::setScatterLoweringConfig(target, entryPointFn,
+                                                       scatterOp))) {
+          return setRootDefaultConfig(target, entryPointFn, computeOp);
+        }
+        return success();
       })
       .Default([&](auto op) {
         LDBG("Default Config");
@@ -2255,10 +2514,11 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
 
   Operation *rootOperation = nullptr;
 
-  // Find the root operation. linalg.generic and linalg.fill are not root
-  // operations if there are other compute operations present.
+  // Find the root operation. linalg.generic, linalg.fill, and scatter are not
+  // root operations if there are other compute operations present.
   for (Operation *op : llvm::reverse(computeOps)) {
-    if (!isa<linalg::GenericOp, linalg::FillOp>(op)) {
+    if (!isa<linalg::GenericOp, linalg::FillOp, IREE::LinalgExt::ScatterOp>(
+            op)) {
       rootOperation = op;
       break;
     }
@@ -2271,9 +2531,19 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
     }
   }
 
+  // Generic ops take priority over scatter and fill ops as the root op.
   if (!rootOperation) {
     for (Operation *op : llvm::reverse(computeOps)) {
-      if (isa<linalg::GenericOp, linalg::FillOp>(op)) {
+      if (isa<linalg::GenericOp>(op)) {
+        rootOperation = op;
+        break;
+      }
+    }
+  }
+
+  if (!rootOperation) {
+    for (Operation *op : llvm::reverse(computeOps)) {
+      if (isa<IREE::LinalgExt::ScatterOp, linalg::FillOp>(op)) {
         rootOperation = op;
         break;
       }

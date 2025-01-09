@@ -12,10 +12,6 @@
 #include "iree/base/api.h"
 #include "iree/hal/drivers/hip/rccl_dynamic_symbols.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif  // __cplusplus
-
 // Converts a ncclResult_t to an iree_status_t.
 //
 // Usage:
@@ -60,9 +56,5 @@ extern "C" {
 iree_status_t iree_hal_hip_nccl_result_to_status(
     const iree_hal_hip_nccl_dynamic_symbols_t* syms, ncclResult_t result,
     const char* file, uint32_t line);
-
-#ifdef __cplusplus
-}  // extern "C"
-#endif  // __cplusplus
 
 #endif  // IREE_HAL_DRIVERS_HIP_RCCL_STATUS_UTIL_H_

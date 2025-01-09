@@ -42,18 +42,11 @@ struct ConvertedTensor {
   Value resourceSize;
 };
 
-void expandResourceOperand(Location loc, Value convertedOperand,
-                           SmallVectorImpl<Value> &newOperands,
-                           OpBuilder &builder);
-SmallVector<Value> expandResourceOperands(Location loc,
-                                          ValueRange convertedOperands,
-                                          ConversionPatternRewriter &rewriter);
-
-ConvertedTensor resolveTensorOperand(
-    Location loc, Value originalOperand, Value convertedOperand,
+ConvertedTensor resolveTensorOperands(
+    Location loc, Value originalOperand, ValueRange convertedOperand,
     IREE::Stream::AffinityAnalysis *affinityAnalysis, OpBuilder &builder);
-ConvertedTensor transferTensorOperand(
-    Location loc, Value originalOperand, Value convertedOperand,
+ConvertedTensor transferTensorOperands(
+    Location loc, Value originalOperand, ValueRange convertedOperand,
     IREE::Stream::AffinityAttr requiredAffinityAttr,
     IREE::Stream::AffinityAnalysis *affinityAnalysis, OpBuilder &builder);
 
@@ -72,19 +65,19 @@ public:
   }
 
 protected:
-  ConvertedTensor resolveTensorOperand(Location loc, Value originalOperand,
-                                       Value convertedOperand,
-                                       OpBuilder &builder) const {
-    return mlir::iree_compiler::resolveTensorOperand(
+  ConvertedTensor resolveTensorOperands(Location loc, Value originalOperand,
+                                        ValueRange convertedOperand,
+                                        OpBuilder &builder) const {
+    return mlir::iree_compiler::resolveTensorOperands(
         loc, originalOperand, convertedOperand, affinityAnalysis, builder);
   }
 
   ConvertedTensor
-  transferTensorOperand(Location loc, Value originalOperand,
-                        Value convertedOperand,
-                        IREE::Stream::AffinityAttr requiredAffinityAttr,
-                        OpBuilder &builder) const {
-    return mlir::iree_compiler::transferTensorOperand(
+  transferTensorOperands(Location loc, Value originalOperand,
+                         ValueRange convertedOperand,
+                         IREE::Stream::AffinityAttr requiredAffinityAttr,
+                         OpBuilder &builder) const {
+    return mlir::iree_compiler::transferTensorOperands(
         loc, originalOperand, convertedOperand, requiredAffinityAttr,
         affinityAnalysis, builder);
   }
@@ -110,13 +103,14 @@ public:
 
 protected:
   virtual LogicalResult matchAndRewriteOnAffinity(
-      OpT op, typename OpConversionPattern<OpT>::OpAdaptor adaptor,
+      OpT op, typename OpConversionPattern<OpT>::OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
       ConversionPatternRewriter &rewriter) const = 0;
 
 private:
   LogicalResult
-  matchAndRewrite(OpT op, typename OpConversionPattern<OpT>::OpAdaptor adaptor,
+  matchAndRewrite(OpT op,
+                  typename OpConversionPattern<OpT>::OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override final {
     auto executionAffinityAttr =
         tryLookupExecutionAffinity(op, this->getAffinityAnalysis());
@@ -124,6 +118,13 @@ private:
                                      rewriter);
   }
 };
+
+void replaceOpWithMultiple(Operation *op,
+                           ArrayRef<SmallVector<Value>> replacements,
+                           ConversionPatternRewriter &rewriter);
+void replaceOpWithMultiple(Operation *op, ValueRange resources,
+                           ValueRange sizes,
+                           ConversionPatternRewriter &rewriter);
 
 } // namespace mlir::iree_compiler
 

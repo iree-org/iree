@@ -107,10 +107,12 @@ def GPUInferMemorySpacePass :
 
 def GPULowerToUKernelsPass :
     Pass<"iree-codegen-gpu-lower-to-ukernels", ""> {
-  let summary = "Lower suitable ops to microkernels.";
+  let summary = "Lower suitable ops to previously-selected microkernels";
   let dependentDialects = [
     "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+    "::mlir::arith::ArithDialect",
+    "::mlir::tensor::TensorDialect",
   ];
 }
 
@@ -178,6 +180,11 @@ def GPUPromoteMatmulOperandsPass :
   ];
 }
 
+def GPUPropagateDispatchSizeBoundsPass :
+    InterfacePass<"iree-codegen-gpu-propagate-dispatch-size-bounds", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to annotate workitem and workgroup IDs with known bounds";
+}
+
 def GPUReduceBankConflictsPass :
     InterfacePass<"iree-codegen-gpu-reduce-bank-conflicts", "mlir::FunctionOpInterface"> {
   let summary = "Pass to try to reduce the number of bank conflicts by padding memref.alloc ops.";
@@ -240,16 +247,6 @@ def GPUApplyTilingLevelPass :
            /*default=*/"false",
            "Allow pad fusion to generate zero size slices">
   ];
-}
-
-def GPUMaterializeHostEncodingPass :
-    Pass<"iree-codegen-gpu-materialize-host-encoding", "mlir::ModuleOp"> {
-  let summary = "Materialize the encoding for tensor as specified by the backend.";
-}
-
-def GPUMaterializeDeviceEncodingPass :
-    InterfacePass<"iree-codegen-gpu-materialize-device-encoding", "mlir::FunctionOpInterface"> {
-  let summary = "Materialize the encoding for tensor as specified by the backend.";
 }
 
 def GPUTensorTileToSerialLoopsPass :

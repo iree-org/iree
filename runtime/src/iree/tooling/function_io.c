@@ -906,18 +906,18 @@ static iree_status_t iree_tooling_create_buffer_view_with_vm_buffer(
       vm_buffer, 0, iree_vm_buffer_length(vm_buffer), 1, &span));
 
   // Wrap the heap memory in a HAL buffer for read-only access.
-  iree_hal_buffer_release_callback_t release_callback = {
+  const iree_hal_buffer_release_callback_t release_callback = {
       .fn = iree_hal_buffer_release_vm_buffer,
       .user_data = vm_buffer,
   };
   iree_vm_buffer_retain(vm_buffer);
   iree_hal_buffer_t* hal_buffer = NULL;
   iree_status_t status = iree_hal_heap_buffer_wrap(
-      device_allocator, IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+      iree_hal_buffer_placement_undefined(), IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
       IREE_HAL_MEMORY_ACCESS_READ,
       IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE | IREE_HAL_BUFFER_USAGE_MAPPING,
       span.data_length, iree_cast_const_byte_span(span), release_callback,
-      &hal_buffer);
+      host_allocator, &hal_buffer);
   iree_vm_buffer_release(vm_buffer);
 
   // Wrap the HAL buffer in a buffer view.
@@ -931,15 +931,14 @@ static iree_status_t iree_tooling_create_buffer_view_with_vm_buffer(
 }
 
 static iree_status_t iree_tooling_create_buffer_view_empty(
-    iree_hal_allocator_t* device_allocator, iree_allocator_t host_allocator,
-    iree_hal_buffer_view_t** out_buffer_view) {
+    iree_allocator_t host_allocator, iree_hal_buffer_view_t** out_buffer_view) {
   iree_hal_buffer_t* hal_buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_heap_buffer_wrap(
-      device_allocator, IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+      iree_hal_buffer_placement_undefined(), IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
       IREE_HAL_MEMORY_ACCESS_READ,
       IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE | IREE_HAL_BUFFER_USAGE_MAPPING, 0,
       iree_byte_span_empty(), iree_hal_buffer_release_callback_null(),
-      &hal_buffer));
+      host_allocator, &hal_buffer));
   iree_status_t status = iree_tooling_create_buffer_view_with_hal_buffer(
       hal_buffer, host_allocator, out_buffer_view);
   iree_hal_buffer_release(hal_buffer);
@@ -953,8 +952,8 @@ static iree_status_t iree_tooling_create_buffer_view_with_value(
   iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
   switch (value.type) {
     case IREE_VM_VALUE_TYPE_NONE:
-      return iree_tooling_create_buffer_view_empty(
-          device_allocator, host_allocator, out_buffer_view);
+      return iree_tooling_create_buffer_view_empty(host_allocator,
+                                                   out_buffer_view);
     case IREE_VM_VALUE_TYPE_I8:
       byte_length = sizeof(value.i8);
       element_type = IREE_HAL_ELEMENT_TYPE_INT_8;
@@ -1015,8 +1014,8 @@ static iree_status_t iree_tooling_create_buffer_view_from_variant(
   if (iree_vm_variant_is_empty(variant)) {
     // Empty value - we need to emit a zero-length value to keep the npy file
     // ordered when there are multiple entries.
-    return iree_tooling_create_buffer_view_empty(
-        device_allocator, host_allocator, out_buffer_view);
+    return iree_tooling_create_buffer_view_empty(host_allocator,
+                                                 out_buffer_view);
   } else if (iree_vm_variant_is_ref(variant)) {
     if (iree_hal_buffer_view_isa(variant.ref)) {
       // Buffer view returned can provide the metadata required.

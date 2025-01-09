@@ -7,27 +7,11 @@
 name: CI - Linux x64 bazel
 
 on:
+  workflow_call:
   workflow_dispatch:
-  pull_request:
-  push:
-    branches:
-      - main
-
-concurrency:
-  # A PR number if a pull request and otherwise the commit hash. This cancels
-  # queued and in-progress runs for the same PR (presubmit) or commit
-  # (postsubmit). The workflow name is prepended to avoid conflicts between
-  # different workflows.
-  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
-  cancel-in-progress: true
 
 jobs:
-  setup:
-    uses: ./.github/workflows/setup.yml
-
   linux_x64_bazel:
-    needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_bazel')
     runs-on: azure-linux-scale
     container:
       image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:78a558b999b230f7e1da376639e14b44f095f30f1777d6a272ba48c0bbdd4ccb
@@ -53,3 +37,5 @@ jobs:
           cp ./build_tools/scripts/fetch_cuda_deps.sh /usr/local/bin
           /usr/local/bin/fetch_cuda_deps.sh ${IREE_CUDA_DEPS_DIR}
           ./build_tools/bazel/build_test_all.sh
+
+      # Alerting on failure is the responsibility of the calling job.

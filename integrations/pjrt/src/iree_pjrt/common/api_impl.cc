@@ -1487,8 +1487,8 @@ PJRT_Error* ClientInstance::Compile(const PJRT_Program* program,
     }
 
     // Set flags.
-    // TODO: Plumb CompileOptions through.
-    // if (!job->SetFlags(options)) return MakeCompilerError(*job);
+    if (!job->SetFlags(options)) return MakeCompilerError(*job);
+
     if (artifact_tx) {
       artifact_tx->WriteArtifact(
           /*label=*/"partitioner_flags", /*extension=*/"txt", /*index=*/-1,
@@ -1538,8 +1538,8 @@ PJRT_Error* ClientInstance::Compile(const PJRT_Program* program,
     if (!SetDefaultCompilerFlags(job.get())) {
       return MakeCompilerError(*job);
     }
-    // TODO: Plumb CompileOptions through.
-    // if (!job->SetFlags(options)) return MakeCompilerError(*job);
+    if (!job->SetFlags(options)) return MakeCompilerError(*job);
+
     if (artifact_tx) {
       artifact_tx->WriteArtifact(
           /*label=*/"flags", /*extension=*/"txt", /*index=*/-1,
@@ -1777,7 +1777,7 @@ void ExecutableImage::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Executable_Name =
       +[](PJRT_Executable_Name_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE_NAMED(PJRT_Executable_Name);
+    IREE_TRACE_SCOPE_NAMED("PJRT_Executable_Name");
     const char* dummy_name = "iree_vmfb";
     args->executable_name = dummy_name;
     args->executable_name_size = strlen(dummy_name);

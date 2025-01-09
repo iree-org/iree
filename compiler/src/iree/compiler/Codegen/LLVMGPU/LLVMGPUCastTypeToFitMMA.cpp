@@ -128,7 +128,7 @@ struct LLVMGPUCastTypeToFitMMAPass final
     RewritePatternSet patterns(context);
     patterns.add<UpcastContractOutput>(context);
 
-    if (failed(applyPatternsAndFoldGreedily(func, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(func, std::move(patterns)))) {
       return signalPassFailure();
     }
   }

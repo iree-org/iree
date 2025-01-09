@@ -11,17 +11,17 @@
 // RUN:      --iree-hal-local-target-device-backends=vmvx | \
 // RUN:  iree-run-module \
 // RUN:      --module=- \
-// RUN:      --function=mutli_device_mul \
+// RUN:      --function=multi_device_mul \
 // RUN:      --input=4xf32=10,11,12,13 \
 // RUN:      --device=local-task \
 // RUN:      --device=local-task \
 // RUN:      --task_topology_group_count=1) | \
 // RUN: FileCheck %s
 
-// CHECK: EXEC @mutli_device_mul
+// CHECK: EXEC @multi_device_mul
 // CHECK-NEXT: result[0]: hal.buffer_view
 // CHECK-NEXT: 4xf32=0 55 144 273
-func.func public @mutli_device_mul(
+func.func public @multi_device_mul(
   // Input argument is resident on device_a (tooling default to first device).
   %input_a: tensor<4xf32> {iree.abi.affinity = #hal.device.promise<@device_a>}
 ) -> (

@@ -1,13 +1,23 @@
-from typing import Any, Callable, ClassVar, List, Optional, Sequence, Tuple, Union
-
-from typing import overload
-
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    overload,
+)
 import asyncio
+
+from .typing import HalModuleBufferViewTraceCallback
 
 def create_hal_module(
     instance: VmInstance,
     device: Optional[HalDevice] = None,
     devices: Optional[List[HalDevice]] = None,
+    debug_sink: Optional[HalModuleDebugSink] = None,
 ) -> VmModule: ...
 def create_io_parameters_module(
     instance: VmInstance, *providers: ParameterProvider
@@ -309,6 +319,36 @@ class HalSemaphore:
         timeout: Optional[int] = None,
         deadline: Optional[int] = None,
     ) -> None: ...
+
+class HalModuleDebugSink:
+    def __init__(
+        self, buffer_view_trace_callback: Optional[HalModuleBufferViewTraceCallback]
+    ):
+        """The function object buffer_view_trace_callback must not include the
+        corresponding HAL VmModule, VmInstance or VmContext in its closure.
+        Native runtime objects are managed by reference counting and do not track
+        cyclic references. This will create an uncollectible cycle.
+        E.g.
+
+        ```
+        vm_context = ...
+        def callback(key, hal_buffer_view):
+            print(vm_context)
+        hal_module = iree.runtime.create_hal_module(
+            vm_instance,
+            device,
+            debug_sink=iree.runtime.HalModuleDebugSink(callback),
+        )
+        ```
+
+        This callback will cause the VM context to never be destroyed.
+        """
+
+        ...
+    @property
+    def buffer_view_trace_callback(
+        self,
+    ) -> Optional[HalModuleBufferViewTraceCallback]: ...
 
 class Linkage(int):
     EXPORT: ClassVar[Linkage] = ...

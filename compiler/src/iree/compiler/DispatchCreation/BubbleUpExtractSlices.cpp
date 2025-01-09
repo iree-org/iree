@@ -149,8 +149,8 @@ struct BubbleUpExtractSlicesPass
       patterns.insert<BubbleUpExtract>(context);
       patterns.insert<SwapExtractSliceOfFill>(context);
       tensor::populateFoldTensorEmptyPatterns(patterns, false);
-      if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                              std::move(patterns)))) {
+      linalg::FillOp::getCanonicalizationPatterns(patterns, context);
+      if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
         return signalPassFailure();
       }
     }

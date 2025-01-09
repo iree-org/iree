@@ -94,12 +94,68 @@ IREE_API_EXPORT void iree_hal_file_retain(iree_hal_file_t* file);
 // Releases the given |file| from the caller.
 IREE_API_EXPORT void iree_hal_file_release(iree_hal_file_t* file);
 
+// Returns the memory access allowed to the file.
+// This may be more strict than the original file handle backing the resource
+// if for example we want to prevent particular users from mutating the file.
+IREE_API_EXPORT iree_hal_memory_access_t
+iree_hal_file_allowed_access(iree_hal_file_t* file);
+
+// Returns the total accessible range of the file.
+// This may be a portion of the original file backing this handle.
+IREE_API_EXPORT uint64_t iree_hal_file_length(iree_hal_file_t* file);
+
+// Returns an optional device-accessible storage buffer representing the file.
+// Available if the implementation is able to perform import/address-space
+// mapping/etc such that device-side transfers can directly access the resources
+// as if they were a normal device buffer.
+IREE_API_EXPORT iree_hal_buffer_t* iree_hal_file_storage_buffer(
+    iree_hal_file_t* file);
+
+// TODO(benvanik): truncate/extend? (both can be tricky with async)
+
+// Returns true if the iree_hal_file_read and iree_hal_file_write APIs are
+// available for use on the file. Not all implementations support synchronous
+// I/O.
+IREE_API_EXPORT bool iree_hal_file_supports_synchronous_io(
+    iree_hal_file_t* file);
+
+// Synchronously reads a segment of |file| into |buffer|.
+// Blocks the caller until completed. Buffers are always host mappable.
+// Only available if iree_hal_file_supports_synchronous_io is true.
+IREE_API_EXPORT iree_status_t iree_hal_file_read(
+    iree_hal_file_t* file, uint64_t file_offset, iree_hal_buffer_t* buffer,
+    iree_device_size_t buffer_offset, iree_device_size_t length);
+
+// Synchronously writes a segment of |buffer| into |file|.
+// Blocks the caller until completed. Buffers are always host mappable.
+// Only available if iree_hal_file_supports_synchronous_io is true.
+IREE_API_EXPORT iree_status_t iree_hal_file_write(
+    iree_hal_file_t* file, uint64_t file_offset, iree_hal_buffer_t* buffer,
+    iree_device_size_t buffer_offset, iree_device_size_t length);
+
 //===----------------------------------------------------------------------===//
 // iree_hal_file_t implementation details
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_file_vtable_t {
   void(IREE_API_PTR* destroy)(iree_hal_file_t* IREE_RESTRICT file);
+
+  iree_hal_memory_access_t(IREE_API_PTR* allowed_access)(iree_hal_file_t* file);
+
+  uint64_t(IREE_API_PTR* length)(iree_hal_file_t* file);
+
+  iree_hal_buffer_t*(IREE_API_PTR* storage_buffer)(iree_hal_file_t* file);
+
+  bool(IREE_API_PTR* supports_synchronous_io)(iree_hal_file_t* file);
+  iree_status_t(IREE_API_PTR* read)(iree_hal_file_t* file, uint64_t file_offset,
+                                    iree_hal_buffer_t* buffer,
+                                    iree_device_size_t buffer_offset,
+                                    iree_device_size_t length);
+  iree_status_t(IREE_API_PTR* write)(iree_hal_file_t* file,
+                                     uint64_t file_offset,
+                                     iree_hal_buffer_t* buffer,
+                                     iree_device_size_t buffer_offset,
+                                     iree_device_size_t length);
 } iree_hal_file_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_file_vtable_t);
 

@@ -514,7 +514,8 @@ struct ConvertDispatchWorkgroupInfoPattern final
   LogicalResult matchAndRewrite(SrcOp op,
                                 PatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<DstOp>(op, op.getResult().getType(),
-                                       op.getDimensionAttr());
+                                       op.getDimensionAttr(),
+                                       /*upper_bound=*/nullptr);
     return success();
   }
 };
@@ -559,7 +560,7 @@ convertDispatchWorkgroupInfoOps(IREE::HAL::ExecutableOp executableOp) {
       ConvertDispatchWorkgroupInfoPattern<IREE::Stream::DispatchWorkgroupSizeOp,
                                           IREE::HAL::InterfaceWorkgroupSizeOp>,
       InlineConstantWorkgroupSizePattern>(executableOp.getContext());
-  return applyPatternsAndFoldGreedily(executableOp, std::move(patterns));
+  return applyPatternsGreedily(executableOp, std::move(patterns));
 }
 
 //===----------------------------------------------------------------------===//

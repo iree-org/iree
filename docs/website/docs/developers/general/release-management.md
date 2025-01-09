@@ -15,6 +15,9 @@ We periodically promote one of these candidates to a "stable" release by
 removing the "pre-release" status. This makes it show up as a "latest" release
 on GitHub. We also push the Python packages for this release to PyPI.
 
+All stable (non-prerelease) releases can be viewed at
+<https://github.com/iree-org/iree/releases?q=prerelease%3Afalse>.
+
 ## Release status
 
 | Package | Release status |
@@ -81,3 +84,37 @@ request that some feature make the cut.
 
 3. Complete any remaining checkbox items on the release tracking issue then
    close it and open a new one for the next release.
+
+## Creating a patch release
+
+1. Create a new branch.
+
+    Checkout the corresponding stable release and create a branch for the patch release:
+
+    ```shell
+    git checkout iree-3.0.0
+    git checkout -b iree-3.0.1
+    ```
+
+2. Apply and commit the patches.
+
+3. Set the patch level:
+
+    * Adjust `compiler/version.json` if patches are applied to the compiler.
+
+    * Adjust `runtime/version.json` if patches are applied to the runtime.
+
+4. Push all changes to the new branch.
+
+5. Trigger the
+    [_Oneshot candidate release_ workflow](https://github.com/iree-org/iree/actions/workflows/oneshot_candidate_release.yml)
+    to create a release.
+
+    * Select to run the workflow from the patch branch.
+
+    * Set the type of build version to produce to "stable".
+
+        ![one_shot_patch](./one-shot-patch.png)
+
+6. Follow the documentation above to promote to stable.
+   The step to create a new tag can be skipped.

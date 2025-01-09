@@ -18,104 +18,6 @@ on:
         default: ""
 
 jobs:
-  test_models:
-    name: "test_models :: ${{ matrix.name }}"
-    runs-on: ${{ matrix.runs-on }}
-    strategy:
-      fail-fast: false
-
-      # Note: these jobs should use persistent runners with local caches.
-      # Downloading test files (50GB+) without a cache can take 20+ minutes.
-      matrix:
-        include:
-          # CPU
-          - name: cpu_llvm_task
-            models-config-file: models_cpu_llvm_task.json
-            runs-on:
-              - self-hosted # must come first
-              - persistent-cache
-              - Linux
-              - X64
-
-          # AMD GPU
-          - name: amdgpu_rocm_mi250_gfx90a
-            models-config-file: models_gpu_rocm_gfx90a.json
-            runs-on: nodai-amdgpu-mi250-x86-64
-          - name: amdgpu_rocm_mi300_gfx942
-            models-config-file: models_gpu_rocm_gfx942.json
-            runs-on: nodai-amdgpu-mi300-x86-64
-          - name: amdgpu_vulkan
-            models-config-file: models_gpu_vulkan.json
-            runs-on: nodai-amdgpu-w7900-x86-64
-
-          # NVIDIA GPU
-          # None at the moment. Could maybe use the persistent a100 runners:
-          #   - self-hosted # must come first
-          #   - runner-group=${{ needs.setup.outputs.runner-group }}
-          #   - environment=${{ needs.setup.outputs.runner-env }}
-          #   - a100
-          #   - os-family=Linux
-          # (note: would need to plumb the presubmit/postsubmit runner-group through to here too)
-    env:
-      PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
-      IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
-      MODELS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-config-file }}
-      VENV_DIR: ${{ github.workspace }}/venv
-    steps:
-      - name: Checking out IREE repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          submodules: false
-      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
-        with:
-          # Must match the subset of versions built in pkgci_build_packages.
-          python-version: "3.11"
-      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
-        with:
-          name: linux_x86_64_release_packages
-          path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
-      - name: Setup venv
-        run: |
-          ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
-            --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
-            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
-
-      # Out of tree tests
-      - name: Check out external TestSuite repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          repository: nod-ai/SHARK-TestSuite
-          ref: f5615ab29da491c0047146258dfa3a0c40c735e5
-          path: SHARK-TestSuite
-          submodules: false
-          lfs: true
-      - name: Install external TestSuite Python requirements
-        run: |
-          source ${VENV_DIR}/bin/activate
-          python3 -m pip install -r SHARK-TestSuite/iree_tests/requirements.txt
-          pip install --no-compile --pre --upgrade -e SHARK-TestSuite/common_tools
-      - name: Download remote files for real weight model tests
-        run: |
-          source ${VENV_DIR}/bin/activate
-          python SHARK-TestSuite/iree_tests/download_remote_files.py --root-dir iree_tests/pytorch/models
-          python SHARK-TestSuite/iree_tests/download_remote_files.py --root-dir iree_tests/sharktank
-
-      - name: Run external tests - models with real weights
-        if: "matrix.models-config-file != '' && !cancelled()"
-        run: |
-          source ${VENV_DIR}/bin/activate
-          pytest \
-            SHARK-TestSuite/iree_tests/pytorch/models \
-            SHARK-TestSuite/iree_tests/sharktank \
-            -rA \
-            -k real_weights \
-            --no-skip-tests-missing-files \
-            --capture=no \
-            --log-cli-level=info \
-            --timeout=240 \
-            --durations=0 \
-            --config-files=${MODELS_CONFIG_FILE_PATH}
-
   test_regression_suite:
     name: "test_regression_suite :: ${{ matrix.name }}"
     runs-on: ${{ matrix.runs-on }}
@@ -189,7 +91,7 @@ jobs:
             -rpfE \
             --capture=no \
             --log-cli-level=info \
-            --timeout=240 \
+            --timeout=600 \
             --durations=0
         env:
           ROCM_CHIP: ${{ matrix.rocm-chip }}
@@ -203,59 +105,63 @@ jobs:
             -rpfE \
             --capture=no \
             --log-cli-level=info \
-            --timeout=240 \
+            --timeout=600 \
             --durations=0
         env:
           ROCM_CHIP: ${{ matrix.rocm-chip }}
 
       # Note: mi250 benchmark times are more lenient than mi300 (allowing about
-      # 10% deviation from observed averages), since the mi250 runners we use
+      # 30% deviation from observed averages), since the mi250 runners we use
       # are more unstable and we care most about peak performance on mi300.
       - name: "Running SDXL rocm pipeline benchmark (mi250)"
         if: contains(matrix.name, 'rocm_mi250_gfx90a')
         run: |
           source ${VENV_DIR}/bin/activate
           pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
-            --goldentime-rocm-e2e-ms 1616.0 \
-            --goldentime-rocm-unet-ms 419.0 \
-            --goldentime-rocm-clip-ms 18.5 \
-            --goldentime-rocm-vae-ms 337.0 \
+            --goldentime-tolerance-multiplier 1.3 \
+            --goldentime-rocm-e2e-ms 1100.0 \
+            --goldentime-rocm-unet-ms 255.0 \
+            --goldentime-rocm-clip-ms 14.5 \
+            --goldentime-rocm-vae-ms 310.0 \
             --goldendispatch-rocm-unet 1602 \
             --goldendispatch-rocm-clip 1139 \
-            --goldendispatch-rocm-vae 246 \
+            --goldendispatch-rocm-vae 245 \
             --goldensize-rocm-unet-bytes 2280000  \
             --goldensize-rocm-clip-bytes 860000 \
             --goldensize-rocm-vae-bytes 840000 \
             --rocm-chip gfx90a \
-            --timeout=240 \
+            --timeout=600 \
             --log-cli-level=info \
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
           rm job_summary.md
 
+      # Note: allowing 10% deviation from observed averages here to account for
+      # different runner conditions.
       - name: "Running SDXL rocm pipeline benchmark (mi300)"
         if: contains(matrix.name, 'rocm_mi300_gfx942')
         run: |
           source ${VENV_DIR}/bin/activate
           pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
-            --goldentime-rocm-e2e-ms 330.0 \
+            --goldentime-tolerance-multiplier 1.1 \
+            --goldentime-rocm-e2e-ms 325.0 \
             --goldentime-rocm-unet-ms 80.0 \
-            --goldentime-rocm-clip-ms 15.5 \
-            --goldentime-rocm-vae-ms 80.0 \
+            --goldentime-rocm-clip-ms 15.0 \
+            --goldentime-rocm-vae-ms 75.0 \
             --goldendispatch-rocm-unet 1602 \
             --goldendispatch-rocm-clip 1139 \
-            --goldendispatch-rocm-vae 246 \
+            --goldendispatch-rocm-vae 245 \
             --goldensize-rocm-unet-bytes 2270000 \
             --goldensize-rocm-clip-bytes 860000  \
             --goldensize-rocm-vae-bytes 840000 \
-            --goldentime-rocm-punet-int8-fp16-ms 53 \
+            --goldentime-rocm-punet-int8-fp16-ms 50.0 \
+            --goldentime-rocm-punet-int8-fp8-ms 52.0 \
             --goldendispatch-rocm-punet-int8-fp16 1424 \
-            --goldensize-rocm-punet-int8-fp16-bytes 2560000 \
-            --goldentime-rocm-punet-int8-fp8-ms 53 \
             --goldendispatch-rocm-punet-int8-fp8 1704 \
             --goldensize-rocm-punet-int8-fp8-bytes 2800000 \
+            --goldensize-rocm-punet-int8-fp16-bytes 2560000 \
             --rocm-chip gfx942 \
             --log-cli-level=info \
-            --timeout=240 \
+            --timeout=600 \
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY

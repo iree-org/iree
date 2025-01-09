@@ -16,10 +16,9 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 /// Helper for setting up a data tiled multi_mma config based on the specified
 /// target.
-LogicalResult
-setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
-                                   mlir::FunctionOpInterface entryPoint,
-                                   Operation *op);
+LogicalResult setDataTiledMultiMmaLoweringConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
+    Operation *op, IREE::GPU::UKernelConfigAttr ukernelConfig);
 
 /// Helper for setting up a convolution config using IGEMM based on the
 /// specified target.
@@ -42,6 +41,11 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
 LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
                                            mlir::FunctionOpInterface entryPoint,
                                            Operation *op);
+
+// Helper for setting tile sizes for scatter.
+LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
+                                       mlir::FunctionOpInterface entryPoint,
+                                       Operation *op);
 
 //===----------------------------------------------------------------------===//
 // Pass Pipeline Options

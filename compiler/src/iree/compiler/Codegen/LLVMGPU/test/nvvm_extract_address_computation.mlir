@@ -40,11 +40,11 @@
 // CHECK-DAG: %[[C8192:.*]] = llvm.mlir.constant(8192 : index) : i64
 //
 // Match the interesting special registers.
-// CHECK-DAG: %[[TID_Y:.*]] = nvvm.read.ptx.sreg.tid.y : i32
+// CHECK-DAG: %[[TID_Y:.*]] = nvvm.read.ptx.sreg.tid.y range <i32, 0, 2> : i32
 // CHECK-DAG: %[[TID_Y_EXT:.*]] = llvm.sext %[[TID_Y]] : i32 to i64
 // CHECK-DAG: %[[LANEID:.*]] = nvvm.read.ptx.sreg.laneid range <i32, 0, 32> : i32
 // CHECK-DAG: %[[LANEID_EXT:.*]] = llvm.sext %[[LANEID]] : i32 to i64
-// CHECK-DAG: %[[TID_Y_IDX:.*]] = llvm.mul %[[TID_Y_EXT]], %[[C64]]  : i64
+// CHECK-DAG: %[[TID_Y_IDX:.*]] = llvm.mul %[[TID_Y_EXT]], %[[C64]] overflow<nsw> : i64
 //
 // Match the loop invariant math on the special registers.
 // CHECK: %[[GRP_IDX:.*]] = llvm.add %[[TID_Y_IDX]], %[[LANEID_EXT]]  : i64

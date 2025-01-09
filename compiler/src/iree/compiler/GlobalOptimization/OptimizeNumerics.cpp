@@ -269,8 +269,7 @@ class OptimizeNumericsPass
     patterns.insert<TensorEmptyCast>(context);
     patterns.insert<LinalgFillCast>(context);
 
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

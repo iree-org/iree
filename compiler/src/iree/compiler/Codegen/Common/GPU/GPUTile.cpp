@@ -183,7 +183,7 @@ static void fusePadIntoConsumer(mlir::FunctionOpInterface funcOp) {
   RewritePatternSet patterns(context);
   patterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
       context, [](tensor::ExtractSliceOp) { return false; });
-  (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  (void)applyPatternsGreedily(funcOp, std::move(patterns));
 
   LLVM_DEBUG({
     llvm::dbgs() << "--- After fusing padding into consumers ---\n";
@@ -199,7 +199,7 @@ static void concretizePadShape(mlir::FunctionOpInterface funcOp) {
   SmallVector<int64_t> numWorkgroups = getStaticNumWorkgroups(funcOp);
   populateConcretizePadResultShapePatterns(patterns, numWorkgroups);
   populateFoldAffineMinInDistributedLoopsPatterns(patterns, numWorkgroups);
-  (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  (void)applyPatternsGreedily(funcOp, std::move(patterns));
 
   LLVM_DEBUG({
     llvm::dbgs() << "--- After concretizing pad result shape ---\n";
@@ -329,7 +329,7 @@ struct GPUTilePass final : impl::GPUTilePassBase<GPUTilePass> {
       // Pull in scf.for op canonicalization patterns to help hoisting across
       // multiple loops and remove loop carried values unused in the body.
       scf::ForOp::getCanonicalizationPatterns(patterns, context);
-      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+      (void)applyPatternsGreedily(funcOp, std::move(patterns));
 
       LLVM_DEBUG({
         llvm::dbgs() << "--- After Downsizing N-D convolution to 1-D  ---\n";

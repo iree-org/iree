@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "bubble_up_ordinal_ops.mlir"
     "bufferize_copy_only_dispatches.mlir"
     "canonicalize_interface_load_store.mlir"
+    "convert_accgemm_to_gemm.mlir"
     "convert_bf16_arith_to_f32.mlir"
     "convert_bf16_to_uint16_buffers.mlir"
     "convert_to_destination_passing_style.mlir"
@@ -43,12 +44,17 @@ iree_lit_test_suite(
     "fold_tensor_extract_op.mlir"
     "forop_canonicalization.mlir"
     "generic_vectorization.mlir"
+    "gpu_materialize_encoding_gfx1100.mlir"
+    "gpu_materialize_encoding_gfx908.mlir"
+    "gpu_materialize_encoding_gfx90a.mlir"
+    "gpu_materialize_encoding_gfx942.mlir"
     "hoist_statically_bound_allocations.mlir"
     "hoist_unrolled_vector_extract_insert_slice.mlir"
     "iree_comprehensive_bufferize.mlir"
     "iree_expand_strided_metadata.mlir"
     "iree_loop_invariant_code_motion.mlir"
     "link_tuning_specs.mlir"
+    "llvmcpu_materialize_encoding.mlir"
     "lower_ukernel_to_calls.mlir"
     "materialize_encoding_into_nop.mlir"
     "materialize_tuning_specs.mlir"
@@ -87,7 +93,9 @@ iree_lit_test_suite(
     "vector_layout_analysis.mlir"
     "vectorize_memref_copy.mlir"
     "vectorize_tensor_pad.mlir"
+    "verify_tuning_specs.mlir"
     "verify_workgroup_distribution.mlir"
+    "vmvx_materialize_encoding.mlir"
   TOOLS
     FileCheck
     iree-opt
@@ -97,6 +105,7 @@ iree_lit_test_suite(
     reductions_codegen_spec.mlir
     reductions_match_spec.mlir
     tuning_spec.mlir
+    tuning_spec_default.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

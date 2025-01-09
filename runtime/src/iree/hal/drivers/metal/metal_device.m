@@ -17,8 +17,8 @@
 #include "iree/hal/drivers/metal/shared_event.h"
 #include "iree/hal/drivers/metal/staging_buffer.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
+#include "iree/hal/utils/file_registry.h"
 #include "iree/hal/utils/file_transfer.h"
-#include "iree/hal/utils/memory_file.h"
 #include "iree/hal/utils/resource_set.h"
 
 typedef struct iree_hal_metal_device_t {
@@ -122,7 +122,7 @@ static iree_status_t iree_hal_metal_device_create_internal(
       initWithDispatchQueue:device->semaphore_notification_queue];  // +1
   device->capture_manager = NULL;
 
-  iree_status_t status = iree_hal_metal_allocator_create(metal_device,
+  iree_status_t status = iree_hal_metal_allocator_create((iree_hal_device_t*)device, metal_device,
 #if defined(IREE_PLATFORM_MACOS)
                                                          metal_queue,
 #endif  // IREE_PLATFORM_MACOS
@@ -256,8 +256,8 @@ static iree_status_t iree_hal_metal_device_create_command_buffer(
   // for argument buffer updates to pass in binding tables.
   if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT) || binding_capacity > 0) {
     return iree_hal_deferred_command_buffer_create(
-        device->device_allocator, mode, command_categories, binding_capacity, &device->block_pool,
-        device->host_allocator, out_command_buffer);
+        device->device_allocator, mode, command_categories, queue_affinity, binding_capacity,
+        &device->block_pool, device->host_allocator, out_command_buffer);
   }
 
   return iree_hal_metal_direct_command_buffer_create(
@@ -288,13 +288,8 @@ static iree_status_t iree_hal_metal_device_import_file(iree_hal_device_t* base_d
                                                        iree_io_file_handle_t* handle,
                                                        iree_hal_external_file_flags_t flags,
                                                        iree_hal_file_t** out_file) {
-  if (iree_io_file_handle_type(handle) != IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
-    return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "implementation does not support the external file type");
-  }
-  return iree_hal_memory_file_wrap(queue_affinity, access, handle,
-                                   iree_hal_device_allocator(base_device),
-                                   iree_hal_device_host_allocator(base_device), out_file);
+  return iree_hal_file_from_handle(iree_hal_device_allocator(base_device), queue_affinity, access,
+                                   handle, iree_hal_device_host_allocator(base_device), out_file);
 }
 
 static iree_status_t iree_hal_metal_device_create_semaphore(iree_hal_device_t* base_device,

@@ -45,6 +45,24 @@ util.func public @sizeof_lhs_encoding_dynamic(%arg0: index, %arg1: index) -> ind
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 4, 8, 16>>
+util.func public @sizeof_lhs_encoding_partially_dynamic(%arg0: index) -> index {
+  %0 = stream.tensor.sizeof tensor<10x?xf32, #encoding>{%arg0} : index
+  util.return %0 : index
+}
+// CHECK-LABEL: @sizeof_lhs_encoding_partially_dynamic
+// CHECK-DAG:     %[[C48:.+]] = arith.constant 48 : index
+// CHECK-DAG:     %[[C16:.+]] = arith.constant 16 : index
+// CHECK:         %[[CEIL_DIV_D1:.+]] = arith.ceildivui %arg0, %[[C16]]
+// CHECK:         %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C16]]
+// CHECK:         %[[T0:.+]] = arith.muli %[[PAD_D1]], %[[C48]]
+// CHECK:         return %[[T0]]
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #encoding = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 4, 8, 16>>
 util.func public @sizeof_rhs_encoding_dynamic(%arg0: index, %arg1: index) -> index {
   %0 = stream.tensor.sizeof tensor<?x?xf32, #encoding>{%arg0, %arg1} : index

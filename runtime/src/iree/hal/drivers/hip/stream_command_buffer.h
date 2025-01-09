@@ -14,10 +14,6 @@
 #include "iree/hal/drivers/hip/rccl_dynamic_symbols.h"
 #include "iree/hal/utils/stream_tracing.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif  // __cplusplus
-
 // Creates command buffer that immediately issues commands against the given
 // HIP |stream|. Access to |stream| must be synchronized by the user.
 //
@@ -33,11 +29,12 @@ iree_status_t iree_hal_hip_stream_command_buffer_create(
     iree_hal_allocator_t* device_allocator,
     const iree_hal_hip_dynamic_symbols_t* hip_symbols,
     const iree_hal_hip_nccl_dynamic_symbols_t* nccl_symbols,
-    hipCtx_t hip_context, iree_hal_stream_tracing_context_t* tracing_context,
+    iree_hal_stream_tracing_context_t* tracing_context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_host_size_t binding_capacity, hipStream_t stream,
-    iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
+    hipStream_t stream, iree_arena_block_pool_t* block_pool,
+    iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer);
 
 // Returns true if |command_buffer| is a HIP stream-based command buffer.
@@ -49,8 +46,11 @@ bool iree_hal_hip_stream_command_buffer_isa(
 // to collect.
 void iree_hal_hip_stream_notify_submitted_commands(
     iree_hal_command_buffer_t* base_command_buffer);
-#ifdef __cplusplus
-}  // extern "C"
-#endif  // __cplusplus
+
+// Returns the set of tracing events that are associated with
+// this command buffer.
+iree_hal_stream_tracing_context_event_list_t
+iree_hal_hip_stream_command_buffer_tracing_events(
+    iree_hal_command_buffer_t* base_command_buffer);
 
 #endif  // IREE_HAL_DRIVERS_HIP_STREAM_COMMAND_BUFFER_H_
