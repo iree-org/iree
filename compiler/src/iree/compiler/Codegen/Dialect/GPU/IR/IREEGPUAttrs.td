@@ -232,11 +232,11 @@ def IREEGPU_DataTiledMMAAttr :
 
   let parameters = (ins
     "::mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr":$intrinsic,
-    DefaultValuedParameter<"int64_t", "1", "Unrolling along the M dimension, on the same thread.">:$intrinsics_m,
-    DefaultValuedParameter<"int64_t", "1", "Unrolling along the M dimension, distributed across this many more threads.">:$subgroups_m,
-    DefaultValuedParameter<"int64_t", "1", "Unrolling along the N dimension, on the same thread.">:$intrinsics_n,
-    DefaultValuedParameter<"int64_t", "1", "Unrolling along the N dimension, distributed across this many more threads.">:$subgroups_n,
-    DefaultValuedParameter<"int64_t", "1", "Unrolling along the K dimension, on the same thread, with interleaved layout.">:$intrinsics_k
+    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the M dimension.">:$intrinsics_m,
+    DefaultValuedParameter<"int64_t", "1", "Subgroup count along the M dimension.">:$subgroups_m,
+    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the N dimension.">:$intrinsics_n,
+    DefaultValuedParameter<"int64_t", "1", "Subgroup count along the N dimension.">:$subgroups_n,
+    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the K dimension, with interleaved layout.">:$intrinsics_k
   );
 }
 
