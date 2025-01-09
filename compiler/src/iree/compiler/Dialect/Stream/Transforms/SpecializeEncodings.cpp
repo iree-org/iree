@@ -70,9 +70,6 @@ static LogicalResult addLayoutsToTensorPhaseOps(
     }
 
     // Bail out if the operation does not have an affinity attribute.
-    // TODO(hanchung): We should use the default device in this case. However,
-    // it is not guaranteed that default device attribute will always be set in
-    // the IR. (Is the statement correct?)
     auto affinityAttr = affinityOp.getAffinityAttr();
     if (!affinityAttr) {
       return;
