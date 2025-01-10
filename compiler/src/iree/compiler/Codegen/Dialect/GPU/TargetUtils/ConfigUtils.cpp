@@ -165,13 +165,6 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
       transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
       /*mustBeAligned*/ mustBeAligned, doCPromotion);
-  if (!schedule) {
-    // Then try again by allowing upcasting accumulator.
-    schedule = deduceMMASchedule(
-        problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
-        transposedLhs, transposedRhs, /*canUpcastAcc=*/true,
-        /*mustBeAligned*/ mustBeAligned, doCPromotion);
-  }
   return schedule;
 }
 
