@@ -159,7 +159,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
                  inBitWidth};
   }
 
-  // We target slightly below the full available shared Memory to leave room for
+  // We target slightly below the full available shared memory to leave room for
   // `GPUReduceBankConflictsPass` that will pad shared memory without keeping
   // track of usage. We can drop this after fixing
   // https://github.com/iree-org/iree/issues/19675
