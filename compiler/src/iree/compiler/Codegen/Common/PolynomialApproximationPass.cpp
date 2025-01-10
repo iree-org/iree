@@ -31,18 +31,17 @@ class PolynomialApproximationPass final
           PolynomialApproximationPass> {
   void runOnOperation() override {
     RewritePatternSet mathPatterns(&getContext());
-    populateExpandTanPattern(mathPatterns);
-    populateExpandSinhPattern(mathPatterns);
-    populateExpandCoshPattern(mathPatterns);
-    populateExpandAsinhPattern(mathPatterns);
-    populateExpandAcoshPattern(mathPatterns);
-    populateExpandAtanhPattern(mathPatterns);
+
     populateExpandPowFPattern(mathPatterns);
     populateExpandFPowIPattern(mathPatterns);
 
-    if (clNativeMathPrecision) {
-      mathPatterns.add<math::ErfPolynomialApproximation>(&getContext());
-    } else {
+    if (!clNativeMathPrecision) {
+      populateExpandAtanhPattern(mathPatterns);
+      populateExpandTanPattern(mathPatterns);
+      populateExpandSinhPattern(mathPatterns);
+      populateExpandCoshPattern(mathPatterns);
+      populateExpandAsinhPattern(mathPatterns);
+      populateExpandAcoshPattern(mathPatterns);
       populateExpandExp2FPattern(mathPatterns);
       populateMathPolynomialApproximationPatterns(mathPatterns);
       populateExpandRoundEvenPattern(mathPatterns);
