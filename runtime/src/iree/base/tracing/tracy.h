@@ -351,7 +351,9 @@ void* iree_tracing_obscure_ptr(void* ptr);
 // an API for what we're doing. We could propose one and try to get it landed
 // such that we at least did not need to manually write out structs and manage
 // the concurrent queues.
-#define IREE_TRACING_EXPERIMENTAL_CONTEXT_API 1
+#if !defined(IREE_TRACING_EXPERIMENTAL_CONTEXT_API)
+#define IREE_TRACING_EXPERIMENTAL_CONTEXT_API 0
+#endif  // !IREE_TRACING_EXPERIMENTAL_CONTEXT_API
 
 typedef struct iree_tracing_context_t iree_tracing_context_t;
 
@@ -434,7 +436,7 @@ static inline iree_tracing_context_t* iree_tracing_context_allocate(
   return NULL;
 }
 static inline void iree_tracing_context_free(iree_tracing_context_t* context) {}
-void iree_tracing_context_calibrate_executor(
+static inline void iree_tracing_context_calibrate_executor(
     iree_tracing_context_t* context, iree_tracing_executor_id_t executor_id,
     int64_t cpu_delta, uint64_t host_timestamp, uint64_t executor_timestamp) {}
 static inline void iree_tracing_context_zone_begin(
