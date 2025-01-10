@@ -17,7 +17,9 @@
 // HACK: tracy doesn't let us at this but we need it in order to create new
 // queue contexts. It's an implementation detail we have to take a dependency on
 // because tracy does not have an API for what we're doing (yet).
-extern tracy::moodycamel::ConcurrentQueue<tracy::QueueItem> tracy::s_queue;
+namespace tracy {
+moodycamel::ConcurrentQueue<QueueItem>& GetQueue();
+}  // namespace tracy
 #endif  // TRACY_ENABLE && IREE_TRACING_EXPERIMENTAL_CONTEXT_API
 
 #ifdef __cplusplus
@@ -457,8 +459,8 @@ struct iree_tracing_context_t {
   tracy::ProducerWrapper token;
   uint32_t thread_id = 0;
   iree_tracing_context_t()
-      : token_detail(tracy::s_queue),
-        token({tracy::s_queue.get_explicit_producer(token_detail)}),
+      : token_detail(tracy::GetQueue()),
+        token({tracy::GetQueue().get_explicit_producer(token_detail)}),
         thread_id(iree_tracing_context_t::next_tracing_thread_id++) {
     token.ptr->threadId = thread_id;
   }
