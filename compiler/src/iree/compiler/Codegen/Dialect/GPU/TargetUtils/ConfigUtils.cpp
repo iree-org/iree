@@ -145,6 +145,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   assert(problem.aType == problem.bType &&
          "expected the same aType and bType.");
   int64_t inBitWidth = problem.aType.getIntOrFloatBitWidth();
+  int64_t outBitWidth = problem.cType.getIntOrFloatBitWidth();
 
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
@@ -158,16 +159,21 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/4,
              /*bestKTileCountPerSubgroup=*/8,
-             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
+             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits * 2 /
+                 inBitWidth};
   } else {
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/16,
              /*bestKTileCountPerSubgroup=*/4,
-             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / 2 /
-                 inBitWidth};
+             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
   }
 
-  int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
+  // We target slightly below the full available shared memory to leave room for
+  // `GPUReduceBankConflictsPass` that will pad shared memory without keeping
+  // track of usage. We can drop this after fixing
+  // https://github.com/iree-org/iree/issues/19675
+  int64_t maxSharedMemoryBytes =
+      target.getWgp().getMaxWorkgroupMemoryBytes() - 128 * outBitWidth;
 
   // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
