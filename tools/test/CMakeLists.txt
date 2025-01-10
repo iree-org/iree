@@ -23,6 +23,7 @@ iree_lit_test_suite(
     "executable_sources.mlir"
     "iree-benchmark-executable.mlir"
     "iree-benchmark-module.mlir"
+    "iree-convert-parameters.txt"
     "iree-dump-parameters.txt"
     "iree-run-mlir.mlir"
     "iree-run-module-expected.mlir"
@@ -43,6 +44,7 @@ iree_lit_test_suite(
     iree-benchmark-executable
     iree-benchmark-module
     iree-compile
+    iree-convert-parameters
     iree-dump-parameters
     iree-opt
     iree-run-mlir
