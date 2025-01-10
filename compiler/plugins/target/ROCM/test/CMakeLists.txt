@@ -39,6 +39,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "external_function_validation.mlir"
+    "gisel_abort.mlir"
     "smoketest.mlir"
     "target_device_features.mlir"
   TOOLS
