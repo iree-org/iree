@@ -131,7 +131,6 @@
     "onnx/node/generated/test_lppool_2d_same_upper",
     "onnx/node/generated/test_max_uint16",
     "onnx/node/generated/test_max_uint8",
-    "onnx/node/generated/test_maxpool_2d_ceil_output_size_reduce_by_one",
     "onnx/node/generated/test_maxpool_with_argmax_2d_precomputed_strides",
     "onnx/node/generated/test_maxunpool_export_with_output_shape",
     "onnx/node/generated/test_maxunpool_export_without_output_shape",
