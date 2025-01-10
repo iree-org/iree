@@ -149,14 +149,13 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/4,
              /*bestKTileCountPerSubgroup=*/8,
-             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits * 4 /
+             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits * 2 /
                  inBitWidth};
   } else {
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/16,
              /*bestKTileCountPerSubgroup=*/4,
-             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits * 2 /
-                 inBitWidth};
+             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
   }
 
   // We target slightly below the full available shared memory to leave room for
