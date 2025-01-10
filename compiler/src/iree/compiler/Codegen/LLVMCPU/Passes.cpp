@@ -126,6 +126,7 @@ static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
 }
 
 //===---------------------------------------------------------------------===//
@@ -447,6 +448,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
   addCPUBufferizePasses(funcPassManager);
 
   // Run IREE specific passes before vector lowering expert.
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
 
   {
@@ -510,6 +512,7 @@ void addConvTileAndDecomposeExpertPassPipeline(
   addCPUBufferizePasses(funcPassManager);
 
   // Run IREE specific passes before vector lowering expert.
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
 
   {
