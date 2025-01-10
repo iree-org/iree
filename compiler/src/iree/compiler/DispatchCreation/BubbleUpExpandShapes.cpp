@@ -204,6 +204,7 @@ void BubbleUpExpandShapesPass::runOnOperation() {
   // that can be done later) of reshape ops.
   tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
   bubbleExpandShapePatterns.insert<BubbleExpandThroughExtract>(context);
+  tensor::populateBubbleUpExpandShapePatterns(bubbleExpandShapePatterns);
   tensor::ExpandShapeOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
                                                      context);
 
