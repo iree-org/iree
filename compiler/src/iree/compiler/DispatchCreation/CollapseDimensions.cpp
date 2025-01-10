@@ -24,19 +24,17 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/Iterators.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/Visitors.h"
 #include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
-#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -777,16 +775,9 @@ hoistTensorReshapesOutOfDispatchRegion(
     auto shapedType = dyn_cast<ShapedType>(origResult.getType());
     assert(shapedType && "result should be shaped type");
 
-    SmallVector<OpFoldResult> outputShape;
     ValueRange dynamicDims = dispatchOp.getResultDynamicDims(index);
-    for (int64_t dim : shapedType.getShape()) {
-      if (ShapedType::isDynamic(dim)) {
-        outputShape.push_back(dynamicDims.front());
-        dynamicDims.drop_front();
-        continue;
-      }
-      outputShape.push_back(rewriter.getIndexAttr(dim));
-    }
+    SmallVector<OpFoldResult> outputShape =
+        mlir::getMixedValues(shapedType.getShape(), dynamicDims, rewriter);
 
     auto newExpandShapeOp = rewriter.create<tensor::ExpandShapeOp>(
         loc, origResult.getType(), returnValue,
@@ -1062,11 +1053,7 @@ void CollapseDimensionsPass::runOnOperation() {
     memref::populateResolveRankedShapedTypeResultDimsPatterns(moveReshapeOps);
     tensor::populateFoldTensorEmptyPatterns(moveReshapeOps);
     SmallVector<Operation *> candidateOps;
-    block.walk([&](Operation *op) {
-      if (isa<tensor::CollapseShapeOp>(op)) {
-        candidateOps.push_back(op);
-      }
-    });
+    block.walk([&](Operation *op) { candidateOps.push_back(op); });
     if (failed(
             applyOpPatternsGreedily(candidateOps, std::move(moveReshapeOps)))) {
       funcOp.emitOpError(
