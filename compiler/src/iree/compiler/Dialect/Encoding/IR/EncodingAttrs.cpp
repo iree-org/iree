@@ -260,6 +260,9 @@ bool hasPackedStorageAttr(RankedTensorType type) {
 FailureOr<linalg::ContractionDimensions>
 getEncodingContractionDims(EncodingAttr encoding) {
   auto indexingMapsAttr = encoding.getUserIndexingMaps();
+  if (!indexingMapsAttr) {
+    return failure();
+  }
   SmallVector<AffineMap> indexingMaps = llvm::map_to_vector(
       indexingMapsAttr.getValue(), [](Attribute m) -> AffineMap {
         return cast<AffineMapAttr>(m).getAffineMap();
