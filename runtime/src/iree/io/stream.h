@@ -16,6 +16,8 @@
 extern "C" {
 #endif  // __cplusplus
 
+typedef struct iree_io_file_handle_t iree_io_file_handle_t;
+
 //===----------------------------------------------------------------------===//
 // iree_io_stream_t
 //===----------------------------------------------------------------------===//
@@ -155,7 +157,7 @@ IREE_API_EXPORT iree_status_t iree_io_stream_copy(
     iree_io_stream_pos_t length);
 
 //===----------------------------------------------------------------------===//
-// Lifetime management utilities
+// iree_io_stream_t utilities
 //===----------------------------------------------------------------------===//
 
 typedef void(IREE_API_PTR* iree_io_stream_release_fn_t)(
@@ -176,6 +178,27 @@ iree_io_stream_release_callback_null(void) {
   iree_io_stream_release_callback_t callback = {NULL, NULL};
   return callback;
 }
+
+// TODO(benvanik): remove/rework iree_io_stream_open so that it doesn't pull in
+// any implementations by putting callbacks on the file handle constructors.
+// Today this requires we link the stream implementations we support into the
+// same library and that users wanting to add their own may only open them
+// explicitly. That may end up being sufficient.
+
+// Opens a stream from the given |file_handle| at the absolute |file_offset|.
+// The returned stream will retain the file until it is released.
+IREE_API_EXPORT iree_status_t iree_io_stream_open(
+    iree_io_stream_mode_t mode, iree_io_file_handle_t* file_handle,
+    uint64_t file_offset, iree_allocator_t host_allocator,
+    iree_io_stream_t** out_stream);
+
+// Writes up to |length| bytes of |source_file_handle| starting at offset
+// |source_file_offset| to the target |stream|. |host_allocator| may be used
+// for transient allocations required during file I/O.
+IREE_API_EXPORT iree_status_t iree_io_stream_write_file(
+    iree_io_stream_t* stream, iree_io_file_handle_t* source_file_handle,
+    uint64_t source_file_offset, iree_io_stream_pos_t length,
+    iree_allocator_t host_allocator);
 
 //===----------------------------------------------------------------------===//
 // iree_io_stream_t implementation details
