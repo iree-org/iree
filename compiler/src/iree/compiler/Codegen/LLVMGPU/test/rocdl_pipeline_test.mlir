@@ -146,6 +146,8 @@ hal.executable @ext_fp8_dispatch {
 
 // Verify that the ceildivsi op gets expanded and lowered successfully all the way to
 // the llvm dialect.
+// Math functions like `math.erf` or `math.sin` should not be expanded at the level of MLIR and instead
+// call rocm device library functions.
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -171,7 +173,11 @@ hal.executable @ceildiv_expand_dispatch {
       %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%4, %5 : tensor<16xi32>, tensor<16xi32>) outs(%3 : tensor<16xi32>) {
       ^bb0(%arg0: i32, %arg1: i32, %arg2: i32):  // no predecessors
           %7 = arith.ceildivsi %arg0, %arg1 : i32
-          linalg.yield %7 : i32
+          %8 = arith.sitofp %7 : i32 to f16
+          %9 = math.erf %8 : f16
+          %10 = math.sin %9 : f16
+          %11 = arith.fptosi %10 : f16 to i32
+          linalg.yield %11 : i32
         } -> tensor<16xi32>
         flow.dispatch.tensor.store %6, %2, offsets=[0], sizes=[16], strides=[1] : tensor<16xi32> -> !flow.dispatch.tensor<writeonly:tensor<16xi32>>
         return
@@ -189,3 +195,5 @@ hal.executable @ceildiv_expand_dispatch {
 // CDNA3-COUNT-2:     llvm.and {{.*}} : i1
 // CDNA3-COUNT-1:     llvm.or {{.*}} : i1
 // CDNA3-COUNT-1:     llvm.select {{.*}} : i1, i32
+// CDNA3:             llvm.call @__ocml_erf_f16
+// CDNA3:             llvm.call @__ocml_sin_f16
