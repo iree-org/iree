@@ -620,6 +620,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
                           /*canUpcastAcc=*/true);
   }
 
+  LDBG("transposedLhs: " << transposedLhs);
+  LDBG("transposedRhs: " << transposedRhs);
+
   // Only batch_matmul is supported in the LLVMGPUPadAndVectorDistribute
   // pipeline.
   // TODO(hanchung): Support cases that there are fused producers.
