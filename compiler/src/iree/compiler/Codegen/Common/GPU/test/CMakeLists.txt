@@ -34,7 +34,6 @@ iree_lit_test_suite(
     "gpu_pad_operands.mlir"
     "gpu_pipeline.mlir"
     "gpu_promote_matmul_operands.mlir"
-    "gpu_propagate_dispatch_size_bounds.mlir"
     "gpu_reorder_workgroups.mlir"
     "gpu_reorder_workgroups_static.mlir"
     "gpu_reuse_shared_memory_allocs.mlir"

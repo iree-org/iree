@@ -130,6 +130,7 @@ iree_cc_library(
     "PassUtils.cpp"
     "Passes.cpp"
     "PolynomialApproximationPass.cpp"
+    "PropagateDispatchSizeBounds.cpp"
     "PropagateReshapesByExpansion.cpp"
     "ReconcileTranslationInfo.cpp"
     "RematerializeParallelOps.cpp"
