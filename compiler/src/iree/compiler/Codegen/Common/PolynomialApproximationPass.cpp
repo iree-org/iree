@@ -40,13 +40,10 @@ class PolynomialApproximationPass final
     populateExpandPowFPattern(mathPatterns);
     populateExpandFPowIPattern(mathPatterns);
 
-    if (clNativeMathPrecision) {
-      mathPatterns.add<math::ErfPolynomialApproximation>(&getContext());
-    } else {
-      populateExpandExp2FPattern(mathPatterns);
-      populateMathPolynomialApproximationPatterns(mathPatterns);
-      populateExpandRoundEvenPattern(mathPatterns);
-    }
+    populateExpandExp2FPattern(mathPatterns);
+    populateMathPolynomialApproximationPatterns(mathPatterns);
+    populateExpandRoundEvenPattern(mathPatterns);
+
     if (failed(
             applyPatternsGreedily(getOperation(), std::move(mathPatterns)))) {
       return signalPassFailure();

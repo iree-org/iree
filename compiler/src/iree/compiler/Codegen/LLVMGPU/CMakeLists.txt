@@ -82,6 +82,7 @@ iree_cc_library(
     "LLVMGPULinkExecutables.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUPackSharedMemoryAlloc.cpp"
+    "LLVMGPUPolynomialApproximation.cpp"
     "LLVMGPUPrefetching.cpp"
     "LLVMGPUPromoteMatmulToFitMMA.cpp"
     "LLVMGPUSelectLoweringStrategy.cpp"
@@ -139,6 +140,7 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRMathDialect
     MLIRMathToLLVM
+    MLIRMathTransforms
     MLIRMemRefDialect
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
