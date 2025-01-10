@@ -283,11 +283,8 @@ EncodingAttr getEncodingAttr(RankedTensorType type) {
 
 bool hasPackedStorageAttr(Type type) {
   if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
-    auto encoding = tensorType.getEncoding();
-    if (!encoding) {
-      return false;
-    }
-    return dyn_cast_or_null<PackedStorageAttr>(encoding) != nullptr;
+    return dyn_cast_or_null<PackedStorageAttr>(tensorType.getEncoding()) !=
+           nullptr;
   }
   return false;
 }
