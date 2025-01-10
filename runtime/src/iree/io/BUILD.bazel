@@ -17,19 +17,6 @@ iree_runtime_cc_library(
     srcs = ["file_handle.c"],
     hdrs = ["file_handle.h"],
     deps = [
-        ":memory_stream",
-        ":stream",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal",
-    ],
-)
-
-iree_runtime_cc_library(
-    name = "memory_stream",
-    srcs = ["memory_stream.c"],
-    hdrs = ["memory_stream.h"],
-    deps = [
-        ":stream",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
     ],
@@ -39,7 +26,7 @@ iree_runtime_cc_test(
     name = "memory_stream_test",
     srcs = ["memory_stream_test.cc"],
     deps = [
-        ":memory_stream",
+        ":stream",
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
@@ -93,32 +80,21 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
-    name = "stdio_stream",
-    srcs = ["stdio_stream.c"],
-    hdrs = ["stdio_stream.h"],
-    deps = [
-        ":stream",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal",
-    ],
-)
-
-iree_runtime_cc_library(
     name = "stream",
-    srcs = ["stream.c"],
-    hdrs = ["stream.h"],
-    deps = [
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal",
+    srcs = [
+        "memory_stream.c",
+        "stdio_stream.c",
+        "stream.c",
+        "vec_stream.c",
     ],
-)
-
-iree_runtime_cc_library(
-    name = "vec_stream",
-    srcs = ["vec_stream.c"],
-    hdrs = ["vec_stream.h"],
+    hdrs = [
+        "memory_stream.h",
+        "stdio_stream.h",
+        "stream.h",
+        "vec_stream.h",
+    ],
     deps = [
-        ":stream",
+        ":file_handle",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
     ],
@@ -128,7 +104,7 @@ iree_runtime_cc_test(
     name = "vec_stream_test",
     srcs = ["vec_stream_test.cc"],
     deps = [
-        ":vec_stream",
+        ":stream",
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
