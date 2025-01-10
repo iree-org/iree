@@ -1,0 +1,12 @@
+// RUN: (iree-convert-parameters \
+// RUN:   --parameters=a=%p/parameters_a.safetensors \
+// RUN:   --parameters=b=%p/parameters_b.safetensors \
+// RUN:   --output=%t.irpa && \
+// RUN:  iree-dump-parameters --parameters=%t.irpa) | \
+// RUN:  FileCheck %s
+
+// CHECK: Parameter scope <global> (4 entries, 256 total bytes)
+// CHECK: 448 | 480 | 32 | `a0`
+// CHECK: 512 | 544 | 32 | `a1`
+// CHECK: 576 | 640 | 64 | `b0`
+// CHECK: 640 | 768 | 128 | `b1`
