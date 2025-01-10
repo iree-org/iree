@@ -794,6 +794,19 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
     }
   }
 
+  int64_t numBatch = scatter.getBatchRank();
+  // Currently bufferization will fail if the only dimension distributed to
+  // workgroups is the batch dims because the workgroup level slice will fold
+  // away and cause a mismatch.
+  // TODO(qedawkins): Support this case.
+  if (llvm::all_of_zip(llvm::drop_begin(workgroupTileSizes, numBatch),
+                       llvm::drop_begin(loopBounds, numBatch),
+                       [](int64_t tileSize, int64_t bound) {
+                         return tileSize == bound || tileSize == 0;
+                       })) {
+    return failure();
+  }
+
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
   MLIRContext *context = scatter.getContext();

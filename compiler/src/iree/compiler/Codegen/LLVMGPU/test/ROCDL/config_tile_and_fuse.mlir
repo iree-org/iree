@@ -365,11 +365,10 @@ func.func @only_scattered_dim(%arg0: tensor<48xf32>,
 }
 
 // CHECK-LABEL: func.func @only_scattered_dim
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUDistribute workgroup_size = [128, 1, 1] subgroup_size = 64
 
-//       CHECK:   linalg_ext.scatter {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     thread = [1]
-//  CHECK-SAME:     workgroup = [48]
+//       CHECK:   linalg_ext.scatter {{.*}}lowering_config = #iree_codegen.lowering_config
+//  CHECK-SAME:     tile_sizes = {{\[}}[128]]
 
 // -----
 
