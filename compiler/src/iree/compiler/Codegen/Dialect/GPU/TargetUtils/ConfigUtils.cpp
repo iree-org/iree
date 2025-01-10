@@ -135,7 +135,6 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   GPUMMAHeuristicSeeds seeds;
   assert(problem.aType == problem.bType &&
          "expected the same aType and bType.");
-  int64_t inBitWidth = problem.aType.getIntOrFloatBitWidth();
 
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
@@ -148,14 +147,11 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     // and a larger bestKTileCountPerSubgroup.
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/4,
-             /*bestKTileCountPerSubgroup=*/8,
-             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
+             /*bestKTileCountPerSubgroup=*/8};
   } else {
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
-             /*bestMNTileCountPerSubgroup=*/16,
-             /*bestKTileCountPerSubgroup=*/4,
-             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / 2 /
-                 inBitWidth};
+             /*bestMNTileCountPerSubgroup=*/8,
+             /*bestKTileCountPerSubgroup=*/4};
   }
 
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
@@ -163,7 +159,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
-      transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
+      /*transposedLhs=*/false, /*transposedRhs=*/false, /*canUpcastAcc=*/false,
       /*mustBeAligned*/ mustBeAligned, doCPromotion);
   if (!schedule) {
     // Then try again by allowing upcasting accumulator.
