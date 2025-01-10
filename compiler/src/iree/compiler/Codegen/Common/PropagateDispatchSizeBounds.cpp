@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -15,53 +15,77 @@
 
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_GPUPROPAGATEDISPATCHSIZEBOUNDSPASS
-#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
+#define GEN_PASS_DEF_PROPAGATEDISPATCHSIZEBOUNDSPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
 static void applyBounds(FunctionOpInterface funcOp,
-                        ArrayRef<int32_t> workgroupSizes,
-                        ArrayRef<int32_t> workgroupCounts) {
+                        ArrayRef<std::optional<int64_t>> workgroupSizes,
+                        ArrayRef<std::optional<int64_t>> workgroupCounts) {
   Builder b(funcOp->getContext());
   funcOp->walk([&](Operation *op) {
     TypeSwitch<Operation *>(op)
         .Case([&](gpu::ThreadIdOp tidOp) {
-          tidOp.setUpperBoundAttr(b.getIndexAttr(
-              workgroupSizes[static_cast<uint32_t>(tidOp.getDimension())]));
+          std::optional<int64_t> bound =
+              workgroupSizes[static_cast<uint32_t>(tidOp.getDimension())];
+          if (bound) {
+            tidOp.setUpperBoundAttr(b.getIndexAttr(*bound));
+          }
+        })
+        .Case([&](gpu::BlockDimOp blockDimOp) {
+          std::optional<int64_t> bound =
+              workgroupSizes[static_cast<int32_t>(blockDimOp.getDimension())];
+          if (bound) {
+            blockDimOp.setUpperBoundAttr(b.getIndexAttr(*bound));
+          }
         })
         .Case([&](IREE::HAL::InterfaceWorkgroupSizeOp wgSizeOp) {
-          wgSizeOp.setUpperBoundAttr(b.getIndexAttr(
-              workgroupSizes[wgSizeOp.getDimension().getZExtValue()]));
+          std::optional<int64_t> bound =
+              workgroupSizes[wgSizeOp.getDimension().getZExtValue()];
+          if (bound) {
+            wgSizeOp.setUpperBoundAttr(b.getIndexAttr(*bound));
+          }
         })
         .Case([&](IREE::HAL::InterfaceWorkgroupIDOp wgIdOp) {
-          wgIdOp.setUpperBoundAttr(b.getIndexAttr(
-              workgroupCounts[wgIdOp.getDimension().getZExtValue()]));
+          std::optional<int64_t> bound =
+              workgroupCounts[wgIdOp.getDimension().getZExtValue()];
+          if (bound) {
+            wgIdOp.setUpperBoundAttr(b.getIndexAttr(*bound));
+          }
         })
         .Case([&](IREE::HAL::InterfaceWorkgroupCountOp wgCountOp) {
-          wgCountOp.setUpperBoundAttr(b.getIndexAttr(
-              workgroupCounts[wgCountOp.getDimension().getZExtValue()]));
+          std::optional<int64_t> bound =
+              workgroupCounts[wgCountOp.getDimension().getZExtValue()];
+          if (bound) {
+            wgCountOp.setUpperBoundAttr(b.getIndexAttr(*bound));
+          }
         })
         .Default([](Operation *) {});
   });
 }
 
-struct GPUPropagateDispatchSizeBoundsPass final
-    : impl::GPUPropagateDispatchSizeBoundsPassBase<
-          GPUPropagateDispatchSizeBoundsPass> {
+struct PropagateDispatchSizeBoundsPass final
+    : impl::PropagateDispatchSizeBoundsPassBase<
+          PropagateDispatchSizeBoundsPass> {
   using Base::Base;
 
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
+    SmallVector<std::optional<int64_t>, 3> workgroupSizes(3, std::nullopt);
+    SmallVector<std::optional<int64_t>, 3> workgroupCounts(3, std::nullopt);
+
     IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    if (!target) {
-      funcOp.emitWarning("no known target attribute late in GPU codegen");
-      return;
+    if (target) {
+      ArrayRef<int32_t> targetWorkgroupSizes =
+          target.getWgp().getMaxWorkgroupSizes().asArrayRef();
+      ArrayRef<int32_t> targetWorkgroupCounts =
+          target.getWgp().getMaxWorkgroupCounts().asArrayRef();
+      llvm::transform(targetWorkgroupSizes, workgroupSizes.begin(),
+                      [](int32_t x) { return std::optional<int64_t>{x}; });
+      llvm::transform(targetWorkgroupCounts, workgroupCounts.begin(),
+                      [](int32_t x) { return std::optional<int64_t>{x}; });
     }
-    SmallVector<int32_t, 3> workgroupSizes(
-        target.getWgp().getMaxWorkgroupSizes().asArrayRef());
-    SmallVector<int32_t, 3> workgroupCounts(
-        target.getWgp().getMaxWorkgroupCounts().asArrayRef());
 
     std::optional<SmallVector<int64_t>> staticWorkgroupSize =
         getWorkgroupSize(funcOp);

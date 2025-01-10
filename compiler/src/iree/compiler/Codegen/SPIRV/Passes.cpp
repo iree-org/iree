@@ -227,7 +227,7 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
 /// Adds passes to perform the final SPIR-V conversion.
 static void addSPIRVLoweringPasses(OpPassManager &modulePassManager) {
   FunctionLikeNest(modulePassManager)
-      .addPass(createGPUPropagateDispatchSizeBoundsPass)
+      .addPass(createPropagateDispatchSizeBoundsPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
       .addPass(createLowerAffinePass)

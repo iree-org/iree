@@ -1053,7 +1053,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createLLVMGPUVectorLoweringPass)
       .addPass(createExpandGPUOpsPass)
       // Expose workitem and workgroup counts to range inference later.
-      .addPass(createGPUPropagateDispatchSizeBoundsPass);
+      .addPass(createPropagateDispatchSizeBoundsPass);
 
   // This pass needs to run before SCF -> CF.
   addLowerAndOptimizeAddressComputationPasses(funcPassManager);
