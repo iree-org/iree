@@ -531,6 +531,11 @@ def PolynomialApproximationPass :
   let summary = "Convert math operations to their polynomial approximation";
 }
 
+def PropagateDispatchSizeBoundsPass :
+    InterfacePass<"iree-codegen-propagate-dispatch-size-bounds", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to annotate workitem and workgroup IDs with known bounds";
+}
+
 def PropagateReshapesByExpansionPass :
     Pass<"iree-codegen-propagate-reshapes-by-expansion", ""> {
   let summary = "Propagates reshaping operations by expansion.";
