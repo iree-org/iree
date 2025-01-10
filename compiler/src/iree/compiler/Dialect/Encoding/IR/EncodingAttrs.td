@@ -41,6 +41,17 @@ def EncodingOpType : IREEEncoding_I32EnumAttr<"EncodingOpType",
 def EncodingOpTypeAttr:
   IREEEncoding_EnumAttr<EncodingOpType, "optype">;
 
+
+def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
+  let mnemonic = "packed_storage";
+  let summary = [{Indicates packed storage data type.}];
+  let description = [{
+    This attribute indicates this is a back-to-back packed storage in memory.
+    This attribute takes no arguments.
+  }];
+  let genVerifyDecl = 0;
+}
+
 def EncodingAttr :
     IREEEncoding_Attr<"Encoding", [
       DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutAttrInterface, [
