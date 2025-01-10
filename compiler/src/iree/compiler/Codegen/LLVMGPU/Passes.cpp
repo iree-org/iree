@@ -1072,10 +1072,15 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createConvertComplexToStandardPass)
       // Convert BF16 operations to occur as F32.
       .addPass(createConvertBf16ArithToF32Pass)
-      .addPass(createConvertBf16ToUInt16BuffersPass)
-      // Convert math dialect elementry functions to polynomial form.
-      .addPass(createPolynomialApproximationPass)
-      .addPass(memref::createExpandOpsPass)
+      .addPass(createConvertBf16ToUInt16BuffersPass);
+
+  if (!forROCDL) {
+    // Convert math dialect elementry functions to polynomial form.
+    // On ROCM, convertToROCDL will expand these to device library calls.
+    funcPassManager.addPass(createPolynomialApproximationPass);
+  }
+
+  funcPassManager.addPass(memref::createExpandOpsPass)
       .addPass(memref::createFoldMemRefAliasOpsPass)
       .addPass(memref::createExpandStridedMetadataPass)
       .addPass(createEmulateNarrowTypePass)
