@@ -768,7 +768,7 @@ struct VMVXHostEncodingLayoutAttrInterface
     SmallVector<NamedAttribute> configItems;
     storeNamedAttrIfPresent(configItems, config, "ukernels");
     return VMVXEncodingLayoutAttr::get(ctx,
-                                      DictionaryAttr::get(ctx, configItems));
+                                       DictionaryAttr::get(ctx, configItems));
   }
 
   Attribute getLayout(Attribute attr, RankedTensorType type) const {

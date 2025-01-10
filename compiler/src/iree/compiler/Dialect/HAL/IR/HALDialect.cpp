@@ -137,8 +137,7 @@ public:
                                                      resultSet);
       for (auto targetAttr : resultSet) {
         Attribute result = targetAttr;
-        if (auto attr =
-                targetAttr.getConfiguration().getNamed("encoding")) {
+        if (auto attr = targetAttr.getConfiguration().getNamed("encoding")) {
           if (auto encodingLayoutAttr =
                   dyn_cast<IREE::Encoding::EncodingLayoutAttrInterface>(
                       attr->getValue())) {
