@@ -54,6 +54,7 @@ jobs:
         run: brew install ninja ccache coreutils bash
       - name: "Building IREE"
         env:
+          # TODO(#19664): Enable building test deps when build errors are fixed.
           IREE_BUILD_TEST_DEPS: 0
         run: bash ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
 
