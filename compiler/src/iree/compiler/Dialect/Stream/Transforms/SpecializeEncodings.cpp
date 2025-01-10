@@ -84,9 +84,9 @@ static LogicalResult addLayoutsToTensorPhaseOps(
   IRRewriter rewriter(funcOp.getContext());
   for (auto affinityOp : candidates) {
     auto affinityAttr = affinityOp.getAffinityAttr();
-    SetVector<Attribute> layouts;
-    if (failed(resolveLayoutAttr(affinityAttr, moduleOp, layouts))) {
-      return affinityOp.emitError("failed on making layouts");
+    SetVector<Attribute> layoutResolvers;
+    if (failed(resolveLayoutAttr(affinityAttr, moduleOp, layoutResolvers))) {
+      return affinityOp.emitError("failed on making layout resolvers");
     }
 
     // Returns an updated encoding attribute if an encoding attribute is present
@@ -101,7 +101,17 @@ static LogicalResult addLayoutsToTensorPhaseOps(
       if (!encodingAttr) {
         return std::nullopt;
       }
-      return encodingAttr.cloneWithLayouts(layouts.getArrayRef());
+      SmallVector<Attribute> layouts;
+      for (auto attr : layoutResolvers) {
+        auto encodingLayoutAttr =
+            dyn_cast<IREE::Encoding::EncodingLayoutAttrInterface>(attr);
+        if (!encodingLayoutAttr) {
+          layouts.push_back(attr);
+          continue;
+        }
+        layouts.push_back(encodingLayoutAttr.getLayout(rankedTensorType));
+      }
+      return encodingAttr.cloneWithLayouts(layouts);
     };
 
     // TODO(hanchung): Update other Stream operations.
