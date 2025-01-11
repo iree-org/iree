@@ -642,6 +642,10 @@ def TileAndDistributeToWorkgroupsUsingForallOpPass :
     "scf::SCFDialect",
     "tensor::TensorDialect",
   ];
+  let options = [
+    Option<"strategy", "strategy", "std::string", /*default=*/"",
+           "Workgroup reordering strategy, one of: '' (none),  'transpose'">,
+  ];
 }
 
 def TileLargeTensorsPass :
