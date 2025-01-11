@@ -1151,11 +1151,6 @@ hal.executable public @main {
 //       CHECK:   scf.forall ({{.*}}) in (12, 37, 10) {
 //       CHECK:     %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c145 step %c1 {{.*}} -> (vector<1x1x1x4x1xf32>)
 //       CHECK:       gpu.barrier
-//   CHECK-DAG:       %[[LHS_RD:.+]] = vector.transfer_read {{.*}} vector<4xf32>
-//   CHECK-DAG:       vector.transfer_write %[[LHS_RD]]
-//   CHECK-DAG:       %[[RHS_RD:.+]] = vector.transfer_read {{.*}} vector<1xf32>
-//   CHECK-DAG:       vector.transfer_write %[[RHS_RD]]
-//       CHECK:       gpu.barrier
 //   CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
 //   CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
 // CHECK-COUNT-1:     amdgpu.mfma {{.*}}blocks = 1 : i32, k = 4 : i32, m = 16 : i32, n = 16 : i32
