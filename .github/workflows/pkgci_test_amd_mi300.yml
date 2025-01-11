@@ -43,6 +43,8 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: false
+      - name: "Mark git safe.directory"
+        run: git config --global --add safe.directory '*'
       - name: Check out runtime submodules
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
