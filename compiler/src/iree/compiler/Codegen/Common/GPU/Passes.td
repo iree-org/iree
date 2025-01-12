@@ -233,6 +233,8 @@ def GPUApplyTilingLevelPass :
            [{llvm::cl::values(
               clEnumValN(IREE::GPU::TilingLevel::Reduction, "reduction",
                          "Tile and fuse all annotated ops to serial loops"),
+              clEnumValN(IREE::GPU::TilingLevel::PartialReduction, "partial_reduction",
+                         "Tile and fuse all annotated ops to partial reduuction loops"),
               clEnumValN(IREE::GPU::TilingLevel::Thread, "thread",
                          "Tile and fuse all annotated ops to threads"),
               clEnumValN(IREE::GPU::TilingLevel::Subgroup, "subgroup",
