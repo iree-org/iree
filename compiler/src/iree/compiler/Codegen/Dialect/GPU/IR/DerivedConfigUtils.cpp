@@ -8,6 +8,7 @@
 #include <numeric>
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -153,7 +154,17 @@ SmallVector<int64_t> deriveThreadTileSizes(Operation *op) {
       .Case([&](IREE::LinalgExt::Im2colOp im2colOp) -> SmallVector<int64_t> {
         return deriveIm2colOpThreadTileSizes(im2colOp, numThreads);
       })
-      .Default([](Operation *op) -> SmallVector<int64_t> { return {}; });
+      .Case([&](IREE::LinalgExt::ScatterOp scatterOp) -> SmallVector<int64_t> {
+        int64_t loopDepth = scatterOp.getLoopIteratorTypes().size();
+        SmallVector<int64_t> loopBounds =
+            scatterOp.getStaticLoopRanges().value_or(
+                SmallVector<int64_t>(loopDepth, ShapedType::kDynamic));
+        int64_t elemBits = scatterOp.getOriginalType().getElementTypeBitWidth();
+        int64_t vectorSize = kPreferredCopyNumBits / elemBits;
+        return getVectorTileSizesFromLoopRanges(loopBounds, numThreads,
+                                                vectorSize);
+      })
+      .Default([&](Operation *op) -> SmallVector<int64_t> { return {}; });
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU
