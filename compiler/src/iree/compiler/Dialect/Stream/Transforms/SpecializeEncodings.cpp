@@ -193,9 +193,13 @@ static LogicalResult duplicateExecutablesPerAffinityVariant(
     SmallVector<Attribute> newEntryPoints;
     SmallVector<IREE::Stream::AffinityAttr> execAffinities;
     // Sanity checks. It should already meet the requirement because they are
-    // checked in step 1.
-    assert(affinityAnalysis.tryLookupExecutionAffinity(dispatchOp,
-                                                       execAffinities));
+    // checked in step 1. This can not be wrapped by an assertion because it
+    // could be dropped by compiler.
+    if (!affinityAnalysis.tryLookupExecutionAffinity(dispatchOp,
+                                                     execAffinities)) {
+      return failure();
+    }
+
     assert(execAffinities.size() == 1);
     SmallVector<Attribute> operandAttrs = resourceAffinities[dispatchOp];
     dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPoint) {
