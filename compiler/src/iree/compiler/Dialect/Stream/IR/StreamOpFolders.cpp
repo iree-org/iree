@@ -1965,6 +1965,13 @@ void AsyncCollectiveOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
+// stream.async.barrier
+//===----------------------------------------------------------------------===//
+
+void AsyncBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {}
+
+//===----------------------------------------------------------------------===//
 // stream.async.transfer
 //===----------------------------------------------------------------------===//
 
