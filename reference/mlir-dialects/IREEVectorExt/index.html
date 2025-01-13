@@ -1745,6 +1745,48 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="NestedLayoutAttr">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#subgroups-per-workgroup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Subgroups per Workgroup
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#threads-per-subgroup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Threads per Subgroup:
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#element-distribution-on-a-thread" class="md-nav__link">
+    <span class="md-ellipsis">
+      Element distribution on a thread
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-full-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      A full example
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -3788,6 +3830,48 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="NestedLayoutAttr">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#subgroups-per-workgroup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Subgroups per Workgroup
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#threads-per-subgroup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Threads per Subgroup:
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#element-distribution-on-a-thread" class="md-nav__link">
+    <span class="md-ellipsis">
+      Element distribution on a thread
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-full-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      A full example
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -3833,7 +3917,13 @@ beyond what is currently available in the Vector Dialect.</p>
 </ul>
 </li>
 <li><a href="#attributes_1">Attributes</a><ul>
-<li><a href="#nestedlayoutattr">NestedLayoutAttr</a></li>
+<li><a href="#nestedlayoutattr">NestedLayoutAttr</a><ul>
+<li><a href="#subgroups-per-workgroup">Subgroups per Workgroup</a></li>
+<li><a href="#threads-per-subgroup">Threads per Subgroup:</a></li>
+<li><a href="#element-distribution-on-a-thread">Element distribution on a thread</a></li>
+<li><a href="#a-full-example">A full example</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -3987,123 +4077,136 @@ distributed vectors.</p>
   ::llvm::ArrayRef&lt;int64_t&gt;   # threadStrides
 &gt;
 </code></pre></div>
-<p>This layout explicitly defines how a shape is mapped to a compute
-hierarchy. We consider the following levels of hierarchy, inspired by GPUs:</p>
+<p>This layout explicitly defines how the shape of the associated vector
+is mapped to a compute hierarchy.
+We consider the following levels of hierarchy, inspired by GPUs:</p>
 <ol>
-<li>Subgroups per Workgroup</li>
-<li>Threads per Subgroup</li>
-<li>Elements per Thread</li>
+<li>Subgroups per workgroup</li>
+<li>Threads per subgroup</li>
+<li>Elements per thread</li>
 </ol>
-<p>Conceptually, each higher level of hierarchy can be viewed as multiple
-tiles of the lower level of hierarchy; each lower level of hierarchy is
-nested in the higher level of hierarchy. The last level represents the
-final elements in memory.</p>
-<p>The conceptual mapping is leveraged during compilation for tiling and
-distributing to hardware for parallel computation. Concretely, the mapping
-is done on each dimension of the original vector shape. For example, for
-vector shape 16x16x16, we have 3 dimensions, so at each level of the
-hierarchy we would have 3 tile sizes. Similarly for vector shape 32x32, we
-would have 2-D tile sizes per compute hierarchy level.</p>
+<p>Note that elements in a thread is also conceptually viewed as
+a 3 dimensions. i.e. elements per thread = batch x outer x element
+However, the final order of sub-dimensions are not exactly in that
+hierarchy. For e.g. a single dimensional vector say <code>vector&lt; n x f16&gt;</code>
+is viewed as a
+<code>vector&lt;subgroup x batch x outer x thread x element&gt;</code> 5 dimensional
+vector. For a two dimensional vector, each above sub-dimension would
+be doubled. i.e. <code>vector&lt; n1 x n2 x f16&gt;</code> is viewed as a
+<code>vector&lt;subgroup1 x subgroup2 x batch1 x batch2 x ... x element1 x element2&gt;</code></p>
+<p>Now, when the vector<subgroup x batch x outer x thread x element> is
+indexed, the indices of 'subgroup' and <code>thread</code> are not directly refferring
+to the subgroup_id and thread_id in the GPU context. lets define them
+as virtual_subgroup_id and virtual_thread_id and they hold the following
+definition:
+<div class="highlight"><pre><span></span><code>virtual_subgroup_id[i] = (subgroup_id / subgroup_stride[i]) % subgroup_tile_size[i]
+virtual_thread_id[i]   = (thread_id   / thread_stride[i]) % thread_tile_size[i]
+</code></pre></div></p>
+<p>the inverse mapping would be:
+<div class="highlight"><pre><span></span><code>subgroup_id = sum_i(subgroup_stride[i] * virtual_subgroup_id[i]) % mul_i(subgroup_tile_size[i])
+thread_id = sum_i(thread_stride[i] * virtual_thread_id[i]) % mul_i(thread_tile_size[i])
+    for i = [0 : rank(undistributed_vector)]
+</code></pre></div></p>
+<p>NOTE: if stride is zero, it represents non-distribution of that
+dimension on that hierarchy.</p>
 <p>We now describe each level of tiling. Each level of tiling represents a
 count of tiles over the next level (rather than a list of tile sizes).</p>
-<ol>
-<li>Subgroups per Workgroup</li>
-</ol>
+<h4 id="subgroups-per-workgroup">Subgroups per Workgroup<a class="headerlink" href="#subgroups-per-workgroup" title="Permanent link">link</a></h4>
 <p>This level of tiling is also known as "subgroup/warp distribution". It
-represents how subgroups are distributed in a workgroup.</p>
-<p>The subgroups are placed contiguously with their shape and ordering
-determined by:
-  - <code>subgroup_tile</code>: Sizes of this level of tiling
-  - <code>subgroup_order</code>: Ordering of dimensions, from outermost to innermost</p>
-<p>For example, subgroup_tile=[4, 2], subgroup_order=[1, 0] will
+represents how the vector is distributed into subgroups.</p>
+<p>For example, consider distributing <code>vector&lt;4x2xf16&gt;</code> to a
+<code>subgroup_tile=[4, 2], subgroup_stride=[1, 4]</code> will
 arrange the subgroups in the order:</p>
-<p>0 4
-1 5
-2 6
-3 7</p>
+<div class="highlight"><pre><span></span><code>virtual_subgroups_ids:
+[0][0] , [0][1] , [1][0], [1][1], [2][0], [2][1], [3][0], [3][1]
+subgroups_ids:
+0, 4, 1, 5, 2, 6, 3, 7
+</code></pre></div>
 <p>The total number of subgroups used (computed by multiplying each dim in
 subgroup_tile) should be a multiple of number of subgroups in the
 harware. If the total number of subgroups used exceeds the number of
 subgroups of the hardware, then the subgroup used (say x) is
 x mod num_subgroups:</p>
-<p>num_subgroups = 4</p>
-<p>0 4               0 0
-1 5    x mod 4    1 1
-2 6    -------&gt;   2 2
-3 7               3 3</p>
-<ol>
-<li>Threads per Subgroup:</li>
-</ol>
-<p>Threads in a subgroup are distributed in three levels.</p>
+<div class="highlight"><pre><span></span><code>num_subgroups = 4
+
+0, 4, 1, 5, 2, 6, 3, 7
+| mod 4
+V
+0, 0, 1, 1, 2, 2, 3, 3
+</code></pre></div>
+<h4 id="threads-per-subgroup">Threads per Subgroup:<a class="headerlink" href="#threads-per-subgroup" title="Permanent link">link</a></h4>
+<p>This level of tiling is also known as "thread distribution" within a subgroup.
+The logic is quite similiar to subgroup distribution using the tile sizes
+and the 'thread_strides'.</p>
+<h4 id="element-distribution-on-a-thread">Element distribution on a thread<a class="headerlink" href="#element-distribution-on-a-thread" title="Permanent link">link</a></h4>
+<p>So after the vector is distributed per thread
+on a subgroup, it is viewed as [batch] x [outer] x [element]
+where each sub-dimensions group has dimensions equal
+to original rank of the undistributed vector.</p>
 <p>The first level, batches, are a way to represent instruction unrolling. For
 example, an intrinsic which can only take 4x4 shape at a time, uses batches
 to unroll a 16x16 shape to the native intrinsice shape.</p>
-<p>Batches can be thought of as loops around the original layout:</p>
-<p>for b_0 in range(batch_0):
-  for b_1 in range(batch_1):
-    ...</p>
-<p><code>batch_tile</code> represents the range of each loop.</p>
 <p>The second level, outers, is a way to represent thread layout duplication
 required by a particular intrinsic. For example, some AMDGPU matrix
 multiplication variants require threads to be distributed
 like:</p>
-<p>0 1 2 3 4
-5 6 7 8 9
---------- --&gt; Thread Layout of shape 2x5 duplicated 2 times, to get a layout of shape 4x5
-0 1 2 3 4     outer_tile=[2, 1]
-5 6 7 8 9     thread_tile=[2, 5]</p>
+<p>E.g.: <code>outer_tile=[2, 1], thread_tile=[2, 5]</code>
+the thread Layout of shape 2x5 duplicated 2 times, to get a layout of shape 4x5</p>
+<div class="highlight"><pre><span></span><code>outer = 0,0 :
+[0 1 2 3 4]
+[5 6 7 8 9]
+
+outer = 1,0 :
+[0 1 2 3 4]
+[5 6 7 8 9]
+</code></pre></div>
 <p><code>outer_tile</code> represents the number of outers in a batch.</p>
-<p>Finally, threads are distributed in a single outer. The thread
-distribution is represented by:</p>
-<ul>
-<li>thread_tile: Sizes of this level of tiling</li>
-<li>thread_order: Ordering of dimensions, from outermost to innermost</li>
-</ul>
-<p>Examples of thread distribution over a 8x4 shape:</p>
-<p>{
-  batch_tile = [2, 1]
-  outer_tile = [2, 2]
-  thread_tile = [2, 2]</p>
-<p>thread_order = [1, 0]
-}</p>
-<p>Distributed tile:</p>
-<p>{
-  [0 2]|[0 2]      0,1,2,3 --&gt; thread ids
-  [1 3]|[1 3]
-  ------------     [x z]   --&gt; a single outer tile
-  [0 2]|[0 2]      [y w]
-  [1 3]|[1 3]
-}{
-  [0 2]|[0 2]      { ... } --&gt; a single batch tile
-  [1 3]|[1 3]</p>
-<hr />
-<p>[0 2]|[0 2]
-  [1 3]|[1 3]
-}</p>
-<p>So, the thread distribution looks like:</p>
-<p>[0 2 0 2]
-[1 3 1 3]
-[0 2 0 2]
-[1 3 1 3]
-[0 2 0 2]
-[1 3 1 3]
-[0 2 0 2]
-[1 3 1 3]</p>
-<p>The total number of threads used (computed by multiplying each dim in
-thread_tile) should be a multiple of subgroup size of the
-harware. If the total number of threads used exceeds the subgroup size of
-the hardware, then the threads used (say tid) is tid mod subgroup_size:</p>
-<p>subgroup_size = 4</p>
-<p>0 1                0 0
-2 3    tid mod 4   1 1
-4 5    --------&gt;   2 2
-6 7                3 3</p>
-<ol>
-<li>Elements per Thread</li>
-</ol>
 <p>The final level of tiling, representing the minimum shape of vector that
 is treated as an atom.</p>
 <p><code>element_tile</code> represents the native size of the vector.</p>
+<h4 id="a-full-example">A full example<a class="headerlink" href="#a-full-example" title="Permanent link">link</a></h4>
+<p>Vector to be distributed: <code>vector&lt;64x64xf16&gt;</code>
+<div class="highlight"><pre><span></span><code>NestedLayout : &lt;
+    subgroup_tile = [2, 1],
+    batch_tile = [2, 4],
+    outer_tile = [1, 1],
+    thread_tile = [16, 4],
+    element_tile = [1, 4],
+    subgroup_strides = [1, 0],
+    thread_strides = [1, 16]
+&gt;
+</code></pre></div></p>
+<p>This is conceptually viewed as a: <code>vector&lt;[2x1]x[2x4]x[1x1]x[16x4]x[1x4]&gt;</code>
+where the first groups of sub-dimensions
+represent the distribution into subgroups.
+The subgroup_strides being [1, 0] means
+each subgroup is going to get a vector
+as follows:</p>
+<div class="highlight"><pre><span></span><code>subgroup0 : vector&lt;[2x4]x[1x1]x[16x4]x[1x4]&gt;
+from vector&lt;[2x1]x[2x4]x[1x1]x[16x4]x[1x4]&gt;[0,:,:,:,:,:,:,:,:,:]
+subgroup1 : vector&lt;[2x4]x[1x1]x[16x4]x[1x4]&gt;
+from vector&lt;[2x1]x[2x4]x[1x1]x[16x4]x[1x4]&gt;[1,:,:,:,:,:,:,:,:,:]
+subgroup2 : vector&lt;[2x4]x[1x1]x[16x4]x[1x4]&gt;
+from vector&lt;[2x1]x[2x4]x[1x1]x[16x4]x[1x4]&gt;[0,:,:,:,:,:,:,:,:,:]
+subgroup3 : vector&lt;[2x4]x[1x1]x[16x4]x[1x4]&gt;
+from vector&lt;[2x1]x[2x4]x[1x1]x[16x4]x[1x4]&gt;[1,:,:,:,:,:,:,:,:,:]
+</code></pre></div>
+<p>Then each vector&lt;[2x4]x[1x1]x[16x4]x[1x4]&gt;
+is distributed threads in a subgroup using
+thread_strides = [1, 16]</p>
+<p>recall: <code>thread_id = sum_i(thread_stride[i] * virtual_thread_id[i]) % mul_i(thread_tile_size[i])</code></p>
+<div class="highlight"><pre><span></span><code>thread0 : vector&lt;[2x4]x[1x1]x[1x4]&gt;
+from vector&lt;[2x4]x[1x1]x[16x4]x[1x4]&gt;[:,:,:,:,0,0,:,:]
+thread1 : vector&lt;[2x4]x[1x1]x[1x4]&gt;
+from vector&lt;[2x4]x[1x1]x[16x4]x[1x4]&gt;[:,:,:,:,1,0,:,:]
+...
+...
+thread16 : vector&lt;[2x4]x[1x1]x[1x4]&gt;
+from vector&lt;[2x4]x[1x1]x[16x4]x[1x4]&gt;[:,:,:,:,0,1,:,:]
+</code></pre></div>
+<p>Finally we are left with a distributed vector
+of conceptual view : <code>vector&lt;[2x4]x[1x1]x[1x4]&gt;</code>
+where the actual shape is : <code>vector&lt;2x16&gt;</code>.</p>
 <h5 id="parameters">Parameters:<a class="headerlink" href="#parameters" title="Permanent link">link</a></h5>
 <table>
 <thead>
