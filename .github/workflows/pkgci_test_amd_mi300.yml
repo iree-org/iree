@@ -19,7 +19,10 @@ on:
 
 jobs:
   test_mi300:
-    runs-on: nodai-amdgpu-mi300-x86-64
+    runs-on: linux-mi300-gpu-1
+    container:
+      image: rocm/dev-ubuntu-22.04:6.3
+      options: --user root --device=/dev/kfd --device=/dev/dri --ipc=host --group-add video --cap-add=SYS_PTRACE --security-opt seccomp=unconfined
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       BUILD_DIR: build-tests
@@ -32,10 +35,16 @@ jobs:
       IREE_HIP_ENABLE: 1
       IREE_HIP_TEST_TARGET_CHIP: "gfx942"
     steps:
+      - name: "Install dependencies"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang lld git
       - name: Check out repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: false
+      - name: "Mark git safe.directory"
+        run: git config --global --add safe.directory '*'
       - name: Check out runtime submodules
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
