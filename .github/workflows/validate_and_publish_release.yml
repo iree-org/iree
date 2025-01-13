@@ -23,7 +23,7 @@ jobs:
     steps:
       - name: Download packages
         id: download_packages
-        uses: dawidd6/action-download-artifact@5e780fc7bbd0cac69fc73271ed86edf5dcb72d67 # v2.26.0
+        uses: dawidd6/action-download-artifact@09f2f74827fd3a8607589e5ad7f9398816f540fe # v3.1.4
         with:
           github_token: ${{secrets.WRITE_ACCESS_TOKEN}}
           workflow: build_package.yml
@@ -115,7 +115,7 @@ jobs:
     steps:
       - name: Publish Release
         id: publish_release
-        uses: eregon/publish-release@46913fa2b3f7edc7345ae3c17f6d1b093a54916d # v1.0.5
+        uses: eregon/publish-release@01df127f5e9a3c26935118e22e738d95b59d10ce # v1.0.6
         env:
           GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
         with:
