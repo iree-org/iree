@@ -24,7 +24,7 @@ func.func @nhwc_conv_mfma() {
 //       CHECK:   linalg.conv_2d_nhwc_hwcf {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
 //  CHECK-SAME:     promote_operands = [0, 1]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 16]
+//  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
 //  CHECK-SAME:     subgroup = [1, 2, 2, 1, 0]
 //  CHECK-SAME:     workgroup = [1, 2, 32, 64, 0]
 
@@ -53,7 +53,7 @@ func.func @nchw_conv_mfma() {
 //       CHECK:   linalg.conv_2d_nchw_fchw {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
 //  CHECK-SAME:     promote_operands = [0, 1]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 16]
+//  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
 //  CHECK-SAME:     subgroup = [1, 2, 2, 1, 0]
 //  CHECK-SAME:     workgroup = [1, 64, 2, 32, 0]
 
@@ -81,9 +81,9 @@ func.func @nhwc_conv_unaligned_mfma() {
 
 //       CHECK:   linalg.conv_2d_nhwc_hwcf {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
-//  CHECK-SAME:     padding = [2, 1, 32, 64, 64]
+//  CHECK-SAME:     padding = [2, 1, 32, 64, 32]
 //  CHECK-SAME:     promote_operands = [0, 1, 2]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 16]
+//  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
 //  CHECK-SAME:     subgroup = [2, 1, 2, 1, 0]
 //  CHECK-SAME:     workgroup = [2, 1, 32, 64, 0]
 
@@ -111,8 +111,8 @@ func.func @nchw_conv_unaligned_mfma() {
 
 //       CHECK:   linalg.conv_2d_nchw_fchw {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
-//  CHECK-SAME:     padding = [1, 64, 2, 32, 64]
+//  CHECK-SAME:     padding = [1, 64, 2, 32, 32]
 //  CHECK-SAME:     promote_operands = [0, 1, 2]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 16]
+//  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
 //  CHECK-SAME:     subgroup = [1, 2, 2, 1, 0]
 //  CHECK-SAME:     workgroup = [1, 64, 2, 32, 0]
