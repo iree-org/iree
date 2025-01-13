@@ -649,7 +649,12 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
       ["getIterationDomain",
        "getLoopIteratorTypes",
        "getResultTilePosition",
-       "getTiledImplementation"]>]> {
+       "getTiledImplementation"]>,
+     DeclareOpInterfaceMethods<PartialReductionOpInterface,
+      ["generateInitialTensorForPartialReduction",
+       "tileToPartialReduction",
+       "mergeReductions",
+       "getPartialResultTilePosition"]>]> {
   let summary = "Online Attention operator";
   let description = [{
     Traditional scaled dot product attention computes:
