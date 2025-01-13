@@ -99,7 +99,7 @@ jobs:
           cat ./c/runtime/version_local.json
 
       - name: Upload version_local.json
-        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
         with:
           name: version_local
           path: |
@@ -344,7 +344,7 @@ jobs:
             "${MANYLINUX_X86_64_IMAGE}" \
             bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
 
-      - uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
         with:
           name: wheels-${{ matrix.build-family }}-${{ matrix.build-package }}
           # We upload all wheels (which includes deps so that subsequent
@@ -356,7 +356,7 @@ jobs:
       - name: Upload Release Assets
         if: github.event.inputs.release_id != ''
         id: upload-release-assets
-        uses: dwenegar/upload-release-assets@5bc3024cf83521df8ebfadf00ad0c4614fd59148 # v1
+        uses: dwenegar/upload-release-assets@fe47e06814723c7b1bea3a7e46cf93d5f020d0c3 # v3
         env:
           GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
         with:
