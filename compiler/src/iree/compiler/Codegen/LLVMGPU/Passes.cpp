@@ -1073,8 +1073,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       // Convert BF16 operations to occur as F32.
       .addPass(createConvertBf16ArithToF32Pass)
       .addPass(createConvertBf16ToUInt16BuffersPass)
-      // Convert math dialect elementry functions to polynomial form.
-      .addPass(createPolynomialApproximationPass)
+      // Expand math dialect elementry functions not supported by device libs.
+      .addPass(createLLVMGPUPolynomialApproximationPass)
       .addPass(memref::createExpandOpsPass)
       .addPass(memref::createFoldMemRefAliasOpsPass)
       .addPass(memref::createExpandStridedMetadataPass)
