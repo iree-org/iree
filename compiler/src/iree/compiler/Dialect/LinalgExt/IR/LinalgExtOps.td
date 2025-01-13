@@ -749,6 +749,52 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     static StringRef getPVAttrStr() { return "pv_attrs"; }
   }];
 }
+
+//===----------------------------------------------------------------------===//
+// ExpReduction
+//===----------------------------------------------------------------------===//
+
+def IREELinalgExt_ExpReductionOp : IREELinalgExt_PureOp<"exp_reduction",
+  [AttrSizedOperandSegments,
+   Pure,
+   DestinationStyleOpInterface,
+   LinalgExtInterface,
+   SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">
+   ]> {
+  let summary = "";
+  let description = [{}];
+
+  let arguments = (ins
+    Variadic<AnyRankedTensor>:$inputs,
+    Variadic<AnyRankedTensor>:$outputs,
+    AffineMapArrayAttr:$indexing_maps,
+    IREELinalgExt_IteratorTypeArrayAttr:$iterator_types);
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region SizedRegion<1>:$region);
+
+  let hasVerifier = 0;
+
+  let assemblyFormat = [{
+    `{` `indexing_maps` `=` $indexing_maps `,`
+    `iterator_types` `=` $iterator_types `}`
+    attr-dict-with-keyword
+    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    (`outs` `(` $outputs^ `:` type($outputs) `)`)?
+    $region (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration =[{
+    // // Helper accessor methods.
+    // unsigned getNumLoops();
+    // int64_t getRank(Value);
+
+    // DestinationStyleOpInterface methods
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
+    }
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Im2col
 //===----------------------------------------------------------------------===//
