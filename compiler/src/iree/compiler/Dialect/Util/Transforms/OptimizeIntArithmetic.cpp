@@ -229,8 +229,9 @@ struct RemoveIndexCastForAssumeOfI32
       newArgs.push_back(arg.getDefiningOp<arith::IndexCastUIOp>().getIn());
     }
     ArrayAttr assumptions = op.getAssumptionsAttr();
-    auto newOp =
-        rewriter.create<Util::AssumeIntOp>(op.getLoc(), newArgs, assumptions);
+    auto newOp = rewriter.create<Util::AssumeIntOp>(
+        op.getLoc(), ValueTypeRange<ArrayRef<Value>>{newArgs}, newArgs,
+        assumptions);
     SmallVector<Value> replacements(newOp.getResults());
     for (auto [newRes, oldRes] :
          llvm::zip_equal(replacements, op.getResults())) {
