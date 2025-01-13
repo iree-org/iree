@@ -654,7 +654,7 @@ def TileLargeTensorsPass :
   ];
   let options = [
     Option<"maxVectorSize", "max-vector-size", "int64_t",
-           /*default=*/"256",
+           /*default=*/"64",
            "Maximum static size to tile to (i.e. all remaining ops will be smaller)">,
   ];
 }
