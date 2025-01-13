@@ -1013,9 +1013,8 @@ hal.executable public @main {
 //       CHECK:         scf.yield %[[REDUCE]]
 
 //       CHECK:   scf.for %{{.*}} = %{{.*}} to %c16 step %c1
-//       CHECK:     scf.for
-// CHECK-COUNT-4:     arith.addf {{.*}} : vector<9xf32>
-//       CHECK:       vector.transfer_write {{.*}} vector<9xi8>, memref<32x16x9x9xi8, #hal.descriptor_type<storage_buffer>>
+// CHECK-COUNT-4:     arith.addf {{.*}} : vector<9x9xf32>
+//       CHECK:       vector.transfer_write {{.*}} vector<9x9xi8>, memref<32x16x9x9xi8, #hal.descriptor_type<storage_buffer>>
 
 // -----
 
