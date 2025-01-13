@@ -7,10 +7,18 @@
 #ifndef IREE_COMPILER_CODEGEN_EXTERNALINTERFACES_UTILS_H_
 #define IREE_COMPILER_CODEGEN_EXTERNALINTERFACES_UTILS_H_
 
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/ValueRange.h"
 
 namespace mlir::iree_compiler::IREE {
+
+static StringLiteral kEncodingInfoAttrName = "encoding_info";
+
+Value calculateStorageSizeInBytesImpl(Attribute attr, Location loc,
+                                      OpBuilder &builder, RankedTensorType type,
+                                      ValueRange dynamicDims);
 
 /// Returns a dictionary attribute that contains the materialized encoding info,
 /// i.e., serialized MaterializeEncodingInfo struct.

@@ -40,6 +40,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 #define DEBUG_TYPE "iree-cpu-encoding-external-models"
 
@@ -285,6 +286,11 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
   // Sanity check. This assert can only fail if there's a programming mistake
   // locally here.
   assert(bestRatedTile.paddingPenalty == bestPaddingPenalty);
+  LLVM_DEBUG(
+      llvm::dbgs() << "bestRatedTile: "; llvm::interleaveComma(
+          ArrayRef<int64_t>{bestRatedTile.M, bestRatedTile.N, bestRatedTile.K},
+          llvm::dbgs());
+      llvm::dbgs() << " penalty:" << bestRatedTile.paddingPenalty << "\n");
   return bestRatedTile;
 }
 
@@ -604,6 +610,18 @@ struct CPUDeviceEncodingLayoutAttrInterface
   MaterializeEncodingInfo getEncodingInfo(Attribute attr,
                                           RankedTensorType type) const {
     auto layoutAttr = cast<CPUEncodingLayoutAttr>(attr);
+
+    // If the layout is already resolved, use it directly.
+    if (auto config = layoutAttr.getConfiguration()) {
+      if (auto namedAttr = config.getNamed(kEncodingInfoAttrName)) {
+        std::optional<MaterializeEncodingInfo> info =
+            Codegen::deserializeEncodingInfo(
+                cast<DictionaryAttr>(namedAttr->getValue()));
+        assert(info && "encoding_info is invalid");
+        return info.value();
+      }
+    }
+
     auto encoding = llvm::dyn_cast_or_null<IREE::Encoding::EncodingAttr>(
         type.getEncoding());
 
@@ -655,6 +673,14 @@ struct CPUDeviceEncodingLayoutAttrInterface
 struct CPUHostEncodingLayoutAttrInterface
     : public IREE::Encoding::EncodingLayoutAttrInterface::ExternalModel<
           CPUHostEncodingLayoutAttrInterface, CPUEncodingLayoutAttr> {
+
+  Value calculateStorageSizeInBytes(Attribute attr, Location loc,
+                                    OpBuilder &builder, RankedTensorType type,
+                                    ValueRange dynamicDims) const {
+    return calculateStorageSizeInBytesImpl(attr, loc, builder, type,
+                                           dynamicDims);
+  }
+
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
@@ -711,6 +737,18 @@ struct VMVXDeviceEncodingLayoutAttrInterface
   MaterializeEncodingInfo getEncodingInfo(Attribute attr,
                                           RankedTensorType type) const {
     auto layoutAttr = cast<VMVXEncodingLayoutAttr>(attr);
+
+    // If the layout is already resolved, use it directly.
+    if (auto config = layoutAttr.getConfiguration()) {
+      if (auto namedAttr = config.getNamed(kEncodingInfoAttrName)) {
+        std::optional<MaterializeEncodingInfo> info =
+            Codegen::deserializeEncodingInfo(
+                cast<DictionaryAttr>(namedAttr->getValue()));
+        assert(info && "encoding_info is invalid");
+        return info.value();
+      }
+    }
+
     auto encoding = llvm::dyn_cast_or_null<IREE::Encoding::EncodingAttr>(
         type.getEncoding());
 
@@ -762,6 +800,13 @@ struct VMVXDeviceEncodingLayoutAttrInterface
 struct VMVXHostEncodingLayoutAttrInterface
     : public IREE::Encoding::EncodingLayoutAttrInterface::ExternalModel<
           VMVXHostEncodingLayoutAttrInterface, VMVXEncodingLayoutAttr> {
+  Value calculateStorageSizeInBytes(Attribute attr, Location loc,
+                                    OpBuilder &builder, RankedTensorType type,
+                                    ValueRange dynamicDims) const {
+    return calculateStorageSizeInBytesImpl(attr, loc, builder, type,
+                                           dynamicDims);
+  }
+
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
