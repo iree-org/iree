@@ -463,7 +463,8 @@ let opDocGroup = OpGroupCompilerHintOps in {
 
 def Util_AssumeIntOp : Util_PureOp<"assume.int", [
     DeclareOpInterfaceMethods<InferIntRangeInterface, ["inferResultRanges"]>,
-    DeclareOpInterfaceMethods<InferIntDivisibilityOpInterface, ["inferResultRanges"]>
+    DeclareOpInterfaceMethods<InferIntDivisibilityOpInterface, ["inferResultRanges"]>,
+    AllTypesMatch<["operands", "results"]>
 ]> {
   let summary = "memorializes assumptions about index/integer values.";
   let description = [{
@@ -497,7 +498,7 @@ def Util_AssumeIntOp : Util_PureOp<"assume.int", [
     OpBuilder<(ins
       "ArrayRef<Value>":$operands,
       "ArrayRef<ArrayAttr>":$assumptions
-    )>
+    )>,
   ];
 
   let extraClassDeclaration = [{

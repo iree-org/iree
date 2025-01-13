@@ -25,6 +25,7 @@ iree_lit_test_suite(
     "integer_divisibility.mlir"
     "ipo.mlir"
     "optimize_int_arithmetic.mlir"
+    "optimize_int_arithmetic_narrowing.mlir"
     "patterns.mlir"
     "propagate_subranges.mlir"
     "simplify_global_accesses.mlir"
