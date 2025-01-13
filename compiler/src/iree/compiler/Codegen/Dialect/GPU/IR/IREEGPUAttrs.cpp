@@ -635,6 +635,19 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
   // distribution-only thread dimensions, we need to get back to the intrinsic.
   TileSwizzle intrinsicSwizzle =
       getIntrinsicSwizzle(getIntrinsic().getValue(), fragment);
+  // We need to call moveCrossThreadOutermost on the intrinsic swizzle, because
+  // it does some extra expansion of dimensions that are cross thread in the Acc
+  // layout. The order of the swizzle.expandShape Dims and the intrinsicSwizzle
+  // expandShape dims may be different, but the corresponding permutations are
+  // adjusted such that the order of dimensions are the same after the
+  // permutation is applied. Since we are applying thr permutation before using
+  // the swizzles, this difference in expandShape dims is okay here. We still
+  // need to call `moveCrossThreadOutermost`, though, because we need to account
+  // for the additional expansion of the expandShape Dims.
+  TileSwizzle accSwizzle =
+      getIntrinsicSwizzle(getIntrinsic().getValue(), MMAFragment::Acc);
+  moveCrossThreadOutermost(intrinsicSwizzle, accSwizzle, fragment);
+
   SmallVector<int64_t> intrinsicLayoutThreadSizes =
       sliceSwizzledShape(intrinsicSwizzle, [](TileSwizzle::Dim d) {
         return d.kind == TileSwizzle::Dim::Kind::CrossThread;

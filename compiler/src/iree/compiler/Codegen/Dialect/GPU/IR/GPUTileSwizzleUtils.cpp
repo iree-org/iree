@@ -6,6 +6,11 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
+#include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
+
+#define DEBUG_TYPE "gpu-tile-swizzle-utils"
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -140,8 +145,132 @@ static int getInnermostNonInternalDimIdx(
   return 0;
 }
 
-TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
-                       IREE::GPU::MMAFragment fragment) {
+void moveCrossThreadOutermost(TileSwizzle &swizzle, TileSwizzle accSwizzle,
+                              MMAFragment fragment) {
+  assert(accSwizzle.expandShape.size() == 2 &&
+         "expected accSwizzle to have 2 reassociation groups");
+  assert(swizzle.expandShape.size() == 2 &&
+         "expected swizzle to have 2 reassociation groups");
+  TileSwizzle::ExpandShapeType expandShape = swizzle.expandShape;
+  TileSwizzle::ExpandShapeType accExpandShape = accSwizzle.expandShape;
+  // We will construct the permutation on the flattened `expandShape` dims that
+  // will move the cross thread dims to outermost, and store the resulting
+  // permutation in `crossThreadToOuterPerm`. This will be used later to adjust
+  // the swizzle.permutation properly.
+  SmallVector<int64_t> crossThreadToOuterPerm;
+  int groupStartIdx = 0;
+  for (int accGroupIdx = 0; accGroupIdx < accExpandShape.size();
+       ++accGroupIdx) {
+    TileSwizzle::ExpandShapeDimVectorType accGroup =
+        accExpandShape[accGroupIdx];
+    // Index for corresponding `swizzle` group is 0 for Lhs and Rhs fragments,
+    // since the 1 index of Rhs and Lhs are K dimensions.
+    int groupIdx = fragment == MMAFragment::Acc ? accGroupIdx : 0;
+    // Skip N group for Lhs.
+    if (fragment == MMAFragment::Lhs && accGroupIdx == 1) {
+      continue;
+    }
+    // Skip M group for Rhs.
+    if (fragment == MMAFragment::Rhs && accGroupIdx == 0) {
+      continue;
+    }
+    TileSwizzle::ExpandShapeDimVectorType group = expandShape[groupIdx];
+    // The expanded shape of the `accSwizzle` group may not necessarily match
+    // the expanded shape of the `swizzle` group, so we need to expand or group
+    // the dimensions of `group` so that there exists a corresponding dimension
+    // in `group` for every CrossThread dimension in `accGroup`.
+    if (accGroup.size() != group.size()) {
+      SmallVector<int64_t> accGroupShape =
+          llvm::map_to_vector(accGroup, [](TileSwizzle::Dim d) {
+            return static_cast<int64_t>(d.size);
+          });
+      SmallVector<int64_t> groupShape =
+          llvm::map_to_vector(group, [](TileSwizzle::Dim d) {
+            return static_cast<int64_t>(d.size);
+          });
+      std::optional<SmallVector<ReassociationIndices>> groupReassociation =
+          getReassociationIndicesForCollapse(accGroupShape, groupShape);
+      // For the current MFMA layouts, there should always be a reassociation
+      // found, since the ACC layout is always an expanded form of the combined
+      // LHS and RHS layouts.
+      assert(groupReassociation.has_value() &&
+             "expected to find reassociation");
+      TileSwizzle::ExpandShapeDimVectorType expandedGroup;
+      for (auto [i, reassociation] : llvm::enumerate(*groupReassociation)) {
+        for (int64_t reInd : reassociation) {
+          expandedGroup.push_back(
+              TileSwizzle::Dim(group[i].kind, accGroup[reInd].size));
+        }
+        int expandedPermIdx;
+        for (auto [permIdx, permDim] : llvm::enumerate(swizzle.permutation)) {
+          if (permDim > i) {
+            permDim += reassociation.size() - 1;
+          }
+          if (permDim == i) {
+            expandedPermIdx = permIdx;
+          }
+        }
+        for (int j = 0; j < reassociation.size() - 1; ++j) {
+          swizzle.permutation.insert(
+              swizzle.permutation.begin() + expandedPermIdx + j + 1, i + j + 1);
+        }
+      }
+      swizzle.expandShape[groupIdx] = expandedGroup;
+    }
+
+    // Compute the localized permutation within the reassociation group, and
+    // apply to the expandShape dims within the group.
+    SmallVector<int64_t> crossThreadInds;
+    SmallVector<int64_t> otherInds;
+    for (int64_t idx = 0; idx < accGroup.size(); ++idx) {
+      TileSwizzle::Dim dim = accGroup[idx];
+      if (dim.kind == TileSwizzle::Dim::Kind::CrossThread) {
+        crossThreadInds.push_back(idx);
+      } else {
+        otherInds.push_back(idx);
+      }
+    }
+    SmallVector<int64_t> groupPerm(crossThreadInds);
+    groupPerm.append(otherInds);
+    applyPermutationToVector(swizzle.expandShape[groupIdx], groupPerm);
+
+    // Append the group permutation to the global `crossThreadToOuterPerm`.
+    // `groupPerm` contains the local permutation within the expand shape
+    // reassociation group, so we need to convert to the global permutation
+    // indices when adding to the global crossThreadToOuterPerm.
+    for (int64_t idx : groupPerm) {
+      crossThreadToOuterPerm.push_back(idx + groupStartIdx);
+    }
+    groupStartIdx += expandShape[groupIdx].size();
+  }
+
+  // For Lhs and Rhs, fill in the rest of the permutation from the skipped
+  // groups.
+  if (fragment != MMAFragment::Acc) {
+    for (int64_t i = swizzle.expandShape.front().size();
+         i < swizzle.permutation.size(); ++i) {
+      crossThreadToOuterPerm.push_back(i);
+    }
+  }
+
+  // At this point, the expandShape dims have been permuted within their groups,
+  // but we still need to adjust the swizzle.permutation to preserve the result
+  // shape of the swizzle. We have the following permutations:
+  //  - perm(originalSrc -> crossThreadOuterSrc)
+  //  - perm(originalSrc -> result)
+  // And we want `perm(crossThreadOuterSrc -> result)`, so we need to take
+  // `inverse(perm(originalSrc -> crossThreadOuterSrc))`, and then apply
+  // `perm(originalSrc -> result)`.
+  SmallVector<int64_t> perm = invertPermutationVector(crossThreadToOuterPerm);
+  applyPermutationToVector(perm, swizzle.permutation);
+  swizzle.permutation = perm;
+}
+
+/// Return the unrolled version of the intrinsic swizzle without any reordering
+/// of CrossThread dims. The result of this function should be passed to
+/// moveCrossThreadOutermost to get the final swizzle.
+TileSwizzle getUnrolledSwizzle(IREE::GPU::DataTiledMMAAttr mma,
+                               IREE::GPU::MMAFragment fragment) {
   auto swizzle = getIntrinsicSwizzle(mma.getIntrinsic().getValue(), fragment);
   switch (fragment) {
   case IREE::GPU::MMAFragment::Lhs:
@@ -194,6 +323,27 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
     }
     break;
   }
+  return swizzle;
+}
+
+TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
+                       IREE::GPU::MMAFragment fragment) {
+  TileSwizzle swizzle = getUnrolledSwizzle(mma, fragment);
+  // We want to move the CrossThread dims to be outermost in the source layout
+  // for the result. We need the transformations for the Lhs and Rhs to match
+  // with the Acc transformation, so we need to know what the acc swizzle is
+  // when moving CrossThread dims, even when the fragment is Lhs or Rhs.
+  TileSwizzle accSwizzle = swizzle;
+  if (fragment != IREE::GPU::MMAFragment::Acc) {
+    accSwizzle = getUnrolledSwizzle(mma, IREE::GPU::MMAFragment::Acc);
+  }
+  LLVM_DEBUG(llvm::dbgs() << fragment
+                          << " swizzle before moving CrossThread dims: "
+                          << swizzle << "\n");
+  moveCrossThreadOutermost(swizzle, accSwizzle, fragment);
+  LLVM_DEBUG(llvm::dbgs() << fragment
+                          << " swizzle after moving CrossThread dims: "
+                          << swizzle << "\n\n");
   return swizzle;
 }
 
