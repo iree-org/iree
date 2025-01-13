@@ -205,6 +205,12 @@ private:
         getValueDependencies(compute, computeDependencies);
       }
     }
+    // if scf.yeild is the only compute op then there is no value in doing
+    // prefetching.
+    if (computeDependencies.size() == 1) {
+      LDBG("Loop does not have compute so not doing prefetching." << forOp);
+      return failure();
+    }
 
     // Restore the original order.
     for (auto &op : forOp.getBody()->getOperations()) {

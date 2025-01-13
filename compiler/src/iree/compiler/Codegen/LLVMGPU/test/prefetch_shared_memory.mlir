@@ -134,3 +134,19 @@ func.func @prefetch_add_with_if(%arg0: memref<128xf32>) {
   vector.transfer_write %0, %arg0[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
   return
 }
+
+// -----
+// CHECK-LABEL: @noprefetch_copyback
+func.func @noprefetch_copyback(%arg0: memref<128xf32>, %arg1: memref<128xf32>) {
+  %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c128 = arith.constant 128 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  scf.for %arg2 = %c0 to %c128 step %c1{
+    %1 = vector.transfer_read %arg0[%arg2], %cst_0 : memref<128xf32>, vector<1xf32>
+    vector.transfer_write %1, %arg1[%arg2] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
+  }
+  return
+}
+// CHECK-NOT: gpu.barrier
