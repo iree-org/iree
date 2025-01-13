@@ -149,6 +149,19 @@ util.func public @tensorTransfer(%input: tensor<?x128xi8>, %dim0: index) -> tens
 
 // -----
 
+util.global private @device : !hal.device
+
+// CHECK-LABEL: @tensorBarrier
+//  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index, %[[DIM0:.+]]: index)
+util.func public @tensorBarrier(%input: tensor<?x128xi8>, %dim0: index) -> tensor<?x128xi8> {
+  // CHECK: %[[TRANSFER:.+]] = stream.async.barrier %[[INPUT]] : !stream.resource<*>{%[[INPUT_SIZE]]} -> !stream.resource<*>
+  %transfer = flow.tensor.barrier %input : tensor<?x128xi8>{%dim0} on #hal.device.affinity<@device>
+  // CHECK: util.return %[[TRANSFER]], %[[INPUT_SIZE]]
+  util.return %transfer : tensor<?x128xi8>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorSlice
 //  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index)
 util.func public @tensorSlice(%input : tensor<5x24x48xf32>) -> tensor<3x24x48xf32> {
