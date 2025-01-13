@@ -1009,7 +1009,10 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       .addPass(createIREELoopInvariantCodeMotionPass)
       .addPass(affine::createAffineExpandIndexOpsPass)
       .addPass(createLowerAffinePass)
-      .addPass(IREE::Util::createOptimizeIntArithmeticPass)
+      .addPass([]() {
+        return IREE::Util::createOptimizeIntArithmeticPass(
+            IREE::Util::OptimizeIntArithmeticPassOptions{/*narrowToI32=*/true});
+      })
       // Do another round of LICM now that we've lowered and optimized
       // arithmetic
       .addPass(createCSEPass)
