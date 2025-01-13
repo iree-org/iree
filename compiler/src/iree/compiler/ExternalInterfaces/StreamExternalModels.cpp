@@ -47,6 +47,26 @@ struct OptionalOpAffinityAttrExternalModel
   }
 };
 
+struct FlowBarrierTargetAffinityAttrExternalModel
+    : public IREE::Stream::AffinityOpInterface::ExternalModel<
+          FlowBarrierTargetAffinityAttrExternalModel,
+          IREE::Flow::TensorBarrierOp> {
+  static void add(MLIRContext *context) {
+    IREE::Flow::TensorBarrierOp::attachInterface<
+        FlowBarrierTargetAffinityAttrExternalModel>(*context);
+  }
+
+  bool requiresAffinity(Operation *op) const { return true; }
+
+  IREE::Stream::AffinityAttr getAffinityAttr(Operation *op) const {
+    return op->getAttrOfType<IREE::Stream::AffinityAttr>("target");
+  }
+
+  void setAffinityAttr(Operation *op, IREE::Stream::AffinityAttr value) const {
+    op->setAttr("target", value);
+  }
+};
+
 struct FlowTransferTargetAffinityAttrExternalModel
     : public IREE::Stream::AffinityOpInterface::ExternalModel<
           FlowTransferTargetAffinityAttrExternalModel,
@@ -173,6 +193,7 @@ void registerStreamExternalModels(DialectRegistry &registry) {
   registry.insert<IREE::Flow::FlowDialect>();
   registry.addExtension(+[](MLIRContext *context,
                             IREE::Flow::FlowDialect *dialect) {
+    FlowBarrierTargetAffinityAttrExternalModel::add(context);
     FlowTransferTargetAffinityAttrExternalModel::add(context);
     AffinityOpAttrExternalModel<IREE::Flow::DispatchRegionOp>::add(context);
     AffinityOpAttrExternalModel<IREE::Flow::DispatchWorkgroupsOp>::add(context);

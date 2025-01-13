@@ -2007,6 +2007,14 @@ void AsyncCollectiveOp::getAsyncAccessRanges(
 }
 
 //===----------------------------------------------------------------------===//
+// stream.async.barrier
+//===----------------------------------------------------------------------===//
+
+bool AsyncBarrierOp::isMetadata() { return true; }
+
+LogicalResult AsyncBarrierOp::verify() { return success(); }
+
+//===----------------------------------------------------------------------===//
 // stream.async.transfer
 //===----------------------------------------------------------------------===//
 
@@ -2026,15 +2034,17 @@ IREE::Stream::AffinityAttr AsyncTransferOp::getAffinityAttr() {
       resultType.getLifetime() == IREE::Stream::Lifetime::Staging) {
     // TODO(multi-device): figure out how to model staging->staging transfers.
     return getSourceAffinityAttr();
-  } else if (sourceType.getLifetime() == IREE::Stream::Lifetime::Staging) {
+  } else if (sourceType.getLifetime() == IREE::Stream::Lifetime::External ||
+             sourceType.getLifetime() == IREE::Stream::Lifetime::Staging) {
     // If source is staging then the op should execute on the consumer.
     return getResultAffinityAttr();
-  } else if (resultType.getLifetime() == IREE::Stream::Lifetime::Staging) {
+  } else if (resultType.getLifetime() == IREE::Stream::Lifetime::External ||
+             resultType.getLifetime() == IREE::Stream::Lifetime::Staging) {
     // If result is staging then the op should execute on the producer.
     return getSourceAffinityAttr();
   } else {
     // Default to result affinity.
-    return getResultAffinityAttr();
+    return getSourceAffinityAttr();
   }
 }
 

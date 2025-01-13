@@ -2216,6 +2216,51 @@ def Stream_AsyncCollectiveOp : Stream_Op<"async.collective", [
   let hasCanonicalizer = 1;
 }
 
+def Stream_AsyncBarrierOp : Stream_Op<"async.barrier", [
+  Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
+  DeclareOpInterfaceMethods<Stream_StreamableOp, [
+    "isMetadata",
+  ]>,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{ }];
+  let description = [{
+  }];
+
+  let arguments = (ins
+    AnyTypeOf<[
+      Stream_AnyStreamResource,
+      Stream_StagingResource,
+    ]>:$source,
+    Stream_Size:$size,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    AnyTypeOf<[
+      Stream_AnyStreamResource,
+      Stream_StagingResource,
+    ]>:$result
+  );
+
+  let assemblyFormat = [{
+    $source `:` type($source)
+    `` `{` $size `}`
+    (`from` `(` $affinity^ `)`)?
+    `->`
+    type($result)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getSize(); }
+    Value getResultSize(unsigned idx) { return getSize(); }
+  }];
+
+  let hasVerifier = 1;
+  let hasCanonicalizer = 1;
+}
+
 def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "getAffinityAttr",
