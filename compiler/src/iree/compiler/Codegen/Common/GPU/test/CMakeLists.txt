@@ -30,6 +30,7 @@ iree_lit_test_suite(
     "gpu_lower_to_ukernels.mlir"
     "gpu_nested_layout_contract_amdgpu.mlir"
     "gpu_nested_layout_vector_distribution.mlir"
+    "gpu_nested_layout_vector_distribution_multi_reduce.mlir"
     "gpu_nested_layout_vector_distribution_step.mlir"
     "gpu_pack_to_instrinsics.mlir"
     "gpu_pad_operands.mlir"
