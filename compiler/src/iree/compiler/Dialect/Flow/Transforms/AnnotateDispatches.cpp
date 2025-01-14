@@ -380,6 +380,18 @@ static std::string summarizeDispatchRegion(Region &region) {
   Operation *bestOp = NULL;
   const int64_t kMinEstimatedCost = -1;
   int64_t bestEstimatedCost = kMinEstimatedCost;
+
+  auto updateIfBetter = [&bestEstimatedCost, &bestOp](int64_t candidateCost,
+                                                      Operation *candidate) {
+    if (candidateCost < bestEstimatedCost) {
+      return;
+    }
+    bestEstimatedCost = candidateCost;
+    bestOp = candidate;
+    LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
+                            << "', cost: " << bestEstimatedCost << "\n");
+  };
+
   // Collect TilingInterface ops for better heuristic names.
   SmallVector<Operation *> tileableOps;
   region.walk([&](Operation *op) {
@@ -389,46 +401,30 @@ static std::string summarizeDispatchRegion(Region &region) {
     TypeSwitch<Operation *>(op)
         .Case<linalg::SoftmaxOp>([&](auto op) {
           int64_t estimatedCost = estimateLinalgSoftmaxOpCost(op);
-          if (estimatedCost < bestEstimatedCost) {
-            return;
-          }
-          bestEstimatedCost = estimatedCost;
-          bestOp = op;
-          LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
-                                  << "', cost: " << bestEstimatedCost << "\n");
+          updateIfBetter(estimatedCost, op);
+        })
+        .Case<IREE::LinalgExt::AttentionOp>([&](auto op) {
+          // Attention like ops are always the most important ops in a dispatch.
+          updateIfBetter(kMaxCost, op);
+        })
+        .Case<IREE::LinalgExt::OnlineAttentionOp>([&](auto op) {
+          // Attention like ops are always the most important ops in a dispatch.
+          updateIfBetter(kMaxCost, op);
         })
         .Case<linalg::LinalgOp>([&](auto op) {
           int64_t estimatedCost = estimateLinalgOpCost(op);
-          if (estimatedCost < bestEstimatedCost) {
-            return;
-          }
-          bestEstimatedCost = estimatedCost;
-          bestOp = op;
-          LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
-                                  << "', cost: " << bestEstimatedCost << "\n");
+          updateIfBetter(estimatedCost, op);
         })
         .Case<IREE::Encoding::SetEncodingOp, IREE::Encoding::UnsetEncodingOp,
               linalg::PackOp, linalg::UnPackOp>([&](auto op) {
           // SetEncoding/UnsetEncoding/PackOp/UnPackOp is the bestOp only if
           // there are no other operations.
           int64_t estimatedCost = kMinEstimatedCost + 1;
-          if (estimatedCost < bestEstimatedCost) {
-            return;
-          }
-          bestEstimatedCost = estimatedCost;
-          bestOp = op;
-          LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
-                                  << "', cost: " << bestEstimatedCost << "\n");
+          updateIfBetter(estimatedCost, op);
         })
         .Case<IREE::LinalgExt::LinalgExtOp>([&](auto op) {
           int64_t estimatedCost = estimateLinalgExtOpCost(op);
-          if (estimatedCost < bestEstimatedCost) {
-            return;
-          }
-          bestEstimatedCost = estimatedCost;
-          bestOp = op;
-          LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
-                                  << "', cost: " << bestEstimatedCost << "\n");
+          updateIfBetter(estimatedCost, op);
         })
         .Default([&](Operation *op) {
           // No cost estimation implemented, skip.
