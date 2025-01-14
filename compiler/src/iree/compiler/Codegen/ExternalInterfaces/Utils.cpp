@@ -49,7 +49,7 @@ Value calculateStorageSizeInBytesImpl(Attribute attr, Location loc,
     if (type.isDynamicDim(dim)) {
       dim = type.getDynamicDimIndex(dim);
       auto alignment = builder.create<arith::ConstantIndexOp>(loc, size);
-      paddedDynamicDims[dim] = builder.create<arith::CeilDivUIOp>(
+      paddedDynamicDims[dim] = builder.create<arith::CeilDivSIOp>(
           loc, paddedDynamicDims[dim], alignment);
       paddedDynamicDims[dim] =
           builder.create<arith::MulIOp>(loc, paddedDynamicDims[dim], alignment);
