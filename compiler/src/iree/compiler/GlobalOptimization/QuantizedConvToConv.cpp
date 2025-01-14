@@ -6,6 +6,7 @@
 
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/GlobalOptimization/Utils.h"
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -15,6 +16,8 @@
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/Matchers.h"
@@ -125,23 +128,29 @@ Value multiplyDims(ImplicitLocOpBuilder &builder, Value value,
 //
 // This is implementing the math explained in Section 2.3 of
 // https://arxiv.org/abs/1712.05877.
-struct QuantizedConvToConv
-    : public OpRewritePattern<linalg::Conv2DNhwcHwcfQOp> {
-  using OpRewritePattern<linalg::Conv2DNhwcHwcfQOp>::OpRewritePattern;
+template <typename Conv2DQOpType, typename Conv2DOpType,
+          typename ConvPoolingType>
+struct QuantizedConvToConv : public OpRewritePattern<Conv2DQOpType> {
+  using OpRewritePattern<Conv2DQOpType>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfQOp op,
+  LogicalResult matchAndRewrite(Conv2DQOpType op,
                                 PatternRewriter &rewriter) const override {
     ImplicitLocOpBuilder builder(op.getLoc(), rewriter);
     auto input = op.getInputs()[0];
     auto filter = op.getInputs()[1];
     auto iZp = op.getInputs()[2];
     auto fZp = op.getInputs()[3];
-    auto inputTy = llvm::cast<RankedTensorType>(input.getType());
     auto resultTy = llvm::cast<ShapedType>(op.getType(0));
     auto accETy = resultTy.getElementType();
-
     auto strides = op.getStrides();
     auto dilations = op.getDilations();
+
+    bool isNHWC = isConvNHWC(op);
+    int filterFDimIndex, filterHDimIndex, filterWDimIndex, filterCDimIndex;
+    int inputNDimIndex, inputHDimIndex, inputWDimIndex, inputCDimIndex;
+    getConv2DOpIndices(isNHWC, filterFDimIndex, filterCDimIndex,
+                       filterHDimIndex, filterWDimIndex, inputNDimIndex,
+                       inputHDimIndex, inputWDimIndex, inputCDimIndex);
 
     IntegerAttr iZpConst, fZpConst;
     bool iZpIsZero = matchPattern(iZp, m_Constant(&iZpConst)) &&
@@ -150,11 +159,11 @@ struct QuantizedConvToConv
                      fZpConst.getValue().isZero();
 
     // First implement the convolution without the zero point.
-    Value newConv = builder
-                        .create<linalg::Conv2DNhwcHwcfOp>(
-                            resultTy, ValueRange{input, filter},
-                            op.getOutputs(), strides, dilations)
-                        .getResult(0);
+    Value newConv =
+        builder
+            .create<Conv2DOpType>(resultTy, ValueRange{input, filter},
+                                  op.getOutputs(), strides, dilations)
+            .getResult(0);
 
     // If the zero pointer value is zero we can just replace.
     if (iZpIsZero && fZpIsZero) {
@@ -163,81 +172,205 @@ struct QuantizedConvToConv
     }
 
     // Compute the summation and correction for the filter zero point:
-    //  sum(d) = filter(a, b, c, d)
-    //  conv(a, b, c, d) -= iZp * filter(d)
+    //  filter(h, w, c) = reduce(filter(h, w, c, f), f)
+    //  conv(n, h, w, c) -= iZp * filter(h, w, c)
     if (!iZpIsZero) {
-      Value filterSum =
-          sumReduceDimensionSubset(builder, filter, accETy,
-                                   /*reduce_dim=*/{true, true, true, false});
-      newConv = applyZeroPoint(builder, newConv, filterSum, iZp, {3});
+      newConv =
+          applyFilterZeroPointCorrection(builder, newConv, filter, iZp, accETy,
+                                         filterFDimIndex, inputCDimIndex);
     }
 
     if (!fZpIsZero) {
-      // Reduce along the input feature dimension:
-      //   sum(a, b, c) = input(a, b, c, d)
-      Value inputSum =
-          sumReduceDimensionSubset(builder, input, accETy,
-                                   /*reduce_dim*/ {false, false, false, true});
-
-      // Materialize a length-1 dimension at the end of the summation.
-      SmallVector<ReassociationExprs> reassociationMap(3);
-      for (int i = 0; i < 3; i++)
-        reassociationMap[i].push_back(builder.getAffineDimExpr(i));
-      reassociationMap.back().push_back(builder.getAffineDimExpr(3));
-
-      auto expandTy =
-          RankedTensorType::get({inputTy.getDimSize(0), inputTy.getDimSize(1),
-                                 inputTy.getDimSize(2), 1},
-                                accETy);
-      inputSum = builder.create<tensor::ExpandShapeOp>(expandTy, inputSum,
-                                                       reassociationMap);
-
-      llvm::SmallVector<int64_t> poolDims;
-      llvm::SmallVector<Value> poolDynDims;
-      GetDynamicDym(builder, poolDims, poolDynDims, inputSum, 0);
-      GetDynamicDym(builder, poolDims, poolDynDims, newConv, 1);
-      GetDynamicDym(builder, poolDims, poolDynDims, newConv, 2);
-      GetDynamicDym(builder, poolDims, poolDynDims, inputSum, 3);
-
-      // Perform a sum-pooling operation across the kernel width and height.
-      auto poolTy = RankedTensorType::get(poolDims, accETy);
-      Value poolTensor = emptyZero(builder, poolTy, poolDynDims);
-
-      // Create the empty kernel defining the shape for the pooling operation.
-      llvm::SmallVector<int64_t> kDims;
-      llvm::SmallVector<Value> kDyn;
-      GetDynamicDym(builder, kDims, kDyn, filter, 0);
-      GetDynamicDym(builder, kDims, kDyn, filter, 1);
-      Value poolInit = builder.create<tensor::EmptyOp>(kDims, accETy, kDyn);
-
-      inputSum = builder
-                     .create<linalg::PoolingNhwcSumOp>(
-                         ArrayRef<Type>{poolTy}, ValueRange{inputSum, poolInit},
-                         poolTensor, strides, dilations)
-                     .getResult(0);
-
-      // Collapse the length-1 ending dimension away.
-      auto collapseTy =
-          RankedTensorType::get(poolTy.getShape().drop_back(), accETy);
-      inputSum = builder.create<tensor::CollapseShapeOp>(collapseTy, inputSum,
-                                                         reassociationMap);
-
-      // Apply the zero-point update based on the input sum.
-      newConv = applyZeroPoint(builder, newConv, inputSum, fZp, {0, 1, 2});
+      newConv = applyInputZeroPointCorrection(
+          isNHWC, builder, newConv, input, filter, fZp, accETy, strides,
+          dilations, inputNDimIndex, inputHDimIndex, inputWDimIndex,
+          inputCDimIndex, filterHDimIndex, filterWDimIndex);
     }
 
     // Apply the final update that occurs when there are multiple zero-points.
     if (!iZpIsZero && !fZpIsZero) {
-      Value count = multiplyDims(builder, filter, {0, 1, 2});
-      Value cast = builder.create<arith::IndexCastOp>(accETy, count);
-      Value ifZp = builder.create<arith::MulIOp>(iZp, fZp);
-      Value zpUpdate = builder.create<arith::MulIOp>(ifZp, cast);
-
-      newConv = addScalar(builder, newConv, zpUpdate);
+      newConv = applyFinalZeroPointUpdate(builder, newConv, filter, iZp, fZp,
+                                          accETy, filterHDimIndex,
+                                          filterWDimIndex, filterCDimIndex);
     }
 
     rewriter.replaceOp(op, newConv);
     return success();
+  }
+
+private:
+  bool isConvNHWC(Conv2DQOpType op) const {
+    if (auto convOp = dyn_cast<linalg::Conv2DNhwcHwcfQOp>(&op)) {
+      return true;
+    } else if (auto convOp = dyn_cast<linalg::Conv2DNchwFchwQOp>(&op)) {
+      return false;
+    } else {
+      llvm_unreachable("Unsupported Conv2DOp type!");
+    }
+  }
+
+  void getConv2DOpIndices(bool isNHWC, int &filterFDimIndex,
+                          int &filterCDimIndex, int &filterHDimIndex,
+                          int &filterWDimIndex, int &inputNDimIndex,
+                          int &inputHDimIndex, int &inputWDimIndex,
+                          int &inputCDimIndex) const {
+    if (isNHWC) {
+      // hwcf
+      filterHDimIndex = 0;
+      filterWDimIndex = 1;
+      filterCDimIndex = 2;
+      filterFDimIndex = 3;
+      // nhwc
+      inputNDimIndex = 0;
+      inputHDimIndex = 1;
+      inputWDimIndex = 2;
+      inputCDimIndex = 3;
+    } else {
+      // fchw
+      filterFDimIndex = 0;
+      filterCDimIndex = 1;
+      filterHDimIndex = 2;
+      filterWDimIndex = 3;
+      // nchw
+      inputNDimIndex = 0;
+      inputCDimIndex = 1;
+      inputHDimIndex = 2;
+      inputWDimIndex = 3;
+    }
+  }
+
+  Value applyFilterZeroPointCorrection(ImplicitLocOpBuilder &builder,
+                                       Value newConv, Value filter, Value iZp,
+                                       Type accETy, int filterFDimIndex,
+                                       int inputCDimIndex) const {
+    llvm::SmallVector<bool, 4> reduceDim(4, true);
+    reduceDim[filterFDimIndex] = false;
+    Value filterSum =
+        sumReduceDimensionSubset(builder, filter, accETy, reduceDim);
+    return applyZeroPoint(builder, newConv, filterSum, iZp, {inputCDimIndex});
+  }
+
+  Value applyInputZeroPointCorrection(
+      bool isNHWC, ImplicitLocOpBuilder &builder, Value newConv, Value input,
+      Value filter, Value fZp, Type accETy, DenseIntElementsAttr strides,
+      DenseIntElementsAttr dilations, int inputNDimIndex, int inputHDimIndex,
+      int inputWDimIndex, int inputCDimIndex, int filterHDimIndex,
+      int filterWDimIndex) const {
+    // Reduce along the input feature dimension:
+    //   sum(n, h, w) = input(n, h, w, c)
+    llvm::SmallVector<bool, 4> reduceDim(4, false);
+    reduceDim[inputCDimIndex] = true;
+    Value inputSum =
+        sumReduceDimensionSubset(builder, input, accETy, reduceDim);
+    inputSum = expandAndPoolInputSum(
+        isNHWC, builder, input, inputSum, newConv, filter, accETy, strides,
+        dilations, inputNDimIndex, inputHDimIndex, inputWDimIndex,
+        inputCDimIndex, filterHDimIndex, filterWDimIndex);
+    // Apply the zero-point update based on the input sum.
+    return applyZeroPoint(builder, newConv, inputSum, fZp,
+                          {inputNDimIndex, inputHDimIndex, inputWDimIndex});
+  }
+
+  Value expandAndPoolInputSum(bool isNHWC, ImplicitLocOpBuilder &builder,
+                              Value input, Value inputSum, Value newConv,
+                              Value filter, Type accETy,
+                              DenseIntElementsAttr strides,
+                              DenseIntElementsAttr dilations,
+                              int inputNDimIndex, int inputHDimIndex,
+                              int inputWDimIndex, int inputCDimIndex,
+                              int filterHDimIndex, int filterWDimIndex) const {
+    auto reassociationMap =
+        getReassociationMap(isNHWC, builder, inputNDimIndex, inputHDimIndex,
+                            inputWDimIndex, inputCDimIndex);
+    auto expandTy = getExpandedType(input, accETy, inputCDimIndex);
+    inputSum = builder.create<tensor::ExpandShapeOp>(expandTy, inputSum,
+                                                     reassociationMap);
+
+    llvm::SmallVector<int64_t> poolDims;
+    llvm::SmallVector<Value> poolDynDims;
+    if (isNHWC) {
+      GetDynamicDym(builder, poolDims, poolDynDims, inputSum, inputNDimIndex);
+      GetDynamicDym(builder, poolDims, poolDynDims, newConv, inputHDimIndex);
+      GetDynamicDym(builder, poolDims, poolDynDims, newConv, inputWDimIndex);
+      GetDynamicDym(builder, poolDims, poolDynDims, inputSum, inputCDimIndex);
+    } else {
+      GetDynamicDym(builder, poolDims, poolDynDims, inputSum, inputNDimIndex);
+      GetDynamicDym(builder, poolDims, poolDynDims, inputSum, inputCDimIndex);
+      GetDynamicDym(builder, poolDims, poolDynDims, newConv, inputHDimIndex);
+      GetDynamicDym(builder, poolDims, poolDynDims, newConv, inputWDimIndex);
+    }
+
+    // Perform a sum-pooling operation across the kernel width and height.
+    auto poolTy = RankedTensorType::get(poolDims, accETy);
+    Value poolTensor = emptyZero(builder, poolTy, poolDynDims);
+
+    llvm::SmallVector<int64_t> kDims;
+    llvm::SmallVector<Value> kDyn;
+    GetDynamicDym(builder, kDims, kDyn, filter, filterHDimIndex);
+    GetDynamicDym(builder, kDims, kDyn, filter, filterWDimIndex);
+    Value poolInit = builder.create<tensor::EmptyOp>(kDims, accETy, kDyn);
+
+    inputSum = builder
+                   .create<ConvPoolingType>(ArrayRef<Type>{poolTy},
+                                            ValueRange{inputSum, poolInit},
+                                            poolTensor, strides, dilations)
+                   .getResult(0);
+
+    // Collapse the length-1 ending dimension away.
+    ArrayRef<int64_t> collapseShape;
+    if (isNHWC) {
+      collapseShape = poolTy.getShape().drop_back();
+    } else {
+      auto shape = poolTy.getShape();
+      llvm::SmallVector<int64_t, 4> new_shape{shape[0], shape[2], shape[3]};
+      collapseShape = ArrayRef<int64_t>(new_shape);
+    }
+
+    auto collapseTy = RankedTensorType::get(collapseShape, accETy);
+
+    return builder.create<tensor::CollapseShapeOp>(collapseTy, inputSum,
+                                                   reassociationMap);
+  }
+
+  Value applyFinalZeroPointUpdate(ImplicitLocOpBuilder &builder, Value newConv,
+                                  Value filter, Value iZp, Value fZp,
+                                  Type accETy, int filterHDimIndex,
+                                  int filterWDimIndex,
+                                  int filterCDimIndex) const {
+    Value count = multiplyDims(
+        builder, filter, {filterHDimIndex, filterWDimIndex, filterCDimIndex});
+    Value cast = builder.create<arith::IndexCastOp>(accETy, count);
+    Value ifZp = builder.create<arith::MulIOp>(iZp, fZp);
+    Value zpUpdate = builder.create<arith::MulIOp>(ifZp, cast);
+    return addScalar(builder, newConv, zpUpdate);
+  }
+
+  SmallVector<ReassociationExprs>
+  getReassociationMap(bool isNHWC, ImplicitLocOpBuilder &builder,
+                      int inputNDimIndex, int inputHDimIndex,
+                      int inputWDimIndex, int inputCDimIndex) const {
+    // Materialize a length-1 dimension at the C dimension of the input.
+    SmallVector<ReassociationExprs> reassociationMap(3);
+    if (isNHWC) {
+      for (int i = 0; i < 3; i++)
+        reassociationMap[i].push_back(builder.getAffineDimExpr(i));
+      reassociationMap.back().push_back(builder.getAffineDimExpr(3));
+    } else {
+      reassociationMap[0].push_back(builder.getAffineDimExpr(0));
+      reassociationMap[0].push_back(builder.getAffineDimExpr(1));
+      reassociationMap[1].push_back(builder.getAffineDimExpr(2));
+      reassociationMap[2].push_back(builder.getAffineDimExpr(3));
+    }
+    return reassociationMap;
+  }
+
+  RankedTensorType getExpandedType(Value input, Type accETy,
+                                   int inputCDimIndex) const {
+    auto type = cast<RankedTensorType>(input.getType());
+    auto shape = type.getShape();
+    llvm::SmallVector<int64_t, 4> new_shape(shape.begin(), shape.end());
+    new_shape[inputCDimIndex] = 1;
+    return RankedTensorType::get(new_shape, accETy);
   }
 };
 
@@ -347,8 +480,12 @@ public:
     MLIRContext *context = op->getContext();
     RewritePatternSet patterns(context);
     linalg::populateLinalgNamedOpConversionPatterns(patterns);
-    patterns.add<QuantizedConvToConv, QuantizedDepthwiseConvToDepthwiseConv>(
-        context);
+    patterns.add<
+        QuantizedConvToConv<linalg::Conv2DNhwcHwcfQOp, linalg::Conv2DNhwcHwcfOp,
+                            linalg::PoolingNhwcSumOp>,
+        QuantizedConvToConv<linalg::Conv2DNchwFchwQOp, linalg::Conv2DNchwFchwOp,
+                            linalg::PoolingNchwSumOp>,
+        QuantizedDepthwiseConvToDepthwiseConv>(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsGreedily(op, std::move(patterns)))) {
       signalPassFailure();
