@@ -393,16 +393,9 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
   std::array<int64_t, 3> workgroupSize = {configAndWgSize->second, 1, 1};
   LoweringConfigAttr loweringConfig = configAndWgSize->first;
 
-  bool usePrefetchSharedMemory = true;
-  // Prefetching has issues when doing c promotion, see
-  // https://github.com/iree-org/iree/issues/19612.
-  if (llvm::any_of(getPromotedOperandList(loweringConfig).value(),
-                   [](int64_t promote) { return promote == 2; })) {
-    usePrefetchSharedMemory = false;
-  }
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
-      linalgOp->getContext(), /*prefetchSharedMemory=*/usePrefetchSharedMemory,
+      linalgOp->getContext(), /*prefetchSharedMemory=*/true,
       /*no_reduce_shared_memory_bank_conflicts=*/false,
       /*use_igemm_convolution=*/true,
       /*reorder_workgroups_strategy=*/std::nullopt);
@@ -444,16 +437,9 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   std::array<int64_t, 3> workgroupSize = {configAndWgSize->second, 1, 1};
   LoweringConfigAttr loweringConfig = configAndWgSize->first;
 
-  bool usePrefetchSharedMemory = true;
-  // Prefetching has issues when doing c promotion, see
-  // https://github.com/iree-org/iree/issues/19612.
-  if (llvm::any_of(getPromotedOperandList(loweringConfig).value(),
-                   [](int64_t promote) { return promote == 2; })) {
-    usePrefetchSharedMemory = false;
-  }
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
-      linalgOp->getContext(), /*prefetchSharedMemory=*/usePrefetchSharedMemory,
+      linalgOp->getContext(), /*prefetchSharedMemory=*/true,
       /*no_reduce_shared_memory_bank_conflicts=*/false,
       /*use_igemm_convolution=*/false,
       /*reorder_workgroups_strategy=*/std::nullopt);
