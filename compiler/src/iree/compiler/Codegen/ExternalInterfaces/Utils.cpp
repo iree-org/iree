@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/ExternalInterfaces/Utils.h"
 
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
@@ -34,6 +35,8 @@ Value calculateStorageSizeInBytesImpl(Attribute attr, Location loc,
     // moved to VMVX implementation details. However, we cook the logic here to
     // reduce code duplication.
     if (ShapedType::isDynamic(size)) {
+      assert(isa<IREE::CPU::VMVXEncodingLayoutAttr>(attr) &&
+             "only VMVX backend attribute can handle dynamic tile sizes");
       size = 16;
     }
 

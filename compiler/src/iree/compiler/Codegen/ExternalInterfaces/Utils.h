@@ -14,7 +14,7 @@
 
 namespace mlir::iree_compiler::IREE {
 
-static StringLiteral kEncodingInfoAttrName = "encoding_info";
+static const char kEncodingInfoAttrName[] = "encoding_info";
 
 Value calculateStorageSizeInBytesImpl(Attribute attr, Location loc,
                                       OpBuilder &builder, RankedTensorType type,
