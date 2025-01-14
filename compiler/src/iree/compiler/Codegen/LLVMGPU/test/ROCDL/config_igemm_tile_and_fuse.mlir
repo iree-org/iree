@@ -76,7 +76,7 @@ func.func @nhwc_conv_unaligned_mfma() {
 
 // CHECK-LABEL: func.func @nhwc_conv_unaligned_mfma
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.conv_2d_nhwc_hwcf {{.*}}lowering_config = #iree_gpu.lowering_config
@@ -106,7 +106,7 @@ func.func @nchw_conv_unaligned_mfma() {
 
 // CHECK-LABEL: func.func @nchw_conv_unaligned_mfma
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.conv_2d_nchw_fchw {{.*}}lowering_config = #iree_gpu.lowering_config

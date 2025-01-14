@@ -277,7 +277,7 @@ func.func @unaligned_to_intrinsic_batched_matmul(%lhs : tensor<12x577x577xf32>, 
 
 // CHECK-LABEL: func.func @unaligned_to_intrinsic_batched_matmul
 // CHECK-SAME:    #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
-// CHECK-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
+// CHECK-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
 //      CHECK:    linalg.batch_matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     padding = [1, 16, 16, 4]
 //  CHECK-SAME:     promote_operands = [0, 1, 2]
@@ -306,7 +306,7 @@ func.func @unaligned_to_intrinsic_batched_matmul_tiling_check(%lhs : tensor<12x5
 
 // CHECK-LABEL: func.func @unaligned_to_intrinsic_batched_matmul_tiling_check
 // CHECK-SAME:    #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
-// CHECK-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
+// CHECK-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
 //      CHECK:    linalg.batch_matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     padding = [1, 16, 512, 4]
 //  CHECK-SAME:     promote_operands = [0, 1, 2]
