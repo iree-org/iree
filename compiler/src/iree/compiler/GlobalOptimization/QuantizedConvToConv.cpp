@@ -318,12 +318,13 @@ private:
 
     // Collapse the length-1 ending dimension away.
     ArrayRef<int64_t> collapseShape;
+    llvm::SmallVector<int64_t, 4> new_shape;
     if (isNHWC) {
       collapseShape = poolTy.getShape().drop_back();
     } else {
       auto shape = poolTy.getShape();
-      llvm::SmallVector<int64_t, 4> new_shape{shape[0], shape[2], shape[3]};
-      collapseShape = ArrayRef<int64_t>(new_shape);
+      new_shape = {shape[0], shape[2], shape[3]};
+      collapseShape = new_shape;
     }
 
     auto collapseTy = RankedTensorType::get(collapseShape, accETy);
