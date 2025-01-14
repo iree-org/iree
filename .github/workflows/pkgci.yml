@@ -53,7 +53,7 @@ jobs:
   # Jobs that run unit tests on special hardware platforms or accelerators
   #############################################################################
 
-  # Temporarily disbling MI250 runs due to downed Cirruscale GPU 945D machine
+  # Disabled while no `nodai-amdgpu-mi250-x86-64` runners are online
   #test_amd_mi250:
   #  name: Test AMD MI250
   #  needs: [setup, build_packages]
