@@ -23,7 +23,7 @@ jobs:
     steps:
       - name: Download packages
         id: download_packages
-        uses: dawidd6/action-download-artifact@09f2f74827fd3a8607589e5ad7f9398816f540fe # v3.1.4
+        uses: dawidd6/action-download-artifact@80620a5d27ce0ae443b965134db88467fc607b43 # v7
         with:
           github_token: ${{secrets.WRITE_ACCESS_TOKEN}}
           workflow: build_package.yml
