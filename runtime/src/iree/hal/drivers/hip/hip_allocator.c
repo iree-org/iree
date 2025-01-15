@@ -207,7 +207,7 @@ static iree_status_t iree_hal_hip_allocator_trim(
   }
   iree_slim_mutex_unlock(&allocator->async_allocation_mutex);
 
-  return iree_ok_status();
+  return status;
 }
 
 static void iree_hal_hip_allocator_query_statistics(
@@ -750,10 +750,12 @@ iree_status_t iree_hal_hip_allocator_alloc_async(
     iree_hal_hip_async_allocation_map_item_t* queue_item =
         (iree_hal_hip_async_allocation_map_item_t*)
             iree_hal_hip_util_tree_node_get_value(sized_allocations);
-    iree_hal_hip_async_allocation_t allocation =
-        iree_hal_hip_async_allocation_queue_at(&queue_item->queue, 0);
-    ptr = allocation.pointer;
-    iree_hal_hip_async_allocation_queue_pop_front(&queue_item->queue, 1);
+    if (iree_hal_hip_async_allocation_queue_count(&queue_item->queue) != 0) {
+      iree_hal_hip_async_allocation_t allocation =
+          iree_hal_hip_async_allocation_queue_at(&queue_item->queue, 0);
+      ptr = allocation.pointer;
+      iree_hal_hip_async_allocation_queue_pop_front(&queue_item->queue, 1);
+    }
   }
   iree_slim_mutex_unlock(&allocator->async_allocation_mutex);
 
@@ -829,7 +831,7 @@ iree_status_t iree_hal_hip_allocator_free_async(
     iree_hal_hip_buffer_set_allocation_empty(buffer);
   }
 
-  return iree_ok_status();
+  return status;
 }
 
 static const iree_hal_allocator_vtable_t iree_hal_hip_allocator_vtable = {
