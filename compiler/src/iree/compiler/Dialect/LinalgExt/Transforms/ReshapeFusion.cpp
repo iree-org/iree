@@ -8,6 +8,7 @@
 // The content of this file is adapted from linalg's ElemenwiseOpFusion.cpp and
 // modified to work with LinalgExt ops, specifically `LinalgExt::AttentionOp`.
 
+#include <cstdint>
 #include <optional>
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -315,13 +316,7 @@ getScatterReshapeInfo(LinalgExt::ScatterOp scatterOp) {
     ReshapeOperandInfo updateInfo;
     updateInfo.originalShape = scatterOp.getUpdateType().getShape();
     llvm::append_range(updateInfo.operandToIterationSpace,
-                       llvm::seq<int64_t>(0, scatterOp.getBatchRank()));
-    updateInfo.operandToIterationSpace.append(
-        updateRank - (rankOfContiguousSlice + scatterOp.getBatchRank()),
-        ReshapeOperandInfo::kNoMapping);
-    llvm::append_range(
-        updateInfo.operandToIterationSpace,
-        llvm::seq(updateRank - rankOfContiguousSlice, updateRank));
+                       llvm::seq<int64_t>(0, updateRank));
     infos.push_back(std::move(updateInfo));
   }
 
@@ -331,8 +326,9 @@ getScatterReshapeInfo(LinalgExt::ScatterOp scatterOp) {
     indicesInfo.originalShape = scatterOp.getIndicesType().getShape();
     llvm::append_range(indicesInfo.operandToIterationSpace,
                        llvm::seq<int64_t>(0, scatterOp.getBatchRank()));
-    indicesInfo.operandToIterationSpace.push_back(
-        ReshapeOperandInfo::kNoMapping);
+    if (scatterOp.getBatchRank() != scatterOp.getIndicesType().getRank())
+      indicesInfo.operandToIterationSpace.push_back(
+          ReshapeOperandInfo::kNoMapping);
     infos.push_back(std::move(indicesInfo));
   }
 
