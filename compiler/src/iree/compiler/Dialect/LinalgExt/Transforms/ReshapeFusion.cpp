@@ -625,73 +625,6 @@ struct FoldAttentionWithProducerReshapeByExpansion final
   linalg::ControlFusionFn controlFoldingReshapes;
 };
 
-/// Remove the unit dims from `iree_linalg_ext.scatter` 's `update` operand.
-/// The dims in `update` between the batch dims and the continuous slice
-/// represent the indexed dimensions. Remove the leading unit dims from the
-/// indexed dims.
-struct FoldScatterNonIterationUnitDims final
-    : public OpRewritePattern<ScatterOp> {
-  FoldScatterNonIterationUnitDims(MLIRContext *context,
-                                  linalg::ControlDropUnitDims options,
-                                  PatternBenefit benefit = 1)
-      : OpRewritePattern<ScatterOp>(context, benefit),
-        options(std::move(options)) {}
-
-  LogicalResult matchAndRewrite(ScatterOp scatterOp,
-                                PatternRewriter &rewriter) const override {
-    if (options.rankReductionStrategy !=
-        linalg::ControlDropUnitDims::RankReductionStrategy::
-            ReassociativeReshape) {
-      return rewriter.notifyMatchFailure(
-          scatterOp, "Only reassociative reshape strategy supported");
-    }
-    llvm::SmallVector<unsigned> canDrop = options.controlFn(scatterOp);
-    const ArrayRef<int64_t> updateShape = scatterOp.getUpdateType().getShape();
-
-    // Find the number of leading unit dimensions
-    int64_t rankOfContiguousSlice =
-        scatterOp.getOriginalType().getRank() - scatterOp.getIndexDepth();
-    ArrayRef<int64_t> indexedDims =
-        scatterOp.getUpdateSliceShape().drop_back(rankOfContiguousSlice);
-    int64_t numDimsToDrop =
-        llvm::find_if(indexedDims, [](int64_t val) { return val != 1; }) -
-        scatterOp.getUpdateSliceShape().begin() - 1;
-
-    int64_t batchRank = scatterOp.getBatchRank();
-    llvm::erase_if(canDrop, [&](unsigned dimPos) {
-      return dimPos < batchRank || dimPos > batchRank + numDimsToDrop;
-    });
-    if (canDrop.empty()) {
-      return failure();
-    }
-
-    SmallVector<int64_t> droppedUpdateShape;
-    droppedUpdateShape.reserve(updateShape.size() - canDrop.size());
-    for (auto [idx, dimLen] : llvm::enumerate(updateShape)) {
-      if (!llvm::is_contained(canDrop, idx)) {
-        droppedUpdateShape.push_back(dimLen);
-      }
-    }
-
-    auto reassoc =
-        getReassociationIndicesForCollapse(updateShape, droppedUpdateShape);
-    assert(reassoc.has_value() && "expected reassociation to be valid");
-    auto collapseOp = rewriter.create<tensor::CollapseShapeOp>(
-        scatterOp.getLoc(),
-        RankedTensorType::get(droppedUpdateShape,
-                              scatterOp.getUpdateType().getElementType()),
-        scatterOp.getUpdates(), reassoc.value());
-
-    rewriter.modifyOpInPlace(scatterOp, [&]() {
-      scatterOp.setOperand(ScatterOp::kUpdatesOpNum, collapseOp.getResult());
-    });
-    return success();
-  }
-
-private:
-  linalg::ControlDropUnitDims options;
-};
-
 struct DropScatterUnitIndexDepth final : public OpRewritePattern<ScatterOp> {
   LogicalResult matchAndRewrite(ScatterOp scatterOp,
                                 PatternRewriter &rewriter) const override {
@@ -1001,8 +934,6 @@ SmallVector<unsigned> defaultControlDropUnitDims(Operation *op) {
 }
 
 void populateFoldUnitExtentDimsPatterns(
-    RewritePatternSet &patterns, const linalg::ControlDropUnitDims &options) {
-  patterns.add<FoldScatterNonIterationUnitDims>(patterns.getContext(), options);
-}
+    RewritePatternSet &patterns, const linalg::ControlDropUnitDims &options) {}
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
