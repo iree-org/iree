@@ -90,7 +90,10 @@ static LogicalResult addLayoutsToTensorPhaseOps(
     }
 
     // Returns an updated encoding attribute if the type is a RankedTensorType
-    // and an encoding attribute is present. Otherwise, returns std::nullopt.
+    // and an EncodingAttr is present. Otherwise, returns std::nullopt. The
+    // method uses the EncodingLayoutAttrInterface from the EncodingAttr to
+    // resolve the layouts of the given `type`; returns the new encodings with
+    // the resolved layouts.
     auto getEncodingWithNewLayouts =
         [=](Type type) -> std::optional<IREE::Encoding::EncodingAttr> {
       auto rankedTensorType = dyn_cast<RankedTensorType>(type);
