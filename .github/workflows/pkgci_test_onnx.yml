@@ -168,8 +168,8 @@ jobs:
       - name: Checkout test suites repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          repository: ScottTodd/iree-test-suites  # DO NOT SUBMIT - merge https://github.com/iree-org/iree-test-suites/pull/65
-          ref: f0aa54520573bc0627a92676fce329c15966d093
+          repository: iree-org/iree-test-suites
+          ref: d7db851fe0c332b80f9380861cd60ac7c642b584
           path: iree-test-suites
       - name: Install ONNX models test suite requirements
         run: |
