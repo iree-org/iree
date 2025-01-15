@@ -530,6 +530,7 @@ func.func @partial_reduction(%3: tensor<?x?xf32>) -> tensor<?xf32> {
 //       PARTRED:     linalg.generic
 //  PARTRED-SAME:       iterator_types = ["parallel", "parallel"]
 //  PARTRED-SAME:       ins(%{{.*}}  : tensor<?x?xf32>) outs(%{{.*}} : tensor<?x?xf32>)
+//  PARTRED-SAME:       attrs = {lowering_config =
 //       PARTRED:   scf.yield
 //       PARTRED:   linalg.reduce ins(%[[OUT]] : tensor<?x8xf32>)
 //  PARTRED-SAME:                 outs(%[[FULL]] : tensor<?xf32>)
