@@ -30,6 +30,11 @@
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::IREE::GPU {
+llvm::cl::opt<bool> clGPUUseTileAndFuseGenericConvolution(
+    "iree-gpu-use-tile-and-fuse-generic-convolution",
+    llvm::cl::desc(
+        "enable the tile and fuse pipeline for generic convolutions"),
+    llvm::cl::init(true));
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
 constexpr int64_t kPreferredCopyNumBits = 128;
@@ -371,12 +376,25 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
     return failure();
 
   LDBG("IGEMM TileAndFuse Config");
-  FailureOr<SmallVector<AffineMap>> igemmContractionMaps =
-      LinalgExt::getIGEMMContractionIndexingMaps(linalgOp);
-  FailureOr<SmallVector<int64_t>> igemmLoopBounds =
-      LinalgExt::getIGEMMLoopBounds(linalgOp);
-  FailureOr<SmallVector<Value>> igemmOperands =
-      LinalgExt::getIGEMMOperands(linalgOp);
+  FailureOr<SmallVector<AffineMap>> igemmContractionMaps;
+  FailureOr<SmallVector<int64_t>> igemmLoopBounds;
+  FailureOr<SmallVector<Value>> igemmOperands;
+  if (!clGPUUseTileAndFuseGenericConvolution) {
+    igemmContractionMaps = LinalgExt::getIGEMMContractionIndexingMaps(linalgOp);
+    igemmLoopBounds = LinalgExt::getIGEMMLoopBounds(linalgOp);
+    igemmOperands = LinalgExt::getIGEMMOperands(linalgOp);
+  } else {
+    FailureOr<LinalgExt::IGEMMGenericConvDetails> igemmGenericConvDetails =
+        LinalgExt::getIGEMMGenericConvDetails(linalgOp);
+    if (failed(igemmGenericConvDetails)) {
+      LDBG("Unsupported generic convolution type");
+      return failure();
+    }
+    igemmContractionMaps = igemmGenericConvDetails->igemmContractionMaps;
+    igemmLoopBounds = igemmGenericConvDetails->igemmLoopBounds;
+    igemmOperands = igemmGenericConvDetails->igemmOperands;
+  }
+
   if (failed(igemmContractionMaps) || failed(igemmLoopBounds) ||
       failed(igemmOperands)) {
     LDBG("Unsupported convolution type");
