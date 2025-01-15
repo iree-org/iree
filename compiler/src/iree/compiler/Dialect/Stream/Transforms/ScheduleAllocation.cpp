@@ -1531,13 +1531,15 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
     scope.mapResourceRange(arg, resourceRange, asmState.get());
   }
 
-  Operation* firstUse = nullptr;
+  Operation *firstUse = nullptr;
   for (auto user : executeOp.getResultTimepoint().getUsers()) {
-    if (!firstUse || user->isBeforeInBlock(firstUse)) firstUse = user;
+    if (!firstUse || user->isBeforeInBlock(firstUse))
+      firstUse = user;
   }
   for (auto result : executeOp.getResults()) {
     for (auto user : result.getUsers()) {
-      if (!firstUse || user->isBeforeInBlock(firstUse)) firstUse = user;
+      if (!firstUse || user->isBeforeInBlock(firstUse))
+        firstUse = user;
     }
   }
 
@@ -1803,12 +1805,11 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
     llvm::dbgs() << "\n";
   });
 
-
   OpBuilder builder(newExecuteOp);
 
   if (firstUse) {
     builder.setInsertionPoint(firstUse);
-  } else  {
+  } else {
     builder.setInsertionPointAfter(newExecuteOp);
   }
 
