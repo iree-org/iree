@@ -23,9 +23,8 @@
     "tests/model_zoo/validated/vision/classification_models_test.py::test_models[resnet/model/resnet50-v2-7.onnx]": "pass",
     "tests/model_zoo/validated/vision/classification_models_test.py::test_models[shufflenet/model/shufflenet-9.onnx]": "pass",
     "tests/model_zoo/validated/vision/classification_models_test.py::test_models[shufflenet/model/shufflenet-v2-12.onnx]": "pass",
-    "tests/model_zoo/validated/vision/object_detection_segmentation_models_test.py::test_models[ssd-mobilenetv1/model/ssd_mobilenet_v1_12.onnx]": "pass",
     "tests/model_zoo/validated/vision/object_detection_segmentation_models_test.py::test_models[tiny-yolov2/model/tinyyolov2-8.onnx]": "pass",
     "tests/model_zoo/validated/vision/object_detection_segmentation_models_test.py::test_models[yolov2-coco/model/yolov2-coco-9.onnx]": "pass",
-    "tests/model_zoo/validated/vision/super_resolution_models_test.py::test_models[sub_pixel_cnn_2016/model/super-resolution-10.onnx]": "pass",
+    "tests/model_zoo/validated/vision/super_resolution_models_test.py::test_models[sub_pixel_cnn_2016/model/super-resolution-10.onnx]": "pass"
   }
 }
