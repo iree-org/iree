@@ -28,7 +28,8 @@ def IREEEncoding_EncodingLayoutAttrInterface :
     InterfaceMethod<
       /*desc=*/[{
         Returns the storage size (in bytes) for the tensor types with an
-        optional encoding.
+        optional encoding. Returns Value() if the size is unknown, i.e., it can
+        not be inferred with existing information.
       }],
       /*retTy=*/"::mlir::Value",
       /*methodName=*/"calculateStorageSizeInBytes",
