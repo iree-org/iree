@@ -396,6 +396,8 @@ not supported by Bazel rules at this point.
 
 ## External test suites
 
+### iree-test-suites
+
 Multiple test suites are under development in the
 [iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites)
 repository.
@@ -407,12 +409,7 @@ repository.
 * Keeping tests out of tree forces them to use public project APIs and allows
   the core project to keep its infrastructure simpler.
 
-The [nod-ai/SHARK-TestSuite](https://github.com/nod-ai/SHARK-TestSuite)
-repository also contains tests for many machine learning models. Some of these
-tests are planned to be migrated into
-[iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites).
-
-### linalg operator tests
+#### linalg operator tests
 
 Tests for operators in the MLIR linalg dialect like `matmul`, and `convolution`
 are being migrated from folders like
@@ -424,7 +421,7 @@ in the
 [iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites)
 repository.
 
-### ONNX operator tests
+#### :simple-onnx: ONNX operator tests
 
 Tests for individual ONNX operators are included at
 [`onnx_ops/`](https://github.com/iree-org/iree-test-suites/tree/main/onnx_ops)
@@ -438,7 +435,7 @@ Testing ONNX programs follows several stages:
 
 ```mermaid
 graph LR
-  Import -. "<br>(offline)" .-> Compile
+  Import -. "(offline)" .-> Compile
   Compile --> Run
 ```
 
@@ -469,15 +466,15 @@ To run slices of the test suite, a [pytest](https://docs.pytest.org/en/stable/)
 runner is included that can be configured using JSON files. The JSON files
 tested in the IREE repo itself are stored in
 [`tests/external/iree-test-suites/onnx_ops/`](https://github.com/iree-org/iree/tree/main/tests/external/iree-test-suites/onnx_ops).
-
-For example, here is part of a config file for running ONNX tests on CPU:
+For example, here is part of a config file for running ONNX operator tests on
+CPU:
 
 <!-- markdownlint-disable-next-line -->
 ```json title="tests/external/iree-test-suites/onnx_ops/onnx_ops_cpu_llvm_sync.json" linenums="1"
 --8<-- "tests/external/iree-test-suites/onnx_ops/onnx_ops_cpu_llvm_sync.json::20"
 ```
 
-#### Updating config files
+##### Updating config files
 
 If the ONNX operator tests fail on a GitHub Actions workflow, check the logs
 for the nature of the failure. Often, a test is *newly passing*, with logs
@@ -496,7 +493,7 @@ committed:
 
 ![image](https://github.com/user-attachments/assets/b5dbdcb4-4c0a-4ff2-adc6-9021614179b2)
 
-### ONNX model tests
+#### :simple-onnx: ONNX model tests
 
 Tests for ONNX models are included at
 [`onnx_models/`](https://github.com/iree-org/iree-test-suites/tree/main/onnx_models)
@@ -504,3 +501,51 @@ in the
 [iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites)
 repository. These tests use models from the upstream
 [onnx/models](https://github.com/onnx/models) repository.
+
+Like the ONNX operator tests, the ONNX model tests use configuration files to
+control which flags are used and which tests are run. The config files tested
+in the IREE repo itself are stored in
+[`tests/external/iree-test-suites/onnx_models/`](https://github.com/iree-org/iree/tree/main/tests/external/iree-test-suites/onnx_models).
+For example, here is part of a config file for running ONNX model tests on CPU:
+
+<!-- markdownlint-disable-next-line -->
+```json title="tests/external/iree-test-suites/onnx_models/onnx_models_cpu_llvm_task.json" linenums="1"
+--8<-- "tests/external/iree-test-suites/onnx_models/onnx_models_cpu_llvm_task.json::14"
+```
+
+Unlike the ONNX operator tests, we do not run the full set of tests on every
+commit to [iree-org/iree](https://github.com/iree-org/iree). Instead, we run a
+curated list of small tests that are expected to pass in
+[iree-org/iree](https://github.com/iree-org/iree) and then run the full set of
+tests nightly in
+[iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites).
+
+#### sharktank tests
+
+Tests for small scale versions of Large Language Models (LLMs)
+and other Generative AI (GenAI) programs exported using the
+[sharktank package](https://github.com/nod-ai/shark-ai/tree/main/sharktank)
+built as part of the [shark-ai project](https://github.com/nod-ai/shark-ai) are
+included at
+[`sharktank_models/`](https://github.com/iree-org/iree-test-suites/tree/main/sharktank_models)
+in the
+[iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites)
+repository.
+
+<!-- TODO(scotttodd): document how to coordinate changes across these projects -->
+
+### SHARK-TestSuite
+
+The [nod-ai/SHARK-TestSuite](https://github.com/nod-ai/SHARK-TestSuite)
+repository also contains tests using IREE,
+[llvm/torch-mlir](https://github.com/llvm/torch-mlir), and
+[nod-ai/shark-ai](https://github.com/nod-ai/shark-ai).
+
+Some test coverage may overlap between SHARK-TestSuite and iree-test-suites,
+though some tests are planned to be migrated into
+[iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites) once
+they mature and have demonstrated general utility to the upstream developer
+community.
+
+Test reports for nightly runs in SHARK-TestSuite are uploaded to
+[nod-ai/e2eshark-reports](https://github.com/nod-ai/e2eshark-reports).

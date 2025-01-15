@@ -17,6 +17,10 @@
   top: 5px;
   left: 0;
   display: inline;
+
+  /* Override other style settings based on header level */
+  font-size: .75rem;
+  text-transform: none;
 }
 
 pre.highlight code {
@@ -71,4 +75,9 @@ pre.highlight code {
   background-color: #ff1744;
   -webkit-mask-image: var(--md-admonition-icon--danger);
   mask-image: var(--md-admonition-icon--danger);
+}
+
+/* Don't convert h5 text to uppercase  */
+.md-typeset h5 {
+  text-transform: none;
 }
