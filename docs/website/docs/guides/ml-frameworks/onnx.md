@@ -34,8 +34,8 @@ graph LR
     Compiled programs are used by the runtime.
   }
 
-  A["ONNX\n(protobuf)"]
-  B["MLIR\n(torch-mlir)"]
+  A["ONNX<br>(protobuf)"]
+  B["MLIR<br>(torch-mlir)"]
   C[IREE compiler]
   D[Runtime deployment]
 

@@ -438,7 +438,7 @@ Testing ONNX programs follows several stages:
 
 ```mermaid
 graph LR
-  Import -. "\n(offline)" .-> Compile
+  Import -. "<br>(offline)" .-> Compile
   Compile --> Run
 ```
 
