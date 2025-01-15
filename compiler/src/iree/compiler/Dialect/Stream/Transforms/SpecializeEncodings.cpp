@@ -89,8 +89,8 @@ static LogicalResult addLayoutsToTensorPhaseOps(
       return affinityOp.emitError("failed on making layout resolvers");
     }
 
-    // Returns an updated encoding attribute if an encoding attribute is present
-    // in the type. Otherwise, returns std::nullopt.
+    // Returns an updated encoding attribute if the type is a RankedTensorType
+    // and an encoding attribute is present. Otherwise, returns std::nullopt.
     auto getEncodingWithNewLayouts =
         [=](Type type) -> std::optional<IREE::Encoding::EncodingAttr> {
       auto rankedTensorType = dyn_cast<RankedTensorType>(type);
@@ -120,9 +120,6 @@ static LogicalResult addLayoutsToTensorPhaseOps(
             .Case<IREE::Stream::TensorSizeOfOp>([&](auto sizeOfOp) {
               auto encodingType =
                   dyn_cast<RankedTensorType>(sizeOfOp.getEncoding());
-              if (!encodingType) {
-                return success();
-              }
               std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
                   getEncodingWithNewLayouts(encodingType);
               if (!encodingAttr) {
@@ -132,6 +129,34 @@ static LogicalResult addLayoutsToTensorPhaseOps(
                 sizeOfOp.setEncoding(
                     cloneWithEncoding(encodingType, encodingAttr.value()));
               });
+              return success();
+            })
+            .Case<IREE::Stream::TensorEmptyOp,
+                  IREE::Stream::TensorSplatOp>([&](auto op) {
+              auto encodingType =
+                  dyn_cast<RankedTensorType>(op.getResultEncoding());
+              std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
+                  getEncodingWithNewLayouts(encodingType);
+              if (!encodingAttr) {
+                return success();
+              }
+              rewriter.modifyOpInPlace(op, [&] {
+                op.setResultEncoding(
+                    cloneWithEncoding(encodingType, encodingAttr.value()));
+              });
+              return success();
+            })
+            .Case<IREE::Stream::TensorConstantOp>([&](auto op) {
+              auto encodingType =
+                  dyn_cast<RankedTensorType>(op.getResultEncoding());
+              if (!encodingType) {
+                return success();
+              }
+              // The EncodingAttr has padding semantic, a constant op with such
+              // encoding can not be resolved at this moment.
+              if (IREE::Encoding::getEncodingAttr(encodingType)) {
+                return failure();
+              }
               return success();
             })
             .Default([](auto *op) { return failure(); });
