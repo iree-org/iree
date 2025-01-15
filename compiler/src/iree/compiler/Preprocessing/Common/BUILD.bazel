@@ -32,7 +32,8 @@ iree_compiler_cc_library(
     srcs = [
         "ApplyPDLPatterns.cpp",
         "ConvertConv2DToImg2Col.cpp",
-        "ConvertConvToChannelsLast.cpp",
+        "ConvertConvToChannelsLast.cpp"
+        "ConvertConvFilterToChannelsLast.cpp",
         "FoldAttentionWithTranspose.cpp",
         "GeneralizeLinalgMatMul.cpp",
         "InterpreterPass.cpp",
