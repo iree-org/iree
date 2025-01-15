@@ -285,7 +285,7 @@ graph LR
   }
 
   subgraph Python
-    compiledmodule("aot.CompiledModule\n\n- extend nn.Module\n- export globals\n- set shapes/dtypes")
+    compiledmodule("aot.CompiledModule<br><br>- extend nn.Module<br>- export globals<br>- set shapes/dtypes")
     export(["ExportOutput (MLIR)"])
     compiledmodule -- "aot.export()" --> export
   end
