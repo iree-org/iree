@@ -363,7 +363,9 @@ static LogicalResult applyTileAndFuseToEachRoot(
 
     if (IREE::Codegen::LoweringConfigAttrInterface originalConfig =
             getLoweringConfig(tilingInterfaceOp)) {
-      setLoweringConfig(tiledResults->tiledAndFusedOps[0], originalConfig);
+      if (!tiledResults->tiledAndFusedOps.empty()) {
+        setLoweringConfig(tiledResults->tiledAndFusedOps[0], originalConfig);
+      }
     }
 
     // Perform the replacement of tiled and fused values.
