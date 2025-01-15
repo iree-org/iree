@@ -22,7 +22,7 @@
 static const char* IREE_HAL_HIP_ALLOCATOR_ID = "HIP unpooled";
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
-#define iree_hal_hip_async_allocation_default_queue_size 8
+#define IREE_HAL_HIP_ASYNC_ALLOCATION_DEFAULT_QUEUE_SIZE 8
 
 typedef struct iree_hal_hip_async_allocation_t {
   iree_device_size_t allocation_size;
@@ -31,7 +31,7 @@ typedef struct iree_hal_hip_async_allocation_t {
 
 IREE_HAL_HIP_UTIL_TYPED_QUEUE_WRAPPER(
     iree_hal_hip_async_allocation_queue, iree_hal_hip_async_allocation_t,
-    iree_hal_hip_async_allocation_default_queue_size);
+    IREE_HAL_HIP_ASYNC_ALLOCATION_DEFAULT_QUEUE_SIZE);
 
 typedef struct iree_hal_hip_async_allocation_map_item_t {
   iree_hal_hip_async_allocation_queue_t queue;
@@ -183,7 +183,30 @@ static iree_allocator_t iree_hal_hip_allocator_host_allocator(
 
 static iree_status_t iree_hal_hip_allocator_trim(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator) {
-  // TODO implement
+  iree_hal_hip_allocator_t* allocator =
+      iree_hal_hip_allocator_cast(base_allocator);
+
+  iree_slim_mutex_lock(&allocator->async_allocation_mutex);
+  iree_status_t status = iree_ok_status();
+  for (iree_hal_hip_util_tree_node_t* i =
+           iree_hal_hip_util_tree_first(&allocator->async_allocation_map.tree);
+       i != NULL; i = iree_hal_hip_util_tree_node_next(i)) {
+    iree_hal_hip_async_allocation_map_item_t* queue_item =
+        (iree_hal_hip_async_allocation_map_item_t*)
+            iree_hal_hip_util_tree_node_get_value(i);
+    while (!iree_hal_hip_async_allocation_queue_empty(&queue_item->queue)) {
+      iree_hal_hip_async_allocation_t allocation =
+          iree_hal_hip_async_allocation_queue_at(&queue_item->queue, 0);
+
+      status = iree_status_join(
+          status,
+          IREE_HIP_CALL_TO_STATUS(allocator->symbols,
+                                  hipFree(allocation.pointer), "hipFree"));
+      iree_hal_hip_async_allocation_queue_pop_front(&queue_item->queue, 1);
+    }
+  }
+  iree_slim_mutex_unlock(&allocator->async_allocation_mutex);
+
   return iree_ok_status();
 }
 
@@ -709,11 +732,13 @@ iree_status_t iree_hal_hip_allocator_alloc_async(
     iree_hal_buffer_t* buffer) {
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
-  if (iree_hal_buffer_allocation_size(buffer) > (size_t)-1 ||
-      iree_hal_buffer_allocation_size(buffer) > (iree_host_size_t)(-1)) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "buffer allocation too large for hip on this system");
+  if (iree_hal_buffer_allocation_size(buffer) > IREE_HOST_SIZE_MAX) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "buffer allocation of %" PRIdsz
+                            " too large to map into host address space with a "
+                            "max value of %" PRIhsz,
+                            iree_hal_buffer_allocation_size(buffer),
+                            IREE_HOST_SIZE_MAX);
   }
 
   hipDeviceptr_t ptr = NULL;
@@ -792,7 +817,7 @@ iree_status_t iree_hal_hip_allocator_free_async(
     iree_hal_hip_async_allocation_t allocation = {
         .allocation_size = iree_hal_buffer_allocation_size(buffer),
         .pointer = device_ptr};
-    iree_hal_hip_async_allocation_queue_push_back(
+    status = iree_hal_hip_async_allocation_queue_push_back(
         &((iree_hal_hip_async_allocation_map_item_t*)
               iree_hal_hip_util_tree_node_get_value(bucket))
              ->queue,
@@ -800,10 +825,9 @@ iree_status_t iree_hal_hip_allocator_free_async(
   }
   iree_slim_mutex_unlock(&allocator->async_allocation_mutex);
 
-  if (!iree_status_is_ok(status)) {
-    return status;
+  if (iree_status_is_ok(status)) {
+    iree_hal_hip_buffer_set_allocation_empty(buffer);
   }
-  iree_hal_hip_buffer_set_allocation_empty(buffer);
 
   return iree_ok_status();
 }
