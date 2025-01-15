@@ -211,7 +211,7 @@ struct VectorReductionToGPUPass final
       vector::ShapeCastOp::getCanonicalizationPatterns(patterns, ctx);
       vector::BroadcastOp::getCanonicalizationPatterns(patterns, ctx);
       vector::ExtractOp::getCanonicalizationPatterns(patterns, ctx);
-      (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+      (void)applyPatternsGreedily(getOperation(), std::move(patterns));
     }
 
     debugPrint(funcOp, "after step #1: preprocessing reduction ops");
@@ -288,7 +288,7 @@ struct VectorReductionToGPUPass final
           patterns, distributionFn, maxWriteElementsToExtract);
       patterns.add<WarpOpBarrier>(patterns.getContext(), 3);
       vector::ReductionOp::getCanonicalizationPatterns(patterns, ctx);
-      (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+      (void)applyPatternsGreedily(getOperation(), std::move(patterns));
     }
 
     debugPrint(funcOp, "after step #4: propagating distribution");
@@ -303,7 +303,7 @@ struct VectorReductionToGPUPass final
         builder.create<gpu::BarrierOp>(loc);
       };
       vector::populateWarpExecuteOnLane0OpToScfForPattern(patterns, options);
-      (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+      (void)applyPatternsGreedily(getOperation(), std::move(patterns));
     }
 
     debugPrint(funcOp, "after step #5: lowering remaining ops");

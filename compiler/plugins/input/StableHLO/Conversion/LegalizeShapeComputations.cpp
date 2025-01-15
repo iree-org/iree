@@ -170,7 +170,7 @@ struct LegalizeShapeComputations final
 
     auto func = this->getOperation();
     populateLegalizeShapeComputationPatterns(&ctx, &patterns);
-    if (failed(applyPatternsAndFoldGreedily(func, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(func, std::move(patterns)))) {
       this->signalPassFailure();
     }
   }

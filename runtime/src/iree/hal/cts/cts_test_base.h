@@ -190,7 +190,7 @@ class CTSTestBase : public BaseType, public CTSTestResources {
         iree_hal_device_allocator(device_), params, buffer_size,
         &device_buffer));
     IREE_ASSERT_OK(
-        iree_hal_buffer_map_zero(device_buffer, 0, IREE_WHOLE_BUFFER));
+        iree_hal_buffer_map_zero(device_buffer, 0, IREE_HAL_WHOLE_BUFFER));
     *out_buffer = device_buffer;
   }
 
@@ -208,8 +208,8 @@ class CTSTestBase : public BaseType, public CTSTestResources {
     IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
         iree_hal_device_allocator(device_), params, buffer_size,
         &device_buffer));
-    IREE_ASSERT_OK(iree_hal_buffer_map_fill(device_buffer, 0, IREE_WHOLE_BUFFER,
-                                            &pattern, sizeof(pattern)));
+    IREE_ASSERT_OK(iree_hal_buffer_map_fill(
+        device_buffer, 0, IREE_HAL_WHOLE_BUFFER, &pattern, sizeof(pattern)));
     *out_buffer = device_buffer;
   }
 

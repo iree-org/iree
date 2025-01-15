@@ -223,17 +223,16 @@ IREE_API_EXPORT iree_status_t iree_hal_fd_file_from_handle(
   // Verify that the requested access can be satisfied.
   if (iree_all_bits_set(access, IREE_HAL_MEMORY_ACCESS_READ) &&
       !iree_all_bits_set(allowed_access, IREE_HAL_MEMORY_ACCESS_READ)) {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0,
-        iree_make_status(
-            IREE_STATUS_PERMISSION_DENIED,
-            "read access requested on a file descriptor that is not readable"));
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_PERMISSION_DENIED,
+        "read access requested on a file descriptor that is not readable");
   } else if (iree_all_bits_set(access, IREE_HAL_MEMORY_ACCESS_WRITE) &&
              !iree_all_bits_set(allowed_access, IREE_HAL_MEMORY_ACCESS_WRITE)) {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_make_status(IREE_STATUS_PERMISSION_DENIED,
-                             "write access requested on a file descriptor that "
-                             "is not writable"));
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_PERMISSION_DENIED,
+                            "write access requested on a file descriptor that "
+                            "is not writable");
   }
 
   // Allocate object that retains the underlying file handle and our opened
@@ -319,8 +318,7 @@ static iree_status_t iree_hal_fd_file_read(iree_hal_file_t* base_file,
   if (iree_status_is_ok(status) &&
       !iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
                          IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
-    status =
-        iree_hal_buffer_mapping_flush_range(&mapping, buffer_offset, length);
+    status = iree_hal_buffer_mapping_flush_range(&mapping, 0, length);
   }
 
   return iree_status_join(status, iree_hal_buffer_unmap_range(&mapping));
@@ -342,8 +340,7 @@ static iree_status_t iree_hal_fd_file_write(iree_hal_file_t* base_file,
   iree_status_t status = iree_ok_status();
   if (!iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
                          IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
-    status = iree_hal_buffer_mapping_invalidate_range(&mapping, buffer_offset,
-                                                      length);
+    status = iree_hal_buffer_mapping_invalidate_range(&mapping, 0, length);
   }
 
   const uint8_t* buffer_ptr = mapping.contents.data;

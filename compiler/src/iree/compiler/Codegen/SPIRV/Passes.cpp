@@ -227,11 +227,14 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
 /// Adds passes to perform the final SPIR-V conversion.
 static void addSPIRVLoweringPasses(OpPassManager &modulePassManager) {
   FunctionLikeNest(modulePassManager)
-      .addPass(createGPUPropagateDispatchSizeBoundsPass)
+      .addPass(createPropagateDispatchSizeBoundsPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
       .addPass(createLowerAffinePass)
-      .addPass(IREE::Util::createOptimizeIntArithmeticPass)
+      .addPass([]() {
+        return IREE::Util::createOptimizeIntArithmeticPass(
+            IREE::Util::OptimizeIntArithmeticPassOptions{/*narrowToI32=*/true});
+      })
 
       // Lower ApplyScale before the i64 Emulation Pass so that new 64-bit ops
       // are also emulated if not supported by the target.

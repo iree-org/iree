@@ -368,7 +368,7 @@ static iree_status_t iree_benchmark_executable_from_flags(
           " is not",
           i);
     }
-    bindings[i] = iree_hal_make_buffer_ref(buffer, 0, IREE_WHOLE_BUFFER);
+    bindings[i] = iree_hal_make_buffer_ref(buffer, 0, IREE_HAL_WHOLE_BUFFER);
   }
 
   // Setup the specification used to perform the executable load.

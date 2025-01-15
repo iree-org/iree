@@ -88,13 +88,28 @@
 // Local zone ID used for the C IREE_TRACE_ZONE_* macros.
 typedef uint32_t iree_zone_id_t;
 
+typedef struct ___tracy_source_location_data iree_tracing_location_t;
+
+// Matches GpuContextType.
+// TODO(benvanik): upstream a few more enum values for CUDA/Metal/etc.
+// The only real behavior that changes in tracy is around whether multi-threaded
+// recording is assumed and IREE_TRACING_GPU_CONTEXT_TYPE_VULKAN is a safe
+// default choice - the context name provided during creation should be
+// descriptive enough for the user.
+typedef enum iree_tracing_gpu_context_type_e {
+  IREE_TRACING_GPU_CONTEXT_TYPE_INVALID = 0,
+  IREE_TRACING_GPU_CONTEXT_TYPE_OPENGL,
+  IREE_TRACING_GPU_CONTEXT_TYPE_VULKAN,
+  IREE_TRACING_GPU_CONTEXT_TYPE_OPENCL,
+  IREE_TRACING_GPU_CONTEXT_TYPE_DIRECT3D12,
+  IREE_TRACING_GPU_CONTEXT_TYPE_DIRECT3D11,
+} iree_tracing_gpu_context_type_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
 
 #if IREE_TRACING_FEATURES
-
-typedef struct ___tracy_source_location_data iree_tracing_location_t;
 
 #ifdef __cplusplus
 #define iree_tracing_make_zone_ctx(zone_id) \
@@ -140,21 +155,6 @@ void iree_tracing_mutex_after_unlock(uint32_t lock_id);
 
 int64_t iree_tracing_time(void);
 int64_t iree_tracing_frequency(void);
-
-// Matches GpuContextType.
-// TODO(benvanik): upstream a few more enum values for CUDA/Metal/etc.
-// The only real behavior that changes in tracy is around whether multi-threaded
-// recording is assumed and IREE_TRACING_GPU_CONTEXT_TYPE_VULKAN is a safe
-// default choice - the context name provided during creation should be
-// descriptive enough for the user.
-typedef enum iree_tracing_gpu_context_type_e {
-  IREE_TRACING_GPU_CONTEXT_TYPE_INVALID = 0,
-  IREE_TRACING_GPU_CONTEXT_TYPE_OPENGL,
-  IREE_TRACING_GPU_CONTEXT_TYPE_VULKAN,
-  IREE_TRACING_GPU_CONTEXT_TYPE_OPENCL,
-  IREE_TRACING_GPU_CONTEXT_TYPE_DIRECT3D12,
-  IREE_TRACING_GPU_CONTEXT_TYPE_DIRECT3D11,
-} iree_tracing_gpu_context_type_t;
 
 uint8_t iree_tracing_gpu_context_allocate(iree_tracing_gpu_context_type_t type,
                                           const char* name, size_t name_length,
@@ -327,6 +327,164 @@ void* iree_tracing_obscure_ptr(void* ptr);
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_CALLSTACKS
 
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+
+//===----------------------------------------------------------------------===//
+// Experimental Tracing Interop API
+//===----------------------------------------------------------------------===//
+
+// Enables a mechanism for recording trace events without relying on
+// thread local state managed by the underlying tracing implementation to allow
+// for a single thread to publish events for any number of threads. This is
+// required when interoping with non-thread-based event sources (remote devices,
+// virtualized processes, threads running in sandboxes, etc). Since support both
+// in IREE and in Tracy for this style of event generation is experimental the
+// normal TLS-based tracing API should be used in most cases.
+//
+// TODO:
+// - Add a tracy::Profiler::SetThreadNameWithHint that updates the
+//   GetThreadNameData() linked list and allow us to set thread names.
+// - Add a tracy::QueueType::ZoneTextLiteral that takes its payload as a ptr.
+// - Add a thread override to MemAllocNamed and MemFreeNamed.
+// - Fix GPU zones to not require serial recording.
+//
+// The implementation relies on details of Tracy internals as it doesn't have
+// an API for what we're doing. We could propose one and try to get it landed
+// such that we at least did not need to manually write out structs and manage
+// the concurrent queues.
+#if !defined(IREE_TRACING_EXPERIMENTAL_CONTEXT_API)
+#define IREE_TRACING_EXPERIMENTAL_CONTEXT_API 0
+#endif  // !IREE_TRACING_EXPERIMENTAL_CONTEXT_API
+
+typedef struct iree_tracing_context_t iree_tracing_context_t;
+
+typedef uint8_t iree_tracing_executor_id_t;
+typedef uint16_t iree_tracing_query_id_t;
+
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+
+#if IREE_TRACING_FEATURES && IREE_TRACING_EXPERIMENTAL_CONTEXT_API
+
+iree_tracing_context_t* iree_tracing_context_allocate(
+    const char* name, iree_host_size_t name_length);
+
+void iree_tracing_context_free(iree_tracing_context_t* context);
+
+void iree_tracing_context_calibrate_executor(
+    iree_tracing_context_t* context, iree_tracing_executor_id_t executor_id,
+    int64_t cpu_delta, uint64_t host_timestamp, uint64_t executor_timestamp);
+
+void iree_tracing_context_zone_begin(iree_tracing_context_t* context,
+                                     uint64_t timestamp,
+                                     const iree_tracing_location_t* src_loc);
+
+void iree_tracing_context_zone_end(iree_tracing_context_t* context,
+                                   uint64_t timestamp);
+
+void iree_tracing_context_zone_value_i64(iree_tracing_context_t* context,
+                                         uint64_t value);
+
+void iree_tracing_context_zone_value_text_literal(
+    iree_tracing_context_t* context, const char* value);
+
+void iree_tracing_context_zone_value_text_dynamic(
+    iree_tracing_context_t* context, const char* value,
+    iree_host_size_t value_length);
+
+void iree_tracing_context_execution_zone_begin(
+    iree_tracing_context_t* context, uint64_t timestamp,
+    const iree_tracing_location_t* src_loc,
+    iree_tracing_executor_id_t executor_id, iree_tracing_query_id_t query_id);
+
+void iree_tracing_context_execution_zone_end(
+    iree_tracing_context_t* context, uint64_t timestamp,
+    iree_tracing_executor_id_t executor_id, iree_tracing_query_id_t query_id);
+
+void iree_tracing_context_execution_zone_notify(
+    iree_tracing_context_t* context, iree_tracing_executor_id_t executor_id,
+    iree_tracing_query_id_t query_id, uint64_t query_timestamp);
+
+void iree_tracing_context_memory_alloc(iree_tracing_context_t* context,
+                                       uint64_t timestamp, const char* pool,
+                                       uint64_t ptr, uint64_t size);
+
+void iree_tracing_context_memory_free(iree_tracing_context_t* context,
+                                      uint64_t timestamp, const char* pool,
+                                      uint64_t ptr);
+
+void iree_tracing_context_message_literal(iree_tracing_context_t* context,
+                                          uint64_t timestamp,
+                                          const char* value);
+
+void iree_tracing_context_message_dynamic(iree_tracing_context_t* context,
+                                          uint64_t timestamp, const char* value,
+                                          iree_host_size_t value_length);
+
+void iree_tracing_context_plot_config(iree_tracing_context_t* context,
+                                      const char* name_literal, uint8_t type,
+                                      bool step, bool fill, uint32_t color);
+
+void iree_tracing_context_plot_value_i64(iree_tracing_context_t* context,
+                                         uint64_t timestamp,
+                                         const char* plot_name, int64_t value);
+
+#else
+
+static inline iree_tracing_context_t* iree_tracing_context_allocate(
+    const char* name, iree_host_size_t name_length) {
+  return NULL;
+}
+static inline void iree_tracing_context_free(iree_tracing_context_t* context) {}
+static inline void iree_tracing_context_calibrate_executor(
+    iree_tracing_context_t* context, iree_tracing_executor_id_t executor_id,
+    int64_t cpu_delta, uint64_t host_timestamp, uint64_t executor_timestamp) {}
+static inline void iree_tracing_context_zone_begin(
+    iree_tracing_context_t* context, uint64_t timestamp,
+    const iree_tracing_location_t* src_loc) {}
+static inline void iree_tracing_context_zone_end(
+    iree_tracing_context_t* context, uint64_t timestamp) {}
+static inline void iree_tracing_context_zone_value_i64(
+    iree_tracing_context_t* context, uint64_t value) {}
+static inline void iree_tracing_context_zone_value_text_literal(
+    iree_tracing_context_t* context, const char* value) {}
+static inline void iree_tracing_context_zone_value_text_dynamic(
+    iree_tracing_context_t* context, const char* value,
+    iree_host_size_t value_length) {}
+static inline void iree_tracing_context_execution_zone_begin(
+    iree_tracing_context_t* context, uint64_t timestamp,
+    const iree_tracing_location_t* src_loc,
+    iree_tracing_executor_id_t executor_id, iree_tracing_query_id_t query_id) {}
+static inline void iree_tracing_context_execution_zone_end(
+    iree_tracing_context_t* context, uint64_t timestamp,
+    iree_tracing_executor_id_t executor_id, iree_tracing_query_id_t query_id) {}
+static inline void iree_tracing_context_execution_zone_notify(
+    iree_tracing_context_t* context, iree_tracing_executor_id_t executor_id,
+    iree_tracing_query_id_t query_id, uint64_t query_timestamp) {}
+static inline void iree_tracing_context_memory_alloc(
+    iree_tracing_context_t* context, uint64_t timestamp, const char* pool,
+    uint64_t ptr, uint64_t size) {}
+static inline void iree_tracing_context_memory_free(
+    iree_tracing_context_t* context, uint64_t timestamp, const char* pool,
+    uint64_t ptr) {}
+static inline void iree_tracing_context_message_literal(
+    iree_tracing_context_t* context, uint64_t timestamp, const char* value) {}
+static inline void iree_tracing_context_message_dynamic(
+    iree_tracing_context_t* context, uint64_t timestamp, const char* value,
+    iree_host_size_t value_length) {}
+static void iree_tracing_context_plot_config(iree_tracing_context_t* context,
+                                             const char* name_literal,
+                                             uint8_t type, bool step, bool fill,
+                                             uint32_t color) {}
+static inline void iree_tracing_context_plot_value_i64(
+    iree_tracing_context_t* context, uint64_t timestamp, const char* plot_name,
+    int64_t value) {}
+
+#endif  // IREE_TRACING_FEATURES && IREE_TRACING_EXPERIMENTAL_CONTEXT_API
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 //===----------------------------------------------------------------------===//
 // Instrumentation C++ RAII types, wrappers, and macros

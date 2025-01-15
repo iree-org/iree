@@ -88,14 +88,15 @@ static LogicalResult verifyAndCollectExpandableUsers(
       return failure();
     if (extractSliceOp.getMixedOffsets() != parallelInsertOp.getMixedOffsets())
       return failure();
-    auto expandShapeOp =
-        dyn_cast<tensor::ExpandShapeOp>(*extractSliceOp->getUsers().begin());
-    if (!expandShapeOp)
-      return failure();
-    SmallVector<ReassociationIndices> expandReIndices =
-        expandShapeOp.getReassociationIndices();
-    if (reIndices != expandReIndices)
-      return failure();
+    for (Operation *user : extractSliceOp->getUsers()) {
+      auto expandShapeOp = dyn_cast<tensor::ExpandShapeOp>(user);
+      if (!expandShapeOp)
+        return failure();
+      SmallVector<ReassociationIndices> expandReIndices =
+          expandShapeOp.getReassociationIndices();
+      if (reIndices != expandReIndices)
+        return failure();
+    }
     expandableUsers.push_back(extractSliceOp);
   }
   return success();
@@ -155,9 +156,14 @@ expandVerifiedUsers(PatternRewriter &rewriter, Location loc, MLIRContext *ctx,
       expandedOffsets, expandedSizes, expandedStrides);
   for (tensor::ExtractSliceOp extractSliceOp : expandableUsers) {
     rewriter.setInsertionPoint(extractSliceOp);
-    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
-        extractSliceOp, resultType, extractSliceOp.getSource(), expandedOffsets,
-        expandedSizes, expandedStrides);
+    auto newExtractSliceOp =
+        rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
+            extractSliceOp, resultType, extractSliceOp.getSource(),
+            expandedOffsets, expandedSizes, expandedStrides);
+    for (Operation *user : newExtractSliceOp->getUsers()) {
+      auto expandShapeOp = dyn_cast<tensor::ExpandShapeOp>(user);
+      expandShapeOp->replaceAllUsesWith(newExtractSliceOp);
+    }
   }
   return;
 }
@@ -300,8 +306,7 @@ void PropagateReshapesByExpansionPass::runOnOperation() {
     // Preemptively attempt to fold any reshapes into interface bindings if
     // possible to simplify subsequent reshape propagation.
     populateReshapeToInterfaceTensorPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }
@@ -335,8 +340,8 @@ void PropagateReshapesByExpansionPass::runOnOperation() {
   populateReshapeToInterfaceTensorPatterns(bubbleExpandShapePatterns);
   bubbleExpandShapePatterns.add<ExpandDestinationForallOp>(context);
 
-  if (failed(applyPatternsAndFoldGreedily(
-          getOperation(), std::move(bubbleExpandShapePatterns)))) {
+  if (failed(applyPatternsGreedily(getOperation(),
+                                   std::move(bubbleExpandShapePatterns)))) {
     getOperation()->emitOpError("Failed to propagate reshapes");
     return signalPassFailure();
   }

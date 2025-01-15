@@ -427,6 +427,7 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
                   ApplyStreamableOp<IREE::Stream::AsyncUpdateOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncCopyOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncCollectiveOp>,
+                  ApplyStreamableOp<IREE::Stream::AsyncBarrierOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncTransferOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncLoadOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncStoreOp>,
@@ -462,8 +463,8 @@ struct RefineUsagePass
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
     GreedyRewriteConfig rewriteConfig;
     rewriteConfig.useTopDownTraversal = true;
-    if (failed(applyPatternsAndFoldGreedily(moduleOp, frozenPatterns,
-                                            rewriteConfig))) {
+    if (failed(
+            applyPatternsGreedily(moduleOp, frozenPatterns, rewriteConfig))) {
       return signalPassFailure();
     }
   }

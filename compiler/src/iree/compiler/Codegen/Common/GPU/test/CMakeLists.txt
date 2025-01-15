@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "gpu_apply_derived_thread_config.mlir"
     "gpu_apply_tiling_level.mlir"
     "gpu_check_resource_usage.mlir"
     "gpu_combine_value_barriers.mlir"
@@ -29,12 +30,12 @@ iree_lit_test_suite(
     "gpu_lower_to_ukernels.mlir"
     "gpu_nested_layout_contract_amdgpu.mlir"
     "gpu_nested_layout_vector_distribution.mlir"
+    "gpu_nested_layout_vector_distribution_multi_reduce.mlir"
     "gpu_nested_layout_vector_distribution_step.mlir"
     "gpu_pack_to_instrinsics.mlir"
     "gpu_pad_operands.mlir"
     "gpu_pipeline.mlir"
     "gpu_promote_matmul_operands.mlir"
-    "gpu_propagate_dispatch_size_bounds.mlir"
     "gpu_reorder_workgroups.mlir"
     "gpu_reorder_workgroups_static.mlir"
     "gpu_reuse_shared_memory_allocs.mlir"

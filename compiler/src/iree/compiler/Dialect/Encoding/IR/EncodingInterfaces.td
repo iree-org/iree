@@ -28,7 +28,8 @@ def IREEEncoding_EncodingLayoutAttrInterface :
     InterfaceMethod<
       /*desc=*/[{
         Returns the storage size (in bytes) for the tensor types with an
-        optional encoding.
+        optional encoding. Returns Value() if the size is unknown, i.e., it can
+        not be inferred with existing information.
       }],
       /*retTy=*/"::mlir::Value",
       /*methodName=*/"calculateStorageSizeInBytes",
@@ -37,6 +38,48 @@ def IREEEncoding_EncodingLayoutAttrInterface :
         "::mlir::OpBuilder &":$builder,
         "RankedTensorType":$type,
         "ValueRange":$dynamicDims
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return {};
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the attribute with simplified configuration/layouts. Attribute
+        is immutable in MLIR concept. Different attributes can implement
+        attribute interface methods differently, and they can carry target
+        configuration (e.g., cpu features) for further lowering. However, some
+        configuration/parameters can be dropped as long as they are no longer
+        needed in the progressively lowering. This method provides a mechanism
+        for such attribute to drop the outdated paramters and makes IR dump less
+        verbose.
+      }],
+      /*retTy=*/"::mlir::Attribute",
+      /*methodName=*/"cloneWithSimplifiedConfig",
+      /*args=*/(ins
+        "::mlir::DictionaryAttr":$config
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return {};
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the serialized layout, which is either common format or wrapped
+        by an attribute that implements EncodingLayoutAttrInterface interface.
+        If it is in common format (e.g., a regular tensor type), we can easily
+        calculate the storage size. Otherwise, we will need a hook from
+        external, and the hook can come from an attribute that implements the
+        interface.
+      }],
+      /*retTy=*/"::mlir::Attribute",
+      /*methodName=*/"getLayout",
+      /*args=*/(ins
+        "::mlir::RankedTensorType":$type
       ),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{

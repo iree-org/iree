@@ -147,14 +147,14 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
   case IREE::GPU::MMAFragment::Lhs:
     // A-matrix (LHS). Source dimensions are M (index 0) and K (index 1).
     // Unroll on K with interleaving, then on M.
-    if (mma.getUnrollK() > 1) {
-      expand(swizzle, 1, {Kind::CrossIntrinsic, mma.getUnrollK()});
+    if (mma.getIntrinsicsK() > 1) {
+      expand(swizzle, 1, {Kind::CrossIntrinsic, mma.getIntrinsicsK()});
       int interleavingIdx =
           getInnermostNonInternalDimIdx(swizzle.expandShape[1]);
       interleave(swizzle, 1, interleavingIdx);
     }
-    if (mma.getUnrollM() > 1) {
-      expand(swizzle, 0, {Kind::CrossIntrinsic, mma.getUnrollM()});
+    if (mma.getIntrinsicsM() > 1) {
+      expand(swizzle, 0, {Kind::CrossIntrinsic, mma.getIntrinsicsM()});
     }
     if (mma.getSubgroupsM() > 1) {
       expand(swizzle, 0, {Kind::CrossThread, mma.getSubgroupsM()});
@@ -164,14 +164,14 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
     // B-matrix (RHS). Since the pack ops already took care of transposing B,
     // source dimensions are N (index 0) and K (index 1).
     // Unroll on K with interleaving, then on N.
-    if (mma.getUnrollK() > 1) {
-      expand(swizzle, 1, {Kind::CrossIntrinsic, mma.getUnrollK()});
+    if (mma.getIntrinsicsK() > 1) {
+      expand(swizzle, 1, {Kind::CrossIntrinsic, mma.getIntrinsicsK()});
       int interleavingIdx =
           getInnermostNonInternalDimIdx(swizzle.expandShape[1]);
       interleave(swizzle, 1, interleavingIdx);
     }
-    if (mma.getUnrollN() > 1) {
-      expand(swizzle, 0, {Kind::CrossIntrinsic, mma.getUnrollN()});
+    if (mma.getIntrinsicsN() > 1) {
+      expand(swizzle, 0, {Kind::CrossIntrinsic, mma.getIntrinsicsN()});
     }
     if (mma.getSubgroupsN() > 1) {
       expand(swizzle, 0, {Kind::CrossThread, mma.getSubgroupsN()});
@@ -180,14 +180,14 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
   case IREE::GPU::MMAFragment::Acc:
     // C-matrix (accumulator). Source dimensions are M (index 0) and N (index
     // 1). Unroll on N, then on M.
-    if (mma.getUnrollN() > 1) {
-      expand(swizzle, 1, {Kind::CrossIntrinsic, mma.getUnrollN()});
+    if (mma.getIntrinsicsN() > 1) {
+      expand(swizzle, 1, {Kind::CrossIntrinsic, mma.getIntrinsicsN()});
+    }
+    if (mma.getIntrinsicsM() > 1) {
+      expand(swizzle, 0, {Kind::CrossIntrinsic, mma.getIntrinsicsM()});
     }
     if (mma.getSubgroupsN() > 1) {
       expand(swizzle, 1, {Kind::CrossThread, mma.getSubgroupsN()});
-    }
-    if (mma.getUnrollM() > 1) {
-      expand(swizzle, 0, {Kind::CrossIntrinsic, mma.getUnrollM()});
     }
     if (mma.getSubgroupsM() > 1) {
       expand(swizzle, 0, {Kind::CrossThread, mma.getSubgroupsM()});

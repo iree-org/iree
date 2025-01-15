@@ -46,6 +46,9 @@ jobs:
   setup:
     uses: ./.github/workflows/setup.yml
 
+  ##############################################################################
+  # Runtime builds
+
   runtime:
     needs: setup
     name: "runtime :: ${{ matrix.name }}"
@@ -94,7 +97,7 @@ jobs:
       - name: Install Python requirements
         run: pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: ccache
-        uses: hendrikmuhs/ccache-action@ed74d11c0b343532753ecead8a951bb09bb34bc9 # v1.2.14
+        uses: hendrikmuhs/ccache-action@53911442209d5c18de8a31615e0923161e435875 # v1.2.16
         with:
           key: ${{ github.job }}-${{ matrix.name }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
@@ -132,7 +135,7 @@ jobs:
       - name: Checkout runtime submodules
         run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: ccache
-        uses: hendrikmuhs/ccache-action@ed74d11c0b343532753ecead8a951bb09bb34bc9 # v1.2.14
+        uses: hendrikmuhs/ccache-action@53911442209d5c18de8a31615e0923161e435875 # v1.2.16
         with:
           key: ${{ github.job }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
@@ -154,30 +157,49 @@ jobs:
 
   runtime_tracing:
     needs: setup
-    name: "runtime_tracing :: ${{ matrix.provider }} provider"
+    name: "runtime_tracing :: ${{ matrix.runs-on }} :: ${{ matrix.provider }}"
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'runtime_tracing')
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runs-on }}
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - provider: tracy
-          - provider: console
+        runs-on: [ubuntu-24.04, windows-2022, macos-14]
+        provider: [tracy, console]
     env:
       BUILD_DIR: build-tracing
-      CC: clang
-      CXX: clang++
-      TRACING_PROVIDER: ${{ matrix.provider }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Install requirements
-        run: sudo apt update && sudo apt install -y ninja-build
+
+      - name: (Linux) Install requirements
+        if: contains(matrix.runs-on, 'ubuntu')
+        run: |
+          sudo apt update
+          sudo apt install -y ninja-build
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
+      - name: (Windows) Configure MSVC
+        if: contains(matrix.runs-on, 'windows')
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+      - name: (macOS) Install requirements
+        if: contains(matrix.runs-on, 'macos')
+        run: brew install ninja ccache coreutils bash
+
+      - name: (Linux/Windows) Set driver options
+        if: contains(matrix.runs-on, 'ubuntu') || contains(matrix.runs-on, 'windows')
+        run: echo IREE_DRIVER_OPTIONS="-DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON -DIREE_HAL_DRIVER_VULKAN=ON" >> $GITHUB_ENV
+      - name: (macOS) Set driver options
+        if: contains(matrix.runs-on, 'macos')
+        run: echo IREE_DRIVER_OPTIONS="-DIREE_HAL_DRIVER_METAL=ON -DIREE_HAL_DRIVER_VULKAN=OFF" >> $GITHUB_ENV
+
       - name: Checkout runtime submodules
         run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: ccache
-        uses: hendrikmuhs/ccache-action@ed74d11c0b343532753ecead8a951bb09bb34bc9 # v1.2.14
+        uses: hendrikmuhs/ccache-action@53911442209d5c18de8a31615e0923161e435875 # v1.2.16
         with:
-          key: ${{ github.job }}-${{ matrix.provider }}
+          key: ${{ github.job }}-${{ matrix.runs-on}}-${{ matrix.provider }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
       - name: CMake - configure
         run: |
@@ -190,11 +212,31 @@ jobs:
             -DIREE_BUILD_COMPILER=OFF \
             -DIREE_ENABLE_LLD=ON \
             -DIREE_ENABLE_RUNTIME_TRACING=ON \
-            -DIREE_TRACING_PROVIDER=${TRACING_PROVIDER} \
-            -DIREE_HAL_DRIVER_CUDA=ON \
-            -DIREE_HAL_DRIVER_HIP=ON
+            -DIREE_TRACING_PROVIDER=${{ matrix.provider }} \
+            ${IREE_DRIVER_OPTIONS}
       - name: CMake - build
         run: cmake --build ${BUILD_DIR} -- -k 0
+
+  ##############################################################################
+  # Full project builds
+
+  linux_x64_bazel:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_bazel')
+    uses: ./.github/workflows/ci_linux_x64_bazel.yml
+    secrets: inherit
+
+  linux_x64_clang:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang')
+    uses: ./.github/workflows/ci_linux_x64_clang.yml
+    secrets: inherit
+
+  linux_x64_clang_asan:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_asan')
+    uses: ./.github/workflows/ci_linux_x64_clang_asan.yml
+    secrets: inherit
 
   ##############################################################################
 
@@ -203,9 +245,16 @@ jobs:
     if: always()
     needs:
       - setup
+
+      # Runtime builds.
       - runtime
       - runtime_small
       - runtime_tracing
+
+      # Full project builds.
+      - linux_x64_bazel
+      - linux_x64_clang
+      - linux_x64_clang_asan
     uses: ./.github/workflows/workflow_summary.yml
     secrets: inherit
     with:

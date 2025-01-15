@@ -729,10 +729,10 @@ hal.executable public @main {
             #iree_gpu.iterator_type<reduction>],
           kind = #iree_gpu.data_tiled_mma_layout<
             intrinsic = MFMA_F32_16x16x4_F32,
-            unroll_m = 8,
-            unroll_n = 2,
+            intrinsics_m = 8,
+            intrinsics_n = 2,
             subgroups_n = 4,
-            unroll_k = 4>}
+            intrinsics_k = 4>}
           : tensor<4x1x8x4x16x4xf32>, tensor<4x1x4x2x4x16x4xf32> into tensor<4x4x8x4x2x4x16x4xf32>
         flow.dispatch.tensor.store %6, %2, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [4, 4, 8, 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : tensor<4x4x8x4x2x4x16x4xf32> -> !flow.dispatch.tensor<readwrite:tensor<4x4x8x4x2x4x16x4xf32>>
         return
@@ -755,11 +755,11 @@ hal.executable public @main {
 // CHECK:      gpu.barrier
 // CHECK-DAG:  %[[A_READ:.+]] = vector.transfer_read %[[A_ALLOC]]{{.*}} vector<8x1x1x4xf32>
 // CHECK-DAG:  %[[B_READ:.+]] = vector.transfer_read %[[B_ALLOC]]{{.*}} vector<2x1x1x4xf32>
-// CHECK-DAG:  %[[C_READ:.+]] = vector.transfer_read %[[BINDING_C]]{{.*}} vector<8x1x2x1x1x4xf32>
-// CHECK-DAG:  %[[C_00_0:.+]] = vector.extract %[[C_READ]][0, 0, 0, 0, 0] : vector<4xf32> from vector<8x1x2x1x1x4xf32>
-// CHECK-DAG:  %[[C_01_0:.+]] = vector.extract %[[C_READ]][0, 0, 1, 0, 0] : vector<4xf32> from vector<8x1x2x1x1x4xf32>
-// CHECK-DAG:  %[[C_70_0:.+]] = vector.extract %[[C_READ]][7, 0, 0, 0, 0] : vector<4xf32> from vector<8x1x2x1x1x4xf32>
-// CHECK-DAG:  %[[C_71_0:.+]] = vector.extract %[[C_READ]][7, 0, 1, 0, 0] : vector<4xf32> from vector<8x1x2x1x1x4xf32>
+// CHECK-DAG:  %[[C_READ:.+]] = vector.transfer_read %[[BINDING_C]]{{.*}} vector<8x2x1x1x4xf32>
+// CHECK-DAG:  %[[C_00_0:.+]] = vector.extract %[[C_READ]][0, 0, 0, 0] : vector<4xf32> from vector<8x2x1x1x4xf32>
+// CHECK-DAG:  %[[C_01_0:.+]] = vector.extract %[[C_READ]][0, 1, 0, 0] : vector<4xf32> from vector<8x2x1x1x4xf32>
+// CHECK-DAG:  %[[C_70_0:.+]] = vector.extract %[[C_READ]][7, 0, 0, 0] : vector<4xf32> from vector<8x2x1x1x4xf32>
+// CHECK-DAG:  %[[C_71_0:.+]] = vector.extract %[[C_READ]][7, 1, 0, 0] : vector<4xf32> from vector<8x2x1x1x4xf32>
 // CHECK-DAG:  %[[A_EXTRACT00:.+]] = vector.extract %[[A_READ]][0, 0, 0, 0] : f32 from vector<8x1x1x4xf32>
 // CHECK-DAG:  %[[A_EXTRACT01:.+]] = vector.extract %[[A_READ]][0, 0, 0, 1] : f32 from vector<8x1x1x4xf32>
 // CHECK-DAG:  %[[A_EXTRACT02:.+]] = vector.extract %[[A_READ]][0, 0, 0, 2] : f32 from vector<8x1x1x4xf32>
@@ -908,6 +908,7 @@ hal.executable public @main {
 // for loop.
 //       CHECK:       vector.transfer_write %{{.*}}, %[[B2]]{{.*}} memref<10x1xf32, #hal.descriptor_type<storage_buffer>>
 //  CHECK-NEXT:     }
+//  CHECK-NEXT:   gpu.barrier
 //  CHECK-NEXT:   } {mapping = [#iree_codegen.workgroup_mapping<x>]}
 //  CHECK-NEXT:   return
 

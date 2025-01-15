@@ -159,7 +159,10 @@ struct ConvertToROCDLPass final
       populateDropSharedMemoryDeallocOpPatterns(patterns);
       populateScalarizeMathOps(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
+      vector::populateBubbleVectorBitCastOpPatterns(patterns);
       vector::populateVectorBroadcastLoweringPatterns(patterns);
+      vector::populateVectorInterleaveLoweringPatterns(patterns);
+      vector::populateVectorInterleaveToShufflePatterns(patterns);
       vector::populateVectorContractLoweringPatterns(
           patterns,
           vector::VectorTransformsOptions().setVectorTransformsOptions(
@@ -176,7 +179,7 @@ struct ConvertToROCDLPass final
           patterns, vector::VectorTransformsOptions());
       vector::populateVectorTransferLoweringPatterns(patterns);
       arith::populateExpandBFloat16Patterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -186,7 +189,7 @@ struct ConvertToROCDLPass final
     {
       RewritePatternSet patterns(&getContext());
       populateGpuRewritePatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -200,7 +203,7 @@ struct ConvertToROCDLPass final
       // (https://github.com/llvm/llvm-project/issues/67815).
       RewritePatternSet patterns(&getContext());
       populateReplaceSlowMinMaxOpsPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -225,6 +228,7 @@ struct ConvertToROCDLPass final
       vector::populateVectorRankReducingFMAPattern(llvmPatterns);
       vector::populateVectorInsertExtractStridedSliceTransforms(llvmPatterns);
       vector::populateVectorStepLoweringPatterns(llvmPatterns);
+      vector::populateVectorBitCastLoweringPatterns(llvmPatterns);
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
       vector::populateVectorTransferLoweringPatterns(llvmPatterns,
                                                      /*maxTransferRank=*/1);

@@ -347,7 +347,9 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   if (pipelineOptions.useIgemmConvolution) {
     funcPassManager.addPass(createConvolutionToIGEMMPass());
   }
-
+  // TODO (nirvedhmeshram) : Can remove this pass after
+  // https://github.com/iree-org/iree/issues/19546 is fixed.
+  funcPassManager.addPass(createConvertAccGEMMToGEMMPass());
   tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true,
                                /*convertToDpsOptions=*/std::nullopt);
 
@@ -409,6 +411,9 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
   }
   funcPassManager.addPass(IREE::GPU::createDistributeMmaToLanesPass());
+
+  // Step 4.5. Things that need to happen right after distribution to threads.
+  funcPassManager.addPass(createGPULowerToUKernelsPass());
 
   // Normalize loop bounds for later lowerings.
   funcPassManager.addPass(iree_compiler::createNormalizeLoopBoundsPass(
@@ -524,72 +529,6 @@ void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createOptimizeVectorTransferPass());
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
-}
-
-//===---------------------------------------------------------------------===//
-// MatmulSIMT
-//===---------------------------------------------------------------------===//
-
-void addGPUMatmulSimtPassPipeline(OpPassManager &funcPassManager,
-                                  const GPUPipelineOptions &options) {
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/false);
-
-  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  funcPassManager.addPass(createGPUTensorTileToSerialLoopsPass());
-  funcPassManager.addPass(createGPUTensorAlloc());
-  funcPassManager.addPass(createGPUTensorTilePass());
-
-  // Linalg -> vector
-  addGPUVectorizationPasses(funcPassManager);
-
-  // tensor to memref
-  addBufferizePasses(funcPassManager);
-
-  // distribute foreach threads
-  funcPassManager.addPass(createGPUDistributePass());
-
-  funcPassManager.addPass(createMemrefCopyToLinalgPass());
-  funcPassManager.addPass(createGPUDistributeSharedMemoryCopyPass());
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  if (options.enableReduceSharedMemoryBankConflicts) {
-    funcPassManager.addPass(createGPUReduceBankConflictsPass());
-  }
-
-  ReorderWorkgroupsStrategy reorderStrategy =
-      getReorderWorkgroupsStrategy(options.reorderStrategy);
-  funcPassManager.addPass(
-      createReorderWorkgroups(reorderStrategy, canReorderWorkgroups));
-
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
-  funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  // Even though we vectorize before bufferization we are not able to hoist
-  // accumulator load/store out of the K loop until distribution. This is
-  // because we materialize the fill and the matmul in two different scf.forall
-  // regions, when they should be in the same scf.forall. Newer pipelines
-  // like TileAndFuse don't have this problem, because they coalesce these
-  // scf.forall regions into a single scf.forall.
-  //
-  // Therefore we still rely on buffer level transformations for transfer ops
-  // hoisting and store to load forwarding. This relies on shacky alias
-  // analysis and we need to move this to tensor level once we have better
-  // abstractions.
-  funcPassManager.addPass(createOptimizeVectorTransferPass());
-
-  // Hoist loop invariant code to avoid pipelining it.
-  funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
-  // Pipeline memory operations.
-  funcPassManager.addPass(createGPUPipeliningPass());
 }
 
 //===---------------------------------------------------------------------===//
@@ -1070,7 +1009,10 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       .addPass(createIREELoopInvariantCodeMotionPass)
       .addPass(affine::createAffineExpandIndexOpsPass)
       .addPass(createLowerAffinePass)
-      .addPass(IREE::Util::createOptimizeIntArithmeticPass)
+      .addPass([]() {
+        return IREE::Util::createOptimizeIntArithmeticPass(
+            IREE::Util::OptimizeIntArithmeticPassOptions{/*narrowToI32=*/true});
+      })
       // Do another round of LICM now that we've lowered and optimized
       // arithmetic
       .addPass(createCSEPass)
@@ -1114,7 +1056,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createLLVMGPUVectorLoweringPass)
       .addPass(createExpandGPUOpsPass)
       // Expose workitem and workgroup counts to range inference later.
-      .addPass(createGPUPropagateDispatchSizeBoundsPass);
+      .addPass(createPropagateDispatchSizeBoundsPass);
 
   // This pass needs to run before SCF -> CF.
   addLowerAndOptimizeAddressComputationPasses(funcPassManager);

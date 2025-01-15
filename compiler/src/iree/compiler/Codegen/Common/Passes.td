@@ -66,6 +66,11 @@ def ConcretizePadResultShapePass :
       "implements OffsetSizeAndStrideOpInterface.";
 }
 
+def ConvertAccGEMMToGEMMPass :
+    Pass<"iree-convert-accgemm-to-gemm", ""> {
+  let summary = "Convert accumulating GEMMs to GEMMs post dispatch creation.";
+}
+
 def ConvertBf16ArithToF32Pass : Pass<"iree-convert-bf16-arith-to-f32", ""> {
   let summary = "Convert bf16 arithmetic operations to f32";
 }
@@ -524,6 +529,11 @@ def PadDynamicAllocPass :
 def PolynomialApproximationPass :
     Pass<"iree-codegen-polynomial-approximation", ""> {
   let summary = "Convert math operations to their polynomial approximation";
+}
+
+def PropagateDispatchSizeBoundsPass :
+    InterfacePass<"iree-codegen-propagate-dispatch-size-bounds", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to annotate workitem and workgroup IDs with known bounds";
 }
 
 def PropagateReshapesByExpansionPass :

@@ -293,7 +293,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   {
     RewritePatternSet patterns(context);
     populateReshapeToInterfaceTensorPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError("reshape to interface tensor patterns failed");
       return signalPassFailure();
     }
@@ -403,8 +403,8 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     {
       RewritePatternSet patterns(exportOp->getContext());
       memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(exportOp.value(),
-                                              std::move(patterns)))) {
+      if (failed(
+              applyPatternsGreedily(exportOp.value(), std::move(patterns)))) {
         exportOp->emitOpError("`tensor.dim` resolution in exportOp failed");
         return signalPassFailure();
       }
@@ -414,7 +414,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   {
     RewritePatternSet patterns(context);
     populateTileAndDistributeToWorkgroupsCleanupPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError("Tile+Distribute clean up patterns failed");
       return signalPassFailure();
     }
@@ -439,7 +439,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
         ->getCanonicalizationPatterns(patterns);
     context->getOrLoadDialect<IREE::LinalgExt::IREELinalgExtDialect>()
         ->getCanonicalizationPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError("tiling canonicalizations failed");
       return signalPassFailure();
     }
@@ -455,7 +455,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   // operations only in `tensor.dim` ops. Resolve these.
   RewritePatternSet resolveDimOps(context);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(resolveDimOps);
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(resolveDimOps)))) {
+  if (failed(applyPatternsGreedily(funcOp, std::move(resolveDimOps)))) {
     funcOp.emitOpError("resolving ranked shaped results dims failed");
     return signalPassFailure();
   }

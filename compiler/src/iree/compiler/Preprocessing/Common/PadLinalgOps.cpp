@@ -165,8 +165,7 @@ public:
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
     patterns.insert<PadMatmulOp>(context, paddingSize);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

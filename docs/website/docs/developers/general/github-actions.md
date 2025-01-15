@@ -69,7 +69,30 @@ graph
 
 ## :material-list-status: Workflow descriptions and status
 
-### Package tests
+### "CI" - Core builds and tests
+
+These workflows build the project from source then run unit tests.
+
+* To keep these workflows focused, they should not need any special hardware
+  (e.g. GPUs).
+* Some workflows in this category use sanitizers, debug builds, alternate
+  compilers, and other features that maintainers want automated coverage for.
+
+Workflow file | Build status | Event triggers
+-- | --: | --
+[`ci.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci.yml) | [![cI](https://github.com/iree-org/iree/actions/workflows/ci.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/iree-org/iree/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush) | `pull_request`, `push`
+ | |
+[`ci_linux_arm64_clang.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_arm64_clang.yml) | [![CI - Linux arm64 clang](https://github.com/iree-org/iree/actions/workflows/ci_linux_arm64_clang.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_linux_arm64_clang.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
+[`ci_macos_x64_clang.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_macos_x64_clang.yml) | [![CI - macOS x64 clang](https://github.com/iree-org/iree/actions/workflows/ci_macos_x64_clang.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_macos_x64_clang.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
+[`ci_macos_arm64_clang.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_macos_arm64_clang.yml) | [![CI - macOS x64 clang](https://github.com/iree-org/iree/actions/workflows/ci_macos_arm64_clang.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_macos_arm64_clang.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
+[`ci_windows_x64_msvc.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_windows_x64_msvc.yml) | [![CI - Windows x64 MSVC](https://github.com/iree-org/iree/actions/workflows/ci_windows_x64_msvc.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_windows_x64_msvc.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
+ | |
+[`ci_linux_x64_clang_byollvm.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_byollvm.yml) | [![CI - Linux x64 clang_byollvm](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_byollvm.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_byollvm.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
+[`ci_linux_x64_clang_debug.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_debug.yml) | [![CI - Linux x64 clang debug](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_debug.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_debug.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
+[`ci_linux_x64_clang_tsan.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_tsan.yml) | [![CI - Linux x64 clang TSan](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_tsan.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_tsan.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
+[`ci_linux_x64_gcc.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_gcc.yml) | [![CI - Linux x64 gcc](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_gcc.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_gcc.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
+
+### "PkgCI" - Package builds and tests
 
 These workflows build packages from source then run test suites using them.
 
@@ -102,50 +125,12 @@ Workflow file | Build status | Event triggers
 Package tests | |
 [`pkgci.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/pkgci.yml) | [![PkgCI](https://github.com/iree-org/iree/actions/workflows/pkgci.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/iree-org/iree/actions/workflows/pkgci.yml?query=branch%3Amain+event%3Apush) | `pull_request`, `push`
 
-### Platform builds
-
-These workflows build the full project from source using standard options then
-run basic tests.
-
-* To keep these workflows focused, they should not need any special hardware
-  (e.g. GPUs).
-
-Workflow file | Build status | Event triggers
--- | --: | --
-[`ci_linux_x64_clang.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang.yml) | [![CI - Linux x64 clang](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang.yml?query=branch%3Amain+event%3Apush) | `pull_request`, `push`
-[`ci_linux_arm64_clang.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_arm64_clang.yml) | [![CI - Linux arm64 clang](https://github.com/iree-org/iree/actions/workflows/ci_linux_arm64_clang.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_linux_arm64_clang.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
-[`ci_macos_x64_clang.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_macos_x64_clang.yml) | [![CI - macOS x64 clang](https://github.com/iree-org/iree/actions/workflows/ci_macos_x64_clang.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_macos_x64_clang.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
-[`ci_windows_x64_msvc.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_windows_x64_msvc.yml) | [![CI - Windows x64 MSVC](https://github.com/iree-org/iree/actions/workflows/ci_windows_x64_msvc.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_windows_x64_msvc.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
-
-<!-- TODO(scotttodd): macos_arm64_clang -->
-
-### Other build configurations
-
-These workflows build the full project from source using optional settings
-then run basic tests.
-
-* Workflows in this category can use sanitizers, debug builds, alternate
-  compilers, and other features that maintainers want automated coverage for.
-
-Workflow file | Build status | Event triggers
--- | --: | --
-[`ci_linux_x64_clang_asan.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_asan.yml) | [![CI - Linux x64 clang ASan](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_asan.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_asan.yml?query=branch%3Amain+event%3Apush) | `pull_request`, `push`
-[`ci_linux_x64_clang_tsan.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_tsan.yml) | [![CI - Linux x64 clang TSan](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_tsan.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_tsan.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
-[`ci_linux_x64_clang_debug.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_debug.yml) | [![CI - Linux x64 clang debug](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_debug.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_debug.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
-[`ci_linux_x64_gcc.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_gcc.yml) | [![CI - Linux x64 gcc](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_gcc.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_gcc.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
-[`ci_linux_x64_clang_byollvm.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_byollvm.yml) | [![CI - Linux x64 clang_byollvm](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_byollvm.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_byollvm.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
-[`ci_linux_x64_bazel.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_bazel.yml) | [![CI - Linux x64 bazel](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_bazel.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_bazel.yml?query=branch%3Amain+event%3Apush) | `pull_request`, `push`
-
-<!-- TODO(scotttodd): the remains of ci.yml (runtime builds, etc.) -->
-<!-- TODO(scotttodd): cross-compilation jobs -->
-
 ### Other workflows
 
 Workflow file | Build status | Event triggers
 -- | --: | --
-[`ci.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci.yml) | [![cI](https://github.com/iree-org/iree/actions/workflows/ci.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/iree-org/iree/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush) | `pull_request`, `push`
 [`build_package.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/build_package.yml) | [![Build Release Packages](https://github.com/iree-org/iree/actions/workflows/build_package.yml/badge.svg)](https://github.com/iree-org/iree/actions/workflows/build_package.yml) | `schedule`
-[`publish_website.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/publish_website.yml) | [![publish_website](https://github.com/iree-org/iree/actions/workflows/publish_website.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/iree-org/iree/actions/workflows/publish_website.yml?query=branch%3Amain+event%3Apush) | `push`
+[`publish_website.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/publish_website.yml) | [![publish_website](https://github.com/iree-org/iree/actions/workflows/publish_website.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/iree-org/iree/actions/workflows/publish_website.yml?query=branch%3Amain+event%3Apush) | `push`, `release`, `schedule`
 [`samples.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/samples.yml) | [![Samples](https://github.com/iree-org/iree/actions/workflows/samples.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/samples.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
 
 ## :octicons-pencil-16: Writing and editing workflows

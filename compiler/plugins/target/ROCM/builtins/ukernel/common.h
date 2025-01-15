@@ -61,7 +61,6 @@ typedef __UINT64_TYPE__ uint64_t;
 // Vector typedefs
 //===----------------------------------------------------------------------===//
 
-typedef __attribute__((__vector_size__(8 * 2))) int64_t int64x2_t;
 typedef __attribute__((__vector_size__(4 * 4))) int32_t int32x4_t;
 
 //===----------------------------------------------------------------------===//
@@ -81,6 +80,31 @@ unsigned int __builtin_amdgcn_wavefrontsize();
 _Float16 __ockl_wfred_max_f16(_Float16);
 int64_t __ockl_wfred_min_i64(int64_t);
 int32_t __ockl_wfred_min_i32(int32_t);
+
+#define __CLK_LOCAL_MEM_FENCE 0x01
+typedef unsigned __cl_mem_fence_flags;
+
+static inline void __threadfence_block() {
+  __builtin_amdgcn_fence(__ATOMIC_SEQ_CST, "workgroup");
+}
+
+static inline void __work_group_barrier(__cl_mem_fence_flags flags) {
+  if (flags) {
+    __builtin_amdgcn_fence(__ATOMIC_RELEASE, "workgroup");
+    __builtin_amdgcn_s_barrier();
+    __builtin_amdgcn_fence(__ATOMIC_ACQUIRE, "workgroup");
+  } else {
+    __builtin_amdgcn_s_barrier();
+  }
+}
+
+static inline void __barrier(int n) {
+  __work_group_barrier((__cl_mem_fence_flags)n);
+}
+
+[[clang::convergent]] static inline void __syncthreads() {
+  __barrier(__CLK_LOCAL_MEM_FENCE);
+}
 
 //===----------------------------------------------------------------------===//
 // Local replacements for HIP headers

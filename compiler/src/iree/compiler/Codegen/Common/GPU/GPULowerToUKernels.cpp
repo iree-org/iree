@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -33,12 +34,8 @@ namespace {
 static FailureOr<IREE::Codegen::UKernelOpInterface>
 matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
   Value input = op.getDpsInputOperand(0)->get();
-  auto inputType = cast<ShapedType>(input.getType());
   Value index = op.getDpsInitOperand(1)->get();
   auto indexType = cast<ShapedType>(index.getType());
-  std::string suffix;
-  llvm::raw_string_ostream(suffix)
-      << inputType.getElementType() << indexType.getElementType();
   auto loweringConfig = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
   if (!loweringConfig) {
     return rewriter.notifyMatchFailure(op, "no lowering_config on this op");
@@ -84,6 +81,51 @@ struct LowerArgmaxToUKernelPattern : OpRewritePattern<linalg::GenericOp> {
   }
 };
 
+struct LowerMultiMmaToUKernelPattern : OpRewritePattern<IREE::GPU::MultiMmaOp> {
+  LowerMultiMmaToUKernelPattern(MLIRContext *context)
+      : OpRewritePattern<IREE::GPU::MultiMmaOp>(context) {}
+
+  LogicalResult matchAndRewrite(IREE::GPU::MultiMmaOp op,
+                                PatternRewriter &rewriter) const override {
+    auto loweringConfig = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
+    if (!loweringConfig) {
+      return rewriter.notifyMatchFailure(op, "no lowering_config on this op");
+    }
+    IREE::GPU::UKernelConfigAttr ukernelAttr =
+        IREE::GPU::getUkernelSpec(loweringConfig);
+    if (!ukernelAttr) {
+      return rewriter.notifyMatchFailure(op, "no ukernel selected for this op");
+    }
+    auto mma = dyn_cast<IREE::GPU::DataTiledMMAAttr>(op.getKind());
+    if (!mma) {
+      return rewriter.notifyMatchFailure(op, "unhandled MMAInterfaceAttr");
+    }
+    auto castIndexToI32 = [&](Value val) {
+      return rewriter.create<arith::IndexCastOp>(op.getLoc(),
+                                                 rewriter.getI32Type(), val);
+    };
+    auto constI32 = [&](int val) {
+      return rewriter.create<arith::ConstantIntOp>(op.getLoc(), val,
+                                                   rewriter.getI32Type());
+    };
+    Value k = castIndexToI32(
+        rewriter.create<tensor::DimOp>(op.getLoc(), op.getLhs(), 1));
+    Value intrinsicsM = constI32(mma.getIntrinsicsM());
+    Value subgroupsM = constI32(mma.getSubgroupsM());
+    Value intrinsicsN = constI32(mma.getIntrinsicsN());
+    Value subgroupsN = constI32(mma.getSubgroupsN());
+    Value intrinsicsK = constI32(mma.getIntrinsicsK());
+    rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
+        op, TypeRange{op.getAccType()}, ukernelAttr.getName(),
+        ValueRange{op.getLhs(), op.getRhs()}, op.getAcc(),
+        ValueRange{k, intrinsicsM, subgroupsM, intrinsicsN, subgroupsN,
+                   intrinsicsK},
+        ukernelAttr.getDefAttrs(),
+        /*strided_outer_dims=*/rewriter.getIndexAttr(0));
+    return success();
+  }
+};
+
 struct GPULowerToUKernelsPass final
     : impl::GPULowerToUKernelsPassBase<GPULowerToUKernelsPass> {
   void runOnOperation() override {
@@ -101,9 +143,9 @@ struct GPULowerToUKernelsPass final
     // evidence that it is difficult for codegen to consistently approach
     // microkernels performance, and that consideration overrides the benefit of
     // fusions for these ops.
-    patterns.insert<LowerArgmaxToUKernelPattern>(context);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    patterns.add<LowerArgmaxToUKernelPattern, LowerMultiMmaToUKernelPattern>(
+        context);
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

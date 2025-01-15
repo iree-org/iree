@@ -47,8 +47,8 @@ class PolynomialApproximationPass final
       populateMathPolynomialApproximationPatterns(mathPatterns);
       populateExpandRoundEvenPattern(mathPatterns);
     }
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(mathPatterns)))) {
+    if (failed(
+            applyPatternsGreedily(getOperation(), std::move(mathPatterns)))) {
       return signalPassFailure();
     }
   }

@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "StreamDialect.h"
     "StreamEnums.h.inc"
+    "StreamInterfaces.h"
     "StreamOpInterfaces.h.inc"
     "StreamOps.h"
     "StreamOps.h.inc"
