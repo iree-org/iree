@@ -53,12 +53,11 @@ jobs:
   # Jobs that run unit tests on special hardware platforms or accelerators
   #############################################################################
 
-  # Disabled while no `nodai-amdgpu-mi250-x86-64` runners are online
-  #test_amd_mi250:
-  #  name: Test AMD MI250
-  #  needs: [setup, build_packages]
-  #  if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_mi250')
-  #  uses: ./.github/workflows/pkgci_test_amd_mi250.yml
+  test_amd_mi250:
+    name: Test AMD MI250
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_mi250')
+    uses: ./.github/workflows/pkgci_test_amd_mi250.yml
 
   test_amd_mi300:
     name: Test AMD MI300
@@ -133,7 +132,7 @@ jobs:
       - build_packages
       - unit_test
       - regression_test
-      # - test_amd_mi250
+      - test_amd_mi250
       - test_amd_mi300
       - test_amd_w7900
       # - test_nvidia_t4
