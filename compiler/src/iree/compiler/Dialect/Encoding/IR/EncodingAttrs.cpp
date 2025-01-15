@@ -156,6 +156,32 @@ Value EncodingAttr::calculateStorageSizeInBytes(Location loc,
                                                 OpBuilder &builder,
                                                 RankedTensorType type,
                                                 ValueRange dynamicDims) const {
+  if (auto layoutsAttr = getLayouts()) {
+    if (llvm::any_of(layoutsAttr.getValue(), [](Attribute attr) {
+          return !llvm::isa<IREE::Encoding::EncodingLayoutAttrInterface>(attr);
+        })) {
+      return Value();
+    }
+
+    auto layoutsAttrArray =
+        llvm::to_vector_of<IREE::Encoding::EncodingLayoutAttrInterface>(
+            layoutsAttr.getValue());
+    Value res;
+    for (auto attr : layoutsAttrArray) {
+      Value requestedSize =
+          attr.calculateStorageSizeInBytes(loc, builder, type, dynamicDims);
+      if (!res) {
+        res = requestedSize;
+        continue;
+      }
+      res = builder.create<arith::MaxUIOp>(loc, res, requestedSize);
+    }
+    return res;
+  }
+
+  // TODO(hanchung): Deprecate the below logic once EncodingSpecialization pass
+  // is enabled by default. The layouts should be resolved and `roundDimsTo`
+  // will be deprecated.
   SmallVector<int64_t> paddedShape(type.getShape());
   SmallVector<Value> paddedDynamicDims(dynamicDims.begin(), dynamicDims.end());
   ArrayRef<int64_t> roundDimsTo = getRoundDimsToArray();

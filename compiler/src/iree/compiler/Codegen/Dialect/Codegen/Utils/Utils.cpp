@@ -80,6 +80,21 @@ bool operator!=(const MaterializeEncodingInfo &lhs,
   return !(lhs == rhs);
 }
 
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const MaterializeEncodingInfo &encodingInfo) {
+  os << "{innerDimsPos = [";
+  llvm::interleaveComma(encodingInfo.innerDimsPos, os);
+  os << "], innerTileSizes = [";
+  llvm::interleaveComma(encodingInfo.innerTileSizes, os);
+  os << "], outerDimsPerm = [";
+  llvm::interleaveComma(encodingInfo.outerDimsPerm, os);
+  if (encodingInfo.swizzle) {
+    os << "], swizzle = " << encodingInfo.swizzle.value();
+  }
+  os << "]}";
+  return os;
+}
+
 //===----------------------------------------------------------------------===//
 // Layout Utilities.
 //===----------------------------------------------------------------------===//
