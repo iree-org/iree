@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/IR/Iterators.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
@@ -34,10 +35,13 @@ struct CloneProducersIntoDispatchRegionsPass final
         return signalPassFailure();
     });
 
-    funcOp->walk([&](Operation *op) {
+    funcOp->walk<WalkOrder::PostOrder, ReverseIterator>([&](Operation *op) {
       if (isOpTriviallyDead(op)) {
         return rewriter.eraseOp(op);
       }
+    });
+
+    funcOp->walk([&](Operation *op) {
       if (!IREE::Flow::isNonNullAndOutsideDispatch(op) ||
           !isa<linalg::GenericOp>(op)) {
         return;
