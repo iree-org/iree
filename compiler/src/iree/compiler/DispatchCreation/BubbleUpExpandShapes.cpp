@@ -134,11 +134,9 @@ void BubbleUpExpandShapesPass::runOnOperation() {
           return false;
         }
 
-        // Do not fuse producer generic op if it has more than one user
-        // or any reduction iterators.
+        // Do not fuse producer generic op if it has any reduction iterators.
         if (auto producerGenericOp = dyn_cast<linalg::GenericOp>(producer)) {
-          return producerGenericOp->hasOneUse() &&
-                 llvm::all_of(producerGenericOp.getIteratorTypesArray(),
+          return llvm::all_of(producerGenericOp.getIteratorTypesArray(),
                               linalg::isParallelIterator);
         }
 
@@ -206,6 +204,10 @@ void BubbleUpExpandShapesPass::runOnOperation() {
   bubbleExpandShapePatterns.insert<BubbleExpandThroughExtract>(context);
   tensor::ExpandShapeOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
                                                      context);
+  tensor::DimOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
+                                             context);
+  tensor::EmptyOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
+                                               context);
 
   GreedyRewriteConfig rewriteConfig;
   rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;

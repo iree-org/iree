@@ -69,3 +69,76 @@ util.func public @attention_v_reshape_propagation(%arg0: index,
 //  CHECK-SAME:       ins(%[[ATTENTION]]
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[GENERIC]]
 //       CHECK:   return %[[COLLAPSE]]
+
+// -----
+
+#elementwise_trait = {
+  indexing_maps = [
+    affine_map<(d0, d1) -> (d0, d1)>,
+    affine_map<(d0, d1) -> (d0, d1)>
+  ],
+  iterator_types = ["parallel", "parallel"]
+}
+
+// This test could actually fuse into 1 by using elementwise fusion. We could
+// in reality, use all reductions with expansion on outer parallel loops also.
+// Elementwise operations are just easier to write.
+util.func public @diamond_propagate_expand_shape(%input : tensor<?x?xf16>)
+                                                       -> tensor<2x?x?xf16> {
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+
+  %c1 = arith.constant 1.0 : f16
+  %dim = tensor.dim %input, %c0 : tensor<?x?xf16>
+  %empty = tensor.empty(%dim, %dim) : tensor<?x?xf16>
+
+  %A = linalg.generic #elementwise_trait
+  ins(%input : tensor<?x?xf16>) outs(%empty : tensor<?x?xf16>) {
+  ^bb0(%in : f16, %out : f16):
+    %add = arith.addf %in, %c1 : f16
+    linalg.yield %add : f16
+  } -> tensor<?x?xf16>
+
+  %B = linalg.generic #elementwise_trait
+  ins(%A : tensor<?x?xf16>) outs(%empty : tensor<?x?xf16>) {
+  ^bb0(%in : f16, %out : f16):
+    %add = arith.addf %in, %c1 : f16
+    linalg.yield %add : f16
+  } -> tensor<?x?xf16>
+
+  %C = linalg.generic #elementwise_trait
+  ins(%A : tensor<?x?xf16>) outs(%empty : tensor<?x?xf16>) {
+  ^bb0(%in : f16, %out : f16):
+    %add = arith.addf %in, %c1 : f16
+    linalg.yield %add : f16
+  } -> tensor<?x?xf16>
+
+  // The canonical form would be to pass both inputs as ins, but for a consise
+  // test, we pass it as outs so we can reuse the elementwise_trait.
+  %D = linalg.generic #elementwise_trait
+  ins(%B : tensor<?x?xf16>) outs(%C : tensor<?x?xf16>) {
+  ^bb0(%in : f16, %out : f16):
+    %add = arith.addf %in, %out : f16
+    linalg.yield %add : f16
+  } -> tensor<?x?xf16>
+
+  %dimA = arith.divui %dim, %c2 : index
+  %out = tensor.expand_shape %D [[0, 1], [2]] output_shape [2, %dimA, %dim] :
+    tensor<?x?xf16> into tensor<2x?x?xf16>
+
+  util.return %out : tensor<2x?x?xf16>
+}
+
+// Check that there is only 1 expand_shape at top
+// CHECK-LABEL: diamond_propagate_expand_shape
+// CHECK: tensor.expand_shape
+// CHECK-NOT: tensor.expand_shape
+// CHECK: linalg.generic
+// CHECK-NOT: tensor.expand_shape
+// CHECK: linalg.generic
+// CHECK-NOT: tensor.expand_shape
+// CHECK: linalg.generic
+// CHECK-NOT: tensor.expand_shape
+// CHECK: linalg.generic
+// CHECK-NOT: tensor.expand_shape
+// CHECK: util.return
