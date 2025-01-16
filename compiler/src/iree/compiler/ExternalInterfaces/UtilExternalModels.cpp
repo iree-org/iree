@@ -377,7 +377,7 @@ struct HoistableLinalgOpInterface
       return false;
     }
 
-    if (linalg::isaFillOpInterface(genericOp).has_value()) {
+    if (IREE::LinalgExt::isFillLikeOp(genericOp)) {
       return false;
     }
 
