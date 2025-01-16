@@ -1162,36 +1162,6 @@ static iree_status_t iree_hal_hip_device_make_buffer_free_callback_data(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_hip_async_free_buffer(void* user_data,
-                                                    iree_hal_hip_event_t* event,
-                                                    iree_status_t status) {
-  iree_hal_hip_device_buffer_free_callback_data_t* data =
-      (iree_hal_hip_device_buffer_free_callback_data_t*)(user_data);
-
-  iree_hal_hip_device_t* device = data->device;
-  int device_ordinal = iree_math_count_trailing_zeros_u64(data->queue_affinity);
-
-  if (device->supports_memory_pools) {
-    status = iree_status_join(
-        status,
-        iree_hal_hip_memory_pools_deallocate(
-            &device->devices[device_ordinal].memory_pools,
-            device->devices[device_ordinal].hip_dispatch_stream, data->buffer));
-  } else {
-    status = iree_status_join(
-        status,
-        iree_hal_hip_allocator_free_async(
-            iree_hal_device_allocator((iree_hal_device_t*)data->device),
-            device->devices[device_ordinal].hip_dispatch_stream, data->buffer));
-  }
-
-  iree_hal_hip_event_release(event);
-  iree_hal_buffer_release(data->buffer);
-  iree_allocator_free(device->host_allocator, data);
-
-  return status;
-}
-
 static iree_status_t iree_hal_hip_device_stream_wait_for_semaphores(
     iree_hal_hip_device_t* device,
     iree_hal_semaphore_list_t wait_semaphore_list,
@@ -1299,13 +1269,6 @@ static iree_status_t iree_hal_hip_device_complete_buffer_operation(
               &data->base.device->devices[device_ordinal].memory_pools,
               data->base.device->devices[device_ordinal].hip_dispatch_stream,
               data->buffer));
-    } else {
-      status = iree_status_join(
-          status,
-          iree_hal_hip_allocator_free_async(
-              iree_hal_device_allocator((iree_hal_device_t*)data->base.device),
-              data->base.device->devices[device_ordinal].hip_dispatch_stream,
-              data->buffer));
     }
   }
 
@@ -1361,13 +1324,17 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
           break;
         }
         status = iree_hal_hip_allocator_alloc_async(
-            iree_hal_device_allocator((iree_hal_device_t*)device),
-            device->devices[device_ordinal].hip_dispatch_stream, data->buffer);
+            iree_hal_device_allocator((iree_hal_device_t*)device), data->buffer);
         break;
       case IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_DEALLOC: {
-        // Because of a quirk of HIP here, we don't actually want to use
-        // free_async which can cause large amounts of memory fragmentation,
-        // so instead we will put the actual free on the cleanup thread.
+        if (!data->base.device->supports_memory_pools && data->buffer) {
+          // If we support memory pools this free is done on the cleanup thread.
+          status = iree_status_join(
+              status,
+              iree_hal_hip_allocator_free_async(
+                  iree_hal_device_allocator((iree_hal_device_t*)data->base.device),
+                  data->buffer));
+        }
       } break;
     }
   }

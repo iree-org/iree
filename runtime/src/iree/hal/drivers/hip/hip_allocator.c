@@ -37,6 +37,14 @@ typedef struct iree_hal_hip_async_allocation_map_item_t {
   iree_hal_hip_async_allocation_queue_t queue;
 } iree_hal_hip_async_allocation_map_item_t;
 
+typedef struct iree_hal_hip_allocator_async_allocation_map {
+    iree_hal_hip_util_tree_t tree;
+    // Inline storage for this tree. We expect the normal number of
+    // nodes in use for a single semaphore to be relatively small.
+    uint8_t
+        inline_storage[sizeof(iree_hal_hip_async_allocation_map_item_t) * 16];
+  } iree_hal_hip_allocator_async_allocation_map_t;
+
 typedef struct iree_hal_hip_allocator_t {
   // Abstract resource used for injecting reference counting and vtable;
   // must be at offset 0.
@@ -59,13 +67,9 @@ typedef struct iree_hal_hip_allocator_t {
   bool supports_concurrent_managed_access;
 
   iree_slim_mutex_t async_allocation_mutex;
-  struct {
-    iree_hal_hip_util_tree_t tree;
-    // Inline storage for this tree. We expect the normal number of
-    // nodes in use for a single semaphore to be relatively small.
-    uint8_t
-        inline_storage[sizeof(iree_hal_hip_async_allocation_map_item_t) * 16];
-  } async_allocation_map;
+  
+  // One allocation map per device in the topology.
+  iree_hal_hip_allocator_async_allocation_map_t* async_allocation_maps;
 
   IREE_STATISTICS(iree_hal_allocator_statistics_t statistics;)
 } iree_hal_hip_allocator_t;
@@ -117,7 +121,8 @@ iree_status_t iree_hal_hip_allocator_create(
 
   iree_hal_hip_allocator_t* allocator = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(host_allocator, sizeof(*allocator),
+      z0, iree_allocator_malloc(host_allocator, sizeof(*allocator) + 
+        topology.count * sizeof(*allocator->async_allocation_maps),
                                 (void**)&allocator));
   iree_hal_resource_initialize(&iree_hal_hip_allocator_vtable,
                                &allocator->resource);
@@ -128,11 +133,15 @@ iree_status_t iree_hal_hip_allocator_create(
   allocator->supports_concurrent_managed_access =
       supports_concurrent_managed_access != 0;
   allocator->topology = topology;
-  iree_hal_hip_util_tree_initialize(
-      host_allocator, sizeof(iree_hal_hip_async_allocation_map_item_t),
-      allocator->async_allocation_map.inline_storage,
-      sizeof(allocator->async_allocation_map.inline_storage),
-      &allocator->async_allocation_map.tree);
+  allocator->async_allocation_maps = (iree_hal_hip_allocator_async_allocation_map_t*)
+    ((uint8_t*)allocator + sizeof(*allocator));
+  for (iree_host_size_t i = 0; i < topology.count; ++i) {
+    iree_hal_hip_util_tree_initialize(
+        host_allocator, sizeof(iree_hal_hip_async_allocation_map_item_t),
+        allocator->async_allocation_maps[i].inline_storage,
+        sizeof(allocator->async_allocation_maps[i].inline_storage),
+        &allocator->async_allocation_maps[i].tree);
+  }
   iree_slim_mutex_initialize(&allocator->async_allocation_mutex);
 
   *out_allocator = (iree_hal_allocator_t*)allocator;
@@ -148,23 +157,25 @@ static void iree_hal_hip_allocator_destroy(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_slim_mutex_deinitialize(&allocator->async_allocation_mutex);
-  for (iree_hal_hip_util_tree_node_t* i =
-           iree_hal_hip_util_tree_first(&allocator->async_allocation_map.tree);
-       i != NULL; i = iree_hal_hip_util_tree_node_next(i)) {
-    iree_hal_hip_async_allocation_map_item_t* queue_item =
-        (iree_hal_hip_async_allocation_map_item_t*)
-            iree_hal_hip_util_tree_node_get_value(i);
-    while (!iree_hal_hip_async_allocation_queue_empty(&queue_item->queue)) {
-      iree_hal_hip_async_allocation_t allocation =
-          iree_hal_hip_async_allocation_queue_at(&queue_item->queue, 0);
+  for (iree_host_size_t i = 0; i < allocator->topology.count; ++i) {
+    for (iree_hal_hip_util_tree_node_t* j =
+            iree_hal_hip_util_tree_first(&allocator->async_allocation_maps[i].tree);
+        j != NULL; j = iree_hal_hip_util_tree_node_next(j)) {
+      iree_hal_hip_async_allocation_map_item_t* queue_item =
+          (iree_hal_hip_async_allocation_map_item_t*)
+              iree_hal_hip_util_tree_node_get_value(j);
+      while (!iree_hal_hip_async_allocation_queue_empty(&queue_item->queue)) {
+        iree_hal_hip_async_allocation_t allocation =
+            iree_hal_hip_async_allocation_queue_at(&queue_item->queue, 0);
 
-      iree_status_ignore(IREE_HIP_CALL_TO_STATUS(
-          allocator->symbols, hipFree(allocation.pointer), "hipFree"));
-      iree_hal_hip_async_allocation_queue_pop_front(&queue_item->queue, 1);
+        iree_status_ignore(IREE_HIP_CALL_TO_STATUS(
+            allocator->symbols, hipFree(allocation.pointer), "hipFree"));
+        iree_hal_hip_async_allocation_queue_pop_front(&queue_item->queue, 1);
+      }
+      iree_hal_hip_async_allocation_queue_deinitialize(&queue_item->queue);
     }
-    iree_hal_hip_async_allocation_queue_deinitialize(&queue_item->queue);
+    iree_hal_hip_util_tree_deinitialize(&allocator->async_allocation_maps[i].tree);
   }
-  iree_hal_hip_util_tree_deinitialize(&allocator->async_allocation_map.tree);
   iree_allocator_free(allocator->host_allocator, allocator);
 
   IREE_TRACE_ZONE_END(z0);
@@ -187,22 +198,25 @@ static iree_status_t iree_hal_hip_allocator_trim(
       iree_hal_hip_allocator_cast(base_allocator);
 
   iree_slim_mutex_lock(&allocator->async_allocation_mutex);
+  
   iree_status_t status = iree_ok_status();
-  for (iree_hal_hip_util_tree_node_t* i =
-           iree_hal_hip_util_tree_first(&allocator->async_allocation_map.tree);
-       i != NULL; i = iree_hal_hip_util_tree_node_next(i)) {
-    iree_hal_hip_async_allocation_map_item_t* queue_item =
-        (iree_hal_hip_async_allocation_map_item_t*)
-            iree_hal_hip_util_tree_node_get_value(i);
-    while (!iree_hal_hip_async_allocation_queue_empty(&queue_item->queue)) {
-      iree_hal_hip_async_allocation_t allocation =
-          iree_hal_hip_async_allocation_queue_at(&queue_item->queue, 0);
+  for (iree_host_size_t i = 0; i < allocator->topology.count; ++i) {
+    status = IREE_HIP_CALL_TO_STATUS(allocator->symbols,
+              hipStreamSynchronize(allocator->topology.devices[i].hip_dispatch_stream), "hipStreamSynchronize");
+    for (iree_hal_hip_util_tree_node_t* j =
+            iree_hal_hip_util_tree_first(&allocator->async_allocation_maps[i].tree);
+        iree_status_is_ok(status) && j != NULL; j = iree_hal_hip_util_tree_node_next(j)) {
+      iree_hal_hip_async_allocation_map_item_t* queue_item =
+          (iree_hal_hip_async_allocation_map_item_t*)
+              iree_hal_hip_util_tree_node_get_value(j);
+      while (!iree_hal_hip_async_allocation_queue_empty(&queue_item->queue)) {
+        iree_hal_hip_async_allocation_t allocation =
+            iree_hal_hip_async_allocation_queue_at(&queue_item->queue, 0);
 
-      status = iree_status_join(
-          status,
-          IREE_HIP_CALL_TO_STATUS(allocator->symbols,
-                                  hipFree(allocation.pointer), "hipFree"));
-      iree_hal_hip_async_allocation_queue_pop_front(&queue_item->queue, 1);
+        status = IREE_HIP_CALL_TO_STATUS(allocator->symbols,
+                                    hipFree(allocation.pointer), "hipFree");
+        iree_hal_hip_async_allocation_queue_pop_front(&queue_item->queue, 1);
+      }
     }
   }
   iree_slim_mutex_unlock(&allocator->async_allocation_mutex);
@@ -728,7 +742,7 @@ static iree_status_t iree_hal_hip_allocator_export_buffer(
 }
 
 iree_status_t iree_hal_hip_allocator_alloc_async(
-    iree_hal_allocator_t* base_allocator, hipStream_t stream,
+    iree_hal_allocator_t* base_allocator,
     iree_hal_buffer_t* buffer) {
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
@@ -741,10 +755,13 @@ iree_status_t iree_hal_hip_allocator_alloc_async(
                             IREE_HOST_SIZE_MAX);
   }
 
+  int device_ordinal = 0;
+  device_ordinal = iree_math_count_trailing_zeros_u64(buffer->placement.queue_affinity);
+
   hipDeviceptr_t ptr = NULL;
   iree_slim_mutex_lock(&allocator->async_allocation_mutex);
   iree_hal_hip_util_tree_node_t* sized_allocations = iree_hal_hip_util_tree_get(
-      &allocator->async_allocation_map.tree,
+      &allocator->async_allocation_maps[device_ordinal].tree,
       (iree_host_size_t)iree_hal_buffer_allocation_size(buffer));
   if (sized_allocations != NULL) {
     iree_hal_hip_async_allocation_map_item_t* queue_item =
@@ -761,14 +778,21 @@ iree_status_t iree_hal_hip_allocator_alloc_async(
 
   iree_status_t status = iree_ok_status();
   if (ptr == NULL) {
-    // In an ideal world we would use hipMallocAsync/hipFreeAsync,
-    // however the caching inside can cause lots of slack
-    // to the point of unusability depending on the memory allocation
-    // patterns of the host program, so instead we simply hipMalloc/hipFree.
     status = IREE_HIP_CALL_TO_STATUS(
-        allocator->symbols,
-        hipMalloc(&ptr, (size_t)iree_hal_buffer_allocation_size(buffer)),
-        "hipMalloc");
+        allocator->symbols, hipCtxPushCurrent(allocator->topology.devices[device_ordinal].hip_context));
+    if (iree_status_is_ok(status)) {
+      // In an ideal world we would use hipMallocAsync/hipFreeAsync,
+      // however the caching inside can cause lots of slack
+      // to the point of unusability depending on the memory allocation
+      // patterns of the host program, so instead we simply hipMalloc/hipFree.
+      status = IREE_HIP_CALL_TO_STATUS(
+          allocator->symbols,
+          hipMalloc(&ptr, (size_t)iree_hal_buffer_allocation_size(buffer)),
+          "hipMalloc");
+      
+      status = iree_status_join(status, IREE_HIP_CALL_TO_STATUS(allocator->symbols, 
+        hipCtxPopCurrent(NULL), "hipCtxPopCurrent"));
+    }
   }
 
   if (iree_status_is_ok(status)) {
@@ -786,7 +810,7 @@ iree_status_t iree_hal_hip_allocator_alloc_async(
 }
 
 iree_status_t iree_hal_hip_allocator_free_async(
-    iree_hal_allocator_t* base_allocator, hipStream_t stream,
+    iree_hal_allocator_t* base_allocator,
     iree_hal_buffer_t* buffer) {
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
@@ -800,14 +824,17 @@ iree_status_t iree_hal_hip_allocator_free_async(
       &allocator->statistics, iree_hal_buffer_memory_type(buffer),
       iree_hal_buffer_allocation_size(buffer)));
 
+  int device_ordinal = 0;
+  device_ordinal = iree_math_count_trailing_zeros_u64(buffer->placement.queue_affinity);
+
   iree_status_t status = iree_ok_status();
   iree_slim_mutex_lock(&allocator->async_allocation_mutex);
   iree_hal_hip_util_tree_node_t* bucket = iree_hal_hip_util_tree_get(
-      &allocator->async_allocation_map.tree,
+      &allocator->async_allocation_maps[device_ordinal].tree,
       (iree_host_size_t)iree_hal_buffer_allocation_size(buffer));
   if (bucket == NULL) {
     status = iree_hal_hip_util_tree_insert(
-        &allocator->async_allocation_map.tree,
+        &allocator->async_allocation_maps[device_ordinal].tree,
         (iree_host_size_t)iree_hal_buffer_allocation_size(buffer), &bucket);
     iree_hal_hip_async_allocation_map_item_t* queue_item =
         (iree_hal_hip_async_allocation_map_item_t*)
