@@ -198,7 +198,8 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
 
           // 7. Skip dequantization-like `producer` ops as we would rather fuse
           //    by cloning the producer instead of multi-use fusion.
-          if (IREE::LinalgExt::isBitExtendOp(producer)) {
+          if (IREE::LinalgExt::isBitTruncateOp(producer) ||
+              IREE::LinalgExt::isBitExtendOp(producer)) {
             return;
           }
 
