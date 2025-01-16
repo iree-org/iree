@@ -94,6 +94,10 @@ createTileAndDistributeToWorkgroupsPass(
     int32_t maxWorkgroupParallelDims,
     linalg::DistributionMethod distributionMethod);
 
+// Pass to tile and distribute using scf.forall with workgroup reordering.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createTileAndDistributeToWorkgroupsWithReordering(bool transposeWorkgroup);
+
 //----------------------------------------------------------------------------//
 // CodeGen Common Patterns
 //----------------------------------------------------------------------------//

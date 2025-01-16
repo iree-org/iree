@@ -642,6 +642,11 @@ def TileAndDistributeToWorkgroupsUsingForallOpPass :
     "scf::SCFDialect",
     "tensor::TensorDialect",
   ];
+  let options = [
+    Option<"transposeWorkgroup", "transpose-workgroup", "bool", /*default=*/"false",
+           "Swaps the workgroup mapping attribute x and y."
+            "Only swaps when the loop bounds are static.">,
+  ];
 }
 
 def TileLargeTensorsPass :
