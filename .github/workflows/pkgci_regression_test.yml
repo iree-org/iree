@@ -46,7 +46,7 @@ jobs:
           - name: amdgpu_rocm_mi300_gfx942
             rocm-chip: gfx942
             backend: rocm
-            runs-on: nodai-amdgpu-mi300-x86-64
+            runs-on: linux-mi300-gpu-1
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
