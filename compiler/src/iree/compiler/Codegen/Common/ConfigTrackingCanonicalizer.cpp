@@ -95,7 +95,7 @@ public:
     {
       config.listener = &listener;
       LogicalResult didConverge =
-          applyPatternsAndFoldGreedily(getOperation(), *patterns, config);
+          applyPatternsGreedily(getOperation(), *patterns, config);
       config.listener = nullptr;
       if (this->testConvergence && failed(didConverge)) {
         getOperation()->emitError("Canonicalizer failed to converge");

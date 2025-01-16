@@ -2268,7 +2268,7 @@ util.func @mixed_conv(%arg0 : tensor<2x130x130x16xf16>, %arg1 : tensor<3x3x16x32
 
 // -----
 
-util.func @mixed_conv_unsupported(%arg0 : tensor<2x130x130x320xf16>, %arg1 : tensor<3x3x320x320xf16>) -> tensor<2x64x64x320xf16> {
+util.func @mixed_conv_stride_2(%arg0 : tensor<2x130x130x320xf16>, %arg1 : tensor<3x3x320x320xf16>) -> tensor<2x64x64x320xf16> {
   %empty = tensor.empty() : tensor<2x64x64x320xf32>
   %cst = arith.constant 0.0 : f32
   %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<2x64x64x320xf32>) -> tensor<2x64x64x320xf32>
@@ -2288,16 +2288,15 @@ util.func @mixed_conv_unsupported(%arg0 : tensor<2x130x130x320xf16>, %arg1 : ten
   } -> tensor<2x64x64x320xf16>
   util.return %truncf : tensor<2x64x64x320xf16>
 }
-// CHECK-LABEL: func public @mixed_conv_unsupported(
-//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.workgroups
+// CHECK-LABEL: func public @mixed_conv_stride_2(
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
 //       CHECK:     %[[FILL:.+]] = linalg.fill
 //       CHECK:     %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
 //  CHECK-SAME:         outs(%[[FILL]] :
-//       CHECK:     flow.dispatch.tensor.store %[[CONV]]
-//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[CONV]]
 //       CHECK:     flow.dispatch.tensor.store %[[GENERIC]]
-//       CHECK:   util.return %[[DISPATCH1]]
+//       CHECK:   util.return %[[DISPATCH]]
 
 // -----
 

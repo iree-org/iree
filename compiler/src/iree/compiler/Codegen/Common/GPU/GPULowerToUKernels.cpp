@@ -110,15 +110,16 @@ struct LowerMultiMmaToUKernelPattern : OpRewritePattern<IREE::GPU::MultiMmaOp> {
     };
     Value k = castIndexToI32(
         rewriter.create<tensor::DimOp>(op.getLoc(), op.getLhs(), 1));
-    Value unrollM = constI32(mma.getUnrollM());
+    Value intrinsicsM = constI32(mma.getIntrinsicsM());
     Value subgroupsM = constI32(mma.getSubgroupsM());
-    Value unrollN = constI32(mma.getUnrollN());
+    Value intrinsicsN = constI32(mma.getIntrinsicsN());
     Value subgroupsN = constI32(mma.getSubgroupsN());
-    Value unrollK = constI32(mma.getUnrollK());
+    Value intrinsicsK = constI32(mma.getIntrinsicsK());
     rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
         op, TypeRange{op.getAccType()}, ukernelAttr.getName(),
         ValueRange{op.getLhs(), op.getRhs()}, op.getAcc(),
-        ValueRange{k, unrollM, subgroupsM, unrollN, subgroupsN, unrollK},
+        ValueRange{k, intrinsicsM, subgroupsM, intrinsicsN, subgroupsN,
+                   intrinsicsK},
         ukernelAttr.getDefAttrs(),
         /*strided_outer_dims=*/rewriter.getIndexAttr(0));
     return success();
@@ -144,8 +145,7 @@ struct GPULowerToUKernelsPass final
     // fusions for these ops.
     patterns.add<LowerArgmaxToUKernelPattern, LowerMultiMmaToUKernelPattern>(
         context);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

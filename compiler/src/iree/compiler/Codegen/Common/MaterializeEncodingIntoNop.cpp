@@ -9,8 +9,6 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
-#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
-#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Pass/PassManager.h"
@@ -36,7 +34,7 @@ struct MaterializeEncodingIntoNopPass final
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    auto operation = getOperation();
+    FunctionOpInterface operation = getOperation();
 
     auto materializeEncodingValueFn =
         [](RankedTensorType, OpBuilder &,
@@ -64,8 +62,7 @@ struct MaterializeEncodingIntoNopPass final
       memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
       context->getOrLoadDialect<tensor::TensorDialect>()
           ->getCanonicalizationPatterns(patterns);
-      if (failed(
-              applyPatternsAndFoldGreedily(operation, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(operation, std::move(patterns)))) {
         operation.emitOpError("folding patterns failed");
         return signalPassFailure();
       }

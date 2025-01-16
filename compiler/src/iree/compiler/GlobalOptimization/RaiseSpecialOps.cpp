@@ -1053,7 +1053,7 @@ struct RaiseSpecialOpsPass
       patterns.insert<InsertSliceNegateAndSlicePattern>(context);
       patterns.insert<ConcatenateNegateAndSlicePattern>(context);
       patterns.insert<RaiseInsertSliceToPad>(context);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }

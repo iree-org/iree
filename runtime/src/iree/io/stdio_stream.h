@@ -51,6 +51,13 @@ IREE_API_EXPORT iree_status_t iree_io_stdio_stream_open(
     iree_io_stdio_stream_mode_t mode, iree_string_view_t path,
     iree_allocator_t host_allocator, iree_io_stream_t** out_stream);
 
+// Opens a file descriptor |fd| using fdopen with the mode determined by |mode|.
+// The file descriptor is duplicated and seeking the stream will not be visible
+// with any other users of the file descriptor.
+IREE_API_EXPORT iree_status_t iree_io_stdio_stream_open_fd(
+    iree_io_stdio_stream_mode_t mode, int fd, iree_allocator_t host_allocator,
+    iree_io_stream_t** out_stream);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

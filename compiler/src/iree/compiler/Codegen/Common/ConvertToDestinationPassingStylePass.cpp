@@ -615,7 +615,7 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
   {
     RewritePatternSet patterns(context);
     patterns.insert<RemoveCstOutsDependency>(context);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
@@ -632,7 +632,7 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
   {
     RewritePatternSet patterns(context);
     linalg::populateEraseUnusedOperandsAndResultsPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
@@ -640,7 +640,7 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
   {
     RewritePatternSet patterns(context);
     patterns.insert<SwitchStoreOfIfResultValue>(context);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }

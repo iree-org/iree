@@ -21,7 +21,6 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -87,14 +86,14 @@ static bool hasMatmulLikeBody(linalg::LinalgOp linalgOp) {
   if (!yieldOp) {
     return false;
   }
-  auto addOp = yieldOp->getOperand(0).getDefiningOp();
+  Operation *addOp = yieldOp->getOperand(0).getDefiningOp();
   if (!addOp || !isa<arith::AddIOp, arith::AddFOp>(addOp)) {
     return false;
   }
-  auto addLhs = addOp->getOperand(0);
-  auto addRhs = addOp->getOperand(1);
-  auto addLhsOp = addLhs.getDefiningOp();
-  auto addRhsOp = addRhs.getDefiningOp();
+  Value addLhs = addOp->getOperand(0);
+  Value addRhs = addOp->getOperand(1);
+  Operation *addLhsOp = addLhs.getDefiningOp();
+  Operation *addRhsOp = addRhs.getDefiningOp();
   if (!(addLhsOp && addRhs == outBlockArg) &&
       !(addRhsOp && addLhs == outBlockArg)) {
     return false;
@@ -103,8 +102,8 @@ static bool hasMatmulLikeBody(linalg::LinalgOp linalgOp) {
   if (!isa<arith::MulFOp, arith::MulIOp>(mulOp)) {
     return false;
   }
-  auto mulLhs = mulOp->getOperand(0);
-  auto mulRhs = mulOp->getOperand(1);
+  Value mulLhs = mulOp->getOperand(0);
+  Value mulRhs = mulOp->getOperand(1);
   auto mulLhsOp = mulLhs.getDefiningOp<CastOpInterface>();
   auto mulRhsOp = mulRhs.getDefiningOp<CastOpInterface>();
   if (!isa<BlockArgument>(mulLhs) && !mulLhsOp && !isa<BlockArgument>(mulRhs) &&
@@ -155,11 +154,11 @@ static LogicalResult isSupportedContractionOp(PatternRewriter &rewriter,
 
 namespace {
 
-class setContractionOpEncoding
+class SetContractionOpEncoding final
     : public OpInterfaceRewritePattern<linalg::LinalgOp> {
 public:
-  using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
-  explicit setContractionOpEncoding(MLIRContext *ctx, int64_t factor)
+  using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
+  explicit SetContractionOpEncoding(MLIRContext *ctx, int64_t factor)
       : OpInterfaceRewritePattern<linalg::LinalgOp>(ctx), padFactor(factor) {}
 
   LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
@@ -244,8 +243,8 @@ private:
 /// Pattern to fold a `linalg.fill` -> `iree_encoding.set_encoding`
 /// operation into a `linalg.fill` of the encoded type.
 struct FoldFillWithSetEncoding final
-    : public OpRewritePattern<IREE::Encoding::SetEncodingOp> {
-  using OpRewritePattern<IREE::Encoding::SetEncodingOp>::OpRewritePattern;
+    : OpRewritePattern<IREE::Encoding::SetEncodingOp> {
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {
@@ -267,18 +266,16 @@ struct FoldFillWithSetEncoding final
   }
 };
 
-struct SetEncodingPass final
-    : public impl::SetEncodingPassBase<SetEncodingPass> {
+struct SetEncodingPass final : impl::SetEncodingPassBase<SetEncodingPass> {
   using Base::Base;
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.insert<setContractionOpEncoding>(context, padFactor);
+    patterns.add<SetContractionOpEncoding>(context, padFactor);
     linalg::FillOp::getCanonicalizationPatterns(patterns, context);
-    patterns.insert<FoldFillWithSetEncoding>(context);
+    patterns.add<FoldFillWithSetEncoding>(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

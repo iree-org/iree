@@ -22,6 +22,15 @@ static llvm::cl::opt<bool> clAnnotateInputAffinities(
                    "the pipeline for debugging."),
     llvm::cl::init(false));
 
+// TODO(hanchung): Enable the pass by default once the implementation is done.
+static llvm::cl::opt<bool> clSpecializeEncodings(
+    "iree-stream-experimental-specialize-encodings",
+    llvm::cl::desc(
+        "Enables SpecializeEncodingPass in Stream pass pipeline. This pass is "
+        "currently under development, so it is not enabled by default. It can "
+        "only handle limited cases at this moment."),
+    llvm::cl::init(false));
+
 namespace mlir::iree_compiler::IREE::Stream {
 
 using FunctionLikeNest =
@@ -139,6 +148,10 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   //----------------------------------------------------------------------------
   // Tensor lowering and resource management
   //----------------------------------------------------------------------------
+
+  if (clSpecializeEncodings) {
+    passManager.addPass(IREE::Stream::createSpecializeEncodingsPass());
+  }
 
   // Lower stream.tensor.* ops to stream.async.* ops based on
   // affinity/configuration assigned during placement.

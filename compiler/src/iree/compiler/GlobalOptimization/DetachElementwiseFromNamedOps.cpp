@@ -194,8 +194,7 @@ struct DetachElementwiseFromNamedOpsPass
                  DetachSplatConstantOutsOperands<IREE::LinalgExt::LinalgExtOp>,
                  DetachSplatConstantOutsOperands<linalg::LinalgOp>>(
         &getContext());
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
   }

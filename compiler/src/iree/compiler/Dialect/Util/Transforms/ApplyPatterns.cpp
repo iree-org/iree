@@ -43,7 +43,7 @@ public:
     IREE::Util::populateCommonPatterns(context, patterns);
 
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
-    if (failed(applyPatternsAndFoldGreedily(getOperation(), frozenPatterns))) {
+    if (failed(applyPatternsGreedily(getOperation(), frozenPatterns))) {
       getOperation()->emitError()
           << "failed to apply patterns, likely due to a bad pattern that "
              "causes an infinite fixed point iteration";

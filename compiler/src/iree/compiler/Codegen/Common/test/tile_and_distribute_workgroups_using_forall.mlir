@@ -1,4 +1,5 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-tile-and-distribute-to-workgroups-using-forall-op, cse))" --mlir-print-local-scope --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-tile-and-distribute-to-workgroups-using-forall-op{transpose-workgroup=true}, cse))" --mlir-print-local-scope --split-input-file %s | FileCheck %s --check-prefix=TRANSPOSE
 
 func.func @matmul_tensors(%0 : tensor<?x?xf32>, %1 : tensor<?x?xf32>, %2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %3 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0]]>}
@@ -672,3 +673,95 @@ func.func @v_shaped_graph(%0: tensor<12xf32>, %1: tensor<12xf32>) -> tensor<12xf
 //   CHECK-DAG:     %[[RIGHT:.+]] = linalg.generic {{.*}} ins(%[[SLICE1]]
 //       CHECK:     linalg.generic {{.*}} ins(%[[LEFT]], %[[RIGHT]]
 //       CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @consumer_fuse_scatter(%arg0: tensor<3x2048x2048xf32>,
+                                 %arg1: tensor<3x2048x2048xf32>,
+                                 %arg2: tensor<3x1xi32>) -> tensor<3x2048x2048xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<3x2048x2048xf32>
+  %1 = linalg.add {lowering_config = #iree_gpu.lowering_config<{workgroup = [1, 1, 256]}>}
+    ins(%arg0, %arg1 : tensor<3x2048x2048xf32>, tensor<3x2048x2048xf32>) outs(%0 : tensor<3x2048x2048xf32>) -> tensor<3x2048x2048xf32>
+  %2 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%1, %arg2 : tensor<3x2048x2048xf32>, tensor<3x1xi32>) outs(%0 : tensor<3x2048x2048xf32>) {
+  ^bb0(%arg3: f32, %arg4: f32):
+    iree_linalg_ext.yield %arg3 : f32
+  } -> tensor<3x2048x2048xf32>
+  return %2 : tensor<3x2048x2048xf32>
+}
+
+// CHECK-LABEL: func @consumer_fuse_scatter(
+//  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<3x2048x2048xf32>
+//  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<3x2048x2048xf32>
+//  CHECK-SAME:   %[[IND:[A-Za-z0-9]+]]: tensor<3x1xi32>
+//       CHECK:   %[[RESULT:.+]] = scf.forall (%[[ID0:.+]], %[[ID1:.+]], %[[ID2:[A-Za-z0-9]+]]) {{.*}} shared_outs(%[[DEST:.+]] = %{{.*}})
+//   CHECK-DAG:     %[[SRC:.+]] = linalg.add
+//   CHECK-DAG:     %[[IND_SLICE:.+]] = tensor.extract_slice %[[IND]][%[[ID0]], 0] {{.*}} : tensor<3x1xi32> to tensor<1x1xi32>
+//   CHECK-DAG:     %[[DEST_SLICE:.+]] = tensor.extract_slice %[[DEST]][0, %[[ID1]], %[[ID2]]] {{.*}} to tensor<3x1x256xf32>
+//       CHECK:     %[[SCATTER:.+]] = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+//  CHECK-SAME:       ins(%[[SRC]], %[[IND_SLICE]]{{.*}} outs(%[[DEST_SLICE]]
+//       CHECK:       tensor.parallel_insert_slice %[[SCATTER]] into %[[DEST]][0, %[[ID1]], %[[ID2]]]
+
+// -----
+
+func.func @dont_transpose_dynamic(%0 : tensor<?x?xf32>, %1 : tensor<?x?xf32>, %2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %3 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0]]>}
+      ins(%0, %1 : tensor<?x?xf32>, tensor<?x?xf32>)
+      outs(%2 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %3 : tensor<?x?xf32>
+}
+
+// TRANSPOSE-LABEL: func @dont_transpose_dynamic(
+//       TRANSPOSE:   scf.forall
+//       TRANSPOSE:    [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
+
+// -----
+
+func.func @transpose_static(%0 : tensor<128x128xf32>, %1 : tensor<128x128xf32>, %2 : tensor<128x128xf32>) -> tensor<128x128xf32> {
+  %3 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0]]>}
+      ins(%0, %1 : tensor<128x128xf32>, tensor<128x128xf32>)
+      outs(%2 : tensor<128x128xf32>) -> tensor<128x128xf32>
+  return %3 : tensor<128x128xf32>
+}
+
+// TRANSPOSE-LABEL: func @transpose_static(
+//       TRANSPOSE:   scf.forall
+//       TRANSPOSE:    [#iree_codegen.workgroup_mapping<x>, #iree_codegen.workgroup_mapping<y>]
+
+// -----
+
+func.func @only_transpose_x_y(%7 : tensor<128x128x128x128xf32>, %8 : tensor<128x128x128x128xf32>) -> tensor<128x128x128x128xf32> {
+  %9 = tensor.empty() : tensor<128x128x128x128xf32>
+  %10 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%7, %8 : tensor<128x128x128x128xf32>, tensor<128x128x128x128xf32>)
+      outs(%9 : tensor<128x128x128x128xf32>)
+      attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[2, 64, 64, 64]]>} {
+    ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
+      %11 = arith.addf %arg0, %arg1 : f32
+      linalg.yield %11 : f32
+    } -> tensor<128x128x128x128xf32>
+  return %10 : tensor<128x128x128x128xf32>
+}
+
+// TRANSPOSE-LABEL: func @only_transpose_x_y(
+//       TRANSPOSE:   scf.forall
+//       TRANSPOSE:     mapping = [#iree_codegen.workgroup_mapping<z:1>, #iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<x>, #iree_codegen.workgroup_mapping<y>]
+
+// -----
+
+// Incase of less than 2 workgroup_mapping, don't apply transpose.
+func.func @dont_transpose_less(%0 : tensor<128x128xf32>, %1 : tensor<128x128xf32>, %2 : tensor<128x128xf32>) -> tensor<128x128xf32> {
+  %3 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 0, 0]]>}
+      ins(%0, %1 : tensor<128x128xf32>, tensor<128x128xf32>)
+      outs(%2 : tensor<128x128xf32>) -> tensor<128x128xf32>
+  return %3 : tensor<128x128xf32>
+}
+
+// TRANSPOSE-LABEL: func @dont_transpose_less(
+//       TRANSPOSE:   scf.forall
+//       TRANSPOSE:    [#iree_codegen.workgroup_mapping<x>]

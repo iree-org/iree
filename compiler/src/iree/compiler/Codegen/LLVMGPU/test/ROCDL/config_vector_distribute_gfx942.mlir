@@ -278,8 +278,8 @@ func.func @narrow_n_batch_matmul_64x968x4x320_f16() {
   flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [64, 968, 4], strides = [1, 1, 1] : tensor<64x968x4xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x968x4xf16>>
   return
 }
-// Check that we don't support LLVMGPUPadAndVectorDistribute for narrow N/M atm.
-// CHECK-NOT:      #iree_codegen.translation_info<pipeline = LLVMGPUPadAndVectorDistribute
+// Check that we support LLVMGPUPadAndVectorDistribute for narrow N/M atm.
+// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUPadAndVectorDistribute
 // CHECK-LABEL: func.func @narrow_n_batch_matmul_64x968x4x320_f16()
 
 // -----

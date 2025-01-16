@@ -191,7 +191,7 @@ void BubbleUpExpandShapesPass::runOnOperation() {
       auto dimExpr = getAffineDimExpr(dim, operandMap.getContext());
       if (std::optional<int64_t> maybeDim =
               operandMap.getResultPosition(dimExpr);
-          maybeDim && !reassoc[maybeDim.value()].empty()) {
+          maybeDim && reassoc[maybeDim.value()].size() > 1) {
         return false;
       }
     }
@@ -204,12 +204,14 @@ void BubbleUpExpandShapesPass::runOnOperation() {
   // that can be done later) of reshape ops.
   tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
   bubbleExpandShapePatterns.insert<BubbleExpandThroughExtract>(context);
+  tensor::ExpandShapeOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
+                                                     context);
 
   GreedyRewriteConfig rewriteConfig;
   rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
-  if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                          std::move(bubbleExpandShapePatterns),
-                                          rewriteConfig))) {
+  if (failed(applyPatternsGreedily(getOperation(),
+                                   std::move(bubbleExpandShapePatterns),
+                                   rewriteConfig))) {
     getOperation()->emitOpError("Failed to perform elementwise operations");
     return signalPassFailure();
   }

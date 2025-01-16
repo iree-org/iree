@@ -10,21 +10,23 @@
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
-func.func @expanded_matmul_transpose_b(%lhs: tensor<2x64x2048xf16>, %rhs: tensor<10x64x2048xf16>) -> tensor<2x10x64x64xf16> {
+func.func @expanded_matmul_transpose_b(%lhs: tensor<2x64x2048xf16>, %rhs: tensor<10x64x2048xf16>) -> tensor<2x10x64x64xf32> {
   %c0 = arith.constant 0 : index
-  %cst = arith.constant 0.000000e+00 : f16
-  %5 = tensor.empty() : tensor<2x10x64x64xf16>
-  %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<2x10x64x64xf16>) -> tensor<2x10x64x64xf16>
+  %cst = arith.constant 0.000000e+00 : f32
+  %5 = tensor.empty() : tensor<2x10x64x64xf32>
+  %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x10x64x64xf32>) -> tensor<2x10x64x64xf32>
   %7 = linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]}
-    ins(%lhs, %rhs : tensor<2x64x2048xf16>, tensor<10x64x2048xf16>) outs(%6 : tensor<2x10x64x64xf16>) {
-  ^bb0(%in: f16, %in_0: f16, %out: f16):
-    %8 = arith.mulf %in, %in_0 : f16
-    %9 = arith.addf %8, %out : f16
-    linalg.yield %9 : f16
-  } -> tensor<2x10x64x64xf16>
-  return %7 : tensor<2x10x64x64xf16>
+    ins(%lhs, %rhs : tensor<2x64x2048xf16>, tensor<10x64x2048xf16>) outs(%6 : tensor<2x10x64x64xf32>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f32):
+    %8 = arith.extf %in : f16 to f32
+    %9 = arith.extf %in_0 : f16 to f32
+    %10 = arith.mulf %8, %9 : f32
+    %11 = arith.addf %10, %out : f32
+    linalg.yield %11 : f32
+  } -> tensor<2x10x64x64xf32>
+  return %7 : tensor<2x10x64x64xf32>
 }
 
 // CHECK-LABEL: func.func @expanded_matmul_transpose_b
@@ -46,21 +48,23 @@ func.func @expanded_matmul_transpose_b(%lhs: tensor<2x64x2048xf16>, %rhs: tensor
 #map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d4, d5)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d3, d4, d5)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
-func.func @multi_dim_mma_schedule(%lhs: tensor<10x32x128x16xf16>, %rhs: tensor<4x32x128x16xf16>) -> tensor<10x4x32x32xf16> {
+func.func @multi_dim_mma_schedule(%lhs: tensor<10x32x128x16xf16>, %rhs: tensor<4x32x128x16xf16>) -> tensor<10x4x32x32xf32> {
   %c0 = arith.constant 0 : index
-  %cst = arith.constant 0.000000e+00 : f16
-  %5 = tensor.empty() : tensor<10x4x32x32xf16>
-  %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<10x4x32x32xf16>) -> tensor<10x4x32x32xf16>
+  %cst = arith.constant 0.000000e+00 : f32
+  %5 = tensor.empty() : tensor<10x4x32x32xf32>
+  %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<10x4x32x32xf32>) -> tensor<10x4x32x32xf32>
   %7 = linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]}
-    ins(%lhs, %rhs : tensor<10x32x128x16xf16>, tensor<4x32x128x16xf16>) outs(%6 : tensor<10x4x32x32xf16>) {
-  ^bb0(%in: f16, %in_0: f16, %out: f16):
-    %8 = arith.mulf %in, %in_0 : f16
-    %9 = arith.addf %8, %out : f16
-    linalg.yield %9 : f16
-  } -> tensor<10x4x32x32xf16>
-  return %7 : tensor<10x4x32x32xf16>
+    ins(%lhs, %rhs : tensor<10x32x128x16xf16>, tensor<4x32x128x16xf16>) outs(%6 : tensor<10x4x32x32xf32>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f32):
+    %8 = arith.extf %in : f16 to f32
+    %9 = arith.extf %in_0 : f16 to f32
+    %10 = arith.mulf %8, %9 : f32
+    %11 = arith.addf %10, %out : f32
+    linalg.yield %11 : f32
+  } -> tensor<10x4x32x32xf32>
+  return %7 : tensor<10x4x32x32xf32>
 }
 
 // CHECK-LABEL: func.func @multi_dim_mma_schedule
@@ -79,23 +83,25 @@ func.func @multi_dim_mma_schedule(%lhs: tensor<10x32x128x16xf16>, %rhs: tensor<4
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d5, d6)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d2, d4, d5, d6)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4)>
-func.func @dynamic_multi_dim_mma_schedule(%lhs: tensor<?x6x16x?x16xf16>, %rhs: tensor<?x32x?x16xf16>) -> tensor<?x6x?x16x32xf16> {
+func.func @dynamic_multi_dim_mma_schedule(%lhs: tensor<?x6x16x?x16xf16>, %rhs: tensor<?x32x?x16xf16>) -> tensor<?x6x?x16x32xf32> {
   %c0 = arith.constant 0 : index
-  %cst = arith.constant 0.000000e+00 : f16
+  %cst = arith.constant 0.000000e+00 : f32
   %d0 = tensor.dim %lhs, %c0 : tensor<?x6x16x?x16xf16>
   %d2 = tensor.dim %rhs, %c0 : tensor<?x32x?x16xf16>
-  %5 = tensor.empty(%d0, %d2) : tensor<?x6x?x16x32xf16>
-  %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<?x6x?x16x32xf16>) -> tensor<?x6x?x16x32xf16>
+  %5 = tensor.empty(%d0, %d2) : tensor<?x6x?x16x32xf32>
+  %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<?x6x?x16x32xf32>) -> tensor<?x6x?x16x32xf32>
   %7 = linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]}
-    ins(%lhs, %rhs : tensor<?x6x16x?x16xf16>, tensor<?x32x?x16xf16>) outs(%6 : tensor<?x6x?x16x32xf16>) {
-  ^bb0(%in: f16, %in_0: f16, %out: f16):
-    %8 = arith.mulf %in, %in_0 : f16
-    %9 = arith.addf %8, %out : f16
-    linalg.yield %9 : f16
-  } -> tensor<?x6x?x16x32xf16>
-  return %7 : tensor<?x6x?x16x32xf16>
+    ins(%lhs, %rhs : tensor<?x6x16x?x16xf16>, tensor<?x32x?x16xf16>) outs(%6 : tensor<?x6x?x16x32xf32>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f32):
+    %8 = arith.extf %in : f16 to f32
+    %9 = arith.extf %in_0 : f16 to f32
+    %10 = arith.mulf %8, %9 : f32
+    %11 = arith.addf %10, %out : f32
+    linalg.yield %11 : f32
+  } -> tensor<?x6x?x16x32xf32>
+  return %7 : tensor<?x6x?x16x32xf32>
 }
 
 // CHECK-LABEL: func.func @dynamic_multi_dim_mma_schedule
@@ -242,9 +248,9 @@ module {
                           #iree_gpu.iterator_type<reduction>],
         kind = #iree_gpu.data_tiled_mma_layout<
                           intrinsic =  MFMA_F32_16x16x4_F32,
-                          unroll_m = 8, unroll_n = 2,
+                          intrinsics_m = 8, intrinsics_n = 2,
                           subgroups_n = 4,
-                          unroll_k = 4>}
+                          intrinsics_k = 4>}
         : tensor<1x8x8x4x16x4xf32>, tensor<1x8x4x2x4x16x4xf32> into tensor<1x1x8x4x2x4x16x4xf32>
     return %6 : tensor<1x1x8x4x2x4x16x4xf32>
   }
@@ -307,3 +313,113 @@ func.func @unaligned_to_intrinsic_batched_matmul_tiling_check(%lhs : tensor<12x5
 //  CHECK-SAME:     reduction = [0, 0, 0, 1]
 //  CHECK-SAME:     subgroup = [0, 1, 8, 0]
 //  CHECK-SAME:     workgroup = [1, 16, 512, 0]
+
+// -----
+
+func.func @large_scatter(%arg0: tensor<3x2048x2048xf32>,
+                   %arg1: tensor<3x1xi32>) -> tensor<3x2048x2048xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<3x2048x2048xf32>
+  %1 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%arg0, %arg1 : tensor<3x2048x2048xf32>, tensor<3x1xi32>) outs(%0 : tensor<3x2048x2048xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    iree_linalg_ext.yield %arg2 : f32
+  } -> tensor<3x2048x2048xf32>
+  return %1 : tensor<3x2048x2048xf32>
+}
+
+// CHECK-LABEL: func.func @large_scatter
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+
+//       CHECK:   linalg_ext.scatter {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1, 4]
+//  CHECK-SAME:     workgroup = [1, 1, 256]
+
+// -----
+
+func.func @small_scatter(%arg0: tensor<3x32x16xf32>,
+                         %arg1: tensor<3x1xi32>) -> tensor<3x32x16xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<3x32x16xf32>
+  %1 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%arg0, %arg1 : tensor<3x32x16xf32>, tensor<3x1xi32>) outs(%0 : tensor<3x32x16xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    iree_linalg_ext.yield %arg2 : f32
+  } -> tensor<3x32x16xf32>
+  return %1 : tensor<3x32x16xf32>
+}
+
+// CHECK-LABEL: func.func @small_scatter
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+
+//       CHECK:   linalg_ext.scatter {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1, 4]
+//  CHECK-SAME:     workgroup = [1, 16, 16]
+
+// -----
+
+func.func @only_scattered_dim(%arg0: tensor<48xf32>,
+                              %arg1: tensor<48x2xi32>) -> tensor<100x100xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<100x100xf32>
+  %1 = iree_linalg_ext.scatter dimension_map = [0, 1] unique_indices(true)
+    ins(%arg0, %arg1 : tensor<48xf32>, tensor<48x2xi32>) outs(%0 : tensor<100x100xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    iree_linalg_ext.yield %arg2 : f32
+  } -> tensor<100x100xf32>
+  return %1 : tensor<100x100xf32>
+}
+
+// CHECK-LABEL: func.func @only_scattered_dim
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUDistribute workgroup_size = [128, 1, 1] subgroup_size = 64
+
+//       CHECK:   linalg_ext.scatter {{.*}}lowering_config = #iree_codegen.lowering_config
+//  CHECK-SAME:     tile_sizes = {{\[}}[128]]
+
+// -----
+
+func.func @dynamic_scatter(%arg0: tensor<3x32x?xf32>,
+                           %arg1: tensor<3x1xi32>,
+                           %arg2: tensor<3x32x?xf32>) -> tensor<3x32x?xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %1 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%arg0, %arg1 : tensor<3x32x?xf32>, tensor<3x1xi32>) outs(%arg2 : tensor<3x32x?xf32>) {
+  ^bb0(%arg3: f32, %arg4: f32):
+    iree_linalg_ext.yield %arg3 : f32
+  } -> tensor<3x32x?xf32>
+  return %1 : tensor<3x32x?xf32>
+}
+
+// CHECK-LABEL: func.func @dynamic_scatter
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+
+//       CHECK:   linalg_ext.scatter {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1, 4]
+//  CHECK-SAME:     workgroup = [1, 1, 256]
+
+// -----
+
+func.func @elementwise_scatter(%arg0: tensor<3x2048x2048xf32>,
+                               %arg1: tensor<3x2048x2048xf32>,
+                               %arg2: tensor<3x1xi32>) -> tensor<3x2048x2048xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<3x2048x2048xf32>
+  %1 = linalg.add ins(%arg0, %arg1 : tensor<3x2048x2048xf32>, tensor<3x2048x2048xf32>)
+    outs(%0 : tensor<3x2048x2048xf32>) -> tensor<3x2048x2048xf32>
+  %2 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%1, %arg2 : tensor<3x2048x2048xf32>, tensor<3x1xi32>) outs(%0 : tensor<3x2048x2048xf32>) {
+  ^bb0(%arg3: f32, %arg4: f32):
+    iree_linalg_ext.yield %arg3 : f32
+  } -> tensor<3x2048x2048xf32>
+  return %2 : tensor<3x2048x2048xf32>
+}
+
+// CHECK-LABEL: func.func @elementwise_scatter
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+
+//       CHECK:   linalg.add {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1, 4]
+//  CHECK-SAME:     workgroup = [1, 1, 256]
+
+// Verify that the scatter does not get a lowering config
+//       CHECK:   linalg_ext.scatter dimension_map

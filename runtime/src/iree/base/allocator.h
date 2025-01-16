@@ -97,6 +97,18 @@ static inline iree_byte_span_t iree_cast_const_byte_span(
   return iree_make_byte_span((uint8_t*)span.data, span.data_length);
 }
 
+// Copies |size| bytes from |src| to |dst| without polluting the cache with
+// |dst| lines. Used when streaming data that will not be read again.
+static inline void iree_memcpy_stream_dst(void* IREE_RESTRICT dst,
+                                          const void* IREE_RESTRICT src,
+                                          iree_host_size_t size) {
+  // TODO(benvanik): implement a proper non-temporal copy. This will be
+  // architecture-specific and may have compiler-specific paths in order to emit
+  // the proper instructions. On x64 this should be using MOVNTDQ (or something
+  // in that family).
+  memcpy(dst, src, size);
+}
+
 //===----------------------------------------------------------------------===//
 // Totally shady stack allocation
 //===----------------------------------------------------------------------===//

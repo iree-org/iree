@@ -106,7 +106,7 @@ typedef struct iree_hal_buffer_ref_t {
   // the base offset of the bound buffer.
   iree_device_size_t offset;
   // Length, in bytes, of the buffer after the offset that is accessed.
-  // This can be IREE_WHOLE_BUFFER, however note that if the entire buffer
+  // This can be IREE_HAL_WHOLE_BUFFER, however note that if the entire buffer
   // contents are larger than supported by the device (~128MiB, usually) this
   // will fail.
   iree_device_size_t length;
@@ -443,10 +443,15 @@ enum iree_hal_dispatch_flag_bits_t {
 
 // An RGBA color.
 typedef struct iree_hal_label_color_t {
-  uint8_t r;
-  uint8_t g;
-  uint8_t b;
-  uint8_t a;
+  union {
+    struct {
+      uint8_t r;
+      uint8_t g;
+      uint8_t b;
+      uint8_t a;
+    };
+    uint32_t value;
+  };
 } iree_hal_label_color_t;
 
 // A source location attached to debug labels.
@@ -457,7 +462,7 @@ typedef struct iree_hal_label_location_t {
 
 // An unspecified color; debugging tools are to choose their own.
 static inline iree_hal_label_color_t iree_hal_label_color_unspecified() {
-  iree_hal_label_color_t color = {0, 0, 0, 0};
+  iree_hal_label_color_t color = {{{0, 0, 0, 0}}};
   return color;
 }
 
@@ -490,7 +495,7 @@ typedef struct iree_hal_buffer_binding_t {
   // This will be added to the offset specified on each usage of the slot.
   iree_device_size_t offset;
   // Length, in bytes, of the buffer that is available to the executable.
-  // This can be IREE_WHOLE_BUFFER, however note that if the entire buffer
+  // This can be IREE_HAL_WHOLE_BUFFER, however note that if the entire buffer
   // contents are larger than supported by the device (~128MiB, usually) this
   // will fail. If the descriptor type is dynamic this will be used for all
   // ranges regardless of offset.
@@ -545,8 +550,12 @@ static inline iree_status_t iree_hal_buffer_binding_table_resolve_ref(
     out_resolved_ref->reserved = buffer_ref.reserved;
     out_resolved_ref->buffer_slot = 0;
     out_resolved_ref->buffer = binding->buffer;
+    const iree_device_size_t max_length =
+        binding->length != IREE_HAL_WHOLE_BUFFER
+            ? binding->length
+            : iree_hal_buffer_byte_length(binding->buffer) - binding->offset;
     return iree_hal_buffer_calculate_range(
-        binding->offset, binding->length, buffer_ref.offset, buffer_ref.length,
+        binding->offset, max_length, buffer_ref.offset, buffer_ref.length,
         &out_resolved_ref->offset, &out_resolved_ref->length);
   }
 }

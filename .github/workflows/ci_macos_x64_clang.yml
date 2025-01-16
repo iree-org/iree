@@ -22,6 +22,7 @@ concurrency:
 
 jobs:
   macos_x64_clang:
+    if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
     runs-on: macos-13
     env:
       BUILD_DIR: build-macos
@@ -58,7 +59,7 @@ jobs:
         run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
       - name: Post to Discord on Failure
-        uses: sarisia/actions-status-discord@ce8cc68e4e626000136b3c702d049a154243e490 # v1.14.7
+        uses: sarisia/actions-status-discord@65843b6a7d18626c252a055e247ccad1f41b4004 # v1.15.1
         if: failure() && github.ref_name == 'main' && github.repository_owner == 'iree-org'
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}

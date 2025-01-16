@@ -90,7 +90,7 @@ public:
     }
 
     // Replace the tiled op with replacements.
-    rewriter.replaceOp(op, tilingResult->replacements);
+    rewriter.replaceOp(op, tilingResult->mergeResult.replacements);
     filter.replaceLinalgTransformationFilter(rewriter,
                                              tilingResult->tiledOps.front());
 
@@ -211,8 +211,7 @@ LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
     // same size.
     RewritePatternSet wgTilingPatterns(funcOp.getContext());
     populateTilingPatterns(wgTilingPatterns, fuseInputProducer, coalesceLoops);
-    if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                            std::move(wgTilingPatterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(wgTilingPatterns)))) {
       return failure();
     }
   }
@@ -224,7 +223,7 @@ LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
         wgTilingCanonicalizationPatterns);
     scf::populateSCFForLoopCanonicalizationPatterns(
         wgTilingCanonicalizationPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
+    if (failed(applyPatternsGreedily(
             funcOp, std::move(wgTilingCanonicalizationPatterns)))) {
       return failure();
     }
@@ -292,7 +291,7 @@ static LogicalResult tileParallelDims(mlir::FunctionOpInterface funcOp,
     if (failed(tilingResult)) {
       return tilingOp->emitOpError("failed to tile to scf.forall");
     }
-    rewriter.replaceOp(tilingOp, tilingResult->replacements);
+    rewriter.replaceOp(tilingOp, tilingResult->mergeResult.replacements);
   }
   return success();
 }

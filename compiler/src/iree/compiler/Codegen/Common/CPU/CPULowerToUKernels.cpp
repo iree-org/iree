@@ -622,8 +622,7 @@ void CPULowerToUKernelsPass::runOnOperation() {
   // These patterns are inherently specific to the VMVX backend.
   patterns.insert<LowerToUKernelPattern<IREE::Codegen::QueryTileSizesOp>>(
       context, isVMVXBackend);
-  if (failed(
-          applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+  if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
   }
 }
