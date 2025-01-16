@@ -8,17 +8,9 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/GlobalOptimization/Passes.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Utils/PassUtils.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/Attributes.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/Diagnostics.h"
-#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
@@ -27,7 +19,7 @@ namespace mlir::iree_compiler::GlobalOptimization {
 // path. This is mainly for testing.
 static llvm::cl::opt<bool> clEnableExperimentalRocmDataTiling(
     "iree-global-opt-experimental-rocm-data-tiling",
-    llvm::cl::desc("Enables data-tiling materializatino for rocm backends "
+    llvm::cl::desc("Enables data-tiling materialization for rocm backends "
                    "(experimental)."),
     llvm::cl::init(false));
 
@@ -38,10 +30,9 @@ using FunctionLikeNest =
     MultiOpNest<IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
 namespace {
-class MaterializeHomogeneousEncodingsPass
-    : public impl::MaterializeHomogeneousEncodingsPassBase<
+struct MaterializeHomogeneousEncodingsPass final
+    : impl::MaterializeHomogeneousEncodingsPassBase<
           MaterializeHomogeneousEncodingsPass> {
-public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect, tensor::TensorDialect,
                     IREE::Codegen::IREECodegenDialect>();
@@ -72,7 +63,7 @@ public:
     // TODO: vmvx has its own logic about supporting dynamic tile
     // sizes. It is not fully integrated into the pipeline, so we remain the
     // materialization to the end.
-    auto executableTarget = executableTargets[0];
+    IREE::HAL::ExecutableTargetAttr executableTarget = executableTargets[0];
     if (executableTarget.getBackend() == "vmvx") {
       return;
     }

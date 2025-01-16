@@ -5,30 +5,27 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
-#include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/Passes.h"
 
-#define DEBUG_TYPE "iree-codegen--materialize-encoding"
+#define DEBUG_TYPE "iree-codegen-materialize-encoding"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
@@ -150,9 +147,8 @@ getFuncExecutableTargetAttrs(FunctionOpInterface funcOp,
   return executableTargetAttrs;
 }
 
-struct MaterializeHostEncodingPass
-    : public impl::MaterializeHostEncodingPassBase<
-          MaterializeHostEncodingPass> {
+struct MaterializeHostEncodingPass final
+    : impl::MaterializeHostEncodingPassBase<MaterializeHostEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, tensor::TensorDialect,
                     IREE::Codegen::IREECodegenDialect,
@@ -160,7 +156,7 @@ struct MaterializeHostEncodingPass
   }
 
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    ModuleOp moduleOp = getOperation();
 
     // Run required analysis passes.
     IREE::Stream::AffinityAnalysis affinityAnalysis(moduleOp);
@@ -211,11 +207,9 @@ struct MaterializeHostEncodingPass
 // that. It should _not_ be running on both - target-specific codegen passes
 // are not allowed on host programs and it's a big violation of layering that
 // this exists.
-struct MaterializeDeviceEncodingPass
-    : public impl::MaterializeDeviceEncodingPassBase<
-          MaterializeDeviceEncodingPass> {
-  using impl::MaterializeDeviceEncodingPassBase<
-      MaterializeDeviceEncodingPass>::MaterializeDeviceEncodingPassBase;
+struct MaterializeDeviceEncodingPass final
+    : impl::MaterializeDeviceEncodingPassBase<MaterializeDeviceEncodingPass> {
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, tensor::TensorDialect,
@@ -224,7 +218,7 @@ struct MaterializeDeviceEncodingPass
   }
 
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    FunctionOpInterface funcOp = getOperation();
     auto executableTargetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
     if (failed(materializeFuncOpEncodings(funcOp, executableTargetAttr,
                                           testCLGPUTarget))) {
