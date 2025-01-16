@@ -33,31 +33,12 @@ namespace {
 struct TileAndDistributeToWorkgroupsUsingForallOpPass final
     : public impl::TileAndDistributeToWorkgroupsUsingForallOpPassBase<
           TileAndDistributeToWorkgroupsUsingForallOpPass> {
-  TileAndDistributeToWorkgroupsUsingForallOpPass(bool strategy)
-      : transposeWorkgroups(strategy) {}
-
+  explicit TileAndDistributeToWorkgroupsUsingForallOpPass(
+      bool transposeWorkgroup) {
+    this->transposeWorkgroup = transposeWorkgroup;
+  }
   using Base::Base;
   void runOnOperation() override;
-
-  LogicalResult initializeOptions(
-      StringRef options,
-      function_ref<LogicalResult(const Twine &)> errorHandler) override {
-    if (failed(Pass::initializeOptions(options, errorHandler))) {
-      return failure();
-    }
-    auto selectedStrategy = llvm::StringSwitch<FailureOr<bool>>(strategy)
-                                .Case("", false)
-                                .Case("transpose", true)
-                                .Default(failure());
-    if (failed(selectedStrategy))
-      return failure();
-
-    transposeWorkgroups = *selectedStrategy;
-    return success();
-  }
-
-private:
-  bool transposeWorkgroups = false;
 };
 
 } // namespace
@@ -213,16 +194,13 @@ pruneDroppedLoops(ArrayRef<Attribute> inputs,
   return prunedAttrs;
 }
 
-// Checks whether we have static dimension for all the loop bounds and steps.
-// This is a requirement if the reordering strategy is set to `transpose`.
-static bool checkStaticLoopBounds(scf::ForallOp forallOp) {
+/// Checks whether we have static dimension for all the loop bounds and steps.
+/// This is a requirement if the reordering strategy is set to `transpose`.
+static bool areAllStaticLoopBounds(scf::ForallOp forallOp) {
 
-  SmallVector<OpFoldResult> mixedLbs = forallOp.getMixedLowerBound();
-  SmallVector<OpFoldResult> mixedUbs = forallOp.getMixedUpperBound();
-  SmallVector<OpFoldResult> mixedSteps = forallOp.getMixedStep();
-
-  for (auto [index, lb, ub, step] :
-       llvm::enumerate(mixedLbs, mixedUbs, mixedSteps)) {
+  for (auto [lb, ub, step] : llvm::zip_equal(forallOp.getMixedLowerBound(),
+                                             forallOp.getMixedUpperBound(),
+                                             forallOp.getMixedStep())) {
 
     std::optional<int64_t> lbVal = getConstantIntValue(lb);
     std::optional<int64_t> ubVal = getConstantIntValue(ub);
@@ -568,10 +546,10 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     // This just transposes the first two dimensions of the workgroup i.e., the
     // #iree.codegen.workgroup_id_x and #iree.codegen.workgroup_id_y.
     // Only reorders if the loop bounds are static.
-    if (transposeWorkgroups) {
+    if (transposeWorkgroup) {
       SmallVector<Attribute> mappingAttrs(forallOp.getMappingAttr().getValue());
       int64_t mappingSize = mappingAttrs.size();
-      if (checkStaticLoopBounds(forallOp) && mappingAttrs.size() >= 2) {
+      if (areAllStaticLoopBounds(forallOp) && mappingSize >= 2) {
         std::swap(mappingAttrs[mappingSize - 1], mappingAttrs[mappingSize - 2]);
         forallOp.setMappingAttr(ArrayAttr::get(context, mappingAttrs));
       }
@@ -598,9 +576,8 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   return;
 }
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createTileAndDistributeToWorkgroupsWithReordering(
-    bool reorderWorkgroupsWithTranspose) {
+createTileAndDistributeToWorkgroupsWithReordering(bool transposeWorkgroup) {
   return std::make_unique<TileAndDistributeToWorkgroupsUsingForallOpPass>(
-      reorderWorkgroupsWithTranspose);
+      transposeWorkgroup);
 }
 } // namespace mlir::iree_compiler

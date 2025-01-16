@@ -96,8 +96,7 @@ createTileAndDistributeToWorkgroupsPass(
 
 // Pass to tile and distribute using scf.forall with workgroup reordering.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createTileAndDistributeToWorkgroupsWithReordering(
-    bool reorderWorkgroupsWithTranspose);
+createTileAndDistributeToWorkgroupsWithReordering(bool transposeWorkgroup);
 
 //----------------------------------------------------------------------------//
 // CodeGen Common Patterns

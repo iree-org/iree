@@ -643,8 +643,9 @@ def TileAndDistributeToWorkgroupsUsingForallOpPass :
     "tensor::TensorDialect",
   ];
   let options = [
-    Option<"strategy", "strategy", "std::string", /*default=*/"",
-           "Workgroup reordering strategy, one of: '' (none),  'transpose'">,
+    Option<"transposeWorkgroup", "transpose-workgroup", "bool", /*default=*/"false",
+           "Swaps the workgroup mapping attribute x and y."
+            "Only swaps when the loop bounds are static.">,
   ];
 }
 
