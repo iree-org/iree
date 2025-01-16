@@ -178,17 +178,12 @@ LogicalResult ScatterOp::verify() {
   }
   const size_t batchRank = updateType.getRank() - originalSliceRank;
 
-  if (updateType.getRank() - batchRank != originalType.getRank() - indexDepth) {
+  if (updateType.getRank() - batchRank != originalSliceRank) {
     return op->emitOpError("expected rank of update value - batch rank to be "
                            "equal to rank of original value - index depth");
   }
-  if (updateType.getRank() < batchRank) {
-    return op->emitOpError("expected update value to be of rank greater than "
-                           "or equal to rank(indices) - 1")
-           << batchRank;
-  }
 
-  if (indicesType.getRank() != batchRank &&
+  if ((indicesType.getRank() != batchRank || indexDepth != 1) &&
       indicesType.getRank() != batchRank + 1) {
     return op->emitOpError("expected indices to be equal to batch rank "
                            "or batch rank + 1");

@@ -8,8 +8,6 @@
 // The content of this file is adapted from linalg's ElemenwiseOpFusion.cpp and
 // modified to work with LinalgExt ops, specifically `LinalgExt::AttentionOp`.
 
-#include <cstdint>
-#include <optional>
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
@@ -19,6 +17,9 @@
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
+
+#include <cstdint>
+#include <optional>
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
