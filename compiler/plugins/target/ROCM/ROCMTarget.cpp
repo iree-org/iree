@@ -60,14 +60,12 @@ namespace mlir::iree_compiler::IREE::HAL {
 namespace {
 
 // TODO(#18792): rename flags back to iree-rocm- as they are not HIP-specific.
-// Only iree-hip-legacy-sync applies uniquely to HIP.
 struct ROCMOptions {
   std::string target = "";
   std::string targetFeatures = "";
   std::string bitcodeDirectory = getDefaultBitcodeDirectory();
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
-  bool legacySync = true;
   bool slpVectorization = true;
   bool globalISel = false;
 
@@ -107,9 +105,7 @@ struct ROCMOptions {
         cl::desc("Enables microkernels in the HIP compiler backend. May be "
                  "`default`, `none`, `all`, or a comma-separated list of "
                  "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
-    binder.opt<bool>("iree-hip-legacy-sync", legacySync, cl::cat(category),
-                     cl::desc("Enables 'legacy-sync' mode, which is required "
-                              "for inline execution."));
+
     binder.list<std::string>(
         "iree-hip-pass-plugin-path", passPlugins,
         cl::desc("LLVM pass plugins are out of tree libraries that implement "
@@ -876,12 +872,6 @@ public:
     Builder b(context);
 
     SmallVector<NamedAttribute> deviceConfigAttrs;
-    if (options.legacySync) {
-      // Indicates that the runtime HAL driver operates only in the legacy
-      // synchronous mode.
-      deviceConfigAttrs.emplace_back(b.getStringAttr("legacy_sync"),
-                                     b.getUnitAttr());
-    }
     auto deviceConfigAttr = b.getDictionaryAttr(deviceConfigAttrs);
 
     SmallVector<NamedAttribute> executableConfigAttrs;

@@ -466,10 +466,6 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
     passManager.addPass(IREE::HAL::createOutlineMemoizeRegionsPass());
   }
 
-  // If any devices require the legacy synchronous execution behavior then
-  // make all async operations blocking.
-  passManager.addPass(IREE::HAL::createFixupLegacySyncPass());
-
   // Prune unused executables and their contents.
   passManager.addPass(IREE::HAL::createPruneExecutablesPass());
 
