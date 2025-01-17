@@ -38,7 +38,7 @@ static AffineMap constructFilterMap(AffineMap map, SmallVector<int64_t> &perm) {
 // Utility function to create a transpose operation.
 static Value createTransposeOp(PatternRewriter &rewriter, Location loc,
                                Value tensor, SmallVector<int64_t> &perm) {
-  SmallVector<OpFoldResult> dimSizes =
+  SmallVector<OpFoldResult, 4> dimSizes =
       tensor::getMixedSizes(rewriter, loc, tensor);
   // Dim index of H, W, F, C
   SmallVector<OpFoldResult, 4> transposeResultDims;
@@ -53,42 +53,57 @@ static Value createTransposeOp(PatternRewriter &rewriter, Location loc,
       .getResult()[0];
 }
 
+llvm::LogicalResult convertConvFilterToTargetLayout(
+    linalg::Conv2DNhwcHwcfOp convOp, PatternRewriter &rewriter,
+    SmallVector<int64_t> &perm) {
+  Location loc = convOp.getLoc();
+
+  // Extract operands.
+  Value input = convOp.getInputs()[0];
+  Value filter = convOp.getInputs()[1];
+  Value output = convOp.getOutputs()[0];
+
+  // Extract indexing maps.
+  AffineMap inputMap = convOp.getIndexingMapsArray()[0];
+  AffineMap filterMap = convOp.getIndexingMapsArray()[1];
+  AffineMap outputMap = convOp.getIndexingMapsArray()[2];
+
+  AffineMap transposedFilterMap = constructFilterMap(filterMap, perm);
+  Value transposedFilter = createTransposeOp(rewriter, loc, filter, perm);
+
+  SmallVector<utils::IteratorType> iterators = convOp.getIteratorTypesArray();
+
+  auto genericOp = rewriter.create<linalg::GenericOp>(
+      loc, output.getType(), ValueRange{input, transposedFilter}, output,
+      ArrayRef<AffineMap>{inputMap, transposedFilterMap, outputMap},
+      iterators);
+
+  // Reuse the same payload as the original convolution op.
+  rewriter.inlineRegionBefore(convOp->getRegion(0), genericOp.getRegion(),
+                              genericOp.getRegion().begin());
+
+  rewriter.replaceOp(convOp, genericOp->getResults());
+  return success();
+}
+
 namespace {
 struct ConvertHwcfToHwfc : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
                                 PatternRewriter &rewriter) const override {
-    Location loc = convOp.getLoc();
-
-    // Extract operands.
-    Value input = convOp.getInputs()[0];
-    Value filter = convOp.getInputs()[1];
-    Value output = convOp.getOutputs()[0];
-
-    // Extract indexing maps.
-    AffineMap inputMap = convOp.getIndexingMapsArray()[0];
-    AffineMap filterMap = convOp.getIndexingMapsArray()[1];
-    AffineMap outputMap = convOp.getIndexingMapsArray()[2];
-
     SmallVector<int64_t> perm = {0, 1, 3, 2};
+    return convertConvFilterToTargetLayout(convOp, rewriter, perm);
+  }
+};
 
-    AffineMap transposedFilterMap = constructFilterMap(filterMap, perm);
-    Value transposedFilter = createTransposeOp(rewriter, loc, filter, perm);
+struct ConvertHwcfToFhwc : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
+  using OpRewritePattern::OpRewritePattern;
 
-    SmallVector<utils::IteratorType> iterators = convOp.getIteratorTypesArray();
-
-    auto genericOp = rewriter.create<linalg::GenericOp>(
-        loc, output.getType(), ValueRange{input, transposedFilter}, output,
-        ArrayRef<AffineMap>{inputMap, transposedFilterMap, outputMap},
-        iterators);
-
-    // Reuse the same payload as the original convolution op.
-    rewriter.inlineRegionBefore(convOp->getRegion(0), genericOp.getRegion(),
-                                genericOp.getRegion().begin());
-
-    rewriter.replaceOp(convOp, genericOp->getResults());
-    return success();
+  LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<int64_t> perm = {3, 0, 1, 2};
+    return convertConvFilterToTargetLayout(convOp, rewriter, perm);
   }
 };
 
@@ -109,6 +124,12 @@ public:
     RewritePatternSet patterns(context);
     if (filterLayout == "hwfc") {
       patterns.add<ConvertHwcfToHwfc>(context);
+    } else if (filterLayout == "fhwc") {
+      patterns.add<ConvertHwcfToFhwc>(context);
+    } else {
+      // TODO add default fallback to filter layout once we have more data
+      // about models with the two layouts
+      llvm_unreachable("Unsupported filter layout. Use hwfc or fhwc.");
     }
 
     if (failed(applyPatternsGreedily(op, std::move(patterns)))) {
@@ -123,5 +144,4 @@ private:
 };
 
 } // namespace
-
 } // namespace mlir::iree_compiler::Preprocessing

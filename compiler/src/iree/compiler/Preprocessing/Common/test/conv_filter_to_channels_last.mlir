@@ -1,7 +1,8 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-preprocessing-convert-conv-filter-to-channels-last{filter-layout=hwfc}))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-preprocessing-convert-conv-filter-to-channels-last{filter-layout=fhwc}))" %s | FileCheck %s
 
-// CHECK-LABEL: @conv
-util.func @conv(%arg0: tensor<2x130x130x16xf16>, %arg1: tensor<3x3x16x320xf16>,
+// CHECK-LABEL: @conv_fp16
+util.func @conv_fp16(%arg0: tensor<2x130x130x16xf16>, %arg1: tensor<3x3x16x320xf16>,
 %arg2: tensor<2x128x128x320xf32>)
     -> tensor<2x128x128x320xf32> {
   %conv0 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
