@@ -33,18 +33,16 @@ hal.executable public @main_0_dispatch_0 {
       // OPT-OUT-LABEL: func.func @main_0_dispatch_0_matmul_transpose_b
       // OPT-OUT:         memref.alloc() : memref<128x32xf16, #gpu.address_space<workgroup>>
       // OPT-OUT:         memref.alloc() : memref<128x32xf16, #gpu.address_space<workgroup>>
-      // OPT-OUT-DAG:     %[[WG_Y:.+]] = hal.interface.workgroup.id[1] : index
-      // OPT-OUT-DAG:     %[[WG_X:.+]] = hal.interface.workgroup.id[0] : index
-      // OPT-OUT-DAG:     arith.muli %[[WG_Y]], %{{.+}} : index
-      // OPT-OUT-DAG:     arith.addi %{{.+}}, %[[WG_X]] : index
-      // OPT-OUT:         scf.for
+      // OPT-OUT:         scf.forall
+      // OPT-OUT:          scf.for
+      // OPT-OUT:         } {mapping = [#iree_codegen.workgroup_mapping<x>, #iree_codegen.workgroup_mapping<y>]}
 
       // OPT-IN-LABEL: func.func @main_0_dispatch_0_matmul_transpose_b
       // OPT-IN:         memref.alloc() : memref<128x32xf16, #gpu.address_space<workgroup>>
       // OPT-IN:         memref.alloc() : memref<128x32xf16, #gpu.address_space<workgroup>>
-      // OPT-IN-DAG:     %[[WG_Y:.+]] = hal.interface.workgroup.id[1] : index
-      // OPT-IN-DAG:     %[[WG_X:.+]] = hal.interface.workgroup.id[0] : index
-      // OPT-IN:         scf.for
+      // OPT-IN:         scf.forall
+      // OPT-IN:          scf.for
+      // OPT-IN:         } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
       func.func @main_0_dispatch_0_matmul_transpose_b_2048x10240x1280_f16xf16xf32()
         attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64, {
@@ -108,20 +106,16 @@ hal.executable public @main_0_dispatch_0 {
       // OPT-OUT-LABEL: func.func @main_0_dispatch_0_matmul_transpose_b
       // OPT-OUT:         memref.alloc() : memref<128x36xf16, #gpu.address_space<workgroup>>
       // OPT-OUT:         memref.alloc() : memref<128x36xf16, #gpu.address_space<workgroup>>
-      // OPT-OUT-DAG:     %[[WG_Y:.+]] = hal.interface.workgroup.id[1] : index
-      // OPT-OUT-DAG:     %[[WG_X:.+]] = hal.interface.workgroup.id[0] : index
-      // OPT-OUT-DAG:     arith.muli %[[WG_Y]], %{{.+}} : index
-      // OPT-OUT-DAG:     arith.addi %{{.+}}, %[[WG_X]] : index
-      // OPT-OUT:         scf.for
+      // OPT-OUT:         scf.forall
+      // OPT-OUT:          scf.for
+      // OPT-OUT:         } {mapping = [#iree_codegen.workgroup_mapping<x>, #iree_codegen.workgroup_mapping<y>]}
 
       // OPT-IN-LABEL: func.func @main_0_dispatch_0_matmul_transpose_b
       // OPT-IN:         memref.alloc() : memref<128x36xf16, #gpu.address_space<workgroup>>
       // OPT-IN:         memref.alloc() : memref<128x36xf16, #gpu.address_space<workgroup>>
-      // OPT-IN-DAG:     %[[WG_Y:.+]] = hal.interface.workgroup.id[1] : index
-      // OPT-IN-DAG:     %[[WG_X:.+]] = hal.interface.workgroup.id[0] : index
-      // OPT-IN-DAG:     arith.muli %[[WG_Y]], %{{.+}} : index
-      // OPT-IN-DAG:     arith.addi %{{.+}}, %[[WG_X]] : index
-      // OPT-IN:         scf.for
+      // OPT-IN:         scf.forall
+      // OPT-IN:          scf.for
+      // OPT-IN:         } {mapping = [#iree_codegen.workgroup_mapping<x>, #iree_codegen.workgroup_mapping<y>]}
       func.func @main_0_dispatch_0_matmul_transpose_b_2048x10240x1280_f16xf16xf32()
         attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64, {
           gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = <Transpose>>  // enable the 'reorderWorkgroups' pass.
@@ -180,9 +174,9 @@ hal.executable public @main_0_dispatch_0 {
       // OPT-OUT-LABEL: func.func @main_0_dispatch_0_matmul_transpose_b
       // OPT-OUT:         memref.alloc() : memref<128x36xf16, #gpu.address_space<workgroup>>
       // OPT-OUT:         memref.alloc() : memref<128x36xf16, #gpu.address_space<workgroup>>
-      // OPT-OUT-DAG:     hal.interface.workgroup.id[1] : index
-      // OPT-OUT-DAG:     hal.interface.workgroup.id[0] : index
-      // OPT-OUT-NEXT:    scf.for
+      // OPT-OUT:         scf.forall
+      // OPT-OUT:          scf.for
+      // OPT-OUT:         } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
       func.func @main_0_dispatch_0_matmul_transpose_b_2048x10240x1280_f16xf16xf32()
         attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64, {
           gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = <None>>  // Disable the 'reorderWorkgroups' pass.
