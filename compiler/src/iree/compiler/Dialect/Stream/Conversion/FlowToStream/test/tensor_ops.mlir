@@ -138,6 +138,26 @@ util.func public @tensorSplat(%value: i8, %dim0: index) -> tensor<?x128xi8> {
 
 util.global private @device : !hal.device
 
+// CHECK-LABEL: @tensorBarrierDispatch
+//  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[DIM0:.+]]: index, %[[DIM1:.+]]: index)
+util.func public @tensorBarrierDispatch(%input: tensor<?x128xi8>, %dim0: index) -> tensor<?x128xi8> {
+  %c0 = arith.constant 0 : index
+  %barrier = flow.tensor.barrier %input : tensor<?x128xi8>{%dim0} on #hal.device.affinity<@device>
+  %0 = flow.dispatch @ex::@entry[%c0](%barrier) : (tensor<?x128xi8>{%dim0}) -> tensor<?x128xi8>{%dim0}
+
+  // CHECK: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK: %[[BARRIER:.+]] = stream.async.barrier %[[INPUT]] : !stream.resource<*>{%[[DIM0]]} -> !stream.resource<*>
+  // CHECK: %[[C0_2:.+]] = arith.constant 0 : index
+  // CHECK: %[[SIZE:.+]] = stream.tensor.sizeof on(#hal.device.affinity<@device>) tensor<?x128xi8>{%arg2} : index
+  // CHECK: %[[DISP:.+]] = stream.async.dispatch on(#hal.device.affinity<@device>) @ex::@entry[%[[C0]]](%[[BARRIER]][%[[C0_2]] to %[[DIM0]] for %[[DIM0]]])
+  // CHECK: util.return %[[DISP]], %[[SIZE]]
+  util.return %0 : tensor<?x128xi8>
+}
+
+// -----
+
+util.global private @device : !hal.device
+
 // CHECK-LABEL: @tensorTransfer
 //  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index, %[[DIM0:.+]]: index)
 util.func public @tensorTransfer(%input: tensor<?x128xi8>, %dim0: index) -> tensor<?x128xi8> {
