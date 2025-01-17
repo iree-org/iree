@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "gpu_combine_value_barriers.mlir"
     "gpu_create_fast_slow_path.mlir"
     "gpu_distribute.mlir"
+    "gpu_distribute_copy_using_forall.mlir"
     "gpu_distribute_forall.mlir"
     "gpu_distribute_scf_for.mlir"
     "gpu_distribute_shared_memory.mlir"
