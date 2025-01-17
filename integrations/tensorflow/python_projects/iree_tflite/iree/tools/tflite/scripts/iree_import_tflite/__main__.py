@@ -51,6 +51,19 @@ def main():
     if args.output_format != "mlir-bytecode":
         logging.warning("output-format option is deprecated, emitting MLIR bytecode")
 
+    # Log compatibility warnings for some known issues.
+    try:
+        from packaging import version
+        from tensorflow import __version__ as tf_version
+
+        # https://discourse.llvm.org/t/rfc-tosa-dialect-increment-to-v1-0/83708
+        if version.parse(tf_version) <= version.parse("2.18.0"):
+            logging.warning(
+                f"Found tensorflow version {tf_version}. Versions of tensorflow<=2.18.0 have known compatibility issues with TOSA v1.0. Consider using a newer tensorflow version or iree-base-compiler<=3.1.0"
+            )
+    except:
+        pass
+
     tflite_to_tosa(
         flatbuffer=args.flatbuffer,
         bytecode=args.output_path,
