@@ -259,3 +259,16 @@ builtin.module {
 //         CHECK:   llvm.zext %[[arg3]] : i32 to i64
 //         CHECK:   llvm.insertvalue %[[arg0]]
 //         CHECK:   llvm.insertvalue %[[arg2]]
+
+// -----
+// Test lowering of iree_codegen.null_pointer.
+module {
+  func.func private @foo(!iree_codegen.null_pointer)
+  func.func @null_pointer() {
+    %0 = iree_codegen.null_pointer
+    call @foo(%0) : (!iree_codegen.null_pointer) -> ()
+    return
+  }
+}
+//   CHECK-LABEL: llvm.func @null_pointer
+//   CHECK:       llvm.mlir.zero : !llvm.ptr
