@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/Interfaces/SubsetOpInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -253,9 +254,38 @@ struct CastLikeInsertSliceOpFolder final
 };
 } // namespace
 
+// Find the earliest insertion point in the block for the given operation.
+static Operation *getEarliestInsertionPointInsideBlock(Block *block,
+                                                       Operation *op) {
+
+  Operation *currInsertionPoint = &(*block->getOperations().begin());
+  DominanceInfo dominanceInfo(currInsertionPoint);
+
+  for (auto operand : op->getOperands()) {
+    if (auto blockArg = dyn_cast<BlockArgument>(operand)) {
+      continue;
+    }
+    Operation *defOp = operand.getDefiningOp();
+    if (!dominanceInfo.dominates(defOp, currInsertionPoint)) {
+      currInsertionPoint = defOp;
+    }
+  }
+  return currInsertionPoint;
+}
+
 void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
   auto funcOp = getOperation();
   IRRewriter rewriter(funcOp->getContext());
+
+  // TODO: This is a temporary hack enabled for bufferization to
+  // get rid of empty buffers.
+  // Tracked here: https://github.com/llvm/llvm-project/issues/122869
+  funcOp.walk([&](tensor::ExtractSliceOp extractSliceOp) {
+    Block *currBlock = extractSliceOp.getOperation()->getBlock();
+    auto latestInsertionPoint =
+        getEarliestInsertionPointInsideBlock(currBlock, extractSliceOp);
+    extractSliceOp->moveAfter(latestInsertionPoint);
+  });
 
   funcOp.walk([&](scf::ForOp forOp) { moveLoopInvariantCode(forOp); });
   LDBG("after hoisting loop invariant code\n" << funcOp);

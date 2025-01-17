@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-stream-specialize-encodings %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-specialize-encodings --verify-diagnostics %s | FileCheck %s
 
 //------------------------------------------------------------------------------
 // Stream ops that have TensorPhaseOp trait. This test suite tests that the
@@ -33,3 +33,52 @@ module {
 // CHECK:         %[[D0_RES:.+]] = stream.tensor.sizeof {{.+}} tensor<?x?xf32, #[[$ENCODING0]]>
 // CHECK:         %[[D1_RES:.+]] = stream.tensor.sizeof {{.+}} tensor<?x?xf32, #[[$ENCODING1]]>
 // CHECK:         return %[[D0_RES]], %[[D1_RES]]
+
+// -----
+
+#map0 = affine_map<(m, n, k) -> (m, k)>
+#map1 = affine_map<(m, n, k) -> (k, n)>
+#map2 = affine_map<(m, n, k) -> (m, n)>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_cpu.vmvx_encoding_layout<>}>
+#device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
+#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
+module {
+  util.global private @device_a = #device_target_local_0_
+
+  util.func public @ops_with_result_encoding_only(%arg0: index, %arg1: index, %scalar_f32 : f32) {
+    %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x0xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
+    %1 = stream.tensor.constant on(#hal.device.affinity<@device_a>) : tensor<?x5x64xf32>{%arg0} in !stream.resource<constant> = dense<0.000000e+00> : tensor<1x5x64xf32>
+    %2 = stream.tensor.splat on(#hal.device.affinity<@device_a>) %scalar_f32 : f32 -> tensor<?x1x10xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
+    util.return
+  }
+}
+// CHECK:       #[[$ENCODING:.+]] = #iree_encoding.encoding
+// CHECK-SAME:    #iree_cpu.vmvx_encoding_layout
+// CHECK-SAME:    encoding_info = {innerDimsPos = [{{.+}}], innerTileSizes = [{{.+}}], outerDimsPerm = [{{.+}}]}
+// CHECK:       #[[TARGET:.+]] = #hal.device.target
+// CHECK:       util.global private @[[$DEVICE:.+]] = #[[TARGET]]
+// CHECK-LABEL: util.func public @ops_with_result_encoding_only
+// CHECK:         stream.tensor.empty on(#hal.device.affinity<@[[$DEVICE]]>) : tensor<?x0xf32, #[[$ENCODING]]>
+// CHECK:         stream.tensor.constant {{.+}} : tensor<1x5x64xf32>
+// CHECK:         stream.tensor.splat on(#hal.device.affinity<@[[$DEVICE]]>) {{.+}} -> tensor<?x1x10xf32, #[[$ENCODING]]>
+// CHECK:         return
+
+// -----
+
+// Checks that the stream.tensor.constant op with encoding is not supported.
+
+#map0 = affine_map<(m, n, k) -> (m, k)>
+#map1 = affine_map<(m, n, k) -> (k, n)>
+#map2 = affine_map<(m, n, k) -> (m, n)>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_cpu.vmvx_encoding_layout<>}>
+#device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
+#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
+module {
+  util.global private @device_a = #device_target_local_0_
+
+  // expected-error @+1 {{failed on adding layouts to Stream::TensorPhaseOp with encodings}}
+  util.func public @ops_with_result_encoding_only(%arg0: index) {
+    %0 = stream.tensor.constant on(#hal.device.affinity<@device_a>) : tensor<?x5x64xf32, #encoding>{%arg0} in !stream.resource<constant> = dense<0.000000e+00> : tensor<1x5x64xf32>
+    util.return
+  }
+}
