@@ -394,6 +394,12 @@ private:
               DFX::Resolution::REQUIRED);
           getState() ^= targetUsage.getState();
         })
+        .Case([&](IREE::Stream::AsyncBarrierOp op) {
+          auto &tiedUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getOperand(0)),
+              DFX::Resolution::REQUIRED);
+          getState() ^= tiedUsage.getState();
+        })
         .Case([&](IREE::Stream::AsyncTransferOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);
           auto &sourceUsage = solver.getElementFor<ValueResourceUsage>(
@@ -715,6 +721,12 @@ private:
                 DFX::Resolution::REQUIRED);
             getState() ^= resultUsage.getState();
           }
+        })
+        .Case([&](IREE::Stream::AsyncBarrierOp op) {
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getResult()),
+              DFX::Resolution::OPTIONAL);
+          getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncTransferOp op) {
           removeAssumedBits(NOT_TRANSFER_READ);
