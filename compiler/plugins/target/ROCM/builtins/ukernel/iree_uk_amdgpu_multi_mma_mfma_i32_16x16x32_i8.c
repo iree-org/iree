@@ -6,46 +6,140 @@
 
 #include "compiler/plugins/target/ROCM/builtins/ukernel/common.h"
 
-// Very naive kernel. TODO(bjacob):
-// 1. Shared memory: can't allocate it within the microkernel (which is just a
-//    helper device function, not the actual amdgpu_kernel). Need to get it
-//    passed down here as additional parameters.
-// 2. Better scheduling via either barrier intrinsics or inline assemby.
+// Microkernel for iree_gpu.multi_mma with DataTiledMMAAttr with
+// intrinsic = MFMA_I32_16x16x32_I8 and a shape with outer M and N dimensions
+// equal to 1 (so that this is just doing the inner loop on the K dimension).
+//
+// This microkernel uses a local memory workspace buffer provided by the caller.
+// It is used to copy tiles of the A and/or B matrices, depending on which ones
+// are reused by multiple subgroups.
+//
+// Note that the A, B, C matrix pointers are all after thread-distribution.
+// When the pointer before thread-distribution is needed (when copying data
+// into local memory), care is taken to subtract the thread-relative offset,
+// which is computed from the thread id.
+//
+// As this function is always_inline, some of its parameters are actually
+// constant values after inlining, so some for() loops and if() branches here
+// are actually unrolled/resolved at compile time, making this microkernel
+// a generic "template". This is summarized in the below table.
+//
+// Parameters                 | Constant? | Description
+// -------------------------- | --------- | -----------
+// a_base, a_offset           | No        | A-matrix pointer (thread-distrib.)
+// b_base, b_offset           | No        | B-matrix pointer (thread-distrib.)
+// c_base, c_offset           | No        | C-matrix pointer (thread-distrib.)
+// local_memory_{base,offset} | No        | Local memory workspace pointer
+// local_memory_bytes         | Yes       | Local memory workspace size
+// k_size                     | Yes       | Size of outer K dimension
+// intrinsics_m, subgroups_m  | Yes       | See DataTiledMMAAttr
+// intrinsics_n, subgroups_n  | Yes       | See DataTiledMMAAttr
+// intrinsics_k               | Yes       | See DataTiledMMAAttr
+//
+// TODO(bjacob): Better scheduling via either barrier intrinsics or inline asm.
 [[clang::always_inline]] void iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8(
-    const int8_t *a_buffer, int64_t a_offset, const int8_t *b_buffer,
-    int64_t b_offset, int32_t *c_buffer, int64_t c_offset, int32_t k_size,
-    int32_t intrinsics_m, int32_t subgroups_m, int32_t intrinsics_n,
-    int32_t subgroups_n, int32_t intrinsics_k) {
-  // Load existing accumulators. The VLA becomes a normal array after inlining.
-  int32x4_t c[intrinsics_m][intrinsics_n];
-  int32x4_t *c_global = (int32x4_t *)(c_buffer + c_offset);
+    const int8_t *a_base, int64_t a_offset, const int8_t *b_base,
+    int64_t b_offset, int32_t *c_base, int64_t c_offset,
+    int8_t *local_memory_base, int64_t local_memory_offset,
+    int32_t local_memory_bytes, int32_t k_size, int32_t intrinsics_m,
+    int32_t subgroups_m, int32_t intrinsics_n, int32_t subgroups_n,
+    int32_t intrinsics_k) {
+  // We will be counting in units of "vectors", meaning, for each A/B/C fragment
+  // the corresponding operand type of the MFMA intrinsic. For A and B, that
+  // type is i64, used as <8 x i8>. For C, that type is <4 x i32>.
+  // For instance here, a_tile_vecs is the number of <8 x i8> vectors in the
+  // A-fragment tile, that is, 1/8 times the number of bytes. By construction,
+  // since these are the operand types of the subgroup operation, these values
+  // are the subgroup size (64) times the relevant expansion factors.
+  int32_t a_tile_vecs = 64 * intrinsics_m * subgroups_m * intrinsics_k;
+  int32_t b_tile_vecs = 64 * intrinsics_n * subgroups_n * intrinsics_k;
+
+  // Decide whether to use local memory for A and/or B based on subgroups.
+  int32_t a_local_vecs = subgroups_n > 1 ? a_tile_vecs : 0;
+  int32_t b_local_vecs = subgroups_m > 1 ? b_tile_vecs : 0;
+
+  // Set up our pointers to local memory for A and B tiles.
+  if (local_memory_bytes < 8 * (a_local_vecs + b_local_vecs)) {
+    __builtin_trap();
+  }
+  int64_t *restrict a_local =
+      (int64_t *)(local_memory_base + local_memory_offset);
+  int64_t *restrict b_local = a_local + a_tile_vecs;
+
+  // Determine our thread id and the range for it.
+  int tid = __builtin_amdgcn_workitem_id_x();
+  int numthreads = 64 * subgroups_m * subgroups_n;
+  __builtin_assume(tid < numthreads);
+
+  // Compute the thread-relative data offsets.
+  int lane_id = tid % 64;
+  int subgroup_id = tid / 64;
+  int subgroup_n_idx = subgroup_id % subgroups_n;
+  int subgroup_m_idx = subgroup_id / subgroups_n;
+  int a_thread_relative_offset =
+      intrinsics_k * (lane_id + 64 * intrinsics_m * subgroup_m_idx);
+  int b_thread_relative_offset =
+      intrinsics_k * (lane_id + 64 * intrinsics_n * subgroup_n_idx);
+
+  // Set up pointers to global memory.
+  const int64_t *restrict a_global = (const int64_t *)(a_base + a_offset);
+  const int64_t *restrict b_global = (const int64_t *)(b_base + b_offset);
+  int32x4_t *restrict c_global = ((int32x4_t *)(c_base + c_offset));
+
+  // Load existing accumulators from global memory into registers.
+  // The VLA becomes a normal array after inlining.
+  int32x4_t c_regs[intrinsics_m][intrinsics_n];
   for (int m = 0; m < intrinsics_m; ++m) {
     for (int n = 0; n < intrinsics_n; ++n) {
-      c[m][n] = c_global[64 * (m * intrinsics_n + n)];
+      c_regs[m][n] = c_global[64 * (m * intrinsics_n + n)];
     }
   }
 
   // Arithmetic loop.
-  const int64_t *a_global = (const int64_t *)(a_buffer + a_offset);
-  const int64_t *b_global = (const int64_t *)(b_buffer + b_offset);
   for (int k_outer = 0; k_outer < k_size; ++k_outer) {
+    // Pointers to A/B data to feed MFMA, based on whether local memory is used.
+    const int64_t *restrict a_mfma_vecs =
+        a_local_vecs ? a_local + a_thread_relative_offset : a_global;
+    const int64_t *restrict b_mfma_vecs =
+        b_local_vecs ? b_local + b_thread_relative_offset : b_global;
+
+    // If needed, load data from global to local memory.
+    if (tid < a_local_vecs) { // Benefits from above assume(tid < numthreads).
+      for (int i = 0; i < a_local_vecs; i += numthreads) {
+        a_local[i + tid] = a_global[i + tid - a_thread_relative_offset];
+      }
+    }
+    if (tid < b_local_vecs) { // Benefits from above assume(tid < numthreads).
+      for (int i = 0; i < b_local_vecs; i += numthreads) {
+        b_local[i + tid] = b_global[i + tid - b_thread_relative_offset];
+      }
+    }
+    // Thread barrier if any local memory is used.
+    if (a_local_vecs || b_local_vecs) {
+      __syncthreads();
+    }
+    // Load data from local memory and perform arithmetic.
     for (int m = 0; m < intrinsics_m; ++m) {
       for (int n = 0; n < intrinsics_n; ++n) {
         for (int k = 0; k < intrinsics_k; ++k) {
-          c[m][n] = __builtin_amdgcn_mfma_i32_16x16x32_i8(
-              a_global[64 * intrinsics_k * m + k],
-              b_global[64 * intrinsics_k * n + k], c[m][n], 0, 0, 0);
+          c_regs[m][n] = __builtin_amdgcn_mfma_i32_16x16x32_i8(
+              a_mfma_vecs[64 * intrinsics_k * m + k],
+              b_mfma_vecs[64 * intrinsics_k * n + k], c_regs[m][n], 0, 0, 0);
         }
       }
     }
-    a_global += 64 * intrinsics_m * subgroups_m * intrinsics_k;
-    b_global += 64 * intrinsics_n * subgroups_n * intrinsics_k;
+    a_global += a_tile_vecs;
+    b_global += b_tile_vecs;
+    // Thread barrier if any local memory is used.
+    if (a_local_vecs || b_local_vecs) {
+      __syncthreads();
+    }
   }
 
   // Store accumulators.
   for (int m = 0; m < intrinsics_m; ++m) {
     for (int n = 0; n < intrinsics_n; ++n) {
-      c_global[64 * (m * intrinsics_n + n)] = c[m][n];
+      c_global[64 * (m * intrinsics_n + n)] = c_regs[m][n];
     }
   }
 }

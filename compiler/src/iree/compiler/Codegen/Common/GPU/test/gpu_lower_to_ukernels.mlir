@@ -83,10 +83,5 @@ func.func @multi_mma_mfma_i32_16x16x32_i8(%a : tensor<1x2x8x1x1x2x8xi8>, %b : te
 }
 
 // CHECK-LABEL: func @multi_mma_mfma_i32_16x16x32_i8(
-//   CHECK-DAG:    %c2_i32 = arith.constant 2 : i32
-//   CHECK-DAG:    %c8_i32 = arith.constant 8 : i32
-//   CHECK-DAG:    %c1_i32 = arith.constant 1 : i32
-//   CHECK-DAG:    %c4_i32 = arith.constant 4 : i32
 //       CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic
 //  CHECK-SAME:      "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8"
-//  CHECK-SAME:      (%c2_i32, %c8_i32, %c1_i32, %c2_i32, %c4_i32, %c2_i32 : i32, i32, i32, i32, i32, i32)
