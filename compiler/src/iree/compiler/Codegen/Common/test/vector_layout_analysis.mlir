@@ -615,6 +615,51 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
+#layoutA = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1],
+  batch_tile    = [1],
+  outer_tile    = [1],
+  thread_tile   = [1],
+  element_tile  = [64],
+
+  subgroup_strides = [0],
+  thread_strides   = [0]
+>
+
+#layoutB = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1],
+  batch_tile    = [64],
+  outer_tile    = [1],
+  thread_tile   = [1],
+  element_tile  = [1],
+
+  subgroup_strides = [0],
+  thread_strides   = [0]
+>
+
+builtin.module attributes { transform.with_named_sequence } {
+  func.func @handle_multiuse_step(%lhs: vector<64xindex>, %rhs: vector<64xindex>) -> (vector<64xindex>, vector<64xindex>) {
+    %l_lhs = iree_vector_ext.to_layout %lhs to layout(#layoutA) : vector<64xindex>
+    %r_lhs = iree_vector_ext.to_layout %rhs to layout(#layoutB) : vector<64xindex>
+    %cst = vector.step : vector<64xindex>
+    // expected-remark @above {{element_tile = [1]}}
+    // expected-remark @above {{element_tile = [64]}}
+    %scaled_lhs = arith.muli %cst, %lhs : vector<64xindex>
+    // expected-remark @above {{element_tile = [64]}}
+    %scaled_rhs = arith.muli %cst, %rhs : vector<64xindex>
+    // expected-remark @above {{element_tile = [1]}}
+    func.return %scaled_lhs, %scaled_rhs : vector<64xindex>, vector<64xindex>
+  }
+
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_vector_layout_analysis %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
 #layout = #iree_vector_ext.nested_layout<
   subgroup_tile = [2, 1, 1],
   batch_tile = [1, 2, 4],
