@@ -396,6 +396,43 @@ cmake --build ../iree-build/
 
 ### Using the Python bindings
 
+There are two available methods for installing the Python bindings, either
+through creating an editable wheel or through extending `PYTHONPATH`.
+
+#### Option A: Installing the bindings as editable wheels
+
+This method links the files in your build tree into your Python package directory
+as an editable wheel.
+
+=== ":fontawesome-brands-linux: Linux"
+
+    ``` shell
+    CMAKE_INSTALL_METHOD=ABS_SYMLINK python -m pip install -e ../iree-build/compiler
+    CMAKE_INSTALL_METHOD=ABS_SYMLINK python -m pip install -e ../iree-build/runtime
+    ```
+
+=== ":fontawesome-brands-apple: macOS"
+
+    ``` shell
+    CMAKE_INSTALL_METHOD=ABS_SYMLINK python -m pip install -e ../iree-build/compiler
+    CMAKE_INSTALL_METHOD=ABS_SYMLINK python -m pip install -e ../iree-build/runtime
+    ```
+
+=== ":fontawesome-brands-windows: Windows"
+
+    ``` powershell
+    $env:CMAKE_INSTALL_MODE="ABS_SYMLINK"
+    python -m pip install -e ..\iree-build\compiler
+    python -m pip install -e ..\iree-build\runtime
+    $env:CMAKE_INSTALL_MODE=null
+    ```
+
+#### Option B: Extending PYTHONPATH
+
+This method more effectively captures the state of your build directory,
+but is prone to errors arising from forgetting to source the environment
+variables.
+
 Extend your `PYTHONPATH` with IREE's `bindings/python` paths and try importing:
 
 === ":fontawesome-brands-linux: Linux"
@@ -431,6 +468,8 @@ Extend your `PYTHONPATH` with IREE's `bindings/python` paths and try importing:
     python -c "import iree.runtime; help(iree.runtime)"
     ```
 
+#### Tensorflow/TFLite bindings
+
 Using IREE's TensorFlow/TFLite importers requires a few extra steps:
 
 ``` shell
@@ -438,6 +477,7 @@ Using IREE's TensorFlow/TFLite importers requires a few extra steps:
 python -m pip install -r integrations/tensorflow/test/requirements.txt
 
 # Install pure Python packages (no build required)
+# You may use `pip install -e` here to create an editable wheel.
 python -m pip install integrations/tensorflow/python_projects/iree_tf
 python -m pip install integrations/tensorflow/python_projects/iree_tflite
 
