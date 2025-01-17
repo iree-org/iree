@@ -399,7 +399,7 @@ cmake --build ../iree-build/
 There are two available methods for installing the Python bindings, either
 through creating an editable wheel or through extending `PYTHONPATH`.
 
-#### Installing the bindings as editable wheels
+#### Option A: Installing the bindings as editable wheels
 
 This method links the files in your build tree into your Python package directory
 as an editable wheel.
@@ -427,7 +427,7 @@ as an editable wheel.
     $env:CMAKE_INSTALL_MODE=null
     ```
 
-#### Extending PYTHONPATH
+#### Option B: Extending PYTHONPATH
 
 This method more effectively captures the state of your build directory,
 but is prone to errors arising from forgetting to source the environment
