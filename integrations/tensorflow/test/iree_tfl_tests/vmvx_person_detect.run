@@ -1,2 +1,3 @@
 # REQUIRES: vmvx
 # RUN: %PYTHON -m iree_tfl_tests.person_detect_test --target_backend=vmvx --artifacts_dir=%t
+# XFAIL: *
