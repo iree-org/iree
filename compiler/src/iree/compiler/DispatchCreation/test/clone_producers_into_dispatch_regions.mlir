@@ -506,3 +506,51 @@ util.func public @clone_gather_like(%arg0: tensor<4x1x4xi64>, %arg1: tensor<1638
 //       CHECK:      %[[ATTENTION:.+]] = iree_linalg_ext.attention
 //       CHECK:        ins({{.*}}, %[[GATHER0]], %[[GATHER1]]
 //       CHECK:      flow.return %[[ATTENTION]]
+
+// -----
+
+util.func public @clone_bit_ext_of_gather_like(%arg0: tensor<128256x4096xf16>, %arg1: tensor<4x?xi64>, %arg2: tensor<4096xf32>) -> tensor<4x?xf32> {
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %cst_0 = arith.constant 1.000000e-01 : f32
+  %dim = tensor.dim %arg1, %c1 : tensor<4x?xi64>
+  %0 = tensor.empty(%dim) : tensor<4x?x4096xf16>
+  %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg1 : tensor<4x?xi64>) outs(%0 : tensor<4x?x4096xf16>) {
+  ^bb0(%in: i64, %out: f16):
+    %7 = arith.index_cast %in : i64 to index
+    %8 = linalg.index 2 : index
+    %extracted = tensor.extract %arg0[%7, %8] : tensor<128256x4096xf16>
+    linalg.yield %extracted : f16
+  } -> tensor<4x?x4096xf16>
+  %2 = tensor.empty(%dim) : tensor<4x?x4096xf32>
+  %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%1 : tensor<4x?x4096xf16>) outs(%2 : tensor<4x?x4096xf32>) {
+  ^bb0(%in: f16, %out: f32):
+    %7 = arith.extf %in : f16 to f32
+    linalg.yield %7 : f32
+  } -> tensor<4x?x4096xf32>
+  %4 = tensor.empty(%dim) : tensor<4x?xf32>
+  %5 = linalg.fill ins(%cst : f32) outs(%4 : tensor<4x?xf32>) -> tensor<4x?xf32>
+  %6 = flow.dispatch.region -> (tensor<4x?xf32>{%dim}) {
+    %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%3 : tensor<4x?x4096xf32>) outs(%5 : tensor<4x?xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %8 = math.powf %in, %cst_0 : f32
+      %9 = arith.addf %8, %out : f32
+      linalg.yield %9 : f32
+    } -> tensor<4x?xf32>
+    flow.return %7 : tensor<4x?xf32>
+  }
+  util.return %6 : tensor<4x?xf32>
+}
+
+// CHECK-LABEL:  util.func public @clone_bit_ext_of_gather_like
+//       CHECK:    %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:      %[[GATHER0:.+]] = linalg.generic
+//       CHECK:        %[[EXTRACT:.+]] = tensor.extract
+//       CHECK:        linalg.yield %[[EXTRACT]]
+//       CHECK:      %[[EXT:.+]] = linalg.generic
+//  CHECK-SAME:        ins(%[[GATHER0]] : tensor<4x?x4096xf16>)
+//       CHECK:        %[[EXTF:.+]] = arith.extf
+//       CHECK:        linalg.yield %[[EXTF]]
+//       CHECK:      %[[RES:.+]] = linalg.generic
+//  CHECK-SAME:        ins(%[[EXT]] : tensor<4x?x4096xf32>)
+//       CHECK:      flow.return %[[RES]]
