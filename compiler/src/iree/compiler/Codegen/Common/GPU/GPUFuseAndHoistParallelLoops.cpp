@@ -256,6 +256,11 @@ struct FuseTilableSliceProducers final
       return failure();
     }
 
+    auto producerParent = tilableProducer->getParentOfType<scf::ForallOp>();
+    if (producerParent && producerParent == parentForall) {
+      return failure();
+    }
+
     SmallVector<LoopLikeOpInterface> loops = {parentForall};
     std::optional<scf::SCFFuseProducerOfSliceResult> fusionResult =
         mlir::scf::tileAndFuseProducerOfSlice(rewriter, sliceOp, loops);
