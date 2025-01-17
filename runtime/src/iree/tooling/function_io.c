@@ -1082,7 +1082,7 @@ static iree_status_t iree_tooling_write_variant_to_binary_file(
   iree_hal_buffer_mapping_t mapping;
   iree_status_t status = iree_hal_buffer_map_range(
       iree_hal_buffer_view_buffer(buffer_view), IREE_HAL_MAPPING_MODE_SCOPED,
-      IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_WHOLE_BUFFER, &mapping);
+      IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_HAL_WHOLE_BUFFER, &mapping);
 
   // Write to the file from the mapped memory.
   if (iree_status_is_ok(status)) {

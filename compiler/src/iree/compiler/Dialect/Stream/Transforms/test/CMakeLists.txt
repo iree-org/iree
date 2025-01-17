@@ -27,7 +27,8 @@ iree_lit_test_suite(
     "encode_device_tensors_packing.mlir"
     "encode_host_tensors.mlir"
     "encode_host_tensors_packing.mlir"
-    "encode_host_tensors_packing_i1.mlir"
+    "encode_host_tensors_packing_i1_attr.mlir"
+    "encode_host_tensors_packing_i1_experimental_clopt.mlir"
     "fold_globals.mlir"
     "fold_uniform_operands.mlir"
     "fuse_dispatch_bindings.mlir"
@@ -44,6 +45,7 @@ iree_lit_test_suite(
     "schedule_concurrency.mlir"
     "schedule_execution.mlir"
     "specialize_dispatches.mlir"
+    "specialize_encodings.mlir"
     "verify_affinities.mlir"
     "verify_async_access_ranges.mlir"
   TOOLS

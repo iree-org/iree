@@ -187,24 +187,6 @@ def VerifyDevicesPass :
   ];
 }
 
-def FixupLegacySyncPass :
-    Pass<"iree-hal-fixup-legacy-sync", "mlir::ModuleOp"> {
-  let summary = "Applies fixups to the program for when using legacy HAL devices.";
-  let description = [{
-    Applies fixups to the program for when using legacy HAL devices that only
-    support synchronous execution. Once all devices support async this will be
-    removed.
-
-    NOTE: this pass only exists for backwards compatibility with legacy HAL
-    drivers. It will be removed once all have migrated to the modern async APIs.
-  }];
-  let dependentDialects = [
-    "mlir::arith::ArithDialect",
-    "IREE::HAL::HALDialect",
-    "IREE::Util::UtilDialect",
-  ];
-}
-
 def InlineMemoizeRegionsPass :
     Pass<"iree-hal-inline-memoize-regions", ""> {
   let summary = "Inlines `hal.device.memoize` regions into their parent region.";

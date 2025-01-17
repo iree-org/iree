@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Support/LLVM.h"
@@ -113,6 +114,15 @@ EncodingAttr EncodingAttr::clone(AffineMap bcastMap) {
              AffineMapAttr::get(bcastMap), getRoundDimsTo(), getLayouts());
 }
 
+EncodingAttr EncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) {
+  MLIRContext *ctx = getContext();
+  return get(ctx, getOperandIndex(), getOpType(), getElementTypes(),
+             /*user_indexing_maps=*/ArrayAttr(),
+             /*bcast_map=*/AffineMapAttr(),
+             /*round_dims_to=*/DenseI64ArrayAttr(),
+             ArrayAttr::get(ctx, layouts));
+}
+
 /// Returns the bit-width of the scalar type. If the type is complex, it returns
 /// the type of individual elements * 2 (1 for real and 1 for complex).
 static unsigned getTypeBitWidth(Type type) {
@@ -146,6 +156,32 @@ Value EncodingAttr::calculateStorageSizeInBytes(Location loc,
                                                 OpBuilder &builder,
                                                 RankedTensorType type,
                                                 ValueRange dynamicDims) const {
+  if (auto layoutsAttr = getLayouts()) {
+    if (llvm::any_of(layoutsAttr.getValue(), [](Attribute attr) {
+          return !llvm::isa<IREE::Encoding::EncodingLayoutAttrInterface>(attr);
+        })) {
+      return Value();
+    }
+
+    auto layoutsAttrArray =
+        llvm::to_vector_of<IREE::Encoding::EncodingLayoutAttrInterface>(
+            layoutsAttr.getValue());
+    Value res;
+    for (auto attr : layoutsAttrArray) {
+      Value requestedSize =
+          attr.calculateStorageSizeInBytes(loc, builder, type, dynamicDims);
+      if (!res) {
+        res = requestedSize;
+        continue;
+      }
+      res = builder.create<arith::MaxUIOp>(loc, res, requestedSize);
+    }
+    return res;
+  }
+
+  // TODO(hanchung): Deprecate the below logic once EncodingSpecialization pass
+  // is enabled by default. The layouts should be resolved and `roundDimsTo`
+  // will be deprecated.
   SmallVector<int64_t> paddedShape(type.getShape());
   SmallVector<Value> paddedDynamicDims(dynamicDims.begin(), dynamicDims.end());
   ArrayRef<int64_t> roundDimsTo = getRoundDimsToArray();
@@ -243,9 +279,16 @@ EncodingAttr getEncodingAttr(RankedTensorType type) {
   return dyn_cast_or_null<EncodingAttr>(type.getEncoding());
 }
 
+bool hasPackedStorageAttr(RankedTensorType type) {
+  return dyn_cast_or_null<PackedStorageAttr>(type.getEncoding()) != nullptr;
+}
+
 FailureOr<linalg::ContractionDimensions>
 getEncodingContractionDims(EncodingAttr encoding) {
   auto indexingMapsAttr = encoding.getUserIndexingMaps();
+  if (!indexingMapsAttr) {
+    return failure();
+  }
   SmallVector<AffineMap> indexingMaps = llvm::map_to_vector(
       indexingMapsAttr.getValue(), [](Attribute m) -> AffineMap {
         return cast<AffineMapAttr>(m).getAffineMap();

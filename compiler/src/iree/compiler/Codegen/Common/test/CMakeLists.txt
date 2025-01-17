@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "bubble_up_ordinal_ops.mlir"
     "bufferize_copy_only_dispatches.mlir"
     "canonicalize_interface_load_store.mlir"
+    "convert_accgemm_to_gemm.mlir"
     "convert_bf16_arith_to_f32.mlir"
     "convert_bf16_to_uint16_buffers.mlir"
     "convert_to_destination_passing_style.mlir"
@@ -65,6 +66,7 @@ iree_lit_test_suite(
     "optimize_tensor_insert_extract_slices.mlir"
     "pad_dynamic_alloc.mlir"
     "polynomial_approximation.mlir"
+    "propagate_dispatch_size_bounds.mlir"
     "propagate_reshapes_by_expansion.mlir"
     "reconcile_translation_info.mlir"
     "reductions.mlir"
@@ -104,6 +106,7 @@ iree_lit_test_suite(
     reductions_codegen_spec.mlir
     reductions_match_spec.mlir
     tuning_spec.mlir
+    tuning_spec_default.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

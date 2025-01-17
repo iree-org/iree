@@ -377,6 +377,110 @@ func.func @scatter_update_slice_2D(
 
 // -----
 
+func.func @scatter_batch_2D_dynamic(
+    %update : tensor<48x?x?xf32>, %indices : tensor<48x?x1xi32>,
+    %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%update, %indices : tensor<48x?x?xf32>, tensor<48x?x1xi32>)
+    outs(%original : tensor<?x?xf32>) {
+    ^bb0(%arg1: f32, %arg2: f32):
+      %1 = arith.addf %arg1, %arg2 : f32
+      iree_linalg_ext.yield %1 : f32
+    } -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+// CHECK-LABEL: func.func @scatter_batch_2D_dynamic(
+//  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.scatter
+//  CHECK-SAME:     dimension_map = [0]
+//  CHECK-SAME:     unique_indices(true)
+//  CHECK-SAME:     ins(%[[UPDATE]], %[[INDICES]]
+//  CHECK-SAME:     outs(%[[ORIGINAL]]
+//       CHECK:     iree_linalg_ext.yield %{{.+}} : f32
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @scatter_batch_2D_static(
+    %update : tensor<48x?x1x10xf32>, %indices : tensor<48x?x1xi32>,
+    %original : tensor<?x10xf32>) -> tensor<?x10xf32> {
+  %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%update, %indices : tensor<48x?x1x10xf32>, tensor<48x?x1xi32>)
+    outs(%original : tensor<?x10xf32>) {
+    ^bb0(%arg1: f32, %arg2: f32):
+      %1 = arith.addf %arg1, %arg2 : f32
+      iree_linalg_ext.yield %1 : f32
+    } -> tensor<?x10xf32>
+  return %0 : tensor<?x10xf32>
+}
+// CHECK-LABEL: func.func @scatter_batch_2D_static(
+//  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.scatter
+//  CHECK-SAME:     dimension_map = [0]
+//  CHECK-SAME:     unique_indices(true)
+//  CHECK-SAME:     ins(%[[UPDATE]], %[[INDICES]]
+//  CHECK-SAME:     outs(%[[ORIGINAL]]
+//       CHECK:     iree_linalg_ext.yield %{{.+}} : f32
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @scatter_rank_reduced(
+    %update : tensor<48x10xf32>, %indices : tensor<48x1xi32>,
+    %original : tensor<?x10xf32>) -> tensor<?x10xf32> {
+  %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%update, %indices : tensor<48x10xf32>, tensor<48x1xi32>)
+    outs(%original : tensor<?x10xf32>) {
+    ^bb0(%arg1: f32, %arg2: f32):
+      %1 = arith.addf %arg1, %arg2 : f32
+      iree_linalg_ext.yield %1 : f32
+    } -> tensor<?x10xf32>
+  return %0 : tensor<?x10xf32>
+}
+// CHECK-LABEL: func.func @scatter_rank_reduced(
+//  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.scatter
+//  CHECK-SAME:     dimension_map = [0]
+//  CHECK-SAME:     unique_indices(true)
+//  CHECK-SAME:     ins(%[[UPDATE]], %[[INDICES]]
+//  CHECK-SAME:     outs(%[[ORIGINAL]]
+//       CHECK:     iree_linalg_ext.yield %{{.+}} : f32
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @scatter_batch_2D_rank_reduced(
+    %update : tensor<48x?x10xf32>, %indices : tensor<48x?x1xi32>,
+    %original : tensor<?x10xf32>) -> tensor<?x10xf32> {
+  %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%update, %indices : tensor<48x?x10xf32>, tensor<48x?x1xi32>)
+    outs(%original : tensor<?x10xf32>) {
+    ^bb0(%arg1: f32, %arg2: f32):
+      %1 = arith.addf %arg1, %arg2 : f32
+      iree_linalg_ext.yield %1 : f32
+    } -> tensor<?x10xf32>
+  return %0 : tensor<?x10xf32>
+}
+// CHECK-LABEL: func.func @scatter_batch_2D_rank_reduced(
+//  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.scatter
+//  CHECK-SAME:     dimension_map = [0]
+//  CHECK-SAME:     unique_indices(true)
+//  CHECK-SAME:     ins(%[[UPDATE]], %[[INDICES]]
+//  CHECK-SAME:     outs(%[[ORIGINAL]]
+//       CHECK:     iree_linalg_ext.yield %{{.+}} : f32
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
 func.func @scatter_update_slice_2D(
     %original: tensor<4x?xi32>, %indices: tensor<1x1xi32>,
     %updates: tensor<1x3xi32>) -> tensor<4x?xi32> {

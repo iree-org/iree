@@ -72,7 +72,7 @@ typedef uint32_t iree_hal_semaphore_flags_t;
 static inline uint64_t iree_hal_status_as_semaphore_failure(
     iree_status_t status) {
   return IREE_HAL_SEMAPHORE_FAILURE_VALUE_STATUS_BIT |
-         (((uint64_t)status) >> 1);
+         (((uint64_t)(uintptr_t)status) >> 1);
 }
 
 // Returns OK if the |value| does not indicate an error.
@@ -92,7 +92,8 @@ static inline iree_status_t iree_hal_semaphore_failure_as_status(
       //
       // See:
       // https://en.wikipedia.org/wiki/X86-64#Canonical_form_addresses
-      return iree_status_clone((iree_status_t)(((int64_t)value << 1) >> 1));
+      return iree_status_clone(
+          (iree_status_t)(intptr_t)(((int64_t)value << 1) >> 1));
     } else {
       return iree_status_from_code(IREE_STATUS_INTERNAL);
     }
@@ -102,9 +103,10 @@ static inline iree_status_t iree_hal_semaphore_failure_as_status(
 }
 
 // Frees an iree_status_t encoded in a semaphore |value|, if any.
-static inline void iree_hal_semaphore_failure_free(uint64_t value) {
+IREE_ATTRIBUTE_ALWAYS_INLINE static inline void iree_hal_semaphore_failure_free(
+    uint64_t value) {
   if (value & IREE_HAL_SEMAPHORE_FAILURE_VALUE_STATUS_BIT) {
-    iree_status_free((iree_status_t)(((int64_t)value << 1) >> 1));
+    iree_status_free((iree_status_t)(intptr_t)(((int64_t)value << 1) >> 1));
   }
 }
 

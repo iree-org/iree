@@ -73,7 +73,10 @@ SmallVector<utils::IteratorType> ScatterOp::getLoopIteratorTypes() {
   SmallVector<utils::IteratorType> iteratorTypes(getUpdateType().getRank(),
                                                  utils::IteratorType::parallel);
   if (!getUniqueIndices()) {
-    iteratorTypes[0] = utils::IteratorType::reduction;
+    int64_t batchRank = getBatchRank();
+    for (auto i : llvm::seq<int64_t>(0, batchRank)) {
+      iteratorTypes[i] = utils::IteratorType::reduction;
+    }
   }
   return iteratorTypes;
 }
@@ -84,7 +87,7 @@ SmallVector<Range> ScatterOp::getIterationDomain(OpBuilder &builder) {
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   SmallVector<Range> ranges;
   for (auto dim : llvm::seq<int64_t>(0, getUpdateType().getRank())) {
-    Value ub = getDimValue(builder, loc, getUpdates(), dim);
+    OpFoldResult ub = getDim(builder, loc, getUpdates(), dim);
     ranges.emplace_back(Range{zero, ub, one});
   }
   return ranges;
@@ -113,14 +116,12 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
 
   // Slice of indices.
   auto indicesRank = getIndicesType().getRank();
-  SmallVector<OpFoldResult> indicesOffsets(indicesRank, zeroAttr);
-  SmallVector<OpFoldResult> indicesSizes(indicesRank);
-  indicesOffsets[0] = offsets[0];
-  indicesSizes[0] = sizes[0];
-  for (auto dim : llvm::seq<int64_t>(1, indicesRank)) {
-    indicesSizes[dim] = getDim(builder, loc, getIndices(), dim);
-  }
+  SmallVector<OpFoldResult> indicesOffsets(offsets.take_front(getBatchRank()));
+  indicesOffsets.push_back(zeroAttr);
+  SmallVector<OpFoldResult> indicesSizes(sizes.take_front(getBatchRank()));
+  indicesSizes.push_back(builder.getIndexAttr(getIndexDepth()));
   SmallVector<OpFoldResult> indicesStrides(indicesRank, oneAttr);
+
   Operation *indicesSlice = getSlice(builder, loc, getIndices(), indicesOffsets,
                                      indicesSizes, indicesStrides);
   if (!indicesSlice) {
@@ -170,15 +171,53 @@ LogicalResult ScatterOp::getResultTilePosition(
 
   auto updateRank = getUpdateType().getRank();
   Location loc = getLoc();
-  for (auto dim : llvm::seq<int64_t>(0, originalRank - updateRank + 1)) {
+  for (auto dim : llvm::seq<int64_t>(0, originalRank - getUpdateSliceRank())) {
     resultSizes[dim] = getDim(builder, loc, getOriginal(), dim);
   }
   for (auto dim :
-       llvm::seq<int64_t>(originalRank - updateRank + 1, originalRank)) {
+       llvm::seq<int64_t>(originalRank - getUpdateSliceRank(), originalRank)) {
     resultOffsets[dim] = offsets[dim - (originalRank - updateRank)];
     resultSizes[dim] = sizes[dim - (originalRank - updateRank)];
   }
   return success();
+}
+
+/// Method to return the position of the result tile computed by the tiled
+/// operation.
+LogicalResult ScatterOp::getIterationDomainTileFromOperandTile(
+    OpBuilder &b, unsigned operandNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes,
+    SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
+    SmallVectorImpl<OpFoldResult> &iterDomainSizes) {
+  // Fusion with producers is not possible in general if `unique_indices` is not
+  // true as reductions along the scattered indices are not tilable in parallel.
+  if (!getUniqueIndices()) {
+    return failure();
+  }
+  // TODO: Support fusion along the index operand. For the index operand, the
+  // offset + size must be the full size for the inner most dim.
+  if (getInputs().getBeginOperandIndex() != operandNumber) {
+    return failure();
+  }
+
+  // The iteration domain is defined in terms of the |input|, so simply
+  // use the given offsets/sizes.
+  iterDomainOffsets.assign(offsets.begin(), offsets.end());
+  iterDomainSizes.assign(sizes.begin(), sizes.end());
+  return success();
+}
+
+/// Method to generate the tiled implementation of an operation from the tile
+/// of the operand.
+FailureOr<TilingResult> ScatterOp::getTiledImplementationFromOperandTile(
+    OpBuilder &b, unsigned operandNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) {
+  SmallVector<OpFoldResult> mappedOffsets, mappedSizes;
+  if (failed(getIterationDomainTileFromOperandTile(
+          b, operandNumber, offsets, sizes, mappedOffsets, mappedSizes))) {
+    return failure();
+  }
+  return getTiledImplementation(b, mappedOffsets, mappedSizes);
 }
 
 LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
@@ -188,13 +227,13 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
   Value update = b.create<memref::LoadOp>(loc, getUpdates(), ivs);
   SmallVector<Value> starts;
   SmallVector<Value> loadIndices;
-  loadIndices.push_back(ivs.front());
+  append_range(loadIndices, ivs.take_front(getBatchRank()));
   loadIndices.push_back(Value());
 
   // Populate with empty values.
-  auto originalTy = cast<ShapedType>(getOriginal().getType());
+  auto originalTy = getOriginalType();
   starts.resize(originalTy.getRank(), Value());
-  auto updateIvs = ivs.drop_front(1);
+  auto updateIvs = ivs.drop_front(getBatchRank());
 
   int64_t offset = starts.size() - updateIvs.size();
   for (auto [idx, iv] : llvm::enumerate(updateIvs)) {
@@ -1805,7 +1844,7 @@ getAttentionIteratorTypes(int64_t domainRank, AffineMap qMap, AffineMap kMap,
   return iteratorTypes;
 }
 
-static SmallVector<Range> getPermutedSlice(AffineMap permutation,
+static SmallVector<Range> getPermutedRange(AffineMap permutation,
                                            ArrayRef<OpFoldResult> offsets,
                                            ArrayRef<OpFoldResult> sizes) {
   auto one = IntegerAttr::get(IndexType::get(permutation.getContext()), 1);
@@ -1821,6 +1860,15 @@ static SmallVector<Range> getPermutedSlice(AffineMap permutation,
     output.push_back(dimRange);
   }
   return output;
+}
+
+static Operation *getPermutedSlice(OpBuilder &b, Location loc, Value val,
+                                   AffineMap permutation,
+                                   ArrayRef<OpFoldResult> offsets,
+                                   ArrayRef<OpFoldResult> sizes) {
+  SmallVector<Range> slice = getPermutedRange(permutation, offsets, sizes);
+  Operation *querySliceOp = getSlice(b, loc, val, slice);
+  return querySliceOp;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1851,12 +1899,12 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   Location loc = getLoc();
 
   SmallVector<Range> querySlice =
-      getPermutedSlice(getQueryMap(), offsets, sizes);
-  SmallVector<Range> keySlice = getPermutedSlice(getKeyMap(), offsets, sizes);
+      getPermutedRange(getQueryMap(), offsets, sizes);
+  SmallVector<Range> keySlice = getPermutedRange(getKeyMap(), offsets, sizes);
   SmallVector<Range> valueSlice =
-      getPermutedSlice(getValueMap(), offsets, sizes);
+      getPermutedRange(getValueMap(), offsets, sizes);
   SmallVector<Range> outputSlice =
-      getPermutedSlice(getOutputMap(), offsets, sizes);
+      getPermutedRange(getOutputMap(), offsets, sizes);
 
   Value scale = getScale();
 
@@ -1900,7 +1948,7 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   Value attnMask = getMask();
   if (attnMask) {
     SmallVector<Range> maskSlice =
-        getPermutedSlice(*getMaskMap(), offsets, sizes);
+        getPermutedRange(*getMaskMap(), offsets, sizes);
     Operation *maskSliceOp = getSlice(builder, loc, attnMask, maskSlice);
     tiledOperands.emplace_back(maskSliceOp->getResult(0));
     slices.push_back(maskSliceOp);
@@ -2004,19 +2052,19 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   Location loc = getLoc();
 
   SmallVector<Range> querySlice =
-      getPermutedSlice(getQueryMap(), offsets, sizes);
-  SmallVector<Range> keySlice = getPermutedSlice(getKeyMap(), offsets, sizes);
+      getPermutedRange(getQueryMap(), offsets, sizes);
+  SmallVector<Range> keySlice = getPermutedRange(getKeyMap(), offsets, sizes);
   SmallVector<Range> valueSlice =
-      getPermutedSlice(getValueMap(), offsets, sizes);
+      getPermutedRange(getValueMap(), offsets, sizes);
   std::optional<SmallVector<Range>> maskSlice;
   if (auto maskMap = getMaskMap()) {
-    maskSlice = getPermutedSlice(*maskMap, offsets, sizes);
+    maskSlice = getPermutedRange(*maskMap, offsets, sizes);
   }
 
   SmallVector<Range> outputSlice =
-      getPermutedSlice(getOutputMap(), offsets, sizes);
-  SmallVector<Range> maxSlice = getPermutedSlice(getMaxMap(), offsets, sizes);
-  SmallVector<Range> sumSlice = getPermutedSlice(getSumMap(), offsets, sizes);
+      getPermutedRange(getOutputMap(), offsets, sizes);
+  SmallVector<Range> maxSlice = getPermutedRange(getMaxMap(), offsets, sizes);
+  SmallVector<Range> sumSlice = getPermutedRange(getSumMap(), offsets, sizes);
 
   Value scale = getScale();
 
@@ -2058,7 +2106,7 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   Value attnMask = getMask();
   if (attnMask) {
     SmallVector<Range> maskSlice =
-        getPermutedSlice(*getMaskMap(), offsets, sizes);
+        getPermutedRange(*getMaskMap(), offsets, sizes);
     Operation *maskSliceOp = getSlice(builder, loc, attnMask, maskSlice);
     tiledOperands.emplace_back(maskSliceOp->getResult(0));
     slices.push_back(maskSliceOp);
@@ -2132,6 +2180,315 @@ LogicalResult OnlineAttentionOp::getResultTilePosition(
     int dim = cast<AffineDimExpr>(dimExpr).getPosition();
     resultOffsets.push_back(offsets[dim]);
     resultSizes.push_back(sizes[dim]);
+  }
+  return success();
+}
+
+static AffineMap getPartialResultMap(AffineMap map, AttentionOpDetail &opInfo) {
+  // Append K2 dimensions at end.
+  for (int dim : opInfo.getK2Dims()) {
+    map = map.insertResult(getAffineDimExpr(dim, map.getContext()),
+                           map.getNumResults());
+  }
+  return map;
+}
+
+FailureOr<SmallVector<Value>>
+OnlineAttentionOp::generateInitialTensorForPartialReduction(
+    OpBuilder &b, Location loc, ArrayRef<OpFoldResult> sizes,
+    ArrayRef<int> reductionDim) {
+  FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
+      getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
+  if (failed(maybeOpInfo)) {
+    return emitOpError("failed to verify op's indexing maps");
+  }
+  AttentionOpDetail &opInfo = maybeOpInfo.value();
+
+  SmallVector<OpFoldResult> shape = llvm::map_to_vector(
+      getIterationDomain(b), [](Range x) { return x.size; });
+
+  SmallVector<OpFoldResult> tiledShape;
+  for (auto [tileSize, dimSize] : llvm::zip_equal(sizes, shape)) {
+    if (isZeroIndex(tileSize)) {
+      tiledShape.push_back(dimSize);
+    } else {
+      tiledShape.push_back(tileSize);
+    }
+  }
+
+  SmallVector<OpFoldResult> accSize = applyPermutationMap<OpFoldResult>(
+      getPartialResultMap(getOutputMap(), opInfo), tiledShape);
+  SmallVector<OpFoldResult> maxSize = applyPermutationMap<OpFoldResult>(
+      getPartialResultMap(getMaxMap(), opInfo), tiledShape);
+  SmallVector<OpFoldResult> sumSize = applyPermutationMap<OpFoldResult>(
+      getPartialResultMap(getSumMap(), opInfo), tiledShape);
+
+  Type accElTy = getElementTypeOrSelf(getOutput().getType());
+  Type maxElTy = getElementTypeOrSelf(getMax().getType());
+  Type sumElTy = getElementTypeOrSelf(getSum().getType());
+
+  Value partialAcc = b.create<tensor::EmptyOp>(loc, accSize, accElTy);
+  Value partialMax = b.create<tensor::EmptyOp>(loc, maxSize, maxElTy);
+  Value partialSum = b.create<tensor::EmptyOp>(loc, sumSize, sumElTy);
+
+  Value accInit = arith::getIdentityValue(arith::AtomicRMWKind::addf, accElTy,
+                                          b, loc, /*useOnlyFiniteValue=*/true);
+  Value maxInit =
+      arith::getIdentityValue(arith::AtomicRMWKind::maximumf, maxElTy, b, loc,
+                              /*useOnlyFiniteValue=*/true);
+  Value sumInit =
+      arith::getIdentityValue(arith::AtomicRMWKind::addf, sumElTy, b, loc);
+
+  Value accFill = b.create<linalg::FillOp>(loc, ValueRange{accInit}, partialAcc)
+                      .getResult(0);
+  Value maxFill = b.create<linalg::FillOp>(loc, ValueRange{maxInit}, partialMax)
+                      .getResult(0);
+  Value sumFill = b.create<linalg::FillOp>(loc, ValueRange{sumInit}, partialSum)
+                      .getResult(0);
+
+  return SmallVector<Value>{accFill, maxFill, sumFill};
+}
+
+FailureOr<TilingResult> OnlineAttentionOp::tileToPartialReduction(
+    OpBuilder &b, Location loc, ValueRange init, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<int> reductionDims) {
+  FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
+      getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
+  if (failed(maybeOpInfo)) {
+    return emitOpError("failed to verify op's indexing maps");
+  }
+  AttentionOpDetail &opInfo = maybeOpInfo.value();
+
+  // Extend result maps, keeping everything else the same.
+  AffineMap partialAccMap = getPartialResultMap(getOutputMap(), opInfo);
+  AffineMap partialMaxMap = getPartialResultMap(getMaxMap(), opInfo);
+  AffineMap partialSumMap = getPartialResultMap(getSumMap(), opInfo);
+
+  SmallVector<AffineMap> indexingMaps = getIndexingMapsArray();
+  indexingMaps[getNumDpsInputs()] = partialAccMap;
+  indexingMaps[getNumDpsInputs() + 1] = partialMaxMap;
+  indexingMaps[getNumDpsInputs() + 2] = partialSumMap;
+
+  SmallVector<Value> tiledOperands;
+  SmallVector<Operation *> slices;
+
+  auto appendSlice = [&](Value val, AffineMap map,
+                         ArrayRef<OpFoldResult> offsets) -> LogicalResult {
+    Operation *sliceOp = getPermutedSlice(b, loc, val, map, offsets, sizes);
+    if (!sliceOp) {
+      return emitOpError("failed to get slice");
+    }
+    tiledOperands.emplace_back(sliceOp->getResult(0));
+    slices.push_back(sliceOp);
+    return success();
+  };
+
+  if (failed(appendSlice(getQuery(), getQueryMap(), offsets))) {
+    return failure();
+  }
+  if (failed(appendSlice(getKey(), getKeyMap(), offsets))) {
+    return failure();
+  }
+  if (failed(appendSlice(getValue(), getValueMap(), offsets))) {
+    return failure();
+  }
+
+  tiledOperands.emplace_back(getScale());
+
+  if (Value mask = getMask()) {
+    if (failed(appendSlice(mask, *getMaskMap(), offsets))) {
+      return failure();
+    }
+  }
+
+  // For results, we set offset of the iterated reduction dims to 0.
+  SmallVector<OpFoldResult> initOffsets(offsets);
+  for (int dim : opInfo.getK2Dims()) {
+    initOffsets[dim] = b.getIndexAttr(0);
+  }
+
+  if (failed(appendSlice(init[0], partialAccMap, initOffsets))) {
+    return failure();
+  }
+  if (failed(appendSlice(init[1], partialMaxMap, initOffsets))) {
+    return failure();
+  }
+  if (failed(appendSlice(init[2], partialSumMap, initOffsets))) {
+    return failure();
+  }
+
+  // Get the initial values.
+  ValueRange slicedInits = ArrayRef(tiledOperands).take_back(3);
+
+  auto tiledOp = cast<OnlineAttentionOp>(
+      mlir::clone(b, getOperation(), slicedInits.getTypes(), tiledOperands));
+  tiledOp.setIndexingMapsAttr(b.getAffineMapArrayAttr(indexingMaps));
+
+  return TilingResult{
+      {tiledOp}, SmallVector<Value>(tiledOp->getResults()), slices};
+}
+
+template <typename CombinerOp>
+static linalg::ReduceOp reduceOnK2(OnlineAttentionOp attn, AffineMap partialMap,
+                                   AttentionOpDetail &opInfo, OpBuilder &b,
+                                   Location loc, Value partialResult,
+                                   Value init) {
+  // linalg.reduce's iteration space is the result's iteration space (and
+  // not the operations iteration space). To account for this, permute the
+  // reduction dimensions based on the partial result map.
+  SmallVector<int64_t> partialReductionDims;
+  for (auto [resultNum, dimExpr] : llvm::enumerate(partialMap.getResults())) {
+    unsigned dim = cast<AffineDimExpr>(dimExpr).getPosition();
+    if (llvm::find(opInfo.getK2Dims(), dim) != opInfo.getK2Dims().end()) {
+      partialReductionDims.push_back(resultNum);
+    }
+  }
+
+  return b.create<linalg::ReduceOp>(
+      loc, partialResult, init, partialReductionDims,
+      [&](OpBuilder &b, Location loc, ValueRange inputs) {
+        Value reduced = b.create<CombinerOp>(loc, inputs[0], inputs[1]);
+        b.create<linalg::YieldOp>(loc, reduced);
+      });
+};
+
+template <typename T>
+static Value elementwiseValueInPlace(OpBuilder &builder, Location loc,
+                                     AffineMap inputMap, AffineMap scaleMap,
+                                     Value value, Value scale) {
+  SmallVector<AffineMap> compressedMaps =
+      compressUnusedDims(SmallVector<AffineMap>{inputMap, scaleMap});
+  inputMap = compressedMaps[0];
+  scaleMap = compressedMaps[1];
+
+  SmallVector<utils::IteratorType> iteratorTypes(inputMap.getNumDims(),
+                                                 utils::IteratorType::parallel);
+
+  auto genericOp = builder.create<linalg::GenericOp>(
+      loc, value.getType(), scale, value,
+      SmallVector<AffineMap>{scaleMap, inputMap}, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        // Convert scale to the same datatype as input.
+        Value scale = convertScalarToDtype(b, loc, args[0], args[1].getType(),
+                                           /*isUnsignedCast=*/false);
+        Value result = b.create<T>(loc, scale, args[1]);
+        b.create<linalg::YieldOp>(loc, result);
+      });
+  return genericOp.getResult(0);
+}
+
+// Compute output = exp2(output - input)
+static Value computeSubAndExp2(OpBuilder &builder, Location loc,
+                               AffineMap inputMap, AffineMap outputMap,
+                               Value input, Value output) {
+  SmallVector<AffineMap> compressedMaps =
+      compressUnusedDims(SmallVector<AffineMap>{inputMap, outputMap});
+  inputMap = compressedMaps[0];
+  outputMap = compressedMaps[1];
+
+  SmallVector<utils::IteratorType> iteratorTypes(inputMap.getNumDims(),
+                                                 utils::IteratorType::parallel);
+  auto genericOp = builder.create<linalg::GenericOp>(
+      loc, output.getType(), input, output,
+      SmallVector<AffineMap>{inputMap, outputMap}, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        // Convert input to the same datatype as output.
+        Value in = convertScalarToDtype(b, loc, args[0], args[1].getType(),
+                                        /*isUnsignedCast=*/false);
+        Value diff = b.create<arith::SubFOp>(loc, args[1], in);
+        Value weight = b.create<math::Exp2Op>(loc, diff);
+        b.create<linalg::YieldOp>(loc, weight);
+      });
+  return genericOp.getResult(0);
+}
+
+FailureOr<MergeResult>
+OnlineAttentionOp::mergeReductions(OpBuilder &b, Location loc,
+                                   ValueRange partialReduce,
+                                   ArrayRef<int> reductionDim) {
+  FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
+      getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
+  if (failed(maybeOpInfo)) {
+    return emitOpError("failed to verify op's indexing maps");
+  }
+  AttentionOpDetail &opInfo = maybeOpInfo.value();
+
+  AffineMap partialAccMap = getPartialResultMap(getOutputMap(), opInfo);
+  AffineMap partialMaxMap = getPartialResultMap(getMaxMap(), opInfo);
+  AffineMap partialSumMap = getPartialResultMap(getSumMap(), opInfo);
+
+  // newMax = max(maxInit, rowMax(partialMax))
+  linalg::ReduceOp reducedMax = reduceOnK2<arith::MaximumFOp>(
+      *this, partialMaxMap, opInfo, b, loc, partialReduce[1], getMax());
+
+  // norm = exp2(partialMax - newMax)
+  Value norm = computeSubAndExp2(b, loc, getMaxMap(), partialMaxMap,
+                                 reducedMax.getResult(0), partialReduce[1]);
+
+  // normSum = norm * partialSum
+  Value normSum = elementwiseValueInPlace<arith::MulFOp>(
+      b, loc, partialSumMap, partialMaxMap, partialReduce[2], norm);
+
+  // newSum = sumInit + rowSum(partialSum)
+  linalg::ReduceOp reducedSum = reduceOnK2<arith::AddFOp>(
+      *this, partialSumMap, opInfo, b, loc, normSum, getSum());
+
+  // normAcc = norm * partialAcc
+  Value normAcc = elementwiseValueInPlace<arith::MulFOp>(
+      b, loc, partialAccMap, partialMaxMap, partialReduce[0], norm);
+
+  // newAcc = accInit + rowMax(partialAcc)
+  linalg::ReduceOp reducedAcc = reduceOnK2<arith::AddFOp>(
+      *this, partialAccMap, opInfo, b, loc, normAcc, getOutput());
+
+  return MergeResult{{reducedAcc, reducedMax, reducedSum},
+                     {reducedAcc.getResult(0), reducedMax.getResult(0),
+                      reducedSum.getResult(0)}};
+}
+
+LogicalResult OnlineAttentionOp::getPartialResultTilePosition(
+    OpBuilder &b, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes, ArrayRef<int> reductionDims) {
+
+  FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
+      getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
+  if (failed(maybeOpInfo)) {
+    return emitOpError("failed to verify op's indexing maps");
+  }
+  AttentionOpDetail &opInfo = maybeOpInfo.value();
+
+  resultOffsets.clear();
+  resultSizes.clear();
+
+  AffineMap resultIndexingMap;
+  switch (resultNumber) {
+  case 0:
+    resultIndexingMap = getOutputMap();
+    break;
+  case 1:
+    resultIndexingMap = getMaxMap();
+    break;
+  case 2:
+    resultIndexingMap = getSumMap();
+    break;
+  default:
+    return failure();
+  }
+
+  AffineMap partialMap = getPartialResultMap(resultIndexingMap, opInfo);
+
+  for (AffineExpr dimExpr : partialMap.getResults()) {
+    int dim = cast<AffineDimExpr>(dimExpr).getPosition();
+    resultSizes.push_back(sizes[dim]);
+
+    if (llvm::find(opInfo.getK2Dims(), dim) != opInfo.getK2Dims().end()) {
+      // Reduction dims are reduced, and are always outputed in the same
+      // place. So use offset 0 for them.
+      resultOffsets.push_back(b.getIndexAttr(0));
+    } else {
+      resultOffsets.push_back(offsets[dim]);
+    }
   }
   return success();
 }

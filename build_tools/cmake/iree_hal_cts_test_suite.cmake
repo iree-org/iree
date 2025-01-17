@@ -19,10 +19,12 @@ include(CMakeParseArguments)
 #       other parameters.
 #   DRIVER_REGISTRATION_HDR: The C #include path for `DRIVER_REGISTRATION_FN`.
 #   DRIVER_REGISTRATION_FN: The C function which registers `DRIVER_NAME`.
-#   COMPILER_TARGET_BACKEND: Optional target backend name to pass to the
-#       `-iree-hal-target-backends` option of `iree-compile` to use for
+#   COMPILER_TARGET_BACKEND: Optional target backend name used for
 #       executable generation. If this is omitted, or the associated compiler
 #       target is not enabled, tests which use executables will be disabled.
+#   COMPILER_TARGET_DEVICE: Optional target device name to pass to the
+#       `--iree-hal-target-device` option of `iree-compile` used for
+#       executable generation. If omitted the target backend name will be used.
 #   COMPILER_FLAGS: Additional compiler flags.
 #       Example: "--iree-llvmcpu-target-float-abi=hard --iree-llvmcpu-loop-unrolling"
 #   EXECUTABLE_FORMAT: Executable format identifier. Will be interpreted
@@ -47,7 +49,7 @@ function(iree_hal_cts_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "DRIVER_NAME;VARIANT_SUFFIX;DRIVER_REGISTRATION_HDR;DRIVER_REGISTRATION_FN;COMPILER_TARGET_BACKEND;EXECUTABLE_FORMAT"
+    "DRIVER_NAME;VARIANT_SUFFIX;DRIVER_REGISTRATION_HDR;DRIVER_REGISTRATION_FN;COMPILER_TARGET_BACKEND;COMPILER_TARGET_DEVICE;EXECUTABLE_FORMAT"
     "DEPS;ARGS;COMPILER_FLAGS;INCLUDED_TESTS;EXCLUDED_TESTS;LABELS;"
     ${ARGN}
   )
@@ -84,9 +86,14 @@ function(iree_hal_cts_test_suite)
 
     set(_TRANSLATE_FLAGS
       "--compile-mode=hal-executable"
-      "--iree-hal-target-backends=${_RULE_COMPILER_TARGET_BACKEND}"
       ${_RULE_COMPILER_FLAGS}
     )
+
+    if(DEFINED _RULE_COMPILER_TARGET_DEVICE)
+      list(APPEND _TRANSLATE_FLAGS "--iree-hal-target-device=${_RULE_COMPILER_TARGET_DEVICE}")
+    else()
+      list(APPEND _TRANSLATE_FLAGS "--iree-hal-target-backends=${_RULE_COMPILER_TARGET_BACKEND}")
+    endif()
 
     # Skip if already created (multiple suites using the same compiler setting).
     iree_package_name(_PACKAGE_NAME)
@@ -183,6 +190,7 @@ function(iree_hal_cts_test_suite)
     set(IREE_CTS_DRIVER_REGISTRATION_FN "${_RULE_DRIVER_REGISTRATION_FN}")
     set(IREE_CTS_DRIVER_NAME "${_RULE_DRIVER_NAME}")
     set(IREE_CTS_TARGET_BACKEND "${_RULE_COMPILER_TARGET_BACKEND}")
+    set(IREE_CTS_TARGET_DEVICE "${_RULE_COMPILER_TARGET_DEVICE}")
 
     configure_file(
       "${IREE_ROOT_DIR}/runtime/src/iree/hal/cts/cts_test_template.cc.in"

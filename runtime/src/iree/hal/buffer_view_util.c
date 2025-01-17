@@ -234,7 +234,7 @@ static iree_status_t iree_hal_buffer_view_generate_buffer_in_situ(
   iree_hal_buffer_mapping_t buffer_mapping = {{0}};
   iree_status_t status = iree_hal_buffer_map_range(
       iree_hal_buffer_view_buffer(buffer_view), IREE_HAL_MAPPING_MODE_SCOPED,
-      IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, 0, IREE_WHOLE_BUFFER,
+      IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, 0, IREE_HAL_WHOLE_BUFFER,
       &buffer_mapping);
 
   // Generate using the callback directly into the buffer.
@@ -516,7 +516,7 @@ static iree_status_t iree_hal_buffer_view_format_impl(
   iree_hal_buffer_mapping_t buffer_mapping = {{0}};
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
       iree_hal_buffer_view_buffer(buffer_view), IREE_HAL_MAPPING_MODE_SCOPED,
-      IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_WHOLE_BUFFER, &buffer_mapping));
+      IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_HAL_WHOLE_BUFFER, &buffer_mapping));
   iree_host_size_t elements_length = 0;
   status = iree_hal_format_buffer_elements(
       iree_make_const_byte_span(buffer_mapping.contents.data,

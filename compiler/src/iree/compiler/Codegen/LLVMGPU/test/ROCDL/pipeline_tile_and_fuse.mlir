@@ -729,10 +729,10 @@ hal.executable public @main {
             #iree_gpu.iterator_type<reduction>],
           kind = #iree_gpu.data_tiled_mma_layout<
             intrinsic = MFMA_F32_16x16x4_F32,
-            unroll_m = 8,
-            unroll_n = 2,
+            intrinsics_m = 8,
+            intrinsics_n = 2,
             subgroups_n = 4,
-            unroll_k = 4>}
+            intrinsics_k = 4>}
           : tensor<4x1x8x4x16x4xf32>, tensor<4x1x4x2x4x16x4xf32> into tensor<4x4x8x4x2x4x16x4xf32>
         flow.dispatch.tensor.store %6, %2, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [4, 4, 8, 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : tensor<4x4x8x4x2x4x16x4xf32> -> !flow.dispatch.tensor<readwrite:tensor<4x4x8x4x2x4x16x4xf32>>
         return
@@ -908,6 +908,7 @@ hal.executable public @main {
 // for loop.
 //       CHECK:       vector.transfer_write %{{.*}}, %[[B2]]{{.*}} memref<10x1xf32, #hal.descriptor_type<storage_buffer>>
 //  CHECK-NEXT:     }
+//  CHECK-NEXT:   gpu.barrier
 //  CHECK-NEXT:   } {mapping = [#iree_codegen.workgroup_mapping<x>]}
 //  CHECK-NEXT:   return
 
@@ -1149,11 +1150,6 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<1x1x16x4x16xf32, #gpu.address_space<workgroup>>
 //       CHECK:   scf.forall ({{.*}}) in (12, 37, 10) {
 //       CHECK:     %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c145 step %c1 {{.*}} -> (vector<1x1x1x4x1xf32>)
-//       CHECK:       gpu.barrier
-//   CHECK-DAG:       %[[LHS_RD:.+]] = vector.transfer_read {{.*}} vector<4xf32>
-//   CHECK-DAG:       vector.transfer_write %[[LHS_RD]]
-//   CHECK-DAG:       %[[RHS_RD:.+]] = vector.transfer_read {{.*}} vector<1xf32>
-//   CHECK-DAG:       vector.transfer_write %[[RHS_RD]]
 //       CHECK:       gpu.barrier
 //   CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
 //   CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
