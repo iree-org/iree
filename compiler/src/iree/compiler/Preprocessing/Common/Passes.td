@@ -39,7 +39,10 @@ def ConvertConv2DToImg2ColPass :
 def ConvertConvFilterToChannelsLastPass:
     Pass<"iree-preprocessing-convert-conv-filter-to-channels-last", ""> {
   let summary = "Convert linalg convolutions filter from hwcf to hwfc.";
-
+  let options = [
+    Option<"filterLayout", "filter-layout", "std::string",
+      /*default=*/"", "Filter layout of convolution.">,
+  ];
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
     "mlir::tensor::TensorDialect",

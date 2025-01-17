@@ -2,12 +2,14 @@
 // ConvertConvFilterToChannelsLastPass
 //===----------------------------------------------------------------------===//
 
-#include <cstdint>
+#include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -23,36 +25,36 @@ namespace mlir::iree_compiler::Preprocessing {
 #include "iree/compiler/Preprocessing/Common/Passes.h.inc"
 
 // Utility function to swap the last two dimensions.
-static AffineMap swapLastTwoDims(AffineMap map) {
-  map.dump();
+static AffineMap constructFilterMap(AffineMap map, SmallVector<int64_t> &perm) {
   unsigned numDims = map.getNumDims();
-  unsigned mapSize = map.getNumResults();
-  SmallVector<AffineExpr> exprs(map.getResults().begin(),
-                                map.getResults().end());
-  std::swap(exprs[mapSize - 2], exprs[mapSize - 1]);
+  ArrayRef<AffineExpr> mapResults = map.getResults();
+  SmallVector<AffineExpr, 4> exprs;
+  for (int i = 0; i < perm.size(); ++i) {
+    exprs.push_back(mapResults[perm[i]]);
+  }
   return AffineMap::get(numDims, map.getNumSymbols(), exprs, map.getContext());
 }
 
 // Utility function to create a transpose operation.
 static Value createTransposeOp(PatternRewriter &rewriter, Location loc,
-                               Value tensor, AffineMap transposedMap) {
+                               Value tensor, SmallVector<int64_t> &perm) {
   SmallVector<OpFoldResult> dimSizes =
       tensor::getMixedSizes(rewriter, loc, tensor);
-  SmallVector<OpFoldResult> transposeResultDims = {dimSizes[0], dimSizes[1],
-                                                   dimSizes[3], dimSizes[2]};
+  // Dim index of H, W, F, C
+  SmallVector<OpFoldResult, 4> transposeResultDims;
+  for (int i = 0; i < perm.size(); ++i) {
+    transposeResultDims.push_back(dimSizes[perm[i]]);
+  }
 
-  SmallVector<int64_t, 4> transposedShape = {0, 1, 3, 2};
   auto tensorType = cast<RankedTensorType>(tensor.getType());
   auto emptyTensor = rewriter.create<tensor::EmptyOp>(
       loc, transposeResultDims, tensorType.getElementType());
-  return rewriter
-      .create<linalg::TransposeOp>(loc, tensor, emptyTensor, transposedShape)
+  return rewriter.create<linalg::TransposeOp>(loc, tensor, emptyTensor, perm)
       .getResult()[0];
 }
 
 namespace {
-struct ConvertLinalgConvNhwcHwcf
-    : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
+struct ConvertHwcfToHwfc : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
@@ -69,39 +71,23 @@ struct ConvertLinalgConvNhwcHwcf
     AffineMap filterMap = convOp.getIndexingMapsArray()[1];
     AffineMap outputMap = convOp.getIndexingMapsArray()[2];
 
-    // Swap the last two dimensions (C <-> F) for the filter.
-    AffineMap transposedFilterMap = swapLastTwoDims(filterMap);
+    SmallVector<int64_t> perm = {0, 1, 3, 2};
 
-    // Create a transposed filter tensor.
-    Value transposedFilter =
-        createTransposeOp(rewriter, loc, filter, transposedFilterMap);
+    AffineMap transposedFilterMap = constructFilterMap(filterMap, perm);
+    Value transposedFilter = createTransposeOp(rewriter, loc, filter, perm);
 
     SmallVector<utils::IteratorType> iterators = convOp.getIteratorTypesArray();
 
-    auto linalgGenericOp = rewriter.create<linalg::GenericOp>(
+    auto genericOp = rewriter.create<linalg::GenericOp>(
         loc, output.getType(), ValueRange{input, transposedFilter}, output,
         ArrayRef<AffineMap>{inputMap, transposedFilterMap, outputMap},
-        iterators,
-        [&](OpBuilder &nestedBuilder, Location nestedLoc,
-            ValueRange blockArgs) {
-          // Block arguments correspond to input, filter, and output.
-          Value inputElem = blockArgs[0];
-          Value filterElem = blockArgs[1];
-          filterElem = rewriter.create<arith::ExtFOp>(
-              nestedLoc, rewriter.getF32Type(), filterElem);
-          inputElem = rewriter.create<arith::ExtFOp>(
-              nestedLoc, rewriter.getF32Type(), inputElem);
+        iterators);
 
-          Value acc = blockArgs[2];
-          Value result = nestedBuilder.create<arith::AddFOp>(
-              nestedLoc, acc,
-              nestedBuilder.create<arith::MulFOp>(nestedLoc, inputElem,
-                                                  filterElem));
+    // Reuse the same payload as the original convolution op.
+    rewriter.inlineRegionBefore(convOp->getRegion(0), genericOp.getRegion(),
+                                genericOp.getRegion().begin());
 
-          nestedBuilder.create<linalg::YieldOp>(nestedLoc, result);
-        });
-
-    rewriter.replaceOp(convOp, linalgGenericOp->getResults());
+    rewriter.replaceOp(convOp, genericOp->getResults());
     return success();
   }
 };
@@ -121,7 +107,9 @@ public:
     MLIRContext *context = &getContext();
 
     RewritePatternSet patterns(context);
-    patterns.add<ConvertLinalgConvNhwcHwcf>(context);
+    if (filterLayout == "hwfc") {
+      patterns.add<ConvertHwcfToHwfc>(context);
+    }
 
     if (failed(applyPatternsGreedily(op, std::move(patterns)))) {
       return signalPassFailure();
@@ -129,6 +117,9 @@ public:
 
     LDBG("after converting convolutions to channels last\n" << *op);
   }
+
+private:
+  llvm::SmallString<4> layout;
 };
 
 } // namespace

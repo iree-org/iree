@@ -55,7 +55,8 @@ struct GPUGeneralizeNamedOpsPass final
     SmallVector<linalg::LinalgOp> namedOpCandidates;
     funcOp.walk([&](linalg::LinalgOp linalgOp) {
       if (isa<linalg::BatchMatmulTransposeBOp, linalg::MatmulTransposeBOp,
-              linalg::VecmatOp, linalg::MatvecOp>(linalgOp))
+              linalg::VecmatOp, linalg::MatvecOp, linalg::Conv2DNhwcHwcfOp>(
+              linalgOp))
         namedOpCandidates.push_back(linalgOp);
     });
 
