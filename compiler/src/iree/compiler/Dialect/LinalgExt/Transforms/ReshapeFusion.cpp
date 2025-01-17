@@ -627,11 +627,28 @@ struct FoldAttentionWithProducerReshapeByExpansion final
 };
 
 struct DropScatterUnitIndexDepth final : public OpRewritePattern<ScatterOp> {
+  using OpRewritePattern<ScatterOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(ScatterOp scatterOp,
                                 PatternRewriter &rewriter) const override {
-    auto indicesShape = scatterOp.getIndicesType().getShape();
-    (void)indicesShape;
-    return failure();
+    llvm::ArrayRef<int64_t> indicesShape =
+        scatterOp.getIndicesType().getShape();
+    int64_t batchRank = scatterOp.getBatchRank();
+    if (indicesShape.size() == batchRank || indicesShape.back() != 1) {
+      return failure();
+    }
+    SmallVector<ReassociationIndices> reassoc;
+    reassoc.reserve(indicesShape.size());
+    for (auto i : llvm::seq<int64_t>(0, batchRank - 1)) {
+      reassoc.emplace_back(1, i);
+    }
+    reassoc.push_back(ReassociationIndices{batchRank - 1, batchRank});
+    auto collapseOp = rewriter.create<tensor::CollapseShapeOp>(
+        scatterOp.getLoc(), scatterOp.getIndices(), reassoc);
+
+    rewriter.modifyOpInPlace(scatterOp, [&]() {
+      scatterOp.setOperand(ScatterOp::kIndicesOpNum, collapseOp.getResult());
+    });
+    return success();
   }
 };
 
@@ -935,6 +952,8 @@ SmallVector<unsigned> defaultControlDropUnitDims(Operation *op) {
 }
 
 void populateFoldUnitExtentDimsPatterns(
-    RewritePatternSet &patterns, const linalg::ControlDropUnitDims &options) {}
+    RewritePatternSet &patterns, const linalg::ControlDropUnitDims &options) {
+  patterns.add<DropScatterUnitIndexDepth>(patterns.getContext());
+}
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
