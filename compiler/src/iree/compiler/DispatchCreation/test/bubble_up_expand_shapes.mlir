@@ -142,3 +142,45 @@ util.func public @diamond_propagate_expand_shape(%input : tensor<?x?xf16>)
 // CHECK: linalg.generic
 // CHECK-NOT: tensor.expand_shape
 // CHECK: util.return
+
+// -----
+
+// Check if unit dim expansion in a cyclic expansion like graph could cause
+// infinite behavior.
+util.func public @test_no_infinite_loop_unit_dim_expansion(%arg0 : tensor<4xi64>, %arg1 : tensor<4xi64>, %arg3 : tensor<4xi64>) -> (tensor<4xi64>) {
+  %c2_i64 = arith.constant 2 : i64
+  %cst = arith.constant dense<[2, 1]> : tensor<2xi64>
+  %c4 = arith.constant 4 : index
+  %c0_i64 = arith.constant 0 : i64
+  %c1_i64 = arith.constant 1 : i64
+  %__hoisted_tensor_4xi64 = arith.constant dense<[1, 2, 3, 4]> : tensor<4xi64>
+  %1 = tensor.empty() : tensor<4xi64>
+  %9 = tensor.empty() : tensor<4xi64>
+  %10:2 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} outs(%9, %1 : tensor<4xi64>, tensor<4xi64>) {
+  ^bb0(%out: i64, %out_0: i64):
+    %16 = linalg.index 0 : index
+    %17 = arith.remsi %16, %c4 : index
+    %extracted = tensor.extract %arg0[%17] : tensor<4xi64>
+    %extracted_1 = tensor.extract %arg1[%17] : tensor<4xi64>
+    linalg.yield %extracted, %extracted_1 : i64, i64
+  } -> (tensor<4xi64>, tensor<4xi64>)
+  %expanded = tensor.expand_shape %10#0 [[0, 1]] output_shape [4, 1] : tensor<4xi64> into tensor<4x1xi64>
+  %11 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "parallel"]}
+    ins(%10#1, %expanded: tensor<4xi64>, tensor<4x1xi64>) outs(%1 : tensor<4xi64>) {
+    ^bb0(%in: i64, %in0: i64, %out: i64):
+      %idx = linalg.index 1 : index
+      %cast = arith.index_cast %idx : index to i64
+      %add = arith.addi %in, %in0: i64
+      %add1 = arith.addi %add, %cast: i64
+      linalg.yield %add1 : i64
+    } -> tensor<4xi64>
+
+  util.return %11 : tensor<4xi64>
+}
+
+// CHECK-LABEL: test_no_infinite_loop_unit_dim_expansion
+// CHECK-NOT: tensor.expand_shape
+// CHECK: linalg.generic
+// CHECK: tensor.expand_shape
+// CHECK: linalg.generic
+// CHECK-NOT: tensor.expand_shape

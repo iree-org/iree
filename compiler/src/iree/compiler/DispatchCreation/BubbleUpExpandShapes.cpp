@@ -117,6 +117,37 @@ struct BubbleExpandThroughExtract final
 
 } // namespace
 
+/// If the domain of the operation is being expanded by unit dimensions, check
+/// if it's possible to have an infinite loop where the unit dim expansion keeps
+/// on propagating infinitely.
+static bool canCauseReshapingLoopByExpansion(Operation *producer,
+                                             Operation *consumer) {
+  bool isExpandingToUnitDims = false;
+  if (auto expandShapeOp = dyn_cast<tensor::ExpandShapeOp>(consumer)) {
+    // If the expand_shape is only expanding unit dimensions and the producer
+    // has multiple results, there is a possibility of an infinite loop.
+    ArrayRef<int64_t> outputShape = expandShapeOp.getStaticOutputShape();
+    for (auto [idx, indices] :
+         llvm::enumerate(expandShapeOp.getReassociationIndices())) {
+      if (indices.size() == 1) {
+        continue;
+      }
+      // Check if the output shape at any of the reassociation indices is 1.
+      for (int64_t ind : indices) {
+        if (outputShape[ind] == 1) {
+          isExpandingToUnitDims = true;
+        }
+      }
+    }
+
+    if (isExpandingToUnitDims && producer->getNumResults() > 1) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void BubbleUpExpandShapesPass::runOnOperation() {
   MLIRContext *context = &getContext();
 
@@ -126,6 +157,10 @@ void BubbleUpExpandShapesPass::runOnOperation() {
         Operation *producer = fusedOperand->get().getDefiningOp();
         Operation *consumer = fusedOperand->getOwner();
         if (!IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer})) {
+          return false;
+        }
+
+        if (canCauseReshapingLoopByExpansion(producer, consumer)) {
           return false;
         }
 
