@@ -34,5 +34,7 @@ iree_include_cmake_plugin_dirs(
 add_subdirectory(src)
 
 if(IREE_BUILD_PYTHON_BINDINGS)
+  configure_file(pyproject.toml pyproject.toml COPYONLY)
+  configure_file(setup.py setup.py @ONLY)
   add_subdirectory(bindings/python)
 endif()
