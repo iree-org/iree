@@ -140,7 +140,7 @@ static iree_status_t iree_hal_device_transfer_mappable_range(
   iree_device_size_t adjusted_data_length = 0;
   if (iree_status_is_ok(status)) {
     // Adjust the data length based on the min we have.
-    if (data_length == IREE_WHOLE_BUFFER) {
+    if (data_length == IREE_HAL_WHOLE_BUFFER) {
       // Whole buffer copy requested - that could mean either, so take the min.
       adjusted_data_length = iree_min(source_mapping.contents.data_length,
                                       target_mapping.contents.data_length);

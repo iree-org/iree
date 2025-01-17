@@ -504,8 +504,7 @@ LogicalResult setDefaultCustomOpLoweringConfig(
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   GreedyRewriteConfig config;
   config.listener = &customOpConfigListener;
-  if (failed(applyPatternsAndFoldGreedily(dummyFuncOp, std::move(patterns),
-                                          config))) {
+  if (failed(applyPatternsGreedily(dummyFuncOp, std::move(patterns), config))) {
     return customOp.emitOpError(
         "failed to canonicalize during custom op configuration setting");
   }
@@ -1342,6 +1341,24 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
       llvm::dbgs() << "\n";
     });
     return llvm::to_vector_of<Value>(newExpandOp->getResults());
+  }
+  if (auto collapseOp = dyn_cast<memref::CollapseShapeOp>(user)) {
+    auto newSourceType = llvm::cast<MemRefType>(replacement.getType());
+    FailureOr<MemRefType> newResultType =
+        memref::CollapseShapeOp::computeCollapsedType(
+            newSourceType, collapseOp.getReassociationIndices());
+    if (failed(newResultType)) {
+      return std::nullopt;
+    }
+
+    auto newCollapseOp = rewriter.create<memref::CollapseShapeOp>(
+        loc, *newResultType, replacement, collapseOp.getReassociation());
+    LLVM_DEBUG({
+      llvm::dbgs() << "\t\tNew user : ";
+      newCollapseOp->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
+      llvm::dbgs() << "\n";
+    });
+    return llvm::to_vector_of<Value>(newCollapseOp->getResults());
   }
   return std::nullopt;
 }

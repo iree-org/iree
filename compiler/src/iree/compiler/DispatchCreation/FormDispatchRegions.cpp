@@ -425,21 +425,6 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
   return true;
 }
 
-/// All operations in a dispatch should be vectorized, which isnt the case today
-/// This is an explicit list of operations that arent vectorized for now
-/// requiring special handling for now in dispatch region formation to avoid
-/// large stack allocations.
-static bool isVectorizedAlways(Operation *producer) {
-  // TODO(#17155) : This is a black list of operations that are not vectorized
-  // today (under the aggressive fusion flag). Remove this blacklist to return
-  // true always.
-  if (auto convOp = dyn_cast<linalg::Conv2DNhwcHwcfOp>(producer)) {
-    auto strides = convOp.getStrides();
-    return strides.isSplat() && strides.getSplatValue<int64_t>() == 1;
-  }
-  return true;
-}
-
 /// Returns true if this is a fusable use, while fusing a root with its
 /// consumer.
 static bool
@@ -554,9 +539,7 @@ isFusableWithConsumer(OpOperand &fusedOperand,
   // Under aggressive fusion assume that the dispatches are vectorized. In which
   // case we dont need to account for the subsequent stack allocation condition.
   if (options.aggressiveFusion) {
-    if (isVectorizedAlways(producer)) {
-      return true;
-    }
+    return true;
   }
 
   // While fusing with consumer, the result of the root might not be the final
@@ -651,7 +634,8 @@ isFusableWithProducer(OpOperand &operand,
   }
 
   // Don't fuse attention with it's producer
-  if (isa<IREE::LinalgExt::AttentionOp>(consumer)) {
+  // TODO: Enable scatter fusion when supported by backends.
+  if (isa<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::ScatterOp>(consumer)) {
     return false;
   }
 

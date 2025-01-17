@@ -18,6 +18,26 @@
 #include "iree/hal/utils/file_transfer.h"
 
 //===----------------------------------------------------------------------===//
+// iree_hal_null_device_options_t
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT void iree_hal_null_device_options_initialize(
+    iree_hal_null_device_options_t* out_options) {
+  memset(out_options, 0, sizeof(*out_options));
+  // TODO(null): set defaults based on compiler configuration. Flags should not
+  // be used as multiple devices may be configured within the process or the
+  // hosting application may be authored in python/etc that does not use a flags
+  // mechanism accessible here.
+}
+
+static iree_status_t iree_hal_null_device_options_verify(
+    const iree_hal_null_device_options_t* options) {
+  // TODO(null): verify that the parameters are within expected ranges and any
+  // requested features are supported.
+  return iree_ok_status();
+}
+
+//===----------------------------------------------------------------------===//
 // iree_hal_null_device_t
 //===----------------------------------------------------------------------===//
 
@@ -40,22 +60,6 @@ static iree_hal_null_device_t* iree_hal_null_device_cast(
     iree_hal_device_t* base_value) {
   IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_null_device_vtable);
   return (iree_hal_null_device_t*)base_value;
-}
-
-void iree_hal_null_device_options_initialize(
-    iree_hal_null_device_options_t* out_options) {
-  memset(out_options, 0, sizeof(*out_options));
-  // TODO(null): set defaults based on compiler configuration. Flags should not
-  // be used as multiple devices may be configured within the process or the
-  // hosting application may be authored in python/etc that does not use a flags
-  // mechanism accessible here.
-}
-
-static iree_status_t iree_hal_null_device_options_verify(
-    const iree_hal_null_device_options_t* options) {
-  // TODO(null): verify that the parameters are within expected ranges and any
-  // requested features are supported.
-  return iree_ok_status();
 }
 
 iree_status_t iree_hal_null_device_create(

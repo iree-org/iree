@@ -983,7 +983,7 @@ def FLOW_CallOp : FLOW_Op<"call", [
   let builders = [
     OpBuilder<(ins
       "SymbolRefAttr":$callee,
-      "TypeRange":$resultTypes,
+      "TypeRange":$resultTypes, "ValueRange":$resultDims,
       "ValueRange":$arguments,
       "ArrayAttr":$tiedOperands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
@@ -1500,6 +1500,52 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
   let hasVerifier = 1;
   let hasCanonicalizer = 1;
   let hasFolder = 1;
+}
+
+def FLOW_TensorBarrierOp : FLOW_PureOp<"tensor.barrier", [
+  AllTypesMatch<["operand", "result"]>,
+  DeclareOpInterfaceMethods<Util_HoistableOpInterface>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{}];
+  let description = [{
+  }];
+
+  let arguments = (ins
+    FLOW_Tensor:$operand,
+    FLOW_ShapeDynamicDims:$argument_dims,
+    AnyAttr:$target
+  );
+  let results = (outs
+    FLOW_Tensor:$result
+  );
+
+  let assemblyFormat = [{
+    $operand `:` type($result) (`{` $argument_dims^ `}`)?
+    `on` $target
+    attr-dict-with-keyword
+  }];
+
+  let builders = [
+    OpBuilder<(ins "Value":$operand, "Attribute":$target),
+    [{
+      build($_builder, $_state,
+          operand.getType(),
+          operand,
+          IREE::Util::buildDynamicDimsForValue($_state.location, operand, $_builder),
+          target);
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    bool isHoistableLeafOp() { return false; }
+
+    ValueRange getOperandDynamicDims(unsigned idx) { return getArgumentDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getArgumentDims(); }
+  }];
+
+  let hasVerifier = 1;
+  let hasCanonicalizer = 1;
 }
 
 def FLOW_TensorTransferOp : FLOW_PureOp<"tensor.transfer", [

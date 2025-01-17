@@ -256,6 +256,11 @@ struct FuseTilableSliceProducers final
       return failure();
     }
 
+    auto producerParent = tilableProducer->getParentOfType<scf::ForallOp>();
+    if (producerParent && producerParent == parentForall) {
+      return failure();
+    }
+
     SmallVector<LoopLikeOpInterface> loops = {parentForall};
     std::optional<scf::SCFFuseProducerOfSliceResult> fusionResult =
         mlir::scf::tileAndFuseProducerOfSlice(rewriter, sliceOp, loops);
@@ -353,7 +358,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     }
     patterns.add<FuseTilableForallConsumers>(context);
     populateForallLoopHoistingPattern(patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
@@ -371,7 +376,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     patterns.add<FuseTilableForallConsumers>(context);
     tensor::populateFoldTensorEmptyPatterns(patterns);
     scf::ForallOp::getCanonicalizationPatterns(patterns, context);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
@@ -385,7 +390,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     patterns.add<FuseTilableSliceProducers>(context);
     tensor::populateFoldTensorEmptyPatterns(patterns);
     scf::ForallOp::getCanonicalizationPatterns(patterns, context);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }

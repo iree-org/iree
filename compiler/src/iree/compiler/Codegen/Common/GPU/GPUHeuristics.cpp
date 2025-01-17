@@ -246,14 +246,20 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
     return failure(); // Cannot use this intrinsic for misaligned cases.
   }
 
-  // Cannot use the intrinsic when the tile size is greater than problem size.
-  // Because tiling is a no-op, and we can't infer tiling sizes from IR.
-  if (!mustBeAligned && (problem.mSizes.back() < intrinsic.mSizes[0] ||
-                         problem.nSizes.back() < intrinsic.nSizes[0] ||
-                         problem.kSizes.back() < intrinsic.kSizes[0])) {
+  // TODO: Figure out what the precise cutoff is, this may be machine dependent.
+  // In situation when alignment isn't required, we disallow intrinsics to be
+  // picked if the tile size is too small. For example, this will force a matmul
+  // with a tiny dimension to not use MFMA instructions because of the
+  // additional overhead that comes with it. However, 4 is only an approximation
+  // to boundary between matvec and matmul. The actual heuristic can be
+  // established after we sweep the different tile sizes for a problem config.
+  // Once a precise threshold is established, replace 4 with the threshold and
+  // remove this todo.
+  if (!mustBeAligned &&
+      (problem.mSizes.back() < 4 || problem.nSizes.back() < 4 ||
+       problem.kSizes.back() < 4)) {
     return failure();
   }
-
   return success();
 }
 

@@ -16,7 +16,7 @@ func.func @multi_mma_mfma_i32_16x16x32_i8(%a : tensor<1x2x8x4x16x2x8xi8>,
       #iree_gpu.iterator_type<reduction>
     ], kind = #iree_gpu.data_tiled_mma_layout<
       intrinsic =  MFMA_I32_16x16x32_I8,
-      unroll_m = 8, unroll_n = 2, subgroups_n = 4, unroll_k = 2
+      intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 2
     >} : tensor<1x2x8x4x16x2x8xi8>, tensor<1x2x4x2x4x16x2x8xi8> into tensor<1x1x8x4x2x4x16x4xi32>
   return %d : tensor<1x1x8x4x2x4x16x4xi32>
 }

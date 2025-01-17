@@ -60,14 +60,12 @@ namespace mlir::iree_compiler::IREE::HAL {
 namespace {
 
 // TODO(#18792): rename flags back to iree-rocm- as they are not HIP-specific.
-// Only iree-hip-legacy-sync applies uniquely to HIP.
 struct ROCMOptions {
   std::string target = "";
   std::string targetFeatures = "";
   std::string bitcodeDirectory = getDefaultBitcodeDirectory();
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
-  bool legacySync = true;
   bool slpVectorization = true;
   bool globalISel = false;
 
@@ -107,9 +105,7 @@ struct ROCMOptions {
         cl::desc("Enables microkernels in the HIP compiler backend. May be "
                  "`default`, `none`, `all`, or a comma-separated list of "
                  "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
-    binder.opt<bool>("iree-hip-legacy-sync", legacySync, cl::cat(category),
-                     cl::desc("Enables 'legacy-sync' mode, which is required "
-                              "for inline execution."));
+
     binder.list<std::string>(
         "iree-hip-pass-plugin-path", passPlugins,
         cl::desc("LLVM pass plugins are out of tree libraries that implement "
@@ -175,9 +171,10 @@ static StringRef getABI(IREE::HAL::ExecutableTargetAttr targetAttr) {
 
 static void dumpModuleToPath(StringRef path, StringRef baseName,
                              StringRef suffix, StringRef extension,
-                             llvm::Module &module) {
+                             llvm::Module &module, StringRef header = {}) {
   llvm::SmallVector<char, 0> data;
   llvm::raw_svector_ostream ostream(data);
+  ostream << header;
   module.print(ostream, nullptr);
   dumpDataToPath(path, baseName, suffix, extension,
                  StringRef(data.data(), data.size()));
@@ -295,7 +292,8 @@ public:
   static void optimizeModule(llvm::Module &module,
                              llvm::TargetMachine &targetMachine,
                              ArrayRef<std::string> passPlugins,
-                             bool slpVectorization) {
+                             bool slpVectorization,
+                             std::string &outPassesString) {
     llvm::LoopAnalysisManager lam;
     llvm::FunctionAnalysisManager fam;
     llvm::CGSCCAnalysisManager cgam;
@@ -336,7 +334,11 @@ public:
     mpm.addPass(llvm::VerifierPass());
     mpm.addPass(pb.buildPerModuleDefaultPipeline(ol));
     mpm.addPass(llvm::VerifierPass());
-
+    llvm::raw_string_ostream os(outPassesString);
+    mpm.printPipeline(os, [&pic](StringRef className) {
+      auto passName = pic.getPassNameForClassName(className);
+      return passName.empty() ? className : passName;
+    });
     mpm.run(module, mam);
   }
 
@@ -469,7 +471,20 @@ public:
         opt.UnsafeFPMath = false;
         opt.NoInfsFPMath = false;
         opt.NoNaNsFPMath = true;
+        // Be extra cautious while this is less tested, and prevent unknown
+        // fallbacks from global isel.
+        //
+        // When GlobalISelAbort is set, any failure of GlobalISel,
+        // whether due to being not yet implemented or incorrect IR will result
+        // in an immediate abortion of compilation. This disables the fallback
+        // path of AMDGPUPassConfig::addInstSelector and 2 legacy passes which
+        // might work around unimplemented cases or errors in GlobalISel
+        // resulting in a successful compilation but would make one assume
+        // results are with GlobalISel when they are not.
         opt.EnableGlobalISel = options.globalISel;
+        opt.GlobalISelAbort = options.globalISel
+                                  ? llvm::GlobalISelAbortMode::Enable
+                                  : llvm::GlobalISelAbortMode::Disable;
         SmallVector<std::string> features;
         if (targetArch.starts_with("gfx10") ||
             targetArch.starts_with("gfx11")) {
@@ -566,12 +581,19 @@ public:
       }
 
       // Run LLVM optimization passes.
+      std::string passesString;
       optimizeModule(*llvmModule, *targetMachine, options.passPlugins,
-                     options.slpVectorization);
+                     options.slpVectorization, passesString);
       if (!serializationOptions.dumpIntermediatesPath.empty()) {
+        std::string header = llvm::formatv(R"TXT(
+; To reproduce the .optimized.ll from the .linked.ll, run:
+; opt --passes='{}'
+
+)TXT",
+                                           passesString);
         dumpModuleToPath(serializationOptions.dumpIntermediatesPath,
                          serializationOptions.dumpBaseName, variantOp.getName(),
-                         ".optimized.ll", *llvmModule);
+                         ".optimized.ll", *llvmModule, header);
       }
 
       if (failed(validateFinalizedModule(variantOp, *llvmModule))) {
@@ -665,7 +687,9 @@ protected:
       }
       int64_t ordinal = ordinalAttr.getInt();
 
-      auto symbolNameRef = builder.createString(exportOp.getName());
+      // Symbol names include a `.kd` suffix as that's what HSA expects.
+      auto symbolNameKd = (exportOp.getName() + ".kd").str();
+      auto symbolNameRef = builder.createString(symbolNameKd);
 
       iree_hal_amdgpu_Dims_t workgroupSize = {0};
       if (auto workgroupSizeAttr = exportOp.getWorkgroupSize()) {
@@ -848,12 +872,6 @@ public:
     Builder b(context);
 
     SmallVector<NamedAttribute> deviceConfigAttrs;
-    if (options.legacySync) {
-      // Indicates that the runtime HAL driver operates only in the legacy
-      // synchronous mode.
-      deviceConfigAttrs.emplace_back(b.getStringAttr("legacy_sync"),
-                                     b.getUnitAttr());
-    }
     auto deviceConfigAttr = b.getDictionaryAttr(deviceConfigAttrs);
 
     SmallVector<NamedAttribute> executableConfigAttrs;

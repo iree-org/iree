@@ -1601,6 +1601,17 @@ void CallOp::build(OpBuilder &builder, OperationState &state,
                      }));
 }
 
+void CallOp::build(OpBuilder &builder, OperationState &state,
+                   SymbolRefAttr callee, TypeRange resultTypes,
+                   ValueRange resultDims, ValueRange arguments,
+                   ArrayAttr tiedOperands,
+                   ArrayRef<NamedAttribute> attributes) {
+  build(
+      builder, state, callee, resultTypes, resultDims, arguments,
+      IREE::Util::buildDynamicDimsForValues(state.location, arguments, builder),
+      tiedOperands, attributes);
+}
+
 FunctionType CallOp::getCalleeType() {
   auto argumentTypes = llvm::map_to_vector(
       getArgOperands(), [](Value arg) { return arg.getType(); });
@@ -1824,6 +1835,12 @@ LogicalResult TensorCloneOp::verify() {
   }
   return success();
 }
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.barrier
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorBarrierOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // flow.tensor.transfer

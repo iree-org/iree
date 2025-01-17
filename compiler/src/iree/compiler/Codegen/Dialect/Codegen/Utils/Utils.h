@@ -38,6 +38,8 @@ bool operator==(const MaterializeEncodingInfo &lhs,
                 const MaterializeEncodingInfo &rhs);
 bool operator!=(const MaterializeEncodingInfo &lhs,
                 const MaterializeEncodingInfo &rhs);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const MaterializeEncodingInfo &encodingInfo);
 
 //===----------------------------------------------------------------------===//
 // Layout Utilities.

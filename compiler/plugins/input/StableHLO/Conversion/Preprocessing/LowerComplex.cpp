@@ -74,8 +74,7 @@ struct LowerComplex final : impl::LowerComplexBase<LowerComplex> {
     RewritePatternSet patterns(ctx);
     populatePreprocessingComplexPatterns(ctx, &patterns);
     populateCanonicalizationPatterns(ctx, &patterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       signalPassFailure();
     }
   }

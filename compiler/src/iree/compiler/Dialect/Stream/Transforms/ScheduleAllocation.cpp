@@ -665,6 +665,13 @@ applyAsyncCollectiveOp(IREE::Stream::AsyncCollectiveOp asyncOp,
   return success();
 }
 
+static LogicalResult applyAsyncBarrierOp(IREE::Stream::AsyncBarrierOp barrierOp,
+                                         AllocationScope &scope,
+                                         OpBuilder builder) {
+  barrierOp.erase();
+  return success();
+}
+
 static LogicalResult applyAsyncTransferOp(IREE::Stream::AsyncTransferOp asyncOp,
                                           AllocationScope &scope,
                                           OpBuilder builder) {
@@ -986,6 +993,9 @@ static LogicalResult applyAsyncAllocations(Region &region,
                    })
                    .Case([&](IREE::Stream::AsyncCollectiveOp op) {
                      return applyAsyncCollectiveOp(op, scope, OpBuilder(op));
+                   })
+                   .Case([&](IREE::Stream::AsyncBarrierOp op) {
+                     return applyAsyncBarrierOp(op, scope, OpBuilder(op));
                    })
                    .Case([&](IREE::Stream::AsyncTransferOp op) {
                      return applyAsyncTransferOp(op, scope, OpBuilder(op));

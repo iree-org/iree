@@ -152,10 +152,10 @@ iree_status_t _TfLiteTensorReallocateIfNeeded(
   // on-demand mapping when the user calls TfLiteTensorData but this at least
   // puts potential errors in the same easy to find place.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_hal_buffer_map_range(tensor->buffer, IREE_HAL_MAPPING_MODE_SCOPED,
-                                IREE_HAL_MEMORY_ACCESS_ALL, 0,
-                                IREE_WHOLE_BUFFER, &tensor->buffer_mapping));
+      z0, iree_hal_buffer_map_range(
+              tensor->buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+              IREE_HAL_MEMORY_ACCESS_ALL, 0, IREE_HAL_WHOLE_BUFFER,
+              &tensor->buffer_mapping));
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -176,7 +176,7 @@ iree_status_t _TfLiteTensorBind(TfLiteTensor* tensor,
   // move this to an on-demand mapping when the user calls TfLiteTensorData but
   // this at least puts potential errors in the same easy to find place.
   iree_device_size_t byte_offset = 0;
-  iree_device_size_t byte_length = IREE_WHOLE_BUFFER;
+  iree_device_size_t byte_length = IREE_HAL_WHOLE_BUFFER;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_buffer_map_range(
               buffer, IREE_HAL_MAPPING_MODE_SCOPED,

@@ -217,6 +217,7 @@ struct VectorDistributionListener : public RewriterBase::Listener {
   void notifyOperationModified(Operation *op) override {
     if (op->hasAttr(kVectorLayoutRedistributeAttrName) &&
         op->hasAttrOfType<ArrayAttr>(kVectorLayoutFetcherStorageAttrName)) {
+      op->removeAttr(kVectorLayoutRedistributeAttrName);
       toBeDistributed.push_back(op);
     }
   }
@@ -318,7 +319,7 @@ LogicalResult distributeVectorOps(Operation *root,
                                                          root->getContext());
   IREE::VectorExt::ToSIMTOp::getCanonicalizationPatterns(patterns,
                                                          root->getContext());
-  if (failed(applyPatternsAndFoldGreedily(root, std::move(patterns)))) {
+  if (failed(applyPatternsGreedily(root, std::move(patterns)))) {
     return failure();
   }
 

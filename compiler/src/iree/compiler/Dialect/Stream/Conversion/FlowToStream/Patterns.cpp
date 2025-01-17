@@ -237,6 +237,24 @@ struct ConvertTensorCloneOp
   }
 };
 
+struct ConvertTensorBarrierOp
+    : public AffinityOpConversionPattern<IREE::Flow::TensorBarrierOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
+  LogicalResult matchAndRewriteOnAffinity(
+      IREE::Flow::TensorBarrierOp op, OneToNOpAdaptor adaptor,
+      IREE::Stream::AffinityAttr executionAffinityAttr,
+      ConversionPatternRewriter &rewriter) const override {
+    auto operand = resolveTensorOperands(op.getLoc(), op.getOperand(),
+                                         adaptor.getOperand(), rewriter);
+    auto barrierOp = rewriter.create<IREE::Stream::AsyncBarrierOp>(
+        op.getLoc(), operand.resource.getType(), operand.resource,
+        operand.resourceSize,
+        /*affinity=*/operand.affinity);
+    rewriter.replaceOpWithMultiple(op, {{barrierOp, operand.resourceSize}});
+    return success();
+  }
+};
+
 struct ConvertTensorTransferOp
     : public AffinityOpConversionPattern<IREE::Flow::TensorTransferOp> {
   using AffinityOpConversionPattern::AffinityOpConversionPattern;
@@ -1162,15 +1180,15 @@ void populateFlowToStreamConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     IREE::Stream::AffinityAnalysis *affinityAnalysis,
     RewritePatternSet &patterns) {
-  patterns
-      .insert<ConvertTensorConstantOp, ConvertTensorDynamicConstantOp,
-              ConvertTensorCastLikeOp<IREE::Flow::TensorReshapeOp>,
-              ConvertTensorCastLikeOp<IREE::Flow::TensorBitCastOp>,
-              ConvertTensorAllocaOp, ConvertTensorEmptyOp, ConvertTensorSplatOp,
-              ConvertTensorCloneOp, ConvertTensorTransferOp,
-              ConvertTensorSliceOp, ConvertTensorUpdateOp, ConvertTensorLoadOp,
-              ConvertTensorStoreOp, ConvertTensorTraceOp>(
-          typeConverter, context, affinityAnalysis);
+  patterns.insert<
+      ConvertTensorConstantOp, ConvertTensorDynamicConstantOp,
+      ConvertTensorCastLikeOp<IREE::Flow::TensorReshapeOp>,
+      ConvertTensorCastLikeOp<IREE::Flow::TensorBitCastOp>,
+      ConvertTensorAllocaOp, ConvertTensorEmptyOp, ConvertTensorSplatOp,
+      ConvertTensorCloneOp, ConvertTensorBarrierOp, ConvertTensorTransferOp,
+      ConvertTensorSliceOp, ConvertTensorUpdateOp, ConvertTensorLoadOp,
+      ConvertTensorStoreOp, ConvertTensorTraceOp>(typeConverter, context,
+                                                  affinityAnalysis);
   patterns.insert<ConvertChannelDefaultOp>(typeConverter, context,
                                            affinityAnalysis);
   patterns.insert<ConvertChannelSplitOp, ConvertChannelRankOp,

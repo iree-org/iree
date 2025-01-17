@@ -33,6 +33,10 @@ namespace {
 struct TileAndDistributeToWorkgroupsUsingForallOpPass final
     : public impl::TileAndDistributeToWorkgroupsUsingForallOpPassBase<
           TileAndDistributeToWorkgroupsUsingForallOpPass> {
+  explicit TileAndDistributeToWorkgroupsUsingForallOpPass(
+      bool transposeWorkgroup) {
+    this->transposeWorkgroup = transposeWorkgroup;
+  }
   using Base::Base;
   void runOnOperation() override;
 };
@@ -188,6 +192,25 @@ pruneDroppedLoops(ArrayRef<Attribute> inputs,
     }
   }
   return prunedAttrs;
+}
+
+/// Checks whether we have static dimension for all the loop bounds and steps.
+/// This is a requirement if the reordering strategy is set to `transpose`.
+static bool areAllStaticLoopBounds(scf::ForallOp forallOp) {
+
+  for (auto [lb, ub, step] : llvm::zip_equal(forallOp.getMixedLowerBound(),
+                                             forallOp.getMixedUpperBound(),
+                                             forallOp.getMixedStep())) {
+
+    std::optional<int64_t> lbVal = getConstantIntValue(lb);
+    std::optional<int64_t> ubVal = getConstantIntValue(ub);
+    std::optional<int64_t> stepVal = getConstantIntValue(step);
+
+    if (!(lbVal && ubVal && stepVal)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /// Find dimensions of the loop that are unit-trip count and drop them from the
@@ -516,6 +539,20 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
       // TODO: run producer and consumer fusion in one worklist.
       fuseProducersOfSlices(rewriter, newFusionOpportunities,
                             tileAndFuseOptions, newLoop);
+      forallOp = newLoop;
+    }
+
+    // Reorder the workgroups if the strategy is set to `transpose`.
+    // This just transposes the first two dimensions of the workgroup i.e., the
+    // #iree.codegen.workgroup_id_x and #iree.codegen.workgroup_id_y.
+    // Only reorders if the loop bounds are static.
+    if (transposeWorkgroup) {
+      SmallVector<Attribute> mappingAttrs(forallOp.getMappingAttr().getValue());
+      int64_t mappingSize = mappingAttrs.size();
+      if (areAllStaticLoopBounds(forallOp) && mappingSize >= 2) {
+        std::swap(mappingAttrs[mappingSize - 1], mappingAttrs[mappingSize - 2]);
+        forallOp.setMappingAttr(ArrayAttr::get(context, mappingAttrs));
+      }
     }
   }
 
@@ -530,12 +567,17 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
         ->getCanonicalizationPatterns(patterns);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     scf::ForallOp::getCanonicalizationPatterns(patterns, context);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError("tiling canonicalization failed");
       return signalPassFailure();
     }
   }
 
   return;
+}
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createTileAndDistributeToWorkgroupsWithReordering(bool transposeWorkgroup) {
+  return std::make_unique<TileAndDistributeToWorkgroupsUsingForallOpPass>(
+      transposeWorkgroup);
 }
 } // namespace mlir::iree_compiler

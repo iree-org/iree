@@ -17,12 +17,15 @@ iree_cc_library(
     "CPUEncodingExternalModels.h"
     "GPUEncodingExternalModels.h"
     "Interfaces.h"
+    "Utils.h"
   SRCS
     "CPUEncodingExternalModels.cpp"
     "GPUEncodingExternalModels.cpp"
     "Interfaces.cpp"
+    "Utils.cpp"
   DEPS
     LLVMSupport
+    MLIRArithDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRTensorDialect
