@@ -450,7 +450,7 @@ void LinearizeMemRefs::runOnOperation() {
   patterns.add<LinearizeVectorLoad>(context);
   patterns.add<LinearizeVectorStore>(context);
 
-  (void)applyPatternsAndFoldGreedily(moduleOp, std::move(patterns));
+  (void)applyPatternsGreedily(moduleOp, std::move(patterns));
 
   return;
 }
