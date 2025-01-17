@@ -135,7 +135,7 @@ struct ConvertUnsignedI64IndexCastProducerToIndex
                                 PatternRewriter &rewriter) const override {
     Type inType = origIndexOp.getIn().getType();
     Type outType = origIndexOp.getOut().getType();
-    if (!inType.isSignlessInteger(64) && isa<IndexType>(outType))
+    if (!inType.isSignlessInteger(64) || !isa<IndexType>(outType))
       return failure();
 
     Operation *producer = origIndexOp.getIn().getDefiningOp();
