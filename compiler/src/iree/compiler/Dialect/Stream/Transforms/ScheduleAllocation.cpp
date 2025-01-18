@@ -665,10 +665,21 @@ applyAsyncCollectiveOp(IREE::Stream::AsyncCollectiveOp asyncOp,
   return success();
 }
 
-static LogicalResult applyAsyncBarrierOp(IREE::Stream::AsyncBarrierOp barrierOp,
+static LogicalResult applyAsyncBarrierOp(IREE::Stream::AsyncBarrierOp asyncOp,
                                          AllocationScope &scope,
                                          OpBuilder builder) {
-  barrierOp.erase();
+  // TODO: barriers are being treated as copies, they should just be metadata
+  // operations but currently its causing failures to be removed.
+  auto sourceRange = scope.lookupResourceRange(asyncOp.getSource());
+  auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
+
+  // Perform the copy.
+  builder.create<IREE::Stream::CmdCopyOp>(
+      asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
+      sourceRange.offset, targetRange.resource, targetRange.resourceSize,
+      targetRange.offset, sourceRange.length);
+
+  asyncOp.erase();
   return success();
 }
 
