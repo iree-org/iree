@@ -669,7 +669,7 @@ static LogicalResult applyAsyncBarrierOp(IREE::Stream::AsyncBarrierOp barrierOp,
                                          AllocationScope &scope,
                                          OpBuilder builder) {
   // TODO: barriers are being treated as copies, they should just be metadata
-  // operations but currently its causing failures to be removed.
+  // operations but currently it's causing failures to be removed.
   auto sourceRange = scope.lookupResourceRange(barrierOp.getSource());
   auto targetRange = scope.lookupResourceRange(barrierOp.getResult());
 
