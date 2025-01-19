@@ -550,12 +550,13 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
        "generateResultTileValue"]>]> {
   let summary = "Attention operator";
   let description = [{
-    Computes the scaled dot product attention function:
+    Computes the dot product attention function:
 
-    attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V
+    attention(Q, K, V) = softmax(Q @ K.T) @ V
 
-    Here Q, K, V are given tensors and scale is a scalar value specifying
-    the scale to use.
+    Here Q, K, V are given tensors. The operation does not take scale,
+
+    If scaling is required, it should be applied to Q or K before calling this op.
 
     If an additional mask argument M is included, the result of the first matmul is modified according to:
 
@@ -565,7 +566,6 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
   let arguments = (ins AnyShaped:$query,
                        AnyShaped:$key,
                        AnyShaped:$value,
-                       AnyFloat:$scale,
                        Optional<AnyShaped>:$mask,
                        AnyShaped:$output,
                        AffineMapArrayAttr:$indexing_maps,
@@ -578,7 +578,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
   let hasCustomAssemblyFormat = 1;
   let assemblyFormat = [{
     attr-dict
-    `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)?  `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )?`)`
+    `ins` `(` $query `,` $key `,` $value `,` (`,` $mask^)?  `:` type($query) `,` type($key) `,` type($value) (`,` type($mask)^ )?`)`
     `outs` `(` $output `:` type($output) `)`
     $region
     (`->` type($results)^)?
@@ -589,7 +589,6 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     "Value":$query,
     "Value":$key,
     "Value":$value,
-    "Value":$scale,
     "Value":$output,
     "ArrayAttr":$indexing_maps,
     CArg<"std::optional<Value>", "std::nullopt">:$mask)>
@@ -611,12 +610,9 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     AffineMap getValueMap() {
       return cast<AffineMap>(getIndexingMapsArray()[2]);
     }
-    AffineMap getScaleMap() {
-      return cast<AffineMap>(getIndexingMapsArray()[3]);
-    }
     std::optional<AffineMap> getMaskMap() {
       if (getMask()) {
-        return cast<AffineMap>(getIndexingMapsArray()[4]);
+        return cast<AffineMap>(getIndexingMapsArray()[3]);
       }
       return std::nullopt;
     }
@@ -659,13 +655,13 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
   let description = [{
     Traditional scaled dot product attention computes:
 
-    attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V
+    attention(Q, K, V) = softmax(Q @ K.T) @ V
 
     Online Attention on the other hand, uses an online normalizer instead of
     softmax:
 
-    online_attention(Q, K, V, scale, running_max, running_sum)
-      = online_normalizer(Q @ K.T * scale, running_max, running_sum) @ V
+    online_attention(Q, K, V, running_max, running_sum)
+      = online_normalizer(Q @ K.T, running_max, running_sum) @ V
 
     If an additional mask argument M is included, the result of the first matmul is modified according to:
 
@@ -686,7 +682,6 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
   let arguments = (ins AnyShaped:$query,
                        AnyShaped:$key,
                        AnyShaped:$value,
-                       AnyFloat:$scale,
                        Optional<AnyShaped>:$mask,
                        AnyShaped:$output,
                        AnyShaped:$max,
@@ -701,7 +696,7 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
   let hasCustomAssemblyFormat = 1;
   let assemblyFormat = [{
     attr-dict
-    `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)?  `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )?`)`
+    `ins` `(` $query `,` $key `,` $value `,` (`,` $mask^)?  `:` type($query) `,` type($key) `,` type($value) `,` (`,` type($mask)^ )?`)`
     `outs` `(` $output `,` $max `,` $sum `:` type($output) `,` type($max) `,` type($sum) `)`
     $region
     (`->` type($results)^)?
@@ -712,7 +707,6 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     "Value":$query,
     "Value":$key,
     "Value":$value,
-    "Value":$scale,
     "Value":$output,
     "Value":$max,
     "Value":$sum,
@@ -737,12 +731,9 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     AffineMap getValueMap() {
       return getIndexingMapsArray()[2];
     }
-    AffineMap getScaleMap() {
-      return getIndexingMapsArray()[3];
-    }
     std::optional<AffineMap> getMaskMap() {
       if (getMask()) {
-        return cast<AffineMap>(getIndexingMapsArray()[4]);
+        return cast<AffineMap>(getIndexingMapsArray()[3]);
       }
       return std::nullopt;
     }

@@ -13,9 +13,13 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/AffineExpr.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "torch-mlir-dialects/Dialect/TMTensor/IR/TMTensorDialect.h"
 #include "torch-mlir-dialects/Dialect/TMTensor/IR/TMTensorOps.h"
+#include "torch-mlir/Dialect/Torch/IR/TorchOps.h"
 
 namespace mlir::iree_compiler::TorchInput {
 
@@ -73,22 +77,29 @@ struct ScatterOpConversion
 };
 } // namespace
 
-static SmallVector<AffineMap> getStandardAttentionIndexingMaps(MLIRContext *ctx,
-                                                               bool hasMask) {
+static SmallVector<AffineMap>
+getStandardAttentionIndexingMaps(MLIRContext *ctx, bool hasMask,
+                                 bool hasScale = true) {
   AffineExpr m, n, k1, k2;
   bindDims(ctx, m, n, k1, k2);
 
   auto qMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k1}, ctx);
   auto kMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, k1}, ctx);
   auto vMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, n}, ctx);
-  auto sMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, ctx);
   auto rMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, n}, ctx);
-  if (hasMask) {
-    // Add mask map only if it exists
-    auto mMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k2}, ctx);
-    return {qMap, kMap, vMap, sMap, mMap, rMap};
+
+  SmallVector<AffineMap> ret = {qMap, kMap, vMap};
+  if (hasScale) {
+    auto sMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, ctx);
+    ret.emplace_back(std::move(sMap));
   }
-  return {qMap, kMap, vMap, sMap, rMap};
+  if (hasMask) {
+    auto mMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k2}, ctx);
+    ret.emplace_back(std::move(mMap));
+  }
+  ret.emplace_back(std::move(rMap));
+
+  return ret;
 }
 
 struct AttentionOpConversion
@@ -96,6 +107,7 @@ struct AttentionOpConversion
   using OpRewritePattern<mlir::torch::TMTensor::AttentionOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(mlir::torch::TMTensor::AttentionOp op,
                                 PatternRewriter &rewriter) const override {
+
     MLIRContext *ctx = getContext();
     Location loc = op->getLoc();
     Value query = op.getQuery();
@@ -141,16 +153,35 @@ struct AttentionOpConversion
     }
 
     // Attention only works for FloatType.
+    auto Q_type = op.getQueryType().getElementType();
+    auto bit_width = Q_type.getIntOrFloatBitWidth();
+    Value scaled_query;
+    double dk = static_cast<double>(headDim);
     FloatType targetType = cast<FloatType>(op.getQueryType().getElementType());
 
-    double dk = static_cast<double>(headDim);
-    dk = 1.0 / std::sqrt(dk);
-    Value scale = rewriter.create<arith::ConstantOp>(
-        loc, targetType, rewriter.getFloatAttr(targetType, dk));
+    // Since we use exp2 for attention instead of the original exp, we have to
+    // multiply the scale by log2(e). We use exp2 instead of exp as most
+    // platforms have better support for exp2 (we verified that we gain some
+    // speedup on some GPUs).
+    if (bit_width >= 16) {
+      dk = (1.0 / std::sqrt(dk)) * M_LOG2E;
+      Value scale = rewriter.create<arith::ConstantOp>(
+          loc, targetType, rewriter.getFloatAttr(targetType, dk));
+      Value scaleTensor =
+          rewriter.create<tensor::SplatOp>(loc, op.getQueryType(), scale);
+      scaled_query = rewriter.create<arith::MulFOp>(loc, query, scaleTensor);
+    } else {
+      dk = std::sqrt(dk) / M_LOG2E;
+      Value scale = rewriter.create<arith::ConstantOp>(
+          loc, targetType, rewriter.getFloatAttr(targetType, dk));
+      Value scaleTensor =
+          rewriter.create<tensor::SplatOp>(loc, op.getQueryType(), scale);
+      scaled_query = rewriter.create<arith::DivFOp>(loc, query, scaleTensor);
+    }
 
     // Add batches to standard attention indexing maps.
-    SmallVector<AffineMap> indexingMaps =
-        getStandardAttentionIndexingMaps(ctx, optionalMask.has_value());
+    SmallVector<AffineMap> indexingMaps = getStandardAttentionIndexingMaps(
+        ctx, optionalMask.has_value(), /*hasScale=*/false);
 
     int64_t numBatches = op.getQueryType().getRank() - 2;
     for (AffineMap &map : indexingMaps) {
@@ -163,7 +194,7 @@ struct AttentionOpConversion
     }
 
     auto attention = rewriter.create<IREE::LinalgExt::AttentionOp>(
-        loc, result.getType(), query, key, value, scale, result,
+        loc, result.getType(), scaled_query, key, value, result,
         rewriter.getAffineMapArrayAttr(indexingMaps), optionalMask);
 
     {

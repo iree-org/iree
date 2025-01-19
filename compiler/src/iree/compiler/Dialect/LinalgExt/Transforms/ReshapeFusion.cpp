@@ -450,9 +450,8 @@ static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
   TypeRange resultTypes = ValueRange(output).getTypes();
   auto fusedOp = rewriter.create<AttentionOp>(
       attentionOp.getLoc(), resultTypes, expandedOpOperands[0],
-      expandedOpOperands[1], expandedOpOperands[2], expandedOpOperands[3],
-      output, rewriter.getAffineMapArrayAttr(expandedOpIndexingMaps),
-      maskOperand);
+      expandedOpOperands[1], expandedOpOperands[2], output,
+      rewriter.getAffineMapArrayAttr(expandedOpIndexingMaps), maskOperand);
 
   rewriter.inlineRegionBefore(attentionOp.getRegion(), fusedOp.getRegion(),
                               fusedOp.getRegion().begin());
@@ -915,7 +914,7 @@ static Operation *createCollapsedOp(AttentionOp origOp,
 
   auto collapsedOp = rewriter.create<AttentionOp>(
       origOp.getLoc(), resultTypes, inputOperands[0], inputOperands[1],
-      inputOperands[2], inputOperands[3], outputOperands[0],
+      inputOperands[2], outputOperands[0],
       rewriter.getAffineMapArrayAttr(indexingMaps), maskOperand);
   rewriter.inlineRegionBefore(origOp.getRegion(), collapsedOp.getRegion(),
                               collapsedOp.getRegion().begin());
