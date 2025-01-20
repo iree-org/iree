@@ -64,6 +64,7 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   affine::registerValueBoundsOpInterfaceExternalModels(registry);
   arith::registerValueBoundsOpInterfaceExternalModels(registry);
   bufferization::registerTransformDialectExtension(registry);
+  gpu::registerValueBoundsOpInterfaceExternalModels(registry);
   gpu::registerTransformDialectExtension(registry);
   gpu::registerValueBoundsOpInterfaceExternalModels(registry);
   linalg::registerTransformDialectExtension(registry);
