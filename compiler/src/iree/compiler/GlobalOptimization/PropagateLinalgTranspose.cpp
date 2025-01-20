@@ -149,6 +149,17 @@ getGenericOpOrGeneralizeContraction(RewriterBase &rewriter, Operation *op,
       !(allowGeneralizing && linalg::isaContractionOpInterface(linalgOp))) {
     return failure();
   }
+
+  // If this is generic op but comply to convolution op interface, assume
+  // it is from ConvertConvToChannelsLast pass and skip.
+  // FuseTransposeWithProducerLinalgOp will fuse the transpose into successive
+  // convolution, negating the effect from the filter layout conversion from
+  // that pass.
+  if (isa<linalg::GenericOp>(linalgOp) &&
+      linalg::isaConvolutionOpInterface(linalgOp)) {
+    return failure();
+  }
+
   auto genericOp = dyn_cast<linalg::GenericOp>(op);
   if (genericOp) {
     return genericOp;
