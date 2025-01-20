@@ -57,11 +57,6 @@ swapExpandShapeWithSlice(RewriterBase &rewriter,
     return affine::makeComposedFoldedAffineApply(rewriter, loc, mulMap,
                                                  {v1, v2});
   };
-  // auto mulAdd = [&](OpFoldResult v1, OpFoldResult v2, OpFoldResult v3) {
-  //   auto mulMap = AffineMap::get(3, 0, {d0 * d1 + d2});
-  //   return affine::makeComposedFoldedAffineApply(rewriter, loc, mulMap,
-  //                                                {v1, v2, v3});
-  // };
 
   SmallVector<OpFoldResult> outputShape =
       getMixedValues(expandShapeOp.getStaticOutputShape(),
@@ -140,9 +135,10 @@ swapExpandShapeWithSlice(RewriterBase &rewriter,
         llvm::map_to_vector(delinOffsets, [&](OpFoldResult ofr) {
           return getValueOrCreateConstantIndexOp(rewriter, loc, ofr);
         });
-    OpFoldResult newOffset =
-        rewriter.create<affine::AffineLinearizeIndexOp>(loc, offsetVals, basis)
-            .getResult();
+    OpFoldResult newOffset = rewriter
+                                 .create<affine::AffineLinearizeIndexOp>(
+                                     loc, offsetVals, basis, /*disjoint=*/true)
+                                 .getResult();
     newOffsets.push_back(newOffset);
     newLengths.push_back(newSize);
 
