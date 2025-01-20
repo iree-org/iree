@@ -163,6 +163,7 @@ static void addLoopMaterializationPasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(IREE::LinalgExt::createLinalgExtToLoopsPass());
   funcPassManager.addPass(createMemrefCopyToLinalgPass());
   funcPassManager.addPass(createConvertLinalgToLoopsPass());
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -394,6 +395,7 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(
   funcPassManager.addPass(
       createSPIRVTileAndPromotePass(SPIRVTileAndPromotePassOptions{
           /*promoteCMatrix=*/true, /*skipThreadLevel=*/true}));
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
   // Run canonicalization patterns to propagate constant shape sizes after
   // removing trip-one loops.
@@ -421,6 +423,7 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(
     funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
   }
 
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   // Performs high-level n-D mechanical vectorization. This does not perform
   // unrolling or lowering, which is done later.
   {
@@ -513,6 +516,7 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createGPUDistributeSharedMemoryCopyPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
 
   {
     GPUReduceBankConflictsPassOptions options = {};
@@ -532,6 +536,7 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createForOpCanonicalizationPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createOptimizeVectorTransferPass());
 
   // Hoist loop invariant code to avoid pipelining it.
@@ -560,6 +565,7 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createGPUTileReductionPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
 
   // Performs high-level n-D mechanical vectorization. This does not perform
   // unrolling or lowering, which is done later.
@@ -588,6 +594,7 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &funcPassManager) {
 
   // Perform various vector-level cross-op optimizations like load-store
   // forwarding, shape casting and casting op cancelling.
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createOptimizeVectorTransferPass());
 
   // Simplify the IR for vector distribution.
