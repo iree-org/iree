@@ -70,7 +70,7 @@ jobs:
         run: ./build_tools/cmake/test_iree_dialects.sh "${BUILD_DIR}"
 
       - name: Post to Discord on Failure
-        uses: sarisia/actions-status-discord@65843b6a7d18626c252a055e247ccad1f41b4004 # v1.15.1
+        uses: sarisia/actions-status-discord@8aa2e3c0e53de9c2d03c1ad676f570f2073bca60 # v1.15.2
         if: failure() && github.ref_name == 'main' && github.repository_owner == 'iree-org'
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
