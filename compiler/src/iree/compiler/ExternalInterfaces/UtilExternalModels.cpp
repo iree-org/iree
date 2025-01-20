@@ -12,12 +12,15 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 namespace mlir::iree_compiler {
 
@@ -101,6 +104,31 @@ struct ArithDivUIInferIntDivisibilityOpInterface
     uint64_t divSDiv = lhsDivisibility.sdiv() / std::abs(intVal.getSExtValue());
 
     setResultDivs(divOp, IREE::Util::ConstantIntDivisibility(divUDiv, divSDiv));
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// ValueBoundsOpInterface
+//===----------------------------------------------------------------------===//
+
+/// For some reason, this interface has to be done as an external model.
+struct UtilAssumeIntValueBoundsOpInterface
+    : public ValueBoundsOpInterface::ExternalModel<
+          UtilAssumeIntValueBoundsOpInterface, IREE::Util::AssumeIntOp> {
+  void populateBoundsForIndexValue(Operation *op, Value value,
+                                   ValueBoundsConstraintSet &cstr) const {
+    auto assumeOp = cast<IREE::Util::AssumeIntOp>(op);
+    auto result = cast<OpResult>(value);
+    assert(result.getOwner() == op && "value is a result of this index op");
+    auto [min, max] =
+        assumeOp.getUnionedUnsignedRange(result.getResultNumber());
+
+    if (min) {
+      cstr.bound(result) >= *min;
+    }
+    if (max) {
+      cstr.bound(result) <= *max;
+    }
   }
 };
 
@@ -488,6 +516,11 @@ void registerUtilExternalModels(DialectRegistry &registry) {
         AlwaysHoistableOpInterfaceHelper<
             tensor::PadOp, tensor::PackOp,
             tensor::UnPackOp>::registerOpInterface(context);
+      });
+  registry.addExtension(
+      +[](MLIRContext *context, IREE::Util::UtilDialect *dialect) {
+        IREE::Util::AssumeIntOp::attachInterface<
+            UtilAssumeIntValueBoundsOpInterface>(*context);
       });
 }
 
