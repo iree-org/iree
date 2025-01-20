@@ -357,9 +357,10 @@ struct ScheduleExecutionPass
       op.getCanonicalizationPatterns(patterns, context);
     }
 
-    // Barriers are used only for analysis and can be removed as part of cleanup.
+    // Barriers are used only for analysis and can be removed as part of
+    // cleanup.
     patterns.insert<RemoveBarriers>(context);
-    
+
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
     if (failed(applyPatternsGreedily(getOperation(), frozenPatterns))) {
       return signalPassFailure();
