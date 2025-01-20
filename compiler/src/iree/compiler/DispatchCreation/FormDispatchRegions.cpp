@@ -633,9 +633,17 @@ isFusableWithProducer(OpOperand &operand,
     return true;
   }
 
-  // Don't fuse attention with it's producer
   // TODO: Enable scatter fusion when supported by backends.
-  if (isa<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::ScatterOp>(consumer)) {
+  if (isa<IREE::LinalgExt::ScatterOp>(consumer)) {
+    return false;
+  }
+
+  if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(consumer)) {
+    // Fuse with the rope computation if it is a gather operation.
+    if (IREE::LinalgExt::isGatherlikeOp(producer)) {
+      return true;
+    }
+    // Disable all other producer fusion. TODO: Enable other producer fusions.
     return false;
   }
 
@@ -770,8 +778,19 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // materializing large tensors between dispatches.
       if (!isa<linalg::LinalgOp, tensor::PadOp, tensor::PackOp,
                IREE::Encoding::SetEncodingOp>(op) ||
-          isa<linalg::FillOp>(op) || IREE::LinalgExt::isBitExtendOp(&op) ||
-          IREE::LinalgExt::isGatherlikeOp(&op)) {
+          IREE::Flow::isClonableIntoDispatchOp(&op)) {
+        continue;
+      }
+
+      // For now check if this is a rope computation that is to be fused with
+      // attention.
+      // TODO: Ideally this is just regular gather fusion which will be covered
+      // by the `isClonableIntoDispatchOp` call above, but for now this is done
+      // as a point fix.
+      if (IREE::LinalgExt::isGatherlikeOp(&op) &&
+          llvm::all_of(op.getUsers(), [](Operation *op) {
+            return isa<IREE::LinalgExt::AttentionOp>(op);
+          })) {
         continue;
       }
 
