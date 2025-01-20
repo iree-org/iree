@@ -27,8 +27,7 @@ iree_status_t iree_hal_hip_allocator_create(
 bool iree_hal_hip_allocator_isa(iree_hal_allocator_t* base_value);
 
 iree_status_t iree_hal_hip_allocator_alloc_async(
-    iree_hal_allocator_t* base_allocator,
-    iree_hal_buffer_t* buffer);
+    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* buffer);
 
 iree_status_t iree_hal_hip_allocator_free_async(iree_hal_allocator_t* allocator,
                                                 iree_hal_buffer_t* buffer);
