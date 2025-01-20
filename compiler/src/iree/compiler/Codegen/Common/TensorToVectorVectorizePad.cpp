@@ -101,9 +101,9 @@ struct VectorizePadWithConditions final
 
     /// Return true if the given `attrOrValue` is a constant zero.
     auto isConstantZero = [](OpFoldResult attrOrValue) {
-      if (isa<Attribute>(attrOrValue)) {
-        auto attr = dyn_cast<IntegerAttr>(cast<Attribute>(attrOrValue));
-        return attr && attr.getValue().getZExtValue() == 0;
+      if (auto attr = dyn_cast<Attribute>(attrOrValue)) {
+        auto intAttr = dyn_cast<IntegerAttr>(attr);
+        return intAttr && intAttr.getValue().getZExtValue() == 0;
       }
       IntegerAttr attr;
       return matchPattern(cast<Value>(attrOrValue), m_Constant(&attr)) &&

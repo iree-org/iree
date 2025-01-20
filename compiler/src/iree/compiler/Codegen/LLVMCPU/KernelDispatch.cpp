@@ -1788,8 +1788,9 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   // backends prefer to not decompose the ops.
   DictionaryAttr pipelineConfig;
   auto target = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  bool hasDynamicInnerTile = llvm::any_of(
-      op.getMixedTiles(), [](OpFoldResult ofr) { return isa<Value>(ofr); });
+  bool hasDynamicInnerTile =
+      llvm::any_of(op.getMixedTiles(),
+                   [](OpFoldResult ofr) { return llvm::IsaPred<Value>(ofr); });
   if (!hasDynamicInnerTile && !isX86(target) && !isRISCV(target)) {
     pipelineConfig = getPipelineConfWithDecompositionAttr(op.getContext());
   }
@@ -1828,8 +1829,9 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   // backends prefer to not decompose the ops.
   DictionaryAttr pipelineConfig;
   auto target = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  bool hasDynamicInnerTile = llvm::any_of(
-      op.getMixedTiles(), [](OpFoldResult ofr) { return isa<Value>(ofr); });
+  bool hasDynamicInnerTile =
+      llvm::any_of(op.getMixedTiles(),
+                   [](OpFoldResult ofr) { return llvm::IsaPred<Value>(ofr); });
   if (!hasDynamicInnerTile && !isX86(target) && !isRISCV(target)) {
     pipelineConfig = getPipelineConfWithDecompositionAttr(op.getContext());
   }

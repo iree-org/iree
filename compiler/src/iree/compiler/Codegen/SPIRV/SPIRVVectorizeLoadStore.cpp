@@ -1000,11 +1000,11 @@ struct ReifyExtractOfCreateMask final
     for (auto [idx, size] :
          llvm::zip_equal(extractOp.getMixedPosition(), maskOp.getOperands())) {
       Value idxVal;
-      if (isa<Attribute>(idx)) {
+      if (auto attr = dyn_cast<Attribute>(idx)) {
         idxVal = rewriter.create<arith::ConstantIndexOp>(
-            loc, cast<IntegerAttr>(cast<Attribute>(idx)).getInt());
+            loc, dyn_cast<IntegerAttr>(attr).getInt());
       } else {
-        idxVal = cast<Value>(idx);
+        idxVal = dyn_cast<Value>(idx);
       }
       Value cmpIdx = rewriter.create<arith::CmpIOp>(
           loc, arith::CmpIPredicate::slt, idxVal, size);
