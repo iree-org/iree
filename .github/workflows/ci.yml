@@ -64,6 +64,9 @@ jobs:
           - name: ubuntu-24.04
             runs-on: ubuntu-24.04
             driver-options: -DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON -DIREE_HAL_DRIVER_VULKAN=ON
+          - name: ubuntu-24.04-arm
+            runs-on: ubuntu-24.04-arm
+            driver-options: -DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON -DIREE_HAL_DRIVER_VULKAN=ON
           - name: windows-2022
             runs-on: windows-2022
             driver-options: -DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON -DIREE_HAL_DRIVER_VULKAN=ON
@@ -166,7 +169,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [ubuntu-24.04, windows-2022, macos-14]
+        runs-on: [ubuntu-24.04, ubuntu-24.04-arm, windows-2022, macos-14]
         provider: [tracy, console]
     env:
       BUILD_DIR: build-tracing
