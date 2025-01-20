@@ -305,7 +305,7 @@ void DistributionLayout::print(raw_ostream &os) const {
 void DistributionLayout::onUpdate(DataFlowSolver *solver) const {
   AnalysisState::onUpdate(solver);
 
-  Value value = anchor.get<Value>();
+  Value value = cast<Value>(anchor);
 
   if (propagation) {
     // Make propagation run again on all users of this value.
