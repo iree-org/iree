@@ -164,7 +164,7 @@ void Explorer::initializeGlobalInfos() {
 void Explorer::initializeInverseCallGraph() {
   forEachFunctionLikeOp([&](FunctionOpInterface parentOp) {
     parentOp->walk([&](CallOpInterface callOp) {
-      if (callOp.getCallableForCallee().is<Value>()) {
+      if (isa<Value>(callOp.getCallableForCallee())) {
         // Indirect calls can't be tracked in the call graph, so ensure we mark
         // the incomplete flag so that any call graph queries return
         // TraversalResult::INCOMPLETE.
@@ -777,7 +777,7 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn,
     // Indirect calls would require us to perform an analysis to first see if we
     // can make them direct or annotate the call sites with the possible
     // targets.
-    if (callOp.getCallableForCallee().is<Value>()) {
+    if (isa<Value>(callOp.getCallableForCallee())) {
       LLVM_DEBUG({
         llvm::dbgs()
             << "  !! traversal incomplete due to unanalyzable indirect call: ";
@@ -786,7 +786,7 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn,
       });
       return TraversalResult::INCOMPLETE;
     }
-    auto targetSymbol = callOp.getCallableForCallee().get<SymbolRefAttr>();
+    auto targetSymbol = cast<SymbolRefAttr>(callOp.getCallableForCallee());
     auto targetOp = symbolTables.lookupNearestSymbolFrom<CallableOpInterface>(
         callOp, targetSymbol);
     assert(targetOp && "call target not found");
@@ -1031,7 +1031,7 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn,
   // Move across a call to the callee entry block.
   auto traverseCallOp = [&](CallOpInterface callOp, unsigned operandIdx) {
     auto callable = callOp.getCallableForCallee();
-    if (callable.is<Value>()) {
+    if (isa<Value>(callable)) {
       LLVM_DEBUG({
         llvm::dbgs()
             << "  !! traversal incomplete due to unanalyzable indirect call: ";
@@ -1040,7 +1040,7 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn,
       });
       return TraversalResult::INCOMPLETE;
     }
-    auto targetSymbol = callable.get<SymbolRefAttr>();
+    auto targetSymbol = cast<SymbolRefAttr>(callable);
     auto targetOp = symbolTables.lookupNearestSymbolFrom<CallableOpInterface>(
         callOp, targetSymbol);
     assert(targetOp && "call target not found");

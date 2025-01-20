@@ -2578,13 +2578,13 @@ module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
-//      CHECK: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0 + d1 * 4)>
+//      CHECK: #[[MAP:.+]] = affine_map<(d0)[s0] -> (d0 * 4 + s0)>
 //      CHECK: func @custom_op_index_handling(%[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xindex>,
 //      CHECK:   scf.forall (%[[IV:[a-zA-Z0-9]+]],
 //      CHECK:     %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]]
 //      CHECK:     iree_linalg_ext.custom_op
 // CHECK-SAME:         ins(%[[SLICE]]
 //      CHECK:       %[[NEW_INDEX:.+]] = iree_linalg_ext.index 0 : index
-//      CHECK:       %[[INDEX:.+]] = affine.apply #[[MAP]](%[[NEW_INDEX]], %[[IV]])
+//      CHECK:       %[[INDEX:.+]] = affine.apply #[[MAP]](%[[IV]])[%[[NEW_INDEX]]]
 //      CHECK:       linalg.generic
 // CHECK-SAME:           ins(%{{.+}}, %[[INDEX]] :

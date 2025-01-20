@@ -684,7 +684,7 @@ Type mlirType(MLIRContext *context, MMTKernel::ScalarType t) {
   case MMTKernel::ScalarType::I32:
     return IntegerType::get(context, 32, IntegerType::Signless);
   case MMTKernel::ScalarType::F32:
-    return FloatType::getF32(context);
+    return Float32Type::get(context);
   }
   assert(false);
   return Type();

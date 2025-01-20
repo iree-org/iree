@@ -433,12 +433,12 @@ public:
               currentStrideVal = rewriter.create<LLVM::ConstantOp>(
                   loc, llvmIndexType, currentStrideInt.value());
             } else {
-              currentStrideVal = currentStride.get<Value>();
+              currentStrideVal = cast<Value>(currentStride);
             }
             currentStride =
                 rewriter.create<LLVM::MulOp>(loc, currentStrideVal, dim)
                     .getResult();
-            desc.setStride(rewriter, loc, i - 1, currentStride.get<Value>());
+            desc.setStride(rewriter, loc, i - 1, cast<Value>(currentStride));
           } else {
             currentStride = rewriter.getIndexAttr(strides[i - 1]);
             desc.setConstantStride(rewriter, loc, i - 1, strides[i - 1]);

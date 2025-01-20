@@ -843,12 +843,12 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
             currentStrideVal = builder.create<LLVM::ConstantOp>(
                 loc, llvmIndexType, currentStrideInt.value());
           } else {
-            currentStrideVal = currentStride.get<Value>();
+            currentStrideVal = cast<Value>(currentStride);
           }
           currentStride =
               builder.create<LLVM::MulOp>(loc, currentStrideVal, dim)
                   .getResult();
-          desc.setStride(builder, loc, i - 1, currentStride.get<Value>());
+          desc.setStride(builder, loc, i - 1, cast<Value>(currentStride));
         } else {
           currentStride = builder.getIndexAttr(strides[i - 1]);
           desc.setConstantStride(builder, loc, i - 1, strides[i - 1]);

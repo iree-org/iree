@@ -820,7 +820,7 @@ def Util_CallOp : Util_Op<"call", [
       return (*this)->getAttrOfType<SymbolRefAttr>("callee");
     }
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
     }
 
     // Clones the call and potentially expands each operand and result.

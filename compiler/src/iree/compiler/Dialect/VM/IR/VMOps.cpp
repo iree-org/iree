@@ -611,11 +611,11 @@ static TypedAttr convertConstIntegerValue(TypedAttr value) {
 static FloatType getFloatType(int bitwidth, MLIRContext *context) {
   switch (bitwidth) {
   case 16:
-    return FloatType::getF16(context);
+    return Float16Type::get(context);
   case 32:
-    return FloatType::getF32(context);
+    return Float32Type::get(context);
   case 64:
-    return FloatType::getF64(context);
+    return Float64Type::get(context);
   default:
     assert(false && "unhandled floating point type");
     return {};

@@ -38,7 +38,7 @@ static Value getAsIndexValue(OpFoldResult attrOrValue, OpBuilder &builder,
       return val;
     matchPattern(val, m_Constant(&attr));
   } else {
-    attr = llvm::cast<IntegerAttr>(attrOrValue.get<Attribute>());
+    attr = cast<IntegerAttr>(cast<Attribute>(attrOrValue));
   }
   return builder.createOrFold<arith::ConstantIndexOp>(loc, attr.getInt());
 }
@@ -101,12 +101,12 @@ struct VectorizePadWithConditions final
 
     /// Return true if the given `attrOrValue` is a constant zero.
     auto isConstantZero = [](OpFoldResult attrOrValue) {
-      if (attrOrValue.is<Attribute>()) {
-        auto attr = llvm::dyn_cast<IntegerAttr>(attrOrValue.get<Attribute>());
-        return attr && attr.getValue().getZExtValue() == 0;
+      if (auto attr = dyn_cast<Attribute>(attrOrValue)) {
+        auto intAttr = dyn_cast<IntegerAttr>(attr);
+        return intAttr && intAttr.getValue().getZExtValue() == 0;
       }
       IntegerAttr attr;
-      return matchPattern(attrOrValue.get<Value>(), m_Constant(&attr)) &&
+      return matchPattern(cast<Value>(attrOrValue), m_Constant(&attr)) &&
              attr.getValue().getZExtValue() == 0;
     };
 

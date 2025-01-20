@@ -67,10 +67,10 @@ static SliceAndDynamicDims cloneOffsetsSizesAndStridesImpl(
     SmallVector<OpFoldResult> clonedOfrs;
     clonedOfrs.reserve(ofrs.size());
     for (auto ofr : ofrs) {
-      if (ofr.is<Attribute>()) {
+      if (isa<Attribute>(ofr)) {
         clonedOfrs.push_back(ofr);
       } else {
-        clonedOfrs.push_back(bvm.lookupOrDefault(ofr.get<Value>()));
+        clonedOfrs.push_back(bvm.lookupOrDefault(cast<Value>(ofr)));
       }
     }
     return clonedOfrs;
