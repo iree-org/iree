@@ -195,7 +195,6 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
 //         CHECK:    arith.maxnumf
-//         CHECK:    arith.maxnumf
 //         CHECK:    vector.broadcast %{{.*}} : f32 to vector<4xf32>
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
 //         CHECK:      vector.transfer_read

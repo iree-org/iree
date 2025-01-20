@@ -229,7 +229,6 @@ func.func @softmax() attributes {hal.executable.target = #executable_target_vulk
 //         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
 //         CHECK:    arith.maxnumf
-//         CHECK:    arith.maxnumf
 //         CHECK:    vector.splat %{{.*}} : vector<4xf32>
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
 //         CHECK:      vector.transfer_read

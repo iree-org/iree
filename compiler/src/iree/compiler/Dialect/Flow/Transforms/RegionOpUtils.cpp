@@ -293,7 +293,7 @@ reifyDynamicResultDimsImpl(OpBuilder &b, Value value,
       return failure();
     for (int64_t i = 0; i < shapedType.getRank(); ++i)
       if (shapedType.isDynamicDim(i))
-        dynamicDims.push_back(dims[opResult.getResultNumber()][i].get<Value>());
+        dynamicDims.push_back(cast<Value>(dims[opResult.getResultNumber()][i]));
     return success();
   }
 
