@@ -534,6 +534,7 @@ def PolynomialApproximationPass :
 def PropagateDispatchSizeBoundsPass :
     InterfacePass<"iree-codegen-propagate-dispatch-size-bounds", "mlir::FunctionOpInterface"> {
   let summary = "Pass to annotate workitem and workgroup IDs with known bounds";
+  let dependentDialects = ["::mlir::arith::ArithDialect"];
 }
 
 def PropagateReshapesByExpansionPass :
