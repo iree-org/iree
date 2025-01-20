@@ -315,6 +315,15 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
 // --iree-stream-schedule-execution
 //===----------------------------------------------------------------------===//
 
+struct RemoveBarriers : public OpRewritePattern<IREE::Stream::AsyncBarrierOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::Stream::AsyncBarrierOp op,
+                                PatternRewriter &rewriter) const override {
+    rewriter.replaceOp(op, op.getOperand(0));
+    return success();
+  }
+};
+
 struct ScheduleExecutionPass
     : public IREE::Stream::impl::ScheduleExecutionPassBase<
           ScheduleExecutionPass> {
@@ -347,6 +356,8 @@ struct ScheduleExecutionPass
     for (auto op : context->getRegisteredOperations()) {
       op.getCanonicalizationPatterns(patterns, context);
     }
+
+    patterns.insert<RemoveBarriers>(context);
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
     if (failed(applyPatternsGreedily(getOperation(), frozenPatterns))) {
       return signalPassFailure();
