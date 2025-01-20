@@ -11,8 +11,29 @@
 
 namespace mlir::iree_compiler {
 
-/// Pattern to convert `tensor.extract_slice(tensor.expand_shape)` to
+/// Converts `tensor.extract_slice(tensor.expand_shape)` to
 /// `tensor.expand_shape(tensor.extract_slice)`.
+/// For this transformation to be possible, the slice must be fully contiguous
+/// within each reassociation group of the expand_shape. If the transformation
+/// is not possible, or if the slice is rank reducting, the function returns
+/// failure.
+///
+/// Example:
+/// ```
+/// %reshape = tensor.expand_shape %in [[0, 1], [2, 3], [4, 5, 6]]
+///     tensor<8x16x32xf32> to tensor<2x4x2x8x4x2x4xf32>
+/// %slice = tensor.extract_slice %reshape ...
+///     tensor<2x4x2x8x4x2x4xf32> to tensor<2x4x1x5x1x1x4xf32>
+///
+/// // The transformation is possible because each reassociation group has a
+/// // contiguous slice. (i.e., [2x4->2x4], [2x8->1x5], [4x2x4->1x1x4])
+/// // After the transformation:
+///
+/// %slice = tensor.extract_slice %in ...
+///     tensor<8x16x32xf32> to tensor<8x5x4xf32>
+/// %reshape = tensor.expand_shape %slice [[0, 1], [2, 3], [4, 5, 6]]
+///     tensor<8x5x4xf32> to tensor<2x4x1x5x1x1x4xf32>
+/// ```
 static LogicalResult
 swapExpandShapeWithSlice(RewriterBase &rewriter,
                          tensor::ExpandShapeOp expandShapeOp,
@@ -141,8 +162,6 @@ swapExpandShapeWithSlice(RewriterBase &rewriter,
 
 namespace {
 
-/// tensor.empty does not define any tensor contents, so an unpadded pack
-/// can be folded away.
 struct SwapExpandShapeWithSlicePattern
     : public OpRewritePattern<tensor::ExtractSliceOp> {
   using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
