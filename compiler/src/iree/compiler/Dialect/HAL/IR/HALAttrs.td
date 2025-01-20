@@ -853,6 +853,7 @@ def HAL_DeviceSelectAttr : AttrDef<HAL_Dialect, "DeviceSelect", [
 def HAL_DeviceAffinityAttr : AttrDef<HAL_Dialect, "DeviceAffinity", [
   DeclareAttrInterfaceMethods<Stream_AffinityAttr, [
     "isExecutableWith",
+    "isTranslatableWith",
     "joinOR",
     "joinAND",
   ]>,

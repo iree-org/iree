@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
@@ -891,6 +892,30 @@ bool DeviceAffinityAttr::isExecutableWith(
     return true;
   // Otherwise not compatible.
   return false;
+}
+
+bool DeviceAffinityAttr::isTranslatableWith(
+    ModuleOp moduleOp, IREE::Stream::AffinityAttr other) const {
+  if (!other)
+    return true;
+
+  auto otherAffinityAttr = llvm::dyn_cast_if_present<DeviceAffinityAttr>(other);
+  if (!otherAffinityAttr)
+    return false;
+
+  SymbolTable symbolTable(moduleOp);
+  auto getExecutableTargets = [&](SymbolRefAttr symbol) {
+    auto globalOp = llvm::cast<IREE::Util::GlobalOp>(
+        symbolTable.lookupSymbolIn(moduleOp, symbol));
+    return globalOp.getInitialValueAttr();
+  };
+  auto device = llvm::dyn_cast<IREE::HAL::DeviceTargetAttr>(
+      getExecutableTargets(getDevice()));
+  auto otherDevice = llvm::dyn_cast<IREE::HAL::DeviceTargetAttr>(
+      getExecutableTargets(otherAffinityAttr.getDevice()));
+  if (!device || !otherDevice)
+    return false;
+  return device.getExecutableTargets() == otherDevice.getExecutableTargets();
 }
 
 IREE::Stream::AffinityAttr

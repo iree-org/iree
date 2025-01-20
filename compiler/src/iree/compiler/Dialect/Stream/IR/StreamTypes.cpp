@@ -393,6 +393,16 @@ bool AffinityAttr::canExecuteTogether(AffinityAttr lhs, AffinityAttr rhs) {
   return lhs.isExecutableWith(rhs);
 }
 
+// static
+bool AffinityAttr::areTranslationCompatible(ModuleOp moduleOp, AffinityAttr lhs,
+                                            AffinityAttr rhs) {
+  if (lhs == rhs)
+    return true;
+  if ((lhs && !rhs) || (rhs && !lhs))
+    return true;
+  return lhs.isTranslatableWith(moduleOp, rhs);
+}
+
 //===----------------------------------------------------------------------===//
 // #stream.partitioning_config
 //===----------------------------------------------------------------------===//

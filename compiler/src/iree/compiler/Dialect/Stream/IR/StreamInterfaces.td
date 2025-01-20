@@ -61,6 +61,20 @@ def Stream_AffinityAttr : AttrInterface<"AffinityAttr"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Returns true if it can share the same execution configuration (e.g.,
+        translation artifacts) with the `other` and vice versa.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isTranslatableWith",
+      /*args=*/(ins "ModuleOp":$moduleOp,
+                    "IREE::Stream::AffinityAttr":$other),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return IREE::Stream::AffinityAttr::areTranslationCompatible(moduleOp, $_attr, other);
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Returns an affinity describing the union with |other| constraints.
         The returned affinity specifies that a particular operation may execute
         on _either_ of the source affinities.
@@ -118,6 +132,11 @@ def Stream_AffinityAttr : AttrInterface<"AffinityAttr"> {
     // Returns true if |lhs| and |rhs| indicate that their operations can
     // execute together on the same execution queue.
     static bool canExecuteTogether(AffinityAttr lhs, AffinityAttr rhs);
+
+    // Returns true if |lhs| and |rhs| are translation compatible. E.g., they
+    // are compatible if they have the same executable targets.
+    static bool areTranslationCompatible(ModuleOp moduleOp, AffinityAttr lhs,
+                                         AffinityAttr rhs);
   }];
 }
 

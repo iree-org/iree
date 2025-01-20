@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamTraits.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
@@ -53,14 +54,58 @@ SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
   return results;
 }
 
-/// Returns the affinities of the `dispatchOp`'s resource operands. An empty
-/// array attribute indicates that the resource operand affinity is not found.
-/// Usually, it happens when it fails on affinity analysis.
+/// Disjoint-set data structure holding non-overlapping sets of aliasing
+/// attributes.
+class AffinityAliasingSet {
+public:
+  void addAlias(Attribute aliasee, Attribute aliaser) {
+    auto aliaseeWithId = getWithId(aliasee);
+    auto aliaserWithId = getWithId(aliaser);
+    attrAliasing.unionSets(aliaseeWithId, aliaserWithId);
+  }
+
+  IREE::Stream::AffinityAttr findLeader(Attribute attr) {
+    return cast<IREE::Stream::AffinityAttr>(
+        attrAliasing.findLeader(getWithId(attr))->attr);
+  }
+
+private:
+  // EquivalenceClasses require ordering for attr type to return deterministic
+  // results, so we provide it by assigning id to all attrs added to the set.
+  struct NumberedAttribute {
+    Attribute attr;
+    int64_t id;
+
+    static Attribute getAttribute(const NumberedAttribute &attr) {
+      return attr.attr;
+    }
+  };
+
+  struct Comparator {
+    int operator()(const NumberedAttribute &a,
+                   const NumberedAttribute &b) const {
+      return a.id < b.id;
+    }
+  };
+
+  NumberedAttribute getWithId(Attribute attr) const {
+    auto [iterator, inserted] = id.try_emplace(attr, id.size());
+    return {attr, iterator->second};
+  }
+
+  mutable llvm::DenseMap<Attribute, int64_t> id;
+  llvm::EquivalenceClasses<NumberedAttribute, Comparator> attrAliasing;
+};
+
+/// Returns the aliased affinities of the `dispatchOp`'s resource operands. An
+/// empty array attribute indicates that the resource operand affinity is not
+/// found. Usually, it happens when it fails on affinity analysis.
 /// Note that the size of the result might not equal to the number of resource
 /// operands. If a resource operand type is not AffinityType, it is skipped.
-static SmallVector<Attribute>
-getResourceOperandsAffinities(IREE::Stream::AffinityAnalysis &affinityAnalysis,
-                              IREE::Stream::AsyncDispatchOp dispatchOp) {
+static SmallVector<Attribute> getAliasedResourceOperandsAffinities(
+    IREE::Stream::AffinityAnalysis &affinityAnalysis,
+    IREE::Stream::AsyncDispatchOp dispatchOp,
+    AffinityAliasingSet &aliasingSet) {
   SmallVector<Attribute> result;
   Builder b(dispatchOp.getContext());
   auto emptyArray = b.getArrayAttr({});
@@ -74,29 +119,81 @@ getResourceOperandsAffinities(IREE::Stream::AffinityAnalysis &affinityAnalysis,
       result.push_back(emptyArray);
       continue;
     }
-    result.push_back(b.getArrayAttr(llvm::to_vector_of<Attribute>(affinities)));
+    auto aliasedAffinities = llvm::map_to_vector(
+        affinities, [&](IREE::Stream::AffinityAttr attr) -> Attribute {
+          return aliasingSet.findLeader(attr);
+        });
+    result.push_back(b.getArrayAttr(aliasedAffinities));
   }
   return result;
+}
+
+/// Returns the aliased execution affinity. The method assumes that the lookup
+/// always succeeds and the number of execution affinities is one.
+static IREE::Stream::AffinityAttr
+getAliasedExecutionAffinity(IREE::Stream::AsyncDispatchOp dispatchOp,
+                            IREE::Stream::AffinityAnalysis &affinityAnalysis,
+                            AffinityAliasingSet &aliasingSet) {
+  SmallVector<IREE::Stream::AffinityAttr> execAffinities;
+  [[maybe_unused]] bool succeed =
+      affinityAnalysis.tryLookupExecutionAffinity(dispatchOp, execAffinities);
+  assert(succeed && "failed on execution affinity lookup");
+  assert(execAffinities.size() == 1 && "We should only have a single execution "
+                                       "affinity when running the pass.");
+  return aliasingSet.findLeader(execAffinities[0]);
+}
+
+/// Returns the set of execution affinity and resource affinity from the `ops`.
+/// Returns failure if there are failures in affinity lookup.
+static FailureOr<SetVector<IREE::Stream::AffinityAttr>>
+collectAllTheAffinities(IREE::Stream::AffinityAnalysis &affinityAnalysis,
+                        ArrayRef<IREE::Stream::AsyncDispatchOp> ops) {
+  SetVector<IREE::Stream::AffinityAttr> attrs;
+  for (auto dispatchOp : ops) {
+    SmallVector<IREE::Stream::AffinityAttr> execAffinities;
+    if (!affinityAnalysis.tryLookupExecutionAffinity(dispatchOp,
+                                                     execAffinities)) {
+      return dispatchOp.emitError("failed on execution affinity lookup");
+    }
+    attrs.insert(execAffinities.begin(), execAffinities.end());
+
+    for (auto operand : dispatchOp.getResourceOperands()) {
+      // Skip if the operand type is not AffinityType.
+      if (!isa<IREE::Stream::AffinityTypeInterface>(operand.getType())) {
+        continue;
+      }
+      SmallVector<IREE::Stream::AffinityAttr> affinities;
+      if (!affinityAnalysis.tryLookupResourceAffinity(operand, affinities)) {
+        continue;
+      }
+      attrs.insert(affinities.begin(), affinities.end());
+    }
+  }
+  return attrs;
 }
 
 /// Duplicates stream.executables based on the affinity analysis of
 /// stream.async.dispatch ops. Some executables can be launched by different
 /// devices. It can produce wrong codegen artifacts when bindings types are
-/// encoded (i.e., the tensor type has an encoding attribute). Because they can
-/// result in different layouts, especially when multi-device is involved. E.g.,
-/// say that device_a and device_b interpret a tensor type with encodings in
-/// different layouts, and there is an executable that can be launch with
-/// resources from either device_a or device_b. It is confusing what the input
-/// layouts for the executable because there are two possibilities. In this
-/// case, we have to duplicate the executable with updated encoding, and modify
-/// the dispatch to launch proper executable based on device analysis.
+/// encoded (i.e., the tensor type has an encoding attribute). Because they
+/// can result in different layouts, especially when multi-device is involved.
+/// E.g., say that device_a and device_b interpret a tensor type with
+/// encodings in different layouts, and there is an executable that can be
+/// launch with resources from either device_a or device_b. It is confusing
+/// what the input layouts for the executable because there are two
+/// possibilities. In this case, we have to duplicate the executable with
+/// updated encoding, and modify the dispatch to launch proper executable
+/// based on device analysis.
 static LogicalResult duplicateExecutablesPerAffinityVariant(
     ModuleOp moduleOp, SymbolTable symbolTable, FunctionOpInterface funcOp,
     IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr) {
   MLIRContext *ctx = moduleOp.getContext();
   IRRewriter rewriter(ctx);
 
-  // 1. Gather per-export [execution affinity -> [resource affinities]] map.
+  // ------------------------------------------------------------------------
+  // Gather per-export [execution affinity -> [resource affinities]] map.
+  // ------------------------------------------------------------------------
+
   IREE::Stream::AffinityAnalysis affinityAnalysis(moduleOp);
   if (failed(affinityAnalysis.run())) {
     return moduleOp.emitError("failed on running affinity analysis");
@@ -110,27 +207,40 @@ static LogicalResult duplicateExecutablesPerAffinityVariant(
            SetVector<std::pair<IREE::Stream::AffinityAttr, ArrayAttr>>>
       exportToDispatchSites;
 
+  // Build equivalence classes for each affinity, giving us nice clustered
+  // sets. Because some affinities could share the same executable targets.
+  AffinityAliasingSet aliasingSet;
+  {
+    FailureOr<SetVector<IREE::Stream::AffinityAttr>> maybeAttrs =
+        collectAllTheAffinities(affinityAnalysis, candidates);
+    if (failed(maybeAttrs)) {
+      return funcOp.emitError("failed to collect all the affinities");
+    }
+    for (auto affinity0 : *maybeAttrs) {
+      for (auto affinity1 : *maybeAttrs) {
+        if (IREE::Stream::AffinityAttr::areTranslationCompatible(
+                moduleOp, affinity0, affinity1)) {
+          aliasingSet.addAlias(affinity0, affinity1);
+        }
+      }
+    }
+  }
+
   llvm::MapVector<IREE::Stream::AsyncDispatchOp, SmallVector<Attribute>>
       resourceAffinities;
   for (auto dispatchOp : candidates) {
-    SmallVector<IREE::Stream::AffinityAttr> execAffinities;
-    if (!affinityAnalysis.tryLookupExecutionAffinity(dispatchOp,
-                                                     execAffinities)) {
-      return dispatchOp.emitError("failed on execution affinity lookup");
-    }
-    assert(execAffinities.size() == 1 &&
-           "We should only have a single execution "
-           "affinity when running the pass.");
-
+    IREE::Stream::AffinityAttr aliasedExecAffinity =
+        getAliasedExecutionAffinity(dispatchOp, affinityAnalysis, aliasingSet);
     SmallVector<Attribute> operandAffinityAttrs =
-        getResourceOperandsAffinities(affinityAnalysis, dispatchOp);
+        getAliasedResourceOperandsAffinities(affinityAnalysis, dispatchOp,
+                                             aliasingSet);
     resourceAffinities[dispatchOp] = operandAffinityAttrs;
 
     dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPoint) {
       auto exportOp = cast<IREE::Stream::ExecutableExportOp>(
           symbolTable.lookupSymbolIn(moduleOp, entryPoint));
       exportToDispatchSites[exportOp].insert(std::make_pair(
-          execAffinities[0], rewriter.getArrayAttr(operandAffinityAttrs)));
+          aliasedExecAffinity, rewriter.getArrayAttr(operandAffinityAttrs)));
     });
   }
 
@@ -146,10 +256,12 @@ static LogicalResult duplicateExecutablesPerAffinityVariant(
     }
   });
 
-  // 2. Duplicate executables for each unqiue resource affinities.
+  // ------------------------------------------------------------------------
+  // Duplicate executables for each unqiue resource affinities.
+  // ------------------------------------------------------------------------
 
-  // Mapping from [execution affinity, resource operands affinities, export] to
-  // the executable op.
+  // Mapping from [execution affinity, resource operands affinities, export]
+  // to the executable op.
   using DispatchSiteInfo = std::tuple<IREE::Stream::AffinityAttr, ArrayAttr,
                                       IREE::Stream::ExecutableExportOp>;
   DenseMap<DispatchSiteInfo, IREE::Stream::ExecutableOp>
@@ -187,26 +299,21 @@ static LogicalResult duplicateExecutablesPerAffinityVariant(
     }
   }
 
-  // 3. Update dispatch sites, i.e., point dispatch entry points to
-  // corresponding cloned executables.
+  // ------------------------------------------------------------------------
+  // Update dispatch sites, i.e., point dispatch entry points to corresponding
+  // cloned executables.
+  // ------------------------------------------------------------------------
+
   for (auto dispatchOp : candidates) {
     SmallVector<Attribute> newEntryPoints;
-    SmallVector<IREE::Stream::AffinityAttr> execAffinities;
-    // Sanity checks. It should already meet the requirement because they are
-    // checked in step 1. This can not be wrapped by an assertion because it
-    // could be dropped by compiler.
-    if (!affinityAnalysis.tryLookupExecutionAffinity(dispatchOp,
-                                                     execAffinities)) {
-      return failure();
-    }
-
-    assert(execAffinities.size() == 1);
+    IREE::Stream::AffinityAttr aliasedExecAffinity =
+        getAliasedExecutionAffinity(dispatchOp, affinityAnalysis, aliasingSet);
     SmallVector<Attribute> operandAttrs = resourceAffinities[dispatchOp];
     dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPoint) {
       auto exportOp = cast<IREE::Stream::ExecutableExportOp>(
           symbolTable.lookupSymbolIn(moduleOp, entryPoint));
       auto info = DispatchSiteInfo(
-          execAffinities[0], rewriter.getArrayAttr(operandAttrs), exportOp);
+          aliasedExecAffinity, rewriter.getArrayAttr(operandAttrs), exportOp);
       assert(dispatchSiteToExecutableOp.count(info));
 
       auto executableOp = dispatchSiteToExecutableOp[info];
