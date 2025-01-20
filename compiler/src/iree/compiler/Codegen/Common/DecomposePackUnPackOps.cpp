@@ -146,7 +146,7 @@ static LogicalResult commonRunOnOperation(
 
               // Do nothing if any of inner tile sizes is dynamic.
               if (llvm::any_of(packOp.getMixedTiles(), [](OpFoldResult tile) {
-                    return tile.is<Value>();
+                    return isa<Value>(tile);
                   })) {
                 return {};
               }
