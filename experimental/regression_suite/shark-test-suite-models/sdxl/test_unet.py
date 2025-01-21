@@ -201,6 +201,7 @@ ROCM_COMPILE_FLAGS = [
     "--iree-dispatch-creation-enable-aggressive-fusion=true",
     "--iree-opt-aggressively-propagate-transposes=true",
     "--iree-opt-outer-dim-concat=true",
+    "--iree-opt-generalize-matmul=true",
     "--iree-vm-target-truncate-unsupported-floats",
     "--iree-llvmgpu-enable-prefetch=true",
     "--iree-opt-data-tiling=false",
@@ -218,7 +219,7 @@ FP16_UNET_FLAGS = [
 
 INT8_PUNET_FLAGS = [
     f"--iree-codegen-transform-dialect-library={iree_test_path_extension}/attention_and_matmul_spec_punet.mlir",
-    "--iree-preprocessing-pass-pipeline=builtin.module(util.func(iree-global-opt-raise-special-ops, iree-flow-canonicalize), iree-preprocessing-transpose-convolution-pipeline, iree-preprocessing-pad-to-intrinsics, util.func(iree-preprocessing-generalize-linalg-matmul-experimental))",
+    "--iree-preprocessing-pass-pipeline=builtin.module(util.func(iree-global-opt-raise-special-ops, iree-flow-canonicalize), iree-preprocessing-transpose-convolution-pipeline, iree-preprocessing-pad-to-intrinsics)",
 ]
 
 ROCM_UNET_PIPELINE_FP16_COMPILE_FLAGS = [
