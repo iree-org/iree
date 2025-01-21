@@ -57,11 +57,6 @@ swapExpandShapeWithSlice(RewriterBase &rewriter,
     return affine::makeComposedFoldedAffineApply(rewriter, loc, mulMap,
                                                  {v1, v2});
   };
-  auto mulAdd = [&](OpFoldResult v1, OpFoldResult v2, OpFoldResult v3) {
-    auto mulMap = AffineMap::get(3, 0, {d0 * d1 + d2});
-    return affine::makeComposedFoldedAffineApply(rewriter, loc, mulMap,
-                                                 {v1, v2, v3});
-  };
 
   SmallVector<OpFoldResult> outputShape =
       getMixedValues(expandShapeOp.getStaticOutputShape(),
@@ -107,8 +102,8 @@ swapExpandShapeWithSlice(RewriterBase &rewriter,
   SmallVector<OpFoldResult> newOffsets, newLengths, newStrides;
   for (const ReassociationIndices &indices :
        expandShapeOp.getReassociationIndices()) {
-    OpFoldResult newOffset = rewriter.getIndexAttr(0);
     OpFoldResult newSize = rewriter.getIndexAttr(1);
+    SmallVector<OpFoldResult> basis, delinOffsets;
 
     int64_t i = 0;
     int64_t e = indices.size();
@@ -118,24 +113,32 @@ swapExpandShapeWithSlice(RewriterBase &rewriter,
       if (!isConstantIntValue(sizes[expandedDim], 1))
         break;
 
-      newOffset =
-          mulAdd(newOffset, outputShape[expandedDim], offsets[expandedDim]);
+      basis.push_back(outputShape[expandedDim]);
+      delinOffsets.push_back(offsets[expandedDim]);
     }
 
     if (i != e) {
       int64_t expandedDim = indices[i];
-      newOffset =
-          mulAdd(newOffset, outputShape[expandedDim], offsets[expandedDim]);
+      basis.push_back(outputShape[expandedDim]);
+      delinOffsets.push_back(offsets[expandedDim]);
       newSize = sizes[expandedDim];
       i++;
     }
 
     for (; i < e; ++i) {
       OpFoldResult fullSize = outputShape[indices[i]];
-      newOffset = mul(newOffset, fullSize);
+      basis.push_back(fullSize);
+      delinOffsets.push_back(rewriter.getIndexAttr(0));
       newSize = mul(newSize, fullSize);
     }
-
+    SmallVector<Value> offsetVals =
+        llvm::map_to_vector(delinOffsets, [&](OpFoldResult ofr) {
+          return getValueOrCreateConstantIndexOp(rewriter, loc, ofr);
+        });
+    OpFoldResult newOffset = rewriter
+                                 .create<affine::AffineLinearizeIndexOp>(
+                                     loc, offsetVals, basis, /*disjoint=*/true)
+                                 .getResult();
     newOffsets.push_back(newOffset);
     newLengths.push_back(newSize);
 

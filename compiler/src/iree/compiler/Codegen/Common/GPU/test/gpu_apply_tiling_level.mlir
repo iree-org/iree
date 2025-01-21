@@ -433,8 +433,8 @@ module {
 
 // THREAD-LABEL: func.func @swap_expand_shape_with_extract_slice
 //       THREAD:   scf.forall (%[[X:[A-Za-z0-9]+]], %[[Y:[A-Za-z0-9]+]], %[[Z:[A-Za-z0-9]+]])
-//       THREAD:     %[[APPLY:.+]] = affine.apply affine_map<(d0, d1, d2) -> (d0 + d1 * 30 + d2 * 10)>(%[[Z]], %[[X]], %[[Y]])
-//       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[APPLY]]] [5] [1] : tensor<60xf32> to tensor<5xf32>
+//       THREAD:     %[[LINEAR_IDX:.+]] = affine.linearize_index disjoint [%[[X]], %[[Y]], %[[Z]]] by (2, 3, 10)
+//       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[LINEAR_IDX]]] [5] [1] : tensor<60xf32> to tensor<5xf32>
 //       THREAD:     %[[EXPAND:.+]] = tensor.expand_shape %[[SLICE]] {{\[\[}}0, 1, 2]] output_shape [1, 1, 5]
 //       THREAD:     linalg.exp {{.*}} ins(%[[EXPAND]]
 
@@ -451,9 +451,10 @@ module {
 }
 
 // THREAD-LABEL: func.func @swap_expand_shape_with_extract_slice_full_inner_dim
+//       THREAD:   %[[C0:.+]] = arith.constant 0 : index
 //       THREAD:   scf.forall (%[[X:[A-Za-z0-9]+]], %[[Y:[A-Za-z0-9]+]])
-//       THREAD:     %[[APPLY:.+]] = affine.apply affine_map<(d0, d1) -> (d0 * 40 + d1 * 10)>(%[[X]], %[[Y]])
-//       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[APPLY]]] [20] [1] : tensor<120xf32> to tensor<20xf32>
+//       THREAD:     %[[LINEAR_IDX:.+]] = affine.linearize_index disjoint [%[[X]], %[[Y]], %[[C0]]] by (3, 4, 10)
+//       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[LINEAR_IDX]]] [20] [1] : tensor<120xf32> to tensor<20xf32>
 //       THREAD:     %[[EXPAND:.+]] = tensor.expand_shape %[[SLICE]] {{\[\[}}0, 1, 2]] output_shape [1, 2, 10]
 //       THREAD:     linalg.exp {{.*}} ins(%[[EXPAND]]
 
@@ -488,10 +489,11 @@ module {
 }
 
 // THREAD-LABEL: func.func @swap_expand_shape_with_extract_slice_multiple_expanded_dims
+//       THREAD:   %[[C0:.+]] = arith.constant 0 : index
 //       THREAD:   scf.forall (%[[ID0:[A-Za-z0-9]+]], %[[ID1:[A-Za-z0-9]+]], %[[ID2:[A-Za-z0-9]+]], %[[ID3:[A-Za-z0-9]+]])
-//       THREAD:     %[[APPLY0:.+]] = affine.apply affine_map<(d0, d1) -> (d0 * 40 + d1 * 10)>(%[[ID0]], %[[ID1]])
-//       THREAD:     %[[APPLY1:.+]] = affine.apply affine_map<(d0, d1) -> (d0 * 8 + d1)>(%[[ID2]], %[[ID3]])
-//       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[APPLY0]], %[[APPLY1]]] [20, 4] [1, 1]
+//       THREAD:     %[[LINEAR_IDX0:.+]] = affine.linearize_index disjoint [%[[ID0]], %[[ID1]], %[[C0]]] by (3, 4, 10)
+//       THREAD:     %[[LINEAR_IDX1:.+]] = affine.linearize_index disjoint [%[[ID2]], %[[ID3]]] by (7, 8)
+//       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[LINEAR_IDX0]], %[[LINEAR_IDX1]]] [20, 4] [1, 1]
 //       THREAD:     %[[EXPAND:.+]] = tensor.expand_shape %[[SLICE]] {{\[\[}}0, 1, 2], [3, 4]] output_shape [1, 2, 10, 1, 4]
 //       THREAD:     linalg.exp {{.*}} ins(%[[EXPAND]]
 
