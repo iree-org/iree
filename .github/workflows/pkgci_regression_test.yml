@@ -42,11 +42,18 @@ jobs:
           - name: amdgpu_rocm_mi250_gfx90a
             rocm-chip: gfx90a
             backend: rocm
+            sku: mi250
             runs-on: nodai-amdgpu-mi250-x86-64
           - name: amdgpu_rocm_mi300_gfx942
             rocm-chip: gfx942
             backend: rocm
+            sku: mi300
             runs-on: nodai-amdgpu-mi300-x86-64
+          - name: amdgpu_rocm_mi308_gfx942
+            rocm-chip: gfx942
+            backend: rocm
+            sku: mi308
+            runs-on: nodai-amdgpu-mi308-x86-64
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
@@ -95,6 +102,7 @@ jobs:
             --durations=0
         env:
           ROCM_CHIP: ${{ matrix.rocm-chip }}
+          SKU: ${{ matrix.sku }}
 
       - name: "Running SD3 special model tests"
         if: "!cancelled()"
