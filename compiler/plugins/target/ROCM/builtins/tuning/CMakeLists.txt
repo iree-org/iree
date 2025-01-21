@@ -19,6 +19,7 @@ iree_c_embed_data(
     iree_default_tuning_specs_amdgpu
   SRCS
     "iree_default_tuning_spec_gfx942.mlir"
+    "iree_default_tuning_spec_mi308x.mlir"
   C_FILE_OUTPUT
     "iree_default_tuning_specs_amdgpu.c"
   H_FILE_OUTPUT
@@ -32,6 +33,7 @@ iree_lit_test_suite(
     verify_default_tuning_specs_amdgpu
   SRCS
     "iree_default_tuning_spec_gfx942.mlir"
+    "iree_default_tuning_spec_mi308x.mlir"
   TOOLS
     iree-opt
 )
