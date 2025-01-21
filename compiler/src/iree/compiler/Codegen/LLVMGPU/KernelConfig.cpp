@@ -48,10 +48,10 @@
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 namespace mlir::iree_compiler {
 
-llvm::cl::opt<bool> clGPUTestTileAndFuseMatmul(
-    "iree-codegen-llvmgpu-test-tile-and-fuse-matmul",
+llvm::cl::opt<bool> clGPUEnableTileAndFuseMatmul(
+    "iree-codegen-llvmgpu-enable-tile-and-fuse-matmul",
     llvm::cl::desc("test the the tile and fuse pipeline for matmul"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 llvm::cl::opt<bool> clGPUTestTileAndFuseVectorize(
     "iree-codegen-llvmgpu-test-tile-and-fuse-vectorize",
@@ -619,6 +619,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
                           targetSubgroupSize, transposedLhs, transposedRhs,
                           /*canUpcastAcc=*/true);
   }
+
+  LDBG("transposedLhs: " << transposedLhs);
+  LDBG("transposedRhs: " << transposedRhs);
 
   // Only batch_matmul is supported in the LLVMGPUPadAndVectorDistribute
   // pipeline.
@@ -2352,7 +2355,7 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     LDBG("Tile and fuse data tiled multi_mma config");
     return success();
   }
-  if (clGPUTestTileAndFuseMatmul) {
+  if (clGPUEnableTileAndFuseMatmul) {
     if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
                                                      computeOp))) {
       LDBG("Tile and fuse matmul config");

@@ -1,4 +1,6 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-nvvm-pipeline)))' --iree-gpu-test-target=sm_80 -split-input-file %s -o - | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant( \
+// RUN:   builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-nvvm-pipeline)))' \
+// RUN:   --iree-codegen-llvmgpu-enable-tile-and-fuse-matmul=false --iree-gpu-test-target=sm_80 -split-input-file %s -o - | FileCheck %s
 
 // This test checks that the lowering of nvvm includes the extraction
 // and optimization of address computations.

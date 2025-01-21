@@ -17,8 +17,8 @@ func.func @simple_generic(%3: tensor<64x256xf32>, %4: tensor<64x256xf32>, %5: te
 
 // CHECK-LABEL: func.func @simple_generic
 //       CHECK:   scf.for %{{.*}} = %c0 to %c64 step %c1
-//       CHECK:     scf.for %{{.*}} = %c0 to %c256 step %c64
-//       CHECK:       linalg.generic {{.*}} outs({{.*}}: tensor<1x64xf32>)
+//       CHECK:     scf.for %{{.*}} = %c0 to %c256 step %c128
+//       CHECK:       linalg.generic {{.*}} outs({{.*}}: tensor<1x128xf32>)
 
 // -----
 
@@ -79,7 +79,7 @@ func.func @multiple_use_tilable_op(%3: tensor<64x256xf32>, %4: tensor<64x256xf32
 
 // CHECK-LABEL: func.func @multiple_use_tilable_op
 //       CHECK:   %[[ADD_TILING:.+]] = scf.for
-//       CHECK:     linalg.add {{.*}} -> tensor<1x64xf32>
+//       CHECK:     linalg.add {{.*}} -> tensor<1x128xf32>
 //       CHECK:   %[[T_TILING:.+]] = scf.for
 //       CHECK:     %[[FUSED_ADD:.+]] = linalg.add {{.*}} -> tensor<64x1xf32>
 //       CHECK:     linalg.transpose ins(%[[FUSED_ADD]]

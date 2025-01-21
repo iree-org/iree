@@ -118,8 +118,8 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
 /// problem based on the available mma intrinsics.
 static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     IREE::GPU::TargetAttr target, GPUMatmulShapeType problem,
-    bool transposedLhs, bool transposedRhs, bool mustBeAligned = true,
-    bool doCPromotion = false) {
+    bool transposedLhs, bool transposedRhs, bool isIGEMM,
+    bool mustBeAligned = true, bool doCPromotion = false) {
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   SmallVector<GPUMatmulShapeType> intrinsics;
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
@@ -142,23 +142,28 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   // See https://github.com/iree-org/iree/issues/16341 for details.
   int64_t mSize = ShapedType::getNumElements(problem.mSizes);
   int64_t nSize = ShapedType::getNumElements(problem.nSizes);
+  int64_t cacheLineSizeElements = kCacheLineSizeBits / inBitWidth;
+  int64_t bestKElementCountPerSubgroup =
+      isIGEMM ? cacheLineSizeElements / 2 : cacheLineSizeElements;
   if (mSize * nSize <= 512 * 512) {
     // For matmuls with small M*N size, we want to distribute M*N onto more
     // workgroups to fill the GPU. Use a smaller bestMNTileCountPerSubgroup
     // and a larger bestKTileCountPerSubgroup.
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/4,
-             /*bestKTileCountPerSubgroup=*/8,
-             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
+             /*bestKTileCountPerSubgroup=*/8, bestKElementCountPerSubgroup * 2};
   } else {
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
-             /*bestMNTileCountPerSubgroup=*/16,
-             /*bestKTileCountPerSubgroup=*/4,
-             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / 2 /
-                 inBitWidth};
+             /*bestMNTileCountPerSubgroup=*/8,
+             /*bestKTileCountPerSubgroup=*/4, bestKElementCountPerSubgroup};
   }
 
-  int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
+  // We target slightly below the full available shared Memory to leave room for
+  // `GPUReduceBankConflictsPass` that will pad shared memory without keeping
+  // track of usage. We can drop this after solving
+  // https://github.com/iree-org/iree/issues/19675
+  int64_t maxSharedMemoryBytes =
+      target.getWgp().getMaxWorkgroupMemoryBytes() - 64 * inBitWidth;
 
   // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
@@ -176,7 +181,8 @@ static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
 getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
                                         ArrayRef<AffineMap> maps,
                                         ArrayRef<Value> operands,
-                                        IREE::GPU::TargetAttr target) {
+                                        IREE::GPU::TargetAttr target,
+                                        bool isIGEMM) {
   if (target.getWgp().getMma().empty())
     return failure();
 
@@ -244,7 +250,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   bool mustBeAligned = true;
   bool doCPromotion = false;
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
-      target, problem, transposedLhs, transposedRhs);
+      target, problem, transposedLhs, transposedRhs, isIGEMM);
 
   // TODO (nirvedhmeshram, qedawkins): The performance with this will be bad if
   // the GEMM is accumulating (i.e doesnt have a zero fill dpsInit) as that
@@ -254,9 +260,9 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     LDBG("Attempting to deduce unaligned TileAndFuse MMA schedulee");
     mustBeAligned = false;
     doCPromotion = true;
-    schedule = getMmaScheduleFromProblemAndTarget(target, problem,
-                                                  transposedLhs, transposedRhs,
-                                                  mustBeAligned, doCPromotion);
+    schedule = getMmaScheduleFromProblemAndTarget(
+        target, problem, transposedLhs, transposedRhs, isIGEMM, mustBeAligned,
+        doCPromotion);
   }
 
   if (!schedule) {
@@ -379,7 +385,8 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> bounds = igemmLoopBounds.value();
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulLoweringConfigAndWorkgroupSize(
-          bounds, igemmContractionMaps.value(), igemmOperands.value(), target);
+          bounds, igemmContractionMaps.value(), igemmOperands.value(), target,
+          /*isIGEMM=*/true);
   if (failed(configAndWgSize)) {
     return failure();
   }
@@ -422,7 +429,8 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   LDBG("Matmul TileAndFuse Config");
 
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
-      getMatmulLoweringConfigAndWorkgroupSize(bounds, maps, operands, target);
+      getMatmulLoweringConfigAndWorkgroupSize(bounds, maps, operands, target,
+                                              /*isIGEMM=*/false);
   if (failed(configAndWgSize)) {
     return failure();
   }
