@@ -542,3 +542,28 @@ util.func public @fix_issue_16835(%arg0: tensor<49x6x16x16xf32>, %arg1: tensor<9
 //       CHECK:   tensor.unpack
 //       CHECK:   linalg.generic
 //       CHECK:   tensor.expand_shape
+
+// -----
+
+util.func public @hoist_constant() -> tensor<2xf32> {
+  %cst = arith.constant dense<[1.0, 2.0]> : tensor<2xf32>
+  %empty = tensor.empty() : tensor<2xf32>
+  %0 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0) -> (d0)>,
+      affine_map<(d0) -> (d0)>
+    ], iterator_types = ["parallel"]}
+    ins(%cst : tensor<2xf32>) outs(%empty : tensor<2xf32>) {
+  ^bb0(%b0: f32, %b1: f32):
+    %1 = math.exp %b0 : f32
+    linalg.yield %1 : f32
+  } -> tensor<2xf32>
+  util.return %0 : tensor<2xf32>
+}
+// CHECK-LABEL: util.global private @__hoisted_tensor_2xf32
+//       CHECK:   util.initializer
+//       CHECK:     %[[EXP:.+]] = linalg.generic
+//       CHECK:       math.exp
+//       CHECK:     util.global.store %[[EXP]], @__hoisted_tensor_2xf32
+//       CHECK: util.func public @hoist_constant
+//       CHECK:   util.global.load immutable @__hoisted_tensor_2xf32
