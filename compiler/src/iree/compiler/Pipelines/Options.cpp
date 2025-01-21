@@ -195,6 +195,12 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
           "File path to create a parameter archive of splat values out of all "
           "parameter backed globals."),
       llvm::cl::cat(category));
+
+  binder.opt<bool>(
+      "iree-opt-generalize-matmul", generalizeMatmul,
+      llvm::cl::desc("Convert named matmul ops to linalg generic ops during "
+                     "global optimization to enable better fusion."),
+      llvm::cl::cat(category));
 }
 
 void SchedulingOptions::bindOptions(OptionsBinder &binder) {
