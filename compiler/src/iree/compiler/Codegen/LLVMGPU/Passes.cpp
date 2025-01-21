@@ -186,10 +186,15 @@ static void addBufferizePasses(OpPassManager &funcPassManager) {
 static void tileAndDistributeToWorkgroup(
     OpPassManager &funcPassManager, bool useForall,
     std::optional<ConvertToDestinationPassingStylePassOptions>
-        convertToDpsOptions = ConvertToDestinationPassingStylePassOptions{}) {
+        convertToDpsOptions = ConvertToDestinationPassingStylePassOptions{},
+    ReorderWorkgroupsStrategy strategy = ReorderWorkgroupsStrategy::None) {
   if (useForall) {
-    funcPassManager.addPass(
-        createTileAndDistributeToWorkgroupsUsingForallOpPass());
+    assert((strategy == ReorderWorkgroupsStrategy::None ||
+            strategy == ReorderWorkgroupsStrategy::Transpose) &&
+           "Only None and Transpose reorder strategies are supported with "
+           "forall distribution.");
+    funcPassManager.addPass(createTileAndDistributeToWorkgroupsWithReordering(
+        strategy == ReorderWorkgroupsStrategy::Transpose));
   } else {
     funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass(
         kNumMaxParallelDims,
@@ -786,12 +791,13 @@ static void addVectorBufferizePasses(OpPassManager &funcPassManager) {
 void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
                                         const GPUPipelineOptions &options,
                                         bool usePadToModelSharedMemcpy) {
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/false);
 
   ReorderWorkgroupsStrategy reorderStrategy =
       getReorderWorkgroupsStrategy(options.reorderStrategy);
-  funcPassManager.addPass(
-      createReorderWorkgroups(reorderStrategy, canReorderWorkgroups));
+
+  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true,
+                               /*convertToDpsOptions=*/std::nullopt,
+                               /*reorderStrategy=*/reorderStrategy);
 
   if (usePadToModelSharedMemcpy) {
     funcPassManager.addPass(createLLVMGPUPromoteMatmulToFitMMAPass());
@@ -1234,6 +1240,7 @@ void buildROCDLCodegenPassPipeline(OpPassManager &variantPassManager) {
         .addPass(createVerifyWorkgroupDistributionPass);
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
+  variantPassManager.addPass(createLowerAffinePass());
   variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());
 
   addLowerToLLVMGPUPasses(variantPassManager.nest<ModuleOp>(),
