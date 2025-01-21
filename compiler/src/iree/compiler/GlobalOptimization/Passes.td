@@ -84,6 +84,10 @@ def FuseSiluHorizontalMatmulPass:
 def GeneralizeLinalgNamedOpsPass :
     InterfacePass<"iree-global-opt-generalize-linalg-named-ops", "mlir::FunctionOpInterface"> {
   let summary = "Convert some Linalg named ops into linalg.generics.";
+  let options = [
+    Option<"enableGeneralizeMatmul", "enable-generalize-matmul", "bool",
+           /*default=*/"false", "Convert linalg named opt to generic ops.">,
+  ];
 }
 
 def InferNumericNarrowingPass :
