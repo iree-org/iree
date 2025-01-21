@@ -90,7 +90,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: iree-org/iree-test-suites
-          ref: 8e6af9e75d874ef8c9f8ff55f12cb38157dd55eb
+          ref: 56509666d185cdb99aafb4ed4d8532b8f3c54fa3
           path: iree-test-suites
       - name: Install ONNX ops test suite requirements
         run: |
@@ -131,7 +131,11 @@ jobs:
           # CPU
           - name: cpu_llvm_task
             config-file: onnx_models_cpu_llvm_task.json
-            runs-on: ubuntu-24.04
+            runs-on:
+              - self-hosted # must come first
+              - persistent-cache
+              - Linux
+              - X64
 
           # AMD GPU
           - name: amdgpu_rocm_rdna3
@@ -169,7 +173,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: iree-org/iree-test-suites
-          ref: d7db851fe0c332b80f9380861cd60ac7c642b584
+          ref: 56509666d185cdb99aafb4ed4d8532b8f3c54fa3
           path: iree-test-suites
       - name: Install ONNX models test suite requirements
         run: |
