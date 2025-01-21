@@ -711,10 +711,10 @@ hal.executable public @main {
       func.func @multi_mma_data_tiled_unrolled_MFMA_F32_16x16x4_F32()
         attributes {translation_info = #translation_info} {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<4x1x8x4x16x4xf32>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<4x1x8x4x4x4x4xf32>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<4x1x4x2x4x16x4xf32>>
         %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<readwrite:tensor<4x4x8x4x2x4x16x4xf32>>
-        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0, 0, 0], sizes = [4, 1, 8, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4x1x8x4x16x4xf32>> -> tensor<4x1x8x4x16x4xf32>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0, 0, 0, 0], sizes = [4, 1, 8, 4, 4, 4, 4], strides = [1, 1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4x1x8x4x4x4x4xf32>> -> tensor<4x1x8x4x4x4x4xf32>
         %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0, 0, 0, 0], sizes = [4, 1, 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4x1x4x2x4x16x4xf32>> -> tensor<4x1x4x2x4x16x4xf32>
         %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [4, 4, 8, 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<readwrite:tensor<4x4x8x4x2x4x16x4xf32>> -> tensor<4x4x8x4x2x4x16x4xf32>
         %6 = iree_gpu.multi_mma %3, %4, %5 {
@@ -733,7 +733,7 @@ hal.executable public @main {
             intrinsics_n = 2,
             subgroups_n = 4,
             intrinsics_k = 4>}
-          : tensor<4x1x8x4x16x4xf32>, tensor<4x1x4x2x4x16x4xf32> into tensor<4x4x8x4x2x4x16x4xf32>
+          : tensor<4x1x8x4x4x4x4xf32>, tensor<4x1x4x2x4x16x4xf32> into tensor<4x4x8x4x2x4x16x4xf32>
         flow.dispatch.tensor.store %6, %2, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [4, 4, 8, 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : tensor<4x4x8x4x2x4x16x4xf32> -> !flow.dispatch.tensor<readwrite:tensor<4x4x8x4x2x4x16x4xf32>>
         return
       }
@@ -745,7 +745,7 @@ hal.executable public @main {
 // CHECK-DAG:  %[[BINDING_A:.+]] = hal.interface.binding.subspan {{.*}} binding(0)
 // CHECK-DAG:  %[[BINDING_B:.+]] = hal.interface.binding.subspan {{.*}} binding(1)
 // CHECK-DAG:  %[[BINDING_C:.+]] = hal.interface.binding.subspan {{.*}} binding(2)
-// CHECK-DAG:  %[[A_ALLOC:.+]] = memref.alloc() : memref<1x1x8x4x16x4xf32, #gpu.address_space<workgroup>>
+// CHECK-DAG:  %[[A_ALLOC:.+]] = memref.alloc() : memref<1x1x8x4x4x4x4xf32, #gpu.address_space<workgroup>>
 // CHECK-DAG:  %[[B_ALLOC:.+]] = memref.alloc() : memref<1x1x4x2x4x16x4xf32, #gpu.address_space<workgroup>>
 // CHECK:      gpu.barrier
 // CHECK-DAG:  %[[A_GLOBAL_LOAD:.+]] = vector.transfer_read %[[BINDING_A]]{{.*}} vector<4xf32>
@@ -753,21 +753,21 @@ hal.executable public @main {
 // CHECK-DAG:  vector.transfer_write %[[A_GLOBAL_LOAD]], %[[A_ALLOC]]
 // CHECK-DAG:  vector.transfer_write %[[B_GLOBAL_LOAD]], %[[B_ALLOC]]
 // CHECK:      gpu.barrier
-// CHECK-DAG:  %[[A_READ:.+]] = vector.transfer_read %[[A_ALLOC]]{{.*}} vector<8x1x1x4xf32>
+// CHECK-DAG:  %[[A_READ:.+]] = vector.transfer_read %[[A_ALLOC]]{{.*}} vector<8x1x1x1x4xf32>
 // CHECK-DAG:  %[[B_READ:.+]] = vector.transfer_read %[[B_ALLOC]]{{.*}} vector<2x1x1x4xf32>
 // CHECK-DAG:  %[[C_READ:.+]] = vector.transfer_read %[[BINDING_C]]{{.*}} vector<8x2x1x1x4xf32>
 // CHECK-DAG:  %[[C_00_0:.+]] = vector.extract %[[C_READ]][0, 0, 0, 0] : vector<4xf32> from vector<8x2x1x1x4xf32>
 // CHECK-DAG:  %[[C_01_0:.+]] = vector.extract %[[C_READ]][0, 1, 0, 0] : vector<4xf32> from vector<8x2x1x1x4xf32>
 // CHECK-DAG:  %[[C_70_0:.+]] = vector.extract %[[C_READ]][7, 0, 0, 0] : vector<4xf32> from vector<8x2x1x1x4xf32>
 // CHECK-DAG:  %[[C_71_0:.+]] = vector.extract %[[C_READ]][7, 1, 0, 0] : vector<4xf32> from vector<8x2x1x1x4xf32>
-// CHECK-DAG:  %[[A_EXTRACT00:.+]] = vector.extract %[[A_READ]][0, 0, 0, 0] : f32 from vector<8x1x1x4xf32>
-// CHECK-DAG:  %[[A_EXTRACT01:.+]] = vector.extract %[[A_READ]][0, 0, 0, 1] : f32 from vector<8x1x1x4xf32>
-// CHECK-DAG:  %[[A_EXTRACT02:.+]] = vector.extract %[[A_READ]][0, 0, 0, 2] : f32 from vector<8x1x1x4xf32>
-// CHECK-DAG:  %[[A_EXTRACT03:.+]] = vector.extract %[[A_READ]][0, 0, 0, 3] : f32 from vector<8x1x1x4xf32>
-// CHECK-DAG:  %[[A_EXTRACT70:.+]] = vector.extract %[[A_READ]][7, 0, 0, 0] : f32 from vector<8x1x1x4xf32>
-// CHECK-DAG:  %[[A_EXTRACT71:.+]] = vector.extract %[[A_READ]][7, 0, 0, 1] : f32 from vector<8x1x1x4xf32>
-// CHECK-DAG:  %[[A_EXTRACT72:.+]] = vector.extract %[[A_READ]][7, 0, 0, 2] : f32 from vector<8x1x1x4xf32>
-// CHECK-DAG:  %[[A_EXTRACT73:.+]] = vector.extract %[[A_READ]][7, 0, 0, 3] : f32 from vector<8x1x1x4xf32>
+// CHECK-DAG:  %[[A_EXTRACT00:.+]] = vector.extract %[[A_READ]][0, 0, 0, 0, 0] : f32 from vector<8x1x1x1x4xf32>
+// CHECK-DAG:  %[[A_EXTRACT01:.+]] = vector.extract %[[A_READ]][0, 0, 0, 0, 1] : f32 from vector<8x1x1x1x4xf32>
+// CHECK-DAG:  %[[A_EXTRACT02:.+]] = vector.extract %[[A_READ]][0, 0, 0, 0, 2] : f32 from vector<8x1x1x1x4xf32>
+// CHECK-DAG:  %[[A_EXTRACT03:.+]] = vector.extract %[[A_READ]][0, 0, 0, 0, 3] : f32 from vector<8x1x1x1x4xf32>
+// CHECK-DAG:  %[[A_EXTRACT70:.+]] = vector.extract %[[A_READ]][7, 0, 0, 0, 0] : f32 from vector<8x1x1x1x4xf32>
+// CHECK-DAG:  %[[A_EXTRACT71:.+]] = vector.extract %[[A_READ]][7, 0, 0, 0, 1] : f32 from vector<8x1x1x1x4xf32>
+// CHECK-DAG:  %[[A_EXTRACT72:.+]] = vector.extract %[[A_READ]][7, 0, 0, 0, 2] : f32 from vector<8x1x1x1x4xf32>
+// CHECK-DAG:  %[[A_EXTRACT73:.+]] = vector.extract %[[A_READ]][7, 0, 0, 0, 3] : f32 from vector<8x1x1x1x4xf32>
 // CHECK-DAG:  %[[B_EXTRACT00:.+]] = vector.extract %[[B_READ]][0, 0, 0, 0] : f32 from vector<2x1x1x4xf32>
 // CHECK-DAG:  %[[B_EXTRACT01:.+]] = vector.extract %[[B_READ]][0, 0, 0, 1] : f32 from vector<2x1x1x4xf32>
 // CHECK-DAG:  %[[B_EXTRACT02:.+]] = vector.extract %[[B_READ]][0, 0, 0, 2] : f32 from vector<2x1x1x4xf32>
