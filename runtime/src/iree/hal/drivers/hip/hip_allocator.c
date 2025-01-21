@@ -158,7 +158,6 @@ static void iree_hal_hip_allocator_destroy(
       iree_hal_hip_allocator_cast(base_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_slim_mutex_deinitialize(&allocator->async_allocation_mutex);
   for (iree_host_size_t i = 0; i < allocator->topology.count; ++i) {
     for (iree_hal_hip_util_tree_node_t* j = iree_hal_hip_util_tree_first(
              &allocator->async_allocation_maps[i].tree);
@@ -179,6 +178,7 @@ static void iree_hal_hip_allocator_destroy(
     iree_hal_hip_util_tree_deinitialize(
         &allocator->async_allocation_maps[i].tree);
   }
+  iree_slim_mutex_deinitialize(&allocator->async_allocation_mutex);
   iree_allocator_free(allocator->host_allocator, allocator);
 
   IREE_TRACE_ZONE_END(z0);
