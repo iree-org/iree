@@ -151,6 +151,7 @@ iree_cc_library(
     "TypePropagationPass.cpp"
     "UnrollAnnotatedLoops.cpp"
     "UserConfig.cpp"
+    "VectorTransferLowering.cpp"
     "VectorizeMemrefCopy.cpp"
     "VerifyWorkgroupDistribution.cpp"
   DEPS
