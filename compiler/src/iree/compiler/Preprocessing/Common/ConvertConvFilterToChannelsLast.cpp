@@ -1,6 +1,8 @@
-//===----------------------------------------------------------------------===//
-// ConvertConvFilterToChannelsLastPass
-//===----------------------------------------------------------------------===//
+// Copyright 2025 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "llvm/ADT/SmallVector.h"
@@ -25,7 +27,7 @@ namespace mlir::iree_compiler::Preprocessing {
 #include "iree/compiler/Preprocessing/Common/Passes.h.inc"
 
 // Utility function to swap the last two dimensions.
-static AffineMap constructFilterMap(AffineMap map, SmallVector<int64_t> &perm) {
+static AffineMap constructFilterMap(AffineMap map, ArrayRef<int64_t> perm) {
   unsigned numDims = map.getNumDims();
   ArrayRef<AffineExpr> mapResults = map.getResults();
   SmallVector<AffineExpr, 4> exprs;
@@ -37,7 +39,7 @@ static AffineMap constructFilterMap(AffineMap map, SmallVector<int64_t> &perm) {
 
 // Utility function to create a transpose operation.
 static Value createTransposeOp(PatternRewriter &rewriter, Location loc,
-                               Value tensor, SmallVector<int64_t> &perm) {
+                               Value tensor, ArrayRef<int64_t> perm) {
   SmallVector<OpFoldResult, 4> dimSizes =
       tensor::getMixedSizes(rewriter, loc, tensor);
   // Dim index of H, W, F, C
@@ -53,18 +55,15 @@ static Value createTransposeOp(PatternRewriter &rewriter, Location loc,
       .getResult()[0];
 }
 
-llvm::LogicalResult
-convertConvFilterToTargetLayout(linalg::Conv2DNhwcHwcfOp convOp,
-                                PatternRewriter &rewriter,
-                                SmallVector<int64_t> &perm) {
+LogicalResult convertConvFilterToTargetLayout(linalg::Conv2DNhwcHwcfOp convOp,
+                                              PatternRewriter &rewriter,
+                                              SmallVector<int64_t> &perm) {
   Location loc = convOp.getLoc();
 
-  // Extract operands.
   Value input = convOp.getInputs()[0];
   Value filter = convOp.getInputs()[1];
   Value output = convOp.getOutputs()[0];
 
-  // Extract indexing maps.
   AffineMap inputMap = convOp.getIndexingMapsArray()[0];
   AffineMap filterMap = convOp.getIndexingMapsArray()[1];
   AffineMap outputMap = convOp.getIndexingMapsArray()[2];
@@ -123,20 +122,23 @@ public:
 
     RewritePatternSet patterns(context);
     if (filterLayout == "hwfc") {
+      LDBG("Converting filter layout to hwfc.");
       patterns.add<ConvertHwcfToHwfc>(context);
     } else if (filterLayout == "fhwc") {
+      LDBG("Converting filter layout to fhwc.");
       patterns.add<ConvertHwcfToFhwc>(context);
     } else {
+      LDBG("convert-filter-to-channels-last pass didn't apply since an "
+           "unsupported layout is given. Please use hwfc or fhwc as pass "
+           "filter-layout option.");
       // TODO add default fallback to filter layout once we have more data
       // about models with the two layouts
-      llvm_unreachable("Unsupported filter layout. Use hwfc or fhwc.");
+      return signalPassFailure();
     }
 
     if (failed(applyPatternsGreedily(op, std::move(patterns)))) {
       return signalPassFailure();
     }
-
-    LDBG("after converting convolutions to channels last\n" << *op);
   }
 };
 
