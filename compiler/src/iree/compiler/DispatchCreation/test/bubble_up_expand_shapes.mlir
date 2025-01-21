@@ -69,3 +69,42 @@ util.func public @attention_v_reshape_propagation(%arg0: index,
 //  CHECK-SAME:       ins(%[[ATTENTION]]
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[GENERIC]]
 //       CHECK:   return %[[COLLAPSE]]
+
+// -----
+
+// Multiple uses of the producer
+
+util.func @multiple_users(%arg0 : tensor<?x128xf16>,
+    %arg1 : tensor<4x?x32x128xf16>) -> tensor<4x?x32x8x16xf16> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %dim = tensor.dim %arg0, %c0 : tensor<?x128xf16>
+  %empty = tensor.empty(%dim) : tensor<4x?x32x128xf16>
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d1, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%arg0 : tensor<?x128xf16>)
+      outs(%empty : tensor<4x?x32x128xf16>) {
+    ^bb0(%b0: f16, %b1 : f16) :
+      %iv0 = linalg.index 0 : index
+      %iv1 = linalg.index 0 : index
+      %iv2 = linalg.index 0 : index
+      %iv3 = linalg.index 0 : index
+      // This is not technically a gather, but doing this way to mimic
+      // use case of rope computation in LLaMa
+      %1 = tensor.extract %arg1[%iv0, %iv1, %iv2, %iv3] : tensor<4x?x32x128xf16>
+      %2 = arith.addf %1, %b0 : f16
+      linalg.yield %2 : f16
+  } -> tensor<4x?x32x128xf16>
+  %1 = tensor.dim %0, %c1 : tensor<4x?x32x128xf16>
+  %2 = tensor.expand_shape %0 [[0], [1], [2], [3, 4]] output_shape [4, %1, 32, 8, 16]
+      : tensor<4x?x32x128xf16> into tensor<4x?x32x8x16xf16>
+  util.return %2 : tensor<4x?x32x8x16xf16>
+}
+// CHECK-LABEL: func public @multiple_users(
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x128xf16>
+//       CHECK:   %[[EXPAND_SHAPE:.+]] = tensor.expand_shape %[[ARG0]]
+//       CHECK:   %[[EXPANDED_GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[EXPAND_SHAPE]] :
+//       CHECK:   return %[[EXPANDED_GENERIC]]
