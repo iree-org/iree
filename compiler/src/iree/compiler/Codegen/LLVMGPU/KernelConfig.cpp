@@ -2517,6 +2517,9 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
 
   // Find the root operation. linalg.generic, linalg.fill, and scatter are not
   // root operations if there are other compute operations present.
+  // Also, construct a set of generic ops that are to be skipped. These generic
+  // ops that are used to compute scatter indices are not root operations.
+  llvm::SmallDenseSet<Operation *, 4> genericToSkip;
   for (Operation *op : llvm::reverse(computeOps)) {
     if (!isa<linalg::GenericOp, linalg::FillOp, IREE::LinalgExt::ScatterOp>(
             op)) {
@@ -2530,29 +2533,32 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
         break;
       }
     }
+
+    if (auto scatterOp = dyn_cast<IREE::LinalgExt::ScatterOp>(op)) {
+      auto indices = scatterOp.getIndices();
+      if (indices.getDefiningOp() == nullptr) {
+        continue;
+      }
+      // If scatter's indices is a generic op, mark it as to skip.
+      if (auto genericOp =
+              dyn_cast<linalg::GenericOp>(indices.getDefiningOp())) {
+        genericToSkip.insert(genericOp);
+      }
+      // If scatter's backward slices are generic ops, mark them as to skip too.
+      SetVector<Operation *> slices;
+      getBackwardSlice(indices, &slices);
+      for (auto slice : slices) {
+        if (isa<linalg::GenericOp>(slice)) {
+          genericToSkip.insert(slice);
+        }
+      }
+    }
   }
 
   // Generic ops take priority over scatter and fill ops as the root op.
   if (!rootOperation) {
     for (Operation *op : llvm::reverse(computeOps)) {
-      if (isa<linalg::GenericOp>(op)) {
-        SetVector<Operation *> slices;
-        getForwardSlice(op->getResult(0), &slices);
-        bool isGenericResultScatterIndices = false;
-        for (auto slice : slices) {
-          LDBG("is scatter");
-          LDBG(*slice);
-          if (auto scatterOp = dyn_cast<IREE::LinalgExt::ScatterOp>(slice)) {
-            scatterOp.getIndices().dump();
-            if (op->getResult(0) == scatterOp.getIndices()) {
-              LDBG("linalg::genric's result is scatter's indices, skip");
-              isGenericResultScatterIndices = true;
-              break;
-            }
-          }
-        }
-        if (isGenericResultScatterIndices)
-          break;
+      if (isa<linalg::GenericOp>(op) && genericToSkip.count(op) == 0) {
         rootOperation = op;
         break;
       }
