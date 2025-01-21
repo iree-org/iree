@@ -112,6 +112,19 @@ SmallVector<int64_t> NestedLayoutAttr::getUndistributedPackedShape() const {
   return shape;
 }
 
+SmallVector<int64_t> NestedLayoutAttr::getUndistributedShape() const {
+  int64_t rank = getRank();
+  SmallVector<int64_t> shape;
+  shape.reserve(rank);
+  for (int64_t i : llvm::seq<int64_t>(rank)) {
+    int64_t expectedDimLen = getSubgroupTile()[i] * getBatchTile()[i] *
+                             getOuterTile()[i] * getThreadTile()[i] *
+                             getElementTile()[i];
+    shape.push_back(expectedDimLen);
+  }
+  return shape;
+}
+
 // Gets the rank of the undistributed vector for this layout.
 int64_t NestedLayoutAttr::getRank() const {
   // The layout requires that all size lists are the same length and match
@@ -196,6 +209,42 @@ NestedLayoutAttr NestedLayoutAttr::get(
   return Base::get(context, subgroupTile, batchTile, outerTile, threadTile,
                    elementTile, normalizedSubgroupStrides,
                    normalizedThreadStrides);
+}
+
+static SmallVector<int64_t> appendDims(ArrayRef<int64_t> tileLens,
+                                       ArrayRef<int64_t> appendLens) {
+  SmallVector<int64_t> tileLensResult = llvm::to_vector(tileLens);
+  tileLensResult.insert(tileLensResult.end(), appendLens.begin(),
+                        appendLens.end());
+  return tileLensResult;
+}
+
+NestedLayoutAttr NestedLayoutAttr::get(MLIRContext *context,
+                                       NestedLayoutAttr source,
+                                       ArrayRef<int64_t> appendSubGroupLens,
+                                       ArrayRef<int64_t> appendBatchLens,
+                                       ArrayRef<int64_t> appendOuterLens,
+                                       ArrayRef<int64_t> appendThreadLens,
+                                       ArrayRef<int64_t> appendElementLens,
+                                       ArrayRef<int64_t> appendSubgroupStrides,
+                                       ArrayRef<int64_t> appendThreadStrides) {
+  SmallVector<int64_t> subgroupTile =
+      appendDims(source.getSubgroupTile(), appendSubGroupLens);
+  SmallVector<int64_t> batchTile =
+      appendDims(source.getBatchTile(), appendBatchLens);
+  SmallVector<int64_t> outerTile =
+      appendDims(source.getOuterTile(), appendOuterLens);
+  SmallVector<int64_t> threadTile =
+      appendDims(source.getThreadTile(), appendThreadLens);
+  SmallVector<int64_t> elementTile =
+      appendDims(source.getElementTile(), appendElementLens);
+  SmallVector<int64_t> subgroupStrides =
+      appendDims(source.getSubgroupStrides(), appendSubgroupStrides);
+  SmallVector<int64_t> threadStrides =
+      appendDims(source.getThreadStrides(), appendThreadStrides);
+  return NestedLayoutAttr::get(context, subgroupTile, batchTile, outerTile,
+                               threadTile, elementTile, subgroupStrides,
+                               threadStrides);
 }
 
 LogicalResult NestedLayoutAttr::verify(
