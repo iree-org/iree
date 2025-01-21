@@ -83,8 +83,8 @@ static void interleave(TileSwizzle &swizzle, int srcIdx, int expandedIdx) {
   swizzle.permutation = outPermutation;
 }
 
-TileSwizzle getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic intrinsic,
-                                IREE::GPU::MMAFragment fragment) {
+static TileSwizzle getIntrinsicSwizzleBeforeMovingCrossThreadOutermost(
+    IREE::GPU::MMAIntrinsic intrinsic, IREE::GPU::MMAFragment fragment) {
   auto layout = IREE::GPU::getSingleSubgroupLayout(intrinsic, fragment);
 
   // MMASingleSubgroupLayout has non-transposed RHS.
@@ -145,12 +145,42 @@ static int getInnermostNonInternalDimIdx(
   return 0;
 }
 
-void moveCrossThreadOutermost(TileSwizzle &swizzle, TileSwizzle accSwizzle,
-                              MMAFragment fragment) {
-  assert(accSwizzle.expandShape.size() == 2 &&
-         "expected accSwizzle to have 2 reassociation groups");
-  assert(swizzle.expandShape.size() == 2 &&
-         "expected swizzle to have 2 reassociation groups");
+/// Moves all `Kind::CrossThread` dims of the Acc layout to the outermost
+/// within their expand shape reassociation groups. This only moves the cross
+/// thread dims of the Acc layout because we want to fuse the unset_encoding
+/// ops with the data tiled matmul. In order to do this, the sliced dimensions
+/// (CrossThread) for each thread need to be outermost in the final write out.
+///
+/// This transformation is for the Acc layout, but the Lhs and Rhs layouts need
+/// to be transformed too, because the layouts need to match the Acc for their
+/// respective M and N tile dimensions.
+///
+/// Example (CrossThread dims are denoted with surrounding {} braces):
+///   Input:
+///     Lhs layout:
+///       expandShape = [[8, {16}], [2, {4}, 4]],
+///       permutation = [0, 3, 1, 2, 4]
+///     Rhs layout:
+///       expandShape = [[{4}, 2, {16}], [2, {4}, 4]],
+///       permutation = [0, 1, 4, 2, 3, 5]
+///     Acc layout:
+///       expandShape = [[8, {4}, 4], [{4}, 2, {16}]],
+///       permutation = [3, 0, 4, 1, 5, 2]
+///   Output:
+///     Lhs layout:
+///       expandShape = [[{4}, 8, {4}], [2, {4}, 4]],
+///       permutation = [1, 4, 0, 2, 3, 5]
+///     Rhs layout:
+///       expandShape = [[{4}, {16}, 2], [2, {4}, 4]],
+///       permutation = [0, 2, 4, 1, 3, 5]
+///     Acc layout:
+///       expandShape = [[{4}, 8, 4], [{4}, {16}, 2]],
+///       permutation = [3, 1, 5, 0, 4, 2]
+static TileSwizzle moveCrossThreadOutermost(TileSwizzle swizzle,
+                                            TileSwizzle accSwizzle,
+                                            MMAFragment fragment) {
+  assert(accSwizzle.expandShape.size() == 2);
+  assert(swizzle.expandShape.size() == 2);
   TileSwizzle::ExpandShapeType expandShape = swizzle.expandShape;
   TileSwizzle::ExpandShapeType accExpandShape = accSwizzle.expandShape;
   // We will construct the permutation on the flattened `expandShape` dims that
@@ -161,8 +191,6 @@ void moveCrossThreadOutermost(TileSwizzle &swizzle, TileSwizzle accSwizzle,
   int groupStartIdx = 0;
   for (int accGroupIdx = 0; accGroupIdx < accExpandShape.size();
        ++accGroupIdx) {
-    TileSwizzle::ExpandShapeDimVectorType accGroup =
-        accExpandShape[accGroupIdx];
     // Index for corresponding `swizzle` group is 0 for Lhs and Rhs fragments,
     // since the 1 index of Rhs and Lhs are K dimensions.
     int groupIdx = fragment == MMAFragment::Acc ? accGroupIdx : 0;
@@ -175,10 +203,23 @@ void moveCrossThreadOutermost(TileSwizzle &swizzle, TileSwizzle accSwizzle,
       continue;
     }
     TileSwizzle::ExpandShapeDimVectorType group = expandShape[groupIdx];
+    TileSwizzle::ExpandShapeDimVectorType accGroup =
+        accExpandShape[accGroupIdx];
     // The expanded shape of the `accSwizzle` group may not necessarily match
-    // the expanded shape of the `swizzle` group, so we need to expand or group
-    // the dimensions of `group` so that there exists a corresponding dimension
+    // the expanded shape of the `swizzle` group, so we may need to expand the
+    // dimensions of `group` further so that the is a corresponding dimension
     // in `group` for every CrossThread dimension in `accGroup`.
+    //
+    // For example:
+    //   Lhs swizzle.expandShape = [[8, {16}], [2, {4}, 4]],
+    //   Acc swizzle.expandShape = [[8, {4}, 4], [{4}, 2, {16}]],
+    //
+    // For group 0 the Lhs swizzle.expandShape has shape [8, {16}], while the
+    // Acc swizzle.expandShape has shape [8, {4}, 4]. Since, the CrossThread dim
+    // of the Acc swizzle group does not appear in the Lhs swizzle group, we
+    // need to expand the Lhs swizzle group so we can permute the groups in the
+    // same way. In this case the Lhs group's {16} dim will be expanded, and the
+    // new Lhs swizzle group will be [8, {4}, {4}].
     if (accGroup.size() != group.size()) {
       SmallVector<int64_t> accGroupShape =
           llvm::map_to_vector(accGroup, [](TileSwizzle::Dim d) {
@@ -210,7 +251,7 @@ void moveCrossThreadOutermost(TileSwizzle &swizzle, TileSwizzle accSwizzle,
             expandedPermIdx = permIdx;
           }
         }
-        for (int j = 0; j < reassociation.size() - 1; ++j) {
+        for (int j = 0, e = reassociation.size() - 1; j < e; ++j) {
           swizzle.permutation.insert(
               swizzle.permutation.begin() + expandedPermIdx + j + 1, i + j + 1);
         }
@@ -218,8 +259,11 @@ void moveCrossThreadOutermost(TileSwizzle &swizzle, TileSwizzle accSwizzle,
       swizzle.expandShape[groupIdx] = expandedGroup;
     }
 
-    // Compute the localized permutation within the reassociation group, and
-    // apply to the expandShape dims within the group.
+    // At this point, the `group` and `accGroup` will have the same shape, so
+    // we can compute a permutation for `accGroup` that would move the Acc
+    // CrossThread dims outermost, and then use that exact permutation for the
+    // `group`. Compute the localized permutation within the acc reassociation
+    // group, and apply to the expandShape dims within the `group`.
     SmallVector<int64_t> crossThreadInds;
     SmallVector<int64_t> otherInds;
     for (int64_t idx = 0; idx < accGroup.size(); ++idx) {
@@ -244,8 +288,9 @@ void moveCrossThreadOutermost(TileSwizzle &swizzle, TileSwizzle accSwizzle,
     groupStartIdx += expandShape[groupIdx].size();
   }
 
-  // For Lhs and Rhs, fill in the rest of the permutation from the skipped
-  // groups.
+  // The matching groups bewteen `accSwizzle` and `swizzle` have now been
+  // permuted. For Lhs and Rhs fragments, we need to fill in the rest of the
+  // permutation from the skipped groups that don't appear in the `accSwizzle`.
   if (fragment != MMAFragment::Acc) {
     for (int64_t i = swizzle.expandShape.front().size();
          i < swizzle.permutation.size(); ++i) {
@@ -264,14 +309,17 @@ void moveCrossThreadOutermost(TileSwizzle &swizzle, TileSwizzle accSwizzle,
   SmallVector<int64_t> perm = invertPermutationVector(crossThreadToOuterPerm);
   applyPermutationToVector(perm, swizzle.permutation);
   swizzle.permutation = perm;
+  return swizzle;
 }
 
-/// Return the unrolled version of the intrinsic swizzle without any reordering
-/// of CrossThread dims. The result of this function should be passed to
-/// moveCrossThreadOutermost to get the final swizzle.
-TileSwizzle getUnrolledSwizzle(IREE::GPU::DataTiledMMAAttr mma,
-                               IREE::GPU::MMAFragment fragment) {
-  auto swizzle = getIntrinsicSwizzle(mma.getIntrinsic().getValue(), fragment);
+/// Return the full swizzle without any reordering of CrossThread dims. The
+/// result of this function should be passed to moveCrossThreadOutermost to
+/// get the final swizzle.
+static TileSwizzle
+getSwizzleBeforeMovingCrossThreadOutermost(IREE::GPU::DataTiledMMAAttr mma,
+                                           IREE::GPU::MMAFragment fragment) {
+  auto swizzle = getIntrinsicSwizzleBeforeMovingCrossThreadOutermost(
+      mma.getIntrinsic().getValue(), fragment);
   switch (fragment) {
   case IREE::GPU::MMAFragment::Lhs:
     // A-matrix (LHS). Source dimensions are M (index 0) and K (index 1).
@@ -328,23 +376,48 @@ TileSwizzle getUnrolledSwizzle(IREE::GPU::DataTiledMMAAttr mma,
 
 TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
                        IREE::GPU::MMAFragment fragment) {
-  TileSwizzle swizzle = getUnrolledSwizzle(mma, fragment);
+  TileSwizzle swizzle =
+      getSwizzleBeforeMovingCrossThreadOutermost(mma, fragment);
   // We want to move the CrossThread dims to be outermost in the source layout
   // for the result. We need the transformations for the Lhs and Rhs to match
   // with the Acc transformation, so we need to know what the acc swizzle is
   // when moving CrossThread dims, even when the fragment is Lhs or Rhs.
   TileSwizzle accSwizzle = swizzle;
   if (fragment != IREE::GPU::MMAFragment::Acc) {
-    accSwizzle = getUnrolledSwizzle(mma, IREE::GPU::MMAFragment::Acc);
+    accSwizzle = getSwizzleBeforeMovingCrossThreadOutermost(
+        mma, IREE::GPU::MMAFragment::Acc);
   }
   LLVM_DEBUG(llvm::dbgs() << fragment
                           << " swizzle before moving CrossThread dims: "
                           << swizzle << "\n");
-  moveCrossThreadOutermost(swizzle, accSwizzle, fragment);
+  TileSwizzle crossThreadOuterSwizzle =
+      moveCrossThreadOutermost(swizzle, accSwizzle, fragment);
   LLVM_DEBUG(llvm::dbgs() << fragment
                           << " swizzle after moving CrossThread dims: "
-                          << swizzle << "\n\n");
-  return swizzle;
+                          << crossThreadOuterSwizzle << "\n\n");
+  return crossThreadOuterSwizzle;
+}
+
+TileSwizzle getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic intrinsic,
+                                IREE::GPU::MMAFragment fragment) {
+  auto swizzle =
+      getIntrinsicSwizzleBeforeMovingCrossThreadOutermost(intrinsic, fragment);
+  TileSwizzle accSwizzle = swizzle;
+  if (fragment != IREE::GPU::MMAFragment::Acc) {
+    accSwizzle = getIntrinsicSwizzleBeforeMovingCrossThreadOutermost(
+        intrinsic, IREE::GPU::MMAFragment::Acc);
+  }
+  LLVM_DEBUG(
+      llvm::dbgs() << fragment
+                   << " intrinsic swizzle before moving CrossThread dims: "
+                   << swizzle << "\n");
+  TileSwizzle crossThreadOuterSwizzle =
+      moveCrossThreadOutermost(swizzle, accSwizzle, fragment);
+  LLVM_DEBUG(
+      llvm::dbgs() << fragment
+                   << " intrinsic swizzle after moving CrossThread dims: "
+                   << crossThreadOuterSwizzle << "\n\n");
+  return crossThreadOuterSwizzle;
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU
