@@ -128,6 +128,9 @@ struct GlobalOptimizationOptions {
   // Strips debug assertions after any useful information has been extracted.
   bool stripAssertions = false;
 
+  // Converts linalg named matmul ops to linalg generic ops.
+  bool generalizeMatmul = false;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalOptimizationOptions>;
 };
