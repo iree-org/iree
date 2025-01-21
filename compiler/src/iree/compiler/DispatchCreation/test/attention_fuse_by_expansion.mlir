@@ -507,8 +507,8 @@ util.func @scatter_collapse_updates(%arg0: tensor<4x?x2x16x4x128xf16>, %arg1: te
 // -----
 
 util.func @scatter_collapse_updates_partial(%arg0: tensor<4x?x2x2x16x4x128xf16>, %arg1: tensor<?x1xi32>, %arg2: tensor<10x16x4x128xf16>) -> tensor<10x16x4x128xf16> {
-  %collapsed = tensor.collapse_shape %arg0[[0, 1], [2, 3], [4], [5], [6]] : tensor<4x?x2x2x16x4x128xf16> into tensor<?x4x16x4x128xf16>
-  %1 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true) ins(%collapsed, %arg1 : tensor<?x4x16x4x128xf16>, tensor<?x1xi32>) outs(%arg2 : tensor<10x16x4x128xf16>) {
+  %collapsed = tensor.collapse_shape %arg0[[0, 1, 2, 3], [4], [5], [6]] : tensor<4x?x2x2x16x4x128xf16> into tensor<?x16x4x128xf16>
+  %1 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true) ins(%collapsed, %arg1 : tensor<?x16x4x128xf16>, tensor<?x1xi32>) outs(%arg2 : tensor<10x16x4x128xf16>) {
   ^bb0(%arg7: f16, %arg8: f16):
     iree_linalg_ext.yield %arg7 : f16
   } -> tensor<10x16x4x128xf16>
@@ -519,10 +519,9 @@ util.func @scatter_collapse_updates_partial(%arg0: tensor<4x?x2x2x16x4x128xf16>,
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]:
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]:
 //  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]:
-//   CHECK-DAG:   %[[INDICES:.+]] = tensor.expand_shape %[[ARG1]] {{.*}} tensor<?x1xi32> into tensor<4x?x1xi32>
-//   CHECK-DAG:   %[[UPDATES:.+]] = tensor.collapse_shape %[[ARG0]] {{.*}} tensor<4x?x2x2x16x4x128xf16> into tensor<4x?x4x16x4x128xf16>
+//   CHECK-DAG:   %[[INDICES:.+]] = tensor.expand_shape %[[ARG1]] {{.*}} tensor<?x1xi32> into tensor<4x?x2x2x1xi32>
 //       CHECK:   %[[SCATTER:.+]] = iree_linalg_ext.scatter
-//  CHECK-SAME:       ins(%[[UPDATES]], %[[INDICES]]
+//  CHECK-SAME:       ins(%[[ARG0]], %[[INDICES]]
 //  CHECK-SAME:       outs(%[[ARG2]]
 //       CHECK:   util.return %[[SCATTER]]
 
