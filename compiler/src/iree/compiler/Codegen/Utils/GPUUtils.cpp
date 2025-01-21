@@ -35,7 +35,7 @@
 
 static constexpr unsigned kShuffleBitWidth = 32;
 
-static llvm::cl::opt<std::string> clTestTarget(
+llvm::cl::opt<std::string> clTestTarget(
     "iree-gpu-test-target",
     llvm::cl::desc(
         "The target for IR LIT tests. Format is '<arch>:<feature>@<api>', "
@@ -953,6 +953,8 @@ IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context) {
     if (StringRef(clTestTarget).starts_with("sm_"))
       backend = "cuda";
     else if (StringRef(clTestTarget).starts_with("gfx"))
+      backend = "hip";
+    else if (StringRef(clTestTarget).starts_with("mi"))
       backend = "hip";
     else if (StringRef(clTestTarget).starts_with("adreno"))
       backend = "vulkan";

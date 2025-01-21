@@ -19,6 +19,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "spec_gfx942.mlir"
+    "spec_mi308x.mlir"
   TOOLS
     FileCheck
     iree-opt
