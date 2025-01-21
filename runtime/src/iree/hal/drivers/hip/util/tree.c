@@ -48,7 +48,7 @@ static iree_status_t iree_hal_hip_util_tree_allocate_node(
 static bool iree_hal_hip_util_tree_free_node(
     iree_hal_hip_util_tree_node_t* node, void* user_data) {
   iree_hal_hip_util_tree_t* tree = (iree_hal_hip_util_tree_t*)user_data;
-  if ((uint8_t*)node > tree->initial_node_cache &&
+  if ((uint8_t*)node >= tree->initial_node_cache &&
       (uint8_t*)node <
           tree->initial_node_cache + tree->initial_node_cache_size) {
     return true;
