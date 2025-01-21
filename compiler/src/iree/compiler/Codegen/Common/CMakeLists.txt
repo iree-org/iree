@@ -147,6 +147,7 @@ iree_cc_library(
     "TileDispatchUsingInterface.cpp"
     "TileLargeTensors.cpp"
     "TileSizeSelection.cpp"
+    "Transforms.cpp"
     "TypePropagationPass.cpp"
     "UnrollAnnotatedLoops.cpp"
     "UserConfig.cpp"
