@@ -182,9 +182,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     static constexpr unsigned kOriginalOpNum = 2;
 
     int64_t getIndexDepth() {
-      return cast<ShapedType>(getDpsInputOperand(1)->get().getType())
-          .getShape()
-          .back();
+      return getDimensionMap().size();
     }
 
     Value getUpdates() {
@@ -214,7 +212,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     /// Utility to get the rank of the portion of `indices` that
     /// represents the batch dimensions
     int64_t getBatchRank() {
-      return getIndicesType().getRank() - 1;
+      return getUpdateType().getRank() - getUpdateSliceRank();
     }
 
     /// Utility to get the shape of the portion of `indices` that
@@ -226,7 +224,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     /// Utility to get the rank of the portion of `updates` that
     /// is scattered into `original`.
     int64_t getUpdateSliceRank() {
-      return getUpdateType().getRank() - getBatchRank();
+      return getOriginalType().getRank() - getIndexDepth();
     }
 
     /// Utility to get the shape of the portion of `updates` that

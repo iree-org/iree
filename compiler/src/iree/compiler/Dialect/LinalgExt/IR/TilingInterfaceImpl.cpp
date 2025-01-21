@@ -117,9 +117,11 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
   // Slice of indices.
   auto indicesRank = getIndicesType().getRank();
   SmallVector<OpFoldResult> indicesOffsets(offsets.take_front(getBatchRank()));
-  indicesOffsets.push_back(zeroAttr);
   SmallVector<OpFoldResult> indicesSizes(sizes.take_front(getBatchRank()));
-  indicesSizes.push_back(builder.getIndexAttr(getIndexDepth()));
+  if (getBatchRank() != getIndicesType().getRank()) {
+    indicesOffsets.push_back(zeroAttr);
+    indicesSizes.push_back(builder.getIndexAttr(getIndexDepth()));
+  }
   SmallVector<OpFoldResult> indicesStrides(indicesRank, oneAttr);
 
   Operation *indicesSlice = getSlice(builder, loc, getIndices(), indicesOffsets,
@@ -228,7 +230,6 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
   SmallVector<Value> starts;
   SmallVector<Value> loadIndices;
   append_range(loadIndices, ivs.take_front(getBatchRank()));
-  loadIndices.push_back(Value());
 
   // Populate with empty values.
   auto originalTy = getOriginalType();
@@ -242,8 +243,13 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
 
   ArrayRef<int64_t> dimMap = getDimensionMap();
 
+  if (getIndicesType().getRank() > getBatchRank()) {
+    loadIndices.push_back(Value());
+  }
   for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
-    loadIndices.back() = b.create<arith::ConstantIndexOp>(loc, i);
+    if (getIndicesType().getRank() > getBatchRank()) {
+      loadIndices.back() = b.create<arith::ConstantIndexOp>(loc, i);
+    }
     Value idx = b.create<memref::LoadOp>(loc, getIndices(), loadIndices);
     Value ret = b.create<arith::IndexCastOp>(loc, b.getIndexType(), idx);
 
