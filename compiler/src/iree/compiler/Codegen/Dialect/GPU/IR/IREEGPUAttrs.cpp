@@ -635,6 +635,7 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
   // distribution-only thread dimensions, we need to get back to the intrinsic.
   TileSwizzle intrinsicSwizzle =
       getIntrinsicSwizzle(getIntrinsic().getValue(), fragment);
+
   SmallVector<int64_t> intrinsicLayoutThreadSizes =
       sliceSwizzledShape(intrinsicSwizzle, [](TileSwizzle::Dim d) {
         return d.kind == TileSwizzle::Dim::Kind::CrossThread;
