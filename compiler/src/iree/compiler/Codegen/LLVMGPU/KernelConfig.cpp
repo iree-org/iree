@@ -38,6 +38,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Types.h"
@@ -2535,6 +2536,23 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
   if (!rootOperation) {
     for (Operation *op : llvm::reverse(computeOps)) {
       if (isa<linalg::GenericOp>(op)) {
+        SetVector<Operation *> slices;
+        getForwardSlice(op->getResult(0), &slices);
+        bool isGenericResultScatterIndices = false;
+        for (auto slice : slices) {
+          LDBG("is scatter");
+          LDBG(*slice);
+          if (auto scatterOp = dyn_cast<IREE::LinalgExt::ScatterOp>(slice)) {
+            scatterOp.getIndices().dump();
+            if (op->getResult(0) == scatterOp.getIndices()) {
+              LDBG("linalg::genric's result is scatter's indices, skip");
+              isGenericResultScatterIndices = true;
+              break;
+            }
+          }
+        }
+        if (isGenericResultScatterIndices)
+          break;
         rootOperation = op;
         break;
       }
