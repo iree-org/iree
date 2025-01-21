@@ -137,26 +137,19 @@ static void specializeGenericTransposeOp(RewriterBase &rewriter,
 /// generalizing is allowed. Otherwise if the `op` is a linalg::GenericOp,
 /// then just return the generic op.
 static FailureOr<linalg::GenericOp>
-getGenericOpOrGeneralizeContraction(RewriterBase &rewriter, Operation *op,
-                                    bool allowGeneralizing) {
+getAllowedGenericOpOrGenerializeNamedOp(RewriterBase &rewriter, Operation *op,
+                                        bool allowGeneralizing) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp) {
     return failure();
   }
   // TODO: Right now this is restricted to contractions due to fragility around
   // handling of convolutions.
-  if (!isa<linalg::GenericOp>(linalgOp) &&
-      !(allowGeneralizing && linalg::isaContractionOpInterface(linalgOp))) {
+  if (linalg::isaConvolutionOpInterface(linalgOp)) {
     return failure();
   }
-
-  // If this is generic op but comply to convolution op interface, assume
-  // it is from ConvertConvToChannelsLast pass and skip.
-  // FuseTransposeWithProducerLinalgOp will fuse the transpose into successive
-  // convolution, negating the effect from the filter layout conversion from
-  // that pass.
-  if (isa<linalg::GenericOp>(linalgOp) &&
-      linalg::isaConvolutionOpInterface(linalgOp)) {
+  if (!isa<linalg::GenericOp>(linalgOp) &&
+      !(allowGeneralizing && linalg::isaContractionOpInterface(linalgOp))) {
     return failure();
   }
 
@@ -221,7 +214,7 @@ public:
     }
 
     int64_t resultIndex = result.getResultNumber();
-    auto maybeGenericOp = getGenericOpOrGeneralizeContraction(
+    auto maybeGenericOp = getAllowedGenericOpOrGenerializeNamedOp(
         rewriter, result.getOwner(), allowGeneralizing);
     if (failed(maybeGenericOp)) {
       return rewriter.notifyMatchFailure(
@@ -628,7 +621,7 @@ public:
     // To do the fusion, we can simply apply the permutation of the transpose
     // to the results of the associated input's indexing map, and then forward
     // the input to the transpose to the consumer generic.
-    auto maybeGenericOp = getGenericOpOrGeneralizeContraction(
+    auto maybeGenericOp = getAllowedGenericOpOrGenerializeNamedOp(
         rewriter, linalgOp, allowGeneralizing);
     if (failed(maybeGenericOp)) {
       return failure();
