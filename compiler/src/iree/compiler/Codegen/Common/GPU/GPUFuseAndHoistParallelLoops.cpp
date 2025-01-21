@@ -4,10 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
-#include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -256,6 +257,11 @@ struct FuseTilableSliceProducers final
       return failure();
     }
 
+    auto producerParent = tilableProducer->getParentOfType<scf::ForallOp>();
+    if (producerParent && producerParent == parentForall) {
+      return failure();
+    }
+
     SmallVector<LoopLikeOpInterface> loops = {parentForall};
     std::optional<scf::SCFFuseProducerOfSliceResult> fusionResult =
         mlir::scf::tileAndFuseProducerOfSlice(rewriter, sliceOp, loops);
@@ -369,6 +375,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     patterns.add<FuseTilableDestinationProducers>(context);
     patterns.add<FuseUnitLoopDestination>(context);
     patterns.add<FuseTilableForallConsumers>(context);
+    populateSwapExtractWithExpandPattern(patterns);
     tensor::populateFoldTensorEmptyPatterns(patterns);
     scf::ForallOp::getCanonicalizationPatterns(patterns, context);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {

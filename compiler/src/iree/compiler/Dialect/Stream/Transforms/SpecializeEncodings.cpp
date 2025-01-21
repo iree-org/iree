@@ -16,6 +16,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
@@ -52,11 +53,92 @@ SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
   return results;
 }
 
+// Returns an updated encoding attribute if the type is a RankedTensorType
+// and an EncodingAttr is present. Otherwise, returns std::nullopt. The
+// method uses the EncodingLayoutAttrInterface from the EncodingAttr to
+// resolve the layouts of the given `type`; returns the new encodings with
+// the resolved layouts.
+static std::optional<IREE::Encoding::EncodingAttr>
+getEncodingWithNewLayouts(Type type,
+                          const SetVector<Attribute> &layoutResolvers) {
+  auto rankedTensorType = dyn_cast<RankedTensorType>(type);
+  if (!rankedTensorType) {
+    return std::nullopt;
+  }
+  auto encodingAttr = IREE::Encoding::getEncodingAttr(rankedTensorType);
+  if (!encodingAttr) {
+    return std::nullopt;
+  }
+  SmallVector<Attribute> layouts;
+  for (auto attr : layoutResolvers) {
+    auto encodingLayoutAttr =
+        dyn_cast<IREE::Encoding::EncodingLayoutAttrInterface>(attr);
+    if (!encodingLayoutAttr) {
+      layouts.push_back(attr);
+      continue;
+    }
+    layouts.push_back(encodingLayoutAttr.getLayout(rankedTensorType));
+  }
+  return encodingAttr.cloneWithLayouts(layouts);
+};
+
 // TODO(hanchung): Add "cloneWithEncoding" method to RankedTensorType.
 static RankedTensorType cloneWithEncoding(RankedTensorType type,
                                           Attribute encodingAttr) {
   return RankedTensorType::get(type.getShape(), type.getElementType(),
                                encodingAttr);
+}
+
+/// Updates the encoding of `sizeOfOp` with resolved layouts.
+static LogicalResult
+updateTensorSizeOfOp(RewriterBase &rewriter,
+                     IREE::Stream::TensorSizeOfOp sizeOfOp,
+                     const SetVector<Attribute> &layoutResolvers) {
+  auto encodingType = dyn_cast<RankedTensorType>(sizeOfOp.getEncoding());
+  std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
+      getEncodingWithNewLayouts(encodingType, layoutResolvers);
+  if (!encodingAttr) {
+    return success();
+  }
+  rewriter.modifyOpInPlace(sizeOfOp, [&] {
+    sizeOfOp.setEncoding(cloneWithEncoding(encodingType, encodingAttr.value()));
+  });
+  return success();
+}
+
+/// Returns failure if `op` has encoding. The EncodingAttr has padding
+/// semantic, a constant op with such  encoding can not be resolved at this
+/// moment.
+static LogicalResult
+updateTensorConstantOp(RewriterBase &rewriter,
+                       IREE::Stream::TensorConstantOp op,
+                       const SetVector<Attribute> &layoutResolvers) {
+  auto encodingType = dyn_cast<RankedTensorType>(op.getResultEncoding());
+  if (!encodingType) {
+    return success();
+  }
+  if (IREE::Encoding::getEncodingAttr(encodingType)) {
+    return failure();
+  }
+  return success();
+}
+
+/// Updates the result_encoding for `op`. The op have to define a
+/// `result_encoding` parameter.
+template <typename OpTy>
+static LogicalResult
+updateResultEncoding(RewriterBase &rewriter, OpTy op,
+                     const SetVector<Attribute> &layoutResolvers) {
+  auto encodingType = dyn_cast<RankedTensorType>(op.getResultEncoding());
+  std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
+      getEncodingWithNewLayouts(encodingType, layoutResolvers);
+  if (!encodingAttr) {
+    return success();
+  }
+  rewriter.modifyOpInPlace(op, [&] {
+    op.setResultEncoding(cloneWithEncoding(encodingType, encodingAttr.value()));
+  });
+  return success();
 }
 
 static LogicalResult addLayoutsToTensorPhaseOps(
@@ -89,50 +171,18 @@ static LogicalResult addLayoutsToTensorPhaseOps(
       return affinityOp.emitError("failed on making layout resolvers");
     }
 
-    // Returns an updated encoding attribute if an encoding attribute is present
-    // in the type. Otherwise, returns std::nullopt.
-    auto getEncodingWithNewLayouts =
-        [=](Type type) -> std::optional<IREE::Encoding::EncodingAttr> {
-      auto rankedTensorType = dyn_cast<RankedTensorType>(type);
-      if (!rankedTensorType) {
-        return std::nullopt;
-      }
-      auto encodingAttr = IREE::Encoding::getEncodingAttr(rankedTensorType);
-      if (!encodingAttr) {
-        return std::nullopt;
-      }
-      SmallVector<Attribute> layouts;
-      for (auto attr : layoutResolvers) {
-        auto encodingLayoutAttr =
-            dyn_cast<IREE::Encoding::EncodingLayoutAttrInterface>(attr);
-        if (!encodingLayoutAttr) {
-          layouts.push_back(attr);
-          continue;
-        }
-        layouts.push_back(encodingLayoutAttr.getLayout(rankedTensorType));
-      }
-      return encodingAttr.cloneWithLayouts(layouts);
-    };
-
     // TODO(hanchung): Update other Stream operations.
     LogicalResult result =
         TypeSwitch<Operation *, LogicalResult>(affinityOp)
-            .Case<IREE::Stream::TensorSizeOfOp>([&](auto sizeOfOp) {
-              auto encodingType =
-                  dyn_cast<RankedTensorType>(sizeOfOp.getEncoding());
-              if (!encodingType) {
-                return success();
-              }
-              std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
-                  getEncodingWithNewLayouts(encodingType);
-              if (!encodingAttr) {
-                return success();
-              }
-              rewriter.modifyOpInPlace(sizeOfOp, [&] {
-                sizeOfOp.setEncoding(
-                    cloneWithEncoding(encodingType, encodingAttr.value()));
-              });
-              return success();
+            .Case<IREE::Stream::TensorSizeOfOp>([&](auto op) {
+              return updateTensorSizeOfOp(rewriter, op, layoutResolvers);
+            })
+            .Case<IREE::Stream::TensorEmptyOp, IREE::Stream::TensorSplatOp>(
+                [&](auto op) {
+                  return updateResultEncoding(rewriter, op, layoutResolvers);
+                })
+            .Case<IREE::Stream::TensorConstantOp>([&](auto op) {
+              return updateTensorConstantOp(rewriter, op, layoutResolvers);
             })
             .Default([](auto *op) { return failure(); });
 

@@ -23,6 +23,7 @@
 #include "mlir/Dialect/Affine/TransformOps/AffineTransformOps.h"
 #include "mlir/Dialect/Arith/IR/ValueBoundsOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/TransformOps/BufferizationTransformOps.h"
+#include "mlir/Dialect/GPU/IR/ValueBoundsOpInterfaceImpl.h"
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
 #include "mlir/Dialect/Linalg/IR/ValueBoundsOpInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/TransformOps/DialectExtension.h"
@@ -63,7 +64,9 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   affine::registerValueBoundsOpInterfaceExternalModels(registry);
   arith::registerValueBoundsOpInterfaceExternalModels(registry);
   bufferization::registerTransformDialectExtension(registry);
+  gpu::registerValueBoundsOpInterfaceExternalModels(registry);
   gpu::registerTransformDialectExtension(registry);
+  gpu::registerValueBoundsOpInterfaceExternalModels(registry);
   linalg::registerTransformDialectExtension(registry);
   linalg::registerValueBoundsOpInterfaceExternalModels(registry);
   linalg::registerSubsetOpInterfaceExternalModels(registry);

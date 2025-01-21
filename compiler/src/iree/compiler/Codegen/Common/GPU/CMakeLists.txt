@@ -54,6 +54,7 @@ iree_cc_library(
     "GPUCombineValueBarriers.cpp"
     "GPUCreateFastSlowPath.cpp"
     "GPUDistribute.cpp"
+    "GPUDistributeCopyUsingForall.cpp"
     "GPUDistributeForall.cpp"
     "GPUDistributeScfFor.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"

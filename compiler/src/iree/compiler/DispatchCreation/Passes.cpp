@@ -194,6 +194,19 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
       //        - help with dispatch region formation.
       //        - move reduction iterators to be innermost.
       .addPass(DispatchCreation::createTransposeGenericOpsPass);
+
+  // Run constant expression hoisting just before dispatch creation in case
+  // there are any new hoisting opportunities (e.g. transpose generics or
+  // horizontal fusion).
+  IREE::Util::ExprHoistingOptions options;
+  options.maxSizeIncreaseThreshold = 0;
+  options.registerDependentDialectsFn = [](DialectRegistry &registry) {
+    registry.insert<IREE::Flow::FlowDialect>();
+  };
+  passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(options));
+  FunctionLikeNest(passManager)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass);
 }
 
 // Pipeline to first create `flow.dispatch.region` ops and then lower to

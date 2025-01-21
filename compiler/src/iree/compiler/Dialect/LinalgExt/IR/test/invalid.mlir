@@ -57,12 +57,12 @@ func.func @scatter_extra_outputs(
 
 // -----
 
-func.func @scatter_mistmatch_dim_map_entries(
-    %update : tensor<?x?xf32>, %indices : tensor<?x1xi32>,
+func.func @scatter_empty_dim_map(
+    %update : tensor<?x?xf32>, %indices : tensor<?x2xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
-  // expected-error @+1 {{invalid number of dimension map entries}}
-  %0 = iree_linalg_ext.scatter dimension_map = [0, 1] unique_indices(true)
-      ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
+  // expected-error @below {{'iree_linalg_ext.scatter' op dimension map must have at least one element}}
+  %0 = iree_linalg_ext.scatter dimension_map = [] unique_indices(true)
+      ins(%update, %indices : tensor<?x?xf32>, tensor<?x2xi32>)
       outs(%original : tensor<?x?xf32>) {
       ^bb0(%arg1: f32, %arg2: f32):
         %1 = arith.addf %arg1, %arg2 : f32
@@ -190,16 +190,16 @@ func.func @scatter_dim_mismatch(
 
 func.func @scatter_dim_mismatch(
     %update : tensor<48x?x2x11xf32>, %indices : tensor<48x?x1xi32>,
-    %original : tensor<?x10xf32>) -> tensor<?x10xf32> {
-  // expected-error @below {{'iree_linalg_ext.scatter' op shape of update value dim#3 must match original value at dim#1}}
+    %original : tensor<2x?x10xf32>) -> tensor<2x?x10xf32> {
+  // expected-error @below {{'iree_linalg_ext.scatter' op shape of update value dim#2 must match original value at dim#1}}
   %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%update, %indices : tensor<48x?x2x11xf32>, tensor<48x?x1xi32>)
-    outs(%original : tensor<?x10xf32>) {
+    outs(%original : tensor<2x?x10xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
       %1 = arith.addf %arg1, %arg2 : f32
       iree_linalg_ext.yield %1 : f32
-    } -> tensor<?x10xf32>
-  return %0 : tensor<?x10xf32>
+    } -> tensor<2x?x10xf32>
+  return %0 : tensor<2x?x10xf32>
 }
 
 // -----
@@ -207,7 +207,7 @@ func.func @scatter_dim_mismatch(
 func.func @scatter_rank_mismatch(
     %update : tensor<?x?x?x?xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
-  // expected-error @below {{'iree_linalg_ext.scatter' op update operand's slice rank (3 = rank(updates) - batch rank) exceeds the rank of the original value (2)}}
+  // expected-error @below {{'iree_linalg_ext.scatter' op expected indices to be equal to batch rank or batch rank + 1}}
   %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%update, %indices : tensor<?x?x?x?xf32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xf32>) {
@@ -223,7 +223,7 @@ func.func @scatter_rank_mismatch(
 func.func @scatter_rank_mismatch(
     %update : tensor<?x?x?x?xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
-  // expected-error @below {{'iree_linalg_ext.scatter' op update operand's slice rank (3 = rank(updates) - batch rank) exceeds the rank of the original value (2)}}
+  // expected-error @below {{'iree_linalg_ext.scatter' op expected indices to be equal to batch rank or batch rank + 1}}
   %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%update, %indices : tensor<?x?x?x?xf32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xf32>) {
@@ -239,7 +239,7 @@ func.func @scatter_rank_mismatch(
 func.func @scatter_rank_mismatch(
     %update : tensor<?x?x?x?x?xf32>, %indices : tensor<?x?x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
-  // expected-error @below {{'iree_linalg_ext.scatter' op update operand's slice rank (3 = rank(updates) - batch rank) exceeds the rank of the original value (2)}}
+  // expected-error @below {{'iree_linalg_ext.scatter' op expected indices to be equal to batch rank or batch rank + 1}}
   %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%update, %indices : tensor<?x?x?x?x?xf32>, tensor<?x?x1xi32>)
     outs(%original : tensor<?x?xf32>) {
@@ -387,27 +387,10 @@ func.func @scatter_yield_mismatch(
 
 // -----
 
-func.func @scatter_index_depth_dynamic(
-    %update : tensor<?x?xi64>, %indices : tensor<?x?xi32>,
-    %original : tensor<?x?xi64>) -> tensor<?x?xi64> {
-  // expected-error @+1 {{expected index depth is static}}
-  %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
-    ins(%update, %indices : tensor<?x?xi64>, tensor<?x?xi32>)
-    outs(%original : tensor<?x?xi64>) {
-    ^bb0(%arg1: i64, %arg2: i64):
-      %1 = arith.addi %arg1, %arg2 : i64
-      %2 = arith.trunci %1 : i64 to i32
-      iree_linalg_ext.yield %1, %2 : i64, i32
-    } -> tensor<?x?xi64>
-  return %0 : tensor<?x?xi64>
-}
-
-// -----
-
 func.func @scatter_index_depth_too_large(
     %original: tensor<?x?xf32>, %indices: tensor<?x3xi32>,
     %update: tensor<?x?xf32>) -> tensor<?x?xf32> {
-  // expected-error @below {{'iree_linalg_ext.scatter' op index depth is greater than the rank of the original value}}
+  // expected-error @below {{'iree_linalg_ext.scatter' op expected update to be at least the rank of non indexed original dims}}
   %0 = iree_linalg_ext.scatter
     dimension_map = [0, 1, 2]
     unique_indices(true)
@@ -425,7 +408,7 @@ func.func @scatter_index_depth_too_large(
 func.func @scatter_index_depth_too_small(
     %update : tensor<?x1xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?x1xf32>) -> tensor<?x?xf32> {
-  // expected-error @below {{'iree_linalg_ext.scatter' op update and index depth does not fully index original}}
+  // expected-error @below {{'iree_linalg_ext.scatter' op expected indices to be equal to batch rank or batch rank + 1}}
   %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%update, %indices : tensor<?x1xf32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?x1xf32>) {

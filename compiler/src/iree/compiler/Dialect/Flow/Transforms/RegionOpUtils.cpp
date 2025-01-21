@@ -293,7 +293,7 @@ reifyDynamicResultDimsImpl(OpBuilder &b, Value value,
       return failure();
     for (int64_t i = 0; i < shapedType.getRank(); ++i)
       if (shapedType.isDynamicDim(i))
-        dynamicDims.push_back(dims[opResult.getResultNumber()][i].get<Value>());
+        dynamicDims.push_back(cast<Value>(dims[opResult.getResultNumber()][i]));
     return success();
   }
 
@@ -915,17 +915,20 @@ getCloneableOps(IREE::Flow::DispatchRegionOp regionOp) {
 /// Clone producers into the dispatch region.
 LogicalResult cloneProducersToRegion(RewriterBase &rewriter,
                                      IREE::Flow::DispatchRegionOp regionOp) {
-  SmallVector<Operation *> cloneableOps = getCloneableOps(regionOp);
-  bool sortResult = mlir::computeTopologicalSorting(cloneableOps);
-  (void)sortResult;
-  assert(sortResult && "could not compute topological sorting");
+  SmallVector<Operation *> cloneableOps;
+  do {
+    cloneableOps = getCloneableOps(regionOp);
+    bool sortResult = mlir::computeTopologicalSorting(cloneableOps);
+    (void)sortResult;
+    assert(sortResult && "could not compute topological sorting");
 
-  for (Operation *producer : llvm::reverse(cloneableOps)) {
-    if (failed(
-            clonePrecedingOpIntoDispatchRegion(rewriter, producer, regionOp))) {
-      return failure();
+    for (Operation *producer : llvm::reverse(cloneableOps)) {
+      if (failed(clonePrecedingOpIntoDispatchRegion(rewriter, producer,
+                                                    regionOp))) {
+        return failure();
+      }
     }
-  }
+  } while (!cloneableOps.empty());
 
   return success();
 }

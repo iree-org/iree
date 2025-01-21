@@ -62,6 +62,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:AMDGPUDialect",
         "@llvm-project//mlir:ArithValueBoundsOpInterfaceImpl",
         "@llvm-project//mlir:BufferizationTransformOps",
+        "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:GPUTransformOps",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LinalgTransformOps",

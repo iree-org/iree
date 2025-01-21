@@ -44,13 +44,17 @@ hal.executable @i4_dequant {
 
 //   CHECK-LABEL: spirv.func @i4_dequant()
 
-//         CHECK: spirv.VectorShuffle [0 : i32, 1 : i32] {{.*}} : vector<4xi32>, vector<4xi32> -> vector<2xi32>
-//         CHECK: spirv.BitwiseAnd
-//         CHECK: spirv.ShiftRightLogical
-//         CHECK: spirv.VectorShuffle [0 : i32, 2 : i32, 1 : i32, 3 : i32]
-//         CHECK: spirv.BitwiseAnd
+//         CHECK: %[[BYTE1:.+]] = spirv.VectorShuffle [0 : i32, 1 : i32] {{.*}} : vector<4xi32>, vector<4xi32> -> vector<2xi32>
+//         CHECK: %[[MASKED:.+]] = spirv.BitwiseAnd %[[BYTE1]]
+//         CHECK: %[[SHIFTED:.+]] = spirv.ShiftRightLogical %[[BYTE1]]
+//         CHECK: %[[COPIED:.+]] = spirv.VectorShuffle [0 : i32, 2 : i32, 1 : i32, 3 : i32] %[[MASKED]], %[[SHIFTED]] : vector<2xi32>, vector<2xi32> -> vector<4xi32>
+//         CHECK: %[[MASKED2:.+]] = spirv.BitwiseAnd %[[COPIED]]
 //         CHECK: spirv.VectorShuffle [2 : i32, 3 : i32] {{.*}} : vector<4xi32>, vector<4xi32> -> vector<2xi32>
-// CHECK-COUNT-3: spirv.VectorShuffle [0 : i32, 2 : i32, 1 : i32, 3 : i32]
+//         CHECK: spirv.VectorShuffle [0 : i32, 1 : i32]
+//         CHECK: spirv.VectorShuffle [0 : i32, 2 : i32, 1 : i32, 3 : i32]
+//         CHECK: spirv.VectorShuffle [2 : i32, 3 : i32]
+//         CHECK: spirv.VectorShuffle [0 : i32, 2 : i32, 1 : i32, 3 : i32]
+//     CHECK-NOT: spirv.VectorShuffle
 
 // CHECK-COUNT-4: spirv.ConvertUToF {{.+}} : vector<4xi32> to vector<4xf32>
 // CHECK-COUNT-4: spirv.FSub
