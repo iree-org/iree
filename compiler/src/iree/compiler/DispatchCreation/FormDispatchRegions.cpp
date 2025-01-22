@@ -633,11 +633,6 @@ isFusableWithProducer(OpOperand &operand,
     return true;
   }
 
-  // TODO: Enable scatter fusion when supported by backends.
-  if (isa<IREE::LinalgExt::ScatterOp>(consumer)) {
-    return false;
-  }
-
   if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(consumer)) {
     // Fuse with the rope computation if it is a gather operation.
     if (IREE::LinalgExt::isGatherlikeOp(producer)) {
