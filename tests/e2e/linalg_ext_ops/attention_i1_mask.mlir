@@ -14,8 +14,10 @@ func.func @attention1x4x4_i1_mask() {
                                             [0.9, 1.0, 1.1, 1.2],
                                             [1.3, 1.4, 1.5, 1.6]]]> : tensor<1x4x4xf32>
 
-  %i8mask = util.unfoldable_constant dense<[165, 165]> : tensor<2xi8>
-  %mask = flow.tensor.bitcast %i8mask : tensor<2xi8> -> tensor<1x4x4xi1>
+  %mask = util.unfoldable_constant dense<[[[1, 0, 1, 0],
+                                           [0, 1, 0, 1],
+                                           [1, 0, 1, 0],
+                                           [0, 1, 0, 1]]]> : tensor<1x4x4xi1>
 
   %scale = arith.constant 0.5 : f32
   %1 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
@@ -55,8 +57,10 @@ func.func @attention1x4x4_i1_mask_all_ones() {
                                             [0.9, 1.0, 1.1, 1.2],
                                             [1.3, 1.4, 1.5, 1.6]]]> : tensor<1x4x4xf32>
 
-  %i8mask = util.unfoldable_constant dense<[255, 255]> : tensor<2xi8>
-  %mask = flow.tensor.bitcast %i8mask : tensor<2xi8> -> tensor<1x4x4xi1>
+  %mask = util.unfoldable_constant dense<[[[1, 1, 1, 1],
+                                           [1, 1, 1, 1],
+                                           [1, 1, 1, 1],
+                                           [1, 1, 1, 1]]]> : tensor<1x4x4xi1>
 
   %scale = arith.constant 0.5 : f32
   %1 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
@@ -96,8 +100,10 @@ func.func @attention1x4x4_i1_mask_tril() {
                                             [0.9, 1.0, 1.1, 1.2],
                                             [1.3, 1.4, 1.5, 1.6]]]> : tensor<1x4x4xf32>
 
-  %i8mask = util.unfoldable_constant dense<[140, 239]> : tensor<2xi8>
-  %mask = flow.tensor.bitcast %i8mask : tensor<2xi8> -> tensor<1x4x4xi1>
+  %mask = util.unfoldable_constant dense<[[[1, 0, 0, 0],
+                                           [1, 1, 0, 0],
+                                           [1, 1, 1, 0],
+                                           [1, 1, 1, 1]]]> : tensor<1x4x4xi1>
 
   %scale = arith.constant 0.5 : f32
   %1 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
