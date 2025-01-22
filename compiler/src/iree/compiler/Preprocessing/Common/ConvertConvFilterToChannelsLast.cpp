@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -26,8 +27,8 @@ namespace mlir::iree_compiler::Preprocessing {
 #define GEN_PASS_DEF_CONVERTCONVFILTERTOCHANNELSLASTPASS
 #include "iree/compiler/Preprocessing/Common/Passes.h.inc"
 
-// Utility function to swap the last two dimensions.
-static AffineMap constructFilterMap(AffineMap map, ArrayRef<int64_t> perm) {
+static AffineMap applyPermutationToResults(AffineMap map,
+                                           ArrayRef<int64_t> perm) {
   unsigned numDims = map.getNumDims();
   ArrayRef<AffineExpr> mapResults = map.getResults();
   SmallVector<AffineExpr, 4> exprs;
@@ -37,27 +38,23 @@ static AffineMap constructFilterMap(AffineMap map, ArrayRef<int64_t> perm) {
   return AffineMap::get(numDims, map.getNumSymbols(), exprs, map.getContext());
 }
 
-// Utility function to create a transpose operation.
-static Value createTransposeOp(PatternRewriter &rewriter, Location loc,
+static Value createTransposeOp(RewriterBase &rewriter, Location loc,
                                Value tensor, ArrayRef<int64_t> perm) {
   SmallVector<OpFoldResult, 4> dimSizes =
       tensor::getMixedSizes(rewriter, loc, tensor);
-  // Dim index of H, W, F, C
-  SmallVector<OpFoldResult, 4> transposeResultDims;
-  for (int i = 0; i < perm.size(); ++i) {
-    transposeResultDims.push_back(dimSizes[perm[i]]);
-  }
+  applyPermutationToVector(dimSizes, perm);
 
   auto tensorType = cast<RankedTensorType>(tensor.getType());
   auto emptyTensor = rewriter.create<tensor::EmptyOp>(
-      loc, transposeResultDims, tensorType.getElementType());
+      loc, dimSizes, tensorType.getElementType());
   return rewriter.create<linalg::TransposeOp>(loc, tensor, emptyTensor, perm)
       .getResult()[0];
 }
 
-LogicalResult convertConvFilterToTargetLayout(linalg::Conv2DNhwcHwcfOp convOp,
-                                              PatternRewriter &rewriter,
-                                              SmallVector<int64_t> &perm) {
+static LogicalResult
+convertConvFilterToTargetLayout(linalg::Conv2DNhwcHwcfOp convOp,
+                                RewriterBase &rewriter,
+                                SmallVector<int64_t> &perm) {
   Location loc = convOp.getLoc();
 
   Value input = convOp.getInputs()[0];
@@ -68,7 +65,7 @@ LogicalResult convertConvFilterToTargetLayout(linalg::Conv2DNhwcHwcfOp convOp,
   AffineMap filterMap = convOp.getIndexingMapsArray()[1];
   AffineMap outputMap = convOp.getIndexingMapsArray()[2];
 
-  AffineMap transposedFilterMap = constructFilterMap(filterMap, perm);
+  AffineMap transposedFilterMap = applyPermutationToResults(filterMap, perm);
   Value transposedFilter = createTransposeOp(rewriter, loc, filter, perm);
 
   SmallVector<utils::IteratorType> iterators = convOp.getIteratorTypesArray();
