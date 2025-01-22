@@ -110,8 +110,6 @@ public:
                              ConstExprHoistingPolicy::ENABLE_HOIST)
           return WalkResult::advance();
         for (Value constExprResult : iterOp->getResults()) {
-          auto *resultInfo = constExprs.lookup(constExprResult);
-          assert(resultInfo && "must have const-expr info");
           if (failed(hoistConstExpr(constExprResult, hoistedMap, moduleSymbols,
                                     constExprs))) {
             return WalkResult::interrupt();
