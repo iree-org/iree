@@ -125,12 +125,25 @@ getDefaultTuningSpec(ModuleOp module,
 
   // Try to look up the default tuning spec for this architecture, if any.
   StringRef arch = gpuTarget.getArch();
+  std::optional<std::string> sku = gpuTarget.getSKU();
   std::string defaultTuningSpecName =
       llvm::formatv("iree_default_tuning_spec_{}.mlir", arch);
   std::optional<StringRef> defaultTuningSpecSource;
-  EmbeddedDataDirectory::withGlobal([&](EmbeddedDataDirectory &dir) {
-    defaultTuningSpecSource = dir.getFile(defaultTuningSpecName);
-  });
+  if (sku) {
+    std::string defaultSKUTuningSpecName =
+        llvm::formatv("iree_default_tuning_spec_{}.mlir", sku);
+    EmbeddedDataDirectory::withGlobal([&](EmbeddedDataDirectory &dir) {
+      defaultTuningSpecSource = dir.getFile(defaultSKUTuningSpecName);
+    });
+  }
+  if (!defaultTuningSpecSource) {
+    // If SKU-specific spec is not found, fall back to the default
+    // architecture-based tuning spec.
+    EmbeddedDataDirectory::withGlobal([&](EmbeddedDataDirectory &dir) {
+      defaultTuningSpecSource = dir.getFile(defaultTuningSpecName);
+    });
+  }
+
   if (!defaultTuningSpecSource) {
     // Not all architectures are expected to provide default tuning specs, so
     // this shouldn't be considered a hard error (but that's up to the caller).

@@ -499,6 +499,8 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
     bool supportsTF32InputMMAOps() const;
     // Returns true if this target supports TensorCore synchronized MMA ops.
     bool supportsSyncMMAOps() const;
+    // Returns the SKU of the target GPU if available.
+    std::optional<std::string> getSKU() const;
   }];
 }
 
