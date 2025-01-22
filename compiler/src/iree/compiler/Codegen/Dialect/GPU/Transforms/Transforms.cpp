@@ -287,6 +287,237 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
   return success();
 }
 
+/// Return whether a parallel insert slice operation can be collapsed with
+/// the given reassociation indices. For a slice to be collapsible, each group
+/// of collapsed dimensions must be fully contiguous in the destination type.
+/// For example, the following parallel_insert_slice can be collapsed:
+/// ```
+///   tensor.parallel_insert_slice ...
+///     tensor<1x2x3x4x5xf32> into tensor<?x?x3x?x5xf32>
+///   ...
+///   // Collapsed by:
+///   tensor.collapse_shape %result [[0, 1, 2], [3, 4]]
+///     tensor<?x?x3x?x5> into tensor<?x?x?xf32>
+/// ```
+/// Since the slice <1x2x3> is contiguous in <?x?x3> for the first group, and
+/// the slice <4x5> is contiguous in <?x5> for the second group.
+static LogicalResult
+collapsibleSlicePrecondition(RewriterBase &rewriter,
+                             tensor::ParallelInsertSliceOp sliceOp,
+                             SmallVector<ReassociationIndices> reassociations) {
+  if (!areAllConstantIntValue(sliceOp.getMixedStrides(), 1)) {
+    return rewriter.notifyMatchFailure(sliceOp, "strides are not all 1");
+  }
+  RankedTensorType sliceType = sliceOp.getSourceType();
+  if (sliceOp.getMixedSizes().size() != sliceType.getRank()) {
+    return rewriter.notifyMatchFailure(
+        sliceOp, "parallel insert slice is rank reducing");
+  }
+
+  SmallVector<OpFoldResult> sizes = sliceOp.getMixedSizes();
+  RankedTensorType fullTensorType = sliceOp.getDestType();
+  ArrayRef<int64_t> destShape = fullTensorType.getShape();
+  for (auto group : reassociations) {
+    bool isFullSlice = true;
+    for (auto idx : llvm::reverse(group)) {
+      std::optional<int64_t> constSize = getConstantIntValue(sizes[idx]);
+      // If the size is dynamic, then conservatively assume it is not full.
+      if (!constSize.has_value()) {
+        if (!isFullSlice) {
+          return rewriter.notifyMatchFailure(
+              sliceOp,
+              "parallel insert slice is not contiguous in the destination");
+        }
+        isFullSlice = false;
+        continue;
+      }
+      if (constSize.value() == 1) {
+        if (destShape[idx] == 1) {
+          continue;
+        }
+        // Unit slices are okay as long as they are the outermost sliced dims.
+        // Any other non-unit sliced dimension that is more outer than the unit
+        // slice would be invalid, so we set `isFullSlice` to false.
+        isFullSlice = false;
+        continue;
+      }
+      // If the size is not unit, then the slice must be full so far.
+      if (!isFullSlice) {
+        return rewriter.notifyMatchFailure(
+            sliceOp,
+            "parallel insert slice is not contiguous in the destination");
+      }
+      if (constSize.value() != destShape[idx]) {
+        isFullSlice = false;
+      }
+    }
+  }
+
+  return success();
+}
+
+/// Collapse all `ops` with the given `reassociations`. All `ops` are expected
+/// to have equivalent offsets, sizes, and strides. All strides are expected to
+/// be 1. This function assumes that the parallelInsertOp passes the
+/// collapsibleSlicePrecondition.
+static tensor::ParallelInsertSliceOp
+collapseParallelInsertOp(RewriterBase &rewriter,
+                         tensor::ParallelInsertSliceOp parallelInsertOp,
+                         SmallVector<ReassociationIndices> reassociations) {
+  // Compute the collapsed offsets, sizes, and strides.
+  rewriter.setInsertionPoint(parallelInsertOp.getParallelCombiningParent());
+  Location loc = parallelInsertOp->getLoc();
+  int64_t resultIdx = parallelInsertOp.getTiedOpResult().getResultNumber();
+  auto forallOp = parallelInsertOp->getParentOfType<scf::ForallOp>();
+  Value loopInit = forallOp.getOutputs()[resultIdx];
+  SmallVector<OpFoldResult> mixedInitSizes =
+      tensor::getMixedSizes(rewriter, loc, loopInit);
+  auto prod = [&](ArrayRef<OpFoldResult> vals) -> OpFoldResult {
+    auto mulMap = AffineMap::get(
+        2, 0, {rewriter.getAffineDimExpr(0) * rewriter.getAffineDimExpr(1)});
+    OpFoldResult product = rewriter.getIndexAttr(1);
+    for (OpFoldResult val : vals) {
+      product = affine::makeComposedFoldedAffineApply(rewriter, loc, mulMap,
+                                                      {product, val});
+    }
+    return product;
+  };
+  SmallVector<OpFoldResult> offsets = parallelInsertOp.getMixedOffsets();
+  SmallVector<OpFoldResult> sizes = parallelInsertOp.getMixedSizes();
+  SmallVector<OpFoldResult> newSizes, newOffsets;
+  for (auto group : reassociations) {
+    if (group.size() == 1) {
+      newOffsets.push_back(offsets[group[0]]);
+      newSizes.push_back(sizes[group[0]]);
+      continue;
+    }
+    ArrayRef<OpFoldResult> basis(mixedInitSizes.begin() + group.front(),
+                                 mixedInitSizes.begin() + group.back() + 1);
+    ArrayRef<OpFoldResult> groupOffsets(offsets.begin() + group.front(),
+                                        offsets.begin() + group.back() + 1);
+    SmallVector<Value> offsetVals =
+        llvm::map_to_vector(groupOffsets, [&](OpFoldResult ofr) {
+          return getValueOrCreateConstantIndexOp(rewriter, loc, ofr);
+        });
+    OpFoldResult collapsedOffset =
+        rewriter
+            .create<affine::AffineLinearizeIndexOp>(loc, offsetVals, basis,
+                                                    /*disjoint=*/true)
+            .getResult();
+    ArrayRef<OpFoldResult> groupSizes(sizes.begin() + group.front(),
+                                      sizes.begin() + group.back() + 1);
+    OpFoldResult collapsedSize = prod(groupSizes);
+    newOffsets.push_back(collapsedOffset);
+    newSizes.push_back(collapsedSize);
+  }
+  SmallVector<OpFoldResult> newStrides(newSizes.size(),
+                                       rewriter.getIndexAttr(1));
+
+  // Collapse the slice source.
+  loc = parallelInsertOp.getParallelCombiningParent()->getLoc();
+  rewriter.setInsertionPoint(parallelInsertOp.getParallelCombiningParent());
+  auto newCollapse = rewriter.create<tensor::CollapseShapeOp>(
+      loc, parallelInsertOp.getSource(), reassociations);
+
+  // Collapse the parallel insert slice.
+  rewriter.setInsertionPoint(parallelInsertOp);
+  auto newInsertOp = rewriter.replaceOpWithNewOp<tensor::ParallelInsertSliceOp>(
+      parallelInsertOp, newCollapse, parallelInsertOp.getDest(), newOffsets,
+      newSizes, newStrides);
+  return newInsertOp;
+}
+
+FailureOr<scf::ForallOp>
+fuseCollapseShapeIntoProducerForall(RewriterBase &rewriter,
+                                    scf::ForallOp forallOp,
+                                    tensor::CollapseShapeOp collapseOp) {
+  // Check that there is a single user of the collapsed result.
+  auto forallResult = cast<OpResult>(collapseOp.getSrc());
+  if (!forallResult.hasOneUse()) {
+    return rewriter.notifyMatchFailure(forallOp,
+                                       "forall result has multiple uses");
+  }
+
+  // Get the result's corresponding parallel_insert_slice op.
+  SmallVector<Operation *> parallelInsertOps = forallOp.getCombiningOps(
+      forallOp.getRegionIterArgs()[forallResult.getResultNumber()]);
+  if (parallelInsertOps.size() != 1) {
+    return rewriter.notifyMatchFailure(
+        forallOp, "Expected a single parallel_insert_slice");
+  }
+
+  auto parallelInsertOp =
+      dyn_cast<tensor::ParallelInsertSliceOp>(parallelInsertOps.front());
+  if (!parallelInsertOp) {
+    return rewriter.notifyMatchFailure(
+        forallOp, "Expected parallel_insert_slice combining op");
+  }
+
+  // Collapse the parallel insert slice op.
+  SmallVector<ReassociationIndices> reassociations =
+      collapseOp.getReassociationIndices();
+  if (failed(collapsibleSlicePrecondition(rewriter, parallelInsertOp,
+                                          reassociations))) {
+    return failure();
+  }
+  tensor::ParallelInsertSliceOp newParallelInsertOp =
+      collapseParallelInsertOp(rewriter, parallelInsertOp, reassociations);
+
+  // At this point, the newParallelInsertOp still has the destination of the
+  // original parallel insert op, so the destination is the original expanded
+  // init block argument, and we can use it to get the sizes for the expand.
+  // The block argument will be corrected later, when the forall op is replaced.
+  Value initArg = newParallelInsertOp.getDest();
+  Value forallOutput = forallOp.getOutputs()[forallResult.getResultNumber()];
+  Location loc = forallOutput.getLoc();
+  rewriter.setInsertionPointAfterValue(forallOutput);
+  SmallVector<OpFoldResult> initSizes =
+      tensor::getMixedSizes(rewriter, loc, forallOutput);
+  loc = initArg.getLoc();
+  rewriter.setInsertionPointToStart(forallOp.getBody());
+  auto expandedInitArg = rewriter.create<tensor::ExpandShapeOp>(
+      loc, initArg.getType(), initArg, reassociations, initSizes);
+
+  // The new parallel insert slice is collapsed, so don't use the expanded init.
+  // Also don't replace the expand shape src with its own result.
+  rewriter.replaceUsesWithIf(
+      initArg, expandedInitArg.getResult(), [&](OpOperand &operand) {
+        return operand != expandedInitArg.getSrcMutable() &&
+               operand != newParallelInsertOp.getDestMutable();
+      });
+
+  // Now create a new scf::Forall with a collapsed loop init.
+  loc = forallOp->getLoc();
+  rewriter.setInsertionPoint(forallOp);
+  SmallVector<Value> newForallOutputs(forallOp.getOutputs());
+  Value collapsedLoopInit = rewriter.create<tensor::CollapseShapeOp>(
+      loc, newForallOutputs[forallResult.getResultNumber()], reassociations);
+  newForallOutputs[forallResult.getResultNumber()] = collapsedLoopInit;
+
+  scf::ForallOp newForallOp = rewriter.create<scf::ForallOp>(
+      loc, forallOp.getMixedLowerBound(), forallOp.getMixedUpperBound(),
+      forallOp.getMixedStep(), newForallOutputs, forallOp.getMappingAttr());
+
+  SmallVector<Value> argReplacements(newForallOp.getInductionVars());
+  argReplacements.append(newForallOp.getRegionIterArgs().begin(),
+                         newForallOp.getRegionIterArgs().end());
+  newForallOp.getTerminator()->erase();
+  rewriter.mergeBlocks(forallOp.getBody(), newForallOp.getBody(),
+                       argReplacements);
+
+  // Replaces the uses of the old scf.forall with the new scf.forall
+  rewriter.replaceOp(collapseOp,
+                     newForallOp.getResult(forallResult.getResultNumber()));
+  for (int idx = 0; idx < forallOp->getNumResults(); ++idx) {
+    if (idx == forallResult.getResultNumber()) {
+      continue;
+    }
+    forallOp->getResult(idx).replaceAllUsesWith(newForallOp->getResult(idx));
+  }
+  rewriter.eraseOp(forallOp);
+  return newForallOp;
+}
+
 //===----------------------------------------------------------------------===//
 // MultiMmaOp Lowering
 //===----------------------------------------------------------------------===//
