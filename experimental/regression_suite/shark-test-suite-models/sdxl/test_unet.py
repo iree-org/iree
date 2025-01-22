@@ -219,7 +219,7 @@ FP16_UNET_FLAGS = [
 
 INT8_PUNET_FLAGS = [
     f"--iree-codegen-transform-dialect-library={iree_test_path_extension}/attention_and_matmul_spec_punet.mlir",
-    "--iree-preprocessing-pass-pipeline=builtin.module(util.func(iree-global-opt-raise-special-ops, iree-flow-canonicalize), iree-preprocessing-transpose-convolution-pipeline, iree-preprocessing-pad-to-intrinsics)",
+    "--iree-preprocessing-pass-pipeline=builtin.module(util.func(iree-flow-canonicalize), iree-preprocessing-transpose-convolution-pipeline, iree-preprocessing-pad-to-intrinsics)",
 ]
 
 ROCM_UNET_PIPELINE_FP16_COMPILE_FLAGS = [
