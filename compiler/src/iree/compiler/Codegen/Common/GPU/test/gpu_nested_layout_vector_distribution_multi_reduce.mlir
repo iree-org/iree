@@ -163,15 +163,15 @@ builtin.module attributes { transform.with_named_sequence } {
 // Subgroup reduction
 // CHECK-DAG: %[[ALLOC:.+]] = memref.alloc() : memref<32x2xf32, #gpu.address_space<workgroup>>
 // CHECK: gpu.barrier
-// CHECK-DAG: %[[TIDX0:.+]] = affine.apply affine_map<()[s0] -> (s0 mod 16)>()[%thread_id_x]
-// CHECK-DAG: %[[TIDX1:.+]] = affine.apply affine_map<()[s0] -> (s0 mod 16 + 16)>()[%thread_id_x]
-// CHECK-DAG: %[[SGIDX:.+]] = affine.apply affine_map<()[s0] -> ((s0 floordiv 64) mod 2)>()[%thread_id_x]
+// CHECK-DAG: %[[SGID:.+]]:3 = affine.delinearize_index %thread_id_x into (2, 64)
+// CHECK-DAG: %[[TIDX:.+]]:2 = affine.delinearize_index %thread_id_x into (16)
 // CHECK-DAG: %[[EXTRACT0:.+]] = vector.extract %[[THREAD_RED4]][0] : vector<1x1xf32> from vector<2x1x1xf32>
 // CHECK-DAG: %[[EXTRACT1:.+]] = vector.extract %[[THREAD_RED4]][1] : vector<1x1xf32> from vector<2x1x1xf32>
-// CHECK-DAG: vector.transfer_write %[[EXTRACT0]], %[[ALLOC]][%[[TIDX0]], %[[SGIDX]]]
-// CHECK-DAG: vector.transfer_write %[[EXTRACT1]], %[[ALLOC]][%[[TIDX1]], %[[SGIDX]]]
+// CHECK-DAG: %[[TIDX1:.+]] = affine.linearize_index disjoint [%c1, %[[TIDX]]#1] by (2, 16) : index
+// CHECK-DAG: vector.transfer_write %[[EXTRACT0]], %[[ALLOC]][%[[TIDX]]#1, %[[SGID]]#1]
+// CHECK-DAG: vector.transfer_write %[[EXTRACT1]], %[[ALLOC]][%[[TIDX1]], %[[SGID]]#1]
 // CHECK: gpu.barrier
-// CHECK-DAG: %[[READ0:.+]] = vector.transfer_read %alloc[%[[TIDX0]], %c0], {{.*}} {in_bounds = [true, true]} : memref<32x2xf32, #gpu.address_space<workgroup>>, vector<1x2xf32>
+// CHECK-DAG: %[[READ0:.+]] = vector.transfer_read %alloc[%[[TIDX]]#1, %c0], {{.*}} {in_bounds = [true, true]} : memref<32x2xf32, #gpu.address_space<workgroup>>, vector<1x2xf32>
 // CHECK-DAG: %[[GATHER0:.+]] = vector.insert_strided_slice %[[READ0]], %[[CST]] {offsets = [0, 0, 0, 0, 0, 0], strides = [1, 1]} : vector<1x2xf32> into vector<2x1x1x1x1x2xf32>
 // CHECK-DAG: %[[READ1:.+]] = vector.transfer_read %alloc[%[[TIDX1]], %c0], %cst_0 {in_bounds = [true, true]} : memref<32x2xf32, #gpu.address_space<workgroup>>, vector<1x2xf32>
 // CHECK-DAG: %[[GATHER1:.+]] = vector.insert_strided_slice %[[READ1]], %[[GATHER0]] {offsets = [1, 0, 0, 0, 0, 0], strides = [1, 1]} : vector<1x2xf32> into vector<2x1x1x1x1x2xf32>
