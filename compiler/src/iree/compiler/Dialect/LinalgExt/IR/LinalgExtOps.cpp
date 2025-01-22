@@ -211,13 +211,19 @@ LogicalResult ScatterOp::verify() {
   // updateSlice[indexDepth..] == original[indexDepth..]
 
   {
-    auto [updateIt, originalIt] = llvm::mismatch(
-        getUpdateSliceShape(), originalType.getShape().drop_front(indexDepth));
-    if (updateIt != getUpdateSliceShape().end()) {
-      return op->emitOpError("shape of update value dim#")
-             << (updateIt - updateType.getShape().begin())
-             << " must match original value at dim#"
-             << (originalIt - originalType.getShape().begin());
+    for (auto idx : llvm::seq<int64_t>(0, getUpdateSliceRank())) {
+      int64_t updateDim = idx + batchRank;
+      int64_t origDim = idx + indexDepth;
+      if (originalType.isDynamicDim(origDim) ||
+          updateType.isDynamicDim(updateDim)) {
+        continue;
+      }
+      if (originalType.getDimSize(origDim) !=
+          updateType.getDimSize(updateDim)) {
+        return op->emitOpError("shape of update value dim#")
+               << (updateDim) << " must match original value at dim#"
+               << (origDim);
+      }
     }
   }
 

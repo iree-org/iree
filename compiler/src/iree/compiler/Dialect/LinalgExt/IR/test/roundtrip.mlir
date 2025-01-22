@@ -101,6 +101,34 @@ func.func @scatter_tensor_dynamic(
 
 // -----
 
+func.func @scatter_tensor_partial_dynamic(
+    %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,
+    %update: tensor<?x10xf32>) -> tensor<?x?xf32> {
+  %0 = iree_linalg_ext.scatter
+    dimension_map = [0]
+    unique_indices(true)
+    ins(%update, %indices : tensor<?x10xf32>, tensor<?x1xi32>)
+    outs(%original: tensor<?x?xf32>) {
+    ^bb0(%arg1: f32, %arg2: f32):
+      %1 = arith.addf %arg1, %arg2 : f32
+      iree_linalg_ext.yield %1 : f32
+    } -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+// CHECK-LABEL: func.func @scatter_tensor_partial_dynamic(
+//  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
+//  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]: tensor<?x1xi32>
+//  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]: tensor<?x10xf32>
+//       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.scatter
+//  CHECK-SAME:     dimension_map = [0]
+//  CHECK-SAME:     unique_indices(true)
+//  CHECK-SAME:     ins(%[[UPDATE]], %[[INDICES]]
+//  CHECK-SAME:     outs(%[[ORIGINAL]]
+//       CHECK:     iree_linalg_ext.yield %{{.+}} : f32
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
 func.func @scatter_tensor_dynamic_implicit_indices(
     %original: tensor<?x?xf32>, %indices: tensor<?xi32>,
     %update: tensor<?x?xf32>) -> tensor<?x?xf32> {
