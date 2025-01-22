@@ -218,7 +218,15 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
                      "ArrayRef<int64_t>":$threadTile,
                      "ArrayRef<int64_t>":$elementTile,
                      "ArrayRef<int64_t>":$subgroupStrides,
-                     "ArrayRef<int64_t>":$threadStrides)>
+                     "ArrayRef<int64_t>":$threadStrides)>,
+    AttrBuilder<(ins "NestedLayoutAttr":$source,
+                     "ArrayRef<int64_t>":$appendSubGroupLens,
+                     "ArrayRef<int64_t>":$appendBatchLens,
+                     "ArrayRef<int64_t>":$appendOuterLens,
+                     "ArrayRef<int64_t>":$appendThreadLens,
+                     "ArrayRef<int64_t>":$appendElementLens,
+                     "ArrayRef<int64_t>":$appendSubgroupStrides,
+                     "ArrayRef<int64_t>":$appendThreadStrides)>
   ];
 
   let extraClassDeclaration = [{
