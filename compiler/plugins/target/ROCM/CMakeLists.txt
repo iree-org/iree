@@ -152,8 +152,7 @@ endforeach()
 add_custom_command(
   OUTPUT ${_all_device_bc_files}
   DEPENDS ${_all_device_bc_deps}
-  POST_BUILD
-    ${_all_device_bc_copy_commands}
+  COMMAND ${_all_device_bc_copy_commands}
 )
 add_custom_target(iree_compiler_plugins_target_ROCM_GenDeviceLibs
   DEPENDS

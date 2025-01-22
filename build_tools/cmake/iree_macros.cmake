@@ -596,6 +596,7 @@ function(iree_symlink_tool)
 
   add_custom_command(
     TARGET "${_TARGET}"
+    POST_BUILD
     BYPRODUCTS
       "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}"
     COMMAND

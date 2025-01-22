@@ -376,8 +376,7 @@ endforeach()
 add_custom_command(
   OUTPUT ${_dylib_target_files}
   DEPENDS ${_dylib_src_files}
-  POST_BUILD
-    ${_dylib_copy_commands}
+  COMMAND ${_dylib_copy_commands}
 )
 
 add_custom_target(IREECompilerPythonDylibFiles
