@@ -256,6 +256,30 @@ util.func public @do_not_propagate_to_conv(%transposed_lhs: tensor<18x2x18x8xf32
 
 // -----
 
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+module {
+  util.func public @do_not_propagate_to_conv_generic(%arg0: tensor<18x2x18x8xf32>, %arg1: tensor<3x3x8x32xf32>) -> tensor<2x16x16x32xf32> {
+    %0 = tensor.empty() : tensor<2x18x18x8xf32>
+    %transposed = linalg.transpose ins(%arg0 : tensor<18x2x18x8xf32>) outs(%0 : tensor<2x18x18x8xf32>) permutation = [1, 0, 2, 3]
+    %1 = tensor.empty() : tensor<2x16x16x32xf32>
+    %2 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%transposed, %arg1 : tensor<2x18x18x8xf32>, tensor<3x3x8x32xf32>) outs(%1 : tensor<2x16x16x32xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %3 = arith.mulf %in, %in_0 : f32
+      %4 = arith.addf %out, %3 : f32
+      linalg.yield %4 : f32
+    } -> tensor<2x16x16x32xf32>
+    util.return %2 : tensor<2x16x16x32xf32>
+  }
+}
+
+// APROP-LABEL: util.func public @do_not_propagate_to_conv_generic
+//       APROP:   linalg.transpose
+//       APROP:   linalg.generic
+
+// -----
+
 util.func public @sink_through_expand_shape(%arg0: tensor<?x?x?xf32>) -> tensor<32x?x16x?x?xf32> {
   %c4 = arith.constant 4 : index
   %c3 = arith.constant 3 : index

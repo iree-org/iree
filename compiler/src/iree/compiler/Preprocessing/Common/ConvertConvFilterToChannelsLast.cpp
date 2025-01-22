@@ -31,8 +31,8 @@ static AffineMap applyPermutationToResults(AffineMap map,
                                            ArrayRef<int64_t> perm) {
   unsigned numDims = map.getNumDims();
   ArrayRef<AffineExpr> mapResults = map.getResults();
-  SmallVector<AffineExpr, 4> exprs;
-  for (int i = 0; i < perm.size(); ++i) {
+  SmallVector<AffineExpr> exprs;
+  for (int i = 0, e = perm.size(); i < e; ++i) {
     exprs.push_back(mapResults[perm[i]]);
   }
   return AffineMap::get(numDims, map.getNumSymbols(), exprs, map.getContext());
@@ -40,7 +40,7 @@ static AffineMap applyPermutationToResults(AffineMap map,
 
 static Value createTransposeOp(RewriterBase &rewriter, Location loc,
                                Value tensor, ArrayRef<int64_t> perm) {
-  SmallVector<OpFoldResult, 4> dimSizes =
+  SmallVector<OpFoldResult> dimSizes =
       tensor::getMixedSizes(rewriter, loc, tensor);
   applyPermutationToVector(dimSizes, perm);
 
