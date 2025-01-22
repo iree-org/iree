@@ -156,8 +156,8 @@ template <typename ConvOp>
 class ConvertConvToWinograd final : public OpRewritePattern<ConvOp> {
 public:
   using OpRewritePattern<ConvOp>::OpRewritePattern;
-  ConvertConvToWinograd<ConvOp>(MLIRContext *context, bool replaceAllConvs,
-                                PatternBenefit benefit = 1)
+  ConvertConvToWinograd(MLIRContext *context, bool replaceAllConvs,
+                        PatternBenefit benefit = 1)
       : OpRewritePattern<ConvOp>(context, benefit),
         replaceAllConvs(replaceAllConvs) {}
 
