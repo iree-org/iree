@@ -720,6 +720,18 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root, unsigned groupNum,
   }
 }
 
+static bool isAttentionMaskGenerator(Operation *op) {
+  for (OpOperand &use : op->getUses()) {
+    if (auto attention =
+            dyn_cast<IREE::LinalgExt::AttentionOp>(use.getOwner())) {
+      if (attention.getMask() == use.get()) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /// Some heuristic is needed to fuse a dispatchable op with root operations
 /// using tile + fuse. Using some heuristic, each root operation is tagged with
 /// an ID (using an IntegerAttr with name `kRootOpAttr`) and all dispatchable
@@ -771,6 +783,12 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // If it is part of a fusion group or root op, ignore it.
       if (hasFusionGroupsAttribute(&op) || hasRootOpAttribute(&op))
         continue;
+      // If the operation is used for masking an AttentionOp, then we always
+      // clone it. The Attention mask is usually big, and is always generated
+      // from a small tensor, so it's always good to clone it.
+      if (isAttentionMaskGenerator(&op)) {
+        continue;
+      }
       // Only look for Linalg ops here. Avoid moving `linalg.fill` that aren't
       // fused with anything else into their own dispatches since it is better
       // to convert them to splats. Also avoid moving dequantization-like ops

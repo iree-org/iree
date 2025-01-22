@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
@@ -790,6 +791,18 @@ FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
 // Utilities to make a dispatch region isolated from above
 //===---------------------------------------------------------------------===//
 
+static bool isAttentionMaskGenerator(Operation *op) {
+  for (OpOperand &use : op->getUses()) {
+    if (auto attention =
+            dyn_cast<IREE::LinalgExt::AttentionOp>(use.getOwner())) {
+      if (attention.getMask() == use.get()) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /// Operations that are cloned into dispatch regions formed with other
 /// operations as roots.
 bool isClonableIntoDispatchOp(Operation *op) {
@@ -805,6 +818,12 @@ bool isClonableIntoDispatchOp(Operation *op) {
     return true;
   }
   if (clEnableGatherFusion && LinalgExt::isGatherlikeOp(op)) {
+    return true;
+  }
+  // If the operation is used for masking an AttentionOp, then we always
+  // clone it. The Attention mask is usually big, and is always generated
+  // from a small tensor, so it's always good to clone it.
+  if (isAttentionMaskGenerator(op)) {
     return true;
   }
   if (isa<arith::ConstantOp>(op) || isa<complex::ConstantOp>(op)) {
