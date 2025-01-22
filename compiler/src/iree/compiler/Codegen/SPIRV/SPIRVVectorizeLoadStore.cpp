@@ -281,8 +281,8 @@ void MemRefUsageAnalysis::analyzeMemRefValue(Value value) {
 template <typename OpTy>
 class MemRefConversionPattern : public OpConversionPattern<OpTy> {
 public:
-  MemRefConversionPattern<OpTy>(MLIRContext *context,
-                                const MemRefUsageAnalysis &memrefUsageAnalysis)
+  MemRefConversionPattern(MLIRContext *context,
+                          const MemRefUsageAnalysis &memrefUsageAnalysis)
       : OpConversionPattern<OpTy>::OpConversionPattern(context),
         memrefUsageAnalysis(memrefUsageAnalysis) {}
 
