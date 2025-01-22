@@ -4,11 +4,19 @@
 // RUN:   --iree-codegen-notify-transform-strategy-application \
 // RUN:   --verify-diagnostics %s | FileCheck %s
 
+<<<<<<< HEAD
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=mi300x@hip \
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-hal-configure-target-executable-variants{target=rocm})))" \
 // RUN:   --iree-codegen-enable-default-tuning-specs \
 // RUN:   --iree-codegen-notify-transform-strategy-application \
 // RUN:   --verify-diagnostics %s | FileCheck %s --check-prefix=MI300X
+=======
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=mi300x \
+// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-hal-configure-target-executable-variants{target=rocm})))" \
+// RUN:   --iree-codegen-enable-default-tuning-specs \
+// RUN:   --iree-codegen-notify-transform-strategy-application \
+// RUN:   --verify-diagnostics %s | FileCheck %s --check-prefix=MI308X
+>>>>>>> 07c47a3859 ([Codegen][Tuner] Add support for per-sku tuning spec)
 
 // Check that the default configuration for mmt_2048x1280x5120_f16_f16_f32
 // applies to the `linalg.matmul_transpose_b` below.
@@ -17,9 +25,15 @@
 // CHECK:          linalg.generic
 // CHECK-SAME:       __tuning_spec_applied__
 
+<<<<<<< HEAD
 // MI300X-LABEL:  func.func @mmt_2048x1280x5120_f16_f16_f32
 // MI300X:          linalg.generic
 // MI300X-SAME:       __tuning_spec_applied__
+=======
+// MI308X-LABEL:  func.func @mmt_2048x1280x5120_f16_f16_f32
+// MI308X:          linalg.generic
+// MI308X-SAME:       __tuning_spec_applied__
+>>>>>>> 07c47a3859 ([Codegen][Tuner] Add support for per-sku tuning spec)
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,

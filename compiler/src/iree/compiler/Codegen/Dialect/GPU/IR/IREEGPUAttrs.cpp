@@ -1094,6 +1094,23 @@ bool TargetAttr::supportsSyncMMAOps() const {
   return false;
 }
 
+std::optional<std::string> TargetAttr::getSKU() const {
+  StringRef arch = getArch();
+  if (arch == "gfx942") {
+    TargetChipAttr chip = getChip();
+    if (chip) {
+      if (chip.getWgpCount() == 304) {
+        return "mi300x";
+      } else if (chip.getWgpCount() == 228) {
+        return "mi300a";
+      } else if (chip.getWgpCount() == 80) {
+        return "mi308x";
+      }
+    }
+  }
+  return std::nullopt;
+}
+
 //===----------------------------------------------------------------------===//
 // Lowering Config Attributes
 //===----------------------------------------------------------------------===//
