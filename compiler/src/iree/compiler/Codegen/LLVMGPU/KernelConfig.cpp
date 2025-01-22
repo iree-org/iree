@@ -2535,8 +2535,8 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
     }
 
     if (auto scatterOp = dyn_cast<IREE::LinalgExt::ScatterOp>(op)) {
-      auto indices = scatterOp.getIndices();
-      if (indices.getDefiningOp() == nullptr) {
+      Value indices = scatterOp.getIndices();
+      if (!indices.getDefiningOp()) {
         continue;
       }
       // If scatter's indices is a generic op, mark it as to skip.
@@ -2554,7 +2554,7 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
   // Generic ops take priority over scatter and fill ops as the root op.
   if (!rootOperation) {
     for (Operation *op : llvm::reverse(computeOps)) {
-      if (isa<linalg::GenericOp>(op) && genericToSkip.count(op) == 0) {
+      if (isa<linalg::GenericOp>(op) && !genericToSkip.contains(op)) {
         rootOperation = op;
         break;
       }
