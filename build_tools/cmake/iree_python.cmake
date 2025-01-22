@@ -47,6 +47,7 @@ function(iree_py_library)
     set(_SRC_BIN_PATH "${CMAKE_CURRENT_BINARY_DIR}/${_SRC_FILE}")
     get_filename_component(_SRC_BIN_DIR "${_SRC_BIN_PATH}" DIRECTORY)
     add_custom_command(
+      POST_BUILD
       TARGET ${_NAME}
       COMMAND
         ${CMAKE_COMMAND} -E make_directory "${_SRC_BIN_DIR}"
