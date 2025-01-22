@@ -85,8 +85,7 @@ MaterializeEncodingTypeConverter::getEncodingInfo(RankedTensorType type) const {
   // If the layout is present in the encoding, use it directly. It means that
   // the layout is already resolved and some information could be dropped during
   // the lowering. Thus, we prioritize the resolved layout.
-  auto maybeEncodingInfo = getEncodingInfoFromLayouts(type);
-  if (maybeEncodingInfo) {
+  if (auto maybeEncodingInfo = getEncodingInfoFromLayouts(type)) {
     return maybeEncodingInfo.value();
   }
   return layoutAttr.getEncodingInfo(type);
