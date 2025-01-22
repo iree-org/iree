@@ -137,8 +137,7 @@ void BubbleUpExpandShapesPass::runOnOperation() {
         // Do not fuse producer generic op if it has more than one user
         // or any reduction iterators.
         if (auto producerGenericOp = dyn_cast<linalg::GenericOp>(producer)) {
-          return producerGenericOp->hasOneUse() &&
-                 llvm::all_of(producerGenericOp.getIteratorTypesArray(),
+          return llvm::all_of(producerGenericOp.getIteratorTypesArray(),
                               linalg::isParallelIterator);
         }
 
