@@ -280,15 +280,23 @@ ROCM_COMPILE_FLAGS = [
 FP16_UNET_FLAGS = [
     "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics)",
 ]
-if os.path.isfile(f"{iree_test_path_extension}/attention_and_matmul_spec_unet_fp16_{sku}.mlir"):
-    FP16_UNET_FLAGS.append(f"--iree-codegen-transform-dialect-library={iree_test_path_extension}/attention_and_matmul_spec_unet_fp16_{sku}.mlir")
+if os.path.isfile(
+    f"{iree_test_path_extension}/attention_and_matmul_spec_unet_fp16_{sku}.mlir"
+):
+    FP16_UNET_FLAGS.append(
+        f"--iree-codegen-transform-dialect-library={iree_test_path_extension}/attention_and_matmul_spec_unet_fp16_{sku}.mlir"
+    )
 
 INT8_PUNET_FLAGS = [
     "--iree-preprocessing-pass-pipeline=builtin.module(util.func(iree-flow-canonicalize), iree-preprocessing-transpose-convolution-pipeline, iree-preprocessing-pad-to-intrinsics)",
 ]
-if os.path.isfile(f"{iree_test_path_extension}/attention_and_matmul_spec_punet_{sku}.mlir"):
-    INT8_PUNET_FLAGS.append(f"--iree-codegen-transform-dialect-library={iree_test_path_extension}/attention_and_matmul_spec_punet_{sku}.mlir")
-    
+if os.path.isfile(
+    f"{iree_test_path_extension}/attention_and_matmul_spec_punet_{sku}.mlir"
+):
+    INT8_PUNET_FLAGS.append(
+        f"--iree-codegen-transform-dialect-library={iree_test_path_extension}/attention_and_matmul_spec_punet_{sku}.mlir"
+    )
+
 
 ROCM_UNET_PIPELINE_FP16_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
@@ -321,6 +329,7 @@ def test_compile_unet_fp16_cpu(sdxl_unet_fp16_mlir):
         / Path(sdxl_unet_fp16_mlir.path.name).with_suffix(f".cpu.vmfb"),
     )
 
+
 def test_compile_unet_fp16_960_1024_cpu(sdxl_unet_fp16_960_1024_mlir):
     VmfbManager.sdxl_unet_fp16_960_1024_cpu_vfmb = iree_compile(
         sdxl_unet_fp16_960_1024_mlir,
@@ -329,6 +338,7 @@ def test_compile_unet_fp16_960_1024_cpu(sdxl_unet_fp16_960_1024_mlir):
         / Path("sdxl_unet_fp16_960_1024_vmfbs")
         / Path(sdxl_unet_fp16_960_1024_mlir.path.name).with_suffix(f".cpu.vmfb"),
     )
+
 
 @pytest.mark.depends(
     on=["test_compile_unet_fp16_pipeline_cpu", "test_compile_unet_fp16_cpu"]
@@ -349,9 +359,7 @@ def test_run_unet_fp16_cpu(
     )
 
 
-@pytest.mark.depends(
-    on=["test_compile_unet_fp16_cpu"]
-)
+@pytest.mark.depends(on=["test_compile_unet_fp16_cpu"])
 def test_run_unet_fp16_960_1024_cpu(
     SDXL_UNET_FP16_960_1024_COMMON_RUN_FLAGS, sdxl_unet_fp16_real_weights
 ):
@@ -384,6 +392,7 @@ def test_compile_unet_fp16_pipeline_rocm(sdxl_unet_fp16_pipeline_mlir):
         ),
     )
 
+
 def test_compile_unet_fp16_pipeline_rocm(sdxl_unet_fp16_pipeline_mlir):
     VmfbManager.sdxl_unet_fp16_rocm_pipeline_vmfb = iree_compile(
         sdxl_unet_fp16_pipeline_mlir,
@@ -412,7 +421,9 @@ def test_compile_unet_fp16_960_1024_rocm(sdxl_unet_fp16_960_1024_mlir):
         ROCM_COMPILE_FLAGS + FP16_UNET_FLAGS,
         Path(vmfb_dir)
         / Path("sdxl_unet_fp16_960_1024_vmfbs")
-        / Path(sdxl_unet_fp16_960_1024_mlir.path.name).with_suffix(f".rocm_{rocm_chip}.vmfb"),
+        / Path(sdxl_unet_fp16_960_1024_mlir.path.name).with_suffix(
+            f".rocm_{rocm_chip}.vmfb"
+        ),
     )
 
 
@@ -434,9 +445,8 @@ def test_run_unet_fp16_rocm(
         + SDXL_UNET_FP16_COMMON_RUN_FLAGS,
     )
 
-@pytest.mark.depends(
-    on=["test_compile_unet_fp16_960_1024_rocm"]
-)
+
+@pytest.mark.depends(on=["test_compile_unet_fp16_960_1024_rocm"])
 def test_run_unet_fp16_rocm(
     SDXL_UNET_FP16_960_1024_COMMON_RUN_FLAGS, sdxl_unet_fp16_real_weights
 ):
@@ -451,6 +461,7 @@ def test_run_unet_fp16_rocm(
         ]
         + SDXL_UNET_FP16_960_1024_COMMON_RUN_FLAGS,
     )
+
 
 def test_compile_punet_int8_fp16_rocm(request, sdxl_punet_int8_fp16_mlir):
     if rocm_chip == "gfx90a":
