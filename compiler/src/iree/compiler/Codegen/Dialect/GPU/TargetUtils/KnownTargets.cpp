@@ -340,7 +340,7 @@ StringRef normalizeAMDGPUTarget(StringRef target) {
     return target;
 
   return llvm::StringSwitch<StringRef>(target.lower())
-      .Cases("mi300x", "mi300a", "mi308x", "gfx942")
+      .Cases("mi300a", "mi300x", "mi308x", "gfx942")
       .Cases("mi250x", "mi250", "mi210", "cdna2", "gfx90a")
       .Cases("mi100", "cdna1", "gfx908")
       .Cases("rx7900xtx", "rx7900xt", "gfx1100")

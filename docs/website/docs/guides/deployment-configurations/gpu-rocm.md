@@ -128,9 +128,9 @@ Here is a table of commonly used architectures:
 | AMD MI250                | `gfx90a`    | `cdna2`
 | AMD MI300X (early units) | `gfx940`    | `cdna3`
 | AMD MI300A (early units) | `gfx941`    | `cdna3`
-| AMD MI308X               | `gfx942`    | `cdna3`
 | AMD MI300A               | `gfx942`    | `cdna3`
 | AMD MI300X               | `gfx942`    | `cdna3`
+| AMD MI308X               | `gfx942`    | `cdna3`
 | AMD RX7900XTX            | `gfx1100`   | `rdna3`
 | AMD RX7900XT             | `gfx1100`   | `rdna3`
 | AMD RX7800XT             | `gfx1101`   | `rdna3`
