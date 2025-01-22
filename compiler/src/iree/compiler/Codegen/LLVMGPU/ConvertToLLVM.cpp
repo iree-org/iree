@@ -201,27 +201,43 @@ class TestLLVMGPULegalizeOpPass final
   }
 };
 
-/// Convention with the HAL side to pass kernel arguments.
-/// The bindings are ordered based on binding set and binding index then
-/// compressed and mapped to dense set of arguments.
-/// This function looks at the symbols and return the mapping between
-/// InterfaceBindingOp and kernel argument index.
-/// For instance if the kernel has (set, bindings) A(0, 1), B(1, 5), C(0, 6) it
-/// will return the mapping [A, 0], [C, 1], [B, 2]
-static llvm::SmallDenseMap<APInt, size_t>
-getKernelArgMapping(Operation *funcOp) {
-  llvm::SetVector<APInt> usedBindingSet;
-  funcOp->walk([&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-    usedBindingSet.insert(subspanOp.getBinding());
-  });
-  auto sparseBindings = usedBindingSet.takeVector();
-  std::sort(sparseBindings.begin(), sparseBindings.end(),
-            [](APInt lhs, APInt rhs) { return lhs.ult(rhs); });
-  llvm::SmallDenseMap<APInt, size_t> mapBindingArgIndex;
-  for (auto [index, binding] : llvm::enumerate(sparseBindings)) {
-    mapBindingArgIndex[binding] = index;
+namespace {
+/// A package for the results of `analyzeSubspanOps` to avoid
+/// arbitrary tuples. The default values are the results for an unused
+/// binding, which is read-only, unused, and in address space 0.
+struct BindingProperties {
+  bool readonly = true;
+  bool unused = true;
+  unsigned addressSpace = 0;
+};
+} // namespace
+/// Analyze subspan binding ops to recover properties of the binding, such as
+/// if it is read-only and the address space it lives in.
+static FailureOr<SmallVector<BindingProperties>>
+analyzeSubspans(llvm::SetVector<IREE::HAL::InterfaceBindingSubspanOp> &subspans,
+                int64_t numBindings, const LLVMTypeConverter *typeConverter) {
+  SmallVector<BindingProperties> result(numBindings, BindingProperties{});
+  for (auto subspan : subspans) {
+    int64_t binding = subspan.getBinding().getSExtValue();
+    result[binding].unused = false;
+    result[binding].readonly &= IREE::HAL::bitEnumContainsAny(
+        subspan.getDescriptorFlags().value_or(IREE::HAL::DescriptorFlags::None),
+        IREE::HAL::DescriptorFlags::ReadOnly);
+    unsigned bindingAddrSpace = 0;
+    auto bindingType = dyn_cast<BaseMemRefType>(subspan.getType());
+    if (bindingType) {
+      bindingAddrSpace = *typeConverter->getMemRefAddressSpace(bindingType);
+    }
+    if (result[binding].addressSpace != 0 &&
+        result[binding].addressSpace != bindingAddrSpace) {
+      return subspan.emitOpError("address space for this op (" +
+                                 Twine(bindingAddrSpace) +
+                                 ") doesn't match previously found space (" +
+                                 Twine(result[binding].addressSpace) + ")");
+    }
+    result[binding].addressSpace = bindingAddrSpace;
   }
-  return mapBindingArgIndex;
+  return result;
 }
 
 class ConvertFunc : public ConvertToLLVMPattern {
@@ -242,30 +258,61 @@ public:
     assert(fnType.getNumInputs() == 0 && fnType.getNumResults() == 0);
 
     TypeConverter::SignatureConversion signatureConverter(/*numOrigInputs=*/0);
-    auto argMapping = getKernelArgMapping(funcOp);
-    // There may be dead symbols, we pick i32 pointer as default argument type.
-    SmallVector<Type, 8> llvmInputTypes(
-        argMapping.size(), LLVM::LLVMPointerType::get(rewriter.getContext()));
-    funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-      LLVM::LLVMPointerType llvmType;
-      if (auto memrefType = dyn_cast<BaseMemRefType>(subspanOp.getType())) {
-        unsigned addrSpace =
-            *getTypeConverter()->getMemRefAddressSpace(memrefType);
-        llvmType = LLVM::LLVMPointerType::get(rewriter.getContext(), addrSpace);
-      } else {
-        llvmType = LLVM::LLVMPointerType::get(rewriter.getContext());
-      }
-      llvmInputTypes[argMapping[subspanOp.getBinding()]] = llvmType;
-    });
-    // As a convention with HAL, push constants are appended as kernel arguments
-    // after all the binding inputs.
-    uint64_t numConstants = 0;
-    funcOp.walk([&](IREE::HAL::InterfaceConstantLoadOp constantOp) {
-      numConstants =
-          std::max(constantOp.getOrdinal().getZExtValue() + 1, numConstants);
-    });
-    llvmInputTypes.resize(argMapping.size() + numConstants,
-                          rewriter.getI32Type());
+    IREE::HAL::PipelineLayoutAttr layout;
+    llvm::SetVector<IREE::HAL::InterfaceBindingSubspanOp> subspans;
+    WalkResult subspanWalkRes =
+        funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
+          auto thisLayout = subspanOp.getLayout();
+          subspans.insert(subspanOp);
+          if (!layout) {
+            layout = thisLayout;
+          }
+          if (layout != thisLayout) {
+            return WalkResult::interrupt();
+          }
+          return WalkResult::advance();
+        });
+    if (subspanWalkRes.wasInterrupted())
+      return rewriter.notifyMatchFailure(
+          op, "differnt subspan bindings disagree about pipeline layout");
+
+    WalkResult constantWalkRes =
+        funcOp.walk([&](IREE::HAL::InterfaceConstantLoadOp constOp) {
+          auto thisLayout = constOp.getLayout();
+          if (!layout) {
+            layout = thisLayout;
+          }
+          if (layout != thisLayout) {
+            return WalkResult::interrupt();
+          }
+          return WalkResult::advance();
+        });
+    if (constantWalkRes.wasInterrupted())
+      return rewriter.notifyMatchFailure(
+          op, "differnt constant bindings disagree about pipeline layout");
+
+    int64_t numBindings = 0;
+    int64_t numConstants = 0;
+    if (layout) {
+      numConstants = layout.getConstants();
+      numBindings = layout.getBindings().size();
+    }
+
+    FailureOr<SmallVector<BindingProperties>> maybeBindingsInfo =
+        analyzeSubspans(subspans, numBindings, getTypeConverter());
+    if (failed(maybeBindingsInfo))
+      return failure();
+    auto bindingsInfo = std::move(*maybeBindingsInfo);
+
+    SmallVector<Type, 8> llvmInputTypes;
+    llvmInputTypes.reserve(numBindings + numConstants);
+    for (const auto &info : bindingsInfo) {
+      llvmInputTypes.push_back(
+          LLVM::LLVMPointerType::get(rewriter.getContext(), info.addressSpace));
+    }
+    // All the push constants are i32 and go at the end of the argument list.
+    llvmInputTypes.resize(numBindings + numConstants, rewriter.getI32Type());
+
     if (!llvmInputTypes.empty())
       signatureConverter.addInputs(llvmInputTypes);
 
@@ -296,6 +343,37 @@ public:
       return failure();
     }
 
+    // Set argument attributes.
+    Attribute unit = rewriter.getUnitAttr();
+    for (auto [idx, info] : llvm::enumerate(bindingsInfo)) {
+      // As a convention with HAL all the kernel argument pointers are 16Bytes
+      // aligned.
+      newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getAlignAttrName(),
+                           rewriter.getI32IntegerAttr(16));
+      // It is safe to set the noalias attribute as it is guaranteed that the
+      // ranges within bindings won't alias.
+      newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getNoAliasAttrName(), unit);
+      newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getNonNullAttrName(), unit);
+      newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getNoUndefAttrName(), unit);
+      if (info.unused) {
+        // While LLVM can work this out from the lack of use, we might as well
+        // be explicit here just to be safe.
+        newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getReadnoneAttrName(),
+                             unit);
+      } else if (info.readonly) {
+        // Setting the readonly attribute here will generate non-coherent cache
+        // loads.
+        newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getReadonlyAttrName(),
+                             unit);
+      }
+    }
+    for (int64_t i = 0; i < numConstants; ++i) {
+      // Push constants are never `undef`, annotate that here, just as with
+      // bindings.
+      newFuncOp.setArgAttr(numBindings + i,
+                           LLVM::LLVMDialect::getNoUndefAttrName(), unit);
+    }
+
     rewriter.eraseOp(funcOp);
     return success();
   }
@@ -309,25 +387,6 @@ public:
             IREE::HAL::InterfaceBindingSubspanOp::getOperationName(), context,
             converter) {}
 
-  /// Checks all subspanOps with the same binding has readonly attribute
-  static bool checkAllSubspansReadonly(LLVM::LLVMFuncOp llvmFuncOp,
-                                       APInt binding) {
-    bool allReadOnly = false;
-    llvmFuncOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp op) {
-      if (op.getBinding() == binding) {
-        if (!bitEnumContainsAny(op.getDescriptorFlags().value_or(
-                                    IREE::HAL::DescriptorFlags::None),
-                                IREE::HAL::DescriptorFlags::ReadOnly)) {
-          allReadOnly = false;
-          return WalkResult::interrupt();
-        }
-        allReadOnly = true;
-      }
-      return WalkResult::advance();
-    });
-    return allReadOnly;
-  }
-
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
@@ -337,7 +396,6 @@ public:
       return failure();
     assert(llvmFuncOp.getNumArguments() > 0);
 
-    auto argMapping = getKernelArgMapping(llvmFuncOp);
     Location loc = op->getLoc();
     auto subspanOp = cast<IREE::HAL::InterfaceBindingSubspanOp>(op);
     IREE::HAL::InterfaceBindingSubspanOpAdaptor adaptor(
@@ -345,27 +403,7 @@ public:
     MemRefType memrefType =
         llvm::dyn_cast<MemRefType>(subspanOp.getResult().getType());
     mlir::BlockArgument llvmBufferArg =
-        llvmFuncOp.getArgument(argMapping[subspanOp.getBinding()]);
-    // As a convention with HAL all the kernel argument pointers are 16Bytes
-    // aligned.
-    llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),
-                          LLVM::LLVMDialect::getAlignAttrName(),
-                          rewriter.getI32IntegerAttr(16));
-    // It is safe to set the noalias attribute as it is guaranteed that the
-    // ranges within bindings won't alias.
-    Attribute unit = rewriter.getUnitAttr();
-    llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),
-                          LLVM::LLVMDialect::getNoAliasAttrName(), unit);
-    llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),
-                          LLVM::LLVMDialect::getNonNullAttrName(), unit);
-    llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),
-                          LLVM::LLVMDialect::getNoUndefAttrName(), unit);
-    if (checkAllSubspansReadonly(llvmFuncOp, subspanOp.getBinding())) {
-      // Setting the readonly attribute here will generate non-coherent cache
-      // loads.
-      llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),
-                            LLVM::LLVMDialect::getReadonlyAttrName(), unit);
-    }
+        llvmFuncOp.getArgument(subspanOp.getBinding().getZExtValue());
     // Add the byte offset.
     Value llvmBufferBasePtr = llvmBufferArg;
 
@@ -393,13 +431,22 @@ public:
       if (ShapedType::isDynamic(offset)) {
         int32_t elementBitWidth =
             IREE::Util::getTypeBitWidth(memrefType.getElementType());
-        Value elementBitWidthVal = rewriter.create<LLVM::ConstantOp>(
-            loc, llvmIndexType, elementBitWidth);
-        Value eight = rewriter.create<LLVM::ConstantOp>(loc, llvmIndexType, 8);
-        Value bitOffset =
-            rewriter.create<LLVM::MulOp>(loc, baseOffsetValue, eight);
-        Value elementOffsetVal =
-            rewriter.create<LLVM::UDivOp>(loc, bitOffset, elementBitWidthVal);
+        Value elementOffsetVal;
+        if (elementBitWidth % 8 != 0) {
+          Value elementBitWidthVal = rewriter.create<LLVM::ConstantOp>(
+              loc, llvmIndexType, elementBitWidth);
+          Value eight =
+              rewriter.create<LLVM::ConstantOp>(loc, llvmIndexType, 8);
+          Value bitOffset =
+              rewriter.create<LLVM::MulOp>(loc, baseOffsetValue, eight);
+          elementOffsetVal =
+              rewriter.create<LLVM::UDivOp>(loc, bitOffset, elementBitWidthVal);
+        } else {
+          Value elementByteWidthVal = rewriter.create<LLVM::ConstantOp>(
+              loc, llvmIndexType, elementBitWidth / 8);
+          elementOffsetVal = rewriter.create<LLVM::UDivOp>(loc, baseOffsetValue,
+                                                           elementByteWidthVal);
+        }
         desc.setOffset(rewriter, loc, elementOffsetVal);
       } else {
         desc.setConstantOffset(rewriter, loc, offset);
@@ -468,17 +515,11 @@ public:
       return failure();
     assert(llvmFuncOp.getNumArguments() > 0);
 
-    auto argMapping = getKernelArgMapping(llvmFuncOp);
     auto ireeConstantOp = cast<IREE::HAL::InterfaceConstantLoadOp>(op);
+    size_t numBindings = ireeConstantOp.getLayout().getBindings().size();
     mlir::BlockArgument llvmBufferArg = llvmFuncOp.getArgument(
-        argMapping.size() + ireeConstantOp.getOrdinal().getZExtValue());
+        numBindings + ireeConstantOp.getOrdinal().getZExtValue());
     assert(llvmBufferArg.getType().isInteger(32));
-
-    // Push constants are never `undef`, annotate that here, just as with
-    // bindings.
-    llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),
-                          LLVM::LLVMDialect::getNoUndefAttrName(),
-                          rewriter.getUnitAttr());
 
     Type dstType = getTypeConverter()->convertType(ireeConstantOp.getType());
     // llvm.zext requires that the result type has a larger bitwidth.
