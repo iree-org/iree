@@ -2544,14 +2544,10 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
               dyn_cast<linalg::GenericOp>(indices.getDefiningOp())) {
         genericToSkip.insert(genericOp);
       }
-      // If scatter's backward slices are generic ops, mark them as to skip too.
+      // Mark scatter's backward slices as to skip too.
       SetVector<Operation *> slices;
       getBackwardSlice(indices, &slices);
-      for (auto slice : slices) {
-        if (isa<linalg::GenericOp>(slice)) {
-          genericToSkip.insert(slice);
-        }
-      }
+      genericToSkip.insert(slices.begin(), slices.end());
     }
   }
 
