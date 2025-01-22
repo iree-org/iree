@@ -135,7 +135,6 @@ getDefaultTuningSpec(ModuleOp module,
     return failure();
   }
 
-<<<<<<< HEAD
   std::optional<StringRef> sku;
   if (IREE::GPU::TargetChipAttr chip = gpuTarget.getChip()) {
     if (StringAttr chipSku = chip.getSku()) {
@@ -157,27 +156,6 @@ getDefaultTuningSpec(ModuleOp module,
     // architecture-based tuning spec to ensure broader compatibility.
     StringRef arch = gpuTarget.getArch();
     defaultTuningSpecSource = fetchDefaultTuningSpec(arch);
-=======
-  // Try to look up the default tuning spec for this architecture, if any.
-  StringRef arch = gpuTarget.getArch();
-  std::optional<std::string> sku = gpuTarget.getSKU();
-  std::string defaultTuningSpecName =
-      llvm::formatv("iree_default_tuning_spec_{}.mlir", arch);
-  std::optional<StringRef> defaultTuningSpecSource;
-  if (sku) {
-    std::string defaultSKUTuningSpecName =
-        llvm::formatv("iree_default_tuning_spec_{}.mlir", sku);
-    EmbeddedDataDirectory::withGlobal([&](EmbeddedDataDirectory &dir) {
-      defaultTuningSpecSource = dir.getFile(defaultSKUTuningSpecName);
-    });
-  }
-  if (!defaultTuningSpecSource) {
-    // If SKU-specific spec is not found, fall back to the default
-    // architecture-based tuning spec.
-    EmbeddedDataDirectory::withGlobal([&](EmbeddedDataDirectory &dir) {
-      defaultTuningSpecSource = dir.getFile(defaultTuningSpecName);
-    });
->>>>>>> 07c47a3859 ([Codegen][Tuner] Add support for per-sku tuning spec)
   }
 
   if (!defaultTuningSpecSource) {
