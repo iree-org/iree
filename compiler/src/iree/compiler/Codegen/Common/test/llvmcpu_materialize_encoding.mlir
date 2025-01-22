@@ -2948,3 +2948,105 @@ func.func @broadcast_K() attributes {
 //  CHECK-SAME:       ins(%[[INPUT]] : tensor<2x4x16xf32>)
 //  CHECK-SAME:       outs(%[[EMPTY]] : tensor<2x4x128x16x1xf32>)
 //       CHECK:   flow.dispatch.tensor.store %[[BROADCAST]], %[[RESULT_BINDING]], offsets = [0, 0, 0, 0, 0], sizes = [2, 4, 128, 16, 1], strides = [1, 1, 1, 1, 1] : tensor<2x4x128x16x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x4x128x16x1xf32>>
+
+// -----
+
+//----------------------------------------------------------------------------//
+// Test suite for encodings with resolved layouts.
+//----------------------------------------------------------------------------//
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#executable_target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f", encoding = #iree_cpu.cpu_encoding_layout<>}>
+#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], layouts = [#iree_cpu.cpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [1, 1], outerDimsPerm = [0, 1]}}>]>
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding1 = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 1, 32, 32>>
+func.func @set_encoding_LHS_with_layout() attributes {
+  hal.executable.target = #executable_target
+} {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<1x256xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<1x256xf32, #encoding>>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x256xf32>> -> tensor<1x256xf32>
+  %3 = iree_encoding.set_encoding %2 : tensor<1x256xf32> -> tensor<1x256xf32, #encoding1>
+  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [1, 256], strides = [1, 1] : tensor<1x256xf32, #encoding1> -> !flow.dispatch.tensor<writeonly:tensor<1x256xf32, #encoding>>
+  return
+}
+// CHECK-LABEL: func.func @set_encoding_LHS_with_layout
+//   CHECK-DAG:   %[[INPUT_BINDING:.+]] = hal.interface.binding.subspan {{.*}} binding(0) {{.*}} : !flow.dispatch.tensor<readonly:tensor<1x256xf32>>
+//   CHECK-DAG:   %[[RESULT_BINDING:.+]] = hal.interface.binding.subspan {{.*}} binding(1) {{.*}} : !flow.dispatch.tensor<writeonly:tensor<1x256x1x1xf32>>
+//       CHECK:   %[[INPUT:.+]] = flow.dispatch.tensor.load %[[INPUT_BINDING]]
+//       CHECK:   %[[PACK:.+]] = tensor.pack %[[INPUT]]
+//  CHECK-SAME:     outer_dims_perm = [0, 1]
+//  CHECK-SAME:     inner_dims_pos = [0, 1]
+//  CHECK-SAME:     inner_tiles = [1, 1]
+//  CHECK-SAME:     tensor<1x256xf32> -> tensor<1x256x1x1xf32>
+//       CHECK:   flow.dispatch.tensor.store %[[PACK]], %[[RESULT_BINDING]]
+
+// -----
+
+#encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], layouts = [#iree_cpu.cpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [1, 0], innerTileSizes = [16, 1], outerDimsPerm = [1, 0]}}>]>
+#executable_target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f", encoding = #iree_cpu.cpu_encoding_layout<>}>
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>
+#encoding1 = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 1, 32, 32>>
+func.func @set_encoding_RHS_with_layout() attributes {
+  hal.executable.target = #executable_target
+} {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<256x10xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<256x10xf32, #encoding>>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [256, 10], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x10xf32>> -> tensor<256x10xf32>
+  %3 = iree_encoding.set_encoding %2 : tensor<256x10xf32> -> tensor<256x10xf32, #encoding1>
+  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [256, 10], strides = [1, 1] : tensor<256x10xf32, #encoding1> -> !flow.dispatch.tensor<writeonly:tensor<256x10xf32, #encoding>>
+  return
+}
+// CHECK-LABEL: func.func @set_encoding_RHS_with_layout
+//   CHECK-DAG:   %[[INPUT_BINDING:.+]] = hal.interface.binding.subspan {{.*}} binding(0) {{.*}} : !flow.dispatch.tensor<readonly:tensor<256x10xf32>>
+//   CHECK-DAG:   %[[RESULT_BINDING:.+]] = hal.interface.binding.subspan {{.*}} binding(1) {{.*}} : !flow.dispatch.tensor<writeonly:tensor<1x256x16x1xf32>>
+//   CHECK-DAG:   %[[PAD_VALUE:.+]] = arith.constant 0.000000e+00 : f32
+//       CHECK:   %[[INPUT:.+]] = flow.dispatch.tensor.load %[[INPUT_BINDING]]
+//       CHECK:   %[[PACK:.+]] = tensor.pack %[[INPUT]]
+//  CHECK-SAME:     padding_value(%[[PAD_VALUE]] : f32)
+//  CHECK-SAME:     outer_dims_perm = [1, 0]
+//  CHECK-SAME:     inner_dims_pos = [1, 0]
+//  CHECK-SAME:     inner_tiles = [16, 1]
+//  CHECK-SAME:     tensor<256x10xf32> -> tensor<1x256x16x1xf32>
+//       CHECK:   flow.dispatch.tensor.store %[[PACK]], %[[RESULT_BINDING]]
+
+// -----
+
+#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], layouts = [#iree_cpu.cpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [1, 16], outerDimsPerm = [0, 1]}}>]>
+#executable_target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features = "+avx512f", encoding = #iree_cpu.cpu_encoding_layout<>, target_triple = "x86_64-xyz-xyz"}>
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+#encoding1 = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 1, 32, 32>>
+func.func @unset_encoding_RES_with_layout() attributes {
+  hal.executable.target = #executable_target
+} {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<1x10xf32, #encoding>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<1x10xf32>>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 10], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x10xf32, #encoding>> -> tensor<1x10xf32, #encoding1>
+  %3 = iree_encoding.unset_encoding %2 : tensor<1x10xf32, #encoding1> -> tensor<1x10xf32>
+  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [1, 10], strides = [1, 1] : tensor<1x10xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x10xf32>>
+  return
+}
+// CHECK-LABEL: func.func @unset_encoding_RES_with_layout
+//   CHECK-DAG:   %[[INPUT_BINDING:.+]] = hal.interface.binding.subspan {{.*}} binding(0) {{.*}} : !flow.dispatch.tensor<readonly:tensor<1x1x1x16xf32>>
+//   CHECK-DAG:   %[[RESULT_BINDING:.+]] = hal.interface.binding.subspan {{.*}} binding(1) {{.*}} : !flow.dispatch.tensor<writeonly:tensor<1x10xf32>>
+//       CHECK:   %[[INPUT:.+]] = flow.dispatch.tensor.load %[[INPUT_BINDING]]
+//       CHECK:   %[[UNPACK:.+]] = tensor.unpack %[[INPUT]]
+//  CHECK-SAME:     outer_dims_perm = [0, 1]
+//  CHECK-SAME:     inner_dims_pos = [0, 1]
+//  CHECK-SAME:     inner_tiles = [1, 16]
+//  CHECK-SAME:     tensor<1x1x1x16xf32> -> tensor<1x10xf32>
+//       CHECK:   flow.dispatch.tensor.store %[[UNPACK]], %[[RESULT_BINDING]]
