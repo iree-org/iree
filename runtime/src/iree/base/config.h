@@ -80,7 +80,7 @@ typedef IREE_HOST_SIZE_T iree_host_size_t;
 
 // Maximum representable value in iree_host_size_t.
 #define IREE_HOST_SIZE_MAX \
-  (sizeof(iree_host_size_t) == 4 ? UINT32_MAX : UINT64_MAX)
+  ((iree_host_size_t)(sizeof(iree_host_size_t) == 4 ? UINT32_MAX : UINT64_MAX))
 
 #if !defined(IREE_DEVICE_SIZE_T)
 #define IREE_DEVICE_SIZE_T size_t
@@ -91,8 +91,9 @@ typedef IREE_HOST_SIZE_T iree_host_size_t;
 typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 
 // Maximum representable value in iree_device_size_t.
-#define IREE_DEVICE_SIZE_MAX \
-  (sizeof(iree_device_size_t) == 4 ? UINT32_MAX : UINT64_MAX)
+#define IREE_DEVICE_SIZE_MAX                                         \
+  ((iree_device_size_t)(sizeof(iree_device_size_t) == 4 ? UINT32_MAX \
+                                                        : UINT64_MAX))
 
 //===----------------------------------------------------------------------===//
 // iree_status_t configuration
