@@ -4,7 +4,7 @@
 // RUN:   --iree-codegen-notify-transform-strategy-application \
 // RUN:   --verify-diagnostics %s | FileCheck %s
 
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=mi300x \
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=mi300x@hip \
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-hal-configure-target-executable-variants{target=rocm})))" \
 // RUN:   --iree-codegen-enable-default-tuning-specs \
 // RUN:   --iree-codegen-notify-transform-strategy-application \

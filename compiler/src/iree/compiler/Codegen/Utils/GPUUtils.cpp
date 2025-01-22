@@ -954,8 +954,6 @@ IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context) {
       backend = "cuda";
     else if (StringRef(clTestTarget).starts_with("gfx"))
       backend = "hip";
-    else if (StringRef(clTestTarget).starts_with("mi"))
-      backend = "hip";
     else if (StringRef(clTestTarget).starts_with("adreno"))
       backend = "vulkan";
     else if (StringRef(clTestTarget).starts_with("apple"))

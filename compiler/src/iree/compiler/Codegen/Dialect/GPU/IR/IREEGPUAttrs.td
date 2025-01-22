@@ -500,7 +500,27 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
     // Returns true if this target supports TensorCore synchronized MMA ops.
     bool supportsSyncMMAOps() const;
     // Returns the SKU of the target GPU if available.
-    std::optional<std::string> getSKU() const;
+    std::optional<StringRef> getSKU() const {
+        llvm::StringRef arch = getArch();
+
+        if (arch == "gfx942") {
+          TargetChipAttr chip = getChip();
+          if (chip) {
+            uint32_t wgpCount = chip.getWgpCount();
+            if (wgpCount == 304) {
+              return "mi300x";
+            }
+            if (wgpCount == 228) {
+              return "mi300a";
+            }
+            if (wgpCount == 80) {
+              return "mi308x";
+            }
+          }
+        }
+
+        return std::nullopt;
+    }
   }];
 }
 
