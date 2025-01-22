@@ -207,9 +207,6 @@ LogicalResult ScatterOp::verify() {
         "size of dimension map must match the last dimension of indices");
   }
 
-  // updateSlice[0..indexDepth] <= original[0..indexDepth]
-  // updateSlice[indexDepth..] == original[indexDepth..]
-
   {
     auto [updateIt, originalIt] = llvm::mismatch(
         getUpdateSliceShape(), originalType.getShape().drop_front(indexDepth));

@@ -107,50 +107,34 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
          "getTiledImplementationFromOperandTile"]>]> {
   let summary = "Scatter operator";
   let description = [{
-    Based on XLA operation semantics, takes two `inputs` (`update` and
-    `indices`) and `outputs` value (`original`). The operation updates
-    the value at the slices specified by `indices` by combining the
-    current value with the value in `updates` using the computation
+    Takes two `inputs` (`update` and `indices`) and `outputs` value (`original`).
+    The operation updates the value at the slices specified by `indices` by
+    combining the current value with the value in `updates` using the computation
     specified in `region`. The `region` specifies a binary operation
-    of signature (T, T) -> T, where `T` is the element-type of
+    of signature `(T, T) -> T`, where `T` is the element-type of
     `updates` (and `original`). The first argument is from `updates`,
     and the second is from `original`.
 
-    The operand `indices` is a N-D tensor/memref type that is composed
-    of two logical parts:
-    - The first `N-1` dimensions represent the batch of updates.
-    - The last dim (at index `N-1`) is the `index_depth`, which should
-      always be static.
+    The size of the `dimension_map` attribute is used to determine how many
+    indices are used to index into `original`, i.e. `index_depth`. The
+    `dimension_map` attribute describes which index value maps to which dimension
+    in the destination.
 
-    For example, given `indices` of shape `[4, 3, 2]`, the batch dimensions
-    are `[4, 3]` and the `index_depth` is `2`.
+    The operand `indices` is a N-D tensor/memref type that is composed
+    of two logical parts. The first `N-1` dimensions represent the batch of
+    updates. The last dim (at index `N-1`) is the `index_depth`, which can be
+    omitted if `index_depth` is 1.
 
     The operand `update` is a M-D tensor/memref type and similarly
-    consists of two parts:
-    - The first `N-1` dimensions represent the batch of updates. This
-      must exactly match to the first `N-1` dimensions in `indices`
-      (from the example above: `indices` must start with `[4, 3]`)
-    - Dimensions `N..M-1` represent the slice scattered into `original`.
-      The first part of this tensor represents the dimensions indexed
-      by `indices`. This must be no larger than `index_depth` but can be
-      less if unit dimensions are omitted.
-
-      The second part represents a contiguous slice to be inserted into
-      `original`.
+    consists of two parts. The first `N-1` dimensions represent the batch of
+    updates. This must exactly match to the first `N-1` dimensions in `indices`.
+    Dimensions `N..M-1` represent the slice scattered into `original`,
+    `update_slice`, and must match the last dimensions in original. This
+    represents a contiguous slice to be inserted into `original`.
 
     The operand `original` is a DPS init representing the destination that
     `update` gets scattered to.
-
-
-    The rank of the `original` is at least `rank(%updates) - batch_rank`.
-    The first `index_depth` indices are derived from `indices` and the
-    shape of update value has the last rank(%original) - index_depth values
-    match %(originals) last dimensions, with the previous dims extending
-    from the index offsets.
-
-    The dimension_map attributes describes which index value maps to which
-    dimension in the destionation. It's rank must equal `index_depth` as
-    represents a permutation of the indices before indexing into `original``.
+    Where `rank(original) = rank(update_slice) + index_depth`
 
     The unique_indices attribute carries the information whether all the
     indices are unique. If `unique_indices` is `true` and two or more updates
