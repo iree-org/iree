@@ -54,6 +54,7 @@ struct WgpDetails {
 // Chip level feature/limit details
 struct ChipDetails {
   uint32_t wgpCount;
+  std::optional<llvm::StringRef> sku;
 };
 
 // Full target details
@@ -116,9 +117,13 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
       DictionaryAttr{});
 
   TargetChipAttr targetChip;
-  if (details.chip)
-    targetChip =
-        TargetChipAttr::get(context, details.chip->wgpCount, DictionaryAttr{});
+  if (details.chip) {
+    StringAttr skuAttr = details.chip->sku
+                             ? StringAttr::get(context, *(details.chip->sku))
+                             : StringAttr::get(context, "");
+    targetChip = TargetChipAttr::get(context, details.chip->wgpCount, skuAttr,
+                                     DictionaryAttr{});
+  }
 
   return TargetAttr::get(context, arch, features, targetWgp, targetChip);
 }
@@ -279,28 +284,27 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
 
   // "AMD Instinct MI300 Series Product Offerings" in Page 23 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/white-papers/amd-cdna-3-white-paper.pdf
-  static const ChipDetails mi300xChip = {304};
-  static const ChipDetails mi300aChip = {228};
-  static const ChipDetails mi308xChip = {80};
+  static const ChipDetails mi300xChip = {304, "mi300x"};
+  static const ChipDetails mi300aChip = {228, "mi300a"};
+  static const ChipDetails mi308xChip = {80, "mi308x"};
 
   // "AMD Instinct MI200 Series Accelerator Product Offerings" in Page 14 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-business-docs/white-papers/amd-cdna2-white-paper.pdf
-  static const ChipDetails mi250xChip = {220};
-  static const ChipDetails mi250Chip = {208};
-  static const ChipDetails mi210Chip = {104};
+  static const ChipDetails mi250xChip = {220, "mi250x"};
+  static const ChipDetails mi250Chip = {208, "mi250"};
+  static const ChipDetails mi210Chip = {104, "mi210"};
 
   // "AMD CDNA Architecture Compute Units" in Page 5 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-business-docs/white-papers/amd-cdna-white-paper.pdf
-  static const ChipDetails mi100Chip = {120};
+  static const ChipDetails mi100Chip = {120, "mi100"};
 
-  static const ChipDetails rx7900xtxChip = {96};
-  static const ChipDetails rx7900xtChip = {84};
-  static const ChipDetails rx7800xtChip = {60};
-  static const ChipDetails rx7700xtChip = {54};
+  static const ChipDetails rx7900xtxChip = {96, "rx7900xtx"};
+  static const ChipDetails rx7900xtChip = {84, "rx7900xt"};
+  static const ChipDetails rx7800xtChip = {60, "rx7800xt"};
+  static const ChipDetails rx7700xtChip = {54, "rx7700xt"};
 
   // See https://llvm.org/docs/AMDGPUUsage.html#processors for gfxN to
   // cdnaN/rdnaN mapping.
-
   return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
       .Case("mi300x", TargetDetails{cdna3Wgp, &mi300xChip})
       .Case("mi300a", TargetDetails{cdna3Wgp, &mi300aChip})
@@ -691,30 +695,6 @@ TargetAttr getHIPTargetDetails(StringRef target, StringRef features,
 
 StringRef normalizeHIPTarget(StringRef target) {
   return normalizeAMDGPUTarget(target);
-}
-
-std::optional<StringRef> getAMDSKU(TargetAttr target) {
-  StringRef arch = target.getArch();
-
-  if (arch != "gfx942") {
-    return std::nullopt;
-  }
-
-  TargetChipAttr chip = target.getChip();
-  if (chip) {
-    uint32_t wgpCount = chip.getWgpCount();
-    if (wgpCount == 304) {
-      return "mi300x";
-    }
-    if (wgpCount == 228) {
-      return "mi300a";
-    }
-    if (wgpCount == 80) {
-      return "mi308x";
-    }
-  }
-
-  return std::nullopt;
 }
 
 TargetAttr getVulkanTargetDetails(llvm::StringRef target,

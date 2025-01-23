@@ -8,7 +8,6 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Utils/EmbeddedDataDirectory.h"
 #include "llvm/ADT/SmallString.h"
@@ -136,7 +135,14 @@ getDefaultTuningSpec(ModuleOp module,
     return failure();
   }
 
-  std::optional<StringRef> sku = getAMDSKU(gpuTarget);
+  std::optional<StringRef> sku;
+  if (IREE::GPU::TargetChipAttr chip = gpuTarget.getChip()) {
+    StringAttr chipSku = chip.getSku();
+    if (!chipSku.empty()) {
+      sku = chipSku.getValue();
+    }
+  }
+
   std::string defaultTuningSpecName;
   std::optional<StringRef> defaultTuningSpecSource;
   if (sku) {
