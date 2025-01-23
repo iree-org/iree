@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
@@ -69,6 +70,16 @@ static IREE::Stream::AffinityAttr getOpAffinity(Operation *op) {
   }
   return {};
 }
+
+// Returns a return op in `op`.
+static Util::ReturnOp getAnyReturnOp(IREE::Util::FuncOp op) {
+  for (auto &block : op.getCallableRegion()->getBlocks()) {
+    if (auto retOp = dyn_cast<IREE::Util::ReturnOp>(block.getTerminator())) {
+      return retOp;
+    }
+  }
+  llvm_unreachable("Util::FuncOp has no return op");
+};
 
 // Base pattern type for resource usage refinement.
 // The results of the usage analysis are available for use by subclasses.
@@ -254,7 +265,7 @@ struct ApplyFuncOp : public UsageRefinementPattern<IREE::Util::FuncOp> {
 
     // Results:
     SmallVector<Type> newOutputs;
-    auto anyReturnOp = *op.getOps<IREE::Util::ReturnOp>().begin();
+    auto anyReturnOp = getAnyReturnOp(op);
     for (auto outputType : llvm::enumerate(op.getFunctionType().getResults())) {
       auto oldType =
           llvm::dyn_cast<IREE::Stream::ResourceType>(outputType.value());
