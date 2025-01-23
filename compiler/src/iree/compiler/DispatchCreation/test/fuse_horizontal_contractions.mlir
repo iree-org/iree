@@ -273,3 +273,32 @@ util.func @horizontal_fusion_i8(%arg0: tensor<2x4096x640xi8>,
 //  CHECK-DAG:   %[[SLICE1:.+]] = tensor.extract_slice %[[TRUNCATE]][0, 0, 0, 0]
 //  CHECK-DAG:   %[[SLICE2:.+]] = tensor.extract_slice %[[TRUNCATE]][1, 0, 0, 0]
 //      CHECK:   util.return %[[SLICE1]], %[[SLICE2]]
+
+// -----
+
+util.func public @dont_fuse_when_same_trunc_op(%arg0: tensor<2x4096x640xi8>, %arg1: tensor<2x640x640xi8>, %arg2: tensor<640xi8>, %arg3: tensor<f32>, %arg4: tensor<2x640x640xi8>, %arg5: tensor<640xi8>, %arg6: tensor<f32>) -> tensor<2x4096x640xf16> {
+  %c0_i32 = arith.constant 0 : i32
+  %0 = tensor.empty() : tensor<2x4096x640xf16>
+  %1 = tensor.empty() : tensor<2x4096x640xi32>
+  %2 = linalg.fill ins(%c0_i32 : i32) outs(%1 : tensor<2x4096x640xi32>) -> tensor<2x4096x640xi32>
+  %3 = linalg.batch_matmul_transpose_b ins(%arg0, %arg1 : tensor<2x4096x640xi8>, tensor<2x640x640xi8>) outs(%2 : tensor<2x4096x640xi32>) -> tensor<2x4096x640xi32>
+  %4 = linalg.batch_matmul_transpose_b ins(%arg0, %arg4 : tensor<2x4096x640xi8>, tensor<2x640x640xi8>) outs(%2 : tensor<2x4096x640xi32>) -> tensor<2x4096x640xi32>
+  %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%4, %3 : tensor<2x4096x640xi32>, tensor<2x4096x640xi32>) outs(%0 : tensor<2x4096x640xf16>) {
+  ^bb0(%in: i32, %in_0: i32, %out: f16):
+    %6 = arith.sitofp %in : i32 to f32
+    %7 = arith.truncf %6 : f32 to f16
+    %8 = arith.sitofp %in_0 : i32 to f32
+    %9 = arith.truncf %8 : f32 to f16
+    %10 = arith.addf %7, %9 : f16
+    linalg.yield %10 : f16
+  } -> tensor<2x4096x640xf16>
+  util.return %5 : tensor<2x4096x640xf16>
+}
+
+// Don't support multiple operands of the trunc being from different matmuls.
+//      CHECK: util.func public @dont_fuse_when_same_trunc_op
+//      CHECK:   %[[CONTRACT1:.+]] = linalg.batch_matmul_transpose_b
+//      CHECK:   %[[CONTRACT2:.+]] = linalg.batch_matmul_transpose_b
+//      CHECK:   %[[GENERIC:.+]] = linalg.generic
+// CHECK-SAME:       ins(%[[CONTRACT2]], %[[CONTRACT1]]
+//      CHECK:   util.return %[[GENERIC]]
