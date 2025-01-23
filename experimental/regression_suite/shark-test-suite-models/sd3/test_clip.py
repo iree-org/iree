@@ -152,10 +152,6 @@ def test_run_clip_cpu(SD3_CLIP_COMMON_RUN_FLAGS, sd3_clip_real_weights):
 ###############################################################################
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Expected compilation to fail",
-)
 def test_compile_clip_rocm(sd3_clip_mlir):
     VmfbManager.sd3_clip_rocm_vmfb = iree_compile(
         sd3_clip_mlir,
