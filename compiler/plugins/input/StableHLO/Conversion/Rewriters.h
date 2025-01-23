@@ -44,18 +44,6 @@ void populateStableHloCollectivesConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     RewritePatternSet *patterns);
 
-//===----------------------------------------------------------------------===//
-// Fine-grained patterns used by the implementation.
-//===----------------------------------------------------------------------===//
-namespace detail {
-
-/// Populates the patterns that convert scalar StableHLO ops to Arith ops.
-void populateScalarHloToArithConversionPatterns(
-    MLIRContext *context, TypeConverter &typeConverter,
-    RewritePatternSet *patterns,
-    llvm::function_ref<bool(Operation *)> filterFn = nullptr);
-} // namespace detail
-
 } // namespace mlir::iree_compiler::stablehlo
 
 #endif // IREE_COMPILER_PLUGINS_INPUT_STABLEHLO_CONVERSION_REWRITERS_H_

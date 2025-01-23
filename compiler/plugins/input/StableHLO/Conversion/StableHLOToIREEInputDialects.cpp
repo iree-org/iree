@@ -12,7 +12,6 @@
 #include "compiler/plugins/input/StableHLO/Conversion/Passes.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Rewriters.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Rewriters.h"
-#include "compiler/plugins/input/StableHLO/Conversion/TypeConversion.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -35,6 +34,7 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "stablehlo/conversions/linalg/transforms/TypeConversion.h"
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
@@ -342,7 +342,7 @@ struct ConvertStableHloToIreeInputDialects final
     RewritePatternSet patterns(context);
 
     std::unique_ptr<TypeConverter> typeConverter =
-        createStableHloToLinalgTypeConverter();
+        std::make_unique<::mlir::stablehlo::LinalgTypeConverter>();
     typeConverter->addArgumentMaterialization(scalarToTensor);
     typeConverter->addSourceMaterialization(scalarToTensor);
     typeConverter->addTargetMaterialization(scalarToTensor);
