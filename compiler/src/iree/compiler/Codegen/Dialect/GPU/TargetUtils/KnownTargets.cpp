@@ -693,6 +693,30 @@ StringRef normalizeHIPTarget(StringRef target) {
   return normalizeAMDGPUTarget(target);
 }
 
+std::optional<StringRef> getAMDSKU(TargetAttr target) {
+  StringRef arch = target.getArch();
+
+  if (arch != "gfx942") {
+    return std::nullopt;
+  }
+
+  TargetChipAttr chip = target.getChip();
+  if (chip) {
+    uint32_t wgpCount = chip.getWgpCount();
+    if (wgpCount == 304) {
+      return "mi300x";
+    }
+    if (wgpCount == 228) {
+      return "mi300a";
+    }
+    if (wgpCount == 80) {
+      return "mi308x";
+    }
+  }
+
+  return std::nullopt;
+}
+
 TargetAttr getVulkanTargetDetails(llvm::StringRef target,
                                   MLIRContext *context) {
   // Go through each vendor's target details. This assumes we won't have

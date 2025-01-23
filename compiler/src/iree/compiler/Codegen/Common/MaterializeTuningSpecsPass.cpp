@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Utils/EmbeddedDataDirectory.h"
 #include "llvm/ADT/SmallString.h"
@@ -111,6 +112,18 @@ getUserTuningSpec(ModuleOp module, IREE::Codegen::IREECodegenDialect &dialect) {
   return *maybeTransformLibrary;
 }
 
+static std::optional<StringRef> fetchDefaultTuningSpec(StringRef identifier) {
+  std::string tuningSpecName =
+      llvm::formatv("iree_default_tuning_spec_{}.mlir", identifier);
+  std::optional<StringRef> tuningSpecSource;
+
+  EmbeddedDataDirectory::withGlobal([&](EmbeddedDataDirectory &dir) {
+    tuningSpecSource = dir.getFile(tuningSpecName);
+  });
+
+  return tuningSpecSource;
+}
+
 static FailureOr<ModuleOp>
 getDefaultTuningSpec(ModuleOp module,
                      IREE::Codegen::IREECodegenDialect &dialect) {
@@ -123,26 +136,19 @@ getDefaultTuningSpec(ModuleOp module,
     return failure();
   }
 
-  std::optional<StringRef> sku = gpuTarget.getSKU();
+  std::optional<StringRef> sku = getAMDSKU(gpuTarget);
   std::string defaultTuningSpecName;
   std::optional<StringRef> defaultTuningSpecSource;
   if (sku) {
     // Try to look up the default tuning spec for this sku.
-    defaultTuningSpecName =
-        llvm::formatv("iree_default_tuning_spec_{}.mlir", sku);
-    EmbeddedDataDirectory::withGlobal([&](EmbeddedDataDirectory &dir) {
-      defaultTuningSpecSource = dir.getFile(defaultTuningSpecName);
-    });
+    defaultTuningSpecSource = fetchDefaultTuningSpec(*sku);
   }
+
   if (!defaultTuningSpecSource) {
     // If SKU-specific spec is not found, fall back to the default
     // architecture-based tuning spec.
     StringRef arch = gpuTarget.getArch();
-    defaultTuningSpecName =
-        llvm::formatv("iree_default_tuning_spec_{}.mlir", arch);
-    EmbeddedDataDirectory::withGlobal([&](EmbeddedDataDirectory &dir) {
-      defaultTuningSpecSource = dir.getFile(defaultTuningSpecName);
-    });
+    defaultTuningSpecSource = fetchDefaultTuningSpec(arch);
   }
 
   if (!defaultTuningSpecSource) {
