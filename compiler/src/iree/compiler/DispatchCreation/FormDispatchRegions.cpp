@@ -693,13 +693,15 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root, unsigned groupNum,
   SmallVector<Operation *> worklist;
   worklist.push_back(root);
   llvm::SmallBitVector rootOuterParallelLoops = getOuterParallelLoops(root);
+  IREE::Flow::ClonableIntoDispatchOptions clonableOptions;
+  clonableOptions.aggressive = options.aggressiveFusion;
   while (!worklist.empty()) {
     Operation *candidate = worklist.pop_back_val();
     for (OpOperand &operand : candidate->getOpOperands()) {
       Operation *producer = operand.get().getDefiningOp();
       if (!producer)
         continue;
-      if (IREE::Flow::isClonableIntoDispatchOp(producer) ||
+      if (IREE::Flow::isClonableIntoDispatchOp(producer, clonableOptions) ||
           hasFusionGroupsAttribute(producer) || hasRootOpAttribute(producer)) {
         continue;
       }
@@ -734,6 +736,8 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
                        unsigned numRootOps = 0) {
   MLIRContext *context = region.getContext();
   OpBuilder builder(context);
+  IREE::Flow::ClonableIntoDispatchOptions clonableOptions;
+  clonableOptions.aggressive = options.aggressiveFusion;
   for (Block &block : region) {
     // Dispatch region formation works by first cloning the root into
     // the dispatch region and then pulling operations in.
@@ -778,7 +782,7 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // materializing large tensors between dispatches.
       if (!isa<linalg::LinalgOp, tensor::PadOp, tensor::PackOp,
                IREE::Encoding::SetEncodingOp>(op) ||
-          IREE::Flow::isClonableIntoDispatchOp(&op)) {
+          IREE::Flow::isClonableIntoDispatchOp(&op, clonableOptions)) {
         continue;
       }
 

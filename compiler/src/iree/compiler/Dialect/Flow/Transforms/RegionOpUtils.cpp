@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
@@ -790,9 +791,22 @@ FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
 // Utilities to make a dispatch region isolated from above
 //===---------------------------------------------------------------------===//
 
+static bool isAttentionMaskGenerator(Operation *op) {
+  for (OpOperand &use : op->getUses()) {
+    if (auto attention =
+            dyn_cast<IREE::LinalgExt::AttentionOp>(use.getOwner())) {
+      if (attention.getMask() == use.get()) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /// Operations that are cloned into dispatch regions formed with other
 /// operations as roots.
-bool isClonableIntoDispatchOp(Operation *op) {
+bool isClonableIntoDispatchOp(Operation *op,
+                              ClonableIntoDispatchOptions options) {
   // TODO(#8637): `tensor.collapse_shape` and `tensor.expand_shape` are
   // trivially clonable too, but they cause problems
   // with bufferization. Make them clonable when fixed.
@@ -805,6 +819,12 @@ bool isClonableIntoDispatchOp(Operation *op) {
     return true;
   }
   if (clEnableGatherFusion && LinalgExt::isGatherlikeOp(op)) {
+    return true;
+  }
+  // If the operation is used for masking an AttentionOp, then we always
+  // clone it. The Attention mask is usually big, and is always generated
+  // from a small tensor, so it's always good to clone it.
+  if (options.aggressive && isAttentionMaskGenerator(op)) {
     return true;
   }
   if (isa<arith::ConstantOp>(op) || isa<complex::ConstantOp>(op)) {
@@ -874,8 +894,8 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
   return false;
 }
 
-SmallVector<Operation *>
-getCloneableOps(IREE::Flow::DispatchRegionOp regionOp) {
+SmallVector<Operation *> getCloneableOps(IREE::Flow::DispatchRegionOp regionOp,
+                                         ClonableIntoDispatchOptions options) {
   // Find values that are used inside of the dispatch region but defined outside
   // of the dispatch region.
   llvm::SetVector<Value> valuesDefinedAbove;
@@ -897,7 +917,8 @@ getCloneableOps(IREE::Flow::DispatchRegionOp regionOp) {
     visited.insert(outsideValue);
 
     Operation *definingOp = outsideValue.getDefiningOp();
-    if (!definingOp || !IREE::Flow::isClonableIntoDispatchOp(definingOp) ||
+    if (!definingOp ||
+        !IREE::Flow::isClonableIntoDispatchOp(definingOp, options) ||
         hasUnfusableUseInDispatch(outsideValue, regionOp)) {
       valuesDefinedAbove.insert(outsideValue);
       continue;
@@ -914,10 +935,11 @@ getCloneableOps(IREE::Flow::DispatchRegionOp regionOp) {
 
 /// Clone producers into the dispatch region.
 LogicalResult cloneProducersToRegion(RewriterBase &rewriter,
-                                     IREE::Flow::DispatchRegionOp regionOp) {
+                                     IREE::Flow::DispatchRegionOp regionOp,
+                                     ClonableIntoDispatchOptions options) {
   SmallVector<Operation *> cloneableOps;
   do {
-    cloneableOps = getCloneableOps(regionOp);
+    cloneableOps = getCloneableOps(regionOp, options);
     bool sortResult = mlir::computeTopologicalSorting(cloneableOps);
     (void)sortResult;
     assert(sortResult && "could not compute topological sorting");
