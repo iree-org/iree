@@ -65,37 +65,37 @@ sdxl_unet_fp16_pipeline_mlir = fetch_source_fixture(
 # FP16 Model for 960x1024 image size
 
 sdxl_unet_fp16_960_1024_inference_input_0 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/ian/unet_npys/arg0_latent_model_input.npy",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/ian/unet_npys/input1.npy",
     group="sdxl_unet_fp16_960_1024",
 )
 
 sdxl_unet_fp16_960_1024_inference_input_1 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/ian/unet_npys/arg1_guidanc_scale.npy",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/ian/unet_npys/input2.npy",
     group="sdxl_unet_fp16_960_1024",
 )
 
 sdxl_unet_fp16_960_1024_inference_input_2 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/ian/unet_npys/arg2_prompt_embeds.npy",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/ian/unet_npys/input3.npy",
     group="sdxl_unet_fp16_960_1024",
 )
 
 sdxl_unet_fp16_960_1024_inference_input_3 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/ian/unet_npys/arg3_add_text_embeds.npy",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/ian/unet_npys/input4.npy",
     group="sdxl_unet_fp16_960_1024",
 )
 
 sdxl_unet_fp16_960_1024_inference_input_4 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/ian/unet_npys/arg4_add_time_ids.npy",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/ian/unet_npys/input5.npy",
     group="sdxl_unet_fp16_960_1024",
 )
 
 sdxl_unet_fp16_960_1024_inference_input_5 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/ian/unet_npys/arg5_t.npy",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/ian/unet_npys/input6.npy",
     group="sdxl_unet_fp16_960_1024",
 )
 
 sdxl_unet_fp16_960_1024_inference_output_0 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/ian/unet_npys/inference_output_0.npy",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/ian/unet_npys/golden_out.npy",
     group="sdxl_unet_fp16_960_1024",
 )
 
@@ -290,8 +290,9 @@ if os.path.isfile(
 INT8_PUNET_FLAGS = [
     "--iree-preprocessing-pass-pipeline=builtin.module(util.func(iree-flow-canonicalize), iree-preprocessing-transpose-convolution-pipeline, iree-preprocessing-pad-to-intrinsics)",
 ]
+
 if os.path.isfile(
-    f"{iree_test_path_extension}/attention_and_matmul_spec_punet_{sku}.mlir"
+        f"{iree_test_path_extension}/attention_and_matmul_spec_punet_{sku}.mlir"
 ):
     INT8_PUNET_FLAGS.append(
         f"--iree-codegen-transform-dialect-library={iree_test_path_extension}/attention_and_matmul_spec_punet_{sku}.mlir"
