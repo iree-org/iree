@@ -54,7 +54,7 @@ struct WgpDetails {
 // Chip level feature/limit details
 struct ChipDetails {
   uint32_t wgpCount;
-  std::optional<llvm::StringRef> sku;
+  std::optional<StringRef> sku;
 };
 
 // Full target details
@@ -118,9 +118,11 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
 
   TargetChipAttr targetChip;
   if (details.chip) {
-    StringAttr skuAttr = details.chip->sku
-                             ? StringAttr::get(context, *(details.chip->sku))
-                             : StringAttr::get(context, "");
+    std::optional<StringAttr> skuAttr =
+        details.chip->sku && !details.chip->sku->empty()
+            ? std::optional<StringAttr>(
+                  StringAttr::get(context, *details.chip->sku))
+            : std::nullopt;
     targetChip = TargetChipAttr::get(context, details.chip->wgpCount, skuAttr,
                                      DictionaryAttr{});
   }

@@ -137,9 +137,9 @@ getDefaultTuningSpec(ModuleOp module,
 
   std::optional<StringRef> sku;
   if (IREE::GPU::TargetChipAttr chip = gpuTarget.getChip()) {
-    StringAttr chipSku = chip.getSku();
-    if (!chipSku.empty()) {
-      sku = chipSku.getValue();
+    std::optional<StringAttr> chipSku = chip.getSku();
+    if (chipSku) {
+      sku = (*chipSku).getValue();
     }
   }
 
