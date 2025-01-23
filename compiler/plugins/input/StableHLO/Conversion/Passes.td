@@ -32,14 +32,14 @@ def ConvertStableHloToLinalgExt :
 // General passes
 //===----------------------------------------------------------------------===//
 
-def ConvertStableHloToLinalg :
-    Pass<"iree-stablehlo-to-linalg", "ModuleOp"> {
-  let summary = "Converts from StableHLO ops to Linalg ops on";
-  let options = [Option<"enablePrimitiveOps", "enable-primitive-ops", "bool",
-                        /*default=*/"false",
-                        "Lower to primitive Linalg ops (map, reduce and "
-                        "transpose) when possible, instead of linalg.generic">];
-}
+// def ConvertStableHloToLinalg :
+//     Pass<"iree-stablehlo-to-linalg", "ModuleOp"> {
+//   let summary = "Converts from StableHLO ops to Linalg ops on";
+//   let options = [Option<"enablePrimitiveOps", "enable-primitive-ops", "bool",
+//                         /*default=*/"false",
+//                         "Lower to primitive Linalg ops (map, reduce and "
+//                         "transpose) when possible, instead of linalg.generic">];
+// }
 
 def LegalizeControlFlow :
     InterfacePass<"iree-stablehlo-legalize-control-flow", "mlir::FunctionOpInterface"> {

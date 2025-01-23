@@ -154,6 +154,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ShapeToStandard",
         "@llvm-project//mlir:ShapeTransforms",
         "@llvm-project//mlir:Transforms",
+        "@stablehlo//:linalg_passes",
         "@stablehlo//:stablehlo_passes",
     ],
 )

@@ -45,6 +45,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "stablehlo/conversions/linalg/transforms/Rewriters.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {
@@ -2577,104 +2578,111 @@ struct SetDimensionSizeConverter final
   }
 };
 
-struct ConvertStableHloToLinalg final
-    : impl::ConvertStableHloToLinalgBase<ConvertStableHloToLinalg> {
-  using ConvertStableHloToLinalgBase::ConvertStableHloToLinalgBase;
+// struct ConvertStableHloToLinalg final
+//     : impl::ConvertStableHloToLinalgBase<ConvertStableHloToLinalg> {
+//   using ConvertStableHloToLinalgBase::ConvertStableHloToLinalgBase;
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<bufferization::BufferizationDialect, linalg::LinalgDialect,
-                    scf::SCFDialect, complex::ComplexDialect, math::MathDialect,
-                    memref::MemRefDialect, shape::ShapeDialect>();
-  }
+//   void getDependentDialects(DialectRegistry &registry) const override {
+//     registry.insert<bufferization::BufferizationDialect,
+//     linalg::LinalgDialect,
+//                     scf::SCFDialect, complex::ComplexDialect,
+//                     math::MathDialect, memref::MemRefDialect,
+//                     shape::ShapeDialect>();
+//   }
 
-  void runOnOperation() override {
-    MLIRContext &ctx = getContext();
-    RewritePatternSet patterns(&ctx);
-    ConversionTarget target(ctx);
-    target.addLegalDialect<
-        bufferization::BufferizationDialect, arith::ArithDialect,
-        complex::ComplexDialect, linalg::LinalgDialect, math::MathDialect,
-        tensor::TensorDialect, sparse_tensor::SparseTensorDialect,
-        scf::SCFDialect, shape::ShapeDialect>();
+//   void runOnOperation() override {
+//     MLIRContext &ctx = getContext();
+//     RewritePatternSet patterns(&ctx);
+//     ConversionTarget target(ctx);
+//     target.addLegalDialect<
+//         bufferization::BufferizationDialect, arith::ArithDialect,
+//         complex::ComplexDialect, linalg::LinalgDialect, math::MathDialect,
+//         tensor::TensorDialect, sparse_tensor::SparseTensorDialect,
+//         scf::SCFDialect, shape::ShapeDialect>();
 
-    target.addLegalOp<UnrealizedConversionCastOp>();
+//     target.addLegalOp<UnrealizedConversionCastOp>();
 
-    auto typeConverter = createStableHloToLinalgTypeConverter();
-    ModuleOp module = getOperation();
+//     auto typeConverter = createStableHloToLinalgTypeConverter();
+//     ModuleOp module = getOperation();
 
-    populateStableHloToLinalgConversionPatterns(&ctx, *typeConverter, &patterns,
-                                                this->enablePrimitiveOps);
-    if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
-      signalPassFailure();
-    }
-  }
-};
+//     populateStableHloToLinalgConversionPatterns(&ctx, *typeConverter,
+//     &patterns,
+//                                                 this->enablePrimitiveOps);
+//     if (failed(applyPartialConversion(module, target, std::move(patterns))))
+//     {
+//       signalPassFailure();
+//     }
+//   }
+// };
 
 } // namespace
 
-void populateStableHloToLinalgConversionPatterns(MLIRContext *context,
-                                                 TypeConverter &typeConverter,
-                                                 RewritePatternSet *patterns,
-                                                 bool enablePrimitiveOps) {
-  // clang-format off
-  patterns->add<
-      BitcastConvertConverter,
-      ConcatenateConverter,
-      ConstConverterTensor,
-      EinsumToLinalgConverter,
-      GatherConversion,
-      RealDynamicSliceConverter,
-      ReshapeOpConverter,
-      ReverseConverter,
-      SetDimensionSizeConverter,
-      SliceConverter,
-      DynamicSliceConverter,
-      DynamicUpdateSliceConverter,
-      PadOpConversion,
-      PadOpNegativePaddingConversion,
-      TorchIndexSelectOpConversion,
-      SelectAndScatterNoOverlapConverter
-      >(typeConverter, context);
+// void populateStableHloToLinalgConversionPatterns(MLIRContext *context,
+//                                                  TypeConverter
+//                                                  &typeConverter,
+//                                                  RewritePatternSet *patterns,
+//                                                  bool enablePrimitiveOps) {
+//   // clang-format off
+//   patterns->add<
+//       BitcastConvertConverter,
+//       ConcatenateConverter,
+//       ConstConverterTensor,
+//       EinsumToLinalgConverter,
+//       GatherConversion,
+//       RealDynamicSliceConverter,
+//       ReshapeOpConverter,
+//       ReverseConverter,
+//       SetDimensionSizeConverter,
+//       SliceConverter,
+//       DynamicSliceConverter,
+//       DynamicUpdateSliceConverter,
+//       PadOpConversion,
+//       PadOpNegativePaddingConversion,
+//       TorchIndexSelectOpConversion,
+//       SelectAndScatterNoOverlapConverter
+//       >(typeConverter, context);
 
-  detail::populatePointwiseStableHloToLinalgConversionPatterns(
-      context, typeConverter, patterns, enablePrimitiveOps);
+//   detail::populatePointwiseStableHloToLinalgConversionPatterns(
+//       context, typeConverter, patterns, enablePrimitiveOps);
 
-  if (enablePrimitiveOps) {
-    patterns->add<
-      BroadcastInDimOpToBroadcastConverter,
-      BroadcastOpToBroadcastConverter,
-      DynamicBroadcastInDimOpToBroadcastConverter,
-      IotaToMapConverter<mlir::stablehlo::IotaOp>,
-      IotaToMapConverter<mlir::stablehlo::DynamicIotaOp>,
-      MapOpToMapConverter,
-      TransposeOpToTransposeConverter
-    >(typeConverter, context);
-  } else {
-    patterns->add<
-      BroadcastConverter<mlir::stablehlo::BroadcastOp>,
-      IotaConverter<mlir::stablehlo::IotaOp>,
-      IotaConverter<mlir::stablehlo::DynamicIotaOp>,
-      HloBroadcastInDimConverter,
-      HloDynamicBroadcastInDimConverter,
-      MapOpToGenericConverter,
-      TransposeConverter<mlir::stablehlo::TransposeOp>
-    >(typeConverter, context);
-  }
+//   if (enablePrimitiveOps) {
+//     patterns->add<
+//       BroadcastInDimOpToBroadcastConverter,
+//       BroadcastOpToBroadcastConverter,
+//       DynamicBroadcastInDimOpToBroadcastConverter,
+//       IotaToMapConverter<mlir::stablehlo::IotaOp>,
+//       IotaToMapConverter<mlir::stablehlo::DynamicIotaOp>,
+//       MapOpToMapConverter,
+//       TransposeOpToTransposeConverter
+//     >(typeConverter, context);
+//   } else {
+//     patterns->add<
+//       BroadcastConverter<mlir::stablehlo::BroadcastOp>,
+//       IotaConverter<mlir::stablehlo::IotaOp>,
+//       IotaConverter<mlir::stablehlo::DynamicIotaOp>,
+//       HloBroadcastInDimConverter,
+//       HloDynamicBroadcastInDimConverter,
+//       MapOpToGenericConverter,
+//       TransposeConverter<mlir::stablehlo::TransposeOp>
+//     >(typeConverter, context);
+//   }
 
-  // clang-format on
+//   // clang-format on
 
-  detail::populateStableHloConvolutionToLinalgConversionPatterns(
-      context, typeConverter, patterns);
-  detail::populateStableHloDotProdToLinalgConversionPatterns(
-      context, typeConverter, patterns);
-  detail::populateStableHloRandomToLinalgConversionPatterns(
-      context, typeConverter, patterns);
-  detail::populateStableHloReductionToLinalgConversionPatterns(
-      context, typeConverter, patterns, enablePrimitiveOps);
-  detail::populateScalarHloToArithConversionPatterns(
-      context, typeConverter, patterns, isInBodyOfLinalgOps);
-  linalg::populateEraseUnusedOperandsAndResultsPatterns(*patterns);
-}
+//   detail::populateStableHloConvolutionToLinalgConversionPatterns(
+//       context, typeConverter, patterns);
+//   detail::populateStableHloDotProdToLinalgConversionPatterns(
+//       context, typeConverter, patterns);
+//   detail::populateStableHloRandomToLinalgConversionPatterns(
+//       context, typeConverter, patterns);
+//   detail::populateStableHloReductionToLinalgConversionPatterns(
+//       context, typeConverter, patterns, enablePrimitiveOps);
+//   detail::populateStableHloReductionToLinalgConversionPatterns(
+//       context, typeConverter, patterns, enablePrimitiveOps);
+//   detail::populateScalarHloToArithConversionPatterns(
+//       context, typeConverter, patterns, isInBodyOfLinalgOps);
+//   linalg::populateEraseUnusedOperandsAndResultsPatterns(*patterns);
+// }
 
 std::unique_ptr<TypeConverter> createStableHloToLinalgTypeConverter() {
   return std::make_unique<LinalgTypeConverter>();

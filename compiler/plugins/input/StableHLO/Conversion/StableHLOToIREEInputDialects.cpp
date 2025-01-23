@@ -511,8 +511,8 @@ struct ConvertStableHloToIreeInputDialects final
     // expensive expansions.
     populateCanonicalizationPatterns(context, &patterns, /*benefit=*/1024);
 
-    populateStableHloToLinalgOnTensorsConversionPatterns(
-        context, *typeConverter, &patterns);
+    // populateStableHloToLinalgOnTensorsConversionPatterns(
+    //     context, *typeConverter, &patterns);
     populateStableHloCollectivesConversionPatterns(context, *typeConverter,
                                                    &patterns);
 
@@ -626,17 +626,19 @@ struct ConvertStableHloToIreeInputDialects final
 
 } // namespace
 
-void populateStableHloToLinalgOnTensorsConversionPatterns(
-    MLIRContext *context, TypeConverter &typeConverter,
-    RewritePatternSet *patterns) {
-  // TODO(#5809): Drop ConcatenateOp lowering in favor of the upstream version
-  //              then remove the PatternBenefit here
-  patterns->add<ConcatenateOpConversion, FftOpConversion,
-                OptimizationBarrierOpConversion>(typeConverter, context,
-                                                 PatternBenefit{1000});
+// void populateStableHloToLinalgOnTensorsConversionPatterns(
+//     MLIRContext *context, TypeConverter &typeConverter,
+//     RewritePatternSet *patterns) {
+//   // TODO(#5809): Drop ConcatenateOp lowering in favor of the upstream
+//   version
+//   //              then remove the PatternBenefit here
+//   patterns->add<ConcatenateOpConversion, FftOpConversion,
+//                 OptimizationBarrierOpConversion>(typeConverter, context,
+//                                                  PatternBenefit{1000});
 
-  populateStableHloToLinalgConversionPatterns(context, typeConverter, patterns,
-                                              /*enablePrimitiveOps=*/false);
-}
+//   populateStableHloToLinalgConversionPatterns(context, typeConverter,
+//   patterns,
+//                                               /*enablePrimitiveOps=*/false);
+// }
 
 } // namespace mlir::iree_compiler::stablehlo
