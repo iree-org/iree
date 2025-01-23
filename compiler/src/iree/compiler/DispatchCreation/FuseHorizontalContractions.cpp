@@ -146,6 +146,10 @@ getTruncateOp(Operation *op,
     return std::nullopt;
   }
   if (seedTruncateOp) {
+    // TODO: support multiple contractions being used by the same truncate op.
+    if (seedTruncateOp == genericOp) {
+      return std::nullopt;
+    }
     if (!checkOperationEquivalence(genericOp, seedTruncateOp.value())) {
       return std::nullopt;
     }
