@@ -176,6 +176,7 @@ declare_mlir_python_sources(IREECompilerPythonExtensions)
 declare_mlir_python_extension(IREECompilerPythonExtensions.Registration
   MODULE_NAME _site_initialize_0
   ADD_TO_PARENT IREECompilerPythonExtensions
+  PYTHON_BINDINGS_LIBRARY nanobind
   SOURCES
     IREECompilerRegistration.cpp
   EMBED_CAPI_LINK_LIBS
@@ -187,6 +188,7 @@ declare_mlir_python_extension(IREECompilerPythonExtensions.Registration
 declare_mlir_python_extension(IREECompilerPythonExtensions.CompilerDialects
   MODULE_NAME _ireeCompilerDialects
   ADD_TO_PARENT IREECompilerPythonExtensions
+  PYTHON_BINDINGS_LIBRARY nanobind
   SOURCES
     IREECompilerDialectsModule.cpp
   EMBED_CAPI_LINK_LIBS
