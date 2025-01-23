@@ -93,10 +93,10 @@ builtin.module attributes { transform.with_named_sequence } {
   thread_strides = [1, 16]
 >
 
-func.func @mfma_16x16x16_out_reduced_alldims(%arg0: vector<32x32xf32>, %arg1: f32) -> f32 {
-  %arg0l = iree_vector_ext.to_layout %arg0 to layout(#nested) : vector<32x32xf32>
-  %0 = vector.multi_reduction <maximumf>, %arg0l, %arg1 [0, 1] : vector<32x32xf32> to f32
-  return %0 : f32
+func.func @mfma_16x16x16_out_reduced_alldims(%arg0: vector<32x32xf16>, %arg1: f16) -> f16 {
+  %arg0l = iree_vector_ext.to_layout %arg0 to layout(#nested) : vector<32x32xf16>
+  %0 = vector.multi_reduction <maximumf>, %arg0l, %arg1 [0, 1] : vector<32x32xf16> to f16
+  return %0 : f16
 }
 
 builtin.module attributes { transform.with_named_sequence } {
@@ -109,12 +109,12 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func @mfma_16x16x16_out_reduced_alldims
 // Local reduction
-// CHECK: vector.multi_reduction <maximumf>, %{{.*}}, %{{.*}} [0, 1, 2, 3, 4, 5] : vector<2x2x1x1x1x4xf32> to f32
+// CHECK: vector.multi_reduction <maximumf>, %{{.*}}, %{{.*}} [0, 1, 2, 3, 4, 5] : vector<2x2x1x1x1x4xf16> to f16
 // Global reduction
-// CHECK: gpu.subgroup_reduce maximumf %{{.*}} cluster(size = 16) : (f32) -> f32
-// CHECK-NEXT: gpu.subgroup_reduce maximumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
+// CHECK: gpu.subgroup_reduce maximumf %{{.*}} cluster(size = 16) : (f16) -> f16
+// CHECK-NEXT: gpu.subgroup_reduce maximumf %{{.*}} cluster(size = 4, stride = 16) : (f16) -> f16
 // Accumulator reduction
-// CHECK: arith.maximumf %{{.*}}, %{{.*}} : vector<1xf32>
+// CHECK: arith.maximumf %{{.*}}, %{{.*}} : vector<1xf16>
 
 // -----
 
