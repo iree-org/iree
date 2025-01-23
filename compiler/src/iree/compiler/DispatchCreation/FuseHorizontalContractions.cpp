@@ -115,6 +115,7 @@ static bool isHorizontalToGroup(Operation *op,
                                 const DominanceInfo &dominanceInfo,
                                 Operation *seedOp) {
   BackwardSliceOptions options;
+  options.inclusive = true;
   // Limit the slice to the seed to make sure the slice is small.
   options.filter = [&](Operation *op) {
     return !dominanceInfo.properlyDominates(op, seedOp);
@@ -146,10 +147,6 @@ getTruncateOp(Operation *op,
     return std::nullopt;
   }
   if (seedTruncateOp) {
-    // TODO: support multiple contractions being used by the same truncate op.
-    if (seedTruncateOp == genericOp) {
-      return std::nullopt;
-    }
     if (!checkOperationEquivalence(genericOp, seedTruncateOp.value())) {
       return std::nullopt;
     }
