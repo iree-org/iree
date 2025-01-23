@@ -19,7 +19,6 @@
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
-#include "stablehlo/conversions/linalg/transforms/Passes.h"
 #include "stablehlo/transforms/Passes.h"
 
 namespace mlir::iree_compiler::stablehlo {
@@ -87,15 +86,7 @@ void buildStableHLOInputConversionPassPipelineImpl(
   passManager.addNestedPass<func::FuncOp>(
       stablehlo::createConvertStableHloToLinalgExt());
   passManager.addNestedPass<func::FuncOp>(stablehlo::createLegalizeChlo());
-  // TODO(scotttodd): plumb through options:
-  //   struct StablehloLegalizeToLinalgPassOptions {
-  //     bool enablePrimitiveOps = false;
-  //     bool enableSparseOps = false;
-  //   };
-  passManager.addNestedPass<func::FuncOp>(
-      ::mlir::stablehlo::createStablehloLegalizeToLinalgPass());
   passManager.addPass(createConvertStableHloToIreeInputDialects());
-  // Ensure conversion completed.
   passManager.addPass(createReconcileUnrealizedCastsPass());
 
   // Note that some StableHLO ops are left by the above and must resolve via

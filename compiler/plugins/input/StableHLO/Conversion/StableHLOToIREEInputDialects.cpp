@@ -34,6 +34,7 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "stablehlo/conversions/linalg/transforms/Rewriters.h"
 #include "stablehlo/conversions/linalg/transforms/TypeConversion.h"
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
@@ -351,6 +352,9 @@ struct ConvertStableHloToIreeInputDialects final
     // expensive expansions.
     populateCanonicalizationPatterns(context, &patterns, /*benefit=*/1024);
 
+    ::mlir::stablehlo::populateStablehloToLinalgConversionPatterns(
+        context, *typeConverter, &patterns, /*enablePrimitiveOps=*/false,
+        /*enableSparseOps=*/false);
     populateStableHloCollectivesConversionPatterns(context, *typeConverter,
                                                    &patterns);
 
