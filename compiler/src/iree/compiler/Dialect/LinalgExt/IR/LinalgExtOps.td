@@ -614,6 +614,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     // Attributes to set on QK and PV matmul after decomposition.
     static StringRef getQKAttrStr() { return "qk_attrs"; }
     static StringRef getPVAttrStr() { return "pv_attrs"; }
+    static StringRef getUseExp2AttrStr() { return "use_exp2"; }
   }];
 }
 
@@ -747,6 +748,7 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     // Attributes to set on QK and PV matmul after decomposition.
     static StringRef getQKAttrStr() { return "qk_attrs"; }
     static StringRef getPVAttrStr() { return "pv_attrs"; }
+    static StringRef getUseExp2AttrStr() { return "use_exp2"; }
   }];
 }
 //===----------------------------------------------------------------------===//
