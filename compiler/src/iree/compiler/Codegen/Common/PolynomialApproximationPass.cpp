@@ -14,7 +14,7 @@ namespace mlir::iree_compiler {
 
 /// Command line to use native hardware operations instead of polynomial
 /// approximation.
-static llvm::cl::opt<bool> clNativeMathPrecision(
+llvm::cl::opt<bool> clNativeMathPrecision(
     "iree-codegen-gpu-native-math-precision",
     llvm::cl::desc(
         "Skip polynomial lowering for math op natively available on GPU"),
@@ -40,10 +40,13 @@ class PolynomialApproximationPass final
     populateExpandPowFPattern(mathPatterns);
     populateExpandFPowIPattern(mathPatterns);
 
-    populateExpandExp2FPattern(mathPatterns);
-    populateMathPolynomialApproximationPatterns(mathPatterns);
-    populateExpandRoundEvenPattern(mathPatterns);
-
+    if (clNativeMathPrecision) {
+      mathPatterns.add<math::ErfPolynomialApproximation>(&getContext());
+    } else {
+      populateExpandExp2FPattern(mathPatterns);
+      populateMathPolynomialApproximationPatterns(mathPatterns);
+      populateExpandRoundEvenPattern(mathPatterns);
+    }
     if (failed(
             applyPatternsGreedily(getOperation(), std::move(mathPatterns)))) {
       return signalPassFailure();

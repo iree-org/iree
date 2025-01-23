@@ -5,11 +5,13 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "mlir/Dialect/Math/Transforms/Approximation.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Transforms/WalkPatternRewriteDriver.h"
-#include "mlir/Dialect/Math/Transforms/Approximation.h"
 
 namespace mlir::iree_compiler {
+
+extern llvm::cl::opt<bool> clNativeMathPrecision;
 
 #define GEN_PASS_DEF_LLVMGPUPOLYNOMIALAPPROXIMATIONPASS
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
@@ -26,7 +28,13 @@ struct LLVMGPUPolynomialApproximationPass final
     populateExpandPowFPattern(mathPatterns);
     populateExpandFPowIPattern(mathPatterns);
 
-    mathPatterns.add<math::ErfPolynomialApproximation>(&getContext());
+    if (clNativeMathPrecision) {
+      mathPatterns.add<math::ErfPolynomialApproximation>(&getContext());
+    } else {
+      populateExpandExp2FPattern(mathPatterns);
+      populateMathPolynomialApproximationPatterns(mathPatterns);
+      populateExpandRoundEvenPattern(mathPatterns);
+    }
 
     walkAndApplyPatterns(getOperation(), std::move(mathPatterns));
   }
