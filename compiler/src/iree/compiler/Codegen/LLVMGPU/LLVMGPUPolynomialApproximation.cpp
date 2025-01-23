@@ -26,7 +26,6 @@ struct LLVMGPUPolynomialApproximationPass final
     // TODO(lialan): Handle these functions efficiently in ROCDL/NVVM
     // conversion passes. This expansion is likely suboptimal.
     populateExpandPowFPattern(mathPatterns);
-    populateExpandFPowIPattern(mathPatterns);
 
     if (clNativeMathPrecision) {
       mathPatterns.add<math::ErfPolynomialApproximation>(&getContext());
