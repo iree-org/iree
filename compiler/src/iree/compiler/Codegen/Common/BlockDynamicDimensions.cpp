@@ -20,9 +20,18 @@
 
 static llvm::cl::opt<bool> clEnableBlockedMatmuls(
     "iree-codegen-block-dynamic-dimensions-of-contractions",
-    llvm::cl::desc("developer flag to gaurd blocking dynamic dimensions of "
+    llvm::cl::desc("developer flag to guard blocking dynamic dimensions of "
                    "contraction-like ops"),
     llvm::cl::Hidden, llvm::cl::init(true));
+
+// This pass doesn't handle lowering config projection
+// when the dimension split happens for the dynamic
+// dimension. Therefore, keep the default to be disabled.
+static llvm::cl::opt<bool> clEnableBlockedAttentions(
+    "iree-codegen-block-dynamic-dimensions-of-attention",
+    llvm::cl::desc("developer flag to guard blocking dynamic dimensions of "
+                   "attention ops"),
+    llvm::cl::Hidden, llvm::cl::init(false));
 
 namespace mlir::iree_compiler {
 
@@ -292,8 +301,11 @@ blockDynamicDimensions(RewriterBase &rewriter,
                        Operation *operation) {
   return TypeSwitch<Operation *, LogicalResult>(operation)
       .Case<IREE::LinalgExt::AttentionOp>([&](auto attentionOp) {
-        return blockDynamicDimensions(rewriter, dynamicDimAnalysis,
-                                      attentionOp);
+        if(clEnableBlockedAttentions){
+          return blockDynamicDimensions(rewriter, dynamicDimAnalysis,
+                                        attentionOp);
+        }
+        return success();
       })
       .Case<linalg::LinalgOp>([&](auto linalgOp) {
         if (clEnableBlockedMatmuls) {
