@@ -5012,42 +5012,30 @@ it over the entire softmax reduction dimension by:
               `outs` `(` $outputs `:` type($outputs) `)`
               $region (`-&gt;` type($results)^)?
 </code></pre></div>
-<p>Based on XLA operation semantics, takes two <code>inputs</code> (<code>update</code> and
-<code>indices</code>) and <code>outputs</code> value (<code>original</code>). The operation updates
-the value at the slices specified by <code>indices</code> by combining the
-current value with the value in <code>updates</code> using the computation
+<p>Takes two <code>inputs</code> (<code>update</code> and <code>indices</code>) and <code>outputs</code> value (<code>original</code>).
+The operation updates the value at the slices specified by <code>indices</code> by
+combining the current value with the value in <code>updates</code> using the computation
 specified in <code>region</code>. The <code>region</code> specifies a binary operation
-of signature (T, T) -&gt; T, where <code>T</code> is the element-type of
+of signature <code>(T, T) -&gt; T</code>, where <code>T</code> is the element-type of
 <code>updates</code> (and <code>original</code>). The first argument is from <code>updates</code>,
 and the second is from <code>original</code>.</p>
+<p>The size of the <code>dimension_map</code> attribute is used to determine how many
+indices are used to index into <code>original</code>, i.e. <code>index_depth</code>. The
+<code>dimension_map</code> attribute describes which index value maps to which dimension
+in the destination.</p>
 <p>The operand <code>indices</code> is a N-D tensor/memref type that is composed
-of two logical parts:
-- The first <code>N-1</code> dimensions represent the batch of updates.
-- The last dim (at index <code>N-1</code>) is the <code>index_depth</code>, which should
-  always be static.</p>
-<p>For example, given <code>indices</code> of shape <code>[4, 3, 2]</code>, the batch dimensions
-are <code>[4, 3]</code> and the <code>index_depth</code> is <code>2</code>.</p>
+of two logical parts. The first <code>N-1</code> dimensions represent the batch of
+updates. The last dim (at index <code>N-1</code>) is the <code>index_depth</code>, which can be
+omitted if <code>index_depth</code> is 1.</p>
 <p>The operand <code>update</code> is a M-D tensor/memref type and similarly
-consists of two parts:
-- The first <code>N-1</code> dimensions represent the batch of updates. This
-  must exactly match to the first <code>N-1</code> dimensions in <code>indices</code>
-  (from the example above: <code>indices</code> must start with <code>[4, 3]</code>)
-- Dimensions <code>N..M-1</code> represent the slice scattered into <code>original</code>.
-  The first part of this tensor represents the dimensions indexed
-  by <code>indices</code>. This must be no larger than <code>index_depth</code> but can be
-  less if unit dimensions are omitted.</p>
-<p>The second part represents a contiguous slice to be inserted into
-  <code>original</code>.</p>
+consists of two parts. The first <code>N-1</code> dimensions represent the batch of
+updates. This must exactly match to the first <code>N-1</code> dimensions in <code>indices</code>.
+Dimensions <code>N..M-1</code> represent the slice scattered into <code>original</code>,
+<code>update_slice</code>, and must match the last dimensions in original. This
+represents a contiguous slice to be inserted into <code>original</code>.</p>
 <p>The operand <code>original</code> is a DPS init representing the destination that
-<code>update</code> gets scattered to.</p>
-<p>The rank of the <code>original</code> is at least <code>rank(%updates) - batch_rank</code>.
-The first <code>index_depth</code> indices are derived from <code>indices</code> and the
-shape of update value has the last rank(%original) - index_depth values
-match %(originals) last dimensions, with the previous dims extending
-from the index offsets.</p>
-<p>The dimension_map attributes describes which index value maps to which
-dimension in the destionation. It's rank must equal <code>index_depth</code> as
-represents a permutation of the indices before indexing into `original``.</p>
+<code>update</code> gets scattered to.
+Where <code>rank(original) = rank(update_slice) + index_depth</code></p>
 <p>The unique_indices attribute carries the information whether all the
 indices are unique. If <code>unique_indices</code> is <code>true</code> and two or more updates
 scatter to the same location in <code>original</code> the final value in <code>original</code> is
