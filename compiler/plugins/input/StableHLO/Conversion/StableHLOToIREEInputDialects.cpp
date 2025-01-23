@@ -332,10 +332,11 @@ struct ConvertStableHloToIreeInputDialects final
     : impl::ConvertStableHloToIreeInputDialectsBase<
           ConvertStableHloToIreeInputDialects> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<
-        IREE::Flow::FlowDialect, IREE::Util::UtilDialect, linalg::LinalgDialect,
-        arith::ArithDialect, tensor::TensorDialect, shape::ShapeDialect,
-        math::MathDialect, memref::MemRefDialect, complex::ComplexDialect>();
+    registry.insert<IREE::Flow::FlowDialect, IREE::Util::UtilDialect,
+                    linalg::LinalgDialect, arith::ArithDialect,
+                    tensor::TensorDialect, shape::ShapeDialect,
+                    math::MathDialect, memref::MemRefDialect,
+                    complex::ComplexDialect, scf::SCFDialect>();
   }
 
   void runOnOperation() override {
