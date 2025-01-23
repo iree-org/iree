@@ -221,3 +221,44 @@ util.func public @attention_rope_fusion(%arg0: index, %arg1: tensor<?x128xf32>,
 //  CHECK-SAME:         ins(%[[GATHER]],
 //       CHECK:      flow.dispatch.tensor.store %[[ATTENTION]]
 //       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+util.func public @verify_bubbling(%arg0: !hal.buffer_view, %arg2: !hal.fence) -> !hal.buffer_view {
+  %c12 = arith.constant 12 : index
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %2 = hal.tensor.import wait(%arg2) => %arg0 : !hal.buffer_view -> tensor<10x10xf32>
+  %empty = tensor.empty() : tensor<10x10xf32>
+  %elementwise = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<10x10xf32>) outs(%empty : tensor<10x10xf32>) {
+    ^bb0(%in : f32, %out : f32):
+      %22 = arith.mulf %cst, %in : f32
+      linalg.yield %22 : f32
+  } -> tensor<10x10xf32>
+  %extract = tensor.extract_slice %elementwise[0, 0][4, 10][1, 1] : tensor<10x10xf32> to tensor<4x10xf32>
+  %expanded = tensor.expand_shape %extract [[0, 1], [2, 3]] output_shape[2, 2, 2, 5] : tensor<4x10xf32> into tensor<2x2x2x5xf32>
+  %extract2 = tensor.extract_slice %expanded[0, 0, 0, 0][1, 1, 2, 5][1, 1, 1, 1] : tensor<2x2x2x5xf32> to tensor<2x5xf32>
+  %empty2 = tensor.empty() : tensor<2x5xf32>
+  %elementwise2 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%extract2 : tensor<2x5xf32>) outs(%empty2 : tensor<2x5xf32>) {
+    ^bb0(%in : f32, %out : f32):
+      %22 = arith.mulf %cst, %in : f32
+      linalg.yield %22 : f32
+  } -> tensor<2x5xf32>
+  %12 = hal.tensor.barrier join(%elementwise2 : tensor<2x5xf32>) => %arg2 : !hal.fence
+  %13 = hal.tensor.export %12 : tensor<2x5xf32> -> !hal.buffer_view
+  util.return %13 : !hal.buffer_view
+}
+
+// Check that all `tensor.expand_shape` and `tensor.extract_slice` ops get bubbled
+// and allow for fusion of the 2 elementwise ops. This should result in a single
+// dispatch.
+
+// CHECK-LABEL: util.func public @verify_bubbling
+//   CHECK-NOT:   linalg.generic
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroup
+//       CHECK:     %[[GEN:.+]] = linalg.generic
+//       CHECK:      flow.dispatch.tensor.store %[[GEN]]
+//   CHECK-NOT:   linalg.generic
