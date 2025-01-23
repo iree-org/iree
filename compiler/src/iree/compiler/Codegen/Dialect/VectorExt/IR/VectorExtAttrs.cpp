@@ -147,7 +147,7 @@ LogicalResult NestedLayoutAttr::isValidLayout(ShapedType shapeTy,
     int64_t expectedShape = getSubgroupTile()[i] * getBatchTile()[i] *
                             getOuterTile()[i] * getThreadTile()[i] *
                             getElementTile()[i];
-    if (expectedShape != shape[i]) {
+    if (!ShapedType::isDynamic(shape[i]) && expectedShape != shape[i]) {
       std::string shapeStr;
       llvm::raw_string_ostream shapeOs(shapeStr);
       llvm::interleaveComma(shape, shapeOs);
