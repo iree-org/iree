@@ -361,8 +361,13 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
     return failure();
   }
 
-  MaterializeEncodingInfo encodingInfo =
-      typeConverter.getEncodingInfo(boundTensorType);
+  MaterializeEncodingInfo encodingInfo;
+  if (auto maybeEncodingInfo = getEncodingInfoFromLayouts(boundTensorType)) {
+    encodingInfo = maybeEncodingInfo.value();
+  } else {
+    encodingInfo = typeConverter.getEncodingInfo(boundTensorType);
+  }
+
   if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
     return failure();
   }
