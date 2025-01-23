@@ -169,6 +169,11 @@ def CloneProducersIntoDispatchRegionsPass :
     regions but defined in the above. This prepares the dispatch regions for
     converting to dispatch workgroups with explicit captures.
   }];
+  let options = [
+    Option<"aggressive", "aggressive", "bool",
+    /*default=*/"false",
+    "Include operations that are cloned only under aggressive fusion mode">,
+  ];
 }
 
 def CollapseDimensionsPass :
