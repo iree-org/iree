@@ -922,3 +922,57 @@ util.func @custom_op_no_producer_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<
 //  CHECK-SAME:         ins(%[[DISPATCH1]],
 //       CHECK:     flow.return %[[CUSTOM_OP]]
 //       CHECK:   util.return %[[DISPATCH2]]
+
+// -----
+
+// Do not form seperate dispatches for mask generators for attention. These
+// will clone into the dispatch.
+
+util.func @attention_clone_mask(%Q : tensor<?x?xf16>, %K : tensor<?x?xf16>, %V: tensor<?x?xf16>) -> tensor<?x?xf16> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %M = tensor.dim %Q, %c0 : tensor<?x?xf16>
+  %K2 = tensor.dim %K, %c1 : tensor<?x?xf16>
+  %N = tensor.dim %V, %c1 : tensor<?x?xf16>
+
+  %false = arith.constant 0 : i1
+  %true = arith.constant 1 : i1
+
+  %scale = arith.constant 1.0 : f16
+
+  %mask_e = tensor.empty(%M, %K2) : tensor<?x?xi1>
+  %out_e = tensor.empty(%M, %N) : tensor<?x?xf16>
+
+  %causalmask = linalg.generic {indexing_maps = [affine_map<(M, K2) -> (M, K2)>], iterator_types = ["parallel", "parallel"]} outs(%mask_e : tensor<?x?xi1>) {
+  ^bb0(%out: i1):
+    %i = linalg.index 0 : index
+    %j = linalg.index 1 : index
+    %dec = arith.cmpi sge, %i, %j : index
+    %mask = arith.select %dec, %false, %true : i1
+    linalg.yield %mask : i1
+  } -> tensor<?x?xi1>
+
+  %out = iree_linalg_ext.attention {
+    indexing_maps = [
+      affine_map<(M, N, K2, K1) -> (M, K1)>,
+      affine_map<(M, N, K2, K1) -> (K2, K1)>,
+      affine_map<(M, N, K2, K1) -> (K2, N)>,
+      affine_map<(M, N, K2, K1) -> ()>,
+      affine_map<(M, N, K2, K1) -> (K2, K1)>,
+      affine_map<(M, N, K2, K1) -> (M, N)>
+    ]
+  } ins(%Q, %K, %V, %scale, %causalmask : tensor<?x?xf16>, tensor<?x?xf16>, tensor<?x?xf16>, f16, tensor<?x?xi1>)
+  outs(%out_e : tensor<?x?xf16>) {
+  ^bb0(%score : f32):
+      iree_linalg_ext.yield %score : f32
+  }-> tensor<?x?xf16>
+
+  util.return %out : tensor<?x?xf16>
+}
+
+// CHECK-LABEL: @attention_clone_mask
+// CHECK-NOT: flow.dispatch.region
+// CHECK:     linalg.generic
+// CHECK:     flow.dispatch.region
+// CHECK:       iree_linalg_ext.attention
+// CHECK:       flow.return
