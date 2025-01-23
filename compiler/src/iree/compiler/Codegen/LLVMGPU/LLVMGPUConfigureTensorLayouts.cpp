@@ -17,6 +17,8 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 
+#include "iree/compiler/Codegen/Utils/Utils.h"
+
 #define DEBUG_TYPE "iree-llvmgpu-configure-vector-layouts"
 
 namespace mlir::iree_compiler {
@@ -711,9 +713,17 @@ static LogicalResult setDerivedThreadConfigLayout(
       static_cast<unsigned>(IREE::GPU::TilingLevel::Thread), linalgOp);
 
   SmallVector<int64_t> opShape = linalgOp.getStaticLoopRanges();
+  std::optional<VectorizationTileSizes> sizes =
+      inferSizesFromIR(linalgOp, std::nullopt);
+  // Even though the opShape could be dynamic, we could potentially
+  // infer the vector shape
+  if (sizes.has_value()) {
+    opShape = sizes.value().vectorSizes;
+  }
+
   for (auto [index, size, element] : llvm::enumerate(opShape, elementTile)) {
     if (ShapedType::isDynamic(size)) {
-      linalgOp->emitError() << "Cannot set layouts for dynamic loop ranges";
+      linalgOp->emitError() << "opShape could not be inferred";
       return failure();
     }
 
