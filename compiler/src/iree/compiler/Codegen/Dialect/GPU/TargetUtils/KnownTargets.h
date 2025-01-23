@@ -36,9 +36,6 @@ StringRef normalizeCUDATarget(StringRef target);
 TargetAttr getHIPTargetDetails(llvm::StringRef target, llvm::StringRef features,
                                MLIRContext *context);
 
-// Returns the SKU of the target GPU if available.
-std::optional<StringRef> getAMDSKU(TargetAttr target);
-
 // Normalizes the given HIP |target| to the gfx target commonly used for
 // compiling towards HIP. For example, "gfx90a" for "cnda2", "gfx1100" for
 // "rx7900xtx". Returns empty StringRef if the given |target| is not recognized.
