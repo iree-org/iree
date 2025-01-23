@@ -14,7 +14,7 @@ namespace mlir::iree_compiler {
 
 /// Command line to use native hardware operations instead of polynomial
 /// approximation.
-llvm::cl::opt<bool> clNativeMathPrecision(
+static llvm::cl::opt<bool> clNativeMathPrecision(
     "iree-codegen-gpu-native-math-precision",
     llvm::cl::desc(
         "Skip polynomial lowering for math op natively available on GPU"),
@@ -29,8 +29,45 @@ namespace {
 class PolynomialApproximationPass final
     : public impl::PolynomialApproximationPassBase<
           PolynomialApproximationPass> {
+
+public:
+  using impl::PolynomialApproximationPassBase<
+      PolynomialApproximationPass>::PolynomialApproximationPassBase;
+
   void runOnOperation() override {
     RewritePatternSet mathPatterns(&getContext());
+
+    if (isLLVMGPU) {
+      populateLLVMGPUPolynomialApproximationPatterns(mathPatterns);
+    } else {
+      populateGenericPolyApproximationPatterns(mathPatterns);
+    }
+
+    if (failed(
+            applyPatternsGreedily(getOperation(), std::move(mathPatterns)))) {
+      return signalPassFailure();
+    }
+  }
+
+  /// Only expand math dialect elementry functions not supported by device libs.
+  void populateLLVMGPUPolynomialApproximationPatterns(
+      RewritePatternSet &mathPatterns) {
+    // TODO(lialan): Handle these functions efficiently in ROCDL/NVVM
+    // conversion passes. This expansion is likely suboptimal.
+    populateExpandPowFPattern(mathPatterns);
+
+    if (clNativeMathPrecision) {
+      mathPatterns.add<math::ErfPolynomialApproximation>(&getContext());
+    } else {
+      populateExpandExp2FPattern(mathPatterns);
+      populateMathPolynomialApproximationPatterns(mathPatterns);
+      populateExpandRoundEvenPattern(mathPatterns);
+    }
+  }
+
+  /// Convert math dialect elementry functions to polynomial form.
+  void
+  populateGenericPolyApproximationPatterns(RewritePatternSet &mathPatterns) {
     populateExpandTanPattern(mathPatterns);
     populateExpandSinhPattern(mathPatterns);
     populateExpandCoshPattern(mathPatterns);
@@ -46,10 +83,6 @@ class PolynomialApproximationPass final
       populateExpandExp2FPattern(mathPatterns);
       populateMathPolynomialApproximationPatterns(mathPatterns);
       populateExpandRoundEvenPattern(mathPatterns);
-    }
-    if (failed(
-            applyPatternsGreedily(getOperation(), std::move(mathPatterns)))) {
-      return signalPassFailure();
     }
   }
 };

@@ -529,6 +529,11 @@ def PadDynamicAllocPass :
 def PolynomialApproximationPass :
     Pass<"iree-codegen-polynomial-approximation", ""> {
   let summary = "Convert math operations to their polynomial approximation";
+  let options = [
+    Option<"isLLVMGPU", "is-llvmgpu", "bool",
+           /*default=*/"false",
+           "Populate expansions for LLVMGPU.">,
+  ];
 }
 
 def PropagateDispatchSizeBoundsPass :

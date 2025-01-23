@@ -78,12 +78,7 @@ def LLVMGPULowerExecutableTargetPass :
 
 def LLVMGPUPackSharedMemoryAllocPass :
     InterfacePass<"iree-llvmgpu-pack-shared-memory-alloc", "mlir::FunctionOpInterface"> {
-  let summary = "Pack shared memory allocation in order to reduce memory usage.";
-}
-
-def LLVMGPUPolynomialApproximationPass :
-    InterfacePass<"iree-llvmgpu-polynomial-approximation", "mlir::FunctionOpInterface"> {
-  let summary = "Expand math functions not supported by target device library functions";
+  let summary = "Pass pack shared memory allocation in order to reduce memory usage.";
 }
 
 def LLVMGPUPrefetchSharedMemoryPass :
