@@ -90,6 +90,7 @@ iree_cc_library(
     MLIRTransforms
     MLIRVectorDialect
     StablehloBroadcastUtils
+    StablehloLinalgTransforms
     StablehloOps
     VhloOps
     iree::compiler::Dialect::Flow::IR
