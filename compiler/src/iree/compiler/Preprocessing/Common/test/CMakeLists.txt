@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "conv2d_to_img2col.mlir"
+    "conv_filter_to_channels_last.mlir"
     "conv_to_channels_last.mlir"
     "fold_attention_with_transpose.mlir"
     "generalize_linalg_matmul.mlir"
