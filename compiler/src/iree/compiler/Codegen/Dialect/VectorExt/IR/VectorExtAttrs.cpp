@@ -126,6 +126,28 @@ SmallVector<int64_t> NestedLayoutAttr::getUndistributedShape() const {
   return shape;
 }
 
+SmallVector<int64_t>
+NestedLayoutAttr::getPackedShapeForUndistributedDim(int64_t dim) const {
+  SmallVector<int64_t> shape;
+  shape.reserve(5);
+  shape.push_back(getSubgroupTile()[dim]);
+  shape.push_back(getBatchTile()[dim]);
+  shape.push_back(getOuterTile()[dim]);
+  shape.push_back(getThreadTile()[dim]);
+  shape.push_back(getElementTile()[dim]);
+  return shape;
+}
+
+SmallVector<int64_t> NestedLayoutAttr::getDistributedUnpackedShape() const {
+  SmallVector<int64_t> shape;
+  shape.reserve(getRank());
+  for (auto [batch, outer, element] :
+       llvm::zip(getBatchTile(), getOuterTile(), getElementTile())) {
+    shape.push_back(batch * outer * element);
+  }
+  return shape;
+}
+
 // Gets the rank of the undistributed vector for this layout.
 int64_t NestedLayoutAttr::getRank() const {
   // The layout requires that all size lists are the same length and match
