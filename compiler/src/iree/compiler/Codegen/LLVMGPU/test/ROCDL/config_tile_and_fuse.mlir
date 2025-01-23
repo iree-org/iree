@@ -358,6 +358,27 @@ func.func @small_scatter(%arg0: tensor<3x32x16xf32>,
 
 // -----
 
+func.func @smaller_scatter(%arg0: tensor<3x4x16xf32>,
+                         %arg1: tensor<3x1xi32>) -> tensor<3x4x16xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<3x4x16xf32>
+  %1 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%arg0, %arg1 : tensor<3x4x16xf32>, tensor<3x1xi32>) outs(%0 : tensor<3x4x16xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    iree_linalg_ext.yield %arg2 : f32
+  } -> tensor<3x4x16xf32>
+  return %1 : tensor<3x4x16xf32>
+}
+
+// CHECK-LABEL: func.func @smaller_scatter
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+
+//       CHECK:   linalg_ext.scatter {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1, 4]
+//  CHECK-SAME:     workgroup = [3, 2, 16]
+
+// -----
+
 func.func @only_scattered_dim(%arg0: tensor<48xf32>,
                               %arg1: tensor<48x2xi32>) -> tensor<100x100xf32> {
   %cst = arith.constant 0.000000e+00 : f32
