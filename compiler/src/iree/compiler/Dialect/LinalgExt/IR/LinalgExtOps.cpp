@@ -207,9 +207,6 @@ LogicalResult ScatterOp::verify() {
         "size of dimension map must match the last dimension of indices");
   }
 
-  // updateSlice[0..indexDepth] <= original[0..indexDepth]
-  // updateSlice[indexDepth..] == original[indexDepth..]
-
   {
     for (auto idx : llvm::seq<int64_t>(0, getUpdateSliceRank())) {
       int64_t updateDim = idx + batchRank;
