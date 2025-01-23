@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Transforms/WalkPatternRewriteDriver.h"
+#include "mlir/Dialect/Math/Transforms/Approximation.h"
 
 namespace mlir::iree_compiler {
 
@@ -24,6 +25,8 @@ struct LLVMGPUPolynomialApproximationPass final
     // conversion passes. This expansion is likely suboptimal.
     populateExpandPowFPattern(mathPatterns);
     populateExpandFPowIPattern(mathPatterns);
+
+    mathPatterns.add<math::ErfPolynomialApproximation>(&getContext());
 
     walkAndApplyPatterns(getOperation(), std::move(mathPatterns));
   }
