@@ -296,10 +296,10 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
       opInfo.membership.resize(opInfo.membership.size() + 1, /*t=*/true);
       auto builder = std::make_unique<PartitionBuilder>();
       builder->ordinal = builders.size();
-      builders.push_back(std::move(builder));
-      usableBuilders.resize(builders.size(), /*t=*/true);
       LLVM_DEBUG(llvm::dbgs()
                  << "Created partition " << builder->ordinal << "\n");
+      builders.push_back(std::move(builder));
+      usableBuilders.resize(builders.size(), /*t=*/true);
       firstCandidateOrdinal = builders.size() - 1;
     }
 
