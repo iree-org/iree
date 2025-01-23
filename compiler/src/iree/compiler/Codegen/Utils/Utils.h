@@ -252,6 +252,37 @@ bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
                  IREE::Flow::DispatchTensorType tensorType,
                  ValueRange dynamicDims);
 
+//===----------------------------------------------------------------------===//
+// Utility functions for vector size inference for dynamic shapes
+//===----------------------------------------------------------------------===//
+
+struct VectorizationTileSizes {
+  SmallVector<int64_t> destShape;
+  SmallVector<int64_t> vectorSizes;
+  SmallVector<bool> vectorScalableFlags;
+};
+
+/// Returns a VectorizationTileSizes which contains the inferred bounded result
+/// shape and vector input sizes. This is useful to infer the sizes from a
+/// chain.
+std::optional<VectorizationTileSizes> inferSizesFromIR(Value val);
+
+/// Returns the result sizes and vector input sizes of the tensor.unpack op. The
+/// inferred bounding size is returned if it is dynamic shape. Returns
+/// std::nullopt if the shape inference failed.
+std::optional<VectorizationTileSizes> inferSizesFromIR(tensor::UnPackOp op);
+
+/// Returns the result sizes and vector input sizes of the tensor.pack op. The
+/// inferred bounding size is returned if it is dynamic shape. Returns
+/// std::nullopt if the shape inference failed.
+std::optional<VectorizationTileSizes> inferSizesFromIR(tensor::PackOp op);
+
+/// Tries to infer the vector sizes from an IR using ValueBounds analysis. If
+/// `opResult` is provided, it stores the bounded result shapes to destShape.
+/// Returns std::nullopt if vector sizes can't be inferred.
+std::optional<VectorizationTileSizes>
+inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_UTILS_H_

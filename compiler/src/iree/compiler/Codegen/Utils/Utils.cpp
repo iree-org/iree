@@ -1588,4 +1588,206 @@ bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
       sliceLoadStoreOp.getMixedStrides(), tensorType, dynamicDims);
 }
 
+//===----------------------------------------------------------------------===//
+// Utility functions for vector size inference for dynamic shapes
+//===----------------------------------------------------------------------===//
+
+std::optional<VectorizationTileSizes>
+inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
+  LLVM_DEBUG({
+    llvm::dbgs() << "Inferring sizes for:\n" << linalgOp;
+    if (opResult) {
+      llvm::dbgs() << " with OpResult.resultNumber="
+                   << opResult->getResultNumber();
+    }
+    llvm::dbgs() << '\n';
+  });
+
+  std::optional<vector::VscaleRange> vscaleRange;
+  if (!opResult) {
+    // Note: Inferring scalable sizes is not supported is `opResult` is set
+    // (which is used to compute sizes for tensor.pack/unpack).
+    auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(linalgOp);
+    vscaleRange = getDefaultVscaleRange(targetAttr);
+  }
+
+  VectorizationTileSizes result;
+  unsigned numDims = linalgOp.getNumLoops();
+  for (int dim = 0; dim < numDims; ++dim) {
+    // Map dimension `dim` to an operand dimension that we will use to
+    // traverse the U-D chain to get `dim` vector size information.
+    SmallVector<std::pair<Value, unsigned>> operandDimPairs;
+    linalgOp.mapIterationSpaceDimToAllOperandDims(dim, operandDimPairs);
+    if (operandDimPairs.empty()) {
+      return std::nullopt;
+    }
+
+    Value firstOperand = operandDimPairs[0].first;
+    unsigned firstOperandDim = operandDimPairs[0].second;
+
+    // Trivial case: `dim` size is available in the operand type.
+    int64_t dimSize = llvm::cast<ShapedType>(firstOperand.getType())
+                          .getShape()[firstOperandDim];
+    bool dimScalable = false;
+    if (!ShapedType::isDynamic(dimSize)) {
+      result.vectorSizes.push_back(dimSize);
+      result.vectorScalableFlags.push_back(dimScalable);
+      LLVM_DEBUG(llvm::dbgs() << "Inferred iteration size '" << dimSize
+                              << "' for dimension '" << dim << "'\n");
+      continue;
+    }
+
+    // Use ValueBounds analysis to infer `dim` size upper bound.
+    FailureOr<DimBoundSize> maybeDimBound;
+    for (auto operandDimPair : operandDimPairs) {
+      Value operand = operandDimPair.first;
+      unsigned operandDim = operandDimPair.second;
+      maybeDimBound = computeDimUpperBound(operand, operandDim, vscaleRange,
+                                           RoundUpVscaleMultiple::Yes);
+      if (succeeded(maybeDimBound)) {
+        break;
+      }
+    }
+
+    if (failed(maybeDimBound)) {
+      return std::nullopt;
+    }
+
+    dimSize = maybeDimBound->baseSize;
+    dimScalable = maybeDimBound->scalable;
+    result.vectorSizes.push_back(dimSize);
+    result.vectorScalableFlags.push_back(dimScalable);
+
+    LLVM_DEBUG(llvm::dbgs() << "Inferred iteration size '" << dimSize
+                            << (dimScalable ? " x vscale" : "")
+                            << "' for dimension '" << dim << "'\n");
+  }
+
+  if (opResult) {
+    assert(!llvm::is_contained(result.vectorScalableFlags, true) &&
+           "inferring scalable bounds with `opResult` not supported!");
+    result.destShape = linalgOp.getIndexingMapMatchingResult(opResult.value())
+                           .compose(result.vectorSizes);
+  }
+
+  return result;
+}
+
+std::optional<VectorizationTileSizes> inferSizesFromIR(tensor::PackOp op) {
+  LLVM_DEBUG(llvm::dbgs() << "Inferring dest sizes for:\n" << op << "\n");
+
+  if (llvm::any_of(op.getInnerTiles(), [](OpFoldResult v) {
+        return !getConstantIntValue(v).has_value();
+      })) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "skip, because inner_tiles are not all constant");
+    return std::nullopt;
+  }
+
+  VectorizationTileSizes result;
+  std::optional<VectorizationTileSizes> inferred =
+      inferSizesFromIR(op.getSource());
+  if (!inferred) {
+    return std::nullopt;
+  }
+  result.vectorSizes = inferred.value().destShape;
+
+  for (auto [dimPos, tileSize] :
+       llvm::zip_equal(op.getInnerDimsPos(), op.getStaticInnerTiles())) {
+    if (result.vectorSizes[dimPos] % tileSize != 0) {
+      return std::nullopt;
+    }
+    result.vectorSizes[dimPos] /= tileSize;
+  }
+  auto outerDimsPerm = op.getOuterDimsPerm();
+  if (!outerDimsPerm.empty()) {
+    applyPermutationToVector(result.vectorSizes, outerDimsPerm);
+  }
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "After adjustment with inner tiles and "
+                    "outer_dims_perm:\n";
+    for (auto [idx, val] : llvm::enumerate(result.vectorSizes)) {
+      llvm::dbgs() << "Dim #" << idx << ": " << val << "\n";
+    }
+  });
+  result.destShape = result.vectorSizes;
+
+  return result;
+}
+
+std::optional<VectorizationTileSizes> inferSizesFromIR(tensor::UnPackOp op) {
+  LLVM_DEBUG(llvm::dbgs() << "Inferring dest sizes for:\n" << op << "\n");
+
+  if (llvm::any_of(op.getInnerTiles(), [](OpFoldResult v) {
+        return !getConstantIntValue(v).has_value();
+      })) {
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "failed on inference because inner_tiles are not all constant");
+    return std::nullopt;
+  }
+
+  VectorizationTileSizes result;
+  std::optional<VectorizationTileSizes> inferred =
+      inferSizesFromIR(op.getSource());
+  if (!inferred) {
+    return std::nullopt;
+  }
+  result.vectorSizes = inferred.value().destShape;
+
+  result.vectorSizes.resize(op.getDestType().getRank());
+  auto outerDimsPerm = op.getOuterDimsPerm();
+  if (!outerDimsPerm.empty()) {
+    applyPermutationToVector(result.vectorSizes,
+                             invertPermutationVector(outerDimsPerm));
+  }
+  for (auto [dimPos, tileSize] :
+       llvm::zip_equal(op.getInnerDimsPos(), op.getStaticInnerTiles())) {
+    result.vectorSizes[dimPos] *= tileSize;
+  }
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "After adjustment with inner tiles and "
+                    "outer_dims_perm:\n";
+    for (auto [idx, val] : llvm::enumerate(result.vectorSizes)) {
+      llvm::dbgs() << "Dim #" << idx << ": " << val << "\n";
+    }
+  });
+  result.destShape = result.vectorSizes;
+
+  return result;
+}
+
+std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
+  std::optional<VectorizationTileSizes> result;
+  TypeSwitch<Operation *, void>(val.getDefiningOp())
+      .Case<linalg::LinalgOp>(
+          [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
+      .Case<tensor::PackOp>([&](auto op) { result = inferSizesFromIR(op); })
+      .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp op) {
+        // tensor::ExtractSliceOp is not vectorizable, so only `destShape` has
+        // the values.
+        result = VectorizationTileSizes();
+        LLVM_DEBUG(llvm::dbgs() << "Inferring sizes for:\n" << op << "\n");
+        int64_t destRank = op.getResult().getType().getRank();
+        for (int dim = 0; dim < destRank; ++dim) {
+          LLVM_DEBUG(llvm::dbgs() << "Dim #" << dim << ": ");
+          FailureOr<int64_t> maybeDimBound =
+              ValueBoundsConstraintSet::computeConstantBound(
+                  presburger::BoundType::UB, {op, dim},
+                  /*stopCondition=*/nullptr, /*closedUB=*/true);
+          if (failed(maybeDimBound)) {
+            LLVM_DEBUG(llvm::dbgs() << "failed\n");
+            result = std::nullopt;
+            return;
+          }
+          LLVM_DEBUG(llvm::dbgs() << maybeDimBound.value() << "\n");
+          result->destShape.push_back(maybeDimBound.value());
+        }
+      })
+      .Default([&](Operation *) {});
+  return result;
+}
+
 } // namespace mlir::iree_compiler
