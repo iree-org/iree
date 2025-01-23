@@ -691,8 +691,8 @@ struct DistributeMultiReduction final
     }
     // Insert gpu.barrier
     rewriter.create<gpu::BarrierOp>(write.getLoc());
-    auto read = rewriter.create<vector::TransferReadOp>(loc, unDistributedType,
-                                                        alloc, indices);
+    auto read = rewriter.create<vector::TransferReadOp>(
+        loc, unDistributedType, alloc, indices, inBounds);
     // Create new layout where subgroup dims are squashed to
     // element tile
     IREE::VectorExt::NestedLayoutAttr intraSubGroupLayout;
