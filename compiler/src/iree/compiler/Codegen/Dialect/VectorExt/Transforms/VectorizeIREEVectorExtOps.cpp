@@ -22,45 +22,84 @@ struct VectorizeToLayoutOpPattern final
     : OpRewritePattern<IREE::VectorExt::ToLayoutOp> {
   using OpRewritePattern::OpRewritePattern;
 
+  vector::TransferReadOp
+  createReadOp(PatternRewriter &rewriter,
+               IREE::VectorExt::ToLayoutOp toLayoutOp) const {
+    Location loc = toLayoutOp.getLoc();
+    ShapedType inputTy = toLayoutOp.getType();
+    auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    auto identityMap = rewriter.getMultiDimIdentityMap(inputTy.getRank());
+    SmallVector<int64_t> readShape =
+        toLayoutOp.getLayout().getUndistributedShape();
+    Value mask = nullptr;
+    if (!toLayoutOp.getType().hasStaticShape()) {
+      SmallVector<OpFoldResult> mixedSourceDims =
+          tensor::getMixedSizes(rewriter, loc, toLayoutOp.getInput());
+      auto maskType = VectorType::get(readShape, rewriter.getI1Type());
+      mask =
+          rewriter.create<vector::CreateMaskOp>(loc, maskType, mixedSourceDims);
+    }
+    VectorType vectorType =
+        VectorType::get(readShape, inputTy.getElementType());
+    auto inBounds = rewriter.getBoolArrayAttr(
+        SmallVector<bool>(vectorType.getRank(), true));
+    auto padValue = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(inputTy.getElementType()));
+    auto read = rewriter.create<vector::TransferReadOp>(
+        loc,
+        /*type=*/vectorType,
+        /*source=*/toLayoutOp.getInput(),
+        /*indices=*/ValueRange{SmallVector<Value>(readShape.size(), zero)},
+        /*permutation_map=*/identityMap,
+        /*padding=*/padValue,
+        /*mask=*/mask,
+        /*in_bounds=*/inBounds);
+    return read;
+  }
+
+  vector::TransferWriteOp
+  createWriteOp(PatternRewriter &rewriter,
+                IREE::VectorExt::ToLayoutOp tensorLayoutOp,
+                Value vectorLayoutOp, Value mask) const {
+    Location loc = tensorLayoutOp.getLoc();
+    ShapedType tensorTy = tensorLayoutOp.getType();
+    auto resType =
+        RankedTensorType::get(tensorTy.getShape(), tensorTy.getElementType());
+    auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    int64_t rank = tensorTy.getShape().size();
+    auto inBounds = rewriter.getBoolArrayAttr(SmallVector<bool>(rank, true));
+    auto identityMap = rewriter.getMultiDimIdentityMap(tensorTy.getRank());
+    auto empty = rewriter.create<tensor::EmptyOp>(
+        loc, tensor::getMixedSizes(rewriter, loc, tensorLayoutOp.getInput()),
+        tensorTy.getElementType());
+    return rewriter.create<vector::TransferWriteOp>(
+        loc,
+        /*result=*/resType,
+        /*vector=*/vectorLayoutOp,
+        /*source=*/empty,
+        /*indices=*/ValueRange{SmallVector<Value>(rank, zero)},
+        /*permutation_map=*/identityMap,
+        /*mask=*/mask,
+        /*inBounds=*/inBounds);
+  }
+
   LogicalResult matchAndRewrite(IREE::VectorExt::ToLayoutOp toLayoutOp,
                                 PatternRewriter &rewriter) const override {
     if (!toLayoutOp.hasTensorSemantics()) {
       return failure();
     }
-    if (!toLayoutOp.getType().hasStaticShape()) {
-      return rewriter.notifyMatchFailure(toLayoutOp,
-                                         "non-static shape for vectorization");
-    }
-
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(toLayoutOp);
-
     Location loc = toLayoutOp.getLoc();
-    ShapedType inputTy = toLayoutOp.getType();
-
-    // Construct the (never used) zero padding value for input.
-    auto padValue = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(inputTy.getElementType()));
-
-    auto newInput = vector::createReadOrMaskedRead(
-        rewriter, loc, toLayoutOp.getInput(), inputTy.getShape(), padValue,
-        /*useInBoundsInsteadOfMasking=*/true);
-
+    vector::TransferReadOp readOp = createReadOp(rewriter, toLayoutOp);
     // Create the toLayout operation but with vector types instead.
     auto newLayoutOp = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-        loc, newInput, toLayoutOp.getLayout(), toLayoutOp.getMmaKindAttr(),
+        loc, readOp, toLayoutOp.getLayout(), toLayoutOp.getMmaKindAttr(),
         toLayoutOp.getSharedMemoryConversion());
-
     // Create the write back to a tensor.
-    int64_t rank = inputTy.getRank();
-    auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    auto empty = rewriter.create<tensor::EmptyOp>(loc, inputTy, ValueRange());
-    rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
-        toLayoutOp,
-        /*vector=*/newLayoutOp,
-        /*source=*/empty,
-        /*indices=*/SmallVector<Value>(rank, zero),
-        /*inBounds=*/SmallVector<bool>(rank, true));
+    vector::TransferWriteOp writeOp =
+        createWriteOp(rewriter, toLayoutOp, newLayoutOp, readOp.getMask());
+    rewriter.replaceOp(toLayoutOp, writeOp);
     return success();
   }
 };
