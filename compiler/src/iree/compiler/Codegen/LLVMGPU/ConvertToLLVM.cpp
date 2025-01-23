@@ -258,38 +258,23 @@ public:
     assert(fnType.getNumInputs() == 0 && fnType.getNumResults() == 0);
 
     TypeConverter::SignatureConversion signatureConverter(/*numOrigInputs=*/0);
+    // Note: we assume that the pipeline layout is the same for all bindings
+    // in this function.
     IREE::HAL::PipelineLayoutAttr layout;
     llvm::SetVector<IREE::HAL::InterfaceBindingSubspanOp> subspans;
-    WalkResult subspanWalkRes =
-        funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-          auto thisLayout = subspanOp.getLayout();
-          subspans.insert(subspanOp);
-          if (!layout) {
-            layout = thisLayout;
-          }
-          if (layout != thisLayout) {
-            return WalkResult::interrupt();
-          }
-          return WalkResult::advance();
-        });
-    if (subspanWalkRes.wasInterrupted())
-      return rewriter.notifyMatchFailure(
-          op, "differnt subspan bindings disagree about pipeline layout");
+    funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
+      if (!layout) {
+        layout = subspanOp.getLayout();
+      }
+      subspans.insert(subspanOp);
+    });
 
-    WalkResult constantWalkRes =
-        funcOp.walk([&](IREE::HAL::InterfaceConstantLoadOp constOp) {
-          auto thisLayout = constOp.getLayout();
-          if (!layout) {
-            layout = thisLayout;
-          }
-          if (layout != thisLayout) {
-            return WalkResult::interrupt();
-          }
-          return WalkResult::advance();
-        });
-    if (constantWalkRes.wasInterrupted())
-      return rewriter.notifyMatchFailure(
-          op, "differnt constant bindings disagree about pipeline layout");
+    funcOp.walk([&](IREE::HAL::InterfaceConstantLoadOp constOp) {
+      if (!layout) {
+        layout = constOp.getLayout();
+      }
+      return WalkResult::interrupt();
+    });
 
     int64_t numBindings = 0;
     int64_t numConstants = 0;
@@ -431,22 +416,13 @@ public:
       if (ShapedType::isDynamic(offset)) {
         int32_t elementBitWidth =
             IREE::Util::getTypeBitWidth(memrefType.getElementType());
-        Value elementOffsetVal;
-        if (elementBitWidth % 8 != 0) {
-          Value elementBitWidthVal = rewriter.create<LLVM::ConstantOp>(
-              loc, llvmIndexType, elementBitWidth);
-          Value eight =
-              rewriter.create<LLVM::ConstantOp>(loc, llvmIndexType, 8);
-          Value bitOffset =
-              rewriter.create<LLVM::MulOp>(loc, baseOffsetValue, eight);
-          elementOffsetVal =
-              rewriter.create<LLVM::UDivOp>(loc, bitOffset, elementBitWidthVal);
-        } else {
-          Value elementByteWidthVal = rewriter.create<LLVM::ConstantOp>(
-              loc, llvmIndexType, elementBitWidth / 8);
-          elementOffsetVal = rewriter.create<LLVM::UDivOp>(loc, baseOffsetValue,
-                                                           elementByteWidthVal);
-        }
+        Value elementBitWidthVal = rewriter.create<LLVM::ConstantOp>(
+            loc, llvmIndexType, elementBitWidth);
+        Value eight = rewriter.create<LLVM::ConstantOp>(loc, llvmIndexType, 8);
+        Value bitOffset =
+            rewriter.create<LLVM::MulOp>(loc, baseOffsetValue, eight);
+        Value elementOffsetVal =
+            rewriter.create<LLVM::UDivOp>(loc, bitOffset, elementBitWidthVal);
         desc.setOffset(rewriter, loc, elementOffsetVal);
       } else {
         desc.setConstantOffset(rewriter, loc, offset);
