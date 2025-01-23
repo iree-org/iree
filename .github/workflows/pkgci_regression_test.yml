@@ -173,3 +173,32 @@ jobs:
             --timeout=600 \
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
+      # Note: allowing 10% deviation from observed averages here to account for
+      # different runner conditions.
+      - name: "Running SDXL rocm pipeline benchmark (mi300)"
+        if: contains(matrix.name, 'rocm_mi308_gfx942')
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
+            --goldentime-tolerance-multiplier 1.1 \
+            --goldentime-rocm-e2e-ms 797.0 \
+            --goldentime-rocm-unet-ms 195.0 \
+            --goldentime-rocm-clip-ms 15.0 \
+            --goldentime-rocm-vae-ms 190.0 \
+            --goldendispatch-rocm-unet 1602 \
+            --goldendispatch-rocm-clip 1139 \
+            --goldendispatch-rocm-vae 246 \
+            --goldensize-rocm-unet-bytes 2270000 \
+            --goldensize-rocm-clip-bytes 860000 \
+            --goldensize-rocm-vae-bytes 840000 \
+            --goldentime-rocm-punet-int8-fp16-ms 138.0 \
+            --goldentime-rocm-punet-int8-fp8-ms 147 \
+            --goldendispatch-rocm-punet-int8-fp16 1424 \
+            --goldendispatch-rocm-punet-int8-fp8 1704 \
+            --goldensize-rocm-punet-int8-fp8-bytes 2800000 \
+            --goldensize-rocm-punet-int8-fp16-bytes 2560000 \
+            --rocm-chip gfx942 \
+            --log-cli-level=info \
+            --timeout=600 \
+            --retries 7
+          echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
