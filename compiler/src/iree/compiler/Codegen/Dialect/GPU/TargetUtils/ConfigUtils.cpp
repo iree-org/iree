@@ -20,6 +20,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -33,6 +34,399 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
 constexpr int64_t kPreferredCopyNumBits = 128;
+
+//===----------------------------------------------------------------------===//
+// Workgroup Size Multiples
+//===----------------------------------------------------------------------===//
+
+static SmallVector<int64_t> getDefaultValueMultiples(Value v) {
+  auto shapedType = dyn_cast<ShapedType>(v.getType());
+  return shapedType ? SmallVector<int64_t>(shapedType.getRank(), 1)
+                    : SmallVector<int64_t>();
+}
+
+/// Compute the workgroup tile size multiples for pack or unpack based on the
+/// inner tile sizes. Returns a pair of vectors `{srcMultiples, destMultiples}`
+/// for the multiples required for the source and destination tensors. Allows
+/// an optional set of initial packed and unpacked operand multiples, which, if
+/// present will be composed with the computed multiples for the src and dest
+/// by taking the LCM of each corresponding multiple.
+template <typename PackOrUnPackOpTy>
+static std::pair<SmallVector<int64_t>, SmallVector<int64_t>>
+inferWorkgroupTileMultiplesFromPackUnPack(
+    PackOrUnPackOpTy op,
+    std::optional<SmallVector<int64_t>> initialPackedMultiples = std::nullopt,
+    std::optional<SmallVector<int64_t>> initialUnPackedMultiples =
+        std::nullopt) {
+  static_assert(llvm::is_one_of<PackOrUnPackOpTy, tensor::PackOp,
+                                tensor::UnPackOp>::value);
+  LDBG("Inferring workgroup tile size multiples from " << op->getName() << ":\n"
+                                                       << op);
+  // Initialize the list of multiples for the packed and unpack inputs.
+  int64_t unPackedRank = (std::is_same<PackOrUnPackOpTy, tensor::PackOp>::value)
+                             ? op.getSourceRank()
+                             : op.getDestRank();
+  SmallVector<int64_t> innerTiles = op.getStaticTiles();
+  // If the tiles are dynamic, then no inference can be made.
+  if (ShapedType::isDynamicShape(innerTiles)) {
+    LLVM_DEBUG(DBGS() << "Cannot infer multiple for dynamic inner tiles."
+                         "Defaulting to all 1.");
+    return {getDefaultValueMultiples(op.getSource()),
+            getDefaultValueMultiples(op.getDest())};
+  }
+
+  // Otherwise, adjust the multiples of the packed and unpacked inputs for the
+  // inner tiles.
+  int64_t packedRank = unPackedRank + innerTiles.size();
+  SmallVector<int64_t> packedMultiples(packedRank, 1);
+  SmallVector<int64_t> unPackedMultiples(unPackedRank, 1);
+  for (auto [i, tile, pos] :
+       llvm::enumerate(innerTiles, op.getInnerDimsPos())) {
+    // We need to invert the outerDimsPerm vector to compute the outerTileIdx.
+    // This is slightly counterintuitive, but the reason this works is because:
+    //  - The outerDimsPerm is a mapping from the permuted index to the
+    //    unpermuted index, since outerDimsPerm[i] will give you the element
+    //    position from the unpermuted tensor that belongs at position `i` in
+    //    the permuted tensor.
+    //  - We have the innerDimPos, which is an index in the unpermuted tensor,
+    //    so we need a mapping from unpermuted tensor indices to the permuted
+    //    tensor indices, which is the inverse of outerDimsPerm.
+    int64_t outerTileIdx = invertPermutationVector(op.getOuterDimsPerm())[pos];
+    int64_t innerTileIdx = i + innerTiles.size();
+    // Compute the LCM with the initial multiples for both the inner tile and
+    // the corresponding outer tile. The multiples for the packedMultiples will
+    // then be these LCMs, and the multiple for the unPackedMultipes will be the
+    // product of these LCMs.
+    int64_t lcmInnerTileMultiple = tile;
+    int64_t lcmOuterTileMultiple = 1;
+    if (initialPackedMultiples) {
+      lcmInnerTileMultiple = std::lcm(
+          initialPackedMultiples.value()[innerTileIdx], lcmInnerTileMultiple);
+      if (lcmInnerTileMultiple != tile) {
+        LLVM_DEBUG(DBGS() << "Cannot find a compatible tile size multiple. "
+                          << "Defaulting to all 1.");
+        return {getDefaultValueMultiples(op.getSource()),
+                getDefaultValueMultiples(op.getDest())};
+      }
+      lcmOuterTileMultiple = std::lcm(
+          initialPackedMultiples.value()[outerTileIdx], lcmOuterTileMultiple);
+    }
+    if (initialUnPackedMultiples) {
+      int64_t unPackedMultiple = lcmOuterTileMultiple * tile;
+      int64_t lcmUnPackedMultiple =
+          std::lcm(initialUnPackedMultiples.value()[pos], unPackedMultiple);
+      lcmOuterTileMultiple = lcmUnPackedMultiple / tile;
+    }
+    packedMultiples[innerTileIdx] = lcmInnerTileMultiple;
+    packedMultiples[outerTileIdx] = lcmOuterTileMultiple;
+    unPackedMultiples[pos] = lcmOuterTileMultiple * lcmInnerTileMultiple;
+  }
+
+  SmallVector<int64_t> srcMultiples =
+      (std::is_same<PackOrUnPackOpTy, tensor::PackOp>::value)
+          ? unPackedMultiples
+          : packedMultiples;
+  SmallVector<int64_t> destMultiples =
+      (std::is_same<PackOrUnPackOpTy, tensor::PackOp>::value)
+          ? packedMultiples
+          : unPackedMultiples;
+  LLVM_DEBUG({
+    DBGS() << "\nInferred " << op->getName() << " multiples:\nsrc: [";
+    llvm::interleaveComma(srcMultiples, llvm::dbgs());
+    llvm::dbgs() << "]\nresult: [";
+    llvm::interleaveComma(destMultiples, llvm::dbgs());
+    llvm::dbgs() << "]\n\n";
+  });
+  return {srcMultiples, destMultiples};
+}
+
+/// Given some initial operand, result, and iteration space multiples, compute
+/// the least common multiples for each dimension of the iteration space, and
+/// adjust the given multiples so all operands, results, and iteration
+/// dimensions agree.
+static void inferWorkgroupTileMultiplesFromLinalgOp(
+    linalg::LinalgOp linalgOp, SmallVector<int64_t> &iterationMultiples,
+    SmallVector<SmallVector<int64_t>> &operandMultiples,
+    SmallVector<SmallVector<int64_t>> &resultMultiples) {
+  LDBG("Inferring workgroup tile size multiples for linalgOp:\n" << linalgOp);
+  auto dbgsPrintMultiples = [](SmallVector<SmallVector<int64_t>> multiples) {
+    LLVM_DEBUG({
+      for (auto [i, m] : llvm::enumerate(multiples)) {
+        DBGS() << "operand " << i << ": [";
+        llvm::interleaveComma(m, llvm::dbgs());
+        llvm::dbgs() << "]\n";
+      }
+    });
+  };
+  LDBG("\noperandMultiples:\n");
+  dbgsPrintMultiples(operandMultiples);
+  LDBG("\nresultMultiples:\n");
+  dbgsPrintMultiples(resultMultiples);
+
+  // Actual logic starts here.
+  SmallVector<int64_t> linalgOpMultiples(
+      linalgOp.getIteratorTypesArray().size(), 1);
+  for (auto [operandIdx, map, multiples] :
+       llvm::enumerate(linalgOp.getIndexingMapsArray(), operandMultiples)) {
+    for (auto [idx, dim] : llvm::enumerate(map.getResults())) {
+      auto dimExpr = dyn_cast<AffineDimExpr>(dim);
+      if (!dimExpr) {
+        continue;
+      }
+      int64_t dimPos = dimExpr.getPosition();
+      int64_t lcm = std::lcm(iterationMultiples[dimPos], multiples[idx]);
+      // If the operand is a DPS init, then include the result dims in the LCM.
+      int64_t dpsInitIdx = operandIdx - linalgOp.getNumDpsInputs();
+      if (dpsInitIdx >= 0) {
+        lcm = std::lcm(resultMultiples[dpsInitIdx][idx], lcm);
+        resultMultiples[dpsInitIdx][idx] = lcm;
+      }
+      iterationMultiples[dimPos] = lcm;
+      operandMultiples[operandIdx][idx] = lcm;
+    }
+  }
+
+  LLVM_DEBUG({
+    DBGS() << "\niterationMultiples: [";
+    llvm::interleaveComma(iterationMultiples, llvm::dbgs());
+    llvm::dbgs() << "]\n";
+  });
+}
+
+/// Given a set of multiples, and reassociations for expansion, return the
+/// corresponding expanded set of multiples, where the product of the expanded
+/// multiples is equal to the original collapsed multiple within each
+/// reassociation group. If there are dynamic shapes in the expanded dims, then
+/// returns all ones as the expanded multiples, since inferring the appropriate
+/// multiples is not possible in the dynamic case.
+///
+/// Example (parenthesis added to expanded groups for readability):
+/// Input:
+///   collapsedMultiples = [4, 32, 64]
+///   expandedShape = [(7, 2), (8, 2, 4), (3, 32)]
+///   reassociations = [[0, 1], [2, 3, 4], [5, 6]]
+/// Output:
+///   expandedMultiples = [(2, 2), (4, 2, 4), (2, 32)]
+static SmallVector<int64_t>
+expandMultiples(ArrayRef<int64_t> collapsedMultiples,
+                ArrayRef<int64_t> expandedShape,
+                SmallVector<ReassociationIndices> reassociations) {
+  SmallVector<int64_t> expandedMultiples(expandedShape.size(), 1);
+  for (auto [multiple, group] :
+       llvm::zip_equal(collapsedMultiples, reassociations)) {
+    if (group.size() == 1) {
+      expandedMultiples[group[0]] = multiple;
+      continue;
+    }
+    int64_t residualMultiple = multiple;
+    for (int i = group.size() - 1; i >= 0; --i) {
+      int64_t expandedSize = expandedShape[group[i]];
+      if (ShapedType::isDynamic(expandedSize)) {
+        LLVM_DEBUG(DBGS() << "Cannot infer multiple with dynamic size. "
+                             "defaulting to all 1");
+        expandedMultiples = SmallVector<int64_t>(expandedShape.size(), 1);
+        return expandedMultiples;
+      }
+      if (residualMultiple % expandedSize != 0) {
+        LLVM_DEBUG(DBGS() << "Expanded size does not divide producer "
+                             "multiple. Defaulting to all 1");
+        expandedMultiples = SmallVector<int64_t>(expandedShape.size(), 1);
+        return expandedMultiples;
+      }
+      if (residualMultiple >= expandedSize) {
+        expandedMultiples[group[i]] = expandedSize;
+        residualMultiple /= expandedSize;
+        continue;
+      }
+      expandedMultiples[group[i]] = residualMultiple;
+      residualMultiple = 1;
+      break;
+    }
+  }
+  return expandedMultiples;
+}
+
+/// Find a set of required workgroup tile size mulitples for the given OpResult
+/// by walking the producer chain of the OpResult's owner, and finding ops that
+/// require specific tile size multiples. For now, the only ops that need
+/// special workgroup tile size multiples are pack and unpack ops. The returned
+/// list of multiples represent the required multiples for the workgroup tile
+/// slice of the `result` tensor after tiling and distributing to workgroups.
+static SmallVector<int64_t> inferResultWorkgroupTileMultiples(OpResult result) {
+  LDBG("Inferring workgroup tile size multiples for result:\n" << result);
+  // Gather multiples for all operands from producers.
+  Operation *op = result.getOwner();
+  auto getOperandMultiples = [&]() -> SmallVector<SmallVector<int64_t>> {
+    SmallVector<SmallVector<int64_t>> operandMultiples;
+    for (Value operand : op->getOperands()) {
+      auto producerResult = dyn_cast<OpResult>(operand);
+      if (!producerResult) {
+        operandMultiples.push_back(getDefaultValueMultiples(operand));
+        continue;
+      }
+      operandMultiples.push_back(
+          inferResultWorkgroupTileMultiples(producerResult));
+    }
+    return operandMultiples;
+  };
+  // Propagate the operand multiples through the given operation to compute
+  // the multiples for the desired result.
+  return llvm::TypeSwitch<Operation *, SmallVector<int64_t>>(op)
+      .Case<tensor::ExpandShapeOp>([&](tensor::ExpandShapeOp expandOp) {
+        SmallVector<int64_t> srcMultiples = getOperandMultiples()[0];
+        LDBG("Inferring workgroup tile size multiples for "
+             << expandOp->getName() << " result.\n");
+        SmallVector<int64_t> resultMultiples = expandMultiples(
+            /*collapsedMultiples=*/srcMultiples,
+            /*expandedShape=*/expandOp.getResultType().getShape(),
+            /*reassociations=*/expandOp.getReassociationIndices());
+        LLVM_DEBUG({
+          DBGS() << "\nInferred expand_shape result multiples: [";
+          llvm::interleaveComma(resultMultiples, llvm::dbgs());
+          llvm::dbgs() << "]\n";
+        });
+        return resultMultiples;
+      })
+      .Case<tensor::PackOp>([&](tensor::PackOp packOp) {
+        SmallVector<int64_t> srcMultiples = getOperandMultiples()[0];
+        return inferWorkgroupTileMultiplesFromPackUnPack(
+                   packOp, /*initialPackedMultiples=*/std::nullopt,
+                   /*initialUnPackedMultiples=*/srcMultiples)
+            .second;
+      })
+      .Case<tensor::UnPackOp>([&](tensor::UnPackOp unPackOp) {
+        SmallVector<int64_t> srcMultiples = getOperandMultiples()[0];
+        return inferWorkgroupTileMultiplesFromPackUnPack(
+                   unPackOp, /*initialPackedMultiples=*/srcMultiples,
+                   /*initialUnPackedMultiples=*/std::nullopt)
+            .second;
+      })
+      .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
+        SmallVector<SmallVector<int64_t>> operandMultiples =
+            getOperandMultiples();
+        LDBG("Inferring workgroup tile size multiples for linalg op result #"
+             << result.getResultNumber() << ":\n"
+             << result);
+        SmallVector<SmallVector<int64_t>> resultMultiples = llvm::map_to_vector(
+            linalgOp->getResults(), getDefaultValueMultiples);
+        SmallVector<int64_t> iterationMultiples(
+            linalgOp.getIteratorTypesArray().size(), 1);
+        inferWorkgroupTileMultiplesFromLinalgOp(
+            linalgOp, iterationMultiples, operandMultiples, resultMultiples);
+        return resultMultiples[result.getResultNumber()];
+      })
+      .Default([&](Operation *) {
+        LDBG("Unsupported operation. Defualting to all 1: " << result);
+        return getDefaultValueMultiples(result);
+      });
+}
+
+/// Find a set of required workgroup tile size mulitples for the given OpOperand
+/// by walking the use chain of the OpOperand's owner, and finding ops that
+/// require specific tile size multiples. For now, the only ops that need
+/// special workgroup tile size multiples are pack and unpack ops. The returned
+/// list of multiples represent the required multiples for the workgroup tile
+/// slice of the `use` tensor after tiling and distributing to workgroups.
+static SmallVector<int64_t> inferUseWorkgroupTileMultiples(OpOperand *use) {
+  LDBG("Inferring workgroup tile size multiples for operand "
+       << use->getOperandNumber() << " of user:\n"
+       << *use->getOwner());
+  // Gather multiples for all operands from producers.
+  Operation *op = use->getOwner();
+  auto getResultMultiples = [&]() -> SmallVector<SmallVector<int64_t>> {
+    SmallVector<SmallVector<int64_t>> resultMultiples;
+    for (Value result : op->getResults()) {
+      for (OpOperand &opUse : result.getUses()) {
+        resultMultiples.push_back(inferUseWorkgroupTileMultiples(&opUse));
+      }
+    }
+    return resultMultiples;
+  };
+  // Propagate the operand multiples through the given operation to compute
+  // the multiples for the desired result.
+  return llvm::TypeSwitch<Operation *, SmallVector<int64_t>>(op)
+      .Case<tensor::CollapseShapeOp>([&](tensor::CollapseShapeOp collapseOp) {
+        SmallVector<int64_t> destMultiples = getResultMultiples()[0];
+        LDBG("Inferring workgroup tile size multiples for "
+             << collapseOp->getName() << "source.\n");
+        SmallVector<int64_t> srcMultiples = expandMultiples(
+            /*collapsedMultiples=*/destMultiples,
+            /*expandedShape=*/collapseOp.getSrcType().getShape(),
+            /*reassociations=*/collapseOp.getReassociationIndices());
+        LLVM_DEBUG({
+          DBGS() << "\nInferred collapse_shape source multiples: ";
+          llvm::interleaveComma(srcMultiples, llvm::dbgs());
+          llvm::dbgs() << "]\n";
+        });
+        return srcMultiples;
+      })
+      .Case<tensor::PackOp>([&](tensor::PackOp packOp) {
+        SmallVector<int64_t> destMultiples = getResultMultiples()[0];
+        return inferWorkgroupTileMultiplesFromPackUnPack(
+                   packOp, /*initialPackedMultiples=*/destMultiples,
+                   /*initialUnPackedMultiples=*/std::nullopt)
+            .first;
+      })
+      .Case<tensor::UnPackOp>([&](tensor::UnPackOp unpackOp) {
+        SmallVector<int64_t> destMultiples = getResultMultiples()[0];
+        return inferWorkgroupTileMultiplesFromPackUnPack(
+                   unpackOp, /*initialPackedMultiples=*/std::nullopt,
+                   /*initialUnPackedMultiples=*/destMultiples)
+            .first;
+      })
+      .Default([&](Operation *) {
+        LDBG("Unsupported operation. Defualting to all 1: " << use->get());
+        return getDefaultValueMultiples(use->get());
+      });
+}
+
+/// Walks the producer and consumer chains of the `tilingOp`, and looks for ops
+/// that require specific workgroup tile size multiples. Right now, the only ops
+/// that require a specific multiple are pack and unpack, since the workgroup
+/// tile sizes need to be multiples of the inner_tiles. After walking the IR and
+/// finding multiples for the slices of the `tilingOp` operands and results, the
+/// function computes and returns the multiples of the `tilingOp` iteration
+/// space. The function may fail to find a valid set of workgroup size
+/// multiples, in which case the function will fallback to returning a list of
+/// all 1, meaning no constraints on the workgroup tile sizes.
+static SmallVector<int64_t>
+getWorkgroupSizeMultiples(TilingInterface tilingOp) {
+  LDBG("Computing workgroup tile size multiples for: "
+       << *tilingOp.getOperation());
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(tilingOp.getOperation());
+  if (!linalgOp) {
+    LDBG("Only LinalgOp is implemented. Defaulting to all 1 multiples.");
+    return SmallVector<int64_t>(tilingOp.getLoopIteratorTypes().size(), 1);
+  }
+
+  // Get operand and result multiples for the op.
+  SmallVector<SmallVector<int64_t>> operandMultiples;
+  for (Value operand : tilingOp->getOperands()) {
+    auto result = dyn_cast<OpResult>(operand);
+    operandMultiples.push_back(result
+                                   ? inferResultWorkgroupTileMultiples(result)
+                                   : getDefaultValueMultiples(operand));
+  }
+  SmallVector<SmallVector<int64_t>> resultMultiples;
+  for (Value result : tilingOp->getResults()) {
+    for (OpOperand &use : result.getUses()) {
+      resultMultiples.push_back(inferUseWorkgroupTileMultiples(&use));
+    }
+  }
+
+  // Infer the workgroup tile size multiples for the iteration space of
+  // `tilingOp` based on the multiples of the operand and result workgroup
+  // tile multiples.
+  SmallVector<int64_t> tileSizeMultiples(tilingOp.getLoopIteratorTypes().size(),
+                                         1);
+  inferWorkgroupTileMultiplesFromLinalgOp(linalgOp, tileSizeMultiples,
+                                          operandMultiples, resultMultiples);
+  return tileSizeMultiples;
+}
+
+//===----------------------------------------------------------------------===//
+// Lowering Config Selection
+//===----------------------------------------------------------------------===//
 
 LogicalResult setDataTiledMultiMmaLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
@@ -529,6 +923,12 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> workgroupTileSizes(loopDepth, 0);
   SmallVector<int64_t> threadTileSizes(loopDepth, 0);
 
+  // Find constraints on workgroup tile sizes due to pack or unpack ops in the
+  // dispatch. If there are no pack or unpack ops present, then these multiples
+  // will be 1, which means there is no constraint on workgroup tile sizes.
+  SmallVector<int64_t> workgroupTileSizeMultiples =
+      getWorkgroupSizeMultiples(cast<TilingInterface>(op));
+
   // Common case for all linalg ops.
 
   // The core idea is to distribute the partitioned loops to the workgroup
@@ -566,23 +966,15 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
     LDBG("Loss factor: " << lossFactor << "\n");
     // Initialize the configuration.
     flatWorkgroupSize = 1;
-    // Initialize tiling along all partitioned loops with size 1.
+    // Initialize thread tiling along all partitioned loops with size 1, and
+    // workgroup tiling with the required tile size multiples. This may lead
+    // to larger workgroup tiles than the number of threads in the workgroup,
+    // but it is unavoidable.
     for (int64_t loopIndex : partitionableLoops) {
-      workgroupTileSizes[loopIndex] = threadTileSizes[loopIndex] = 1;
+      workgroupTileSizes[loopIndex] = workgroupTileSizeMultiples[loopIndex];
+      threadTileSizes[loopIndex] = 1;
     }
-    // Override the innermost dimension to distribute to threads in a subgroup.
-    workgroupTileSizes[partitionableLoops.back()] = subgroupSize;
 
-    // If there are more than 3 parallel dim try to tile the extra higher level
-    // dimensions to 1 for extra dimensions.
-    if (isa<linalg::GenericOp>(linalgOp.getOperation())) {
-      for (auto [i, tileSize] : llvm::enumerate(workgroupTileSizes)) {
-        if (tileSize != 0)
-          break;
-        if (loopBounds[i] != 1)
-          tileSize = 1;
-      }
-    }
     // Scan from the innermost shape dimension and try to deduce the
     // configuration for the corresponding GPU workgroup dimension.
     int64_t wgDim = 0;
@@ -592,18 +984,26 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
       if (ShapedType::isDynamic(loopBound))
         continue;
 
-      // Try to find some power of two that can devide the current shape dim
+      // Try to find some power of two that can divide the current shape dim
       // size. This vector keeps the candidate tile sizes.
       SmallVector<int64_t, 8> candidates;
 
+      // Ensure vectorization works with the `workgroupTileMultiple`.
+      int64_t workgroupTileMultiple = workgroupTileSizeMultiples[shapeDim];
+      vectorizable =
+          vectorizable && 4 * numThreads % workgroupTileMultiple == 0;
       // For the inner most workgroup dim, try to see if we can have 4
       // elements per thread. This enables vectorization.
       if (vectorizable && wgDim == 0 && !lossFactor) {
         candidates.push_back(4 * numThreads);
       }
-      // Try all power of two numbers up to the subgroup size.
-      for (unsigned i = numThreads; i >= 1; i >>= 1) {
-        candidates.push_back(i);
+      // Try all power of two multiples of `workgroupTileMultiple` up to the
+      // subgroup size.
+      uint64_t maxCandidate =
+          std::max<uint64_t>(1, llvm::PowerOf2Ceil(llvm::divideCeil(
+                                    numThreads, workgroupTileMultiple)));
+      for (unsigned i = maxCandidate; i >= 1; i >>= 1) {
+        candidates.push_back(i * workgroupTileMultiple);
       }
       LLVM_DEBUG({
         llvm::dbgs() << "Base candidate tile sizes: [";
@@ -629,13 +1029,10 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
           continue;
         }
 
-        // Found a suitable candidate. Try to let each thread handle 4
-        // elements if this is the workgroup x dimension.
+        // Try to let each thread handle 4 elements if this is the workgroup x
+        // dimension.
         // TODO: Try to take into account element type bit width to get
         // 4xdword reads instead of 4x{elements}.
-        workgroupTileSizes[shapeDim] = scaledTileSize;
-        LLVM_DEBUG(llvm::dbgs()
-                   << "Chosen workgroup tile size: " << scaledTileSize << "\n");
         if (vectorizable && wgDim == 0 && !lossFactor && candidate % 4 == 0) {
           // Use size-1 vectors to increase parallelism if larger ones causes
           // idle threads in the subgroup.
@@ -648,13 +1045,29 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
           assert(numThreads % (candidate / vectorSize) == 0);
           numThreads /= candidate / vectorSize;
         } else {
+          // When the workgroupTileMultiple is not a Po2, then the candidate
+          // may not evenly divide the numThreads. In this case, we get some
+          // idle threads in the last iteration of the workgroup tile. Verify
+          // that the idle threads are within the lossFactor.
+          int64_t maybeCandidateWorkgroupSize = candidate;
+          if (numThreads % candidate != 0) {
+            maybeCandidateWorkgroupSize =
+                std::min<int64_t>(1ll << llvm::Log2_64(candidate), numThreads);
+            int64_t idleThreads = candidate % maybeCandidateWorkgroupSize;
+            if (idleThreads != 0 &&
+                (!lossFactor || idleThreads > candidate / *lossFactor)) {
+              continue;
+            }
+          }
           if (wgDim == 0)
             vectorizable = false;
           threadTileSizes[shapeDim] = scaleToByte;
-          candidateWorkgroupSize = candidate;
-          assert(numThreads % candidate == 0);
-          numThreads /= candidate;
+          candidateWorkgroupSize = maybeCandidateWorkgroupSize;
+          numThreads /= candidateWorkgroupSize;
         }
+        workgroupTileSizes[shapeDim] = scaledTileSize;
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Chosen workgroup tile size: " << scaledTileSize << "\n");
         assert(numThreads >= 1);
         break;
       }
@@ -674,8 +1087,17 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   if (distributeToThreads(newNumThreads) != 1) {
     // Otherwise, allow larger and larger loss factor.
 
-    // Threads for distribution. Use 32 at least.
-    int64_t numThreads = std::max(subgroupSize, 32);
+    // Threads for distribution. Use `minPreferrefNumThreads` at least, but no
+    // more than 4 subgroups.
+    int64_t minPreferrefNumThreads = std::reduce(
+        workgroupTileSizeMultiples.begin(), workgroupTileSizeMultiples.end(), 1,
+        std::multiplies<int64_t>());
+    int64_t numThreads =
+        std::min<int64_t>(4 * subgroupSize, minPreferrefNumThreads);
+    // If minPreferrefNumThreads is small, use at least 32 or subgroupSize
+    // threads, whichever is larger.
+    numThreads =
+        std::max<int64_t>(std::max<int64_t>(subgroupSize, 32), numThreads);
     // We can tolerate (1 / lossFactor) of threads in the workgroup to be idle.
     int64_t lossFactor = 32;
 
@@ -683,21 +1105,6 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
       if (distributeToThreads(numThreads, lossFactor) == 1)
         break;
     }
-  }
-
-  // Attach the MMA schedule as an attribute to the entry point export function
-  // for later access in the pipeline.
-  MLIRContext *context = linalgOp.getContext();
-  SmallVector<NamedAttribute, 1> attrs;
-  Builder b(context);
-  attrs.emplace_back(StringAttr::get(context, "workgroup"),
-                     b.getI64ArrayAttr(workgroupTileSizes));
-
-  attrs.emplace_back(StringAttr::get(context, "thread"),
-                     b.getI64ArrayAttr(threadTileSizes));
-
-  if (isNonMatvecContraction(linalgOp)) {
-    GPU::setPromotedOperandList(context, attrs, {0, 1});
   }
 
   // Heuristic value chosen to limit maximum vector sizes when tiling below.
@@ -726,6 +1133,28 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
       loopTileSizes[i] = tileSize;
     }
   }
+
+  for (auto dim : partitionableLoops) {
+    if (workgroupTileSizes[dim] == loopBounds[dim]) {
+      workgroupTileSizes[dim] = 0;
+    }
+  }
+
+  // Attach the MMA schedule as an attribute to the entry point export function
+  // for later access in the pipeline.
+  MLIRContext *context = linalgOp.getContext();
+  SmallVector<NamedAttribute, 1> attrs;
+  Builder b(context);
+  attrs.emplace_back(StringAttr::get(context, "workgroup"),
+                     b.getI64ArrayAttr(workgroupTileSizes));
+
+  attrs.emplace_back(StringAttr::get(context, "thread"),
+                     b.getI64ArrayAttr(threadTileSizes));
+
+  if (isNonMatvecContraction(linalgOp)) {
+    GPU::setPromotedOperandList(context, attrs, {0, 1});
+  }
+
   if (llvm::any_of(loopTileSizes, [](int64_t s) { return s != 0; })) {
     attrs.emplace_back(StringAttr::get(context, "reduction"),
                        b.getI64ArrayAttr(loopTileSizes));
