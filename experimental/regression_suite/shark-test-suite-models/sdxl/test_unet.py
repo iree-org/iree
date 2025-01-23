@@ -292,13 +292,13 @@ INT8_PUNET_FLAGS = [
 ]
 
 if os.path.isfile(
-        f"{iree_test_path_extension}/attention_and_matmul_spec_punet_{sku}.mlir"
+    f"{iree_test_path_extension}/attention_and_matmul_spec_punet_{sku}.mlir"
 ):
     INT8_PUNET_FLAGS.append(
         f"--iree-codegen-transform-dialect-library={iree_test_path_extension}/attention_and_matmul_spec_punet_{sku}.mlir"
     )
 else:
-    # TODO: Investigate numerics failure without using the MI300 punet attention spec 
+    # TODO: Investigate numerics failure without using the MI300 punet attention spec
     INT8_PUNET_FLAGS.append(
         f"--iree-codegen-transform-dialect-library={iree_test_path_extension}/attention_and_matmul_spec_punet_mi300.mlir"
     )
