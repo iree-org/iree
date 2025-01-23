@@ -122,14 +122,11 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
       workgroupSize, targetSubgroupSize, pipelineConfig);
 }
 
-/// Given a target and a matmul problem, try to find an MMA schedule for the
-/// problem based on the available mma intrinsics.
-static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
-    IREE::GPU::TargetAttr target, GPUMatmulShapeType problem,
-    bool transposedLhs, bool transposedRhs, bool mustBeAligned = true,
-    bool doCPromotion = false) {
+static SmallVector<IREE::GPU::MmaInterfaceAttr>
+getExpandedMmaIntrinsicList(IREE::GPU::TargetAttr target) {
+  MLIRContext *context = target.getContext();
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
-  SmallVector<GPUMatmulShapeType> intrinsics;
+  SmallVector<IREE::GPU::MmaInterfaceAttr> expandedIntrinsics;
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     // Intrinsics that do not specify a scope cannot be distributed.
     if (failed(mma.getMmaScope()))
@@ -137,12 +134,36 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     if (mma.getSubgroupSize() != targetSubgroupSize)
       continue;
 
+    // Prefer larger virtual intrinsics if they are available.
+    for (IREE::GPU::VirtualMMAIntrinsic virtualIntrinsic :
+         mma.getVirtualIntrinsics()) {
+      auto virtualMma =
+          IREE::GPU::VirtualMMAAttr::get(context, virtualIntrinsic);
+      expandedIntrinsics.push_back(virtualMma);
+    }
+
+    // Add the base intrinsic.
+    expandedIntrinsics.push_back(mma);
+  }
+  return expandedIntrinsics;
+}
+
+/// Given a target and a matmul problem, try to find an MMA schedule for the
+/// problem based on the available mma intrinsics.
+static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
+    ArrayRef<IREE::GPU::MmaInterfaceAttr> intrinsicList,
+    int64_t maxSharedMemoryBytes, int64_t targetSubgroupSize,
+    GPUMatmulShapeType problem, bool transposedLhs, bool transposedRhs,
+    bool mustBeAligned = true, bool doCPromotion = false) {
+  if (intrinsicList.empty())
+    return std::nullopt;
+
+  SmallVector<GPUMatmulShapeType> intrinsics;
+  for (IREE::GPU::MmaInterfaceAttr mma : intrinsicList) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
   }
-  if (intrinsics.empty())
-    return std::nullopt;
 
   GPUMMAHeuristicSeeds seeds;
   assert(problem.aType == problem.bType &&
@@ -169,8 +190,6 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
              /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / 2 /
                  inBitWidth};
   }
-
-  int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
   // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
@@ -255,8 +274,11 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
 
   bool mustBeAligned = true;
   bool doCPromotion = false;
+  SmallVector<IREE::GPU::MmaInterfaceAttr> expandedIntrinsics =
+      getExpandedMmaIntrinsicList(target);
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
-      target, problem, transposedLhs, transposedRhs);
+      expandedIntrinsics, target.getWgp().getMaxWorkgroupMemoryBytes(),
+      target.getPreferredSubgroupSize(), problem, transposedLhs, transposedRhs);
 
   // TODO (nirvedhmeshram, qedawkins): The performance with this will be bad if
   // the GEMM is accumulating (i.e doesnt have a zero fill dpsInit) as that
@@ -266,9 +288,10 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     LDBG("Attempting to deduce unaligned TileAndFuse MMA schedulee");
     mustBeAligned = false;
     doCPromotion = true;
-    schedule = getMmaScheduleFromProblemAndTarget(target, problem,
-                                                  transposedLhs, transposedRhs,
-                                                  mustBeAligned, doCPromotion);
+    schedule = getMmaScheduleFromProblemAndTarget(
+        expandedIntrinsics, target.getWgp().getMaxWorkgroupMemoryBytes(),
+        target.getPreferredSubgroupSize(), problem, transposedLhs,
+        transposedRhs, mustBeAligned, doCPromotion);
   }
 
   if (!schedule) {
@@ -325,8 +348,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     reductionTileSizes[kDim] = schedule->kTileSizes[i];
   }
 
-  IREE::GPU::MmaInterfaceAttr mmaKind =
-      target.getWgp().getMma()[schedule->index];
+  IREE::GPU::MmaInterfaceAttr mmaKind = expandedIntrinsics[schedule->index];
 
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
