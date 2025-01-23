@@ -417,7 +417,7 @@ def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
     "uint32_t":$wgp_count,
 
     // An optional SKU identifier to distinguish different models.
-    OptionalParameter<"StringAttr">:$sku,
+    OptionalParameter<"std::optional<StringAttr>">:$sku,
     // An optional extra dict
     // This field allows to inject more features/limits not supported in the
     // above list for better flexibility.
