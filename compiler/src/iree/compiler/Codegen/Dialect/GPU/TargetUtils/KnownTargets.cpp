@@ -119,7 +119,7 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
   TargetChipAttr targetChip;
   if (details.chip) {
     std::optional<StringAttr> skuAttr = std::nullopt;
-    if (details.chip->sku && !details.chip->sku->empty()) {
+    if (details.chip->sku) {
       skuAttr = StringAttr::get(context, *details.chip->sku);
     }
     targetChip = TargetChipAttr::get(context, details.chip->wgpCount, skuAttr,
