@@ -6,10 +6,10 @@
 
 #include "iree/compiler/mlir_interop.h"
 #include "mlir-c/IR.h"
-#include "mlir/Bindings/Python/PybindAdaptors.h"
+#include "mlir/Bindings/Python/NanobindAdaptors.h"
 
-namespace py = pybind11;
-using namespace mlir::python::adaptors;
+namespace py = nanobind;
+using namespace mlir::python::nanobind_adaptors;
 
 namespace {
 
@@ -21,14 +21,14 @@ public:
 
 } // namespace
 
-PYBIND11_MODULE(_site_initialize_0, m, py::mod_gil_not_used()) {
+NB_MODULE(_site_initialize_0, m) {
   m.doc() = "iree-compile registration";
 
   // Make sure that GlobalInitialize and GlobalShutdown are called with module
   // lifetime.
   py::class_<GlobalInitializer>(m, "_GlobalInitializer");
   m.attr("_global_init_hook") =
-      py::cast(new GlobalInitializer, py::return_value_policy::take_ownership);
+      py::cast(new GlobalInitializer, py::rv_policy::take_ownership);
 
   m.def("register_dialects", [](MlirDialectRegistry registry) {
     ireeCompilerRegisterDialects(registry);
