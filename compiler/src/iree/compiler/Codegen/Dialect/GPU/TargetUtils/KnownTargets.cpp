@@ -118,11 +118,10 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
 
   TargetChipAttr targetChip;
   if (details.chip) {
-    std::optional<StringAttr> skuAttr =
-        details.chip->sku && !details.chip->sku->empty()
-            ? std::optional<StringAttr>(
-                  StringAttr::get(context, *details.chip->sku))
-            : std::nullopt;
+    std::optional<StringAttr> skuAttr = std::nullopt;
+    if (details.chip->sku && !details.chip->sku->empty()) {
+      skuAttr = StringAttr::get(context, *details.chip->sku);
+    }
     targetChip = TargetChipAttr::get(context, details.chip->wgpCount, skuAttr,
                                      DictionaryAttr{});
   }

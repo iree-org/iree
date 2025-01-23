@@ -137,22 +137,23 @@ getDefaultTuningSpec(ModuleOp module,
 
   std::optional<StringRef> sku;
   if (IREE::GPU::TargetChipAttr chip = gpuTarget.getChip()) {
-    std::optional<StringAttr> chipSku = chip.getSku();
-    if (chipSku) {
-      sku = (*chipSku).getValue();
+    if (std::optional<StringAttr> chipSku = chip.getSku()) {
+      sku = chipSku->getValue();
     }
   }
 
   std::string defaultTuningSpecName;
   std::optional<StringRef> defaultTuningSpecSource;
   if (sku) {
-    // Try to look up the default tuning spec for this sku.
+    // GPUs with the same ISA may have different hardware characteristics such
+    // as the number of workgroup processors and power limits, Look up
+    // SKU-specific tuning spec for optimal performance.
     defaultTuningSpecSource = fetchDefaultTuningSpec(*sku);
   }
 
   if (!defaultTuningSpecSource) {
     // If SKU-specific spec is not found, fall back to the default
-    // architecture-based tuning spec.
+    // architecture-based tuning spec to ensure broader compatibility.
     StringRef arch = gpuTarget.getArch();
     defaultTuningSpecSource = fetchDefaultTuningSpec(arch);
   }
