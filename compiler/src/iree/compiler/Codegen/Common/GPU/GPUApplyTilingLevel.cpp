@@ -212,6 +212,13 @@ static LogicalResult applyTileAndFuseToEachRoot(
       return failure();
     }
 
+    if (IREE::Codegen::LoweringConfigAttrInterface originalConfig =
+            getLoweringConfig(tilingInterfaceOp)) {
+      if (!tiledResults->tiledAndFusedOps.empty()) {
+        setLoweringConfig(tiledResults->tiledAndFusedOps[0], originalConfig);
+      }
+    }
+
     // Perform the replacement of tiled and fused values.
     SmallVector<Operation *> opsToReplace{tilingInterfaceOp};
     llvm::append_range(opsToReplace, tiledResults->fusedProducers);
