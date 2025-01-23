@@ -15,13 +15,6 @@ namespace mlir::iree_compiler::stablehlo {
 // General StableHLO/CHLO lowering patterns.
 //===----------------------------------------------------------------------===//
 
-// /// Populates the patterns that convert from StableHLO to Linalg on tensors.
-// void populateStableHloToLinalgConversionPatterns(MLIRContext *context,
-//                                                  TypeConverter
-//                                                  &typeConverter,
-//                                                  RewritePatternSet *patterns,
-//                                                  bool enablePrimitiveOps);
-
 /// Collection of rewrite patterns for lowering of CHLO ops to StableHLO and
 /// Shape ops.
 void populateLegalizeChloPatterns(MLIRContext *context,
@@ -45,12 +38,6 @@ void populateStableHloToLinalgExtConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     RewritePatternSet *patterns);
 
-/// Populates the patterns that convert from StableHLO to Linalg on tensors.
-/// Extends the general linalg lowering patterns with IREE-specific ones.
-void populateStableHloToLinalgOnTensorsConversionPatterns(
-    MLIRContext *context, TypeConverter &typeConverter,
-    RewritePatternSet *patterns);
-
 /// Populates the patterns that convert from StableHLO collective ops to Flow
 /// ops.
 void populateStableHloCollectivesConversionPatterns(
@@ -61,35 +48,6 @@ void populateStableHloCollectivesConversionPatterns(
 // Fine-grained patterns used by the implementation.
 //===----------------------------------------------------------------------===//
 namespace detail {
-/// Populates the patterns that convert from elementwise StableHLO ops to Linalg
-/// on tensors.
-void populatePointwiseStableHloToLinalgConversionPatterns(
-    MLIRContext *context, TypeConverter &typeConverter,
-    RewritePatternSet *patterns, bool enablePrimitiveOps);
-
-/// Populates the patterns that convert from convolution StableHLO ops to Linalg
-/// on tensors.
-void populateStableHloConvolutionToLinalgConversionPatterns(
-    MLIRContext *context, TypeConverter &typeConverter,
-    RewritePatternSet *patterns);
-
-/// Populates the patterns that convert from dot product StableHLO ops to Linalg
-/// on tensors.
-void populateStableHloDotProdToLinalgConversionPatterns(
-    MLIRContext *context, TypeConverter &typeConverter,
-    RewritePatternSet *patterns);
-
-/// Populates the patterns that convert from random number generation StableHLO
-/// ops to Linalg on tensors.
-void populateStableHloRandomToLinalgConversionPatterns(
-    MLIRContext *context, TypeConverter &typeConverter,
-    RewritePatternSet *patterns);
-
-/// Populates the patterns that convert from reduction StableHLO ops to Linalg
-/// on tensors.
-void populateStableHloReductionToLinalgConversionPatterns(
-    MLIRContext *context, TypeConverter &typeConverter,
-    RewritePatternSet *patterns, bool enablePrimitiveOps);
 
 /// Populates the patterns that convert scalar StableHLO ops to Arith ops.
 void populateScalarHloToArithConversionPatterns(
