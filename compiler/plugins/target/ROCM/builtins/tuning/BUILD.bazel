@@ -26,6 +26,7 @@ endif()
 # Target archs for tuning specs. https://llvm.org/docs/AMDGPUUsage.html#processors
 gpu_archs = [
     "gfx942",
+    "mi308x",
 ]
 
 tuning_spec_mlir_files = [
