@@ -969,4 +969,66 @@ FailureOr<SmallVector<Value>> CustomOp::decomposeOperation(OpBuilder &builder) {
   return customOpReplacements;
 }
 
+// ExpReductionOp
+
+struct DecomposeExpReduction : OpRewritePattern<ExpReductionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ExpReductionOp op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+
+    // Split the op into:
+    // curr_max = max(s, old_max)
+    // ex = e^{x - curr_max}
+    // norm = e^{curr_max - old_max}
+    // norm_outs = outs * norm (for each outs in exp_reduction)
+    // exp_reduction_generic ins(ex, ...) outs(norm_outs)
+
+    // curr_max = max(s, old_max)
+    OpOperand *s = op.getDpsInputOperand(0);
+    OpOperand *oldMax = op.getDpsInitOperand(0);
+    AffineMap sMap = op.getMatchingIndexingMap(s);
+    AffineMap oldMaxMap = op.getMatchingIndexingMap(oldMax);
+    Value currMax = reduce<arith::MaximumFOp>(rewriter, loc, sMap, oldMaxMap,
+                                              s->get(), oldMax->get());
+
+    // ex = e^{s - curr_max}
+    Value ex =
+        computeSubAndExp2(rewriter, loc, oldMaxMap, sMap, currMax, s->get());
+
+    // norm = e^{old_max - curr_max}
+    Value norm = computeSubAndExp2(rewriter, loc, oldMaxMap, oldMaxMap, currMax,
+                                   oldMax->get());
+    AffineMap normMap = oldMaxMap;
+
+    // norm_outs = outs * norm (for each outs in exp_reduction)
+    SmallVector<Value> normOuts = {currMax};
+    for (OpOperand &oldOut :
+         op.getDpsInitsMutable().slice(1, op.getNumDpsInits() - 1)) {
+      AffineMap oldOutMap = op.getMatchingIndexingMap(&oldOut);
+      Value normOldOut = elementwiseValueInPlace<arith::MulFOp>(
+          rewriter, loc, oldOutMap, normMap, oldOut.get(), norm);
+      normOuts.push_back(normOldOut);
+    }
+
+    // exp_reduction_generic ins(ex, ...) outs(norm_outs)
+    SmallVector<Value> inputs = op.getDpsInputs();
+    inputs[0] = ex;
+    linalg::GenericOp expRedGeneric = rewriter.create<linalg::GenericOp>(
+        loc, TypeRange(normOuts), inputs, normOuts, op.getIndexingMapsArray(),
+        op.getIteratorTypesArray());
+    rewriter.inlineRegionBefore(op.getRegion(), expRedGeneric.getRegion(),
+                                expRedGeneric.getRegion().begin());
+
+    rewriter.replaceOp(op, expRedGeneric);
+
+    return success();
+  }
+};
+
+void populateExpReductionDecompositionPatterns(RewritePatternSet &patterns) {
+  patterns.add<DecomposeExpReduction>(patterns.getContext());
+}
+
 } // namespace mlir::iree_compiler::IREE::LinalgExt
