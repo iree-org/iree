@@ -72,7 +72,7 @@ static IREE::Stream::AffinityAttr getOpAffinity(Operation *op) {
 }
 
 // Returns a return op in `op`.
-static Util::ReturnOp getAnyReturnOp(IREE::Util::FuncOp op) {
+static IREE::Util::ReturnOp getAnyReturnOp(IREE::Util::FuncOp op) {
   for (auto &block : op.getCallableRegion()->getBlocks()) {
     if (auto retOp = dyn_cast<IREE::Util::ReturnOp>(block.getTerminator())) {
       return retOp;
