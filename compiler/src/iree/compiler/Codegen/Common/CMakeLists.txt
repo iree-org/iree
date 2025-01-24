@@ -93,7 +93,6 @@ iree_cc_library(
     "ConvolutionToIGEMM.cpp"
     "DecomposeAffineOpsPass.cpp"
     "DecomposeConvolutionToLowerDimOps.cpp"
-    "DecomposeLinalgGeneric.cpp"
     "DecomposePackUnPackOps.cpp"
     "DropVectorUnitDims.cpp"
     "EmulateNarrowType.cpp"
