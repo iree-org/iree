@@ -12,10 +12,12 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamTraits.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/LogicalResult.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
@@ -83,6 +85,51 @@ getEncodingWithNewLayouts(Type type,
   }
   return encodingAttr.cloneWithLayouts(layouts);
 };
+
+/// Update the bindings of function argumentswith encoding layouts. It only
+/// updates the uses when the argument type is stream.binding_type. The bindings
+/// are only used by binding subspan ops that return whatever types. Today they
+/// are mostly flow tensor type. If the type implements
+/// IREE::Encoding::EncodingTypeInterface type interface, the method uses the
+/// interface methods to compute the type that has updated encodings (i.e.,
+/// encodings with layouts) and updates the type.
+static LogicalResult
+updateBindingEncodings(FunctionOpInterface funcOp,
+                       ArrayRef<Attribute> bindingLayoutAttrs) {
+  int idx = 0;
+  Region &region = funcOp.getFunctionBody();
+  for (auto arg : region.getArguments()) {
+    if (!isa<IREE::Stream::BindingType>(arg.getType())) {
+      continue;
+    }
+    auto updatedEncoding =
+        dyn_cast<IREE::Encoding::EncodingAttr>(bindingLayoutAttrs[idx++]);
+    if (!updatedEncoding) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Skip, The binding layout attribute is not EncodingAttr, "
+                    "which means that the type does not have encodings.\n");
+      continue;
+    }
+    for (auto user : arg.getUsers()) {
+      auto subspanOp = dyn_cast<IREE::Stream::BindingSubspanOp>(user);
+      if (!subspanOp) {
+        return failure();
+      }
+
+      auto encodingTypeInterface =
+          dyn_cast<IREE::Encoding::EncodingTypeInterface>(subspanOp.getType());
+      if (!encodingTypeInterface) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Can not update the binding type because the type does "
+                      "not implement EncodingTypeInterface.\n");
+        return failure();
+      }
+      subspanOp.getResult().setType(
+          encodingTypeInterface.updateEncoding(updatedEncoding));
+    }
+  }
+  return success();
+}
 
 /// Returns the affinities of the `dispatchOp`'s resource operands. An empty
 /// array attribute indicates that the resource operand affinity is not found.
@@ -345,8 +392,38 @@ static LogicalResult duplicateExecutablesPerAffinityVariant(
   }
 
   //===--------------------------------------------------------------------===//
-  // TODO(hanchung): Update encodings in executables.
+  // Update encoding types for bindings in executables.
   //===--------------------------------------------------------------------===//
+  for (auto dispatchOp : candidates) {
+    SmallVector<Attribute> bindingLayoutAttrs =
+        dispatchOpBindingLayouts[dispatchOp];
+    bool succeeded = true;
+    dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPoint) {
+      if (!succeeded) {
+        return;
+      }
+      auto exportOp = cast<IREE::Stream::ExecutableExportOp>(
+          symbolTable.lookupSymbolIn(moduleOp, entryPoint));
+      auto executableOp =
+          exportOp->getParentOfType<IREE::Stream::ExecutableOp>();
+      LLVM_DEBUG(llvm::dbgs() << "Update ExecutableOp: "
+                              << executableOp.getSymName() << "\n");
+      LLVM_DEBUG({
+        llvm::dbgs() << "  binding layouts: [";
+        llvm::interleaveComma(bindingLayoutAttrs, llvm::dbgs());
+        llvm::dbgs() << "]\n";
+      });
+      auto func = cast<mlir::FunctionOpInterface>(symbolTable.lookupSymbolIn(
+          executableOp.getInnerModule(), exportOp.getSymName()));
+      if (failed(updateBindingEncodings(func, bindingLayoutAttrs))) {
+        succeeded = false;
+      }
+    });
+
+    if (!succeeded) {
+      return failure();
+    }
+  }
 
   return success();
 }

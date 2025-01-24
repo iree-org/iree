@@ -26,6 +26,9 @@
 #define GET_TYPEDEF_CLASSES
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h.inc" // IWYU pragma: export
 #undef GET_TYPEDEF_CLASSES
+// The EncodingTypeInterfaces.h.inc needs to be included after EncodingAttrs
+// because an interface method could have EncodingAttr types.
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypeInterfaces.h.inc" // IWYU pragma: export
 // clang-format on
 
 //===---------------------------------------------------------------------===//
