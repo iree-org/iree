@@ -5826,6 +5826,7 @@ to solve a specific contraction problem.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.target_chip&lt;
   uint32_t,   # wgp_count
+  StringAttr,   # sku
   DictionaryAttr   # extra
 &gt;
 </code></pre></div>
@@ -5846,6 +5847,11 @@ AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.</p>
 <tr>
 <td style="text-align: center;">wgp_count</td>
 <td style="text-align: center;"><code>uint32_t</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">sku</td>
+<td style="text-align: center;"><code>StringAttr</code></td>
 <td></td>
 </tr>
 <tr>
