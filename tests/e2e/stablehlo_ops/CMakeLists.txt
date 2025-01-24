@@ -645,7 +645,7 @@ iree_check_single_backend_test_suite(
     "batch_norm_inference.mlir"
     "bitcast_convert.mlir"
     "broadcast.mlir"
-    # "broadcast_add.mlir"
+    "broadcast_add.mlir"
     "broadcast_in_dim.mlir"
     # "clamp.mlir"  # TODO(#10906): fix (i8/i16?)
     # "compare.mlir"  # TODO(#10906): fix (i8/i16?)
@@ -750,7 +750,7 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
-    # "philox.mlir"
+    "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
     "reduce_window.mlir"

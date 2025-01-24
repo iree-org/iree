@@ -51,8 +51,8 @@ ALL_SRCS = enforce_glob(
         "multiply.mlir",
         "negate.mlir",
         "pad.mlir",
-        "pow.mlir",
         "philox.mlir",
+        "pow.mlir",
         "reduce.mlir",
         "reduce_window.mlir",
         "remainder.mlir",
@@ -78,6 +78,7 @@ ALL_SRCS = enforce_glob(
         "while.mlir",
     ],
     include = ["*.mlir"],
+    exclude = [],
 )
 
 iree_check_single_backend_test_suite(
