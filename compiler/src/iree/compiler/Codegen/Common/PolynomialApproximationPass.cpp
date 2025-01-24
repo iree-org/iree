@@ -35,12 +35,32 @@ public:
       PolynomialApproximationPass>::PolynomialApproximationPassBase;
 
   void runOnOperation() override {
+    using PatternFunction = std::function<decltype(populateExpandTanPattern)>;
+    std::map<std::string, PatternFunction> patternMap = {
+        {"tan", populateExpandTanPattern},
+        {"sinh", populateExpandSinhPattern},
+        {"cosh", populateExpandCoshPattern},
+        {"asinh", populateExpandAsinhPattern},
+        {"acosh", populateExpandAcoshPattern},
+        {"atanh", populateExpandAtanhPattern},
+        {"powf", populateExpandPowFPattern},
+        {"fpowi", populateExpandFPowIPattern},
+        {"erf",
+         [&](RewritePatternSet &mathPatterns) {
+           this->populateErfPattern(mathPatterns);
+         }},
+    };
+
     RewritePatternSet mathPatterns(&getContext());
 
-    if (isLLVMGPU) {
-      populateLLVMGPUPolynomialApproximationPatterns(mathPatterns);
-    } else {
-      populateGenericPolyApproximationPatterns(mathPatterns);
+    std::vector<StringRef> noOps = splitByComma(noApproxOps);
+    for (auto &pattern : patternMap) {
+      // Skip any ops in the "do not convert" list.
+      auto it = std::find(noOps.begin(), noOps.end(), pattern.first);
+      if (it != noOps.end()) {
+        continue;
+      }
+      pattern.second(mathPatterns);
     }
 
     if (failed(
@@ -49,35 +69,17 @@ public:
     }
   }
 
-  /// Only expand math dialect elementry functions not supported by device libs.
-  void populateLLVMGPUPolynomialApproximationPatterns(
-      RewritePatternSet &mathPatterns) {
-    // TODO(lialan): Handle these functions efficiently in ROCDL/NVVM
-    // conversion passes. This expansion is likely suboptimal.
-    populateExpandPowFPattern(mathPatterns);
-    populateExpandFPowIPattern(mathPatterns);
-
-    if (clNativeMathPrecision) {
-      mathPatterns.add<math::ErfPolynomialApproximation>(&getContext());
-    } else {
-      populateExpandExp2FPattern(mathPatterns);
-      populateMathPolynomialApproximationPatterns(mathPatterns);
-      populateExpandRoundEvenPattern(mathPatterns);
+  std::vector<StringRef> splitByComma(StringRef str) {
+    std::vector<StringRef> result;
+    SmallVector<StringRef, 8> parts;
+    str.split(parts, ",");
+    for (auto part : parts) {
+      result.push_back(part.str());
     }
+    return result;
   }
 
-  /// Convert math dialect elementry functions to polynomial form.
-  void
-  populateGenericPolyApproximationPatterns(RewritePatternSet &mathPatterns) {
-    populateExpandTanPattern(mathPatterns);
-    populateExpandSinhPattern(mathPatterns);
-    populateExpandCoshPattern(mathPatterns);
-    populateExpandAsinhPattern(mathPatterns);
-    populateExpandAcoshPattern(mathPatterns);
-    populateExpandAtanhPattern(mathPatterns);
-    populateExpandPowFPattern(mathPatterns);
-    populateExpandFPowIPattern(mathPatterns);
-
+  void populateErfPattern(RewritePatternSet &mathPatterns) {
     if (clNativeMathPrecision) {
       mathPatterns.add<math::ErfPolynomialApproximation>(&getContext());
     } else {
