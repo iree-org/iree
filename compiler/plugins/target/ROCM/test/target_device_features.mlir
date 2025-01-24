@@ -21,9 +21,9 @@
 // GFX942-SAME:         subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
 // GFX942-SAME:         max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
 // GFX942-SAME:         max_workgroup_counts = [2147483647, 2147483647, 2147483647],
-// MI300X: chip = <wgp_count = 304>>
-// MI300A: chip = <wgp_count = 228>>
-// MI308X: chip = <wgp_count = 80>>
+// MI300X: chip = <wgp_count = 304, sku = "mi300x">>
+// MI300A: chip = <wgp_count = 228, sku = "mi300a">>
+// MI308X: chip = <wgp_count = 80,  sku = "mi308x">>
 
 // GFX941: target = #iree_gpu.target<arch = "gfx941",
 // GFX941-SAME:         features = "+sramecc,-xnack"
