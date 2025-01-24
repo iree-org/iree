@@ -530,7 +530,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
        "getResultTilePosition",
        "getTiledImplementation",
        "generateResultTileValue"]>]> {
-  let summary = "Attention operator";
+         let summary = "Attention operator";
   let description = [{
     Computes the scaled dot product attention function:
 
@@ -759,8 +759,16 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_PureOp<"exp_reduction",
    Pure,
    DestinationStyleOpInterface,
    LinalgExtInterface,
-   SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">
-   ]> {
+   DeclareOpInterfaceMethods<LinalgStructuredInterface,
+    ["getLibraryCallName",
+     "getIteratorTypesArray"]>,
+   SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
+   DeclareOpInterfaceMethods<TilingInterface,
+      ["getIterationDomain",
+       "getLoopIteratorTypes",
+       "getResultTilePosition",
+       "getTiledImplementation",
+       "generateResultTileValue"]>]> {
   let summary = "";
   let description = [{}];
 
@@ -784,9 +792,11 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_PureOp<"exp_reduction",
   }];
 
   let extraClassDeclaration =[{
-    // // Helper accessor methods.
-    // unsigned getNumLoops();
-    // int64_t getRank(Value);
+
+    static std::function<void(ImplicitLocOpBuilder &, Block &, ArrayRef<NamedAttribute>)>
+    getRegionBuilder() {
+      return nullptr;
+    }
 
     // DestinationStyleOpInterface methods
     MutableOperandRange getDpsInitsMutable() {
