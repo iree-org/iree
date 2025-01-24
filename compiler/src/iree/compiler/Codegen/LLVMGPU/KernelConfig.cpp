@@ -38,6 +38,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Types.h"
@@ -2516,6 +2517,9 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
 
   // Find the root operation. linalg.generic, linalg.fill, and scatter are not
   // root operations if there are other compute operations present.
+  // Also, construct a set of generic ops that are to be skipped. These generic
+  // ops that are used to compute scatter indices are not root operations.
+  llvm::SmallDenseSet<Operation *, 4> genericToSkip;
   for (Operation *op : llvm::reverse(computeOps)) {
     if (!isa<linalg::GenericOp, linalg::FillOp, IREE::LinalgExt::ScatterOp>(
             op)) {
@@ -2529,12 +2533,26 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
         break;
       }
     }
+
+    if (auto scatterOp = dyn_cast<IREE::LinalgExt::ScatterOp>(op)) {
+      Value indices = scatterOp.getIndices();
+      if (!indices.getDefiningOp()) {
+        continue;
+      }
+
+      // Mark scatter's backward slices(inclusive) as to skip.
+      BackwardSliceOptions options;
+      options.inclusive = true;
+      SetVector<Operation *> slices;
+      getBackwardSlice(indices, &slices, options);
+      genericToSkip.insert(slices.begin(), slices.end());
+    }
   }
 
   // Generic ops take priority over scatter and fill ops as the root op.
   if (!rootOperation) {
     for (Operation *op : llvm::reverse(computeOps)) {
-      if (isa<linalg::GenericOp>(op)) {
+      if (isa<linalg::GenericOp>(op) && !genericToSkip.contains(op)) {
         rootOperation = op;
         break;
       }
