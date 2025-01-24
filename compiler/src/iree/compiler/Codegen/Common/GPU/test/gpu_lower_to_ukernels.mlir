@@ -76,12 +76,13 @@ func.func @multi_mma_mfma_i32_16x16x32_i8(%a : tensor<1x2x8x1x1x2x8xi8>, %b : te
     kind = #iree_gpu.data_tiled_mma_layout<intrinsic =  MFMA_I32_16x16x32_I8, intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 2>,
     lowering_config = #iree_gpu.lowering_config<{
       reduction = [0, 0, 0],
-      ukernel = #iree_gpu.ukernel_config<name = "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8", def_attrs = {vm.import.module = "rocm"}>,
+      ukernel = #iree_gpu.ukernel_config<name = "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8", def_attrs = {vm.import.module = "rocm"}, shared_memory_size = 16384>,
       workgroup = [1, 1, 0]}>
   } : tensor<1x2x8x1x1x2x8xi8>, tensor<1x2x1x2x1x1x2x8xi8> into tensor<1x1x1x8x2x1x1x4xi32>
   return %d : tensor<1x1x1x8x2x1x1x4xi32>
 }
 
 // CHECK-LABEL: func @multi_mma_mfma_i32_16x16x32_i8(
-//       CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic
+//       CHECK:   bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<16384xi8>
+//       CHECK:   iree_codegen.ukernel.generic
 //  CHECK-SAME:      "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8"

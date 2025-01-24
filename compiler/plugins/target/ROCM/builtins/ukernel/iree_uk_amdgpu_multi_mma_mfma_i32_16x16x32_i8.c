@@ -10,13 +10,13 @@
 // intrinsic = MFMA_I32_16x16x32_I8 and a shape with outer M and N dimensions
 // equal to 1 (so that this is just doing the inner loop on the K dimension).
 //
-// This microkernel uses a local memory workspace buffer provided by the caller.
-// It is used to copy tiles of the A and/or B matrices, depending on which ones
-// are reused by multiple subgroups.
+// This microkernel uses a shared memory workspace buffer provided by the
+// caller. It is used to copy tiles of the A and/or B matrices, depending on
+// which ones are reused by multiple subgroups.
 //
 // Note that the A, B, C matrix pointers are all after thread-distribution.
 // When the pointer before thread-distribution is needed (when copying data
-// into local memory), care is taken to subtract the thread-relative offset,
+// into shared memory), care is taken to subtract the thread-relative offset,
 // which is computed from the thread id.
 //
 // As this function is always_inline, some of its parameters are actually
@@ -24,24 +24,24 @@
 // are actually unrolled/resolved at compile time, making this microkernel
 // a generic "template". This is summarized in the below table.
 //
-// Parameters                 | Constant? | Description
-// -------------------------- | --------- | -----------
-// a_base, a_offset           | No        | A-matrix pointer (thread-distrib.)
-// b_base, b_offset           | No        | B-matrix pointer (thread-distrib.)
-// c_base, c_offset           | No        | C-matrix pointer (thread-distrib.)
-// local_memory_{base,offset} | No        | Local memory workspace pointer
-// local_memory_bytes         | Yes       | Local memory workspace size
-// k_size                     | Yes       | Size of outer K dimension
-// intrinsics_m, subgroups_m  | Yes       | See DataTiledMMAAttr
-// intrinsics_n, subgroups_n  | Yes       | See DataTiledMMAAttr
-// intrinsics_k               | Yes       | See DataTiledMMAAttr
+// Parameters                  | Constant?  | Description
+// --------------------------- | ---------- | -----------
+// a_base, a_offset            | No         | A-matrix pointer (thread-distrib.)
+// b_base, b_offset            | No         | B-matrix pointer (thread-distrib.)
+// c_base, c_offset            | No         | C-matrix pointer (thread-distrib.)
+// shared_memory_{base,offset} | No         | Shared memory workspace pointer
+// shared_memory_bytes         | Yes        | Shared memory workspace size
+// k_size                      | From shape | Size of outer K dimension
+// intrinsics_m, subgroups_m   | Yes        | See DataTiledMMAAttr
+// intrinsics_n, subgroups_n   | Yes        | See DataTiledMMAAttr
+// intrinsics_k                | Yes        | See DataTiledMMAAttr
 //
 // TODO(bjacob): Better scheduling via either barrier intrinsics or inline asm.
 [[clang::always_inline]] void iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8(
     const int8_t *a_base, int64_t a_offset, const int8_t *b_base,
     int64_t b_offset, int32_t *c_base, int64_t c_offset,
-    int8_t *local_memory_base, int64_t local_memory_offset,
-    int32_t local_memory_bytes, int32_t k_size, int32_t intrinsics_m,
+    int8_t *shared_memory_base, int64_t shared_memory_offset,
+    int32_t shared_memory_bytes, int32_t k_size, int32_t intrinsics_m,
     int32_t subgroups_m, int32_t intrinsics_n, int32_t subgroups_n,
     int32_t intrinsics_k) {
   // We will be counting in units of "vectors", meaning, for each A/B/C fragment
@@ -54,17 +54,17 @@
   int32_t a_tile_vecs = 64 * intrinsics_m * subgroups_m * intrinsics_k;
   int32_t b_tile_vecs = 64 * intrinsics_n * subgroups_n * intrinsics_k;
 
-  // Decide whether to use local memory for A and/or B based on subgroups.
-  int32_t a_local_vecs = subgroups_n > 1 ? a_tile_vecs : 0;
-  int32_t b_local_vecs = subgroups_m > 1 ? b_tile_vecs : 0;
+  // Decide whether to use shared memory for A and/or B based on subgroups.
+  int32_t a_shared_vecs = subgroups_n > 1 ? a_tile_vecs : 0;
+  int32_t b_shared_vecs = subgroups_m > 1 ? b_tile_vecs : 0;
 
-  // Set up our pointers to local memory for A and B tiles.
-  if (local_memory_bytes < 8 * (a_local_vecs + b_local_vecs)) {
+  // Set up our pointers to shared memory for A and B tiles.
+  if (shared_memory_bytes < 8 * (a_shared_vecs + b_shared_vecs)) {
     __builtin_trap();
   }
-  int64_t *restrict a_local =
-      (int64_t *)(local_memory_base + local_memory_offset);
-  int64_t *restrict b_local = a_local + a_tile_vecs;
+  int64_t *restrict a_shared =
+      (int64_t *)(shared_memory_base + shared_memory_offset);
+  int64_t *restrict b_shared = a_shared + a_tile_vecs;
 
   // Determine our thread id and the range for it.
   int tid = __builtin_amdgcn_workitem_id_x();
@@ -97,28 +97,29 @@
 
   // Arithmetic loop.
   for (int k_outer = 0; k_outer < k_size; ++k_outer) {
-    // Pointers to A/B data to feed MFMA, based on whether local memory is used.
+    // Pointers to A/B data to feed MFMA, based on whether shared memory is
+    // used.
     const int64_t *restrict a_mfma_vecs =
-        a_local_vecs ? a_local + a_thread_relative_offset : a_global;
+        a_shared_vecs ? a_shared + a_thread_relative_offset : a_global;
     const int64_t *restrict b_mfma_vecs =
-        b_local_vecs ? b_local + b_thread_relative_offset : b_global;
+        b_shared_vecs ? b_shared + b_thread_relative_offset : b_global;
 
-    // If needed, load data from global to local memory.
-    if (tid < a_local_vecs) { // Benefits from above assume(tid < numthreads).
-      for (int i = 0; i < a_local_vecs; i += numthreads) {
-        a_local[i + tid] = a_global[i + tid - a_thread_relative_offset];
+    // If needed, load data from global to shared memory.
+    if (tid < a_shared_vecs) { // Benefits from above assume(tid < numthreads).
+      for (int i = 0; i < a_shared_vecs; i += numthreads) {
+        a_shared[i + tid] = a_global[i + tid - a_thread_relative_offset];
       }
     }
-    if (tid < b_local_vecs) { // Benefits from above assume(tid < numthreads).
-      for (int i = 0; i < b_local_vecs; i += numthreads) {
-        b_local[i + tid] = b_global[i + tid - b_thread_relative_offset];
+    if (tid < b_shared_vecs) { // Benefits from above assume(tid < numthreads).
+      for (int i = 0; i < b_shared_vecs; i += numthreads) {
+        b_shared[i + tid] = b_global[i + tid - b_thread_relative_offset];
       }
     }
-    // Thread barrier if any local memory is used.
-    if (a_local_vecs || b_local_vecs) {
+    // Thread barrier if any shared memory is used.
+    if (a_shared_vecs || b_shared_vecs) {
       __syncthreads();
     }
-    // Load data from local memory and perform arithmetic.
+    // Load data from shared memory and perform arithmetic.
     for (int m = 0; m < intrinsics_m; ++m) {
       for (int n = 0; n < intrinsics_n; ++n) {
         for (int k = 0; k < intrinsics_k; ++k) {
@@ -130,8 +131,8 @@
     }
     a_global += a_tile_vecs;
     b_global += b_tile_vecs;
-    // Thread barrier if any local memory is used.
-    if (a_local_vecs || b_local_vecs) {
+    // Thread barrier if any shared memory is used.
+    if (a_shared_vecs || b_shared_vecs) {
       __syncthreads();
     }
   }

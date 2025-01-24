@@ -111,14 +111,14 @@ struct LowerMultiMmaToUKernelPattern : OpRewritePattern<IREE::GPU::MultiMmaOp> {
     auto constI32 = [&](int val) {
       return rewriter.create<arith::ConstantIntOp>(loc, val, I32Type);
     };
-    int64_t localMemorySize = ukernelAttr.getLocalMemorySize();
-    Attribute localAddrSpace = gpu::AddressSpaceAttr::get(
+    int64_t sharedMemorySize = ukernelAttr.getSharedMemorySize();
+    Attribute sharedAddrSpace = gpu::AddressSpaceAttr::get(
         rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
-    RankedTensorType localMemoryType =
-        RankedTensorType::get({localMemorySize}, I8Type);
-    auto localMemory = rewriter.create<bufferization::AllocTensorOp>(
-        loc, localMemoryType, ValueRange{});
-    localMemory.setMemorySpaceAttr(localAddrSpace);
+    RankedTensorType sharedMemoryType =
+        RankedTensorType::get({sharedMemorySize}, I8Type);
+    auto sharedMemory = rewriter.create<bufferization::AllocTensorOp>(
+        loc, sharedMemoryType, ValueRange{});
+    sharedMemory.setMemorySpaceAttr(sharedAddrSpace);
     Value k = castIndexToI32(
         rewriter.create<tensor::DimOp>(op.getLoc(), op.getLhs(), 1));
     Value intrinsicsM = constI32(mma.getIntrinsicsM());
@@ -129,7 +129,7 @@ struct LowerMultiMmaToUKernelPattern : OpRewritePattern<IREE::GPU::MultiMmaOp> {
     rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
         op, TypeRange{op.getAccType()}, ukernelAttr.getName(),
         ValueRange{op.getLhs(), op.getRhs()}, op.getAcc(),
-        ValueRange{localMemory, constI32(localMemorySize), k, intrinsicsM,
+        ValueRange{sharedMemory, constI32(sharedMemorySize), k, intrinsicsM,
                    subgroupsM, intrinsicsN, subgroupsN, intrinsicsK},
         ukernelAttr.getDefAttrs(),
         /*strided_outer_dims=*/rewriter.getIndexAttr(0));

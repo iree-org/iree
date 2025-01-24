@@ -58,7 +58,7 @@ static UKernelNameAndSuffix getUKernelNameAndSuffix(Operation *op) {
   return {};
 }
 
-static int64_t getLocalMemorySize(IREE::GPU::TargetAttr gpuTarget) {
+static int64_t getSharedMemorySize(IREE::GPU::TargetAttr gpuTarget) {
   if (!gpuTarget) {
     return 0;
   }
@@ -86,20 +86,20 @@ static IREE::GPU::UKernelConfigAttr getUKernelConfig(Operation *op) {
     auto defsAttr = DictionaryAttr::get(
         context, {{StringAttr::get(context, "vm.import.module"),
                    StringAttr::get(context, "rocm")}});
-    int64_t localMemorySize = 0;
+    int64_t sharedMemorySize = 0;
     if (isa<IREE::GPU::MultiMmaOp>(op)) {
       // Value large enough for current purposes, and small enough (1/4 of
-      // local memory) to leave room for other things using local memory,
+      // shared memory) to leave room for other things using shared memory,
       // particular in fusions.
-      localMemorySize = 16384;
-      // Validate our assumption that this is only a fraction of local memory.
+      sharedMemorySize = 16384;
+      // Validate our assumption that this is only a fraction of shared memory.
       IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(execTarget);
-      if (localMemorySize > getLocalMemorySize(gpuTarget) / 4) {
+      if (sharedMemorySize > getSharedMemorySize(gpuTarget) / 4) {
         return {};
       }
     }
     return IREE::GPU::UKernelConfigAttr::get(context, nameAttr, defsAttr,
-                                             localMemorySize);
+                                             sharedMemorySize);
   }
   return {};
 }

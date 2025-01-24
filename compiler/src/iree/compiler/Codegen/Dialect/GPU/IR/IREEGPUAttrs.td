@@ -536,7 +536,7 @@ def IREEGPU_UKernelConfigAttr  :
   let parameters = (ins
        "StringAttr":$name,
        "DictionaryAttr":$def_attrs,
-       DefaultValuedParameter<"int64_t", "0", "Size in bytes of local memory workspace">:$local_memory_size
+       DefaultValuedParameter<"int64_t", "0", "Size in bytes of shared memory workspace">:$shared_memory_size
   );
 }
 
