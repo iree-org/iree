@@ -52,6 +52,7 @@ ALL_SRCS = enforce_glob(
         "negate.mlir",
         "pad.mlir",
         "pow.mlir",
+        "philox.mlir",
         "reduce.mlir",
         "reduce_window.mlir",
         "remainder.mlir",
@@ -77,9 +78,6 @@ ALL_SRCS = enforce_glob(
         "while.mlir",
     ],
     include = ["*.mlir"],
-    exclude = [
-        "philox.mlir",
-    ],
 )
 
 iree_check_single_backend_test_suite(
@@ -158,6 +156,7 @@ iree_check_single_backend_test_suite(
             "multiply.mlir",
             "negate.mlir",
             "pad.mlir",
+            "philox.mlir",
             "pow.mlir",
             "reduce.mlir",
             "reduce_window.mlir",
@@ -187,7 +186,6 @@ iree_check_single_backend_test_suite(
         exclude = [
             "dot_bf16.mlir",
             "exponential_fp16.mlir",
-            "philox.mlir",
         ],
     ),
     compiler_flags = [
@@ -238,6 +236,7 @@ iree_check_single_backend_test_suite(
             "multiply.mlir",
             "negate.mlir",
             "pad.mlir",
+            "philox.mlir",
             "pow.mlir",
             "reduce.mlir",
             "reduce_window.mlir",
@@ -266,7 +265,6 @@ iree_check_single_backend_test_suite(
         exclude = [
             "exponential_fp16.mlir",
             "fft.mlir",  # TODO(#9583)
-            "philox.mlir",
             "reverse.mlir",  # TODO(#12415): disabled due to miscompilation on Pixel 6.
         ],
     ),
@@ -373,6 +371,7 @@ iree_check_single_backend_test_suite(
             "multiply.mlir",
             "negate.mlir",
             "pad.mlir",
+            "philox.mlir",
             "pow.mlir",
             "reduce.mlir",
             "remainder.mlir",
@@ -399,7 +398,6 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "philox.mlir",
             "reduce_window.mlir",  # TODO(#15012): fix test crash
         ],
     ),

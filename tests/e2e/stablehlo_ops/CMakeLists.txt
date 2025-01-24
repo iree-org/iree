@@ -51,6 +51,7 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
+    "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
     "reduce_window.mlir"
@@ -129,6 +130,7 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
+    "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
     "reduce_window.mlir"
@@ -206,6 +208,7 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
+    "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
     "reduce_window.mlir"
@@ -279,6 +282,7 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
+    "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
     "reduce_window.mlir"
@@ -353,6 +357,7 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
+    "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
     "reduce_window.mlir"
@@ -437,6 +442,7 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
+    "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
     "reduce_window.mlir"
@@ -520,6 +526,7 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
+    "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
     "reduce_window.mlir"
@@ -595,6 +602,7 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
+    "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
     "remainder.mlir"
@@ -642,7 +650,7 @@ iree_check_single_backend_test_suite(
     # "clamp.mlir"  # TODO(#10906): fix (i8/i16?)
     # "compare.mlir"  # TODO(#10906): fix (i8/i16?)
     # "complex.mlir" # TODO(#11054)
-    # "concatenate.mlir"  # error: line:114: OpPhi's number of incoming blocks (2) does not match block's predecessor count (2).
+    "concatenate.mlir"
     "constant.mlir"
     # "convert.mlir"  # TODO(#10906): fix (i8/i16?)
     "convolution.mlir"

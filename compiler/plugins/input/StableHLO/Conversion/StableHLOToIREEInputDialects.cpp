@@ -46,6 +46,71 @@ namespace mlir::iree_compiler::stablehlo {
 
 namespace {
 
+/// Converts stablehlo.concatenate operation to extract_slice ops + insert_slice
+/// ops. mlir::stablehlo::populateStablehloToLinalgConversionPatterns provides a
+/// lowering to linalg using SCF that has numerics issues when run through IREE,
+/// so we use this lowering instead with a higher pattern benefit.
+struct ConcatenateOpConversion final
+    : OpConversionPattern<mlir::stablehlo::ConcatenateOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::ConcatenateOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto resultType =
+        getTypeConverter()->convertType<RankedTensorType>(op.getType());
+    if (!resultType || !resultType.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(op,
+                                         "expected static shape for output");
+    }
+
+    Location loc = op.getLoc();
+    uint64_t dim = op.getDimension();
+    int64_t rank = resultType.getRank();
+    SmallVector<Value, 3> offsets;
+    SmallVector<Value, 3> sizes;
+    SmallVector<Value, 3> strides;
+
+    for (int64_t i = 0; i < rank; ++i) {
+      offsets.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 0));
+      sizes.push_back(rewriter.createOrFold<tensor::DimOp>(
+          loc, adaptor.getOperands()[0], i));
+      strides.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 1));
+    }
+
+    Value resultDimSize = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    for (Value arg : adaptor.getOperands()) {
+      auto size = rewriter.createOrFold<tensor::DimOp>(loc, arg, dim);
+      resultDimSize =
+          rewriter.createOrFold<arith::AddIOp>(loc, resultDimSize, size);
+    }
+    sizes[dim] = resultDimSize;
+
+    Value result = rewriter.create<tensor::EmptyOp>(
+        loc, resultType.getShape(), resultType.getElementType());
+
+    auto toOpFoldResult = [](Value v) -> OpFoldResult {
+      auto op = v.getDefiningOp<arith::ConstantIndexOp>();
+      if (!op)
+        return v;
+      return op.getValue();
+    };
+
+    Value accBound = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    for (Value arg : adaptor.getOperands()) {
+      offsets[dim] = accBound;
+      sizes[dim] = rewriter.createOrFold<tensor::DimOp>(loc, arg, dim);
+      result = rewriter.create<tensor::InsertSliceOp>(
+          loc, arg, result, llvm::map_to_vector(offsets, toOpFoldResult),
+          llvm::map_to_vector(sizes, toOpFoldResult),
+          llvm::map_to_vector(strides, toOpFoldResult));
+      accBound = rewriter.create<arith::AddIOp>(loc, accBound, sizes[dim]);
+    }
+    rewriter.replaceOp(op, result);
+    return success();
+  }
+};
+
 // Returns true if all attributes in the given dictionary are valid for IREE
 // input dialects.
 static bool isValidFuncAttr(DictionaryAttr attrs) {
@@ -353,17 +418,22 @@ struct ConvertStableHloToIreeInputDialects final
     // expensive expansions.
     populateCanonicalizationPatterns(context, &patterns, /*benefit=*/1024);
 
+    // Run custom patterns with a high benefit to override stablehlo patterns.
+    patterns.add<ConcatenateOpConversion>(*typeConverter, context,
+                                          PatternBenefit{1000});
+
+    // Run upstream stablehlo patterns with a default benefit.
     ::mlir::stablehlo::populateStablehloToLinalgConversionPatterns(
         context, *typeConverter, &patterns, /*enablePrimitiveOps=*/false,
         /*enableSparseOps=*/false);
+
+    // Lowerings using IREE-specific operators (and not just common dialects
+    // like linalg, scf, arith, etc.).
     populateStableHloCollectivesConversionPatterns(context, *typeConverter,
                                                    &patterns);
-
     // TODO(#12678): Handle remaining complex ops.
-
     // TODO(*): expose patterns that do this much better from
-    // iree/compiler/Dialect/Util/Transforms/ConvertPrimitiveType.cpp
-
+    //          iree/compiler/Dialect/Util/Transforms/ConvertPrimitiveType.cpp
     // Structural patterns (functions, cfg, terminators).
     patterns.add<BuiltinFuncOpPattern>(*typeConverter, context);
     patterns.add<GlobalOpPattern, TensorEmptyPattern>(*typeConverter, context);
