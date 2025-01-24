@@ -10,11 +10,7 @@
 #include "compiler/plugins/input/StableHLO/Conversion/PassDetail.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-class TypeConverter;
-namespace iree_compiler::stablehlo {
-
-std::unique_ptr<TypeConverter> createStableHloToLinalgTypeConverter();
+namespace mlir::iree_compiler::stablehlo {
 
 struct StableHloOptions : public PassPipelineOptions<StableHloOptions> {};
 
@@ -36,7 +32,6 @@ void buildStableHLOXLAInputConversionPassPipeline(
 
 void registerStableHLOConversionPasses();
 
-} // namespace iree_compiler::stablehlo
-} // namespace mlir
+} // namespace mlir::iree_compiler::stablehlo
 
 #endif // IREE_COMPILER_PLUGINS_INPUT_STABLEHLO_CONVERSION_PASSES_H_

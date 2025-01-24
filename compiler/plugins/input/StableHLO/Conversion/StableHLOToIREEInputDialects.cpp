@@ -12,7 +12,6 @@
 #include "compiler/plugins/input/StableHLO/Conversion/Passes.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Rewriters.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Rewriters.h"
-#include "compiler/plugins/input/StableHLO/Conversion/TypeConversion.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -35,6 +34,8 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "stablehlo/conversions/linalg/transforms/Rewriters.h"
+#include "stablehlo/conversions/linalg/transforms/TypeConversion.h"
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
@@ -46,7 +47,9 @@ namespace mlir::iree_compiler::stablehlo {
 namespace {
 
 /// Converts stablehlo.concatenate operation to extract_slice ops + insert_slice
-/// ops.
+/// ops. mlir::stablehlo::populateStablehloToLinalgConversionPatterns provides a
+/// lowering to linalg using SCF that has numerics issues when run through IREE,
+/// so we use this lowering instead with a higher pattern benefit.
 struct ConcatenateOpConversion final
     : OpConversionPattern<mlir::stablehlo::ConcatenateOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -104,122 +107,6 @@ struct ConcatenateOpConversion final
       accBound = rewriter.create<arith::AddIOp>(loc, accBound, sizes[dim]);
     }
     rewriter.replaceOp(op, result);
-    return success();
-  }
-};
-
-/// Creates coefficients based on DFT definition, see
-/// https://en.wikipedia.org/wiki/Discrete_Fourier_transform.
-Value getDFTMatmulCoeff(OpBuilder b, Location loc, RankedTensorType matrixType,
-                        bool isRealPart) {
-  // scale = 2 * pi / N
-  double scale = 2 * M_PI / matrixType.getDimSize(0);
-
-  SmallVector<Attribute> values;
-  assert(matrixType.getRank() == 2 && "expected 2D matrix");
-  for (auto i : llvm::seq<unsigned>(0, matrixType.getDimSize(0))) {
-    for (auto j : llvm::seq<unsigned>(0, matrixType.getDimSize(1))) {
-      double v = scale * i * j;
-      if (isRealPart) {
-        v = cos(v);
-      } else {
-        v = -sin(v);
-      }
-      values.push_back(b.getF32FloatAttr(v));
-    }
-  }
-  return b.create<arith::ConstantOp>(
-      loc, matrixType, DenseFPElementsAttr::get(matrixType, values));
-}
-
-Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
-                                  RankedTensorType resultType, Value lhs,
-                                  Value rhs) {
-  Value zero = b.create<arith::ConstantOp>(
-      loc, b.getZeroAttr(resultType.getElementType()));
-  Value emptyTensor = b.create<mlir::tensor::EmptyOp>(
-      loc, resultType.getShape(), resultType.getElementType(),
-      /*dyn_size=*/ValueRange{});
-  Value zeroTensor =
-      b.create<linalg::FillOp>(loc, zero, emptyTensor).getResult(0);
-
-  switch (llvm::cast<RankedTensorType>(lhs.getType()).getRank()) {
-  case 1:
-    return b
-        .create<linalg::VecmatOp>(loc, TypeRange{resultType},
-                                  ValueRange{lhs, rhs}, ValueRange{zeroTensor})
-        .getResult(0);
-  case 2:
-    return b
-        .create<linalg::MatmulOp>(loc, TypeRange{resultType},
-                                  ValueRange{lhs, rhs}, ValueRange{zeroTensor})
-        .getResult(0);
-  default:
-    assert(false && "unhandled matmul type");
-    return Value();
-  }
-}
-
-/// Converts stablehlo.fft operation to Linalg ops.
-struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
-  using OpConversionPattern::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(mlir::stablehlo::FftOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    if (op.getFftType() != mlir::stablehlo::FftType::RFFT) {
-      return rewriter.notifyMatchFailure(op,
-                                         "non RFFT types are supported yet");
-    }
-
-    auto inputType = dyn_cast<RankedTensorType>(adaptor.getOperand().getType());
-    if (!inputType || !inputType.hasStaticShape() || inputType.getRank() > 2) {
-      return rewriter.notifyMatchFailure(op, "only static 1D or 2D dft ops");
-    }
-
-    int64_t rank = inputType.getRank();
-    int64_t n = inputType.getDimSize(rank - 1);
-    int64_t fftLength = op.getFftLength().front() / 2 + 1;
-
-    Location loc = op.getLoc();
-    auto matrixType =
-        RankedTensorType::get({n, fftLength}, inputType.getElementType());
-    auto resultType = RankedTensorType::get(
-        llvm::cast<RankedTensorType>(op.getType()).getShape(),
-        inputType.getElementType());
-
-    Value realMatrix =
-        getDFTMatmulCoeff(rewriter, loc, matrixType, /*isRealPart=*/true);
-    Value real = createLinalgMatmulOnTensors(rewriter, loc, resultType,
-                                             adaptor.getOperand(), realMatrix);
-
-    Value imagMatrix =
-        getDFTMatmulCoeff(rewriter, loc, matrixType, /*isRealPart=*/false);
-    Value imag = createLinalgMatmulOnTensors(rewriter, loc, resultType,
-                                             adaptor.getOperand(), imagMatrix);
-
-    // Pack the results back to mlir::stablehlo::ComplexOp.
-    rewriter.replaceOpWithNewOp<mlir::stablehlo::ComplexOp>(op, op.getType(),
-                                                            real, imag);
-    return success();
-  }
-};
-
-struct OptimizationBarrierOpConversion final
-    : OpConversionPattern<mlir::stablehlo::OptimizationBarrierOp> {
-  using OpConversionPattern::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(mlir::stablehlo::OptimizationBarrierOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    SmallVector<Value> outputs;
-    for (Value operand : adaptor.getOperands()) {
-      outputs.push_back(
-          rewriter
-              .create<IREE::Util::OptimizationBarrierOp>(op.getLoc(), operand)
-              .getResult(0));
-    }
-    rewriter.replaceOp(op, outputs);
     return success();
   }
 };
@@ -383,6 +270,25 @@ struct GlobalOpPattern final : OpConversionPattern<ml_program::GlobalOp> {
   }
 };
 
+struct OptimizationBarrierOpConversion final
+    : OpConversionPattern<mlir::stablehlo::OptimizationBarrierOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::OptimizationBarrierOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Value> outputs;
+    for (Value operand : adaptor.getOperands()) {
+      outputs.push_back(
+          rewriter
+              .create<IREE::Util::OptimizationBarrierOp>(op.getLoc(), operand)
+              .getResult(0));
+    }
+    rewriter.replaceOp(op, outputs);
+    return success();
+  }
+};
+
 template <typename T>
 struct GenericTypeConvert final : ConversionPattern {
   GenericTypeConvert(StringRef rootName, TypeConverter &converter,
@@ -491,10 +397,11 @@ struct ConvertStableHloToIreeInputDialects final
     : impl::ConvertStableHloToIreeInputDialectsBase<
           ConvertStableHloToIreeInputDialects> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<
-        IREE::Flow::FlowDialect, IREE::Util::UtilDialect, linalg::LinalgDialect,
-        arith::ArithDialect, tensor::TensorDialect, shape::ShapeDialect,
-        math::MathDialect, memref::MemRefDialect, complex::ComplexDialect>();
+    registry.insert<IREE::Flow::FlowDialect, IREE::Util::UtilDialect,
+                    linalg::LinalgDialect, arith::ArithDialect,
+                    tensor::TensorDialect, shape::ShapeDialect,
+                    math::MathDialect, memref::MemRefDialect,
+                    complex::ComplexDialect, scf::SCFDialect>();
   }
 
   void runOnOperation() override {
@@ -502,7 +409,7 @@ struct ConvertStableHloToIreeInputDialects final
     RewritePatternSet patterns(context);
 
     std::unique_ptr<TypeConverter> typeConverter =
-        createStableHloToLinalgTypeConverter();
+        std::make_unique<::mlir::stablehlo::LinalgTypeConverter>();
     typeConverter->addArgumentMaterialization(scalarToTensor);
     typeConverter->addSourceMaterialization(scalarToTensor);
     typeConverter->addTargetMaterialization(scalarToTensor);
@@ -511,19 +418,26 @@ struct ConvertStableHloToIreeInputDialects final
     // expensive expansions.
     populateCanonicalizationPatterns(context, &patterns, /*benefit=*/1024);
 
-    populateStableHloToLinalgOnTensorsConversionPatterns(
-        context, *typeConverter, &patterns);
+    // Run custom patterns with a high benefit to override stablehlo patterns.
+    patterns.add<ConcatenateOpConversion>(*typeConverter, context,
+                                          PatternBenefit{1000});
+
+    // Run upstream stablehlo patterns with a default benefit.
+    ::mlir::stablehlo::populateStablehloToLinalgConversionPatterns(
+        context, *typeConverter, &patterns, /*enablePrimitiveOps=*/false,
+        /*enableSparseOps=*/false);
+
+    // Lowerings using IREE-specific operators (and not just common dialects
+    // like linalg, scf, arith, etc.).
     populateStableHloCollectivesConversionPatterns(context, *typeConverter,
                                                    &patterns);
-
     // TODO(#12678): Handle remaining complex ops.
-
     // TODO(*): expose patterns that do this much better from
-    // iree/compiler/Dialect/Util/Transforms/ConvertPrimitiveType.cpp
-
+    //          iree/compiler/Dialect/Util/Transforms/ConvertPrimitiveType.cpp
     // Structural patterns (functions, cfg, terminators).
     patterns.add<BuiltinFuncOpPattern>(*typeConverter, context);
     patterns.add<GlobalOpPattern, TensorEmptyPattern>(*typeConverter, context);
+    patterns.add<OptimizationBarrierOpConversion>(*typeConverter, context);
 
     patterns.add<
         GenericTypeConvert<cf::CondBranchOp>, GenericTypeConvert<cf::BranchOp>,
@@ -625,18 +539,5 @@ struct ConvertStableHloToIreeInputDialects final
 };
 
 } // namespace
-
-void populateStableHloToLinalgOnTensorsConversionPatterns(
-    MLIRContext *context, TypeConverter &typeConverter,
-    RewritePatternSet *patterns) {
-  // TODO(#5809): Drop ConcatenateOp lowering in favor of the upstream version
-  //              then remove the PatternBenefit here
-  patterns->add<ConcatenateOpConversion, FftOpConversion,
-                OptimizationBarrierOpConversion>(typeConverter, context,
-                                                 PatternBenefit{1000});
-
-  populateStableHloToLinalgConversionPatterns(context, typeConverter, patterns,
-                                              /*enablePrimitiveOps=*/false);
-}
 
 } // namespace mlir::iree_compiler::stablehlo
