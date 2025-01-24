@@ -262,10 +262,12 @@ void buildIREEVMTransformPassPipeline(
 
   IREE::Stream::TransformOptions streamOptions;
   // TODO(benvanik): find a way to share the enums w/o circular deps.
+  streamOptions.initializationMode =
+      (IREE::Stream::InitializationMode)schedulingOptions.initializationMode;
+  streamOptions.optimizeBindings = schedulingOptions.optimizeBindings;
   streamOptions.dumpStatisticsFormat =
       (IREE::Stream::DumpOutputFormat)schedulingOptions.dumpStatisticsFormat;
   streamOptions.dumpStatisticsFile = schedulingOptions.dumpStatisticsFile;
-  streamOptions.optimizeBindings = schedulingOptions.optimizeBindings;
 
   switch (schedulingOptions.executionModel) {
   case SchedulingOptions::ExecutionModel::HostOnly:

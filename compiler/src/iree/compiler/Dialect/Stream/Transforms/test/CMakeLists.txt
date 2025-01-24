@@ -46,6 +46,7 @@ iree_lit_test_suite(
     "schedule_execution.mlir"
     "specialize_dispatches.mlir"
     "specialize_encodings.mlir"
+    "sync_initializers.mlir"
     "verify_affinities.mlir"
     "verify_async_access_ranges.mlir"
   TOOLS

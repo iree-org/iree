@@ -247,6 +247,27 @@ def ScheduleConcurrencyPass :
   ];
 }
 
+def SyncInitializersPass :
+    Pass<"iree-stream-sync-initializers", "mlir::ModuleOp"> {
+  let summary = "Makes all initializer-produced timepoints synchronously wait before proceeding.";
+  let description = [{
+    Gathers all global timepoint stores within each initializer and converts
+    them to a single synchronous host wait.
+
+    NOTE: this does not currently find timepoints in called functions. To handle
+    that we would need to analyze the call graph to find functions called only
+    from initializers and duplicate any function that is called from both
+    initializers and non-initializer roots. At the point in the pipeline where
+    this pass runs most internal function calls return timepoints and the
+    initializer is the place where they are stored into globals so it happens to
+    work out.
+  }];
+  let dependentDialects = [
+    "IREE::Stream::StreamDialect",
+    "IREE::Util::UtilDialect",
+  ];
+}
+
 def PropagateTimepointsPass :
     Pass<"iree-stream-propagate-timepoints", "mlir::ModuleOp"> {
   let summary = "Materializes timepoints and sinks them to consumers throughout the whole program.";

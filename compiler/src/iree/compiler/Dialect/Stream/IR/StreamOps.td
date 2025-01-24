@@ -3793,7 +3793,8 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
       Stream_StagingResource,
     ]>>:$resource_operands,
     Variadic<Stream_Size>:$resource_operand_sizes,
-    Stream_Timepoint:$await_timepoint
+    Stream_Timepoint:$await_timepoint,
+    UnitAttr:$sync
   );
   let results = (outs
     Variadic<AnyTypeOf<[
@@ -3803,6 +3804,7 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   );
 
   let assemblyFormat = [{
+    (`sync` $sync^)?
     $await_timepoint `=` `` `>`
     $resource_operands `:`
     custom<ShapedTypeList>(type($resource_operands),

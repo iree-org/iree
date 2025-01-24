@@ -24,7 +24,22 @@ namespace mlir::iree_compiler::IREE::Stream {
 // Pipelines
 //===----------------------------------------------------------------------===//
 
-// TODO(benvanik): find a way to share this with IREEVM.h w/o circular deps.
+// TODO(benvanik): find a way to share option enums with the top-level Options.h
+// w/o circular deps.
+
+// Defines the behavior of initialization.
+enum class InitializationMode {
+  // Synchronously initialize all parameters and globals prior to returning
+  // from the module initializer.
+  Synchronous = 0,
+  // Asynchronously initialize all parameters and globals and return
+  // immediately from the module initializer without waiting for them to
+  // complete. Subsequent invocations will queue waiting for any dependencies
+  // they have on the initialized values.
+  Asynchronous = 1,
+};
+
+// TODO(benvanik): find a way to share this with Options.h w/o circular deps.
 // Defines the output format of a dump pass.
 enum class DumpOutputFormat {
   // Dumping disabled.
@@ -40,7 +55,21 @@ enum class DumpOutputFormat {
 };
 
 struct TransformOptions : public PassPipelineOptions<TransformOptions> {
-  // TODO(benvanik): options for async/sync overrides.
+  Option<InitializationMode> initializationMode{
+      *this,
+      "initialization-mode",
+      llvm::cl::desc(
+          "Specifies the initialization mode for parameters and globals."),
+      llvm::cl::init(InitializationMode::Synchronous),
+      llvm::cl::values(
+          clEnumValN(InitializationMode::Synchronous, "sync",
+                     "Synchronously initialize all parameters and globals "
+                     "prior to returning from the module initializer."),
+          clEnumValN(InitializationMode::Asynchronous, "async",
+                     "Asynchronously initialize all parameters and globals and "
+                     "return immediately from the module initializer without "
+                     "waiting for them to complete.")),
+  };
 
   Option<bool> optimizeBindings{
       *this,

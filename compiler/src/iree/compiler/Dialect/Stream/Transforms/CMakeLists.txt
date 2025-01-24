@@ -41,6 +41,7 @@ iree_cc_library(
     "ScheduleExecution.cpp"
     "SpecializeDispatches.cpp"
     "SpecializeEncodings.cpp"
+    "SyncInitializers.cpp"
     "VerifyAffinities.cpp"
     "VerifyAsyncAccessRanges.cpp"
     "VerifyLowerings.cpp"

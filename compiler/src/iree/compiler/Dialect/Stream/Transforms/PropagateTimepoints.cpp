@@ -139,8 +139,17 @@ static std::pair<Value, Value> consumeTimepoint(Location loc, Value value,
 
   if (auto awaitOp = dyn_cast_or_null<IREE::Stream::TimepointAwaitOp>(
           value.getDefiningOp())) {
-    return std::make_pair(awaitOp.getAwaitTimepoint(),
-                          awaitOp.getTiedResultOperand(value));
+    // We can only consume asynchronous timepoints. If the await is a sync point
+    // then we know that know result can be used without the host synchronizing
+    // and all results will be available immediately (fallthrough to below).
+    if (awaitOp.getSync()) {
+      return std::make_pair(
+          builder.create<IREE::Stream::TimepointImmediateOp>(loc).getResult(),
+          value);
+    } else {
+      return std::make_pair(awaitOp.getAwaitTimepoint(),
+                            awaitOp.getTiedResultOperand(value));
+    }
   } else if (auto executeOp = dyn_cast_or_null<IREE::Stream::AsyncExecuteOp>(
                  value.getDefiningOp())) {
     return std::make_pair(executeOp.getResultTimepoint(), value);
@@ -546,6 +555,11 @@ static void expandSwitchOp(mlir::cf::SwitchOp op,
 // perform an initial scan to populate the mapping.
 static void expandAwaitOp(IREE::Stream::TimepointAwaitOp op,
                           IRMapping &resourceTimepointMap) {
+  // If the await is fully synchronous then don't include the original await
+  // timepoint in analysis of the dependent results.
+  if (op.getSync()) {
+    return;
+  }
   for (auto result : op.getResults()) {
     resourceTimepointMap.map(op.getTiedResultOperand(result),
                              op.getAwaitTimepoint());
