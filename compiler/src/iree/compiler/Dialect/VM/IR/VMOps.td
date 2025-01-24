@@ -294,6 +294,8 @@ def VM_ImportOp : VM_Op<"import", [
       return getResAttrs().value_or(nullptr);
     }
   }];
+
+  let hasVerifier = 1;
 }
 
 def VM_InitializerOp : VM_Op<"initializer", [
