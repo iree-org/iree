@@ -60,7 +60,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: iree-org/iree-test-suites
-          ref: c47d13c0730a51beed3bef6128e7a61a80f85ce9
+          ref: 56509666d185cdb99aafb4ed4d8532b8f3c54fa3
           path: iree-test-suites
           lfs: true
       - name: Install Sharktank models test suite requirements
