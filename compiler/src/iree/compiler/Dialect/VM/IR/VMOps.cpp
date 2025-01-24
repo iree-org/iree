@@ -367,6 +367,14 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
   result.addRegion();
 }
 
+LogicalResult ImportOp::verify() {
+  if (!getName().contains('.')) {
+    return emitOpError(
+        "must reference a function in a module (@module_name.func_name)");
+  }
+  return success();
+}
+
 LogicalResult ImportOp::verifyType() {
   auto type = getFunctionTypeAttr().getValue();
   if (!llvm::isa<FunctionType>(type))

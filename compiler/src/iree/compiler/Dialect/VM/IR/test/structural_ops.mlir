@@ -81,6 +81,13 @@ vm.module @import_funcs {
 
 // -----
 
+vm.module @import_funcs_invalid {
+  // expected-error@+1 {{'vm.import' op must reference a function in a module}}
+  vm.import private @missing_module_name()
+}
+
+// -----
+
 // CHECK-LABEL: @initializers
 vm.module @initializers {
   // CHECK-NEXT: vm.initializer {
