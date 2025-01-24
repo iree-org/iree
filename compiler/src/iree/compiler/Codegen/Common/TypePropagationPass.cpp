@@ -65,9 +65,8 @@ static Value convertElementType(OpBuilder &b, Location loc, Type targetType,
 /// std::nullopt.
 static std::optional<Type> getLegalizedType(Type t) {
   if (auto shapedType = llvm::dyn_cast<RankedTensorType>(t)) {
-    Type elementType = shapedType.getElementType();
     std::optional<Type> legalizedElementType =
-        legalizeStorageElementType(elementType);
+        legalizeStorageElementType(shapedType);
     if (!legalizedElementType)
       return std::nullopt;
     return RankedTensorType::get(shapedType.getShape(),
@@ -121,7 +120,7 @@ struct ConstantOpTypeConversion
           constantOp, "expected attribute type to be shaped type");
     }
     std::optional<Type> legalizedElementType =
-        legalizeStorageElementType(attrType.getElementType());
+        legalizeStorageElementType(attrType);
     if (!legalizedElementType) {
       return rewriter.notifyMatchFailure(constantOp,
                                          "cannot legalize elementType");
@@ -227,8 +226,10 @@ struct GenericOpTypePropagation
         signatureConverter.addInputs(index, argType);
         continue;
       }
+      auto inputOperandType =
+          llvm::cast<RankedTensorType>(genericOp->getOperandTypes()[index]);
       std::optional<Type> legalizedArgType =
-          legalizeStorageElementType(argType);
+          legalizeStorageElementType(inputOperandType);
       if (!legalizedArgType) {
         return genericOp.emitOpError("failed to get legalized type for arg ")
                << index;
@@ -259,7 +260,7 @@ struct GenericOpTypePropagation
           OpOperand *yieldOperand =
               modifiedOp.getMatchingYieldValue(modifiedOpOperand);
           std::optional<Type> legalizedType =
-              legalizeStorageElementType(yieldOperand->get().getType());
+              legalizeStorageElementType(modifiedOpOperand->get().getType());
           if (!legalizedType) {
             return genericOp.emitOpError(
                 "failed to get legalized type for yield value");
@@ -289,7 +290,7 @@ struct LinalgFillTypePropagation
                   ConversionPatternRewriter &rewriter) const final {
     Value value = adaptor.getInputs().front();
     std::optional<Type> legalizedElementType =
-        legalizeStorageElementType(value.getType());
+        legalizeStorageElementType(adaptor.getOutputs()[0].getType());
     if (!legalizedElementType) {
       return fillOp.emitOpError("failed to get legalized type for value");
     }
@@ -355,8 +356,8 @@ struct IREELinalgExtScatterTypePropagation
     // type.
     TypeConverter::SignatureConversion signatureConverter(
         modifiedOpRegion.getNumArguments());
-    Type argType = modifiedOpRegion.getArguments()[0].getType();
-    std::optional<Type> legalizedArgType = legalizeStorageElementType(argType);
+    std::optional<Type> legalizedArgType =
+        legalizeStorageElementType(inputType);
     if (!legalizedArgType) {
       return scatterOp.emitOpError("failed to get legalized type for argument");
     }
@@ -418,8 +419,12 @@ struct IREELinalgExtSortTypePropagation
     TypeConverter::SignatureConversion signatureConverter(
         modifiedOpRegion.getNumArguments());
     for (auto [index, arg] : llvm::enumerate(modifiedOpRegion.getArguments())) {
+      // Refer to input types of the original operation to determine the
+      // corresponding legal arg type.
+      auto convertType = index % 2 == 0 ? sortOp->getOperandTypes()[index / 2]
+                                        : sortOp->getResultTypes()[index / 2];
       std::optional<Type> legalizedArgType =
-          legalizeStorageElementType(arg.getType());
+          legalizeStorageElementType(convertType);
       if (!legalizedArgType) {
         return sortOp.emitOpError("failed to get legalized type for argument");
       }

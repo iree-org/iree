@@ -21,6 +21,8 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 
+static constexpr int64_t kNumBitsInByte = 8;
+
 namespace mlir::iree_compiler::IREE::Encoding {
 
 EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
@@ -152,6 +154,37 @@ static int32_t getRoundedElementByteWidth(Type type) {
   return llvm::PowerOf2Ceil(byteAligned);
 }
 
+Value PackedStorageAttr::calculateStorageSizeInBytes(
+    Location loc, OpBuilder &builder, RankedTensorType type,
+    ValueRange dynamicDims) const {
+  unsigned elementBits = type.getElementTypeBitWidth();
+  assert(elementBits == 1 && "packed storage only supported for i1 for now");
+
+  // Calculate all static dims first, if any.
+  bool isPackedStorage = IREE::Encoding::hasPackedStorageAttr(type);
+  int64_t staticCount = 1;
+  if (!isPackedStorage) {
+    staticCount *= elementBits * kNumBitsInByte;
+  }
+
+  for (unsigned i = 0; i < type.getRank(); ++i) {
+    if (!type.isDynamicDim(i))
+      staticCount *= type.getDimSize(i);
+  }
+  // Scale by dynamic dims, if present.
+  auto value =
+      builder.create<arith::ConstantIndexOp>(loc, staticCount).getResult();
+  for (auto dim : dynamicDims) {
+    value = builder.createOrFold<arith::MulIOp>(loc, value, dim);
+  }
+
+  if (isPackedStorage) {
+    auto divisor = builder.create<arith::ConstantIndexOp>(loc, kNumBitsInByte);
+    value = builder.createOrFold<arith::CeilDivSIOp>(loc, value, divisor);
+  }
+  return value;
+}
+
 Value EncodingAttr::calculateStorageSizeInBytes(Location loc,
                                                 OpBuilder &builder,
                                                 RankedTensorType type,
@@ -214,8 +247,11 @@ Value EncodingAttr::calculateStorageSizeInBytes(Location loc,
     pad(k, roundDimsTo[2]);
   }
 
-  constexpr int64_t kNumBitsInByte = 8;
   unsigned elementBits = getTypeBitWidth(type.getElementType());
+  // Deal with unpacked storage of i1.
+  if (elementBits == 1 && !IREE::Encoding::hasPackedStorageAttr(type)) {
+    elementBits = kNumBitsInByte;
+  }
   int64_t numBytesPerElem = 1;
   if (elementBits > kNumBitsInByte) {
     numBytesPerElem *= getRoundedElementByteWidth(type.getElementType());
@@ -279,8 +315,12 @@ EncodingAttr getEncodingAttr(RankedTensorType type) {
   return dyn_cast_or_null<EncodingAttr>(type.getEncoding());
 }
 
-bool hasPackedStorageAttr(RankedTensorType type) {
-  return dyn_cast_or_null<PackedStorageAttr>(type.getEncoding()) != nullptr;
+bool hasPackedStorageAttr(Type type) {
+  if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
+    return dyn_cast_or_null<PackedStorageAttr>(tensorType.getEncoding()) !=
+           nullptr;
+  }
+  return false;
 }
 
 FailureOr<linalg::ContractionDimensions>

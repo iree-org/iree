@@ -58,7 +58,7 @@ static LogicalResult checkEncoding(Operation *op, RankedTensorType encodingType,
 // Aligns the element type of a tensor<> to a byte-aligned power of 2 bit width.
 static RankedTensorType alignTensorType(RankedTensorType originalType) {
   Type elementType = originalType.getElementType();
-  Type alignedType = legalizeStorageElementType(elementType);
+  Type alignedType = legalizeStorageElementType(originalType);
   if (alignedType == elementType)
     return originalType;
   return RankedTensorType::get(originalType.getShape(), alignedType,
@@ -168,7 +168,7 @@ static Value canonicalizeFillPattern(Value pattern, OpBuilder &builder) {
   //   %i8_val = (%i8_val << 2) | %i2_val
   //   %i8_val = (%i8_val << 2) | %i2_val
   //   %i8_val = (%i8_val << 2) | %i2_val
-  if (needToPackSubByteElementBitWidth(elementBitWidth)) {
+  if (needToPackSubByteElements(pattern.getType())) {
     Type i8Type = builder.getI8Type();
     Value bitwidth = builder.createOrFold<arith::ConstantOp>(
         loc, i8Type, builder.getIntegerAttr(i8Type, elementBitWidth));
@@ -620,7 +620,8 @@ struct EncodeHostTensorsPass
 static IREE::Flow::DispatchTensorType
 alignDispatchTensorType(IREE::Flow::DispatchTensorType originalType) {
   Type elementType = originalType.getBoundElementType();
-  Type alignedType = legalizeStorageElementType(elementType);
+  Type alignedType =
+      legalizeStorageElementType(originalType.asRankedTensorType());
   if (alignedType == elementType)
     return originalType;
   return IREE::Flow::DispatchTensorType::get(

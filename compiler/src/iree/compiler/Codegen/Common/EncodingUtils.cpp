@@ -30,6 +30,9 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
   addConversion([](FloatType floatType) { return floatType; });
   addConversion([](MemRefType memrefType) { return memrefType; });
   addConversion([=](RankedTensorType type) -> RankedTensorType {
+    if (IREE::Encoding::hasPackedStorageAttr(type)) {
+      return type;
+    }
     // For a given tensor type with an encoding, return the materialized
     // type to use for it. If no encoding is set, then return the tensor type
     // itself.
@@ -92,6 +95,8 @@ MaterializeEncodingTypeConverter::getEncodingInfo(RankedTensorType type) const {
 }
 
 RankedTensorType dropEncoding(RankedTensorType type) {
+  assert(!IREE::Encoding::hasPackedStorageAttr(type) &&
+         "not expected `packed_storage` attribute.");
   return RankedTensorType::get(type.getShape(), type.getElementType());
 }
 

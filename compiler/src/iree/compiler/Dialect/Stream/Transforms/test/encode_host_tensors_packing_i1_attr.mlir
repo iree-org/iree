@@ -20,3 +20,10 @@ func.func @aligned_i1_size() -> index {
 // CHECK: func @aligned_i1_size() -> index {
 // CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
 // CHECK: return %[[C3]] : index
+
+// -----
+
+#packed = #iree_encoding.packed_storage
+func.func @packed_i1_input_output(%input : tensor<16xi1, #packed>) -> tensor<16xi1, #packed> {
+  return %input : tensor<16xi1, #packed>
+}

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -1512,7 +1513,9 @@ LogicalResult TensorCloneOp::verify() {
   // information.
   auto sourceEncoding = llvm::cast<RankedTensorType>(op.getSourceEncoding());
   auto resultEncoding = llvm::cast<RankedTensorType>(op.getResultEncoding());
-  if (sourceEncoding.getEncoding() != resultEncoding.getEncoding()) {
+  if (sourceEncoding.getEncoding() != resultEncoding.getEncoding() &&
+      !IREE::Encoding::hasPackedStorageAttr(sourceEncoding) &&
+      !IREE::Encoding::hasPackedStorageAttr(resultEncoding)) {
     return op.emitOpError() << "clones changing tensor encoding from "
                             << sourceEncoding.getEncoding() << " to "
                             << resultEncoding.getEncoding() << "; not allowed";

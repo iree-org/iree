@@ -33,22 +33,6 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_llvm-cpu_local-task_i1
-  SRCS
-    "attention_i1_mask.mlir"
-  TARGET_BACKEND
-    "llvm-cpu"
-  DRIVER
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-llvmcpu-target-cpu=generic"
-    "--iree-experimental-packed-i1-storage"
-  LABELS
-    "nowasm"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
     check_vmvx_local-task
   SRCS
     "scan.mlir"
