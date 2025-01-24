@@ -44,6 +44,8 @@ iree_cc_library(
     "Convert1X1FilterConv2DToMatmul.cpp"
     "DataLayoutPropagation.cpp"
     "DecomposeConcat.cpp"
+    "DecomposeLinalgGeneric.cpp"
+    "DecomposeSoftmax.cpp"
     "DemoteContractionInputsToBF16.cpp"
     "DetachElementwiseFromNamedOps.cpp"
     "EraseUnusedLinalgOperands.cpp"
