@@ -118,8 +118,9 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
 
   TargetChipAttr targetChip;
   if (details.chip) {
-    StringAttr skuAttr =
-        StringAttr::get(context, details.chip->sku.value_or(""));
+    auto skuAttr = details.chip->sku
+                       ? StringAttr::get(context, *details.chip->sku)
+                       : StringAttr{};
     targetChip = TargetChipAttr::get(context, details.chip->wgpCount, skuAttr,
                                      DictionaryAttr{});
   }
