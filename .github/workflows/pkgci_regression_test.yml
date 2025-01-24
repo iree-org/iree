@@ -175,7 +175,7 @@ jobs:
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
       # Note: allowing 10% deviation from observed averages here to account for
       # different runner conditions.
-      - name: "Running SDXL rocm pipeline benchmark (mi300)"
+      - name: "Running SDXL rocm pipeline benchmark (mi308)"
         if: contains(matrix.name, 'rocm_mi308_gfx942')
         run: |
           source ${VENV_DIR}/bin/activate
