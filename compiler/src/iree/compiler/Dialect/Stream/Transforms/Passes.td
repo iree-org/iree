@@ -437,11 +437,33 @@ def SpecializeDispatchesPass :
 
 def SpecializeEncodingsPass :
     Pass<"iree-stream-specialize-encodings", "mlir::ModuleOp"> {
-  let summary = "Specializes data-tiling encodings based on device analysis.";
+  let summary = "Specializes data-tiling encodings based on layout analysis.";
   let description = [{
-    Attaches layouts to encodings and duplicates executables based on device
+    Attaches layouts to encodings and duplicates executables based on the
+    encoding layout analysis.
+
+    Some executables can be launched by different devices. It can produce
+    wrong codegen artifacts when bindings types are encoded (i.e., the
+    tensor type has an encoding attribute). Because they can result in
+    different layouts, especially when multi-device is involved. E.g., say
+    that device_a and device_b interpret a tensor type with encodings in
+    different layouts, and there is an executable that can be launched with
+    resources from either device_a or device_b. It is confusing what the
+    input layouts for the executable because there are two possibilities. In
+    this case, we have to duplicate the executable with updated encoding,
+    and modify the dispatch to launch proper executable based on device
     analysis.
-    TODO: Unpack the context. The pass is not fully implemented yet.
+
+    The pass resolves the layouts based on Stream affinity analysis. It updates
+    the encodings of all the Stream tensor ops with resolved layouts, duplicates
+    executables based on the set of incoming layouts and result layouts, and
+    updates bindings with resolved layouts.
+
+    It requires at least one of the dialect implements
+    AffinityAnalysisDialectInterface dialect interface, because Stream does not
+    need to know any dialect other than itself. It also requires the binding
+    types to implement EncodingTypeInterface, so it can updates the types
+    without accessing any other dialects.
   }];
 }
 
