@@ -50,7 +50,6 @@ util.func public @deviceMultiDeviceSync(%arg0: i1) -> !stream.resource<transient
   // CHECK: stream.async.execute on(#hal.device.affinity<@__device_0>)
   // CHECK: stream.async.splat
   // CHECK: stream.async.dispatch
-  // CHECK: stream.async.barrier
   // CHECK: stream.async.transfer
 
   %2 = stream.async.dispatch on(#hal.device.affinity<@__device_1>) @ex::@dispatch1[%c1, %c1, %c1](%0[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
@@ -59,14 +58,12 @@ util.func public @deviceMultiDeviceSync(%arg0: i1) -> !stream.resource<transient
   // CHECK: stream.async.execute on(#hal.device.affinity<@__device_1>)
   // CHECK: stream.async.splat
   // CHECK: stream.async.dispatch
-  // CHECK: stream.async.barrier
   // CHECK: stream.async.transfer
 
   %7 = stream.async.dispatch on(#hal.device.affinity<@__device_0>) @ex::@dispatch2[%c1, %c1, %c1](%3[%c0 to %c128 for %c128], %6[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}, !stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
   %9 = stream.async.barrier %7 : !stream.resource<transient>{%c128} -> !stream.resource<transient>
   // CHECK: stream.async.execute on(#hal.device.affinity<@__device_0>)
   // CHECK: stream.async.dispatch
-  // CHECK: stream.async.barrier
 
   %8 = stream.async.dispatch on(#hal.device.affinity<@__device_1>) @ex::@dispatch2[%c1, %c1, %c1](%4[%c0 to %c128 for %c128], %5[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}, !stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
   %10 = stream.async.transfer %8 : !stream.resource<transient>{%c128} from(#hal.device.affinity<@__device_1>) -> to(#hal.device.affinity<@__device_0>) !stream.resource<transient>{%c128}
