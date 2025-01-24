@@ -57,6 +57,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTransformUtils
     MLIRViewLikeInterface
+    iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
   PUBLIC

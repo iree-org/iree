@@ -16,6 +16,7 @@
 #include "compiler/plugins/target/LLVMCPU/LinkerTool.h"
 #include "compiler/plugins/target/LLVMCPU/StaticLibraryGenerator.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -170,6 +171,9 @@ public:
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
     target.storeToConfigAttrs(context, configItems);
+    configItems.emplace_back(
+        b.getStringAttr("encoding"),
+        IREE::CPU::CPUEncodingLayoutAttr::get(context, {}));
 
     // Compute the format used at runtime to select the executable loader.
     std::string format;
