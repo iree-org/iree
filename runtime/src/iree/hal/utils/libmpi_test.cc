@@ -23,7 +23,6 @@ class LibmpiTest : public ::testing::Test {
   static void SetUpTestSuite() {
     iree_status_t status =
         iree_hal_mpi_library_load(iree_allocator_system(), &library, &symbols);
-
     if (!iree_status_is_ok(status)) {
       iree_status_fprint(stderr, status);
       iree_status_ignore(status);
@@ -86,6 +85,196 @@ TEST_F(LibmpiTest, MPIErrorToIREEStatus) {
   EXPECT_THAT(iree_hal_mpi_result_to_status(&symbols, MPI_ERR_ACCESS, __FILE__,
                                             __LINE__),
               StatusIs(StatusCode::kInternal));
+}
+
+TEST_F(LibmpiTest, Bcast) {
+  const int N = 100;
+  char array[N] = {0};
+  int root = 1;
+
+  if (world_size < 2) {
+    GTEST_SKIP() << "This test requires mpiexec with more than one node";
+  }
+
+  if (rank == root) memset(array, 'r', N);
+
+  IREE_EXPECT_OK(
+      MPI_RESULT_TO_STATUS(&symbols,
+                           MPI_Bcast(array, N, IREE_MPI_BYTE(&symbols), root,
+                                     IREE_MPI_COMM_WORLD(&symbols)),
+                           "MPI_Bcast"));
+
+  for (int i = 0; i < N; i++) {
+    EXPECT_EQ(array[i], 'r') << "[" << rank << "] failed at index " << i;
+  }
+}
+
+TEST_F(LibmpiTest, Gather) {
+  const int N = 100;
+  char sendarray[N] = {0};
+  int root = 1;
+  char* recvbuf = NULL;
+
+  if (world_size < 2) {
+    GTEST_SKIP() << "This test requires mpiexec with more than one node";
+  }
+
+  memset(sendarray, (char)(rank + 1), N);
+
+  if (rank == root) {
+    recvbuf = (char*)malloc(world_size * N * sizeof(char));
+    ASSERT_NE(recvbuf, nullptr);
+  }
+  IREE_EXPECT_OK(MPI_RESULT_TO_STATUS(
+      &symbols,
+      MPI_Gather(sendarray, N, IREE_MPI_BYTE(&symbols), recvbuf, N,
+                 IREE_MPI_BYTE(&symbols), root, IREE_MPI_COMM_WORLD(&symbols)),
+      "MPI_Gather"));
+
+  if (rank == root) {
+    for (int i = 0; i < N * world_size; i++) {
+      EXPECT_EQ(recvbuf[i], (char)((i / N) + 1))
+          << "[" << rank << "] failed at index " << i;
+    }
+    free(recvbuf);
+  }
+}
+
+TEST_F(LibmpiTest, Scatter) {
+  const int N = 100;
+  char recvbuf[N] = {0};
+  int root = 1;
+  char* sendbuf = NULL;
+
+  if (world_size < 2) {
+    GTEST_SKIP() << "This test requires mpiexec with more than one node";
+  }
+
+  if (rank == root) {
+    sendbuf = (char*)malloc(world_size * N * sizeof(char));
+    ASSERT_NE(sendbuf, nullptr);
+    memset(sendbuf, 's', world_size * N * sizeof(char));
+  }
+
+  IREE_EXPECT_OK(MPI_RESULT_TO_STATUS(
+      &symbols,
+      MPI_Scatter(sendbuf, N, IREE_MPI_BYTE(&symbols), recvbuf, N,
+                  IREE_MPI_BYTE(&symbols), root, IREE_MPI_COMM_WORLD(&symbols)),
+      "MPI_Scatter"));
+
+  for (int i = 0; i < N; i++) {
+    EXPECT_EQ(recvbuf[i], 's') << "[" << rank << "] failed at index " << i;
+  }
+
+  if (rank == root) {
+    free(sendbuf);
+  }
+}
+
+TEST_F(LibmpiTest, Allgather) {
+  const int N = 100;
+  char sendarray[N] = {0};
+  char* recvbuf = NULL;
+
+  if (world_size < 2) {
+    GTEST_SKIP() << "This test requires mpiexec with more than one node";
+  }
+
+  memset(sendarray, (char)(rank + 1), N);
+  recvbuf = (char*)malloc(world_size * N * sizeof(char));
+  ASSERT_NE(recvbuf, nullptr);
+
+  IREE_EXPECT_OK(MPI_RESULT_TO_STATUS(
+      &symbols,
+      MPI_Allgather(sendarray, N, IREE_MPI_BYTE(&symbols), recvbuf, N,
+                    IREE_MPI_BYTE(&symbols), IREE_MPI_COMM_WORLD(&symbols)),
+      "MPI_Allgather"));
+
+  for (int i = 0; i < N * world_size; i++) {
+    EXPECT_EQ(recvbuf[i], (char)((i / N) + 1))
+        << "[" << rank << "] failed at index " << i;
+  }
+  free(recvbuf);
+}
+
+TEST_F(LibmpiTest, Alltoall) {
+  const int N = 100;
+  char* sendbuf = NULL;
+  char* recvbuf = NULL;
+
+  if (world_size < 2) {
+    GTEST_SKIP() << "Thist test requires mpiexec with more than one node";
+  }
+
+  sendbuf = (char*)malloc(world_size * N * sizeof(char));
+  ASSERT_NE(sendbuf, nullptr);
+  memset(sendbuf, (char)('A' + rank), N * world_size);
+
+  recvbuf = (char*)malloc(world_size * N * sizeof(char));
+  ASSERT_NE(recvbuf, nullptr);
+
+  IREE_EXPECT_OK(MPI_RESULT_TO_STATUS(
+      &symbols,
+      MPI_Alltoall(sendbuf, N, IREE_MPI_BYTE(&symbols), recvbuf, N,
+                   IREE_MPI_BYTE(&symbols), IREE_MPI_COMM_WORLD(&symbols)),
+      "MPI_Alltoall"));
+
+  for (int i = 0; i < N * world_size; i++) {
+    EXPECT_EQ(recvbuf[i], (char)((i / N) + 'A'))
+        << "[" << rank << "] failed at index " << i;
+  }
+  free(sendbuf);
+  free(recvbuf);
+}
+
+TEST_F(LibmpiTest, ReduceSum) {
+  const int N = 100;
+  int sendbuf[N] = {0};
+  int recvbuf[N] = {0};
+  int root = 1;
+
+  if (world_size < 2) {
+    GTEST_SKIP() << "Thist test requires mpiexec with more than one node";
+  }
+
+  for (int i = 0; i < N; i++) sendbuf[i] = i + 1;
+
+  IREE_EXPECT_OK(MPI_RESULT_TO_STATUS(
+      &symbols,
+      MPI_Reduce(sendbuf, recvbuf, N, IREE_MPI_INT(&symbols),
+                 IREE_MPI_OP_SUM(&symbols), root,
+                 IREE_MPI_COMM_WORLD(&symbols)),
+      "MPI_Reduce"));
+
+  if (rank == root) {
+    for (int i = 0; i < N; i++) {
+      EXPECT_EQ(recvbuf[i], world_size * (i + 1))
+          << "[" << rank << "] failed at index " << i;
+    }
+  }
+}
+
+TEST_F(LibmpiTest, AllReduce) {
+  const int N = 100;
+  int sendbuf[N] = {0};
+  int recvbuf[N] = {0};
+
+  if (world_size < 2) {
+    GTEST_SKIP() << "Thist test requires mpiexec with more than one node";
+  }
+
+  for (int i = 0; i < N; i++) sendbuf[i] = i + 1;
+
+  IREE_EXPECT_OK(MPI_RESULT_TO_STATUS(
+      &symbols,
+      MPI_Allreduce(sendbuf, recvbuf, N, IREE_MPI_INT(&symbols),
+                    IREE_MPI_OP_SUM(&symbols), IREE_MPI_COMM_WORLD(&symbols)),
+      "MPI_Allreduce"));
+
+  for (int i = 0; i < N; i++) {
+    EXPECT_EQ(recvbuf[i], world_size * (i + 1))
+        << "[" << rank << "] failed at index " << i;
+  }
 }
 
 }  // namespace
