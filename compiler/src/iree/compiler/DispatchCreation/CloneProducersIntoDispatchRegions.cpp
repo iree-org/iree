@@ -26,12 +26,15 @@ namespace {
 struct CloneProducersIntoDispatchRegionsPass final
     : public impl::CloneProducersIntoDispatchRegionsPassBase<
           CloneProducersIntoDispatchRegionsPass> {
+  using Base::Base;
   void runOnOperation() override {
     mlir::FunctionOpInterface funcOp = getOperation();
     IRRewriter rewriter(funcOp->getContext());
 
+    IREE::Flow::ClonableIntoDispatchOptions options;
+    options.aggressive = aggressive;
     funcOp->walk([&](IREE::Flow::DispatchRegionOp regionOp) {
-      if (failed(cloneProducersToRegion(rewriter, regionOp)))
+      if (failed(cloneProducersToRegion(rewriter, regionOp, options)))
         return signalPassFailure();
     });
 
@@ -54,7 +57,7 @@ struct CloneProducersIntoDispatchRegionsPass final
     // Rerun the cloning again to move still clonable operations into
     // dispatches.
     funcOp->walk([&](IREE::Flow::DispatchRegionOp regionOp) {
-      if (failed(cloneProducersToRegion(rewriter, regionOp)))
+      if (failed(cloneProducersToRegion(rewriter, regionOp, options)))
         return signalPassFailure();
     });
   }

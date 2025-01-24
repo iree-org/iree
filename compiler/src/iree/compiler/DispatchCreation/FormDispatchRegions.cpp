@@ -633,9 +633,17 @@ isFusableWithProducer(OpOperand &operand,
     return true;
   }
 
-  // Don't fuse attention with it's producer
   // TODO: Enable scatter fusion when supported by backends.
-  if (isa<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::ScatterOp>(consumer)) {
+  if (isa<IREE::LinalgExt::ScatterOp>(consumer)) {
+    return false;
+  }
+
+  if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(consumer)) {
+    // Fuse with the rope computation if it is a gather operation.
+    if (IREE::LinalgExt::isGatherlikeOp(producer)) {
+      return true;
+    }
+    // Disable all other producer fusion. TODO: Enable other producer fusions.
     return false;
   }
 
@@ -685,13 +693,15 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root, unsigned groupNum,
   SmallVector<Operation *> worklist;
   worklist.push_back(root);
   llvm::SmallBitVector rootOuterParallelLoops = getOuterParallelLoops(root);
+  IREE::Flow::ClonableIntoDispatchOptions clonableOptions;
+  clonableOptions.aggressive = options.aggressiveFusion;
   while (!worklist.empty()) {
     Operation *candidate = worklist.pop_back_val();
     for (OpOperand &operand : candidate->getOpOperands()) {
       Operation *producer = operand.get().getDefiningOp();
       if (!producer)
         continue;
-      if (IREE::Flow::isClonableIntoDispatchOp(producer) ||
+      if (IREE::Flow::isClonableIntoDispatchOp(producer, clonableOptions) ||
           hasFusionGroupsAttribute(producer) || hasRootOpAttribute(producer)) {
         continue;
       }
@@ -726,6 +736,8 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
                        unsigned numRootOps = 0) {
   MLIRContext *context = region.getContext();
   OpBuilder builder(context);
+  IREE::Flow::ClonableIntoDispatchOptions clonableOptions;
+  clonableOptions.aggressive = options.aggressiveFusion;
   for (Block &block : region) {
     // Dispatch region formation works by first cloning the root into
     // the dispatch region and then pulling operations in.
@@ -770,8 +782,19 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // materializing large tensors between dispatches.
       if (!isa<linalg::LinalgOp, tensor::PadOp, tensor::PackOp,
                IREE::Encoding::SetEncodingOp>(op) ||
-          isa<linalg::FillOp>(op) || IREE::LinalgExt::isBitExtendOp(&op) ||
-          IREE::LinalgExt::isGatherlikeOp(&op)) {
+          IREE::Flow::isClonableIntoDispatchOp(&op, clonableOptions)) {
+        continue;
+      }
+
+      // For now check if this is a rope computation that is to be fused with
+      // attention.
+      // TODO: Ideally this is just regular gather fusion which will be covered
+      // by the `isClonableIntoDispatchOp` call above, but for now this is done
+      // as a point fix.
+      if (IREE::LinalgExt::isGatherlikeOp(&op) &&
+          llvm::all_of(op.getUsers(), [](Operation *op) {
+            return isa<IREE::LinalgExt::AttentionOp>(op);
+          })) {
         continue;
       }
 

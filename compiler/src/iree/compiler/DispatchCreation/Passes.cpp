@@ -137,6 +137,7 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
       // 2. Bubble up expand_shape ops (or sink collapse_shape ops) to get
       //    elementwise operation into higher dimensions for more fusion
       //    opportunities.
+      .addPass(DispatchCreation::createBubbleUpExtractSlicesPass)
       .addPass(DispatchCreation::createBubbleUpExpandShapesPass)
       .addPass(DispatchCreation::createBubbleUpExtractSlicesPass)
       .addPass(IREE::Flow::createCanonicalizerPass)
@@ -229,7 +230,11 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
       // afterwards that would need the full dispatch content but don't want to
       // handle explicit captures as materialized as dispatch workgroup operands
       // and block arguments.
-      .addPass(DispatchCreation::createCloneProducersIntoDispatchRegionsPass);
+      .addPass([&]() {
+        return DispatchCreation::createCloneProducersIntoDispatchRegionsPass(
+            CloneProducersIntoDispatchRegionsPassOptions{
+                clEnableAggressiveFusion});
+      });
 
   // Experimental data tiling path. The intent of this path is to set encodings
   // after fusion decisions have already been made, so encodings can be

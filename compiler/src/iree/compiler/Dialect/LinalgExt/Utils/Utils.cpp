@@ -8,6 +8,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -355,12 +356,22 @@ bool isGatherlikeOp(Operation *op) {
   if (yieldOp.getNumOperands() != 1) {
     return false;
   }
-  auto extractOp = yieldOp.getOperand(0).getDefiningOp<tensor::ExtractOp>();
-  if (!extractOp) {
-    return false;
-  }
 
-  return true;
+  llvm::SetVector<Operation *> sliceOps;
+  BackwardSliceOptions options;
+  bool hasTensorExtract = false;
+  options.filter = [&](Operation *currOp) {
+    if (isa<tensor::ExtractOp>(currOp)) {
+      // Exclude it from the slice, but mark the boolean above to `true` to
+      // annotate that a `tensor.extract` was hit. Stop the traversal to avoid
+      // unnecessary traversal.
+      hasTensorExtract = true;
+      return false;
+    }
+    return currOp->getBlock() == genericOp.getBody();
+  };
+  mlir::getBackwardSlice(yieldOp.getOperand(0), &sliceOps, options);
+  return hasTensorExtract;
 }
 
 FailureOr<SmallVector<AffineMap>>

@@ -191,7 +191,7 @@ func.func @scatter_dim_mismatch(
 func.func @scatter_dim_mismatch(
     %update : tensor<48x?x2x11xf32>, %indices : tensor<48x?x1xi32>,
     %original : tensor<2x?x10xf32>) -> tensor<2x?x10xf32> {
-  // expected-error @below {{'iree_linalg_ext.scatter' op shape of update value dim#2 must match original value at dim#1}}
+  // expected-error @below {{'iree_linalg_ext.scatter' op shape of update value dim#3 must match original value at dim#2}}
   %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%update, %indices : tensor<48x?x2x11xf32>, tensor<48x?x1xi32>)
     outs(%original : tensor<2x?x10xf32>) {

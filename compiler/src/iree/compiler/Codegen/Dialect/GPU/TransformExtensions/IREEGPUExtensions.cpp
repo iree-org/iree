@@ -218,6 +218,54 @@ void transform_dialect::FuseForallOp::getEffects(
   transform::modifiesPayload(effects);
 }
 
+//===---------------------------------------------------------------------===//
+// FuseCollapseShapeIntoForallOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform_dialect::FuseCollapseShapeIntoForallOp::apply(
+    transform::TransformRewriter &rewriter,
+    transform::TransformResults &results, transform::TransformState &state) {
+  auto producers = state.getPayloadOps(getProducer());
+  auto consumers = state.getPayloadOps(getConsumer());
+
+  int64_t numProducers = llvm::range_size(producers);
+  int64_t numConsumers = llvm::range_size(consumers);
+  if (numProducers != 1 || numConsumers != 1) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "More than one producer or consumer");
+  }
+
+  auto producer = dyn_cast<scf::ForallOp>(*producers.begin());
+  if (!producer) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "Non-forall producer");
+  }
+  auto consumer = dyn_cast<tensor::CollapseShapeOp>(*consumers.begin());
+  if (!consumer) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "Non-collapse_shape consumer");
+  }
+
+  FailureOr<scf::ForallOp> fusedForallOp =
+      GPU::fuseCollapseShapeIntoProducerForall(rewriter, producer, consumer);
+  if (failed(fusedForallOp)) {
+    return mlir::emitSilenceableFailure(state.getTopLevel(),
+                                        "failed to fuse collapse_shape op");
+  }
+
+  results.set(getOperation()->getOpResult(0), {fusedForallOp.value()});
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::FuseCollapseShapeIntoForallOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::consumesHandle(getProducerMutable(), effects);
+  transform::consumesHandle(getConsumerMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
+  transform::modifiesPayload(effects);
+}
+
 } // namespace mlir::iree_compiler::IREE
 
 void mlir::iree_compiler::registerTransformDialectIREEGPUExtension(

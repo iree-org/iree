@@ -1,4 +1,4 @@
-# Copyright 2024 The IREE Authors
+# Copyright 2025 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -18,17 +18,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "convert_to_multi_mma.mlir",
-            "distribute_lane_forall.mlir",
-            "distribute_multi_mma.mlir",
-            "drop_multi_mma_unit_dims.mlir",
-            "lower_multi_mma.mlir",
-            "lower_vector_barrier.mlir",
-            "transform_fuse_collapse_shape_with_forall.mlir",
-            "transform_fuse_forall.mlir",
-            "transform_lower_barrier_region.mlir",
-            "vectorize_iree_gpu_ops.mlir",
-            "unroll_multi_mma.mlir",
+            "vectorize_vector_ext_ops.mlir",
         ],
         include = ["*.mlir"],
     ),

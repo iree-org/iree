@@ -546,3 +546,57 @@ func.func @fuse_imperfectly_aligned_unpack(%arg0: tensor<5x31xf16>, %arg1: index
 //       CHECK:     linalg.copy
 //       CHECK:   scf.forall.in_parallel
 //       CHECK:   return
+
+// -----
+
+#map = affine_map<(d0) -> (d0 * 2)>
+func.func @no_fuse_non_contiguous_collapse_shape(%arg0: tensor<8x8xf32>) -> tensor<64xf32> {
+  %0 = tensor.empty() : tensor<8x8xf32>
+  %1 = scf.forall (%arg1) in (4) shared_outs(%arg2 = %0) -> (tensor<8x8xf32>) {
+    %2 = affine.apply #map(%arg1)
+    %extracted_slice = tensor.extract_slice %arg0[%2, 0] [2, 7] [1, 1] : tensor<8x8xf32> to tensor<2x7xf32>
+    %extracted_slice_0 = tensor.extract_slice %arg2[%2, 0] [2, 7] [1, 1] : tensor<8x8xf32> to tensor<2x7xf32>
+    %3 = linalg.copy ins(%extracted_slice : tensor<2x7xf32>) outs(%extracted_slice_0 : tensor<2x7xf32>) -> tensor<2x7xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %3 into %arg2[%2, 0] [2, 7] [1, 1] : tensor<2x7xf32> into tensor<8x8xf32>
+    }
+  } {mapping = [#gpu.thread<x>]}
+  %collapsed = tensor.collapse_shape %1 [[0, 1]] : tensor<8x8xf32> into tensor<64xf32>
+  return %collapsed : tensor<64xf32>
+}
+
+// CHECK-LABEL: func @no_fuse_non_contiguous_collapse_shape
+//       CHECK:   %[[FORALL_RESULT:.+]] = scf.forall {{.*}} -> (tensor<8x8xf32>) {
+//       CHECK:     scf.forall.in_parallel {
+//   CHECK-DAG:       tensor.parallel_insert_slice {{.*}} : tensor<2x7xf32> into tensor<8x8xf32>
+//       CHECK:     }
+//       CHECK:   } {mapping = [#gpu.thread<x>]}
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[FORALL_RESULT]]
+//       CHECK:   return %[[COLLAPSE]]
+
+// -----
+
+#map = affine_map<(d0) -> (d0 * 2)>
+func.func @no_fuse_collapse_shape_rank_reduced(%arg0: tensor<8x8xf32>) -> tensor<64xf32> {
+  %0 = tensor.empty() : tensor<8x8xf32>
+  %1 = scf.forall (%arg1) in (8) shared_outs(%arg2 = %0) -> (tensor<8x8xf32>) {
+    %2 = affine.apply #map(%arg1)
+    %extracted_slice = tensor.extract_slice %arg0[%2, 0] [1, 8] [1, 1] : tensor<8x8xf32> to tensor<8xf32>
+    %extracted_slice_0 = tensor.extract_slice %arg2[%2, 0] [1, 8] [1, 1] : tensor<8x8xf32> to tensor<8xf32>
+    %3 = linalg.copy ins(%extracted_slice : tensor<8xf32>) outs(%extracted_slice_0 : tensor<8xf32>) -> tensor<8xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %3 into %arg2[%2, 0] [1, 8] [1, 1] : tensor<8xf32> into tensor<8x8xf32>
+    }
+  } {mapping = [#gpu.thread<x>]}
+  %collapsed = tensor.collapse_shape %1 [[0, 1]] : tensor<8x8xf32> into tensor<64xf32>
+  return %collapsed : tensor<64xf32>
+}
+
+// CHECK-LABEL: func @no_fuse_collapse_shape_rank_reduced
+//       CHECK:   %[[FORALL_RESULT:.+]] = scf.forall {{.*}} -> (tensor<8x8xf32>) {
+//       CHECK:     scf.forall.in_parallel {
+//   CHECK-DAG:       tensor.parallel_insert_slice {{.*}} : tensor<8xf32> into tensor<8x8xf32>
+//       CHECK:     }
+//       CHECK:   } {mapping = [#gpu.thread<x>]}
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[FORALL_RESULT]]
+//       CHECK:   return %[[COLLAPSE]]

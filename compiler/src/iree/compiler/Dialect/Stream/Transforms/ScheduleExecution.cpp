@@ -282,14 +282,14 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
         toBeDeleted.replaceAllUsesWith(awaitOp.getResults().front());
         deadOps.insert(oldResult.getDefiningOp());
       }
-
-      // Sort the ops in the execution region. This is safe because we are
-      // still unaliased and SSA values imply ordering.
-      mlir::sortTopologically(block);
     }
     for (auto *deadOp : llvm::reverse(deadOps)) {
       deadOp->erase();
     }
+
+    // Sort the ops in the execution region. This is safe because we are
+    // still unaliased and SSA values imply ordering.
+    mlir::sortTopologically(block);
 
     LLVM_DEBUG({
       llvm::dbgs() << "\nPartitions constructed:\n";
