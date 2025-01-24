@@ -1040,6 +1040,8 @@ void ConvertToLLVMPass::runOnOperation() {
 
   populateComplexToLLVMConversionPatterns(typeConverter, patterns);
   populateMathToLLVMConversionPatterns(typeConverter, patterns);
+  // Note: workaround needed due to `memref.subview` returnd from an `if`.
+  memref::populateExpandStridedMetadataPatterns(patterns);
   iree_compiler::populateIREEResolveExtractStridedMetadataPatterns(patterns);
   populateFinalizeMemRefToLLVMConversionPatterns(typeConverter, patterns);
   populateFuncToLLVMConversionPatterns(typeConverter, patterns);
