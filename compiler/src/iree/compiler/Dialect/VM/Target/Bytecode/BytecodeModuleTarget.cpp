@@ -330,7 +330,6 @@ buildFlatBufferModule(IREE::VM::TargetOptions vmOptions,
   importFuncOps.resize(ordinalCounts.getImportFuncs());
   exportFuncOps.resize(ordinalCounts.getExportFuncs());
   internalFuncOps.resize(ordinalCounts.getInternalFuncs());
-
   for (auto &op : moduleOp.getBlock().getOperations()) {
     if (auto funcOp = dyn_cast<IREE::VM::FuncOp>(op)) {
       internalFuncOps[funcOp.getOrdinal()->getLimitedValue()] = funcOp;
@@ -338,6 +337,11 @@ buildFlatBufferModule(IREE::VM::TargetOptions vmOptions,
       exportFuncOps[exportOp.getOrdinal()->getLimitedValue()] = exportOp;
     } else if (auto importOp = dyn_cast<IREE::VM::ImportOp>(op)) {
       importFuncOps[importOp.getOrdinal()->getLimitedValue()] = importOp;
+      if (!importOp.getName().contains('.')) {
+        return importOp.emitOpError("must reference a function in a module "
+                                    "(@module_name.func_name); got unscoped `@")
+               << importOp.getName() << "`";
+      }
     }
   }
 
