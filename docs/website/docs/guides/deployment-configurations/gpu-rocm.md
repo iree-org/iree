@@ -128,10 +128,10 @@ compile towards each GPU chip. Here is a table of commonly used architectures:
 | AMD MI300A               | `mi300a`    | `gfx942`            | `cdna3`                |
 | AMD MI300X               | `mi300x`    | `gfx942`            | `cdna3`                |
 | AMD MI308X               | `mi308x`    | `gfx942`            | `cdna3`                |
-| AMD PRO W7900            | `w7900`     | `gfx1100`           | `rdna3`                |
-| AMD PRO W7800            | `w7800`     | `gfx1100`           | `rdna3`                |
 | AMD RX7900XTX            | `rx7900xtx` | `gfx1100`           | `rdna3`                |
 | AMD RX7900XT             | `rx7900xt`  | `gfx1100`           | `rdna3`                |
+| AMD PRO W7900            | `w7900`     | `gfx1100`           | `rdna3`                |
+| AMD PRO W7800            | `w7800`     | `gfx1100`           | `rdna3`                |
 | AMD RX7800XT             | `rx7800xt`  | `gfx1101`           | `rdna3`                |
 | AMD RX7700XT             | `rx7700xt`  | `gfx1101`           | `rdna3`                |
 | AMD PRO V710             | `v710`      | `gfx1101`           | `rdna3`                |
