@@ -126,7 +126,7 @@ struct GlobalOptimizationOptions {
   bool numericPrecisionReduction = false;
 
   // Strips debug assertions after any useful information has been extracted.
-  bool stripAssertions = false;
+  bool stripAssertions = true;
 
   // Converts linalg named matmul ops to linalg generic ops.
   bool generalizeMatmul = false;
