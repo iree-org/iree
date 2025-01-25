@@ -1,11 +1,11 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(builtin.module(iree-codegen-materialize-tuning-specs,iree-codegen-materialize-user-configs))' \
 // RUN:   --iree-codegen-tuning-spec-path=%p/tuning_spec.mlir \
-// RUN:   --iree-codegen-notify-transform-strategy-application \
+// RUN:   --iree-codegen-test-notify-transform-strategy-application \
 // RUN:   --no-implicit-module --verify-diagnostics %s | FileCheck %s
 
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-codegen-materialize-tuning-specs,builtin.module(iree-codegen-materialize-user-configs))' \
 // RUN:   --iree-codegen-tuning-spec-path=%p/tuning_spec.mlir \
-// RUN:   --iree-codegen-notify-transform-strategy-application \
+// RUN:   --iree-codegen-test-notify-transform-strategy-application \
 // RUN:   --no-implicit-module --verify-diagnostics %s | FileCheck %s --check-prefix=PARENT
 
 // (1) We start by running the `Materialize Tuning Specs` pass to embed the
