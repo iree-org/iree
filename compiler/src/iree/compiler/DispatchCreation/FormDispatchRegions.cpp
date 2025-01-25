@@ -267,14 +267,14 @@ matchIteratorTypes(const llvm::SmallBitVector &rootOuterParallelLoop,
 
   // If the candidate is all parallel, then it should be at least as parallel as
   // the root.
-  for (int pos : llvm::seq<int>(0, rootOuterParallelLoop.size())) {
+  for (int pos : llvm::seq<int>(0, std::min(candidateOuterParallelLoop.size(),
+                                            rootOuterParallelLoop.size()))) {
     // If we reach the end of the outer loops of the root, break out of the
     // loop.
     if (!rootOuterParallelLoop.test(pos))
       break;
     // If the root loop is parallel, the candidate loop should also be parallel.
-    if (pos >= candidateOuterParallelLoop.size() ||
-        !candidateOuterParallelLoop.test(pos))
+    if (!candidateOuterParallelLoop.test(pos))
       return false;
   }
   return true;
@@ -631,11 +631,6 @@ isFusableWithProducer(OpOperand &operand,
   if (options.fusePadWithConsumers && isa<tensor::PadOp>(producer) &&
       isa<linalg::ConvolutionOpInterface>(consumer)) {
     return true;
-  }
-
-  // TODO: Enable scatter fusion when supported by backends.
-  if (isa<IREE::LinalgExt::ScatterOp>(consumer)) {
-    return false;
   }
 
   if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(consumer)) {
