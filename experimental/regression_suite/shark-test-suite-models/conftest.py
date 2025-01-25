@@ -10,6 +10,7 @@ class VmfbManager:
     sdxl_vae_cpu_vmfb = None
     sdxl_unet_fp16_cpu_vmfb = None
     sdxl_unet_fp16_cpu_pipeline_vmfb = None
+    sdxl_unet_fp16_960_1024_cpu_vfmb = None
     sdxl_scheduler_cpu_vmfb = None
     sdxl_clip_rocm_vmfb = None
     sdxl_vae_rocm_vmfb = None
@@ -17,6 +18,7 @@ class VmfbManager:
     sdxl_punet_int8_fp16_rocm_vmfb = None
     sdxl_punet_int8_fp8_rocm_vmfb = None
     sdxl_unet_fp16_rocm_pipeline_vmfb = None
+    sdxl_unet_fp16_960_1024_rocm_vmfb = None
     sdxl_scheduler_rocm_vmfb = None
     sd3_clip_cpu_vmfb = None
     sd3_vae_cpu_vmfb = None
