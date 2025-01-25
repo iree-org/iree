@@ -1,13 +1,13 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 \
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-hal-configure-target-executable-variants{target=rocm})))" \
 // RUN:   --iree-codegen-enable-default-tuning-specs \
-// RUN:   --iree-codegen-notify-transform-strategy-application \
+// RUN:   --iree-codegen-test-notify-transform-strategy-application \
 // RUN:   --verify-diagnostics %s | FileCheck %s
 
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=mi300x@hip \
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-hal-configure-target-executable-variants{target=rocm})))" \
 // RUN:   --iree-codegen-enable-default-tuning-specs \
-// RUN:   --iree-codegen-notify-transform-strategy-application \
+// RUN:   --iree-codegen-test-notify-transform-strategy-application \
 // RUN:   --verify-diagnostics %s | FileCheck %s --check-prefix=MI300X
 
 // Check that the default configuration for mmt_2048x1280x5120_f16_f16_f32
