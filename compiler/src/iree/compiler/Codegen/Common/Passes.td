@@ -698,6 +698,16 @@ def VectorizeMemrefCopyPass :
   let summary = "Vectorizes memref copy operations.";
 }
 
+def VectorTransferLoweringPass :
+    InterfacePass<"iree-codegen-vector-transfer-lowering", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to lower transfer ops to simpler ops like `vector.load`, `vector.store`, `vector.broadcast`, and a set of scf ops.";
+  let options = [
+    Option<"enableScalableLowerings", "enable-scalable-lowerings", "bool",
+      /*default=*/"false",
+      "Enables scalable vector specific transfer lowerings">,
+  ];
+}
+
 def VerifyWorkgroupDistributionPass :
     InterfacePass<"iree-codegen-verify-workgroup-distribution", "mlir::FunctionOpInterface"> {
   let summary = "Pass to verify proper distribution to workgroups.";

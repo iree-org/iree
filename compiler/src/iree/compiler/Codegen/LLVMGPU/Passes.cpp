@@ -1026,8 +1026,12 @@ static void
 addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
   funcPassManager.addPass(createExtractAddressComputationGPUPass)
       .addPass(memref::createExpandOpsPass)
+      // Lower any remaining vector.transfer_read and vector.transfer_write ops,
+      // since some of the following patterns have trouble dealing with their
+      // full complexity.
+      .addPass(createVectorTransferLoweringPass)
       .addPass(memref::createFoldMemRefAliasOpsPass)
-      .addPass(memref::createExpandStridedMetadataPass)
+      .addPass(createIREEExpandStridedMetadataPass)
       .addPass(createPropagateDispatchSizeBoundsPass)
       // Hoist loop invariant variables to give affine decomposition pass the
       // right loop dependencies.
@@ -1109,7 +1113,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createPolynomialApproximationPass)
       .addPass(memref::createExpandOpsPass)
       .addPass(memref::createFoldMemRefAliasOpsPass)
-      .addPass(memref::createExpandStridedMetadataPass)
+      .addPass(createIREEExpandStridedMetadataPass)
       .addPass(createEmulateNarrowTypePass)
       .addPass(affine::createAffineExpandIndexOpsPass)
       .addPass(createLowerAffinePass);

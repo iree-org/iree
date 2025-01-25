@@ -135,7 +135,7 @@ struct EmulateNarrowTypePass final
     RewritePatternSet patterns(ctx);
     arith::populateArithNarrowTypeEmulationPatterns(typeConverter, patterns);
     memref::populateMemRefNarrowTypeEmulationPatterns(typeConverter, patterns);
-    populateIREEResolveExtractStridedMetadataPatterns(ctx, patterns);
+    populateIREEResolveExtractStridedMetadataPatterns(patterns);
     vector::populateVectorNarrowTypeEmulationPatterns(typeConverter, patterns);
     populateIreeNarrowTypeEmulationPatterns(typeConverter, patterns);
 

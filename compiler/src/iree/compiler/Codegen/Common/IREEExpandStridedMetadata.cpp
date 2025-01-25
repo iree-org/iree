@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
@@ -138,8 +139,6 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     if (!binding)
       return failure();
     auto memRefType = llvm::cast<MemRefType>(binding.getResult().getType());
-    if (memRefType.getRank() < 1)
-      return failure();
 
     auto loc = op.getLoc();
     OpBuilder::InsertionGuard g(rewriter);
@@ -151,6 +150,8 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
           op, "failed to resolve descriptor with source being binding op");
     }
 
+    bool bindsBasePointer =
+        memRefType.getRank() == 0 && memRefType.getLayout().isIdentity();
     // For the base buffer of the `hal.interface.binding.subspan` create a 1D
     // buffer with zero offset. For example, if the
     // `hal.interface.binding.subspan` is
@@ -191,25 +192,30 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     dispatchIndexOpFoldResult(linearizedMemrefSize, dynamicLinearShape,
                               staticLinearShape);
 
-    auto newBufferType = MemRefType::get(
-        staticLinearShape, memRefType.getElementType(),
-        MemRefLayoutAttrInterface(), memRefType.getMemorySpace());
-    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    auto linearInterfaceBinding =
-        rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-            loc, newBufferType, binding.getLayoutAttr(),
-            binding.getBindingAttr(), zero, dynamicLinearShape,
-            binding.getAlignmentAttr(), binding.getDescriptorFlagsAttr());
-
+    MemRefType newBufferType;
+    IREE::HAL::InterfaceBindingSubspanOp newBinding;
+    if (bindsBasePointer) {
+      newBufferType = memRefType;
+      newBinding = binding;
+    } else {
+      newBufferType = MemRefType::get(
+          staticLinearShape, memRefType.getElementType(),
+          MemRefLayoutAttrInterface(), memRefType.getMemorySpace());
+      Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+      newBinding = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
+          loc, newBufferType, binding.getLayoutAttr(), binding.getBindingAttr(),
+          zero, dynamicLinearShape, binding.getAlignmentAttr(),
+          binding.getDescriptorFlagsAttr());
+    }
     SmallVector<Value> results;
-    results.reserve(memRefType.getRank() + 2);
+    results.reserve(memRefType.getRank() * 2 + 2);
     auto baseBufferType = llvm::cast<MemRefType>(op.getBaseBuffer().getType());
     if (!op.getBaseBuffer().use_empty()) {
       if (newBufferType == baseBufferType) {
-        results.push_back(linearInterfaceBinding);
+        results.push_back(newBinding);
       } else {
         Value reinterpretCast = rewriter.create<memref::ReinterpretCastOp>(
-            loc, baseBufferType, linearInterfaceBinding, /*offset=*/0,
+            loc, baseBufferType, newBinding, /*offset=*/0,
             /*sizes=*/ArrayRef<int64_t>(),
             /*strides=*/ArrayRef<int64_t>());
         results.push_back(reinterpretCast);
@@ -259,17 +265,18 @@ struct IREEExpandStridedMetadataPass final
 } // namespace
 
 void populateIREEResolveExtractStridedMetadataPatterns(
-    MLIRContext *context, RewritePatternSet &patterns) {
+    RewritePatternSet &patterns) {
   memref::populateResolveExtractStridedMetadataPatterns(patterns);
   patterns.insert<ResolveExtractMetadataFromHalInterfaceBindingSubspan>(
-      context);
-  patterns.insert<ConvertCodegenIREEExtractMetadataToMemRef>(context);
+      patterns.getContext());
+  patterns.insert<ConvertCodegenIREEExtractMetadataToMemRef>(
+      patterns.getContext());
 }
 
 void IREEExpandStridedMetadataPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
-  populateIREEResolveExtractStridedMetadataPatterns(context, patterns);
+  populateIREEResolveExtractStridedMetadataPatterns(patterns);
   populateRemoveDeadMemAllocPatterns(patterns);
   if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();

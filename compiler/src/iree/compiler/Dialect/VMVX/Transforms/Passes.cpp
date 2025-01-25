@@ -92,6 +92,7 @@ buildVectorVMVXTransformPassPipeline(OpPassManager &variantPassManager) {
 
       // Resolve get_buffer_descriptor ops. All structural buffer manipulations
       // must conclude before this point.
+      .addPass(memref::createFoldMemRefAliasOpsPass)
       .addPass(createIREEExpandStridedMetadataPass)
       .addPass(createResolveBufferDescriptorsPass)
       .addPass(createCleanupBufferAllocViewPass)
