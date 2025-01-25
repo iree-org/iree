@@ -77,8 +77,7 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
   return
 }
 
-//       CHECK: #[[$MAP_Y:.+]] = affine_map<()[s0] -> (s0 * 16)>
-//       CHECK: #[[$MAP_X:.+]] = affine_map<()[s0] -> ((s0 floordiv 32) * 16)>
+//       CHECK: #[[$MAP:.+]] = affine_map<()[s0] -> (s0 * 16)>
 
 // CHECK-LABEL: func.func @matmul_256x1024x128_div_add()
 
@@ -94,8 +93,9 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
 //   CHECK-DAG:   %[[LHS_ALLOC:.+]] = memref.alloc() : memref<32x32xf16, 3>
 //   CHECK-DAG:   %[[RHS_ALLOC:.+]] = memref.alloc() : memref<32x32xf16, 3>
 
-//       CHECK:   %[[OFFSET_Y:.+]] = affine.apply #[[$MAP_Y]]()[%[[ID_Y]]]
-//       CHECK:   %[[OFFSET_X:.+]] = affine.apply #[[$MAP_X]]()[%[[ID_X]]]
+//       CHECK:   %[[IDS_X:.+]]:2 = affine.delinearize_index %[[ID_X]] into (2, 32) : index, index
+//       CHECK:   %[[OFFSET_Y:.+]] = affine.apply #[[$MAP]]()[%[[ID_Y]]]
+//       CHECK:   %[[OFFSET_X:.+]] = affine.apply #[[$MAP]]()[%[[IDS_X]]#0]
 
 //       CHECK:   scf.for %{{.+}} = %[[OFFSET_Y]] to %[[C32]] step %[[C32]]
 //       CHECK:     scf.for %{{.+}} = %[[OFFSET_X]] to %[[C32]] step %[[C32]]
@@ -109,10 +109,10 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
 //       CHECK:     gpu.barrier
 //       CHECK:     scf.for %[[IV_Y:.+]] = %[[OFFSET_Y]] to %[[C32]] step %[[C32]]
 //       CHECK:       %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][%[[IV_Y]], 0]
+//   CHECK-DAG:       %[[READ0:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C0]]]
+//   CHECK-DAG:       %[[READ1:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C16]]]
 //       CHECK:       scf.for %[[IV_X:.+]] = %[[OFFSET_X]] to %[[C32]] step %[[C32]]
 //       CHECK:         %[[RHS_VIEW:.+]] = memref.subview %[[RHS_ALLOC]][0, %[[IV_X]]]
-//   CHECK-DAG:         %[[READ0:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C0]]]
-//   CHECK-DAG:         %[[READ1:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C16]]]
 //   CHECK-DAG:         %[[READ2:.+]] = vector.transfer_read %[[RHS_VIEW]][%[[C0]], %[[C0]]]
 //   CHECK-DAG:         %[[READ3:.+]] = vector.transfer_read %[[RHS_VIEW]][%[[C16]], %[[C0]]]
 //   CHECK-DAG:         %[[READ4:.+]] = vector.transfer_read %{{.+}}[%[[C0]], %[[C0]]]
@@ -209,8 +209,7 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
   return
 }
 
-//       CHECK: #[[$MAP_Y:.+]] = affine_map<()[s0] -> (s0 * 16)>
-//       CHECK: #[[$MAP_X:.+]] = affine_map<()[s0] -> ((s0 floordiv 32) * 16)>
+//       CHECK: #[[$MAP:.+]] = affine_map<()[s0] -> (s0 * 16)>
 
 // CHECK-LABEL: func.func @matmul_256x1024x128_div_add()
 
@@ -228,8 +227,9 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
 //       CHECK:   %[[LHS_ALLOC:.+]] = memref.alloc() : memref<1x32x32xf16, 3>
 //       CHECK:   %[[RHS_ALLOC:.+]] = memref.alloc() : memref<1x32x32xf16, 3>
 
-//       CHECK:   %[[OFFSET_Y:.+]] = affine.apply #[[$MAP_Y]]()[%[[ID_Y]]]
-//       CHECK:   %[[OFFSET_X:.+]] = affine.apply #[[$MAP_X]]()[%[[ID_X]]]
+//       CHECK:   %[[IDS_X:.+]]:2 = affine.delinearize_index %[[ID_X]] into (2, 32)
+//       CHECK:   %[[OFFSET_Y:.+]] = affine.apply #[[$MAP]]()[%[[ID_Y]]]
+//       CHECK:   %[[OFFSET_X:.+]] = affine.apply #[[$MAP]]()[%[[IDS_X]]#0]
 
 //       CHECK:   scf.for %{{.+}} = %[[ID_Z]] to %[[C1]] step %[[C1]]
 //       CHECK:     scf.for %{{.+}} = %[[OFFSET_Y]] to %[[C32]] step %[[C32]]
@@ -246,10 +246,10 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
 //       CHECK:     scf.for %[[IV_Z:.+]] = %[[ID_Z]] to %[[C1]] step %[[C1]]
 //       CHECK:       scf.for %[[IV_Y:.+]] = %[[OFFSET_Y]] to %[[C32]] step %[[C32]]
 //       CHECK:         %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][%[[IV_Z]], %[[IV_Y]], 0] [1, 16, 32]
+//   CHECK-DAG:         %[[READ0:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C0]], %[[C0]]]
+//   CHECK-DAG:         %[[READ1:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C0]], %[[C16]]]
 //       CHECK:         scf.for %[[IV_X:.+]] = %[[OFFSET_X]] to %[[C32]] step %[[C32]] {
 //       CHECK:           %[[RHS_VIEW:.+]] = memref.subview %[[RHS_ALLOC]][%[[IV_Z]], 0, %[[IV_X]]] [1, 32, 16]
-//   CHECK-DAG:           %[[READ0:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C0]], %[[C0]]]
-//   CHECK-DAG:           %[[READ1:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C0]], %[[C16]]]
 //   CHECK-DAG:           %[[READ2:.+]] = vector.transfer_read %[[RHS_VIEW]][%[[C0]], %[[C0]], %[[C0]]]
 //   CHECK-DAG:           %[[READ3:.+]] = vector.transfer_read %[[RHS_VIEW]][%[[C0]], %[[C16]], %[[C0]]]
 //   CHECK-DAG:           %[[READ4:.+]] = vector.transfer_read %{{.+}}[%[[C0]], %[[C0]], %[[C0]]]
@@ -337,8 +337,7 @@ func.func @matmul_256x1024x128_mixed_signedness_int8() {
   return
 }
 
-//       CHECK: #[[$MAP_Y:.+]] = affine_map<()[s0] -> (s0 * 16)>
-//       CHECK: #[[$MAP_X:.+]] = affine_map<()[s0] -> ((s0 floordiv 32) * 16)>
+//       CHECK: #[[$MAP:.+]] = affine_map<()[s0] -> (s0 * 16)>
 
 // CHECK-LABEL: func.func @matmul_256x1024x128_mixed_signedness_int8()
 
@@ -354,8 +353,9 @@ func.func @matmul_256x1024x128_mixed_signedness_int8() {
 //   CHECK-DAG:   %[[LHS_ALLOC:.+]] = memref.alloc() : memref<32x32xi8, 3>
 //   CHECK-DAG:   %[[RHS_ALLOC:.+]] = memref.alloc() : memref<32x32xi8, 3>
 
-//       CHECK:   %[[OFFSET_Y:.+]] = affine.apply #[[$MAP_Y]]()[%[[ID_Y]]]
-//       CHECK:   %[[OFFSET_X:.+]] = affine.apply #[[$MAP_X]]()[%[[ID_X]]]
+//       CHECK:   %[[IDS_X:.+]]:2 = affine.delinearize_index %[[ID_X]] into (2, 32)
+//       CHECK:   %[[OFFSET_Y:.+]] = affine.apply #[[$MAP]]()[%[[ID_Y]]]
+//       CHECK:   %[[OFFSET_X:.+]] = affine.apply #[[$MAP]]()[%[[IDS_X]]#0]
 
 //       CHECK:   scf.for %{{.+}} = %[[OFFSET_Y]] to %[[C32]] step %[[C32]]
 //       CHECK:     scf.for %{{.+}} = %[[OFFSET_X]] to %[[C32]] step %[[C32]]
@@ -369,10 +369,10 @@ func.func @matmul_256x1024x128_mixed_signedness_int8() {
 //       CHECK:     gpu.barrier
 //       CHECK:     scf.for %[[IV_Y:.+]] = %[[OFFSET_Y]] to %[[C32]] step %[[C32]]
 //       CHECK:       %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][%[[IV_Y]], 0]
+//   CHECK-DAG:       %[[READ0:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C0]]]
+//   CHECK-DAG:       %[[READ1:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C16]]]
 //       CHECK:       scf.for %[[IV_X:.+]] = %[[OFFSET_X]] to %[[C32]] step %[[C32]]
 //       CHECK:         %[[RHS_VIEW:.+]] = memref.subview %[[RHS_ALLOC]][0, %[[IV_X]]]
-//   CHECK-DAG:         %[[READ0:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C0]]]
-//   CHECK-DAG:         %[[READ1:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C16]]]
 //   CHECK-DAG:         %[[READ2:.+]] = vector.transfer_read %[[RHS_VIEW]][%[[C0]], %[[C0]]]
 //   CHECK-DAG:         %[[READ3:.+]] = vector.transfer_read %[[RHS_VIEW]][%[[C16]], %[[C0]]]
 //   CHECK-DAG:         %[[READ4:.+]] = vector.transfer_read %{{.+}}[%[[C0]], %[[C0]]]

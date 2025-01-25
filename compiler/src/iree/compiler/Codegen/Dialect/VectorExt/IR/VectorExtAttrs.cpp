@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "iree/compiler/Utils/Indexing.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -286,51 +287,28 @@ NestedLayoutAttr::computeThreadIds(Value threadId, int64_t subgroupSize,
 
   Location loc = threadId.getLoc();
 
-  AffineExpr tidExpr, size, stride;
-  bindDims(rewriter.getContext(), tidExpr);
-  bindSymbols(rewriter.getContext(), size, stride);
+  SmallVector<int64_t> subgroupBasis, threadBasis;
+  SmallVector<size_t> subgroupDimToResult, threadDimToResult;
 
-  // (tid floordiv stride) mod size
-  AffineMap threadTidMap =
-      AffineMap::get(/*dims=*/1, /*syms=*/2, tidExpr.floorDiv(stride) % size);
+  if (failed(basisFromSizesStrides(getSubgroupTile(), getSubgroupStrides(),
+                                   subgroupBasis, subgroupDimToResult)))
+    return {};
+  if (failed(basisFromSizesStrides(getThreadTile(), getThreadStrides(),
+                                   threadBasis, threadDimToResult)))
+    return {};
 
-  // (tid floordiv (stride * subgroup_size)) mod size
-  AffineMap subgroupTidMap = AffineMap::get(
-      /*dims=*/1, /*syms=*/2, tidExpr.floorDiv(stride * subgroupSize) % size);
+  // Add the subgroup_size to the end of the subgroup delinearization basis.
+  subgroupBasis.push_back(subgroupSize);
 
-  for (auto [dimSize, dimStride] :
-       llvm::zip_equal(getSubgroupTile(), getSubgroupStrides())) {
-    // Dimension is not distributed.
-    if (dimStride == 0) {
-      virtualTids.push_back(rewriter.create<arith::ConstantOp>(
-          loc, rewriter.getIndexAttr(dimStride)));
-      continue;
-    }
+  auto subgroupSplit = rewriter.create<affine::AffineDelinearizeIndexOp>(
+      loc, threadId, subgroupBasis, /*hasOuterBound=*/false);
+  auto threadSplit = rewriter.create<affine::AffineDelinearizeIndexOp>(
+      loc, threadId, threadBasis, /*hasOuterBound=*/false);
 
-    auto sizeVal =
-        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(dimSize));
-    auto strideVal = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getIndexAttr(dimStride));
-    virtualTids.push_back(rewriter.create<affine::AffineApplyOp>(
-        loc, subgroupTidMap, ValueRange{threadId, sizeVal, strideVal}));
-  }
-
-  for (auto [dimSize, dimStride] :
-       llvm::zip_equal(getThreadTile(), getThreadStrides())) {
-    // Dimension is not distributed.
-    if (dimStride == 0) {
-      virtualTids.push_back(rewriter.create<arith::ConstantOp>(
-          loc, rewriter.getIndexAttr(dimStride)));
-      continue;
-    }
-
-    auto sizeVal =
-        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(dimSize));
-    auto strideVal = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getIndexAttr(dimStride));
-    virtualTids.push_back(rewriter.create<affine::AffineApplyOp>(
-        loc, threadTidMap, ValueRange{threadId, sizeVal, strideVal}));
-  }
+  llvm::transform(subgroupDimToResult, std::back_inserter(virtualTids),
+                  [&](size_t idx) { return subgroupSplit.getResult(idx); });
+  llvm::transform(threadDimToResult, std::back_inserter(virtualTids),
+                  [&](size_t idx) { return threadSplit.getResult(idx); });
 
   return virtualTids;
 }
