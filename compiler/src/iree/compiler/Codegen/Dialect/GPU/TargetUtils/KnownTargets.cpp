@@ -302,6 +302,10 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   static const ChipDetails rx7900xtChip = {84, "rx7900xt"};
   static const ChipDetails rx7800xtChip = {60, "rx7800xt"};
   static const ChipDetails rx7700xtChip = {54, "rx7700xt"};
+  static const ChipDetails v710Chip = {54, "v710"};
+  static const ChipDetails w7900Chip = {96, "w7900"};
+  static const ChipDetails w7800Chip = {70, "w7800"};
+  static const ChipDetails w7700Chip = {48, "w7700"};
 
   // See https://llvm.org/docs/AMDGPUUsage.html#processors for gfxN to
   // cdnaN/rdnaN mapping.
@@ -325,6 +329,14 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
       .Case("rx7800xt", TargetDetails{rdna3Wgp, &rx7800xtChip})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-7700-xt.c3911
       .Case("rx7700xt", TargetDetails{rdna3Wgp, &rx7700xtChip})
+      // https://www.techpowerup.com/gpu-specs/radeon-pro-v710.c4234
+      .Case("v710", TargetDetails{rdna3Wgp, &v710Chip})
+      // https://www.techpowerup.com/gpu-specs/radeon-pro-w7900.c4147
+      .Case("w7900", TargetDetails{rdna3Wgp, &w7900Chip})
+      // https://www.techpowerup.com/gpu-specs/radeon-pro-w7800.c4148
+      .Case("w7800", TargetDetails{rdna3Wgp, &w7800Chip})
+      // https://www.techpowerup.com/gpu-specs/radeon-pro-w7700.c4184
+      .Case("w7700", TargetDetails{rdna3Wgp, &w7700Chip})
       .Cases("rdna3", "gfx1100", "gfx1101", "gfx1102", "gfx1103", "gfx1150",
              "gfx1151", TargetDetails{rdna3Wgp, nullptr})
       .Cases("rdna2", "gfx1030", "gfx1031", "gfx1032", "gfx1033", "gfx1034",
@@ -347,8 +359,8 @@ StringRef normalizeAMDGPUTarget(StringRef target) {
       .Cases("mi300a", "mi300x", "mi308x", "gfx942")
       .Cases("mi250x", "mi250", "mi210", "cdna2", "gfx90a")
       .Cases("mi100", "cdna1", "gfx908")
-      .Cases("rx7900xtx", "rx7900xt", "gfx1100")
-      .Cases("rx7800xt", "rx7700xt", "gfx1101")
+      .Cases("rx7900xtx", "rx7900xt", "w7900", "w7800", "gfx1100")
+      .Cases("rx7800xt", "rx7700xt", "v710", "w7700", "gfx1101")
       .Default("");
 }
 
