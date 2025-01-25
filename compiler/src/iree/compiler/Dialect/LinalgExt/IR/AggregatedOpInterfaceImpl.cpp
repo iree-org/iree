@@ -256,9 +256,10 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
 }
 
 // Compute output = exp2(output - input)
-static Value computeSubAndExp2(OpBuilder &builder, Location loc,
+static Value computeSubAndExp(OpBuilder &builder, Location loc,
                                AffineMap inputMap, AffineMap outputMap,
-                               Value input, Value output) {
+                               Value input, Value output,
+                               bool useExp2) {
   SmallVector<AffineMap> compressedMaps =
       compressUnusedDims(SmallVector<AffineMap>{inputMap, outputMap});
   inputMap = compressedMaps[0];
@@ -274,7 +275,11 @@ static Value computeSubAndExp2(OpBuilder &builder, Location loc,
         Value in = convertScalarToDtype(b, loc, args[0], args[1].getType(),
                                         /*isUnsignedCast=*/false);
         Value diff = b.create<arith::SubFOp>(loc, args[1], in);
-        Value weight = b.create<math::Exp2Op>(loc, diff);
+        Value weight;
+        if (useExp2)
+          weight = b.create<math::Exp2Op>(loc, diff);
+        else
+          weight = b.create<math::ExpOp>(loc, diff);
         b.create<linalg::YieldOp>(loc, weight);
       });
   return genericOp.getResult(0);
@@ -306,38 +311,17 @@ static bool willBeContiguousSlice(OpFoldResult inputSize, OpFoldResult tileSize,
 //===----------------------------------------------------------------------===//
 
 Value computeQKAndElementwise(Location loc, OpBuilder &b, Value query,
-                              Value key, Value scale, std::optional<Value> mask,
+                              Value key, std::optional<Value> mask,
                               AffineMap qMap, AffineMap kMap, AffineMap sMap,
                               std::optional<AffineMap> maskMap,
                               SmallVector<OpFoldResult> iterationDomain,
                               Type sElementType, Region &elementwiseRegion,
                               DictionaryAttr qkAttrs, bool lowPrecision) {
   MLIRContext *ctx = b.getContext();
-  // Since we use exp2 for attention instead of the original exp, we have to
-  // multiply the scale by log2(e). We use exp2 instead of exp as most platforms
-  // have better support for exp2 (we verified that we gain some speedup on
-  // some GPUs).
-  Value log2e = b.create<arith::ConstantOp>(
-      loc, b.getFloatAttr(scale.getType(), M_LOG2E));
-  scale = b.create<arith::MulFOp>(loc, scale, log2e);
-
   auto qETy = getElementTypeOrSelf(query.getType());
 
   AffineMap scaleMap = AffineMap::get(/*dimCount=*/qMap.getNumInputs(),
                                       /*symbolCount=*/0, ctx);
-
-  // In the original algorithm, the scaling is done after the softmax:
-  //        softmax(Q @ K.T * scale) @ V
-  //
-  // But, it is mathematically equivalent to do it on Q first and then multiply
-  // it by K.T. This just allows us to do the scaling once, instead of each
-  // iteration of the loop. This is only valid for f16 or f32 types as f8
-  // is extremely limited on its dynamic range therefore this would
-  // significantly affect numerics.
-  if (!lowPrecision) {
-    query = elementwiseValueInPlace<arith::MulFOp>(b, loc, qMap, scaleMap,
-                                                   query, scale);
-  }
 
   // ---- QK Matmul ----
 
@@ -366,10 +350,6 @@ Value computeQKAndElementwise(Location loc, OpBuilder &b, Value query,
     // losing numerical precision due to the low dynamic range of fp8 types when
     // pre applying the sclaing.
     AffineMap sMap = b.getMultiDimIdentityMap(sSizes.size());
-    AffineMap scaleMap = AffineMap::get(/*dimCount=*/sMap.getNumInputs(),
-                                        /*symbolCount=*/0, ctx);
-    s = elementwiseValueInPlace<arith::MulFOp>(b, loc, sMap, scaleMap, s,
-                                               scale);
 
     // If we need to truncate to fp8 post softmax we apply a scaling to use the
     // full fp8 range. We can do this with a offset as post `exp2` this equates
@@ -405,10 +385,14 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   std::optional<Value> mask = getMask();
   DictionaryAttr config = getDecompositionConfigAttr();
 
+  bool useExp2 = true;
   DictionaryAttr qkAttrs, pvAttrs;
   if (config) {
     qkAttrs = config.getAs<DictionaryAttr>(getQKAttrStr());
     pvAttrs = config.getAs<DictionaryAttr>(getPVAttrStr());
+    if (mlir::BoolAttr useExp2Attr = mlir::dyn_cast_or_null<mlir::BoolAttr>(config.get(getUseExp2AttrStr()))) {
+      useExp2 = useExp2Attr.getValue();
+    }
   }
   Value output = getOutput();
 
@@ -431,9 +415,9 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   Type f32Type = b.getF32Type();
 
   // ---- QK Matmul + elementwise math ----
-  Value s = computeQKAndElementwise(loc, b, query, key, getScale(), mask, qMap,
-                                    kMap, sMap, getMaskMap(), sizes, f32Type,
-                                    getRegion(), qkAttrs, lowPrecision);
+  Value s = computeQKAndElementwise(loc, b, query, key, mask, qMap, kMap, sMap,
+                                    getMaskMap(), sizes, f32Type, getRegion(),
+                                    qkAttrs, lowPrecision);
 
   // ---- Softmax ----
 
@@ -475,7 +459,7 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
 
   // P = exp2(S - max)
   AffineMap pMap = sMap;
-  Value p = computeSubAndExp2(b, loc, maxMap, sMap, max, s);
+  Value p = computeSubAndExp(b, loc, maxMap, sMap, max, s, useExp2);
 
   // sum = rowSum(P)
   Value sum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, sumFill);
@@ -524,10 +508,14 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Type elementType = getElementTypeOrSelf(getOutput().getType());
   DictionaryAttr config = getDecompositionConfigAttr();
 
+  bool useExp2 = true;
   DictionaryAttr qkAttrs, pvAttrs;
   if (config) {
     qkAttrs = config.getAs<DictionaryAttr>(getQKAttrStr());
     pvAttrs = config.getAs<DictionaryAttr>(getPVAttrStr());
+    if (mlir::BoolAttr useExp2Attr = mlir::dyn_cast_or_null<mlir::BoolAttr>(config.get(getUseExp2AttrStr()))) {
+      useExp2 = useExp2Attr.getValue();
+    }
   }
 
   FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
@@ -546,9 +534,9 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   bool lowPrecision = qETy.getIntOrFloatBitWidth() <= 8;
 
   // ---- QK Matmul + elementwise math ----
-  Value s = computeQKAndElementwise(
-      loc, b, query, key, getScale(), mask, qMap, kMap, sMap, getMaskMap(),
-      sizes, elementType, getRegion(), qkAttrs, lowPrecision);
+  Value s = computeQKAndElementwise(loc, b, query, key, mask, qMap, kMap, sMap,
+                                    getMaskMap(), sizes, elementType,
+                                    getRegion(), qkAttrs, lowPrecision);
 
   // TODO: This decomposition should be in a seperate op called
   // "online softmax".
@@ -561,7 +549,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   // norm = exp2(oldMax - newMax)
   // normMap = maxMap
   AffineMap normMap = getMaxMap();
-  Value norm = computeSubAndExp2(b, loc, maxMap, normMap, newMax, oldMax);
+  Value norm = computeSubAndExp(b, loc, maxMap, normMap, newMax, oldMax, useExp2);
 
   // normSum = norm * oldSum
   AffineMap sumMap = getSumMap();
@@ -571,7 +559,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   // P = exp2(S - newMax)
   // PMap = SMap
   AffineMap pMap = sMap;
-  Value p = computeSubAndExp2(b, loc, maxMap, sMap, newMax, s);
+  Value p = computeSubAndExp(b, loc, maxMap, sMap, newMax, s, useExp2);
 
   // newSum = normSum + rowSum(P)
   Value newSum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, normSum);
