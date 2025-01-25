@@ -392,7 +392,7 @@ public:
     // Add the byte offset.
     Value llvmBufferBasePtr = llvmBufferArg;
 
-    auto [strides, offset] = getStridesAndOffset(memrefType);
+    auto [strides, offset] = memrefType.getStridesAndOffset();
     if (memrefType.hasStaticShape() &&
         !llvm::any_of(strides, ShapedType::isDynamic) &&
         !ShapedType::isDynamic(offset)) {

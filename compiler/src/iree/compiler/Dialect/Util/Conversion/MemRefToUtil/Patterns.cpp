@@ -58,7 +58,7 @@ static Value getByteOffsetForIndices(OpBuilder &builder, Location loc,
   }
   SmallVector<int64_t> strides;
   int64_t offset;
-  if (failed(getStridesAndOffset(memrefType, strides, offset)) ||
+  if (failed(memrefType.getStridesAndOffset(strides, offset)) ||
       strides[0] != 1) {
     emitError(loc, "expected memref stride 1");
     return {};

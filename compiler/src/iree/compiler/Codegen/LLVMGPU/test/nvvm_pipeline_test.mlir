@@ -451,7 +451,7 @@ hal.executable @mma_fused {
 //           SM80:   nvvm.cp.async.wait.group 3
 //   SM80-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   SM80-COUNT-2:   nvvm.wmma.mma
-//   SM80-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> ()
+//   SM80-COUNT-2:   nvvm.cp.async.shared.global %{{.*}}, %{{.*}}, 16, cache = cg, %{{.*}} : !llvm.ptr<3>, !llvm.ptr<1>, i32
 //           SM80:   nvvm.cp.async.commit.group
 //           SM80:   llvm.br
 //       SM80-NOT:   nvvm.wmma.mma
@@ -529,7 +529,7 @@ hal.executable @mma_fused_fp16 {
 //           SM80:   nvvm.cp.async.wait.group 3
 //   SM80-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
 //   SM80-COUNT-1:   nvvm.wmma.mma
-//   SM80-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> ()
+//   SM80-COUNT-2:   nvvm.cp.async.shared.global %{{.*}}, %{{.*}}, 16, cache = cg, %{{.*}} : !llvm.ptr<3>, !llvm.ptr<1>, i32
 //           SM80:   nvvm.cp.async.commit.group
 //           SM80:   llvm.br
 //       SM80-NOT:   nvvm.wmma.mma
@@ -602,7 +602,7 @@ hal.executable @mma_fused_fp16 {
 //           SM80:   nvvm.cp.async.wait.group 3
 //   SM80-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   SM80-COUNT-2:   nvvm.wmma.mma
-//   SM80-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> ()
+//   SM80-COUNT-2:   nvvm.cp.async.shared.global %{{.*}}, %{{.*}}, 16, cache = cg, %{{.*}} : !llvm.ptr<3>, !llvm.ptr<1>, i32
 //           SM80:   nvvm.cp.async.commit.group
 //           SM80:   llvm.br
 //       SM80-NOT:   nvvm.wmma.mma
@@ -670,7 +670,7 @@ hal.executable @mma_fused_fp16 {
 //           SM80:   nvvm.cp.async.wait.group 3
 //   SM80-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   SM80-COUNT-2:   nvvm.wmma.mma
-//           SM80:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> ()
+//           SM80:   nvvm.cp.async.shared.global %{{.*}}, %{{.*}}, 16, cache = cg, %{{.*}} : !llvm.ptr<3>, !llvm.ptr<1>, i32
 //           SM80:   nvvm.cp.async.commit.group
 //           SM80:   llvm.br
 //       SM80-NOT:   nvvm.wmma.mma
