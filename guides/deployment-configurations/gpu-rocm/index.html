@@ -4084,76 +4084,87 @@ certain intrinsics on AMD GPUs. These will be used automatically or if the
 different chips, users can use this flag to point to an explicit directory.
 For example, in ROCm installations on Linux, this is often found under
 <code>/opt/rocm/amdgcn/bitcode</code>.</p>
-<p>Canonically a HIP target (<code>iree-hip-target</code>) matching the LLVM AMDGPU backend
-of the form <code>gfx&lt;arch_number&gt;</code> is needed to compile towards each GPU chip.
-If no target is specified then we will default to <code>gfx908</code>.</p>
-<p>Here is a table of commonly used architectures:</p>
+<p>A HIP target (<code>iree-hip-target</code>) matching the LLVM AMDGPU backend is needed to
+compile towards each GPU chip. Here is a table of commonly used architectures:</p>
 <table>
 <thead>
 <tr>
 <th>AMD GPU</th>
-<th>Target Chip</th>
+<th>SKU Name</th>
+<th>Target Architecture</th>
 <th>Architecture Code Name</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>AMD MI100</td>
+<td><code>mi100</code></td>
 <td><code>gfx908</code></td>
 <td><code>cdna1</code></td>
 </tr>
 <tr>
 <td>AMD MI210</td>
+<td><code>mi210</code></td>
 <td><code>gfx90a</code></td>
 <td><code>cdna2</code></td>
 </tr>
 <tr>
 <td>AMD MI250</td>
+<td><code>mi250</code></td>
 <td><code>gfx90a</code></td>
 <td><code>cdna2</code></td>
 </tr>
 <tr>
 <td>AMD MI300X (early units)</td>
+<td>N/A</td>
 <td><code>gfx940</code></td>
 <td><code>cdna3</code></td>
 </tr>
 <tr>
 <td>AMD MI300A (early units)</td>
+<td>N/A</td>
 <td><code>gfx941</code></td>
 <td><code>cdna3</code></td>
 </tr>
 <tr>
 <td>AMD MI300A</td>
+<td><code>mi300a</code></td>
 <td><code>gfx942</code></td>
 <td><code>cdna3</code></td>
 </tr>
 <tr>
 <td>AMD MI300X</td>
+<td><code>mi300x</code></td>
 <td><code>gfx942</code></td>
 <td><code>cdna3</code></td>
 </tr>
 <tr>
 <td>AMD MI308X</td>
+<td><code>mi308x</code></td>
 <td><code>gfx942</code></td>
 <td><code>cdna3</code></td>
 </tr>
 <tr>
 <td>AMD RX7900XTX</td>
+<td><code>rx7900xtx</code></td>
 <td><code>gfx1100</code></td>
 <td><code>rdna3</code></td>
 </tr>
 <tr>
 <td>AMD RX7900XT</td>
+<td><code>rx7900xt</code></td>
 <td><code>gfx1100</code></td>
 <td><code>rdna3</code></td>
 </tr>
 <tr>
 <td>AMD RX7800XT</td>
+<td><code>rx7800xt</code></td>
 <td><code>gfx1101</code></td>
 <td><code>rdna3</code></td>
 </tr>
 <tr>
 <td>AMD RX7700XT</td>
+<td><code>rx7700xt</code></td>
 <td><code>gfx1101</code></td>
 <td><code>rdna3</code></td>
 </tr>
@@ -4161,15 +4172,22 @@ If no target is specified then we will default to <code>gfx908</code>.</p>
 </table>
 <p>For a more comprehensive list of prior GPU generations, you can refer to the
 <a href="https://llvm.org/docs/AMDGPUUsage.html#processors">LLVM AMDGPU backend</a>.</p>
-<p>In addition to the canonical <code>gfx&lt;arch_number&gt;</code> scheme, <code>iree-hip-target</code> also
-supports two additonal schemes to make a better developer experience:</p>
-<ul>
-<li>Architecture code names like <code>cdna3</code> or <code>rdna3</code></li>
-<li>GPU product names like <code>mi300x</code> or <code>rx7900xtx</code></li>
-</ul>
-<p>These two schemes are translated into the canonical form under the hood.
-We add support for common code/product names without aiming to be exhaustive.
-If the ones you want are missing, please use the canonical form.</p>
+<p>The <code>iree-hip-target</code> option support three schemes:</p>
+<ol>
+<li>The exact GPU product (SKU), e.g., <code>--iree-hip-target=mi300x</code>. This allows
+  the compiler to know about both the target architecture and about additional
+  hardware details like the number of compute units. This extra information
+  guides some compiler heuristics and allows for SKU-specific <a href="../../../reference/tuning/">tuning
+  specs</a>.</li>
+<li>The GPU architecture, as defined by LLVM, e.g., <code>--iree-hip-target=gfx942</code>.
+  This scheme allows for architecture-specific <a href="../../../reference/tuning/">tuning
+  specs</a> only.</li>
+<li>The architecture code name, e.g., <code>--iree-hip-target=cdna3</code>. This scheme gets
+  translated to closes matching GPU architecture under the hood.</li>
+</ol>
+<p>We support for common code/SKU names without aiming to be exhaustive. If the
+ones you want are missing, please use the GPU architecture scheme (2.) as it is
+the most general.</p>
 <h3 id="run-a-compiled-program"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25ZM7.25 8a.75.75 0 0 1-.22.53l-2.25 2.25a.749.749 0 0 1-1.275-.326.75.75 0 0 1 .215-.734L5.44 8 3.72 6.28a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215l2.25 2.25c.141.14.22.331.22.53m1.5 1.5h3a.75.75 0 0 1 0 1.5h-3a.75.75 0 0 1 0-1.5"/></svg></span> Run a compiled program<a class="headerlink" href="#run-a-compiled-program" title="Permanent link">link</a></h3>
 <p>Run the following command:</p>
 <div class="highlight"><pre><span></span><code>iree-run-module<span class="w"> </span><span class="se">\</span>
