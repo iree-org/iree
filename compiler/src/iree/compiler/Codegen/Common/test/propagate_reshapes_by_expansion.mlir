@@ -57,7 +57,7 @@ func.func @fold_expand_into_loads_dynamic() -> tensor<2x?x16x32xf32> {
 // CHECK-LABEL: func @fold_expand_into_loads_dynamic()
 //   CHECK-DAG:   %[[C16:.+]] = arith.constant 16 : index
 //   CHECK-DAG:   %[[CONST:.+]] = hal.interface.constant.load
-//       CHECK:   %[[SHAPE:.+]] = arith.divui %[[CONST]], %[[C16]]
+//       CHECK:   %[[SHAPE:.+]] = arith.divsi %[[CONST]], %[[C16]]
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
 //  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<2x?x16x32xf32>>{%[[SHAPE]]}
 //       CHECK:   %[[LOAD:.+]] = flow.dispatch.tensor.load %[[SUBSPAN]]
@@ -81,7 +81,7 @@ func.func @fold_collapse_into_stores_dynamic(%arg0 : tensor<2x?x32xf32>) {
 // CHECK-LABEL: func @fold_collapse_into_stores_dynamic(
 //   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
 //       CHECK:   %[[CONST:.+]] = hal.interface.constant.load
-//       CHECK:   %[[SHAPE:.+]] = arith.divui %[[CONST]], %[[C2]]
+//       CHECK:   %[[SHAPE:.+]] = arith.divsi %[[CONST]], %[[C2]]
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
 //  CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<2x?x32xf32>>{%[[SHAPE]]}
 //       CHECK:   flow.dispatch.tensor.store %{{.+}}, %[[SUBSPAN]]
