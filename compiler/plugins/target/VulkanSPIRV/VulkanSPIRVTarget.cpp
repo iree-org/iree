@@ -160,12 +160,8 @@ public:
   getDefaultDeviceTarget(MLIRContext *context,
                          const TargetRegistry &targetRegistry) const override {
     Builder b(context);
-
-    SmallVector<NamedAttribute> deviceConfigAttrs;
-    auto deviceConfigAttr = b.getDictionaryAttr(deviceConfigAttrs);
-
-    SmallVector<NamedAttribute> executableConfigAttrs;
-    auto executableConfigAttr = b.getDictionaryAttr(executableConfigAttrs);
+    auto deviceConfigAttr = b.getDictionaryAttr({});
+    auto executableConfigAttr = b.getDictionaryAttr({});
 
     SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
     targetRegistry.getTargetBackend("vulkan-spirv")
@@ -199,13 +195,9 @@ public:
   IREE::HAL::ExecutableTargetAttr
   getExecutableTarget(MLIRContext *context, bool indirectBindings) const {
     Builder b(context);
-    SmallVector<NamedAttribute> configItems;
-    auto addConfig = [&](StringRef name, Attribute value) {
-      configItems.emplace_back(b.getStringAttr(name), value);
-    };
-
+    SmallVector<NamedAttribute, 1> configItems;
     if (auto target = GPU::getVulkanTargetDetails(options_.target, context)) {
-      addConfig("iree.gpu.target", target);
+      configItems.emplace_back("iree.gpu.target", target);
     } else {
       emitError(b.getUnknownLoc(), "Unknown Vulkan target '")
           << options_.target << "'";
