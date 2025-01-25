@@ -205,6 +205,7 @@ iree_cc_library(
     MLIRTransforms
     MLIRValueBoundsOpInterface
     MLIRVectorDialect
+    MLIRVectorToSCF
     MLIRVectorTransforms
     MLIRViewLikeInterface
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
