@@ -873,12 +873,12 @@ def IREEInput_AlignOp : IREEInput_PureOp<"align", [
   }];
 
   let arguments = (ins
-    SignlessIntegerLike:$value,
-    SignlessIntegerLike:$alignment
+    SignlessIntegerOrIndexLike:$value,
+    SignlessIntegerOrIndexLike:$alignment
   );
 
   let results = (outs
-    SignlessIntegerLike:$result
+    SignlessIntegerOrIndexLike:$result
   );
 
   let assemblyFormat = [{

@@ -346,12 +346,12 @@ def Util_AlignOp : Util_PureOp<"align", [
   }];
 
   let arguments = (ins
-    Index:$value,
-    Index:$alignment
+    SignlessIntegerOrIndexLike:$value,
+    SignlessIntegerOrIndexLike:$alignment
   );
 
   let results = (outs
-    Index:$result
+    SignlessIntegerOrIndexLike:$result
   );
 
   let assemblyFormat = [{
