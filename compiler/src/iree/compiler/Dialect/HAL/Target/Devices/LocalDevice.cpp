@@ -36,12 +36,8 @@ LocalDevice::LocalDevice(const LocalDevice::Options options)
 IREE::HAL::DeviceTargetAttr LocalDevice::getDefaultDeviceTarget(
     MLIRContext *context, const TargetRegistry &targetRegistry) const {
   Builder b(context);
-
-  SmallVector<NamedAttribute> deviceConfigAttrs;
-  auto deviceConfigAttr = b.getDictionaryAttr(deviceConfigAttrs);
-
-  SmallVector<NamedAttribute> executableConfigAttrs;
-  auto executableConfigAttr = b.getDictionaryAttr(executableConfigAttrs);
+  auto deviceConfigAttr = b.getDictionaryAttr({});
+  auto executableConfigAttr = b.getDictionaryAttr({});
 
   SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
   for (auto backendName : options.defaultTargetBackends) {
@@ -64,12 +60,8 @@ std::optional<IREE::HAL::DeviceTargetAttr>
 LocalDevice::getHostDeviceTarget(MLIRContext *context,
                                  const TargetRegistry &targetRegistry) const {
   Builder b(context);
-
-  SmallVector<NamedAttribute> deviceConfigAttrs;
-  auto deviceConfigAttr = b.getDictionaryAttr(deviceConfigAttrs);
-
-  SmallVector<NamedAttribute> executableConfigAttrs;
-  auto executableConfigAttr = b.getDictionaryAttr(executableConfigAttrs);
+  auto deviceConfigAttr = b.getDictionaryAttr({});
+  auto executableConfigAttr = b.getDictionaryAttr({});
 
   SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
   for (auto backendName : options.defaultHostBackends) {

@@ -462,12 +462,11 @@ static void populateReflectionAttrs(IREE::ABI::InvocationModel invocationModel,
 
   if (auto reflectionAttr =
           exportOp->getAttrOfType<DictionaryAttr>("iree.reflection")) {
-    attrs.append(reflectionAttr.getValue().begin(),
-                 reflectionAttr.getValue().end());
+    llvm::append_range(attrs, reflectionAttr.getValue());
   }
 
   if (auto abiAttr = exportOp->getAttr("iree.abi")) {
-    attrs.emplace_back(StringAttr::get(context, "iree.abi"), abiAttr);
+    attrs.emplace_back("iree.abi", abiAttr);
   }
 
   switch (invocationModel) {
@@ -475,7 +474,7 @@ static void populateReflectionAttrs(IREE::ABI::InvocationModel invocationModel,
   case IREE::ABI::InvocationModel::Sync:
     break;
   case IREE::ABI::InvocationModel::CoarseFences:
-    attrs.emplace_back(StringAttr::get(context, "iree.abi.model"),
+    attrs.emplace_back("iree.abi.model",
                        StringAttr::get(context, "coarse-fences"));
     break;
   }
@@ -484,10 +483,9 @@ static void populateReflectionAttrs(IREE::ABI::InvocationModel invocationModel,
   // Users in source frontends can override this with something more natural
   // (python/whatever).
   if (auto declAttr = exportOp->getAttr("iree.abi.declaration")) {
-    attrs.emplace_back(StringAttr::get(context, "iree.abi.declaration"),
-                       declAttr);
+    attrs.emplace_back("iree.abi.declaration", declAttr);
   } else {
-    attrs.emplace_back(StringAttr::get(context, "iree.abi.declaration"),
+    attrs.emplace_back("iree.abi.declaration",
                        formatSourceDeclaration(invocationModel, exportOp,
                                                wrapperOp.getName(),
                                                exportOp.getAllArgAttrs(),

@@ -96,10 +96,10 @@ DictionaryAttr getLayoutImpl(Attribute attr, RankedTensorType type) {
   MLIRContext *ctx = attr.getContext();
   auto deviceLayoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(attr);
   const MaterializeEncodingInfo info = deviceLayoutAttr.getEncodingInfo(type);
-  auto strAttr = StringAttr::get(ctx, kEncodingInfoAttrName);
   Attribute encodingInfoAttr =
       IREE::Codegen::serializeEncodingInfo(attr.getContext(), info);
-  return DictionaryAttr::get(ctx, {NamedAttribute(strAttr, encodingInfoAttr)});
+  return DictionaryAttr::get(
+      ctx, NamedAttribute(kEncodingInfoAttrName, encodingInfoAttr));
 }
 
 } // namespace mlir::iree_compiler::IREE

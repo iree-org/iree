@@ -153,15 +153,15 @@ void FuncOp::setReflectionAttr(StringRef name, Attribute value) {
     llvm::append_range(attrs, existingAttr);
   }
   bool didFind = false;
-  for (size_t i = 0; i < attrs.size(); ++i) {
-    if (attrs[i].getName() == name) {
-      attrs[i].setValue(value);
+  for (NamedAttribute &attr : attrs) {
+    if (attr.getName() == name) {
+      attr.setValue(value);
       didFind = true;
       break;
     }
   }
   if (!didFind) {
-    attrs.push_back(NamedAttribute(StringAttr::get(getContext(), name), value));
+    attrs.emplace_back(name, value);
     DictionaryAttr::sortInPlace(attrs);
   }
   getOperation()->setAttr("iree.reflection",
