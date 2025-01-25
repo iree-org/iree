@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
@@ -33,11 +34,11 @@ llvm::cl::opt<std::string> clCodegenTransformDialectLibraryFileName(
     llvm::cl::init(""));
 
 llvm::cl::opt<bool> clCodegenNotifyTransformDialectLibraryApplication(
-    "iree-codegen-notify-transform-strategy-application",
+    "iree-codegen-test-notify-transform-strategy-application",
     llvm::cl::desc(
         "Emit a remark when a transform configuration strategy successfully "
         "applies on a function. This is intended for testing/debuging."),
-    llvm::cl::init(false));
+    llvm::cl::Hidden, llvm::cl::init(false));
 
 #define GEN_PASS_DEF_MATERIALIZEUSERCONFIGSPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
