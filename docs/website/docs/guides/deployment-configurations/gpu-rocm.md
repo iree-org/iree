@@ -115,39 +115,43 @@ different chips, users can use this flag to point to an explicit directory.
 For example, in ROCm installations on Linux, this is often found under
 `/opt/rocm/amdgcn/bitcode`.
 
-Canonically a HIP target (`iree-hip-target`) matching the LLVM AMDGPU backend
-of the form `gfx<arch_number>` is needed to compile towards each GPU chip.
-If no target is specified then we will default to `gfx908`.
+A HIP target (`iree-hip-target`) matching the LLVM AMDGPU backend is needed to
+compile towards each GPU chip. Here is a table of commonly used architectures:
 
-Here is a table of commonly used architectures:
-
-| AMD GPU                  | Target Chip | Architecture Code Name
-| ------------------------ | ----------- | ----------------------
-| AMD MI100                | `gfx908`    | `cdna1`
-| AMD MI210                | `gfx90a`    | `cdna2`
-| AMD MI250                | `gfx90a`    | `cdna2`
-| AMD MI300X (early units) | `gfx940`    | `cdna3`
-| AMD MI300A (early units) | `gfx941`    | `cdna3`
-| AMD MI300A               | `gfx942`    | `cdna3`
-| AMD MI300X               | `gfx942`    | `cdna3`
-| AMD MI308X               | `gfx942`    | `cdna3`
-| AMD RX7900XTX            | `gfx1100`   | `rdna3`
-| AMD RX7900XT             | `gfx1100`   | `rdna3`
-| AMD RX7800XT             | `gfx1101`   | `rdna3`
-| AMD RX7700XT             | `gfx1101`   | `rdna3`
+| AMD GPU                  | SKU Name    | Target Architecture | Architecture Code Name |
+| ------------------------ | ----------- | ------------------- | ---------------------- |
+| AMD MI100                | `mi100`     | `gfx908`            | `cdna1`                |
+| AMD MI210                | `mi210`     | `gfx90a`            | `cdna2`                |
+| AMD MI250                | `mi250`     | `gfx90a`            | `cdna2`                |
+| AMD MI300X (early units) | N/A         | `gfx940`            | `cdna3`                |
+| AMD MI300A (early units) | N/A         | `gfx941`            | `cdna3`                |
+| AMD MI300A               | `mi300a`    | `gfx942`            | `cdna3`                |
+| AMD MI300X               | `mi300x`    | `gfx942`            | `cdna3`                |
+| AMD MI308X               | `mi308x`    | `gfx942`            | `cdna3`                |
+| AMD RX7900XTX            | `rx7900xtx` | `gfx1100`           | `rdna3`                |
+| AMD RX7900XT             | `rx7900xt`  | `gfx1100`           | `rdna3`                |
+| AMD RX7800XT             | `rx7800xt`  | `gfx1101`           | `rdna3`                |
+| AMD RX7700XT             | `rx7700xt`  | `gfx1101`           | `rdna3`                |
 
 For a more comprehensive list of prior GPU generations, you can refer to the
 [LLVM AMDGPU backend](https://llvm.org/docs/AMDGPUUsage.html#processors).
 
-In addition to the canonical `gfx<arch_number>` scheme, `iree-hip-target` also
-supports two additonal schemes to make a better developer experience:
+The `iree-hip-target` option support three schemes:
 
-* Architecture code names like `cdna3` or `rdna3`
-* GPU product names like `mi300x` or `rx7900xtx`
+1. The exact GPU product (SKU), e.g., `--iree-hip-target=mi300x`. This allows
+  the compiler to know about both the target architecture and about additional
+  hardware details like the number of compute units. This extra information
+  guides some compiler heuristics and allows for SKU-specific [tuning
+  specs](../../reference/tuning.md).
+2. The GPU architecture, as defined by LLVM, e.g., `--iree-hip-target=gfx942`.
+  This scheme allows for architecture-specific [tuning
+  specs](../../reference/tuning.md) only.
+3. The architecture code name, e.g., `--iree-hip-target=cdna3`. This scheme gets
+  translated to closes matching GPU architecture under the hood.
 
-These two schemes are translated into the canonical form under the hood.
-We add support for common code/product names without aiming to be exhaustive.
-If the ones you want are missing, please use the canonical form.
+We support for common code/SKU names without aiming to be exhaustive. If the
+ones you want are missing, please use the GPU architecture scheme (2.) as it is
+the most general.
 
 ### :octicons-terminal-16: Run a compiled program
 
