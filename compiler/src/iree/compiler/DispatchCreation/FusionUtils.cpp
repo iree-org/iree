@@ -69,6 +69,10 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
     return false;
   }
 
+  if (IREE::LinalgExt::isBitTruncateOp(producerOp)) {
+    return false;
+  }
+
   auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp);
   if (!linalgConsumerOp) {
     return false;
