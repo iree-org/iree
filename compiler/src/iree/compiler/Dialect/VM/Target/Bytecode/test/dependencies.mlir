@@ -1,5 +1,8 @@
-// RUN: iree-compile --split-input-file --compile-mode=vm \
-// RUN: --iree-vm-bytecode-module-output-format=flatbuffer-text %s | FileCheck %s
+// RUN: iree-compile \
+// RUN:   --split-input-file \
+// RUN:   --compile-mode=vm \
+// RUN:   --iree-vm-bytecode-module-output-format=flatbuffer-text %s | \
+// RUN: FileCheck %s
 
 // CHECK-LABEL: "main_module"
 // CHECK: "version": 100
@@ -29,4 +32,11 @@ vm.module @main_module attributes { version = 100 : i32 } {
   // CHECK: "flags": "OPTIONAL"
   vm.import private optional @optional.method1() attributes { minimum_version = 11 : i32 }
 
+}
+
+// -----
+
+vm.module @import_funcs_invalid {
+  // expected-error@+1 {{'vm.import' op must reference a function in a module}}
+  vm.import private @missing_module_name.fn()
 }
