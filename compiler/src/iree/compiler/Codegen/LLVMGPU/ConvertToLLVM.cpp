@@ -549,7 +549,8 @@ void populateScalarizeMathOps(RewritePatternSet &patterns) {
                ScalarizeMathOp<math::Log10Op>, ScalarizeMathOp<math::Log2Op>,
                ScalarizeMathOp<math::PowFOp>, ScalarizeMathOp<math::RsqrtOp>,
                ScalarizeMathOp<math::SinOp>, ScalarizeMathOp<math::SqrtOp>,
-               ScalarizeMathOp<math::TanhOp>>(patterns.getContext());
+               ScalarizeMathOp<math::TanhOp>, ScalarizeMathOp<math::ErfOp>>(
+      patterns.getContext());
 }
 
 void populateConvertSharedMemoryAllocOps(RewritePatternSet &patterns) {
