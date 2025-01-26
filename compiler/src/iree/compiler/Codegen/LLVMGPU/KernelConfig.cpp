@@ -1770,12 +1770,17 @@ static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
                                                preferredSubgroupSize);
 }
 
+/// Returns true if it's MatVec like i.e., either the bound of M dim = 1, or the
+/// M dim isn't present.
 static bool isMatvecLike(linalg::LinalgOp linalgOp) {
-  if (linalgOp.getNumParallelLoops() != 2)
-    return false;
 
-  if (linalgOp.getNumReductionLoops() != 1)
+  if (!llvm::is_contained({1, 2}, linalgOp.getNumParallelLoops())) {
     return false;
+  }
+
+  if (linalgOp.getNumReductionLoops() != 1) {
+    return false;
+  }
 
   // TODO: Allow for matvec with fused dequantization.
   FailureOr<linalg::ContractionDimensions> dims =
@@ -1786,6 +1791,11 @@ static bool isMatvecLike(linalg::LinalgOp linalgOp) {
   // TODO: Support batch matvec.
   if (!dims->batch.empty())
     return false;
+
+  // Don't need to check the bounds.
+  if (dims->m.empty()) {
+    return llvm::hasSingleElement(dims->n) && llvm::hasSingleElement(dims->k);
+  }
 
   for (ArrayRef indices : {dims->m, dims->n, dims->k}) {
     if (!llvm::hasSingleElement(indices))
