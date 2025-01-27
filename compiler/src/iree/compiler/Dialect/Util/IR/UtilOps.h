@@ -48,6 +48,11 @@ Value buildIfElseTree(
 // Removes duplicate attributes in the array (if any).
 ArrayAttr deduplicateArrayElements(ArrayAttr arrayAttr);
 
+// Finds the operand index in |operands| that |tiedResult| references.
+// Returns TiedOpInterface::kUntiedIndex if no operand is found.
+int64_t findTiedOperand(OpAsmParser::UnresolvedOperand tiedResult,
+                        ArrayRef<OpAsmParser::UnresolvedOperand> operands);
+
 //===----------------------------------------------------------------------===//
 // custom<SymbolVisibility>($sym_visibility)
 //===----------------------------------------------------------------------===//

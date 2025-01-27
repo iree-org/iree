@@ -1364,6 +1364,36 @@ void TensorStoreOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
+// stream.tensor.dispatch
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct DeduplicateTensorDispatchEntryRefs final
+    : public OpRewritePattern<TensorDispatchOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorDispatchOp dispatchOp,
+                                PatternRewriter &rewriter) const override {
+    auto originalAttr = dispatchOp.getEntryPointsAttr();
+    auto newAttr = deduplicateArrayElements(originalAttr);
+    if (newAttr == originalAttr)
+      return failure();
+    rewriter.modifyOpInPlace(dispatchOp,
+                             [&]() { dispatchOp.setEntryPointsAttr(newAttr); });
+    return success();
+  }
+};
+
+} // namespace
+
+void TensorDispatchOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                   MLIRContext *context) {
+  // TODO(benvanik): maybe tied type/lifetime updates?
+  results.insert<ElideUnusedOp<TensorDispatchOp>>(context);
+  results.insert<DeduplicateTensorDispatchEntryRefs>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // stream.async.alloca
 //===----------------------------------------------------------------------===//
 

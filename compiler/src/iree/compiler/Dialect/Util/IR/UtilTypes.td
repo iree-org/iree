@@ -184,6 +184,26 @@ def Util_ObjectType : TypeDef<Util_Dialect, "Object"> {
 }
 
 //===----------------------------------------------------------------------===//
+// !util.unused
+//===----------------------------------------------------------------------===//
+
+def Util_UnusedType : TypeDef<Util_Dialect, "Unused"> {
+  let mnemonic = "unused";
+
+  let summary = [{a placeholder for unused types}];
+  let description = [{
+    An unused type placeholder used to satisfy verifiers that may require a
+    type even if unused.
+  }];
+
+  let builders = [
+    TypeBuilder<(ins), [{
+      return $_get($_ctxt);
+    }]>
+  ];
+}
+
+//===----------------------------------------------------------------------===//
 // !util.variant
 //===----------------------------------------------------------------------===//
 

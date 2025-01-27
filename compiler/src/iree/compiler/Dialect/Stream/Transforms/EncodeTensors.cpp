@@ -590,6 +590,41 @@ struct EncodeTensorStoreOp
 };
 
 //===----------------------------------------------------------------------===//
+// stream.tensor.dispatch
+//===----------------------------------------------------------------------===//
+
+struct EncodeTensorDispatchOp
+    : public OpRewritePattern<IREE::Stream::TensorDispatchOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::Stream::TensorDispatchOp op,
+                                PatternRewriter &rewriter) const override {
+    // Strip off the tensor encoding information - it's not used at all here. If
+    // we changed the tensor dispatch op to accept indices and lengths for
+    // offsetting we would need to account for that here but today we require
+    // that to happen on slices/updates instead.
+    Value zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
+    SmallVector<Value> operandOffsets;
+    SmallVector<Value> operandEnds;
+    SmallVector<Value> operandLengths;
+    auto operandSizes = op.getOperandSizes();
+    for (auto operand : op.getMixedOperands()) {
+      if (isa<IREE::Stream::ResourceType>(operand.getType())) {
+        operandOffsets.push_back(zeroOffset);
+        operandEnds.push_back(operandSizes.front());
+        operandLengths.push_back(operandSizes.front());
+        operandSizes = operandSizes.drop_front(1);
+      }
+    }
+    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncDispatchOp>(
+        op, op.getResultTypes(), op.getWorkload(), op.getEntryPointsAttr(),
+        op.getMixedOperands(), op.getOperandSizes(), operandOffsets,
+        operandEnds, operandLengths, op.getResultSizes(),
+        op.getTiedOperandsAttr(), op.getAffinityAttr());
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // --iree-stream-encode-host-tensors
 //===----------------------------------------------------------------------===//
 
@@ -602,8 +637,8 @@ struct EncodeHostTensorsPass
         EncodeTensorImportOp, EncodeTensorExportOp, EncodeTensorSizeOfOp,
         EncodeTensorEmptyOp, EncodeTensorConstantOp, EncodeTensorSplatOp,
         EncodeTensorCloneOp, EncodeTensorSliceOp, EncodeTensorFillOp,
-        EncodeTensorUpdateOp, EncodeTensorLoadOp, EncodeTensorStoreOp>(
-        &getContext());
+        EncodeTensorUpdateOp, EncodeTensorLoadOp, EncodeTensorStoreOp,
+        EncodeTensorDispatchOp>(&getContext());
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
     if (failed(applyPatternsGreedily(getOperation(), frozenPatterns))) {
       return signalPassFailure();

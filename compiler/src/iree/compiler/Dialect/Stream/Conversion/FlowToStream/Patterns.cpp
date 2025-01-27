@@ -782,17 +782,11 @@ struct ConvertDispatchOp
       IREE::Flow::DispatchOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
       ConversionPatternRewriter &rewriter) const override {
-    // Zero is going to be used for each operand to start.
-    auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
-
     // Query and resolve all operands and their sizes.
-    SmallVector<Value> dispatchOperands;
-    SmallVector<Value> dispatchOperandSizes;
-    SmallVector<Value> dispatchOperandOffsets;
-    SmallVector<Value> dispatchOperandEnds;
-    SmallVector<Value> dispatchOperandLengths;
+    SmallVector<Value> operands;
     SmallVector<Value> operandSizes;
-
+    SmallVector<Value> allOperandSizes;
+    SmallVector<Type> operandEncodings;
     for (auto [oldOperand, convertedOperands] :
          llvm::zip_equal(op.getArguments(), adaptor.getArguments())) {
       Value newOperand;
@@ -801,34 +795,36 @@ struct ConvertDispatchOp
             transferTensorOperands(op.getLoc(), oldOperand, convertedOperands,
                                    executionAffinityAttr, rewriter);
         newOperand = newOperandCast.resource;
-        dispatchOperandSizes.push_back(newOperandCast.resourceSize);
         operandSizes.push_back(newOperandCast.resourceSize);
-        dispatchOperandOffsets.push_back(zeroOffset);
-        dispatchOperandEnds.push_back(newOperandCast.resourceSize);
-        dispatchOperandLengths.push_back(newOperandCast.resourceSize);
+        allOperandSizes.push_back(newOperandCast.resourceSize);
+        operandEncodings.push_back(oldOperand.getType());
       } else {
-        operandSizes.push_back({});
+        allOperandSizes.push_back({});
+        operandEncodings.push_back(rewriter.getType<IREE::Util::UnusedType>());
         newOperand = convertedOperands.front();
       }
-      dispatchOperands.push_back(newOperand);
+      operands.push_back(newOperand);
     }
 
     // Construct result sizes or reuse tied operand sizes from above.
     SmallVector<Value> resultSizes;
     SmallVector<Type> resultTypes;
+    SmallVector<Type> resultEncodings;
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto tiedOperandBase = op.getTiedOperandsIndexAndLength().first;
     for (auto result : llvm::enumerate(op.getResults())) {
       auto oldResultType = result.value().getType();
       if (!llvm::isa<ShapedType>(oldResultType)) {
         resultTypes.push_back(getTypeConverter()->convertType(oldResultType));
+        resultEncodings.push_back(rewriter.getType<IREE::Util::UnusedType>());
         continue;
       }
       auto tiedOperand = op.getTiedResultOperandIndex(result.index());
       if (tiedOperand.has_value()) {
         auto operandIndex = tiedOperand.value() - tiedOperandBase;
-        resultSizes.push_back(operandSizes[operandIndex]);
-        resultTypes.push_back(dispatchOperands[operandIndex].getType());
+        resultSizes.push_back(allOperandSizes[operandIndex]);
+        resultTypes.push_back(operands[operandIndex].getType());
+        resultEncodings.push_back(operandEncodings[operandIndex]);
       } else {
         auto resultDynamicDims = IREE::Util::buildDynamicDimsForValue(
             op.getLoc(), result.value(), rewriter);
@@ -836,15 +832,21 @@ struct ConvertDispatchOp
             buildResultSizeOf(op.getLoc(), result.value(), resultDynamicDims,
                               executionAffinityAttr, rewriter));
         resultTypes.push_back(unknownType);
+        resultEncodings.push_back(oldResultType);
       }
     }
 
-    auto newOp = rewriter.create<IREE::Stream::AsyncDispatchOp>(
+    auto newOp = rewriter.create<IREE::Stream::TensorDispatchOp>(
         op.getLoc(), resultTypes, flattenValues(adaptor.getWorkload()),
-        adaptor.getEntryPointsAttr(), dispatchOperands, dispatchOperandSizes,
-        dispatchOperandOffsets, dispatchOperandEnds, dispatchOperandLengths,
-        resultSizes, adaptor.getTiedOperandsAttr(), executionAffinityAttr);
-    newOp->setDialectAttrs(op->getDialectAttrs());
+        adaptor.getEntryPointsAttr(), operands, operandSizes,
+        rewriter.getTypeArrayAttr(operandEncodings), op.getArgumentDims(),
+        resultSizes, rewriter.getTypeArrayAttr(resultEncodings),
+        op.getResultDims(), adaptor.getTiedOperandsAttr(),
+        executionAffinityAttr);
+    newOp->setDialectAttrs(
+        llvm::make_filter_range(op->getDialectAttrs(), [](NamedAttribute attr) {
+          return attr.getName() != "stream.affinity";
+        }));
     SmallVector<SmallVector<Value>> replacementsVec = llvm::map_to_vector(
         llvm::zip_equal(newOp->getResults(), resultSizes), [](auto it) {
           return SmallVector<Value>{std::get<0>(it), std::get<1>(it)};
