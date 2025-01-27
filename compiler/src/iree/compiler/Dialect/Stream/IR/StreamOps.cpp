@@ -82,8 +82,30 @@ static LogicalResult verifyOpDynamicDims(Operation *op, TypeRange types,
                                          ValueRange dynamicDims) {
   unsigned requiredCount = 0;
   for (auto type : types) {
-    if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
+    if (auto shapedType = llvm::dyn_cast_if_present<ShapedType>(type)) {
       requiredCount += shapedType.getNumDynamicDims();
+    }
+  }
+  if (dynamicDims.size() != requiredCount) {
+    return op->emitOpError()
+           << "type set has " << requiredCount
+           << " dynamic dimensions but only " << dynamicDims.size()
+           << " dimension values are attached";
+  }
+  return success();
+}
+
+// Verifies that |dynamicDims| contains the appropriate number of dims for all
+// the dynamic dimensions in |type|.
+static LogicalResult verifyOpDynamicDimsRange(Operation *op,
+                                              ArrayAttr typesAttr,
+                                              ValueRange dynamicDims) {
+  unsigned requiredCount = 0;
+  for (auto attr : typesAttr) {
+    if (auto typeAttr = dyn_cast_if_present<TypeAttr>(attr)) {
+      if (auto shapedType = llvm::dyn_cast<ShapedType>(typeAttr.getValue())) {
+        requiredCount += shapedType.getNumDynamicDims();
+      }
     }
   }
   if (dynamicDims.size() != requiredCount) {
@@ -365,6 +387,375 @@ static void printEncodedResourceOperands(OpAsmPrinter &p, Operation *op,
       });
   p.decreaseIndent();
   p.printNewline();
+}
+
+//===----------------------------------------------------------------------===//
+// custom<EncodedShapedTypeList>
+//===----------------------------------------------------------------------===//
+// encoding{%dim0, %dim1} in type{%size0}, type, type{%size1}
+
+static ParseResult
+parseShapedType(OpAsmParser &parser, Type &type,
+                SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dims) {
+  if (failed(parser.parseType(type))) {
+    return failure();
+  }
+  if (auto shapedType = dyn_cast<ShapedType>(type)) {
+    if (!shapedType.hasStaticShape()) {
+      SmallVector<OpAsmParser::UnresolvedOperand> dynamicDims;
+      if (failed(parser.parseLBrace()) ||
+          failed(parser.parseOperandList(dynamicDims,
+                                         shapedType.getNumDynamicDims(),
+                                         OpAsmParser::Delimiter::None)) ||
+          failed(parser.parseRBrace())) {
+        return failure();
+      }
+      dims.append(dynamicDims);
+    }
+  } else if (isa<IREE::Util::SizeAwareTypeInterface>(type)) {
+    OpAsmParser::UnresolvedOperand size;
+    if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
+        failed(parser.parseRBrace())) {
+      return failure();
+    }
+    dims.push_back(size);
+  }
+  return success();
+}
+
+static void printSizedType(OpAsmPrinter &p, Operation *op, Type type,
+                           Value size) {
+  p.printType(type);
+  p << "{";
+  p.printOperand(size);
+  p << "}";
+}
+
+static OperandRange printShapedType(OpAsmPrinter &p, Operation *op, Type type,
+                                    OperandRange dims) {
+  p.printType(type);
+  if (auto shapedType = dyn_cast<ShapedType>(type)) {
+    if (!shapedType.hasStaticShape()) {
+      if (dims.empty()) {
+        p << "{<<INVALID>>}";
+        return dims;
+      }
+      p << "{";
+      llvm::interleaveComma(dims.take_front(shapedType.getNumDynamicDims()), p,
+                            [&](Value value) { p.printOperand(value); });
+      p << "}";
+      dims = dims.drop_front(shapedType.getNumDynamicDims());
+    }
+  } else if (isa<IREE::Util::SizeAwareTypeInterface>(type)) {
+    p << "{";
+    p.printOperand(dims.front());
+    p << "}";
+    dims = dims.drop_front(1);
+  }
+  return dims;
+}
+
+static ParseResult parseEncodedShapedTypeList(
+    OpAsmParser &parser, SmallVectorImpl<Type> &types,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sizes,
+    SmallVectorImpl<Type> &encodings,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &encodingDims) {
+  do {
+    Type type0;
+    SmallVector<OpAsmParser::UnresolvedOperand> dims0;
+    if (failed(parseShapedType(parser, type0, dims0))) {
+      return failure();
+    }
+    if (succeeded(parser.parseOptionalKeyword("in"))) {
+      Type type1;
+      SmallVector<OpAsmParser::UnresolvedOperand> dims1;
+      if (failed(parseShapedType(parser, type1, dims1))) {
+        return failure();
+      }
+      types.push_back(type1);
+      sizes.append(dims1);
+      encodings.push_back(type0);
+      encodingDims.append(dims0);
+    } else {
+      types.push_back(type0);
+      sizes.append(dims0);
+      encodings.push_back(IREE::Util::UnusedType::get(parser.getContext()));
+    }
+  } while (succeeded(parser.parseOptionalComma()));
+  return success();
+}
+
+static void printEncodedShapedTypeList(OpAsmPrinter &p, Operation *op,
+                                       TypeRange types, OperandRange sizes,
+                                       ArrayAttr encodings,
+                                       OperandRange encodingDims) {
+  llvm::interleaveComma(
+      llvm::zip_equal(types, encodings.getAsValueRange<TypeAttr>()), p,
+      [&](std::tuple<Type, Type> it) {
+        auto [type, encoding] = it;
+        if (!isa<IREE::Util::UnusedType>(encoding)) {
+          encodingDims = printShapedType(p, op, encoding, encodingDims);
+          p << " in ";
+        }
+        sizes = printShapedType(p, op, type, sizes);
+      });
+}
+
+//===----------------------------------------------------------------------===//
+// custom<EncodedShapedResultList>
+//===----------------------------------------------------------------------===//
+// encoding{%dim0, %dim1} in type{%dim2}, type{%size}, %operand4
+//
+// Supported result formats:
+//   type{%size}
+//   %operand as type{%size}
+//   encoding{%dim0, %dim1} in %operand4
+//   encoding{%dim0, %dim1} in %operand4 as type{%size}
+
+static ParseResult parseEncodedShapedResultList(
+    OpAsmParser &parser, ArrayRef<OpAsmParser::UnresolvedOperand> operands,
+    TypeRange operandTypes,
+    ArrayRef<OpAsmParser::UnresolvedOperand> operandSizes,
+    SmallVectorImpl<Type> &resultTypes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultSizes,
+    SmallVectorImpl<Type> &resultEncodingTypes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultEncodingDims,
+    ArrayAttr &tiedOperands) {
+  SmallVector<int64_t> tiedOperandIndices;
+  do {
+    Type type0;
+    SmallVector<OpAsmParser::UnresolvedOperand> dims0;
+    auto typeResult = parser.parseOptionalType(type0);
+    if (typeResult.has_value() && succeeded(typeResult.value())) {
+      if (auto shapedType = dyn_cast<ShapedType>(type0)) {
+        if (!shapedType.hasStaticShape()) {
+          if (failed(parser.parseLBrace()) ||
+              failed(parser.parseOperandList(dims0,
+                                             shapedType.getNumDynamicDims(),
+                                             OpAsmParser::Delimiter::None)) ||
+              failed(parser.parseRBrace())) {
+            return failure();
+          }
+        }
+      } else if (auto sizedType =
+                     dyn_cast<IREE::Util::SizeAwareTypeInterface>(type0)) {
+        OpAsmParser::UnresolvedOperand size;
+        if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
+            failed(parser.parseRBrace())) {
+          return failure();
+        }
+        dims0.push_back(size);
+      }
+    }
+
+    // Type only:
+    if (failed(parser.parseOptionalKeyword("in"))) {
+      resultTypes.push_back(type0);
+      resultSizes.append(dims0);
+      resultEncodingTypes.push_back(
+          IREE::Util::UnusedType::get(parser.getContext()));
+      tiedOperandIndices.push_back(IREE::Util::TiedOpInterface::kUntiedIndex);
+      continue;
+    }
+
+    // Check for optional tied result reference.
+    OpAsmParser::UnresolvedOperand tiedResult;
+    auto res = parser.parseOptionalOperand(tiedResult);
+    Type resultType;
+    int64_t tiedOperandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
+    if (res.has_value() && succeeded(res.value())) {
+      tiedOperandIndex = findTiedOperand(tiedResult, operands);
+      if (tiedOperandIndex == IREE::Util::TiedOpInterface::kUntiedIndex) {
+        return parser.emitError(tiedResult.location,
+                                "tied operand not found for result reference ")
+               << tiedResult.name;
+      }
+      if (succeeded(parser.parseOptionalKeyword("as"))) {
+        // Type _may_ differ from the operand.
+        if (failed(parser.parseType(resultType))) {
+          return failure();
+        }
+      } else {
+        // Use the operands type.
+        resultType = operandTypes[tiedOperandIndex];
+      }
+    } else if (failed(parser.parseType(resultType))) {
+      return failure();
+    }
+
+    // Parse optional type dimensions (usually resource size here).
+    if (auto sizedType =
+            dyn_cast<IREE::Util::SizeAwareTypeInterface>(resultType)) {
+      OpAsmParser::UnresolvedOperand size;
+      if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
+          failed(parser.parseRBrace())) {
+        return failure();
+      }
+      resultSizes.push_back(size);
+    }
+
+    resultTypes.push_back(resultType);
+    resultEncodingTypes.push_back(type0);
+    resultEncodingDims.append(dims0);
+    tiedOperandIndices.push_back(tiedOperandIndex);
+  } while (succeeded(parser.parseOptionalComma()));
+  if (!tiedOperandIndices.empty()) {
+    tiedOperands = parser.getBuilder().getIndexArrayAttr(tiedOperandIndices);
+  }
+  return success();
+}
+
+static void printEncodedShapedResultList(
+    OpAsmPrinter &p, Operation *op, ValueRange operands, TypeRange operandTypes,
+    OperandRange operandSizes, TypeRange resultTypes, OperandRange resultSizes,
+    ArrayAttr resultEncodings, OperandRange resultEncodingDims,
+    ArrayAttr tiedOperands) {
+  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op);
+  for (unsigned i = 0; i < resultTypes.size(); ++i) {
+    auto resultEncodingType =
+        cast<TypeAttr>(resultEncodings.getValue()[i]).getValue();
+    if (!isa<IREE::Util::UnusedType>(resultEncodingType)) {
+      p.printType(resultEncodingType);
+      if (auto shapedType = dyn_cast<ShapedType>(resultEncodingType)) {
+        if (!shapedType.hasStaticShape()) {
+          if (resultEncodingDims.empty()) {
+            p << "{<<INVALID>>}";
+            return;
+          }
+          p << "{";
+          llvm::interleaveComma(
+              resultEncodingDims.take_front(shapedType.getNumDynamicDims()), p,
+              [&](Value value) { p.printOperand(value); });
+          p << "}";
+          resultEncodingDims =
+              resultEncodingDims.drop_front(shapedType.getNumDynamicDims());
+        }
+      } else if (auto sizedType = dyn_cast<IREE::Util::SizeAwareTypeInterface>(
+                     resultEncodingType)) {
+        p << "{";
+        p.printOperand(resultEncodingDims.front());
+        p << "}";
+        resultEncodingDims = resultEncodingDims.drop_front(1);
+      }
+      p << " in ";
+    }
+    auto resultType = resultTypes[i];
+    auto tiedOperandIndex =
+        tiedOp ? tiedOp.getTiedResultOperandIndex(i) : std::nullopt;
+    bool printType = true;
+    if (tiedOperandIndex.has_value()) {
+      auto tiedOperand = op->getOperand(tiedOperandIndex.value());
+      p.printOperand(tiedOperand);
+      if (tiedOperand.getType() != resultType) {
+        p << " as ";
+      } else {
+        // Type elided as it matches the operand.
+        printType = false;
+      }
+    }
+    if (printType) {
+      p.printType(resultType);
+    }
+    if (auto sizedType =
+            dyn_cast<IREE::Util::SizeAwareTypeInterface>(resultType)) {
+      p << "{";
+      p.printOperand(resultSizes.front());
+      p << "}";
+      resultSizes = resultSizes.drop_front(1);
+    }
+    if (i < resultTypes.size() - 1) {
+      p << ", ";
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// custom<EncodedShapedFunctionType>
+//===----------------------------------------------------------------------===//
+// (type, encoding{%dim0, %dim1} in type{%size}, type) ->
+//     (encoding{%dim} in type{%size}, %operand4)
+
+static ParseResult parseEncodedShapedFunctionType(
+    OpAsmParser &parser, ArrayRef<OpAsmParser::UnresolvedOperand> operands,
+    SmallVectorImpl<Type> &operandTypes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operandSizes,
+    ArrayAttr &operandEncodings,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operandEncodingDims,
+    SmallVectorImpl<Type> &resultTypes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultSizes,
+    ArrayAttr &resultEncodings,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultEncodingDims,
+    ArrayAttr &tiedOperands) {
+  SmallVector<Type> operandEncodingTypes;
+  SmallVector<Type> resultEncodingTypes;
+  if (failed(parser.parseLParen())) {
+    return failure();
+  }
+  if (failed(parser.parseOptionalRParen())) {
+    if (failed(parseEncodedShapedTypeList(parser, operandTypes, operandSizes,
+                                          operandEncodingTypes,
+                                          operandEncodingDims)) ||
+        failed(parser.parseRParen())) {
+      return failure();
+    }
+  }
+  if (failed(parser.parseArrow())) {
+    return failure();
+  }
+  if (succeeded(parser.parseOptionalLParen())) {
+    if (succeeded(parser.parseOptionalRParen())) {
+      // Empty list/no results `()`.
+    } else {
+      // One or more result types.
+      if (failed(parseEncodedShapedResultList(
+              parser, operands, operandTypes, operandSizes, resultTypes,
+              resultSizes, resultEncodingTypes, resultEncodingDims,
+              tiedOperands)) ||
+          failed(parser.parseRParen())) {
+        return failure();
+      }
+    }
+  } else {
+    // Single result with omitted `()`.
+    if (failed(parseEncodedShapedResultList(
+            parser, operands, operandTypes, operandSizes, resultTypes,
+            resultSizes, resultEncodingTypes, resultEncodingDims,
+            tiedOperands))) {
+      return failure();
+    }
+  }
+  operandEncodings = ArrayAttr::get(
+      parser.getContext(),
+      llvm::map_to_vector(operandEncodingTypes, [](Type type) -> Attribute {
+        return type ? TypeAttr::get(type) : Attribute{};
+      }));
+  resultEncodings = ArrayAttr::get(
+      parser.getContext(),
+      llvm::map_to_vector(resultEncodingTypes, [](Type type) -> Attribute {
+        return TypeAttr::get(type);
+      }));
+  return success();
+}
+
+static void printEncodedShapedFunctionType(
+    OpAsmPrinter &p, Operation *op, ValueRange operands, TypeRange operandTypes,
+    OperandRange operandSizes, ArrayAttr operandEncodings,
+    OperandRange operandEncodingDims, TypeRange resultTypes,
+    OperandRange resultSizes, ArrayAttr resultEncodings,
+    OperandRange resultEncodingDims, ArrayAttr tiedOperands) {
+  p << "(";
+  printEncodedShapedTypeList(p, op, operandTypes, operandSizes,
+                             operandEncodings, operandEncodingDims);
+  p << ") -> ";
+  if (resultTypes.size() != 1) {
+    p << "(";
+  }
+  printEncodedShapedResultList(p, op, operands, operandTypes, operandSizes,
+                               resultTypes, resultSizes, resultEncodings,
+                               resultEncodingDims, tiedOperands);
+  if (resultTypes.size() != 1) {
+    p << ")";
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -1705,6 +2096,70 @@ ValueRange TensorTraceOp::getResultDynamicDims(unsigned idx) {
 }
 
 //===----------------------------------------------------------------------===//
+// stream.tensor.dispatch
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorDispatchOp::verify() {
+  TensorDispatchOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getMixedOperands(),
+                                op.getOperandSizes())) ||
+      failed(verifyOpValueSizes(op, op.getResults(), op.getResultSizes()))) {
+    return failure();
+  }
+  if (failed(verifyOpDynamicDimsRange(op, op.getOperandEncodings(),
+                                      op.getOperandEncodingDims())) ||
+      failed(verifyOpDynamicDimsRange(op, op.getResultEncodings(),
+                                      op.getResultEncodingDims()))) {
+    return failure();
+  }
+  return success();
+}
+
+static LogicalResult
+verifyDispatchSymbolUses(Operation *op, ArrayAttr entryPointsAttr,
+                         ValueRange workload,
+                         SymbolTableCollection &symbolTable) {
+  auto entryPointAttrs = entryPointsAttr.getAsRange<SymbolRefAttr>();
+  if (entryPointAttrs.empty()) {
+    return op->emitOpError() << "at least one entry point must be defined";
+  }
+  for (auto entryPointAttr : entryPointAttrs) {
+    auto exportOp =
+        symbolTable.lookupNearestSymbolFrom<IREE::Stream::ExecutableExportOp>(
+            op, entryPointAttr);
+    if (!exportOp) {
+      // TODO(benvanik): there are a lot of tests that are assuming this is not
+      // verified. We'll need to go add dummy executables for all of them. Today
+      // we just bail on the verifier if the symbol isn't found.
+      //
+      // Should be:
+      //   return op->emitOpError() << "undefined entry point: " <<
+      //   entry_point();
+      return success();
+    }
+
+    // Verify that the workload parameters captured match the target export.
+    if (failed(verifyDispatchWorkload(op, exportOp, workload))) {
+      return failure();
+    }
+
+    // TODO(benvanik): verify that the target function has matching operands.
+  }
+  return success();
+}
+
+LogicalResult
+TensorDispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+  return verifyDispatchSymbolUses(getOperation(), getEntryPointsAttr(),
+                                  getWorkload(), symbolTable);
+}
+
+std::pair<unsigned, unsigned>
+TensorDispatchOp::getTiedOperandsIndexAndLength() {
+  return getODSOperandIndexAndLength(1); // $operands
+}
+
+//===----------------------------------------------------------------------===//
 // stream.async.alloca
 //===----------------------------------------------------------------------===//
 
@@ -2220,34 +2675,8 @@ LogicalResult AsyncDispatchOp::verify() {
 
 LogicalResult
 AsyncDispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
-  Operation *op = getOperation();
-  auto entryPointRefs = getEntryPointRefs();
-  if (entryPointRefs.empty()) {
-    return emitOpError() << "at least one entry point must be defined";
-  }
-  for (auto entryPointAttr : entryPointRefs) {
-    auto exportOp =
-        symbolTable.lookupNearestSymbolFrom<IREE::Stream::ExecutableExportOp>(
-            op, entryPointAttr);
-    if (!exportOp) {
-      // TODO(benvanik): there are a lot of tests that are assuming this is not
-      // verified. We'll need to go add dummy executables for all of them. Today
-      // we just bail on the verifier if the symbol isn't found.
-      //
-      // Should be:
-      //   return op->emitOpError() << "undefined entry point: " <<
-      //   entry_point();
-      return success();
-    }
-
-    // Verify that the workload parameters captured match the target export.
-    if (failed(verifyDispatchWorkload(op, exportOp, getWorkload()))) {
-      return failure();
-    }
-
-    // TODO(benvanik): verify that the target function has matching operands.
-  }
-  return success();
+  return verifyDispatchSymbolUses(getOperation(), getEntryPointsAttr(),
+                                  getWorkload(), symbolTable);
 }
 
 std::pair<unsigned, unsigned> AsyncDispatchOp::getTiedOperandsIndexAndLength() {
