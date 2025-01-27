@@ -63,31 +63,43 @@ struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
     }
 
     // Check if the producerOp is fusible
-    if (producerOp.getNumDpsInputs() != 1 || producerOp.getNumResults() != 1 ||
-        !isElementwise(producerOp) ||
+    if (!isElementwise(producerOp) ||
         !IREE::LinalgExt::isBitExtendOp(producerOp)) {
       return rewriter.notifyMatchFailure(producerOp,
                                          "producer op is not fusible");
     }
 
+    auto result = cast<OpResult>(extractOp.getTensor());
+    auto resultMap = producerOp.getIndexingMapMatchingResult(result);
+    const SmallVector<int64_t> resultPerm = llvm::map_to_vector<4>(
+        resultMap.getResults(), [](AffineExpr expr) -> int64_t {
+          return cast<AffineDimExpr>(expr).getPosition();
+        });
+
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(extractOp);
 
-    // Create a new extract op that extracts from the original tensor
-    // (after the original extract). Clone the producerOp's body into the
-    // consumerOp, inline the cloned block (erases the block) after the new
-    // extract, and clean up.
-    auto newExtractOp = rewriter.create<tensor::ExtractOp>(
-        extractOp.getLoc(), producerOp.getDpsInputOperand(0)->get(),
-        extractOp.getIndices());
+    SmallVector<Value> extractOps;
+    for (OpOperand &operand : producerOp->getOpOperands()) {
+      auto map = producerOp.getMatchingIndexingMap(&operand);
+      auto perm = llvm::map_to_vector<4>(
+          map.getResults(), [](AffineExpr expr) -> int64_t {
+            return cast<AffineDimExpr>(expr).getPosition();
+          });
+      SmallVector<Value, 4> indices = extractOp.getIndices();
+      perm = applyPermutation(perm, resultPerm);
+      indices = applyPermutation(indices, perm);
+      auto newExtract = rewriter.create<tensor::ExtractOp>(
+          extractOp.getLoc(), operand.get(), indices);
+      extractOps.push_back(newExtract);
+    }
     rewriter.cloneRegionBefore(producerOp.getRegion(), consumerOp.getRegion(),
                                consumerOp.getRegion().begin());
     Block &clonedBlock = consumerOp.getRegion().front();
     auto producerTermOp = clonedBlock.getTerminator();
 
-    rewriter.inlineBlockBefore(
-        &clonedBlock, extractOp->getNextNode(),
-        {newExtractOp.getResult(), newExtractOp.getResult()});
+    rewriter.inlineBlockBefore(&clonedBlock, extractOp->getNextNode(),
+                               extractOps);
 
     // Replace the the all references to the original extract result with the
     // result from the inlined producerOp.
