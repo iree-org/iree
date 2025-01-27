@@ -7,11 +7,12 @@
 #include "iree/compiler/Utils/Indexing.h"
 
 using namespace mlir;
-using namespace mlir::iree_compiler;
 
-LogicalResult mlir::iree_compiler::basisFromSizesStrides(
-    ArrayRef<int64_t> sizes, ArrayRef<int64_t> strides,
-    SmallVectorImpl<int64_t> &basis, SmallVectorImpl<size_t> &dimToResult) {
+namespace mlir::iree_compiler {
+LogicalResult basisFromSizesStrides(ArrayRef<int64_t> sizes,
+                                    ArrayRef<int64_t> strides,
+                                    SmallVectorImpl<int64_t> &basis,
+                                    SmallVectorImpl<size_t> &dimToResult) {
   assert(sizes.size() == strides.size());
   size_t numDims = sizes.size();
   basis.reserve(numDims);
@@ -63,3 +64,4 @@ LogicalResult mlir::iree_compiler::basisFromSizesStrides(
   }
   return success();
 }
+} // namespace mlir::iree_compiler
