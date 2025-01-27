@@ -151,6 +151,7 @@ iree_cc_library(
     "TypePropagationPass.cpp"
     "UnrollAnnotatedLoops.cpp"
     "UserConfig.cpp"
+    "VectorTransferLowering.cpp"
     "VectorizeMemrefCopy.cpp"
     "VerifyWorkgroupDistribution.cpp"
   DEPS
@@ -204,6 +205,7 @@ iree_cc_library(
     MLIRTransforms
     MLIRValueBoundsOpInterface
     MLIRVectorDialect
+    MLIRVectorToSCF
     MLIRVectorTransforms
     MLIRViewLikeInterface
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
