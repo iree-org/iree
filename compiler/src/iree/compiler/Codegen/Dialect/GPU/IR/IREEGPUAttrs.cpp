@@ -477,7 +477,7 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
 
   OpFoldResult zero = builder.getIndexAttr(0);
   OpFoldResult one = builder.getIndexAttr(1);
-  Value cZero = builder.createOrFold<arith::ConstantIndexOp>(loc, 0);
+  Value cZero = builder.create<arith::ConstantIndexOp>(loc, 0);
   canonicalStrides.append(rankReducedShape.size(), one);
 
   SmallVector<Value> vtids;
