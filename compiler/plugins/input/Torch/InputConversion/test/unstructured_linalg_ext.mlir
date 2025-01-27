@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(torch-iree-torch-unstructured-to-linalg-ext))" %s | FileCheck %s
 
-// CHECK:         #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d2)>
-// CHECK:         #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+// CHECK-DAG:         #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d2)>
+// CHECK-DAG:         #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 
 func.func @fft_rfft.with_transpose(%arg0: !torch.vtensor<[3,8,16],f32>) -> !torch.vtensor<[3,5,16],complex<f32>> {
     %int-2 = torch.constant.int -2
@@ -28,7 +28,7 @@ func.func @fft_rfft.with_transpose(%arg0: !torch.vtensor<[3,8,16],f32>) -> !torc
 // CHECK:             %[[VAR0:.*]] = torch.aten.transpose.int %arg0, %[[INT1]], %[[INT2]] : !torch.vtensor<[3,8,16],f32>, !torch.int, !torch.int -> !torch.vtensor<[3,16,8],f32>
 // CHECK:             %[[VAR1:.*]] = torch_c.to_builtin_tensor %[[VAR0]] : !torch.vtensor<[3,16,8],f32> -> tensor<3x16x8xf32>
 // CHECK-DAG:         %[[VAR2:.*]] = tensor.empty() : tensor<3x16x8xf32>
-// CHECK:             %[[VAR3:.*]] = linalg.generic {indexing_maps = [#%[[MAP]], #%[[MAP1]]], iterator_types = ["parallel", "parallel", "parallel"]} ins(%[[CST_6]] : tensor<8xi64>) outs(%[[VAR2]] : tensor<3x16x8xf32>) {
+// CHECK:             %[[VAR3:.*]] = linalg.generic {indexing_maps = [#[[$MAP]], #[[$MAP1]]], iterator_types = ["parallel", "parallel", "parallel"]} ins(%[[CST_6]] : tensor<8xi64>) outs(%[[VAR2]] : tensor<3x16x8xf32>) {
 // CHECK:             ^bb0(%in: i64, %out: f32):
 // CHECK:               %[[VAR15:.*]] = linalg.index 0 : index
 // CHECK:               %[[VAR16:.*]] = linalg.index 1 : index
@@ -77,7 +77,7 @@ func.func @fft_rfft.last(%arg0: !torch.vtensor<[3,8,16],f32>) -> !torch.vtensor<
 // CHECK-DAG:         %[[CST_8:.*]] = arith.constant dense<{{.*}}> : tensor<16xi64>
 // CHECK:             %[[VAR0:.*]] = torch_c.to_builtin_tensor %arg0 : !torch.vtensor<[3,8,16],f32> -> tensor<3x8x16xf32>
 // CHECK-DAG:         %[[VAR1:.*]] = tensor.empty() : tensor<3x8x16xf32>
-// CHECK:             %[[VAR2:.*]] = linalg.generic {indexing_maps = [#%[[MAP]], #%[[MAP1]]]], iterator_types = ["parallel", "parallel", "parallel"]} ins(%[[CST_8]] : tensor<16xi64>) outs(%[[VAR1]] : tensor<3x8x16xf32>) {
+// CHECK:             %[[VAR2:.*]] = linalg.generic {indexing_maps = [#[[$MAP]], #[[$MAP1]]], iterator_types = ["parallel", "parallel", "parallel"]} ins(%[[CST_8]] : tensor<16xi64>) outs(%[[VAR1]] : tensor<3x8x16xf32>) {
 // CHECK:             ^bb0(%in: i64, %out: f32):
 // CHECK:               %[[VAR14:.*]] = linalg.index 0 : index
 // CHECK:               %[[VAR15:.*]] = linalg.index 1 : index
