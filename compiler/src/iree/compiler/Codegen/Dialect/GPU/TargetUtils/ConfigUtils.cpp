@@ -790,14 +790,26 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
   int64_t numBatch = scatter.getBatchRank();
   // Currently bufferization will fail if the only dimension distributed to
   // workgroups is the batch dims because the workgroup level slice will fold
-  // away and cause a mismatch.
-  // TODO(qedawkins): Support this case.
+  // away and cause a mismatch. To work around this we ensure that at least one
+  // inner dim is always at least partially distributed to workgroups.
   if (llvm::all_of_zip(llvm::drop_begin(workgroupTileSizes, numBatch),
                        llvm::drop_begin(loopBounds, numBatch),
                        [](int64_t tileSize, int64_t bound) {
                          return tileSize == bound || tileSize == 0;
                        })) {
-    return failure();
+    bool hasNonUnitInnerSlice = false;
+    for (int i = numBatch, e = loopDepth; i < e; ++i) {
+      if (workgroupTileSizes[i] > 1) {
+        workgroupTileSizes[i] /= 2;
+        hasNonUnitInnerSlice = true;
+        break;
+      }
+    }
+    // If the inner most slice is a single element then we have to bail out.
+    // TODO: Support this case.
+    if (!hasNonUnitInnerSlice) {
+      return failure();
+    }
   }
 
   // Attach the MMA schedule as an attribute to the entry point export function
