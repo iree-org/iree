@@ -80,18 +80,20 @@ struct FuseTransposeWithAttentionOp final
     int64_t inputIndex = operand->getOperandNumber();
 
     auto producerMaps = producer.getIndexingMapsArray();
-    AffineMap inMap = producerMaps[0];
-    AffineMap outMap = producerMaps[1];
-    if (!inMap.isProjectedPermutation() || !outMap.isPermutation()) {
+    AffineMap producerInputMap = producerMaps[0];
+    AffineMap producerResultMap = producerMaps[1];
+    if (!producerInputMap.isProjectedPermutation() ||
+        !producerResultMap.isPermutation()) {
       return failure();
     }
 
     rewriter.modifyOpInPlace(attentionOp, [&]() {
       SmallVector<AffineMap> newIndexingMaps =
           attentionOp.getIndexingMapsArray();
-      AffineMap inputMap = attentionOp.getMatchingIndexingMap(operand);
-      AffineMap composedMap = inMap.compose(inversePermutation(outMap));
-      newIndexingMaps[inputIndex] = composedMap.compose(inputMap);
+      AffineMap consumerInputMap = attentionOp.getMatchingIndexingMap(operand);
+      AffineMap composedMap =
+          producerInputMap.compose(inversePermutation(producerResultMap));
+      newIndexingMaps[inputIndex] = composedMap.compose(consumerInputMap);
       attentionOp.setIndexingMapsAttr(
           rewriter.getAffineMapArrayAttr(newIndexingMaps));
       attentionOp.setOperand(inputIndex, producer.getDpsInputs()[0]);
