@@ -267,14 +267,14 @@ matchIteratorTypes(const llvm::SmallBitVector &rootOuterParallelLoop,
 
   // If the candidate is all parallel, then it should be at least as parallel as
   // the root.
-  for (int pos : llvm::seq<int>(0, rootOuterParallelLoop.size())) {
+  for (int pos : llvm::seq<int>(0, std::min(candidateOuterParallelLoop.size(),
+                                            rootOuterParallelLoop.size()))) {
     // If we reach the end of the outer loops of the root, break out of the
     // loop.
     if (!rootOuterParallelLoop.test(pos))
       break;
     // If the root loop is parallel, the candidate loop should also be parallel.
-    if (pos >= candidateOuterParallelLoop.size() ||
-        !candidateOuterParallelLoop.test(pos))
+    if (!candidateOuterParallelLoop.test(pos))
       return false;
   }
   return true;
@@ -633,11 +633,6 @@ isFusableWithProducer(OpOperand &operand,
     return true;
   }
 
-  // TODO: Enable scatter fusion when supported by backends.
-  if (isa<IREE::LinalgExt::ScatterOp>(consumer)) {
-    return false;
-  }
-
   if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(consumer)) {
     // Fuse with the rope computation if it is a gather operation.
     if (IREE::LinalgExt::isGatherlikeOp(producer)) {
@@ -693,13 +688,15 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root, unsigned groupNum,
   SmallVector<Operation *> worklist;
   worklist.push_back(root);
   llvm::SmallBitVector rootOuterParallelLoops = getOuterParallelLoops(root);
+  IREE::Flow::ClonableIntoDispatchOptions clonableOptions;
+  clonableOptions.aggressive = options.aggressiveFusion;
   while (!worklist.empty()) {
     Operation *candidate = worklist.pop_back_val();
     for (OpOperand &operand : candidate->getOpOperands()) {
       Operation *producer = operand.get().getDefiningOp();
       if (!producer)
         continue;
-      if (IREE::Flow::isClonableIntoDispatchOp(producer) ||
+      if (IREE::Flow::isClonableIntoDispatchOp(producer, clonableOptions) ||
           hasFusionGroupsAttribute(producer) || hasRootOpAttribute(producer)) {
         continue;
       }
@@ -734,6 +731,8 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
                        unsigned numRootOps = 0) {
   MLIRContext *context = region.getContext();
   OpBuilder builder(context);
+  IREE::Flow::ClonableIntoDispatchOptions clonableOptions;
+  clonableOptions.aggressive = options.aggressiveFusion;
   for (Block &block : region) {
     // Dispatch region formation works by first cloning the root into
     // the dispatch region and then pulling operations in.
@@ -778,7 +777,7 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // materializing large tensors between dispatches.
       if (!isa<linalg::LinalgOp, tensor::PadOp, tensor::PackOp,
                IREE::Encoding::SetEncodingOp>(op) ||
-          IREE::Flow::isClonableIntoDispatchOp(&op)) {
+          IREE::Flow::isClonableIntoDispatchOp(&op, clonableOptions)) {
         continue;
       }
 

@@ -358,6 +358,27 @@ func.func @small_scatter(%arg0: tensor<3x32x16xf32>,
 
 // -----
 
+func.func @smaller_scatter(%arg0: tensor<3x4x16xf32>,
+                         %arg1: tensor<3x1xi32>) -> tensor<3x4x16xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<3x4x16xf32>
+  %1 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%arg0, %arg1 : tensor<3x4x16xf32>, tensor<3x1xi32>) outs(%0 : tensor<3x4x16xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    iree_linalg_ext.yield %arg2 : f32
+  } -> tensor<3x4x16xf32>
+  return %1 : tensor<3x4x16xf32>
+}
+
+// CHECK-LABEL: func.func @smaller_scatter
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+
+//       CHECK:   linalg_ext.scatter {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1, 4]
+//  CHECK-SAME:     workgroup = [3, 2, 16]
+
+// -----
+
 func.func @only_scattered_dim(%arg0: tensor<48xf32>,
                               %arg1: tensor<48x2xi32>) -> tensor<100x100xf32> {
   %cst = arith.constant 0.000000e+00 : f32
@@ -423,3 +444,35 @@ func.func @elementwise_scatter(%arg0: tensor<3x2048x2048xf32>,
 
 // Verify that the scatter does not get a lowering config
 //       CHECK:   linalg_ext.scatter dimension_map
+
+// -----
+
+func.func @scatter_as_root_op(%arg0: tensor<4x?xi64>,
+                              %arg1: tensor<4x?x32x8x128xf16>) -> tensor<?x32x8x128xf16> {
+  %i1 = arith.constant 1 : index
+  %0 = tensor.dim %arg0, %i1 : tensor<4x?xi64>
+  %1 = tensor.empty(%0) : tensor<4x?xi32>
+  %2 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%arg0 : tensor<4x?xi64>) outs(%1 : tensor<4x?xi32>) {
+  ^bb0(%in: i64, %out: i32):
+    %3 = arith.trunci %in : i64 to i32
+    linalg.yield %3 : i32
+  } -> tensor<4x?xi32>
+
+  %4 = tensor.dim %arg1, %i1 : tensor<4x?x32x8x128xf16>
+  %5 = tensor.empty(%4) : tensor<?x32x8x128xf16>
+  %6 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true) ins(%arg1, %2 : tensor<4x?x32x8x128xf16>, tensor<4x?xi32>) outs(%5 : tensor<?x32x8x128xf16>) {
+  ^bb0(%arg2: f16, %arg3: f16):
+    iree_linalg_ext.yield %arg2 : f16
+  } -> tensor<?x32x8x128xf16>
+  return %6 : tensor<?x32x8x128xf16>
+}
+
+// CHECK-LABEL: func.func @scatter_as_root_op
+
+// Verify that the linalg.generic does not get a lowering config
+// CHECK:      linalg.generic
+// CHECK-SAME: {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+// CHECK-SAME: ins(%arg0 : tensor<4x?xi64>) outs({{.*}} : tensor<4x?xi32>) {
+
+// Verify that the scatter op gets a lowering config
+// CHECK:      iree_linalg_ext.scatter {{.*}}lowering_config =

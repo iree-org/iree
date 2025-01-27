@@ -266,3 +266,27 @@ func.func @gather_like(%base : tensor<16384x16x32x128xf16>,
 // CHECK-LABEL: func.func @gather_like
 // CHECK: %[[OUT:.+]] = linalg.generic
 // CHECK: to_layout %[[OUT]] to layout(#[[$LAYOUT]])
+
+// -----
+
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+                                              workgroup_size = [64, 1, 1]
+                                              subgroup_size = 64>
+
+func.func @dynamic_infer_sizes(%in : tensor<4x32x?x128xf16>) -> tensor<1x1x?x128xf16> attributes { translation_info = #translation } {
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %d2 = tensor.dim %in, %c2 : tensor<4x32x?x128xf16>
+  %45 = affine.min affine_map<(d0)[s0] -> (-d0 + s0, 1024)>(%c0)[%d2]
+  %extracted_slice_5 = tensor.extract_slice %in[%c0, %c0, %c0, 0] [1, 1, %45, 128] [1, 1, 1, 1] : tensor<4x32x?x128xf16> to tensor<1x1x?x128xf16>
+  %49 = tensor.empty(%45) : tensor<1x1x?x128xf16>
+  %50 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config} ins(%extracted_slice_5 : tensor<1x1x?x128xf16>) outs(%49 : tensor<1x1x?x128xf16>) -> tensor<1x1x?x128xf16>
+  return %50 : tensor<1x1x?x128xf16>
+}
+
+// CHECK-DAG: #[[LAYOUT:.+]] = #iree_vector_ext.nested_layout<subgroup_tile = [1, 1, 1, 1], batch_tile = [1, 1, 256, 1], outer_tile = [1, 1, 1, 1], thread_tile = [1, 1, 4, 16], element_tile = [1, 1, 1, 8], subgroup_strides = [0, 0, 0, 0], thread_strides = [0, 0, 16, 1]>
+
+// CHECK: %[[EXTRACT:.+]] = tensor.extract_slice %arg0{{.*}} : tensor<4x32x?x128xf16> to tensor<1x1x?x128xf16>
+// CHECK: %[[EMPTY:.+]] = tensor.empty({{.*}}) : tensor<1x1x?x128xf16>
+// CHECK: %[[COPY:.+]] = linalg.copy {{.*}} ins(%[[EXTRACT]] : tensor<1x1x?x128xf16>) outs(%[[EMPTY]] : tensor<1x1x?x128xf16>)
+// CHECK: iree_vector_ext.to_layout %[[COPY]] to layout(#[[LAYOUT]]) : tensor<1x1x?x128xf16>

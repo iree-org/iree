@@ -646,9 +646,14 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # Some parts of the build use FindPython instead of FindPython3. Why? No
   # one knows, but they are different. So make sure to bootstrap this one too.
   # Not doing this here risks them diverging, which on multi-Python systems,
-  # can be troublesome. Note that pybind11 and nanobind require FindPython.
+  # can be troublesome. Note that nanobind requires FindPython.
   set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
   find_package(Python 3.9 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
+  if(APPLE)
+    # Workaround for upstream using PyClassMethod_New but nanobind not being aware
+    # see https://github.com/iree-org/iree/issues/19591
+    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -Wl,-U -Wl,_PyClassMethod_New")
+  endif()
 elseif(IREE_BUILD_COMPILER OR IREE_BUILD_TESTS)
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
   set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
@@ -783,30 +788,6 @@ if(IREE_BUILD_PYTHON_BINDINGS OR IREE_BUILD_COMPILER)
     GIT_TAG        0f9ce749b257fdfe701edb3cf6f7027ba029434a # v2.4.0
   )
   FetchContent_MakeAvailable(nanobind)
-endif()
-
-# Both the IREE and MLIR Python bindings require pybind11. We initialize it here
-# at the top level so that everything uses ours consistently.
-if(IREE_BUILD_PYTHON_BINDINGS AND IREE_BUILD_COMPILER)
-  set(pybind11_VERSION 2.13.6)
-  include(FetchContent)
-  FetchContent_Declare(
-      pybind11
-      GIT_REPOSITORY https://github.com/pybind/pybind11
-      GIT_TAG        v${pybind11_VERSION}
-  )
-  set(PYBIND11_FINDPYTHON ON)
-  FetchContent_MakeAvailable(pybind11)
-  # pybind11 source fetches do not include find_package integration, which is
-  # a shame since sub-projects can require that to work. If we were using
-  # CMake 3.24, we could just add OVERRIDE_FIND_PACKAGE to the
-  # FetchContent_Declare call above and it would take care of doing the
-  # following to let subsequent sub-project find_package calls to resolve
-  # successfully.
-  set(pybind11_DIR "${pybind11_BINARY_DIR}")
-  file(WRITE "${pybind11_BINARY_DIR}/pybind11Config.cmake" "")
-  file(WRITE "${pybind11_BINARY_DIR}/pybind11ConfigVersion.cmake"
-       "set(PACKAGE_VERSION ${pybind11_VERSION})\nset(PACKAGE_VERSION_COMPATIBLE TRUE)")
 endif()
 
 if(NOT IREE_BUILD_COMPILER)

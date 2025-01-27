@@ -35,9 +35,11 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Types.h"
@@ -424,11 +426,9 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   }
 
   Builder b(context);
-  SmallVector<NamedAttribute, 2> attrs;
-  attrs.emplace_back(StringAttr::get(context, "workgroup"),
-                     b.getI64ArrayAttr(workgroupTileSizes));
-  attrs.emplace_back(StringAttr::get(context, "reduction"),
-                     b.getI64ArrayAttr(reductionTileSizes));
+  SmallVector<NamedAttribute, 2> attrs = {
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+      NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
   IREE::GPU::setPromotedOperandList(context, attrs, {0, 1});
   IREE::GPU::setMmaKind(context, attrs, mmaKinds[schedule->index]);
   IREE::GPU::setSubgroupMCount(context, attrs, schedule->mSubgroupCounts[0]);
@@ -447,9 +447,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
         /*use_igemm_convolution=*/false,
         /*reorder_workgroups_strategy=*/std::nullopt);
     pipelineAttrs.emplace_back(
-        StringAttr::get(context,
-                        IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
-        pipelineOptions);
+        IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName(), pipelineOptions);
   }
 
   auto pipelineConfig = DictionaryAttr::get(context, pipelineAttrs);
@@ -687,11 +685,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
                                        *contractionDims, reductionTileSizes));
 
   Builder b(context);
-  SmallVector<NamedAttribute, 2> attrs;
-  attrs.emplace_back(StringAttr::get(context, "workgroup"),
-                     b.getI64ArrayAttr(workgroupTileSizes));
-  attrs.emplace_back(StringAttr::get(context, "reduction"),
-                     b.getI64ArrayAttr(reductionTileSizes));
+  SmallVector<NamedAttribute, 2> attrs = {
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+      NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
   IREE::GPU::setPromotedOperandList(context, attrs, {0, 1});
   IREE::GPU::setMmaKind(context, attrs, mmaKinds[schedule->index]);
   IREE::GPU::setSubgroupMCount(context, attrs, schedule->mSubgroupCounts[0]);
@@ -903,11 +899,9 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
 
   reductionTileSizes[k2Dim] = schedule->kTileSizes[0] * schedule->kSize;
 
-  SmallVector<NamedAttribute, 2> attrs;
-  attrs.emplace_back(StringAttr::get(context, "workgroup"),
-                     b.getI64ArrayAttr(workgroupTileSizes));
-  attrs.emplace_back(StringAttr::get(context, "reduction"),
-                     b.getI64ArrayAttr(reductionTileSizes));
+  SmallVector<NamedAttribute, 2> attrs = {
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+      NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
   IREE::GPU::setPromotedOperandList(context, attrs, {0, 1, 2});
 
   SmallVector<NamedAttribute, 2> qkConfig;
@@ -936,9 +930,8 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
 
   SmallVector<NamedAttribute, 2> qkAttrs;
   SmallVector<NamedAttribute, 2> pvAttrs;
-
-  qkAttrs.emplace_back(b.getNamedAttr("attention_qk_matmul", b.getUnitAttr()));
-  pvAttrs.emplace_back(b.getNamedAttr("attention_pv_matmul", b.getUnitAttr()));
+  qkAttrs.emplace_back("attention_qk_matmul", b.getUnitAttr());
+  pvAttrs.emplace_back("attention_pv_matmul", b.getUnitAttr());
 
   auto qkConfigDict = b.getDictionaryAttr(qkConfig);
   auto pvConfigDict = b.getDictionaryAttr(pvConfig);
@@ -948,8 +941,8 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   auto pvLoweringConfig =
       IREE::GPU::LoweringConfigAttr::get(context, pvConfigDict);
 
-  qkAttrs.emplace_back(b.getNamedAttr("lowering_config", qkLoweringConfig));
-  pvAttrs.emplace_back(b.getNamedAttr("lowering_config", pvLoweringConfig));
+  qkAttrs.emplace_back("lowering_config", qkLoweringConfig);
+  pvAttrs.emplace_back("lowering_config", pvLoweringConfig);
 
   auto qkAttrDict = b.getDictionaryAttr(qkAttrs);
   auto pvAttrDict = b.getDictionaryAttr(pvAttrs);
@@ -1131,11 +1124,9 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   MLIRContext *context = op.getContext();
 
-  SmallVector<NamedAttribute, 2> attrs;
-  attrs.emplace_back(StringAttr::get(context, "workgroup"),
-                     b.getI64ArrayAttr(workgroupTileSizes));
-  attrs.emplace_back(StringAttr::get(context, "reduction"),
-                     b.getI64ArrayAttr(reductionTileSizes));
+  SmallVector<NamedAttribute, 2> attrs = {
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+      NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
 
   SmallVector<NamedAttribute> qkConfig;
   IREE::GPU::setBasis(context, qkConfig, IREE::GPU::TilingLevel::Subgroup,
@@ -1160,17 +1151,17 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   auto pvLoweringConfig =
       IREE::GPU::LoweringConfigAttr::get(context, pvConfigDict);
 
-  qkAttrs.emplace_back(b.getNamedAttr("lowering_config", qkLoweringConfig));
-  pvAttrs.emplace_back(b.getNamedAttr("lowering_config", pvLoweringConfig));
+  qkAttrs.emplace_back("lowering_config", qkLoweringConfig);
+  pvAttrs.emplace_back("lowering_config", pvLoweringConfig);
 
   auto qkAttrDict = b.getDictionaryAttr(qkAttrs);
   auto pvAttrDict = b.getDictionaryAttr(pvAttrs);
 
   SmallVector<NamedAttribute, 2> decompositionConfig;
-  decompositionConfig.emplace_back(
-      b.getNamedAttr(IREE::LinalgExt::AttentionOp::getQKAttrStr(), qkAttrDict));
-  decompositionConfig.emplace_back(
-      b.getNamedAttr(IREE::LinalgExt::AttentionOp::getPVAttrStr(), pvAttrDict));
+  decompositionConfig.emplace_back(IREE::LinalgExt::AttentionOp::getQKAttrStr(),
+                                   qkAttrDict);
+  decompositionConfig.emplace_back(IREE::LinalgExt::AttentionOp::getPVAttrStr(),
+                                   pvAttrDict);
 
   // Set attention decomposition control config.
   op.setDecompositionConfigAttr(b.getDictionaryAttr(decompositionConfig));
@@ -1323,7 +1314,6 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
 
       auto context = op.getContext();
       Builder b(context);
-      SmallVector<NamedAttribute, 1> attrs;
 
       SmallVector<int64_t> threadTileSizes(numParallelLoops + numReductionLoops,
                                            0);
@@ -1339,12 +1329,10 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
           numParallelLoops + numReductionLoops, 0);
       reductionTileSizes[numParallelLoops + numReductionLoops - 1] = tileK;
 
-      attrs.emplace_back(b.getStringAttr("workgroup"),
-                         b.getI64ArrayAttr(workgroupTileSizes));
-      attrs.emplace_back(b.getStringAttr("thread"),
-                         b.getI64ArrayAttr(threadTileSizes));
-      attrs.emplace_back(b.getStringAttr("reduction"),
-                         b.getI64ArrayAttr(reductionTileSizes));
+      SmallVector<NamedAttribute, 3> attrs = {
+          NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+          NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes)),
+          NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
 
       auto configDict = b.getDictionaryAttr(attrs);
       auto loweringConfig =
@@ -2145,12 +2133,10 @@ static LogicalResult setArgmaxUkernelConfig(
 
   MLIRContext *context = op->getContext();
   Builder b(context);
-  SmallVector<NamedAttribute, 2> attrs;
-  attrs.emplace_back(StringAttr::get(context, "workgroup"),
-                     b.getI64ArrayAttr(workgroupTileSizes));
-  attrs.emplace_back(StringAttr::get(context, "reduction"),
-                     b.getI64ArrayAttr(reductionTileSizes));
-  attrs.emplace_back(StringAttr::get(context, "ukernel"), ukernelConfig);
+  SmallVector<NamedAttribute, 3> attrs = {
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+      NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes)),
+      NamedAttribute("ukernel", ukernelConfig)};
   IREE::GPU::setPromotedOperandList(context, attrs, {0, 1});
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
@@ -2516,6 +2502,9 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
 
   // Find the root operation. linalg.generic, linalg.fill, and scatter are not
   // root operations if there are other compute operations present.
+  // Also, construct a set of generic ops that are to be skipped. These generic
+  // ops that are used to compute scatter indices are not root operations.
+  llvm::SmallDenseSet<Operation *, 4> genericToSkip;
   for (Operation *op : llvm::reverse(computeOps)) {
     if (!isa<linalg::GenericOp, linalg::FillOp, IREE::LinalgExt::ScatterOp>(
             op)) {
@@ -2529,12 +2518,26 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
         break;
       }
     }
+
+    if (auto scatterOp = dyn_cast<IREE::LinalgExt::ScatterOp>(op)) {
+      Value indices = scatterOp.getIndices();
+      if (!indices.getDefiningOp()) {
+        continue;
+      }
+
+      // Mark scatter's backward slices(inclusive) as to skip.
+      BackwardSliceOptions options;
+      options.inclusive = true;
+      SetVector<Operation *> slices;
+      getBackwardSlice(indices, &slices, options);
+      genericToSkip.insert(slices.begin(), slices.end());
+    }
   }
 
   // Generic ops take priority over scatter and fill ops as the root op.
   if (!rootOperation) {
     for (Operation *op : llvm::reverse(computeOps)) {
-      if (isa<linalg::GenericOp>(op)) {
+      if (isa<linalg::GenericOp>(op) && !genericToSkip.contains(op)) {
         rootOperation = op;
         break;
       }

@@ -69,11 +69,8 @@ ArrayAttr deduplicateArrayElements(ArrayAttr arrayAttr) {
   return ArrayAttr::get(arrayAttr.getContext(), attrsSet.takeVector());
 }
 
-// Finds the operand index in |operands| that |tiedResult| references.
-// Returns TiedOpInterface::kUntiedIndex if no operand is found.
-static int64_t
-findTiedOperand(OpAsmParser::UnresolvedOperand tiedResult,
-                ArrayRef<OpAsmParser::UnresolvedOperand> operands) {
+int64_t findTiedOperand(OpAsmParser::UnresolvedOperand tiedResult,
+                        ArrayRef<OpAsmParser::UnresolvedOperand> operands) {
   int64_t operandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
   for (int64_t i = 0; i < operands.size(); ++i) {
     if (operands[i].name == tiedResult.name &&

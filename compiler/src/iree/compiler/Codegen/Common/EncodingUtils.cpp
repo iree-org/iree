@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -79,8 +80,35 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
   });
 }
 
+IREE::Codegen::MaterializeEncodingInfo
+MaterializeEncodingTypeConverter::getEncodingInfo(RankedTensorType type) const {
+  // If the layout is present in the encoding, use it directly. It means that
+  // the layout is already resolved and some information could be dropped during
+  // the lowering. Thus, we prioritize the resolved layout.
+  if (auto maybeEncodingInfo = getEncodingInfoFromLayouts(type)) {
+    return maybeEncodingInfo.value();
+  }
+  return layoutAttr.getEncodingInfo(type);
+}
+
 RankedTensorType dropEncoding(RankedTensorType type) {
   return RankedTensorType::get(type.getShape(), type.getElementType());
+}
+
+std::optional<IREE::Codegen::MaterializeEncodingInfo>
+getEncodingInfoFromLayouts(RankedTensorType type) {
+  auto encodingAttr = IREE::Encoding::getEncodingAttr(type);
+  if (!encodingAttr) {
+    return std::nullopt;
+  }
+  auto layoutsAttr = encodingAttr.getLayouts();
+  if (!layoutsAttr) {
+    return std::nullopt;
+  }
+  ArrayRef<Attribute> layouts = layoutsAttr.getValue();
+  assert(layouts.size() == 1 && "only single layout is supported");
+  return cast<IREE::Codegen::LayoutAttrInterface>(layouts[0])
+      .getEncodingInfo(type);
 }
 
 } // namespace mlir::iree_compiler
