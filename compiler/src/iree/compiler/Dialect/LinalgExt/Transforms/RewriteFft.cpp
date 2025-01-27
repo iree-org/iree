@@ -25,15 +25,15 @@ FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
   }
 
   // Skip else getBitReversalOrder produces invalid dense elements attr.
-  if (isa<ComplexType>(getElementTypeOrSelf(operand.getType())))
-    return rewriter.notifyMatchFailure(op, "expected real types");
+  if (!operandType.getElementType().isF32())
+    return rewriter.notifyMatchFailure(op, "expected F32 types");
 
   ImplicitLocOpBuilder b(loc, rewriter);
 
   auto getBitReversalOrder = [](ImplicitLocOpBuilder &b, Value real,
                                 int64_t fftLength) -> SmallVector<Value> {
-    auto realType = llvm::cast<ShapedType>(real.getType());
-    auto rank = realType.getRank();
+    ShapedType realType = llvm::cast<ShapedType>(real.getType());
+    int64_t rank = realType.getRank();
 
     SmallVector<OpFoldResult> mixedSizes =
         tensor::getMixedSizes(b, b.getLoc(), real);
@@ -107,9 +107,10 @@ FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
     SmallVector<Value> inputs;
     inputs.push_back(b.create<arith::ConstantIndexOp>(s));
     inputs.append(getCoeffConstants(b, s));
-    auto fft = b.create<IREE::LinalgExt::FftOp>(
-        TypeRange{results[0].getType(), results[1].getType()}, inputs, results);
-    results = fft.getResults();
+    results = b.create<IREE::LinalgExt::FftOp>(
+                   TypeRange{results[0].getType(), results[1].getType()},
+                   inputs, results)
+                  .getResults();
   }
 
   SmallVector<int64_t> shape(operandType.getShape().begin(),

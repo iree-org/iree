@@ -40,8 +40,26 @@ collapseOpIterationDims(AttentionOp op,
                         ArrayRef<ReassociationIndices> foldedIterationDims,
                         RewriterBase &rewriter);
 
-// Rewrite input rfft op (dialect-agnostic) into linalg_ext.fft. Return real
-// and imaginary tensor values.
+/// Rewrite an input rfft op (from an upstream dialect) into linalg_ext.fft.
+/// Only applies to power of 2 FFT sizes. Return real and imaginary tensor
+/// values or failure.
+///
+/// op: merely used for getting the Location and for reporting match failures.
+/// operand: input operand to FFT, must be of type RankedTensorType and with
+///   static shapes for the pattern to apply.
+/// fftLength: size of input dimension
+///   along which FFT is computed, must be power of 2 for the pattern to apply
+///
+/// Example usage from Torch to LinalgExt:
+///
+/// Value builtinCast =
+/// rewriter.create<torch::TorchConversion::ToBuiltinTensorOp>(
+///            loc,
+///            cast<torch::Torch::ValueTensorType>(self.getType())
+///                .toBuiltinTensor(),
+///            self);
+/// int64_t fftLength = inputShape[dim]; // where dim is FFT dimension
+/// auto res = rewriteFft(op, builtinCast, fftLength, rewriter);
 FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
                                               int64_t fftLength,
                                               PatternRewriter &rewriter);
