@@ -12,7 +12,6 @@
 #include "compiler/plugins/input/StableHLO/Conversion/Passes.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Rewriters.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Rewriters.h"
-#include "compiler/plugins/input/StableHLO/Conversion/TypeConversion.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -35,6 +34,8 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "stablehlo/conversions/linalg/transforms/Rewriters.h"
+#include "stablehlo/conversions/linalg/transforms/TypeConversion.h"
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
@@ -46,7 +47,9 @@ namespace mlir::iree_compiler::stablehlo {
 namespace {
 
 /// Converts stablehlo.concatenate operation to extract_slice ops + insert_slice
-/// ops.
+/// ops. mlir::stablehlo::populateStablehloToLinalgConversionPatterns provides a
+/// lowering to linalg using SCF that has numerics issues when run through IREE,
+/// so we use this lowering instead with a higher pattern benefit.
 struct ConcatenateOpConversion final
     : OpConversionPattern<mlir::stablehlo::ConcatenateOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -491,10 +494,11 @@ struct ConvertStableHloToIreeInputDialects final
     : impl::ConvertStableHloToIreeInputDialectsBase<
           ConvertStableHloToIreeInputDialects> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<
-        IREE::Flow::FlowDialect, IREE::Util::UtilDialect, linalg::LinalgDialect,
-        arith::ArithDialect, tensor::TensorDialect, shape::ShapeDialect,
-        math::MathDialect, memref::MemRefDialect, complex::ComplexDialect>();
+    registry.insert<IREE::Flow::FlowDialect, IREE::Util::UtilDialect,
+                    linalg::LinalgDialect, arith::ArithDialect,
+                    tensor::TensorDialect, shape::ShapeDialect,
+                    math::MathDialect, memref::MemRefDialect,
+                    complex::ComplexDialect, scf::SCFDialect>();
   }
 
   void runOnOperation() override {
@@ -502,7 +506,7 @@ struct ConvertStableHloToIreeInputDialects final
     RewritePatternSet patterns(context);
 
     std::unique_ptr<TypeConverter> typeConverter =
-        createStableHloToLinalgTypeConverter();
+        std::make_unique<::mlir::stablehlo::LinalgTypeConverter>();
     typeConverter->addArgumentMaterialization(scalarToTensor);
     typeConverter->addSourceMaterialization(scalarToTensor);
     typeConverter->addTargetMaterialization(scalarToTensor);
@@ -511,16 +515,23 @@ struct ConvertStableHloToIreeInputDialects final
     // expensive expansions.
     populateCanonicalizationPatterns(context, &patterns, /*benefit=*/1024);
 
-    populateStableHloToLinalgOnTensorsConversionPatterns(
-        context, *typeConverter, &patterns);
+    // Run custom patterns with a high benefit to override stablehlo patterns.
+    patterns.add<ConcatenateOpConversion, FftOpConversion,
+                 OptimizationBarrierOpConversion>(*typeConverter, context,
+                                                  PatternBenefit{1000});
+
+    // Run upstream stablehlo patterns with a default benefit.
+    ::mlir::stablehlo::populateStablehloToLinalgConversionPatterns(
+        context, *typeConverter, &patterns, /*enablePrimitiveOps=*/false,
+        /*enableSparseOps=*/false);
+
+    // Lowerings using IREE-specific operators (and not just common dialects
+    // like linalg, scf, arith, etc.).
     populateStableHloCollectivesConversionPatterns(context, *typeConverter,
                                                    &patterns);
-
     // TODO(#12678): Handle remaining complex ops.
-
     // TODO(*): expose patterns that do this much better from
-    // iree/compiler/Dialect/Util/Transforms/ConvertPrimitiveType.cpp
-
+    //          iree/compiler/Dialect/Util/Transforms/ConvertPrimitiveType.cpp
     // Structural patterns (functions, cfg, terminators).
     patterns.add<BuiltinFuncOpPattern>(*typeConverter, context);
     patterns.add<GlobalOpPattern, TensorEmptyPattern>(*typeConverter, context);
@@ -625,18 +636,5 @@ struct ConvertStableHloToIreeInputDialects final
 };
 
 } // namespace
-
-void populateStableHloToLinalgOnTensorsConversionPatterns(
-    MLIRContext *context, TypeConverter &typeConverter,
-    RewritePatternSet *patterns) {
-  // TODO(#5809): Drop ConcatenateOp lowering in favor of the upstream version
-  //              then remove the PatternBenefit here
-  patterns->add<ConcatenateOpConversion, FftOpConversion,
-                OptimizationBarrierOpConversion>(typeConverter, context,
-                                                 PatternBenefit{1000});
-
-  populateStableHloToLinalgConversionPatterns(context, typeConverter, patterns,
-                                              /*enablePrimitiveOps=*/false);
-}
 
 } // namespace mlir::iree_compiler::stablehlo

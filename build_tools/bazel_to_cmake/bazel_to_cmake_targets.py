@@ -90,6 +90,9 @@ class TargetConverter:
                 "@stablehlo//:stablehlo_passes": [
                     "StablehloPasses",
                 ],
+                "@stablehlo//:linalg_passes": [
+                    "StablehloLinalgTransforms",
+                ],
                 "@stablehlo//:vhlo_ops": [
                     "VhloOps",
                 ],
