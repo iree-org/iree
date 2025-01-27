@@ -216,7 +216,8 @@ struct ConvertToROCDLPass final
       populateLLVMConversionPatterns(&getContext(), llvmPatterns, converter);
       populateComplexToLLVMConversionPatterns(converter, llvmPatterns);
       populateMathToLLVMConversionPatterns(converter, llvmPatterns);
-      memref::populateExpandStridedMetadataPatterns(llvmPatterns);
+      iree_compiler::populateIREEResolveExtractStridedMetadataPatterns(
+          llvmPatterns);
       populateFinalizeMemRefToLLVMConversionPatterns(converter, llvmPatterns);
       populateFuncToLLVMConversionPatterns(converter, llvmPatterns);
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
