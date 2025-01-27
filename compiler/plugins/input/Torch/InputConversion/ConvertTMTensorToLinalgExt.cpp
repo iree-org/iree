@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineExpr.h"
@@ -77,9 +78,8 @@ struct ScatterOpConversion
 };
 } // namespace
 
-static SmallVector<AffineMap>
-getStandardAttentionIndexingMaps(MLIRContext *ctx, bool hasMask,
-                                 bool hasScale = true) {
+static SmallVector<AffineMap> getStandardAttentionIndexingMaps(MLIRContext *ctx,
+                                                               bool hasMask) {
   AffineExpr m, n, k1, k2;
   bindDims(ctx, m, n, k1, k2);
 
@@ -89,10 +89,6 @@ getStandardAttentionIndexingMaps(MLIRContext *ctx, bool hasMask,
   auto rMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, n}, ctx);
 
   SmallVector<AffineMap> ret = {qMap, kMap, vMap};
-  if (hasScale) {
-    auto sMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, ctx);
-    ret.emplace_back(std::move(sMap));
-  }
   if (hasMask) {
     auto mMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k2}, ctx);
     ret.emplace_back(std::move(mMap));
@@ -169,19 +165,21 @@ struct AttentionOpConversion
           loc, targetType, rewriter.getFloatAttr(targetType, dk));
       Value scaleTensor =
           rewriter.create<tensor::SplatOp>(loc, op.getQueryType(), scale);
-      scaled_query = rewriter.create<arith::MulFOp>(loc, query, scaleTensor);
+      auto mulOp = rewriter.create<linalg::MulOp>(loc, query, scaleTensor);
+      scaled_query = mulOp.getResult(0);
     } else {
       dk = std::sqrt(dk) / M_LOG2E;
       Value scale = rewriter.create<arith::ConstantOp>(
           loc, targetType, rewriter.getFloatAttr(targetType, dk));
       Value scaleTensor =
           rewriter.create<tensor::SplatOp>(loc, op.getQueryType(), scale);
-      scaled_query = rewriter.create<arith::DivFOp>(loc, query, scaleTensor);
+      auto divOp = rewriter.create<linalg::DivOp>(loc, query, scaleTensor);
+      scaled_query = divOp.getResult(0);
     }
 
     // Add batches to standard attention indexing maps.
-    SmallVector<AffineMap> indexingMaps = getStandardAttentionIndexingMaps(
-        ctx, optionalMask.has_value(), /*hasScale=*/false);
+    SmallVector<AffineMap> indexingMaps =
+        getStandardAttentionIndexingMaps(ctx, optionalMask.has_value());
 
     int64_t numBatches = op.getQueryType().getRank() - 2;
     for (AffineMap &map : indexingMaps) {
