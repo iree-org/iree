@@ -917,6 +917,13 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
       if (insertSliceUser.getDest() == v)
         return true;
     }
+
+    if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(user)) {
+      // Only clone for Q uses.
+      if (!(attentionOp.getQuery() == v || attentionOp.getMask() == v)) {
+        return true;
+      }
+    }
   }
   return false;
 }
