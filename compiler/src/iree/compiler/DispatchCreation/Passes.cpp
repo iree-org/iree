@@ -129,7 +129,9 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
       .addPass([]() {
         return DispatchCreation::createElementwiseOpFusionPass(
             ElementwiseOpFusionPassOptions{
-                clEnableElementWiseFuseMultiReduction});
+                /*intraDispatch=*/false,
+                /*fuseMultiReduction=*/clEnableElementWiseFuseMultiReduction,
+                /*fuseTruncateOps=*/false});
       })
       .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
@@ -148,7 +150,9 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
       .addPass([]() {
         return DispatchCreation::createElementwiseOpFusionPass(
             ElementwiseOpFusionPassOptions{
-                clEnableElementWiseFuseMultiReduction});
+                /*intraDispatch=*/false,
+                /*fuseMultiReduction=*/clEnableElementWiseFuseMultiReduction,
+                /*fuseTruncateOps=*/false});
       })
       .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
@@ -224,6 +228,13 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
                 clEnableAggressiveFusion,
                 clEnableFusePaddingIntoLinalgConsumerOps,
                 clEnableFusePaddingIntoLinalgProducerOps});
+      })
+      // Elementwise fuse operations that are iside a dispatch if possible.
+      .addPass([&]() {
+        return DispatchCreation::createElementwiseOpFusionPass(
+            ElementwiseOpFusionPassOptions{/*intraDispatch=*/true,
+                                           /*fuseMultiReduction=*/false,
+                                           /*fuseTruncateOps=*/true});
       })
       // Clone all producers into the dispatch region to perpare for being
       // isolated from above. This enables running additional transformations
