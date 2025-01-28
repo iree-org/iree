@@ -50,16 +50,15 @@ collapseOpIterationDims(AttentionOp op,
 /// fftLength: size of input dimension
 ///   along which FFT is computed, must be power of 2 for the pattern to apply
 ///
-/// Example usage from Torch to LinalgExt:
+/// Using Torch dialect as an example, see snippet below.
+/// `%arg0` is the |operand|, `torch.aten.fft_rfft` is passed as |op|, and
+/// |fftLength| (= 16) is statically computed accessing the shape of `%arg0`
+/// ([3,8,16]) at the FFT dimension index (%int-1).
 ///
-/// Value builtinCast =
-/// rewriter.create<torch::TorchConversion::ToBuiltinTensorOp>(
-///            loc,
-///            cast<torch::Torch::ValueTensorType>(self.getType())
-///                .toBuiltinTensor(),
-///            self);
-/// int64_t fftLength = inputShape[dim]; // where dim is FFT dimension
-/// auto res = rewriteFft(op, builtinCast, fftLength, rewriter);
+/// %int-1 = torch.constant.int -1
+/// %out = torch.aten.fft_rfft  %arg0, %none, %int-1, %none :
+///           !torch.vtensor<[3,8,16],f32>, !torch.none, !torch.int, !torch.none
+///           -> !torch.vtensor<[3,8,9],complex<f32>>
 FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
                                               int64_t fftLength,
                                               PatternRewriter &rewriter);
