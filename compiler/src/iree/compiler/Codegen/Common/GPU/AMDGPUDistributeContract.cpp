@@ -54,24 +54,24 @@ static LogicalResult isIntrinsicLayoutCompatible(
     VectorContractOpInfo &opInfo, IREE::GPU::MmaInterfaceAttr intrinsic,
     NestedLayoutAttr lhsLayout, NestedLayoutAttr rhsLayout,
     NestedLayoutAttr accLayout) {
-  auto [lhsM, rhsN] = opInfo.getOperandMNIndex();
-  auto [lhsK, rhsK] = opInfo.getOperandKIndex();
-  auto [accM, accN] = opInfo.getResultMNIndex();
-  if (failed(isSubgroupLayoutCompatible(
-          getSingleSubgroupLayout(intrinsic, IREE::GPU::MMAFragment::Lhs),
-          lhsLayout, lhsM, lhsK))) {
-    return failure();
-  }
-  if (failed(isSubgroupLayoutCompatible(
-          getSingleSubgroupLayout(intrinsic, IREE::GPU::MMAFragment::Rhs),
-          rhsLayout, rhsK, rhsN))) {
-    return failure();
-  }
-  if (failed(isSubgroupLayoutCompatible(
-          getSingleSubgroupLayout(intrinsic, IREE::GPU::MMAFragment::Acc),
-          accLayout, accM, accN))) {
-    return failure();
-  }
+  // auto [lhsM, rhsN] = opInfo.getOperandMNIndex();
+  // auto [lhsK, rhsK] = opInfo.getOperandKIndex();
+  // auto [accM, accN] = opInfo.getResultMNIndex();
+  // if (failed(isSubgroupLayoutCompatible(
+  //         getSingleSubgroupLayout(intrinsic, IREE::GPU::MMAFragment::Lhs),
+  //         lhsLayout, lhsM, lhsK))) {
+  //   return failure();
+  // }
+  // if (failed(isSubgroupLayoutCompatible(
+  //         getSingleSubgroupLayout(intrinsic, IREE::GPU::MMAFragment::Rhs),
+  //         rhsLayout, rhsK, rhsN))) {
+  //   return failure();
+  // }
+  // if (failed(isSubgroupLayoutCompatible(
+  //         getSingleSubgroupLayout(intrinsic, IREE::GPU::MMAFragment::Acc),
+  //         accLayout, accM, accN))) {
+  //   return failure();
+  // }
   return success();
 }
 

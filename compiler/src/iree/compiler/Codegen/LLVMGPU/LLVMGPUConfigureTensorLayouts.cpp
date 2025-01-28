@@ -588,8 +588,31 @@ static void swapOperandsToTransposeIntrinsic(RewriterBase &rewriter,
   std::swap(indexingMaps[0], indexingMaps[1]);
 
   contractOp.setIndexingMapsAttr(rewriter.getAffineMapArrayAttr(indexingMaps));
+
   contractOp->setOperand(0, rhs);
   contractOp->setOperand(1, lhs);
+
+  BlockArgument arg0 = contractOp.getBlock()->getArgument(0);
+  BlockArgument arg1 = contractOp.getBlock()->getArgument(1);
+
+  // Set the correct types on the block arguments.
+  Type type0 = arg0.getType();
+  Type type1 = arg1.getType();
+  arg0.setType(type1);
+  arg1.setType(type0);
+
+  // Actually swap the block operands.
+  IRMapping mapping;
+  mapping.map(arg0, arg1);
+  mapping.map(arg1, arg0);
+
+  contractOp.getBody()->walk([&](Operation *op) {
+    for (OpOperand &operand : op->getOpOperands()) {
+      if (auto mapped = mapping.lookupOrDefault(operand.get())) {
+        operand.set(mapped);
+      }
+    }
+  });
 }
 
 static IREE::GPU::MMAScheduleAttr

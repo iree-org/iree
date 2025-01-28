@@ -107,7 +107,7 @@ func.func @main(%arg0: !stream.binding, %arg1: !stream.binding, %arg2: !stream.b
     %v_32 = arith.extf %v : f16 to f32
     %mul  = arith.mulf %ex, %v_32 : f32
     %nacc = arith.addf %mul, %acc : f32
-    iree_linalg_ext.yield %m, %nsum, %nacc : f32, f32, f32
+    linalg.yield %m, %nsum, %nacc : f32, f32, f32
   } -> tensor<20x4096x64xf32>, tensor<20x4096x64xf32>, tensor<20x4096x64xf32>
 
   %result_empty = tensor.empty() : tensor<20x4096x64xf16>
