@@ -262,4 +262,38 @@ def FuseCollapseShapeIntoForallOp : Op<Transform_Dialect, "iree.fuse_collapse_sh
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
+def FuseExtractSliceIntoForallOp : Op<Transform_Dialect, "iree.fuse_extract_slice_into_forall",
+    [FunctionalStyleTransformOpTrait,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     DeclareOpInterfaceMethods<TransformOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Fuses a consumer tensor.extract_slice op into a producer scf.forall op.
+    This transform is supported if the extract_slice op has all zero offsets,
+    and if all the offsets, sizes, and strides dominate the scf.forall op.
+    After the transformation, the forall loop output argument corresponding
+    to the sliced result will be replaced with a slice of it with the same
+    offsets, sizes, and strides as the original extract_slice. The source of
+    the corresponding tensor.parallel_insert_slice of the scf.forall will also
+    become a slice of the original parallel insert source, clamped to fit within
+    the new sliced result tensor.
+
+    #### Return modes
+    Emits a definite failure if either the producer is not an scf.forall op or
+    if the consumer is not a tensor.extract_slice op.
+  }];
+
+  let arguments = (
+      ins TransformHandleTypeInterface:$producer,
+          TransformHandleTypeInterface:$consumer
+  );
+  let results = (outs TransformHandleTypeInterface:$result);
+
+  let assemblyFormat = [{
+    $consumer `into` $producer attr-dict
+    `:` functional-type(operands, results)
+  }];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_TRANSFORMEXTENSIONS_IREEGPUEXTENSIONS

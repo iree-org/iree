@@ -346,6 +346,27 @@ struct FuseCollapseShapeConsumers final
   }
 };
 
+struct FuseExtractSliceConsumers final
+    : OpRewritePattern<tensor::ExtractSliceOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
+                                PatternRewriter &rewriter) const override {
+    // Find the scf::ForallOp producer, and get the corresponding
+    // tensor::ParallelInsertSliceOp.
+    auto forallOp = extractSliceOp.getSource().getDefiningOp<scf::ForallOp>();
+    if (!forallOp) {
+      return rewriter.notifyMatchFailure(extractSliceOp,
+                                         "No forall op producer");
+    }
+
+    if (failed(fuseExtractSliceIntoProducerForall(rewriter, forallOp,
+                                                  extractSliceOp))) {
+      return failure();
+    }
+    return success();
+  }
+};
+
 void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
   MLIRContext *context = &getContext();
 
@@ -391,6 +412,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     patterns.add<FuseUnitLoopDestination>(context);
     patterns.add<FuseTilableForallConsumers>(context);
     patterns.add<FuseCollapseShapeConsumers>(context);
+    patterns.add<FuseExtractSliceConsumers>(context);
     populateSwapExtractWithExpandPattern(patterns);
     tensor::populateFoldTensorEmptyPatterns(patterns);
     scf::ForallOp::getCanonicalizationPatterns(patterns, context);

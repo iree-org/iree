@@ -99,6 +99,51 @@ fuseCollapseShapeIntoProducerForall(RewriterBase &rewriter,
                                     scf::ForallOp forallOp,
                                     tensor::CollapseShapeOp collapseOp);
 
+/// Function to fuse an extract slice op into a forall op producer. This rewrite
+/// effectively bubbles the extract_slice op up through the forall output
+/// operand, and the block argument inside the forall becomes the size of the
+/// slice. The parallel_insert_slice user of the init block argument will have
+/// its source clamped to fit into the sliced destination, and all other uses
+/// of the block argument will be replaced with the value of the output operand
+/// for the forall outside of the loop body.
+/// *NOTE: This can create dynamically zero sized tensors inside the forall
+/// body when the source of the parallel_insert_slice is clamped.
+///
+/// The following example illustrates a simple case of this transformation:
+/// ```
+/// %forall = scf.forall ... shared_outs(%arg = %dest) -> tensor<16xf32> {
+///   %user = "some_user" %arg
+///   ...
+///   scf.in_parallel {
+///     tensor.parallel_insert_slice %val into %arg ...
+///         tensor<4xf32> into tensor<16xf32>
+///   }
+/// }
+/// %extract = tensor.extract_slice %forall ...
+///     tensor<16xf32> into tensor<?xf32>
+/// ```
+/// After the transformation this would become:
+/// ```
+/// %extract = tensor.extract_slice %dest ...
+///     tensor<16xf32> into tensor<?xf32>
+/// %forall = scf.forall ... shared_outs(%arg = %extract) -> tensor<?xf32> {
+///   // The user now has the dest from outside the loop as its operand.
+///   %user = "some_user" %dest
+///   ...
+///   // `%clamped_val` can be dynamically zero sized.
+///   %clamped_val = tensor.extract_slice %val ...
+///       tensor<4xf32> to tensor<?xf32>
+///   scf.in_parallel {
+///     tensor.parallel_insert_slice %clamped_val into %arg ...
+///         tensor<?xf32> into tensor<?xf32>
+///   }
+/// }
+/// ```
+FailureOr<scf::ForallOp>
+fuseExtractSliceIntoProducerForall(RewriterBase &rewriter,
+                                   scf::ForallOp forallOp,
+                                   tensor::ExtractSliceOp extractSliceOp);
+
 // Helper to convert a contraction-like linalg op to an iree_gpu.multi_mma.
 FailureOr<IREE::GPU::MultiMmaOp>
 convertContractionToMultiMma(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
