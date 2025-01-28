@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
+#include "iree/compiler/Utils/Indexing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/ADT/SmallVector.h"
@@ -476,28 +477,38 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
 
   OpFoldResult zero = builder.getIndexAttr(0);
   OpFoldResult one = builder.getIndexAttr(1);
+  Value cZero = builder.create<arith::ConstantIndexOp>(loc, 0);
   canonicalStrides.append(rankReducedShape.size(), one);
+
+  SmallVector<Value> vtids;
+  SmallVector<int64_t> vtidBasis;
+  SmallVector<size_t> dimToVtid;
+  if (failed(basisFromSizesStrides(subgroupLayout.thread,
+                                   subgroupLayout.tstrides, vtidBasis,
+                                   dimToVtid))) {
+    return failure();
+  }
+  auto splitLaneId = builder.create<affine::AffineDelinearizeIndexOp>(
+      loc, laneId, vtidBasis, /*hasOuterBound=*/false);
 
   // Each thread grabs `element` contiguous data, so the vtid needs to be
   // multiplied by `element` to get the next bunch of data.
   // vtid: virtual thread id
   // tid: lane id
   // vtid = ((tid floordiv stride_i) mod size_i) * element_i.
-  SmallVector<OpFoldResult> vtids;
-  for (auto [dimSize, dimStride, element] :
-       llvm::zip_equal(subgroupLayout.thread, subgroupLayout.tstrides,
-                       subgroupLayout.element)) {
-    if (dimSize == 1) {
-      vtids.push_back(zero);
-      continue;
+  //
+  // Instead of computing those maps, we use one big `delinearize` expression
+  // in order to prevent unwanted "simplifications" on affine maps that
+  // worsen the generated code quality.
+  for (auto [splitResultIdx, element] :
+       llvm::zip_equal(dimToVtid, subgroupLayout.element)) {
+    Value vtid = splitLaneId.getResult(splitResultIdx);
+    int64_t vtidLen = vtidBasis[splitResultIdx - 1];
+    if (element != 1) {
+      vtid = builder.create<affine::AffineLinearizeIndexOp>(
+          loc, ValueRange{vtid, cZero}, ArrayRef<int64_t>{vtidLen, element},
+          /*disjoint=*/true);
     }
-
-    // ((tid floordiv stride) mod size) * element.
-    AffineExpr tidExpr = builder.getAffineDimExpr(0);
-    AffineMap vtidMap = AffineMap::get(
-        /*dims=*/1, /*syms=*/0,
-        (tidExpr.floorDiv(dimStride) % dimSize) * element);
-    Value vtid = builder.create<affine::AffineApplyOp>(loc, vtidMap, laneId);
     vtids.push_back(vtid);
   }
 

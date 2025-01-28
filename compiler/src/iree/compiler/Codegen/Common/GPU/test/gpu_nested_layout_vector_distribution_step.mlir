@@ -27,8 +27,9 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func @step_1
 // CHECK: %[[CST:.+]] = arith.constant dense<[0, 4, 8, 12]> : vector<4xindex>
-// CHECK: %[[TID:.+]] = affine.apply affine_map<()[s0] -> ((s0 floordiv 16) mod 4)>()[%thread_id_x]
-// CHECK: %[[TIDB:.+]] = vector.broadcast %[[TID]] : index to vector<4xindex>
+// CHECK: %[[IDX:.+]] = gpu.thread_id x
+// CHECK: %[[TID:.+]]:3 = affine.delinearize_index %[[IDX]] into (4, 16)
+// CHECK: %[[TIDB:.+]] = vector.broadcast %[[TID]]#1 : index to vector<4xindex>
 // CHECK: %[[OFFSET:.+]] = arith.addi %[[TIDB]], %[[CST]] : vector<4xindex>
 
 // -----
@@ -60,8 +61,9 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func @step_2
 // CHECK: %[[CST:.+]] = arith.constant dense<[0, 1, 8, 9, 16, 17]> : vector<6xindex>
-// CHECK: %[[TID:.+]] = affine.apply affine_map<()[s0] -> ((s0 floordiv 2) mod 4)>()[%thread_id_x]
-// CHECK: %[[TID_STRIDE:.+]] = arith.muli %[[TID]], %c2 : index
+// CHECK: %[[IDX:.+]] = gpu.thread_id x
+// CHECK: %[[TID:.+]]:3 = affine.delinearize_index %[[IDX]] into (4, 2)
+// CHECK: %[[TID_STRIDE:.+]] = arith.muli %[[TID]]#1, %c2 : index
 // CHECK: %[[TID_STRIDEV:.+]] = vector.broadcast %[[TID_STRIDE]] : index to vector<6xindex>
 // CHECK: %[[OFFSET:.+]] = arith.addi %[[TID_STRIDEV]], %[[CST]] : vector<6xindex>
 
@@ -94,12 +96,13 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func @step_3
 // CHECK: %[[CST:.+]] = arith.constant dense<[0, 1, 8, 9]> : vector<4xindex>
-// CHECK: %[[WID:.+]] = affine.apply affine_map<()[s0] -> ((s0 floordiv 512) mod 3)>()[%thread_id_x]
-// CHECK: %[[TID:.+]] = affine.apply affine_map<()[s0] -> ((s0 floordiv 2) mod 4)>()[%thread_id_x]
-// CHECK: %[[WID_STRIDE:.+]] = arith.muli %[[WID]], %c16 : index
+// CHECK: %[[IDX:.+]] = gpu.thread_id x
+// CHECK: %[[WID:.+]]:4 = affine.delinearize_index %[[IDX]] into (3, 8, 64)
+// CHECK: %[[TID:.+]]:3 = affine.delinearize_index %[[IDX]] into (4, 2)
+// CHECK: %[[WID_STRIDE:.+]] = arith.muli %[[WID]]#1, %c16 : index
 // CHECK: %[[WID_STRIDEV:.+]] = vector.broadcast %[[WID_STRIDE]] : index to vector<4xindex>
 // CHECK: %[[OFFSET0:.+]] = arith.addi %[[WID_STRIDEV]], %[[CST]] : vector<4xindex>
-// CHECK: %[[TID_STRIDE:.+]] = arith.muli %[[TID]], %c2 : index
+// CHECK: %[[TID_STRIDE:.+]] = arith.muli %[[TID]]#1, %c2 : index
 // CHECK: %[[TID_STRIDEV:.+]] = vector.broadcast %[[TID_STRIDE]] : index to vector<4xindex>
 // CHECK: %[[OFFSET1:.+]] = arith.addi %[[OFFSET0]], %[[TID_STRIDEV]] : vector<4xindex>
 
@@ -132,7 +135,8 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func @step_4
 // CHECK: %[[CST:.+]] = arith.constant dense<[0, 1, 2, 3, 4, 5, 6, 7]> : vector<8xindex>
-// CHECK: %[[TID:.+]] = affine.apply affine_map<()[s0] -> (s0 mod 16)>()[%thread_id_x]
-// CHECK: %[[TID_STRIDE:.+]] = arith.muli %[[TID]], %c8 : index
+// CHECK: %[[IDX:.+]] = gpu.thread_id x
+// CHECK: %[[TID:.+]]:2 = affine.delinearize_index %[[IDX]] into (16)
+// CHECK: %[[TID_STRIDE:.+]] = arith.muli %[[TID]]#1, %c8 : index
 // CHECK: %[[TID_STRIDEV:.+]] = vector.broadcast %[[TID_STRIDE]] : index to vector<8xindex>
 // CHECK: %[[OFFSET:.+]] = arith.addi %[[TID_STRIDEV]], %[[CST]] : vector<8xindex>
