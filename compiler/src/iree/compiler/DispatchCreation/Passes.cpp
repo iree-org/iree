@@ -128,7 +128,9 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
       .addPass([]() {
         return DispatchCreation::createElementwiseOpFusionPass(
             ElementwiseOpFusionPassOptions{
-                clEnableElementWiseFuseMultiReduction});
+                /*intraDispatch=*/false,
+                /*fuseMultiReduction=*/clEnableElementWiseFuseMultiReduction,
+                /*fuseTruncateOps=*/false});
       })
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
@@ -145,7 +147,9 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
       .addPass([]() {
         return DispatchCreation::createElementwiseOpFusionPass(
             ElementwiseOpFusionPassOptions{
-                clEnableElementWiseFuseMultiReduction});
+                /*intraDispatch=*/false,
+                /*fuseMultiReduction=*/clEnableElementWiseFuseMultiReduction,
+                /*fuseTruncateOps=*/false});
       })
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
@@ -227,7 +231,14 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
                 clEnableFusePaddingIntoLinalgConsumerOps,
                 clEnableFusePaddingIntoLinalgProducerOps});
       })
-      // Clone all producers into the dispatch region to prepare for being
+      // Elementwise fuse operations that are iside a dispatch if possible.
+      .addPass([&]() {
+        return DispatchCreation::createElementwiseOpFusionPass(
+            ElementwiseOpFusionPassOptions{/*intraDispatch=*/true,
+                                           /*fuseMultiReduction=*/false,
+                                           /*fuseTruncateOps=*/true});
+      })
+      // Clone all producers into the dispatch region to perpare for being
       // isolated from above. This enables running additional transformations
       // afterwards that would need the full dispatch content but don't want to
       // handle explicit captures as materialized as dispatch workgroup operands
