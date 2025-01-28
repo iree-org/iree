@@ -32,14 +32,12 @@ func.func @multiple_dim_distribute(%s0 : index, %s1 : index, %s2 : index, %s3 : 
 //   CHECK-DAG:   %[[WG_ID_X:.+]] = hal.interface.workgroup.id[0]
 //   CHECK-DAG:   %[[WG_ID_Y:.+]] = hal.interface.workgroup.id[1]
 //   CHECK-DAG:   %[[WG_ID_Z:.+]] = hal.interface.workgroup.id[2]
+//   CHECK-DAG:   %[[WG_IDS_Z:.+]]:3 = affine.delinearize_index %[[WG_ID_Z]] into (%[[S0]], %[[S1]], %[[S2]])
 //   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty() : tensor<1x2x1x3x1x4x1x1xf32>
 //   CHECK-DAG:   %[[IN_SLICE:.+]] = tensor.extract_slice %[[INPUT]][0, 0, 0, %[[WG_ID_X]]] [2, 3, 4, 1]
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[IN_SLICE]] :
 //  CHECK-SAME:       outs(%[[EMPTY]] :
-//   CHECK-DAG:   %[[WG_ID_Z_0:.+]] = affine.apply affine_map<()[s0, s1, s2] -> ((s1 floordiv s2) floordiv s0)>()[%[[S1]], %[[WG_ID_Z]], %[[S2]]]
-//   CHECK-DAG:   %[[WG_ID_Z_1:.+]] = affine.apply affine_map<()[s0, s1, s2] -> ((s1 floordiv s2) mod s0)>()[%[[S1]], %[[WG_ID_Z]], %[[S2]]]
-//   CHECK-DAG:   %[[WG_ID_Z_2:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 mod s1)>()[%[[WG_ID_Z]], %[[S2]]]
 //       CHECK:   flow.dispatch.tensor.store %[[GENERIC]],
-//  CHECK-SAME:       offsets = [%[[WG_ID_Z_0]], 0, %[[WG_ID_Z_1]], 0, %[[WG_ID_Z_2]], 0, %[[WG_ID_Y]], %[[WG_ID_X]]]
+//  CHECK-SAME:       offsets = [%[[WG_IDS_Z]]#0, 0, %[[WG_IDS_Z]]#1, 0, %[[WG_IDS_Z]]#2, 0, %[[WG_ID_Y]], %[[WG_ID_X]]]
 //  CHECK-SAME:       sizes = [1, 2, 1, 3, 1, 4, 1, 1]
