@@ -385,12 +385,8 @@ public:
   getDefaultDeviceTarget(MLIRContext *context,
                          const TargetRegistry &targetRegistry) const override {
     Builder b(context);
-
-    SmallVector<NamedAttribute> deviceConfigAttrs;
-    auto deviceConfigAttr = b.getDictionaryAttr(deviceConfigAttrs);
-
-    SmallVector<NamedAttribute> executableConfigAttrs;
-    auto executableConfigAttr = b.getDictionaryAttr(executableConfigAttrs);
+    auto deviceConfigAttr = b.getDictionaryAttr({});
+    auto executableConfigAttr = b.getDictionaryAttr({});
 
     // If we had multiple target environments we would generate one target attr
     // per environment, with each setting its own environment attribute.
@@ -424,16 +420,13 @@ public:
   getExecutableTarget(MLIRContext *context) const {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
-    auto addConfig = [&](StringRef name, Attribute value) {
-      configItems.emplace_back(b.getStringAttr(name), value);
-    };
-
     if (failed(options.verify(b)))
       return nullptr;
 
     if (auto target = GPU::getCUDATargetDetails(
-            options.clTarget, options.clTargetFeatures, context))
-      addConfig("iree.gpu.target", target);
+            options.clTarget, options.clTargetFeatures, context)) {
+      configItems.emplace_back("iree.gpu.target", target);
+    }
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
         b.getStringAttr("cuda"), b.getStringAttr("cuda-nvptx-fb"),

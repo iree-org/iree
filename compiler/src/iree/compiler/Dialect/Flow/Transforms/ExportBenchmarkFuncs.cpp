@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/IRMapping.h"
@@ -233,12 +234,10 @@ createEntryPointBenchmarkFunc(mlir::ModuleOp moduleOp,
       loc, funcName, moduleBuilder.getFunctionType({}, {}));
   funcOp.setPublic();
   funcOp->setAttr("iree.abi.stub", moduleBuilder.getUnitAttr());
-  SmallVector<NamedAttribute> reflectionAttrs = {
-      moduleBuilder.getNamedAttr("iree.benchmark",
-                                 moduleBuilder.getStringAttr("entry")),
-  };
+  NamedAttribute reflectionAttr("iree.benchmark",
+                                moduleBuilder.getStringAttr("entry"));
   funcOp->setAttr("iree.reflection",
-                  moduleBuilder.getDictionaryAttr(reflectionAttrs));
+                  moduleBuilder.getDictionaryAttr(reflectionAttr));
   Block *block = funcOp.addEntryBlock();
 
   // Call the existing function with dummy arguments.

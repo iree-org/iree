@@ -94,7 +94,7 @@ bool verifyMemRefInnerDimsContiguousRowMajor(MemRefType type) {
     return true;
   }
 
-  if (failed(mlir::getStridesAndOffset(type, strides, offset))) {
+  if (failed(type.getStridesAndOffset(strides, offset))) {
     return false;
   }
 

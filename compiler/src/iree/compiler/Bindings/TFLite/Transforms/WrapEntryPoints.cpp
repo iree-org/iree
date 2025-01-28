@@ -605,7 +605,7 @@ private:
   // IO tensor names and quantization information.
   void populateReflectionAttrs(IREE::Util::FuncOp entryFuncOp,
                                IREE::Util::FuncOp wrapperFuncOp) {
-    SmallVector<NamedAttribute> attrs;
+    SmallVector<NamedAttribute, 1> attrs;
     attrs.push_back(buildIONamesAttr(entryFuncOp));
     // TODO(#3972): tfl.io.quant: quantization information.
     // TODO(#3978): tfl.io.types: tensor types (complex/strings/etc).
@@ -636,7 +636,7 @@ private:
       }
     }
     return NamedAttribute{
-        StringAttr::get(&getContext(), "tfl.io.names"),
+        "tfl.io.names",
         StringAttr::get(&getContext(), llvm::join(pieces, ";"))};
   }
 };

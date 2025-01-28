@@ -69,7 +69,6 @@ iree_cc_library(
     "LLVMCPUTileRootAndFuseProducerConsumer.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "LLVMCPUVectorShapeCastLowering.cpp"
-    "LLVMCPUVectorTransferLowering.cpp"
     "LLVMCPUVectorTransposeLowering.cpp"
     "LLVMCPUVerifyVectorSizeLegality.cpp"
     "LLVMCPUVirtualVectorLowering.cpp"
