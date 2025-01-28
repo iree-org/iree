@@ -82,6 +82,82 @@ func.func @vmt1() attributes {hal.executable.target = #executable_target_rocm_hs
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb">
+#map = affine_map<(d0, d1) -> (d1)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+#map2 = affine_map<(d0, d1) -> (d0)>
+func.func @matvec_like_no_m_dim() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f16
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<32000x4096xf16>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<32000xf16>>
+  %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [4096], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4096xf16>> -> tensor<4096xf16>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32000, 4096], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32000x4096xf16>> -> tensor<32000x4096xf16>
+  %5 = tensor.empty() : tensor<32000xf16>
+  %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<32000xf16>) -> tensor<32000xf16>
+  %7 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "reduction"]} ins(%3, %4 : tensor<4096xf16>, tensor<32000x4096xf16>) outs(%6 : tensor<32000xf16>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f16):
+    %8 = arith.mulf %in, %in_0 : f16
+    %9 = arith.addf %out, %8 : f16
+    linalg.yield %9 : f16
+  } -> tensor<32000xf16>
+  flow.dispatch.tensor.store %7, %2, offsets = [0], sizes = [32000], strides = [1] : tensor<32000xf16> -> !flow.dispatch.tensor<writeonly:tensor<32000xf16>>
+  return
+}
+
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[8], [0, 512]{{\]}}>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+// CHECK-LABEL: func.func @matvec_like_no_m_dim()
+//  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb">
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+func.func @matvec_unit_n_dim() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f16
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x4096xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<32000x4096xf16>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<32000x1xf16>>
+  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 4096], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x4096xf16>> -> tensor<1x4096xf16>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32000, 4096], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32000x4096xf16>> -> tensor<32000x4096xf16>
+  %5 = tensor.empty() : tensor<32000x1xf16>
+  %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<32000x1xf16>) -> tensor<32000x1xf16>
+  %7 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} ins(%4, %3 : tensor<32000x4096xf16>, tensor<1x4096xf16>) outs(%6 : tensor<32000x1xf16>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f16):
+    %8 = arith.mulf %in, %in_0 : f16
+    %9 = arith.addf %out, %8 : f16
+    linalg.yield %9 : f16
+  } -> tensor<32000x1xf16>
+  flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [32000, 1], strides = [1, 1] : tensor<32000x1xf16> -> !flow.dispatch.tensor<writeonly:tensor<32000x1xf16>>
+  return
+}
+
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[8, 1], [0, 0, 512]{{\]}}>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+// CHECK-LABEL: func.func @matvec_unit_n_dim()
+//  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+
+// -----
+
 // This test uses special heuristics that needs to check the backend in the #hal.executable.target.
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
