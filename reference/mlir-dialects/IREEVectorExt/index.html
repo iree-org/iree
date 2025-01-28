@@ -4122,6 +4122,11 @@ arrange the subgroups in the order:</p>
 subgroups_ids:
 0, 4, 1, 5, 2, 6, 3, 7
 </code></pre></div>
+<p>The subgroups are placed contiguously with their shape and ordering
+determined by:
+  - <code>subgroup_tile</code>: Sizes of this level of tiling
+  - <code>subgroup_strides</code>: Stride of this level of tiling. 0 if not distributed.
+Tiling levels must not overlap.</p>
 <p>The total number of subgroups used (computed by multiplying each dim in
 subgroup_tile) should be a multiple of number of subgroups in the
 harware. If the total number of subgroups used exceeds the number of
