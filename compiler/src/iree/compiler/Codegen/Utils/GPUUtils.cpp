@@ -82,10 +82,11 @@ getSubgroupIdsAndCounts(mlir::OpBuilder &builder, mlir::Location loc,
     mlir::Value subgroupId =
         builder.create<mlir::gpu::ThreadIdOp>(loc, indexType, dimAttr[i]);
     if (i == 0) {
-      mlir::AffineExpr d0 = builder.getAffineDimExpr(0);
-      subgroupId = mlir::affine::makeComposedAffineApply(
-          builder, loc, d0.floorDiv(builder.getAffineConstantExpr(warpSize)),
-          {subgroupId});
+      subgroupId =
+          builder
+              .create<affine::AffineDelinearizeIndexOp>(
+                  loc, subgroupId, ArrayRef<int64_t>{numSubgroups[i], warpSize})
+              .getResult(0);
     }
     procInfo[numDims - 1 - i] = {
         subgroupId,

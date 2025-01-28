@@ -9,9 +9,11 @@
 #include <thread>
 
 #include "iree/compiler/Utils/EmbeddedDataDirectory.h"
+#include "iree/compiler/Utils/Indexing.h"
 #include "iree/compiler/Utils/Permutation.h"
 #include "llvm/Support/FormatVariadic.h"
 
+using namespace mlir;
 using namespace mlir::iree_compiler;
 using namespace testing;
 
@@ -65,4 +67,42 @@ TEST(EmbeddedDataDirectory, GetMap) {
     keys.push_back(iter.str());
   }
   EXPECT_THAT(keys, UnorderedElementsAre("filename1", "filename2"));
+}
+
+TEST(BasisFromSizeStrides, SimpleCase) {
+  SmallVector<int64_t> basis;
+  SmallVector<size_t> dimToResult;
+
+  EXPECT_TRUE(
+      succeeded(basisFromSizesStrides({4, 16}, {1, 4}, basis, dimToResult)));
+  EXPECT_THAT(basis, ElementsAre(16, 4));
+  EXPECT_THAT(dimToResult, ElementsAre(2, 1));
+}
+
+TEST(BasisFromSizeStrides, ZeroStride) {
+  SmallVector<int64_t> basis;
+  SmallVector<size_t> dimToResult;
+
+  EXPECT_TRUE(succeeded(
+      basisFromSizesStrides({16, 4, 4}, {1, 0, 16}, basis, dimToResult)));
+  EXPECT_THAT(basis, ElementsAre(4, 16, 1));
+  EXPECT_THAT(dimToResult, ElementsAre(2, 3, 1));
+}
+
+TEST(BasisFromSizeStrides, JumpsInStrides) {
+  SmallVector<int64_t> basis;
+  SmallVector<size_t> dimToResult;
+
+  EXPECT_TRUE(
+      succeeded(basisFromSizesStrides({8, 4}, {8, 1}, basis, dimToResult)));
+  EXPECT_THAT(basis, ElementsAre(8, 2, 4));
+  EXPECT_THAT(dimToResult, ElementsAre(1, 3));
+}
+
+TEST(BasisFromSizeStrides, OverlappingStrides) {
+  SmallVector<int64_t> basis;
+  SmallVector<size_t> dimToResult;
+
+  EXPECT_FALSE(
+      succeeded(basisFromSizesStrides({8, 4}, {6, 1}, basis, dimToResult)));
 }

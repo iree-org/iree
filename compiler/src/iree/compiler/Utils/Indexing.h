@@ -49,6 +49,38 @@ inline OpFoldResult linearIndexFromShape(ArrayRef<OpFoldResult> multiIndex,
       builder, builder.getLoc(), linearIndexExpr, multiIndexAndStrides);
 }
 
+/// Given a set of dimension `sizes` and `strides`, compute a `basis` - a list
+/// of sizes suitable for passing to an `affine.delinearize_index` op without
+/// outer bound that would produce the same effects as a `(x / strides[i]) %
+/// sizes[i]` delinearization. The permutation mapping each dimension in `sizes`
+/// to its corresponding delinearization result is in `dimToResult`.
+///
+/// That is, if there are `N` elements in the shape, after one builds
+///
+///     %r:(N+1) affine.delinearize_index %x by (basis) : index, index, ...
+///
+/// then, for all `i`
+///
+///    %r#(dimToResult[i]) == (%x floordiv strides[i]) mod sizes[i]
+///
+/// For example, sizes = {4, 16}, strides = {1, 4} will return basis = {4, 1}
+/// and dimToResult = {2, 1}
+///
+/// This function does handle the case where the strides "skip over" elements.
+/// For example, sizes = {16, 4} strides = {8, 1} will yield basis = {16, 2, 4}
+/// and dimToResult = {1, 3}.
+///
+/// If a basis can't be found - for instance, if we have sizes = {4, 4}
+/// strides = {3, 1}, returns failure().
+///
+/// As a special case, dimensions with stride 0 are treated as size-1
+/// dimensions that are placed at the end of the delinearization, from where
+/// they will canonicalize to 0.
+LogicalResult basisFromSizesStrides(ArrayRef<int64_t> sizes,
+                                    ArrayRef<int64_t> strides,
+                                    SmallVectorImpl<int64_t> &basis,
+                                    SmallVectorImpl<size_t> &dimToResult);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_UTILS_INDEXING_H_
