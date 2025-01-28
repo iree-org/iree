@@ -1,41 +1,130 @@
-# Copyright 2025 The IREE Authors
+# Copyright 2021 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-cmake_minimum_required(VERSION 3.16)
-message(STATUS "Start building tracy capture tool")
 
-option(NO_ISA_EXTENSIONS "Disable ISA extensions (don't pass -march=native or -mcpu=native to the compiler)" OFF)
-option(NO_STATISTICS "Disable calculation of statistics" ON)
-option(NO_PARALLEL_STL "Disable parallel STL" OFF)
+cmake_minimum_required(VERSION 3.16.3)
+
+project(IREETracyServer C CXX)
 
 set(TRACY_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../third_party/tracy")
-include(${TRACY_SOURCE_DIR}/cmake/version.cmake)
 
+find_package(Threads REQUIRED)
 
-set(CMAKE_CXX_STANDARD 20)
+#-------------------------------------------------------------------------------
+# Detect package manager
+#-------------------------------------------------------------------------------
 
-project(
-    IREETracyCaptureServer
-    LANGUAGES C CXX
-    VERSION ${TRACY_VERSION_STRING}
+message(STATUS "Checking for Tracy dependencies...")
+find_program(PKGCONFIG pkg-config)
+if(NOT PKGCONFIG)
+  message(STATUS "Could not find pkg-config to get dependencies; you need to specify them manually or use pkg-config")
+  message(STATUS "  Ubuntu/Debian: `apt install pkg-config`")
+  message(STATUS "  MacOS: `brew install pkg-config`")
+else()
+  include(FindPkgConfig)
+
+  # Deps slightly differ by platform but some are common.
+  pkg_check_modules(TRACY_DEPS
+    tbb
+    libzstd
+  )
+  pkg_check_modules(TRACY_CAPSTONE_DEPS
+    capstone
+  )
+
+  if(NOT TRACY_DEPS_FOUND)
+    message(STATUS "Could not find Tracy dependencies (Tracy server will not be built).")
+    message(STATUS "To build Tracy, install packages libzstd, and tbb:")
+    message(STATUS "  Ubuntu/Debian: `apt install libcapstone-dev libtbb-dev libzstd-dev`")
+    message(STATUS "  MacOS: `brew install capstone tbb zstd`")
+    return()
+  endif()
+
+  if(NOT TRACY_CAPSTONE_DEPS_FOUND)
+    message(STATUS "Could not find capstone, a Tracy dependency (Tracy server will not be built).")
+    message(STATUS "To build Tracy, install capstone or build from source:")
+    message(STATUS "  Ubuntu/Debian: `apt install libcapstone-dev`")
+    message(STATUS "  MacOS: `brew install capstone`")
+    return()
+  endif()
+endif()
+
+#-------------------------------------------------------------------------------
+# Configuration
+#-------------------------------------------------------------------------------
+
+function(setup_cxx_options name)
+  set_target_properties(${name}
+    PROPERTIES
+      CXX_STANDARD 17
+  )
+  target_compile_options(${name}
+    PRIVATE
+      $<$<CXX_COMPILER_ID:GNU,Clang>:-Wno-unused-result>
+  )
+  target_include_directories(${name}
+    PUBLIC
+      ${TRACY_SOURCE_DIR}/imgui
+      ${TRACY_DEPS_INCLUDE_DIRS}
+      ${TRACY_CAPSTONE_DEPS_INCLUDE_DIRS}
+      # capstone-next moved capstone.h to a capstone/ subdirectory, but the
+      # pkg-config isn't updated yet as of April 2022.
+      ${TRACY_CAPSTONE_DEPS_INCLUDE_DIRS}/capstone
+  )
+  target_link_libraries(${name}
+    PRIVATE
+      ${TRACY_DEPS_LIBRARIES}
+      ${TRACY_CAPSTONE_DEPS_LIBRARIES}
+      ${CMAKE_DL_LIBS}
+      ${CMAKE_THREAD_LIBS_INIT}
+  )
+  target_link_directories(${name}
+    PRIVATE
+      ${TRACY_DEPS_LIBRARY_DIRS}
+      ${TRACY_CAPSTONE_DEPS_LIBRARY_DIRS}
+  )
+endfunction()
+
+#-------------------------------------------------------------------------------
+# Common library
+#-------------------------------------------------------------------------------
+
+file(GLOB COMMON_SRCS ${TRACY_SOURCE_DIR}/public/common/*.cpp)
+add_library(IREETracyCommon
+  ${COMMON_SRCS}
+)
+setup_cxx_options(IREETracyCommon)
+
+#-------------------------------------------------------------------------------
+# Server library
+#-------------------------------------------------------------------------------
+
+file(GLOB SERVER_SRCS ${TRACY_SOURCE_DIR}/server/*.cpp)
+add_library(IREETracyServer
+  ${SERVER_SRCS}
+)
+setup_cxx_options(IREETracyServer)
+target_link_libraries(IREETracyServer
+  PRIVATE
+    IREETracyCommon
 )
 
-include(${TRACY_SOURCE_DIR}/cmake/config.cmake)
-include(${TRACY_SOURCE_DIR}/cmake/vendor.cmake)
-include(${TRACY_SOURCE_DIR}/cmake/server.cmake)
+#-------------------------------------------------------------------------------
+# Standalone capture server
+#-------------------------------------------------------------------------------
 
-set(PROGRAM_FILES
-    ${TRACY_SOURCE_DIR}/capture/src/capture.cpp
+add_executable(IREETracyCaptureServer
+  ${TRACY_SOURCE_DIR}/capture/src/capture.cpp
 )
-
-add_executable(${PROJECT_NAME} ${PROGRAM_FILES} ${COMMON_FILES} ${SERVER_FILES})
-
-set_target_properties(${PROJECT_NAME}
+set_target_properties(IREETracyCaptureServer
   PROPERTIES
     OUTPUT_NAME "iree-tracy-capture"
 )
-
-target_link_libraries(${PROJECT_NAME} PRIVATE TracyServer TracyGetOpt)
-set_property(DIRECTORY ${CMAKE_CURRENT_LIST_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
+setup_cxx_options(IREETracyCaptureServer)
+target_link_libraries(IREETracyCaptureServer
+  PRIVATE
+    IREETracyCommon
+    IREETracyServer
+)

@@ -970,16 +970,6 @@ if(IREE_ENABLE_CLANG_TIDY)
   set(CMAKE_CXX_CLANG_TIDY "")
 endif()
 
-if(IREE_BUILD_TRACY)
-  if(NOT CMAKE_SYSTEM_NAME MATCHES "Darwin|Linux")
-    message(WARNING "Building Tracy (IREE_BUILD_TRACY) on non-Darwin/Linux is unsupported and may fail below.")
-  endif()
-  add_subdirectory(build_tools/third_party/tracy ${CMAKE_CURRENT_BINARY_DIR}/tracy)
-  if(NOT TARGET IREETracyCaptureServer)
-    message(SEND_ERROR "Could not build Tracy. Either unset IREE_BUILD_TRACY or look for missing dependencies above and install them.")
-  endif()
-endif()
-
 # Order constraint: The python bindings install tools targets from tools/
 # and tracy, and must come after it.
 if(IREE_BUILD_PYTHON_BINDINGS)
