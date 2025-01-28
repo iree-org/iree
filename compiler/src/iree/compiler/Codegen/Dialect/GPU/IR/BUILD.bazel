@@ -34,6 +34,7 @@ iree_td_library(
     ),
     deps = [
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:td_files",
+        "//compiler/src/iree/compiler/Utils",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
         "@llvm-project//mlir:DialectUtilsTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
