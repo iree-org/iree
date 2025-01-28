@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule -canonicalize -cse --split-input-file | FileCheck %s
+// RUN: iree-opt %s -iree-transform-dialect-interpreter --verify-diagnostics -transform-dialect-drop-schedule -canonicalize -cse --split-input-file | FileCheck %s
 
 #map = affine_map<(d0) -> (d0 * 2)>
 module {
@@ -39,13 +39,14 @@ module attributes {transform.with_named_sequence} {
 //   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty() : tensor<8xf32>
 //   CHECK-DAG:   %[[SLICED_OUT:.+]] = tensor.extract_slice %[[EMPTY]][0] [%[[ARG1]]] [1] : tensor<8xf32> to tensor<?xf32>
 //       CHECK:   %[[FORALL_RESULT:.+]] = scf.forall (%[[IDX:.+]]) in (4) shared_outs(%[[SLICED_BBARG:.+]] = %[[SLICED_OUT]]) -> (tensor<?xf32>) {
-//   CHECK-DAG:     %[[SLICE_IDX:.+]] = affine.apply #[[$MAP]](%[[IDX]])
-//   CHECK-DAG:     %[[SIZE_CLAMPED_LOW:.+]] = affine.max #[[$MAP1]](%[[IDX]])[%[[ARG1]]]
-//   CHECK-DAG:     %[[SIZE_CLAMPED_HIGH:.+]] = affine.min #[[$MAP2]](%[[SIZE_CLAMPED_LOW]])
 
+//   CHECK-DAG:     %[[SLICE_IDX:.+]] = affine.apply #[[$MAP]](%[[IDX]])
 //   CHECK-DAG:     %[[IN_SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[SLICE_IDX]]] [2] [1] : tensor<8xf32> to tensor<2xf32>
 //   CHECK-DAG:     %[[OUT_SLICE:.+]] = tensor.extract_slice %[[EMPTY]][%[[SLICE_IDX]]] [2] [1] : tensor<8xf32> to tensor<2xf32>
 //   CHECK-DAG:     %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]] : tensor<2xf32>) outs(%[[OUT_SLICE]] : tensor<2xf32>) -> tensor<2xf32>
+
+//   CHECK-DAG:     %[[SIZE_CLAMPED_LOW:.+]] = affine.max #[[$MAP1]](%[[IDX]])[%[[ARG1]]]
+//   CHECK-DAG:     %[[SIZE_CLAMPED_HIGH:.+]] = affine.min #[[$MAP2]](%[[SIZE_CLAMPED_LOW]])
 
 //       CHECK:     %[[SLICED_COPY:.+]] = tensor.extract_slice %[[COPY]][0] [%[[SIZE_CLAMPED_HIGH]]] [1] : tensor<2xf32> to tensor<?xf32>
 //       CHECK:     scf.forall.in_parallel {
@@ -98,16 +99,15 @@ module {
 //   CHECK-DAG:   %[[SLICED_OUT:.+]] = tensor.extract_slice %[[EMPTY]][0, 0] [%[[EXTRACT_SIZE0]], %[[EXTRACT_SIZE1]]] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
 //       CHECK:   %[[FORALL_RESULT:.+]] = scf.forall (%[[IDX0:.+]], %[[IDX1:.+]]) = (0, 0) to (%[[SIZE0]], %[[SIZE1]]) step (%[[STEP0]], %[[STEP1]])
 //  CHECK-SAME:       shared_outs(%[[SLICED_BBARG:.+]] = %[[SLICED_OUT]]) -> (tensor<?x?xf32>) {
+
+//   CHECK-DAG:     %[[IN_SLICE:.+]] = tensor.extract_slice %[[ARG0]]{{.*}}[%[[IDX0]], %[[IDX1]]] [%[[STEP0]], %[[STEP1]]] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+//   CHECK-DAG:     %[[OUT_SLICE:.+]] = tensor.extract_slice %[[EMPTY]]{{.*}}[%[[IDX0]], %[[IDX1]]] [%[[STEP0]], %[[STEP1]]] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+//   CHECK-DAG:     %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]] : tensor<?x?xf32>) outs(%[[OUT_SLICE]] : tensor<?x?xf32>) -> tensor<?x?xf32>
+
 //   CHECK-DAG:     %[[SIZE_CLAMPED_LOW0:.+]] = affine.max #[[$MAP]](%[[IDX0]])[%[[EXTRACT_SIZE0]]]
 //   CHECK-DAG:     %[[SIZE_CLAMPED_HIGH0:.+]] = affine.min #[[$MAP1]](%[[SIZE_CLAMPED_LOW0]])[%[[STEP0]]]
 //   CHECK-DAG:     %[[SIZE_CLAMPED_LOW1:.+]] = affine.max #[[$MAP]](%[[IDX1]])[%[[EXTRACT_SIZE1]]]
 //   CHECK-DAG:     %[[SIZE_CLAMPED_HIGH1:.+]] = affine.min #[[$MAP1]](%[[SIZE_CLAMPED_LOW1]])[%[[STEP1]]]
-
-//   CHECK-DAG:     %[[IN_SLICE:.+]] = tensor.extract_slice %[[ARG0]]
-//  CHECK-SAME:       [%[[IDX0]], %[[IDX1]]] [%[[STEP0]], %[[STEP1]]] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
-//   CHECK-DAG:     %[[OUT_SLICE:.+]] = tensor.extract_slice %[[EMPTY]]
-//  CHECK-SAME:       [%[[IDX0]], %[[IDX1]]] [%[[STEP0]], %[[STEP1]]] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
-//   CHECK-DAG:     %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]] : tensor<?x?xf32>) outs(%[[OUT_SLICE]] : tensor<?x?xf32>) -> tensor<?x?xf32>
 
 //       CHECK:     %[[SLICED_COPY:.+]] = tensor.extract_slice %[[COPY]][0, 0] [%[[SIZE_CLAMPED_HIGH0]], %[[SIZE_CLAMPED_HIGH1]]] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
 //       CHECK:     scf.forall.in_parallel {
@@ -156,16 +156,15 @@ module attributes {transform.with_named_sequence} {
 //   CHECK-DAG:   %[[SLICED_OUT:.+]] = tensor.extract_slice %[[EMPTY]][0, 0] [1, %[[ARG1]]] [1, 1] : tensor<4x8xf32> to tensor<1x?xf32>
 //       CHECK:   %[[FORALL_RESULT:.+]] = scf.forall (%[[IDX0:.+]], %[[IDX1:.+]]) = (0, 0) to (4, 8) step (2, 2)
 //  CHECK-SAME:       shared_outs(%[[SLICED_BBARG:.+]] = %[[SLICED_OUT]]) -> (tensor<1x?xf32>) {
+
+//   CHECK-DAG:     %[[IN_SLICE:.+]] = tensor.extract_slice %[[ARG0]]{{.*}}[%[[IDX0]], %[[IDX1]]] [2, 2] [1, 1] : tensor<4x8xf32> to tensor<2x2xf32>
+//   CHECK-DAG:     %[[OUT_SLICE:.+]] = tensor.extract_slice %[[EMPTY]]{{.*}}[%[[IDX0]], %[[IDX1]]] [2, 2] [1, 1] : tensor<4x8xf32> to tensor<2x2xf32>
+//   CHECK-DAG:     %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]] : tensor<2x2xf32>) outs(%[[OUT_SLICE]] : tensor<2x2xf32>) -> tensor<2x2xf32>
+
 //   CHECK-DAG:     %[[SIZE_CLAMPED_LOW0:.+]] = affine.max #[[$MAP]](%[[IDX0]])
 //   CHECK-DAG:     %[[SIZE_CLAMPED_HIGH0:.+]] = affine.min #[[$MAP1]](%[[SIZE_CLAMPED_LOW0]])
 //   CHECK-DAG:     %[[SIZE_CLAMPED_LOW1:.+]] = affine.max #[[$MAP2]](%[[IDX1]])[%[[ARG1]]]
 //   CHECK-DAG:     %[[SIZE_CLAMPED_HIGH1:.+]] = affine.min #[[$MAP1]](%[[SIZE_CLAMPED_LOW1]])
-
-//   CHECK-DAG:     %[[IN_SLICE:.+]] = tensor.extract_slice %[[ARG0]]
-//  CHECK-SAME:       [%[[IDX0]], %[[IDX1]]] [2, 2] [1, 1] : tensor<4x8xf32> to tensor<2x2xf32>
-//   CHECK-DAG:     %[[OUT_SLICE:.+]] = tensor.extract_slice %[[EMPTY]]
-//  CHECK-SAME:       [%[[IDX0]], %[[IDX1]]] [2, 2] [1, 1] : tensor<4x8xf32> to tensor<2x2xf32>
-//   CHECK-DAG:     %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]] : tensor<2x2xf32>) outs(%[[OUT_SLICE]] : tensor<2x2xf32>) -> tensor<2x2xf32>
 
 //       CHECK:     %[[SLICED_COPY:.+]] = tensor.extract_slice %[[COPY]]
 //  CHECK-SAME:       [0, 0] [%[[SIZE_CLAMPED_HIGH0]], %[[SIZE_CLAMPED_HIGH1]]] [1, 1] : tensor<2x2xf32> to tensor<?x?xf32>
@@ -219,15 +218,14 @@ module attributes {transform.with_named_sequence} {
 //   CHECK-DAG:   %[[SLICED_OUT:.+]] = tensor.extract_slice %[[EMPTY]][0, 0] [4, %[[ARG1]]] [1, 1] : tensor<4x8xf32> to tensor<4x?xf32>
 //       CHECK:   %[[FORALL_RESULT:.+]] = scf.forall (%[[IDX:.+]]) in (4)
 //  CHECK-SAME:       shared_outs(%[[SLICED_BBARG:.+]] = %[[SLICED_OUT]]) -> (tensor<4x?xf32>) {
+
 //   CHECK-DAG:     %[[SLICE_IDX:.+]] = affine.apply #[[$MAP]](%[[IDX]])
+//   CHECK-DAG:     %[[IN_SLICE:.+]] = tensor.extract_slice %[[ARG0]]{{.*}}[0, %[[SLICE_IDX]]] [1, 2] [1, 1] : tensor<4x8xf32> to tensor<2xf32>
+//   CHECK-DAG:     %[[OUT_SLICE:.+]] = tensor.extract_slice %[[EMPTY]]{{.*}}[0, %[[SLICE_IDX]]] [1, 2] [1, 1] : tensor<4x8xf32> to tensor<2xf32>
+//   CHECK-DAG:     %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]] : tensor<2xf32>) outs(%[[OUT_SLICE]] : tensor<2xf32>) -> tensor<2xf32>
+
 //   CHECK-DAG:     %[[SIZE_CLAMPED_LOW:.+]] = affine.max #[[$MAP1]](%[[IDX]])[%[[ARG1]]]
 //   CHECK-DAG:     %[[SIZE_CLAMPED_HIGH:.+]] = affine.min #[[$MAP2]](%[[SIZE_CLAMPED_LOW]])
-
-//   CHECK-DAG:     %[[IN_SLICE:.+]] = tensor.extract_slice %[[ARG0]]
-//  CHECK-SAME:       [0, %[[SLICE_IDX]]] [1, 2] [1, 1] : tensor<4x8xf32> to tensor<2xf32>
-//   CHECK-DAG:     %[[OUT_SLICE:.+]] = tensor.extract_slice %[[EMPTY]]
-//  CHECK-SAME:       [0, %[[SLICE_IDX]]] [1, 2] [1, 1] : tensor<4x8xf32> to tensor<2xf32>
-//   CHECK-DAG:     %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]] : tensor<2xf32>) outs(%[[OUT_SLICE]] : tensor<2xf32>) -> tensor<2xf32>
 
 //       CHECK:     %[[SLICED_COPY:.+]] = tensor.extract_slice %[[COPY]][0] [%[[SIZE_CLAMPED_HIGH]]] [1] : tensor<2xf32> to tensor<?xf32>
 //       CHECK:     scf.forall.in_parallel {
@@ -279,3 +277,34 @@ module attributes {transform.with_named_sequence} {
 //       CHECK:     }
 //       CHECK:   } {mapping = [#gpu.thread<x>]}
 //       CHECK:   return %[[FORALL_RESULT]]#0, %[[FORALL_RESULT]]#1
+
+// -----
+
+#map = affine_map<(d0) -> (d0 * 2)>
+module {
+  func.func @no_fuse_extract_slice_with_offset(%arg0: tensor<8xf32>, %arg1: index) -> tensor<?xf32> {
+    %0 = tensor.empty() : tensor<8xf32>
+    %1 = scf.forall (%arg2) in (4) shared_outs(%arg3 = %0) -> (tensor<8xf32>) {
+      %2 = affine.apply #map(%arg2)
+      %extracted_slice_0 = tensor.extract_slice %arg0[%2] [2] [1] : tensor<8xf32> to tensor<2xf32>
+      %extracted_slice_1 = tensor.extract_slice %arg3[%2] [2] [1] : tensor<8xf32> to tensor<2xf32>
+      %3 = linalg.copy ins(%extracted_slice_0 : tensor<2xf32>) outs(%extracted_slice_1 : tensor<2xf32>) -> tensor<2xf32>
+      scf.forall.in_parallel {
+        tensor.parallel_insert_slice %3 into %arg3[%2] [2] [1] : tensor<2xf32> into tensor<8xf32>
+      }
+    } {mapping = [#gpu.thread<x>]}
+    %extracted_slice = tensor.extract_slice %1[2] [%arg1] [1] : tensor<8xf32> to tensor<?xf32>
+    return %extracted_slice : tensor<?xf32>
+  }
+}
+
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
+    %producer = transform.structured.match ops{["scf.forall"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    %consumer = transform.get_consumers_of_result %producer[0] : (!transform.any_op) -> !transform.any_op
+    // expected-error@+1 {{failed to fuse extract_slice op}}
+    %2 = transform.iree.fuse_extract_slice_into_forall %consumer into %producer
+     : (!transform.any_op, !transform.any_op) -> !transform.any_op
+    transform.yield
+  }
+}

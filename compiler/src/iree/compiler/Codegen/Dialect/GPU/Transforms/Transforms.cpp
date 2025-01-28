@@ -554,32 +554,27 @@ static FailureOr<tensor::ParallelInsertSliceOp>
 clampParallelInsertSliceOp(RewriterBase &rewriter,
                            tensor::ParallelInsertSliceOp parallelInsertOp,
                            SmallVector<OpFoldResult> upperBoundSizes) {
-  // Clamp the sizes of the parallel insert source.
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(parallelInsertOp.getParallelCombiningParent());
   Location loc = parallelInsertOp.getParallelCombiningParent()->getLoc();
 
-  auto clampSizes = [&](SmallVector<OpFoldResult> offsets,
-                        SmallVector<OpFoldResult> sizes, Location loc) {
-    SmallVector<OpFoldResult> clampedSizes;
-    for (auto [offset, size, ub] :
-         llvm::zip_equal(offsets, sizes, upperBoundSizes)) {
-      AffineExpr d0, d1, d2;
-      auto ctx = rewriter.getContext();
-      bindDims(ctx, d0, d1, d2);
-      auto lbClampMap = AffineMap::get(3, 0, {d0 - d1, d2}, ctx);
-      auto ubClampMap = rewriter.getMultiDimIdentityMap(2);
-      auto lbClamped = affine::makeComposedFoldedAffineMax(
-          rewriter, loc, lbClampMap, {ub, offset, rewriter.getIndexAttr(0)});
-      auto ubClamped = affine::makeComposedFoldedAffineMin(
-          rewriter, loc, ubClampMap, {lbClamped, size});
-      clampedSizes.push_back(ubClamped);
-    }
-    return clampedSizes;
-  };
-  SmallVector<OpFoldResult> clampedSizes =
-      clampSizes(parallelInsertOp.getMixedOffsets(),
-                 parallelInsertOp.getMixedSizes(), loc);
+  // Clamp the parallel_insert_slice sizes to fit within the full result tensor.
+  SmallVector<OpFoldResult> offsets = parallelInsertOp.getMixedOffsets();
+  SmallVector<OpFoldResult> sizes = parallelInsertOp.getMixedSizes();
+  SmallVector<OpFoldResult> clampedSizes;
+  for (auto [offset, size, ub] :
+       llvm::zip_equal(offsets, sizes, upperBoundSizes)) {
+    AffineExpr d0, d1, d2;
+    MLIRContext *ctx = rewriter.getContext();
+    bindDims(ctx, d0, d1, d2);
+    auto lbClampMap = AffineMap::get(3, 0, {d0 - d1, d2}, ctx);
+    auto ubClampMap = rewriter.getMultiDimIdentityMap(2);
+    OpFoldResult lbClamped = affine::makeComposedFoldedAffineMax(
+        rewriter, loc, lbClampMap, {ub, offset, rewriter.getIndexAttr(0)});
+    OpFoldResult ubClamped = affine::makeComposedFoldedAffineMin(
+        rewriter, loc, ubClampMap, {lbClamped, size});
+    clampedSizes.push_back(ubClamped);
+  }
 
   // Compute the clamped type. This could be rank reduced, but rank reduced
   // dimensions will never be potentially zero by construction. The earlier

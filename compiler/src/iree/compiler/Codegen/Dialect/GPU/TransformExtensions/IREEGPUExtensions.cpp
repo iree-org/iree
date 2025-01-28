@@ -298,7 +298,7 @@ transform_dialect::FuseExtractSliceIntoForallOp::apply(
   FailureOr<scf::ForallOp> fusedForallOp =
       GPU::fuseExtractSliceIntoProducerForall(rewriter, producer, consumer);
   if (failed(fusedForallOp)) {
-    return mlir::emitSilenceableFailure(state.getTopLevel(),
+    return mlir::emitSilenceableFailure(*this,
                                         "failed to fuse extract_slice op");
   }
 

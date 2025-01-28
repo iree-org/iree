@@ -269,14 +269,14 @@ def FuseExtractSliceIntoForallOp : Op<Transform_Dialect, "iree.fuse_extract_slic
      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Fuses a consumer tensor.extract_slice op into a producer scf.forall op.
-    The users of the block argument for the corresponding forall output operand
-    should be only a tensor.parallel_insert_slice op, and tensor.extract_slice
-    ops that extract an equivalent subset. After the fusion, the output of the
-    forall will be an equal subset slice of the original output, and all users
-    of this block arg will be clamped to the slice size. Additional tensor.pad
-    ops will be inserted after any tensor.extract_slice users inside the forall
-    so that types match. Similarly, a tensor.extract_slice op will be inserted
-    before the tensor.parallel_insert_slice.
+    This transform is supported if the extract_slice op has all zero offsets,
+    and if all the offsets, sizes, and strides dominate the scf.forall op.
+    After the transformation, the forall loop output argument corresponding
+    to the sliced result will be replaced with a slice of it with the same
+    offsets, sizes, and strides as the original extract_slice. The source of
+    the corresponding tensor.parallel_insert_slice of the scf.forall will also
+    become a slice of the original parallel insert source, clamped to fit within
+    the new sliced result tensor.
 
     #### Return modes
     Emits a definite failure if either the producer is not an scf.forall op or
