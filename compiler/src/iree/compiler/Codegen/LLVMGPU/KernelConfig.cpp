@@ -50,22 +50,19 @@
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 namespace mlir::iree_compiler {
 
-llvm::cl::opt<bool> clGPUTestTileAndFuseMatmul(
-    "iree-codegen-llvmgpu-test-tile-and-fuse-matmul",
+// TODO: Formalize flag under LLVMGPU opt levels.
+llvm::cl::opt<bool> clGPUUseTileAndFuseMatmul(
+    "iree-codegen-llvmgpu-use-tile-and-fuse-matmul",
     llvm::cl::desc("test the the tile and fuse pipeline for matmul"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
-llvm::cl::opt<bool> clGPUTestTileAndFuseVectorize(
-    "iree-codegen-llvmgpu-test-tile-and-fuse-vectorize",
-    llvm::cl::desc(
-        "test the tile and fuse pipeline for all supported operations"),
-    llvm::cl::init(false));
-
+// TODO: Formalize flag under LLVMGPU opt levels.
 llvm::cl::opt<bool> clLLVMGPUVectorizePipeline(
     "iree-codegen-llvmgpu-vectorize-pipeline",
     llvm::cl::desc("forces use of the legacy LLVMGPU vectorize pipeline"),
     llvm::cl::init(false));
 
+// TODO: Formalize flag under LLVMGPU opt levels.
 llvm::cl::opt<bool> clGPUEnableVectorDistribution(
     "iree-codegen-llvmgpu-use-vector-distribution",
     llvm::cl::desc("enable the usage of the vector distribution pipeline"),
@@ -80,24 +77,28 @@ llvm::cl::opt<bool> clGPUUnalignedGEMMVectorDistribution(
                    "unaligned GEMMs when supported"),
     llvm::cl::init(false));
 
+// TODO: Formalize flag under LLVMGPU opt levels.
 llvm::cl::opt<bool> clGPUUseTileAndFuseConvolution(
     "iree-codegen-llvmgpu-use-tile-and-fuse-convolution",
     llvm::cl::desc(
         "enable the tile and fuse pipeline for supported convolutions"),
     llvm::cl::init(true));
 
+// TODO: Formalize flag under LLVMGPU opt levels.
 /// Flag to force using WMMA tensorcore operations.
 llvm::cl::opt<bool>
     clGPUUseWMMA("iree-codegen-llvmgpu-use-wmma",
                  llvm::cl::desc("force use of wmma operations for tensorcore"),
                  llvm::cl::init(false));
 
+// TODO: Formalize flag under LLVMGPU opt levels.
 /// Flag used to toggle using mma.sync vs wmma when targetting tensorcore.
 llvm::cl::opt<bool>
     clGPUUseMMASync("iree-codegen-llvmgpu-use-mma-sync",
                     llvm::cl::desc("force use mma sync instead of wmma ops"),
                     llvm::cl::init(false));
 
+// TODO: Move to a testing only flag.
 llvm::cl::opt<int> clGPUMatmulCThreshold(
     "iree-codegen-llvmgpu-matmul-c-matrix-threshold",
     llvm::cl::desc("matmul c matrix element count threshold to be considered "
@@ -114,6 +115,13 @@ static llvm::cl::opt<bool>
     clLLVMGPUUseIgemm("iree-codegen-llvmgpu-use-igemm",
                       llvm::cl::desc("Enable implicit gemm for convolutions."),
                       llvm::cl::init(true));
+
+// Hidden testing only flag
+llvm::cl::opt<bool> clGPUTestTileAndFuseVectorize(
+    "iree-codegen-llvmgpu-test-tile-and-fuse-vectorize",
+    llvm::cl::desc(
+        "test the tile and fuse pipeline for all supported operations"),
+    llvm::cl::init(false), llvm::cl::Hidden);
 namespace {
 
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
@@ -2340,7 +2348,7 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     LDBG("Tile and fuse data tiled multi_mma config");
     return success();
   }
-  if (clGPUTestTileAndFuseMatmul) {
+  if (clGPUUseTileAndFuseMatmul) {
     if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
                                                      computeOp))) {
       LDBG("Tile and fuse matmul config");
