@@ -297,8 +297,17 @@ util.func public @dont_fuse_when_same_trunc_op(%arg0: tensor<2x4096x640xi8>, %ar
 
 // Don't support multiple operands of the trunc being from different matmuls.
 //      CHECK: util.func public @dont_fuse_when_same_trunc_op
-//      CHECK:   %[[CONTRACT1:.+]] = linalg.batch_matmul_transpose_b
-//      CHECK:   %[[CONTRACT2:.+]] = linalg.batch_matmul_transpose_b
-//      CHECK:   %[[GENERIC:.+]] = linalg.generic
-// CHECK-SAME:       ins(%[[CONTRACT2]], %[[CONTRACT1]]
-//      CHECK:   util.return %[[GENERIC]]
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<2x4096x640xi8>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<2x640x640xi8>
+// CHECK-SAME:     %[[ARG4:[a-zA-Z0-9]+]]: tensor<2x640x640xi8>
+//  CHECK-DAG:   %[[EXPAND_ARG1:.+]] = tensor.expand_shape %[[ARG1]]
+//  CHECK-DAG:   %[[EXPAND_ARG4:.+]] = tensor.expand_shape %[[ARG4]]
+//      CHECK:   %[[INSERT0:.+]] = tensor.insert_slice %[[EXPAND_ARG1]]
+//      CHECK:   %[[INSERT1:.+]] = tensor.insert_slice %[[EXPAND_ARG4]] into %[[INSERT0]]
+//      CHECK:   %[[CONTRACT:.+]] = linalg.generic
+// CHECK-SAME:       ins(%[[ARG0]], %[[INSERT1]] :
+//  CHECK-DAG:   %[[SLICE0:.+]] = tensor.extract_slice %[[CONTRACT]]
+//  CHECK-DAG:   %[[SLICE1:.+]] = tensor.extract_slice %[[CONTRACT]]
+//      CHECK:   %[[TRUNC:.+]] = linalg.generic
+// CHECK-SAME:       ins(%[[SLICE1]], %[[SLICE0]] :
+//      CHECK:   util.return %[[TRUNC]]
