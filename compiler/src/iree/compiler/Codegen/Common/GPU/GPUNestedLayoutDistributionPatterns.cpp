@@ -560,6 +560,7 @@ struct DistributeMultiReduction final
   LogicalResult matchAndRewrite(vector::MultiDimReductionOp multiReduceOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
+    Location loc = multiReduceOp.getLoc();
     VectorValue srcVector = multiReduceOp.getSource();
     Value acc = multiReduceOp.getAcc();
     Value res = multiReduceOp.getResult();
@@ -592,7 +593,24 @@ struct DistributeMultiReduction final
       disAcc = multiReduceOp.getAcc();
     }
 
-    Location loc = multiReduceOp.getLoc();
+    VectorValue mask = nullptr;
+    if (auto maskOp = multiReduceOp->getParentOfType<vector::MaskOp>()) {
+      std::optional<DistributionSignature> signatureMask =
+          getOpSignature(maskOp);
+      auto maskLayout = dyn_cast_or_null<NestedLayoutAttr>(
+          signatureMask.value()[maskOp.getMask()]);
+      if (!maskLayout) {
+        return rewriter.notifyMatchFailure(maskOp,
+                                           "expected nested layout attr");
+      }
+      mask = getDistributed(rewriter, maskOp.getMask(), maskLayout);
+      Value passThruSrc = getCombiningIdentityValue(
+          loc, rewriter, multiReduceOp.getKind(), disSrc.getType());
+      disSrc = cast<VectorValue>(
+          rewriter.create<arith::SelectOp>(loc, mask, disSrc, passThruSrc)
+              .getResult());
+    }
+
     SmallVector<bool> reducedDims = multiReduceOp.getReductionMask();
     int64_t rank = srcVector.getType().getRank();
 
@@ -607,18 +625,23 @@ struct DistributeMultiReduction final
     }
     Value localInit = getCombiningIdentityValue(
         loc, rewriter, multiReduceOp.getKind(), disAcc.getType());
-    auto localReduction = rewriter.create<vector::MultiDimReductionOp>(
+    Value localReduction = rewriter.create<vector::MultiDimReductionOp>(
         loc, disSrc, localInit, distributedReductionMask,
         multiReduceOp.getKind());
+    if (mask) {
+      localReduction =
+          vector::maskOperation(rewriter, localReduction.getDefiningOp(), mask)
+              ->getResult(0);
+    }
 
     VectorValue locallyReduced;
     if (accVector) {
-      locallyReduced = dyn_cast<VectorValue>(localReduction.getResult());
+      locallyReduced = dyn_cast<VectorValue>(localReduction);
     } else {
       // Broadcast scalar accumulator to vector.
       VectorType vecType = VectorType::get(ArrayRef{int64_t(1)}, elemTy);
-      locallyReduced = rewriter.create<vector::BroadcastOp>(
-          loc, vecType, localReduction.getResult());
+      locallyReduced =
+          rewriter.create<vector::BroadcastOp>(loc, vecType, localReduction);
     }
 
     assert(locallyReduced && "result should have been a vector");
@@ -701,7 +724,6 @@ struct DistributeMultiReduction final
 
     for (unsigned i = 0; i < numElements; ++i) {
       Value extracted = rewriter.create<vector::ExtractOp>(loc, flat, i);
-
       // Reduce across all reduction dimensions 1-by-1.
       for (unsigned i = 0, e = reductionMask.size(); i != e; ++i) {
         if (reductionMask[i]) {
@@ -1634,6 +1656,33 @@ struct DistributeCreateMask final
   int64_t subgroupSize;
 };
 
+struct DistributeMask final : OpDistributionPattern<vector::MaskOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult matchAndRewrite(vector::MaskOp maskOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<Value> returns =
+        maskOp.getBody()->getTerminator()->getOperands();
+    for (auto [idx, ret] : llvm::enumerate(returns)) {
+      if (VectorValue vectorRet = dyn_cast<VectorValue>(ret)) {
+        VectorValue maskRet = cast<VectorValue>(maskOp.getResult(idx));
+        VectorLayoutInterface layout =
+            dyn_cast<NestedLayoutAttr>(signature[maskRet]);
+        if (!layout) {
+          return rewriter.notifyMatchFailure(maskOp,
+                                             "layout must be NestedLayoutAttr");
+        }
+        ret = getDistributed(rewriter, vectorRet, layout);
+      }
+    }
+    rewriter.eraseOp(maskOp.getBody()->getTerminator());
+    rewriter.inlineBlockBefore(maskOp.getBody(), maskOp);
+    replaceOpWithDistributedValues(rewriter, maskOp, returns);
+    return success();
+  }
+};
+
 } // namespace
 
 void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
@@ -1650,6 +1699,7 @@ void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
   patterns.add<DistributeStep>(patterns.getContext(), threadId, subgroupSize);
   patterns.add<DistributeCreateMask>(patterns.getContext(), threadId,
                                      subgroupSize);
+  patterns.add<DistributeMask>(patterns.getContext());
 }
 
 }; // namespace mlir::iree_compiler
