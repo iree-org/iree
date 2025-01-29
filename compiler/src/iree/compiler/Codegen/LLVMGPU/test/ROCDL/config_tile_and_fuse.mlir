@@ -179,8 +179,8 @@ module {
 //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 4]
-//  CHECK-SAME:     thread = [1, 1, 0]
-//  CHECK-SAME:     workgroup = [1, 64, 0]
+//  CHECK-SAME:     thread = [1, 4, 0]
+//  CHECK-SAME:     workgroup = [1, 256, 0]
 
 // -----
 
@@ -198,8 +198,8 @@ module {
 // CHECK-LABEL: func.func @elementwise_dynamic_dim
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
 //       CHECK:   linalg.add {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     thread = [1, 1]
-//  CHECK-SAME:     workgroup = [1, 64]
+//  CHECK-SAME:     thread = [1, 4]
+//  CHECK-SAME:     workgroup = [1, 256]
 
 // -----
 
