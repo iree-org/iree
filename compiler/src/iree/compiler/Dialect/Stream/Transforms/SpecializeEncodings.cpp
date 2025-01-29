@@ -233,6 +233,7 @@ updateTensorDispatchOp(RewriterBase &rewriter,
       std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
           getEncodingWithNewLayouts(type, layoutResolvers);
       if (!encodingAttr) {
+        newTypeAttrs.push_back(type);
         continue;
       }
       newTypeAttrs.push_back(cloneWithEncoding(cast<RankedTensorType>(type),
