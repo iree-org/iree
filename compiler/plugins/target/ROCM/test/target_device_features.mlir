@@ -4,6 +4,8 @@
 // RUN:   --iree-hip-target=mi300a %s | FileCheck %s --check-prefixes=GFX942,MI300A
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-hip-target=mi308x %s | FileCheck %s --check-prefixes=GFX942,MI308X
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-hip-target=mi300x %s | FileCheck %s --check-prefixes=GFX942,MI325X
 //
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-hip-target=gfx941 --iree-hip-target-features=+sramecc,-xnack %s | FileCheck %s --check-prefix=GFX941
@@ -33,6 +35,7 @@
 // MI300X: chip = <wgp_count = 304, sku = "mi300x">>
 // MI300A: chip = <wgp_count = 228, sku = "mi300a">>
 // MI308X: chip = <wgp_count = 80,  sku = "mi308x">>
+// MI325X: chip = <wgp_count = 304,  sku = "mi325x">>
 
 // GFX941: target = #iree_gpu.target<arch = "gfx941",
 // GFX941-SAME:         features = "+sramecc,-xnack"
