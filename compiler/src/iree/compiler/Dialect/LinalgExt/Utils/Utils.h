@@ -181,9 +181,8 @@ struct IGEMMGenericConvDetails {
   /// The reassociation indices used to computer the collapse shape of the
   /// filter in IGEMM transformation.
   SmallVector<ReassociationIndices> filterReassocIndices;
-  /// The index at which the reduction dimentions bounds start in
-  /// igemmLoopBounds.
-  int64_t reductionBoundIndex;
+  /// The iterator type list for a convolution with IGEMM indexing. .
+  SmallVector<utils::IteratorType> igemmLoopIterators;
   /// Indicates if the OutputChannel is before the OutputImage in the output.
   /// This determines our lhs/rhs ordering.
   bool isOutputChannelFirst;

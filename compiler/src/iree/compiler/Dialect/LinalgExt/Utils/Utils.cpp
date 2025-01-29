@@ -655,17 +655,21 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   SmallVector<int64_t> igemmLoopBounds;
   igemmLoopBounds.insert(igemmLoopBounds.end(), outputShape.begin(),
                          outputShape.begin() + numParallelDims);
-  int64_t reductionBoundIndex = igemmLoopBounds.size();
+
+  SmallVector<utils::IteratorType> igemmLoopIterators(outputShape.size(),
+                                                      parallel);
+
   for (auto iter : llvm::enumerate(filterIterators)) {
     if (iter.value() == reduction) {
       igemmLoopBounds.push_back(reshapedFilterShape[iter.index()]);
+      igemmLoopIterators.push_back(reduction);
     }
   }
   igemmDetails.igemmLoopBounds = igemmLoopBounds;
   igemmDetails.filterReassocIndices = filterReassocIndices;
   igemmDetails.isOutputChannelFirst = isOutputChannelFirst;
   igemmDetails.convDims = convDims;
-  igemmDetails.reductionBoundIndex = reductionBoundIndex;
+  igemmDetails.igemmLoopIterators = igemmLoopIterators;
 
   return igemmDetails;
 }

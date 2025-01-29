@@ -30,6 +30,9 @@
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::IREE::GPU {
+
+// TODO (nirvedhmeshram) : This flag allows a lot more convolutions to use IGEMM
+// so drop this flag after sufficient use with no issues.
 llvm::cl::opt<bool> clGPUUseTileAndFuseGenericConvolution(
     "iree-gpu-use-tile-and-fuse-generic-convolution",
     llvm::cl::desc(

@@ -54,13 +54,10 @@ static SmallVector<int64_t> getBasisFromShape(ArrayRef<int64_t> shape) {
   SmallVector<int64_t> basis(shape.size());
   int64_t cummulativeProduct = 1;
   for (int i = shape.size() - 1; i >= 0; --i) {
-    cummulativeProduct *= shape[i];
     basis[i] = cummulativeProduct;
+    cummulativeProduct *= shape[i];
   }
-  // Shift left with innermost basis one.
-  basis.push_back(1);
-  // Drop the outermost basis.
-  return llvm::to_vector(llvm::ArrayRef(basis).drop_front());
+  return basis;
 }
 
 namespace {
@@ -130,7 +127,8 @@ public:
         igemmConvDetails.filterReassocIndices;
     bool isOutputChannelFirst = igemmConvDetails.isOutputChannelFirst;
     SmallVector<int64_t> igemmLoopBounds = igemmConvDetails.igemmLoopBounds;
-    int64_t reductionBoundIndex = igemmConvDetails.reductionBoundIndex;
+    SmallVector<utils::IteratorType> igemmLoopIterators =
+        igemmConvDetails.igemmLoopIterators;
 
     Value input = linalgOp.getDpsInputs()[0];
     Value filter = linalgOp.getDpsInputs()[1];
@@ -174,10 +172,17 @@ public:
     }
 
     SmallVector<int64_t> mPos;
+    SmallVector<int64_t> mShape;
     for (auto outputImage : convDims.outputImage) {
       for (auto [idx, e] : llvm::enumerate(inputMap.getResults())) {
         if (e.isFunctionOfDim(outputImage)) {
           mPos.push_back(idx);
+        }
+      }
+      for (auto [idx, e] : llvm::enumerate(outputMap.getResults())) {
+        if (e.isFunctionOfDim(outputImage)) {
+          mShape.push_back(outputShape[idx]);
+          colTensorShape.push_back(outputShape[idx]);
         }
       }
     }
@@ -190,17 +195,11 @@ public:
         }
       }
     }
-
-    SmallVector<int64_t> mShape;
-    for (auto outputImage : convDims.outputImage) {
-      for (auto [idx, e] : llvm::enumerate(outputMap.getResults())) {
-        if (e.isFunctionOfDim(outputImage)) {
-          mShape.push_back(outputShape[idx]);
-          colTensorShape.push_back(outputShape[idx]);
-        }
-      }
-    }
-
+    // The index at which the reduction dimension bounds starts in
+    // igemmLoopBounds.
+    int64_t reductionBoundIndex = convDims.batch.size() +
+                                  convDims.outputImage.size() +
+                                  convDims.outputChannel.size();
     SmallVector<int64_t> kShape(igemmLoopBounds.begin() + reductionBoundIndex,
                                 igemmLoopBounds.end());
     colTensorShape.insert(colTensorShape.end(), kShape.begin(), kShape.end());
@@ -223,23 +222,16 @@ public:
                 kBasis, batchPos, mPos, kPos)
             .getResult(0);
 
-    int64_t numParallelDim = igemmLoopBounds.size() - kShape.size();
-    int64_t numKDims = kShape.size();
-
     Value reshapedFilter = rewriter.create<tensor::CollapseShapeOp>(
         loc, filter, filterReassocIndices);
-
-    auto parallel = utils::IteratorType::parallel;
-    auto reduction = utils::IteratorType::reduction;
-    SmallVector<utils::IteratorType> genericIterators(numParallelDim, parallel);
-    genericIterators.insert(genericIterators.end(), numKDims, reduction);
 
     auto genericGEMMOp = rewriter.create<linalg::GenericOp>(
         loc, outputType,
         /*inputs=*/
         isOutputChannelFirst ? ValueRange{reshapedFilter, img2ColTensor}
                              : ValueRange{img2ColTensor, reshapedFilter},
-        /*outputs=*/ValueRange{output}, igemmContractionMaps, genericIterators,
+        /*outputs=*/ValueRange{output}, igemmContractionMaps,
+        igemmLoopIterators,
         [](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
           Value lhs = convertScalarToDtype(nestedBuilder, nestedLoc, args[0],
                                            args[2].getType(),
