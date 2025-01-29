@@ -1,4 +1,5 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --iree-codegen-llvmgpu-use-vector-distribution \
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 \
+// RUN:   --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=false --iree-codegen-llvmgpu-use-vector-distribution \
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=WMMA
 
 // TODO: This test is still using the legacy LLVMGPU kernel config. This needs
