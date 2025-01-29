@@ -206,16 +206,14 @@ function install_deps() {
   # Get the output of uname -m
   uname_m=$(uname -m)
 
-  # Check if the output is aarch64
   if [[ "$uname_m" == "aarch64" ]]; then
     echo "The architecture is aarch64 and we use manylinux 2_28 so install deps"
     yum install -y epel-release
     yum update -y
     # Required for Tracy
-    yum install -y capstone-devel tbb-devel libzstd-devel
+    yum install -y libzstd-devel
     yum install -y clang lld
   elif [[ "$uname_m" == "x86_64" ]]; then
-    # Check if the output is x86_64
     echo "The architecture is x86_64 so assume we are on a managed image with deps"
   else
     echo "The architecture is unknown. Exiting"
