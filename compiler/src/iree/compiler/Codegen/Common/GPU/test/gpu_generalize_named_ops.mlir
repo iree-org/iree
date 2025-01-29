@@ -111,3 +111,17 @@ func.func @lowering_config(%arg0: tensor<512x128xf16>, %arg1: tensor<512x128xf16
 // CHECK-LABEL: func.func @lowering_config
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     lowering_config = #[[$CONFIG]]
+
+// -----
+
+func.func @transpose_op(%arg0: tensor<16x32xf16>) -> tensor<32x16xf16> {
+  %empty = tensor.empty() : tensor<32x16xf16>
+  %transpose = linalg.transpose
+      ins(%arg0 : tensor<16x32xf16>)
+      outs(%empty : tensor<32x16xf16>)
+      permutation = [1, 0]
+  return %transpose : tensor<32x16xf16>
+}
+
+// CHECK-LABEL: func.func @transpose_op
+//       CHECK:   linalg.generic
