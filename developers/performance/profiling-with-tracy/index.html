@@ -3081,9 +3081,27 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#additional-capstone-dependencies-for-cpu-code-disassembly" class="md-nav__link">
+  <a href="#building-the-tracy-profiler-gui" class="md-nav__link">
     <span class="md-ellipsis">
-      Additional Capstone dependencies for CPU code disassembly
+      Building the tracy-profiler GUI
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#building-the-tracy-capture-cli-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      Building the tracy-capture CLI tool
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#building-the-tracy-csvexport-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      Building the tracy-csvexport tool
     </span>
   </a>
   
@@ -4043,9 +4061,27 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#additional-capstone-dependencies-for-cpu-code-disassembly" class="md-nav__link">
+  <a href="#building-the-tracy-profiler-gui" class="md-nav__link">
     <span class="md-ellipsis">
-      Additional Capstone dependencies for CPU code disassembly
+      Building the tracy-profiler GUI
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#building-the-tracy-capture-cli-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      Building the tracy-capture CLI tool
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#building-the-tracy-csvexport-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      Building the tracy-csvexport tool
     </span>
   </a>
   
@@ -4161,7 +4197,7 @@ UI and CLI capture tool, is a PDF manual:</p>
 <h2 id="capturing-a-trace"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M14.184 1.143zl1.422 2.464a1.75 1.75 0 0 1-.757 2.451L3.104 11.713a1.75 1.75 0 0 1-2.275-.702l-.447-.775a1.75 1.75 0 0 1 .53-2.32L11.682.573a1.75 1.75 0 0 1 2.502.57m-4.709 9.32zl2.644 3.863a.75.75 0 1 1-1.238.848l-1.881-2.75v2.826a.75.75 0 0 1-1.5 0v-2.826l-1.881 2.75a.75.75 0 1 1-1.238-.848l2.049-2.992a.75.75 0 0 1 .293-.253l1.809-.87a.75.75 0 0 1 .944.252M9.436 3.92zl-4.97 3.39.942 1.63 5.42-2.61Zm3.091-2.108h.001l-1.85 1.26 1.505 2.605 2.016-.97a.25.25 0 0 0 .13-.151.25.25 0 0 0-.022-.199l-1.422-2.464a.25.25 0 0 0-.161-.119.25.25 0 0 0-.197.038M1.756 9.157a.25.25 0 0 0-.075.33l.447.775a.25.25 0 0 0 .325.1l1.598-.769-.83-1.436z"/></svg></span> Capturing a trace<a class="headerlink" href="#capturing-a-trace" title="Permanent link">link</a></h2>
 <p>You will need three things to capture a trace:</p>
 <ol>
-<li>The Tracy profiler UI (or CLI capture tool)</li>
+<li>The Tracy profiler UI or CLI capture tool</li>
 <li>A binary tool to trace, such as <code>iree-run-module</code>, built with tracing
     support enabled</li>
 <li>A program to profile, e.g. a <code>.vmfb</code> file with parameters and input values</li>
@@ -4420,7 +4456,8 @@ to have a relatively low limit when running with <code>sudo</code>.</p>
 <p>First, refer to the upstream build instructions at either the
 <a href="https://github.com/wolfpld/tracy/">https://github.com/wolfpld/tracy/</a> repository itself or the
 <a href="#the-tracy-manual">Tracy PDF manual</a>.</p>
-<p>For example, to build the profiler GUI from an IREE checkout:</p>
+<h4 id="building-the-tracy-profiler-gui">Building the tracy-profiler GUI<a class="headerlink" href="#building-the-tracy-profiler-gui" title="Permanent link">link</a></h4>
+<p>To build the profiler GUI from an IREE checkout:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Build using CMake:</span>
 <span class="nb">cd</span><span class="w"> </span>third_party/tracy
 cmake<span class="w"> </span>-B<span class="w"> </span>profiler/build<span class="w"> </span>-S<span class="w"> </span>profiler<span class="w"> </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>Release
@@ -4429,39 +4466,31 @@ cmake<span class="w"> </span>--build<span class="w"> </span>profiler/build<span 
 <span class="c1"># Now launch the profiler:</span>
 ./profiler/build/tracy-profiler
 </code></pre></div>
-<h4 id="additional-capstone-dependencies-for-cpu-code-disassembly">Additional Capstone dependencies for CPU code disassembly<a class="headerlink" href="#additional-capstone-dependencies-for-cpu-code-disassembly" title="Permanent link">link</a></h4>
-<p>You can skip this section if you don't need disassembly of CPU code.</p>
-<p><a href="https://github.com/capstone-engine/capstone">Capstone</a> is the disassembly
-framework used by Tracy. The default branch, which is what OS packages still
-distribute, is running a few years behind current CPU architectures.</p>
-<p>Newer CPU architectures such as RISC-V, or newer extensions of existing
-architectures (e.g. new SIMD instructions in the ARM architecture) are typically
-only supported in the
-<a href="https://github.com/capstone-engine/capstone/tree/next"><code>next</code></a> branch. If you
-need that support, check out and build that branch. Consider uninstalling any OS
-package for <code>capstone</code> or otherwise ensure that your IREE build will pick up
-your <code>next</code> branch build.</p>
-<h5 id="linux">Linux<a class="headerlink" href="#linux" title="Permanent link">link</a></h5>
-<p>If you haven't opted to build <code>capstone-next</code> (see above section), install the
-OS package for <code>capstone</code> now (Debian-based distributions):</p>
-<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>libcapstone-dev
+<h4 id="building-the-tracy-capture-cli-tool">Building the tracy-capture CLI tool<a class="headerlink" href="#building-the-tracy-capture-cli-tool" title="Permanent link">link</a></h4>
+<p>To build <code>tracy-capture</code> from an IREE checkout:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Build using CMake:</span>
+<span class="nb">cd</span><span class="w"> </span>third_party/tracy
+cmake<span class="w"> </span>-B<span class="w"> </span>capture/build<span class="w"> </span>-S<span class="w"> </span>capture<span class="w"> </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>Release
+cmake<span class="w"> </span>--build<span class="w"> </span>capture/build<span class="w"> </span>--parallel<span class="w"> </span>--config<span class="w"> </span>Release
+
+<span class="c1"># Run the capture tool:</span>
+./capture/build/tracy-capture<span class="w"> </span>--help
 </code></pre></div>
-<p>Install other dependencies:</p>
-<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>libtbb-dev<span class="w"> </span>libzstd-dev<span class="w"> </span>libglfw3-dev<span class="w"> </span>libfreetype6-dev<span class="w"> </span>libgtk-3-dev
-</code></pre></div>
-<p>If you only build the command-line tool <code>iree-tracy-capture</code> and not the
-graphical <code>iree-tracy-profiler</code>, you can install only:</p>
-<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>libtbb-dev<span class="w"> </span>libzstd-dev
-</code></pre></div>
-<p>The zstd version on Ubuntu 18.04 is old. You will need to install it from source
-from <a href="https://github.com/facebook/zstd.git">https://github.com/facebook/zstd.git</a></p>
-<h5 id="mac">Mac<a class="headerlink" href="#mac" title="Permanent link">link</a></h5>
-<p>If you haven't opted to build <code>capstone-next</code> (see above section), install the
-system <code>capstone</code> now:</p>
-<div class="highlight"><pre><span></span><code>brew<span class="w"> </span>install<span class="w"> </span>capstone
-</code></pre></div>
-<p>Install other dependencies:</p>
-<div class="highlight"><pre><span></span><code>brew<span class="w"> </span>install<span class="w"> </span>pkg-config<span class="w"> </span>glfw<span class="w"> </span>freetype<span class="w"> </span>tbb<span class="w"> </span>zstd
+<p>IREE also maintains a downstream build for <code>tracy-capture</code>, renamed as
+<code>iree-tracy-capture</code>, that is bundled along with the <code>iree-base-runtime</code> Python
+package on Linux. To build this yourself, set the <code>-DIREE_BUILD_TRACY=ON</code> CMake
+option in your IREE CMake build or set the <code>IREE_RUNTIME_BUILD_TRACY_TOOLS=1</code>
+environment variable when building Python packages
+(see <a href="https://github.com/iree-org/iree/blob/main/runtime/setup.py"><code>runtime/setup.py</code></a>).</p>
+<h4 id="building-the-tracy-csvexport-tool">Building the <code>tracy-csvexport</code> tool<a class="headerlink" href="#building-the-tracy-csvexport-tool" title="Permanent link">link</a></h4>
+<p>To build <code>tracy-csvexport</code> from an IREE checkout:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Build using CMake:</span>
+<span class="nb">cd</span><span class="w"> </span>third_party/tracy
+cmake<span class="w"> </span>-B<span class="w"> </span>csvexport/build<span class="w"> </span>-S<span class="w"> </span>csvexport<span class="w"> </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>Release
+cmake<span class="w"> </span>--build<span class="w"> </span>csvexport/build<span class="w"> </span>--parallel<span class="w"> </span>--config<span class="w"> </span>Release
+
+<span class="c1"># Run the csvexport tool:</span>
+./csvexport/build/tracy-csvexport<span class="w"> </span>--help
 </code></pre></div>
 <h3 id="android-system-settings-required-for-sampling-and-systrace">Android system settings required for Sampling and SysTrace<a class="headerlink" href="#android-system-settings-required-for-sampling-and-systrace" title="Permanent link">link</a></h3>
 <p>When profiling on an Android device, in order to get the most useful information
