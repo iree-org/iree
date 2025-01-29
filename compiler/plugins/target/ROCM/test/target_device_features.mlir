@@ -34,8 +34,8 @@
 // GFX942-SAME:         max_workgroup_counts = [2147483647, 2147483647, 2147483647],
 // MI300X: chip = <wgp_count = 304, sku = "mi300x">>
 // MI300A: chip = <wgp_count = 228, sku = "mi300a">>
-// MI308X: chip = <wgp_count = 80,  sku = "mi308x">>
-// MI325X: chip = <wgp_count = 304,  sku = "mi325x">>
+// MI308X: chip = <wgp_count = 80, sku = "mi308x">>
+// MI325X: chip = <wgp_count = 304, sku = "mi325x">>
 
 // GFX941: target = #iree_gpu.target<arch = "gfx941",
 // GFX941-SAME:         features = "+sramecc,-xnack"
