@@ -335,9 +335,16 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     // shapes do not require c promotion.
     GPU::setPromotedOperandList(context, attrs, {0, 1, 2});
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
+
+    // Initialize inner and outer padding sizes from reductionTileSizes.
+    for (int64_t kDim : kDims) {
+      paddingTileSizes[kDim] = reductionTileSizes[kDim];
+    }
+
     int64_t innerKDim = contractionDims.k.back();
     int64_t kPackFactor = std::get<2>(mmaKind.getMNKShape());
-    paddingTileSizes[innerKDim] = reductionTileSizes[innerKDim] * kPackFactor;
+    paddingTileSizes[innerKDim] *= kPackFactor;
+
     attrs.emplace_back(StringAttr::get(context, "padding"),
                        b.getI64ArrayAttr(paddingTileSizes));
   }
