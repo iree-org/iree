@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
@@ -84,159 +83,27 @@ getEncodingWithNewLayouts(Type type,
   return encodingAttr.cloneWithLayouts(layouts);
 };
 
-/// Returns the affinities of the `dispatchOp`'s resource operands. An empty
-/// array attribute indicates that the resource operand affinity is not found.
-/// Usually, it happens when it fails on affinity analysis.
-/// Note that the size of the result might not equal to the number of resource
-/// operands. If a resource operand type is not AffinityType, it is skipped.
-static SmallVector<Attribute>
-getResourceOperandsAffinities(IREE::Stream::AffinityAnalysis &affinityAnalysis,
-                              IREE::Stream::AsyncDispatchOp dispatchOp) {
-  SmallVector<Attribute> result;
-  Builder b(dispatchOp.getContext());
-  auto emptyArray = b.getArrayAttr({});
-  for (auto operand : dispatchOp.getResourceOperands()) {
-    // Skip if the operand type is not AffinityType.
-    if (!isa<IREE::Stream::AffinityTypeInterface>(operand.getType())) {
-      continue;
-    }
-    SmallVector<IREE::Stream::AffinityAttr> affinities;
-    if (!affinityAnalysis.tryLookupResourceAffinity(operand, affinities)) {
-      result.push_back(emptyArray);
-      continue;
-    }
-    result.push_back(b.getArrayAttr(llvm::to_vector_of<Attribute>(affinities)));
-  }
-  return result;
-}
-
-/// Returns the encoding layout of each binding. They are resolved by the
-/// `resolveLayoutAttr` and the corresponding affinity. An empty array attribute
-/// indicates that the operand resource does not have an encoding in the tensor
-/// type.
-static FailureOr<SmallVector<Attribute>> getEncodingLayoutForBindings(
-    ModuleOp moduleOp, FunctionOpInterface funcOp,
-    ArrayRef<Attribute> operandAffinities,
-    IREE::Stream::AffinityAttr resultAffinity,
-    IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr) {
-  MLIRContext *ctx = funcOp.getContext();
-  Region &region = funcOp.getFunctionBody();
-
-  // The size of function arguments could be greater than the number of operand
-  // affinities because the function also captures output resources in the
-  // arguments.
-  SmallVector<ArrayAttr> argsAffinities = llvm::map_to_vector(
-      operandAffinities, [](Attribute attr) { return cast<ArrayAttr>(attr); });
-  auto resAffinityAttr = ArrayAttr::get(ctx, {cast<Attribute>(resultAffinity)});
-  argsAffinities.resize(region.getNumArguments(), resAffinityAttr);
-
-  SmallVector<Attribute> result;
-  auto emptyArrayAttr = ArrayAttr::get(ctx, {});
-  int idx = 0;
-  for (auto arg : region.getArguments()) {
-    if (!isa<IREE::Stream::BindingType>(arg.getType())) {
-      continue;
-    }
-    ArrayRef<Attribute> affinities = argsAffinities[idx++].getValue();
-    assert(affinities.size() == 1);
-
-    SetVector<Attribute> layoutResolvers;
-    if (failed(
-            resolveLayoutAttr(cast<IREE::Stream::AffinityAttr>(affinities[0]),
-                              moduleOp, layoutResolvers))) {
-      return failure();
-    }
-
-    for (auto user : arg.getUsers()) {
-      auto subspanOp = dyn_cast<IREE::Stream::BindingSubspanOp>(user);
-      if (!subspanOp) {
-        return failure();
-      }
-      auto resultType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
-          subspanOp.getResult().getType());
-      if (!resultType) {
-        return failure();
-      }
-      std::optional<IREE::Encoding::EncodingAttr> newEncodingType =
-          getEncodingWithNewLayouts(resultType.asRankedTensorType(),
-                                    layoutResolvers);
-      if (!newEncodingType) {
-        result.push_back(emptyArrayAttr);
-      } else {
-        result.push_back(newEncodingType.value());
-      }
-    }
-  }
-
-  return result;
-}
-
-/// Returns the resolved layouts of the bindings for the `dispatchOp`. It
-/// gathers the operand resource affinities and the execution affinity, looks at
-/// the bindings in executable functions, and resolves the layouts for the
-/// tensor types. Returns a failure if it can not figure the layouts.
-static FailureOr<SmallVector<Attribute>> getBindingLayoutsForDispatchOp(
-    ModuleOp moduleOp, SymbolTable symbolTable,
-    IREE::Stream::AffinityAnalysis &affinityAnalysis,
-    IREE::Stream::AsyncDispatchOp dispatchOp,
-    IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr) {
-  SmallVector<IREE::Stream::AffinityAttr> execAffinities;
-  if (!affinityAnalysis.tryLookupExecutionAffinity(dispatchOp,
-                                                   execAffinities)) {
-    return failure();
-  }
-  if (execAffinities.size() != 1) {
-    return failure();
-  }
-
-  // We can gather the binding layouts from any of entry_point, because they
-  // should all have the same binding types.
-  bool done = false;
-  FailureOr<SmallVector<Attribute>> result;
-  dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPoint) {
-    if (done) {
-      return;
-    }
-    auto exportOp = cast<IREE::Stream::ExecutableExportOp>(
-        symbolTable.lookupSymbolIn(moduleOp, entryPoint));
-    auto executableOp = exportOp->getParentOfType<IREE::Stream::ExecutableOp>();
-    SmallVector<Attribute> operandAffinityAttrs =
-        getResourceOperandsAffinities(affinityAnalysis, dispatchOp);
-    auto funcOp = cast<mlir::FunctionOpInterface>(symbolTable.lookupSymbolIn(
-        executableOp.getInnerModule(), exportOp.getSymName()));
-    result =
-        getEncodingLayoutForBindings(moduleOp, funcOp, operandAffinityAttrs,
-                                     execAffinities[0], resolveLayoutAttr);
-    done = true;
-  });
-
-  return result;
-}
-
-/// Duplicates stream.executables based on the affinity analysis of
-/// stream.async.dispatch ops. Some executables can be launched by different
-/// devices. It can produce wrong codegen artifacts when bindings types are
-/// encoded (i.e., the tensor type has an encoding attribute). Because they can
-/// result in different layouts, especially when multi-device is involved. E.g.,
-/// say that device_a and device_b interpret a tensor type with encodings in
-/// different layouts, and there is an executable that can be launch with
-/// resources from either device_a or device_b. It is confusing what the input
-/// layouts for the executable because there are two possibilities. In this
-/// case, we have to duplicate the executable with updated encoding, and modify
-/// the dispatch to launch proper executable based on device analysis.
-static LogicalResult duplicateExecutablesPerAffinityVariant(
+/// Duplicates stream.executables based on the operand encodings and result
+/// encodings of stream.tensor.dispatch ops. Some executables can be launched by
+/// different devices. It can produce wrong codegen artifacts when bindings
+/// types are encoded (i.e., the tensor type has an encoding attribute). Because
+/// they can result in different layouts, especially when multi-device is
+/// involved. E.g., say that device_a and device_b interpret a tensor type with
+/// encodings in different layouts, and there is an executable that can be
+/// launch with resources from either device_a or device_b. It is confusing what
+/// the input layouts for the executable because there are two possibilities. In
+/// this case, we have to duplicate the executable with updated encoding, and
+/// modify the dispatch to launch proper executable based on resolved encoding
+/// layouts.
+static LogicalResult duplicateExecutablesPerLayoutVariant(
     ModuleOp moduleOp, SymbolTable symbolTable, FunctionOpInterface funcOp,
     IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr) {
   MLIRContext *ctx = moduleOp.getContext();
   IRRewriter rewriter(ctx);
 
-  IREE::Stream::AffinityAnalysis affinityAnalysis(moduleOp);
-  if (failed(affinityAnalysis.run())) {
-    return moduleOp.emitError("failed on running affinity analysis");
-  }
-  SmallVector<IREE::Stream::AsyncDispatchOp> candidates;
+  SmallVector<IREE::Stream::TensorDispatchOp> candidates;
   funcOp.walk(
-      [&](IREE::Stream::AsyncDispatchOp op) { candidates.push_back(op); });
+      [&](IREE::Stream::TensorDispatchOp op) { candidates.push_back(op); });
 
   //===--------------------------------------------------------------------===//
   // Gather per-export [binding layouts] map. A function in an executable can be
@@ -250,21 +117,19 @@ static LogicalResult duplicateExecutablesPerAffinityVariant(
       bindingLayoutSetPerExportOp;
 
   // Records the binding layouts for a dispatch op.
-  llvm::MapVector<IREE::Stream::AsyncDispatchOp, SmallVector<Attribute>>
+  llvm::MapVector<IREE::Stream::TensorDispatchOp, SmallVector<Attribute>>
       dispatchOpBindingLayouts;
   for (auto dispatchOp : candidates) {
-    FailureOr<SmallVector<Attribute>> bindingLayoutAttrs =
-        getBindingLayoutsForDispatchOp(moduleOp, symbolTable, affinityAnalysis,
-                                       dispatchOp, resolveLayoutAttr);
-    if (failed(bindingLayoutAttrs)) {
-      return failure();
-    }
-    dispatchOpBindingLayouts[dispatchOp] = bindingLayoutAttrs.value();
+    SmallVector<Attribute> bindingLayoutAttrs(
+        dispatchOp.getOperandEncodings().getValue());
+    llvm::append_range(bindingLayoutAttrs,
+                       dispatchOp.getResultEncodings().getValue());
+    dispatchOpBindingLayouts[dispatchOp] = bindingLayoutAttrs;
     dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPoint) {
       auto exportOp = cast<IREE::Stream::ExecutableExportOp>(
           symbolTable.lookupSymbolIn(moduleOp, entryPoint));
       bindingLayoutSetPerExportOp[exportOp].insert(
-          rewriter.getArrayAttr(bindingLayoutAttrs.value()));
+          rewriter.getArrayAttr(bindingLayoutAttrs));
     });
   }
 
@@ -280,6 +145,7 @@ static LogicalResult duplicateExecutablesPerAffinityVariant(
 
   //===--------------------------------------------------------------------===//
   // Duplicate executables for each unqiue binding layouts.
+  // TODO(hanchung): Update encodings in executables.
   //===--------------------------------------------------------------------===//
   // Mapping from [export op, binding layouts] to the executable op. So we can
   // use it to update dispatch sites later on.
@@ -344,10 +210,6 @@ static LogicalResult duplicateExecutablesPerAffinityVariant(
     });
   }
 
-  //===--------------------------------------------------------------------===//
-  // TODO(hanchung): Update encodings in executables.
-  //===--------------------------------------------------------------------===//
-
   return success();
 }
 
@@ -356,6 +218,34 @@ static RankedTensorType cloneWithEncoding(RankedTensorType type,
                                           Attribute encodingAttr) {
   return RankedTensorType::get(type.getShape(), type.getElementType(),
                                encodingAttr);
+}
+
+/// Updates the operand encondings and result encodings for the `dispatchOp`
+/// with resolved layouts.
+static LogicalResult
+updateTensorDispatchOp(RewriterBase &rewriter,
+                       IREE::Stream::TensorDispatchOp dispatchOp,
+                       const SetVector<Attribute> &layoutResolvers) {
+  auto getNewTypeAttrs = [&](ArrayAttr typeArrayAttr) {
+    SmallVector<Type> newTypeAttrs;
+    for (auto typeAttr : typeArrayAttr.getValue()) {
+      auto type = cast<TypeAttr>(typeAttr).getValue();
+      std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
+          getEncodingWithNewLayouts(type, layoutResolvers);
+      if (!encodingAttr) {
+        continue;
+      }
+      newTypeAttrs.push_back(cloneWithEncoding(cast<RankedTensorType>(type),
+                                               encodingAttr.value()));
+    }
+    return rewriter.getTypeArrayAttr(newTypeAttrs);
+  };
+
+  dispatchOp.setOperandEncodingsAttr(
+      getNewTypeAttrs(dispatchOp.getOperandEncodings()));
+  dispatchOp.setResultEncodingsAttr(
+      getNewTypeAttrs(dispatchOp.getResultEncodings()));
+  return success();
 }
 
 /// Updates the encoding of `sizeOfOp` with resolved layouts.
@@ -443,6 +333,9 @@ static LogicalResult addLayoutsToTensorPhaseOps(
     // TODO(hanchung): Update other Stream operations.
     LogicalResult result =
         TypeSwitch<Operation *, LogicalResult>(affinityOp)
+            .Case<IREE::Stream::TensorDispatchOp>([&](auto op) {
+              return updateTensorDispatchOp(rewriter, op, layoutResolvers);
+            })
             .Case<IREE::Stream::TensorSizeOfOp>([&](auto op) {
               return updateTensorSizeOfOp(rewriter, op, layoutResolvers);
             })
@@ -481,6 +374,12 @@ struct SpecializeEncodingsPass
       executableOps[executableOp.getName()] = executableOp;
     }
 
+    IREE::Stream::AffinityAnalysis affinityAnalysis(moduleOp);
+    if (failed(affinityAnalysis.run())) {
+      moduleOp.emitError("failed on running affinity analysis");
+      return signalPassFailure();
+    }
+
     IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr =
         usedDialects[0]->makeLayoutAttrResolver(moduleOp);
     for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
@@ -490,8 +389,7 @@ struct SpecializeEncodingsPass
             "failed on adding layouts to Stream::TensorPhaseOp with encodings");
         return signalPassFailure();
       }
-
-      if (failed(duplicateExecutablesPerAffinityVariant(
+      if (failed(duplicateExecutablesPerLayoutVariant(
               moduleOp, symbolTable, funcOp, resolveLayoutAttr))) {
         funcOp.emitError("failed on executable duplication");
         return signalPassFailure();

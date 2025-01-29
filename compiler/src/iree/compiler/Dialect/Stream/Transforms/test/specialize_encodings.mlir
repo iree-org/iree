@@ -85,7 +85,7 @@ module {
 
 // -----
 
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {ukernels = "none"}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_cpu.vmvx_encoding_layout<>}>
 #map = affine_map<(d0) -> (d0)>
 #map0 = affine_map<(m, n, k) -> (m, k)>
 #map1 = affine_map<(m, n, k) -> (k, n)>
@@ -118,9 +118,9 @@ module attributes {stream.affinity.default = #hal.device.affinity<@device_a>} {
     %1 = stream.timepoint.import on(#hal.device.affinity<@device_a>) %arg1 : (!hal.fence) => !stream.timepoint
     %2 = stream.timepoint.await %1 => %0 : !stream.resource<external>{%c16}
     %3 = stream.async.transfer %2 : !stream.resource<external>{%c16} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%c16}
-    %4 = stream.async.dispatch on(#hal.device.affinity<@device_a>) @ex::@dispatch(%3[%c0 to %c16 for %c16]) : (!stream.resource<*>{%c16}) -> !stream.resource<*>{%c16}
+    %4 = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @ex::@dispatch(%3) : (tensor<16xf32, #encoding> in !stream.resource<*>{%c16}) -> tensor<16xf32, #encoding> in !stream.resource<*>{%c16}
     %5 = stream.async.transfer %4 : !stream.resource<*>{%c16} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_b>) !stream.resource<*>{%c16}
-    %6 = stream.async.dispatch on(#hal.device.affinity<@device_b>) @ex::@dispatch(%5[%c0 to %c16 for %c16]) : (!stream.resource<*>{%c16}) -> !stream.resource<*>{%c16}
+    %6 = stream.tensor.dispatch on(#hal.device.affinity<@device_b>) @ex::@dispatch(%5) : (tensor<16xf32, #encoding> in !stream.resource<*>{%c16}) -> tensor<16xf32, #encoding> in !stream.resource<*>{%c16}
     %7 = stream.async.transfer %6 : !stream.resource<*>{%c16} from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%c16}
     %result, %result_timepoint = stream.timepoint.barrier on(#hal.device.affinity<@device_a>) %7 : !stream.resource<*>{%c16} => !stream.timepoint
     stream.timepoint.chain_external on(#hal.device.affinity<@device_a>) %result_timepoint => (%arg2 : !hal.fence)
@@ -129,7 +129,6 @@ module attributes {stream.affinity.default = #hal.device.affinity<@device_a>} {
     util.return %9 : !hal.buffer_view
   }
 }
-
 // CHECK:       #[[DEVICE_LOCAL_0:.+]] = #hal.device.target
 // CHECK:       #[[DEVICE_LOCAL_1:.+]] = #hal.device.target
 // CHECK:       util.global private @[[$DEVICE_A:.+]] = #[[DEVICE_LOCAL_0]]
@@ -137,12 +136,12 @@ module attributes {stream.affinity.default = #hal.device.affinity<@device_a>} {
 // CHECK:       stream.executable private @[[$EX0:.+]] {
 // CHECK-NOT:   stream.executable private
 // CHECK-LABEL: util.func public @multi_device_with_same_executable_targets
-// CHECK:         stream.async.dispatch on(#hal.device.affinity<@[[$DEVICE_A]]>) @[[$EX0]]::@dispatch
-// CHECK:         stream.async.dispatch on(#hal.device.affinity<@[[$DEVICE_B]]>) @[[$EX0]]::@dispatch
+// CHECK:         stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_A]]>) @[[$EX0]]::@dispatch
+// CHECK:         stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_B]]>) @[[$EX0]]::@dispatch
 
 // -----
 
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {ukernels = "none"}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_cpu.vmvx_encoding_layout<>}>
 #executable_target_x86_64 = #hal.executable.target<"llvm-cpu", "xyz", {encoding = #iree_cpu.cpu_encoding_layout<>, target_triple="x86_64-xyz-xyz", cpu_features="+avx512f"}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #device_target_local_1_ = #hal.device.target<"local", {ordinal = 1 : index}, [#executable_target_x86_64]> : !hal.device
@@ -176,9 +175,9 @@ module attributes {stream.affinity.default = #hal.device.affinity<@device_a>} {
     %1 = stream.timepoint.import on(#hal.device.affinity<@device_a>) %arg1 : (!hal.fence) => !stream.timepoint
     %2 = stream.timepoint.await %1 => %0 : !stream.resource<external>{%c16}
     %3 = stream.async.transfer %2 : !stream.resource<external>{%c16} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%c16}
-    %4 = stream.async.dispatch on(#hal.device.affinity<@device_a>) @ex::@dispatch(%3[%c0 to %c16 for %c16]) : (!stream.resource<*>{%c16}) -> !stream.resource<*>{%c16}
+    %4 = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @ex::@dispatch(%3) : (tensor<16xf32, #encoding> in !stream.resource<*>{%c16}) -> tensor<16xf32, #encoding> in !stream.resource<*>{%c16}
     %5 = stream.async.transfer %4 : !stream.resource<*>{%c16} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_b>) !stream.resource<*>{%c16}
-    %6 = stream.async.dispatch on(#hal.device.affinity<@device_b>) @ex::@dispatch(%5[%c0 to %c16 for %c16]) : (!stream.resource<*>{%c16}) -> !stream.resource<*>{%c16}
+    %6 = stream.tensor.dispatch on(#hal.device.affinity<@device_b>) @ex::@dispatch(%5) : (tensor<16xf32, #encoding> in !stream.resource<*>{%c16}) -> tensor<16xf32, #encoding> in !stream.resource<*>{%c16}
     %7 = stream.async.transfer %6 : !stream.resource<*>{%c16} from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%c16}
     %result, %result_timepoint = stream.timepoint.barrier on(#hal.device.affinity<@device_a>) %7 : !stream.resource<*>{%c16} => !stream.timepoint
     stream.timepoint.chain_external on(#hal.device.affinity<@device_a>) %result_timepoint => (%arg2 : !hal.fence)
@@ -187,7 +186,6 @@ module attributes {stream.affinity.default = #hal.device.affinity<@device_a>} {
     util.return %9 : !hal.buffer_view
   }
 }
-
 // CHECK:       #[[DEVICE_LOCAL_0:.+]] = #hal.device.target
 // CHECK:       #[[DEVICE_LOCAL_1:.+]] = #hal.device.target
 // CHECK:       util.global private @[[$DEVICE_A:.+]] = #[[DEVICE_LOCAL_0]]
@@ -195,5 +193,5 @@ module attributes {stream.affinity.default = #hal.device.affinity<@device_a>} {
 // CHECK:       stream.executable private @[[$EX0:.+]] {
 // CHECK:       stream.executable private @[[$EX1:.+]] {
 // CHECK-LABEL: util.func public @multi_device_with_different_executable_targets
-// CHECK:         stream.async.dispatch on(#hal.device.affinity<@[[$DEVICE_A]]>) @[[$EX0]]::@dispatch
-// CHECK:         stream.async.dispatch on(#hal.device.affinity<@[[$DEVICE_B]]>) @[[$EX1]]::@dispatch
+// CHECK:         stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_A]]>) @[[$EX0]]::@dispatch
+// CHECK:         stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_B]]>) @[[$EX1]]::@dispatch
