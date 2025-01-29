@@ -8,6 +8,7 @@
 #define IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_
 
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
@@ -159,6 +160,37 @@ FailureOr<SmallVector<int64_t>> getIGEMMLoopBounds(linalg::LinalgOp linalgOp);
 /// used to determine which inputs are the lhs and rhs, since depending on the
 /// layout, the order can be different (e.g., NCHW has the lhs and rhs swapped).
 FailureOr<SmallVector<Value>> getIGEMMOperands(linalg::LinalgOp linalgOp);
+
+/// Struct that holds inferred IGEMM details for a convolution operation.
+struct IGEMMGenericConvDetails {
+  /// The indexing maps array for a convolution operation with IGEMM
+  /// indexing. The resulting indexing maps represents the indexing of some
+  /// contraction that computes the equivalent IGEMM matmul of the convolution.
+  SmallVector<AffineMap> igemmContractionMaps;
+  /// The loop bounds of a convolution op with IGEMM indexing. This
+  /// function assumes the same ordering of dimensions as
+  /// igemmContractionMaps;
+  SmallVector<int64_t> igemmLoopBounds;
+  /// The operand list for a convolution with IGEMM indexing. This is
+  /// used to determine which inputs are the lhs and rhs, since depending on the
+  /// layout, the order can be different (e.g., NCHW has the lhs and rhs
+  /// swapped).
+  SmallVector<Value> igemmOperands;
+  /// The inferred convolution dimensions.
+  mlir::linalg::ConvolutionDimensions convDims;
+  /// The reassociation indices used to computer the collapse shape of the
+  /// filter in IGEMM transformation.
+  SmallVector<ReassociationIndices> filterReassocIndices;
+  /// The iterator type list for a convolution with IGEMM indexing. .
+  SmallVector<utils::IteratorType> igemmLoopIterators;
+  /// Indicates if the OutputChannel is before the OutputImage in the output.
+  /// This determines our lhs/rhs ordering.
+  bool isOutputChannelFirst;
+};
+
+/// Populate `IGEMMGenericConvDetails` for a given convolution operation.
+FailureOr<IGEMMGenericConvDetails>
+getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp);
 
 /// Returns true if the operation increases bitwidths of tensors.
 /// This function checks that the genericOp:

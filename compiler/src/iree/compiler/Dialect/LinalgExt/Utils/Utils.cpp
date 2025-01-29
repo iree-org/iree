@@ -8,15 +8,25 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Builders.h"
 
+#define DEBUG_TYPE "iree-linalgExt-utils"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
+
 namespace mlir::iree_compiler::IREE::LinalgExt {
+
+static bool hasAllOneValues(ArrayRef<int64_t> attr) {
+  return llvm::all_of(attr, [](int64_t element) { return element == 1; });
+}
 
 OpFoldResult addOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
                      OpFoldResult b) {
@@ -450,6 +460,218 @@ FailureOr<SmallVector<Value>> getIGEMMOperands(linalg::LinalgOp linalgOp) {
                     convOp.getOperands()[2]};
           })
       .Default([](Operation *) { return failure(); });
+}
+
+FailureOr<IGEMMGenericConvDetails>
+getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
+
+  auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
+  MLIRContext *ctx = linalgOp->getContext();
+  if (failed(convDimsOrFailure))
+    return failure();
+  const mlir::linalg::ConvolutionDimensions &convDims = *convDimsOrFailure;
+  LLVM_DEBUG({
+    llvm::dbgs() << "conv: " << linalgOp;
+    llvm::dbgs() << "\nconv batch dim: ";
+    llvm::interleaveComma(convDims.batch, llvm::dbgs());
+    llvm::dbgs() << "\nconv output window dims: ";
+    llvm::interleaveComma(convDims.outputImage, llvm::dbgs());
+    llvm::dbgs() << "\nconv output channel dim: ";
+    llvm::interleaveComma(convDims.outputChannel, llvm::dbgs());
+    llvm::dbgs() << "\nconv filter window dims: ";
+    llvm::interleaveComma(convDims.filterLoop, llvm::dbgs());
+    llvm::dbgs() << "\nconv input channel dims: ";
+    llvm::interleaveComma(convDims.inputChannel, llvm::dbgs());
+    llvm::dbgs() << "\nconv depth multiplier: ";
+    llvm::interleaveComma(convDims.depth, llvm::dbgs());
+    llvm::dbgs() << "\n";
+  });
+  Value input = linalgOp.getDpsInputs()[0];
+  Value filter = linalgOp.getDpsInputs()[1];
+  Value output = linalgOp.getDpsInits()[0];
+  auto inputType = llvm::cast<ShapedType>(input.getType());
+  auto filterType = llvm::cast<ShapedType>(filter.getType());
+  auto outputType = llvm::cast<ShapedType>(output.getType());
+
+  if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
+    LDBG("[unimplemented] expected 'filterType' and 'inputType' to have static "
+         "shapes.");
+    return failure();
+  }
+
+  // TODO: Support dilation.
+  if (!hasAllOneValues(convDims.dilations)) {
+    LDBG("[unimplemented] expected no dilations (expected dilations to all be "
+         "one).");
+    return failure();
+  }
+  // TODO: Support depthwise.
+  if (!convDims.depth.empty()) {
+    LDBG("[unimplemented] expected no depth");
+    return failure();
+  }
+
+  // TODO: Support pooling operations. For pooling ops, the input/output channel
+  // size will be categorized as the additional batch dimension.
+  if (convDims.outputChannel.empty() || convDims.inputChannel.empty()) {
+    LDBG("[unimplemented] expected no pooling operations");
+    return failure();
+  }
+  auto filterShape = filterType.getShape();
+  auto outputShape = outputType.getShape();
+  auto indexingMaps = linalgOp.getIndexingMapsArray();
+  auto filterMap = indexingMaps[1];
+
+  SmallVector<int64_t> reductionDims;
+  for (auto iter : llvm::enumerate(linalgOp.getIteratorTypesArray())) {
+    if (linalg::isReductionIterator(iter.value())) {
+      reductionDims.push_back(iter.index());
+    }
+  }
+  SmallVector<int64_t> filterkPos;
+  for (auto reductionDim : reductionDims) {
+    std::optional<int64_t> maybeDim = filterMap.getResultPosition(
+        getAffineDimExpr(reductionDim, filterMap.getContext()));
+    filterkPos.push_back(maybeDim.value());
+  }
+  // group together adjacent reduction dimensions in the filter
+  SmallVector<ReassociationIndices> collapsedFilterReductionDim;
+  int64_t prevFilterIndex = filterkPos[0];
+  int64_t currCollapsedIndex = 0;
+  collapsedFilterReductionDim.push_back({filterkPos[0]});
+  SmallVector<int64_t> kShape = {filterShape[filterkPos[0]]};
+  for (auto currPos : llvm::ArrayRef(filterkPos).drop_front()) {
+    if (prevFilterIndex == currPos - 1) {
+      collapsedFilterReductionDim[currCollapsedIndex].push_back(currPos);
+    } else {
+      collapsedFilterReductionDim.push_back({currPos});
+      ++currCollapsedIndex;
+    }
+    prevFilterIndex = currPos;
+  }
+
+  auto parallel = utils::IteratorType::parallel;
+  auto reduction = utils::IteratorType::reduction;
+  SmallVector<utils::IteratorType> filterIterators;
+  SmallVector<int64_t> filterNdims;
+  for (auto outputChannel : convDims.outputChannel) {
+    std::optional<int64_t> maybeDim = filterMap.getResultPosition(
+        getAffineDimExpr(outputChannel, filterMap.getContext()));
+    filterNdims.push_back(maybeDim.value());
+  }
+  SmallVector<ReassociationIndices> filterReassocIndices;
+  // Interleave the parallel dims with the reduction dims.
+  int64_t filterNdimPos = 0;
+  for (auto collapsedDim : collapsedFilterReductionDim) {
+    for (int i = filterNdimPos; i < filterNdims.size(); i++) {
+      if (filterNdims[i] < collapsedDim[0]) {
+        filterReassocIndices.push_back({filterNdims[i]});
+        filterIterators.push_back(parallel);
+        filterNdimPos = i + 1;
+      } else {
+        break;
+      }
+    }
+    filterIterators.push_back(reduction);
+    filterReassocIndices.push_back(collapsedDim);
+  }
+  // insert any leftover parallel dims in the end.
+  for (int i = filterNdimPos; i < filterNdims.size(); i++) {
+    filterReassocIndices.push_back({filterNdims[i]});
+    filterIterators.push_back(parallel);
+  }
+  SmallVector<int64_t> reshapedFilterShape(filterReassocIndices.size(), 1);
+  for (auto [idx, indices] : llvm::enumerate(filterReassocIndices)) {
+    for (auto index : indices) {
+      reshapedFilterShape[idx] *= filterShape[index];
+    }
+  }
+
+  int64_t numBDims = (convDims.batch).size();
+  int64_t numMDims = (convDims.outputImage).size();
+  int64_t numNDims = (convDims.outputChannel).size();
+  int64_t numParallelDims = numBDims + numMDims + numNDims;
+  int64_t numKDims = collapsedFilterReductionDim.size();
+  SmallVector<utils::IteratorType> genericIterators(numParallelDims, parallel);
+  genericIterators.insert(genericIterators.end(), numKDims, reduction);
+
+  SmallVector<AffineExpr> dims(numParallelDims + numKDims);
+  bindDimsList<AffineExpr>(ctx, dims);
+  auto resultMap = AffineMap::get(
+      numParallelDims + numKDims, 0,
+      SmallVector<AffineExpr>(dims.begin(), dims.begin() + numParallelDims),
+      ctx);
+
+  bool isOutputChannelFirst = false;
+  auto outputChannelPos = convDims.outputChannel;
+  auto outputImagePos = convDims.outputImage;
+  if (outputChannelPos.back() < outputImagePos[0])
+    isOutputChannelFirst = true;
+
+  // prepare the input map.
+  SmallVector<AffineExpr> inputDims;
+  // Add the batch dimensions.
+  inputDims.insert(inputDims.end(), dims.begin(), dims.begin() + numBDims);
+  int64_t starting_m_pos =
+      isOutputChannelFirst ? numBDims + numNDims : numBDims;
+  // Add the M dims.
+  inputDims.insert(inputDims.end(), dims.begin() + starting_m_pos,
+                   dims.begin() + starting_m_pos + numMDims);
+  // Add the reduction dims.
+  inputDims.insert(inputDims.end(), dims.begin() + numParallelDims, dims.end());
+  auto inputMapGEMM =
+      AffineMap::get(numParallelDims + numKDims, 0, inputDims, ctx);
+
+  // prepare filter map.
+  SmallVector<AffineExpr> filterDims;
+  int64_t curr_n_pos = isOutputChannelFirst ? numBDims : numBDims + numMDims;
+  int64_t curr_k_pos = numBDims + numMDims + numNDims;
+
+  for (auto iter : filterIterators) {
+    if (iter == parallel) {
+      filterDims.push_back(dims[curr_n_pos++]);
+    } else if (iter == reduction) {
+      filterDims.push_back(dims[curr_k_pos++]);
+    }
+  }
+  auto filterMapGEMM =
+      AffineMap::get(numParallelDims + numKDims, 0, filterDims, ctx);
+
+  SmallVector<AffineMap> indexingGEMMMaps;
+  if (isOutputChannelFirst) {
+    indexingGEMMMaps.push_back(filterMapGEMM);
+    indexingGEMMMaps.push_back(inputMapGEMM);
+  } else {
+    indexingGEMMMaps.push_back(inputMapGEMM);
+    indexingGEMMMaps.push_back(filterMapGEMM);
+  }
+  indexingGEMMMaps.push_back(resultMap);
+  IGEMMGenericConvDetails igemmDetails;
+  igemmDetails.igemmContractionMaps = indexingGEMMMaps;
+  igemmDetails.igemmOperands = isOutputChannelFirst
+                                   ? SmallVector<Value>({filter, input})
+                                   : SmallVector<Value>({input, filter});
+  igemmDetails.igemmOperands.push_back(output);
+  SmallVector<int64_t> igemmLoopBounds;
+  igemmLoopBounds.insert(igemmLoopBounds.end(), outputShape.begin(),
+                         outputShape.begin() + numParallelDims);
+
+  SmallVector<utils::IteratorType> igemmLoopIterators(outputShape.size(),
+                                                      parallel);
+
+  for (auto iter : llvm::enumerate(filterIterators)) {
+    if (iter.value() == reduction) {
+      igemmLoopBounds.push_back(reshapedFilterShape[iter.index()]);
+      igemmLoopIterators.push_back(reduction);
+    }
+  }
+  igemmDetails.igemmLoopBounds = igemmLoopBounds;
+  igemmDetails.filterReassocIndices = filterReassocIndices;
+  igemmDetails.isOutputChannelFirst = isOutputChannelFirst;
+  igemmDetails.convDims = convDims;
+  igemmDetails.igemmLoopIterators = igemmLoopIterators;
+
+  return igemmDetails;
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
