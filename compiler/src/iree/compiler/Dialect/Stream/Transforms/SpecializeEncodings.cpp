@@ -223,29 +223,67 @@ static RankedTensorType cloneWithEncoding(RankedTensorType type,
 /// Updates the operand encondings and result encodings for the `dispatchOp`
 /// with resolved layouts.
 static LogicalResult
-updateTensorDispatchOp(RewriterBase &rewriter,
+updateTensorDispatchOp(RewriterBase &rewriter, ModuleOp moduleOp,
+                       IREE::Stream::AffinityAnalysis &affinityAnalysis,
                        IREE::Stream::TensorDispatchOp dispatchOp,
-                       const SetVector<Attribute> &layoutResolvers) {
-  auto getNewTypeAttrs = [&](ArrayAttr typeArrayAttr) {
-    SmallVector<Type> newTypeAttrs;
-    for (auto typeAttr : typeArrayAttr.getValue()) {
-      auto type = cast<TypeAttr>(typeAttr).getValue();
-      std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
-          getEncodingWithNewLayouts(type, layoutResolvers);
-      if (!encodingAttr) {
-        newTypeAttrs.push_back(type);
-        continue;
-      }
-      newTypeAttrs.push_back(cloneWithEncoding(cast<RankedTensorType>(type),
-                                               encodingAttr.value()));
+                       const SetVector<Attribute> &resLayoutResolvers,
+                       IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr) {
+  SmallVector<Type> newOperandEncodings;
+  for (auto [operand, typeAttr] :
+       llvm::zip_equal(dispatchOp.getMixedOperands(),
+                       dispatchOp.getOperandEncodings().getValue())) {
+    auto type = cast<TypeAttr>(typeAttr).getValue();
+    // Skip if the operand type is not AffinityType.
+    if (!isa<IREE::Stream::AffinityTypeInterface>(type)) {
+      newOperandEncodings.push_back(type);
+      continue;
     }
-    return rewriter.getTypeArrayAttr(newTypeAttrs);
-  };
+    SmallVector<IREE::Stream::AffinityAttr> affinityAttrs;
+    if (!affinityAnalysis.tryLookupResourceAffinity(operand, affinityAttrs)) {
+      return failure();
+    }
+    if (affinityAttrs.size() != 1) {
+      return failure();
+    }
+    SetVector<Attribute> layoutResolvers;
+    if (failed(
+            resolveLayoutAttr(affinityAttrs[0], moduleOp, layoutResolvers))) {
+      return dispatchOp.emitError("failed on making layout resolvers");
+    }
 
+    std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
+        getEncodingWithNewLayouts(type, layoutResolvers);
+    if (!encodingAttr) {
+      newOperandEncodings.push_back(type);
+      continue;
+    }
+    newOperandEncodings.push_back(
+        cloneWithEncoding(cast<RankedTensorType>(type), encodingAttr.value()));
+  }
   dispatchOp.setOperandEncodingsAttr(
-      getNewTypeAttrs(dispatchOp.getOperandEncodings()));
+      rewriter.getTypeArrayAttr(newOperandEncodings));
+
+  SmallVector<Type> newResultEncodings;
+  for (auto typeAttr : dispatchOp.getResultEncodings().getValue()) {
+    auto type = cast<TypeAttr>(typeAttr).getValue();
+    // Skip if the result type is not AffinityType.
+    if (!isa<IREE::Stream::AffinityTypeInterface>(type)) {
+      newResultEncodings.push_back(type);
+      continue;
+    }
+
+    std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
+        getEncodingWithNewLayouts(type, resLayoutResolvers);
+    if (!encodingAttr) {
+      newResultEncodings.push_back(type);
+      continue;
+    }
+    newResultEncodings.push_back(
+        cloneWithEncoding(cast<RankedTensorType>(type), encodingAttr.value()));
+  }
   dispatchOp.setResultEncodingsAttr(
-      getNewTypeAttrs(dispatchOp.getResultEncodings()));
+      rewriter.getTypeArrayAttr(newResultEncodings));
+
   return success();
 }
 
@@ -302,7 +340,8 @@ updateResultEncoding(RewriterBase &rewriter, OpTy op,
 }
 
 static LogicalResult addLayoutsToTensorPhaseOps(
-    ModuleOp moduleOp, FunctionOpInterface funcOp,
+    ModuleOp moduleOp, IREE::Stream::AffinityAnalysis &affinityAnalysis,
+    FunctionOpInterface funcOp,
     IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr) {
   SmallVector<IREE::Stream::AffinityOpInterface> candidates;
   funcOp.walk([&](IREE::Stream::AffinityOpInterface affinityOp) {
@@ -335,7 +374,9 @@ static LogicalResult addLayoutsToTensorPhaseOps(
     LogicalResult result =
         TypeSwitch<Operation *, LogicalResult>(affinityOp)
             .Case<IREE::Stream::TensorDispatchOp>([&](auto op) {
-              return updateTensorDispatchOp(rewriter, op, layoutResolvers);
+              return updateTensorDispatchOp(rewriter, moduleOp,
+                                            affinityAnalysis, op,
+                                            layoutResolvers, resolveLayoutAttr);
             })
             .Case<IREE::Stream::TensorSizeOfOp>([&](auto op) {
               return updateTensorSizeOfOp(rewriter, op, layoutResolvers);
@@ -384,7 +425,7 @@ struct SpecializeEncodingsPass
     IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr =
         usedDialects[0]->makeLayoutAttrResolver(moduleOp);
     for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
-      if (failed(addLayoutsToTensorPhaseOps(moduleOp, funcOp,
+      if (failed(addLayoutsToTensorPhaseOps(moduleOp, affinityAnalysis, funcOp,
                                             resolveLayoutAttr))) {
         funcOp.emitError(
             "failed on adding layouts to Stream::TensorPhaseOp with encodings");
