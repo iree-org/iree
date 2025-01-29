@@ -5,7 +5,7 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-hip-target=mi308x %s | FileCheck %s --check-prefixes=GFX942,MI308X
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
-// RUN:   --iree-hip-target=mi300x %s | FileCheck %s --check-prefixes=GFX942,MI325X
+// RUN:   --iree-hip-target=mi325x %s | FileCheck %s --check-prefixes=GFX942,MI325X
 //
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-hip-target=gfx941 --iree-hip-target-features=+sramecc,-xnack %s | FileCheck %s --check-prefix=GFX941
