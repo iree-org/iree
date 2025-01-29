@@ -141,6 +141,10 @@ module attributes {stream.affinity.default = #hal.device.affinity<@device_a>} {
 
 // -----
 
+// Tests that launch the executable on device_a, pass the result to device_b and
+// launch it on device_b. Thus, the incoming layout of second tensor dispatch op
+// has device_a layout, and it produces device_b layout.
+
 #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_cpu.vmvx_encoding_layout<>}>
 #executable_target_x86_64 = #hal.executable.target<"llvm-cpu", "xyz", {encoding = #iree_cpu.cpu_encoding_layout<>, target_triple="x86_64-xyz-xyz", cpu_features="+avx512f"}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
@@ -186,12 +190,18 @@ module attributes {stream.affinity.default = #hal.device.affinity<@device_a>} {
     util.return %9 : !hal.buffer_view
   }
 }
-// CHECK:       #[[DEVICE_LOCAL_0:.+]] = #hal.device.target
-// CHECK:       #[[DEVICE_LOCAL_1:.+]] = #hal.device.target
+// CHECK-DAG:   #[[DEVICE_LOCAL_0:.+]] = #hal.device.target
+// CHECK-DAG:   #[[DEVICE_LOCAL_1:.+]] = #hal.device.target
+// CHECK-DAG:   #[[$DEVICE_A_ENCODING:.+]] = #iree_encoding.encoding{{.+}} layouts = [#iree_cpu.vmvx_encoding_layout
+// CHECK-DAG:   #[[$DEVICE_B_ENCODING:.+]] = #iree_encoding.encoding{{.+}} layouts = [#iree_cpu.cpu_encoding_layout
 // CHECK:       util.global private @[[$DEVICE_A:.+]] = #[[DEVICE_LOCAL_0]]
 // CHECK:       util.global private @[[$DEVICE_B:.+]] = #[[DEVICE_LOCAL_1]]
 // CHECK:       stream.executable private @[[$EX0:.+]] {
 // CHECK:       stream.executable private @[[$EX1:.+]] {
 // CHECK-LABEL: util.func public @multi_device_with_different_executable_targets
 // CHECK:         stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_A]]>) @[[$EX0]]::@dispatch
+// CHECK-SAME:      #[[$DEVICE_A_ENCODING]]
+// CHECK-SAME:      #[[$DEVICE_A_ENCODING]]
 // CHECK:         stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_B]]>) @[[$EX1]]::@dispatch
+// CHECK-SAME:      #[[$DEVICE_A_ENCODING]]
+// CHECK-SAME:      #[[$DEVICE_B_ENCODING]]
