@@ -130,6 +130,21 @@ struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
 
 void ElementwiseOpFusionPass::runOnOperation() {
   MLIRContext *context = &getContext();
+  // Try fuse with linalgExt patterns.
+  GreedyRewriteConfig rewriteConfig;
+  rewriteConfig.setMaxIterations(GreedyRewriteConfig::kNoLimit);
+  linalg::ControlFusionFn foldTransposeControlFn = [](OpOperand *fusedOperand) {
+    return true;
+  };
+  RewritePatternSet linalgExtFusionPatterns(context);
+  IREE::LinalgExt::populateFuseLinalgExtOpsWithTransposes(
+      linalgExtFusionPatterns, foldTransposeControlFn);
+  if (failed(applyPatternsGreedily(
+          getOperation(), std::move(linalgExtFusionPatterns), rewriteConfig))) {
+    getOperation()->emitOpError(
+        "Failed to fuse elementwise ops with linalgExt patterns.");
+    return signalPassFailure();
+  }
 
   // Only fuse operations where all uses of the producer are generic
   // operations. If an operation is used in a named op, it will be computed
@@ -176,29 +191,10 @@ void ElementwiseOpFusionPass::runOnOperation() {
   linalg::populateElementwiseOpsFusionPatterns(linalgFusionPatterns,
                                                fuseElementwiseOpsControlFn);
 
-  GreedyRewriteConfig rewriteConfig;
-  rewriteConfig.setMaxIterations(GreedyRewriteConfig::kNoLimit);
   if (failed(applyPatternsGreedily(
           getOperation(), std::move(linalgFusionPatterns), rewriteConfig))) {
     getOperation()->emitOpError(
         "Failed to fuse elementwise ops with upstream patterns.");
-    return signalPassFailure();
-  }
-
-  // Try fuse with linalgExt patterns.
-  linalg::ControlFusionFn foldTransposeControlFn = [](OpOperand *fusedOperand) {
-    Operation *producer = fusedOperand->get().getDefiningOp();
-    Operation *consumer = fusedOperand->getOwner();
-
-    return IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer});
-  };
-  RewritePatternSet linalgExtFusionPatterns(context);
-  IREE::LinalgExt::populateFuseLinalgExtOpsWithTransposes(
-      linalgExtFusionPatterns, foldTransposeControlFn);
-  if (failed(applyPatternsGreedily(
-          getOperation(), std::move(linalgExtFusionPatterns), rewriteConfig))) {
-    getOperation()->emitOpError(
-        "Failed to fuse elementwise ops with linalgExt patterns.");
     return signalPassFailure();
   }
 }

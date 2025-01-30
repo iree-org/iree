@@ -18,6 +18,34 @@
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
+static bool isaTranspose(linalg::LinalgOp linalgOp) {
+  if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops())
+    return false;
+
+  if (linalgOp.getNumDpsInputs() != 1 || linalgOp.getNumDpsInits() != 1)
+    return false;
+
+  SmallVector<AffineMap> mapRange = linalgOp.getIndexingMapsArray();
+  if (mapRange.size() != 2 || !mapRange.front().isPermutation() ||
+      !mapRange.back().isPermutation() || mapRange.front() == mapRange.back()) {
+    return false;
+  }
+  return llvm::hasSingleElement(linalgOp.getBlock()->getOperations());
+}
+
+static SmallVector<int64_t> getPermutation(linalg::LinalgOp linalgOp) {
+  assert(isaTranspose(linalgOp) && "linalgOp must be a transpose");
+  SmallVector<AffineMap> mapRange = linalgOp.getIndexingMapsArray();
+  AffineMap outMap = mapRange.back();
+  AffineMap inMap = mapRange.front();
+
+  // To get the permutation, look at each output index and find which
+  // dimension in the input we're reading from for that index.
+  return llvm::map_to_vector(outMap.getResults(), [&](AffineExpr expr) {
+    return static_cast<int64_t>(inMap.getResultPosition(expr).value());
+  });
+}
+
 namespace {
 
 struct FuseTransposeWithAttentionOp final
@@ -70,6 +98,71 @@ struct FuseTransposeWithAttentionOp final
       attentionOp.setOperand(inputIndex, producer.getDpsInputs()[0]);
     });
 
+    return success();
+  }
+
+private:
+  linalg::ControlFusionFn controlFn;
+};
+
+static Value createTranspose(OpBuilder &builder, Value source,
+                             SmallVector<int64_t> perm) {
+  SmallVector<OpFoldResult> mixedSizes =
+      tensor::getMixedSizes(builder, source.getLoc(), source);
+  applyPermutationToVector(mixedSizes, perm);
+  Type elemType = cast<RankedTensorType>(source.getType()).getElementType();
+  Value empty =
+      builder.create<tensor::EmptyOp>(source.getLoc(), mixedSizes, elemType)
+          .getResult();
+  if (llvm::isa_and_nonnull<tensor::EmptyOp>(source.getDefiningOp())) {
+    return empty;
+  }
+  return builder
+      .create<linalg::TransposeOp>(source.getLoc(), source, empty, perm)
+      ->getResult(0);
+}
+
+struct FuseConsumerTransposeWithAttention final
+    : public OpRewritePattern<LinalgExt::AttentionOp> {
+  FuseConsumerTransposeWithAttention(MLIRContext *context,
+                                     linalg::ControlFusionFn controlFn,
+                                     PatternBenefit benefit = 1)
+      : OpRewritePattern<LinalgExt::AttentionOp>(context, benefit),
+        controlFn(controlFn) {}
+
+  LogicalResult matchAndRewrite(LinalgExt::AttentionOp attentionOp,
+                                PatternRewriter &rewriter) const override {
+    auto users = attentionOp->getUsers();
+    if (llvm::range_size(users) != 1) {
+      return failure();
+    }
+    auto transposeOp = dyn_cast<linalg::LinalgOp>(*users.begin());
+    if (!transposeOp || !isaTranspose(transposeOp)) {
+      return failure();
+    }
+
+    OpOperand *transposeOperand = attentionOp.getDpsInitOperand(0);
+    int64_t inputIndex = transposeOperand->getOperandNumber();
+    SmallVector<int64_t> perm = getPermutation(transposeOp);
+
+    rewriter.modifyOpInPlace(attentionOp, [&]() {
+      SmallVector<AffineMap> newIndexingMaps =
+          attentionOp.getIndexingMapsArray();
+      AffineMap inputMap = attentionOp.getMatchingIndexingMap(transposeOperand);
+      SmallVector<AffineExpr> newExprs =
+          applyPermutation(inputMap.getResults(), perm);
+      AffineMap transposedMap =
+          AffineMap::get(inputMap.getNumDims(), inputMap.getNumSymbols(),
+                         newExprs, rewriter.getContext());
+      newIndexingMaps[inputIndex] = transposedMap;
+      attentionOp.setIndexingMapsAttr(
+          rewriter.getAffineMapArrayAttr(newIndexingMaps));
+      auto transposedInit =
+          createTranspose(rewriter, transposeOperand->get(), perm);
+      attentionOp.setOperand(inputIndex, transposedInit);
+      attentionOp.getResult(0).setType(transposedInit.getType());
+    });
+    rewriter.replaceOp(transposeOp, attentionOp);
     return success();
   }
 
@@ -180,6 +273,8 @@ void populateFuseLinalgExtOpsWithTransposes(
     const linalg::ControlFusionFn &controlFusionFn) {
   patterns.add<FuseTransposeWithAttentionOp>(patterns.getContext(),
                                              controlFusionFn);
+  patterns.add<FuseConsumerTransposeWithAttention>(patterns.getContext(),
+                                                   controlFusionFn);
 }
 
 void populateBubbleTransposeFromLinalgExtOps(
