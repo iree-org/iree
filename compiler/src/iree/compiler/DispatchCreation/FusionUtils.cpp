@@ -82,7 +82,8 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   // elementwise oepration implies that the `outs` operand is not real usage
   // (and is typically a `tensor.empty`), so the core condition is that there is
   // only one "real" operand of the consumer.
-  if (options.fuseTruncateOps && IREE::LinalgExt::isBitTruncateOp(producerOp) &&
+  if (!options.fuseTruncateOps &&
+      IREE::LinalgExt::isBitTruncateOp(producerOp) &&
       !(linalgConsumerOp.getNumLoops() ==
             linalgConsumerOp.getNumParallelLoops() &&
         linalgConsumerOp.getNumDpsInputs() == 1)) {
@@ -102,7 +103,8 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
              .isPermutation()) {
       return false;
     }
-    if (!options.fuseMultiReduction && linalgConsumerOp.getNumReductionLoops() != 1) {
+    if (!options.fuseMultiReduction &&
+        linalgConsumerOp.getNumReductionLoops() != 1) {
       return false;
     }
     if (linalg::isaContractionOpInterface(linalgConsumerOp) ||
