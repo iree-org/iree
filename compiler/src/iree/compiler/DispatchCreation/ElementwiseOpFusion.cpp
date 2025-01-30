@@ -150,10 +150,7 @@ void ElementwiseOpFusionPass::runOnOperation() {
 
   // Try fuse with linalgExt patterns.
   linalg::ControlFusionFn foldTransposeControlFn = [](OpOperand *fusedOperand) {
-    Operation *producer = fusedOperand->get().getDefiningOp();
-    Operation *consumer = fusedOperand->getOwner();
-
-    return IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer});
+    return true;
   };
   RewritePatternSet linalgExtFusionPatterns(context);
   IREE::LinalgExt::populateFuseLinalgExtOpsWithTransposes(
