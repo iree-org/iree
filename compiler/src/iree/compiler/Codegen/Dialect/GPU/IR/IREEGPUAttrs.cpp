@@ -130,6 +130,48 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
   return {};
 }
 
+static std::tuple<int64_t, int64_t, int64_t>
+getMNKShape(MMAIntrinsic intrinsic) {
+  switch (intrinsic) {
+  case MMAIntrinsic::MFMA_F64_16x16x4_F64:
+  case MMAIntrinsic::MFMA_F32_16x16x4_F32:
+    return {16, 16, 4};
+  case MMAIntrinsic::MFMA_F32_16x16x8_BF16:
+    return {16, 16, 8};
+  case MMAIntrinsic::MFMA_F32_16x16x16_F16:
+  case MMAIntrinsic::MFMA_F32_16x16x16_BF16:
+  case MMAIntrinsic::MFMA_I32_16x16x16_I8:
+  case MMAIntrinsic::WMMA_F32_16x16x16_F16:
+  case MMAIntrinsic::WMMA_F32_16x16x16_BF16:
+  case MMAIntrinsic::WMMA_F16_16x16x16_F16:
+  case MMAIntrinsic::WMMA_BF16_16x16x16_BF16:
+  case MMAIntrinsic::WMMA_I32_16x16x16_I8:
+  case MMAIntrinsic::NV_WMMA_F32_16x16x16_F16:
+  case MMAIntrinsic::NV_WMMA_F16_16x16x16_F16:
+    return {16, 16, 16};
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ:
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ_F8E5M2FNUZ:
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ:
+  case MMAIntrinsic::MFMA_I32_16x16x32_I8:
+    return {16, 16, 32};
+  case MMAIntrinsic::MFMA_F32_32x32x4_BF16:
+    return {32, 32, 4};
+  case MMAIntrinsic::MFMA_F32_32x32x8_F16:
+  case MMAIntrinsic::MFMA_F32_32x32x8_BF16:
+  case MMAIntrinsic::MFMA_I32_32x32x8_I8:
+    return {32, 32, 8};
+  case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ:
+  case MMAIntrinsic::MFMA_F32_32x32x16_F8E5M2FNUZ:
+  case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ:
+  case MMAIntrinsic::MFMA_F32_32x32x16_F8E5M2FNUZ_F8E4M3FNUZ:
+  case MMAIntrinsic::MFMA_I32_32x32x16_I8:
+    return {32, 32, 16};
+  }
+  assert(false && "unexpected enum value");
+  return {};
+}
+
 MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
                                                 MMAFragment fragment) {
   switch (intrinsic) {
@@ -292,11 +334,7 @@ static OpaqueMmaLayout getOpaqueMMALayout(MLIRContext *context,
                                           MMAIntrinsicType intrinsic) {
   OpaqueMmaLayout o;
   std::tie(o.aType, o.bType, o.cType) = getABCElementTypes(context, intrinsic);
-  auto lhs = getSingleSubgroupLayout(intrinsic, MMAFragment::Lhs);
-  auto rhs = getSingleSubgroupLayout(intrinsic, MMAFragment::Rhs);
-  o.mSize = lhs.outer[0] * lhs.thread[0] * lhs.element[0];
-  o.kSize = lhs.outer[1] * lhs.thread[1] * lhs.element[1];
-  o.nSize = rhs.outer[1] * rhs.thread[1] * rhs.element[1];
+  std::tie(o.mSize, o.nSize, o.kSize) = getMNKShape(intrinsic);
   return o;
 }
 
@@ -388,6 +426,12 @@ int64_t MMAAttr::getSubgroupSize() const {
 }
 
 FailureOr<IREE::GPU::MMAScope> MMAAttr::getMmaScope() const {
+  // Explicit distribution currently unsupported for NV intrinsics.
+  MMAIntrinsic intrinsic = getIntrinsic().getValue();
+  if (intrinsic == MMAIntrinsic::NV_WMMA_F16_16x16x16_F16 ||
+      intrinsic == MMAIntrinsic::NV_WMMA_F32_16x16x16_F16) {
+    return failure();
+  }
   return IREE::GPU::MMAScope::Subgroup;
 }
 
@@ -854,6 +898,22 @@ VirtualMMAAttr VirtualMMAAttr::get(MLIRContext *context,
                                    VirtualMMAIntrinsic type) {
   auto intrinsicAttr = VirtualMMAIntrinsicAttr::get(context, type);
   return VirtualMMAAttr::get(context, intrinsicAttr);
+}
+
+static std::tuple<int64_t, int64_t, int64_t>
+getMNKShape(VirtualMMAIntrinsic type) {
+  // V(Virtual)MFMA instructions which have 2 mfma instructions interleaved
+  // along the k dimension.
+  switch (type) {
+  case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
+    return {16, 16, 32};
+  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16:
+    return {32, 32, 16};
+  }
+  assert(false && "unhandled virtual mma layout type.");
+  return {};
 }
 
 static std::tuple<Type, Type, Type>

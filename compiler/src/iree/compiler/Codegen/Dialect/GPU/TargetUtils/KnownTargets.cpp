@@ -453,8 +453,8 @@ StringRef normalizeARMGPUTarget(StringRef target) {
 
 const WgpDetails *getAmpereWgpDetails() {
   static const MMAIntrinsic mmaOps[] = {
-      MMAIntrinsic::WMMA_F32_16x16x16_F16,
-      MMAIntrinsic::WMMA_F16_16x16x16_F16,
+      MMAIntrinsic::NV_WMMA_F32_16x16x16_F16,
+      MMAIntrinsic::NV_WMMA_F16_16x16x16_F16,
   };
   static const WgpDetails ampereWgp = {allComputeBits,
                                        allStorageBits,
@@ -472,8 +472,8 @@ const WgpDetails *getAmpereWgpDetails() {
 
 const WgpDetails *getTuringWgpDetails() {
   static const MMAIntrinsic mmaOps[] = {
-      MMAIntrinsic::WMMA_F32_16x16x16_F16,
-      MMAIntrinsic::WMMA_F16_16x16x16_F16,
+      MMAIntrinsic::NV_WMMA_F32_16x16x16_F16,
+      MMAIntrinsic::NV_WMMA_F16_16x16x16_F16,
   };
   static const WgpDetails turingWgp = {allComputeBits,
                                        allStorageBits,
@@ -491,8 +491,8 @@ const WgpDetails *getTuringWgpDetails() {
 
 const WgpDetails *getVoltaWgpDetails() {
   static const MMAIntrinsic mmaOps[] = {
-      MMAIntrinsic::WMMA_F32_16x16x16_F16,
-      MMAIntrinsic::WMMA_F16_16x16x16_F16,
+      MMAIntrinsic::NV_WMMA_F32_16x16x16_F16,
+      MMAIntrinsic::NV_WMMA_F16_16x16x16_F16,
   };
   // clang-format off
   static const WgpDetails voltaWgp = {
