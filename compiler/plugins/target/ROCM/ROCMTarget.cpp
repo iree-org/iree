@@ -66,6 +66,7 @@ struct ROCMOptions {
   std::string bitcodeDirectory = getDefaultBitcodeDirectory();
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
+  bool experimentalPadLayout = false;
   bool slpVectorization = true;
   bool globalISel = false;
 
@@ -105,6 +106,10 @@ struct ROCMOptions {
         cl::desc("Enables microkernels in the HIP compiler backend. May be "
                  "`default`, `none`, `all`, or a comma-separated list of "
                  "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
+    binder.opt<bool>("iree-hip-enable-experimental-pad-layout",
+                     experimentalPadLayout, cl::cat(category),
+                     cl::desc("Enables additional padding on allocations to "
+                              "maximize cache bandwidth."));
 
     binder.list<std::string>(
         "iree-hip-pass-plugin-path", passPlugins,
@@ -248,6 +253,11 @@ public:
     if (auto target = GPU::getHIPTargetDetails(
             options.target, options.targetFeatures, context)) {
       addConfig("iree.gpu.target", target);
+      if (options.experimentalPadLayout) {
+        if (Attribute encoding = GPU::getHIPTargetEncodingLayoutAttr(target)) {
+          addConfig("encoding", encoding);
+        }
+      }
     }
 
     addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));

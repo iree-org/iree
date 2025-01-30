@@ -9,8 +9,12 @@
 #include <optional>
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/MLIRContext.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -705,6 +709,18 @@ TargetAttr getHIPTargetDetails(StringRef target, StringRef features,
                             context);
   }
   return nullptr;
+}
+
+Attribute getHIPTargetEncodingLayoutAttr(TargetAttr target) {
+  // This is only enabled for CDNA2 and CDNA3 for the time being.
+  // TODO(kuhar): Enable for other HIP targets.
+  if (!llvm::is_contained({"gfx90a", "gfx940", "gfx941", "gfx942"},
+                          target.getArch())) {
+    return nullptr;
+  }
+
+  return IREE::GPU::GPUPadLayoutAttr::get(
+      target.getContext(), /*cacheLineBytes=*/128, /*cacheSets=*/4);
 }
 
 StringRef normalizeHIPTarget(StringRef target) {

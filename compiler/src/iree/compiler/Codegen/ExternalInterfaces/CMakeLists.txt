@@ -30,7 +30,6 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRTensorDialect
     iree::compiler::Codegen::Dialect::CPU::IR::IREECPUDialect
-    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::Codegen::Utils
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Utils
