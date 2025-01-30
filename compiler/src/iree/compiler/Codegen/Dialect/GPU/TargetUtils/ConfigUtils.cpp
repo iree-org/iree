@@ -559,11 +559,10 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
                    [](AffineMap map) { return map.isProjectedPermutation(); });
   bool powTwo =
       llvm::all_of(linalgOp->getOperands(), elementHasPowerOfTwoBitwidth);
-  bool staticShape = llvm::none_of(loopBounds, ShapedType::isDynamic);
 
   // Require all affine maps to be projected permutation so that we can
   // generate vector transfer ops.
-  bool vectorizable = projPerm && powTwo && staticShape;
+  bool vectorizable = projPerm && powTwo;
 
   const unsigned minBitwidth = getMinElementBitwidth(linalgOp);
   // Make sure we use a tile size that results in some integral number of bytes.
