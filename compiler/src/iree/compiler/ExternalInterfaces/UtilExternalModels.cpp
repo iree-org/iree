@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -340,6 +341,9 @@ struct HoistableLinalgOpInterface
     auto genericOp = llvm::dyn_cast<linalg::GenericOp>(op);
     if (!genericOp)
       return !isa<linalg::FillOp>(op);
+    if (IREE::LinalgExt::isBitExtendOp(op)) {
+      return false;
+    }
     // Generally, we prefer to not hoist broadcasts.
     // Detect op that only broadcast input as fusing them makes the new
     // op cheaper.
