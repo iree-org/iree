@@ -17,9 +17,8 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 #define GEN_PASS_DEF_CONVERTCONV2DTOIM2COLOPPASS
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc"
 
-static bool hasAllOneValues(DenseIntElementsAttr attr) {
-  return llvm::all_of(
-      attr, [](APInt element) { return element.getSExtValue() == 1; });
+static bool hasAllOneValues(ArrayRef<int64_t> attr) {
+  return llvm::all_of(attr, [](int64_t element) { return element == 1; });
 }
 
 static Value createAdd(Location loc, Value x, Value y, OpBuilder &builder) {
@@ -36,12 +35,37 @@ static Value createMul(Location loc, Value x, Value y, OpBuilder &builder) {
   return builder.create<arith::MulFOp>(loc, x, y);
 }
 
+// TODO : Upstream utility that does this pruning is broken for LinalgOp. Drop
+// this if that gets fixed.
+static SmallVector<NamedAttribute> getPrunedAttributeList(linalg::LinalgOp op) {
+  const StringLiteral memoAttr =
+      linalg::LinalgDialect::kMemoizedIndexingMapsAttrName;
+  SmallVector<NamedAttribute> prunedAttributeList;
+  for (auto attr : op->getDiscardableAttrs()) {
+    if (attr.getName() != memoAttr) {
+      prunedAttributeList.push_back(attr);
+    }
+  }
+  return prunedAttributeList;
+}
+
+// Helper to convert a shape into basis for im2col op.
+static SmallVector<int64_t> getBasisFromShape(ArrayRef<int64_t> shape) {
+  SmallVector<int64_t> basis(shape.size());
+  int64_t cummulativeProduct = 1;
+  for (int i = shape.size() - 1; i >= 0; --i) {
+    basis[i] = cummulativeProduct;
+    cummulativeProduct *= shape[i];
+  }
+  return basis;
+}
+
 namespace {
 
 using ControlFnTy = std::function<bool(Operation *)>;
-
-// Convert linalg.conv_2d_nhwc_hwcf into linalg.generic (for img2col packing)
+// Converts non-depthwise convs into into linalg.generic (for img2col packing)
 // and linalg.matmul.
+// The following explains this for a linalg.conv_2d_nhwc_hwcf op.
 //
 // A convolution operaton can be written as a matrix-matrix multiplication by
 // unfolding the cross correlation between input and filter and explicitly copy
@@ -73,101 +97,141 @@ using ControlFnTy = std::function<bool(Operation *)>;
 // multiplication (Ho x Wo, Kh x Kw x C) * (Kh x Kw x C, D) for each input in
 // the N input. For the case where N > 1 its a batched matrxi-matrix
 // multplication.
-class ConvertConv2DNhwcHwcf final
-    : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
+
+class ConvertConvGeneric final
+    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
 
-  ConvertConv2DNhwcHwcf(MLIRContext *context,
-                        std::optional<ControlFnTy> controlFn)
-      : OpRewritePattern<linalg::Conv2DNhwcHwcfOp>(context),
-        controlFn(controlFn) {}
-
-  LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
+  ConvertConvGeneric(MLIRContext *context, std::optional<ControlFnTy> controlFn)
+      : OpInterfaceRewritePattern(context), controlFn(controlFn) {}
+  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (controlFn.has_value() && !controlFn.value()(convOp)) {
-      return rewriter.notifyMatchFailure(convOp, "controlFn failed.");
+    if (controlFn.has_value() && !controlFn.value()(linalgOp)) {
+      return rewriter.notifyMatchFailure(linalgOp, "controlFn failed.");
     }
 
-    auto inputType = llvm::cast<ShapedType>(convOp.getInputs()[0].getType());
-    auto filterType = llvm::cast<ShapedType>(convOp.getInputs()[1].getType());
-    auto outputType = llvm::cast<ShapedType>(convOp.getOutputs()[0].getType());
+    auto igemmConvDetailsOrFailure =
+        LinalgExt::getIGEMMGenericConvDetails(linalgOp);
+    if (failed(igemmConvDetailsOrFailure))
+      return rewriter.notifyMatchFailure(linalgOp,
+                                         "Failed to extract IGEMM details");
 
-    if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
-      return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
-        diag << "[unimplemented] "
-             << "expected 'filterType' and 'inputType' to have static shapes.";
-      });
+    LinalgExt::IGEMMGenericConvDetails igemmConvDetails =
+        *igemmConvDetailsOrFailure;
+
+    SmallVector<AffineMap> igemmContractionMaps =
+        igemmConvDetails.igemmContractionMaps;
+    mlir::linalg::ConvolutionDimensions convDims = igemmConvDetails.convDims;
+    SmallVector<ReassociationIndices> filterReassocIndices =
+        igemmConvDetails.filterReassocIndices;
+    bool isOutputChannelFirst = igemmConvDetails.isOutputChannelFirst;
+    SmallVector<int64_t> igemmLoopBounds = igemmConvDetails.igemmLoopBounds;
+    SmallVector<utils::IteratorType> igemmLoopIterators =
+        igemmConvDetails.igemmLoopIterators;
+
+    Value input = linalgOp.getDpsInputs()[0];
+    Value filter = linalgOp.getDpsInputs()[1];
+    Value output = linalgOp.getDpsInits()[0];
+    auto inputType = llvm::cast<ShapedType>(input.getType());
+    auto filterType = llvm::cast<ShapedType>(filter.getType());
+    auto outputType = llvm::cast<ShapedType>(output.getType());
+
+    ArrayRef<int64_t> filterShape = filterType.getShape();
+    ArrayRef<int64_t> outputShape = outputType.getShape();
+    ArrayRef<int64_t> inputShape = inputType.getShape();
+    SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
+    AffineMap inputMap = indexingMaps[0];
+    AffineMap filterMap = indexingMaps[1];
+    AffineMap outputMap = indexingMaps[2];
+
+    SmallVector<OpFoldResult> kernelSizes;
+    for (auto filterLoop : convDims.filterLoop) {
+      std::optional<int64_t> maybeDim = filterMap.getResultPosition(
+          getAffineDimExpr(filterLoop, filterMap.getContext()));
+      if (!maybeDim) {
+        return rewriter.notifyMatchFailure(linalgOp,
+                                           "Failed to infer filter shape.");
+      }
+      kernelSizes.push_back(
+          rewriter.getIndexAttr(filterShape[maybeDim.value()]));
     }
 
-    // TODO: Support dilation.
-    if (!hasAllOneValues(convOp.getDilations())) {
-      return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
-        diag << "[unimplemented] "
-             << "expected no dilations (expected dilations to all be one).";
-      });
+    // Shape of the resulting tensor from im2col.
+    SmallVector<int64_t> colTensorShape;
+    SmallVector<int64_t> batchPos;
+    for (auto batch : convDims.batch) {
+      std::optional<int64_t> maybeBatch = inputMap.getResultPosition(
+          getAffineDimExpr(batch, inputMap.getContext()));
+      if (!maybeBatch) {
+        return rewriter.notifyMatchFailure(linalgOp,
+                                           "Failed to infer batch shape.");
+      }
+      batchPos.push_back(maybeBatch.value());
+      colTensorShape.push_back(inputShape[maybeBatch.value()]);
     }
 
-    Value input = convOp.getInputs()[0];
-    Value filter = convOp.getInputs()[1];
-    Value output = convOp.getOutputs()[0];
+    SmallVector<int64_t> mPos;
+    SmallVector<int64_t> mShape;
+    for (auto outputImage : convDims.outputImage) {
+      for (auto [idx, e] : llvm::enumerate(inputMap.getResults())) {
+        if (e.isFunctionOfDim(outputImage)) {
+          mPos.push_back(idx);
+        }
+      }
+      for (auto [idx, e] : llvm::enumerate(outputMap.getResults())) {
+        if (e.isFunctionOfDim(outputImage)) {
+          mShape.push_back(outputShape[idx]);
+          colTensorShape.push_back(outputShape[idx]);
+        }
+      }
+    }
 
-    auto filterShape = filterType.getShape();
-    auto outputShape = outputType.getShape();
+    SmallVector<int64_t> kPos;
+    for (auto reductionDim : convDims.inputChannel) {
+      for (auto [idx, e] : llvm::enumerate(inputMap.getResults())) {
+        if (e.isFunctionOfDim(reductionDim)) {
+          kPos.push_back(idx);
+        }
+      }
+    }
+    // The index at which the reduction dimension bounds starts in
+    // igemmLoopBounds.
+    int64_t reductionBoundIndex = convDims.batch.size() +
+                                  convDims.outputImage.size() +
+                                  convDims.outputChannel.size();
+    SmallVector<int64_t> kShape(igemmLoopBounds.begin() + reductionBoundIndex,
+                                igemmLoopBounds.end());
+    colTensorShape.insert(colTensorShape.end(), kShape.begin(), kShape.end());
 
-    const int n = outputShape[0];
-    const int oh = outputShape[1];
-    const int ow = outputShape[2];
-    const int oc = outputShape[3];
-    const int fh = filterShape[0];
-    const int fw = filterShape[1];
-    const int ic = filterShape[2];
+    SmallVector<OpFoldResult> mBasis =
+        getAsIndexOpFoldResult(getContext(), getBasisFromShape(mShape));
+    SmallVector<OpFoldResult> kBasis =
+        getAsIndexOpFoldResult(getContext(), getBasisFromShape(kShape));
 
-    auto loc = convOp.getLoc();
-
-    SmallVector<int64_t> colTensorShape = {n, oh, ow, fh * fw * ic};
-
-    SmallVector<ReassociationIndices> outputReassocIndices = {{0}, {1, 2}, {3}};
-
+    SmallVector<OpFoldResult> kOffset(kBasis.size(), rewriter.getIndexAttr(0));
+    SmallVector<OpFoldResult> mOffset(mBasis.size(), rewriter.getIndexAttr(0));
+    auto loc = linalgOp.getLoc();
     Value colTensor = rewriter.create<tensor::EmptyOp>(
         loc, colTensorShape, inputType.getElementType());
-    SmallVector<int64_t> strides(convOp.getStrides().getValues<int64_t>());
-    SmallVector<int64_t> dilations(convOp.getDilations().getValues<int64_t>());
-    SmallVector<OpFoldResult> kernelSize = {rewriter.getIndexAttr(fh),
-                                            rewriter.getIndexAttr(fw)};
-    OpFoldResult zero = rewriter.getIndexAttr(0);
-    OpFoldResult one = rewriter.getIndexAttr(1);
-    SmallVector<OpFoldResult> mOffset = {zero, zero};
-    SmallVector<OpFoldResult> mBasis = {rewriter.getIndexAttr(ow), one};
-    SmallVector<OpFoldResult> kOffset = {zero};
-    SmallVector<OpFoldResult> kBasis = {one};
-    SmallVector<int64_t> batchPos = {0};
-    SmallVector<int64_t> mPos = {1, 2};
-    SmallVector<int64_t> kPos = {3};
-    Value img2ColTensor = rewriter
-                              .create<IREE::LinalgExt::Im2colOp>(
-                                  loc, input, /*output=*/colTensor, strides,
-                                  dilations, kernelSize, mOffset, mBasis,
-                                  kOffset, kBasis, batchPos, mPos, kPos)
-                              .getResult(0);
-
-    SmallVector<ReassociationIndices> filterReassocIndices = {{0, 1, 2}, {3}};
-    auto reshapedFilterType =
-        RankedTensorType::get({fh * fw * ic, oc}, inputType.getElementType());
+    Value img2ColTensor =
+        rewriter
+            .create<IREE::LinalgExt::Im2colOp>(
+                loc, input, /*output=*/colTensor, convDims.strides,
+                convDims.dilations, kernelSizes, mOffset, mBasis, kOffset,
+                kBasis, batchPos, mPos, kPos)
+            .getResult(0);
 
     Value reshapedFilter = rewriter.create<tensor::CollapseShapeOp>(
-        loc, reshapedFilterType, filter, filterReassocIndices);
+        loc, filter, filterReassocIndices);
 
-    SmallVector<AffineMap> indexingMaps =
-        getIGEMMContractionIndexingMaps(convOp).value();
-    auto parallel = utils::IteratorType::parallel;
-    auto reduction = utils::IteratorType::reduction;
-    SmallVector<utils::IteratorType> genericIterators = {
-        parallel, parallel, parallel, parallel, reduction};
-    auto genericOp = rewriter.create<linalg::GenericOp>(
+    auto genericGEMMOp = rewriter.create<linalg::GenericOp>(
         loc, outputType,
-        /*inputs=*/ValueRange{img2ColTensor, reshapedFilter},
-        /*outputs=*/ValueRange{output}, indexingMaps, genericIterators,
+        /*inputs=*/
+        isOutputChannelFirst ? ValueRange{reshapedFilter, img2ColTensor}
+                             : ValueRange{img2ColTensor, reshapedFilter},
+        /*outputs=*/ValueRange{output}, igemmContractionMaps,
+        igemmLoopIterators,
         [](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
           Value lhs = convertScalarToDtype(nestedBuilder, nestedLoc, args[0],
                                            args[2].getType(),
@@ -178,130 +242,11 @@ public:
           Value mul = createMul(nestedLoc, lhs, rhs, nestedBuilder);
           Value add = createAdd(nestedLoc, mul, args[2], nestedBuilder);
           nestedBuilder.create<linalg::YieldOp>(nestedLoc, add);
-        },
-        linalg::getPrunedAttributeList(convOp));
-    Value result = genericOp.getResults().front();
+        });
+    genericGEMMOp->setDiscardableAttrs(getPrunedAttributeList(linalgOp));
+    Value result = genericGEMMOp.getResults().front();
 
-    rewriter.replaceOp(convOp, result);
-
-    return success();
-  }
-
-private:
-  std::optional<ControlFnTy> controlFn;
-};
-
-// For nchw, because the channels are to the left of the image shape dimensions,
-// the position of the contraction dimension in the resulting matmul is
-// reversed. This swaps the LHS and RHS of the matmul when compared with nhwc
-// (i.e. (D, C x Kh x Kw) * (C x Kh x Kw, Ho x Wo))
-class ConvertConv2DNchwFchw final
-    : public OpRewritePattern<linalg::Conv2DNchwFchwOp> {
-public:
-  using OpRewritePattern::OpRewritePattern;
-
-  ConvertConv2DNchwFchw(MLIRContext *context,
-                        std::optional<ControlFnTy> controlFn)
-      : OpRewritePattern<linalg::Conv2DNchwFchwOp>(context),
-        controlFn(controlFn) {}
-
-  LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp convOp,
-                                PatternRewriter &rewriter) const override {
-    if (controlFn.has_value() && !controlFn.value()(convOp)) {
-      return rewriter.notifyMatchFailure(convOp, "controlFn failed.");
-    }
-
-    auto inputType = llvm::cast<ShapedType>(convOp.getInputs()[0].getType());
-    auto filterType = llvm::cast<ShapedType>(convOp.getInputs()[1].getType());
-    auto outputType = llvm::cast<ShapedType>(convOp.getOutputs()[0].getType());
-
-    if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
-      return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
-        diag << "[unimplemented] "
-             << "expected 'filterType' and 'inputType' to have static shapes.";
-      });
-    }
-
-    // TODO: Support dilation.
-    if (!hasAllOneValues(convOp.getDilations()))
-      return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
-        diag << "[unimplemented] "
-             << "expected no dilations (expected dilations to all be one).";
-      });
-
-    Value input = convOp.getInputs()[0];
-    Value filter = convOp.getInputs()[1];
-    Value output = convOp.getOutputs()[0];
-
-    auto filterShape = filterType.getShape();
-    auto outputShape = outputType.getShape();
-
-    const int n = outputShape[0];
-    const int oc = outputShape[1];
-    const int oh = outputShape[2];
-    const int ow = outputShape[3];
-    const int ic = filterShape[1];
-    const int fh = filterShape[2];
-    const int fw = filterShape[3];
-
-    auto loc = convOp.getLoc();
-
-    SmallVector<int64_t> colTensorShape = {n, oh, ow, fh * fw * ic};
-
-    Value colTensor = rewriter.create<tensor::EmptyOp>(
-        loc, colTensorShape, inputType.getElementType());
-    SmallVector<int64_t> strides(convOp.getStrides().getValues<int64_t>());
-    SmallVector<int64_t> dilations(convOp.getDilations().getValues<int64_t>());
-    SmallVector<OpFoldResult> kernelSize = {rewriter.getIndexAttr(fh),
-                                            rewriter.getIndexAttr(fw)};
-    OpFoldResult zero = rewriter.getIndexAttr(0);
-    OpFoldResult one = rewriter.getIndexAttr(1);
-    SmallVector<OpFoldResult> mOffset = {zero, zero};
-    SmallVector<OpFoldResult> mBasis = {rewriter.getIndexAttr(ow), one};
-    SmallVector<OpFoldResult> kOffset = {zero};
-    SmallVector<OpFoldResult> kBasis = {one};
-    SmallVector<int64_t> batchPos = {0};
-    SmallVector<int64_t> mPos = {2, 3};
-    SmallVector<int64_t> kPos = {1};
-    Value img2ColTensor = rewriter
-                              .create<IREE::LinalgExt::Im2colOp>(
-                                  loc, input, /*output=*/colTensor, strides,
-                                  dilations, kernelSize, mOffset, mBasis,
-                                  kOffset, kBasis, batchPos, mPos, kPos)
-                              .getResult(0);
-
-    SmallVector<ReassociationIndices> filterReassocIndices = {{0}, {1, 2, 3}};
-    auto reshapedFilterType =
-        RankedTensorType::get({oc, fh * fw * ic}, inputType.getElementType());
-    Value reshapedFilter = rewriter.create<tensor::CollapseShapeOp>(
-        loc, reshapedFilterType, filter, filterReassocIndices);
-
-    SmallVector<AffineMap> indexingMaps =
-        getIGEMMContractionIndexingMaps(convOp).value();
-    auto parallel = utils::IteratorType::parallel;
-    auto reduction = utils::IteratorType::reduction;
-    SmallVector<utils::IteratorType> genericIterators = {
-        parallel, parallel, parallel, parallel, reduction};
-    auto genericOp = rewriter.create<linalg::GenericOp>(
-        loc, outputType,
-        /*inputs=*/ValueRange{reshapedFilter, img2ColTensor},
-        /*outputs=*/ValueRange{output}, indexingMaps, genericIterators,
-        [](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
-          Value lhs = convertScalarToDtype(nestedBuilder, nestedLoc, args[0],
-                                           args[2].getType(),
-                                           /*isUnsignedCast=*/false);
-          Value rhs = convertScalarToDtype(nestedBuilder, nestedLoc, args[1],
-                                           args[2].getType(),
-                                           /*isUnsignedCast=*/false);
-          Value mul = createMul(nestedLoc, lhs, rhs, nestedBuilder);
-          Value add = createAdd(nestedLoc, mul, args[2], nestedBuilder);
-          nestedBuilder.create<linalg::YieldOp>(nestedLoc, add);
-        },
-        linalg::getPrunedAttributeList(convOp));
-    Value result = genericOp.getResults().front();
-
-    rewriter.replaceOp(convOp, result);
-
+    rewriter.replaceOp(linalgOp, result);
     return success();
   }
 
@@ -327,8 +272,8 @@ struct ConvertConv2DToIm2ColOpPass final
 
 void populateConv2DToIm2colOpPatterns(RewritePatternSet &patterns,
                                       std::optional<ControlFnTy> controlFn) {
-  patterns.insert<ConvertConv2DNhwcHwcf, ConvertConv2DNchwFchw>(
-      patterns.getContext(), std::move(controlFn));
+  patterns.insert<ConvertConvGeneric>(patterns.getContext(),
+                                      std::move(controlFn));
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

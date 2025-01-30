@@ -61,9 +61,7 @@ public:
   getDefaultDeviceTarget(MLIRContext *context,
                          const TargetRegistry &targetRegistry) const override {
     Builder b(context);
-    SmallVector<NamedAttribute> configItems;
-
-    auto configAttr = b.getDictionaryAttr(configItems);
+    auto configAttr = b.getDictionaryAttr({});
 
     // If we had multiple target environments we would generate one target attr
     // per environment, with each setting its own environment attribute.
@@ -97,13 +95,9 @@ public:
   IREE::HAL::ExecutableTargetAttr
   getExecutableTarget(MLIRContext *context) const {
     Builder b(context);
-    SmallVector<NamedAttribute> configItems;
-    auto addConfig = [&](StringRef name, Attribute value) {
-      configItems.emplace_back(b.getStringAttr(name), value);
-    };
-
+    SmallVector<NamedAttribute, 1> configItems;
     if (auto target = GPU::getMetalTargetDetails(context)) {
-      addConfig("iree.gpu.target", target);
+      configItems.emplace_back("iree.gpu.target", target);
     }
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(

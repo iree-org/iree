@@ -461,9 +461,11 @@ struct ChainDependentAwaits : public OpRewritePattern<Op> {
     for (auto operand : llvm::enumerate(op.getResourceOperands())) {
       if (auto awaitOp =
               operand.value().template getDefiningOp<TimepointAwaitOp>()) {
-        newTimepoints.push_back(awaitOp.getAwaitTimepoint());
-        replacements.push_back(std::make_pair(
-            operand.index(), awaitOp.getTiedResultOperand(operand.value())));
+        if (!awaitOp.getSync()) {
+          newTimepoints.push_back(awaitOp.getAwaitTimepoint());
+          replacements.push_back(std::make_pair(
+              operand.index(), awaitOp.getTiedResultOperand(operand.value())));
+        }
       }
     }
     if (replacements.empty())
@@ -1359,6 +1361,36 @@ void TensorStoreOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
   // TODO(benvanik): if value is a constant splat then turn into fill.
   // TODO(benvanik): combine multiple stores to the same target if contiguous.
+}
+
+//===----------------------------------------------------------------------===//
+// stream.tensor.dispatch
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct DeduplicateTensorDispatchEntryRefs final
+    : public OpRewritePattern<TensorDispatchOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorDispatchOp dispatchOp,
+                                PatternRewriter &rewriter) const override {
+    auto originalAttr = dispatchOp.getEntryPointsAttr();
+    auto newAttr = deduplicateArrayElements(originalAttr);
+    if (newAttr == originalAttr)
+      return failure();
+    rewriter.modifyOpInPlace(dispatchOp,
+                             [&]() { dispatchOp.setEntryPointsAttr(newAttr); });
+    return success();
+  }
+};
+
+} // namespace
+
+void TensorDispatchOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                   MLIRContext *context) {
+  // TODO(benvanik): maybe tied type/lifetime updates?
+  results.insert<ElideUnusedOp<TensorDispatchOp>>(context);
+  results.insert<DeduplicateTensorDispatchEntryRefs>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -3050,7 +3082,9 @@ findSourceAwaitOp(Value resource) {
              baseResource.getDefiningOp())) {
     if (auto awaitOp = dyn_cast<IREE::Stream::TimepointAwaitOp>(
             baseResource.getDefiningOp())) {
-      return {awaitOp, baseResource};
+      if (!awaitOp.getSync()) {
+        return {awaitOp, baseResource};
+      }
     }
     auto tiedValue = definingOp.getTiedResultOperand(baseResource);
     if (!tiedValue)
@@ -3141,6 +3175,11 @@ struct SinkAwaitToFirstConsumer : public OpRewritePattern<TimepointAwaitOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TimepointAwaitOp op,
                                 PatternRewriter &rewriter) const override {
+    // Don't move sync points as they may be implicitly guarding execution.
+    if (op.getSync()) {
+      return rewriter.notifyMatchFailure(op, "sync awaits cannot be moved");
+    }
+
     // TODO(benvanik): amortize this dominance calculation.
     DominanceInfo domInfo(op->getParentOp());
 
@@ -3197,6 +3236,7 @@ struct SinkSubviewsAcrossAwaits : public OpRewritePattern<TimepointAwaitOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TimepointAwaitOp op,
                                 PatternRewriter &rewriter) const override {
+    rewriter.setInsertionPointAfter(op);
     rewriter.startOpModification(op);
     bool didChange = false;
     for (auto operand : llvm::enumerate(op.getResourceOperands())) {
@@ -3276,7 +3316,7 @@ struct GroupAwaitsByTimepoint : public OpRewritePattern<TimepointAwaitOp> {
       if (dominanceInfo.dominates(use.getOwner(), op))
         continue;
       auto awaitOp = dyn_cast<TimepointAwaitOp>(use.getOwner());
-      if (!awaitOp)
+      if (!awaitOp || awaitOp.getSync())
         continue;
       // Ensure all dependencies of the await op are available.
       if (!areAllOperandsDefinedBy(awaitOp, op, dominanceInfo)) {
@@ -3351,12 +3391,31 @@ struct FoldDuplicateAwaitResources : public OpRewritePattern<TimepointAwaitOp> {
     // Create replacement op with deduped operands/results.
     auto newOp = rewriter.create<IREE::Stream::TimepointAwaitOp>(
         op.getLoc(), newOperands, newOperandSizes, op.getAwaitTimepoint());
+    newOp.setSync(op.getSync());
 
     // Replace all duplicate results with the base results.
     for (auto &replacement : replacements) {
       auto oldResult = replacement.first;
       auto newResult = newOp.getResults()[replacement.second];
       rewriter.replaceAllUsesWith(oldResult, newResult);
+    }
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+struct ElideUnusedTimepointAwait : public OpRewritePattern<TimepointAwaitOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TimepointAwaitOp op,
+                                PatternRewriter &rewriter) const override {
+    // If there are any uses the await is required to associate the timepoint.
+    if (!op.use_empty()) {
+      return failure();
+    }
+    // If the await is a sync point then we cannot elide it even if it has no
+    // uses.
+    if (op.getSync()) {
+      return rewriter.notifyMatchFailure(op, "sync ops cannot be elided");
     }
     rewriter.eraseOp(op);
     return success();
@@ -3373,7 +3432,7 @@ void TimepointAwaitOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<SinkSubviewsAcrossAwaits>(context);
   results.insert<GroupAwaitsByTimepoint>(context);
   results.insert<FoldDuplicateAwaitResources>(context);
-  results.insert<ElideUnusedOp<TimepointAwaitOp>>(context);
+  results.insert<ElideUnusedTimepointAwait>(context);
 }
 
 //===----------------------------------------------------------------------===//

@@ -35,6 +35,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Matchers.h"
@@ -425,11 +426,9 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   }
 
   Builder b(context);
-  SmallVector<NamedAttribute, 2> attrs;
-  attrs.emplace_back(StringAttr::get(context, "workgroup"),
-                     b.getI64ArrayAttr(workgroupTileSizes));
-  attrs.emplace_back(StringAttr::get(context, "reduction"),
-                     b.getI64ArrayAttr(reductionTileSizes));
+  SmallVector<NamedAttribute, 2> attrs = {
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+      NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
   IREE::GPU::setPromotedOperandList(context, attrs, {0, 1});
   IREE::GPU::setMmaKind(context, attrs, mmaKinds[schedule->index]);
   IREE::GPU::setSubgroupMCount(context, attrs, schedule->mSubgroupCounts[0]);
@@ -448,9 +447,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
         /*use_igemm_convolution=*/false,
         /*reorder_workgroups_strategy=*/std::nullopt);
     pipelineAttrs.emplace_back(
-        StringAttr::get(context,
-                        IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
-        pipelineOptions);
+        IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName(), pipelineOptions);
   }
 
   auto pipelineConfig = DictionaryAttr::get(context, pipelineAttrs);
@@ -688,11 +685,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
                                        *contractionDims, reductionTileSizes));
 
   Builder b(context);
-  SmallVector<NamedAttribute, 2> attrs;
-  attrs.emplace_back(StringAttr::get(context, "workgroup"),
-                     b.getI64ArrayAttr(workgroupTileSizes));
-  attrs.emplace_back(StringAttr::get(context, "reduction"),
-                     b.getI64ArrayAttr(reductionTileSizes));
+  SmallVector<NamedAttribute, 2> attrs = {
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+      NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
   IREE::GPU::setPromotedOperandList(context, attrs, {0, 1});
   IREE::GPU::setMmaKind(context, attrs, mmaKinds[schedule->index]);
   IREE::GPU::setSubgroupMCount(context, attrs, schedule->mSubgroupCounts[0]);
@@ -904,11 +899,9 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
 
   reductionTileSizes[k2Dim] = schedule->kTileSizes[0] * schedule->kSize;
 
-  SmallVector<NamedAttribute, 2> attrs;
-  attrs.emplace_back(StringAttr::get(context, "workgroup"),
-                     b.getI64ArrayAttr(workgroupTileSizes));
-  attrs.emplace_back(StringAttr::get(context, "reduction"),
-                     b.getI64ArrayAttr(reductionTileSizes));
+  SmallVector<NamedAttribute, 2> attrs = {
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+      NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
   IREE::GPU::setPromotedOperandList(context, attrs, {0, 1, 2});
 
   SmallVector<NamedAttribute, 2> qkConfig;
@@ -937,9 +930,8 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
 
   SmallVector<NamedAttribute, 2> qkAttrs;
   SmallVector<NamedAttribute, 2> pvAttrs;
-
-  qkAttrs.emplace_back(b.getNamedAttr("attention_qk_matmul", b.getUnitAttr()));
-  pvAttrs.emplace_back(b.getNamedAttr("attention_pv_matmul", b.getUnitAttr()));
+  qkAttrs.emplace_back("attention_qk_matmul", b.getUnitAttr());
+  pvAttrs.emplace_back("attention_pv_matmul", b.getUnitAttr());
 
   auto qkConfigDict = b.getDictionaryAttr(qkConfig);
   auto pvConfigDict = b.getDictionaryAttr(pvConfig);
@@ -949,8 +941,8 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   auto pvLoweringConfig =
       IREE::GPU::LoweringConfigAttr::get(context, pvConfigDict);
 
-  qkAttrs.emplace_back(b.getNamedAttr("lowering_config", qkLoweringConfig));
-  pvAttrs.emplace_back(b.getNamedAttr("lowering_config", pvLoweringConfig));
+  qkAttrs.emplace_back("lowering_config", qkLoweringConfig);
+  pvAttrs.emplace_back("lowering_config", pvLoweringConfig);
 
   auto qkAttrDict = b.getDictionaryAttr(qkAttrs);
   auto pvAttrDict = b.getDictionaryAttr(pvAttrs);
@@ -1132,11 +1124,9 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   MLIRContext *context = op.getContext();
 
-  SmallVector<NamedAttribute, 2> attrs;
-  attrs.emplace_back(StringAttr::get(context, "workgroup"),
-                     b.getI64ArrayAttr(workgroupTileSizes));
-  attrs.emplace_back(StringAttr::get(context, "reduction"),
-                     b.getI64ArrayAttr(reductionTileSizes));
+  SmallVector<NamedAttribute, 2> attrs = {
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+      NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
 
   SmallVector<NamedAttribute> qkConfig;
   IREE::GPU::setBasis(context, qkConfig, IREE::GPU::TilingLevel::Subgroup,
@@ -1161,17 +1151,17 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   auto pvLoweringConfig =
       IREE::GPU::LoweringConfigAttr::get(context, pvConfigDict);
 
-  qkAttrs.emplace_back(b.getNamedAttr("lowering_config", qkLoweringConfig));
-  pvAttrs.emplace_back(b.getNamedAttr("lowering_config", pvLoweringConfig));
+  qkAttrs.emplace_back("lowering_config", qkLoweringConfig);
+  pvAttrs.emplace_back("lowering_config", pvLoweringConfig);
 
   auto qkAttrDict = b.getDictionaryAttr(qkAttrs);
   auto pvAttrDict = b.getDictionaryAttr(pvAttrs);
 
   SmallVector<NamedAttribute, 2> decompositionConfig;
-  decompositionConfig.emplace_back(
-      b.getNamedAttr(IREE::LinalgExt::AttentionOp::getQKAttrStr(), qkAttrDict));
-  decompositionConfig.emplace_back(
-      b.getNamedAttr(IREE::LinalgExt::AttentionOp::getPVAttrStr(), pvAttrDict));
+  decompositionConfig.emplace_back(IREE::LinalgExt::AttentionOp::getQKAttrStr(),
+                                   qkAttrDict);
+  decompositionConfig.emplace_back(IREE::LinalgExt::AttentionOp::getPVAttrStr(),
+                                   pvAttrDict);
 
   // Set attention decomposition control config.
   op.setDecompositionConfigAttr(b.getDictionaryAttr(decompositionConfig));
@@ -1324,7 +1314,6 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
 
       auto context = op.getContext();
       Builder b(context);
-      SmallVector<NamedAttribute, 1> attrs;
 
       SmallVector<int64_t> threadTileSizes(numParallelLoops + numReductionLoops,
                                            0);
@@ -1340,12 +1329,10 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
           numParallelLoops + numReductionLoops, 0);
       reductionTileSizes[numParallelLoops + numReductionLoops - 1] = tileK;
 
-      attrs.emplace_back(b.getStringAttr("workgroup"),
-                         b.getI64ArrayAttr(workgroupTileSizes));
-      attrs.emplace_back(b.getStringAttr("thread"),
-                         b.getI64ArrayAttr(threadTileSizes));
-      attrs.emplace_back(b.getStringAttr("reduction"),
-                         b.getI64ArrayAttr(reductionTileSizes));
+      SmallVector<NamedAttribute, 3> attrs = {
+          NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+          NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes)),
+          NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
 
       auto configDict = b.getDictionaryAttr(attrs);
       auto loweringConfig =
@@ -1783,12 +1770,24 @@ static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
                                                preferredSubgroupSize);
 }
 
+/// Returns true if it's MatVec like i.e., either the bound of M or N dim = 1,
+/// or one of M, N dim isn't present.
 static bool isMatvecLike(linalg::LinalgOp linalgOp) {
-  if (linalgOp.getNumParallelLoops() != 2)
-    return false;
 
-  if (linalgOp.getNumReductionLoops() != 1)
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<unsigned> parallelDims;
+  linalgOp.getParallelDims(parallelDims);
+
+  // Validate that there's exactly one parallel dimension with size != 1.
+  unsigned nonUnitParallelDimsCount = llvm::count_if(
+      parallelDims, [&bounds](unsigned idx) { return bounds[idx] != 1; });
+
+  // No. of parallel dims size shouldn't exceed 2.
+  // There should be exactly one reduction loop.
+  if (parallelDims.size() > 2 || nonUnitParallelDimsCount != 1 ||
+      linalgOp.getNumReductionLoops() != 1) {
     return false;
+  }
 
   // TODO: Allow for matvec with fused dequantization.
   FailureOr<linalg::ContractionDimensions> dims =
@@ -1800,16 +1799,10 @@ static bool isMatvecLike(linalg::LinalgOp linalgOp) {
   if (!dims->batch.empty())
     return false;
 
-  for (ArrayRef indices : {dims->m, dims->n, dims->k}) {
-    if (!llvm::hasSingleElement(indices))
-      return false;
-  }
-
-  // Check if the first parallel dimension has bound 1, indicating we found a
-  // vector shape.
-  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
-  if (bounds[dims->m.front()] != 1)
+  if (dims->m.size() >= 2 || dims->n.size() >= 2 ||
+      !llvm::hasSingleElement(dims->k)) {
     return false;
+  }
 
   return true;
 }
@@ -1881,12 +1874,7 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
   if (!foundSingleReductionOutput)
     return failure();
 
-  // Tile all the parallel dimension to 1.
-  SmallVector<unsigned> partitionedLoops =
-      cast<PartitionableLoopsInterface>(op.getOperation())
-          .getPartitionableLoops(kNumMaxParallelDims);
-  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
-  SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
+  SmallVector<int64_t> workgroupTileSizes(op.getNumParallelLoops(), 1);
 
   // Without any bounds on dynamic dims, we need specialization to
   // get peak performance. For now, just use the warp size.
@@ -1991,17 +1979,18 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
   // validate this strategy and extend to more linalg generics and to CUDA.
   if (isROCmBackend(target) && llvm::none_of(bounds, ShapedType::isDynamic) &&
       isMatvecLike(op)) {
-    int64_t lastParallelBound = bounds[parallelDims.back()];
+    int64_t parallelIdx = *llvm::find_if(
+        parallelDims, [&](int64_t currIdx) { return bounds[currIdx] != 1; });
+    int64_t parallelBound = bounds[parallelIdx];
     int64_t numParallelReductions = 1;
     const int64_t maxParallelFactor = groupSize / 4;
-    for (int64_t parallelFactor = 2;
-         (parallelFactor < maxParallelFactor) &&
-         (lastParallelBound % parallelFactor == 0) &&
-         (lastParallelBound > parallelFactor);
+    for (int64_t parallelFactor = 2; (parallelFactor < maxParallelFactor) &&
+                                     (parallelBound % parallelFactor == 0) &&
+                                     (parallelBound > parallelFactor);
          parallelFactor *= 2) {
       numParallelReductions = parallelFactor;
     }
-    workgroupTileSizes.back() = numParallelReductions;
+    workgroupTileSizes[parallelIdx] = numParallelReductions;
   }
 
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
@@ -2146,12 +2135,10 @@ static LogicalResult setArgmaxUkernelConfig(
 
   MLIRContext *context = op->getContext();
   Builder b(context);
-  SmallVector<NamedAttribute, 2> attrs;
-  attrs.emplace_back(StringAttr::get(context, "workgroup"),
-                     b.getI64ArrayAttr(workgroupTileSizes));
-  attrs.emplace_back(StringAttr::get(context, "reduction"),
-                     b.getI64ArrayAttr(reductionTileSizes));
-  attrs.emplace_back(StringAttr::get(context, "ukernel"), ukernelConfig);
+  SmallVector<NamedAttribute, 3> attrs = {
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+      NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes)),
+      NamedAttribute("ukernel", ukernelConfig)};
   IREE::GPU::setPromotedOperandList(context, attrs, {0, 1});
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);

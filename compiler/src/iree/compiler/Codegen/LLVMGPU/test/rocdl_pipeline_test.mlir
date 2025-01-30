@@ -183,9 +183,9 @@ hal.executable @ceildiv_expand_dispatch {
 //   CDNA3-LABEL: hal.executable public @ceildiv_expand_dispatch
 //         CDNA3:   hal.executable.variant public @rocm
 //     CDNA3-NOT:     arith.ceildivsi
-// CDNA3-COUNT-1:     llvm.select {{.*}} : i1, i32
-// CDNA3-COUNT-2:     llvm.sdiv {{.*}} : i32
-// CDNA3-COUNT-4:     llvm.icmp {{.*}} : i32
-// CDNA3-COUNT-2:     llvm.and {{.*}} : i1
-// CDNA3-COUNT-1:     llvm.or {{.*}} : i1
-// CDNA3-COUNT-1:     llvm.select {{.*}} : i1, i32
+// CDNA3-COUNT-1:     llvm.select {{.*}} : vector<1xi1>, vector<1xi32>
+// CDNA3-COUNT-2:     llvm.sdiv {{.*}} : vector<1xi32>
+// CDNA3-COUNT-4:     llvm.icmp {{.*}} : vector<1xi32>
+// CDNA3-COUNT-2:     llvm.and {{.*}} : vector<1xi1>
+// CDNA3-COUNT-1:     llvm.or {{.*}} : vector<1xi1>
+// CDNA3-COUNT-1:     llvm.select {{.*}} : vector<1xi1>, vector<1xi32>

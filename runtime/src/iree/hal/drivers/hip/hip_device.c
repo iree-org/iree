@@ -517,6 +517,11 @@ static void iree_hal_hip_device_destroy(iree_hal_device_t* base_device) {
 
   const iree_hal_hip_dynamic_symbols_t* symbols = device->hip_symbols;
 
+  for (iree_host_size_t i = 0; i < device->device_count; ++i) {
+    iree_hal_hip_dispatch_thread_deinitialize(
+        device->devices[i].dispatch_thread);
+  }
+
   iree_hal_hip_cleanup_thread_deinitialize(device->cleanup_thread);
   iree_hal_hip_cleanup_thread_deinitialize(device->buffer_free_thread);
 
@@ -552,11 +557,6 @@ static void iree_hal_hip_device_destroy(iree_hal_device_t* base_device) {
     // primaryCtx by design on HIP/HCC path.
     IREE_HIP_IGNORE_ERROR(
         symbols, hipDevicePrimaryCtxRelease(device->devices[i].hip_device));
-  }
-
-  for (iree_host_size_t i = 0; i < device->device_count; ++i) {
-    iree_hal_hip_dispatch_thread_deinitialize(
-        device->devices[i].dispatch_thread);
   }
 
   iree_arena_block_pool_deinitialize(&device->block_pool);

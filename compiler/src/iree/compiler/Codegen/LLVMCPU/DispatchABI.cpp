@@ -781,7 +781,7 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
   // Construct the MemRefDescriptor type based on the information we have.
   // NOTE: we could use the binding length to clamp this/check that the
   // requested range is valid.
-  auto [strides, offset] = getStridesAndOffset(memRefType);
+  auto [strides, offset] = memRefType.getStridesAndOffset();
   if (memRefType.hasStaticShape() &&
       !llvm::any_of(strides, ShapedType::isDynamic) &&
       !ShapedType::isDynamic(offset)) {

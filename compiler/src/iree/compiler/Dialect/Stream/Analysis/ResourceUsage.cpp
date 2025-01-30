@@ -484,6 +484,30 @@ private:
             getState() ^= resultUsage.getState();
           }
         })
+        .Case<IREE::Stream::AsyncExecuteOp, IREE::Stream::AsyncConcurrentOp>(
+            [&](auto op) {
+              IREE::Stream::AsyncConcurrentOp c;
+              // Take on the state from the internal usage.
+              for (auto yieldOp :
+                   op.getClosureBodyRegion()
+                       .template getOps<IREE::Stream::YieldOp>()) {
+                auto &yieldUsage = solver.getElementFor<ValueResourceUsage>(
+                    *this,
+                    Position::forValue(
+                        yieldOp.getOperand(result.getResultNumber())),
+                    DFX::Resolution::REQUIRED);
+                getState() ^= yieldUsage.getState();
+              }
+              // If the result is passed through as a tied operand then also
+              // inherit the original state.
+              auto tiedOperand = op.getTiedResultOperand(result);
+              if (tiedOperand) {
+                auto &tiedUsage = solver.getElementFor<ValueResourceUsage>(
+                    *this, Position::forValue(tiedOperand),
+                    DFX::Resolution::REQUIRED);
+                getState() ^= tiedUsage.getState();
+              }
+            })
         .Default([&](Operation *op) {});
   }
 
@@ -804,6 +828,30 @@ private:
                 *this, Position::forValue(result), DFX::Resolution::REQUIRED);
             getState() ^= resultUsage.getState();
           }
+        })
+        .Case<IREE::Stream::AsyncExecuteOp, IREE::Stream::AsyncConcurrentOp>(
+            [&](auto op) {
+              // Take on the traits of all ops within the execution region that
+              // use the value and handle ties if needed.
+              auto &operandUsage = solver.getElementFor<ValueResourceUsage>(
+                  *this,
+                  Position::forValue(
+                      op.getClosureBodyRegion().getArgument(operandIdx)),
+                  DFX::Resolution::REQUIRED);
+              getState() ^= operandUsage.getState();
+              for (auto result : op.getOperandTiedResults(operandIdx)) {
+                auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
+                    *this, Position::forValue(result),
+                    DFX::Resolution::REQUIRED);
+                getState() ^= resultUsage.getState();
+              }
+            })
+        .Case([&](IREE::Stream::YieldOp op) {
+          // Take on the traits of the result of the parent operation.
+          Value result = op->getParentOp()->getResult(operandIdx);
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(result), DFX::Resolution::REQUIRED);
+          getState() ^= resultUsage.getState();
         })
         .Default([&](Operation *op) {});
   }

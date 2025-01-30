@@ -151,3 +151,18 @@ util.func private @tensorTrace(%tensor0: !stream.resource<staging>, %tensor0_siz
   ]
   util.return
 }
+
+// -----
+
+// CHECK-LABEL: @tensorDispatch
+util.func private @tensorDispatch(%arg0: !stream.resource<*>, %arg1: index, %arg2: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  %c4 = arith.constant 4 : index
+  // CHECK: = stream.tensor.dispatch @executable::@dispatch[%c1, %c2, %c3](%arg0, %c4) :
+  // CHECK-SAME: (tensor<4x?xf32>{%arg2} in !stream.resource<*>{%arg1}, index) -> tensor<?x4xf32>{%arg2} in %arg0{%arg1}
+  %0 = stream.tensor.dispatch @executable::@dispatch[%c1, %c2, %c3](%arg0, %c4) : (tensor<4x?xf32>{%arg2} in !stream.resource<*>{%arg1}, index) -> tensor<?x4xf32>{%arg2} in %arg0{%arg1}
+  util.return %0 : !stream.resource<*>
+}
