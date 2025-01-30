@@ -121,7 +121,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     bool transposedLhs, bool transposedRhs, bool mustBeAligned = true,
     bool doCPromotion = false) {
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
-  SmallVector<GPUMatmulShapeType> intrinsics;
+  SmallVector<GPUMatmulShapeType, 2> intrinsics;
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     // Intrinsics that do not specify a scope cannot be distributed.
     if (failed(mma.getMmaScope()))
@@ -202,7 +202,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   // Gather all static M, N, and K dimensions to deduce the MMASchedule. Dynamic
   // dimensions will be tiled to 1 in workgroup tiling, so they are ignored when
   // computing an MMA schedule.
-  SmallVector<int64_t> mDims, nDims, kDims;
+  SmallVector<int64_t> mDims, nDims, kDims, batchDims;
   for (auto mDim : contractionDims.m) {
     if (!ShapedType::isDynamic(bounds[mDim])) {
       mDims.push_back(mDim);
@@ -216,6 +216,12 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   for (auto kDim : contractionDims.k) {
     if (!ShapedType::isDynamic(bounds[kDim])) {
       kDims.push_back(kDim);
+    }
+  }
+
+  for (auto batchDim : contractionDims.batch) {
+    if (!ShapedType::isDynamic(bounds[batchDim])) {
+      batchDims.push_back(batchDim);
     }
   }
 
@@ -233,8 +239,9 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   Type initElemType = getElementTypeOrSelf(init);
 
   GPUMatmulShapeType problem{getDimBounds(mDims), getDimBounds(nDims),
-                             getDimBounds(kDims), lhsElemType,
-                             rhsElemType,         initElemType};
+                             getDimBounds(kDims), getDimBounds(batchDims),
+                             lhsElemType,         rhsElemType,
+                             initElemType};
 
   // Infer if lhs or rhs is transposed to help generate better schedule.
   // TODO: Drop this. This is only a consideration for other pipelines.

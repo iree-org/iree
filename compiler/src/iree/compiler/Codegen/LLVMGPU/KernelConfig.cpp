@@ -339,7 +339,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Helper fn to store mma information.
   auto storeMmaInfo = [](IREE::GPU::MmaInterfaceAttr mma,
-                         SmallVector<GPUMatmulShapeType> &intrinsics,
+                         SmallVector<GPUMatmulShapeType, 2> &intrinsics,
                          SmallVector<IREE::GPU::MmaInterfaceAttr> &mmaKinds) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
@@ -347,7 +347,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     mmaKinds.emplace_back(mma);
   };
 
-  SmallVector<GPUMatmulShapeType> intrinsics;
+  SmallVector<GPUMatmulShapeType, 2> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
   SmallVector<IREE::GPU::MmaInterfaceAttr> mmaKinds;
   MLIRContext *context = op.getContext();
@@ -546,7 +546,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Helper fn to store mma information.
   auto storeMmaInfo = [](IREE::GPU::MmaInterfaceAttr mma,
-                         SmallVector<GPUMatmulShapeType> &intrinsics,
+                         SmallVector<GPUMatmulShapeType, 2> &intrinsics,
                          SmallVector<IREE::GPU::MmaInterfaceAttr> &mmaKinds) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
@@ -554,7 +554,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
     mmaKinds.emplace_back(mma);
   };
 
-  SmallVector<GPUMatmulShapeType> intrinsics;
+  SmallVector<GPUMatmulShapeType, 2> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
   SmallVector<IREE::GPU::MmaInterfaceAttr> mmaKinds;
   MLIRContext *context = op.getContext();
@@ -766,7 +766,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
 
   // Helper fn to store mma information.
   auto storeMmaInfo = [](IREE::GPU::MmaInterfaceAttr mma,
-                         SmallVector<GPUMatmulShapeType> &intrinsics,
+                         SmallVector<GPUMatmulShapeType, 2> &intrinsics,
                          SmallVector<IREE::GPU::MmaInterfaceAttr> &mmaKinds) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
@@ -774,7 +774,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
     mmaKinds.emplace_back(mma);
   };
 
-  SmallVector<GPUMatmulShapeType> intrinsics;
+  SmallVector<GPUMatmulShapeType, 2> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
   SmallVector<IREE::GPU::MmaInterfaceAttr> mmaKinds;
   MLIRContext *context = op.getContext();

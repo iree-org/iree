@@ -891,7 +891,7 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
   // just the first element.
   GPUMatmulShapeType problem(dimM, dimN, dimK, lhsElem, rhsElem, initElem);
 
-  SmallVector<GPUMatmulShapeType> intrinsics;
+  SmallVector<GPUMatmulShapeType, 2> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();
