@@ -7,10 +7,13 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -81,6 +84,24 @@ struct LowerArgmaxToUKernelPattern : OpRewritePattern<linalg::GenericOp> {
   }
 };
 
+static Value createSharedMemory(PatternRewriter &rewriter, Location loc,
+                                int sharedMemoryBytes) {
+  RankedTensorType tensorType =
+      RankedTensorType::get({sharedMemoryBytes}, rewriter.getI8Type());
+  ValueRange dynSizes{};
+  if (!sharedMemoryBytes) {
+    IREE::Codegen::NullPointerType nullPointerType =
+        IREE::Codegen::NullPointerType::get(rewriter.getContext());
+    return rewriter.create<IREE::Codegen::NullPointerOp>(loc, nullPointerType);
+  }
+  auto allocOp =
+      rewriter.create<bufferization::AllocTensorOp>(loc, tensorType, dynSizes);
+  Attribute sharedAddrSpace = gpu::AddressSpaceAttr::get(
+      rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+  allocOp.setMemorySpaceAttr(sharedAddrSpace);
+  return allocOp;
+}
+
 struct LowerMultiMmaToUKernelPattern : OpRewritePattern<IREE::GPU::MultiMmaOp> {
   LowerMultiMmaToUKernelPattern(MLIRContext *context)
       : OpRewritePattern<IREE::GPU::MultiMmaOp>(context) {}
@@ -100,14 +121,16 @@ struct LowerMultiMmaToUKernelPattern : OpRewritePattern<IREE::GPU::MultiMmaOp> {
     if (!mma) {
       return rewriter.notifyMatchFailure(op, "unhandled MMAInterfaceAttr");
     }
+    Location loc = op->getLoc();
+    Type I32Type = rewriter.getI32Type();
     auto castIndexToI32 = [&](Value val) {
-      return rewriter.create<arith::IndexCastOp>(op.getLoc(),
-                                                 rewriter.getI32Type(), val);
+      return rewriter.create<arith::IndexCastOp>(loc, I32Type, val);
     };
     auto constI32 = [&](int val) {
-      return rewriter.create<arith::ConstantIntOp>(op.getLoc(), val,
-                                                   rewriter.getI32Type());
+      return rewriter.create<arith::ConstantIntOp>(loc, val, I32Type);
     };
+    int64_t sharedMemoryBytes = ukernelAttr.getSharedMemoryBytes();
+    auto sharedMemory = createSharedMemory(rewriter, loc, sharedMemoryBytes);
     Value k = castIndexToI32(
         rewriter.create<tensor::DimOp>(op.getLoc(), op.getLhs(), 1));
     Value intrinsicsM = constI32(mma.getIntrinsicsM());
@@ -118,8 +141,8 @@ struct LowerMultiMmaToUKernelPattern : OpRewritePattern<IREE::GPU::MultiMmaOp> {
     rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
         op, TypeRange{op.getAccType()}, ukernelAttr.getName(),
         ValueRange{op.getLhs(), op.getRhs()}, op.getAcc(),
-        ValueRange{k, intrinsicsM, subgroupsM, intrinsicsN, subgroupsN,
-                   intrinsicsK},
+        ValueRange{sharedMemory, constI32(sharedMemoryBytes), k, intrinsicsM,
+                   subgroupsM, intrinsicsN, subgroupsN, intrinsicsK},
         ukernelAttr.getDefAttrs(),
         /*strided_outer_dims=*/rewriter.getIndexAttr(0));
     return success();

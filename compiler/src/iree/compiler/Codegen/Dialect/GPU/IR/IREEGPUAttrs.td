@@ -532,12 +532,13 @@ def IREEGPU_UKernelConfigAttr  :
   let summary = "An attribute specifying a ukernel that an op can lower to.";
   let description = [{
     An attribute that can be applied to any operation to specify that it has
-    been match with a ukernel that is a legal lowering for it.
+    been matched with a ukernel that is a legal lowering for it.
   }];
   let assemblyFormat = "`<` struct(params) `>`";
   let parameters = (ins
        "StringAttr":$name,
-       "DictionaryAttr":$def_attrs
+       "DictionaryAttr":$def_attrs,
+       DefaultValuedParameter<"int64_t", "0", "Size in bytes of shared memory workspace">:$shared_memory_bytes
   );
 }
 

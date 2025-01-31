@@ -8,6 +8,7 @@
 #define IREE_CODEGEN_DIALECT_IREECODEGENOPS
 
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.td"
+include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -101,7 +102,15 @@ def IREECodegen_ExtractStridedMetadataOp : Op<IREECodegen_Dialect, "extract_stri
   }];
 }
 
-
+def IREECodegen_NullPointerOp :
+     Op<IREECodegen_Dialect, "null_pointer", [Pure]> {
+  let summary = "Returns a null_pointer value.";
+  let description = [{
+    This is meant to be used only as arguments to microkernels.
+  }];
+  let results = (outs NullPointer:$result);
+  let assemblyFormat = "attr-dict";
+}
 
 
 #endif // IREE_CODEGEN_DIALECT_IREECODEGENOPS
