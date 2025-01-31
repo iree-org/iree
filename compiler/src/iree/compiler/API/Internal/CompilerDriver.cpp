@@ -59,6 +59,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Remarks/RemarkFormat.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Endian.h"
@@ -1235,6 +1236,9 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     return false;
   }
 
+  if (llvm::PrintPipelinePasses) {
+    passManager->dump();
+  }
   if (failed(passManager->run(parsedModule))) {
     return false;
   }
@@ -1248,6 +1252,10 @@ bool Invocation::runTextualPassPipeline(const char *textPassPipeline) {
   if (failed(mlir::parsePassPipeline(textPassPipeline, *passManager,
                                      llvm::errs()))) {
     return false;
+  }
+
+  if (llvm::PrintPipelinePasses) {
+    passManager->dump();
   }
   if (failed(passManager->run(parsedModule))) {
     return false;
