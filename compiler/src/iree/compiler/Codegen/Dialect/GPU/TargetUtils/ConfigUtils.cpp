@@ -131,10 +131,14 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   SmallVector<GPUMatmulShapeType> intrinsics;
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
-    auto [mSize, nSize, kSize] = mma.getMNKShape();
-    auto [aType, bType, cType] = mma.getABCElementTypes();
+    // Intrinsics that do not specify a scope cannot be distributed.
+    if (failed(mma.getMmaScope()))
+      continue;
     if (mma.getSubgroupSize() != targetSubgroupSize)
       continue;
+
+    auto [mSize, nSize, kSize] = mma.getMNKShape();
+    auto [aType, bType, cType] = mma.getABCElementTypes();
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
   }
   if (intrinsics.empty())
