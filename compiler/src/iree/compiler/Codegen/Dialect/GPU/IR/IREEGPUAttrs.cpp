@@ -70,6 +70,10 @@ static bool is_AMD_WMMA(MMAIntrinsic intrinsic) {
   return getArchID(intrinsic) >= 0x1800 && getArchID(intrinsic) <= 0x1FFF;
 }
 
+static bool is_AMD(MMAIntrinsic intrinsic) {
+  return is_AMD_MFMA(intrinsic) || is_AMD_WMMA(intrinsic);
+}
+
 static int64_t getIntrinsicSubgroupSize(MMAIntrinsic intrinsic) {
   // Not using Wave64 at all at the moment, so the only place where the
   // subgroup size is 64 is on CDNA* architectures.
@@ -130,45 +134,18 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
   return {};
 }
 
+/// Returns the MNK shape for an intrinsic without an implemented concrete
+/// layout.
 static std::tuple<int64_t, int64_t, int64_t>
-getMNKShape(MMAIntrinsic intrinsic) {
+getUnsupportedMNKShape(MMAIntrinsic intrinsic) {
   switch (intrinsic) {
-  case MMAIntrinsic::MFMA_F64_16x16x4_F64:
-  case MMAIntrinsic::MFMA_F32_16x16x4_F32:
-    return {16, 16, 4};
-  case MMAIntrinsic::MFMA_F32_16x16x8_BF16:
-    return {16, 16, 8};
-  case MMAIntrinsic::MFMA_F32_16x16x16_F16:
-  case MMAIntrinsic::MFMA_F32_16x16x16_BF16:
-  case MMAIntrinsic::MFMA_I32_16x16x16_I8:
-  case MMAIntrinsic::WMMA_F32_16x16x16_F16:
-  case MMAIntrinsic::WMMA_F32_16x16x16_BF16:
-  case MMAIntrinsic::WMMA_F16_16x16x16_F16:
-  case MMAIntrinsic::WMMA_BF16_16x16x16_BF16:
-  case MMAIntrinsic::WMMA_I32_16x16x16_I8:
   case MMAIntrinsic::NV_WMMA_F32_16x16x16_F16:
   case MMAIntrinsic::NV_WMMA_F16_16x16x16_F16:
     return {16, 16, 16};
-  case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
-  case MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ:
-  case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ_F8E5M2FNUZ:
-  case MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ:
-  case MMAIntrinsic::MFMA_I32_16x16x32_I8:
-    return {16, 16, 32};
-  case MMAIntrinsic::MFMA_F32_32x32x4_BF16:
-    return {32, 32, 4};
-  case MMAIntrinsic::MFMA_F32_32x32x8_F16:
-  case MMAIntrinsic::MFMA_F32_32x32x8_BF16:
-  case MMAIntrinsic::MFMA_I32_32x32x8_I8:
-    return {32, 32, 8};
-  case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ:
-  case MMAIntrinsic::MFMA_F32_32x32x16_F8E5M2FNUZ:
-  case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ:
-  case MMAIntrinsic::MFMA_F32_32x32x16_F8E5M2FNUZ_F8E4M3FNUZ:
-  case MMAIntrinsic::MFMA_I32_32x32x16_I8:
-    return {32, 32, 16};
+  default:
+    assert(false && "unexpected enum value");
+    return {};
   }
-  assert(false && "unexpected enum value");
   return {};
 }
 
@@ -329,12 +306,19 @@ struct OpaqueMmaLayout {
   Type cType;
 };
 
-template <typename MMAIntrinsicType>
 static OpaqueMmaLayout getOpaqueMMALayout(MLIRContext *context,
-                                          MMAIntrinsicType intrinsic) {
+                                          MMAIntrinsic intrinsic) {
   OpaqueMmaLayout o;
   std::tie(o.aType, o.bType, o.cType) = getABCElementTypes(context, intrinsic);
-  std::tie(o.mSize, o.nSize, o.kSize) = getMNKShape(intrinsic);
+  if (is_AMD(intrinsic)) {
+    auto lhs = getSingleSubgroupLayout(intrinsic, MMAFragment::Lhs);
+    auto rhs = getSingleSubgroupLayout(intrinsic, MMAFragment::Rhs);
+    o.mSize = lhs.outer[0] * lhs.thread[0] * lhs.element[0];
+    o.kSize = lhs.outer[1] * lhs.thread[1] * lhs.element[1];
+    o.nSize = rhs.outer[1] * rhs.thread[1] * rhs.element[1];
+  } else {
+    std::tie(o.mSize, o.nSize, o.kSize) = getUnsupportedMNKShape(intrinsic);
+  }
   return o;
 }
 
@@ -936,6 +920,18 @@ getABCElementTypes(MLIRContext *context, VirtualMMAIntrinsic type) {
   }
   assert(false && "unhandled virtual mma layout type.");
   return {};
+}
+
+static OpaqueMmaLayout getOpaqueMMALayout(MLIRContext *context,
+                                          VirtualMMAIntrinsic intrinsic) {
+  OpaqueMmaLayout o;
+  std::tie(o.aType, o.bType, o.cType) = getABCElementTypes(context, intrinsic);
+  auto lhs = getSingleSubgroupLayout(intrinsic, MMAFragment::Lhs);
+  auto rhs = getSingleSubgroupLayout(intrinsic, MMAFragment::Rhs);
+  o.mSize = lhs.outer[0] * lhs.thread[0] * lhs.element[0];
+  o.kSize = lhs.outer[1] * lhs.thread[1] * lhs.element[1];
+  o.nSize = rhs.outer[1] * rhs.thread[1] * rhs.element[1];
+  return o;
 }
 
 std::tuple<Type, Type, Type> VirtualMMAAttr::getABCElementTypes() const {
