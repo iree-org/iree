@@ -270,6 +270,39 @@ NestedLayoutAttr NestedLayoutAttr::get(MLIRContext *context,
                                threadStrides);
 }
 
+NestedLayoutAttr
+NestedLayoutAttr::get(MLIRContext *context,
+                      ArrayRef<NestedLayoutAttr> operandLayouts,
+                      ArrayRef<AffineMap> operandIndexingMaps) {
+  int64_t numDims = operandIndexingMaps[0].getNumDims();
+  SmallVector<int64_t> subgroupTile(numDims, 0);
+  SmallVector<int64_t> batchTile(numDims, 0);
+  SmallVector<int64_t> outerTile(numDims, 0);
+  SmallVector<int64_t> threadTile(numDims, 0);
+  SmallVector<int64_t> elementTile(numDims, 0);
+  SmallVector<int64_t> subgroupStrides(numDims, 0);
+  SmallVector<int64_t> threadStrides(numDims, 0);
+
+  for (auto [layout, indexingMap] :
+       llvm::zip(operandLayouts, operandIndexingMaps)) {
+    for (int64_t resultIdx : llvm::seq<int64_t>(indexingMap.getNumResults())) {
+      int64_t iterSpacePos = indexingMap.getDimPosition(resultIdx);
+      subgroupTile[iterSpacePos] = layout.getSubgroupTile()[resultIdx];
+      batchTile[iterSpacePos] = layout.getBatchTile()[resultIdx];
+      outerTile[iterSpacePos] = layout.getBatchTile()[resultIdx];
+      threadTile[iterSpacePos] = layout.getThreadTile()[resultIdx];
+      elementTile[iterSpacePos] = layout.getElementTile()[resultIdx];
+
+      subgroupStrides[iterSpacePos] = layout.getSubgroupStrides()[resultIdx];
+      threadStrides[iterSpacePos] = layout.getThreadStrides()[resultIdx];
+    }
+  }
+
+  return NestedLayoutAttr::get(context, subgroupTile, batchTile, outerTile,
+                               threadTile, elementTile, subgroupStrides,
+                               threadStrides);
+}
+
 LogicalResult NestedLayoutAttr::verify(
     llvm::function_ref<InFlightDiagnostic()> emitError,
     ArrayRef<int64_t> subgroupTile, ArrayRef<int64_t> batchTile,

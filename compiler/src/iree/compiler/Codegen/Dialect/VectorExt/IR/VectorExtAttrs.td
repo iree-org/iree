@@ -232,7 +232,12 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
                      "ArrayRef<int64_t>":$appendThreadLens,
                      "ArrayRef<int64_t>":$appendElementLens,
                      "ArrayRef<int64_t>":$appendSubgroupStrides,
-                     "ArrayRef<int64_t>":$appendThreadStrides)>
+                     "ArrayRef<int64_t>":$appendThreadStrides)>,
+    // Special builder to extract and unify a new layout
+    // to represent the iteration space from operand
+    // layout
+    AttrBuilder<(ins "ArrayRef<NestedLayoutAttr>":$operandLayouts,
+                     "ArrayRef<AffineMap>":$operandIndexingMaps)>
   ];
 
   let extraClassDeclaration = [{
