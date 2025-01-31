@@ -90,7 +90,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: iree-org/iree-test-suites
-          ref: 8e6af9e75d874ef8c9f8ff55f12cb38157dd55eb
+          ref: 56509666d185cdb99aafb4ed4d8532b8f3c54fa3
           path: iree-test-suites
       - name: Install ONNX ops test suite requirements
         run: |
@@ -130,11 +130,26 @@ jobs:
         include:
           # CPU
           - name: cpu_llvm_task
-            runs-on: ubuntu-24.04
+            config-file: onnx_models_cpu_llvm_task.json
+            runs-on:
+              - self-hosted # must come first
+              - persistent-cache
+              - Linux
+              - X64
 
-          # TODO(scotttodd): test other backends (parameterize the test suite)
+          # AMD GPU
+          - name: amdgpu_rocm_rdna3
+            config-file: onnx_models_gpu_rocm_rdna3.json
+            runs-on: nodai-amdgpu-w7900-x86-64
+          - name: amdgpu_vulkan
+            config-file: onnx_models_gpu_vulkan.json
+            runs-on: nodai-amdgpu-w7900-x86-64
+
+          # NVIDIA GPU
+          # TODO(#18238): migrate to new runner cluster
     env:
       VENV_DIR: ${{ github.workspace }}/venv
+      CONFIG_FILE_PATH: tests/external/iree-test-suites/onnx_models/${{ matrix.config-file }}
     steps:
       - name: Checking out IREE repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -158,7 +173,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: iree-org/iree-test-suites
-          ref: 8e6af9e75d874ef8c9f8ff55f12cb38157dd55eb
+          ref: 56509666d185cdb99aafb4ed4d8532b8f3c54fa3
           path: iree-test-suites
       - name: Install ONNX models test suite requirements
         run: |
@@ -170,6 +185,6 @@ jobs:
           pytest iree-test-suites/onnx_models/ \
               -rA \
               --log-cli-level=info \
-              --override-ini=xfail_strict=false \
               --timeout=120 \
-              --durations=0
+              --durations=0 \
+              --test-config-file=${CONFIG_FILE_PATH}
