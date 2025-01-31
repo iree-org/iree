@@ -24,18 +24,17 @@ PIP package name | Description
 Collectively, these packages allow for importing from frontends, compiling
 towards various targets, and executing compiled code on IREE's backends.
 
-???+ Info "Note - `iree-compiler` and `iree-runtime` are deprecated"
+???+ Info "Note - deprecated package names"
     The Python packages
     [`iree-compiler`](https://pypi.org/project/iree-compiler/) and
-    [`iree-runtime`](https://pypi.org/project/iree-runtime/) have been
-    renamed to
+    [`iree-runtime`](https://pypi.org/project/iree-runtime/) are deprecated.
+    The packages were renamed to
     [`iree-base-compiler`](https://pypi.org/project/iree-base-compiler/) and
     [`iree-base-runtime`](https://pypi.org/project/iree-base-runtime/)
-    respectively, thus effectively deprecating the old packages.
-    This name change only affects the names of the packages but not
-    the modules. To make sure the new packages are used, run
-    `pip uninstall iree-compiler iree-runtime` before installing the
-    new packages.
+    respectively.
+
+    To clean old installed packages, run
+    `pip uninstall iree-compiler iree-runtime`.
 
 ## :octicons-download-16: Prerequisites
 
@@ -109,13 +108,13 @@ page for instructions for building from source.
 
 ## Usage
 
-!!! info "Info - API reference pages"
+### :material-file-document-multiple: API reference pages
 
-    API reference pages for IREE's runtime and compiler Python APIs are hosted on
-    [readthedocs](https://iree-python-api.readthedocs.io/en/latest/).
-
-    Documentation for the MLIR compiler Python APIs can be found at
-    [https://mlir.llvm.org/docs/Bindings/Python/](https://mlir.llvm.org/docs/Bindings/Python/).
+Description | URL
+-- | --
+IREE Python APIs | <https://iree-python-api.readthedocs.io/>
+IREE Turbine APIs | <https://iree-turbine.readthedocs.io/>
+MLIR Python APIs | <https://mlir.llvm.org/docs/Bindings/Python/>
 
 ### Compile a program
 
