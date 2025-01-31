@@ -530,6 +530,28 @@ util.func public @applyAsyncTransferOp(%operand: !stream.resource<transient>, %s
 
 // -----
 
+// CHECK-LABEL: @applyAsyncTransferMultiScopeOp
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+util.func public @applyAsyncTransferMultiScopeOp(%operand: !stream.resource<transient>, %size: index) {
+  // CHECK: %[[ALLOCA:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca uninitialized on(#hal.device.affinity<@result_device>) : !stream.resource<transient>{%[[SIZE]]}
+  // CHECK: stream.cmd.execute on(#hal.device.affinity<@execution_device>) await(%[[ALLOCA_TIMEPOINT]])
+  // CHECK-SAME: with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]},
+  // CHECK-SAME:      %[[ALLOCA]] as %[[ALLOCA_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
+  %result, %result_timepoint = stream.async.execute on(#hal.device.affinity<@execution_device>) with(%operand as %capture: !stream.resource<transient>{%size}) -> !stream.resource<transient>{%size} {
+    // CHECK: stream.cmd.copy %[[OPERAND_CAPTURE]][%c0], %[[ALLOCA_CAPTURE]][%c0], %[[SIZE]]
+    // CHECK-SAME: : !stream.resource<transient>{%[[SIZE]]} -> !stream.resource<transient>{%[[SIZE]]}
+    // CHECK: stream.cmd.flush to(#hal.device.affinity<@result_device>) %[[ALLOCA_CAPTURE]][%c0 for %[[SIZE]]]
+    // CHECK-SAME: : !stream.resource<transient>{%[[SIZE]]}
+    %0 = stream.async.transfer %capture : !stream.resource<transient>{%size} from(#hal.device.affinity<@execution_device>) -> to(#hal.device.affinity<@result_device>) !stream.resource<transient>{%size}
+    stream.yield %0 : !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  // CHECK: util.optimization_barrier %[[ALLOCA]]
+  util.optimization_barrier %result : !stream.resource<transient>
+  util.return
+}
+
+// -----
+
 // CHECK-LABEL: @applyAsyncDispatchOp
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[END:.+]]: index, %[[LENGTH:.+]]: index)
 util.func public @applyAsyncDispatchOp(%operand: !stream.resource<transient>, %size: index, %offset: index, %end: index, %length: index) {

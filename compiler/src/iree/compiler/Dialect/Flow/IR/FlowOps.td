@@ -1507,8 +1507,9 @@ def FLOW_TensorBarrierOp : FLOW_PureOp<"tensor.barrier", [
   DeclareOpInterfaceMethods<Util_HoistableOpInterface>,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{}];
+  let summary = [{indicates a value that must have a specific affinity}];
   let description = [{
+    DO NOT SUBMIT
   }];
 
   let arguments = (ins
