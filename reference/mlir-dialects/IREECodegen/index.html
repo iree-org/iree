@@ -1664,9 +1664,42 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_codegennull_pointer-codegennullpointerop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_codegen.null_pointer (Codegen::NullPointerOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_codegenquery_tile_sizes-codegenquerytilesizesop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_codegen.query_tile_sizes (Codegen::QueryTileSizesOp)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#types" class="md-nav__link">
+    <span class="md-ellipsis">
+      Types
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nullpointertype" class="md-nav__link">
+    <span class="md-ellipsis">
+      NullPointerType
     </span>
   </a>
   
@@ -3716,9 +3749,42 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_codegennull_pointer-codegennullpointerop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_codegen.null_pointer (Codegen::NullPointerOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_codegenquery_tile_sizes-codegenquerytilesizesop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_codegen.query_tile_sizes (Codegen::QueryTileSizesOp)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#types" class="md-nav__link">
+    <span class="md-ellipsis">
+      Types
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nullpointertype" class="md-nav__link">
+    <span class="md-ellipsis">
+      NullPointerType
     </span>
   </a>
   
@@ -3771,7 +3837,12 @@ within a backend.</p>
 <li><a href="#iree_codegen-dialect">'iree_codegen' Dialect</a><ul>
 <li><a href="#operations">Operations</a><ul>
 <li><a href="#iree_codegenextract_strided_metadata-codegenextractstridedmetadataop">iree_codegen.extract_strided_metadata (Codegen::ExtractStridedMetadataOp)</a></li>
+<li><a href="#iree_codegennull_pointer-codegennullpointerop">iree_codegen.null_pointer (Codegen::NullPointerOp)</a></li>
 <li><a href="#iree_codegenquery_tile_sizes-codegenquerytilesizesop">iree_codegen.query_tile_sizes (Codegen::QueryTileSizesOp)</a></li>
+</ul>
+</li>
+<li><a href="#types">Types</a><ul>
+<li><a href="#nullpointertype">NullPointerType</a></li>
 </ul>
 </li>
 </ul>
@@ -3865,6 +3936,30 @@ This makes lowering more progressive and brings the following benefits:
 </tr>
 </tbody>
 </table>
+<h3 id="iree_codegennull_pointer-codegennullpointerop"><code>iree_codegen.null_pointer</code> (Codegen::NullPointerOp)<a class="headerlink" href="#iree_codegennull_pointer-codegennullpointerop" title="Permanent link">link</a></h3>
+<p><em>Returns a null_pointer value.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.null_pointer` attr-dict
+</code></pre></div>
+<p>This is meant to be used only as arguments to microkernels.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>Pseudo null-pointer type. Lowers to a null pointer.</td>
+</tr>
+</tbody>
+</table>
 <h3 id="iree_codegenquery_tile_sizes-codegenquerytilesizesop"><code>iree_codegen.query_tile_sizes</code> (Codegen::QueryTileSizesOp)<a class="headerlink" href="#iree_codegenquery_tile_sizes-codegenquerytilesizesop" title="Permanent link">link</a></h3>
 <p><em>Query tile sizes</em></p>
 <p>Syntax:</p>
@@ -3880,7 +3975,7 @@ This makes lowering more progressive and brings the following benefits:
 <tr><td><code>tensor_type</code></td><td>::mlir::TypeAttr</td><td>Tensor type attribute</td></tr>
 </table>
 
-<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
+<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -3895,6 +3990,11 @@ This makes lowering more progressive and brings the following benefits:
 </tr>
 </tbody>
 </table>
+<h2 id="types">Types<a class="headerlink" href="#types" title="Permanent link">link</a></h2>
+<h3 id="nullpointertype">NullPointerType<a class="headerlink" href="#nullpointertype" title="Permanent link">link</a></h3>
+<p>Pseudo null-pointer type. Lowers to a null pointer.</p>
+<p>Syntax: <code>!iree_codegen.null_pointer</code></p>
+<p>This is meant to be used only as arguments to microkernels.</p>
 
 
 

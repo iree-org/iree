@@ -5973,11 +5973,12 @@ NVIDIA GPUs.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.ukernel_config&lt;
   StringAttr,   # name
-  DictionaryAttr   # def_attrs
+  DictionaryAttr,   # def_attrs
+  int64_t   # shared_memory_bytes
 &gt;
 </code></pre></div>
 <p>An attribute that can be applied to any operation to specify that it has
-been match with a ukernel that is a legal lowering for it.</p>
+been matched with a ukernel that is a legal lowering for it.</p>
 <h5 id="parameters_18">Parameters:<a class="headerlink" href="#parameters_18" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5997,6 +5998,11 @@ been match with a ukernel that is a legal lowering for it.</p>
 <td style="text-align: center;">def_attrs</td>
 <td style="text-align: center;"><code>DictionaryAttr</code></td>
 <td></td>
+</tr>
+<tr>
+<td style="text-align: center;">shared_memory_bytes</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td>Size in bytes of shared memory workspace</td>
 </tr>
 </tbody>
 </table>
