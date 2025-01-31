@@ -249,7 +249,7 @@ struct ConvertTensorBarrierOp
     auto barrierOp = rewriter.create<IREE::Stream::AsyncBarrierOp>(
         op.getLoc(), operand.resource.getType(), operand.resource,
         operand.resourceSize,
-        /*affinity=*/operand.affinity);
+        /*affinity=*/executionAffinityAttr);
     rewriter.replaceOpWithMultiple(op, {{barrierOp, operand.resourceSize}});
     return success();
   }
