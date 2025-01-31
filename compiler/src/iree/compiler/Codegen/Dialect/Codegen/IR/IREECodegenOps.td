@@ -105,6 +105,9 @@ def IREECodegen_ExtractStridedMetadataOp : Op<IREECodegen_Dialect, "extract_stri
 def IREECodegen_NullPointerOp :
      Op<IREECodegen_Dialect, "null_pointer", [Pure]> {
   let summary = "Returns a null_pointer value.";
+  let description = [{
+    This is meant to be used only as arguments to microkernels.
+  }];
   let results = (outs NullPointer:$result);
   let assemblyFormat = "attr-dict";
 }
