@@ -176,3 +176,16 @@ func.func @ukernel_generic_test_fndef_attrs(%arg0 : memref<?xf32, strided<[1], o
 }
 //      CHECK: func.func private @test1d(memref<f32>, index, index)
 // CHECK-SAME:     hal.import.fields = ["processor_id", "processor_data"]
+
+// -----
+
+func.func @ukernel_with_null_pointer_arg() {
+  %0 = iree_codegen.null_pointer
+  iree_codegen.ukernel.generic "foo" ins(%0: !iree_codegen.null_pointer)
+  return
+}
+
+// CHECK-LABEL: func.func private @foo(!iree_codegen.null_pointer, index)
+// CHECK-DAG:   %[[NULLPTR:.+]] = iree_codegen.null_pointer
+// CHECK-DAG:   %[[ZERO:.+]] = arith.constant 0 : index
+// CHECK:      call @foo(%[[NULLPTR]], %[[ZERO]]) : (!iree_codegen.null_pointer, index) -> ()

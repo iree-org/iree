@@ -7,11 +7,15 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.cpp.inc"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/IR/DialectImplementation.h"
+
+// clang-format off
+#define GET_TYPEDEF_CLASSES
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.cpp.inc" // IWYU pragma: export
+// clang-format on
 
 namespace mlir::iree_compiler::IREE::Codegen {
 
@@ -44,6 +48,8 @@ void IREECodegenDialect::initialize() {
 #define GET_OP_LIST
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.cpp.inc"
       >();
+
+  addTypes<IREE::Codegen::NullPointerType>();
 }
 
 LogicalResult

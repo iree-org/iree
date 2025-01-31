@@ -18,6 +18,7 @@ iree_cc_library(
     "IREECodegenDialect.h"
     "IREECodegenInterfaces.h"
     "IREECodegenOps.h"
+    "IREECodegenTypes.h"
     "UKernelOps.h"
   TEXTUAL_HDRS
     "IREECodegenAttrs.cpp.inc"
@@ -28,7 +29,9 @@ iree_cc_library(
     "IREECodegenInterfaces.h.inc"
     "IREECodegenOps.cpp.inc"
     "IREECodegenOps.h.inc"
+    "IREECodegenTypes.cpp.inc"
     "IREECodegenTypes.h"
+    "IREECodegenTypes.h.inc"
     "LoweringConfigEnums.cpp.inc"
     "LoweringConfigEnums.h.inc"
     "UKernelOps.cpp.inc"
@@ -39,10 +42,12 @@ iree_cc_library(
     "IREECodegenInterfaces.cpp"
     "IREECodegenLibraryManager.cpp"
     "IREECodegenOps.cpp"
+    "IREECodegenTypes.cpp"
     "UKernelOps.cpp"
   DEPS
     ::IREECodegenDialectGen
     ::IREECodegenOpsGen
+    ::IREECodegenTypesGen
     ::LoweringConfigGen
     ::LoweringConfigInterfaceGen
     ::UKernelOpsGen
@@ -106,6 +111,16 @@ iree_tablegen_library(
     --gen-attrdef-defs IREECodegenAttrs.cpp.inc
     --gen-enum-decls LoweringConfigEnums.h.inc
     --gen-enum-defs LoweringConfigEnums.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
+    IREECodegenTypesGen
+  TD_FILE
+    "IREECodegenTypes.td"
+  OUTS
+    --gen-typedef-decls IREECodegenTypes.h.inc
+    --gen-typedef-defs IREECodegenTypes.cpp.inc
 )
 
 iree_tablegen_library(

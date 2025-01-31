@@ -19,6 +19,7 @@ exports_files([
     "IREECodegenInterfaces.td",
     "IREECodegenOps.td",
     "UKernelOps.td",
+    "IREECodegenTypes.td",
 ])
 
 iree_td_library(
@@ -29,6 +30,7 @@ iree_td_library(
             "IREECodegenDialect.td",
             "IREECodegenInterfaces.td",
             "IREECodegenOps.td",
+            "IREECodegenTypes.td",
             "UKernelOps.td",
         ],
         include = ["*.td"],
@@ -52,6 +54,7 @@ iree_compiler_cc_library(
         "IREECodegenInterfaces.cpp",
         "IREECodegenLibraryManager.cpp",
         "IREECodegenOps.cpp",
+        "IREECodegenTypes.cpp",
         "UKernelOps.cpp",
     ],
     hdrs = [
@@ -59,6 +62,7 @@ iree_compiler_cc_library(
         "IREECodegenDialect.h",
         "IREECodegenInterfaces.h",
         "IREECodegenOps.h",
+        "IREECodegenTypes.h",
         "UKernelOps.h",
     ],
     textual_hdrs = [
@@ -75,10 +79,13 @@ iree_compiler_cc_library(
         "LoweringConfigEnums.h.inc",
         "UKernelOps.cpp.inc",
         "UKernelOps.h.inc",
+        "IREECodegenTypes.cpp.inc",
+        "IREECodegenTypes.h.inc",
     ],
     deps = [
         ":IREECodegenDialectGen",
         ":IREECodegenOpsGen",
+        ":IREECodegenTypesGen",
         ":LoweringConfigGen",
         ":LoweringConfigInterfaceGen",
         ":UKernelOpsGen",
@@ -180,6 +187,26 @@ iree_gentbl_cc_library(
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "IREECodegenAttrs.td",
     deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "IREECodegenTypesGen",
+    tbl_outs = [
+        (
+            ["--gen-typedef-decls"],
+            "IREECodegenTypes.h.inc",
+        ),
+        (
+            ["--gen-typedef-defs"],
+            "IREECodegenTypes.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "IREECodegenTypes.td",
+    deps = [
+        ":td_files",
+        "//compiler/src/iree/compiler/Codegen/Interfaces:td_files",
+    ],
 )
 
 iree_gentbl_cc_library(

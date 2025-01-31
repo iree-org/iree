@@ -21,6 +21,9 @@ iree_cc_library(
     "LLVMGPUUtils.cpp"
     "PrefetchSharedMemoryCopy.cpp"
   DEPS
+    LLVMExecutionEngine
+    LLVMIRReader
+    LLVMInterpreter
     LLVMSupport
     MLIRAMDGPUDialect
     MLIRAffineDialect

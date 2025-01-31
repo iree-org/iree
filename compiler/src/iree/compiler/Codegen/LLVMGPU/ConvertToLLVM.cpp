@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -529,14 +530,30 @@ struct HALInterfaceWorkgroupOpsConverter final
   }
 };
 
+class ConvertNullPointerOp : public ConvertToLLVMPattern {
+public:
+  ConvertNullPointerOp(MLIRContext *context, LLVMTypeConverter &converter)
+      : ConvertToLLVMPattern(IREE::Codegen::NullPointerOp::getOperationName(),
+                             context, converter) {}
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<LLVM::ZeroOp>(
+        op, LLVM::LLVMPointerType::get(getContext()));
+    return success();
+  }
+};
+
 } // namespace
 
 void populateLLVMConversionPatterns(MLIRContext *context,
                                     RewritePatternSet &patterns,
                                     LLVMTypeConverter &converter) {
-  patterns
-      .insert<ConvertFunc, ConvertIREEBindingSubspanOp, ConvertIREEConstantOp>(
-          context, converter);
+  patterns.add<ConvertFunc, ConvertIREEBindingSubspanOp, ConvertIREEConstantOp,
+               ConvertNullPointerOp>(context, converter);
+  converter.addConversion([context](IREE::Codegen::NullPointerType type) {
+    return LLVM::LLVMPointerType::get(context);
+  });
 }
 
 void populateScalarizeMathOps(RewritePatternSet &patterns) {
