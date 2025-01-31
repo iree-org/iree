@@ -2509,6 +2509,16 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#iree-test-suites" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree-test-suites
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="iree-test-suites">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#linalg-operator-tests" class="md-nav__link">
     <span class="md-ellipsis">
       linalg operator tests
@@ -2524,13 +2534,21 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="ONNX operator tests">
-      <ul class="md-nav__list">
+</li>
         
           <li class="md-nav__item">
-  <a href="#updating-config-files" class="md-nav__link">
+  <a href="#onnx-model-tests" class="md-nav__link">
     <span class="md-ellipsis">
-      Updating config files
+      ONNX model tests
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sharktank-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      sharktank tests
     </span>
   </a>
   
@@ -2542,9 +2560,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#onnx-model-tests" class="md-nav__link">
+  <a href="#shark-testsuite" class="md-nav__link">
     <span class="md-ellipsis">
-      ONNX model tests
+      SHARK-TestSuite
     </span>
   </a>
   
@@ -4048,6 +4066,16 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#iree-test-suites" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree-test-suites
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="iree-test-suites">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#linalg-operator-tests" class="md-nav__link">
     <span class="md-ellipsis">
       linalg operator tests
@@ -4063,13 +4091,21 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="ONNX operator tests">
-      <ul class="md-nav__list">
+</li>
         
           <li class="md-nav__item">
-  <a href="#updating-config-files" class="md-nav__link">
+  <a href="#onnx-model-tests" class="md-nav__link">
     <span class="md-ellipsis">
-      Updating config files
+      ONNX model tests
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sharktank-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      sharktank tests
     </span>
   </a>
   
@@ -4081,9 +4117,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#onnx-model-tests" class="md-nav__link">
+  <a href="#shark-testsuite" class="md-nav__link">
     <span class="md-ellipsis">
-      ONNX model tests
+      SHARK-TestSuite
     </span>
   </a>
   
@@ -4448,6 +4484,7 @@ our <code>CMakeLists.txt</code> file by
 and platform detection, such as <code>iree_static_linker_test</code>. Those targets are
 not supported by Bazel rules at this point.</p>
 <h2 id="external-test-suites">External test suites<a class="headerlink" href="#external-test-suites" title="Permanent link">link</a></h2>
+<h3 id="iree-test-suites">iree-test-suites<a class="headerlink" href="#iree-test-suites" title="Permanent link">link</a></h3>
 <p>Multiple test suites are under development in the
 <a href="https://github.com/iree-org/iree-test-suites">iree-org/iree-test-suites</a>
 repository.</p>
@@ -4459,11 +4496,7 @@ repository.</p>
 <li>Keeping tests out of tree forces them to use public project APIs and allows
   the core project to keep its infrastructure simpler.</li>
 </ul>
-<p>The <a href="https://github.com/nod-ai/SHARK-TestSuite">nod-ai/SHARK-TestSuite</a>
-repository also contains tests for many machine learning models. Some of these
-tests are planned to be migrated into
-<a href="https://github.com/iree-org/iree-test-suites">iree-org/iree-test-suites</a>.</p>
-<h3 id="linalg-operator-tests">linalg operator tests<a class="headerlink" href="#linalg-operator-tests" title="Permanent link">link</a></h3>
+<h4 id="linalg-operator-tests">linalg operator tests<a class="headerlink" href="#linalg-operator-tests" title="Permanent link">link</a></h4>
 <p>Tests for operators in the MLIR linalg dialect like <code>matmul</code>, and <code>convolution</code>
 are being migrated from folders like
 <a href="https://github.com/iree-org/iree/tree/main/tests/e2e/matmul"><code>tests/e2e/matmul/</code></a>
@@ -4473,7 +4506,7 @@ in the
 in the
 <a href="https://github.com/iree-org/iree-test-suites">iree-org/iree-test-suites</a>
 repository.</p>
-<h3 id="onnx-operator-tests">ONNX operator tests<a class="headerlink" href="#onnx-operator-tests" title="Permanent link">link</a></h3>
+<h4 id="onnx-operator-tests"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M23.033 11.296c-.05 0-.101 0-.151.013L18.86 3.87a.968.968 0 0 0-1.558-1.118L9.286 1.156a.97.97 0 0 0-.968-.854.976.976 0 0 0-.967.967.93.93 0 0 0 .113.453L1.219 10.68a.8.8 0 0 0-.251-.038.968.968 0 0 0 0 1.935h.037l3.368 8.33a1.1 1.1 0 0 0-.088.403.968.968 0 0 0 1.671.666l10.115.993c.1.427.49.728.943.728.54 0 .967-.44.967-.967a1 1 0 0 0-.226-.628l5.114-8.872c.05.013.1.013.164.013.54 0 .967-.44.967-.968a.97.97 0 0 0-.967-.98zm-5.806-7.275a1 1 0 0 0 .453.327L16.147 15.92c-.1.025-.189.05-.277.1L7.451 8.708a.8.8 0 0 0 .038-.251c0-.063-.013-.126-.013-.189zm4.876 8.507-5.177 3.556a1 1 0 0 0-.126-.075l1.546-11.674h.012l3.946 7.288a.96.96 0 0 0-.201.905zM6.383 7.502a.98.98 0 0 0-.83.955v.062l-3.455 2.048 5.378-7.702zm.352 1.91a.9.9 0 0 0 .352-.164l8.356 7.263a1.1 1.1 0 0 0-.063.352v.05l-9.31 3.845a.97.97 0 0 0-.604-.402zm8.896 8.117a.92.92 0 0 0 .503.289l.465 4.046a1.05 1.05 0 0 0-.452.452l-9.814-.955zm1.144.213a.96.96 0 0 0 .54-.867.9.9 0 0 0-.038-.25l4.738-3.255-4.8 8.33zm.251-14.35-9.889 4.31-.113-.075 1.257-5.39h.037c.34 0 .641-.176.817-.44l7.891 1.57zM1.935 11.612c0-.063-.013-.126-.013-.189l3.908-2.3c.076.076.164.151.264.202L4.825 20.243l-3.204-7.904c.188-.176.314-.44.314-.728"/></svg></span> ONNX operator tests<a class="headerlink" href="#onnx-operator-tests" title="Permanent link">link</a></h4>
 <p>Tests for individual ONNX operators are included at
 <a href="https://github.com/iree-org/iree-test-suites/tree/main/onnx_ops"><code>onnx_ops/</code></a>
 in the
@@ -4483,7 +4516,7 @@ repository. These tests are generated from the upstream tests at
 in the <a href="https://github.com/onnx/onnx">onnxx/onnx</a> repository.</p>
 <p>Testing ONNX programs follows several stages:</p>
 <pre class="mermaid"><code>graph LR
-  Import -. "&lt;br&gt;(offline)" .-&gt; Compile
+  Import -. "(offline)" .-&gt; Compile
   Compile --&gt; Run</code></pre>
 <p>This particular test suite treats importing as an offline step and contains
 test cases organized into folders of programs, inputs, and expected outputs:</p>
@@ -4503,8 +4536,9 @@ iree-run-module<span class="w"> </span>--module<span class="o">=</span>model.vmf
 <p>To run slices of the test suite, a <a href="https://docs.pytest.org/en/stable/">pytest</a>
 runner is included that can be configured using JSON files. The JSON files
 tested in the IREE repo itself are stored in
-<a href="https://github.com/iree-org/iree/tree/main/tests/external/iree-test-suites/onnx_ops"><code>tests/external/iree-test-suites/onnx_ops/</code></a>.</p>
-<p>For example, here is part of a config file for running ONNX tests on CPU:</p>
+<a href="https://github.com/iree-org/iree/tree/main/tests/external/iree-test-suites/onnx_ops"><code>tests/external/iree-test-suites/onnx_ops/</code></a>.
+For example, here is part of a config file for running ONNX operator tests on
+CPU:</p>
 <!-- markdownlint-disable-next-line -->
 <div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">tests/external/iree-test-suites/onnx_ops/onnx_ops_cpu_llvm_sync.json</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 1</span>
 <span class="normal"> 2</span>
@@ -4546,7 +4580,7 @@ tested in the IREE repo itself are stored in
 <span class="w">  </span><span class="nt">&quot;expected_compile_failures&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_affine_grid_2d&quot;</span><span class="p">,</span>
 </code></pre></div></td></tr></table></div>
-<h4 id="updating-config-files">Updating config files<a class="headerlink" href="#updating-config-files" title="Permanent link">link</a></h4>
+<h5 id="updating-config-files">Updating config files<a class="headerlink" href="#updating-config-files" title="Permanent link">link</a></h5>
 <p>If the ONNX operator tests fail on a GitHub Actions workflow, check the logs
 for the nature of the failure. Often, a test is <em>newly passing</em>, with logs
 like this:</p>
@@ -4559,13 +4593,77 @@ _ IREE compile and run: test_mod_uint64::model.mlir::model.mlir::cpu_llvm_sync _
 "Artifact", which can be downloaded from the action run summary page and then
 committed:</p>
 <p><img alt="image" src="https://github.com/user-attachments/assets/b5dbdcb4-4c0a-4ff2-adc6-9021614179b2" /></p>
-<h3 id="onnx-model-tests">ONNX model tests<a class="headerlink" href="#onnx-model-tests" title="Permanent link">link</a></h3>
+<h4 id="onnx-model-tests"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M23.033 11.296c-.05 0-.101 0-.151.013L18.86 3.87a.968.968 0 0 0-1.558-1.118L9.286 1.156a.97.97 0 0 0-.968-.854.976.976 0 0 0-.967.967.93.93 0 0 0 .113.453L1.219 10.68a.8.8 0 0 0-.251-.038.968.968 0 0 0 0 1.935h.037l3.368 8.33a1.1 1.1 0 0 0-.088.403.968.968 0 0 0 1.671.666l10.115.993c.1.427.49.728.943.728.54 0 .967-.44.967-.967a1 1 0 0 0-.226-.628l5.114-8.872c.05.013.1.013.164.013.54 0 .967-.44.967-.968a.97.97 0 0 0-.967-.98zm-5.806-7.275a1 1 0 0 0 .453.327L16.147 15.92c-.1.025-.189.05-.277.1L7.451 8.708a.8.8 0 0 0 .038-.251c0-.063-.013-.126-.013-.189zm4.876 8.507-5.177 3.556a1 1 0 0 0-.126-.075l1.546-11.674h.012l3.946 7.288a.96.96 0 0 0-.201.905zM6.383 7.502a.98.98 0 0 0-.83.955v.062l-3.455 2.048 5.378-7.702zm.352 1.91a.9.9 0 0 0 .352-.164l8.356 7.263a1.1 1.1 0 0 0-.063.352v.05l-9.31 3.845a.97.97 0 0 0-.604-.402zm8.896 8.117a.92.92 0 0 0 .503.289l.465 4.046a1.05 1.05 0 0 0-.452.452l-9.814-.955zm1.144.213a.96.96 0 0 0 .54-.867.9.9 0 0 0-.038-.25l4.738-3.255-4.8 8.33zm.251-14.35-9.889 4.31-.113-.075 1.257-5.39h.037c.34 0 .641-.176.817-.44l7.891 1.57zM1.935 11.612c0-.063-.013-.126-.013-.189l3.908-2.3c.076.076.164.151.264.202L4.825 20.243l-3.204-7.904c.188-.176.314-.44.314-.728"/></svg></span> ONNX model tests<a class="headerlink" href="#onnx-model-tests" title="Permanent link">link</a></h4>
 <p>Tests for ONNX models are included at
 <a href="https://github.com/iree-org/iree-test-suites/tree/main/onnx_models"><code>onnx_models/</code></a>
 in the
 <a href="https://github.com/iree-org/iree-test-suites">iree-org/iree-test-suites</a>
 repository. These tests use models from the upstream
 <a href="https://github.com/onnx/models">onnx/models</a> repository.</p>
+<p>Like the ONNX operator tests, the ONNX model tests use configuration files to
+control which flags are used and which tests are run. The config files tested
+in the IREE repo itself are stored in
+<a href="https://github.com/iree-org/iree/tree/main/tests/external/iree-test-suites/onnx_models"><code>tests/external/iree-test-suites/onnx_models/</code></a>.
+For example, here is part of a config file for running ONNX model tests on CPU:</p>
+<!-- markdownlint-disable-next-line -->
+<div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">tests/external/iree-test-suites/onnx_models/onnx_models_cpu_llvm_task.json</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 1</span>
+<span class="normal"> 2</span>
+<span class="normal"> 3</span>
+<span class="normal"> 4</span>
+<span class="normal"> 5</span>
+<span class="normal"> 6</span>
+<span class="normal"> 7</span>
+<span class="normal"> 8</span>
+<span class="normal"> 9</span>
+<span class="normal">10</span>
+<span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;config_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cpu_llvm_task&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;iree_compile_flags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="s2">&quot;--iree-hal-target-backends=llvm-cpu&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;--iree-llvmcpu-target-cpu=host&quot;</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;iree_run_module_flags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="s2">&quot;--device=local-task&quot;</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;tests_and_expected_outcomes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;skip&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;tests/model_zoo/validated/vision/body_analysis_models_test.py::test_models[age_gender/models/age_googlenet.onnx]&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;pass&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;tests/model_zoo/validated/vision/body_analysis_models_test.py::test_models[age_gender/models/gender_googlenet.onnx]&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;pass&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;tests/model_zoo/validated/vision/classification_models_test.py::test_models[alexnet/model/bvlcalexnet-12.onnx]&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;pass&quot;</span><span class="p">,</span>
+</code></pre></div></td></tr></table></div>
+<p>Unlike the ONNX operator tests, we do not run the full set of tests on every
+commit to <a href="https://github.com/iree-org/iree">iree-org/iree</a>. Instead, we run a
+curated list of small tests that are expected to pass in
+<a href="https://github.com/iree-org/iree">iree-org/iree</a> and then run the full set of
+tests nightly in
+<a href="https://github.com/iree-org/iree-test-suites">iree-org/iree-test-suites</a>.</p>
+<h4 id="sharktank-tests">sharktank tests<a class="headerlink" href="#sharktank-tests" title="Permanent link">link</a></h4>
+<p>Tests for small scale versions of Large Language Models (LLMs)
+and other Generative AI (GenAI) programs exported using the
+<a href="https://github.com/nod-ai/shark-ai/tree/main/sharktank">sharktank package</a>
+built as part of the <a href="https://github.com/nod-ai/shark-ai">shark-ai project</a> are
+included at
+<a href="https://github.com/iree-org/iree-test-suites/tree/main/sharktank_models"><code>sharktank_models/</code></a>
+in the
+<a href="https://github.com/iree-org/iree-test-suites">iree-org/iree-test-suites</a>
+repository.</p>
+<!-- TODO(scotttodd): document how to coordinate changes across these projects -->
+
+<h3 id="shark-testsuite">SHARK-TestSuite<a class="headerlink" href="#shark-testsuite" title="Permanent link">link</a></h3>
+<p>The <a href="https://github.com/nod-ai/SHARK-TestSuite">nod-ai/SHARK-TestSuite</a>
+repository also contains tests using IREE,
+<a href="https://github.com/llvm/torch-mlir">llvm/torch-mlir</a>, and
+<a href="https://github.com/nod-ai/shark-ai">nod-ai/shark-ai</a>.</p>
+<p>Some test coverage may overlap between SHARK-TestSuite and iree-test-suites,
+though some tests are planned to be migrated into
+<a href="https://github.com/iree-org/iree-test-suites">iree-org/iree-test-suites</a> once
+they mature and have demonstrated general utility to the upstream developer
+community.</p>
+<p>Test reports for nightly runs in SHARK-TestSuite are uploaded to
+<a href="https://github.com/nod-ai/e2eshark-reports">nod-ai/e2eshark-reports</a>.</p>
 
 
 
