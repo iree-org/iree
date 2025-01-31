@@ -440,7 +440,7 @@ struct AllocationScope {
       ResourceRange aliasRange = resourceRange;
       if (auto subviewOp =
               IREE::Stream::ResourceSubviewOp::findSubviewOp(alias)) {
-        aliasRange.resourceSize = subviewOp.getSubrangeResource();
+        aliasRange.resource = subviewOp.getSubrangeResource();
         aliasRange.resourceSize = subviewOp.getSubrangeResourceSize();
         aliasRange.offset = subviewOp.getSubrangeOffset();
         aliasRange.length = subviewOp.getSubrangeLength();
