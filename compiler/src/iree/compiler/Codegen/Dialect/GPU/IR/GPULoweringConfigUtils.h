@@ -50,6 +50,7 @@ void setBasis(MLIRContext *context, SmallVector<NamedAttribute> &attrs,
               IREE::GPU::TilingLevel level, const Basis &basis);
 
 /// Helper to retrieve/set a list of operand indices to promote.
+StringRef getPromotedOperandListAttrName();
 std::optional<SmallVector<int64_t>>
 getPromotedOperandList(LoweringConfigAttr config);
 void setPromotedOperandList(MLIRContext *context,
