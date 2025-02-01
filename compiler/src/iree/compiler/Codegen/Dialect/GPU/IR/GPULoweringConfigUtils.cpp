@@ -118,6 +118,8 @@ FailureOr<Basis> getBasis(IREE::GPU::LoweringConfigAttr config,
 
 constexpr StringLiteral kPromoteOperandsName = "promote_operands";
 
+StringRef getPromotedOperandListAttrName() { return kPromoteOperandsName; }
+
 std::optional<SmallVector<int64_t>>
 getPromotedOperandList(LoweringConfigAttr config) {
   auto array = config.getAttributes().getAs<ArrayAttr>(kPromoteOperandsName);
