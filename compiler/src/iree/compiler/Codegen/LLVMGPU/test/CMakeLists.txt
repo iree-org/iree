@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "cast_address_space_function.mlir"
     "cast_type_to_fit_mma.mlir"
     "config_custom_op.mlir"
+    "config_horizontally_fused_ops.mlir"
     "config_matvec.mlir"
     "config_root_op_attribute.mlir"
     "config_winograd.mlir"
