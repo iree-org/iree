@@ -981,6 +981,203 @@ static Operation *getOpWithAttr(Operation *root, StringRef attr) {
   return result;
 }
 
+//===---------------------------------------------------------------------===//
+// Decompose horizontally fused gemm operations
+// TODO: Eventually drop this if we end up creating an operation for the
+// horizontally fused contractions.
+//===---------------------------------------------------------------------===//
+
+static LogicalResult captureUsedOperationsAndBlockArguements(
+    linalg::LinalgOp linalgOp, SetVector<int64_t> &usedInputs,
+    SetVector<Operation *> &usedOperations, int64_t resultNumber) {
+  BackwardSliceOptions options;
+  options.inclusive = true;
+  options.filter = [&](Operation *op) -> bool {
+    return op->getBlock() == linalgOp.getBlock();
+  };
+
+  auto yieldOp = cast<linalg::YieldOp>(linalgOp.getBlock()->getTerminator());
+  Value result = yieldOp.getOperand(resultNumber);
+
+  getBackwardSlice(result, &usedOperations, options);
+
+  // Get all block arguments used by the operations. If any of the arguments
+  // used is a dpsInit argument other than resultNumber, return failure.
+  for (Operation *op : usedOperations) {
+    for (Value operand : op->getOperands()) {
+      if (auto blockArg = dyn_cast<BlockArgument>(operand)) {
+        if (blockArg.getOwner() != linalgOp.getBlock()) {
+          continue;
+        }
+
+        int64_t argNumber = blockArg.getArgNumber();
+        if (argNumber >= linalgOp.getNumDpsInputs() &&
+            argNumber - linalgOp.getNumDpsInputs() != resultNumber) {
+          return failure();
+        }
+
+        if (argNumber < linalgOp.getNumDpsInputs()) {
+          usedInputs.insert(argNumber);
+        }
+      }
+    }
+  }
+
+  return success();
+}
+
+static IREE::GPU::LoweringConfigAttr
+getModifiedLoweringConfigForDecomposedGemmOp(
+    RewriterBase &rewriter, IREE::GPU::LoweringConfigAttr origAttr,
+    ArrayRef<unsigned> keptOperands) {
+  std::optional<SmallVector<int64_t>> promotedOperandsList =
+      IREE::GPU::getPromotedOperandList(origAttr);
+  if (!promotedOperandsList) {
+    return origAttr;
+  }
+
+  llvm::SmallDenseSet<int64_t> promotedOperandsSet(
+      promotedOperandsList->begin(), promotedOperandsList->end());
+  SmallVector<NamedAttribute> attrs;
+  auto promotedOperandsListName = IREE::GPU::getPromotedOperandListAttrName();
+  for (auto origAttr : origAttr.getAttributes().getValue()) {
+    if (origAttr.getName().getValue() != promotedOperandsListName) {
+      attrs.push_back(origAttr);
+      continue;
+    }
+    SmallVector<int64_t> newPromotedOperands;
+    for (auto [index, origOperandNum] : llvm::enumerate(keptOperands)) {
+      if (promotedOperandsSet.contains(origOperandNum)) {
+        newPromotedOperands.push_back(index);
+      }
+    }
+
+    attrs.emplace_back(
+        NamedAttribute{promotedOperandsListName,
+                       rewriter.getI64ArrayAttr(newPromotedOperands)});
+  }
+
+  return IREE::GPU::LoweringConfigAttr::get(rewriter.getContext(),
+                                            rewriter.getDictionaryAttr(attrs));
+}
+
+static LogicalResult
+decomposeHorizontallyFusedGemmOperations(RewriterBase &rewriter,
+                                         linalg::LinalgOp linalgOp) {
+  assert(isaHorizontallyFusedContraction(linalgOp) &&
+         "expected op that is a horizontally fused contraction");
+
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(linalgOp);
+  // Create num_results linalg.generics, each producing a single result (and
+  // relying on canonicalizations to simplify).
+  for (int64_t resultNumber : llvm::seq<int64_t>(linalgOp->getNumResults())) {
+    rewriter.setInsertionPoint(linalgOp);
+
+    auto yieldOp = cast<linalg::YieldOp>(linalgOp.getBlock()->getTerminator());
+    Value result = yieldOp.getOperand(resultNumber);
+
+    // Get all operations required to produce this result.
+    SetVector<Operation *> usedOperations;
+    SetVector<int64_t> usedInputs;
+    if (failed(captureUsedOperationsAndBlockArguements(
+            linalgOp, usedInputs, usedOperations, resultNumber))) {
+      return failure();
+    }
+
+    // Create a new linalg.generic operation for this result.
+    SmallVector<OpOperand *> inputs = llvm::map_to_vector(
+        usedInputs, [&](int64_t x) { return linalgOp.getDpsInputOperand(x); });
+    SmallVector<OpOperand *> inits = {linalgOp.getDpsInitOperand(resultNumber)};
+
+    SmallVector<AffineMap> indexingMaps =
+        llvm::map_to_vector(usedInputs, [&](int64_t x) {
+          return linalgOp.getIndexingMapsArray()[x];
+        });
+    indexingMaps.push_back(linalgOp.getIndexingMapMatchingResult(
+        linalgOp->getOpResult(resultNumber)));
+    llvm::SmallBitVector unusedDims = getUnusedDimsBitVector(indexingMaps);
+    indexingMaps = compressUnusedDims(indexingMaps);
+
+    SmallVector<utils::IteratorType> iteratorTypes;
+    for (int64_t i : llvm::seq<int64_t>(linalgOp.getNumLoops())) {
+      if (!unusedDims.test(i)) {
+        iteratorTypes.push_back(linalgOp.getIteratorTypesArray()[i]);
+      }
+    }
+
+    SmallVector<Value> inputVals = llvm::map_to_vector(
+        inputs, [](OpOperand *operand) { return operand->get(); });
+    SmallVector<Value> initVals = llvm::map_to_vector(
+        inits, [](OpOperand *operand) { return operand->get(); });
+    auto newOp = rewriter.create<linalg::GenericOp>(
+        linalgOp.getLoc(), TypeRange{inits[0]->get().getType()}, inputVals,
+        initVals, indexingMaps, iteratorTypes,
+        [&](OpBuilder &b, Location loc, ValueRange blockArgs) {
+          Block *oldBody = linalgOp.getBlock();
+          usedInputs.insert(resultNumber + linalgOp.getNumDpsInputs());
+
+          IRMapping regionMapping;
+
+          for (auto [oldBlockArgNum, newBlockArg] :
+               llvm::zip_equal(usedInputs, blockArgs)) {
+            regionMapping.map(oldBody->getArgument(oldBlockArgNum),
+                              newBlockArg);
+          }
+
+          for (Operation *usedOperation : usedOperations) {
+            b.clone(*usedOperation, regionMapping);
+          }
+
+          b.create<linalg::YieldOp>(loc, regionMapping.lookup(result));
+        });
+
+    if (unusedDims.none()) {
+      DictionaryAttr origDictAttr = linalgOp->getDiscardableAttrDictionary();
+      auto loweringConfigAttr = dyn_cast_or_null<IREE::GPU::LoweringConfigAttr>(
+          origDictAttr.get(IREE::GPU::LoweringConfigAttr::getMnemonic()));
+      DictionaryAttr newDictAttr;
+      if (loweringConfigAttr &&
+          loweringConfigAttr.getAttributes().get(
+              IREE::GPU::getPromotedOperandListAttrName())) {
+        SmallVector<NamedAttribute> newAttrList;
+        for (auto origAttr : origDictAttr.getValue()) {
+          if (origAttr.getName() !=
+              IREE::GPU::LoweringConfigAttr::getMnemonic()) {
+            newAttrList.push_back(origAttr);
+            continue;
+          }
+          SmallVector<unsigned> operandNums =
+              llvm::map_to_vector(inputs, [](OpOperand *operand) {
+                return operand->getOperandNumber();
+              });
+          auto range = llvm::map_range(inits, [](OpOperand *operand) {
+            return operand->getOperandNumber();
+          });
+          operandNums.append(range.begin(), range.end());
+          auto origGPUAttr =
+              cast<IREE::GPU::LoweringConfigAttr>(origAttr.getValue());
+          IREE::GPU::LoweringConfigAttr newGPUAttr =
+              getModifiedLoweringConfigForDecomposedGemmOp(
+                  rewriter, origGPUAttr, operandNums);
+          newAttrList.emplace_back(
+              NamedAttribute{origAttr.getName(), newGPUAttr});
+        }
+        newDictAttr = DictionaryAttr::get(rewriter.getContext(), newAttrList);
+      } else {
+        newDictAttr = origDictAttr;
+      }
+      newOp->setDiscardableAttrs(newDictAttr);
+    }
+
+    rewriter.replaceAllUsesWith(linalgOp->getResult(resultNumber),
+                                newOp.getResult(0));
+  }
+
+  rewriter.eraseOp(linalgOp);
+  return success();
+}
+
 struct LLVMGPUConfigureTensorLayoutsPass final
     : impl::LLVMGPUConfigureTensorLayoutsPassBase<
           LLVMGPUConfigureTensorLayoutsPass> {
@@ -993,6 +1190,19 @@ struct LLVMGPUConfigureTensorLayoutsPass final
   void runOnOperation() override {
     FunctionOpInterface func = getOperation();
     IRRewriter rewriter(func);
+
+    SmallVector<linalg::LinalgOp> horizontallyFusedOps;
+    func.walk([&](linalg::LinalgOp linalgOp) {
+      if (isaHorizontallyFusedContraction(linalgOp)) {
+        horizontallyFusedOps.push_back(linalgOp);
+      }
+    });
+    for (auto linalgOp : llvm::make_early_inc_range(horizontallyFusedOps)) {
+      if (failed(
+              decomposeHorizontallyFusedGemmOperations(rewriter, linalgOp))) {
+        return signalPassFailure();
+      }
+    }
 
     std::optional<SmallVector<int64_t>> maybeWorkgroupSize =
         getWorkgroupSize(func);
