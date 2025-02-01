@@ -1828,9 +1828,9 @@ LogicalResult TensorSplatOp::verify() {
 
 LogicalResult TensorCloneOp::verify() {
   if (failed(verifyOpDynamicDims(getOperation(), {getOperand()},
-                                 getArgumentDims())) ||
+                                 getOperandDims())) ||
       failed(verifyOpDynamicDims(getOperation(), {getResult()},
-                                 getArgumentDims()))) {
+                                 getOperandDims()))) {
     return failure();
   }
   return success();
@@ -1840,7 +1840,30 @@ LogicalResult TensorCloneOp::verify() {
 // flow.tensor.barrier
 //===----------------------------------------------------------------------===//
 
-LogicalResult TensorBarrierOp::verify() { return success(); }
+LogicalResult TensorBarrierOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {getOperand()},
+                                 getOperandDims()))) {
+    return failure();
+  }
+  return success();
+}
+
+Value TensorBarrierOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getOperand());
+}
+
+Value TensorBarrierOp::getTiedResultOperand(Value result) {
+  return getOperand();
+}
+
+::std::optional<unsigned>
+TensorBarrierOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // operand
+}
+
+SmallVector<int64_t> TensorBarrierOp::getTiedResultOperandIndices() {
+  return {0}; // operand
+}
 
 //===----------------------------------------------------------------------===//
 // flow.tensor.transfer
@@ -1848,9 +1871,9 @@ LogicalResult TensorBarrierOp::verify() { return success(); }
 
 LogicalResult TensorTransferOp::verify() {
   if (failed(verifyOpDynamicDims(getOperation(), {getOperand()},
-                                 getArgumentDims())) ||
+                                 getOperandDims())) ||
       failed(verifyOpDynamicDims(getOperation(), {getResult()},
-                                 getArgumentDims()))) {
+                                 getOperandDims()))) {
     return failure();
   }
   return success();

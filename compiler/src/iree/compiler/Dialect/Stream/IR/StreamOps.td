@@ -2306,10 +2306,10 @@ def Stream_AsyncBarrierOp : Stream_Op<"async.barrier", [
 ]> {
   let summary = [{indicates a value that must have a specific affinity}];
   let description = [{
-    DO NOT SUBMIT
-    tie to force in-place
-    do operand and result need same affinity?
-    no execution, so what does it mean?
+    Prevents fusion and scheduling of a value across an affinity boundary.
+    May introduce copy-on-write behavior if the operand value is used as well as
+    the result and users should try to keep the operand to a single use by this
+    op.
   }];
 
   let arguments = (ins

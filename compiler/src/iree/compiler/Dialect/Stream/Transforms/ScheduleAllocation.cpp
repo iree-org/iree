@@ -1349,6 +1349,28 @@ static Value findTiedYieldResult(Value seedValue) {
   return {};
 }
 
+// Walks up the use-def chain to find an affinity the given local value is
+// pinned to. May return nullptr if there's no assigned affinity and the
+// enclosing execution region affinity should be used.
+//
+// TODO(benvanik): change this to use an affinity analysis on the escaping
+// value instead. The local value may not have a transfer associated with it.
+static IREE::Stream::AffinityAttr findLocalValueAffinity(Value value) {
+  while (value) {
+    if (auto transferOp = dyn_cast_if_present<IREE::Stream::AsyncTransferOp>(
+            value.getDefiningOp())) {
+      return transferOp.getResultAffinityAttr();
+    } else if (auto tiedOp =
+                   llvm::dyn_cast_or_null<IREE::Util::TiedOpInterface>(
+                       value.getDefiningOp())) {
+      value = tiedOp.getTiedResultOperand(value);
+    } else {
+      break;
+    }
+  }
+  return {};
+}
+
 // Returns a reversed list of subrange operations that lead from an initial
 // resource down a sequence to |derivedValue|. The first element in the list
 // will be the last subview of |derivedValue| and the last element will be the
@@ -1639,15 +1661,10 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
       continue;
     }
 
-    // DO NOT SUBMIT
-    // have to get consumer affinity
-    // may be able to get from a transfer
-    // could check allocation compatibility with execute op and place there
-    IREE::Stream::AffinityAttr allocationAffinity;
-    if (auto transferOp = dyn_cast_if_present<IREE::Stream::AsyncTransferOp>(
-            yieldValue.getDefiningOp())) {
-      allocationAffinity = transferOp.getResultAffinityAttr();
-    } else {
+    // Find a pinned affinity for the value or inherit the execution region
+    // affinity.
+    auto allocationAffinity = findLocalValueAffinity(yieldValue);
+    if (!allocationAffinity) {
       allocationAffinity = executeOp.getAffinityAttr();
     }
 
