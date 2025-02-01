@@ -15,12 +15,14 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -1251,6 +1253,198 @@ LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
   }
 
   return success();
+}
+
+//===---------------------------------------------------------------------===//
+// Copied over from implementation of `isaContractionInterfaceImpl` in Linalg
+//===---------------------------------------------------------------------===//
+
+/// If the value is defined by a chain of unary side effect-free, go up the
+/// use-def chain until the first value that isn't defined by such an op.
+// TODO: relax to multi-operands with constants, which are technically unary ops
+// as needed (e.g. add5).
+static Value getSourceSkipUnary(Value value) {
+  Operation *op = value.getDefiningOp();
+  while (op && op->getNumOperands() == 1) {
+    auto iface = dyn_cast<MemoryEffectOpInterface>(op);
+    if (!iface || !iface.hasNoEffect())
+      break;
+    value = op->getOperand(0);
+    op = value.getDefiningOp();
+  }
+  return value;
+}
+
+struct ContractionOpSequenceArgs {
+  std::pair<BlockArgument, BlockArgument> operands;
+  BlockArgument accumulator;
+};
+static std::optional<ContractionOpSequenceArgs>
+isContractionOpSequence(Value yielded,
+                        function_ref<bool(Operation *, Operation *)> isaPair) {
+  Operation *reductionOp = yielded.getDefiningOp();
+  if (reductionOp->getNumResults() != 1 || reductionOp->getNumOperands() != 2) {
+    return std::nullopt;
+  }
+
+  Value reductionLHS = getSourceSkipUnary(reductionOp->getOperand(0));
+  Value reductionRHS = getSourceSkipUnary(reductionOp->getOperand(1));
+
+  BlockArgument updated = dyn_cast<BlockArgument>(reductionRHS);
+  Value contributed = reductionLHS;
+  if (!updated) {
+    updated = dyn_cast<BlockArgument>(reductionLHS);
+    if (!updated) {
+      return std::nullopt;
+    }
+    contributed = reductionRHS;
+  }
+  contributed = getSourceSkipUnary(contributed);
+
+  Operation *elementwiseOp = contributed.getDefiningOp();
+  if (!elementwiseOp || elementwiseOp->getNumResults() != 1 ||
+      elementwiseOp->getNumOperands() != 2) {
+    return std::nullopt;
+  }
+
+  if (!isaPair(elementwiseOp, reductionOp)) {
+    return std::nullopt;
+  }
+
+  auto elementwiseLHS = dyn_cast_or_null<BlockArgument>(
+      getSourceSkipUnary(elementwiseOp->getOperand(0)));
+  auto elementwiseRHS = dyn_cast_or_null<BlockArgument>(
+      getSourceSkipUnary(elementwiseOp->getOperand(1)));
+  if (!elementwiseLHS || !elementwiseRHS) {
+    return std::nullopt;
+  }
+
+  return ContractionOpSequenceArgs{{elementwiseLHS, elementwiseRHS}, updated};
+}
+
+/// Returns true if the two operations are of the kinds specified by a pair of
+/// consecutive template arguments.
+template <typename AddOpTy, typename MulOpTy, typename... Args>
+static bool isPairTemplateImpl(Operation *add, Operation *mul) {
+  static_assert(sizeof...(Args) % 2 == 0,
+                "expected an even number of template arguments");
+  if (isa<AddOpTy>(add) && isa<MulOpTy>(mul))
+    return true;
+
+  if constexpr (sizeof...(Args) > 0)
+    return isPairTemplateImpl<Args...>(add, mul);
+  else
+    return false;
+}
+
+/// Returns true if the block is a body of a contraction with the kinds of
+/// operations given pairwise by template arguments.
+template <typename... Args>
+static std::optional<ContractionOpSequenceArgs>
+isContractionOpSequence(Value yielded) {
+  return isContractionOpSequence(yielded, &isPairTemplateImpl<Args...>);
+}
+
+/// Recognize an operation that is horizontally fused contraction.
+/// TODO: The logic below is quite convoluted. Might be better
+/// off having a dedicated operation for this.
+bool isaHorizontallyFusedContraction(linalg::LinalgOp linalgOp) {
+  if (linalgOp->getNumResults() == 1) {
+    return false;
+  }
+  // Check that the number of `ins` is one more than the number of results.
+  if (linalgOp.getNumDpsInputs() != linalgOp->getNumResults() + 1) {
+    return false;
+  }
+  SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
+  if (!llvm::all_of(indexingMaps, [](AffineMap m) {
+        return m.isProjectedPermutation() && !m.isPermutation();
+      })) {
+    return false;
+  }
+  // Check all the rhs indexing maps, those between [1, numDpsInputs) are equal.
+  if (!llvm::all_of(ArrayRef<AffineMap>(indexingMaps)
+                        .take_front(linalgOp.getNumDpsInputs())
+                        .drop_front(2),
+                    [&](AffineMap m) { return m == indexingMaps[1]; })) {
+    return false;
+  }
+  // Check all the outs indexing maps, those between [numDpsInputs, numDpsInits)
+  // are equal.
+  if (!llvm::all_of(ArrayRef<AffineMap>(indexingMaps)
+                        .take_back(linalgOp.getNumDpsInits())
+                        .drop_front(),
+                    [&](AffineMap m) {
+                      return m == indexingMaps[linalgOp.getNumDpsInputs()];
+                    })) {
+    return false;
+  }
+
+  llvm::SetVector<BlockArgument> rhsArgs;
+  llvm::SetVector<BlockArgument> outArgs;
+  for (auto yieldedVal : linalgOp.getBlock()->getTerminator()->getOperands()) {
+    std::optional<ContractionOpSequenceArgs> args =
+        isContractionOpSequence<arith::MulFOp, arith::AddFOp, arith::MulIOp,
+                                arith::AddIOp, complex::MulOp, complex::AddOp,
+                                arith::AndIOp, arith::OrIOp>(yieldedVal);
+    if (!args) {
+      return false;
+    }
+    // For now just check that the common operand is the first argument of the
+    // op, and the other operands are all inputs.
+    BlockArgument lhs = args->operands.first;
+    BlockArgument rhs = args->operands.second;
+    if (lhs == rhs) {
+      return false;
+    }
+    if (lhs.getArgNumber() != 0) {
+      if (rhs.getArgNumber() != 0) {
+        return false;
+      }
+      std::swap(lhs, rhs);
+    }
+    assert(rhs.getArgNumber() != 0 && "cannot have rhs be arg number 0");
+    if (rhs.getArgNumber() >= linalgOp.getNumDpsInputs()) {
+      return false;
+    }
+    if (args->accumulator.getArgNumber() < linalgOp.getNumDpsInputs()) {
+      return false;
+    }
+    if (!rhsArgs.insert(rhs)) {
+      return false;
+    }
+    if (!outArgs.insert(args->accumulator)) {
+      return false;
+    }
+  }
+
+  // Take one of the LHS, RHS and OUTS indexing maps and check they are valid
+  auto getResultDims = [](AffineMap m) {
+    auto r = llvm::map_range(m.getResults(), [](AffineExpr e) {
+      return cast<AffineDimExpr>(e).getPosition();
+    });
+    return llvm::SmallDenseSet<unsigned>(r.begin(), r.end());
+  };
+  llvm::SmallDenseSet<unsigned> lhsDims = getResultDims(indexingMaps[0]);
+  llvm::SmallDenseSet<unsigned> rhsDims = getResultDims(indexingMaps[1]);
+  llvm::SmallDenseSet<unsigned> outsDims =
+      getResultDims(indexingMaps[linalgOp.getNumDpsInputs()]);
+  llvm::SmallDenseSet<unsigned> mDims = lhsDims;
+  llvm::set_intersect(mDims, outsDims);
+  if (mDims.empty()) {
+    return false;
+  }
+  llvm::SmallDenseSet<unsigned> nDims = rhsDims;
+  llvm::set_intersect(nDims, outsDims);
+  if (nDims.empty()) {
+    return false;
+  }
+  llvm::SmallDenseSet<unsigned> kDims = lhsDims;
+  llvm::set_intersect(kDims, rhsDims);
+  if (kDims.empty()) {
+    return false;
+  }
+  return true;
 }
 
 //===---------------------------------------------------------------------===//

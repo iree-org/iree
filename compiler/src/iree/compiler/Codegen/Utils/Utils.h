@@ -160,6 +160,11 @@ SmallVector<Operation *> getComputeOps(Operation *containingOp);
 std::optional<LoopTilingAndDistributionInfo>
 isTiledAndDistributedLoop(scf::ForOp forOp);
 
+/// CHeck if a given operation is a horizontally fused contraction operation.
+/// The expectation is that the LHS is common, and all the operands are
+/// different RHS.
+bool isaHorizontallyFusedContraction(linalg::LinalgOp genericOp);
+
 /// Collects information about loops matching tiled+distribute pattern.
 SmallVector<LoopTilingAndDistributionInfo>
 getTiledAndDistributedLoopInfo(mlir::FunctionOpInterface funcOp);
