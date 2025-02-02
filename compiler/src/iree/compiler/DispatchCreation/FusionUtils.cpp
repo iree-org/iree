@@ -13,6 +13,7 @@
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 namespace mlir::iree_compiler::DispatchCreation {
 
@@ -120,6 +121,15 @@ LogicalResult moveOperandDefs(RewriterBase &rewriter,
   for (auto op : operations) {
     for (auto operand : op->getOperands()) {
       getBackwardSlice(operand, &slice, options);
+    }
+    auto regions = op->getRegions();
+    if (regions.empty()) {
+      continue;
+    }
+    llvm::SetVector<Value> capturedVals;
+    mlir::getUsedValuesDefinedAbove(regions, capturedVals);
+    for (auto value : capturedVals) {
+      getBackwardSlice(value, &slice, options);
     }
   }
 

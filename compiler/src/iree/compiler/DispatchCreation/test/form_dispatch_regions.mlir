@@ -1004,3 +1004,36 @@ util.func @scatter_index_producer_fusion(%arg0 : tensor<?x1xi64>,
 //  CHECK-SAME:         ins(%{{.+}}, %[[GENERIC]] :
 //       CHECK:     flow.return %[[SCATTER]]
 //       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+util.func @move_captured_from_above_ops(%arg0 : tensor<1x1x2x4xi32>,
+    %arg1 : f64, %arg2 : f64) -> tensor<2x3xi8> {
+  %empty = tensor.empty() : tensor<2x3xi32>
+  %unpack = tensor.unpack %arg0 outer_dims_perm = [0, 1]
+      inner_dims_pos = [0, 1] inner_tiles = [2, 4] into %empty : tensor<1x1x2x4xi32> -> tensor<2x3xi32>
+  %0 = arith.mulf %arg1, %arg2 : f64
+  %1 = tensor.empty() : tensor<2x3xi8>
+  %2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%unpack : tensor<2x3xi32>) outs(%1 : tensor<2x3xi8>) {
+  ^bb0(%in: i32, %out: i8):
+    %3 = arith.sitofp %in : i32 to f32
+    %4 = arith.truncf %0 : f64 to f32
+    %5 = arith.mulf %3, %4 : f32
+    %48 = arith.fptosi %5 : f32 to i8
+    linalg.yield %48 : i8
+  } -> tensor<2x3xi8>
+  util.return %2 : tensor<2x3xi8>
+}
+// CHECK-LABEL: func public @move_captured_from_above_ops
+//       CHECK:   %[[OP:.+]] = arith.mulf
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[UNPACK:.+]] = tensor.unpack
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[UNPACK]] :
+//       CHECK:       %[[TRUNCF:.+]] = arith.truncf %[[OP]]
+//       CHECK:       linalg.yield
+//       CHECK:     flow.return %[[GENERIC]]
+//       CHECK:   util.return %[[DISPATCH]]
