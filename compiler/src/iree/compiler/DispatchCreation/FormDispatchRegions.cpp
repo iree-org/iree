@@ -926,6 +926,13 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
       }
       regionOp = *newRegionOp;
     }
+    // Simplify tensor::DimOps.
+    {
+      SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
+      if (failed(IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
+        return failure();
+      }
+    }
     regionOps.push_back(regionOp);
   }
 

@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true}))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true}, canonicalize))" --split-input-file %s | FileCheck %s
 
 util.func public @pack_elementwise_fusion(%arg0 : tensor<?xf32>,
     %arg1 : tensor<?x?xf32>) -> tensor<?x?x8x32xf32> {
@@ -461,11 +461,7 @@ util.func public @data_dependent_shape(%arg0 : tensor<f32>, %arg1 : tensor<2xi32
 //      CHECK:   %[[D0:.+]] = arith.index_cast %[[D0_I32]]
 //      CHECK:   %[[D1_I32:.+]] = tensor.extract %[[ARG1]][%[[C1]]]
 //      CHECK:   %[[D1:.+]] = arith.index_cast %[[D1_I32]]
-//      CHECK:   %[[WL0:.+]] = affine.apply
-// CHECK-SAME:       %[[D0]]
-//      CHECK:   %[[WL1:.+]] = affine.apply
-// CHECK-SAME:       %[[D1]]
-//      CHECK:   flow.dispatch.region[%[[WL0]], %[[WL1]]]
+//      CHECK:   flow.dispatch.region[%[[D0]], %[[D1]]]
 //      CHECK:     count(%[[B0:.+]]: index, %[[B1:.+]]: index)
 //      CHECK:       %[[X:.+]], %[[Y:.+]], %[[Z:.+]] = flow.dispatch.workgroup_count_from_dag_root %[[B0]], %[[B1]]
 //      CHECK:       flow.return %[[X]], %[[Y]], %[[Z]]
