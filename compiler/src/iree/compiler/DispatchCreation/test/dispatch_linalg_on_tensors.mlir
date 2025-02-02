@@ -1431,9 +1431,9 @@ util.func public @multi_use_producer_fusion(%arg0 : tensor<?x8xf32>, %arg1 : ten
 //      CHECK:     %[[GENERIC:.+]] = linalg.generic
 // CHECK-SAME:         ins(%[[MATMUL]], %[[BIAS]] :
 // CHECK-SAME:         outs(%[[INIT]] :
-//  CHECK-DAG:     flow.dispatch.tensor.store %[[GENERIC]], %[[RESULT0]]
-//  CHECK-DAG:     flow.dispatch.tensor.store %[[MATMUL]], %[[RESULT1]]
-//      CHECK:   util.return %[[DISPATCH]]#1, %[[DISPATCH]]#0
+//  CHECK-DAG:     flow.dispatch.tensor.store %[[MATMUL]], %[[RESULT0]]
+//  CHECK-DAG:     flow.dispatch.tensor.store %[[GENERIC]], %[[RESULT1]]
+//      CHECK:   util.return %[[DISPATCH]]#0, %[[DISPATCH]]#1
 
 // -----
 
@@ -1535,9 +1535,9 @@ util.func public @fuse_conv2d_with_multiple_uses(%input: tensor<1x225x225x16xf32
 //  CHECK-SAME:       %[[OUT2:.+]]: !flow.dispatch.tensor<writeonly:tensor<1x112x112x32xf32>>
 //       CHECK:     %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
-//   CHECK-DAG:     flow.dispatch.tensor.store %[[GENERIC]], %[[OUT1]]
-//   CHECK-DAG:     flow.dispatch.tensor.store %[[CONV]], %[[OUT2]]
-//       CHECK:   util.return %[[DISPATCH]]#0, %[[DISPATCH]]#1
+//   CHECK-DAG:     flow.dispatch.tensor.store %[[CONV]], %[[OUT1]]
+//   CHECK-DAG:     flow.dispatch.tensor.store %[[GENERIC]], %[[OUT2]]
+//       CHECK:   util.return %[[DISPATCH]]#1, %[[DISPATCH]]#0
 
 // -----
 
