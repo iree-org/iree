@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -331,35 +332,40 @@ static bool hasCompatibleOuterParallelLoops(
 }
 
 /// For all uses of an operation, finds the use that dominates all other uses.
-static std::optional<OpOperand *>
+static SmallVector<OpOperand *>
 getFusableUse(Operation *op, DominanceInfo const &dominanceInfo,
               bool aggressiveFusion) {
   if (!aggressiveFusion && llvm::count_if(op->getUses(), [](OpOperand &use) {
                              return !isa<tensor::DimOp>(use.getOwner());
                            }) != 1) {
-    return std::nullopt;
+    return {};
   }
 
   // Collect non-dim users.
-  SmallVector<Operation *> nonDimUsers;
+  SetVector<Operation *> ignoredUsers;
   for (Operation *user : op->getUsers()) {
-    if (isa<tensor::DimOp>(user))
-      continue;
-    nonDimUsers.push_back(user);
+    if (isa<tensor::DimOp>(user)) {
+      ignoredUsers.insert(user);
+    }
   }
 
   // Find the use in a non-dim user that dominates all other non-dim users.
+  SmallVector<OpOperand *> fusableUses;
   for (auto &use : op->getUses()) {
     Operation *user = use.getOwner();
-    if (isa<tensor::DimOp>(user))
+    if (ignoredUsers.contains(user)) {
       continue;
-    if (llvm::all_of(nonDimUsers, [&](Operation *c) {
-          return dominanceInfo.dominates(user, c);
+    }
+    if (llvm::all_of(op->getUsers(), [&](Operation *otherUser) {
+          if (user == otherUser || ignoredUsers.contains(otherUser))
+            return true;
+          return dominanceInfo.dominates(user, otherUser);
         })) {
-      return &use;
+      fusableUses.push_back(&use);
+      ignoredUsers.insert(user);
     }
   }
-  return std::nullopt;
+  return fusableUses;
 }
 
 /// Returns true if the operands are fusable.
@@ -576,38 +582,30 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
   for (Operation *root : roots) {
     SmallVector<Operation *> workList;
     llvm::SmallBitVector rootOuterParallelLoops = getOuterParallelLoops(root);
+    int64_t rootNumber = getRootNumber(root);
     workList.push_back(root);
     while (!workList.empty()) {
       Operation *currRoot = workList.pop_back_val();
-      assert(hasRootOpAttribute(currRoot) &&
-             "unexpected non-root op in worklist");
 
-      // Helper function to make the consumer the root instead of the producer
-      // when they are to be fused.
-      auto updateRootTo = [&context, &currRoot](Operation *newRoot) {
-        int64_t rootNumber = getRootNumber(currRoot);
-        setRootAttribute(context, newRoot, rootNumber);
-        removeRootOpAttribute(currRoot);
-        appendToFusionGroup(currRoot, rootNumber);
-      };
-
-      std::optional<OpOperand *> fusableUse =
+      SmallVector<OpOperand *> fusableUses =
           getFusableUse(currRoot, dominanceInfo,
                         /*aggressiveFusion=*/options.aggressiveFusion);
-      if (!fusableUse)
+      if (fusableUses.empty())
         continue;
 
       // Analyse the use to see if it is fusable.
-      Operation *consumerOp = fusableUse.value()->getOwner();
-      if (hasRootOpAttribute(consumerOp) ||
-          hasFusionGroupsAttribute(consumerOp)) {
-        continue;
-      }
+      for (OpOperand *fusableUse : fusableUses) {
+        Operation *consumerOp = fusableUse->getOwner();
+        if (hasRootOpAttribute(consumerOp) ||
+            hasFusionGroupsAttribute(consumerOp)) {
+          continue;
+        }
 
-      if (isFusableWithConsumer(*(fusableUse.value()), rootOuterParallelLoops,
-                                options)) {
-        updateRootTo(consumerOp);
-        workList.push_back(consumerOp);
+        if (isFusableWithConsumer(*fusableUse, rootOuterParallelLoops,
+                                  options)) {
+          appendToFusionGroup(consumerOp, rootNumber);
+          workList.push_back(consumerOp);
+        }
       }
     }
   }
@@ -701,15 +699,15 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root, unsigned groupNum,
         continue;
       }
 
-      std::optional<OpOperand *> fusableUse =
-          getFusableUse(producer, dominanceInfo,
-                        /*aggressiveFusion=*/options.aggressiveFusion);
-      if (!fusableUse || fusableUse.value()->getOwner() != candidate)
-        continue;
-
       if (!isFusableWithProducer(operand, rootOuterParallelLoops, options)) {
         continue;
       }
+
+      SmallVector<OpOperand *> fusableUses =
+          getFusableUse(producer, dominanceInfo,
+                        /*aggressiveFusion=*/options.aggressiveFusion);
+      if (fusableUses.empty() || fusableUses.front()->getOwner() != candidate)
+        continue;
 
       appendToFusionGroup(producer, groupNum);
       worklist.push_back(producer);
@@ -814,14 +812,14 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
 static LogicalResult
 createFusionGroups(TensorDimTrackingRewriter &rewriter,
                    mlir::FunctionOpInterface funcOp,
-                   DominanceInfo const &dominanceInfo,
+                   DominanceInfo &dominanceInfo,
                    FormDispatchRegionsPassOptions const &options) {
   // Step 1: Decide fusion groups (heuristic). This marks rootOps with an
   // attribute
   unsigned numRoots =
       decideFusableLinalgOps(funcOp.getFunctionBody(), dominanceInfo, options);
   SmallVector<Operation *> roots(numRoots, nullptr);
-  DenseMap<unsigned, SmallVector<Operation *>> producers;
+  DenseMap<unsigned, SmallVector<Operation *>> fusedOperations;
 
   LLVM_DEBUG({
     llvm::dbgs() << "\n--- After deciding fusion groups ---\n";
@@ -834,11 +832,12 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
   funcOp.walk([&](Operation *op) {
     if (hasRootOpAttribute(op)) {
       roots[getRootNumber(op)] = op;
+      fusedOperations[getRootNumber(op)].push_back(op);
       removeRootOpAttribute(op);
     }
     if (hasFusionGroupsAttribute(op)) {
       assert(getFusionGroups(op).size() == 1 && "expected exactly one group");
-      producers[getFusionGroups(op).front()].push_back(op);
+      fusedOperations[getFusionGroups(op).front()].push_back(op);
       removeFusionGroupsAttribute(op);
     }
   });
@@ -846,7 +845,32 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
   // Step 2. Create a DispatchRegionOp for every fusion group.
   OpBuilder::InsertionGuard g(rewriter);
   SmallVector<IREE::Flow::DispatchRegionOp> regionOps;
-  for (const auto &it : llvm::enumerate(roots)) {
+  for (auto [rootIndex, root] : llvm::enumerate(roots)) {
+
+    // Sort producers topologically. All producers must be in the same block
+    // as the root.
+    SmallVector<Operation *> &currFusedOperations = fusedOperations[rootIndex];
+    bool sortResult = mlir::computeTopologicalSorting(currFusedOperations);
+    (void)sortResult;
+    assert(sortResult && "could not compute topological sorting");
+
+    int rootPos = 0;
+    for (auto [index, fusedOperation] : llvm::enumerate(currFusedOperations)) {
+      if (fusedOperation == root) {
+        rootPos = index;
+        break;
+      }
+    }
+    SmallVector<Operation *> producers, consumers;
+    if (rootPos > 0) {
+      producers = llvm::to_vector(
+          ArrayRef<Operation *>(currFusedOperations).take_front(rootPos));
+    }
+    if (rootPos < currFusedOperations.size() - 1) {
+      consumers = llvm::to_vector(
+          ArrayRef<Operation *>(currFusedOperations).drop_front(rootPos + 1));
+    }
+
     // Simplify tensor::DimOps.
     {
       SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
@@ -857,20 +881,14 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
 
     // Create fusion group.
     IREE::Flow::DispatchRegionOp regionOp;
-    auto maybeRegionOp =
-        IREE::Flow::wrapOpInDispatchRegion(rewriter, it.value());
-    if (failed(maybeRegionOp))
-      return failure();
+    auto maybeRegionOp = IREE::Flow::wrapOpInDispatchRegion(rewriter, root);
+    if (failed(maybeRegionOp)) {
+      return root->emitOpError("failed to move root into dispatch");
+    }
     regionOp = *maybeRegionOp;
 
-    // Sort producers topologically. All producers must be in the same block
-    // as the root.
-    bool sortResult = mlir::computeTopologicalSorting(producers[it.index()]);
-    (void)sortResult;
-    assert(sortResult && "could not compute topological sorting");
-
     // Move ops into the region.
-    for (Operation *producer : llvm::reverse(producers[it.index()])) {
+    for (Operation *producer : llvm::reverse(producers)) {
       // Simplify tensor::DimOps.
       {
         SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
@@ -881,16 +899,32 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
 
       auto newRegionOp =
           movePrecedingOpsIntoDispatchRegion(rewriter, producer, regionOp);
-      if (failed(newRegionOp))
-        return failure();
+      if (failed(newRegionOp)) {
+        return producer->emitOpError("failed to move producer into region");
+      }
       regionOp = *newRegionOp;
     }
-    // Simplify tensor::DimOps.
-    {
-      SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
-      if (failed(IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
-        return failure();
+
+    for (Operation *consumer : consumers) {
+      // Simplify tensor::DimOps.
+      {
+        SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
+        if (failed(IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
+          return failure();
+        }
       }
+
+      if (failed(moveOperandDefs(rewriter, consumer, regionOp, dominanceInfo,
+                                 regionOp.getOperation()))) {
+        continue;
+      }
+
+      auto newRegionOp = IREE::Flow::moveFollowingOpIntoDispatchRegion(
+          rewriter, consumer, regionOp);
+      if (failed(newRegionOp)) {
+        return consumer->emitOpError("failed to move consumer into region");
+      }
+      regionOp = *newRegionOp;
     }
     regionOps.push_back(regionOp);
   }
@@ -916,7 +950,7 @@ struct FormDispatchRegionsPass final
 /// Create dispatch.region Ops based on a fusion heuristic.
 void FormDispatchRegionsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
-  DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
+  DominanceInfo &dominanceInfo = getAnalysis<DominanceInfo>();
   TensorDimTrackingRewriter rewriter(funcOp);
   FormDispatchRegionsPassOptions options{aggressiveFusion, fusePadWithConsumers,
                                          fusePadWithProducers};

@@ -10,6 +10,8 @@
 #include "compiler/src/iree/compiler/DispatchCreation/FusionUtils.h"
 #include "compiler/src/iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 
 namespace mlir::iree_compiler::DispatchCreation {
@@ -95,6 +97,37 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
     }
   }
   return true;
+}
+
+LogicalResult moveOperandDefs(RewriterBase &rewriter,
+                              ArrayRef<Operation *> operations,
+                              Operation *insertionPoint,
+                              DominanceInfo &dominanceInfo,
+                              ArrayRef<Operation *> ignoreOperations) {
+  BackwardSliceOptions options;
+  llvm::DenseSet<Operation *> ignoreOperationsSet;
+  ignoreOperationsSet.insert(ignoreOperations.begin(), ignoreOperations.end());
+  options.filter = [&](Operation *op) {
+    return !dominanceInfo.properlyDominates(op, insertionPoint) &&
+           !ignoreOperationsSet.contains(op);
+  };
+  // Set inclusive to true cause the slice is computed from the operand, and
+  // we want to include the defining op (which is the point here)
+  options.omitUsesFromAbove = false;
+  options.inclusive = true;
+
+  llvm::SetVector<Operation *> slice;
+  for (auto op : operations) {
+    for (auto operand : op->getOperands()) {
+      getBackwardSlice(operand, &slice, options);
+    }
+  }
+
+  mlir::topologicalSort(slice);
+  for (auto op : slice) {
+    rewriter.moveOpBefore(op, insertionPoint);
+  }
+  return success();
 }
 
 } // namespace mlir::iree_compiler::DispatchCreation
