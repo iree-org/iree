@@ -133,4 +133,62 @@ def EncodingAttr :
   let genVerifyDecl = 0;
 }
 
+//===---------------------------------------------------------------------===//
+// Encoding specialization attributes, which are mainly for testing purpose.
+//===---------------------------------------------------------------------===//
+
+def UnspecializedEncodingAttr :
+    IREEEncoding_Attr<"UnspecializedEncoding", [
+      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutAttrInterface, [
+        "cloneWithSimplifiedConfig",
+      ]>
+    ]> {
+  let mnemonic = "unspecialized_encoding";
+
+  let summary = "An attribute that indicates the encoding is not yet specialized";
+
+  let description = [{
+    This attribute indicates this is an unspecialized encoding. It implements
+    very basic interface methods of EncodingLayoutAttrInterface that converts
+    it to the SpecializeEncodingAttr during encoding specialization. It is
+    mainly for testing purpose as some transformations do not depend on actual
+    dialects that implement the attribute interface.
+  }];
+
+  let parameters = (ins
+    AttrParameter<"IntegerAttr", "The seed that attached on the attribute. "
+    "Different seed values indicate different layouts.">:$seed
+  );
+
+  let hasCustomAssemblyFormat = 1;
+  let genVerifyDecl = 0;
+}
+
+def SpecializedEncodingAttr :
+    IREEEncoding_Attr<"SpecializedEncoding", [
+      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutAttrInterface, [
+        "getLayout",
+      ]>
+    ]> {
+  let mnemonic = "specialized_encoding";
+
+  let summary = "An attribute that indicates the encoding is specialized";
+
+  let description = [{
+    This attribute is similar to UnspecializeEncodingAttr, but with an optional
+    type. The attribute denotes the layout of the type. Different seed values
+    indicate different layouts, which can be used to emulate different encoding
+    attributes.
+  }];
+
+  let parameters = (ins
+    AttrParameter<"IntegerAttr", "The seed that attached on the attribute. "
+    "Different seed values indicate different layouts.">:$seed,
+    AttrParameter<"TypeAttr", "">:$type
+  );
+
+  let hasCustomAssemblyFormat = 1;
+  let genVerifyDecl = 0;
+}
+
 #endif // IREE_DIALECT_ENCODING_ATTRS
