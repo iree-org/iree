@@ -11,13 +11,16 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamTraits.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/LogicalResult.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/IR/Types.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
@@ -83,6 +86,58 @@ getEncodingWithNewLayouts(Type type,
   return encodingAttr.cloneWithLayouts(layouts);
 };
 
+/// Updates the bindings of function arguments with encoding layouts. It only
+/// updates the uses when the argument type is stream.binding_type. The bindings
+/// are only used by binding subspan ops that return whatever types. Today they
+/// are mostly flow tensor type. If the type implements
+/// IREE::Encoding::EncodingTypeInterface type interface, the method uses the
+/// interface methods to compute the type that has updated encodings (i.e.,
+/// encodings with layouts) and updates the type.
+static LogicalResult
+updateBindingEncodings(FunctionOpInterface funcOp,
+                       ArrayRef<Attribute> bindingLayoutTypeAttrs) {
+  Region &region = funcOp.getFunctionBody();
+  for (auto [arg, newTypeAttr] :
+       llvm::zip_equal(region.getArguments(), bindingLayoutTypeAttrs)) {
+    if (!isa<IREE::Stream::BindingType>(arg.getType())) {
+      continue;
+    }
+    auto newType =
+        dyn_cast<RankedTensorType>(cast<TypeAttr>(newTypeAttr).getValue());
+    if (!newType) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Skip, the new type is not RankedTensorType.\n");
+      continue;
+    }
+    auto encodingAttr = IREE::Encoding::getEncodingAttr(newType);
+    if (!encodingAttr) {
+      LLVM_DEBUG(
+          llvm::dbgs()
+          << "Skip, the binding layout attribute is not EncodingAttr, "
+             "which means that the type does not have a valid encoding.\n");
+      continue;
+    }
+    for (auto user : arg.getUsers()) {
+      auto subspanOp = dyn_cast<IREE::Stream::BindingSubspanOp>(user);
+      if (!subspanOp) {
+        return failure();
+      }
+
+      auto encodingTypeInterface =
+          dyn_cast<IREE::Encoding::EncodingTypeInterface>(subspanOp.getType());
+      if (!encodingTypeInterface) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Can not update the binding type because the type does "
+                      "not implement EncodingTypeInterface.\n");
+        return failure();
+      }
+      subspanOp.getResult().setType(
+          encodingTypeInterface.updateEncoding(encodingAttr));
+    }
+  }
+  return success();
+}
+
 /// Duplicates stream.executables based on the operand encodings and result
 /// encodings of stream.tensor.dispatch ops. Some executables can be launched by
 /// different devices. It can produce wrong codegen artifacts when bindings
@@ -145,7 +200,6 @@ static LogicalResult duplicateExecutablesPerLayoutVariant(
 
   //===--------------------------------------------------------------------===//
   // Duplicate executables for each unqiue binding layouts.
-  // TODO(hanchung): Update encodings in executables.
   //===--------------------------------------------------------------------===//
   // Mapping from [export op, binding layouts] to the executable op. So we can
   // use it to update dispatch sites later on.
@@ -154,17 +208,9 @@ static LogicalResult duplicateExecutablesPerLayoutVariant(
   DenseMap<ExportAndBindingLayouts, IREE::Stream::ExecutableOp>
       dispatchSiteToExecutableOp;
   for (auto [exportOp, layoutSet] : bindingLayoutSetPerExportOp) {
-    auto executableOp = exportOp->getParentOfType<IREE::Stream::ExecutableOp>();
-    // No need to duplicate the executable if all the uses have the same
-    // incoming layouts and produce the result in the same layout.
-    if (layoutSet.size() == 1) {
-      dispatchSiteToExecutableOp[ExportAndBindingLayouts(
-          exportOp, layoutSet[0])] = executableOp;
-      continue;
-    }
-
     int64_t dupId = -1;
-    for (auto bindingLayoutAttrs : layoutSet) {
+    auto executableOp = exportOp->getParentOfType<IREE::Stream::ExecutableOp>();
+    for (ArrayAttr bindingLayoutTypeAttrs : layoutSet) {
       rewriter.setInsertionPointAfter(executableOp);
       IREE::Stream::ExecutableOp dupOp = executableOp;
       if (dupId != -1) {
@@ -177,8 +223,17 @@ static LogicalResult duplicateExecutablesPerLayoutVariant(
           executableOp.getRegion().cloneInto(&dupOp.getRegion(), mapping);
         });
       }
+
+      // Update the binding encodings within the cloned executable op.
+      auto innerFuncOp =
+          cast<mlir::FunctionOpInterface>(symbolTable.lookupSymbolIn(
+              dupOp.getInnerModule(), exportOp.getSymName()));
+      if (failed(updateBindingEncodings(innerFuncOp,
+                                        bindingLayoutTypeAttrs.getValue()))) {
+        return failure();
+      }
       dispatchSiteToExecutableOp[ExportAndBindingLayouts(
-          exportOp, bindingLayoutAttrs)] = dupOp;
+          exportOp, bindingLayoutTypeAttrs)] = dupOp;
       dupId++;
     }
   }
@@ -209,7 +264,6 @@ static LogicalResult duplicateExecutablesPerLayoutVariant(
       dispatchOp.setEntryPointsAttr(rewriter.getArrayAttr(newEntryPoints));
     });
   }
-
   return success();
 }
 
