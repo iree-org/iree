@@ -1,4 +1,4 @@
-// Copyright 2024 The IREE Authors
+// Copyright 2025 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -38,7 +38,7 @@ static SmallVector<int64_t> getLinearizedShape(MemRefType type) {
     return {};
 
   int64_t linearizedShape = 1;
-  for (auto shape : type.getShape()) {
+  for (int64_t shape : type.getShape()) {
     if (shape == ShapedType::kDynamic)
       return {ShapedType::kDynamic};
     linearizedShape *= shape;
@@ -54,7 +54,7 @@ static FailureOr<MemRefType> linearizeType(MemRefType memrefType) {
   int64_t offset;
   if (failed(getStridesAndOffset(memrefType, strides, offset)))
     return failure();
-  if (!strides.empty() && strides.back() != 1)
+  if (strides.empty())
     return failure();
   // Form layout for the linearized memref.
   StridedLayoutAttr layoutAttr;
@@ -83,9 +83,10 @@ static Value linearizeOperand(Location loc, PatternRewriter &rewriter,
   // Fetch offset and strides of the old memref.
   SmallVector<int64_t> strides;
   int64_t offset;
-  if (failed(getStridesAndOffset(linearizedType, strides, offset)))
+  if (failed(getStridesAndOffset(linearizedType, strides, offset))) {
     // TODO(avarma): Change function signature.
     return nullptr;
+  }
 
   if (linearizedType.hasStaticShape()) {
     return rewriter.create<memref::ReinterpretCastOp>(
@@ -94,11 +95,11 @@ static Value linearizeOperand(Location loc, PatternRewriter &rewriter,
   } else {
     assert(sizeRes && "expected a linear dynamic size to have been computed");
     SmallVector<OpFoldResult> size = {sizeRes};
-    OpFoldResult zeroOffset = rewriter.getIndexAttr(offset);
+    OpFoldResult staticOffset = rewriter.getIndexAttr(offset);
     SmallVector<OpFoldResult> strides;
     strides.push_back(rewriter.getIndexAttr(1));
     return rewriter.create<memref::ReinterpretCastOp>(
-        loc, linearizedType, operand, zeroOffset, size, strides);
+        loc, linearizedType, operand, staticOffset, size, strides);
   }
 }
 
@@ -179,7 +180,7 @@ struct LinearizeMemrefAlloc : public OpRewritePattern<OpTy> {
     Value linearizedOp = rewriter.create<OpTy>(
         loc, newTypeOfSourceMemref, dynamicLinearizedSize,
         allocOp.getSymbolOperands(), allocOp.getAlignmentAttr());
-    SmallVector<int64_t, 2> indices(currentTypeOfSourceMemref.getRank());
+    SmallVector<int64_t, 2> indices(currentTypeOfSourceMemref.getRank(), 0);
     std::iota(indices.begin(), indices.end(), 0);
     Value delinearizedOp = rewriter.create<memref::ExpandShapeOp>(
         loc, currentTypeOfSourceMemref, linearizedOp, ArrayRef({indices}),
@@ -220,10 +221,9 @@ struct LinearizeMemrefLoad : public OpRewritePattern<memref::LoadOp> {
     Value linearizedOperand =
         linearizeOperand(loc, rewriter, loadOp.getMemref(),
                          newTypeOfSourceMemref, linearizedSizes);
-    Value linearizedLoad = rewriter.create<memref::LoadOp>(
-        loc, linearizedOperand, linearizedIndices, loadOp.getNontemporal());
+    rewriter.replaceOpWithNewOp<memref::LoadOp>(
+        loadOp, linearizedOperand, linearizedIndices, loadOp.getNontemporal());
 
-    rewriter.replaceOp(loadOp, {linearizedLoad});
     return success();
   }
 };
@@ -336,7 +336,7 @@ struct LinearizeMemrefCopy : public OpRewritePattern<memref::CopyOp> {
     basis = getMixedOrigSize(loc, rewriter, copyOp.getTarget());
     if (failed(basis))
       return failure();
-    multiIndices[0] = llvm::dyn_cast_if_present<Value>(((*basis)[0]));
+    multiIndices[0] = llvm::dyn_cast_if_present<Value>((*basis)[0]);
     linearizedSizes = rewriter.create<affine::AffineLinearizeIndexOp>(
         loc, multiIndices, *basis, true);
     Value linearizedTarget =
@@ -380,10 +380,9 @@ struct LinearizeVectorLoad : public OpRewritePattern<vector::LoadOp> {
         linearizeOperand(loc, rewriter, loadOp.getBase(), newTypeOfSourceMemref,
                          linearizedSizes);
 
-    Value linearizedLoad = rewriter.create<vector::LoadOp>(
-        loc, loadOp.getType(), linearizedOperand, linearizedIndices);
+    rewriter.replaceOpWithNewOp<vector::LoadOp>(
+        loadOp, loadOp.getType(), linearizedOperand, linearizedIndices);
 
-    rewriter.replaceOp(loadOp, {linearizedLoad});
     return success();
   }
 };
