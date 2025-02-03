@@ -29,24 +29,42 @@ namespace {
 class PolynomialApproximationPass final
     : public impl::PolynomialApproximationPassBase<
           PolynomialApproximationPass> {
-  void runOnOperation() override {
-    RewritePatternSet mathPatterns(&getContext());
-    populateExpandTanPattern(mathPatterns);
-    populateExpandSinhPattern(mathPatterns);
-    populateExpandCoshPattern(mathPatterns);
-    populateExpandAsinhPattern(mathPatterns);
-    populateExpandAcoshPattern(mathPatterns);
-    populateExpandAtanhPattern(mathPatterns);
-    populateExpandPowFPattern(mathPatterns);
-    populateExpandFPowIPattern(mathPatterns);
+public:
+  using Base::Base;
 
-    if (clNativeMathPrecision) {
-      mathPatterns.add<math::ErfPolynomialApproximation>(&getContext());
-    } else {
-      populateExpandExp2FPattern(mathPatterns);
-      populateMathPolynomialApproximationPatterns(mathPatterns);
-      populateExpandRoundEvenPattern(mathPatterns);
+  void runOnOperation() override {
+    
+    using PatternFunction = llvm::function_ref<void(RewritePatternSet &)>;
+    llvm::StringMap<PatternFunction> patternMap = {
+        {"tan", populateExpandTanPattern},
+        {"sinh", populateExpandSinhPattern},
+        {"cosh", populateExpandCoshPattern},
+        {"asinh", populateExpandAsinhPattern},
+        {"acosh", populateExpandAcoshPattern},
+        {"atanh", populateExpandAtanhPattern},
+        {"powf", populateExpandPowFPattern},
+        {"fpowi", populateExpandFPowIPattern},
+        {"erf",
+         [&](RewritePatternSet &patterns) {
+           if (clNativeMathPrecision) {
+             patterns.add<math::ErfPolynomialApproximation>(&getContext());
+           } else {
+             populateExpandExp2FPattern(patterns);
+             populateMathPolynomialApproximationPatterns(patterns);
+             populateExpandRoundEvenPattern(patterns);
+           }
+         }},
+    };
+
+    RewritePatternSet mathPatterns(&getContext());
+
+    for (const auto &[fnName, populateFn] : patternMap) {
+      // Skip any ops in the "do not convert" list.
+      if (!llvm::is_contained(noApproxOps, fnName)) {
+        populateFn(mathPatterns);
+      }
     }
+
     if (failed(
             applyPatternsGreedily(getOperation(), std::move(mathPatterns)))) {
       return signalPassFailure();
