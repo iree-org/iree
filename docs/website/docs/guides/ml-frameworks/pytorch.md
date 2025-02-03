@@ -9,14 +9,6 @@ icon: simple/pytorch
 
 # PyTorch + IREE = :octicons-heart-16:
 
-!!! caution "Caution - under development"
-
-    We are still validating and fixing specific models. We don't expect that
-    you will be able to do a lot of advanced things without working with us.
-
-    Stay tuned and join the discussion in our
-    [Discord server](https://discord.gg/wEWh6Z9nMU)'s `#pytorch` channel.
-
 ## :octicons-book-16: Overview
 
 [iree-turbine](https://github.com/iree-org/iree-turbine) offers a tight
@@ -59,6 +51,11 @@ graph LR
   aot -.-> binary
 ```
 
+!!! info
+
+    Documentation for iree-turbine is available at
+    <https://iree-turbine.readthedocs.io/>.
+
 ## :octicons-download-16: Prerequisites
 
 1. First install a recent version of PyTorch by following
@@ -67,7 +64,7 @@ graph LR
     === ":fontawesome-brands-linux: Linux"
 
         ``` shell
-        python -m pip install torch --index-url https://download.pytorch.org/whl/test/cpu
+        python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
         ```
 
     === ":fontawesome-brands-apple: macOS"
