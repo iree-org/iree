@@ -67,7 +67,7 @@ def iree_bitcode_library(
     clang_tool = "@llvm-project//clang:clang"
     link_tool = "@llvm-project//llvm:llvm-link"
     builtin_headers_dep = "@llvm-project//clang:builtin_headers_gen"
-    builtin_headers_path = "external/llvm-project/clang/staging/include/"
+    builtin_headers_path = "$(WORKSPACE_ROOT)/clang/staging/include/"
 
     base_copts = [
         # Target architecture
@@ -136,6 +136,7 @@ def iree_bitcode_library(
             tools = [
                 clang_tool,
             ],
+            toolchains = ["@llvm-project//clang:workspace_root"],
             message = "Compiling %s to %s..." % (src, bitcode_out),
             output_to_bindir = 1,
             **kwargs
@@ -189,7 +190,7 @@ def iree_cuda_bitcode_library(
     clang_tool = "@llvm-project//clang:clang"
     link_tool = "@llvm-project//llvm:llvm-link"
     builtin_headers_dep = "@llvm-project//clang:builtin_headers_gen"
-    builtin_headers_path = "external/llvm-project/clang/staging/include/"
+    builtin_headers_path = "$(WORKSPACE_ROOT)/clang/staging/include/"
 
     base_copts = [
         "-x",
@@ -230,6 +231,7 @@ def iree_cuda_bitcode_library(
             tools = [
                 clang_tool,
             ],
+            toolchains = ["@llvm-project//clang:workspace_root"],
             message = "Compiling %s to %s..." % (src, bitcode_out),
             output_to_bindir = 1,
             **kwargs

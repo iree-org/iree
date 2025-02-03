@@ -17,6 +17,8 @@ build --compilation_mode=opt
 common --experimental_repo_remote_exec
 # Actually printing output on errors is... a useful default
 test --test_output=errors
+# TODO(aaronmondal): Fix these.
+build --noincompatible_disallow_empty_glob
 
 # Includes a startup option, so we can't put this in a config, but it doesn't
 # hurt anything on non-windows platforms.
