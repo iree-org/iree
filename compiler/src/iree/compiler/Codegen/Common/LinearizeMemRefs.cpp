@@ -52,7 +52,7 @@ static FailureOr<MemRefType> linearizeType(MemRefType memrefType) {
   // Fetch offset and strides of the old memref.
   SmallVector<int64_t> strides;
   int64_t offset;
-  if (failed(getStridesAndOffset(memrefType, strides, offset)))
+  if (failed(memrefType.getStridesAndOffset(strides, offset)))
     return failure();
   if (strides.empty())
     return failure();
@@ -83,7 +83,7 @@ static Value linearizeOperand(Location loc, PatternRewriter &rewriter,
   // Fetch offset and strides of the old memref.
   SmallVector<int64_t> strides;
   int64_t offset;
-  if (failed(getStridesAndOffset(linearizedType, strides, offset))) {
+  if (failed(linearizedType.getStridesAndOffset(strides, offset))) {
     // TODO(avarma): Change function signature.
     return nullptr;
   }
