@@ -20,7 +20,8 @@ Example
 
   SIMPLE_MUL_ASM = """
   func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = tosa.mul %arg0, %arg1 {shift = 0 : i8} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
+      %shift = "tosa.const"() {value = dense<0> : tensor<1xi8>} : () -> tensor<1xi8>
+      %0 = tosa.mul %arg0, %arg1, %shift : (tensor<4xf32>, tensor<4xf32>, tensor<1xi8>) -> tensor<4xf32>
       return %0 : tensor<4xf32>
   }
   """
