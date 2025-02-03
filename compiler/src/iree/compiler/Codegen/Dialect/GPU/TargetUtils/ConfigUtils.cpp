@@ -121,7 +121,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     bool transposedLhs, bool transposedRhs, bool mustBeAligned = true,
     bool doCPromotion = false) {
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
-  SmallVector<GPUMatmulShapeType, 2> intrinsics;
+  SmallVector<GPUMatmulShapeType> intrinsics;
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     // Intrinsics that do not specify a scope cannot be distributed.
     if (failed(mma.getMmaScope()))
@@ -203,23 +203,23 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   // dimensions will be tiled to 1 in workgroup tiling, so they are ignored when
   // computing an MMA schedule.
   SmallVector<int64_t> mDims, nDims, kDims, batchDims;
-  for (auto mDim : contractionDims.m) {
+  for (int64_t mDim : contractionDims.m) {
     if (!ShapedType::isDynamic(bounds[mDim])) {
       mDims.push_back(mDim);
     }
   }
-  for (auto nDim : contractionDims.n) {
+  for (int64_t nDim : contractionDims.n) {
     if (!ShapedType::isDynamic(bounds[nDim])) {
       nDims.push_back(nDim);
     }
   }
-  for (auto kDim : contractionDims.k) {
+  for (int64_t kDim : contractionDims.k) {
     if (!ShapedType::isDynamic(bounds[kDim])) {
       kDims.push_back(kDim);
     }
   }
 
-  for (auto batchDim : contractionDims.batch) {
+  for (int64_t batchDim : contractionDims.batch) {
     if (!ShapedType::isDynamic(bounds[batchDim])) {
       batchDims.push_back(batchDim);
     }
