@@ -66,6 +66,7 @@ resolveCPUFeaturesForCPU(const llvm::Triple &triple, std::string &cpu,
     std::vector<llvm::StringRef> cpuFeatureList;
     const llvm::AArch64::ArchInfo *cpuArch = llvm::AArch64::getArchForCpu(cpu);
     llvm::AArch64::getExtensionFeatures(cpuArch->DefaultExts, cpuFeatureList);
+    targetCpuFeatures.AddFeature(cpuArch->ArchFeature);
     for (const auto &feature : cpuFeatureList) {
       targetCpuFeatures.AddFeature(feature);
     }
