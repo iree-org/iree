@@ -1393,6 +1393,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#api-reference-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      API reference pages
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#compile-a-program" class="md-nav__link">
     <span class="md-ellipsis">
       Compile a program
@@ -3842,6 +3851,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#api-reference-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      API reference pages
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#compile-a-program" class="md-nav__link">
     <span class="md-ellipsis">
       Compile a program
@@ -3964,18 +3982,16 @@ integrations with frameworks:</p>
 <p>Collectively, these packages allow for importing from frontends, compiling
 towards various targets, and executing compiled code on IREE's backends.</p>
 <details class="info" open="open">
-<summary>Note - <code>iree-compiler</code> and <code>iree-runtime</code> are deprecated</summary>
+<summary>Note - deprecated package names</summary>
 <p>The Python packages
 <a href="https://pypi.org/project/iree-compiler/"><code>iree-compiler</code></a> and
-<a href="https://pypi.org/project/iree-runtime/"><code>iree-runtime</code></a> have been
-renamed to
+<a href="https://pypi.org/project/iree-runtime/"><code>iree-runtime</code></a> are deprecated.
+The packages were renamed to
 <a href="https://pypi.org/project/iree-base-compiler/"><code>iree-base-compiler</code></a> and
 <a href="https://pypi.org/project/iree-base-runtime/"><code>iree-base-runtime</code></a>
-respectively, thus effectively deprecating the old packages.
-This name change only affects the names of the packages but not
-the modules. To make sure the new packages are used, run
-<code>pip uninstall iree-compiler iree-runtime</code> before installing the
-new packages.</p>
+respectively.</p>
+<p>To clean old installed packages, run
+<code>pip uninstall iree-compiler iree-runtime</code>.</p>
 </details>
 <h2 id="prerequisites"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06z"/></svg></span> Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
 <p>To use IREE's Python bindings, you will first need to install
@@ -4050,13 +4066,29 @@ python<span class="w"> </span>./build_tools/pkgci/setup_venv.py<span class="w"> 
 <p>See <a href="../../../building-from-source/getting-started/#python-bindings">Building Python bindings</a>
 page for instructions for building from source.</p>
 <h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">link</a></h2>
-<div class="admonition info">
-<p class="admonition-title">Info - API reference pages</p>
-<p>API reference pages for IREE's runtime and compiler Python APIs are hosted on
-<a href="https://iree-python-api.readthedocs.io/en/latest/">readthedocs</a>.</p>
-<p>Documentation for the MLIR compiler Python APIs can be found at
-<a href="https://mlir.llvm.org/docs/Bindings/Python/">https://mlir.llvm.org/docs/Bindings/Python/</a>.</p>
-</div>
+<h3 id="api-reference-pages"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 4v18h16v2H4c-1.1 0-2-.9-2-2V4zm11 3h5.5L15 1.5zM8 0h8l6 6v12c0 1.11-.89 2-2 2H8a2 2 0 0 1-2-2V2c0-1.11.89-2 2-2m9 16v-2H8v2zm3-4v-2H8v2z"/></svg></span> API reference pages<a class="headerlink" href="#api-reference-pages" title="Permanent link">link</a></h3>
+<table>
+<thead>
+<tr>
+<th>Description</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IREE Python APIs</td>
+<td><a href="https://iree-python-api.readthedocs.io/">https://iree-python-api.readthedocs.io/</a></td>
+</tr>
+<tr>
+<td>IREE Turbine APIs</td>
+<td><a href="https://iree-turbine.readthedocs.io/">https://iree-turbine.readthedocs.io/</a></td>
+</tr>
+<tr>
+<td>MLIR Python APIs</td>
+<td><a href="https://mlir.llvm.org/docs/Bindings/Python/">https://mlir.llvm.org/docs/Bindings/Python/</a></td>
+</tr>
+</tbody>
+</table>
 <h3 id="compile-a-program">Compile a program<a class="headerlink" href="#compile-a-program" title="Permanent link">link</a></h3>
 <p><a href="https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/low_level_invoke_function.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">iree</span><span class="w"> </span><span class="kn">import</span> <span class="n">compiler</span> <span class="k">as</span> <span class="n">ireec</span>
