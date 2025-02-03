@@ -31,14 +31,6 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-// TODO (nirvedhmeshram) : This flag allows a lot more convolutions to use IGEMM
-// so drop this flag after sufficient use with no issues.
-llvm::cl::opt<bool> clGPUUseTileAndFuseGenericConvolution(
-    "iree-gpu-use-tile-and-fuse-generic-convolution",
-    llvm::cl::desc(
-        "enable the tile and fuse pipeline for generic convolutions"),
-    llvm::cl::init(true));
-
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
 constexpr int64_t kPreferredCopyNumBits = 128;
 
@@ -383,35 +375,22 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
     return failure();
 
   LDBG("IGEMM TileAndFuse Config");
-  FailureOr<SmallVector<AffineMap>> igemmContractionMaps;
-  FailureOr<SmallVector<int64_t>> igemmLoopBounds;
-  FailureOr<SmallVector<Value>> igemmOperands;
-  if (!clGPUUseTileAndFuseGenericConvolution) {
-    igemmContractionMaps = LinalgExt::getIGEMMContractionIndexingMaps(linalgOp);
-    igemmLoopBounds = LinalgExt::getIGEMMLoopBounds(linalgOp);
-    igemmOperands = LinalgExt::getIGEMMOperands(linalgOp);
-  } else {
-    FailureOr<LinalgExt::IGEMMGenericConvDetails> igemmGenericConvDetails =
-        LinalgExt::getIGEMMGenericConvDetails(linalgOp);
-    if (failed(igemmGenericConvDetails)) {
-      LDBG("Unsupported generic convolution type");
-      return failure();
-    }
-    igemmContractionMaps = igemmGenericConvDetails->igemmContractionMaps;
-    igemmLoopBounds = igemmGenericConvDetails->igemmLoopBounds;
-    igemmOperands = igemmGenericConvDetails->igemmOperands;
-  }
-
-  if (failed(igemmContractionMaps) || failed(igemmLoopBounds) ||
-      failed(igemmOperands)) {
+  FailureOr<LinalgExt::IGEMMGenericConvDetails> igemmGenericConvDetails =
+      LinalgExt::getIGEMMGenericConvDetails(linalgOp);
+  if (failed(igemmGenericConvDetails)) {
     LDBG("Unsupported convolution type");
     return failure();
   }
+  SmallVector<AffineMap> igemmContractionMaps =
+      igemmGenericConvDetails->igemmContractionMaps;
+  SmallVector<int64_t> igemmLoopBounds =
+      igemmGenericConvDetails->igemmLoopBounds;
+  SmallVector<Value> igemmOperands = igemmGenericConvDetails->igemmOperands;
 
-  SmallVector<int64_t> bounds = igemmLoopBounds.value();
+  SmallVector<int64_t> bounds = igemmLoopBounds;
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
-      getMatmulLoweringConfigAndWorkgroupSize(
-          bounds, igemmContractionMaps.value(), igemmOperands.value(), target);
+      getMatmulLoweringConfigAndWorkgroupSize(bounds, igemmContractionMaps,
+                                              igemmOperands, target);
   if (failed(configAndWgSize)) {
     return failure();
   }
