@@ -2364,8 +2364,8 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
   if (succeeded(setVectorDistributionConfig(target, entryPointFn, computeOp))) {
     return success();
   }
-  // TODO : remove this when tile and fuse backend config becomes the default
-  // for matmul.
+  // TODO (nirvedhmeshram, qedawkins) : remove this when tile and fuse backend
+  // config becomes the default for matmul.
   if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
                                                    computeOp))) {
     LDBG("Tile and fuse matmul config after no vector distribute config");
