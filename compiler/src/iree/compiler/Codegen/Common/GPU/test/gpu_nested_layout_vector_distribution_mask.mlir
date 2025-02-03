@@ -33,8 +33,8 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func @masked_read_write
 // CHECK: %[[DIM:.+]] = memref.dim %arg0, %c0 : memref<?x128xf16>
-// CHECK: %[[VSID:.+]] = affine.apply affine_map<()[s0] -> ((s0 floordiv 64) mod 2)>()[%thread_id_x]
-// CHECK: %[[VTID:.+]] = affine.apply affine_map<()[s0] -> ((s0 floordiv 16) mod 16)>()[%thread_id_x]
+// CHECK: %[[VSID:.+]]:3 = affine.delinearize_index %thread_id_x into (2, 64) : index, index, index
+// CHECK: %[[VTID:.+]]:3 = affine.delinearize_index %thread_id_x into (16, 16) : index, index, index
 // CHECK: %[[LASTIDX:.+]] = arith.subi %[[DIM]], %c1 : index
 // CHECK: %[[PACKED_LASTIDX:.+]]:4 = affine.delinearize_index %[[LASTIDX]] into (2, 4, 16, 2) : index, index, index, index
 
@@ -45,10 +45,10 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[DISTR_LASTIDX:.+]] = affine.linearize_index [%[[PACKED_LASTIDX]]#1, %[[PACKED_LASTIDX]]#3] by (4, 2) : index
 // CHECK: %[[DISTR_BOUND:.+]] = arith.addi %[[DISTR_LASTIDX]], %c1 : index
 
-// CHECK: %[[EQ_BOUND_TID:.+]] = arith.cmpi eq, %[[VTID]], %[[PACKED_LASTIDX]]#2 : index
-// CHECK: %[[LT_BOUND_TID:.+]] = arith.cmpi slt, %[[VTID]], %[[PACKED_LASTIDX]]#2 : index
-// CHECK: %[[EQ_BOUND_SID:.+]] = arith.cmpi eq, %[[VSID]], %[[PACKED_LASTIDX]]#0 : index
-// CHECK: %[[LT_BOUND_SID:.+]] = arith.cmpi slt, %[[VSID]], %[[PACKED_LASTIDX]]#0 : index
+// CHECK: %[[EQ_BOUND_TID:.+]] = arith.cmpi eq, %[[VTID]]#1, %[[PACKED_LASTIDX]]#2 : index
+// CHECK: %[[LT_BOUND_TID:.+]] = arith.cmpi slt, %[[VTID]]#1, %[[PACKED_LASTIDX]]#2 : index
+// CHECK: %[[EQ_BOUND_SID:.+]] = arith.cmpi eq, %[[VSID]]#1, %[[PACKED_LASTIDX]]#0 : index
+// CHECK: %[[LT_BOUND_SID:.+]] = arith.cmpi slt, %[[VSID]]#1, %[[PACKED_LASTIDX]]#0 : index
 
 // CHECK: %[[SELTREE0:.+]] = arith.select %[[LT_BOUND_TID]], %[[ETILE_VALID_BOUND]], %[[ETILE_INVALID_BOUND]] : index
 // CHECK: %[[SELTREE1:.+]] = arith.select %[[EQ_BOUND_TID]], %[[DISTR_BOUND]], %[[SELTREE0]] : index

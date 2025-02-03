@@ -1608,8 +1608,12 @@ struct DistributeCreateMask final
           creatMaskOp, "missing nested layout for step op result");
     }
     SmallVector<Value> subgroupIndices, threadIndices;
-    populateWarpAndThreadIndices(rewriter, threadId, subgroupSize, resultLayout,
-                                 subgroupIndices, threadIndices);
+    if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
+                                            resultLayout, subgroupIndices,
+                                            threadIndices))) {
+      return rewriter.notifyMatchFailure(
+          creatMaskOp, "warp or thread tiles have overlapping strides");
+    }
 
     SmallVector<Value> distributedBounds =
         createDistributedBounds(rewriter, loc, creatMaskOp.getOperands(),
