@@ -5,8 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //===- GPUEncodingExternalModels.cpp --------------------------------------===//
 //
-// This file implements the IREE::Codegen::LayoutAttrInterface for GPU backends.
-// Different from CPU backends, we do not tranpose narrow-N to narrow-M for a
+// This file implements the IREE::Codegen::LayoutAttrInterface and
+// IREE::Encoding::EncodingLayoutAttrInterface for GPU backends.
+// Different from CPU backends, we do not transpose narrow-N to narrow-M for a
 // combination of reasons:
 //
 //   1. As linalg.matmul materializes into iree_gpu.multi_mma, which inherits
@@ -21,17 +22,22 @@
 
 #include "iree/compiler/Codegen/ExternalInterfaces/GPUEncodingExternalModels.h"
 
-#include <cfloat>
-
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/IR/BuiltinAttributes.h"
+
+#include <cassert>
+#include <cfloat>
+#include <cstdint>
+#include <numeric>
 
 #define DEBUG_TYPE "iree-gpu-encoding-external-models"
 
@@ -333,6 +339,94 @@ struct GPUDeviceEncodingLayoutAttrInterface
   }
 };
 
+struct GPUPadEncodingLayoutAttrInterface final
+    : Encoding::EncodingLayoutAttrInterface::ExternalModel<
+          GPUPadEncodingLayoutAttrInterface, GPUPadLayoutAttr> {
+  Attribute cloneWithSimplifiedConfig(Attribute attr,
+                                      DictionaryAttr /*config*/) const {
+    // This attribute is self-contained and does not need to look anything up
+    // from the target `config`.
+    return attr;
+  }
+
+  Attribute getLayout(Attribute attr, RankedTensorType type) const {
+    MLIRContext *ctx = attr.getContext();
+    auto padLayoutAttr = cast<GPUPadLayoutAttr>(attr);
+    auto encodingAttr = cast<Encoding::EncodingAttr>(type.getEncoding());
+
+    const int64_t rank = type.getRank();
+    SmallVector<int32_t> padValues(rank, 0);
+    auto noPaddingAttr = Encoding::PadEncodingLayoutAttr::get(
+        ctx, DenseI32ArrayAttr::get(ctx, padValues));
+    if (encodingAttr.getOpType().getValue() !=
+        IREE::Encoding::EncodingOpType::matmul) {
+      // We only support simple matmuls for now.
+      return noPaddingAttr;
+    }
+
+    const int64_t operandIndex = encodingAttr.getOperandIndex().getInt();
+    if (!llvm::is_contained({0, 1}, operandIndex)) {
+      // We only have to pad matmul operands.
+      return noPaddingAttr;
+    }
+
+    // We only support simple matmuls for now. Filter out everything that
+    // does not have a simple row-major access pattern with a single static
+    // reduction dimension.
+    FailureOr<linalg::ContractionDimensions> contractionDims =
+        Encoding::getEncodingContractionDims(encodingAttr);
+    if (failed(contractionDims) || contractionDims->k.size() != 1) {
+      return noPaddingAttr;
+    }
+
+    std::optional<unsigned> padDimensionIndex =
+        encodingAttr.mapDimToOperandIndex(contractionDims->k[0]);
+    if (!padDimensionIndex || padDimensionIndex != rank - 1) {
+      return noPaddingAttr;
+    }
+    ArrayRef<int64_t> shape = type.getShape();
+    if (ShapedType::isDynamic(shape[*padDimensionIndex])) {
+      return noPaddingAttr;
+    }
+
+    const int64_t elementBits = type.getElementTypeBitWidth();
+    const int64_t cacheLineBytes = padLayoutAttr.getCacheLineBytes();
+    if (elementBits % 8 != 0 || elementBits > cacheLineBytes) {
+      // We do not support unaligned element types.
+      return noPaddingAttr;
+    }
+
+    // Attempt to maximize L1 cache bandwidth by engaging all cache sets.
+    // We want to make sure that the reduction dimension is a multiple of the
+    // cache line, but not a multiple of cache line * cache sets. This way the
+    // next 'row' will start at a different cache set.
+    const int64_t cacheSetSpanBytes =
+        padLayoutAttr.getCacheSets() * cacheLineBytes;
+    const int64_t dimSizeInBytes =
+        type.getDimSize(*padDimensionIndex) * (elementBits / 8);
+    int64_t padBytes = 0;
+    if (int64_t unalignedBytes = dimSizeInBytes % cacheLineBytes;
+        unalignedBytes != 0) {
+      // First, pad to the multiple of cache lines.
+      padBytes += cacheLineBytes - unalignedBytes;
+    }
+
+    if ((dimSizeInBytes + padBytes) % cacheSetSpanBytes == 0) {
+      // Pad by one cache line to engage all cache sets.
+      padBytes += cacheLineBytes;
+    }
+
+    assert((dimSizeInBytes + padBytes) % cacheLineBytes == 0 &&
+           "Incorrect pad amount");
+    assert(padBytes < cacheSetSpanBytes && "Incorrect pad amount");
+    const int64_t numPadElements = (padBytes * 8) / elementBits;
+    padValues[*padDimensionIndex] = numPadElements;
+    auto padLayout = Encoding::PadEncodingLayoutAttr::get(
+        ctx, DenseI32ArrayAttr::get(ctx, padValues));
+    return padLayout;
+  }
+};
+
 } // namespace
 
 void registerGPUEncodingExternalModels(DialectRegistry &registry) {
@@ -340,6 +434,8 @@ void registerGPUEncodingExternalModels(DialectRegistry &registry) {
       +[](MLIRContext *ctx, IREE::GPU::IREEGPUDialect *dialect) {
         IREE::GPU::GPUEncodingLayoutAttr::attachInterface<
             GPUDeviceEncodingLayoutAttrInterface>(*ctx);
+        IREE::GPU::GPUPadLayoutAttr::attachInterface<
+            GPUPadEncodingLayoutAttrInterface>(*ctx);
       });
 }
 
