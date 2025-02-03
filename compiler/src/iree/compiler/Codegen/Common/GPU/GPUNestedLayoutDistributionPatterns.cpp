@@ -116,6 +116,95 @@ getElementVectorTileShape(NestedLayoutAttr vectorLayout) {
   return tileShape;
 }
 
+/// Given a distributed vector that has B1XB2xO1XO2xE1XE2,
+/// convert that to B1XO1xE1xB2xO2xE2 form.
+static VectorValue getDeinterleavedPackedForm(PatternRewriter &rewriter,
+                                              VectorValue val,
+                                              NestedLayoutAttr layout) {
+  Location loc = val.getDefiningOp()->getLoc();
+  SmallVector<int64_t> interleavedPackedShape(layout.getRank() * 3, 0);
+  for (int64_t undistributedDim : llvm::seq<int64_t>(layout.getRank())) {
+    SmallVector<int64_t> packedShapePerDim =
+        layout.getPackedShapeForUndistributedDim(undistributedDim);
+    interleavedPackedShape[layout.getRank() * 0 + undistributedDim] =
+        packedShapePerDim[1];
+    interleavedPackedShape[layout.getRank() * 1 + undistributedDim] =
+        packedShapePerDim[2];
+    interleavedPackedShape[layout.getRank() * 2 + undistributedDim] =
+        packedShapePerDim[4];
+  }
+  VectorType interleavedPackedType =
+      VectorType::get(interleavedPackedShape, val.getType().getElementType());
+  VectorValue interleavedPackedShaped =
+      rewriter.create<vector::ShapeCastOp>(loc, interleavedPackedType, val);
+
+  // 0 1 2 3 4 5 ---> 0 2 4 1 3 5
+  SmallVector<int64_t> perm;
+  perm.reserve(layout.getRank() * 3);
+  for (int64_t undistributedDim : llvm::seq<int64_t>(layout.getRank())) {
+    for (int64_t tileGroupIdx : llvm::seq<int64_t>(3)) {
+      perm.push_back(tileGroupIdx * layout.getRank() + undistributedDim);
+    }
+  }
+  return rewriter.create<vector::TransposeOp>(loc, interleavedPackedShaped,
+                                              perm);
+}
+
+/// Given a distributed vector that has B1XB2xO1XO2xE1XE2,
+/// convert that to [B1XO1xE1]x[B2xO2xE2] form.
+static VectorValue getDeinterleavedUnpackedForm(PatternRewriter &rewriter,
+                                                VectorValue val,
+                                                NestedLayoutAttr layout) {
+  Location loc = val.getDefiningOp()->getLoc();
+  VectorValue deinterleavedPacked =
+      getDeinterleavedPackedForm(rewriter, val, layout);
+  ArrayRef<int64_t> deinterleavedPackedShape =
+      deinterleavedPacked.getType().getShape();
+  SmallVector<int64_t> unpackedShape;
+  unpackedShape.reserve(layout.getRank() * 3);
+  for (int64_t unDistrDim : llvm::seq<int64_t>(layout.getRank())) {
+    int64_t collapsedDimLen = deinterleavedPackedShape[unDistrDim * 3 + 0] *
+                              deinterleavedPackedShape[unDistrDim * 3 + 1] *
+                              deinterleavedPackedShape[unDistrDim * 3 + 2];
+    unpackedShape.push_back(collapsedDimLen);
+  }
+  VectorType unpackedType = VectorType::get(
+      unpackedShape, deinterleavedPacked.getType().getElementType());
+  return rewriter.create<vector::ShapeCastOp>(loc, unpackedType,
+                                              deinterleavedPacked);
+}
+
+/// Given a distributed vector that has [B1xO1xE1]x[B2xO2xE2],
+/// convert that to B1 x B2 x O1 X O2 x E1 x E2 form.
+static VectorValue getInterleavedPackedForm(PatternRewriter &rewriter,
+                                            VectorValue val,
+                                            NestedLayoutAttr layout) {
+  Location loc = val.getDefiningOp()->getLoc();
+  SmallVector<int64_t> nonInterleavedPackedShape;
+  nonInterleavedPackedShape.reserve(layout.getRank() * 3);
+  for (int64_t undistributedDim : llvm::seq<int64_t>(layout.getRank())) {
+    SmallVector<int64_t> packedShapePerDim =
+        layout.getPackedShapeForUndistributedDim(undistributedDim);
+    nonInterleavedPackedShape.push_back(packedShapePerDim[1]);
+    nonInterleavedPackedShape.push_back(packedShapePerDim[2]);
+    nonInterleavedPackedShape.push_back(packedShapePerDim[4]);
+  }
+  VectorType nonInterleavedPackedType = VectorType::get(
+      nonInterleavedPackedShape, val.getType().getElementType());
+  VectorValue nonInterleavedPackedShaped =
+      rewriter.create<vector::ShapeCastOp>(loc, nonInterleavedPackedType, val);
+  // 0 1 2 3 4 5 ---> 0 3 1 4 2 5
+  SmallVector<int64_t> perm;
+  perm.reserve(layout.getRank() * 3);
+  for (int64_t tileGroupIdx : llvm::seq<int64_t>(3)) {
+    for (int64_t undistributedDim : llvm::seq<int64_t>(layout.getRank())) {
+      perm.push_back(tileGroupIdx + 3 * undistributedDim);
+    }
+  }
+  return rewriter.create<vector::TransposeOp>(loc, nonInterleavedPackedShaped,
+                                              perm);
+}
+
 /// Computes the warp and thread indices for the given vector layout from a
 /// single linearized thread ID.
 static LogicalResult populateWarpAndThreadIndices(
@@ -166,6 +255,7 @@ struct DistributeTransferRead final
                                            "non-nested mask vector layout");
       }
       mask = getDistributed(rewriter, mask, maskLayout);
+      mask = getDeinterleavedUnpackedForm(rewriter, mask, maskLayout);
     }
 
     // Guard on memrefs for distribution. In isolation this pattern is agnostic
@@ -276,6 +366,7 @@ struct DistributeTransferWrite final
                                            "non-nested mask vector layout");
       }
       mask = getDistributed(rewriter, mask, maskLayout);
+      mask = getDeinterleavedUnpackedForm(rewriter, mask, maskLayout);
     }
 
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
@@ -1529,7 +1620,10 @@ struct DistributeCreateMask final
         VectorType::get(resultLayout.getDistributedUnpackedShape(), elemType);
     auto distrMask = rewriter.create<vector::CreateMaskOp>(
         loc, distrUnpackedType, distributedBounds);
-    replaceOpWithDistributedValues(rewriter, creatMaskOp, {distrMask});
+    VectorValue interleavedDistrMask =
+        getInterleavedPackedForm(rewriter, distrMask, resultLayout);
+    replaceOpWithDistributedValues(rewriter, creatMaskOp,
+                                   {interleavedDistrMask});
     return success();
   }
   Value threadId;
