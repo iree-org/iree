@@ -148,5 +148,5 @@ hal.executable private @main {
 //          CHECK:     %[[LOOP_T:.+]] = vector.shape_cast %[[LOOP]] : vector<1x1x1x1x4x1xf32> to vector<4xf32>
 //          CHECK:     vector.transfer_write %[[LOOP_T]]
 // Note there is a writeback loop here that is skipped to simplify the test.
-//          CHECK:     vector.transfer_write {{.*}}, %[[B2]]
+//       CHECK:        memref.copy {{.*}}#gpu.address_space<workgroup>> to {{.*}}#hal.descriptor_type<storage_buffer>
 //          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
