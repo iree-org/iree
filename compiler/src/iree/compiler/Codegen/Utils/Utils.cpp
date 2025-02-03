@@ -1048,8 +1048,8 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
       for (auto [i, id, numTiles] :
            llvm::enumerate(delinearized.getResults(), splitNumTiles)) {
         // We iterate the delinearize results from slowest up to fastest, and
-        // we know that these are all the highest values of `dim. Tha tis,
-        // `i = 0` corresponds to `dim = numParallelDims - 1`.
+        // we know that these are all the highest values of dimension. That is,
+        // `i = 0` corresponds to the `numParallelDims - 1`-th dimension.
         procInfo[i] = {id,
                        getValueOrCreateConstantIndexOp(builder, loc, numTiles),
                        distributionMethod};
