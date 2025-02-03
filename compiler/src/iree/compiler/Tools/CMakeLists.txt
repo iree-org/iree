@@ -121,6 +121,7 @@ iree_cc_library(
     MLIRTensorTransformOps
     MLIRVectorTransformOps
     MLIRTransformLoopExtension
+    MLIRComplexToStandard
   PUBLIC
 )
 

@@ -17,6 +17,7 @@
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/ArmSME/Transforms/Passes.h"
+#include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -48,6 +49,8 @@ inline void registerMlirPasses() {
   registerViewOpGraphPass();
   registerStripDebugInfoPass();
   registerSymbolDCEPass();
+  bufferization::registerBufferizationPasses();
+  registerConvertComplexToStandard();
 
   // Generic conversions
   registerReconcileUnrealizedCastsPass();
