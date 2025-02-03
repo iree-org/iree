@@ -409,8 +409,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     int64_t subgroupSize, bool transposedLhs, bool transposedRhs,
     bool canUpcastAcc, bool mustBeAligned, bool doCPromotion) {
   for (auto [index, intrinsic] : llvm::enumerate(intrinsics)) {
-    if (failed(canTargetIntrinsic(problem, intrinsic, canUpcastAcc,
-                                  subgroupSize, mustBeAligned))) {
+    if (failed(canTargetIntrinsic(problem, intrinsic, subgroupSize,
+                                  canUpcastAcc, mustBeAligned))) {
       continue;
     }
 
@@ -464,13 +464,13 @@ FailureOr<GPUMMASchedule> deduceAttentionSchedule(
          qkMatmul.nSizes.size() == 1 && qkMatmul.kSizes.size() == 1 &&
          "unimplemented: multi M/N/K attention schedule");
   for (auto [index, intrinsic] : llvm::enumerate(intrinsics)) {
-    if (failed(canTargetIntrinsic(qkMatmul, intrinsic, canUpcastAcc,
-                                  subgroupSize, mustBeAligned))) {
+    if (failed(canTargetIntrinsic(qkMatmul, intrinsic, subgroupSize,
+                                  canUpcastAcc, mustBeAligned))) {
       continue;
     }
 
-    if (failed(canTargetIntrinsic(pvMatmul, intrinsic, canUpcastAcc,
-                                  subgroupSize, mustBeAligned))) {
+    if (failed(canTargetIntrinsic(pvMatmul, intrinsic, subgroupSize,
+                                  canUpcastAcc, mustBeAligned))) {
       continue;
     }
 
