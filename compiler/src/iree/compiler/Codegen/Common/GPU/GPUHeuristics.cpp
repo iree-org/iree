@@ -254,9 +254,7 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
   }
 
   // Send very skinny, {2-4}xNxK and Mx{2-4}xK, matmuls to the vector reduction
-  // pipeline, similar to matvec. Note: Because of reassociation in the vector
-  // reduction pipeline, this may lead to precission loss. If this ever becomes
-  // an issue, we can hide this behind a flag.
+  // pipeline, similar to matvec.
   // TODO: Figure out what the precise cutoff is, this may be machine dependent.
   // In situation when alignment isn't required, we disallow intrinsics to be
   // picked if the tile size is too small. For example, this will force a matmul

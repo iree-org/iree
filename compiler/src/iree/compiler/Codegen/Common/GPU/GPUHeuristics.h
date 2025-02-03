@@ -21,9 +21,9 @@ struct GPUMatmulShapeType {
   GPUMatmulShapeType(int64_t m, int64_t n, int64_t k, Type a, Type b, Type c)
       : mSizes({m}), nSizes({n}), kSizes({k}), batchSizes({}), aType(a),
         bType(b), cType(c) {}
-  GPUMatmulShapeType(SmallVector<int64_t, 2> m, SmallVector<int64_t, 2> n,
-                     SmallVector<int64_t, 2> k, SmallVector<int64_t, 2> batch,
-                     Type a, Type b, Type c)
+  GPUMatmulShapeType(ArrayRef<int64_t> m, ArrayRef<int64_t> n,
+                     ArrayRef<int64_t> k, ArrayRef<int64_t> batch, Type a,
+                     Type b, Type c)
       : mSizes(m), nSizes(n), kSizes(k), batchSizes(batch), aType(a), bType(b),
         cType(c) {}
 };
