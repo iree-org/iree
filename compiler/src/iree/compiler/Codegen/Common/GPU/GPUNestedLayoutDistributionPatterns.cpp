@@ -549,17 +549,19 @@ static int64_t getShuffleWidth(NestedLayoutAttr layout, int64_t dim) {
 ///      to shared memory and will be reloaded into a layout where partial
 ///      reductions will be placed inside threads.
 struct DistributeMultiReduction final
-    : OpDistributionPattern<vector::MultiDimReductionOp> {
-  using OpDistributionPattern::OpDistributionPattern;
+    : MaskedOpDistributionPattern<vector::MultiDimReductionOp> {
+  using MaskedOpDistributionPattern::MaskedOpDistributionPattern;
 
   DistributeMultiReduction(MLIRContext *context, int64_t subgroupSize,
                            int64_t maxBitsPerShuffle, int64_t benefit = 1)
-      : OpDistributionPattern(context, benefit), subgroupSize(subgroupSize),
-        maxBitsPerShuffle(maxBitsPerShuffle) {}
+      : MaskedOpDistributionPattern(context, benefit),
+        subgroupSize(subgroupSize), maxBitsPerShuffle(maxBitsPerShuffle) {}
 
-  LogicalResult matchAndRewrite(vector::MultiDimReductionOp multiReduceOp,
-                                DistributionSignature &signature,
-                                PatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(vector::MultiDimReductionOp multiReduceOp,
+                  DistributionSignature &signature, vector::MaskOp maskOp,
+                  std::optional<DistributionSignature> &maskSignature,
+                  PatternRewriter &rewriter) const {
     Location loc = multiReduceOp.getLoc();
     VectorValue srcVector = multiReduceOp.getSource();
     Value acc = multiReduceOp.getAcc();
@@ -594,11 +596,9 @@ struct DistributeMultiReduction final
     }
 
     VectorValue mask = nullptr;
-    if (auto maskOp = multiReduceOp->getParentOfType<vector::MaskOp>()) {
-      std::optional<DistributionSignature> signatureMask =
-          getOpSignature(maskOp);
+    if (maskOp) {
       auto maskLayout = dyn_cast_or_null<NestedLayoutAttr>(
-          signatureMask.value()[maskOp.getMask()]);
+          maskSignature.value()[maskOp.getMask()]);
       if (!maskLayout) {
         return rewriter.notifyMatchFailure(maskOp,
                                            "expected nested layout attr");
@@ -1656,33 +1656,6 @@ struct DistributeCreateMask final
   int64_t subgroupSize;
 };
 
-struct DistributeMask final : OpDistributionPattern<vector::MaskOp> {
-  using OpDistributionPattern::OpDistributionPattern;
-
-  LogicalResult matchAndRewrite(vector::MaskOp maskOp,
-                                DistributionSignature &signature,
-                                PatternRewriter &rewriter) const override {
-    SmallVector<Value> returns =
-        maskOp.getBody()->getTerminator()->getOperands();
-    for (auto [idx, ret] : llvm::enumerate(returns)) {
-      if (VectorValue vectorRet = dyn_cast<VectorValue>(ret)) {
-        VectorValue maskRet = cast<VectorValue>(maskOp.getResult(idx));
-        VectorLayoutInterface layout =
-            dyn_cast<NestedLayoutAttr>(signature[maskRet]);
-        if (!layout) {
-          return rewriter.notifyMatchFailure(maskOp,
-                                             "layout must be NestedLayoutAttr");
-        }
-        ret = getDistributed(rewriter, vectorRet, layout);
-      }
-    }
-    rewriter.eraseOp(maskOp.getBody()->getTerminator());
-    rewriter.inlineBlockBefore(maskOp.getBody(), maskOp);
-    replaceOpWithDistributedValues(rewriter, maskOp, returns);
-    return success();
-  }
-};
-
 } // namespace
 
 void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
@@ -1699,7 +1672,6 @@ void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
   patterns.add<DistributeStep>(patterns.getContext(), threadId, subgroupSize);
   patterns.add<DistributeCreateMask>(patterns.getContext(), threadId,
                                      subgroupSize);
-  patterns.add<DistributeMask>(patterns.getContext());
 }
 
 }; // namespace mlir::iree_compiler
