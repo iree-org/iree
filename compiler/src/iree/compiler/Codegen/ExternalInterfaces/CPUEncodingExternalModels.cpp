@@ -670,17 +670,9 @@ struct CPUDeviceEncodingLayoutAttrInterface
   }
 };
 
-struct CPUHostEncodingLayoutAttrInterface
-    : public IREE::Encoding::EncodingLayoutAttrInterface::ExternalModel<
+struct CPUHostEncodingLayoutAttrInterface final
+    : IREE::Encoding::EncodingLayoutAttrInterface::ExternalModel<
           CPUHostEncodingLayoutAttrInterface, CPUEncodingLayoutAttr> {
-
-  Value calculateStorageSizeInBytes(Attribute attr, Location loc,
-                                    OpBuilder &builder, RankedTensorType type,
-                                    ValueRange dynamicDims) const {
-    return calculateStorageSizeInBytesImpl(attr, loc, builder, type,
-                                           dynamicDims);
-  }
-
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
@@ -694,6 +686,18 @@ struct CPUHostEncodingLayoutAttrInterface
   Attribute getLayout(Attribute attr, RankedTensorType type) const {
     MLIRContext *ctx = attr.getContext();
     return CPUEncodingLayoutAttr::get(ctx, getLayoutImpl(attr, type));
+  }
+};
+
+struct CPUHostSerializedEncodingLayoutAttrInterface final
+    : IREE::Encoding::SerializedEncodingLayoutAttrInterface::ExternalModel<
+          CPUHostSerializedEncodingLayoutAttrInterface, CPUEncodingLayoutAttr> {
+
+  Value calculateStorageSizeInBytes(Attribute attr, Location loc,
+                                    OpBuilder &builder, RankedTensorType type,
+                                    ValueRange dynamicDims) const {
+    return calculateStorageSizeInBytesImpl(attr, loc, builder, type,
+                                           dynamicDims);
   }
 };
 
@@ -731,8 +735,8 @@ enumerateVMVXMatmulTiles(linalg::ContractionDimensions cDims,
   };
 }
 
-struct VMVXDeviceEncodingLayoutAttrInterface
-    : public Codegen::LayoutAttrInterface::ExternalModel<
+struct VMVXDeviceEncodingLayoutAttrInterface final
+    : Codegen::LayoutAttrInterface::ExternalModel<
           VMVXDeviceEncodingLayoutAttrInterface, VMVXEncodingLayoutAttr> {
   MaterializeEncodingInfo getEncodingInfo(Attribute attr,
                                           RankedTensorType type) const {
@@ -797,16 +801,9 @@ struct VMVXDeviceEncodingLayoutAttrInterface
   }
 };
 
-struct VMVXHostEncodingLayoutAttrInterface
-    : public IREE::Encoding::EncodingLayoutAttrInterface::ExternalModel<
+struct VMVXHostEncodingLayoutAttrInterface final
+    : IREE::Encoding::EncodingLayoutAttrInterface::ExternalModel<
           VMVXHostEncodingLayoutAttrInterface, VMVXEncodingLayoutAttr> {
-  Value calculateStorageSizeInBytes(Attribute attr, Location loc,
-                                    OpBuilder &builder, RankedTensorType type,
-                                    ValueRange dynamicDims) const {
-    return calculateStorageSizeInBytesImpl(attr, loc, builder, type,
-                                           dynamicDims);
-  }
-
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
@@ -822,6 +819,18 @@ struct VMVXHostEncodingLayoutAttrInterface
   }
 };
 
+struct VMVXHostSerializedEncodingLayoutAttrInterface final
+    : IREE::Encoding::SerializedEncodingLayoutAttrInterface::ExternalModel<
+          VMVXHostSerializedEncodingLayoutAttrInterface,
+          VMVXEncodingLayoutAttr> {
+  Value calculateStorageSizeInBytes(Attribute attr, Location loc,
+                                    OpBuilder &builder, RankedTensorType type,
+                                    ValueRange dynamicDims) const {
+    return calculateStorageSizeInBytesImpl(attr, loc, builder, type,
+                                           dynamicDims);
+  }
+};
+
 } // namespace
 
 void registerCPUEncodingExternalModels(DialectRegistry &registry) {
@@ -829,10 +838,12 @@ void registerCPUEncodingExternalModels(DialectRegistry &registry) {
       +[](MLIRContext *ctx, IREE::CPU::IREECPUDialect *dialect) {
         IREE::CPU::CPUEncodingLayoutAttr::attachInterface<
             CPUDeviceEncodingLayoutAttrInterface,
-            CPUHostEncodingLayoutAttrInterface>(*ctx);
+            CPUHostEncodingLayoutAttrInterface,
+            CPUHostSerializedEncodingLayoutAttrInterface>(*ctx);
         IREE::CPU::VMVXEncodingLayoutAttr::attachInterface<
             VMVXDeviceEncodingLayoutAttrInterface,
-            VMVXHostEncodingLayoutAttrInterface>(*ctx);
+            VMVXHostEncodingLayoutAttrInterface,
+            VMVXHostSerializedEncodingLayoutAttrInterface>(*ctx);
       });
 }
 

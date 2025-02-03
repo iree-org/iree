@@ -144,6 +144,62 @@ module attributes {stream.affinity.default = #hal.device.affinity<@device_a>} {
 // CHECK:         stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_B]]>) @[[$EX0]]::@dispatch
 // CHECK-SAME:      #[[$ENCODING]]
 
+//------------------------------------------------------------------------------
+// iree_gpu.gpu_pad_encoding specialization tests.
+// These get serialized to iree_encoding.pad_encoding_layout attributes.
+//------------------------------------------------------------------------------
+
+// -----
+
+#map0 = affine_map<(m, n, k) -> (m, k)>
+#map1 = affine_map<(m, n, k) -> (n, k)>
+#map2 = affine_map<(m, n, k) -> (m, n)>
+#map3 = affine_map<(m, n, k) -> (n, k)>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip",
+  encoding = #iree_gpu.gpu_pad_layout<cache_line_bytes = 128, cache_sets = 4>, ukernels = "none"}>
+#device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_rocm_hsaco_fb]> : !hal.device
+#encodingA = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map1, #map2]>
+#encodingB = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map1, #map2]>
+#encodingC = #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map1, #map2]>
+#encodingD = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map3, #map2]>
+module {
+  util.global private @device_a = #device_target_local_0_
+
+  util.func public @with_pad_encoding(%arg0: index, %arg1: index, %scalar_f32 : f32) {
+    %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf16, #encodingA>{} in !stream.resource<*>{%arg1}
+    %1 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4160xf16, #encodingA>{} in !stream.resource<*>{%arg1}
+    %2 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x1337xf16, #encodingA>{} in !stream.resource<*>{%arg1}
+    %3 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4095xf16, #encodingA>{} in !stream.resource<*>{%arg1}
+    %4 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x4096xf16, #encodingA>{%arg0} in !stream.resource<*>{%arg1}
+    %5 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x?xf16, #encodingA>{%arg0, %arg1} in !stream.resource<*>{%arg1}
+    %6 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf16, #encodingB>{} in !stream.resource<*>{%arg1}
+    %7 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf16, #encodingC>{} in !stream.resource<*>{%arg1}
+    %8 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf16, #encodingD>{} in !stream.resource<*>{%arg1}
+    util.return
+  }
+}
+
+// CHECK-DAG: #[[$NO_PAD_LHS:.+]] = #iree_encoding.encoding<operand_index = 0 : index, {{.*}}, layouts = [#iree_encoding.pad_encoding_layout<[0, 0]>]
+// CHECK-DAG: #[[$NO_PAD_OUT:.+]] = #iree_encoding.encoding<operand_index = 2 : index, {{.*}}, layouts = [#iree_encoding.pad_encoding_layout<[0, 0]>]
+// CHECK-DAG: #[[$PAD_LHS_0:.+]] =  #iree_encoding.encoding<operand_index = 0 : index, {{.*}}, layouts = [#iree_encoding.pad_encoding_layout<[0, 64]>]
+// CHECK-DAG: #[[$PAD_LHS_1:.+]] =  #iree_encoding.encoding<operand_index = 0 : index, {{.*}}, layouts = [#iree_encoding.pad_encoding_layout<[0, 7]>]
+// CHECK-DAG: #[[$PAD_LHS_2:.+]] =  #iree_encoding.encoding<operand_index = 0 : index, {{.*}}, layouts = [#iree_encoding.pad_encoding_layout<[0, 65]>]
+// CHECK-DAG: #[[$PAD_RHS:.+]] =    #iree_encoding.encoding<operand_index = 1 : index, {{.*}}, layouts = [#iree_encoding.pad_encoding_layout<[0, 64]>]
+
+// CHECK-LABEL: util.func public @with_pad_encoding
+//
+// CHECK: stream.tensor.empty {{.*}} : tensor<4096x4096xf16, #[[$PAD_LHS_0]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<4096x4160xf16, #[[$NO_PAD_LHS]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<4096x1337xf16, #[[$PAD_LHS_1]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<4096x4095xf16, #[[$PAD_LHS_2]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<?x4096xf16, #[[$PAD_LHS_0]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<?x?xf16, #[[$NO_PAD_LHS]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<4096x4096xf16, #[[$PAD_RHS]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<4096x4096xf16, #[[$NO_PAD_OUT]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<4096x4096xf16, #[[$PAD_RHS]]>
+//
+// CHECK-NEXT: util.return
+
 // -----
 
 // Tests that launch the executable on device_a, pass the result to device_b and

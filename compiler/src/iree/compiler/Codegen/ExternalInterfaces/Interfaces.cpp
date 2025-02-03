@@ -12,8 +12,8 @@
 namespace mlir::iree_compiler {
 
 void registerCodegenExternalInterfaces(DialectRegistry &registry) {
-  IREE::GPU::registerGPUEncodingExternalModels(registry);
   IREE::CPU::registerCPUEncodingExternalModels(registry);
+  IREE::GPU::registerGPUEncodingExternalModels(registry);
 }
 
 } // namespace mlir::iree_compiler

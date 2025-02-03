@@ -36,6 +36,10 @@ StringRef normalizeCUDATarget(StringRef target);
 TargetAttr getHIPTargetDetails(llvm::StringRef target, llvm::StringRef features,
                                MLIRContext *context);
 
+// Returns an attribute implementing `EncodingLayoutAttributeInterface` if
+// |target| has known encoding preferences.
+Attribute getHIPTargetEncodingLayoutAttr(TargetAttr target);
+
 // Normalizes the given HIP |target| to the gfx target commonly used for
 // compiling towards HIP. For example, "gfx90a" for "cnda2", "gfx1100" for
 // "rx7900xtx". Returns empty StringRef if the given |target| is not recognized.

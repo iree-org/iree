@@ -341,6 +341,33 @@ def IREEGPU_GPUEncodingLayoutAttr :
 }
 
 //===----------------------------------------------------------------------===//
+// iree_gpu.gpu_pad_layout
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_GPUPadLayoutAttr : AttrDef<IREEGPU_Dialect, "GPUPadLayout"> {
+  let mnemonic = "gpu_pad_layout";
+  let summary = "The padded encoding layout attribute for GPU targets.";
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let description = [{
+    Describes padding preferences for a given GPU target.
+    This attribute can implement any encoding interface for data-tiling,
+    e.g., Encoding::EncodingLayoutAttrInterface, etc. They should be implemented
+    through external model mechanism because we do not want to relocate
+    domain-specific logic to the dialect implementation, and we can have better
+    code structure. See the implementation in
+    compiler/Codegen/ExternalInterfaces/*.
+  }];
+
+  let parameters = (ins
+    // Relevant target properties that will later allow us to decide the
+    // serialized pad layout.
+    "uint32_t":$cache_line_bytes,
+    "uint32_t":$cache_sets
+  );
+}
+
+//===----------------------------------------------------------------------===//
 // Workgroup processor level description
 //===----------------------------------------------------------------------===//
 
