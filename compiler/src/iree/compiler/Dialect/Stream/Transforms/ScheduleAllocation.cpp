@@ -1357,14 +1357,35 @@ static Value findTiedYieldResult(Value seedValue) {
 // value instead. The local value may not have a transfer associated with it.
 static IREE::Stream::AffinityAttr findLocalValueAffinity(Value value) {
   while (value) {
-    if (auto transferOp = dyn_cast_if_present<IREE::Stream::AsyncTransferOp>(
-            value.getDefiningOp())) {
+    auto definingOp = value.getDefiningOp();
+    if (!definingOp) {
+      // Block argument or something we don't track locally.
+      return {};
+    } else if (auto transferOp =
+                   dyn_cast<IREE::Stream::AsyncTransferOp>(definingOp)) {
       return transferOp.getResultAffinityAttr();
+    } else if (auto regionOp = dyn_cast<RegionBranchOpInterface>(definingOp)) {
+      // A region op with a yielded value (like stream.async.concurrent).
+      // Note that we always want to check for tied ops first as that will let
+      // us skip over the region entirely.
+      if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
+        if (auto tiedValue = tiedOp.getTiedResultOperand(value)) {
+          value = tiedValue;
+          continue;
+        }
+      }
+      unsigned resultIndex = cast<OpResult>(value).getResultNumber();
+      auto &block = regionOp.getOperation()->getRegion(0).front();
+      auto terminatorOp =
+          cast<RegionBranchTerminatorOpInterface>(block.getTerminator());
+      value = terminatorOp.getSuccessorOperands(
+          RegionBranchPoint::parent())[resultIndex];
     } else if (auto tiedOp =
-                   llvm::dyn_cast_or_null<IREE::Util::TiedOpInterface>(
-                       value.getDefiningOp())) {
+                   dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
+      // If the producer is tied then try to get the operand.
       value = tiedOp.getTiedResultOperand(value);
     } else {
+      // Analysis blocked.
       break;
     }
   }
