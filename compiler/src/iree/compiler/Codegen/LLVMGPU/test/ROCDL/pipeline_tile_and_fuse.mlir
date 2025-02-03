@@ -1158,7 +1158,6 @@ hal.executable public @main {
 //       CHECK:     %[[LOOP_T:.+]] = vector.shape_cast %[[LOOP]] : vector<1x1x1x4x1xf32> to vector<4xf32>
 //       CHECK:     vector.transfer_write %[[LOOP_T]]
 //       CHECK:     scf.for {{.*}} {
-//       CHECK:       %[[SHARED_READ:.+]] = vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
-//       CHECK:       vector.transfer_write %[[SHARED_READ]], %[[B2]]
+//       CHECK:       memref.copy {{.*}}#gpu.address_space<workgroup>> to {{.*}}#hal.descriptor_type<storage_buffer>
 //       CHECK:    }
 //       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
