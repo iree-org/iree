@@ -50,8 +50,8 @@
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 namespace mlir::iree_compiler {
 
-llvm::cl::opt<bool> clGPUTestTileAndFuseMatmul(
-    "iree-codegen-llvmgpu-test-tile-and-fuse-matmul",
+llvm::cl::opt<bool> clGPUEarlyTileAndFuseMatmul(
+    "iree-codegen-llvmgpu-early-tile-and-fuse-matmul",
     llvm::cl::desc("test the the tile and fuse pipeline for matmul"),
     llvm::cl::init(false));
 
@@ -2340,7 +2340,7 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     LDBG("Tile and fuse data tiled multi_mma config");
     return success();
   }
-  if (clGPUTestTileAndFuseMatmul) {
+  if (clGPUEarlyTileAndFuseMatmul) {
     if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
                                                      computeOp))) {
       LDBG("Tile and fuse matmul config");
@@ -2362,6 +2362,13 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     }
   }
   if (succeeded(setVectorDistributionConfig(target, entryPointFn, computeOp))) {
+    return success();
+  }
+  // TODO (nirvedhmeshram, qedawkins) : remove this when tile and fuse backend
+  // config becomes the default for matmul.
+  if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
+                                                   computeOp))) {
+    LDBG("Tile and fuse matmul config after no vector distribute config");
     return success();
   }
 
