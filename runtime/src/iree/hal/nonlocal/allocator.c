@@ -156,6 +156,11 @@ iree_hal_nl_allocator_query_buffer_compatibility(
   // We are now optimal.
   params->type &= ~IREE_HAL_MEMORY_TYPE_OPTIMAL;
 
+  // device has no memory map support
+  if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+    params->usage &= ~IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED;
+  }
+
   // Guard against the corner case where the requested buffer size is 0. The
   // application is unlikely to do anything when requesting a 0-byte buffer; but
   // it can happen in real world use cases. So we should at least not crash.
@@ -235,7 +240,6 @@ static iree_status_t iree_hal_nl_allocator_allocate_buffer(
     // Device local
     buffer_type = IREE_HAL_NL_BUFFER_TYPE_DEVICE;
     device_ptr = nl_mem_alloc(allocation_size);
-    host_ptr = (void*)device_ptr;
   } else {
     // Host local cases.
     buffer_type = IREE_HAL_NL_BUFFER_TYPE_HOST;

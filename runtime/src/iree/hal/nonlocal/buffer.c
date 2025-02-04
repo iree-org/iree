@@ -96,11 +96,13 @@ static iree_status_t iree_hal_nl_buffer_map_range(
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
       iree_hal_buffer_memory_type(base_buffer),
       IREE_HAL_MEMORY_TYPE_HOST_VISIBLE));
+#if 0
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
       iree_hal_buffer_allowed_usage(base_buffer),
       mapping_mode == IREE_HAL_MAPPING_MODE_PERSISTENT
           ? IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT
           : IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED));
+#endif
 
   IREE_ASSERT(buffer->host_ptr, "mappable buffers require host pointers");
   uint8_t* data_ptr = (uint8_t*)(buffer->host_ptr) + local_byte_offset;
@@ -108,11 +110,13 @@ static iree_status_t iree_hal_nl_buffer_map_range(
   // behavior but it will make debugging issues easier. Alternatively for
   // heap buffers we could reallocate them such that ASAN yells, but that
   // would only work if the entire buffer was discarded.
+#if 0
 #ifndef NDEBUG
   if (iree_any_bit_set(memory_access, IREE_HAL_MEMORY_ACCESS_DISCARD)) {
     memset(data_ptr, 0xCD, local_byte_length);
   }
 #endif  // !NDEBUG
+#endif
 
   mapping->contents = iree_make_byte_span(data_ptr, local_byte_length);
   return iree_ok_status();
