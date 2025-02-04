@@ -335,29 +335,33 @@ struct HoistableLinalgOpInterface
           HoistableLinalgOpInterface<OpTy>, OpTy> {
   bool isHoistableOp(Operation *) const { return true; }
 
-  /// FillOp and broadcasting ops are not hoistableLeaf ops, since it is
-  /// typically better to fuse them with their consumers.
+  // Determines if a linalg op is a hoistable leaf, based on heuristics.
   bool isHoistableLeafOp(Operation *op) const {
-    auto genericOp = llvm::dyn_cast<linalg::GenericOp>(op);
-    if (!genericOp)
-      return !isa<linalg::FillOp>(op);
+    // Don't hoist bit extend ops because fusing them with their
+    // consumers prevents materializing the high bit-width tensor and they
+    // preform very little real computation.
     if (IREE::LinalgExt::isBitExtendOp(op)) {
       return false;
     }
-    // Generally, we prefer to not hoist broadcasts.
-    // Detect op that only broadcast input as fusing them makes the new
-    // op cheaper.
-    if (genericOp.getNumParallelLoops() == genericOp.getNumLoops() &&
-        isa<linalg::YieldOp>(genericOp.getBody()->front())) {
-      for (OpOperand *opOperand : genericOp.getDpsInputOperands()) {
-        AffineMap indexingMap = genericOp.getMatchingIndexingMap(opOperand);
-        if (indexingMap.isProjectedPermutation() &&
-            indexingMap.getNumDims() != indexingMap.getNumResults()) {
-          return false;
-        }
-      }
+
+    // Hoist all non-generic linalg ops except for fill ops which should be
+    // fused with their consumers.
+    auto genericOp = llvm::dyn_cast<linalg::GenericOp>(op);
+    if (!genericOp) {
+      return !isa<linalg::FillOp>(op);
     }
-    return !linalg::isaFillOpInterface(genericOp).has_value();
+    if (linalg::isaFillOpInterface(genericOp).has_value()) {
+      return false;
+    }
+
+    // Don't hoist broadcast-like ops because fusing them makes the new
+    // op cheaper.
+    if (linalg::isaBroadcastOpInterface(genericOp).has_value()) {
+      return false;
+    }
+
+    // Hoist all other ops.
+    return true;
   }
   bool isAtomicallyHoistableOp(Operation *) const { return true; }
   bool isOperandHoistable(Operation *, OpOperand *) const { return true; }
