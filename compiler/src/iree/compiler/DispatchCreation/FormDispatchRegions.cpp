@@ -25,6 +25,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -40,6 +41,7 @@
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-form-dispatch-regions"
 
@@ -963,6 +965,19 @@ void FormDispatchRegionsPass::runOnOperation() {
                                          fusePadWithProducers};
   if (failed(createFusionGroups(rewriter, funcOp, dominanceInfo, options))) {
     funcOp->emitOpError("failed to create fusion groups");
+    return signalPassFailure();
+  }
+
+  // Canonicalize all the dispatch regions to remove unused operands.
+  MLIRContext *context = &getContext();
+  RewritePatternSet patterns(context);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
+  IREE::Flow::DispatchRegionOp::getCanonicalizationPatterns(patterns, context);
+  GreedyRewriteConfig config;
+  config.maxIterations = GreedyRewriteConfig::kNoLimit;
+  config.fold = true;
+  if (failed(applyPatternsGreedily(funcOp, std::move(patterns), config))) {
+    funcOp.emitOpError("failed in cleanup patterns");
     return signalPassFailure();
   }
 }
