@@ -319,8 +319,7 @@ Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
   ArrayRef<int32_t> padding = getPadding().asArrayRef();
   assert(padding.size() == type.getRank() && "Invalid padding");
 
-  const int64_t elementSize =
-      llvm::divideCeil(type.getElementTypeBitWidth(), 8);
+  const int64_t elementSize = getRoundedElementByteWidth(type.getElementType());
   int64_t staticProduct = elementSize;
   Value dynamicProduct = builder.create<arith::ConstantIndexOp>(loc, 1);
 
