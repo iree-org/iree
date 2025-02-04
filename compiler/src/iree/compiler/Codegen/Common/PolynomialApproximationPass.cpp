@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Math/Transforms/Approximation.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -25,6 +26,16 @@ static llvm::cl::opt<bool> clNativeMathPrecision(
 
 namespace {
 
+static void populateErfPattern(RewritePatternSet &patterns) {
+  if (clNativeMathPrecision) {
+    patterns.add<math::ErfPolynomialApproximation>(patterns.getContext());
+  } else {
+    populateExpandExp2FPattern(patterns);
+    populateMathPolynomialApproximationPatterns(patterns);
+    populateExpandRoundEvenPattern(patterns);
+  }
+}
+
 /// math dialect elementry functions -> polynomial form.
 class PolynomialApproximationPass final
     : public impl::PolynomialApproximationPassBase<
@@ -33,19 +44,7 @@ public:
   using Base::Base;
 
   void runOnOperation() override {
-
     using PatternFunction = llvm::function_ref<void(RewritePatternSet &)>;
-
-    auto populateErfPattern = [&](RewritePatternSet &patterns) {
-      if (clNativeMathPrecision) {
-        patterns.add<math::ErfPolynomialApproximation>(&getContext());
-      } else {
-        populateExpandExp2FPattern(patterns);
-        populateMathPolynomialApproximationPatterns(patterns);
-        populateExpandRoundEvenPattern(patterns);
-      }
-    };
-
     // Order matters here.
     llvm::SmallVector<std::pair<StringRef, PatternFunction>> patternMap = {
         {"tan", populateExpandTanPattern},
