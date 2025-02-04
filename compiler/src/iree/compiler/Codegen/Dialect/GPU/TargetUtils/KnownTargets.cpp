@@ -1019,6 +1019,35 @@ const WgpDetails *getSM121WgpDetails() {
   return &sm121Wgp;
 }
 
+const WgpDetails *getAdaWgpDetails() {
+  // Ada (sm_89) exposes the same tensor-core instructions as Ampere-class
+  // hardware.
+  static const MMAIntrinsic mmaOps[] = {
+      MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16,
+      MMAIntrinsic::NV_MMA_SYNC_F16_16x8x16_F16,
+      MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_BF16,
+      MMAIntrinsic::NV_WMMA_F32_16x16x16_F16,
+      MMAIntrinsic::NV_WMMA_F16_16x16x16_F16,
+  };
+  static const WgpDetails adaWgp = {allComputeBits,
+                                    allStorageBits,
+                                    allSubgroupOps,
+                                    allDotProductOps,
+                                    std::size(mmaOps),
+                                    mmaOps,
+                                    0,
+                                    nullptr,
+                                    {32, 32},
+                                    {1024, 1024, 1024},
+                                    1024,
+                                    // sm_89 caps shared memory at 99 KB per
+                                    // block (100 KB per SM); the 128 KB figure
+                                    // is the unified L1+shared size.
+                                    99 * 1024,
+                                    {0x7fffffff, 0xffff, 0xffff}};
+  return &adaWgp;
+}
+
 // Reports Ampere-class NVIDIA tensor core capabilities for GPU target
 // selection.
 const WgpDetails *getAmpereWgpDetails() {
@@ -1136,12 +1165,17 @@ const WgpDetails *getPascalWgpDetails() {
 std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
   const WgpDetails *sm120Wgp = getSM120WgpDetails();
   const WgpDetails *sm121Wgp = getSM121WgpDetails();
+  const WgpDetails *adaWgp = getAdaWgpDetails();
   const WgpDetails *ampereWgp = getAmpereWgpDetails();
   const WgpDetails *turingWgp = getTuringWgpDetails();
   const WgpDetails *voltaWgp = getVoltaWgpDetails();
   const WgpDetails *pascalWgp = getPascalWgpDetails();
 
   static const ChipDetails a100Chip = {108};
+  static const ChipDetails rtx4090Chip = {128};
+  static const ChipDetails rtx4080Chip = {76};
+  static const ChipDetails rtx4070Chip = {46};
+  static const ChipDetails rtx4060Chip = {24};
   static const ChipDetails rtx3090tiChip = {84};
   static const ChipDetails rtx3090Chip = {82};
   static const ChipDetails rtx3080tiChip = {80};
@@ -1153,15 +1187,18 @@ std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
   // lists mappings from microarchitectures to compute capabilities.
 
   std::string lowerTarget = target.lower();
-  // Treat RTX 40 family aliases as Ada-class devices when no exact chip is
-  // named.
-  if (StringRef(lowerTarget).starts_with("rtx40")) {
-    return TargetDetails{ampereWgp, nullptr};
-  }
 
   return llvm::StringSwitch<std::optional<TargetDetails>>(lowerTarget)
       // https://www.techpowerup.com/gpu-specs/a100-sxm4-80-gb.c3746
       .Case("a100", TargetDetails{ampereWgp, &a100Chip})
+      // https://www.techpowerup.com/gpu-specs/geforce-rtx-4090.c3889
+      .Case("rtx4090", TargetDetails{adaWgp, &rtx4090Chip})
+      // https://www.techpowerup.com/gpu-specs/geforce-rtx-4080.c3888
+      .Case("rtx4080", TargetDetails{adaWgp, &rtx4080Chip})
+      // https://www.techpowerup.com/gpu-specs/geforce-rtx-4070.c3924
+      .Case("rtx4070", TargetDetails{adaWgp, &rtx4070Chip})
+      // https://www.techpowerup.com/gpu-specs/geforce-rtx-4060.c4107
+      .Case("rtx4060", TargetDetails{adaWgp, &rtx4060Chip})
       // https://www.techpowerup.com/gpu-specs/geforce-rtx-3090-ti.c3829
       .Case("rtx3090ti", TargetDetails{ampereWgp, &rtx3090tiChip})
       // https://www.techpowerup.com/gpu-specs/geforce-rtx-3090.c3622
@@ -1179,7 +1216,7 @@ std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
       // validation.
       .Case("sm_120", TargetDetails{sm120Wgp, nullptr})
       .Case("sm_121", TargetDetails{sm121Wgp, nullptr})
-      .Cases({"ada", "sm_89"}, TargetDetails{ampereWgp, nullptr})
+      .Cases({"ada", "sm_89"}, TargetDetails{adaWgp, nullptr})
       .Cases({"ampere", "sm_80", "sm_86", "sm_87"},
              TargetDetails{ampereWgp, nullptr})
       .Cases({"turing", "sm_75"}, TargetDetails{turingWgp, nullptr})
