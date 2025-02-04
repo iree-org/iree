@@ -229,8 +229,8 @@ struct ConvertTensorCloneOp
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto cloneOp = rewriter.create<IREE::Stream::TensorCloneOp>(
         op.getLoc(), unknownType, operand.resource, op.getOperand().getType(),
-        op.getArgumentDims(), operand.resourceSize, op.getResult().getType(),
-        flattenValues(adaptor.getArgumentDims()), operand.resourceSize,
+        op.getOperandDims(), operand.resourceSize, op.getResult().getType(),
+        flattenValues(adaptor.getOperandDims()), operand.resourceSize,
         executionAffinityAttr);
     rewriter.replaceOpWithMultiple(op, {{cloneOp, operand.resourceSize}});
     return success();
@@ -249,7 +249,7 @@ struct ConvertTensorBarrierOp
     auto barrierOp = rewriter.create<IREE::Stream::AsyncBarrierOp>(
         op.getLoc(), operand.resource.getType(), operand.resource,
         operand.resourceSize,
-        /*affinity=*/operand.affinity);
+        /*affinity=*/executionAffinityAttr);
     rewriter.replaceOpWithMultiple(op, {{barrierOp, operand.resourceSize}});
     return success();
   }
