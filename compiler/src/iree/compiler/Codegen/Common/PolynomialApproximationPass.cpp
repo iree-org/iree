@@ -35,7 +35,8 @@ public:
   void runOnOperation() override {
 
     using PatternFunction = llvm::function_ref<void(RewritePatternSet &)>;
-    llvm::StringMap<PatternFunction> patternMap = {
+    // Order matters here.
+    llvm::SmallVector<std::pair<StringRef, PatternFunction>> patternMap = {
         {"tan", populateExpandTanPattern},
         {"sinh", populateExpandSinhPattern},
         {"cosh", populateExpandCoshPattern},
