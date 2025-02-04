@@ -21,6 +21,9 @@ using llvm::APIntOps::GreatestCommonDivisor;
 
 namespace mlir::iree_compiler {
 
+// Threshold used to determine whether a matmul dimension is 'very skinny'.
+constexpr int64_t kVerySkinnyDimThreshold = 4;
+
 template <typename T>
 static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                                      const llvm::SmallVectorImpl<T> &vector) {
@@ -77,17 +80,17 @@ calculateResultSharedMemoryUsedInBytes(const GPUMMASchedule &schedule,
 static bool isScheduleAligned(const GPUMatmulShapeType &problem,
                               const GPUMMASchedule &schedule,
                               bool mustBeAligned) {
-  SmallVector<int64_t> alignedMSizes(problem.mSizes);
+  SmallVector<int64_t, 2> alignedMSizes(problem.mSizes);
   alignedMSizes.back() =
       mustBeAligned ? problem.mSizes.back()
                     : llvm::divideCeil(problem.mSizes.back(), schedule.mSize) *
                           schedule.mSize;
-  SmallVector<int64_t> alignedNSizes(problem.nSizes);
+  SmallVector<int64_t, 2> alignedNSizes(problem.nSizes);
   alignedNSizes.back() =
       mustBeAligned ? problem.nSizes.back()
                     : llvm::divideCeil(problem.nSizes.back(), schedule.nSize) *
                           schedule.nSize;
-  SmallVector<int64_t> alignedKSizes(problem.kSizes);
+  SmallVector<int64_t, 2> alignedKSizes(problem.kSizes);
   alignedKSizes.back() =
       mustBeAligned ? problem.kSizes.back()
                     : llvm::divideCeil(problem.kSizes.back(), schedule.kSize) *
@@ -106,7 +109,7 @@ static bool isScheduleAligned(const GPUMatmulShapeType &problem,
       };
   // Checks whether the elements of `a` are evenly divisible by the
   // corresponding elements of `b`.
-  auto areAligned = [](SmallVector<int64_t> a, SmallVector<int64_t> b) {
+  auto areAligned = [](SmallVector<int64_t, 2> a, SmallVector<int64_t, 2> b) {
     for (auto [aVal, bVal] : llvm::zip_equal(a, b)) {
       if (aVal % bVal != 0) {
         return false;
@@ -223,6 +226,7 @@ static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
 
 static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
                                         const GPUMatmulShapeType &intrinsic,
+                                        int64_t preferredSubgroupSize,
                                         bool canUpcastAcc, bool mustBeAligned) {
   assert(intrinsic.mSizes.size() == 1 && intrinsic.nSizes.size() == 1 &&
          intrinsic.kSizes.size() == 1 &&
@@ -240,12 +244,17 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
     }
   }
 
-  if (mustBeAligned && (problem.mSizes.back() % intrinsic.mSizes[0] != 0 ||
-                        problem.nSizes.back() % intrinsic.nSizes[0] != 0 ||
-                        problem.kSizes.back() % intrinsic.kSizes[0] != 0)) {
-    return failure(); // Cannot use this intrinsic for misaligned cases.
+  if (mustBeAligned) {
+    if ((problem.mSizes.back() % intrinsic.mSizes[0] != 0 ||
+         problem.nSizes.back() % intrinsic.nSizes[0] != 0 ||
+         problem.kSizes.back() % intrinsic.kSizes[0] != 0)) {
+      return failure();
+    }
+    return success();
   }
 
+  // Send very skinny, {2-4}xNxK and Mx{2-4}xK, matmuls to the vector reduction
+  // pipeline, similar to matvec.
   // TODO: Figure out what the precise cutoff is, this may be machine dependent.
   // In situation when alignment isn't required, we disallow intrinsics to be
   // picked if the tile size is too small. For example, this will force a matmul
@@ -255,10 +264,15 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
   // established after we sweep the different tile sizes for a problem config.
   // Once a precise threshold is established, replace 4 with the threshold and
   // remove this todo.
-  if (!mustBeAligned &&
-      (problem.mSizes.back() < 4 || problem.nSizes.back() < 4 ||
-       problem.kSizes.back() < 4)) {
-    return failure();
+  if (llvm::all_equal({problem.mSizes.size(), problem.nSizes.size(),
+                       problem.kSizes.size(), size_t{1}}) &&
+      problem.batchSizes.empty()) {
+    int64_t mSize = problem.mSizes.back();
+    int64_t nSize = problem.nSizes.back();
+    if ((mSize <= kVerySkinnyDimThreshold && (nSize > preferredSubgroupSize)) ||
+        (nSize <= kVerySkinnyDimThreshold && (mSize > preferredSubgroupSize))) {
+      return failure();
+    }
   }
   return success();
 }
@@ -279,8 +293,8 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
   // 16x16x16 intrinsic, then:
   //  - mTotalTileCounts would be 4 * (16/16) = 4
   //  - nTotalTileCounts would be 2 * (32/16) = 4
-  SmallVector<int64_t> mTotalTileCounts = problem.mSizes;
-  SmallVector<int64_t> nTotalTileCounts = problem.nSizes;
+  SmallVector<int64_t, 2> mTotalTileCounts = problem.mSizes;
+  SmallVector<int64_t, 2> nTotalTileCounts = problem.nSizes;
   mTotalTileCounts.back() =
       llvm::divideCeil(problem.mSizes.back(), intrinsic.mSizes[0]);
   nTotalTileCounts.back() =
@@ -361,7 +375,7 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
   // For the problem described above {M:[4, 16], N:[2, 32], K[3, 128]} with a
   // 16x16x16 intrinsic, then:
   //  - kTotalTileCounts would be 3 * (128/16) = 24
-  SmallVector<int64_t> kTotalTileCounts = problem.kSizes;
+  SmallVector<int64_t, 2> kTotalTileCounts = problem.kSizes;
   kTotalTileCounts.back() =
       llvm::divideCeil(problem.kSizes.back(), intrinsic.kSizes[0]);
   // Compute the ideal number of intrinsics along K per subgroup based on the
@@ -395,8 +409,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     int64_t subgroupSize, bool transposedLhs, bool transposedRhs,
     bool canUpcastAcc, bool mustBeAligned, bool doCPromotion) {
   for (auto [index, intrinsic] : llvm::enumerate(intrinsics)) {
-    if (failed(canTargetIntrinsic(problem, intrinsic, canUpcastAcc,
-                                  mustBeAligned))) {
+    if (failed(canTargetIntrinsic(problem, intrinsic, subgroupSize,
+                                  canUpcastAcc, mustBeAligned))) {
       continue;
     }
 
@@ -450,13 +464,13 @@ FailureOr<GPUMMASchedule> deduceAttentionSchedule(
          qkMatmul.nSizes.size() == 1 && qkMatmul.kSizes.size() == 1 &&
          "unimplemented: multi M/N/K attention schedule");
   for (auto [index, intrinsic] : llvm::enumerate(intrinsics)) {
-    if (failed(canTargetIntrinsic(qkMatmul, intrinsic, canUpcastAcc,
-                                  mustBeAligned))) {
+    if (failed(canTargetIntrinsic(qkMatmul, intrinsic, subgroupSize,
+                                  canUpcastAcc, mustBeAligned))) {
       continue;
     }
 
-    if (failed(canTargetIntrinsic(pvMatmul, intrinsic, canUpcastAcc,
-                                  mustBeAligned))) {
+    if (failed(canTargetIntrinsic(pvMatmul, intrinsic, subgroupSize,
+                                  canUpcastAcc, mustBeAligned))) {
       continue;
     }
 
