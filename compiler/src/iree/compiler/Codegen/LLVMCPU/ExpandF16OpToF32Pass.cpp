@@ -63,6 +63,9 @@ struct ExpandF16OpToF32Pass
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());
     patterns.insert<ExpandF16OpToF32Pattern<arith::MaximumFOp>>(context);
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 } // namespace
