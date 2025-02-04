@@ -186,10 +186,6 @@ static const char *getDefaultEnabledUkernels(Attribute attr) {
     return "mmt4d";
   }
   if (isAArch64(targetAttr)) {
-    if (hasFeature(targetAttr, "+sve") || hasFeature(targetAttr, "+sve2") ||
-        hasFeature(targetAttr, "+sme")) {
-      return kNone;
-    }
     return "mmt4d";
   }
   return kNone;
