@@ -5,10 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/Math/Transforms/Approximation.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -35,6 +33,7 @@ public:
   using Base::Base;
 
   void runOnOperation() override {
+
     using PatternFunction = llvm::function_ref<void(RewritePatternSet &)>;
     llvm::StringMap<PatternFunction> patternMap = {
         {"tan", populateExpandTanPattern},
@@ -47,7 +46,13 @@ public:
         {"fpowi", populateExpandFPowIPattern},
         {"erf",
          [&](RewritePatternSet &patterns) {
-           this->populateErfPattern(patterns);
+           if (clNativeMathPrecision) {
+             patterns.add<math::ErfPolynomialApproximation>(&getContext());
+           } else {
+             populateExpandExp2FPattern(patterns);
+             populateMathPolynomialApproximationPatterns(patterns);
+             populateExpandRoundEvenPattern(patterns);
+           }
          }},
     };
 
@@ -63,17 +68,6 @@ public:
     if (failed(
             applyPatternsGreedily(getOperation(), std::move(mathPatterns)))) {
       return signalPassFailure();
-    }
-  }
-
-  void populateErfPattern(RewritePatternSet &mathPatterns) {
-    // TODO(lialan): retire the flag and clean up.
-    if (clNativeMathPrecision) {
-      mathPatterns.add<math::ErfPolynomialApproximation>(&getContext());
-    } else {
-      populateExpandExp2FPattern(mathPatterns);
-      populateMathPolynomialApproximationPatterns(mathPatterns);
-      populateExpandRoundEvenPattern(mathPatterns);
     }
   }
 };
