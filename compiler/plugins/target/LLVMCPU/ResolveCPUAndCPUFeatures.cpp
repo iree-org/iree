@@ -81,16 +81,8 @@ void tweakCPUFeatures(const llvm::Triple &triple, std::string &cpu,
                       std::string &cpuFeatures) {
   if (triple.isAArch64()) {
     llvm::SubtargetFeatures targetCpuFeatures(cpuFeatures);
-    // Helper to add a feature if not already present. This check matters as
-    // we check for equality of features to tell whether to generate the error
-    // about implicitly targeting a generic CPU.
-    auto addFeature = [&](const char *feature) {
-      if (!targetCpuFeatures.hasFlag(std::string("+") + feature)) {
-        targetCpuFeatures.AddFeature(feature, true);
-      }
-    };
     // x18 is platform-reserved per the Aarch64 procedure call specification.
-    addFeature("reserve-x18");
+    targetCpuFeatures.AddFeature("reserve-x18", true);
     cpuFeatures = targetCpuFeatures.getString();
   }
 }
