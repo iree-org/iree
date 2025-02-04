@@ -6536,13 +6536,18 @@ lowering.</p>
 </tbody>
 </table>
 <h4 id="flowtensorbarrier-flowtensorbarrierop"><code>flow.tensor.barrier</code> (Flow::TensorBarrierOp)<a class="headerlink" href="#flowtensorbarrier-flowtensorbarrierop" title="Permanent link">link</a></h4>
+<p><em>Indicates a value that must have a specific affinity</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.barrier` $operand `:` type($result) (`{` $argument_dims^ `}`)?
+<div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.barrier` $operand `:` type($result) (`{` $operand_dims^ `}`)?
               `on` $target
               attr-dict-with-keyword
 </code></pre></div>
+<p>Prevents fusion and scheduling of a value across an affinity boundary.
+May introduce copy-on-write behavior if the operand value is used as well as
+the result and users should try to keep the operand to a single use by this
+op.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>HoistableOpInterface</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>HoistableOpInterface</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_18">Attributes:<a class="headerlink" href="#attributes_18" title="Permanent link">link</a></h5>
 <table>
@@ -6564,7 +6569,7 @@ lowering.</p>
 <td>ranked tensor of any type values</td>
 </tr>
 <tr>
-<td style="text-align: center;"><code>argument_dims</code></td>
+<td style="text-align: center;"><code>operand_dims</code></td>
 <td>variadic of index</td>
 </tr>
 </tbody>
@@ -6637,7 +6642,7 @@ lowering.</p>
 <h4 id="flowtensorclone-flowtensorcloneop"><code>flow.tensor.clone</code> (Flow::TensorCloneOp)<a class="headerlink" href="#flowtensorclone-flowtensorcloneop" title="Permanent link">link</a></h4>
 <p><em>Performs a full tensor clone operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.clone` $operand `:` type($result) (`{` $argument_dims^ `}`)?
+<div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.clone` $operand `:` type($result) (`{` $operand_dims^ `}`)?
               attr-dict-with-keyword
 </code></pre></div>
 <p>Clones the input tensor into an identical output tensor.</p>
@@ -6658,7 +6663,7 @@ lowering.</p>
 <td>ranked tensor of any type values</td>
 </tr>
 <tr>
-<td style="text-align: center;"><code>argument_dims</code></td>
+<td style="text-align: center;"><code>operand_dims</code></td>
 <td>variadic of index</td>
 </tr>
 </tbody>
@@ -7126,7 +7131,7 @@ values being traced.</p>
 <h4 id="flowtensortransfer-flowtensortransferop"><code>flow.tensor.transfer</code> (Flow::TensorTransferOp)<a class="headerlink" href="#flowtensortransfer-flowtensortransferop" title="Permanent link">link</a></h4>
 <p><em>Transfers a tensor to a target by copying if needed</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.transfer` $operand `:` type($result) (`{` $argument_dims^ `}`)?
+<div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.transfer` $operand `:` type($result) (`{` $operand_dims^ `}`)?
               `to` $target
               attr-dict-with-keyword
 </code></pre></div>
@@ -7158,7 +7163,7 @@ context is required.</p>
 <td>ranked tensor of any type values</td>
 </tr>
 <tr>
-<td style="text-align: center;"><code>argument_dims</code></td>
+<td style="text-align: center;"><code>operand_dims</code></td>
 <td>variadic of index</td>
 </tr>
 </tbody>

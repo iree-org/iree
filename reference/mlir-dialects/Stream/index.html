@@ -6933,16 +6933,19 @@ result must assume nothing of the contents and use <code>discard</code> access.<
 </tbody>
 </table>
 <h4 id="streamasyncbarrier-streamasyncbarrierop"><code>stream.async.barrier</code> (Stream::AsyncBarrierOp)<a class="headerlink" href="#streamasyncbarrier-streamasyncbarrierop" title="Permanent link">link</a></h4>
+<p><em>Indicates a value that must have a specific affinity</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `stream.async.barrier` $source `:` type($source)
+<div class="highlight"><pre><span></span><code>operation ::= `stream.async.barrier` (`on` `(` $affinity^ `)`)?
+              $source `:` type($source)
               `` `{` $size `}`
-              (`from` `(` $affinity^ `)`)?
-              `-&gt;`
-              type($result)
               attr-dict-with-keyword
 </code></pre></div>
+<p>Prevents fusion and scheduling of a value across an affinity boundary.
+May introduce copy-on-write behavior if the operand value is used as well as
+the result and users should try to keep the operand to a single use by this
+op.</p>
 <p>Traits: <code>Stream_AsyncPhaseOp</code></p>
-<p>Interfaces: <code>Stream_AffinityOp</code>, <code>StreamableOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Interfaces: <code>InferTypeOpInterface</code>, <code>Stream_AffinityOp</code>, <code>StreamableOpInterface</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
