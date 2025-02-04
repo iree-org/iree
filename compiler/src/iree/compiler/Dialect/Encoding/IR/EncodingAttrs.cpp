@@ -4,12 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cassert>
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/Utils.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -17,6 +19,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
@@ -313,9 +316,36 @@ std::string stringifyOperandIndex(IntegerAttr valueAttr) {
 Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
     Location loc, OpBuilder &builder, RankedTensorType type,
     ValueRange dynamicDims) const {
-  // TODO(kuhar): Add sizeof calculation.
-  assert(false && "Unimplemented");
-  return nullptr;
+  ArrayRef<int32_t> padding = getPadding().asArrayRef();
+  assert(padding.size() == type.getRank() && "Invalid padding");
+
+  const int64_t elementSize = getRoundedElementByteWidth(type.getElementType());
+  int64_t staticProduct = elementSize;
+  Value dynamicProduct = builder.create<arith::ConstantIndexOp>(loc, 1);
+
+  size_t dynamicDimIdx = 0;
+  for (auto [dimSize, padValue] : llvm::zip_equal(type.getShape(), padding)) {
+    if (!ShapedType::isDynamic(dimSize)) {
+      staticProduct *= (dimSize + padValue);
+      continue;
+    }
+
+    Value dynamicDimSize = dynamicDims[dynamicDimIdx];
+    ++dynamicDimIdx;
+
+    if (padValue != 0) {
+      dynamicDimSize = builder.create<arith::AddIOp>(
+          loc, dynamicDimSize,
+          builder.create<arith::ConstantIndexOp>(loc, padValue),
+          arith::IntegerOverflowFlags::nsw);
+    }
+    dynamicProduct = builder.createOrFold<arith::MulIOp>(
+        loc, dynamicProduct, dynamicDimSize, arith::IntegerOverflowFlags::nsw);
+  }
+
+  return builder.createOrFold<arith::MulIOp>(
+      loc, builder.create<arith::ConstantIndexOp>(loc, staticProduct),
+      dynamicProduct, arith::IntegerOverflowFlags::nsw);
 }
 
 //===---------------------------------------------------------------------===//
