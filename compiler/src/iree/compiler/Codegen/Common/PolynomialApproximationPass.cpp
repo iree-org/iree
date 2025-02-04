@@ -35,6 +35,17 @@ public:
   void runOnOperation() override {
 
     using PatternFunction = llvm::function_ref<void(RewritePatternSet &)>;
+
+    auto populateErfPattern = [&](RewritePatternSet &patterns) {
+      if (clNativeMathPrecision) {
+        patterns.add<math::ErfPolynomialApproximation>(&getContext());
+      } else {
+        populateExpandExp2FPattern(patterns);
+        populateMathPolynomialApproximationPatterns(patterns);
+        populateExpandRoundEvenPattern(patterns);
+      }
+    };
+
     // Order matters here.
     llvm::SmallVector<std::pair<StringRef, PatternFunction>> patternMap = {
         {"tan", populateExpandTanPattern},
@@ -45,16 +56,7 @@ public:
         {"atanh", populateExpandAtanhPattern},
         {"powf", populateExpandPowFPattern},
         {"fpowi", populateExpandFPowIPattern},
-        {"erf",
-         [&](RewritePatternSet &patterns) {
-           if (clNativeMathPrecision) {
-             patterns.add<math::ErfPolynomialApproximation>(&getContext());
-           } else {
-             populateExpandExp2FPattern(patterns);
-             populateMathPolynomialApproximationPatterns(patterns);
-             populateExpandRoundEvenPattern(patterns);
-           }
-         }},
+        {"erf", populateErfPattern},
     };
 
     RewritePatternSet mathPatterns(&getContext());
