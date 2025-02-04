@@ -1013,7 +1013,8 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
     auto numParallelDims = parallelLoopRanges.size();
 
     SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
-    std::optional<OpFoldResult> splitDim;
+    std::optional<Value> splitDim;
+    SmallVector<OpFoldResult> splitNumTiles;
     for (size_t dim = 0; dim < numParallelDims; ++dim) {
       if (numParallelDims > maxWorkgroupParallelDims &&
           dim >= maxWorkgroupParallelDims - 1) {
@@ -1030,19 +1031,7 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
         bindSymbols(builder.getContext(), d0, d1, d2);
         OpFoldResult numTiles = affine::makeComposedFoldedAffineApply(
             builder, loc, (d1 - d0).ceilDiv(d2), {offset, size, step});
-        OpFoldResult dimValue;
-        if (dim == numParallelDims - 1)
-          dimValue = splitDim.value();
-        else {
-          dimValue = affine::makeComposedFoldedAffineApply(
-              builder, loc, (d0 % d1), {splitDim.value(), numTiles});
-          splitDim = affine::makeComposedFoldedAffineApply(
-              builder, loc, (d0).floorDiv(d1), {splitDim.value(), numTiles});
-        }
-        procInfo[numParallelDims - dim - 1] = {
-            getValueOrCreateConstantIndexOp(builder, loc, dimValue),
-            getValueOrCreateConstantIndexOp(builder, loc, numTiles),
-            distributionMethod};
+        splitNumTiles.push_back(numTiles);
         continue;
       }
       procInfo[numParallelDims - dim - 1] = {
@@ -1051,6 +1040,20 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
           buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupCountOp>(builder,
                                                                         dim),
           distributionMethod};
+    }
+    if (splitDim) {
+      std::reverse(splitNumTiles.begin(), splitNumTiles.end());
+      auto delinearized = builder.create<affine::AffineDelinearizeIndexOp>(
+          loc, *splitDim, splitNumTiles, /*hasOuterBound=*/true);
+      for (auto [i, id, numTiles] :
+           llvm::enumerate(delinearized.getResults(), splitNumTiles)) {
+        // We iterate the delinearize results from slowest up to fastest, and
+        // we know that these are all the highest values of dimension. That is,
+        // `i = 0` corresponds to the `numParallelDims - 1`-th dimension.
+        procInfo[i] = {id,
+                       getValueOrCreateConstantIndexOp(builder, loc, numTiles),
+                       distributionMethod};
+      }
     }
     return procInfo;
   }};
