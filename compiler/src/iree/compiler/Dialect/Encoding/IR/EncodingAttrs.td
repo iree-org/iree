@@ -54,7 +54,7 @@ def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
 
 def EncodingAttr :
     IREEEncoding_Attr<"Encoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializedEncodingAttrInterface , [
         "calculateStorageSizeInBytes",
       ]>
     ]> {
@@ -130,6 +130,93 @@ def EncodingAttr :
     EncodingAttr cloneWithLayouts(ArrayRef<Attribute> layouts);
   }];
 
+  let genVerifyDecl = 0;
+}
+
+//===---------------------------------------------------------------------===//
+// encoding.pad_encoding_layout
+//===---------------------------------------------------------------------===//
+
+def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializedEncodingAttrInterface,
+        ["calculateStorageSizeInBytes"]>
+    ]> {
+  let mnemonic = "pad_encoding_layout";
+  let assemblyFormat = "`<` $padding `>`";
+
+  let summary = "An attribute that encodes padding values of tensor dimensions";
+  let description = [{
+    Associates tensor dimensions with pad values (numbers of appended elements).
+    The logical dimensions of the tensors do not change, and the elements in the
+    padded regions are left uninitialized.
+
+    This attribute implements `Encoding::SerializedEncodingLayoutAttrInterface`,
+    to provide a hook for tensor sizeof lowering. The implementation of this
+    interface is backend-agnostic, but the emission of the pad encoding attribute
+    itself can be target- or domain-specific.
+  }];
+
+  let parameters = (ins
+    // How many padding elements to add along each tensor dimension.
+    "DenseI32ArrayAttr":$padding
+  );
+}
+
+//===---------------------------------------------------------------------===//
+// Encoding specialization attributes, which are mainly for testing purpose.
+//===---------------------------------------------------------------------===//
+
+def UnspecializedEncodingAttr :
+    IREEEncoding_Attr<"UnspecializedEncoding", [
+      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutAttrInterface, [
+        "cloneWithSimplifiedConfig",
+      ]>
+    ]> {
+  let mnemonic = "unspecialized_encoding";
+
+  let summary = "An attribute that indicates the encoding is not yet specialized";
+
+  let description = [{
+    This attribute indicates this is an unspecialized encoding. It implements
+    very basic interface methods of EncodingLayoutAttrInterface that converts
+    it to the SpecializeEncodingAttr during encoding specialization. It is
+    mainly for testing purpose as some transformations do not depend on actual
+    dialects that implement the attribute interface.
+  }];
+
+  let parameters = (ins
+    AttrParameter<"IntegerAttr", "The seed that attached on the attribute. "
+    "Different seed values indicate different layouts.">:$seed
+  );
+
+  let hasCustomAssemblyFormat = 1;
+  let genVerifyDecl = 0;
+}
+
+def SpecializedEncodingAttr :
+    IREEEncoding_Attr<"SpecializedEncoding", [
+      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutAttrInterface, [
+        "getLayout",
+      ]>
+    ]> {
+  let mnemonic = "specialized_encoding";
+
+  let summary = "An attribute that indicates the encoding is specialized";
+
+  let description = [{
+    This attribute is similar to UnspecializedEncodingAttr, but with an optional
+    type. The attribute denotes the layout of the type. Different seed values
+    indicate different layouts, which can be used to emulate different encoding
+    attributes.
+  }];
+
+  let parameters = (ins
+    AttrParameter<"IntegerAttr", "The seed that attached on the attribute. "
+    "Different seed values indicate different layouts.">:$seed,
+    AttrParameter<"TypeAttr", "">:$type
+  );
+
+  let hasCustomAssemblyFormat = 1;
   let genVerifyDecl = 0;
 }
 

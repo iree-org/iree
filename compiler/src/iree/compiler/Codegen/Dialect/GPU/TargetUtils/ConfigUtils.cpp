@@ -123,10 +123,14 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   SmallVector<GPUMatmulShapeType> intrinsics;
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
-    auto [mSize, nSize, kSize] = mma.getMNKShape();
-    auto [aType, bType, cType] = mma.getABCElementTypes();
+    // Intrinsics that do not specify a scope cannot be distributed.
+    if (failed(mma.getMmaScope()))
+      continue;
     if (mma.getSubgroupSize() != targetSubgroupSize)
       continue;
+
+    auto [mSize, nSize, kSize] = mma.getMNKShape();
+    auto [aType, bType, cType] = mma.getABCElementTypes();
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
   }
   if (intrinsics.empty())
@@ -198,20 +202,26 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   // Gather all static M, N, and K dimensions to deduce the MMASchedule. Dynamic
   // dimensions will be tiled to 1 in workgroup tiling, so they are ignored when
   // computing an MMA schedule.
-  SmallVector<int64_t> mDims, nDims, kDims;
-  for (auto mDim : contractionDims.m) {
+  SmallVector<int64_t> mDims, nDims, kDims, batchDims;
+  for (int64_t mDim : contractionDims.m) {
     if (!ShapedType::isDynamic(bounds[mDim])) {
       mDims.push_back(mDim);
     }
   }
-  for (auto nDim : contractionDims.n) {
+  for (int64_t nDim : contractionDims.n) {
     if (!ShapedType::isDynamic(bounds[nDim])) {
       nDims.push_back(nDim);
     }
   }
-  for (auto kDim : contractionDims.k) {
+  for (int64_t kDim : contractionDims.k) {
     if (!ShapedType::isDynamic(bounds[kDim])) {
       kDims.push_back(kDim);
+    }
+  }
+
+  for (int64_t batchDim : contractionDims.batch) {
+    if (!ShapedType::isDynamic(bounds[batchDim])) {
+      batchDims.push_back(batchDim);
     }
   }
 
@@ -229,8 +239,9 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   Type initElemType = getElementTypeOrSelf(init);
 
   GPUMatmulShapeType problem{getDimBounds(mDims), getDimBounds(nDims),
-                             getDimBounds(kDims), lhsElemType,
-                             rhsElemType,         initElemType};
+                             getDimBounds(kDims), getDimBounds(batchDims),
+                             lhsElemType,         rhsElemType,
+                             initElemType};
 
   // Infer if lhs or rhs is transposed to help generate better schedule.
   // TODO: Drop this. This is only a consideration for other pipelines.
@@ -335,9 +346,16 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     // shapes do not require c promotion.
     GPU::setPromotedOperandList(context, attrs, {0, 1, 2});
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
+
+    // Initialize inner and outer padding sizes from reductionTileSizes.
+    for (int64_t kDim : kDims) {
+      paddingTileSizes[kDim] = reductionTileSizes[kDim];
+    }
+
     int64_t innerKDim = contractionDims.k.back();
     int64_t kPackFactor = std::get<2>(mmaKind.getMNKShape());
-    paddingTileSizes[innerKDim] = reductionTileSizes[innerKDim] * kPackFactor;
+    paddingTileSizes[innerKDim] *= kPackFactor;
+
     attrs.emplace_back(StringAttr::get(context, "padding"),
                        b.getI64ArrayAttr(paddingTileSizes));
   }
@@ -364,22 +382,22 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
     return failure();
 
   LDBG("IGEMM TileAndFuse Config");
-  FailureOr<SmallVector<AffineMap>> igemmContractionMaps =
-      LinalgExt::getIGEMMContractionIndexingMaps(linalgOp);
-  FailureOr<SmallVector<int64_t>> igemmLoopBounds =
-      LinalgExt::getIGEMMLoopBounds(linalgOp);
-  FailureOr<SmallVector<Value>> igemmOperands =
-      LinalgExt::getIGEMMOperands(linalgOp);
-  if (failed(igemmContractionMaps) || failed(igemmLoopBounds) ||
-      failed(igemmOperands)) {
+  FailureOr<LinalgExt::IGEMMGenericConvDetails> igemmGenericConvDetails =
+      LinalgExt::getIGEMMGenericConvDetails(linalgOp);
+  if (failed(igemmGenericConvDetails)) {
     LDBG("Unsupported convolution type");
     return failure();
   }
+  SmallVector<AffineMap> igemmContractionMaps =
+      igemmGenericConvDetails->igemmContractionMaps;
+  SmallVector<int64_t> igemmLoopBounds =
+      igemmGenericConvDetails->igemmLoopBounds;
+  SmallVector<Value> igemmOperands = igemmGenericConvDetails->igemmOperands;
 
-  SmallVector<int64_t> bounds = igemmLoopBounds.value();
+  SmallVector<int64_t> bounds = igemmLoopBounds;
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
-      getMatmulLoweringConfigAndWorkgroupSize(
-          bounds, igemmContractionMaps.value(), igemmOperands.value(), target);
+      getMatmulLoweringConfigAndWorkgroupSize(bounds, igemmContractionMaps,
+                                              igemmOperands, target);
   if (failed(configAndWgSize)) {
     return failure();
   }
@@ -531,11 +549,10 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
                    [](AffineMap map) { return map.isProjectedPermutation(); });
   bool powTwo =
       llvm::all_of(linalgOp->getOperands(), elementHasPowerOfTwoBitwidth);
-  bool staticShape = llvm::none_of(loopBounds, ShapedType::isDynamic);
 
   // Require all affine maps to be projected permutation so that we can
   // generate vector transfer ops.
-  bool vectorizable = projPerm && powTwo && staticShape;
+  bool vectorizable = projPerm && powTwo;
 
   const unsigned minBitwidth = getMinElementBitwidth(linalgOp);
   // Make sure we use a tile size that results in some integral number of bytes.
@@ -790,14 +807,26 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
   int64_t numBatch = scatter.getBatchRank();
   // Currently bufferization will fail if the only dimension distributed to
   // workgroups is the batch dims because the workgroup level slice will fold
-  // away and cause a mismatch.
-  // TODO(qedawkins): Support this case.
+  // away and cause a mismatch. To work around this we ensure that at least one
+  // inner dim is always at least partially distributed to workgroups.
   if (llvm::all_of_zip(llvm::drop_begin(workgroupTileSizes, numBatch),
                        llvm::drop_begin(loopBounds, numBatch),
                        [](int64_t tileSize, int64_t bound) {
                          return tileSize == bound || tileSize == 0;
                        })) {
-    return failure();
+    bool hasNonUnitInnerSlice = false;
+    for (int i = numBatch, e = loopDepth; i < e; ++i) {
+      if (workgroupTileSizes[i] > 1) {
+        workgroupTileSizes[i] /= 2;
+        hasNonUnitInnerSlice = true;
+        break;
+      }
+    }
+    // If the inner most slice is a single element then we have to bail out.
+    // TODO: Support this case.
+    if (!hasNonUnitInnerSlice) {
+      return failure();
+    }
   }
 
   // Attach the MMA schedule as an attribute to the entry point export function

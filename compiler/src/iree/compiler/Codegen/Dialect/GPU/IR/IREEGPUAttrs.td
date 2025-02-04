@@ -341,6 +341,33 @@ def IREEGPU_GPUEncodingLayoutAttr :
 }
 
 //===----------------------------------------------------------------------===//
+// iree_gpu.gpu_pad_layout
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_GPUPadLayoutAttr : AttrDef<IREEGPU_Dialect, "GPUPadLayout"> {
+  let mnemonic = "gpu_pad_layout";
+  let summary = "The padded encoding layout attribute for GPU targets.";
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let description = [{
+    Describes padding preferences for a given GPU target.
+    This attribute can implement any encoding interface for data-tiling,
+    e.g., Encoding::EncodingLayoutAttrInterface, etc. They should be implemented
+    through external model mechanism because we do not want to relocate
+    domain-specific logic to the dialect implementation, and we can have better
+    code structure. See the implementation in
+    compiler/Codegen/ExternalInterfaces/*.
+  }];
+
+  let parameters = (ins
+    // Relevant target properties that will later allow us to decide the
+    // serialized pad layout.
+    "uint32_t":$cache_line_bytes,
+    "uint32_t":$cache_sets
+  );
+}
+
+//===----------------------------------------------------------------------===//
 // Workgroup processor level description
 //===----------------------------------------------------------------------===//
 
@@ -416,6 +443,8 @@ def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
   let parameters = (ins
     "uint32_t":$wgp_count,
 
+    // An optional SKU identifier to distinguish different models.
+    OptionalParameter<"StringAttr">:$sku,
     // An optional extra dict
     // This field allows to inject more features/limits not supported in the
     // above list for better flexibility.
@@ -530,12 +559,13 @@ def IREEGPU_UKernelConfigAttr  :
   let summary = "An attribute specifying a ukernel that an op can lower to.";
   let description = [{
     An attribute that can be applied to any operation to specify that it has
-    been match with a ukernel that is a legal lowering for it.
+    been matched with a ukernel that is a legal lowering for it.
   }];
   let assemblyFormat = "`<` struct(params) `>`";
   let parameters = (ins
        "StringAttr":$name,
-       "DictionaryAttr":$def_attrs
+       "DictionaryAttr":$def_attrs,
+       DefaultValuedParameter<"int64_t", "0", "Size in bytes of shared memory workspace">:$shared_memory_bytes
   );
 }
 

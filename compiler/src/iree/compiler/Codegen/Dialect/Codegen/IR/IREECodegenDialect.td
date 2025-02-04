@@ -67,6 +67,7 @@ def IREECodegen_Dialect : Dialect {
     /// the module once and can reuse it across all invocations.
     std::mutex libraryMutex;
   }];
+  let useDefaultTypePrinterParser = 1;
   let useDefaultAttributePrinterParser = 1;
   let hasOperationAttrVerify = 1;
 }

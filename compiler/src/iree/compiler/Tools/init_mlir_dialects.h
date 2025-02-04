@@ -29,6 +29,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/LLVMIR/NVVMDialect.h"
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Dialect/LLVMIR/Transforms/InlinerInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -79,6 +80,7 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   mesh::MeshDialect,
                   memref::MemRefDialect,
                   ml_program::MLProgramDialect,
+                  NVVM::NVVMDialect,
                   pdl::PDLDialect,
                   pdl_interp::PDLInterpDialect,
                   scf::SCFDialect,

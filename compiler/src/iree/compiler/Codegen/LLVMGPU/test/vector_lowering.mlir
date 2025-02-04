@@ -12,7 +12,8 @@ module {
 // CHECK-LABEL: func.func @broadcast_read_lowering
 //  CHECK-SAME: (%[[ARG0:.+]]: memref<4096x32xf16>)
 //  CHECK: %[[INIT:.+]] = arith.constant dense<0.000000e+00> : vector<1x8xf16>
-//  CHECK: %[[ELEM:.+]] = memref.load %[[ARG0]]{{.*}} : memref<4096x32xf16>
+//  CHECK: %[[LOAD:.+]] = vector.load %[[ARG0]]{{.*}} : memref<4096x32xf16>
+//  CHECK: %[[ELEM:.+]] = vector.extract %[[LOAD]][0] : f16 from vector<1xf16>
 //  CHECK: %[[SPLAT:.+]] = vector.splat %[[ELEM]] : vector<8xf16>
 //  CHECK: %[[INSERT:.+]] = vector.insert %[[SPLAT]], %[[INIT]] [0] : vector<8xf16> into vector<1x8xf16>
 //  CHECK: return %[[INSERT]]

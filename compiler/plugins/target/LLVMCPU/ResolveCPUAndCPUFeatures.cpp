@@ -6,6 +6,7 @@
 
 #include "compiler/plugins/target/LLVMCPU/ResolveCPUAndCPUFeatures.h"
 
+#include "llvm/TargetParser/AArch64TargetParser.h"
 #include "llvm/TargetParser/Host.h"
 #include "llvm/TargetParser/RISCVTargetParser.h"
 #include "llvm/TargetParser/SubtargetFeature.h"
@@ -61,6 +62,14 @@ resolveCPUFeaturesForCPU(const llvm::Triple &triple, std::string &cpu,
   } else if (triple.isRISCV64()) {
     llvm::SmallVector<std::string> cpuFeatureList;
     addCpuFeatures(llvm::RISCV::getFeaturesForCPU, cpuFeatureList);
+  } else if (triple.isAArch64()) {
+    std::vector<llvm::StringRef> cpuFeatureList;
+    const llvm::AArch64::ArchInfo *cpuArch = llvm::AArch64::getArchForCpu(cpu);
+    llvm::AArch64::getExtensionFeatures(cpuArch->DefaultExts, cpuFeatureList);
+    targetCpuFeatures.AddFeature(cpuArch->ArchFeature);
+    for (const auto &feature : cpuFeatureList) {
+      targetCpuFeatures.AddFeature(feature);
+    }
   } else {
     return ResolveCPUAndCPUFeaturesStatus::UnimplementedMapping;
   }
@@ -72,16 +81,8 @@ void tweakCPUFeatures(const llvm::Triple &triple, std::string &cpu,
                       std::string &cpuFeatures) {
   if (triple.isAArch64()) {
     llvm::SubtargetFeatures targetCpuFeatures(cpuFeatures);
-    // Helper to add a feature if not already present. This check matters as
-    // we check for equality of features to tell whether to generate the error
-    // about implicitly targeting a generic CPU.
-    auto addFeature = [&](const char *feature) {
-      if (!targetCpuFeatures.hasFlag(std::string("+") + feature)) {
-        targetCpuFeatures.AddFeature(feature, true);
-      }
-    };
     // x18 is platform-reserved per the Aarch64 procedure call specification.
-    addFeature("reserve-x18");
+    targetCpuFeatures.AddFeature("reserve-x18", true);
     cpuFeatures = targetCpuFeatures.getString();
   }
 }

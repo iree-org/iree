@@ -65,22 +65,51 @@ func.func @in_nested_region(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>, %5: te
 
 // -----
 
-func.func @multiple_use_tilable_op(%3: tensor<64x256xf32>, %4: tensor<64x256xf32>) -> (tensor<64x256xf32>, tensor<256x64xf32>) {
-  %add_empty = tensor.empty() : tensor<64x256xf32>
+func.func @multiple_use_tilable_op(%3: tensor<64x256xf32>, %4: tensor<64x256xf32>) -> (tensor<64x256xf32>, tensor<64x256xf32>) {
+  %empty = tensor.empty() : tensor<64x256xf32>
   %6 = linalg.add
     ins(%3, %4 : tensor<64x256xf32>, tensor<64x256xf32>)
-    outs(%add_empty : tensor<64x256xf32>) -> tensor<64x256xf32>
-  %transpose_empty = tensor.empty() : tensor<256x64xf32>
-  %7 = linalg.transpose
+    outs(%empty : tensor<64x256xf32>) -> tensor<64x256xf32>
+  %7 = linalg.exp
     ins(%6 : tensor<64x256xf32>)
-    outs(%transpose_empty : tensor<256x64xf32>) permutation = [1, 0]
-  return %6, %7 : tensor<64x256xf32>, tensor<256x64xf32>
+    outs(%empty : tensor<64x256xf32>) -> tensor<64x256xf32>
+  return %6, %7 : tensor<64x256xf32>, tensor<64x256xf32>
 }
 
 // CHECK-LABEL: func.func @multiple_use_tilable_op
 //       CHECK:   %[[ADD_TILING:.+]] = scf.for
 //       CHECK:     linalg.add {{.*}} -> tensor<1x64xf32>
-//       CHECK:   %[[T_TILING:.+]] = scf.for
-//       CHECK:     %[[FUSED_ADD:.+]] = linalg.add {{.*}} -> tensor<64x1xf32>
-//       CHECK:     linalg.transpose ins(%[[FUSED_ADD]]
-//       CHECK:   return %[[ADD_TILING]], %[[T_TILING]]
+//       CHECK:   %[[EXP_TILING:.+]] = scf.for
+//       CHECK:     %[[FUSED_ADD:.+]] = linalg.add {{.*}} -> tensor<1x64xf32>
+//       CHECK:     linalg.exp ins(%[[FUSED_ADD]]
+//       CHECK:   return %[[ADD_TILING]], %[[EXP_TILING]]
+
+// -----
+
+func.func @no_tile_transpose(%arg0: tensor<64x256xf32>) -> tensor<256x64xf32> {
+  %empty = tensor.empty() : tensor<256x64xf32>
+  %0 = linalg.transpose
+    ins(%arg0 : tensor<64x256xf32>)
+    outs(%empty : tensor<256x64xf32>) permutation = [1, 0]
+  return %0 : tensor<256x64xf32>
+}
+
+// CHECK-LABEL: func.func @no_tile_transpose
+//   CHECK-NOT:   scf.for
+//       CHECK:   %[[T:.+]] = linalg.transpose
+//       CHECK:   return %[[T]]
+
+// -----
+
+func.func @no_tile_copy(%arg0: tensor<64x256xf32>) -> tensor<64x256xf32> {
+  %empty = tensor.empty() : tensor<64x256xf32>
+  %0 = linalg.copy
+    ins(%arg0 : tensor<64x256xf32>)
+    outs(%empty : tensor<64x256xf32>) -> tensor<64x256xf32>
+  return %0 : tensor<64x256xf32>
+}
+
+// CHECK-LABEL: func.func @no_tile_copy
+//   CHECK-NOT:   scf.for
+//       CHECK:   %[[COPY:.+]] = linalg.copy
+//       CHECK:   return %[[COPY]]

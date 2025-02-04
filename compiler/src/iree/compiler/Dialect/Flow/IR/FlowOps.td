@@ -1469,14 +1469,14 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
 
   let arguments = (ins
     FLOW_Tensor:$operand,
-    FLOW_ShapeDynamicDims:$argument_dims
+    FLOW_ShapeDynamicDims:$operand_dims
   );
   let results = (outs
     FLOW_Tensor:$result
   );
 
   let assemblyFormat = [{
-    $operand `:` type($result) (`{` $argument_dims^ `}`)?
+    $operand `:` type($result) (`{` $operand_dims^ `}`)?
     attr-dict-with-keyword
   }];
 
@@ -1493,8 +1493,8 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
   let extraClassDeclaration = [{
     bool isHoistableLeafOp() { return false; }
 
-    ValueRange getOperandDynamicDims(unsigned idx) { return getArgumentDims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return getArgumentDims(); }
+    ValueRange getOperandDynamicDims(unsigned idx) { return getOperandDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getOperandDims(); }
   }];
 
   let hasVerifier = 1;
@@ -1506,14 +1506,24 @@ def FLOW_TensorBarrierOp : FLOW_PureOp<"tensor.barrier", [
   AllTypesMatch<["operand", "result"]>,
   DeclareOpInterfaceMethods<Util_HoistableOpInterface>,
   Util_ShapeAwareOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+      "getTiedResult",
+      "getTiedResultOperand",
+      "getTiedResultOperandIndex",
+      "getTiedResultOperandIndices",
+  ]>,
 ]> {
-  let summary = [{}];
+  let summary = [{indicates a value that must have a specific affinity}];
   let description = [{
+    Prevents fusion and scheduling of a value across an affinity boundary.
+    May introduce copy-on-write behavior if the operand value is used as well as
+    the result and users should try to keep the operand to a single use by this
+    op.
   }];
 
   let arguments = (ins
     FLOW_Tensor:$operand,
-    FLOW_ShapeDynamicDims:$argument_dims,
+    FLOW_ShapeDynamicDims:$operand_dims,
     AnyAttr:$target
   );
   let results = (outs
@@ -1521,7 +1531,7 @@ def FLOW_TensorBarrierOp : FLOW_PureOp<"tensor.barrier", [
   );
 
   let assemblyFormat = [{
-    $operand `:` type($result) (`{` $argument_dims^ `}`)?
+    $operand `:` type($result) (`{` $operand_dims^ `}`)?
     `on` $target
     attr-dict-with-keyword
   }];
@@ -1540,8 +1550,8 @@ def FLOW_TensorBarrierOp : FLOW_PureOp<"tensor.barrier", [
   let extraClassDeclaration = [{
     bool isHoistableLeafOp() { return false; }
 
-    ValueRange getOperandDynamicDims(unsigned idx) { return getArgumentDims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return getArgumentDims(); }
+    ValueRange getOperandDynamicDims(unsigned idx) { return getOperandDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getOperandDims(); }
   }];
 
   let hasVerifier = 1;
@@ -1564,7 +1574,7 @@ def FLOW_TensorTransferOp : FLOW_PureOp<"tensor.transfer", [
 
   let arguments = (ins
     FLOW_Tensor:$operand,
-    FLOW_ShapeDynamicDims:$argument_dims,
+    FLOW_ShapeDynamicDims:$operand_dims,
     AnyAttr:$target
   );
   let results = (outs
@@ -1572,7 +1582,7 @@ def FLOW_TensorTransferOp : FLOW_PureOp<"tensor.transfer", [
   );
 
   let assemblyFormat = [{
-    $operand `:` type($result) (`{` $argument_dims^ `}`)?
+    $operand `:` type($result) (`{` $operand_dims^ `}`)?
     `to` $target
     attr-dict-with-keyword
   }];
@@ -1591,8 +1601,8 @@ def FLOW_TensorTransferOp : FLOW_PureOp<"tensor.transfer", [
   let extraClassDeclaration = [{
     bool isHoistableLeafOp() { return false; }
 
-    ValueRange getOperandDynamicDims(unsigned idx) { return getArgumentDims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return getArgumentDims(); }
+    ValueRange getOperandDynamicDims(unsigned idx) { return getOperandDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getOperandDims(); }
   }];
 
   let hasVerifier = 1;

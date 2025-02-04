@@ -66,6 +66,7 @@ struct ROCMOptions {
   std::string bitcodeDirectory = getDefaultBitcodeDirectory();
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
+  bool experimentalPadLayout = false;
   bool slpVectorization = true;
   bool globalISel = false;
 
@@ -105,6 +106,10 @@ struct ROCMOptions {
         cl::desc("Enables microkernels in the HIP compiler backend. May be "
                  "`default`, `none`, `all`, or a comma-separated list of "
                  "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
+    binder.opt<bool>("iree-hip-enable-experimental-pad-layout",
+                     experimentalPadLayout, cl::cat(category),
+                     cl::desc("Enables additional padding on allocations to "
+                              "maximize cache bandwidth."));
 
     binder.list<std::string>(
         "iree-hip-pass-plugin-path", passPlugins,
@@ -228,9 +233,9 @@ public:
   IREE::HAL::ExecutableTargetAttr
   getExecutableTarget(StringRef deviceID, MLIRContext *context) const {
     Builder b(context);
-    SmallVector<NamedAttribute> configItems;
+    SmallVector<NamedAttribute, 4> configItems;
     auto addConfig = [&](StringRef name, Attribute value) {
-      configItems.emplace_back(b.getStringAttr(name), value);
+      configItems.emplace_back(name, value);
     };
 
     if (failed(options.verify(b))) {
@@ -248,6 +253,11 @@ public:
     if (auto target = GPU::getHIPTargetDetails(
             options.target, options.targetFeatures, context)) {
       addConfig("iree.gpu.target", target);
+      if (options.experimentalPadLayout) {
+        if (Attribute encoding = GPU::getHIPTargetEncodingLayoutAttr(target)) {
+          addConfig("encoding", encoding);
+        }
+      }
     }
 
     addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));
@@ -840,12 +850,8 @@ public:
   getDefaultDeviceTarget(MLIRContext *context,
                          const TargetRegistry &targetRegistry) const override {
     Builder b(context);
-
-    SmallVector<NamedAttribute> deviceConfigAttrs;
-    auto deviceConfigAttr = b.getDictionaryAttr(deviceConfigAttrs);
-
-    SmallVector<NamedAttribute> executableConfigAttrs;
-    auto executableConfigAttr = b.getDictionaryAttr(executableConfigAttrs);
+    auto deviceConfigAttr = b.getDictionaryAttr({});
+    auto executableConfigAttr = b.getDictionaryAttr({});
 
     // If we had multiple target environments we would generate one target attr
     // per environment, with each setting its own environment attribute.
@@ -870,12 +876,8 @@ public:
   getDefaultDeviceTarget(MLIRContext *context,
                          const TargetRegistry &targetRegistry) const override {
     Builder b(context);
-
-    SmallVector<NamedAttribute> deviceConfigAttrs;
-    auto deviceConfigAttr = b.getDictionaryAttr(deviceConfigAttrs);
-
-    SmallVector<NamedAttribute> executableConfigAttrs;
-    auto executableConfigAttr = b.getDictionaryAttr(executableConfigAttrs);
+    auto deviceConfigAttr = b.getDictionaryAttr({});
+    auto executableConfigAttr = b.getDictionaryAttr({});
 
     // If we had multiple target environments we would generate one target attr
     // per environment, with each setting its own environment attribute.

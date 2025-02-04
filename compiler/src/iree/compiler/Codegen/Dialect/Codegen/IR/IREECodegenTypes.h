@@ -13,6 +13,11 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Support/LLVM.h"
 
+// clang-format off
+#define GET_TYPEDEF_CLASSES
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h.inc" // IWYU pragma: export
+// clang-format on
+
 namespace mlir::iree_compiler::IREE::Codegen {
 //===----------------------------------------------------------------------===//
 // Layout Struct Types.

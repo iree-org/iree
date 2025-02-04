@@ -15,7 +15,9 @@
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Support/LLVM.h"
@@ -156,18 +158,15 @@ Value EncodingAttr::calculateStorageSizeInBytes(Location loc,
                                                 OpBuilder &builder,
                                                 RankedTensorType type,
                                                 ValueRange dynamicDims) const {
-  if (auto layoutsAttr = getLayouts()) {
-    if (llvm::any_of(layoutsAttr.getValue(), [](Attribute attr) {
-          return !llvm::isa<IREE::Encoding::EncodingLayoutAttrInterface>(attr);
-        })) {
-      return Value();
+  if (ArrayAttr layoutsAttr = getLayouts()) {
+    if (!llvm::all_of(layoutsAttr.getValue(),
+                      llvm::IsaPred<SerializedEncodingLayoutAttrInterface>)) {
+      return nullptr;
     }
 
-    auto layoutsAttrArray =
-        llvm::to_vector_of<IREE::Encoding::EncodingLayoutAttrInterface>(
-            layoutsAttr.getValue());
     Value res;
-    for (auto attr : layoutsAttrArray) {
+    for (auto attr :
+         layoutsAttr.getAsRange<SerializedEncodingLayoutAttrInterface>()) {
       Value requestedSize =
           attr.calculateStorageSizeInBytes(loc, builder, type, dynamicDims);
       if (!res) {
@@ -309,6 +308,86 @@ std::string stringifyOperandIndex(IntegerAttr valueAttr) {
     assert(false && "invalid index");
     return "";
   }
+}
+
+Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
+    Location loc, OpBuilder &builder, RankedTensorType type,
+    ValueRange dynamicDims) const {
+  // TODO(kuhar): Add sizeof calculation.
+  assert(false && "Unimplemented");
+  return nullptr;
+}
+
+//===---------------------------------------------------------------------===//
+// Encoding specialization attributes, which are mainly for testing purpose.
+//===---------------------------------------------------------------------===//
+
+Attribute UnspecializedEncodingAttr::parse(AsmParser &p, Type type) {
+  if (failed(p.parseLess())) {
+    return {};
+  }
+  IntegerAttr seed;
+  if (failed(p.parseAttribute(seed))) {
+    return {};
+  }
+  if (failed(p.parseGreater())) {
+    return {};
+  }
+  return get(p.getContext(), seed);
+}
+
+void UnspecializedEncodingAttr::print(AsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << "<";
+  p.printAttributeWithoutType(getSeed());
+  os << ">";
+}
+
+Attribute
+UnspecializedEncodingAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
+  MLIRContext *ctx = getContext();
+  return SpecializedEncodingAttr::get(ctx, getSeed(), /*type=*/{});
+}
+
+Attribute SpecializedEncodingAttr::parse(AsmParser &p, Type type) {
+  if (failed(p.parseLess())) {
+    return {};
+  }
+
+  IntegerAttr seed;
+  if (failed(p.parseAttribute(seed))) {
+    return {};
+  }
+
+  TypeAttr typeAttr;
+  if (succeeded(p.parseOptionalComma()) && failed(p.parseAttribute(typeAttr))) {
+    return {};
+  }
+
+  if (failed(p.parseGreater())) {
+    return {};
+  }
+  return get(p.getContext(), seed, typeAttr);
+}
+
+void SpecializedEncodingAttr::print(AsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << "<";
+  p.printAttributeWithoutType(getSeed());
+  if (auto typeAttr = getType()) {
+    os << ", ";
+    p.printAttribute(typeAttr);
+  }
+  os << ">";
+}
+
+static RankedTensorType dropEncoding(RankedTensorType type) {
+  return RankedTensorType::get(type.getShape(), type.getElementType());
+}
+
+Attribute SpecializedEncodingAttr::getLayout(RankedTensorType type) const {
+  MLIRContext *ctx = getContext();
+  return get(ctx, getSeed(), TypeAttr::get(dropEncoding(type)));
 }
 
 } // namespace mlir::iree_compiler::IREE::Encoding
