@@ -607,6 +607,8 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
                                   options)) {
           appendToFusionGroup(consumerOp, rootNumber);
           workList.push_back(consumerOp);
+        } else {
+          break;
         }
       }
     }
