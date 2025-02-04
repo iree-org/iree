@@ -156,13 +156,7 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
 
 
   let parameters = (ins
-    mmaintrinsic:$intrinsic,
-    "int64_t":$mSize,
-    "int64_t":$nSize,
-    "int64_t":$kSize,
-    "::mlir::Type":$aType,
-    "::mlir::Type":$bType,
-    "::mlir::Type":$cType
+    mmaintrinsic:$intrinsic
   );
 }
 
@@ -176,26 +170,52 @@ class IREEGPU_MmaEnumAttr<EnumAttrInfo enumInfo, string name = "">
 def IREEGPU_MMAIntrinsicAttr
   : IREEGPU_MmaEnumAttr<IREEGPU_MMAIntrinsic, "mma_intrinsic">;
 
-def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
+def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
+  DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
+    "getABCElementTypes",
+    "getABCVectorTypes",
+    "getMNKShape",
+    "getSubgroupSize",
+    "getMmaScope",
+    "buildMmaOperation",
+    "populateOperandOffsetsSizesStrides",
+  ]>
+]> {
   let mnemonic = "mma_layout";
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
-  let description = !strconcat(baseDescription, [{
-    This mma variant describes configurations for MMA ops. The |intrinsic|
-    field specifies which particular MMA intrinsic this refers to, with each
-    intrinsic implicating a specific MNK shape and operand types.
+  let description = [{
+    Attribute describing a particular shape of matrix-multiply and accumulate
+    instruction. Abstractly, all attributes of this type represent the following
+    unit of arithmetic for matrices A, B, and C.
+
+    ```
+      C += A x B
+    ```
+
+    The |intrinsic| field specifies which particular MMA intrinsic this refers
+    to, with each intrinsic implicating a specific MNK shape and operand types.
     See IREEGPUEnums.td for the definition of the intrinsics.
-  }]);
+  }];
 
-  let hasCustomAssemblyFormat = 1;
+  let parameters = (ins
+    EnumParameter<IREEGPU_MMAIntrinsic>:$intrinsic
+  );
 
-  let skipDefaultBuilders = 1;
-  let builders = [
-    AttrBuilder<(ins "MMAIntrinsic":$intrinsic)>
-  ];
+  let assemblyFormat = "`<` params `>`";
 
   let extraClassDeclaration = [{
     int64_t getBlockSize() const;
+
+    int64_t getMSize() const {
+      return std::get<0>(getMNKShape());
+    }
+    int64_t getNSize() const {
+      return std::get<1>(getMNKShape());
+    }
+    int64_t getKSize() const {
+      return std::get<2>(getMNKShape());
+    }
 
     SmallVector<VirtualMMAIntrinsic> getVirtualIntrinsics() const;
   }];
@@ -231,7 +251,7 @@ def IREEGPU_DataTiledMMAAttr :
   let assemblyFormat = "`<` struct(params) `>`";
 
   let parameters = (ins
-    "::mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr":$intrinsic,
+    EnumParameter<IREEGPU_MMAIntrinsic>:$intrinsic,
     DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the M dimension.">:$intrinsics_m,
     DefaultValuedParameter<"int64_t", "1", "Subgroup count along the M dimension.">:$subgroups_m,
     DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the N dimension.">:$intrinsics_n,
@@ -269,12 +289,9 @@ def IREEGPU_VirtualMMAAttr :
   }];
 
   let assemblyFormat = "`<` struct(params) `>`";
-  let builders = [
-    AttrBuilder<(ins "VirtualMMAIntrinsic":$intrinsic)>
-  ];
 
   let parameters = (ins
-    "::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr":$intrinsic
+    EnumParameter<IREEGPU_VirtualMMAIntrinsic>:$intrinsic
   );
 
   let extraClassDeclaration = [{
