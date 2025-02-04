@@ -8,12 +8,11 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
-#include <numeric>
+#include <optional>
 
 namespace mlir::iree_compiler {
 
@@ -101,14 +100,16 @@ getEncodingInfoFromLayouts(RankedTensorType type) {
   if (!encodingAttr) {
     return std::nullopt;
   }
-  auto layoutsAttr = encodingAttr.getLayouts();
+  ArrayAttr layoutsAttr = encodingAttr.getLayouts();
   if (!layoutsAttr) {
     return std::nullopt;
   }
   ArrayRef<Attribute> layouts = layoutsAttr.getValue();
   assert(layouts.size() == 1 && "only single layout is supported");
-  return cast<IREE::Codegen::LayoutAttrInterface>(layouts[0])
-      .getEncodingInfo(type);
+  if (auto layout = dyn_cast<IREE::Codegen::LayoutAttrInterface>(layouts[0])) {
+    return layout.getEncodingInfo(type);
+  }
+  return std::nullopt;
 }
 
 } // namespace mlir::iree_compiler
