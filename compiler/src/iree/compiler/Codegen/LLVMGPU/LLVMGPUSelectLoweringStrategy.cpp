@@ -45,11 +45,14 @@ verifyLoweringConfiguration(FunctionOpInterface funcOp,
                             IREE::Codegen::TranslationInfoAttr translationInfo,
                             ArrayRef<int64_t> workgroupSize, F verificationFn) {
   auto walkResult = funcOp.walk([&](Operation *op) -> WalkResult {
-    auto loweringConfig =
+    auto codegenLoweringConfig =
         getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op);
-    if (!loweringConfig)
+    auto gpuLoweringConfig =
+        getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
+    if (!codegenLoweringConfig && !gpuLoweringConfig)
       return WalkResult::advance();
-    return verificationFn(op, loweringConfig, translationInfo, workgroupSize);
+    return verificationFn(op, codegenLoweringConfig, translationInfo,
+                          gpuLoweringConfig, workgroupSize);
   });
   return failure(walkResult.wasInterrupted());
 }
