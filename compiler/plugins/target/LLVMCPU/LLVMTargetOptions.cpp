@@ -607,12 +607,9 @@ LLVMTargetOptions LLVMCPUTargetCLOptions::getTargetOptions() {
   ResolveCPUAndCPUFeaturesStatus status;
   std::optional<LLVMTarget> maybeTarget = LLVMTarget::create(
       targetTriple, targetCPU, targetCPUFeatures, linkEmbedded, status);
-  (void)status; // Ignore status here, since this code runs at target backend
-                // registration time and we don't know if this backend will
-                // actually be used, and these error statuses are non-fatal,
-                // mostly warning about fallbacks. If the target backend is
-                // actually used, any error here will also trigger in
-                // loadFromConfigAttr, where we will generate an IR error.
+  if (status != ResolveCPUAndCPUFeaturesStatus::OK) {
+    llvm::errs() << getMessage(status, targetTriple);
+  }
   if (maybeTarget) {
     targetOptions.target = *maybeTarget;
   } else {
