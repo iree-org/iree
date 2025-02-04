@@ -536,13 +536,24 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       rhsElemType = getElementTypeOrSelf(rhsOp.getDpsInputs()[0]);
   }
 
+  SmallVector<int64_t> batchDims;
+  for (int64_t batchDim : contractionDims->batch) {
+    if (!ShapedType::isDynamic(bounds[batchDim])) {
+      batchDims.push_back(batchDim);
+    }
+  }
+  auto getDimBounds = [&](SmallVector<int64_t> dims) -> SmallVector<int64_t> {
+    return llvm::map_to_vector(dims, [&](int64_t dim) { return bounds[dim]; });
+  };
+
   // TODO(Max191): Support multiple M/N/K dimension problems for MMASchedules
   // once the pipeline is able to support it. After adding multiple dimensions,
   // all instances of schedule->m/nSubgroupCounts[0] and
   // schedule->m/n/kTileSizes[0] need to use the full list of sizes instead of
   // just the first element.
-  GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
-                             lhsElemType,  rhsElemType,  initElemType};
+  GPUMatmulShapeType problem{
+      {bounds[mDim]}, {bounds[nDim]}, {bounds[kDim]}, getDimBounds(batchDims),
+      lhsElemType,    rhsElemType,    initElemType};
 
   // Helper fn to store mma information.
   auto storeMmaInfo = [](IREE::GPU::MmaInterfaceAttr mma,

@@ -282,12 +282,12 @@ module {
 // -----
 
 module {
-func.func @unaligned_to_intrinsic_batched_matmul(%lhs : tensor<12x577x577xf32>, %rhs : tensor<12x577x577xf32>) -> tensor<12x577x577xf32> {
+func.func @unaligned_to_intrinsic_batched_matmul(%lhs : tensor<12x2x577xf32>, %rhs : tensor<12x577x577xf32>) -> tensor<12x2x577xf32> {
     %c0 = arith.constant 0.0 : f32
-    %empty = tensor.empty() : tensor<12x577x577xf32>
-    %fill = linalg.fill ins(%c0 : f32) outs(%empty : tensor<12x577x577xf32>) -> tensor<12x577x577xf32>
-    %mm = linalg.batch_matmul ins(%lhs, %rhs : tensor<12x577x577xf32>, tensor<12x577x577xf32>) outs(%fill : tensor<12x577x577xf32>) -> tensor<12x577x577xf32>
-    return %mm :  tensor<12x577x577xf32>
+    %empty = tensor.empty() : tensor<12x2x577xf32>
+    %fill = linalg.fill ins(%c0 : f32) outs(%empty : tensor<12x2x577xf32>) -> tensor<12x2x577xf32>
+    %mm = linalg.batch_matmul ins(%lhs, %rhs : tensor<12x2x577xf32>, tensor<12x577x577xf32>) outs(%fill : tensor<12x2x577xf32>) -> tensor<12x2x577xf32>
+    return %mm :  tensor<12x2x577xf32>
 }
 }
 
