@@ -64,10 +64,16 @@ resolveCPUFeaturesForCPU(const llvm::Triple &triple, std::string &cpu,
     addCpuFeatures(llvm::RISCV::getFeaturesForCPU, cpuFeatureList);
   } else if (triple.isAArch64()) {
     std::vector<llvm::StringRef> cpuFeatureList;
-    const llvm::AArch64::ArchInfo *cpuArch = llvm::AArch64::getArchForCpu(cpu);
-    llvm::AArch64::getExtensionFeatures(cpuArch->DefaultExts, cpuFeatureList);
-    targetCpuFeatures.AddFeature(cpuArch->ArchFeature);
-    for (const auto &feature : cpuFeatureList) {
+    std::optional<llvm::AArch64::CpuInfo> cpuInfo =
+        llvm::AArch64::parseCpu(cpu);
+    if (!cpuInfo) {
+      return ResolveCPUAndCPUFeaturesStatus::UnknownCPU;
+    }
+    llvm::AArch64::ExtensionSet extensions;
+    extensions.addCPUDefaults(*cpuInfo);
+    std::vector<std::string> features;
+    extensions.toLLVMFeatureList(features);
+    for (const auto &feature : features) {
       targetCpuFeatures.AddFeature(feature);
     }
   } else {
@@ -168,6 +174,7 @@ resolveCPUAndCPUFeatures(std::string_view triple_str, std::string &cpu,
                     ResolveCPUAndCPUFeaturesStatus b) {
     return a == ResolveCPUAndCPUFeaturesStatus::OK ? b : a;
   };
+
   return combine(combine(status1, status2), status3);
 }
 
@@ -183,6 +190,8 @@ std::string getMessage(ResolveCPUAndCPUFeaturesStatus status,
     return "Resolution of CPU to CPU-features is not implemented on this "
            "target architecture. Pass explicit "
            "CPU-features, or implement the missing mapping.\n";
+  case ResolveCPUAndCPUFeaturesStatus::UnknownCPU:
+    return "Unknown CPU name for this target architecture.";
   default:
     assert(false);
     return "";
