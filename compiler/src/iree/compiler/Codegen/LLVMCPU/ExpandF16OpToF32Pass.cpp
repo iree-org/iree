@@ -63,9 +63,6 @@ struct ExpandF16OpToF32Pass
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());
     patterns.insert<ExpandF16OpToF32Pattern<arith::MaximumFOp>>(context);
-    // TODO(#15661): Remove the expansion for math.powf op after fixing
-    // approximation issue.
-    patterns.insert<ExpandF16OpToF32Pattern<math::PowFOp>>(context);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
