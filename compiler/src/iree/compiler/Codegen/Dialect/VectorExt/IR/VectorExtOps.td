@@ -10,6 +10,8 @@
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtBase.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtAttrs.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.td"
+include "mlir/Interfaces/VectorInterfaces.td"
+include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
@@ -111,6 +113,49 @@ def IREEVectorExt_ToSIMTOp : IREEVectorExt_PureOp<"to_simt",
   let extraClassDeclaration = [{}];
   let assemblyFormat = "$input attr-dict `:` type($input) `->` type($output)";
   let hasFolder = 1;
+}
+
+def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
+    DeclareOpInterfaceMethods<VectorTransferOpInterface>,
+    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+    DeclareOpInterfaceMethods<ConditionallySpeculatable>,
+    AttrSizedOperandSegments
+  ]>,
+  Arguments<(ins AnyShaped:$source,
+                 Variadic<Index>:$indices,
+                 Variadic<VectorOfAnyRankOf<[Index]>>:$index_vecs,
+                 DenseI64ArrayAttr:$indexed,
+                 AffineMapArrayAttr:$indexed_maps,
+                 AffineMapAttr:$permutation_map,
+                 AnyType:$padding,
+                 Optional<VectorOfNonZeroRankOf<[I1]>>:$mask,
+                 BoolArrayAttr:$in_bounds)>,
+  Results<(outs AnyVectorOfAnyRank:$vector)> {
+
+  let summary = "Gathers a supervector from memory into an SSA vector value.";
+
+  let description = [{
+    This operation is a superset operation of vector.transfer_read, but allows
+    for gathering along dimensions specified in `indexed` attribute. The index
+    vector for each `indexed` array is specified by `index_vecs`.
+
+    Each vector in `index_vecs` is a index vector of size 1. The size of the
+    index_vecs vector must match the result vector dimension it is producing.
+  }];
+
+  let extraClassDeclaration = [{
+    // MaskableOpInterface methods.
+    bool supportsPassthru() { return true; }
+
+    SmallVector<AffineMap> getIndexedMapsArray() {
+      return llvm::to_vector(getIndexedMaps().getAsValueRange<AffineMapAttr>());
+    }
+  }];
+
+  let hasCanonicalizer = 1;
+  let hasCustomAssemblyFormat = 1;
+  let hasFolder = 1;
+  let hasVerifier = 1;
 }
 
 #endif  // IREE_DIALECT_VECTOREXT_OPS

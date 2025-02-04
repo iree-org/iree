@@ -135,3 +135,25 @@ func.func @to_simt_op_0d(%simd: vector<f32>) -> vector<f32> {
 }
 // CHECK-LABEL: func.func @to_simt_op
 // CHECK:      iree_vector_ext.to_simd
+
+// -----
+
+func.func @transfer_gather(%indices : vector<128xindex>,
+                           %indices2 : vector<32xindex>,
+                           %source : tensor<4096x64x32xf16>)
+                           -> vector<128x64x32xf16> {
+  %cst0 = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0, %c0](%indices, %indices2),
+                                         %cst0
+                                         { indexed = array<i64: 0, 2>,
+                                           indexed_maps = [
+                                             affine_map<(d0, d1, d2) -> (d0)>,
+                                             affine_map<(d0, d1, d2) -> (d2)>
+                                           ]
+                                         }
+  : tensor<4096x64x32xf16>, vector<128xindex>, vector<32xindex>, vector<128x64x32xf16>
+  return %out : vector<128x64x32xf16>
+}
+// CHECK-LABEL: func.func @transfer_gather
+// CHECK: iree_vector_ext.transfer_gather

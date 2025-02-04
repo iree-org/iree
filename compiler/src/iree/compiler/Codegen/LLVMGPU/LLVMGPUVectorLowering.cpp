@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -122,6 +124,10 @@ struct LLVMGPUVectorLoweringPass final
     RewritePatternSet vectorToLoopsPatterns(&getContext());
     VectorTransferToSCFOptions vectorToSCFOptions;
     vectorToSCFOptions.enableFullUnroll();
+    IREE::VectorExt::populateVectorTransferGatherLoweringPatterns(
+        vectorToLoopsPatterns);
+    IREE::VectorExt::TransferGatherOp::getCanonicalizationPatterns(
+        vectorToLoopsPatterns, funcOp.getContext());
     populateVectorToSCFConversionPatterns(vectorToLoopsPatterns,
                                           vectorToSCFOptions);
     memref::populateFoldMemRefAliasOpPatterns(vectorToLoopsPatterns);

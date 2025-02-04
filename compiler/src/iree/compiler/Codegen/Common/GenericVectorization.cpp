@@ -6,7 +6,10 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -99,8 +102,9 @@ public:
       GenericVectorizationPass>::GenericVectorizationPassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<tensor::TensorDialect, linalg::LinalgDialect,
-                    vector::VectorDialect>();
+    registry
+        .insert<tensor::TensorDialect, linalg::LinalgDialect,
+                vector::VectorDialect, IREE::VectorExt::IREEVectorExtDialect>();
   }
   void runOnOperation() override;
 };
@@ -156,6 +160,12 @@ void GenericVectorizationPass::runOnOperation() {
     }
     // Pad scalable dims with `false` to match the vector sizes.
     scalableVecDims.resize(vectorSizes.size());
+    if (vectorizeGatherAccesses && vectorizeToTransferGather &&
+        IREE::LinalgExt::isGatherlikeOp(op)) {
+      (void)IREE::VectorExt::vectorizeGatherToTransferGather(
+          rewriter, op, vectorSizes, scalableVecDims);
+      continue;
+    }
     (void)linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
                             vectorizeGatherAccesses);
   };
