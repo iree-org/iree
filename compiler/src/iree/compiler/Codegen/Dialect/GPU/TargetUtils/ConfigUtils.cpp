@@ -176,9 +176,13 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
       target.getWgp().getMaxWorkgroupMemoryBytes() - 128 * outBitWidth;
 
   // First try to find a schedule with an exactly matching intrinsic.
+  // TODO (nirvedhmeshram) : Not passing the transpose infromation is exactly
+  // what the VectorDistribute pipeline does. However, in that case it is to
+  // avoid codegen issues but here it is becuase we have performance
+  // regressions with it. We need to investigate why this is the case.
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
-      transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
+      /*transposedLhs=*/false, /*transposedRhs=*/false, /*canUpcastAcc=*/false,
       /*mustBeAligned*/ mustBeAligned, doCPromotion);
   return schedule;
 }
