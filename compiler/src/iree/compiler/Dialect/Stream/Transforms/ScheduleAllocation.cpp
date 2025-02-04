@@ -694,10 +694,14 @@ static LogicalResult applyAsyncTransferOp(IREE::Stream::AsyncTransferOp asyncOp,
   };
   auto currentAffinityAttr =
       IREE::Stream::AffinityAttr::lookupOrDefault(asyncOp);
-  bool transferIn = asyncOp.getSourceAffinityAttr() != currentAffinityAttr ||
-                    isStaging(asyncOp.getSource());
-  bool transferOut = asyncOp.getResultAffinityAttr() != currentAffinityAttr ||
-                     isStaging(asyncOp.getResult());
+  auto sourceAffinityAttr = asyncOp.getSourceAffinityAttr();
+  auto resultAffinityAttr = asyncOp.getResultAffinityAttr();
+  bool transferIn =
+      (sourceAffinityAttr && sourceAffinityAttr != currentAffinityAttr) ||
+      isStaging(asyncOp.getSource());
+  bool transferOut =
+      (resultAffinityAttr && resultAffinityAttr != currentAffinityAttr) ||
+      isStaging(asyncOp.getResult());
 
   auto sourceRange = scope.lookupResourceRange(asyncOp.getSource());
   auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
@@ -1274,35 +1278,47 @@ struct ResultReservationSet {
 };
 
 struct ResultAllocation {
+  // Affinity for the allocations.
+  IREE::Stream::AffinityAttr affinityAttr;
   // Reservations bucketed by lifetime.
   SmallVector<ResultReservationSet> reservationSets;
 };
 
-// Produces parameters for one or more result allocations composed of an ordered
-// set of |reservations| with matching lifetimes.
-static ResultAllocation
-reserveResultAllocation(ArrayRef<ResultReservation> reservations) {
-  // We want deterministic ordering of the allocations for each lifetime type
-  // so we build them all here and then just nuke the ones we don't end up
-  // using.
-  SmallVector<ResultReservationSet> sets(
-      IREE::Stream::getMaxEnumValForLifetime() + 1);
-  for (auto &reservation : reservations) {
-    auto &set =
-        sets[static_cast<unsigned>(reservation.resultType.getLifetime())];
-    set.reservationLocs.push_back(reservation.loc);
-    set.reservationTypes.push_back(reservation.resultType);
-    set.reservationSizes.push_back(reservation.resultSize);
-    set.reservations.push_back(std::move(reservation));
-  }
+// A map of allocation placement affinities to the alloc reservations requested.
+using ResultAllocationMap =
+    llvm::MapVector<IREE::Stream::AffinityAttr, SmallVector<ResultReservation>>;
 
-  // Remove unused sets. This does a bunch of moves and is really bad but eh.
-  for (int i = sets.size() - 1; i >= 0; --i) {
-    if (sets[i].reservations.empty()) {
-      sets.erase(sets.begin() + i);
+// Produces parameters for one or more result allocations composed of an ordered
+// set of |reservations| with matching lifetimes. Allocations will be bucketed
+// both by their allocation affinity (where they should be placed) and their
+// lifetime (how long they're expected to live).
+static std::vector<ResultAllocation>
+reserveResultAllocations(ResultAllocationMap &reservationMap) {
+  std::vector<ResultAllocation> result;
+  for (auto &[affinityAttr, reservations] : reservationMap) {
+    // We want deterministic ordering of the allocations for each lifetime type
+    // so we build them all here and then just nuke the ones we don't end up
+    // using.
+    SmallVector<ResultReservationSet> sets(
+        IREE::Stream::getMaxEnumValForLifetime() + 1);
+    for (auto &reservation : reservations) {
+      auto &set =
+          sets[static_cast<unsigned>(reservation.resultType.getLifetime())];
+      set.reservationLocs.push_back(reservation.loc);
+      set.reservationTypes.push_back(reservation.resultType);
+      set.reservationSizes.push_back(reservation.resultSize);
+      set.reservations.push_back(std::move(reservation));
     }
+
+    // Remove unused sets. This does a bunch of moves and is really bad but eh.
+    for (int i = sets.size() - 1; i >= 0; --i) {
+      if (sets[i].reservations.empty()) {
+        sets.erase(sets.begin() + i);
+      }
+    }
+    result.push_back(ResultAllocation{affinityAttr, sets});
   }
-  return ResultAllocation{sets};
+  return result;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1328,6 +1344,49 @@ static Value findTiedYieldResult(Value seedValue) {
         // Escaping through a yield.
         return results[use.getOperandNumber()];
       }
+    }
+  }
+  return {};
+}
+
+// Walks up the use-def chain to find an affinity the given local value is
+// pinned to. May return nullptr if there's no assigned affinity and the
+// enclosing execution region affinity should be used.
+//
+// TODO(benvanik): change this to use an affinity analysis on the escaping
+// value instead. The local value may not have a transfer associated with it.
+static IREE::Stream::AffinityAttr findLocalValueAffinity(Value value) {
+  while (value) {
+    auto definingOp = value.getDefiningOp();
+    if (!definingOp) {
+      // Block argument or something we don't track locally.
+      return {};
+    } else if (auto transferOp =
+                   dyn_cast<IREE::Stream::AsyncTransferOp>(definingOp)) {
+      return transferOp.getResultAffinityAttr();
+    } else if (auto regionOp = dyn_cast<RegionBranchOpInterface>(definingOp)) {
+      // A region op with a yielded value (like stream.async.concurrent).
+      // Note that we always want to check for tied ops first as that will let
+      // us skip over the region entirely.
+      if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
+        if (auto tiedValue = tiedOp.getTiedResultOperand(value)) {
+          value = tiedValue;
+          continue;
+        }
+      }
+      unsigned resultIndex = cast<OpResult>(value).getResultNumber();
+      auto &block = regionOp.getOperation()->getRegion(0).front();
+      auto terminatorOp =
+          cast<RegionBranchTerminatorOpInterface>(block.getTerminator());
+      value = terminatorOp.getSuccessorOperands(
+          RegionBranchPoint::parent())[resultIndex];
+    } else if (auto tiedOp =
+                   dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
+      // If the producer is tied then try to get the operand.
+      value = tiedOp.getTiedResultOperand(value);
+    } else {
+      // Analysis blocked.
+      break;
     }
   }
   return {};
@@ -1541,7 +1600,7 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
     auto resourceRange = ResourceRange(arg, operandSize);
     scope.mapResourceRange(arg, resourceRange, asmState.get());
   }
-  SmallVector<ResultReservation> resultReservations;
+  ResultAllocationMap resultReservations;
   for (auto [result, resultSize] :
        llvm::zip_equal(executeOp.getResults(), executeOp.getResultSizes())) {
     auto resultType = llvm::cast<IREE::Stream::ResourceType>(result.getType());
@@ -1623,6 +1682,13 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
       continue;
     }
 
+    // Find a pinned affinity for the value or inherit the execution region
+    // affinity.
+    auto allocationAffinity = findLocalValueAffinity(yieldValue);
+    if (!allocationAffinity) {
+      allocationAffinity = executeOp.getAffinityAttr();
+    }
+
     // Queue up the allocation for packing.
     ResultReservation resultReservation = {
         definingOp->getLoc(), result, resultType, resultSize, yieldValue,
@@ -1633,54 +1699,56 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
       resultReservation.result.printAsOperand(llvm::dbgs(), asmState);
       llvm::dbgs() << "\n";
     });
-    resultReservations.push_back(resultReservation);
+    resultReservations[allocationAffinity].push_back(resultReservation);
   }
-  auto resultAllocation = reserveResultAllocation(resultReservations);
-  for (auto &reservationSet : resultAllocation.reservationSets) {
-    // Allocate and tie an operand to the result.
-    auto timepointType = externalBuilder.getType<IREE::Stream::TimepointType>();
-    auto [allocaOp, suballocations] =
-        IREE::Stream::ResourceAllocaOp::createSuballocations(
-            timepointType, reservationSet.reservationTypes.front(),
-            reservationSet.reservationLocs, reservationSet.reservationSizes,
-            executeOp.getAwaitTimepoint(), executeOp.getAffinityAttr(),
-            externalBuilder);
-    newAwaitTimepoints.push_back(allocaOp.getResultTimepoint());
+  for (auto &resultAllocation : reserveResultAllocations(resultReservations)) {
+    for (auto &reservationSet : resultAllocation.reservationSets) {
+      // Allocate and tie an operand to the result.
+      auto timepointType =
+          externalBuilder.getType<IREE::Stream::TimepointType>();
+      auto [allocaOp, suballocations] =
+          IREE::Stream::ResourceAllocaOp::createSuballocations(
+              timepointType, reservationSet.reservationTypes.front(),
+              reservationSet.reservationLocs, reservationSet.reservationSizes,
+              executeOp.getAwaitTimepoint(), resultAllocation.affinityAttr,
+              externalBuilder);
+      newAwaitTimepoints.push_back(allocaOp.getResultTimepoint());
 
-    auto asmState = getRootAsmState(executeOp->getParentOp());
-    LLVM_DEBUG({
-      llvm::dbgs() << "  + alloc for result reservation set: ";
-      allocaOp.print(llvm::dbgs(), *asmState);
-      llvm::dbgs() << ":\n";
-    });
-
-    for (auto [reservation, suballocation] :
-         llvm::zip_equal(reservationSet.reservations, suballocations)) {
-      newOperands.push_back(suballocation);
-      newOperandSizes.push_back(reservation.resultSize);
-      resultReplacements.push_back(
-          std::make_pair(reservation.result, suballocation));
-
-      // Insert entry arg for the new operand tied all the way to the yield.
-      auto arg =
-          entryBlock.addArgument(reservation.resultType, reservation.loc);
-
+      auto asmState = getRootAsmState(executeOp->getParentOp());
       LLVM_DEBUG({
-        llvm::dbgs() << "    + adding entry arg for reservation ";
-        reservation.result.printAsOperand(llvm::dbgs(), *asmState);
-        llvm::dbgs() << "{";
-        reservation.resultSize.printAsOperand(llvm::dbgs(), *asmState);
-        llvm::dbgs() << "} from ";
-        reservation.yieldValue.printAsOperand(llvm::dbgs(), *asmState);
-        llvm::dbgs() << " as ";
-        arg.printAsOperand(llvm::dbgs(), *asmState);
-        llvm::dbgs() << "\n";
+        llvm::dbgs() << "  + alloc for result reservation set: ";
+        allocaOp.print(llvm::dbgs(), *asmState);
+        llvm::dbgs() << ":\n";
       });
 
-      // Map into scope, updating all aliases.
-      auto resourceRange = ResourceRange(arg, reservation.resultSize);
-      scope.mapResourceRange(reservation.yieldValue, resourceRange,
-                             asmState.get());
+      for (auto [reservation, suballocation] :
+           llvm::zip_equal(reservationSet.reservations, suballocations)) {
+        newOperands.push_back(suballocation);
+        newOperandSizes.push_back(reservation.resultSize);
+        resultReplacements.push_back(
+            std::make_pair(reservation.result, suballocation));
+
+        // Insert entry arg for the new operand tied all the way to the yield.
+        auto arg =
+            entryBlock.addArgument(reservation.resultType, reservation.loc);
+
+        LLVM_DEBUG({
+          llvm::dbgs() << "    + adding entry arg for reservation ";
+          reservation.result.printAsOperand(llvm::dbgs(), *asmState);
+          llvm::dbgs() << "{";
+          reservation.resultSize.printAsOperand(llvm::dbgs(), *asmState);
+          llvm::dbgs() << "} from ";
+          reservation.yieldValue.printAsOperand(llvm::dbgs(), *asmState);
+          llvm::dbgs() << " as ";
+          arg.printAsOperand(llvm::dbgs(), *asmState);
+          llvm::dbgs() << "\n";
+        });
+
+        // Map into scope, updating all aliases.
+        auto resourceRange = ResourceRange(arg, reservation.resultSize);
+        scope.mapResourceRange(reservation.yieldValue, resourceRange,
+                               asmState.get());
+      }
     }
   }
 

@@ -2469,6 +2469,19 @@ bool AsyncBarrierOp::isMetadata() { return true; }
 
 LogicalResult AsyncBarrierOp::verify() { return success(); }
 
+Value AsyncBarrierOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
+}
+
+::std::optional<unsigned>
+AsyncBarrierOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // source
+}
+
+SmallVector<int64_t> AsyncBarrierOp::getTiedResultOperandIndices() {
+  return {0}; // source
+}
+
 //===----------------------------------------------------------------------===//
 // stream.async.transfer
 //===----------------------------------------------------------------------===//

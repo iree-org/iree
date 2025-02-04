@@ -139,14 +139,14 @@ util.func public @tensorSplat(%value: i8, %dim0: index) -> tensor<?x128xi8> {
 util.global private @device : !hal.device
 
 // CHECK-LABEL: @tensorBarrierDispatch
-//  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[DIM0:.+]]: index, %[[DIM1:.+]]: index)
+//  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index, %[[DIM0:.+]]: index)
 util.func public @tensorBarrierDispatch(%input: tensor<?x128xi8>, %dim0: index) -> tensor<?x128xi8> {
-  // CHECK: %[[BARRIER:.+]] = stream.async.barrier %[[INPUT]] : !stream.resource<*>{%[[DIM0]]} -> !stream.resource<*>
+  // CHECK: %[[BARRIER:.+]] = stream.async.barrier on(#hal.device.affinity<@device>) %[[INPUT]] : !stream.resource<*>{%[[INPUT_SIZE]]}
   %barrier = flow.tensor.barrier %input : tensor<?x128xi8>{%dim0} on #hal.device.affinity<@device>
-  // CHECK: %[[SIZE:.+]] = stream.tensor.sizeof on(#hal.device.affinity<@device>) tensor<?x128xi8>{%arg2} : index
-  // CHECK: %[[RESULT:.+]] = stream.tensor.dispatch on(#hal.device.affinity<@device>) @ex::@entry(%[[BARRIER]])
+  // CHECK: %[[RESULT_SIZE:.+]] = stream.tensor.sizeof tensor<?x128xi8>{%[[DIM0]]} : index
+  // CHECK: %[[RESULT:.+]] = stream.tensor.dispatch @ex::@entry(%[[BARRIER]])
   %0 = flow.dispatch @ex::@entry(%barrier) : (tensor<?x128xi8>{%dim0}) -> tensor<?x128xi8>{%dim0}
-  // CHECK: util.return %[[RESULT]], %[[SIZE]]
+  // CHECK: util.return %[[RESULT]], %[[RESULT_SIZE]]
   util.return %0 : tensor<?x128xi8>
 }
 
@@ -170,7 +170,7 @@ util.global private @device : !hal.device
 // CHECK-LABEL: @tensorBarrier
 //  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index, %[[DIM0:.+]]: index)
 util.func public @tensorBarrier(%input: tensor<?x128xi8>, %dim0: index) -> tensor<?x128xi8> {
-  // CHECK: %[[TRANSFER:.+]] = stream.async.barrier %[[INPUT]] : !stream.resource<*>{%[[INPUT_SIZE]]} -> !stream.resource<*>
+  // CHECK: %[[TRANSFER:.+]] = stream.async.barrier on(#hal.device.affinity<@device>) %[[INPUT]] : !stream.resource<*>{%[[INPUT_SIZE]]}
   %transfer = flow.tensor.barrier %input : tensor<?x128xi8>{%dim0} on #hal.device.affinity<@device>
   // CHECK: util.return %[[TRANSFER]], %[[INPUT_SIZE]]
   util.return %transfer : tensor<?x128xi8>

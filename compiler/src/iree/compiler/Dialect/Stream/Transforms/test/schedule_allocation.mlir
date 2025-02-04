@@ -530,6 +530,64 @@ util.func public @applyAsyncTransferOp(%operand: !stream.resource<transient>, %s
 
 // -----
 
+// CHECK-LABEL: @applyAsyncTransferMultiScopeOp
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+util.func public @applyAsyncTransferMultiScopeOp(%operand: !stream.resource<transient>, %size: index) {
+  // CHECK: %[[ALLOCA:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca uninitialized on(#hal.device.affinity<@result_device>) : !stream.resource<transient>{%[[SIZE]]}
+  // CHECK: stream.cmd.execute on(#hal.device.affinity<@execution_device>) await(%[[ALLOCA_TIMEPOINT]])
+  // CHECK-SAME: with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]},
+  // CHECK-SAME:      %[[ALLOCA]] as %[[ALLOCA_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
+  %result, %result_timepoint = stream.async.execute on(#hal.device.affinity<@execution_device>) with(%operand as %capture: !stream.resource<transient>{%size}) -> !stream.resource<transient>{%size} {
+    // CHECK: stream.cmd.copy %[[OPERAND_CAPTURE]][%c0], %[[ALLOCA_CAPTURE]][%c0], %[[SIZE]]
+    // CHECK-SAME: : !stream.resource<transient>{%[[SIZE]]} -> !stream.resource<transient>{%[[SIZE]]}
+    // CHECK: stream.cmd.flush to(#hal.device.affinity<@result_device>) %[[ALLOCA_CAPTURE]][%c0 for %[[SIZE]]]
+    // CHECK-SAME: : !stream.resource<transient>{%[[SIZE]]}
+    %0 = stream.async.transfer %capture : !stream.resource<transient>{%size} from(#hal.device.affinity<@execution_device>) -> to(#hal.device.affinity<@result_device>) !stream.resource<transient>{%size}
+    stream.yield %0 : !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  // CHECK: util.optimization_barrier %[[ALLOCA]]
+  util.optimization_barrier %result : !stream.resource<transient>
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @applyAsyncConcurrentTransferMultiScopeOp
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+util.func public @applyAsyncConcurrentTransferMultiScopeOp(%operand: !stream.resource<transient>, %size: index) {
+  // CHECK-DAG: %[[ALLOCA_A:.+]], %[[ALLOCA_A_TIMEPOINT:.+]] = stream.resource.alloca uninitialized on(#hal.device.affinity<@result_device_a>) : !stream.resource<transient>{%[[SIZE]]}
+  // CHECK-DAG: %[[ALLOCA_B:.+]], %[[ALLOCA_B_TIMEPOINT:.+]] = stream.resource.alloca uninitialized on(#hal.device.affinity<@result_device_b>) : !stream.resource<transient>{%[[SIZE]]}
+  // CHECK-DAG: %[[ALLOCA_TIMEPOINTS:.+]] = stream.timepoint.join max(%[[ALLOCA_A_TIMEPOINT]], %[[ALLOCA_B_TIMEPOINT]])
+  // CHECK: stream.cmd.execute on(#hal.device.affinity<@execution_device>) await(%[[ALLOCA_TIMEPOINTS]])
+  // CHECK-SAME: with(%[[OPERAND]] as %[[OPERAND_CAPTURE:[a-z0-9_]+]]: !stream.resource<transient>{%[[SIZE]]},
+  // CHECK-SAME:      %[[ALLOCA_A]] as %[[ALLOCA_A_CAPTURE:[a-z0-9_]+]]: !stream.resource<transient>{%[[SIZE]]},
+  // CHECK-SAME:      %[[ALLOCA_B]] as %[[ALLOCA_B_CAPTURE:[a-z0-9_]+]]: !stream.resource<transient>{%[[SIZE]]})
+  %results:2, %result_timepoint = stream.async.execute on(#hal.device.affinity<@execution_device>) with(%operand as %capture: !stream.resource<transient>{%size}) -> (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) {
+    // CHECK: stream.cmd.concurrent
+    %concurrent:2 = stream.async.concurrent with(%capture as %concurrent_capture: !stream.resource<transient>{%size}) -> (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) {
+      // CHECK: stream.cmd.copy %[[OPERAND_CAPTURE]][%c0], %[[ALLOCA_A_CAPTURE]][%c0], %[[SIZE]]
+      // CHECK-SAME: : !stream.resource<transient>{%[[SIZE]]} -> !stream.resource<transient>{%[[SIZE]]}
+      // CHECK: stream.cmd.flush to(#hal.device.affinity<@result_device_a>) %[[ALLOCA_A_CAPTURE]][%c0 for %[[SIZE]]]
+      // CHECK-SAME: : !stream.resource<transient>{%[[SIZE]]}
+      %transfer_a = stream.async.transfer %concurrent_capture : !stream.resource<transient>{%size} from(#hal.device.affinity<@execution_device>) -> to(#hal.device.affinity<@result_device_a>) !stream.resource<transient>{%size}
+      // CHECK: stream.cmd.copy %[[OPERAND_CAPTURE]][%c0], %[[ALLOCA_B_CAPTURE]][%c0], %[[SIZE]]
+      // CHECK-SAME: : !stream.resource<transient>{%[[SIZE]]} -> !stream.resource<transient>{%[[SIZE]]}
+      // CHECK: stream.cmd.flush to(#hal.device.affinity<@result_device_b>) %[[ALLOCA_B_CAPTURE]][%c0 for %[[SIZE]]]
+      // CHECK-SAME: : !stream.resource<transient>{%[[SIZE]]}
+      %transfer_b = stream.async.transfer %concurrent_capture : !stream.resource<transient>{%size} from(#hal.device.affinity<@execution_device>) -> to(#hal.device.affinity<@result_device_b>) !stream.resource<transient>{%size}
+      stream.yield %transfer_a, %transfer_b : !stream.resource<transient>{%size}, !stream.resource<transient>{%size}
+    }
+    stream.yield %concurrent#0, %concurrent#1 : !stream.resource<transient>{%size}, !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  // CHECK: util.optimization_barrier %[[ALLOCA_A]]
+  util.optimization_barrier %results#0 : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[ALLOCA_B]]
+  util.optimization_barrier %results#1 : !stream.resource<transient>
+  util.return
+}
+
+// -----
+
 // CHECK-LABEL: @applyAsyncDispatchOp
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[END:.+]]: index, %[[LENGTH:.+]]: index)
 util.func public @applyAsyncDispatchOp(%operand: !stream.resource<transient>, %size: index, %offset: index, %end: index, %length: index) {

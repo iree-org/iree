@@ -2291,15 +2291,25 @@ def Stream_AsyncCollectiveOp : Stream_Op<"async.collective", [
 }
 
 def Stream_AsyncBarrierOp : Stream_Op<"async.barrier", [
+  AllTypesMatch<["source", "result"]>,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   DeclareOpInterfaceMethods<Stream_StreamableOp, [
     "isMetadata",
   ]>,
   Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
 ]> {
-  let summary = [{ }];
+  let summary = [{indicates a value that must have a specific affinity}];
   let description = [{
+    Prevents fusion and scheduling of a value across an affinity boundary.
+    May introduce copy-on-write behavior if the operand value is used as well as
+    the result and users should try to keep the operand to a single use by this
+    op.
   }];
 
   let arguments = (ins
@@ -2318,11 +2328,9 @@ def Stream_AsyncBarrierOp : Stream_Op<"async.barrier", [
   );
 
   let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
     $source `:` type($source)
     `` `{` $size `}`
-    (`from` `(` $affinity^ `)`)?
-    `->`
-    type($result)
     attr-dict-with-keyword
   }];
 
