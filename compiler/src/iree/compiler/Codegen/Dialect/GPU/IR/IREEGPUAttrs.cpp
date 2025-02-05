@@ -62,15 +62,15 @@ static uint32_t getArchID(MMAIntrinsic intrinsic) {
   return static_cast<int>(intrinsic) & 0xFF00;
 }
 
-static bool is_AMD_MFMA(MMAIntrinsic intrinsic) {
+bool is_AMD_MFMA(MMAIntrinsic intrinsic) {
   return getArchID(intrinsic) >= 0x1000 && getArchID(intrinsic) <= 0x17FF;
 }
 
-static bool is_AMD_WMMA(MMAIntrinsic intrinsic) {
+bool is_AMD_WMMA(MMAIntrinsic intrinsic) {
   return getArchID(intrinsic) >= 0x1800 && getArchID(intrinsic) <= 0x1FFF;
 }
 
-static bool is_AMD(MMAIntrinsic intrinsic) {
+bool is_AMD(MMAIntrinsic intrinsic) {
   return is_AMD_MFMA(intrinsic) || is_AMD_WMMA(intrinsic);
 }
 

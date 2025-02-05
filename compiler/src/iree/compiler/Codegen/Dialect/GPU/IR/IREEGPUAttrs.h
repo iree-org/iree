@@ -63,6 +63,10 @@ int64_t getMSize(MMAIntrinsic intrinsic);
 int64_t getNSize(MMAIntrinsic intrinsic);
 int64_t getKSize(MMAIntrinsic intrinsic);
 
+bool is_AMD_MFMA(MMAIntrinsic intrinsic);
+bool is_AMD_WMMA(MMAIntrinsic intrinsic);
+bool is_AMD(MMAIntrinsic intrinsic);
+
 MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
                                                 MMAFragment fragment);
 
