@@ -80,51 +80,54 @@ verifyGPUMatmulPipeline(Operation *op,
 
   if (pipeline != CodeGenPipeline::LLVMGPUMatmulTensorCore &&
       pipeline != CodeGenPipeline::LLVMGPUMatmulTensorCoreMmaSync &&
-      pipeline != CodeGenPipeline::LLVMGPUTileAndFuse &&
       pipeline != CodeGenPipeline::LLVMGPUVectorDistribute) {
     return success();
   }
 
+  // Only verify batched and unbatched matmul.
+  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) {
+    return success();
+  }
+
   uint32_t reduction = static_cast<uint32_t>(IREE::GPU::TilingLevel::Reduction);
-  uint numLoops = llvm::cast<linalg::LinalgOp>(op).getNumLoops();
+  uint numLoops = llvm::cast<linalg::MatmulOp>(op).getNumLoops();
+  size_t size = 0;
 
   SmallVector<int64_t> reductionTileSizes =
       gpuLoweringConfig.getStaticTilingLevelSizes(reduction, op);
-  size_t size = reductionTileSizes.size();
-  // if (size > numLoops) {
-  //   return op->emitOpError("expected number of reduction tile size is equal
-  //   or "
-  //                          "less than number of loops");
-  // }
+
+  if (!reductionTileSizes.empty()) {
+    size = reductionTileSizes.size();
+  }
+
+  if (size > numLoops) {
+    // return op->emitOpError(
+    //     "expected number of reduction tile size is equal or "
+    //     "less than number of loops");
+  }
   for (size_t i = 0; i < size; ++i) {
     if (reductionTileSizes[i] > 0 &&
-        llvm::cast<linalg::LinalgOp>(op).getIteratorTypesArray()[i] !=
+        llvm::cast<linalg::MatmulOp>(op).getIteratorTypesArray()[i] !=
             utils::IteratorType::reduction) {
       return op->emitOpError(
           "expected to non-zero reduction tile has reduction iterator");
     }
   }
 
-  SmallVector<int64_t> workgroupTileSizes =
-      gpuLoweringConfig.getWorkgroupTileSizes();
-  size = workgroupTileSizes.size();
+  // SmallVector<int64_t> workgroupTileSizes =
+  //     gpuLoweringConfig.getWorkgroupTileSizes();
+  // size = workgroupTileSizes.size();
 
-  for (size_t i = 0; i < size; ++i) {
-    if (workgroupTileSizes[i] > 0 &&
-        llvm::cast<linalg::LinalgOp>(op).getIteratorTypesArray()[i] !=
-            utils::IteratorType::parallel) {
-      return op->emitOpError(
-          "expected to non-zero workgroup tile has parallel iterator");
-    }
-  }
+  // for (size_t i = 0; i < size; ++i) {
+  // if (workgroupTileSizes[i] > 0 &&
+  //     llvm::cast<linalg::MatmulOp>(op).getIteratorTypesArray()[i] !=
+  //         utils::IteratorType::parallel) {
+  //   return op->emitOpError(
+  //       "expected to non-zero workgroup tile has parallel iterator");
+  // }
+  // }
 
-  if (pipeline == CodeGenPipeline::LLVMGPUTileAndFuse ||
-      pipeline == CodeGenPipeline::LLVMGPUVectorDistribute) {
-    return success();
-  }
-
-  // Only verify batched and unbatched matmul.
-  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) {
+  if (pipeline == CodeGenPipeline::LLVMGPUVectorDistribute) {
     return success();
   }
 
