@@ -7,7 +7,15 @@ tags:
 icon: simple/tensorflow
 ---
 
-# TensorFlow Lite integration
+# TensorFlow Lite (LiteRT) integration
+
+!!! warning
+
+    Support for TensorFlow Lite depends on the TOSA MLIR dialect, which
+    is undergoing a major version change that will introduce a new backwards
+    compatibility baseline. During this transition, support will be unstable.
+
+    See <https://github.com/iree-org/iree/issues/19777> for details.
 
 ## :octicons-book-16: Overview
 
@@ -47,7 +55,7 @@ graph LR
     [official documentation](https://www.tensorflow.org/install):
 
     ```shell
-    python -m pip install tensorflow
+    python -m pip install "tensorflow<=2.18.0"
     ```
 
 2. Install IREE packages, either by
@@ -58,11 +66,17 @@ graph LR
 
         Stable release packages are [published to PyPI](https://pypi.org/).
 
+        !!! note
+
+            Until the major version updates in
+            <https://github.com/iree-org/iree/issues/19777> are completed, we
+            recommend users install old versions.
+
         ``` shell
         python -m pip install \
-          iree-base-compiler \
-          iree-base-runtime \
-          iree-tools-tflite
+          "iree-base-compiler<=3.1.0" \
+          "iree-base-runtime<=3.1.0" \
+          "iree-tools-tflite<=20250107.1133"
         ```
 
     === ":material-alert: Nightly releases"
@@ -96,20 +110,23 @@ These two stages can be completed entirely via the command line.
 
 ``` shell
 WORKDIR="/tmp/workdir"
-TFLITE_URL="https://storage.googleapis.com/iree-model-artifacts/tflite-integration-tests/posenet_i8.tflite"
-TFLITE_PATH=${WORKDIR}/model.tflite
+mkdir -p ${WORKDIR}
+cd ${WORKDIR}
+
+# Fetch a model from https://www.kaggle.com/models/tensorflow/posenet-mobilenet
+TFLITE_URL="https://www.kaggle.com/api/v1/models/tensorflow/posenet-mobilenet/tfLite/float-075/1/download"
+curl -L -o posenet.tar.gz ${TFLITE_URL}
+tar xf posenet.tar.gz
+
+TFLITE_PATH=${WORKDIR}/1.tflite
 IMPORT_PATH=${WORKDIR}/tosa.mlir
 MODULE_PATH=${WORKDIR}/module.vmfb
 
-# Fetch the sample model
-wget ${TFLITE_URL} -O ${TFLITE_PATH}
-
-# Import the sample model to an IREE compatible form
+# Import the model to MLIR (in the TOSA dialect) so IREE can compile it.
 iree-import-tflite ${TFLITE_PATH} -o ${IMPORT_PATH}
 
 # Compile for the CPU backend
 iree-compile \
-    --iree-input-type=tosa \
     --iree-hal-target-backends=llvm-cpu \
     ${IMPORT_PATH} \
     -o ${MODULE_PATH}
@@ -121,14 +138,22 @@ The example below demonstrates downloading, compiling, and executing a TFLite
 model using the Python API. This includes some initial setup to declare global
 variables, download the sample module, and download the sample inputs.
 
-Declaration of absolute paths for the sample repo and import all required
-libraries. The default setup uses the CPU backend as the only target. This can
-be reconfigured to select alternative targets.
+The default setup uses the CPU backend as the only target. This can be
+reconfigured to select alternative targets.
+
+First install some extra packages:
+
+```bash
+python -m pip install kagglehub pillow
+```
+
+Then run the demo Python script:
 
 ``` python
 import iree.compiler.tflite as iree_tflite_compile
 import iree.runtime as iree_rt
-import numpy
+import kagglehub
+import numpy as np
 import os
 import urllib.request
 
@@ -137,64 +162,57 @@ from PIL import Image
 workdir = "/tmp/workdir"
 os.makedirs(workdir, exist_ok=True)
 
-tfliteFile = "/".join([workdir, "model.tflite"])
-jpgFile = "/".join([workdir, "input.jpg"])
-tfliteIR = "/".join([workdir, "tflite.mlir"])
-tosaIR = "/".join([workdir, "tosa.mlir"])
-bytecodeModule = "/".join([workdir, "iree.vmfb"])
+# Download a model.
+download_path = kagglehub.model_download(
+    "tensorflow/posenet-mobilenet/tfLite/float-075"
+)
+tflite_file = os.path.join(download_path, "1.tflite")
 
+# Once downloaded we can compile the model for the selected backends. Both the
+# TFLite and TOSA representations of the model are saved for debugging purposes.
+# This is optional and can be omitted.
+tosa_ir = os.path.join(workdir, "tosa.mlirbc")
+bytecode_module = os.path.join(workdir, "iree.vmfb")
 backends = ["llvm-cpu"]
-config = "local-task"
-```
+backend_extra_args = ["--iree-llvmcpu-target-cpu=host"]
 
-The TFLite sample model and input are downloaded locally.
-
-``` python
-tfliteUrl = "https://storage.googleapis.com/iree-model-artifacts/tflite-integration-tests/posenet_i8.tflite"
-jpgUrl = "https://storage.googleapis.com/iree-model-artifacts/tflite-integration-tests/posenet_i8_input.jpg"
-
-urllib.request.urlretrieve(tfliteUrl, tfliteFile)
-urllib.request.urlretrieve(jpgUrl, jpgFile)
-```
-
-Once downloaded we can compile the model for the selected backends. Both the
-TFLite and TOSA representations of the model are saved for debugging purposes.
-This is optional and can be omitted.
-
-``` python
 iree_tflite_compile.compile_file(
-  tfliteFile,
-  input_type="tosa",
-  output_file=bytecodeModule,
-  save_temp_tfl_input=tfliteIR,
-  save_temp_iree_input=tosaIR,
-  target_backends=backends,
-  import_only=False)
-```
+    tflite_file,
+    input_type="tosa",
+    extra_args=backend_extra_args,
+    output_file=bytecode_module,
+    save_temp_iree_input=tosa_ir,
+    target_backends=backends,
+    import_only=False,
+)
 
-After compilation is completed we configure the VmModule using the local-task
-configuration and compiled IREE module.
-
-``` python
+# After compilation is completed we configure the VmModule using the local-task
+# configuration and compiled IREE module.
 config = iree_rt.Config("local-task")
 context = iree_rt.SystemContext(config=config)
-with open(bytecodeModule, 'rb') as f:
-  vm_module = iree_rt.VmModule.from_flatbuffer(config.vm_instance, f.read())
-  context.add_vm_module(vm_module)
-```
+with open(bytecode_module, "rb") as f:
+    vm_module = iree_rt.VmModule.from_flatbuffer(config.vm_instance, f.read())
+    context.add_vm_module(vm_module)
 
-Finally, the IREE module is loaded and ready for execution. Here we load the
-sample image, manipulate to the expected input size, and execute the module. By
-default TFLite models include a single function named 'main'. The final results
-are printed.
+# Finally, the IREE module is loaded and ready for execution. Here we load the
+# sample image, manipulate to the expected input size, and execute the module.
+# By default TFLite models include a single function named 'main'. The final
+# results are printed.
 
-``` python
-im = numpy.array(Image.open(jpgFile).resize((192, 192))).reshape((1, 192, 192, 3))
+jpg_file = "/".join([workdir, "input.jpg"])
+jpg_url = "https://raw.githubusercontent.com/tensorflow/tfjs-models/refs/heads/master/pose-detection/test_data/pose.jpg"
+urllib.request.urlretrieve(jpg_url, jpg_file)
+
+im = (
+    np.array(Image.open(jpg_file).resize((353, 257)))
+    .astype(np.float32)
+    .reshape((1, 353, 257, 3))
+)
 args = [im]
 
 invoke = context.modules.module["main"]
 iree_results = invoke(*args)
-print(iree_results)
+print(iree_results[0].to_host())
 ```
 
 ## :octicons-code-16: Samples
@@ -219,7 +237,7 @@ Text classification with TFLite and IREE | [![Open in Colab](https://colab.resea
 
 Failures during the import step usually indicate a failure to lower from
 TensorFlow Lite's operations to TOSA, the intermediate representation used by
-IREE. Many TensorFlow Lite operations are not fully supported, particularly
-those than use dynamic shapes. Please reach out on one of IREE's
+IREE. Some TensorFlow Lite operations are not fully supported. Please reach out
+on one of IREE's
 [communication channels](../../index.md#communication-channels) if you notice
 something missing.
