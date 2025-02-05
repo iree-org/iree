@@ -115,52 +115,6 @@ def IREEGPU_DotProductOpsAttr : EnumAttr<
 }
 
 //===----------------------------------------------------------------------===//
-// Base MMA vector layout
-//===----------------------------------------------------------------------===//
-
-class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
-    AttrDef<IREEGPU_Dialect, attrname, [
-  DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
-    "getABCElementTypes",
-    "getABCVectorTypes",
-    "getMNKShape",
-    "getSubgroupSize",
-    "getMmaScope",
-    "buildMmaOperation",
-    "populateOperandOffsetsSizesStrides",
-  ]>
-]> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
-
-  string baseDescription = [{
-    Attribute describing a particular shape of matrix-multiply and accumulate
-    instruction. Abstractly, all attributes of this type represent the following
-    unit of arithmetic for matrices A, B, and C.
-
-    ```
-      C += A x B
-    ```
-
-    Where the shape of matrix `A` is `[m, k]`, `B` is `[k, n]`, and
-    `C` is `[m, n]`. This intentionally leaves the layout information abstract
-    and uses interface methods to materialize layout information only when
-    needed. The shape of the mma intrinsic is stored explicitly here as that
-    information is queried frequently.
-
-    The element types for this particular mma intrinsic are |aType|, |bType|,
-    and |cType| for matrices `A`, `B`, and `C` respectively.
-
-    ######
-
-  }];
-
-
-  let parameters = (ins
-    mmaintrinsic:$intrinsic
-  );
-}
-
-//===----------------------------------------------------------------------===//
 // MMA intrinsic
 //===----------------------------------------------------------------------===//
 
