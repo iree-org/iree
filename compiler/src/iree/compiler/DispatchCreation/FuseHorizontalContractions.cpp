@@ -49,29 +49,57 @@ struct FuseHorizontalContractionsPass final
 } // namespace
 
 /// Helper method to check operations equivalence
-static bool checkOperationEquivalence(Operation *lhsOp, Operation *rhsOp) {
-  // During equivalence check, it would have been easier if `checkEquivalence`
-  // would just use `OpOperands *`. Since it takes `Value`s for now, just
-  // check that the values are the same as operands. This is potentially
-  // making the match too broad, but is an OK work-around for now.
-  // TODO(MaheshRavishankar): Fix upstream `checkEquivalence` signater in
-  // `OperationEquivalence::isEquivalentTo`.
-  llvm::SmallDenseSet<Value, 8> operands;
-  operands.insert(lhsOp->operand_begin(), lhsOp->operand_end());
-  operands.insert(rhsOp->operand_begin(), rhsOp->operand_end());
+static bool checkOperationEquivalence(Operation *aOp, Operation *bOp) {
+  auto aLinalgOp = dyn_cast<linalg::LinalgOp>(aOp);
+  auto bLinalgOp = dyn_cast<linalg::LinalgOp>(bOp);
 
-  llvm::DenseMap<Value, Value> equivalentValues;
-  auto checkEquivalent = [&](Value lhsValue, Value rhsValue) {
-    if (operands.contains(lhsValue) && operands.contains(rhsValue)) {
-      return success();
-    }
-    return success(equivalentValues.lookup(lhsValue) == rhsValue ||
-                   equivalentValues.lookup(rhsValue) == lhsValue);
+  if (!aLinalgOp || !bLinalgOp) {
+    return false;
+  }
+  // Contraction ops verifies that there are two operands and one result.
+  assert(linalg::isaContractionOpInterface(aLinalgOp) &&
+         linalg::isaContractionOpInterface(bLinalgOp) &&
+         "expected lhs and rhs to be contraction ops");
+
+  // CHeck that the LHS operand is the same. Can be relaxed in the future.
+  if (aLinalgOp.getDpsInputOperand(0)->get() !=
+      bLinalgOp.getDpsInputOperand(0)->get()) {
+    return false;
+  }
+
+  auto checkSameRankAndElementType = [](Value aVal, Value bVal) {
+    auto aType = dyn_cast<ShapedType>(aVal.getType());
+    auto bType = dyn_cast<ShapedType>(bVal.getType());
+    return aType && bType && aType.getRank() == bType.getRank() &&
+           aType.getElementType() == bType.getElementType();
   };
-  auto markEquivalent = [&](Value v1, Value v2) { equivalentValues[v1] = v2; };
-  return OperationEquivalence::isEquivalentTo(
-      lhsOp, rhsOp, checkEquivalent, markEquivalent,
-      /*flags=*/OperationEquivalence::IgnoreLocations);
+  // Check that the RHS rank and element type are the same. We dont check the
+  // type cause we allow RHS to be transposes.
+  if (!checkSameRankAndElementType(aLinalgOp.getDpsInputOperand(1)->get(),
+                                   bLinalgOp.getDpsInputOperand(1)->get())) {
+    return false;
+  }
+
+  // Check that the output rank and element type are the same. We dont check the
+  // type cause we allow RHS to be transposes.
+  if (!checkSameRankAndElementType(aLinalgOp.getDpsInitOperand(0)->get(),
+                                   bLinalgOp.getDpsInitOperand(0)->get())) {
+    return false;
+  }
+
+  // Check that the iterator types are the same.
+  if (aLinalgOp.getIteratorTypesArray() != bLinalgOp.getIteratorTypesArray()) {
+    return false;
+  }
+
+  // Check region equivalence.
+  if (!OperationEquivalence::isRegionEquivalentTo(
+          &aLinalgOp->getRegion(0), &bLinalgOp->getRegion(0),
+          OperationEquivalence::IgnoreLocations)) {
+    return false;
+  }
+
+  return true;
 }
 
 /// Check that an operation is a `empty -> fill -> contraction`
@@ -82,7 +110,7 @@ static bool isEquivalentContractionOp(
     return false;
   }
   if (seedContractionOp) {
-    return checkOperationEquivalence(linalgOp, seedContractionOp.value());
+    return checkOperationEquivalence(seedContractionOp.value(), linalgOp);
   }
   return true;
 }
@@ -130,11 +158,6 @@ static std::optional<SmallVector<Operation *>> getHorizontalFusionGroupMembers(
     const DominanceInfo &dominanceInfo, int fusionLimit) {
 
   Value lhs = seedOp->getOperand(0);
-  auto lhsType = cast<RankedTensorType>(lhs.getType());
-  Value rhs = seedOp->getOperand(1);
-  auto rhsType = cast<RankedTensorType>(rhs.getType());
-  Value out = seedOp->getOperand(2);
-  auto outType = cast<RankedTensorType>(out.getType());
 
   SetVector<Operation *> allOps;
   SmallVector<Operation *> contractionOps = {seedOp};
@@ -147,11 +170,6 @@ static std::optional<SmallVector<Operation *>> getHorizontalFusionGroupMembers(
 
     // Constraints of the operation itself.
     if (!isEquivalentContractionOp(linalgOp, seedOp)) {
-      return false;
-    }
-    if (linalgOp->getOperand(0).getType() != lhsType ||
-        linalgOp->getOperand(1).getType() != rhsType ||
-        linalgOp->getOperand(2).getType() != outType) {
       return false;
     }
     if (groupedOperations.contains(linalgOp)) {
@@ -183,8 +201,8 @@ static std::optional<SmallVector<Operation *>> getHorizontalFusionGroupMembers(
   }
 
   // Sort the users so that the order is deterministic
-  llvm::sort(lhsUsers, [&](Operation *lhs, Operation *rhs) {
-    return dominanceInfo.properlyDominates(lhs, rhs);
+  llvm::sort(lhsUsers, [&](Operation *a, Operation *b) {
+    return dominanceInfo.properlyDominates(a, b);
   });
 
   // Collect all contraction op users of lhs.
@@ -213,13 +231,80 @@ static void appendRange(V &vector, R &&range) {
   vector.append(range.begin(), range.end());
 }
 
-static FailureOr<linalg::GenericOp>
+LogicalResult
+permuteIndexingMapsToMatchSeedLhs(RewriterBase &rewriter,
+                                  AffineMap seedLhsIndexingMap,
+                                  ArrayRef<utils::IteratorType> iteratorTypes,
+                                  SmallVector<AffineMap> &indexingMaps) {
+  if (indexingMaps.empty()) {
+    return failure();
+  }
+  AffineMap lhsIndexingMap = indexingMaps[0];
+  if (seedLhsIndexingMap == lhsIndexingMap) {
+    return success();
+  }
+
+  assert(lhsIndexingMap.getNumDims() == seedLhsIndexingMap.getNumDims());
+  if (!lhsIndexingMap.isProjectedPermutation() ||
+      !seedLhsIndexingMap.isProjectedPermutation() ||
+      lhsIndexingMap.getNumResults() != seedLhsIndexingMap.getNumResults()) {
+    return failure();
+  }
+
+  auto getResultDimsRange = [](ArrayRef<AffineExpr> exprs) {
+    return llvm::map_range(exprs, [](AffineExpr expr) {
+      return cast<AffineDimExpr>(expr).getPosition();
+    });
+  };
+  auto seedLhsResultDimsRange =
+      getResultDimsRange(seedLhsIndexingMap.getResults());
+  auto lhsResultDimsRange = getResultDimsRange(lhsIndexingMap.getResults());
+
+  // Start with a identity permutations. For now try to only swap dimensions
+  // which is not a general solution.
+  SmallVector<unsigned> interchangeVector =
+      llvm::to_vector(llvm::seq<unsigned>(0, lhsIndexingMap.getNumDims()));
+  for (auto [seedDimPos, lhsDimPos] :
+       llvm::zip_equal(seedLhsResultDimsRange, lhsResultDimsRange)) {
+    if (seedDimPos == lhsDimPos) {
+      continue;
+    }
+    // If the current positions are what we started with, swap the positions.
+    if (interchangeVector[lhsDimPos] == lhsDimPos &&
+        interchangeVector[seedDimPos] == seedDimPos) {
+      interchangeVector[lhsDimPos] = seedDimPos;
+      interchangeVector[seedDimPos] = lhsDimPos;
+      continue;
+    }
+    // If this was a changed dimension, check that it is consistent.
+    if (interchangeVector[lhsDimPos] != seedDimPos ||
+        interchangeVector[seedDimPos] != lhsDimPos) {
+      return failure();
+    }
+  }
+
+  // Check that the iterator types remain the same
+  SmallVector<utils::IteratorType> permutedIteratorTypes =
+      llvm::to_vector(iteratorTypes);
+  if (permutedIteratorTypes != iteratorTypes) {
+    return failure();
+  }
+
+  AffineMap interchangeMap =
+      AffineMap::getPermutationMap(interchangeVector, rewriter.getContext());
+  for (auto &map : indexingMaps) {
+    if (!map.isEmpty()) {
+      map = map.compose(interchangeMap);
+    }
+  }
+  return success();
+}
+
+static std::optional<linalg::GenericOp>
 fuseHorizontally(RewriterBase &rewriter, Location loc,
                  MutableArrayRef<Operation *> linalgOps) {
-  if (!llvm::all_of(linalgOps, [](Operation *op) {
-        return isa_and_nonnull<linalg::LinalgOp>(op);
-      })) {
-    return failure();
+  if (linalgOps.empty()) {
+    return std::nullopt;
   }
 
   SmallVector<Value> fusedIns;
@@ -228,33 +313,60 @@ fuseHorizontally(RewriterBase &rewriter, Location loc,
   SmallVector<AffineMap> fusedInsIndexingMaps;
   SmallVector<AffineMap> fusedOutsIndexingMaps;
 
+  linalg::LinalgOp seedOp = cast<linalg::LinalgOp>(linalgOps.front());
+  SmallVector<utils::IteratorType> fusedIteratorTypes =
+      cast<linalg::LinalgOp>(linalgOps.front()).getIteratorTypesArray();
+
+  OpOperand *seedOpLhs = seedOp.getDpsInputOperand(0);
+  AffineMap seedOpLhsIndexingMap = seedOp.getMatchingIndexingMap(seedOpLhs);
+  fusedIns.push_back(seedOpLhs->get());
+  fusedInsIndexingMaps.push_back(seedOpLhsIndexingMap);
+
+  llvm::SmallDenseSet<Operation *> droppedOps;
   for (auto op : linalgOps) {
-    auto linalgOp = cast<linalg::LinalgOp>(op);
-    fusedIns.append(linalgOp.getDpsInputs());
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+    if (!linalgOp ||
+        linalgOp.getDpsInputOperand(0)->get() != seedOpLhs->get()) {
+      droppedOps.insert(op);
+      continue;
+    }
+
+    SmallVector<AffineMap> opIndexingMaps = linalgOp.getIndexingMapsArray();
+    if (failed(permuteIndexingMapsToMatchSeedLhs(rewriter, seedOpLhsIndexingMap,
+                                                 fusedIteratorTypes,
+                                                 opIndexingMaps))) {
+      droppedOps.insert(op);
+      continue;
+    }
+
+    // Append the RHS operands;
+    SmallVector<OpOperand *> ins = linalgOp.getDpsInputOperands();
+    appendRange(
+        fusedIns,
+        llvm::map_range(ArrayRef<OpOperand *>(ins).drop_front(),
+                        [](OpOperand *operand) { return operand->get(); }));
+
+    // Append the Outs operands.
     appendRange(fusedOuts, llvm::map_range(linalgOp.getDpsInitsMutable(),
                                            [](OpOperand &operand) {
                                              return operand.get();
                                            }));
+
+    // Append the result types.
     fusedResultTypes.append(linalgOp->result_type_begin(),
                             linalgOp->result_type_end());
-    appendRange(
-        fusedInsIndexingMaps,
-        llvm::map_range(linalgOp.getIndexingMaps().getValue().take_front(
-                            linalgOp.getNumDpsInputs()),
-                        [](Attribute attr) {
-                          return cast<AffineMapAttr>(attr).getValue();
-                        }));
-    appendRange(
-        fusedOutsIndexingMaps,
-        llvm::map_range(linalgOp.getIndexingMaps().getValue().drop_front(
-                            linalgOp.getNumDpsInputs()),
-                        [](Attribute attr) {
-                          return cast<AffineMapAttr>(attr).getValue();
-                        }));
+
+    // Append the rhs indexing maps.
+    appendRange(fusedInsIndexingMaps,
+                ArrayRef<AffineMap>(opIndexingMaps)
+                    .slice(1, linalgOp.getNumDpsInputs() - 1));
+
+    // Append the outs indexing maps.
+    appendRange(fusedOutsIndexingMaps,
+                ArrayRef<AffineMap>(opIndexingMaps)
+                    .drop_front(linalgOp.getNumDpsInputs()));
   }
 
-  SmallVector<utils::IteratorType> fusedIteratorTypes =
-      cast<linalg::LinalgOp>(linalgOps.front()).getIteratorTypesArray();
   SmallVector<AffineMap> fusedIndexingMaps = std::move(fusedInsIndexingMaps);
   fusedIndexingMaps.append(fusedOutsIndexingMaps);
   auto fusedOp = rewriter.create<linalg::GenericOp>(
@@ -262,15 +374,22 @@ fuseHorizontally(RewriterBase &rewriter, Location loc,
       fusedIteratorTypes, [](OpBuilder &, Location, ValueRange) {});
 
   Block *fusedBody = fusedOp.getBlock();
-  auto insIndex = 0;
+  auto rhsIndex = 0;
   auto outsIndex = fusedOp.getNumDpsInputs();
   SmallVector<Value> yieldVals;
   for (auto op : linalgOps) {
+    if (droppedOps.contains(op)) {
+      continue;
+    }
     auto linalgOp = cast<linalg::LinalgOp>(op);
     Block *body = linalgOp.getBlock();
-    SmallVector<Value> replacements = llvm::map_to_vector(
-        fusedBody->getArguments().slice(insIndex, linalgOp.getNumDpsInputs()),
-        [](BlockArgument arg) -> Value { return arg; });
+    SmallVector<Value> replacements = {fusedBody->getArgument(0)};
+    appendRange(
+        replacements,
+        llvm::map_range(fusedBody->getArguments().slice(
+                            rhsIndex + 1, linalgOp.getNumDpsInputs() - 1),
+                        [](BlockArgument arg) -> Value { return arg; }));
+
     appendRange(
         replacements,
         llvm::map_range(fusedBody->getArguments().slice(
@@ -278,7 +397,7 @@ fuseHorizontally(RewriterBase &rewriter, Location loc,
                         [](BlockArgument arg) -> Value { return arg; }));
 
     rewriter.mergeBlocks(body, fusedBody, replacements);
-    insIndex += linalgOp.getNumDpsInputs();
+    rhsIndex += linalgOp.getNumDpsInputs() - 1;
     outsIndex += linalgOp.getNumDpsInits();
 
     auto yieldOp = cast<linalg::YieldOp>(fusedBody->getTerminator());
@@ -299,13 +418,13 @@ fuseHorizontally(RewriterBase &rewriter, Location loc,
   return fusedOp;
 }
 
-static FailureOr<linalg::GenericOp>
-fuseGroup(RewriterBase &rewriter, MutableArrayRef<Operation *> fusionGroup,
-          DominanceInfo &dominanceInfo) {
+static void fuseGroup(RewriterBase &rewriter,
+                      MutableArrayRef<Operation *> fusionGroup,
+                      DominanceInfo &dominanceInfo) {
   if (!llvm::all_of(fusionGroup, [](Operation *op) {
         return isa_and_nonnull<linalg::LinalgOp>(op);
       })) {
-    return failure();
+    return;
   }
   linalg::LinalgOp baseContractOp = cast<linalg::LinalgOp>(fusionGroup.front());
   Location loc = baseContractOp.getLoc();
@@ -314,16 +433,10 @@ fuseGroup(RewriterBase &rewriter, MutableArrayRef<Operation *> fusionGroup,
 
   if (failed(moveOperandDefs(rewriter, fusionGroup, baseContractOp,
                              dominanceInfo))) {
-    return baseContractOp.emitOpError("failed to re-order operand definitions");
+    return;
   }
 
-  FailureOr<linalg::GenericOp> fusedContractionOp =
-      fuseHorizontally(rewriter, loc, fusionGroup);
-  if (failed(fusedContractionOp)) {
-    return baseContractOp.emitOpError(
-        "failed to fuse contraction ops horizontally");
-  }
-  return fusedContractionOp.value();
+  fuseHorizontally(rewriter, loc, fusionGroup);
 }
 
 void FuseHorizontalContractionsPass::runOnOperation() {
@@ -373,18 +486,7 @@ void FuseHorizontalContractionsPass::runOnOperation() {
 
   IRRewriter rewriter(context);
   for (auto &fusionGroup : horizontalFusionGroups) {
-    FailureOr<linalg::GenericOp> fusedOperation =
-        fuseGroup(rewriter, fusionGroup, dominanceInfo);
-    if (failed(fusedOperation)) {
-      return signalPassFailure();
-    }
-    auto fusedOp = fusedOperation.value();
-    rewriter.setInsertionPoint(fusedOp);
-    if (failed(linalg::deduplicateOperandsAndRemoveDeadResults(
-            rewriter, fusedOp, /*removeOutputs=*/false))) {
-      fusedOp->emitOpError("failed to remove duplicate operands");
-      return signalPassFailure();
-    }
+    fuseGroup(rewriter, fusionGroup, dominanceInfo);
   }
 }
 } // namespace mlir::iree_compiler::DispatchCreation

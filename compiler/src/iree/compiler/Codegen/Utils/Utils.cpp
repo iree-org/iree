@@ -1362,23 +1362,6 @@ bool isaHorizontallyFusedContraction(linalg::LinalgOp linalgOp) {
       })) {
     return false;
   }
-  // Check all the rhs indexing maps, those between [1, numDpsInputs) are equal.
-  if (!llvm::all_of(ArrayRef<AffineMap>(indexingMaps)
-                        .take_front(linalgOp.getNumDpsInputs())
-                        .drop_front(2),
-                    [&](AffineMap m) { return m == indexingMaps[1]; })) {
-    return false;
-  }
-  // Check all the outs indexing maps, those between [numDpsInputs, numDpsInits)
-  // are equal.
-  if (!llvm::all_of(ArrayRef<AffineMap>(indexingMaps)
-                        .take_back(linalgOp.getNumDpsInits())
-                        .drop_front(),
-                    [&](AffineMap m) {
-                      return m == indexingMaps[linalgOp.getNumDpsInputs()];
-                    })) {
-    return false;
-  }
 
   llvm::SetVector<BlockArgument> rhsArgs;
   llvm::SetVector<BlockArgument> outArgs;
