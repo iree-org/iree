@@ -77,7 +77,6 @@ verifyGPUMatmulPipeline(Operation *op,
                         IREE::GPU::LoweringConfigAttr gpuLoweringConfig,
                         ArrayRef<int64_t> workgroupSize) {
   CodeGenPipeline pipeline = translationInfo.getDispatchLoweringPassPipeline();
-  op->dump();
 
   if (pipeline != CodeGenPipeline::LLVMGPUMatmulTensorCore &&
       pipeline != CodeGenPipeline::LLVMGPUMatmulTensorCoreMmaSync &&
