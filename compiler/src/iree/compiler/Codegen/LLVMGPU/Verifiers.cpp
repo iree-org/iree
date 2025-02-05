@@ -119,7 +119,7 @@ verifyGPUMatmulPipeline(Operation *op,
   }
 
   if (pipeline == CodeGenPipeline::LLVMGPUTileAndFuse ||
-      pipeline == CodeGenPipeline::LLVMGPUVectgiorDistribute) {
+      pipeline == CodeGenPipeline::LLVMGPUVectorDistribute) {
     return success();
   }
 
