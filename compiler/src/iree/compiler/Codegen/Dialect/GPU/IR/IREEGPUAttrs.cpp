@@ -345,6 +345,21 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
   return {};
 }
 
+MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
+                                                MMAFragment fragment,
+                                                bool colMajor) {
+  MMASingleSubgroupLayout baseLayout =
+      getSingleSubgroupLayout(intrinsic, fragment);
+  assert(baseLayout.element.size() == 2 && "expected 2d layout");
+  if (colMajor) {
+    std::swap(baseLayout.element[0], baseLayout.element[1]);
+    std::swap(baseLayout.thread[0], baseLayout.thread[1]);
+    std::swap(baseLayout.outer[0], baseLayout.outer[1]);
+    std::swap(baseLayout.tstrides[0], baseLayout.tstrides[1]);
+  }
+  return baseLayout;
+}
+
 // Struct describing the shape of a MMA operation, but not the detailed layout.
 struct OpaqueMmaLayout {
   int64_t mSize = 0;
@@ -388,7 +403,11 @@ static OpaqueMmaLayout getOpaqueMMALayout(MLIRContext *context,
 MMASingleSubgroupLayout getSingleSubgroupLayout(MmaInterfaceAttr mmaKind,
                                                 MMAFragment fragment) {
   if (auto mmaAttr = dyn_cast<MMAAttr>(mmaKind)) {
-    return getSingleSubgroupLayout(mmaAttr.getIntrinsic(), fragment);
+    // |colMajor| indicates that the accumulator layout should be returned
+    // column major.
+    return getSingleSubgroupLayout(mmaAttr.getIntrinsic(), fragment,
+                                   fragment == MMAFragment::Acc &&
+                                       mmaAttr.getColMajor());
   }
   if (auto vmmaAttr = dyn_cast<VirtualMMAAttr>(mmaKind)) {
     return getSingleSubgroupLayout(vmmaAttr.getIntrinsic(), fragment);
@@ -400,6 +419,10 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MmaInterfaceAttr mmaKind,
 //===----------------------------------------------------------------------===//
 // MMA Attributes
 //===----------------------------------------------------------------------===//
+
+MMAAttr MMAAttr::get(MLIRContext *context, MMAIntrinsic type) {
+  return Base::get(context, type, /*colMajor=*/false);
+}
 
 std::tuple<Type, Type, Type> MMAAttr::getABCElementTypes() const {
   return IREE::GPU::getABCElementTypes(getContext(), getIntrinsic());
@@ -468,7 +491,7 @@ SmallVector<VirtualMMAIntrinsic> MMAAttr::getVirtualIntrinsics() const {
 
 static Value createMmaOp(OpBuilder &builder, Location loc,
                          MMAIntrinsic intrinsic, Type resultType, Value lhs,
-                         Value rhs, Value acc) {
+                         Value rhs, Value acc, bool colMajor = false) {
   auto getVecOrSingleElem = [&](Value vec) -> Value {
     bool one = llvm::cast<VectorType>(vec.getType()).getNumElements() == 1;
     return one ? builder.create<vector::ExtractOp>(loc, vec, 0) : vec;
@@ -478,6 +501,13 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
     // MFMA intrinsics want single-element operands of element type, not vector.
     lhs = getVecOrSingleElem(lhs);
     rhs = getVecOrSingleElem(rhs);
+
+    // Because the thread layout of the lhs and rhs are transpositions of one
+    // another for all MFMA variants, to produce a column major result we can
+    // simply swap the operands to the MFMA.
+    if (colMajor) {
+      std::swap(lhs, rhs);
+    }
     return builder
         .create<amdgpu::MFMAOp>(loc, resultType, layout.mSize, layout.nSize,
                                 layout.kSize, getBlockSize(intrinsic), lhs, rhs,
@@ -507,7 +537,7 @@ FailureOr<Value> MMAAttr::buildMmaOperation(OpBuilder &builder, Location loc,
     return failure();
   }
   if (Value value = createMmaOp(builder, loc, getIntrinsic(), resultType, lhs,
-                                rhs, acc)) {
+                                rhs, acc, getColMajor())) {
     return value;
   }
   return failure();
@@ -592,8 +622,8 @@ LogicalResult MMAAttr::populateOperandOffsetsSizesStrides(
     SmallVector<OpFoldResult> &offsets, SmallVector<OpFoldResult> &sizes,
     SmallVector<OpFoldResult> &strides) const {
 
-  MMASingleSubgroupLayout subgroupLayout =
-      getSingleSubgroupLayout(getIntrinsic(), fragment);
+  MMASingleSubgroupLayout subgroupLayout = getSingleSubgroupLayout(
+      getIntrinsic(), fragment, fragment == MMAFragment::Acc && getColMajor());
   SmallVector<OpFoldResult> canonicalOffsets;
   SmallVector<OpFoldResult> canonicalSizes;
   if (failed(populateCanonicalOffsetsSizesAndStrides(
