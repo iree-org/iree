@@ -72,54 +72,13 @@ getInstructionShape(Operation *op, CodeGenPipeline pipeline,
 /// and Tensor Core pipelines.
 LogicalResult
 verifyGPUMatmulPipeline(Operation *op,
-                        IREE::Codegen::LoweringConfigAttr codegenloweringConfig,
+                        IREE::Codegen::LoweringConfigAttr loweringConfig,
                         IREE::Codegen::TranslationInfoAttr translationInfo,
-                        IREE::GPU::LoweringConfigAttr gpuLoweringConfig,
                         ArrayRef<int64_t> workgroupSize) {
   CodeGenPipeline pipeline = translationInfo.getDispatchLoweringPassPipeline();
 
   if (pipeline != CodeGenPipeline::LLVMGPUMatmulTensorCore &&
-      pipeline != CodeGenPipeline::LLVMGPUMatmulTensorCoreMmaSync &&
-      pipeline != CodeGenPipeline::LLVMGPUTileAndFuse &&
-      pipeline != CodeGenPipeline::LLVMGPUVectorDistribute) {
-    return success();
-  }
-
-  uint32_t reduction = static_cast<uint32_t>(IREE::GPU::TilingLevel::Reduction);
-  uint numLoops = llvm::cast<linalg::LinalgOp>(op).getNumLoops();
-
-  SmallVector<int64_t> reductionTileSizes =
-      gpuLoweringConfig.getStaticTilingLevelSizes(reduction, op);
-  size_t size = reductionTileSizes.size();
-  // if (size > numLoops) {
-  //   return op->emitOpError("expected number of reduction tile size is equal
-  //   or "
-  //                          "less than number of loops");
-  // }
-  for (size_t i = 0; i < size; ++i) {
-    if (reductionTileSizes[i] > 0 &&
-        llvm::cast<linalg::LinalgOp>(op).getIteratorTypesArray()[i] !=
-            utils::IteratorType::reduction) {
-      return op->emitOpError(
-          "expected to non-zero reduction tile has reduction iterator");
-    }
-  }
-
-  SmallVector<int64_t> workgroupTileSizes =
-      gpuLoweringConfig.getWorkgroupTileSizes();
-  size = workgroupTileSizes.size();
-
-  for (size_t i = 0; i < size; ++i) {
-    if (workgroupTileSizes[i] > 0 &&
-        llvm::cast<linalg::LinalgOp>(op).getIteratorTypesArray()[i] !=
-            utils::IteratorType::parallel) {
-      return op->emitOpError(
-          "expected to non-zero workgroup tile has parallel iterator");
-    }
-  }
-
-  if (pipeline == CodeGenPipeline::LLVMGPUTileAndFuse ||
-      pipeline == CodeGenPipeline::LLVMGPUVectorDistribute) {
+      pipeline != CodeGenPipeline::LLVMGPUMatmulTensorCoreMmaSync) {
     return success();
   }
 
@@ -165,7 +124,7 @@ verifyGPUMatmulPipeline(Operation *op,
 
   // Tile shapes in number of elements.
   SmallVector<int64_t> tileShape =
-      codegenloweringConfig.getTileSizeVals(kWorkgroupTileLevel);
+      loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
   SmallVector<int64_t> threadBlockShape{tileShape};
 
   if (auto batchMatmulOp = dyn_cast<linalg::BatchMatmulOp>(op)) {
@@ -271,6 +230,61 @@ verifyGPUMatmulPipeline(Operation *op,
     return op->emitError("Tensor Core instruction shape ")
            << instructionShape << " cannot be tiled on warp shape " << warpShape
            << " with compilation pipeline " << pipelineName;
+  }
+
+  return success();
+}
+
+/// Verifies launch configuration for matmul and batchmatmul on a GPU for CUDA
+/// and Tensor Core pipelines.
+LogicalResult
+verifyGPUMatmulPipeline(Operation *op,
+                        IREE::GPU::LoweringConfigAttr loweringConfig,
+                        IREE::Codegen::TranslationInfoAttr translationInfo) {
+
+  CodeGenPipeline pipeline = translationInfo.getDispatchLoweringPassPipeline();
+
+  if (pipeline != CodeGenPipeline::LLVMGPUVectorDistribute) {
+    return success();
+  }
+
+  // Only verify batched and unbatched matmul.
+  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) {
+    return success();
+  }
+
+  unsigned reduction = static_cast<uint32_t>(IREE::GPU::TilingLevel::Reduction);
+  uint numLoops = llvm::cast<linalg::LinalgOp>(op).getNumLoops();
+  size_t size = 0;
+
+  SmallVector<int64_t> reductionTileSizes =
+      loweringConfig.getStaticTilingLevelSizes(reduction, op);
+
+  size = reductionTileSizes.size();
+
+  if (size > numLoops) {
+    return op->emitOpError("expected number of reduction tile size is equal "
+                           "or less than number of loops");
+  }
+  for (size_t i = 0; i < size; ++i) {
+    if (reductionTileSizes[i] > 0 &&
+        llvm::cast<linalg::LinalgOp>(op).getIteratorTypesArray()[i] !=
+            utils::IteratorType::reduction) {
+      return op->emitOpError(
+          "expected to non-zero reduction tile has reduction iterator");
+    }
+  }
+
+  SmallVector<int64_t> workgroupTileSizes =
+      loweringConfig.getWorkgroupTileSizes();
+  size = workgroupTileSizes.size();
+  for (size_t i = 0; i < size; ++i) {
+    if (workgroupTileSizes[i] > 0 &&
+        llvm::cast<linalg::LinalgOp>(op).getIteratorTypesArray()[i] !=
+            utils::IteratorType::parallel) {
+      return op->emitOpError(
+          "expected to non-zero workgroup tile has parallel iterator");
+    }
   }
 
   return success();

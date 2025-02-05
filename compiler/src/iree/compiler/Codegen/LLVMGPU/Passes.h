@@ -90,13 +90,16 @@ void buildLLVMGPUCodegenConfigurationPassPipeline(
 /// the module within the IREE::HAL::ExecutableOp.
 void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManagery,
                                      bool useROCM);
+LogicalResult
+verifyGPUMatmulPipeline(Operation *op,
+                        IREE::GPU::LoweringConfigAttr loweringConfig,
+                        IREE::Codegen::TranslationInfoAttr translationInfo);
 
 /// Lowering calling vectorization patterns.
 LogicalResult
 verifyGPUMatmulPipeline(Operation *op,
-                        IREE::Codegen::LoweringConfigAttr codegenloweringConfig,
+                        IREE::Codegen::LoweringConfigAttr loweringConfig,
                         IREE::Codegen::TranslationInfoAttr translationInfo,
-                        IREE::GPU::LoweringConfigAttr gpuloweringConfig,
                         ArrayRef<int64_t> workgroupSize);
 
 //----------------------------------------------------------------------------//
