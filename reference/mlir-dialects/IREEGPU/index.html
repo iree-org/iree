@@ -5277,7 +5277,7 @@ produces.</p>
 <h3 id="datatiledmmaattr">DataTiledMMAAttr<a class="headerlink" href="#datatiledmmaattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.data_tiled_mma_layout&lt;
-  ::mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr,   # intrinsic
+  ::mlir::iree_compiler::IREE::GPU::MMAIntrinsic,   # intrinsic
   int64_t,   # intrinsics_m
   int64_t,   # subgroups_m
   int64_t,   # intrinsics_n
@@ -5305,8 +5305,8 @@ data at an offset that's as simple as possible a mapping from the thread ID.</p>
 <tbody>
 <tr>
 <td style="text-align: center;">intrinsic</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr</code></td>
-<td></td>
+<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::MMAIntrinsic</code></td>
+<td>an enum of type MMAIntrinsic</td>
 </tr>
 <tr>
 <td style="text-align: center;">intrinsics_m</td>
@@ -5567,22 +5567,18 @@ form of a lowering config, offering flexibility at the cost of structure.</p>
 </tbody>
 </table>
 <h3 id="mmaattr">MMAAttr<a class="headerlink" href="#mmaattr" title="Permanent link">link</a></h3>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_gpu.mma_layout&lt;
+  ::mlir::iree_compiler::IREE::GPU::MMAIntrinsic   # intrinsic
+&gt;
+</code></pre></div>
 <p>Attribute describing a particular shape of matrix-multiply and accumulate
 instruction. Abstractly, all attributes of this type represent the following
 unit of arithmetic for matrices A, B, and C.</p>
 <div class="highlight"><pre><span></span><code>  C += A x B
 </code></pre></div>
-<p>Where the shape of matrix <code>A</code> is <code>[m, k]</code>, <code>B</code> is <code>[k, n]</code>, and
-<code>C</code> is <code>[m, n]</code>. This intentionally leaves the layout information abstract
-and uses interface methods to materialize layout information only when
-needed. The shape of the mma intrinsic is stored explicitly here as that
-information is queried frequently.</p>
-<p>The element types for this particular mma intrinsic are |aType|, |bType|,
-and |cType| for matrices <code>A</code>, <code>B</code>, and <code>C</code> respectively.</p>
-<h6 id="_1"><a class="headerlink" href="#_1" title="Permanent link">link</a></h6>
-<p>This mma variant describes configurations for MMA ops. The |intrinsic|
-field specifies which particular MMA intrinsic this refers to, with each
-intrinsic implicating a specific MNK shape and operand types.
+<p>The |intrinsic| field specifies which particular MMA intrinsic this refers
+to, with each intrinsic implicating a specific MNK shape and operand types.
 See IREEGPUEnums.td for the definition of the intrinsics.</p>
 <h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
 <table>
@@ -5596,38 +5592,8 @@ See IREEGPUEnums.td for the definition of the intrinsics.</p>
 <tbody>
 <tr>
 <td style="text-align: center;">intrinsic</td>
-<td style="text-align: center;"><code>MMAIntrinsicAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">mSize</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">nSize</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">kSize</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">aType</td>
-<td style="text-align: center;"><code>::mlir::Type</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">bType</td>
-<td style="text-align: center;"><code>::mlir::Type</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">cType</td>
-<td style="text-align: center;"><code>::mlir::Type</code></td>
-<td></td>
+<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::MMAIntrinsic</code></td>
+<td>an enum of type MMAIntrinsic</td>
 </tr>
 </tbody>
 </table>
@@ -6065,7 +6031,7 @@ been matched with a ukernel that is a legal lowering for it.</p>
 <h3 id="virtualmmaattr">VirtualMMAAttr<a class="headerlink" href="#virtualmmaattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.virtual_mma_layout&lt;
-  ::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr   # intrinsic
+  ::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic   # intrinsic
 &gt;
 </code></pre></div>
 <p>This mma variant represents "virtual" MMA ops that has modification to
@@ -6086,8 +6052,8 @@ in a chained-matmul operation.</p>
 <tbody>
 <tr>
 <td style="text-align: center;">intrinsic</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr</code></td>
-<td></td>
+<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic</code></td>
+<td>an enum of type VirtualMMAIntrinsic</td>
 </tr>
 </tbody>
 </table>
