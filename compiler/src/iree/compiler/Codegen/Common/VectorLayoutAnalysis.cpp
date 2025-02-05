@@ -1010,22 +1010,17 @@ void PropagateLayout::visitMaskOp(
   mask.getBody()->walk([&](vector::ContractionOp contract) {
     const DistributionLayout *lhs = getLatticeElement(contract.getLhs());
     const DistributionLayout *rhs = getLatticeElement(contract.getRhs());
-    if (!lhs->isUninitialized() && !rhs->isUninitialized()) {
-      if (NestedLayoutAttr lhsLayout =
-              dyn_cast<NestedLayoutAttr>(lhs->getLayout())) {
-        if (NestedLayoutAttr rhsLayout =
-                dyn_cast<NestedLayoutAttr>(rhs->getLayout())) {
-          SmallVector<NestedLayoutAttr> layouts{lhsLayout, rhsLayout};
-          SmallVector<AffineMap> maps{contract.getIndexingMapsArray()[0],
-                                      contract.getIndexingMapsArray()[1]};
-          NestedLayoutAttr inferredMaskLayout =
-              NestedLayoutAttr::get(lhsLayout.getContext(), layouts, maps);
-          DistributionLayout *maskLayout = getLatticeElement(mask.getMask());
-          ChangeResult changed = maskLayout->resolve(inferredMaskLayout);
-          update(maskLayout, changed);
-        }
-      }
-    }
+    SmallVector<VectorLayoutInterface> layouts{lhs->getLayout(),
+                                               rhs->getLayout()};
+    SmallVector<AffineMap> maps{contract.getIndexingMapsArray()[0],
+                                contract.getIndexingMapsArray()[1]};
+    AffineMap domainIdentity = AffineMap::getMultiDimIdentityMap(
+        maps[0].getNumDims(), contract.getContext());
+    VectorLayoutInterface inferredMaskLayout =
+        layouts[0].getRecombinedLayout(layouts, maps, domainIdentity);
+    DistributionLayout *maskLayout = getLatticeElement(mask.getMask());
+    ChangeResult changed = maskLayout->resolve(inferredMaskLayout);
+    update(maskLayout, changed);
   });
 }
 

@@ -270,10 +270,9 @@ NestedLayoutAttr NestedLayoutAttr::get(MLIRContext *context,
                                threadStrides);
 }
 
-NestedLayoutAttr
-NestedLayoutAttr::get(MLIRContext *context,
-                      ArrayRef<NestedLayoutAttr> operandLayouts,
-                      ArrayRef<AffineMap> operandIndexingMaps) {
+NestedLayoutAttr NestedLayoutAttr::get(
+    MLIRContext *context, ArrayRef<NestedLayoutAttr> operandLayouts,
+    ArrayRef<AffineMap> operandIndexingMaps, AffineMap resultMap) {
   int64_t numDims = operandIndexingMaps[0].getNumDims();
   SmallVector<int64_t> subgroupTile(numDims, 0);
   SmallVector<int64_t> batchTile(numDims, 0);
@@ -285,22 +284,48 @@ NestedLayoutAttr::get(MLIRContext *context,
 
   for (auto [layout, indexingMap] :
        llvm::zip(operandLayouts, operandIndexingMaps)) {
+
     for (int64_t resultIdx : llvm::seq<int64_t>(indexingMap.getNumResults())) {
       int64_t iterSpacePos = indexingMap.getDimPosition(resultIdx);
-      subgroupTile[iterSpacePos] = layout.getSubgroupTile()[resultIdx];
-      batchTile[iterSpacePos] = layout.getBatchTile()[resultIdx];
-      outerTile[iterSpacePos] = layout.getBatchTile()[resultIdx];
-      threadTile[iterSpacePos] = layout.getThreadTile()[resultIdx];
-      elementTile[iterSpacePos] = layout.getElementTile()[resultIdx];
+      std::optional<unsigned int> mayBeResultPos =
+          resultMap.getResultPosition(getAffineDimExpr(iterSpacePos, context));
+      if (!mayBeResultPos.has_value()) {
+        continue;
+      }
+      int64_t resultPos = mayBeResultPos.value();
+      subgroupTile[resultPos] = layout.getSubgroupTile()[resultIdx];
+      batchTile[resultPos] = layout.getBatchTile()[resultIdx];
+      outerTile[resultPos] = layout.getOuterTile()[resultIdx];
+      threadTile[resultPos] = layout.getThreadTile()[resultIdx];
+      elementTile[resultPos] = layout.getElementTile()[resultIdx];
 
-      subgroupStrides[iterSpacePos] = layout.getSubgroupStrides()[resultIdx];
-      threadStrides[iterSpacePos] = layout.getThreadStrides()[resultIdx];
+      subgroupStrides[resultPos] = layout.getSubgroupStrides()[resultIdx];
+      threadStrides[resultPos] = layout.getThreadStrides()[resultIdx];
     }
   }
 
   return NestedLayoutAttr::get(context, subgroupTile, batchTile, outerTile,
                                threadTile, elementTile, subgroupStrides,
                                threadStrides);
+}
+
+VectorLayoutInterface
+NestedLayoutAttr::getRecombinedLayout(ArrayRef<VectorLayoutInterface> layouts,
+                                      ArrayRef<AffineMap> maps,
+                                      AffineMap resultMap) {
+  if (llvm::any_of(layouts, [](VectorLayoutInterface layout) {
+        return !mlir::isa<NestedLayoutAttr>(layout);
+      })) {
+    return NestedLayoutAttr();
+  }
+
+  SmallVector<NestedLayoutAttr> nestedLayouts;
+  llvm::transform(layouts, std::back_inserter(nestedLayouts),
+                  [&](VectorLayoutInterface layout) {
+                    return mlir::cast<NestedLayoutAttr>(layout);
+                  });
+  return NestedLayoutAttr::get(resultMap.getContext(), nestedLayouts, maps,
+                               resultMap);
 }
 
 LogicalResult NestedLayoutAttr::verify(
