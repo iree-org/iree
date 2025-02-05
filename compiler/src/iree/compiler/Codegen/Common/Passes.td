@@ -411,6 +411,21 @@ def InstrumentMemoryAccessesPass :
   let summary = "Instruments memory reads and writes for address tracking when dispatch instrumentation is enabled.";
 }
 
+def LinearizeMemRefs : Pass<"iree-linearize-memrefs", "ModuleOp"> {
+  let summary =
+      "An inter-procedural pass to linearize memrefs";
+  let description = [{
+    An inter-procedural pass to linearize memrefs.
+    Currently operates on :-
+    1. memref.load/store
+    2. vector.load/store
+    3. memref.alloc*
+    4. memref.dealloc
+    5. memref.copy
+  }];
+  let dependentDialects = ["affine::AffineDialect", "memref::MemRefDialect", "vector::VectorDialect"];
+}
+
 def LinkTuningSpecsPass : Pass<"iree-codegen-link-tuning-specs", "ModuleOp"> {
   let summary =
       "Link nested transform dialect tuning specs named sequences into a single entry point";
