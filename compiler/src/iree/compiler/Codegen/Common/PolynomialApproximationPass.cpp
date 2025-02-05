@@ -27,13 +27,7 @@ static llvm::cl::opt<bool> clNativeMathPrecision(
 namespace {
 
 static void populateErfPattern(RewritePatternSet &patterns) {
-  if (clNativeMathPrecision) {
-    patterns.add<math::ErfPolynomialApproximation>(patterns.getContext());
-  } else {
-    populateExpandExp2FPattern(patterns);
-    populateMathPolynomialApproximationPatterns(patterns);
-    populateExpandRoundEvenPattern(patterns);
-  }
+  patterns.add<math::ErfPolynomialApproximation>(patterns.getContext());
 }
 
 /// math dialect elementry functions -> polynomial form.
@@ -62,7 +56,7 @@ public:
 
     for (const auto &[fnName, populateFn] : patternMap) {
       // Skip any ops in the "do not convert" list.
-      if (!llvm::is_contained(noApproxOps, fnName)) {
+      if (!llvm::is_contained(noApproxOps, fnName) && !clNativeMathPrecision) {
         populateFn(mathPatterns);
       }
     }
