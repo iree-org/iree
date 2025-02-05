@@ -607,7 +607,13 @@ LLVMTargetOptions LLVMCPUTargetCLOptions::getTargetOptions() {
   ResolveCPUAndCPUFeaturesStatus status;
   std::optional<LLVMTarget> maybeTarget = LLVMTarget::create(
       targetTriple, targetCPU, targetCPUFeatures, linkEmbedded, status);
-  if (status != ResolveCPUAndCPUFeaturesStatus::OK) {
+  // Only report serious errors here, not potentially verbose warnings such as
+  // ImplicitGenericFallback, which has false positives at this point as it
+  // triggers on default-constructed targets that we might not actually use.
+  // If the targets are used, they will trigger the warning again in
+  // LLVMTarget::loadFromConfigAttr.
+  if (status != ResolveCPUAndCPUFeaturesStatus::OK &&
+      status != ResolveCPUAndCPUFeaturesStatus::ImplicitGenericFallback) {
     llvm::errs() << getMessage(status, targetTriple);
   }
   if (maybeTarget) {
