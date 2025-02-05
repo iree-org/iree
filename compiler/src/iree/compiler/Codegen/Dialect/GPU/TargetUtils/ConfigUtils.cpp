@@ -751,12 +751,6 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
     }
   }
 
-  for (auto dim : partitionableLoops) {
-    if (workgroupTileSizes[dim] == loopBounds[dim]) {
-      workgroupTileSizes[dim] = 0;
-    }
-  }
-
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
   MLIRContext *context = linalgOp.getContext();
