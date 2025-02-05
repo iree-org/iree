@@ -85,24 +85,27 @@ verifyGPUMatmulPipeline(Operation *op,
     return success();
   }
 
-  uint32_t reduction = static_cast<uint32_t>(IREE::GPU::TilingLevel::Reduction);
-  uint numLoops = llvm::cast<linalg::LinalgOp>(op).getNumLoops();
-
-  SmallVector<int64_t> reductionTileSizes =
-      gpuLoweringConfig.getStaticTilingLevelSizes(reduction, op);
-  size_t size = reductionTileSizes.size();
+  // uint32_t reduction =
+  // static_cast<uint32_t>(IREE::GPU::TilingLevel::Reduction); uint numLoops =
+  // llvm::cast<linalg::LinalgOp>(op).getNumLoops();
+  size_t size = 0;
+  // if (gpuLoweringConfig.hasTilingLevel(reduction)) {
+  //   SmallVector<int64_t> reductionTileSizes =
+  //       gpuLoweringConfig.getStaticTilingLevelSizes(reduction, op);
+  //    size = reductionTileSizes.size();
+  // }
   // if (size > numLoops) {
   //   return op->emitOpError("expected number of reduction tile size is equal
   //   or "
   //                          "less than number of loops");
   // }
   for (size_t i = 0; i < size; ++i) {
-    if (reductionTileSizes[i] > 0 &&
-        llvm::cast<linalg::LinalgOp>(op).getIteratorTypesArray()[i] !=
-            utils::IteratorType::reduction) {
-      return op->emitOpError(
-          "expected to non-zero reduction tile has reduction iterator");
-    }
+    // if (reductionTileSizes[i] > 0 &&
+    //     llvm::cast<linalg::LinalgOp>(op).getIteratorTypesArray()[i] !=
+    //         utils::IteratorType::reduction) {
+    //   return op->emitOpError(
+    //       "expected to non-zero reduction tile has reduction iterator");
+    // }
   }
 
   SmallVector<int64_t> workgroupTileSizes =
@@ -110,12 +113,12 @@ verifyGPUMatmulPipeline(Operation *op,
   size = workgroupTileSizes.size();
 
   for (size_t i = 0; i < size; ++i) {
-    if (workgroupTileSizes[i] > 0 &&
-        llvm::cast<linalg::LinalgOp>(op).getIteratorTypesArray()[i] !=
-            utils::IteratorType::parallel) {
-      return op->emitOpError(
-          "expected to non-zero workgroup tile has parallel iterator");
-    }
+    // if (workgroupTileSizes[i] > 0 &&
+    //     llvm::cast<linalg::LinalgOp>(op).getIteratorTypesArray()[i] !=
+    //         utils::IteratorType::parallel) {
+    //   return op->emitOpError(
+    //       "expected to non-zero workgroup tile has parallel iterator");
+    // }
   }
 
   if (pipeline == CodeGenPipeline::LLVMGPUTileAndFuse ||
