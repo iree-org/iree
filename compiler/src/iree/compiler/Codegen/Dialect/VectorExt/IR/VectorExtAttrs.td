@@ -237,7 +237,8 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     // to represent the iteration space from operand
     // layout
     AttrBuilder<(ins "ArrayRef<NestedLayoutAttr>":$operandLayouts,
-                     "ArrayRef<AffineMap>":$operandIndexingMaps)>
+                     "ArrayRef<AffineMap>":$operandIndexingMaps,
+                     "AffineMap":$resultMap)>
   ];
 
   let extraClassDeclaration = [{
