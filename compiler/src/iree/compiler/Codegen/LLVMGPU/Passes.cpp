@@ -1113,7 +1113,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass([]() {
         return createPolynomialApproximationPass(
             PolynomialApproximationPassOptions{/*noApproxOps =*/{
-                "tan", "sinh", "cosh", "asinh", "acosh", "atanh", "powf"}});
+                "tan", "sinh", "cosh", "asinh", "acosh", "atanh"}});
       })
       .addPass(memref::createExpandOpsPass)
       .addPass(memref::createFoldMemRefAliasOpsPass)
