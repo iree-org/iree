@@ -92,7 +92,8 @@ verifyGPUMatmulPipeline(Operation *op,
       gpuLoweringConfig.getStaticTilingLevelSizes(reduction, op);
   size_t size = reductionTileSizes.size();
   // if (size > numLoops) {
-  //   return op->emitOpError("expected number of reduction tile size is equal or "
+  //   return op->emitOpError("expected number of reduction tile size is equal
+  //   or "
   //                          "less than number of loops");
   // }
   for (size_t i = 0; i < size; ++i) {
