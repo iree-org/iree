@@ -11,12 +11,16 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Matchers.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -100,7 +104,7 @@ struct MaterializeFlowDispatchTensorLoadOp final
       return rewriter.notifyMatchFailure(loadOp, "unhandled partial loads");
     }
 
-    auto sourceType = loadOp.getSourceType();
+    IREE::Flow::DispatchTensorType sourceType = loadOp.getSourceType();
     auto boundTensorType = cast<RankedTensorType>(sourceType.getBoundType());
     auto &typeConverter =
         *getTypeConverter<MaterializePadEncodingTypeConverter>();
@@ -156,7 +160,7 @@ struct MaterializeFlowDispatchTensorStoreOp final
       return rewriter.notifyMatchFailure(storeOp, "unhandled partial stores");
     }
 
-    auto targetType = storeOp.getTargetType();
+    IREE::Flow::DispatchTensorType targetType = storeOp.getTargetType();
     auto boundTensorType = cast<RankedTensorType>(targetType.getBoundType());
     auto &typeConverter =
         *getTypeConverter<MaterializePadEncodingTypeConverter>();
@@ -171,12 +175,7 @@ struct MaterializeFlowDispatchTensorStoreOp final
     }
 
     Location loc = storeOp.getLoc();
-    auto valueType = cast<RankedTensorType>(adaptor.getValue().getType());
-    SmallVector<Value> dynamicResultSizes;
-    for (size_t dim = 0, e = valueType.getNumDynamicDims(); dim != e; ++dim) {
-      dynamicResultSizes.push_back(
-          rewriter.create<tensor::DimOp>(loc, adaptor.getValue(), dim));
-    }
+    SmallVector<Value> dynamicResultSizes{storeOp->getOperands()};
     Value empty =
         rewriter.create<tensor::EmptyOp>(loc, paddedType, dynamicResultSizes);
 
@@ -191,17 +190,13 @@ struct MaterializeFlowDispatchTensorStoreOp final
 
     SmallVector<OpFoldResult> newMixedSizes = getMixedValues(
         paddedType.getShape(), storeOp.getTargetDims(), rewriter);
-    SmallVector<OpFoldResult> newOffsets(newMixedSizes.size(),
-                                         rewriter.getIndexAttr(0));
-    SmallVector<OpFoldResult> newStrides(newMixedSizes.size(),
-                                         rewriter.getIndexAttr(1));
     SmallVector<int64_t> newStaticDims;
     SmallVector<Value> newDynamicDims;
     dispatchIndexOpFoldResults(newMixedSizes, newDynamicDims, newStaticDims);
 
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
-        storeOp, insertOp, adaptor.getTarget(), newDynamicDims, newOffsets,
-        newMixedSizes, newStrides);
+        storeOp, insertOp, adaptor.getTarget(), newDynamicDims, offsets,
+        newMixedSizes, strides);
     return success();
   }
 };

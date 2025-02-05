@@ -69,6 +69,43 @@ func.func @set_zero_pad_encoding_and_store() {
 
 #binding_ro = #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">
 #binding = #hal.pipeline.binding<storage_buffer, Indirect>
+#encoding_mmt = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f16, f16, f16]>
+#pad_encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f16, f16, f16],
+                                        layouts = [#iree_encoding.pad_encoding_layout<[0, 64]>]>
+func.func @dynamic_set_zero_pad_encoding_and_store() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(<constants = 2, bindings = [#binding_ro, #binding], flags = Indirect>) ordinal(0) : i32
+  %1 = arith.index_castui %0 : i32 to index
+  %2 = hal.interface.constant.load layout(<constants = 2, bindings = [#binding_ro, #binding], flags = Indirect>) ordinal(1) : i32
+  %dynamic_sz = arith.index_castui %2 : i32 to index
+  %3 = hal.interface.binding.subspan layout(<constants = 2, bindings = [#binding_ro, #binding], flags = Indirect>) binding(0) alignment(64) offset(%1) flags("ReadOnly|Indirect")
+    : !flow.dispatch.tensor<readonly:tensor<?x2048xf16>>
+  %4 = hal.interface.binding.subspan layout(<constants = 2, bindings = [#binding_ro, #binding], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags(Indirect)
+    : !flow.dispatch.tensor<writeonly:tensor<?x2048xf16, #pad_encoding>>
+  %5 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [%dynamic_sz, 2048], strides = [1, 1]
+    : !flow.dispatch.tensor<readonly:tensor<?x2048xf16>>{%dynamic_sz} -> tensor<?x2048xf16>
+  %6 = iree_encoding.set_encoding %5 : tensor<?x2048xf16> -> tensor<?x2048xf16, #encoding_mmt>
+  flow.dispatch.tensor.store %6, %4, offsets = [0, 0], sizes = [%dynamic_sz, 2048], strides = [1, 1]
+    : tensor<?x2048xf16, #encoding_mmt> -> !flow.dispatch.tensor<writeonly:tensor<?x2048xf16, #pad_encoding>>{%dynamic_sz}
+  return
+}
+
+// CHECK-LABEL: @dynamic_set_zero_pad_encoding_and_store
+// CHECK:         %[[CST:.+]] = hal.interface.constant.load {{.+}} ordinal(1) : i32
+// CHECK:         %[[SZ:.+]] = arith.index_castui %[[CST]]
+// CHECK:         %[[A:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+// CHECK-SAME:                  !flow.dispatch.tensor<readonly:tensor<?x2048xf16>>
+// CHECK:         %[[B:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+// CHECK-SAME:                  !flow.dispatch.tensor<writeonly:tensor<?x2112xf16>>
+// CHECK:         %[[LD:.+]] = flow.dispatch.tensor.load %[[A]], offsets = [0, 0], sizes = [%[[SZ]], 2048], strides = [1, 1]
+// CHECK-SAME:                  !flow.dispatch.tensor<readonly:tensor<?x2048xf16>>{%[[SZ]]} -> tensor<?x2048xf16>
+// CHECK:         flow.dispatch.tensor.store %[[LD]], %[[B]], offsets = [0, 0], sizes = [%[[SZ]], 2048], strides = [1, 1]
+// CHECK-SAME:                  tensor<?x2048xf16> -> !flow.dispatch.tensor<writeonly:tensor<?x2112xf16>>{%[[SZ]]}
+
+// -----
+
+#binding_ro = #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">
+#binding = #hal.pipeline.binding<storage_buffer, Indirect>
 #encoding_mmt_lhs = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f16, f16, f16]>
 #pad_encoding_lhs = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f16, f16, f16],
                                             layouts = [#iree_encoding.pad_encoding_layout<[0, 64]>]>
