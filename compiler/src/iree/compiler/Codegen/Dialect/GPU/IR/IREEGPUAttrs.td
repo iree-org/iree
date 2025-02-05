@@ -207,16 +207,6 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
   let extraClassDeclaration = [{
     int64_t getBlockSize() const;
 
-    int64_t getMSize() const {
-      return std::get<0>(getMNKShape());
-    }
-    int64_t getNSize() const {
-      return std::get<1>(getMNKShape());
-    }
-    int64_t getKSize() const {
-      return std::get<2>(getMNKShape());
-    }
-
     SmallVector<VirtualMMAIntrinsic> getVirtualIntrinsics() const;
   }];
 }

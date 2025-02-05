@@ -318,6 +318,16 @@ getMNKShapeFromIntrinsic(MMAIntrinsic intrinsic) {
   return getUnsupportedMNKShape(intrinsic);
 }
 
+int64_t getMSize(MMAIntrinsic intrinsic) {
+  return std::get<0>(getMNKShapeFromIntrinsic(intrinsic));
+}
+int64_t getNSize(MMAIntrinsic intrinsic) {
+  return std::get<1>(getMNKShapeFromIntrinsic(intrinsic));
+}
+int64_t getKSize(MMAIntrinsic intrinsic) {
+  return std::get<2>(getMNKShapeFromIntrinsic(intrinsic));
+}
+
 static OpaqueMmaLayout getOpaqueMMALayout(MLIRContext *context,
                                           MMAIntrinsic intrinsic) {
   OpaqueMmaLayout o;
