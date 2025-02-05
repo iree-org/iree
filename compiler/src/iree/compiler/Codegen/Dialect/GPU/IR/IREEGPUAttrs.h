@@ -59,6 +59,10 @@ struct MMASingleSubgroupLayout {
   SmallVector<int64_t, 2> element;
 };
 
+int64_t getMSize(MMAIntrinsic intrinsic);
+int64_t getNSize(MMAIntrinsic intrinsic);
+int64_t getKSize(MMAIntrinsic intrinsic);
+
 MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
                                                 MMAFragment fragment);
 

@@ -319,7 +319,7 @@ static TileSwizzle
 getSwizzleBeforeMovingCrossThreadOutermost(IREE::GPU::DataTiledMMAAttr mma,
                                            IREE::GPU::MMAFragment fragment) {
   auto swizzle = getIntrinsicSwizzleBeforeMovingCrossThreadOutermost(
-      mma.getIntrinsic().getValue(), fragment);
+      mma.getIntrinsic(), fragment);
   switch (fragment) {
   case IREE::GPU::MMAFragment::Lhs:
     // A-matrix (LHS). Source dimensions are M (index 0) and K (index 1).

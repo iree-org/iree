@@ -46,8 +46,7 @@ getUKernelNameAndSuffixForMultiMma(IREE::GPU::MultiMmaOp op) {
   if (!mma) {
     return {}; // Only handling DataTiledMMAAttr for now.
   }
-  return {"multi_mma",
-          stringifyMMAIntrinsic(mma.getIntrinsic().getValue()).lower()};
+  return {"multi_mma", stringifyMMAIntrinsic(mma.getIntrinsic()).lower()};
 }
 
 // Returns ukernel name and suffix for any op. Empty name = no ukernel.

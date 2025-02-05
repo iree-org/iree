@@ -1008,7 +1008,7 @@ queryMMAIntrinsics(IREE::HAL::ExecutableVariantOp executableOp) {
   if (IREE::GPU::TargetAttr target = getGPUTargetAttr(executableOp)) {
     mmaIntrinsics = llvm::map_to_vector(
         target.getWgp().getMma(),
-        [](IREE::GPU::MMAAttr attr) { return attr.getIntrinsic().getValue(); });
+        [](IREE::GPU::MMAAttr attr) { return attr.getIntrinsic(); });
   }
   return mmaIntrinsics;
 }

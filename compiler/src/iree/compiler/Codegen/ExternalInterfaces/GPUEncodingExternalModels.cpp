@@ -62,7 +62,8 @@ static MMAAttr chooseIntrinsicMMAAttr(TypeRange eTypes, TargetWgpAttr wgp) {
     // which would optimize performance when power is not the bottleneck.
     // Currently we just choose the intrinsic maximizing K, but that can be
     // revisited later.
-    if (candidateMma && candidateMma.getKSize() > mma.getKSize()) {
+    if (candidateMma &&
+        getKSize(candidateMma.getIntrinsic()) > getKSize(mma.getIntrinsic())) {
       continue;
     }
     candidateMma = mma;
@@ -202,16 +203,18 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
       IREE::Encoding::getMatmulNarrowDim(encoding);
   if (narrowDim.isM()) {
     intrinsicsM =
-        std::min(intrinsicsM, static_cast<int>(llvm::divideCeil(
-                                  narrowDim.size, intrinsicMma.getMSize())));
+        std::min(intrinsicsM,
+                 static_cast<int>(llvm::divideCeil(
+                     narrowDim.size, getMSize(intrinsicMma.getIntrinsic()))));
   }
   if (narrowDim.isN()) {
     std::swap(intrinsicsM, intrinsicsN);
     std::swap(subgroupsM, subgroupsN);
     assert(subgroupsN == 1);
     intrinsicsN =
-        std::min(intrinsicsN, static_cast<int>(llvm::divideCeil(
-                                  narrowDim.size, intrinsicMma.getNSize())));
+        std::min(intrinsicsN,
+                 static_cast<int>(llvm::divideCeil(
+                     narrowDim.size, getNSize(intrinsicMma.getIntrinsic()))));
   }
 
   return DataTiledMMAAttr::get(ctx, intrinsicMma.getIntrinsic(), intrinsicsM,
