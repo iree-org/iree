@@ -1112,7 +1112,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       // Convert math dialect elementry functions to polynomial form.
       .addPass([]() {
         return createPolynomialApproximationPass(
-            PolynomialApproximationPassOptions{/*noApproxOps =*/{"tan"}});
+            PolynomialApproximationPassOptions{/*noApproxOps =*/{
+                "tan", "sinh", "cosh", "asinh", "acosh", "atanh", "powf"}});
       })
       .addPass(memref::createExpandOpsPass)
       .addPass(memref::createFoldMemRefAliasOpsPass)
