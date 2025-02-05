@@ -146,7 +146,7 @@ getTruncateOp(Operation *op,
   if (!genericOp) {
     return std::nullopt;
   }
-  if (seedTruncateOp) {
+  if (seedTruncateOp && seedTruncateOp != genericOp) {
     if (!checkOperationEquivalence(genericOp, seedTruncateOp.value())) {
       return std::nullopt;
     }
@@ -186,11 +186,6 @@ static std::optional<HorizontalFusionGroup> getHorizontalFusionGroupMembers(
   auto rhsType = cast<RankedTensorType>(rhs.getType());
   Value out = seedOp->getOperand(2);
   auto outType = cast<RankedTensorType>(out.getType());
-
-  if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape() ||
-      !outType.hasStaticShape()) {
-    return std::nullopt;
-  }
 
   SetVector<Operation *> allOps;
   SmallVector<linalg::LinalgOp> contractionOps = {seedOp};
@@ -261,6 +256,7 @@ static std::optional<HorizontalFusionGroup> getHorizontalFusionGroupMembers(
 
     std::optional<linalg::GenericOp> userTruncOp =
         getTruncateOp(linalgUser, allOps, dominanceInfo, seedTruncOp);
+
     // If there are truncate ops to fuse and current contraction op
     // does not have a compatible truncate op to fuse as well, ignore
     // the op for horizontal fusion.
@@ -271,8 +267,14 @@ static std::optional<HorizontalFusionGroup> getHorizontalFusionGroupMembers(
     contractionOps.push_back(linalgUser);
     allOps.insert(linalgUser);
     if (truncateOps) {
-      truncateOps.value().push_back(userTruncOp.value());
-      allOps.insert(userTruncOp.value());
+      // Special casing for the case where all the truncate ops are the same
+      // TODO: This should be removed when the truncate ops always go with the
+      // producer contractions.
+      if (!(truncateOps->size() == 1 &&
+            userTruncOp.value() == truncateOps->front())) {
+        truncateOps->push_back(userTruncOp.value());
+        allOps.insert(userTruncOp.value());
+      }
     }
     if (contractionOps.size() >= fusionLimit) {
       break;
@@ -281,6 +283,13 @@ static std::optional<HorizontalFusionGroup> getHorizontalFusionGroupMembers(
 
   if (contractionOps.size() == 1) {
     return std::nullopt;
+  }
+
+  // Special casing for the case where all the truncate ops are the same
+  // TODO: This should be removed when the truncate ops always go with the
+  // producer contractions.
+  if (truncateOps->size() == 1) {
+    truncateOps = std::nullopt;
   }
 
   return HorizontalFusionGroup{contractionOps, truncateOps};
