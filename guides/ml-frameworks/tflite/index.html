@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#tensorflow-lite-integration" class="md-skip">
+        <a href="#tensorflow-lite-litert-integration" class="md-skip">
           Skip to content
         </a>
       
@@ -3849,7 +3849,14 @@
   
 
 
-<h1 id="tensorflow-lite-integration">TensorFlow Lite integration<a class="headerlink" href="#tensorflow-lite-integration" title="Permanent link">link</a></h1>
+<h1 id="tensorflow-lite-litert-integration">TensorFlow Lite (LiteRT) integration<a class="headerlink" href="#tensorflow-lite-litert-integration" title="Permanent link">link</a></h1>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Support for TensorFlow Lite depends on the TOSA MLIR dialect, which
+is undergoing a major version change that will introduce a new backwards
+compatibility baseline. During this transition, support will be unstable.</p>
+<p>See <a href="https://github.com/iree-org/iree/issues/19777">https://github.com/iree-org/iree/issues/19777</a> for details.</p>
+</div>
 <h2 id="overview"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.74 3.74 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574M8.755 4.75l-.004 7.322a3.75 3.75 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25"/></svg></span> Overview<a class="headerlink" href="#overview" title="Permanent link">link</a></h2>
 <p>IREE supports compiling and running TensorFlow Lite (TFLite) programs stored as
 <a href="https://www.tensorflow.org/lite/guide">TFLite FlatBuffers</a>. These files can be
@@ -3882,7 +3889,7 @@ imported into an IREE-compatible format then compiled to a series of backends.</
 <li>
 <p>Install TensorFlow by following the
     <a href="https://www.tensorflow.org/install">official documentation</a>:</p>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>tensorflow
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;tensorflow&lt;=2.18.0&quot;</span>
 </code></pre></div>
 </li>
 <li>
@@ -3893,10 +3900,16 @@ imported into an IREE-compatible format then compiled to a series of backends.</
 <div class="tabbed-content">
 <div class="tabbed-block">
 <p>Stable release packages are <a href="https://pypi.org/">published to PyPI</a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Until the major version updates in
+<a href="https://github.com/iree-org/iree/issues/19777">https://github.com/iree-org/iree/issues/19777</a> are completed, we
+recommend users install old versions.</p>
+</div>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>iree-base-compiler<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>iree-base-runtime<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>iree-tools-tflite
+<span class="w">  </span><span class="s2">&quot;iree-base-compiler&lt;=3.1.0&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s2">&quot;iree-base-runtime&lt;=3.1.0&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s2">&quot;iree-tools-tflite&lt;=20250107.1133&quot;</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -3927,20 +3940,23 @@ imported into an IREE-compatible format then compiled to a series of backends.</
 <h3 id="using-command-line-tools">Using Command Line Tools<a class="headerlink" href="#using-command-line-tools" title="Permanent link">link</a></h3>
 <p>These two stages can be completed entirely via the command line.</p>
 <div class="highlight"><pre><span></span><code><span class="nv">WORKDIR</span><span class="o">=</span><span class="s2">&quot;/tmp/workdir&quot;</span>
-<span class="nv">TFLITE_URL</span><span class="o">=</span><span class="s2">&quot;https://storage.googleapis.com/iree-model-artifacts/tflite-integration-tests/posenet_i8.tflite&quot;</span>
-<span class="nv">TFLITE_PATH</span><span class="o">=</span><span class="si">${</span><span class="nv">WORKDIR</span><span class="si">}</span>/model.tflite
+mkdir<span class="w"> </span>-p<span class="w"> </span><span class="si">${</span><span class="nv">WORKDIR</span><span class="si">}</span>
+<span class="nb">cd</span><span class="w"> </span><span class="si">${</span><span class="nv">WORKDIR</span><span class="si">}</span>
+
+<span class="c1"># Fetch a model from https://www.kaggle.com/models/tensorflow/posenet-mobilenet</span>
+<span class="nv">TFLITE_URL</span><span class="o">=</span><span class="s2">&quot;https://www.kaggle.com/api/v1/models/tensorflow/posenet-mobilenet/tfLite/float-075/1/download&quot;</span>
+curl<span class="w"> </span>-L<span class="w"> </span>-o<span class="w"> </span>posenet.tar.gz<span class="w"> </span><span class="si">${</span><span class="nv">TFLITE_URL</span><span class="si">}</span>
+tar<span class="w"> </span>xf<span class="w"> </span>posenet.tar.gz
+
+<span class="nv">TFLITE_PATH</span><span class="o">=</span><span class="si">${</span><span class="nv">WORKDIR</span><span class="si">}</span>/1.tflite
 <span class="nv">IMPORT_PATH</span><span class="o">=</span><span class="si">${</span><span class="nv">WORKDIR</span><span class="si">}</span>/tosa.mlir
 <span class="nv">MODULE_PATH</span><span class="o">=</span><span class="si">${</span><span class="nv">WORKDIR</span><span class="si">}</span>/module.vmfb
 
-<span class="c1"># Fetch the sample model</span>
-wget<span class="w"> </span><span class="si">${</span><span class="nv">TFLITE_URL</span><span class="si">}</span><span class="w"> </span>-O<span class="w"> </span><span class="si">${</span><span class="nv">TFLITE_PATH</span><span class="si">}</span>
-
-<span class="c1"># Import the sample model to an IREE compatible form</span>
+<span class="c1"># Import the model to MLIR (in the TOSA dialect) so IREE can compile it.</span>
 iree-import-tflite<span class="w"> </span><span class="si">${</span><span class="nv">TFLITE_PATH</span><span class="si">}</span><span class="w"> </span>-o<span class="w"> </span><span class="si">${</span><span class="nv">IMPORT_PATH</span><span class="si">}</span>
 
 <span class="c1"># Compile for the CPU backend</span>
 iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--iree-input-type<span class="o">=</span>tosa<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span><span class="si">${</span><span class="nv">IMPORT_PATH</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-o<span class="w"> </span><span class="si">${</span><span class="nv">MODULE_PATH</span><span class="si">}</span>
@@ -3949,12 +3965,16 @@ iree-compile<span class="w"> </span><span class="se">\</span>
 <p>The example below demonstrates downloading, compiling, and executing a TFLite
 model using the Python API. This includes some initial setup to declare global
 variables, download the sample module, and download the sample inputs.</p>
-<p>Declaration of absolute paths for the sample repo and import all required
-libraries. The default setup uses the CPU backend as the only target. This can
-be reconfigured to select alternative targets.</p>
+<p>The default setup uses the CPU backend as the only target. This can be
+reconfigured to select alternative targets.</p>
+<p>First install some extra packages:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>kagglehub<span class="w"> </span>pillow
+</code></pre></div>
+<p>Then run the demo Python script:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">iree.compiler.tflite</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">iree_tflite_compile</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">iree.runtime</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">iree_rt</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">kagglehub</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">urllib.request</span>
 
@@ -3963,52 +3983,57 @@ be reconfigured to select alternative targets.</p>
 <span class="n">workdir</span> <span class="o">=</span> <span class="s2">&quot;/tmp/workdir&quot;</span>
 <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">workdir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-<span class="n">tfliteFile</span> <span class="o">=</span> <span class="s2">&quot;/&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">workdir</span><span class="p">,</span> <span class="s2">&quot;model.tflite&quot;</span><span class="p">])</span>
-<span class="n">jpgFile</span> <span class="o">=</span> <span class="s2">&quot;/&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">workdir</span><span class="p">,</span> <span class="s2">&quot;input.jpg&quot;</span><span class="p">])</span>
-<span class="n">tfliteIR</span> <span class="o">=</span> <span class="s2">&quot;/&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">workdir</span><span class="p">,</span> <span class="s2">&quot;tflite.mlir&quot;</span><span class="p">])</span>
-<span class="n">tosaIR</span> <span class="o">=</span> <span class="s2">&quot;/&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">workdir</span><span class="p">,</span> <span class="s2">&quot;tosa.mlir&quot;</span><span class="p">])</span>
-<span class="n">bytecodeModule</span> <span class="o">=</span> <span class="s2">&quot;/&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">workdir</span><span class="p">,</span> <span class="s2">&quot;iree.vmfb&quot;</span><span class="p">])</span>
+<span class="c1"># Download a model.</span>
+<span class="n">download_path</span> <span class="o">=</span> <span class="n">kagglehub</span><span class="o">.</span><span class="n">model_download</span><span class="p">(</span>
+    <span class="s2">&quot;tensorflow/posenet-mobilenet/tfLite/float-075&quot;</span>
+<span class="p">)</span>
+<span class="n">tflite_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">download_path</span><span class="p">,</span> <span class="s2">&quot;1.tflite&quot;</span><span class="p">)</span>
 
+<span class="c1"># Once downloaded we can compile the model for the selected backends. Both the</span>
+<span class="c1"># TFLite and TOSA representations of the model are saved for debugging purposes.</span>
+<span class="c1"># This is optional and can be omitted.</span>
+<span class="n">tosa_ir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">workdir</span><span class="p">,</span> <span class="s2">&quot;tosa.mlirbc&quot;</span><span class="p">)</span>
+<span class="n">bytecode_module</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">workdir</span><span class="p">,</span> <span class="s2">&quot;iree.vmfb&quot;</span><span class="p">)</span>
 <span class="n">backends</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;llvm-cpu&quot;</span><span class="p">]</span>
-<span class="n">config</span> <span class="o">=</span> <span class="s2">&quot;local-task&quot;</span>
-</code></pre></div>
-<p>The TFLite sample model and input are downloaded locally.</p>
-<div class="highlight"><pre><span></span><code><span class="n">tfliteUrl</span> <span class="o">=</span> <span class="s2">&quot;https://storage.googleapis.com/iree-model-artifacts/tflite-integration-tests/posenet_i8.tflite&quot;</span>
-<span class="n">jpgUrl</span> <span class="o">=</span> <span class="s2">&quot;https://storage.googleapis.com/iree-model-artifacts/tflite-integration-tests/posenet_i8_input.jpg&quot;</span>
+<span class="n">backend_extra_args</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;--iree-llvmcpu-target-cpu=host&quot;</span><span class="p">]</span>
 
-<span class="n">urllib</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">urlretrieve</span><span class="p">(</span><span class="n">tfliteUrl</span><span class="p">,</span> <span class="n">tfliteFile</span><span class="p">)</span>
-<span class="n">urllib</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">urlretrieve</span><span class="p">(</span><span class="n">jpgUrl</span><span class="p">,</span> <span class="n">jpgFile</span><span class="p">)</span>
-</code></pre></div>
-<p>Once downloaded we can compile the model for the selected backends. Both the
-TFLite and TOSA representations of the model are saved for debugging purposes.
-This is optional and can be omitted.</p>
-<div class="highlight"><pre><span></span><code><span class="n">iree_tflite_compile</span><span class="o">.</span><span class="n">compile_file</span><span class="p">(</span>
-  <span class="n">tfliteFile</span><span class="p">,</span>
-  <span class="n">input_type</span><span class="o">=</span><span class="s2">&quot;tosa&quot;</span><span class="p">,</span>
-  <span class="n">output_file</span><span class="o">=</span><span class="n">bytecodeModule</span><span class="p">,</span>
-  <span class="n">save_temp_tfl_input</span><span class="o">=</span><span class="n">tfliteIR</span><span class="p">,</span>
-  <span class="n">save_temp_iree_input</span><span class="o">=</span><span class="n">tosaIR</span><span class="p">,</span>
-  <span class="n">target_backends</span><span class="o">=</span><span class="n">backends</span><span class="p">,</span>
-  <span class="n">import_only</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-</code></pre></div>
-<p>After compilation is completed we configure the VmModule using the local-task
-configuration and compiled IREE module.</p>
-<div class="highlight"><pre><span></span><code><span class="n">config</span> <span class="o">=</span> <span class="n">iree_rt</span><span class="o">.</span><span class="n">Config</span><span class="p">(</span><span class="s2">&quot;local-task&quot;</span><span class="p">)</span>
+<span class="n">iree_tflite_compile</span><span class="o">.</span><span class="n">compile_file</span><span class="p">(</span>
+    <span class="n">tflite_file</span><span class="p">,</span>
+    <span class="n">input_type</span><span class="o">=</span><span class="s2">&quot;tosa&quot;</span><span class="p">,</span>
+    <span class="n">extra_args</span><span class="o">=</span><span class="n">backend_extra_args</span><span class="p">,</span>
+    <span class="n">output_file</span><span class="o">=</span><span class="n">bytecode_module</span><span class="p">,</span>
+    <span class="n">save_temp_iree_input</span><span class="o">=</span><span class="n">tosa_ir</span><span class="p">,</span>
+    <span class="n">target_backends</span><span class="o">=</span><span class="n">backends</span><span class="p">,</span>
+    <span class="n">import_only</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># After compilation is completed we configure the VmModule using the local-task</span>
+<span class="c1"># configuration and compiled IREE module.</span>
+<span class="n">config</span> <span class="o">=</span> <span class="n">iree_rt</span><span class="o">.</span><span class="n">Config</span><span class="p">(</span><span class="s2">&quot;local-task&quot;</span><span class="p">)</span>
 <span class="n">context</span> <span class="o">=</span> <span class="n">iree_rt</span><span class="o">.</span><span class="n">SystemContext</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">)</span>
-<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">bytecodeModule</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-  <span class="n">vm_module</span> <span class="o">=</span> <span class="n">iree_rt</span><span class="o">.</span><span class="n">VmModule</span><span class="o">.</span><span class="n">from_flatbuffer</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">vm_instance</span><span class="p">,</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
-  <span class="n">context</span><span class="o">.</span><span class="n">add_vm_module</span><span class="p">(</span><span class="n">vm_module</span><span class="p">)</span>
-</code></pre></div>
-<p>Finally, the IREE module is loaded and ready for execution. Here we load the
-sample image, manipulate to the expected input size, and execute the module. By
-default TFLite models include a single function named 'main'. The final results
-are printed.</p>
-<div class="highlight"><pre><span></span><code><span class="n">im</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">jpgFile</span><span class="p">)</span><span class="o">.</span><span class="n">resize</span><span class="p">((</span><span class="mi">192</span><span class="p">,</span> <span class="mi">192</span><span class="p">)))</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">192</span><span class="p">,</span> <span class="mi">192</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">bytecode_module</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="n">vm_module</span> <span class="o">=</span> <span class="n">iree_rt</span><span class="o">.</span><span class="n">VmModule</span><span class="o">.</span><span class="n">from_flatbuffer</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">vm_instance</span><span class="p">,</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+    <span class="n">context</span><span class="o">.</span><span class="n">add_vm_module</span><span class="p">(</span><span class="n">vm_module</span><span class="p">)</span>
+
+<span class="c1"># Finally, the IREE module is loaded and ready for execution. Here we load the</span>
+<span class="c1"># sample image, manipulate to the expected input size, and execute the module.</span>
+<span class="c1"># By default TFLite models include a single function named &#39;main&#39;. The final</span>
+<span class="c1"># results are printed.</span>
+
+<span class="n">jpg_file</span> <span class="o">=</span> <span class="s2">&quot;/&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">workdir</span><span class="p">,</span> <span class="s2">&quot;input.jpg&quot;</span><span class="p">])</span>
+<span class="n">jpg_url</span> <span class="o">=</span> <span class="s2">&quot;https://raw.githubusercontent.com/tensorflow/tfjs-models/refs/heads/master/pose-detection/test_data/pose.jpg&quot;</span>
+<span class="n">urllib</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">urlretrieve</span><span class="p">(</span><span class="n">jpg_url</span><span class="p">,</span> <span class="n">jpg_file</span><span class="p">)</span>
+
+<span class="n">im</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">jpg_file</span><span class="p">)</span><span class="o">.</span><span class="n">resize</span><span class="p">((</span><span class="mi">353</span><span class="p">,</span> <span class="mi">257</span><span class="p">)))</span>
+    <span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+    <span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">353</span><span class="p">,</span> <span class="mi">257</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+<span class="p">)</span>
 <span class="n">args</span> <span class="o">=</span> <span class="p">[</span><span class="n">im</span><span class="p">]</span>
 
 <span class="n">invoke</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">module</span><span class="p">[</span><span class="s2">&quot;main&quot;</span><span class="p">]</span>
 <span class="n">iree_results</span> <span class="o">=</span> <span class="n">invoke</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">iree_results</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">iree_results</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">to_host</span><span class="p">())</span>
 </code></pre></div>
 <h2 id="samples"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.75.75 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215m-6.56 0a.75.75 0 0 1 1.042.018.75.75 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.75.75 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg></span> Samples<a class="headerlink" href="#samples" title="Permanent link">link</a></h2>
 <ul>
@@ -4044,8 +4069,8 @@ is available
 <h2 id="troubleshooting"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13M6.92 6.085h.001a.749.749 0 1 1-1.342-.67c.169-.339.436-.701.849-.977C6.845 4.16 7.369 4 8 4a2.76 2.76 0 0 1 1.637.525c.503.377.863.965.863 1.725 0 .448-.115.83-.329 1.15-.205.307-.47.513-.692.662-.109.072-.22.138-.313.195l-.006.004a6 6 0 0 0-.26.16 1 1 0 0 0-.276.245.75.75 0 0 1-1.248-.832c.184-.264.42-.489.692-.661q.154-.1.313-.195l.007-.004c.1-.061.182-.11.258-.161a1 1 0 0 0 .277-.245C8.96 6.514 9 6.427 9 6.25a.61.61 0 0 0-.262-.525A1.27 1.27 0 0 0 8 5.5c-.369 0-.595.09-.74.187a1 1 0 0 0-.34.398M9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/></svg></span> Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">link</a></h2>
 <p>Failures during the import step usually indicate a failure to lower from
 TensorFlow Lite's operations to TOSA, the intermediate representation used by
-IREE. Many TensorFlow Lite operations are not fully supported, particularly
-those than use dynamic shapes. Please reach out on one of IREE's
+IREE. Some TensorFlow Lite operations are not fully supported. Please reach out
+on one of IREE's
 <a href="../../../#communication-channels">communication channels</a> if you notice
 something missing.</p>
 
