@@ -1759,6 +1759,9 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(tensor::UnPackOp op) {
 }
 
 std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
+  if (!val.getDefiningOp())
+    return std::nullopt;
+
   std::optional<VectorizationTileSizes> result;
   TypeSwitch<Operation *, void>(val.getDefiningOp())
       .Case<linalg::LinalgOp>(
