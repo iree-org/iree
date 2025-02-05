@@ -178,6 +178,7 @@ void ElementwiseOpFusionPass::runOnOperation() {
       };
 
   RewritePatternSet linalgFusionPatterns(context);
+  linalgFusionPatterns.insert<GatherFusionPattern>(context);
   linalg::populateElementwiseOpsFusionPatterns(linalgFusionPatterns,
                                                fuseElementwiseOpsControlFn);
 
@@ -200,7 +201,6 @@ void ElementwiseOpFusionPass::runOnOperation() {
   RewritePatternSet linalgExtFusionPatterns(context);
   IREE::LinalgExt::populateFuseLinalgExtOpsWithTransposes(
       linalgExtFusionPatterns, foldTransposeControlFn);
-  linalgExtFusionPatterns.insert<GatherFusionPattern>(context);
   if (failed(applyPatternsGreedily(
           getOperation(), std::move(linalgExtFusionPatterns), rewriteConfig))) {
     getOperation()->emitOpError(
