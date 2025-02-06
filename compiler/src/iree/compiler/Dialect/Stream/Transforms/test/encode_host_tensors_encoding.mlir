@@ -270,6 +270,66 @@ util.func public @sizeof_lhs_encoding_with_bcast_across_m_dim_dynamic(%arg0: ind
 
 // -----
 
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#no_pad_layout = #iree_encoding.pad_encoding_layout<[0, 0]>
+#no_pad_encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], layouts = [#no_pad_layout]>
+#pad_layout_a = #iree_encoding.pad_encoding_layout<[0, 64]>
+#pad_encoding_a = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], layouts = [#pad_layout_a]>
+#pad_layout_b = #iree_encoding.pad_encoding_layout<[64, 0]>
+#pad_encoding_b = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], layouts = [#pad_layout_b]>
+util.func public @sizeof_lhs_pad_encoding_static() -> index, index, index {
+  %0 = stream.tensor.sizeof tensor<2048x4096xf16, #no_pad_encoding>{} : index
+  %1 = stream.tensor.sizeof tensor<2048x4096xf16, #pad_encoding_a>{} : index
+  %2 = stream.tensor.sizeof tensor<2048x4096xf16, #pad_encoding_b>{} : index
+  util.return %0, %1, %2 : index, index, index
+}
+
+// We expect (2048 + pad[0]) * (4096 + pad[1]) * (16 / 8).
+
+// CHECK-LABEL: @sizeof_lhs_pad_encoding_static
+// CHECK-DAG:     %[[CST_A:.+]] = arith.constant 16777216 : index
+// CHECK-DAG:     %[[CST_B:.+]] = arith.constant 17039360 : index
+// CHECK-DAG:     %[[CST_C:.+]] = arith.constant 17301504 : index
+// CHECK:         return %[[CST_A]], %[[CST_B]], %[[CST_C]]
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#no_pad_layout = #iree_encoding.pad_encoding_layout<[0, 0]>
+#no_pad_encoding = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], layouts = [#no_pad_layout]>
+#pad_layout_a = #iree_encoding.pad_encoding_layout<[0, 64]>
+#pad_encoding_a = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], layouts = [#pad_layout_a]>
+#pad_layout_b = #iree_encoding.pad_encoding_layout<[64, 0]>
+#pad_encoding_b = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], layouts = [#pad_layout_b]>
+util.func public @sizeof_rhs_pad_encoding_dynamic(%arg0 : index, %arg1 : index) -> index, index, index, index {
+  %0 = stream.tensor.sizeof tensor<2048x?xf16, #no_pad_encoding>{%arg0} : index
+  %1 = stream.tensor.sizeof tensor<?x4096xf16, #pad_encoding_a>{%arg0} : index
+  %2 = stream.tensor.sizeof tensor<?x4096xf16, #pad_encoding_b>{%arg0} : index
+  %3 = stream.tensor.sizeof tensor<?x?xf16, #pad_encoding_b>{%arg0, %arg1} : index
+  util.return %0, %1, %2, %3 : index, index, index, index
+}
+
+// CHECK-LABEL: @sizeof_rhs_pad_encoding_dynamic
+// CHECK-DAG:     %[[CST_2:.+]] = arith.constant 2 : index
+// CHECK-DAG:     %[[CST_64:.+]] = arith.constant 64 : index
+// CHECK-DAG:     %[[CST_4096:.+]] = arith.constant 4096 : index
+// CHECK-DAG:     %[[CST_8192:.+]] = arith.constant 8192 : index
+// CHECK-DAG:     %[[CST_8320:.+]] = arith.constant 8320 : index
+// CHECK:         %[[A:.+]] = arith.muli %arg0, %[[CST_4096]] overflow<nsw>
+// CHECK:         %[[B:.+]] = arith.muli %arg0, %[[CST_8320]] overflow<nsw>
+// CHECK:         %[[C_0:.+]] = arith.addi %arg0, %[[CST_64]] overflow<nsw>
+// CHECK:         %[[C_1:.+]] = arith.muli %[[C_0]], %[[CST_8192]] overflow<nsw>
+// CHECK:         %[[D_0:.+]] = arith.addi %arg0, %[[CST_64]] overflow<nsw>
+// CHECK:         %[[D_1:.+]] = arith.muli %[[D_0]], %arg1 overflow<nsw>
+// CHECK:         %[[D_2:.+]] = arith.muli %[[D_1]], %[[CST_2]] overflow<nsw>
+// CHECK:         return %[[A]], %[[B]], %[[C_1]], %[[D_2]]
+
+// -----
+
 #encoding_layout_0 = #iree_cpu.cpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [4, 8], outerDimsPerm = [0, 1]}}>
 #encoding_layout_1 = #iree_cpu.vmvx_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [2, 16], outerDimsPerm = [0, 1]}}>
 #encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], layouts = [#encoding_layout_0, #encoding_layout_1]>

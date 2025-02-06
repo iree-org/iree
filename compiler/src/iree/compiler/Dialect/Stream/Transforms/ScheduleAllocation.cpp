@@ -927,7 +927,8 @@ static LogicalResult applyAsyncCallOp(IREE::Stream::AsyncCallOp asyncOp,
       newResourceOperands, newResourceSizes, newResourceOffsets,
       newResourceLengths,
       /*result_sizes=*/ValueRange{},
-      /*tied_operands=*/nullptr, builder.getArrayAttr(newResourceAccesses));
+      /*tied_operands=*/nullptr, asyncOp.getArgAttrsAttr(),
+      asyncOp.getResAttrsAttr(), builder.getArrayAttr(newResourceAccesses));
   newOp->setDialectAttrs(asyncOp->getDialectAttrs());
   asyncOp.erase();
   return success();

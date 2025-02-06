@@ -539,7 +539,9 @@ static LogicalResult addLayoutsToTensorPhaseOps(
                 [&](auto op) { return updateTensorSliceOp(rewriter, op); })
             .Case<IREE::Stream::TensorUpdateOp>(
                 [&](auto op) { return updateTensorUpdateOp(rewriter, op); })
-            .Default([](auto *op) { return failure(); });
+            .Default([](Operation *op) {
+              return op->emitOpError("Unhandled stream op");
+            });
 
     if (failed(result)) {
       return failure();

@@ -6,6 +6,7 @@
 
 #include "compiler/plugins/target/LLVMCPU/ResolveCPUAndCPUFeatures.h"
 
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/TargetParser/AArch64TargetParser.h"
 #include "llvm/TargetParser/Host.h"
 #include "llvm/TargetParser/RISCVTargetParser.h"
@@ -49,25 +50,35 @@ resolveCPUFeaturesForCPU(const llvm::Triple &triple, std::string &cpu,
     return ResolveCPUAndCPUFeaturesStatus::OK;
   }
   llvm::SubtargetFeatures targetCpuFeatures(cpuFeatures);
-  auto addCpuFeatures = [&](const auto &getFeaturesForCPU,
-                            auto &cpuFeatureList) {
-    getFeaturesForCPU(cpu, cpuFeatureList, false);
-    for (const auto &feature : cpuFeatureList) {
+  if (triple.isX86()) {
+    if (!llvm::X86::parseArchX86(cpu, /*Only64Bit=*/true)) {
+      return ResolveCPUAndCPUFeaturesStatus::UnknownCPU;
+    }
+    llvm::SmallVector<llvm::StringRef> features;
+    llvm::X86::getFeaturesForCPU(cpu, features, /*NeedPlus=*/false);
+    for (const auto &feature : features) {
       targetCpuFeatures.AddFeature(feature);
     }
-  };
-  if (triple.isX86()) {
-    llvm::SmallVector<llvm::StringRef> cpuFeatureList;
-    addCpuFeatures(llvm::X86::getFeaturesForCPU, cpuFeatureList);
   } else if (triple.isRISCV64()) {
-    llvm::SmallVector<std::string> cpuFeatureList;
-    addCpuFeatures(llvm::RISCV::getFeaturesForCPU, cpuFeatureList);
+    if (!llvm::RISCV::parseCPU(cpu, triple.isRISCV64())) {
+      return ResolveCPUAndCPUFeaturesStatus::UnknownCPU;
+    }
+    llvm::SmallVector<std::string> features;
+    llvm::RISCV::getFeaturesForCPU(cpu, features, /*NeedPlus=*/false);
+    for (const auto &feature : features) {
+      targetCpuFeatures.AddFeature(feature);
+    }
   } else if (triple.isAArch64()) {
-    std::vector<llvm::StringRef> cpuFeatureList;
-    const llvm::AArch64::ArchInfo *cpuArch = llvm::AArch64::getArchForCpu(cpu);
-    llvm::AArch64::getExtensionFeatures(cpuArch->DefaultExts, cpuFeatureList);
-    targetCpuFeatures.AddFeature(cpuArch->ArchFeature);
-    for (const auto &feature : cpuFeatureList) {
+    std::optional<llvm::AArch64::CpuInfo> cpuInfo =
+        llvm::AArch64::parseCpu(cpu);
+    if (!cpuInfo) {
+      return ResolveCPUAndCPUFeaturesStatus::UnknownCPU;
+    }
+    llvm::AArch64::ExtensionSet extensions;
+    extensions.addCPUDefaults(*cpuInfo);
+    std::vector<std::string> features;
+    extensions.toLLVMFeatureList(features);
+    for (const auto &feature : features) {
       targetCpuFeatures.AddFeature(feature);
     }
   } else {
@@ -141,18 +152,56 @@ Examples:
   return msg;
 }
 
+std::string getUnknownCPUMessage(std::string_view triple_str) {
+  llvm::Triple triple(triple_str);
+  std::string msg = llvm::formatv("Unknown CPU for target architecture {}.\n",
+                                  triple.getArchName());
+  if (triple.isX86()) {
+    msg += "List of accepted CPUs: ";
+    llvm::SmallVector<llvm::StringRef> allAcceptedCpus;
+    llvm::X86::fillValidCPUArchList(allAcceptedCpus, /*Only64Bit=*/true);
+    llvm::raw_string_ostream s(msg);
+    llvm::interleaveComma(allAcceptedCpus, s);
+    msg += "\n";
+  } else if (triple.isRISCV()) {
+    msg += "List of accepted CPUs: ";
+    llvm::SmallVector<llvm::StringRef> allAcceptedCpus;
+    llvm::RISCV::fillValidCPUArchList(allAcceptedCpus, /*IsRV64=*/true);
+    llvm::raw_string_ostream s(msg);
+    llvm::interleaveComma(allAcceptedCpus, s);
+    msg += "\n";
+  } else if (triple.isAArch64()) {
+    msg += "List of accepted CPUs: ";
+    llvm::SmallVector<llvm::StringRef> allAcceptedCpus;
+    llvm::AArch64::fillValidCPUArchList(allAcceptedCpus);
+    llvm::raw_string_ostream s(msg);
+    llvm::interleaveComma(allAcceptedCpus, s);
+    msg += "\n";
+  }
+  return msg;
+}
+
 } // namespace
 
 ResolveCPUAndCPUFeaturesStatus
 resolveCPUAndCPUFeatures(std::string_view triple_str, std::string &cpu,
                          std::string &cpuFeatures) {
+  // Helper to return the first non-OK status.
+  auto combine = [](ResolveCPUAndCPUFeaturesStatus a,
+                    ResolveCPUAndCPUFeaturesStatus b) {
+    return a == ResolveCPUAndCPUFeaturesStatus::OK ? b : a;
+  };
+
   llvm::Triple triple(triple_str);
   // No early-return on error status. The caller may treat these errors as
   // non-fatal and will carry on with whichever `cpu` and `cpuFeatures` we
   // produce.
   auto status1 = resolveHostCPUAndCPUFeatures(cpu, cpuFeatures);
   auto status2 = resolveCPUFeaturesForCPU(triple, cpu, cpuFeatures);
-  tweakCPUFeatures(triple, cpu, cpuFeatures);
+  auto status12 = combine(status1, status2);
+  if (status12 == ResolveCPUAndCPUFeaturesStatus::OK) {
+    tweakCPUFeatures(triple, cpu, cpuFeatures);
+  }
 
   std::string defaultTweakedCpu;
   std::string defaultTweakedCpuFeatures;
@@ -163,12 +212,7 @@ resolveCPUAndCPUFeatures(std::string_view triple_str, std::string &cpu,
           ? ResolveCPUAndCPUFeaturesStatus::ImplicitGenericFallback
           : ResolveCPUAndCPUFeaturesStatus::OK;
 
-  // Helper to return the first non-OK status.
-  auto combine = [](ResolveCPUAndCPUFeaturesStatus a,
-                    ResolveCPUAndCPUFeaturesStatus b) {
-    return a == ResolveCPUAndCPUFeaturesStatus::OK ? b : a;
-  };
-  return combine(combine(status1, status2), status3);
+  return combine(status12, status3);
 }
 
 std::string getMessage(ResolveCPUAndCPUFeaturesStatus status,
@@ -183,6 +227,8 @@ std::string getMessage(ResolveCPUAndCPUFeaturesStatus status,
     return "Resolution of CPU to CPU-features is not implemented on this "
            "target architecture. Pass explicit "
            "CPU-features, or implement the missing mapping.\n";
+  case ResolveCPUAndCPUFeaturesStatus::UnknownCPU:
+    return getUnknownCPUMessage(triple_str);
   default:
     assert(false);
     return "";

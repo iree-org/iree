@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Math/Transforms/Approximation.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -25,28 +26,47 @@ static llvm::cl::opt<bool> clNativeMathPrecision(
 
 namespace {
 
+static void populateErfPattern(RewritePatternSet &patterns) {
+  if (clNativeMathPrecision) {
+    patterns.add<math::ErfPolynomialApproximation>(patterns.getContext());
+  } else {
+    populateExpandExp2FPattern(patterns);
+    populateMathPolynomialApproximationPatterns(patterns);
+    populateExpandRoundEvenPattern(patterns);
+  }
+}
+
 /// math dialect elementry functions -> polynomial form.
 class PolynomialApproximationPass final
     : public impl::PolynomialApproximationPassBase<
           PolynomialApproximationPass> {
-  void runOnOperation() override {
-    RewritePatternSet mathPatterns(&getContext());
-    populateExpandTanPattern(mathPatterns);
-    populateExpandSinhPattern(mathPatterns);
-    populateExpandCoshPattern(mathPatterns);
-    populateExpandAsinhPattern(mathPatterns);
-    populateExpandAcoshPattern(mathPatterns);
-    populateExpandAtanhPattern(mathPatterns);
-    populateExpandPowFPattern(mathPatterns);
-    populateExpandFPowIPattern(mathPatterns);
+public:
+  using Base::Base;
 
-    if (clNativeMathPrecision) {
-      mathPatterns.add<math::ErfPolynomialApproximation>(&getContext());
-    } else {
-      populateExpandExp2FPattern(mathPatterns);
-      populateMathPolynomialApproximationPatterns(mathPatterns);
-      populateExpandRoundEvenPattern(mathPatterns);
+  void runOnOperation() override {
+    using PatternFunction = llvm::function_ref<void(RewritePatternSet &)>;
+    // Order matters here.
+    llvm::SmallVector<std::pair<StringRef, PatternFunction>> patternMap = {
+        {"tan", populateExpandTanPattern},
+        {"sinh", populateExpandSinhPattern},
+        {"cosh", populateExpandCoshPattern},
+        {"asinh", populateExpandAsinhPattern},
+        {"acosh", populateExpandAcoshPattern},
+        {"atanh", populateExpandAtanhPattern},
+        {"powf", populateExpandPowFPattern},
+        {"fpowi", populateExpandFPowIPattern},
+        {"erf", populateErfPattern},
+    };
+
+    RewritePatternSet mathPatterns(&getContext());
+
+    for (const auto &[fnName, populateFn] : patternMap) {
+      // Skip any ops in the "do not convert" list.
+      if (!llvm::is_contained(noApproxOps, fnName)) {
+        populateFn(mathPatterns);
+      }
     }
+
     if (failed(
             applyPatternsGreedily(getOperation(), std::move(mathPatterns)))) {
       return signalPassFailure();

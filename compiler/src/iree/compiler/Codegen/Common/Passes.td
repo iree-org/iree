@@ -456,6 +456,17 @@ def MaterializeEncodingIntoNopPass :
   let summary = "Drop the encodings from tensor types with encodings.";
 }
 
+def MaterializeEncodingIntoPaddingPass :
+    InterfacePass<"iree-codegen-materialize-encoding-into-padding", "mlir::FunctionOpInterface"> {
+  let summary = "Materialize `#iree_encoding.pad_encoding_layout` attributes.";
+  let description = [{
+    Handles padding introduced by `pad_encoding_layout` encoding layouts, which
+    requires `flow.dispatch.tensor.load`/`.store` to be adjusted to account for
+    padding regions.
+    Materializes any other encoding layouts into nop.
+  }];
+}
+
 def MaterializeTuningSpecsPass : Pass<"iree-codegen-materialize-tuning-specs", "ModuleOp"> {
   let summary =
       "Load tuning spec transform dialect libraries and encode them in the module";
@@ -529,6 +540,12 @@ def PadDynamicAllocPass :
 def PolynomialApproximationPass :
     Pass<"iree-codegen-polynomial-approximation", ""> {
   let summary = "Convert math operations to their polynomial approximation";
+  let options = [
+    ListOption<"noApproxOps", "no-approx-ops", "std::string",
+           [{List of operations that should not be approximated.\n"
+           "As of now, possible options are:\n"
+           "\ttan, sinh, cosh, asinh, acosh, atanh, powf, fpowf, erf\n}]>,
+  ];
 }
 
 def PropagateDispatchSizeBoundsPass :

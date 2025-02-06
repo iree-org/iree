@@ -186,10 +186,6 @@ static const char *getDefaultEnabledUkernels(Attribute attr) {
     return "mmt4d";
   }
   if (isAArch64(targetAttr)) {
-    if (hasFeature(targetAttr, "+sve") || hasFeature(targetAttr, "+sve2") ||
-        hasFeature(targetAttr, "+sme")) {
-      return kNone;
-    }
     return "mmt4d";
   }
   return kNone;
@@ -1763,6 +1759,9 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(tensor::UnPackOp op) {
 }
 
 std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
+  if (!val.getDefiningOp())
+    return std::nullopt;
+
   std::optional<VectorizationTileSizes> result;
   TypeSwitch<Operation *, void>(val.getDefiningOp())
       .Case<linalg::LinalgOp>(

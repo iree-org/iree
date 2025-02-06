@@ -1566,7 +1566,7 @@ void FuncOp::build(OpBuilder &builder, OperationState &state, StringRef name,
   if (!argAttrs.empty() || !resAttrs.empty()) {
     assert(type.getNumInputs() == argAttrs.size());
     assert(type.getNumResults() == resAttrs.size());
-    function_interface_impl::addArgAndResultAttrs(
+    call_interface_impl::addArgAndResultAttrs(
         builder, state, argAttrs, resAttrs, builder.getStringAttr("arg_attrs"),
         builder.getStringAttr("res_attrs"));
   }
@@ -1998,7 +1998,7 @@ struct FoldTensorLoadWithExtractSlice
 };
 
 /// Pattern to fold `tensor.insert_slice` with `flow.dispatch.tensor.store`
-/// oeprations.
+/// operations.
 // TODO(ravishankarm): Eventually this should go in as a canonicalization at the
 // Flow level.
 struct FoldInsertSliceWithTensorStoreOp
@@ -2014,13 +2014,13 @@ struct FoldInsertSliceWithTensorStoreOp
       return failure();
 
     // Check that the `dest` of the `tensor.insert_slice` and target of the
-    // `flow.dispatch.tensor.store` are the same interface binding.
+    // `flow.dispatch.tensor.store` are the same interface binding, if these
+    // are still in a dispatch region.
     std::optional<BlockArgument> destBinding =
         getBindingArgument(insertSliceOp.getDest());
     std::optional<BlockArgument> targetBinding =
         getBindingArgument(dispatchTensorStoreOp.getTarget());
-    if (!destBinding || !targetBinding ||
-        destBinding.value() != targetBinding.value()) {
+    if (destBinding != targetBinding) {
       return failure();
     }
 
