@@ -792,6 +792,9 @@ FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
 //===---------------------------------------------------------------------===//
 
 static bool isAttentionMaskGenerator(Operation *op) {
+  if (!isa<linalg::LinalgOp>(op)) {
+    return false;
+  }
   for (OpOperand &use : op->getUses()) {
     if (auto attention =
             dyn_cast<IREE::LinalgExt::AttentionOp>(use.getOwner())) {
