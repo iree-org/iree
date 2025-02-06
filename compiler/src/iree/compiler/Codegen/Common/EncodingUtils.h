@@ -97,12 +97,16 @@ FailureOr<Value> lowerUnsetEncodingToUnpackOp(
     Value packedValue, const MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn);
 
-/// Pouplates the set of patterns that lowers operations with encoding types to
+/// Populates the set of patterns that lowers operations with encoding types to
 /// operations without encodings.
 void populateMaterializeEncodingPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn);
+
+/// Returns true when `padLayout` adds non-zero padding to at least one
+/// dimension.
+bool isNonZeroPadding(IREE::Encoding::PadEncodingLayoutAttr padLayout);
 
 } // namespace mlir::iree_compiler
 

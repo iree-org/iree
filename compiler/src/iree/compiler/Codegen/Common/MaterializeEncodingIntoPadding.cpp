@@ -56,8 +56,8 @@ static PadEncodingLayoutAttr getPadLayout(RankedTensorType type) {
 // encoding layout, or the same type for all other tensors.
 static RankedTensorType getPaddedType(RankedTensorType type) {
   PadEncodingLayoutAttr layout = getPadLayout(type);
-  if (!layout) {
-    return type;
+  if (!isNonZeroPadding(layout)) {
+    return dropEncoding(type);
   }
 
   ArrayRef<int32_t> padding = layout.getPadding().asArrayRef();
@@ -69,6 +69,10 @@ static RankedTensorType getPaddedType(RankedTensorType type) {
   }
 
   return RankedTensorType::get(newShape, type.getElementType());
+}
+
+static bool hasNonZeroPadding(RankedTensorType type) {
+  return isNonZeroPadding(getPadLayout(type));
 }
 
 struct MaterializePadEncodingTypeConverter final
@@ -106,17 +110,16 @@ struct MaterializeFlowDispatchTensorLoadOp final
 
     IREE::Flow::DispatchTensorType sourceType = loadOp.getSourceType();
     auto boundTensorType = cast<RankedTensorType>(sourceType.getBoundType());
+    if (!hasNonZeroPadding(boundTensorType)) {
+      // Let the Nop pattern handle this.
+      return rewriter.notifyMatchFailure(loadOp, "no padding applied");
+    }
+
     auto &typeConverter =
         *getTypeConverter<MaterializePadEncodingTypeConverter>();
     auto paddedType =
         typeConverter.convertType<RankedTensorType>(boundTensorType);
-    if (paddedType == boundTensorType) {
-      return rewriter.notifyMatchFailure(loadOp, "bound type already valid");
-    }
-    if (paddedType.getShape() == boundTensorType.getShape()) {
-      // Let the Nop pattern handle this.
-      return rewriter.notifyMatchFailure(loadOp, "no padding applied");
-    }
+    assert(paddedType != boundTensorType && "Expected conversion with padding");
 
     SmallVector<OpFoldResult> newMixedSizes =
         getMixedValues(paddedType.getShape(), loadOp.getSourceDims(), rewriter);
@@ -162,17 +165,16 @@ struct MaterializeFlowDispatchTensorStoreOp final
 
     IREE::Flow::DispatchTensorType targetType = storeOp.getTargetType();
     auto boundTensorType = cast<RankedTensorType>(targetType.getBoundType());
+    if (!hasNonZeroPadding(boundTensorType)) {
+      // Let the Nop pattern handle this.
+      return rewriter.notifyMatchFailure(storeOp, "no padding applied");
+    }
+
     auto &typeConverter =
         *getTypeConverter<MaterializePadEncodingTypeConverter>();
     auto paddedType =
         typeConverter.convertType<RankedTensorType>(boundTensorType);
-    if (paddedType == boundTensorType) {
-      return rewriter.notifyMatchFailure(storeOp, "bound type already valid");
-    }
-    if (paddedType.getShape() == boundTensorType.getShape()) {
-      // Let the Nop pattern handle this.
-      return rewriter.notifyMatchFailure(storeOp, "no padding applied");
-    }
+    assert(paddedType != boundTensorType && "Expected conversion with padding");
 
     Location loc = storeOp.getLoc();
     SmallVector<Value> dynamicResultSizes{storeOp->getOperands()};
