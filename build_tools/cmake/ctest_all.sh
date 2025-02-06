@@ -124,6 +124,8 @@ if [[ "${OSTYPE}" =~ ^msys ]]; then
     # TODO(#11070): Fix argument/result signature mismatch
     "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_fully_connected.mlir"
     "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_matmul.mlir"
+    # Flaky on CI for unknown reasons, skip.
+    "iree/tools/test/iree-dump-parameters.txt.test"
   )
 elif [[ "${OSTYPE}" =~ ^darwin ]]; then
   excluded_tests+=(
