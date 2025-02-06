@@ -2520,14 +2520,15 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
 
   Operation *rootOperation = nullptr;
 
-  // Find the root operation. linalg.generic, linalg.fill, and scatter are not
-  // root operations if there are other compute operations present.
-  // Also, construct a set of generic ops that are to be skipped. These generic
-  // ops that are used to compute scatter indices are not root operations.
+  // Find the root operation. linalg.generic, linalg.fill, tensor.pack,
+  // tensor.unpack, and scatter are not root operations if there are other
+  // compute operations present. Also, construct a set of generic ops that
+  // are to be skipped. These generic ops that are used to compute scatter
+  // indices are not root operations.
   llvm::SmallDenseSet<Operation *, 4> genericToSkip;
   for (Operation *op : llvm::reverse(computeOps)) {
-    if (!isa<linalg::GenericOp, linalg::FillOp, IREE::LinalgExt::ScatterOp>(
-            op)) {
+    if (!isa<linalg::GenericOp, linalg::FillOp, IREE::LinalgExt::ScatterOp,
+             tensor::PackOp, tensor::UnPackOp>(op)) {
       rootOperation = op;
       break;
     }
@@ -2554,10 +2555,21 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
     }
   }
 
-  // Generic ops take priority over scatter and fill ops as the root op.
+  // Generic ops take priority over pack, unpack, scatter, and fill ops as the
+  // root op.
   if (!rootOperation) {
     for (Operation *op : llvm::reverse(computeOps)) {
       if (isa<linalg::GenericOp>(op) && !genericToSkip.contains(op)) {
+        rootOperation = op;
+        break;
+      }
+    }
+  }
+
+  // Pack and unpack ops take priority over scatter and fill ops as the root op.
+  if (!rootOperation) {
+    for (Operation *op : llvm::reverse(computeOps)) {
+      if (isa<tensor::PackOp, tensor::UnPackOp>(op)) {
         rootOperation = op;
         break;
       }
