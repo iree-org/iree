@@ -116,8 +116,6 @@ iree-compile \
     | AMD MI100                | `mi100`     | `gfx908`            | `cdna1`                |
     | AMD MI210                | `mi210`     | `gfx90a`            | `cdna2`                |
     | AMD MI250                | `mi250`     | `gfx90a`            | `cdna2`                |
-    | AMD MI300X (early units) | N/A         | `gfx940`            | `cdna3`                |
-    | AMD MI300A (early units) | N/A         | `gfx941`            | `cdna3`                |
     | AMD MI300A               | `mi300a`    | `gfx942`            | `cdna3`                |
     | AMD MI300X               | `mi300x`    | `gfx942`            | `cdna3`                |
     | AMD MI308X               | `mi308x`    | `gfx942`            | `cdna3`                |
