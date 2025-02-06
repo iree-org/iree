@@ -22,7 +22,7 @@
 !!! tip
     `iree-compile` and other tools are installed to your python module
     installation path. If you pip install with the user mode, it is under
-    `${HOME}/.local/bin`, or `%APPDATA%Python` on Windows. You may want to
+    `${HOME}/.local/bin`, or `%APPDATA%\Python` on Windows. You may want to
     include the path in your system's `PATH` environment variable:
 
     ```shell
