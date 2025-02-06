@@ -48,6 +48,7 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "AMDGPUDistributeContract.cpp"
+    "DecomposeHorizontallyFusedGemms.cpp"
     "ExpandGPUOps.cpp"
     "GPUApplyTilingLevel.cpp"
     "GPUCheckResourceUsage.cpp"
@@ -141,6 +142,7 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Codegen::Utils::VectorOpUtils
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Utils
   PUBLIC
 )
