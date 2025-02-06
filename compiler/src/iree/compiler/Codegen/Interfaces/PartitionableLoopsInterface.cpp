@@ -261,6 +261,8 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
     IREE::LinalgExt::OnlineAttentionOp::attachInterface<
         AllParallelAsPartitionableLoops<IREE::LinalgExt::OnlineAttentionOp>>(
         *ctx);
+    IREE::LinalgExt::CustomOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::CustomOp>>(*ctx);
   });
   registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
     tensor::PackOp::attachInterface<
