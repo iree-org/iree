@@ -214,7 +214,7 @@ bool isGatherlikeOp(Operation *op);
 /// Check if a given operation is a horizontally fused contraction operation.
 /// The expectation is that the LHS is common, and all the operands are
 /// different RHS.
-bool isaHorizontallyFusedContraction(linalg::LinalgOp genericOp);
+bool isaHorizontallyFusedContraction(Operation *op);
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_
