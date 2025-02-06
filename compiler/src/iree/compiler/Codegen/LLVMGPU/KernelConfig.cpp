@@ -490,6 +490,15 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
   FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
       mlir::linalg::inferContractionDims(op);
+  if (failed(contractionDims)) {
+    assert(op->getNumResults() > 1 &&
+           "expected horizontally fused contraction op");
+    SmallVector<AffineMap> indexingMaps;
+    indexingMaps.push_back(op.getMatchingIndexingMap(op.getDpsInputOperand(0)));
+    indexingMaps.push_back(op.getMatchingIndexingMap(op.getDpsInputOperand(1)));
+    indexingMaps.push_back(op.getMatchingIndexingMap(op.getDpsInitOperand(0)));
+    contractionDims = mlir::linalg::inferContractionDims(indexingMaps);
+  }
   assert(succeeded(contractionDims) && "Could not infer contraction dims");
 
   if (contractionDims->k.size() < 1 || contractionDims->m.size() < 1 ||
@@ -602,6 +611,8 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
              /*bestMNTileCountPerSubgroup=*/8,
              /*bestKTileCountPerSubgroup=*/4};
   }
+  // Scale the seed by number of contractions of horizontally fused case.
+  seeds.bestMNTileCountPerSubgroup /= op.getNumDpsInputs() - 1;
 
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
@@ -699,7 +710,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute, 2> attrs = {
       NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
       NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
-  IREE::GPU::setPromotedOperandList(context, attrs, {0, 1});
+  auto promotedOperands =
+      llvm::to_vector(llvm::seq<int64_t>(op.getNumDpsInputs()));
+  IREE::GPU::setPromotedOperandList(context, attrs, promotedOperands);
   IREE::GPU::setMmaKind(context, attrs, mmaKinds[schedule->index]);
   IREE::GPU::setSubgroupMCount(context, attrs, schedule->mSubgroupCounts[0]);
   IREE::GPU::setSubgroupNCount(context, attrs, schedule->nSubgroupCounts[0]);
@@ -1204,7 +1217,8 @@ setVectorDistributionConfig(IREE::GPU::TargetAttr target,
   LDBG("VectorDistribution: finding a suitable config...");
 
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
-    if (linalg::isaContractionOpInterface(linalgOp)) {
+    if (linalg::isaContractionOpInterface(linalgOp) ||
+        IREE::LinalgExt::isaHorizontallyFusedContraction(linalgOp)) {
       LDBG("VectorDistribution: trying to find a suitable contraction config");
       return setMatmulVectorDistributionConfig(target, entryPoint, linalgOp);
     }

@@ -203,14 +203,18 @@ ChangeResult DistributionLayout::resolveWithPossibleConflict(
   IRRewriter builder(opOperand.getOwner());
   // Handle case where constantOp may have multiple consumers with different
   // layouts by creating a copy of constOp for other users.
-  if (!opOperand.get().hasOneUse() && !vectorLayout &&
+  if (!opOperand.get().hasOneUse() &&
       llvm::isa_and_nonnull<arith::ConstantOp, vector::StepOp>(
           opOperand.get().getDefiningOp())) {
     builder.setInsertionPoint(opOperand.get().getDefiningOp());
     Operation *copiedConstOp = builder.clone(*opOperand.get().getDefiningOp());
     Value copiedConst = copiedConstOp->getResult(0);
-    builder.replaceAllUsesExcept(opOperand.get(), copiedConst,
-                                 opOperand.getOwner());
+    DistributionLayout *newConstLayout =
+        propagation->getLatticeElement(copiedConst);
+    newConstLayout->subscribeEnforcement(enforcement);
+    (void)newConstLayout->resolve(rhs);
+    opOperand.set(copiedConst);
+    return ChangeResult::NoChange;
   }
 
   ResolutionResult result = doResolution(rhs);

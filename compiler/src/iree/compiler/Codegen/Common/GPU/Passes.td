@@ -13,6 +13,18 @@ include "mlir/Pass/PassBase.td"
 // Common Passes used for GPU-like backends (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
+def DecomposeHorizontallyFusedGemmsPass :
+    InterfacePass<"iree-codegen-gpu-decompose-horizontally-fused-gemms",
+                  "mlir::FunctionOpInterface"> {
+  let summary =
+      "Decomposes a horizontally fused GEMM back into its constituent GEMMs";
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+    "::mlir::linalg::LinalgDialect",
+  ];
+}
+
+
 def GPUCheckResourceUsagePass :
     InterfacePass<"iree-codegen-gpu-check-resource-usage", "mlir::FunctionOpInterface"> {
   let summary = "Checks GPU specific resource usage constraints like shared memory limits";
