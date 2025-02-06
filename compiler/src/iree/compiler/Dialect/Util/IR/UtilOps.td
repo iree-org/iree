@@ -778,7 +778,9 @@ def Util_CallOp : Util_Op<"call", [
   let arguments = (ins
     FlatSymbolRefAttr:$callee,
     Variadic<AnyType>:$operands,
-    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
   );
   let results = (outs
     Variadic<AnyType>:$results
@@ -792,7 +794,7 @@ def Util_CallOp : Util_Op<"call", [
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     ), [{
       build($_builder, $_state, callee.getResultTypes(), callee.getName(),
-            operands, tied_operands);
+            operands, tied_operands, /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr);
       $_state.addAttributes(attrs);
     }]>,
   ];

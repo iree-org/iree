@@ -960,7 +960,7 @@ struct ConvertCallOp : public AffinityOpConversionPattern<IREE::Flow::CallOp> {
         op.getLoc(), resultTypes, adaptor.getCalleeAttr(), callOperands,
         callOperandSizes, callOperandOffsets, callOperandEnds,
         callOperandLengths, resultSizes, adaptor.getTiedOperandsAttr(),
-        executionAffinityAttr);
+        op.getArgAttrsAttr(), op.getResAttrsAttr(), executionAffinityAttr);
     newOp->setDialectAttrs(op->getDialectAttrs());
     replaceOpWithMultiple(op, newOp->getResults(), resultSizes, rewriter);
     return success();

@@ -396,7 +396,7 @@ class FuncCallOpPattern : public OpConversionPattern<func::CallOp> {
         srcOp->getAttrOfType<ArrayAttr>("iree.abi.tied_operands");
     rewriter.replaceOpWithNewOp<IREE::Util::CallOp>(
         srcOp, resultTypes, srcOp.getCallee(), adaptor.getOperands(),
-        tiedOperandsAttr);
+        tiedOperandsAttr, srcOp.getArgAttrsAttr(), srcOp.getResAttrsAttr());
     return success();
   }
 };

@@ -151,7 +151,8 @@ struct ConvertCallOp : public OpConversionPattern<IREE::Util::CallOp> {
     }
     auto newOp = rewriter.replaceOpWithNewOp<IREE::Util::CallOp>(
         op, resultTypes, op.getCallee(), adaptor.getOperands(),
-        adaptor.getTiedOperandsAttr());
+        adaptor.getTiedOperandsAttr(), adaptor.getArgAttrsAttr(),
+        adaptor.getResAttrsAttr());
     newOp->setDialectAttrs(op->getDialectAttrs());
     return success();
   }

@@ -1566,7 +1566,7 @@ void FuncOp::build(OpBuilder &builder, OperationState &state, StringRef name,
   if (!argAttrs.empty() || !resAttrs.empty()) {
     assert(type.getNumInputs() == argAttrs.size());
     assert(type.getNumResults() == resAttrs.size());
-    function_interface_impl::addArgAndResultAttrs(
+    call_interface_impl::addArgAndResultAttrs(
         builder, state, argAttrs, resAttrs, builder.getStringAttr("arg_attrs"),
         builder.getStringAttr("res_attrs"));
   }

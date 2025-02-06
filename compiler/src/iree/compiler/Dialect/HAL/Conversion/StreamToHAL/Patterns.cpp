@@ -924,7 +924,8 @@ struct CmdCallOpPattern
 
     rewriter.replaceOpWithNewOp<IREE::Util::CallOp>(
         callOp, resultTypes, callOp.getCallee(), operands,
-        /*tied_operands=*/ArrayAttr{});
+        /*tied_operands=*/ArrayAttr{}, callOp.getArgAttrsAttr(),
+        callOp.getResAttrsAttr());
     return success();
   }
 };

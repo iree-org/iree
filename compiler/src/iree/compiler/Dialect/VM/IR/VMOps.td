@@ -4242,7 +4242,9 @@ def VM_CallOp : VM_CallBaseOp<"call"> {
 
   let arguments = (ins
     VM_FuncRefAttr:$callee,
-    Variadic<VM_AnyType>:$operands
+    Variadic<VM_AnyType>:$operands,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
   );
   let results = (outs
     Variadic<VM_AnyType>:$results
@@ -4301,7 +4303,9 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
     VM_FuncRefAttr:$callee,
     SignlessIntElementsAttr<16>:$segment_sizes,
     TypeArrayAttr:$segment_types,
-    Variadic<VM_AnyType>:$operands
+    Variadic<VM_AnyType>:$operands,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
   );
   let results = (outs
     Variadic<VM_AnyType>:$results

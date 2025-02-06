@@ -121,7 +121,8 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
     operand = builder
                   .create<transform::IncludeOp>(
                       loc, anyOpType, symbol,
-                      transform::FailurePropagationMode::Suppress, operand)
+                      transform::FailurePropagationMode::Suppress, operand,
+                      /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr)
                   .getResults()
                   .front();
   }

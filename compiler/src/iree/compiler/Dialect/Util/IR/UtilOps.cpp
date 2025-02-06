@@ -1624,7 +1624,7 @@ void FuncOp::build(OpBuilder &builder, OperationState &state, StringRef name,
   if (!argAttrs.empty() || !resAttrs.empty()) {
     assert(type.getNumInputs() == argAttrs.size());
     assert(type.getNumResults() == resAttrs.size());
-    function_interface_impl::addArgAndResultAttrs(
+    call_interface_impl::addArgAndResultAttrs(
         builder, state, argAttrs, resAttrs, builder.getStringAttr("arg_attrs"),
         builder.getStringAttr("res_attrs"));
   }
@@ -1716,7 +1716,7 @@ ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
   result.attributes.append(parsedAttributes);
 
   assert(resultAttrs.size() == resultTypes.size());
-  function_interface_impl::addArgAndResultAttrs(
+  call_interface_impl::addArgAndResultAttrs(
       builder, result, arguments, resultAttrs,
       builder.getStringAttr("arg_attrs"), builder.getStringAttr("res_attrs"));
 
@@ -1913,7 +1913,8 @@ IREE::Util::CallOp IREE::Util::CallOp::cloneAndExpand(
 
   return builder.create<IREE::Util::CallOp>(
       getLoc(), newResultTypes, getCallee(), newOperands,
-      builder.getIndexArrayAttr(newTiedOperands));
+      builder.getIndexArrayAttr(newTiedOperands), getArgAttrsAttr(),
+      getResAttrsAttr());
 }
 
 //===----------------------------------------------------------------------===//
