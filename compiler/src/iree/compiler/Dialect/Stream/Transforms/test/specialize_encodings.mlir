@@ -68,7 +68,7 @@ module {
 #map0 = affine_map<(m, n, k) -> (m, k)>
 #map1 = affine_map<(m, n, k) -> (k, n)>
 #map2 = affine_map<(m, n, k) -> (m, n)>
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_cpu.vmvx_encoding_layout<>}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
 module {
@@ -83,9 +83,7 @@ module {
     util.return
   }
 }
-// CHECK:       #[[$ENCODING:.+]] = #iree_encoding.encoding
-// CHECK-SAME:    #iree_cpu.vmvx_encoding_layout
-// CHECK-SAME:    encoding_info = {innerDimsPos = [{{.+}}], innerTileSizes = [{{.+}}], outerDimsPerm = [{{.+}}]}
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<{{.+}} layouts = [#iree_encoding.specialized_encoding<123, tensor<?x4xf32>>]
 // CHECK:       #[[TARGET:.+]] = #hal.device.target
 // CHECK:       util.global private @[[$DEVICE:.+]] = #[[TARGET]]
 // CHECK-LABEL: util.func public @tensor_fill_op
@@ -99,7 +97,7 @@ module {
 #map0 = affine_map<(m, n, k) -> (m, k)>
 #map1 = affine_map<(m, n, k) -> (k, n)>
 #map2 = affine_map<(m, n, k) -> (m, n)>
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_cpu.vmvx_encoding_layout<>}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
 module {
@@ -119,7 +117,7 @@ module {
 #map0 = affine_map<(m, n, k) -> (m, k)>
 #map1 = affine_map<(m, n, k) -> (k, n)>
 #map2 = affine_map<(m, n, k) -> (m, n)>
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_cpu.vmvx_encoding_layout<>}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
 module {
@@ -141,7 +139,7 @@ module {
 #map0 = affine_map<(m, n, k) -> (m, k)>
 #map1 = affine_map<(m, n, k) -> (k, n)>
 #map2 = affine_map<(m, n, k) -> (m, n)>
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_cpu.vmvx_encoding_layout<>}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
 module {
@@ -165,7 +163,7 @@ module {
 #map0 = affine_map<(m, n, k) -> (m, k)>
 #map1 = affine_map<(m, n, k) -> (k, n)>
 #map2 = affine_map<(m, n, k) -> (m, n)>
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_cpu.vmvx_encoding_layout<>}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
 module {
