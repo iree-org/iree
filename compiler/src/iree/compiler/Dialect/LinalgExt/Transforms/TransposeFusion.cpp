@@ -103,6 +103,68 @@ private:
   linalg::ControlFusionFn controlFn;
 };
 
+static Value createTranspose(OpBuilder &builder, Value source,
+                             SmallVector<int64_t> perm) {
+  SmallVector<OpFoldResult> mixedSizes =
+      tensor::getMixedSizes(builder, source.getLoc(), source);
+  applyPermutationToVector(mixedSizes, perm);
+  Type elemType = cast<RankedTensorType>(source.getType()).getElementType();
+  Value empty =
+      builder.create<tensor::EmptyOp>(source.getLoc(), mixedSizes, elemType)
+          .getResult();
+  return builder
+      .create<linalg::TransposeOp>(source.getLoc(), source, empty, perm)
+      ->getResult(0);
+}
+
+struct FuseConsumerTransposeWithAttention final
+    : public OpRewritePattern<LinalgExt::AttentionOp> {
+  FuseConsumerTransposeWithAttention(MLIRContext *context,
+                                     linalg::ControlFusionFn controlFn,
+                                     PatternBenefit benefit = 1)
+      : OpRewritePattern<LinalgExt::AttentionOp>(context, benefit),
+        controlFn(controlFn) {}
+
+  LogicalResult matchAndRewrite(LinalgExt::AttentionOp attentionOp,
+                                PatternRewriter &rewriter) const override {
+    auto users = attentionOp->getUsers();
+    if (llvm::range_size(users) != 1) {
+      return failure();
+    }
+    auto transposeOp = dyn_cast<linalg::LinalgOp>(*users.begin());
+    if (!transposeOp || !isaTranspose(transposeOp)) {
+      return failure();
+    }
+
+    OpOperand *transposeOperand = attentionOp.getDpsInitOperand(0);
+    int64_t inputIndex = transposeOperand->getOperandNumber();
+    SmallVector<int64_t> perm = getPermutation(transposeOp);
+
+    rewriter.modifyOpInPlace(attentionOp, [&]() {
+      SmallVector<AffineMap> newIndexingMaps =
+          attentionOp.getIndexingMapsArray();
+      AffineMap inputMap = attentionOp.getMatchingIndexingMap(transposeOperand);
+      SmallVector<AffineExpr> newExprs =
+          applyPermutation(inputMap.getResults(), perm);
+      AffineMap transposedMap =
+          AffineMap::get(inputMap.getNumDims(), inputMap.getNumSymbols(),
+                         newExprs, rewriter.getContext());
+      newIndexingMaps[inputIndex] = transposedMap;
+      attentionOp.setIndexingMapsAttr(
+          rewriter.getAffineMapArrayAttr(newIndexingMaps));
+      auto transposedInit =
+          createTranspose(rewriter, transposeOperand->get(), perm);
+      attentionOp.setOperand(inputIndex, transposedInit);
+      attentionOp.getResult(0).setType(transposedInit.getType());
+    });
+    rewriter.replaceOp(transposeOp, attentionOp);
+    return success();
+  }
+
+private:
+  linalg::ControlFusionFn controlFn;
+};
+
 // Bubbles transpose-V out of attention to expose the more performant
 // attention-transposeV.
 struct BubbleTransposeVFromAttentionOp
@@ -206,6 +268,8 @@ void populateFuseLinalgExtOpsWithTransposes(
     const linalg::ControlFusionFn &controlFusionFn) {
   patterns.add<FuseTransposeWithAttentionOp>(patterns.getContext(),
                                              controlFusionFn);
+  patterns.add<FuseConsumerTransposeWithAttention>(patterns.getContext(),
+                                                   controlFusionFn);
 }
 
 void populateBubbleTransposeFromLinalgExtOps(
