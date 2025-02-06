@@ -545,7 +545,7 @@ public:
         };
 
         // Mark the entry point as a kernel.
-        setMetadataValueI32("kernel", 1);
+        llvmFunc->setCallingConv(llvm::CallingConv::PTX_Kernel);
 
         // Set the maximum number of threads in the thread block (CTA).
         auto exportOp = exportOpMap[funcOp.getName()];
