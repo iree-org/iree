@@ -2684,6 +2684,8 @@ def Stream_AsyncCallOp : Stream_Op<"async.call", [
     Variadic<Stream_Size>:$resource_operand_lengths,
     Variadic<Stream_Size>:$result_sizes,
     OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -3368,6 +3370,8 @@ def Stream_CmdCallOp : Stream_Op<"cmd.call", [
     Variadic<Stream_Size>:$resource_operand_lengths,
     Variadic<Stream_Size>:$result_sizes,
     OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs,
     Stream_ResourceAccessArrayAttr:$resource_operand_accesses
   );
   let results = (outs
