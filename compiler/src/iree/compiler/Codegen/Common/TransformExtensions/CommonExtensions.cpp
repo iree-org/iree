@@ -964,14 +964,6 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     return listener.checkAndResetError();
   }
 
-  //   3. Post-bufferization passes are fine.
-  PassManager pm(getContext());
-  addIREEPostBufferizationPasses(pm);
-  if (failed(pm.run(target))) {
-    return mlir::emitDefiniteFailure(target)
-           << "post-bufferization passes failed";
-  }
-
   results.set(getOperation()->getOpResult(0), {target});
   return listener.checkAndResetError();
 }

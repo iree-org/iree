@@ -18,9 +18,11 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
+#include "mlir/Transforms/CSE.h"
 #include "mlir/Transforms/Passes.h"
 
 // NOTE: redundant bindings will result in unique buffer locations during the
@@ -447,14 +449,9 @@ buildBenchmarkModule(IREE::HAL::ExecutableOp sourceExecutableOp,
   if (!hasAnyBenchmarks)
     return {};
 
-  // Run CSE and the canonicalizer to pretty up the output.
-  PassManager passManager(moduleOp->getContext());
-  passManager.addPass(mlir::createCanonicalizerPass());
-  passManager.addPass(mlir::createCSEPass());
-  if (failed(passManager.run(*moduleOp))) {
-    moduleOp->emitError("failed to run canonicalizer; malformed output");
-    return {};
-  }
+  IRRewriter rewriter(moduleOp->getContext());
+  DominanceInfo domInfo;
+  mlir::eliminateCommonSubExpressions(rewriter, domInfo, moduleOp.get());
 
   return moduleOp;
 }
