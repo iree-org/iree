@@ -94,8 +94,9 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManagery,
 /// Lowering calling vectorization patterns.
 LogicalResult
 verifyGPUMatmulPipeline(Operation *op,
-                        IREE::Codegen::LoweringConfigAttr loweringConfig,
+                        IREE::Codegen::LoweringConfigAttr codegenloweringConfig,
                         IREE::Codegen::TranslationInfoAttr translationInfo,
+                        IREE::GPU::LoweringConfigAttr gpuloweringConfig,
                         ArrayRef<int64_t> workgroupSize);
 
 //----------------------------------------------------------------------------//
