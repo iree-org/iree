@@ -57,6 +57,7 @@ iree_lit_test_suite(
     "llvmcpu_materialize_encoding.mlir"
     "lower_ukernel_to_calls.mlir"
     "materialize_encoding_into_nop.mlir"
+    "materialize_encoding_into_padding.mlir"
     "materialize_tuning_specs.mlir"
     "materialize_tuning_specs_default_missing.mlir"
     "materialize_tuning_specs_invalid_spec.mlir"

@@ -50,8 +50,11 @@ void addIREEComprehensiveBufferizePasses(
 
 void addConstantBufferizePasses(OpPassManager &funcPassManager);
 
-/// Populate Encoding to Nop pass and canonicalizer pass to the pipeline
+/// Populate Encoding to Nop pass and canonicalizer pass to the pipeline.
 void addEncodingToNopPasses(FunctionLikeNest &passManager);
+
+/// Populate Encoding to padding pass and canonicalizer pass to the pipeline.
+void addEncodingToPaddingPasses(FunctionLikeNest &passManager);
 
 /// Links nested transform dialect tuning specs named sequences into a single
 /// entry point. Returns the new named sequence op (inserted into the `module`)

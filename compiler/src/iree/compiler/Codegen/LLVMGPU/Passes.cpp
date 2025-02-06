@@ -1157,7 +1157,9 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
     FunctionLikeNest funcPassManager(modulePassManager);
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
-    addEncodingToNopPasses(funcPassManager);
+    // This materializes into 'nop' in the absence of pad encoding layout
+    // attributes.
+    addEncodingToPaddingPasses(funcPassManager);
     funcPassManager.addPass(createBlockDynamicDimensionsPass);
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass);
     funcPassManager.addPass(createCSEPass);
