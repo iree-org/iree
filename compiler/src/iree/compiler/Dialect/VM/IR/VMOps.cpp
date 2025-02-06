@@ -120,7 +120,7 @@ void FuncOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 
   assert(type.getNumInputs() == argAttrs.size() &&
          "expected as many argument attribute lists as arguments");
-  function_interface_impl::addArgAndResultAttrs(
+  call_interface_impl::addArgAndResultAttrs(
       builder, result, argAttrs,
       /*resultAttrs=*/std::nullopt, getArgAttrsAttrName(result.name),
       getResAttrsAttrName(result.name));
@@ -289,7 +289,7 @@ ParseResult ImportOp::parse(OpAsmParser &parser, OperationState &result) {
     return parser.emitError(parser.getCurrentLocation())
            << "invalid result type list";
   }
-  function_interface_impl::addArgAndResultAttrs(
+  call_interface_impl::addArgAndResultAttrs(
       builder, result, argAttrs,
       /*resultAttrs=*/std::nullopt, getArgAttrsAttrName(result.name),
       getResAttrsAttrName(result.name));
@@ -358,7 +358,7 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
   if (!argAttrs.empty()) {
     assert(type.getNumInputs() == argAttrs.size() &&
            "expected as many argument attribute lists as arguments");
-    function_interface_impl::addArgAndResultAttrs(
+    call_interface_impl::addArgAndResultAttrs(
         builder, result, argAttrs,
         /*resultAttrs=*/std::nullopt, getArgAttrsAttrName(result.name),
         getResAttrsAttrName(result.name));

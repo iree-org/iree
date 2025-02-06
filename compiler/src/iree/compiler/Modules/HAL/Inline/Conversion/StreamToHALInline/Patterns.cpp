@@ -498,7 +498,8 @@ struct CmdDispatchOpPattern
     llvm::append_range(callArgs, adaptor.getResourceLengths());
     rewriter.replaceOpWithNewOp<IREE::Util::CallOp>(
         dispatchOp, TypeRange{}, callee.getLeafReference(), callArgs,
-        /*tied_operands=*/ArrayAttr{});
+        /*tied_operands=*/ArrayAttr{},
+        /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr);
     return success();
   }
 };
@@ -564,7 +565,8 @@ struct CmdCallOpPattern : public OpConversionPattern<IREE::Stream::CmdCallOp> {
 
     rewriter.replaceOpWithNewOp<IREE::Util::CallOp>(
         callOp, resultTypes, callOp.getCallee(), operands,
-        /*tied_operands=*/ArrayAttr{});
+        /*tied_operands=*/ArrayAttr{},
+        /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr);
     return success();
   }
 };
