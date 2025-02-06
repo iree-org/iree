@@ -16,7 +16,13 @@ namespace mlir::iree_compiler::DispatchCreation {
 
 /// Return true of the producer and consumer of `operand` are fusable
 /// using elementwise op fusion transformation.
+struct ElementwiseOpsFusabilityOptions {
+  // Control fusion with consumer that has multiple reduction dimensions.
+  bool fuseMultiReduction = false;
+  // Control fusion with producer that is a truncate-like operation.
+  bool fuseTruncateOps = false;
+};
 bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *operand,
-                                bool fuseMultiReduction);
+                                ElementwiseOpsFusabilityOptions options);
 
 } // namespace mlir::iree_compiler::DispatchCreation
