@@ -136,6 +136,10 @@ private:
                              RegionBranchPoint branchPoint,
                              MutableArrayRef<OpOperand> operands);
 
+  void visitMaskOp(
+      vector::MaskOp maskOp,
+      std::function<void(DistributionLayout *, mlir::ChangeResult)> update);
+
   DistributionLayout *getLatticeElement(Value val);
 
   MLIRContext *ctx;
@@ -163,6 +167,10 @@ private:
   void visitRegionSuccessors(RegionBranchOpInterface branch,
                              RegionBranchPoint branchPoint,
                              OperandRange operands);
+
+  void visitMaskOp(
+      vector::MaskOp maskOp,
+      std::function<void(DistributionLayout *, mlir::ChangeResult)> update);
 
   DistributionLayout *getLatticeElement(Value val);
 
@@ -797,6 +805,55 @@ static void enforceLayoutToGatherOp(
   }
 }
 
+static void enforceLayoutToTransferReadOp(
+    vector::TransferReadOp read, ArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+  if (resultLattices.empty()) {
+    return;
+  }
+  if (!read.getMask()) {
+    return;
+  }
+  // transfer_read has only one vector result.
+  const DistributionLayout *result = resultLattices[0];
+  // Cannot enforce layout if result is uninitialized.
+  if (result->isUninitialized()) {
+    return;
+  }
+  for (auto [index, operandLattice] : llvm::enumerate(operandLattices)) {
+    ChangeResult changed = operandLattice->resolveWithPossibleConflict(
+        result, getOpOperand(read, index));
+    update(operandLattice, changed);
+  }
+}
+
+static void enforceLayoutToTransferWriteOp(
+    vector::TransferWriteOp write,
+    ArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+  if (operandLattices.empty()) {
+    return;
+  }
+  if (!write.getMask()) {
+    return;
+  }
+  // transfer_write may have layout set on the vector
+  // that is to be written
+  const DistributionLayout *writeOperand = operandLattices[0];
+  // Cannot enforce layout if writeOperand is uninitialized.
+  if (writeOperand->isUninitialized()) {
+    return;
+  }
+  for (auto [index, operandLattice] :
+       llvm::enumerate(operandLattices.slice(1))) {
+    ChangeResult changed = operandLattice->resolveWithPossibleConflict(
+        writeOperand, getOpOperand(write, index + 1));
+    update(operandLattice, changed);
+  }
+}
+
 void enforcementTransferFunction(
     Operation *op, ArrayRef<DistributionLayout *> operandLattices,
     ArrayRef<const DistributionLayout *> resultLattices,
@@ -840,6 +897,18 @@ void enforcementTransferFunction(
                                  update);
     return;
   }
+
+  if (auto read = dyn_cast<vector::TransferReadOp>(op)) {
+    enforceLayoutToTransferReadOp(read, operandLattices, resultLattices,
+                                  update);
+    return;
+  }
+
+  if (auto write = dyn_cast<vector::TransferWriteOp>(op)) {
+    enforceLayoutToTransferWriteOp(write, operandLattices, resultLattices,
+                                   update);
+    return;
+  }
 }
 
 /// ==========================================================================
@@ -874,6 +943,51 @@ LogicalResult PropagateLayout::visit(ProgramPoint *point) {
   return failure();
 }
 
+void PropagateLayout::visitMaskOp(
+    vector::MaskOp mask,
+    std::function<void(DistributionLayout *, mlir::ChangeResult)> update) {
+  mask.getBody()->walk(
+      [&](Operation *traversed) { visitOperation(traversed); });
+  // Propogate from body to results
+  SmallVector<OpResult> vectorResults =
+      llvm::filter_to_vector(mask.getResults(), [](OpResult result) {
+        return isa<VectorType>(result.getType());
+      });
+  SmallVector<DistributionLayout *> resultLayouts = llvm::map_to_vector(
+      vectorResults, [&](Value result) -> DistributionLayout * {
+        return getLatticeElement(result);
+      });
+  SmallVector<Value> vectorYieldResults = llvm::filter_to_vector(
+      mask.getBody()->getTerminator()->getOperands(),
+      [](Value result) { return isa<VectorType>(result.getType()); });
+  SmallVector<DistributionLayout *> yieldLayouts = llvm::map_to_vector(
+      vectorYieldResults, [&](Value yieldResult) -> DistributionLayout * {
+        return getLatticeElement(yieldResult);
+      });
+  for (auto [result, yieldResult] : llvm::zip(resultLayouts, yieldLayouts)) {
+    if (!result->hasLayout() && !yieldResult->isUninitialized()) {
+      ChangeResult changed = result->resolve(yieldResult);
+      update(result, changed);
+    }
+  }
+
+  mask.getBody()->walk([&](vector::ContractionOp contract) {
+    const DistributionLayout *lhs = getLatticeElement(contract.getLhs());
+    const DistributionLayout *rhs = getLatticeElement(contract.getRhs());
+    SmallVector<VectorLayoutInterface> layouts{lhs->getLayout(),
+                                               rhs->getLayout()};
+    SmallVector<AffineMap> maps{contract.getIndexingMapsArray()[0],
+                                contract.getIndexingMapsArray()[1]};
+    AffineMap domainIdentity = AffineMap::getMultiDimIdentityMap(
+        maps[0].getNumDims(), contract.getContext());
+    VectorLayoutInterface inferredMaskLayout =
+        layouts[0].getRecombinedLayout(layouts, maps, domainIdentity);
+    DistributionLayout *maskLayout = getLatticeElement(mask.getMask());
+    ChangeResult changed = maskLayout->resolve(inferredMaskLayout);
+    update(maskLayout, changed);
+  });
+}
+
 void PropagateLayout::visitOperation(Operation *op) {
   // Handle region branching control flow.
   // TODO: Write more about what we are doing here.
@@ -889,6 +1003,15 @@ void PropagateLayout::visitOperation(Operation *op) {
                             yield->getOperands());
       return;
     }
+  }
+
+  auto changeFunc = [&](DistributionLayout *lattice, ChangeResult changed) {
+    this->propagateIfChanged(lattice, changed);
+  };
+
+  if (auto mask = dyn_cast<vector::MaskOp>(op)) {
+    visitMaskOp(mask, changeFunc);
+    return;
   }
 
   // TODO: Handle BranchOpInterface also.
@@ -920,10 +1043,6 @@ void PropagateLayout::visitOperation(Operation *op) {
   if (resultLattices.empty()) {
     return;
   }
-
-  auto changeFunc = [&](DistributionLayout *lattice, ChangeResult changed) {
-    this->propagateIfChanged(lattice, changed);
-  };
 
   propagationTransferFunction(op, operandLattices, resultLattices, changeFunc);
 }
@@ -997,6 +1116,34 @@ LogicalResult EnforceLayout::visit(ProgramPoint *point) {
   return failure();
 }
 
+void EnforceLayout::visitMaskOp(
+    vector::MaskOp mask,
+    std::function<void(DistributionLayout *, mlir::ChangeResult)> update) {
+  mask.getBody()->walk(
+      [&](Operation *traversed) { visitOperation(traversed); });
+  SmallVector<OpResult> vectorResults =
+      llvm::filter_to_vector(mask.getResults(), [](OpResult result) {
+        return isa<VectorType>(result.getType());
+      });
+  SmallVector<DistributionLayout *> resultLayouts = llvm::map_to_vector(
+      vectorResults, [&](Value result) -> DistributionLayout * {
+        return getLatticeElement(result);
+      });
+  SmallVector<Value> vectorYieldResults = llvm::filter_to_vector(
+      mask.getBody()->getTerminator()->getOperands(),
+      [](Value result) { return isa<VectorType>(result.getType()); });
+  SmallVector<DistributionLayout *> yieldLayouts = llvm::map_to_vector(
+      vectorYieldResults, [&](Value yieldResult) -> DistributionLayout * {
+        return getLatticeElement(yieldResult);
+      });
+  for (auto [result, yieldResult] : llvm::zip(resultLayouts, yieldLayouts)) {
+    if (!yieldResult->hasLayout() && !result->isUninitialized()) {
+      ChangeResult changed = yieldResult->resolve(result);
+      update(yieldResult, changed);
+    }
+  }
+}
+
 void EnforceLayout::visitOperation(Operation *op) {
   // Handle region branching control flow.
   // TODO: Write more about what we are doing here.
@@ -1012,6 +1159,15 @@ void EnforceLayout::visitOperation(Operation *op) {
                             yield->getOpOperands());
       return;
     }
+  }
+
+  auto changeFunc = [&](DistributionLayout *lattice, ChangeResult changed) {
+    this->propagateIfChanged(lattice, changed);
+  };
+
+  if (auto mask = dyn_cast<vector::MaskOp>(op)) {
+    visitMaskOp(mask, changeFunc);
+    return;
   }
 
   // TODO: Handle BranchOpInterface also.
@@ -1044,10 +1200,6 @@ void EnforceLayout::visitOperation(Operation *op) {
     DistributionLayout *resultLattice = getLatticeElement(result);
     resultLattices.push_back(resultLattice);
   }
-
-  auto changeFunc = [&](DistributionLayout *lattice, ChangeResult changed) {
-    this->propagateIfChanged(lattice, changed);
-  };
 
   enforcementTransferFunction(op, operandLattices, resultLattices, changeFunc);
 }

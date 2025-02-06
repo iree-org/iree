@@ -144,9 +144,8 @@ DistributionPattern::getDistributed(RewriterBase &rewriter, VectorValue value,
   return toSIMT.getResult();
 }
 
-void DistributionPattern::replaceOpWithDistributedValues(
+SmallVector<Value> DistributionPattern::getOpDistributedReplacements(
     RewriterBase &rewriter, Operation *op, ValueRange values) const {
-  // Replace all OpResults with the given values.
   SmallVector<Value> replacements;
   for (auto [opResult, replacement] :
        llvm::zip_equal(op->getOpResults(), values)) {
@@ -162,7 +161,14 @@ void DistributionPattern::replaceOpWithDistributedValues(
     }
     replacements.push_back(replacement);
   }
+  return replacements;
+}
 
+void DistributionPattern::replaceOpWithDistributedValues(
+    RewriterBase &rewriter, Operation *op, ValueRange values) const {
+  // Replace all OpResults with the given values.
+  SmallVector<Value> replacements =
+      getOpDistributedReplacements(rewriter, op, values);
   rewriter.replaceOp(op, replacements);
 }
 
@@ -184,6 +190,34 @@ void DistributionPattern::setSignatureForRedistribution(
                 ArrayAttr::get(rewriter.getContext(), signature));
     op->setAttr(kVectorLayoutRedistributeAttrName, unitAttr);
   });
+}
+
+LogicalResult
+DistributionPattern::replaceParentMask(PatternRewriter &rewriter,
+                                       vector::MaskOp maskOp) const {
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(maskOp);
+  std::optional<DistributionSignature> signatureMask = getOpSignature(maskOp);
+  if (!signatureMask.has_value()) {
+    return rewriter.notifyMatchFailure(maskOp, "mask should have a signature.");
+  }
+  SmallVector<Value> returns = maskOp.getBody()->getTerminator()->getOperands();
+  for (auto [idx, ret] : llvm::enumerate(returns)) {
+    if (VectorValue vectorRet = dyn_cast<VectorValue>(ret)) {
+      VectorValue maskRet = cast<VectorValue>(maskOp.getResult(idx));
+      VectorLayoutInterface layout =
+          dyn_cast<NestedLayoutAttr>(signatureMask.value()[maskRet]);
+      if (!layout) {
+        return rewriter.notifyMatchFailure(maskOp,
+                                           "layout must be NestedLayoutAttr");
+      }
+      ret = getDistributed(rewriter, vectorRet, layout);
+    }
+  }
+  rewriter.eraseOp(maskOp.getBody()->getTerminator());
+  rewriter.inlineBlockBefore(maskOp.getBody(), maskOp);
+  replaceOpWithDistributedValues(rewriter, maskOp, returns);
+  return success();
 }
 
 static void
@@ -239,7 +273,12 @@ static void applyVectorDistribution(Operation *root,
   std::deque<Operation *> worklist;
   LLVM_DEBUG(llvm::dbgs() << "Collecting operations to be distributed\n");
   root->walk([&](Operation *op) {
-    if (hasOpSignature(op)) {
+    // The distribution of mask op is special.
+    // Although the signature set for visibility purposes
+    // but it will be distributed when the body is
+    // distributed. Therefore, we explicitly exclude
+    // the yield and the mask op.
+    if (hasOpSignature(op) && !isa<vector::MaskOp, vector::YieldOp>(op)) {
       worklist.push_back(op);
     }
   });

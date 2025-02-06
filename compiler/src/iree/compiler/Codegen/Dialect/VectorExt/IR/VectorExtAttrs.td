@@ -232,7 +232,13 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
                      "ArrayRef<int64_t>":$appendThreadLens,
                      "ArrayRef<int64_t>":$appendElementLens,
                      "ArrayRef<int64_t>":$appendSubgroupStrides,
-                     "ArrayRef<int64_t>":$appendThreadStrides)>
+                     "ArrayRef<int64_t>":$appendThreadStrides)>,
+    // Special builder to extract and unify a new layout
+    // to represent the iteration space from operand
+    // layout
+    AttrBuilder<(ins "ArrayRef<NestedLayoutAttr>":$operandLayouts,
+                     "ArrayRef<AffineMap>":$operandIndexingMaps,
+                     "AffineMap":$resultMap)>
   ];
 
   let extraClassDeclaration = [{
@@ -242,6 +248,12 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
 
     // Get the undistributed shape that is subgroup x batch x outer x thread x element
     SmallVector<int64_t> getUndistributedPackedShape() const;
+
+    // Get the subgroup x batch x outer x thread x element shape for original dim
+    SmallVector<int64_t> getPackedShapeForUndistributedDim(int64_t dim) const;
+
+    // Get the distributed shape but has the same rank as the undistributed shape.
+    SmallVector<int64_t> getDistributedUnpackedShape() const;
   }];
 
   let genVerifyDecl = 1;
