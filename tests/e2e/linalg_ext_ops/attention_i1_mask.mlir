@@ -1,3 +1,4 @@
+#packed = #iree_encoding.packed_storage
 func.func @attention1x4x4_i1_mask() {
   %init = tensor.empty() : tensor<1x4x4xf32>
   %query = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
@@ -15,7 +16,7 @@ func.func @attention1x4x4_i1_mask() {
                                             [1.3, 1.4, 1.5, 1.6]]]> : tensor<1x4x4xf32>
 
   %i8mask = util.unfoldable_constant dense<[165, 165]> : tensor<2xi8>
-  %mask = flow.tensor.bitcast %i8mask : tensor<2xi8> -> tensor<1x4x4xi1>
+  %mask = flow.tensor.bitcast %i8mask : tensor<2xi8> -> tensor<1x4x4xi1, #packed>
 
   %scale = arith.constant 0.5 : f32
   %1 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
@@ -25,7 +26,7 @@ func.func @attention1x4x4_i1_mask() {
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
                      ins(%query, %key, %value, %scale, %mask : tensor<1x4x4xf32>,
-        tensor<1x4x4xf32>, tensor<1x4x4xf32>, f32, tensor<1x4x4xi1>) outs(%init : tensor<1x4x4xf32>) {
+        tensor<1x4x4xf32>, tensor<1x4x4xf32>, f32, tensor<1x4x4xi1, #packed>) outs(%init : tensor<1x4x4xf32>) {
           ^bb0(%arg0: f32):
           iree_linalg_ext.yield %arg0 : f32
         } -> tensor<1x4x4xf32>
@@ -56,7 +57,7 @@ func.func @attention1x4x4_i1_mask_all_ones() {
                                             [1.3, 1.4, 1.5, 1.6]]]> : tensor<1x4x4xf32>
 
   %i8mask = util.unfoldable_constant dense<[255, 255]> : tensor<2xi8>
-  %mask = flow.tensor.bitcast %i8mask : tensor<2xi8> -> tensor<1x4x4xi1>
+  %mask = flow.tensor.bitcast %i8mask : tensor<2xi8> -> tensor<1x4x4xi1, #packed>
 
   %scale = arith.constant 0.5 : f32
   %1 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
@@ -66,7 +67,7 @@ func.func @attention1x4x4_i1_mask_all_ones() {
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
                      ins(%query, %key, %value, %scale, %mask : tensor<1x4x4xf32>,
-        tensor<1x4x4xf32>, tensor<1x4x4xf32>, f32, tensor<1x4x4xi1>) outs(%init : tensor<1x4x4xf32>) {
+        tensor<1x4x4xf32>, tensor<1x4x4xf32>, f32, tensor<1x4x4xi1, #packed>) outs(%init : tensor<1x4x4xf32>) {
           ^bb0(%arg0: f32):
           iree_linalg_ext.yield %arg0 : f32
         } -> tensor<1x4x4xf32>
@@ -97,7 +98,7 @@ func.func @attention1x4x4_i1_mask_tril() {
                                             [1.3, 1.4, 1.5, 1.6]]]> : tensor<1x4x4xf32>
 
   %i8mask = util.unfoldable_constant dense<[140, 239]> : tensor<2xi8>
-  %mask = flow.tensor.bitcast %i8mask : tensor<2xi8> -> tensor<1x4x4xi1>
+  %mask = flow.tensor.bitcast %i8mask : tensor<2xi8> -> tensor<1x4x4xi1, #packed>
 
   %scale = arith.constant 0.5 : f32
   %1 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
@@ -107,7 +108,7 @@ func.func @attention1x4x4_i1_mask_tril() {
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
                      ins(%query, %key, %value, %scale, %mask : tensor<1x4x4xf32>,
-        tensor<1x4x4xf32>, tensor<1x4x4xf32>, f32, tensor<1x4x4xi1>) outs(%init : tensor<1x4x4xf32>) {
+        tensor<1x4x4xf32>, tensor<1x4x4xf32>, f32, tensor<1x4x4xi1, #packed>) outs(%init : tensor<1x4x4xf32>) {
           ^bb0(%arg0: f32):
           iree_linalg_ext.yield %arg0 : f32
         } -> tensor<1x4x4xf32>
