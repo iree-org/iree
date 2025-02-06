@@ -358,6 +358,22 @@ updateTensorSizeOfOp(RewriterBase &rewriter,
   return success();
 }
 
+/// Updates the target encoding of `op` with resolved layouts.
+static LogicalResult
+updateTensorFillOp(RewriterBase &rewriter, IREE::Stream::TensorFillOp op,
+                   const SetVector<Attribute> &layoutResolvers) {
+  auto encodingType = dyn_cast<RankedTensorType>(op.getTargetEncoding());
+  std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
+      getEncodingWithNewLayouts(encodingType, layoutResolvers);
+  if (!encodingAttr) {
+    return success();
+  }
+  rewriter.modifyOpInPlace(op, [&] {
+    op.setTargetEncoding(cloneWithEncoding(encodingType, encodingAttr.value()));
+  });
+  return success();
+}
+
 /// Returns failure if `op` has encoding. The EncodingAttr has padding
 /// semantic, a constant op with such  encoding can not be resolved at this
 /// moment.
@@ -375,7 +391,70 @@ updateTensorConstantOp(RewriterBase &rewriter,
   return success();
 }
 
-/// Updates the result_encoding for `op`. The op have to define a
+/// Returns a failure if there are encodings in target encoding type or update
+/// encoding type.
+static LogicalResult updateTensorUpdateOp(RewriterBase &rewriter,
+                                          IREE::Stream::TensorUpdateOp op) {
+  auto targetEncodingType = dyn_cast<RankedTensorType>(op.getTargetEncoding());
+  if (targetEncodingType && targetEncodingType.getEncoding()) {
+    return failure();
+  }
+  auto updateEncodingType = dyn_cast<RankedTensorType>(op.getUpdateEncoding());
+  if (updateEncodingType && updateEncodingType.getEncoding()) {
+    return failure();
+  }
+  return success();
+}
+
+/// Returns a failure if there are encodings in source encoding type or result
+/// encoding type.
+static LogicalResult updateTensorCloneOp(RewriterBase &rewriter,
+                                         IREE::Stream::TensorCloneOp op) {
+  auto sourceEncodingType = dyn_cast<RankedTensorType>(op.getSourceEncoding());
+  if (sourceEncodingType && sourceEncodingType.getEncoding()) {
+    return failure();
+  }
+  auto resultEncodingType = dyn_cast<RankedTensorType>(op.getResultEncoding());
+  if (resultEncodingType && resultEncodingType.getEncoding()) {
+    return failure();
+  }
+  return success();
+}
+
+/// Returns a failure if there are encodings in source encoding type or result
+/// encoding type.
+static LogicalResult updateTensorSliceOp(RewriterBase &rewriter,
+                                         IREE::Stream::TensorSliceOp op) {
+  auto sourceEncodingType = dyn_cast<RankedTensorType>(op.getSourceEncoding());
+  if (sourceEncodingType && sourceEncodingType.getEncoding()) {
+    return failure();
+  }
+  auto resultEncodingType = dyn_cast<RankedTensorType>(op.getResultEncoding());
+  if (resultEncodingType && resultEncodingType.getEncoding()) {
+    return failure();
+  }
+  return success();
+}
+
+/// Updates the source_encoding for `op`. The op has to define a
+/// `source_encoding` parameter.
+template <typename OpTy>
+static LogicalResult
+updateSourceEncoding(RewriterBase &rewriter, OpTy op,
+                     const SetVector<Attribute> &layoutResolvers) {
+  auto encodingType = dyn_cast<RankedTensorType>(op.getSourceEncoding());
+  std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
+      getEncodingWithNewLayouts(encodingType, layoutResolvers);
+  if (!encodingAttr) {
+    return success();
+  }
+  rewriter.modifyOpInPlace(op, [&] {
+    op.setSourceEncoding(cloneWithEncoding(encodingType, encodingAttr.value()));
+  });
+  return success();
+}
+
+/// Updates the result_encoding for `op`. The op has to define a
 /// `result_encoding` parameter.
 template <typename OpTy>
 static LogicalResult
@@ -393,6 +472,16 @@ updateResultEncoding(RewriterBase &rewriter, OpTy op,
   return success();
 }
 
+/// Adds the resolved layouts to all tensor types on stream tensor ops, if
+/// encodings are present. Most of stream tensor ops implement
+/// AffinityOpInterface, where a stream affinity indicates the kind of
+/// enviroment the ops are expected run in. When an encoding is present in the
+/// tensor type, the method resolves the layouts, strips outdated information,
+/// and adds the resolved layouts to the encodings. The updated encodings should
+/// have enough information for other lowering transformations.
+/// TODO(hanchung): Add support for stream.tensor.load ops and
+/// stream.tensor.store ops. They are not affinity ops, so additional analysis
+/// will be needed in the work.
 static LogicalResult addLayoutsToTensorPhaseOps(
     ModuleOp moduleOp, IREE::Stream::AffinityAnalysis &affinityAnalysis,
     FunctionOpInterface funcOp,
@@ -424,7 +513,6 @@ static LogicalResult addLayoutsToTensorPhaseOps(
       return affinityOp.emitError("failed on making layout resolvers");
     }
 
-    // TODO(hanchung): Update other Stream operations.
     LogicalResult result =
         TypeSwitch<Operation *, LogicalResult>(affinityOp)
             .Case<IREE::Stream::TensorDispatchOp>([&](auto op) {
@@ -442,6 +530,15 @@ static LogicalResult addLayoutsToTensorPhaseOps(
             .Case<IREE::Stream::TensorConstantOp>([&](auto op) {
               return updateTensorConstantOp(rewriter, op, layoutResolvers);
             })
+            .Case<IREE::Stream::TensorFillOp>([&](auto op) {
+              return updateTensorFillOp(rewriter, op, layoutResolvers);
+            })
+            .Case<IREE::Stream::TensorCloneOp>(
+                [&](auto op) { return updateTensorCloneOp(rewriter, op); })
+            .Case<IREE::Stream::TensorSliceOp>(
+                [&](auto op) { return updateTensorSliceOp(rewriter, op); })
+            .Case<IREE::Stream::TensorUpdateOp>(
+                [&](auto op) { return updateTensorUpdateOp(rewriter, op); })
             .Default([](Operation *op) {
               return op->emitOpError("Unhandled stream op");
             });
