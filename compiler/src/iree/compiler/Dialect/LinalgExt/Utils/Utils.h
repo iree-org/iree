@@ -211,5 +211,10 @@ bool isBroadcastingOp(linalg::LinalgOp op);
 ///     2. `linalg.yield` consumes the result of a `tensor.extract_slice`
 bool isGatherlikeOp(Operation *op);
 
+/// Check if a given operation is a horizontally fused contraction operation.
+/// The expectation is that the LHS is common, and all the operands are
+/// different RHS.
+bool isaHorizontallyFusedContraction(linalg::LinalgOp genericOp);
+
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_

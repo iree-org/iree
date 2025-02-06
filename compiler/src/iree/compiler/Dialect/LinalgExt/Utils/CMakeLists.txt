@@ -25,6 +25,7 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRAnalysis
     MLIRArithDialect
+    MLIRComplexDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgUtils
