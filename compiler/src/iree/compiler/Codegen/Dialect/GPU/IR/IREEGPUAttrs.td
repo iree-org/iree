@@ -153,10 +153,15 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
   }];
 
   let parameters = (ins
-    EnumParameter<IREEGPU_MMAIntrinsic>:$intrinsic
+    EnumParameter<IREEGPU_MMAIntrinsic>:$intrinsic,
+    DefaultValuedParameter<"bool", "false">:$col_major
   );
 
-  let assemblyFormat = "`<` params `>`";
+  let assemblyFormat = "`<` $intrinsic (`,` `col_major` `=` $col_major^)? `>`";
+
+  let builders = [
+    AttrBuilder<(ins "MMAIntrinsic":$intrinsic)>
+  ];
 
   let extraClassDeclaration = [{
     int64_t getBlockSize() const;
