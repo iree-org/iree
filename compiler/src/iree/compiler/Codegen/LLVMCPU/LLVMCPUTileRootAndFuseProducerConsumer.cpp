@@ -32,6 +32,113 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+// Fuse all consumers of the given `tiledOp` into the surrounding scf.forall.
+// Returns a list of new `tensor.extract_slice` ops with new fusion
+// opportunities, as well as the new surrounding `scf.forall` (because consumer
+// fusion replaces the loop).
+static std::pair<std::queue<Operation *>, scf::ForOp>
+fuseConsumers(RewriterBase &rewriter, Operation *tiledOp) {
+
+  //  Typically, the consumers of the tiled operation are slices of the
+  //  results of the tiled operation. These are expressed in IR using
+  //  `tensor.insert_slice` operations, whose outputs are the operands of the
+  //  untiled operation. Create a worklist of these `tensor.insert_siices`
+  //  operations. If the consumers of the source of the `tensor.insert_slices`
+  //  can be tiled such that the tiled value is generated in-place, that
+  //  effectively tiles + fuses the operations.
+  auto addCandidateSlices = [](Operation *fusedOp,
+                               std::queue<tensor::InsertSliceOp> &candidates) {
+    for (auto *userOp : fusedOp->getResults().getUsers()) {
+      if (auto sliceOp = llvm::dyn_cast<tensor::InsertSliceOp>(userOp)) {
+        candidates.push(sliceOp);
+      }
+    }
+  };
+
+  // Collect the candidate slices which can be potential consumers that can be
+  // fused.
+  std::queue<tensor::InsertSliceOp> candidates;
+  addCandidateSlices(tiledOp, candidates);
+
+  std::queue<Operation *> newFusionOpportunities;
+  scf::ForOp newLoop = tiledOp->getParentOfType<scf::ForOp>();
+
+  while (!candidates.empty()) {
+
+    // Traverse the slices in BFS fashion.
+    tensor::InsertSliceOp candidateSliceOp = candidates.front();
+    candidates.pop();
+
+    FailureOr<scf::SCFFuseConsumerOfSliceResult> fusedResult =
+        mlir::scf::tileAndFuseConsumerOfSlice(rewriter, candidateSliceOp);
+    if (failed(fusedResult)) {
+      LLVM_DEBUG(llvm::dbgs() << "failed to fuse consumer of slice: "
+                              << candidateSliceOp << "\n");
+      continue;
+    }
+
+    // Replace the original consumer operation with the tiled implementation.
+    rewriter.replaceOp(fusedResult->origConsumerOperand->getOwner(),
+                       fusedResult->tiledOps.front());
+
+    // The result of the fused conumers might themselved be slices of
+    // values produced by operations that implement the `TilingInterface`.
+    // Add these operations to the worklist.
+    addCandidateSlices(fusedResult->tiledAndFusedConsumerOperand->getOwner(),
+                       candidates);
+
+    for (auto tiledOp : fusedResult.value().tiledOps) {
+      for (auto operand : tiledOp->getOperands()) {
+        if (auto sliceProducer =
+                operand.getDefiningOp<tensor::ExtractSliceOp>()) {
+          if (llvm::isa_and_present<TilingInterface>(
+                  sliceProducer.getSource().getDefiningOp())) {
+            newFusionOpportunities.push(sliceProducer);
+          }
+        }
+      }
+      // Store the new loop for follow up producer fusion.
+      newLoop = tiledOp->getParentOfType<scf::ForOp>();
+    }
+  }
+  return std::make_pair(newFusionOpportunities, newLoop);
+}
+
+static void fuseProducersOfSlices(RewriterBase &rewriter,
+                                  std::queue<Operation *> &worklist,
+                                  scf::SCFTileAndFuseOptions &options,
+                                  scf::ForOp forOp) {
+  SmallVector<LoopLikeOpInterface> loops = {cast<LoopLikeOpInterface>(&*forOp)};
+  while (!worklist.empty()) {
+    auto candidateSlice = cast<tensor::ExtractSliceOp>(worklist.front());
+    worklist.pop();
+
+    auto fusableProducer =
+        candidateSlice.getSource().getDefiningOp<TilingInterface>();
+    if (!fusableProducer)
+      continue;
+
+    std::optional<scf::SCFTileAndFuseOptions::ControlFnResult> controlFnResult =
+        options.fusionControlFn(candidateSlice,
+                                cast<OpResult>(candidateSlice.getSource()),
+                                /*destinationInitArg=*/false);
+    if (!controlFnResult)
+      continue;
+
+    // The operands of the fused producer might themselved be slices of
+    // values produced by operations that implement the `TilingInterface`.
+    // Add these operations to the worklist.
+    std::optional<scf::SCFFuseProducerOfSliceResult> fusedResult =
+        scf::tileAndFuseProducerOfSlice(rewriter, candidateSlice, loops);
+    if (!fusedResult)
+      continue;
+
+    for (auto newSlice : fusedResult->generatedSlices) {
+      worklist.push(newSlice);
+    }
+  }
+}
+
 /// Starting from `op` walk all operands backwards to find all
 /// potentially fusable operations, i.e. operations that implement
 /// the `TilingInterface`.
@@ -42,6 +149,7 @@ static void collectTiledAndFusedOps(Operation *rootOp,
   result.insert(rootOp);
   while (!worklist.empty()) {
     Operation *current = worklist.pop_back_val();
+    // Collect all tilable producers.
     for (OpOperand &operand : current->getOpOperands()) {
       Operation *producer = operand.get().getDefiningOp();
       if (!producer || !isa<TilingInterface>(producer) ||
@@ -50,25 +158,41 @@ static void collectTiledAndFusedOps(Operation *rootOp,
       worklist.push_back(producer);
       result.insert(producer);
     }
+    // Collect all tilable consumers.
+    for (auto user : current->getUsers()) {
+      if (result.count(user)) {
+        continue;
+      }
+      if (isa<TilingInterface>(user)) {
+        worklist.push_back(user);
+        result.insert(user);
+      }
+    }
   }
 }
 
-/// Tile the root operation and fuse the producers of the root operation.
-/// If `onlyFuseProducerInputOperands` is set, only fuse producer input
-/// operands. Returns the tiled operation to be used for fusing consumers.
+/// Implementation of tile root and fuse producers and consumers greedily.
+/// Tile the root operation and fuse the producers of the root operation
+/// then consumers (finds any missing fusion opportunities, then apply producer
+/// fusion). If `onlyFuseProducerInputOperands` is set, only fuse producer input
+/// operands.
 FailureOr<Operation *>
-tileRootAndFuseProducers(IRRewriter &rewriter, TilingInterface rootOp,
-                         int64_t tilingLevel,
-                         bool onlyFuseProducerInputOperands) {
+tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
+                                int64_t tilingLevel,
+                                bool onlyFuseProducerInputOperands) {
   mlir::DominanceInfo dominanceInfo(rootOp);
   llvm::SmallDenseSet<Operation *> tiledAndFusedOps;
   collectTiledAndFusedOps(rootOp, tiledAndFusedOps);
 
   llvm::DenseSet<Operation *> yieldReplacementsFor;
   for (auto op : tiledAndFusedOps) {
-    if (llvm::any_of(op->getUsers(), [&](Operation *user) {
-          return dominanceInfo.properlyDominates(rootOp, user);
-        })) {
+    if (llvm::any_of(op->getUsers(),
+                     [&](Operation *user) {
+                       return dominanceInfo.properlyDominates(rootOp, user);
+                     }) &&
+        (llvm::count_if(op->getUsers(), [&](Operation *user) {
+           return tiledAndFusedOps.contains(user);
+         }) < 2)) {
       yieldReplacementsFor.insert(op);
     }
   }
@@ -135,77 +259,23 @@ tileRootAndFuseProducers(IRRewriter &rewriter, TilingInterface rootOp,
       rewriter.eraseOp(toReplace);
     }
   }
+  FailureOr<Operation *> tiledOp = tiledResults->tiledAndFusedOps.front();
+
+  if (failed(tiledOp)) {
+    return failure();
+  }
+
+  if (!onlyFuseProducerInputOperands) {
+    auto [newFusionOpportunities, newLoop] =
+        fuseConsumers(rewriter, tiledOp.value());
+
+    if (newLoop) {
+      fuseProducersOfSlices(rewriter, newFusionOpportunities,
+                            tileAndFuseOptions, newLoop);
+    }
+  }
 
   return tiledResults->tiledAndFusedOps.front();
-}
-
-static void fuseConsumers(RewriterBase &rewriter, Operation *tiledOp) {
-
-  //  Typically, the consumers of the tiled operation are slices of the
-  //  results of the tiled operation. These are expressed in IR using
-  //  `tensor.insert_slice` operations, whose outputs are the operands of the
-  //  untiled operation. Create a worklist of these `tensor.insert_siices`
-  //  operations. If the consumers of the source of the `tensor.insert_slices`
-  //  can be tiled such that the tiled value is generated in-place, that
-  //  effectively tiles + fuses the operations.
-  auto addCandidateSlices = [](Operation *fusedOp,
-                               std::queue<tensor::InsertSliceOp> &candidates) {
-    for (auto *userOp : fusedOp->getResults().getUsers()) {
-      if (auto sliceOp = llvm::dyn_cast<tensor::InsertSliceOp>(userOp)) {
-        candidates.push(sliceOp);
-      }
-    }
-  };
-
-  // Collect the candidate slices which can be potential consumers that can be
-  // fused.
-  std::queue<tensor::InsertSliceOp> candidates;
-  addCandidateSlices(tiledOp, candidates);
-
-  while (!candidates.empty()) {
-
-    // Traverse the slices in BFS fashion.
-    tensor::InsertSliceOp candidateSliceOp = candidates.front();
-    candidates.pop();
-
-    FailureOr<scf::SCFFuseConsumerOfSliceResult> fusedResult =
-        mlir::scf::tileAndFuseConsumerOfSlice(rewriter, candidateSliceOp);
-    if (failed(fusedResult)) {
-      LLVM_DEBUG(llvm::dbgs() << "failed to fuse consumer of slice: "
-                              << candidateSliceOp << "\n");
-      continue;
-    }
-
-    // Replace the original consumer operation with the tiled implementation.
-    rewriter.replaceOp(fusedResult->origConsumerOperand->getOwner(),
-                       fusedResult->tiledOps.front());
-
-    // The result of the fused conumers might themselved be slices of
-    // values produced by operations that implement the `TilingInterface`.
-    // Add these operations to the worklist.
-    addCandidateSlices(fusedResult->tiledAndFusedConsumerOperand->getOwner(),
-                       candidates);
-  }
-}
-
-/// Implementation of tile root and fuse producers and consumers greedily.
-/// If `onlyFuseProducerInputOperands` is set, only fuse producer input operands
-/// and disable consumer fusion.
-static LogicalResult tileRootAndFuse(IRRewriter &rewriter,
-                                     TilingInterface rootOp,
-                                     int64_t tilingLevel,
-                                     bool onlyFuseProducerInputOperands) {
-
-  FailureOr<Operation *> tiledOp = tileRootAndFuseProducers(
-      rewriter, rootOp, tilingLevel, onlyFuseProducerInputOperands);
-
-  if (failed(tiledOp))
-    return failure();
-
-  if (!onlyFuseProducerInputOperands)
-    fuseConsumers(rewriter, tiledOp.value());
-
-  return success();
 }
 
 /// This pass starts with the first TilingInterface operation that has
@@ -262,7 +332,7 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
     return;
   }
 
-  if (failed(tileRootAndFuse(
+  if (failed(tileRootAndFuseProducerConsumer(
           rewriter, dyn_cast<TilingInterface>(rootOp.value()),
           tilingLevel.getValue(), onlyFuseProducerInputOperands.getValue()))) {
     funcOp.emitError() << "tiling of level " << tilingLevel.getValue()
