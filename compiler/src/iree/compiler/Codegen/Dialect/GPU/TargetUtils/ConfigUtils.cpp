@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
@@ -172,12 +173,40 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   return schedule;
 }
 
+/// A coarse approximation of when the given value |v| is consumed column
+/// major.
+bool coarseIsResultColumnMajor(Value v, int64_t dim0, int64_t dim1) {
+  if (!v.hasOneUse()) {
+    return false;
+  }
+
+  auto consumer = dyn_cast<linalg::LinalgOp>(*v.user_begin());
+  if (!consumer) {
+    return false;
+  }
+
+  OpOperand &operand = *v.use_begin();
+  AffineMap indexingMap = consumer.getMatchingIndexingMap(&operand);
+
+  SmallVector<unsigned int> permutedDims;
+  auto d0 = dyn_cast<AffineDimExpr>(indexingMap.getResult(dim0));
+  auto d1 = dyn_cast<AffineDimExpr>(indexingMap.getResult(dim1));
+
+  // If dim0 (outer dim) has a smaller position than dim1, then assume the
+  // consumer is not using |v| transposed.
+  if (!d0 || !d1 || d0.getPosition() < d1.getPosition()) {
+    return false;
+  }
+  return true;
+}
+
 /// Create a matmul lowering config based on iteration bounds and indexing
 /// maps for a given target. This function computes contraction dimensions
 /// and deduces an MMA intrinsic schedule to choose tile sizes and the
 /// workgroup size.
 static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
-getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
+getMatmulLoweringConfigAndWorkgroupSize(Value result,
+                                        SmallVector<int64_t> bounds,
                                         ArrayRef<AffineMap> maps,
                                         ArrayRef<Value> operands,
                                         IREE::GPU::TargetAttr target) {
@@ -327,6 +356,22 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   IREE::GPU::MmaInterfaceAttr mmaKind =
       target.getWgp().getMma()[schedule->index];
 
+  if (auto mma = dyn_cast<MMAAttr>(mmaKind)) {
+    bool preferColumnMajor =
+        coarseIsResultColumnMajor(result, mDims.back(), nDims.back());
+
+    // Note that "column major" is overloaded here. |preferColumnMajor| is in
+    // reference to the computation itself, while |colMajor| on MMAAttr refers
+    // to whether the result of the MMA instruction should be column major. MFMA
+    // only vectorizes along columns, so we want to pick the *opposite* of
+    // whatever the computation prefers (e.g. row-major compute => do MFMA
+    // column major).
+    if (IREE::GPU::is_AMD_MFMA(mma.getIntrinsic()) && !preferColumnMajor) {
+      mmaKind =
+          MMAAttr::get(mma.getContext(), mma.getIntrinsic(), /*colMajor=*/true);
+    }
+  }
+
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
   MLIRContext *context = lhs.getContext();
@@ -374,7 +419,8 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
                                   mlir::FunctionOpInterface entryPoint,
                                   Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp || !linalg::isaConvolutionOpInterface(linalgOp)) {
+  if (!linalgOp || !linalg::isaConvolutionOpInterface(linalgOp) ||
+      !linalgOp.hasPureTensorSemantics()) {
     return failure();
   }
 
@@ -396,7 +442,8 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
 
   SmallVector<int64_t> bounds = igemmLoopBounds;
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
-      getMatmulLoweringConfigAndWorkgroupSize(bounds, igemmContractionMaps,
+      getMatmulLoweringConfigAndWorkgroupSize(linalgOp->getResult(0), bounds,
+                                              igemmContractionMaps,
                                               igemmOperands, target);
   if (failed(configAndWgSize)) {
     return failure();
@@ -429,7 +476,8 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                                       mlir::FunctionOpInterface entryPoint,
                                       Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp || !linalg::isaContractionOpInterface(linalgOp)) {
+  if (!linalgOp || !linalg::isaContractionOpInterface(linalgOp) ||
+      !linalgOp.hasPureTensorSemantics()) {
     return failure();
   }
 
@@ -440,7 +488,8 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   LDBG("Matmul TileAndFuse Config");
 
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
-      getMatmulLoweringConfigAndWorkgroupSize(bounds, maps, operands, target);
+      getMatmulLoweringConfigAndWorkgroupSize(linalgOp->getResult(0), bounds,
+                                              maps, operands, target);
   if (failed(configAndWgSize)) {
     return failure();
   }
