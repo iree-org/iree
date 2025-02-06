@@ -2051,6 +2051,11 @@ static iree_status_t iree_vm_bytecode_dispatch(
         float* result = VM_DecResultRegF32("result");
         *result = vm_cast_si64f32(operand);
       });
+      DISPATCH_OP(EXT_F32, CastUI64F32, {
+        int64_t operand = (int64_t)VM_DecOperandRegI64("operand");
+        float* result = VM_DecResultRegF32("result");
+        *result = vm_cast_ui64f32(operand);
+      });
       DISPATCH_OP(EXT_F32, CastUI32F32, {
         int32_t operand = (int32_t)VM_DecOperandRegI32("operand");
         float* result = VM_DecResultRegF32("result");
