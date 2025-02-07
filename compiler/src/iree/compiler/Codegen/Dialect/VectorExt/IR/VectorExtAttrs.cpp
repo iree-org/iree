@@ -273,14 +273,14 @@ NestedLayoutAttr NestedLayoutAttr::get(MLIRContext *context,
 NestedLayoutAttr NestedLayoutAttr::get(
     MLIRContext *context, ArrayRef<NestedLayoutAttr> operandLayouts,
     ArrayRef<AffineMap> operandIndexingMaps, AffineMap resultMap) {
-  int64_t numDims = operandIndexingMaps[0].getNumDims();
-  SmallVector<int64_t> subgroupTile(numDims, 0);
-  SmallVector<int64_t> batchTile(numDims, 0);
-  SmallVector<int64_t> outerTile(numDims, 0);
-  SmallVector<int64_t> threadTile(numDims, 0);
-  SmallVector<int64_t> elementTile(numDims, 0);
-  SmallVector<int64_t> subgroupStrides(numDims, 0);
-  SmallVector<int64_t> threadStrides(numDims, 0);
+  int64_t resRank = resultMap.getNumResults();
+  SmallVector<int64_t> subgroupTile(resRank, 0);
+  SmallVector<int64_t> batchTile(resRank, 0);
+  SmallVector<int64_t> outerTile(resRank, 0);
+  SmallVector<int64_t> threadTile(resRank, 0);
+  SmallVector<int64_t> elementTile(resRank, 0);
+  SmallVector<int64_t> subgroupStrides(resRank, 0);
+  SmallVector<int64_t> threadStrides(resRank, 0);
 
   for (auto [layout, indexingMap] :
        llvm::zip(operandLayouts, operandIndexingMaps)) {
