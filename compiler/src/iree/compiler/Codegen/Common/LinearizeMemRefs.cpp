@@ -103,45 +103,32 @@ static Value linearizeOperand(Location loc, PatternRewriter &rewriter,
   }
 }
 
-static SmallVector<OpFoldResult> getDimValues(Location loc,
-                                              PatternRewriter &rewriter,
-                                              MemRefType type,
-                                              ValueRange dynamicDims) {
-  SmallVector<OpFoldResult> dims;
-  auto shape = type.getShape();
-  int dynamicDimIndex = 0;
-  for (int i = 0; i < shape.size(); ++i) {
-    if (ShapedType::isDynamic(shape[i])) {
-      dims.push_back(dynamicDims[dynamicDimIndex++]);
+/// Utility function used to linearize indices/sizes.
+static FailureOr<Value>
+createLinearizeIndexOp(PatternRewriter &rewriter, Location loc, Value memref,
+                       SmallVector<Value> multiIndices = {}) {
+  // Step 1. Form basis.
+  FailureOr<SmallVector<OpFoldResult>> basis =
+      memref::getMixedSizes(rewriter, loc, memref);
+  if (failed(basis))
+    return failure();
+  // Step 2. Form multiIndices if not already present.
+  if (multiIndices.empty()) {
+    SmallVector<Value> multiIndicesNew(
+        (*basis).size(), rewriter.create<arith::ConstantIndexOp>(loc, 0));
+    if (auto attr = llvm::dyn_cast_if_present<Attribute>((*basis)[0])) {
+      auto intVal = cast<IntegerAttr>(attr).getInt();
+      multiIndicesNew[0] =
+          rewriter.create<arith::ConstantIndexOp>(loc, intVal).getResult();
     } else {
-      dims.push_back(
-          rewriter.create<arith::ConstantIndexOp>(loc, shape[i]).getResult());
+      multiIndicesNew[0] = llvm::dyn_cast_if_present<Value>((*basis)[0]);
     }
+    multiIndices = multiIndicesNew;
   }
-  return dims;
-}
-
-static FailureOr<SmallVector<OpFoldResult>>
-getMixedOrigSize(Location loc, PatternRewriter &rewriter, Value sourceValue) {
-  MemRefType sourceType = llvm::cast<MemRefType>(sourceValue.getType());
-  Operation *sourceOp = sourceValue.getDefiningOp();
-  if (auto allocOp = dyn_cast_if_present<memref::AllocOp>(sourceOp)) {
-    return getDimValues(loc, rewriter, sourceType, allocOp.getDynamicSizes());
-  } else if (auto allocaOp = dyn_cast_if_present<memref::AllocaOp>(sourceOp)) {
-    return getDimValues(loc, rewriter, sourceType, allocaOp.getDynamicSizes());
-  } else {
-    if (sourceType.hasStaticShape()) {
-      SmallVector<OpFoldResult> dims;
-      dims.reserve(sourceType.getRank());
-      for (int64_t dim : sourceType.getShape()) {
-        dims.push_back(
-            rewriter.create<arith::ConstantIndexOp>(loc, dim).getResult());
-      }
-      return dims;
-    } else {
-      return failure();
-    }
-  }
+  // Step 3. Form linearizedIndexOp.
+  Value linearizedSizes = rewriter.create<affine::AffineLinearizeIndexOp>(
+      loc, multiIndices, *basis, true);
+  return linearizedSizes;
 }
 
 template <typename OpTy>
@@ -167,14 +154,11 @@ struct LinearizeMemrefAlloc : public OpRewritePattern<OpTy> {
 
     SmallVector<Value> dynamicLinearizedSize;
     if (!newTypeOfSourceMemref.hasStaticShape()) {
-      SmallVector<OpFoldResult> basis = getDimValues(
-          loc, rewriter, currentTypeOfSourceMemref, allocOp.getDynamicSizes());
-      SmallVector<Value> multiIndices(
-          basis.size(), rewriter.create<arith::ConstantIndexOp>(loc, 0));
-      multiIndices[0] = llvm::dyn_cast_if_present<Value>(basis[0]);
-      Value linearizedSizes = rewriter.create<affine::AffineLinearizeIndexOp>(
-          loc, multiIndices, basis, true);
-      dynamicLinearizedSize.push_back(linearizedSizes);
+      FailureOr<Value> linearizedSizes =
+          createLinearizeIndexOp(rewriter, loc, allocOp.getResult());
+      if (failed(linearizedSizes))
+        return failure();
+      dynamicLinearizedSize.push_back(*linearizedSizes);
     }
 
     Value linearizedOp = rewriter.create<OpTy>(
@@ -206,23 +190,19 @@ struct LinearizeMemrefLoad : public OpRewritePattern<memref::LoadOp> {
       return failure();
     MemRefType newTypeOfSourceMemref = *maybeNewTypeOfSourceMemref;
 
-    FailureOr<SmallVector<OpFoldResult>> basis =
-        getMixedOrigSize(loc, rewriter, loadOp.getMemref());
-    if (failed(basis))
+    FailureOr<Value> linearizedIndices = createLinearizeIndexOp(
+        rewriter, loc, loadOp.getMemref(), loadOp.getIndices());
+    if (failed(linearizedIndices))
       return failure();
-    Value linearizedIndices = rewriter.create<affine::AffineLinearizeIndexOp>(
-        loc, loadOp.getIndices(), *basis, true);
-
-    SmallVector<Value> multiIndices(
-        (*basis).size(), rewriter.create<arith::ConstantIndexOp>(loc, 0));
-    multiIndices[0] = llvm::dyn_cast_if_present<Value>((*basis)[0]);
-    Value linearizedSizes = rewriter.create<affine::AffineLinearizeIndexOp>(
-        loc, multiIndices, *basis, true);
+    FailureOr<Value> linearizedSizes =
+        createLinearizeIndexOp(rewriter, loc, loadOp.getMemref());
+    if (failed(linearizedSizes))
+      return failure();
     Value linearizedOperand =
         linearizeOperand(loc, rewriter, loadOp.getMemref(),
-                         newTypeOfSourceMemref, linearizedSizes);
+                         newTypeOfSourceMemref, *linearizedSizes);
     rewriter.replaceOpWithNewOp<memref::LoadOp>(
-        loadOp, linearizedOperand, linearizedIndices, loadOp.getNontemporal());
+        loadOp, linearizedOperand, *linearizedIndices, loadOp.getNontemporal());
 
     return success();
   }
@@ -244,24 +224,21 @@ struct LinearizeMemrefStore : public OpRewritePattern<memref::StoreOp> {
       return failure();
     MemRefType newTypeOfSourceMemref = *maybeNewTypeOfSourceMemref;
 
-    FailureOr<SmallVector<OpFoldResult>> basis =
-        getMixedOrigSize(loc, rewriter, storeOp.getMemref());
-    if (failed(basis))
+    FailureOr<Value> linearizedIndices = createLinearizeIndexOp(
+        rewriter, loc, storeOp.getMemref(), storeOp.getIndices());
+    if (failed(linearizedIndices))
       return failure();
-    Value linearizedIndices = rewriter.create<affine::AffineLinearizeIndexOp>(
-        loc, storeOp.getIndices(), *basis, true);
-    SmallVector<Value> multiIndices(
-        (*basis).size(), rewriter.create<arith::ConstantIndexOp>(loc, 0));
-    multiIndices[0] = llvm::dyn_cast_if_present<Value>((*basis)[0]);
-    Value linearizedSizes = rewriter.create<affine::AffineLinearizeIndexOp>(
-        loc, multiIndices, *basis, true);
+    FailureOr<Value> linearizedSizes =
+        createLinearizeIndexOp(rewriter, loc, storeOp.getMemref());
+    if (failed(linearizedSizes))
+      return failure();
     Value linearizedOperand =
         linearizeOperand(loc, rewriter, storeOp.getMemref(),
-                         newTypeOfSourceMemref, linearizedSizes);
+                         newTypeOfSourceMemref, *linearizedSizes);
 
     rewriter.replaceOpWithNewOp<memref::StoreOp>(
         storeOp, storeOp.getValueToStore(), linearizedOperand,
-        linearizedIndices, storeOp.getNontemporal());
+        *linearizedIndices, storeOp.getNontemporal());
 
     return success();
   }
@@ -283,18 +260,13 @@ struct LinearizeMemrefDealloc : public OpRewritePattern<memref::DeallocOp> {
       return failure();
     MemRefType newTypeOfSourceMemref = *maybeNewTypeOfSourceMemref;
 
-    FailureOr<SmallVector<OpFoldResult>> basis =
-        getMixedOrigSize(loc, rewriter, deallocOp.getMemref());
-    if (failed(basis))
+    FailureOr<Value> linearizedSizes =
+        createLinearizeIndexOp(rewriter, loc, deallocOp.getMemref());
+    if (failed(linearizedSizes))
       return failure();
-    SmallVector<Value> multiIndices(
-        (*basis).size(), rewriter.create<arith::ConstantIndexOp>(loc, 0));
-    multiIndices[0] = llvm::dyn_cast_if_present<Value>((*basis)[0]);
-    Value linearizedSizes = rewriter.create<affine::AffineLinearizeIndexOp>(
-        loc, multiIndices, *basis, true);
     Value linearizedOperand =
         linearizeOperand(loc, rewriter, deallocOp.getMemref(),
-                         newTypeOfSourceMemref, linearizedSizes);
+                         newTypeOfSourceMemref, *linearizedSizes);
 
     rewriter.replaceOpWithNewOp<memref::DeallocOp>(deallocOp,
                                                    linearizedOperand);
@@ -321,27 +293,19 @@ struct LinearizeMemrefCopy : public OpRewritePattern<memref::CopyOp> {
       return failure();
     MemRefType newTypeOfSourceMemref = *maybeNewTypeOfSourceMemref;
 
-    FailureOr<SmallVector<OpFoldResult>> basis =
-        getMixedOrigSize(loc, rewriter, copyOp.getSource());
-    if (failed(basis))
+    FailureOr<Value> linearizedSizes =
+        createLinearizeIndexOp(rewriter, loc, copyOp.getSource());
+    if (failed(linearizedSizes))
       return failure();
-    SmallVector<Value> multiIndices(
-        (*basis).size(), rewriter.create<arith::ConstantIndexOp>(loc, 0));
-    multiIndices[0] = llvm::dyn_cast_if_present<Value>((*basis)[0]);
-    Value linearizedSizes = rewriter.create<affine::AffineLinearizeIndexOp>(
-        loc, multiIndices, *basis, true);
     Value linearizedSource =
         linearizeOperand(loc, rewriter, copyOp.getSource(),
-                         newTypeOfSourceMemref, linearizedSizes);
-    basis = getMixedOrigSize(loc, rewriter, copyOp.getTarget());
-    if (failed(basis))
+                         newTypeOfSourceMemref, *linearizedSizes);
+    linearizedSizes = createLinearizeIndexOp(rewriter, loc, copyOp.getTarget());
+    if (failed(linearizedSizes))
       return failure();
-    multiIndices[0] = llvm::dyn_cast_if_present<Value>((*basis)[0]);
-    linearizedSizes = rewriter.create<affine::AffineLinearizeIndexOp>(
-        loc, multiIndices, *basis, true);
     Value linearizedTarget =
         linearizeOperand(loc, rewriter, copyOp.getTarget(),
-                         newTypeOfSourceMemref, linearizedSizes);
+                         newTypeOfSourceMemref, *linearizedSizes);
 
     rewriter.replaceOpWithNewOp<memref::CopyOp>(copyOp, linearizedSource,
                                                 linearizedTarget);
@@ -365,23 +329,20 @@ struct LinearizeVectorLoad : public OpRewritePattern<vector::LoadOp> {
       return failure();
     MemRefType newTypeOfSourceMemref = *maybeNewTypeOfSourceMemref;
 
-    FailureOr<SmallVector<OpFoldResult>> basis =
-        getMixedOrigSize(loc, rewriter, loadOp.getBase());
-    if (failed(basis))
+    FailureOr<Value> linearizedIndices = createLinearizeIndexOp(
+        rewriter, loc, loadOp.getBase(), loadOp.getIndices());
+    if (failed(linearizedIndices))
       return failure();
-    Value linearizedIndices = rewriter.create<affine::AffineLinearizeIndexOp>(
-        loc, loadOp.getIndices(), *basis, true);
-    SmallVector<Value> multiIndices(
-        (*basis).size(), rewriter.create<arith::ConstantIndexOp>(loc, 0));
-    multiIndices[0] = llvm::dyn_cast_if_present<Value>((*basis)[0]);
-    Value linearizedSizes = rewriter.create<affine::AffineLinearizeIndexOp>(
-        loc, multiIndices, *basis, true);
+    FailureOr<Value> linearizedSizes =
+        createLinearizeIndexOp(rewriter, loc, loadOp.getBase());
+    if (failed(linearizedSizes))
+      return failure();
     Value linearizedOperand =
         linearizeOperand(loc, rewriter, loadOp.getBase(), newTypeOfSourceMemref,
-                         linearizedSizes);
+                         *linearizedSizes);
 
     rewriter.replaceOpWithNewOp<vector::LoadOp>(
-        loadOp, loadOp.getType(), linearizedOperand, linearizedIndices);
+        loadOp, loadOp.getType(), linearizedOperand, *linearizedIndices);
 
     return success();
   }
@@ -403,28 +364,26 @@ struct LinearizeVectorStore : public OpRewritePattern<vector::StoreOp> {
       return failure();
     MemRefType newTypeOfSourceMemref = *maybeNewTypeOfSourceMemref;
 
-    FailureOr<SmallVector<OpFoldResult>> basis =
-        getMixedOrigSize(loc, rewriter, storeOp.getBase());
-    if (failed(basis))
+    FailureOr<Value> linearizedIndices = createLinearizeIndexOp(
+        rewriter, loc, storeOp.getBase(), storeOp.getIndices());
+    if (failed(linearizedIndices))
       return failure();
-    Value linearizedIndices = rewriter.create<affine::AffineLinearizeIndexOp>(
-        loc, storeOp.getIndices(), *basis, true);
-    SmallVector<Value> multiIndices(
-        (*basis).size(), rewriter.create<arith::ConstantIndexOp>(loc, 0));
-    multiIndices[0] = llvm::dyn_cast_if_present<Value>((*basis)[0]);
-    Value linearizedSizes = rewriter.create<affine::AffineLinearizeIndexOp>(
-        loc, multiIndices, *basis, true);
+    FailureOr<Value> linearizedSizes =
+        createLinearizeIndexOp(rewriter, loc, storeOp.getBase());
+    if (failed(linearizedSizes))
+      return failure();
     Value linearizedOperand =
         linearizeOperand(loc, rewriter, storeOp.getBase(),
-                         newTypeOfSourceMemref, linearizedSizes);
+                         newTypeOfSourceMemref, *linearizedSizes);
 
     rewriter.replaceOpWithNewOp<vector::StoreOp>(
         storeOp, storeOp.getValueToStore(), linearizedOperand,
-        linearizedIndices);
+        *linearizedIndices);
 
     return success();
   }
 };
+
 //===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
