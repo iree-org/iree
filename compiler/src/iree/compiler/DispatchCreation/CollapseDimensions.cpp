@@ -168,6 +168,19 @@ static SmallVector<ReassociationIndices> getCollapsibleLoops(Operation *op) {
 
 /// Returns true if the given op is collapsable.
 static bool isEligibleForCollapse(Operation *op) {
+  auto fusionOp = dyn_cast<LinalgFusionOpInterface>(op);
+  if (!fusionOp) {
+    return false;
+  }
+
+  // TODO(guray) There is no mechanism to tell the collapsed indexes to
+  // `tensor.expand_shape`. Once we have this support in MLIR, we can enable
+  // dynamic tensor shapes.
+  auto loops = fusionOp.getStaticLoopRanges();
+  if (failed(loops) || llvm::any_of(loops.value(), ShapedType::isDynamic)) {
+    return false;
+  }
+
   if (isa<IREE::LinalgExt::AttentionOp>(op)) {
     return true;
   }
@@ -176,14 +189,6 @@ static bool isEligibleForCollapse(Operation *op) {
   if (!genericOp) {
     return false;
   }
-
-  // TODO(guray) There is no mechanism to tell the collapsed indexes to
-  // `tensor.expand_shape`. Once we have this support in MLIR, we can enable
-  // dynamic tensor shapes.
-  if (genericOp.hasDynamicShape()) {
-    return false;
-  }
-
   // TODO(guray) Currently we can only collapse when result of all the
   // AffineMaps are dimensions. Possible to collapse cases like
   // affine_map<d0, d1+d2> with affine_map<d0, d1+d2>, however, this is not
