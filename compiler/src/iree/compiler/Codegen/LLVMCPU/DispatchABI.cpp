@@ -792,8 +792,8 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
     int64_t rank = memRefType.getRank();
 
     // Build MemRef descriptor for this interface binding.
-    auto desc = MemRefDescriptor::undef(builder, loc,
-                                        typeConverter->convertType(memRefType));
+    auto desc = MemRefDescriptor::poison(
+        builder, loc, typeConverter->convertType(memRefType));
     desc.setAllocatedPtr(builder, loc, basePtrValue);
     desc.setAlignedPtr(builder, loc, basePtrValue);
     auto llvmIndexType = typeConverter->convertType(builder.getIndexType());

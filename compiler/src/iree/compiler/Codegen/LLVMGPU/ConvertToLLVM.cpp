@@ -406,7 +406,7 @@ public:
       int64_t rank = memrefType.getRank();
 
       // Build MemRef descriptor for this interface binding.
-      auto desc = MemRefDescriptor::undef(
+      auto desc = MemRefDescriptor::poison(
           rewriter, loc, typeConverter->convertType(memrefType));
       desc.setAllocatedPtr(rewriter, loc, llvmBufferBasePtr);
       desc.setAlignedPtr(rewriter, loc, llvmBufferBasePtr);
