@@ -301,7 +301,7 @@ blockDynamicDimensions(RewriterBase &rewriter,
                        Operation *operation) {
   return TypeSwitch<Operation *, LogicalResult>(operation)
       .Case<IREE::LinalgExt::AttentionOp>([&](auto attentionOp) {
-        if(clEnableBlockedAttentions){
+        if (clEnableBlockedAttentions) {
           return blockDynamicDimensions(rewriter, dynamicDimAnalysis,
                                         attentionOp);
         }
