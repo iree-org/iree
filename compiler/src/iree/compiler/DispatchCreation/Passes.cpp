@@ -58,7 +58,7 @@ static llvm::cl::opt<bool> clEnableFuseHorizontalContractions(
     "iree-dispatch-creation-enable-fuse-horizontal-contractions",
     llvm::cl::desc(
         "Enables horizontal fusion of contractions with one common operand"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 static llvm::cl::opt<bool> clCollapseReductionDims(
     "iree-dispatch-creation-collapse-reduction-dims",
