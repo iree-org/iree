@@ -290,3 +290,35 @@ func.func @dynamic_infer_sizes(%in : tensor<4x32x?x128xf16>) -> tensor<1x1x?x128
 // CHECK: %[[EMPTY:.+]] = tensor.empty({{.*}}) : tensor<1x1x?x128xf16>
 // CHECK: %[[COPY:.+]] = linalg.copy {{.*}} ins(%[[EXTRACT]] : tensor<1x1x?x128xf16>) outs(%[[EMPTY]] : tensor<1x1x?x128xf16>)
 // CHECK: iree_vector_ext.to_layout %[[COPY]] to layout(#[[LAYOUT]]) : tensor<1x1x?x128xf16>
+
+// -----
+
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+                                              workgroup_size = [64, 1, 1]
+                                              subgroup_size = 64>
+
+#lowering_config = #iree_gpu.lowering_config<{
+    subgroup_basis = [[1, 1, 2, 2], [0, 1, 2, 3]],
+    thread_basis = [[1, 1, 8, 8], [0, 1, 2, 3]],
+    thread = [0, 0, 8, 8]
+}>
+
+func.func @dynamic_infer_sizes_lowering_config(%in : tensor<4x32x?x128xf16>) -> tensor<1x1x?x128xf16> attributes { translation_info = #translation } {
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %d2 = tensor.dim %in, %c2 : tensor<4x32x?x128xf16>
+  %45 = affine.min affine_map<(d0)[s0] -> (-d0 + s0, 128)>(%c0)[%d2]
+  %extracted_slice_5 = tensor.extract_slice %in[%c0, %c0, %c0, 0] [1, 1, %45, 128] [1, 1, 1, 1] : tensor<4x32x?x128xf16> to tensor<1x1x?x128xf16>
+  %49 = tensor.empty(%45) : tensor<1x1x?x128xf16>
+  %50 = linalg.copy {lowering_config = #lowering_config} ins(%extracted_slice_5 : tensor<1x1x?x128xf16>) outs(%49 : tensor<1x1x?x128xf16>) -> tensor<1x1x?x128xf16>
+  return %50 : tensor<1x1x?x128xf16>
+}
+
+// CHECK-DAG: #[[LAYOUT:.+]] = #iree_vector_ext.nested_layout<subgroup_tile = [1, 1, 2, 2], batch_tile = [1, 1, 1, 1], outer_tile = [1, 1, 1, 1], thread_tile = [1, 1, 8, 8], element_tile = [1, 1, 8, 8], subgroup_strides = [0, 0, 2, 1], thread_strides = [0, 0, 8, 1]>
+
+// CHECK: %[[EXTRACT:.+]] = tensor.extract_slice %arg0{{.*}} : tensor<4x32x?x128xf16> to tensor<1x1x?x128xf16>
+// CHECK: %[[EMPTY:.+]] = tensor.empty({{.*}}) : tensor<1x1x?x128xf16>
+// CHECK: %[[EXTRACTL:.+]] = iree_vector_ext.to_layout %[[EXTRACT]] to layout(#[[LAYOUT]]) : tensor<1x1x?x128xf16>
+// CHECK: %[[EMPTYL:.+]] = iree_vector_ext.to_layout %[[EMPTY]] to layout(#[[LAYOUT]]) : tensor<1x1x?x128xf16>
+// CHECK: %[[COPY:.+]] = linalg.copy {{.*}} ins(%[[EXTRACTL]] : tensor<1x1x?x128xf16>) outs(%[[EMPTYL]] : tensor<1x1x?x128xf16>)
+// CHECK: iree_vector_ext.to_layout %[[COPY]] to layout(#[[LAYOUT]]) : tensor<1x1x?x128xf16>
