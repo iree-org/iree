@@ -13,6 +13,7 @@
 #include "iree/compiler/Utils/Permutation.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -26,6 +27,11 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Rewrite/PatternApplicator.h"
+
+static llvm::cl::opt<bool> clEnableDistributedComputeMask(
+    "iree-codegen-distributed-compute-mask",
+    llvm::cl::desc("developer flag to enable masked compute post distribution"),
+    llvm::cl::Hidden, llvm::cl::init(false));
 
 namespace mlir::iree_compiler {
 
@@ -658,7 +664,7 @@ struct DistributeMultiReduction final
     Value localReduction = rewriter.create<vector::MultiDimReductionOp>(
         loc, disSrc, localInit, distributedReductionMask,
         multiReduceOp.getKind());
-    if (mask) {
+    if (clEnableDistributedComputeMask && mask) {
       localReduction =
           vector::maskOperation(rewriter, localReduction.getDefiningOp(), mask)
               ->getResult(0);
@@ -1071,7 +1077,7 @@ struct DistributeContract final
         loc, rewriter, contractOp.getKind(), disAcc.getType());
     Value localContract = doDistributedContraction(
         rewriter, loc, ctx, contractOp, disLhs, disRhs, localInit);
-    if (mask) {
+    if (clEnableDistributedComputeMask && mask) {
       localContract =
           vector::maskOperation(rewriter, localContract.getDefiningOp(), mask)
               ->getResult(0);
