@@ -113,3 +113,18 @@ func.func @no_tile_copy(%arg0: tensor<64x256xf32>) -> tensor<64x256xf32> {
 //   CHECK-NOT:   scf.for
 //       CHECK:   %[[COPY:.+]] = linalg.copy
 //       CHECK:   return %[[COPY]]
+
+// -----
+
+func.func @no_tile_fill(%arg0: f32) -> tensor<64x256xf32> {
+  %empty = tensor.empty() : tensor<64x256xf32>
+  %0 = linalg.fill
+    ins(%arg0 : f32)
+    outs(%empty : tensor<64x256xf32>) -> tensor<64x256xf32>
+  return %0 : tensor<64x256xf32>
+}
+
+// CHECK-LABEL: func.func @no_tile_fill
+//   CHECK-NOT:   scf.for
+//       CHECK:   %[[FILL:.+]] = linalg.fill
+//       CHECK:   return %[[FILL]]
