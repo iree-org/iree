@@ -179,11 +179,12 @@ static void processRegion(RewriterBase &rewriter, Region *region,
       // Try to greedily tile + fuse linalg ops.
       if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
 
-        // Skip copies and transposes. This is based on an expectation that such
-        // ops are introduced carefully and don't represent significant
-        // computation anyway. Equivalent generics are still tiled as they
-        // typically arise organically.
-        if (isa<linalg::TransposeOp, linalg::CopyOp>(op)) {
+        // Skip copies, transposes, and fills. This is based on an expectation
+        // that such ops are introduced carefully and don't represent
+        // significant computation anyway. Equivalent generics are still tiled
+        // as they typically arise organically. Fills in particular are almost
+        // never found on their own and will be fused when tiling if need be.
+        if (isa<linalg::TransposeOp, linalg::CopyOp, linalg::FillOp>(op)) {
           continue;
         }
         tileToMaxVectorSize(rewriter, linalgOp, maxVectorSize);
