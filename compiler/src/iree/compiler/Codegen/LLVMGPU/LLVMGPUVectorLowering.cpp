@@ -26,11 +26,13 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct PromoteContractOperands final
-    : public OpRewritePattern<vector::ContractionOp> {
-  using OpRewritePattern::OpRewritePattern;
+    : public vector::MaskableOpRewritePattern<vector::ContractionOp> {
+  using MaskableOpRewritePattern::MaskableOpRewritePattern;
 
-  LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
-                                PatternRewriter &rewriter) const override {
+  FailureOr<Value>
+  matchAndRewriteMaskableOp(vector::ContractionOp contractOp,
+                            vector::MaskingOpInterface maskOp,
+                            PatternRewriter &rewriter) const override {
     Type operandElType = getElementTypeOrSelf(contractOp.getLhsType());
     Type resultElType = getElementTypeOrSelf(contractOp.getResultType());
 
@@ -44,11 +46,16 @@ struct PromoteContractOperands final
     Value rhs =
         promoteToElementType(loc, rewriter, contractOp.getRhs(), resultElType);
 
-    rewriter.replaceOpWithNewOp<vector::ContractionOp>(
-        contractOp, lhs, rhs, contractOp.getAcc(), contractOp.getIndexingMaps(),
+    auto replacement = rewriter.create<vector::ContractionOp>(
+        loc, lhs, rhs, contractOp.getAcc(), contractOp.getIndexingMaps(),
         contractOp.getIteratorTypes());
 
-    return success();
+    if (!maskOp) {
+      return replacement.getResult();
+    }
+    auto maskedOp = vector::maskOperation(
+        rewriter, replacement, maskOp.getMask(), maskOp.getPassthru());
+    return maskedOp->getResult(0);
   }
 
   Value promoteToElementType(Location loc, RewriterBase &rewriter, Value v,
