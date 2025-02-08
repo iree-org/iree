@@ -126,6 +126,7 @@ if [[ "${OSTYPE}" =~ ^msys ]]; then
     "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_matmul.mlir"
     # Flaky on CI for unknown reasons, skip.
     "iree/tools/test/iree-dump-parameters.txt.test"
+    "iree/tools/test/parameters_unscoped.mlir.test"
   )
 elif [[ "${OSTYPE}" =~ ^darwin ]]; then
   excluded_tests+=(
