@@ -175,8 +175,9 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
       auto streamable =
           dyn_cast_or_null<IREE::Stream::StreamableOpInterface>(producer);
 
-      auto srcAffinity = dyn_cast<IREE::Stream::AffinityOpInterface>(producer);
-      auto opAffinity = dyn_cast<IREE::Stream::AffinityOpInterface>(op);
+      auto srcAffinity =
+          dyn_cast_or_null<IREE::Stream::AffinityOpInterface>(producer);
+      auto opAffinity = dyn_cast_or_null<IREE::Stream::AffinityOpInterface>(op);
 
       if (streamable && srcAffinity &&
           IREE::Stream::AffinityAttr::canExecuteTogether(
