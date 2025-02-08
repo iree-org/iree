@@ -100,14 +100,14 @@ util.func public @deviceTripleSync(%arg0: i1) -> (!stream.resource<transient>, !
   // CHECK: stream.async.dispatch
   // CHECK: stream.async.transfer
   %3 = stream.async.dispatch on(#hal.device.affinity<@device1>) @ex::@dispatch0[%c1, %c1, %c1](%0[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
-  %4 = stream.async.transfer %3 : !stream.resource<transient>{%c128} from(#hal.device.affinity<@device1>) -> to(#hal.device.affinity<@device0>) !stream.resource<transient>{%c128}
+  %4 = stream.async.transfer %3 : !stream.resource<transient>{%c128} from(#hal.device.affinity<@device1>) -> to(#hal.device.affinity<@device0>) on(#hal.device.affinity<@device1>) !stream.resource<transient>{%c128}
 
   // CHECK: stream.async.execute
   // CHECK: stream.async.splat
   // CHECK: stream.async.dispatch
   // CHECK: stream.async.transfer
   %5 = stream.async.dispatch on(#hal.device.affinity<@device2>) @ex::@dispatch0[%c1, %c1, %c1](%0[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
-  %6 = stream.async.transfer %5 : !stream.resource<transient>{%c128} from(#hal.device.affinity<@device2>) -> to(#hal.device.affinity<@device0>) !stream.resource<transient>{%c128}
+  %6 = stream.async.transfer %5 : !stream.resource<transient>{%c128} from(#hal.device.affinity<@device2>) -> to(#hal.device.affinity<@device0>) on(#hal.device.affinity<@device2>) !stream.resource<transient>{%c128}
 
   // CHECK: stream.async.execute
   // CHECK: stream.async.dispatch
@@ -121,13 +121,13 @@ util.func public @deviceTripleSync(%arg0: i1) -> (!stream.resource<transient>, !
   // CHECK: stream.async.execute
   // CHECK: stream.async.transfer
   // CHECK: stream.async.dispatch
-  %9 = stream.async.transfer %7 : !stream.resource<transient>{%c128} from(#hal.device.affinity<@device0>) -> to(#hal.device.affinity<@device1>) !stream.resource<transient>{%c128}
+  %9 = stream.async.transfer %7 : !stream.resource<transient>{%c128} from(#hal.device.affinity<@device0>) -> to(#hal.device.affinity<@device1>) on(#hal.device.affinity<@device1>) !stream.resource<transient>{%c128}
   %12 = stream.async.dispatch on(#hal.device.affinity<@device1>) @ex::@dispatch0[%c1, %c1, %c1](%9[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
 
   // CHECK: stream.async.execute
   // CHECK: stream.async.transfer
   // CHECK: stream.async.dispatch
-  %10 = stream.async.transfer %7 : !stream.resource<transient>{%c128} from(#hal.device.affinity<@device0>) -> to(#hal.device.affinity<@device2>) !stream.resource<transient>{%c128}
+  %10 = stream.async.transfer %7 : !stream.resource<transient>{%c128} from(#hal.device.affinity<@device0>) -> to(#hal.device.affinity<@device2>) on(#hal.device.affinity<@device2>) !stream.resource<transient>{%c128}
   %13 = stream.async.dispatch on(#hal.device.affinity<@device2>) @ex::@dispatch0[%c1, %c1, %c1](%10[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
 
   util.return %11, %12, %13 : !stream.resource<transient>, !stream.resource<transient>, !stream.resource<transient>

@@ -169,39 +169,22 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
 
     // Synchronizing operations should join with their producers if the producer
     // is streamable.
-    if (dyn_cast<IREE::Stream::AsyncBarrierOp>(op)) {
+    if (dyn_cast<IREE::Stream::AsyncBarrierOp>(op) ||
+        dyn_cast<IREE::Stream::AsyncTransferOp>(op)) {
       auto producer = op.getOperand(0).getDefiningOp();
       auto streamable =
           dyn_cast_or_null<IREE::Stream::StreamableOpInterface>(producer);
-      if (streamable) {
+
+      auto srcAffinity = dyn_cast<IREE::Stream::AffinityOpInterface>(producer);
+      auto opAffinity = dyn_cast<IREE::Stream::AffinityOpInterface>(op);
+
+      if (streamable && srcAffinity &&
+          IREE::Stream::AffinityAttr::canExecuteTogether(
+              opAffinity.getAffinityAttr(), srcAffinity.getAffinityAttr())) {
         if (!syncOps.contains(producer))
           syncOps[producer] = llvm::SmallVector<Operation *>();
         syncOps[producer].push_back(&op);
         continue;
-      }
-    }
-
-    if (auto transfer = dyn_cast<IREE::Stream::AsyncTransferOp>(op)) {
-      auto producer = op.getOperand(0).getDefiningOp();
-      auto streamable =
-          dyn_cast_or_null<IREE::Stream::StreamableOpInterface>(producer);
-      if (streamable) {
-        int transferCount = 0;
-        for (auto use : producer->getUsers()) {
-          if (isa<IREE::Stream::AsyncTransferOp>(use)) {
-            transferCount++;
-          }
-        }
-
-        if (transferCount < 2) {
-          if (!syncOps.contains(producer)) {
-            syncOps[producer] = llvm::SmallVector<Operation *>();
-            syncOps[producer].push_back(&op);
-            continue;
-          }
-        }
-
-        transfer.setAffinityAttr(transfer.getResultAffinityAttr());
       }
     }
 
