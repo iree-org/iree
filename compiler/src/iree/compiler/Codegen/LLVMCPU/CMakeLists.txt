@@ -138,6 +138,7 @@ iree_cc_library(
     MLIRTransformDialect
     MLIRTransformUtils
     MLIRTransforms
+    MLIRUBToLLVM
     MLIRValueBoundsOpInterface
     MLIRVectorDialect
     MLIRVectorToArmSME
