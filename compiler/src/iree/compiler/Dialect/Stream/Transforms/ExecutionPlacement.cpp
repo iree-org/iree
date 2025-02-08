@@ -43,21 +43,22 @@ struct ExecutionPlacementPass
   void runOnOperation() override {
 
     getOperation()->walk([](IREE::Stream::AsyncTransferOp transfer) {
-      if (transfer.getExecAffinityAttr())
+      if (transfer.getAffinityAttr())
         return;
 
       auto operand = transfer.getSource();
       auto producer = operand.getDefiningOp();
       auto streamable =
           dyn_cast_or_null<IREE::Stream::StreamableOpInterface>(producer);
-      auto srcAffinity = dyn_cast<IREE::Stream::AffinityOpInterface>(producer);
+      auto srcAffinity =
+          dyn_cast_or_null<IREE::Stream::AffinityOpInterface>(producer);
 
       bool hasOneUse = operand.hasOneUse();
       if (hasOneUse && streamable && srcAffinity) {
-        transfer.setExecAffinityAttr(srcAffinity.getAffinityAttr());
-      } else {
-        transfer.setExecAffinityAttr(transfer.getResultAffinityAttr());
+        transfer.setAffinityAttr(srcAffinity.getAffinityAttr());
+        return;
       }
+      transfer.setAffinityAttr(transfer.getResultAffinityAttr());
     });
   }
 };

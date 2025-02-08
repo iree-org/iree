@@ -2344,10 +2344,7 @@ def Stream_AsyncBarrierOp : Stream_Op<"async.barrier", [
 }
 
 def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinityAttr",
-    "setAffinityAttr",
-  ]>,
+  DeclareOpInterfaceMethods<Stream_AffinityOp>,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
   DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
@@ -2372,7 +2369,7 @@ def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
     Stream_Size:$result_size,
     OptionalAttr<Stream_AffinityAttr>:$source_affinity,
     OptionalAttr<Stream_AffinityAttr>:$result_affinity,
-    OptionalAttr<Stream_AffinityAttr>:$exec_affinity
+    OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
     AnyTypeOf<[
@@ -2384,10 +2381,10 @@ def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
   let assemblyFormat = [{
     $source `:` type($source)
     `` `{` $source_size `}`
+    (`on` `(` $affinity^ `)`)?
     (`from` `(` $source_affinity^ `)`)?
     `->`
     (`to` `(` $result_affinity^ `)`)?
-    (`on` `(` $exec_affinity^ `)`)?
     type($result) `` `{` $result_size `}`
     attr-dict-with-keyword
   }];
