@@ -491,7 +491,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
       mlir::linalg::inferContractionDims(op);
   if (failed(contractionDims)) {
-    assert(op->getNumResults() > 1 &&
+    assert(IREE::LinalgExt::isaHorizontallyFusedContraction(op) &&
            "expected horizontally fused contraction op");
     SmallVector<AffineMap> indexingMaps;
     indexingMaps.push_back(op.getMatchingIndexingMap(op.getDpsInputOperand(0)));
