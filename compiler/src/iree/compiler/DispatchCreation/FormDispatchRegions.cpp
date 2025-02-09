@@ -333,41 +333,34 @@ static bool hasCompatibleOuterParallelLoops(
              consumerIndexingMap, rootOuterParallelLoops);
 }
 
-/// For all uses of an operation, finds the use that dominates all other uses.
+/// For all uses of an operation, return the uses that could be fused.
+/// The returned vector contains the uses in dominance order.
 static SmallVector<OpOperand *>
-getFusableUse(Operation *op, DominanceInfo const &dominanceInfo,
-              bool aggressiveFusion) {
+getFusableUses(MLIRContext *context, Operation *op,
+               DominanceInfo const &dominanceInfo, bool aggressiveFusion) {
   if (!aggressiveFusion && llvm::count_if(op->getUses(), [](OpOperand &use) {
                              return !isa<tensor::DimOp>(use.getOwner());
                            }) != 1) {
     return {};
   }
 
-  // Collect non-dim users.
-  SetVector<Operation *> ignoredUsers;
-  for (Operation *user : op->getUsers()) {
-    if (isa<tensor::DimOp>(user)) {
-      ignoredUsers.insert(user);
-    }
-  }
-
-  // Find the use in a non-dim user that dominates all other non-dim users.
-  SmallVector<OpOperand *> fusableUses;
-  for (auto &use : op->getUses()) {
+  // Collect all fusable user candidates.
+  SetVector<OpOperand *> fusableUses;
+  for (OpOperand &use : op->getUses()) {
     Operation *user = use.getOwner();
-    if (ignoredUsers.contains(user)) {
+    if (isa<tensor::DimOp>(user)) {
       continue;
     }
-    if (llvm::all_of(op->getUsers(), [&](Operation *otherUser) {
-          if (user == otherUser || ignoredUsers.contains(otherUser))
-            return true;
-          return dominanceInfo.dominates(user, otherUser);
-        })) {
-      fusableUses.push_back(&use);
-      ignoredUsers.insert(user);
-    }
+    fusableUses.insert(&use);
   }
-  return fusableUses;
+
+  SmallVector<OpOperand *> usesVec = fusableUses.takeVector();
+  llvm::sort(usesVec, [&](OpOperand *lhsUse, OpOperand *rhsUse) {
+    return dominanceInfo.properlyDominates(lhsUse->getOwner(),
+                                           rhsUse->getOwner());
+  });
+
+  return usesVec;
 }
 
 /// Returns true if the operands are fusable.
@@ -590,8 +583,8 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
       Operation *currRoot = workList.pop_back_val();
 
       SmallVector<OpOperand *> fusableUses =
-          getFusableUse(currRoot, dominanceInfo,
-                        /*aggressiveFusion=*/options.aggressiveFusion);
+          getFusableUses(context, currRoot, dominanceInfo,
+                         /*aggressiveFusion=*/options.aggressiveFusion);
       if (fusableUses.empty())
         continue;
 
@@ -708,8 +701,8 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root, unsigned groupNum,
       }
 
       SmallVector<OpOperand *> fusableUses =
-          getFusableUse(producer, dominanceInfo,
-                        /*aggressiveFusion=*/options.aggressiveFusion);
+          getFusableUses(context, producer, dominanceInfo,
+                         /*aggressiveFusion=*/options.aggressiveFusion);
       if (fusableUses.empty() || fusableUses.front()->getOwner() != candidate)
         continue;
 
@@ -851,8 +844,8 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
   SmallVector<IREE::Flow::DispatchRegionOp> regionOps;
   for (auto [rootIndex, root] : llvm::enumerate(roots)) {
 
-    // Sort producers topologically. All producers must be in the same block
-    // as the root.
+    // Sort producers and consumers topologically. All fused ops must be in the
+    // same block as the root.
     SmallVector<Operation *> &currFusedOperations = fusedOperations[rootIndex];
     bool sortResult = mlir::computeTopologicalSorting(currFusedOperations);
     (void)sortResult;
