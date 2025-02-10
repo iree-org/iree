@@ -54,11 +54,23 @@ struct ExecutionPlacementPass
           dyn_cast_or_null<IREE::Stream::AffinityOpInterface>(producer);
 
       bool hasOneUse = operand.hasOneUse();
-      if (hasOneUse && streamable && srcAffinity) {
+      if (hasOneUse && streamable && srcAffinity &&
+          srcAffinity.getAffinityAttr()) {
         transfer.setAffinityAttr(srcAffinity.getAffinityAttr());
         return;
       }
-      transfer.setAffinityAttr(transfer.getResultAffinityAttr());
+
+      if (transfer.getResultAffinityAttr()) {
+        transfer.setAffinityAttr(transfer.getResultAffinityAttr());
+        return;
+      }
+
+      if (transfer.getSourceAffinityAttr()) {
+        transfer.setAffinityAttr(transfer.getSourceAffinityAttr());
+        return;
+      }
+
+      transfer->emitOpError("Unknown src/dest affinity");
     });
   }
 };

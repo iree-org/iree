@@ -179,7 +179,7 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
           dyn_cast_or_null<IREE::Stream::AffinityOpInterface>(producer);
       auto opAffinity = dyn_cast_or_null<IREE::Stream::AffinityOpInterface>(op);
 
-      if (streamable && srcAffinity &&
+      if (streamable && srcAffinity && srcAffinity.getAffinityAttr() &&
           IREE::Stream::AffinityAttr::canExecuteTogether(
               opAffinity.getAffinityAttr(), srcAffinity.getAffinityAttr())) {
         if (!syncOps.contains(producer))
