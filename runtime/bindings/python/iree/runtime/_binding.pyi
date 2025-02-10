@@ -164,6 +164,8 @@ class HalCommandBuffer:
         length: Optional[int] = None,
         end: bool = False,
     ) -> None: ...
+    @property
+    def __iree_vm_ref__(self) -> VmRef: ...
 
 HalSemaphoreList = List[Tuple[HalSemaphore, int]]
 
