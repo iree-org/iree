@@ -34,6 +34,7 @@
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
 #include "mlir/Conversion/SCFToSPIRV/SCFToSPIRV.h"
 #include "mlir/Conversion/TensorToSPIRV/TensorToSPIRV.h"
+#include "mlir/Conversion/UBToSPIRV/UBToSPIRV.h"
 #include "mlir/Conversion/VectorToSPIRV/VectorToSPIRV.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -655,6 +656,8 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   // Pull in builtin func to spirv.func conversion.
   populateBuiltinFuncToSPIRVPatterns(typeConverter, patterns);
+
+  ub::populateUBToSPIRVConversionPatterns(typeConverter, patterns);
 
   // Add IREE HAL interface op conversions.
   patterns.add<
