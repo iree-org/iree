@@ -270,6 +270,9 @@ struct FlattenBindingSubspan final
     if (byteOffset && !matchPattern(byteOffset, m_Zero())) {
       elementOffset = convertByteOffsetToElementOffset(
           rewriter, loc, byteOffset, oldType.getElementType());
+      // The element offset needs to look dynamic.
+      elementOffset =
+          getValueOrCreateConstantIndexOp(rewriter, loc, elementOffset);
       AffineExpr s0, s1;
       bindSymbols(rewriter.getContext(), s0, s1);
       linearShape = affine::makeComposedFoldedAffineApply(
