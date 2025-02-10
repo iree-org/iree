@@ -22,6 +22,7 @@
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
+#include "mlir/Conversion/UBToLLVM/UBToLLVM.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
@@ -29,6 +30,7 @@
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
@@ -99,9 +101,9 @@ struct ConvertToROCDLPass final
       ConvertToROCDLPass>::ConvertToROCDLPassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<IREE::GPU::IREEGPUDialect, LLVM::LLVMDialect,
-                ROCDL::ROCDLDialect, amdgpu::AMDGPUDialect, gpu::GPUDialect>();
+    registry.insert<IREE::GPU::IREEGPUDialect, LLVM::LLVMDialect,
+                    ROCDL::ROCDLDialect, amdgpu::AMDGPUDialect, gpu::GPUDialect,
+                    ub::UBDialect>();
   }
   void runOnOperation() override {
     ModuleOp m = getOperation();
@@ -238,6 +240,8 @@ struct ConvertToROCDLPass final
       LLVMConversionTarget target(getContext());
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToROCDLConversionLegality(target);
+      ub::populateUBToLLVMConversionPatterns(converter, llvmPatterns);
+
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns))))
         signalPassFailure();
     }

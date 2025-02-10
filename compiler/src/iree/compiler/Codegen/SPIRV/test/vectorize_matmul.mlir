@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file \
-// RUN:   --pass-pipeline='builtin.module(func.func(iree-codegen-generic-vectorization,iree-spirv-initial-vector-lowering,iree-codegen-optimize-tensor-insert-extract-slices,iree-spirv-final-vector-lowering))' \
+// RUN:   --pass-pipeline='builtin.module(func.func(iree-codegen-generic-vectorization,iree-spirv-initial-vector-lowering,iree-codegen-optimize-tensor-insert-extract-slices,iree-spirv-final-vector-lowering,canonicalize,cse))' \
 // RUN:   %s | FileCheck %s
 
 func.func @matmul_1x4x4(%lhs: tensor<1x4xf32>, %rhs: tensor<4x4xf32>, %init: tensor<1x4xf32>) -> tensor<1x4xf32> {
@@ -139,9 +139,7 @@ func.func @matmul_broadcast_add(%init: tensor<1x8xf32>, %a: tensor<1x8xf32>, %b:
 //          CHECK:   %[[EXT0:.+]] = vector.extract %[[READ]][0] : f32 from vector<1xf32>
 //          CHECK:   %[[BCST0:.+]] = vector.splat %[[EXT0]] : vector<4xf32>
 //          CHECK:   %[[ADD0:.+]] = arith.addf %{{.+}}, %[[BCST0]] : vector<4xf32>
-//          CHECK:   %[[EXT1:.+]] = vector.extract %[[READ]][0] : f32 from vector<1xf32>
-//          CHECK:   %[[BCST1:.+]] = vector.splat %[[EXT1]] : vector<4xf32>
-//          CHECK:   %[[ADD1:.+]] = arith.addf %{{.+}}, %[[BCST1]] : vector<4xf32>
+//          CHECK:   %[[ADD1:.+]] = arith.addf %{{.+}}, %[[BCST0]] : vector<4xf32>
 //          CHECK:   %[[WRITE0:.+]] = vector.transfer_write %[[ADD0]], %[[INIT]][%[[C0]], %[[C0]]]
 //          CHECK:   %[[WRITE1:.+]] = vector.transfer_write %[[ADD1]], %[[WRITE0]][%[[C0]], %[[C4]]]
 //          CHECK:   return %[[WRITE1]]
@@ -287,7 +285,7 @@ func.func @matmul_4x4x4_i8_to_i32_dot_prod(%lhs: tensor<4x4xi8>, %rhs : tensor<4
 // CHECK-SAME:    (%[[LHS:.+]]: tensor<4x4xi8>, %[[RHS:.+]]: tensor<4x4xi8>)
 // CHECK-DAG:     %[[C0I8:.+]]   = arith.constant 0 : i8
 // CHECK-DAG:     %[[C0I32:.+]]  = arith.constant 0 : i32
-// CHECK-DAG:     %[[V4I8:.+]]   = arith.constant dense<0> : vector<4xi8>
+// CHECK-DAG:     %[[V4I8:.+]]   = ub.poison : vector<4xi8>
 // CHECK-DAG:     %[[V4I32:.+]]  = arith.constant dense<0> : vector<4xi32>
 // CHECK-DAG:     %[[V1I32:.+]]  = arith.constant dense<0> : vector<1xi32>
 // CHECK-DAG:     %[[IDX0:.+]]   = arith.constant 0 : index
