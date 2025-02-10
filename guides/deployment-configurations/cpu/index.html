@@ -3938,22 +3938,8 @@
 <a href="https://llvm.org/">LLVM</a> to compile all dense computations in each program into
 highly optimized CPU native instruction streams, which are embedded in one of
 IREE's deployable formats.</p>
-<p>To compile a program for CPU execution:</p>
-<ol>
-<li>
-<p>Pick a CPU target supported by LLVM. By default, IREE includes these LLVM
-   targets:</p>
-<ul>
-<li>X86</li>
-<li>ARM</li>
-<li>AArch64</li>
-<li>RISCV</li>
-</ul>
-<p>Other targets may work, but in-tree test coverage and performance work is
-focused on that list.</p>
-</li>
-<li>
-<p>Pick one of IREE's supported executable formats:</p>
+<p>To compile a program for CPU execution, pick one of IREE's supported executable
+formats:</p>
 <table>
 <thead>
 <tr>
@@ -3963,34 +3949,39 @@ focused on that list.</p>
 </thead>
 <tbody>
 <tr>
-<td>Embedded ELF</td>
-<td>(Default) Portable, high performance dynamic library</td>
+<td>embedded ELF</td>
+<td>portable, high performance dynamic library</td>
 </tr>
 <tr>
-<td>System library</td>
-<td>Platform-specific dynamic library (.so, .dll, etc.)</td>
+<td>system library</td>
+<td>platform-specific dynamic library (.so, .dll, etc.)</td>
 </tr>
 <tr>
 <td>VMVX</td>
-<td>Reference target</td>
+<td>reference target</td>
 </tr>
 </tbody>
 </table>
-</li>
-</ol>
-<p>At runtime, CPU executables can be loaded using one of IREE's CPU HAL devices:</p>
+<p>At runtime, CPU executables can be loaded using one of IREE's CPU HAL drivers:</p>
 <ul>
-<li><code>local-task</code>: asynchronous, multithreaded device built on IREE's "task"
+<li><code>local-task</code>: asynchronous, multithreaded driver built on IREE's "task"
    system</li>
-<li><code>local-sync</code>: synchronous, single-threaded devices that executes work inline</li>
+<li><code>local-sync</code>: synchronous, single-threaded driver that executes work inline</li>
 </ul>
+<div class="admonition todo">
+<p class="admonition-title">Todo</p>
+<p>Add IREE's CPU support matrix: what architectures are supported; what
+architectures are well optimized; etc.</p>
+</div>
+<!-- TODO(??): when to use CPU vs GPU vs other backends -->
+
 <h2 id="prerequisites"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06z"/></svg></span> Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
 <h3 id="get-the-iree-compiler">Get the IREE compiler<a class="headerlink" href="#get-the-iree-compiler" title="Permanent link">link</a></h3>
 <h4 id="download-the-compiler-from-a-release"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06z"/></svg></span> Download the compiler from a release<a class="headerlink" href="#download-the-compiler-from-a-release" title="Permanent link">link</a></h4>
 <p>Python packages are distributed through multiple channels. See the
 <a href="../../../reference/bindings/python/">Python Bindings</a> page for more details.
 The core <a href="https://pypi.org/project/iree-base-compiler/"><code>iree-base-compiler</code></a>
-package includes the compiler tools:</p>
+package includes the LLVM-based CPU compiler:</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m8.878.392 5.25 3.045c.54.314.872.89.872 1.514v6.098a1.75 1.75 0 0 1-.872 1.514l-5.25 3.045a1.75 1.75 0 0 1-1.756 0l-5.25-3.045A1.75 1.75 0 0 1 1 11.049V4.951c0-.624.332-1.201.872-1.514L7.122.392a1.75 1.75 0 0 1 1.756 0M7.875 1.69l-4.63 2.685L8 7.133l4.755-2.758-4.63-2.685a.25.25 0 0 0-.25 0M2.5 5.677v5.372c0 .09.047.171.125.216l4.625 2.683V8.432Zm6.25 8.271 4.625-2.683a.25.25 0 0 0 .125-.216V5.677L8.75 8.432Z"/></svg></span> Stable releases</label><label for="__tabbed_1_2"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5 5.782V2.5h-.25a.75.75 0 0 1 0-1.5h6.5a.75.75 0 0 1 0 1.5H11v3.282l3.666 5.76C15.619 13.04 14.543 15 12.767 15H3.233c-1.776 0-2.852-1.96-1.899-3.458Zm-2.4 6.565a.75.75 0 0 0 .633 1.153h9.534a.75.75 0 0 0 .633-1.153L12.225 10.5h-8.45ZM9.5 2.5h-3V6c0 .143-.04.283-.117.403L4.73 9h6.54L9.617 6.403A.75.75 0 0 1 9.5 6Z"/></svg></span> Nightly releases</label><label for="__tabbed_1_3"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.5 2.5 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25m-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0m8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5M4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5"/></svg></span> Development packages</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
@@ -4026,7 +4017,7 @@ python<span class="w"> </span>./build_tools/pkgci/setup_venv.py<span class="w"> 
 <p class="admonition-title">Tip</p>
 <p><code>iree-compile</code> and other tools are installed to your python module
 installation path. If you pip install with the user mode, it is under
-<code>${HOME}/.local/bin</code>, or <code>%APPDATA%\Python</code> on Windows. You may want to
+<code>${HOME}/.local/bin</code>, or <code>%APPDATA%Python</code> on Windows. You may want to
 include the path in your system's <code>PATH</code> environment variable:</p>
 <div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/.local/bin:<span class="si">${</span><span class="nv">PATH</span><span class="si">}</span>
 </code></pre></div>
@@ -4034,9 +4025,13 @@ include the path in your system's <code>PATH</code> environment variable:</p>
 <h4 id="build-the-compiler-from-source"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m13.78 15.3 6 6 2.11-2.16-6-6zm3.72-5.2c-.39 0-.81-.05-1.14-.19L4.97 21.25l-2.11-2.11 7.41-7.4L8.5 9.96l-.72.7-1.45-1.41v2.86l-.7.7-3.52-3.56.7-.7h2.81l-1.4-1.41 3.56-3.56a2.976 2.976 0 0 1 4.22 0L9.89 5.74l1.41 1.4-.71.71 1.79 1.78 1.82-1.88c-.14-.33-.2-.75-.2-1.12a3.49 3.49 0 0 1 3.5-3.52c.59 0 1.11.14 1.58.42L16.41 6.2l1.5 1.5 2.67-2.67c.28.47.42.97.42 1.6 0 1.92-1.55 3.47-3.5 3.47"/></svg></span> Build the compiler from source<a class="headerlink" href="#build-the-compiler-from-source" title="Permanent link">link</a></h4>
 <p>Please make sure you have followed the
 <a href="../../../building-from-source/getting-started/">Getting started</a> page to build
-IREE for your host platform. The <code>llvm-cpu</code> compiler backend is compiled in by
-default on all platforms, though you should ensure that the
-<code>IREE_TARGET_BACKEND_LLVM_CPU</code> CMake option is <code>ON</code> when configuring.</p>
+IREE for your host platform and the
+<a href="../../../building-from-source/android/">Android cross-compilation</a> or
+<a href="../../../building-from-source/ios/">iOS cross-compilation</a> page if you are cross
+compiling for a mobile device. The <code>llvm-cpu</code> compiler backend is compiled in by
+default on all platforms.</p>
+<p>Ensure that the <code>IREE_TARGET_BACKEND_LLVM_CPU</code> CMake option is <code>ON</code> when
+configuring for the host.</p>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
 <p><code>iree-compile</code> will be built under the <code>iree-build/tools/</code> directory. You
@@ -4046,27 +4041,14 @@ may want to include this path in your system's <code>PATH</code> environment var
 <p>You will need to get an IREE runtime that supports the local CPU HAL driver,
 along with the appropriate executable loaders for your application.</p>
 <p>You can check for CPU support by looking for the <code>local-sync</code> and <code>local-task</code>
-drivers and devices:</p>
-<div class="highlight"><pre><span></span><code><span class="go">&lt;!-- markdownlint-disable --&gt;</span>
-<span class="gp">$ </span>iree-run-module<span class="w"> </span>--list_drivers
-
-<span class="gp"># </span><span class="o">============================================================================</span>
-<span class="gp"># </span>Available<span class="w"> </span>HAL<span class="w"> </span><span class="nv">drivers</span>
-<span class="gp"># </span><span class="o">============================================================================</span>
-<span class="gp"># </span>Use<span class="w"> </span>--list_devices<span class="o">={</span>driver<span class="w"> </span>name<span class="o">}</span><span class="w"> </span>to<span class="w"> </span>enumerate<span class="w"> </span>available<span class="w"> </span>devices.
+drivers:</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--list_drivers
 
 <span class="go">        cuda: NVIDIA CUDA HAL driver (via dylib)</span>
-<span class="hll"><span class="go">         hip: HIP HAL driver (via dylib)</span>
-</span><span class="hll"><span class="go">  local-sync: Local execution using a lightweight inline synchronous queue</span>
-</span><span class="go">  local-task: Local execution using the IREE multithreading task system</span>
-<span class="go">      vulkan: Vulkan 1.x (dynamic)</span>
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--list_devices
-
-<span class="go">  hip://GPU-00000000-1111-2222-3333-444444444444</span>
-<span class="hll"><span class="go">  local-sync://</span>
-</span><span class="hll"><span class="go">  local-task://</span>
-</span><span class="go">  vulkan://00000000-1111-2222-3333-444444444444</span>
+<span class="go">         hip: HIP HAL driver (via dylib)</span>
+<span class="hll"><span class="go">  local-sync: Local execution using a lightweight inline synchronous queue</span>
+</span><span class="hll"><span class="go">  local-task: Local execution using the IREE multithreading task system</span>
+</span><span class="go">      vulkan: Vulkan 1.x (dynamic)</span>
 </code></pre></div>
 <h4 id="download-the-runtime-from-a-release"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06z"/></svg></span> Download the runtime from a release<a class="headerlink" href="#download-the-runtime-from-a-release" title="Permanent link">link</a></h4>
 <p>Python packages are distributed through multiple channels. See the
@@ -4105,54 +4087,38 @@ python<span class="w"> </span>./build_tools/pkgci/setup_venv.py<span class="w"> 
 </div>
 </div>
 <h4 id="build-the-runtime-from-source"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m13.78 15.3 6 6 2.11-2.16-6-6zm3.72-5.2c-.39 0-.81-.05-1.14-.19L4.97 21.25l-2.11-2.11 7.41-7.4L8.5 9.96l-.72.7-1.45-1.41v2.86l-.7.7-3.52-3.56.7-.7h2.81l-1.4-1.41 3.56-3.56a2.976 2.976 0 0 1 4.22 0L9.89 5.74l1.41 1.4-.71.71 1.79 1.78 1.82-1.88c-.14-.33-.2-.75-.2-1.12a3.49 3.49 0 0 1 3.5-3.52c.59 0 1.11.14 1.58.42L16.41 6.2l1.5 1.5 2.67-2.67c.28.47.42.97.42 1.6 0 1.92-1.55 3.47-3.5 3.47"/></svg></span> Build the runtime from source<a class="headerlink" href="#build-the-runtime-from-source" title="Permanent link">link</a></h4>
-<p>Please make sure you have followed one of the
-<a href="../../../building-from-source/">Building from source</a> pages to build
-IREE for your target platform. The local CPU HAL drivers and devices are
-compiled in by default on all platforms, though you should ensure that the
-<code>IREE_HAL_DRIVER_LOCAL_TASK</code> and <code>IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF</code>
-(or other executable loader) CMake options are <code>ON</code> when configuring.</p>
+<p>Please make sure you have followed the
+<a href="../../../building-from-source/getting-started/">Getting started</a> page to build
+IREE for your host platform and the
+<a href="../../../building-from-source/android/">Android cross-compilation</a> page if you
+are cross compiling for Android. The local CPU HAL drivers are compiled in by
+default on all platforms.</p>
+<p>Ensure that the <code>IREE_HAL_DRIVER_LOCAL_TASK</code> and
+<code>IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF</code> (or other executable loader) CMake
+options are <code>ON</code> when configuring for the target.</p>
 <h2 id="compile-and-run-a-program">Compile and run a program<a class="headerlink" href="#compile-and-run-a-program" title="Permanent link">link</a></h2>
 <p>With the requirements out of the way, we can now compile a model and run it.</p>
 <h3 id="compile-a-program"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4 1.75C4 .784 4.784 0 5.75 0h5.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v8.586A1.75 1.75 0 0 1 14.25 15h-9a.75.75 0 0 1 0-1.5h9a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 10 4.25V1.5H5.75a.25.25 0 0 0-.25.25v2.5a.75.75 0 0 1-1.5 0Zm1.72 4.97a.75.75 0 0 1 1.06 0l2 2a.75.75 0 0 1 0 1.06l-2 2a.749.749 0 0 1-1.275-.326.75.75 0 0 1 .215-.734l1.47-1.47-1.47-1.47a.75.75 0 0 1 0-1.06M3.28 7.78 1.81 9.25l1.47 1.47a.75.75 0 0 1-.018 1.042.75.75 0 0 1-1.042.018l-2-2a.75.75 0 0 1 0-1.06l2-2a.75.75 0 0 1 1.042.018.75.75 0 0 1 .018 1.042m8.22-6.218V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914z"/></svg></span> Compile a program<a class="headerlink" href="#compile-a-program" title="Permanent link">link</a></h3>
-<p>The IREE compiler transforms a model into its final deployable format in several
+<p>The IREE compiler transforms a model into its final deployable format in many
 sequential steps. A model authored with Python in an ML framework should use the
 corresponding framework's import tool to convert into a format (i.e.,
 <a href="https://mlir.llvm.org/">MLIR</a>) expected by the IREE compiler first.</p>
-<p>Using a
-<a href="https://github.com/onnx/models/tree/main/validated/vision/classification/mobilenet">MobileNet model</a>
-as an example, import using IREE's <a href="../../ml-frameworks/onnx/">ONNX importer</a>:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Download the model you want to compile and run.</span>
-wget<span class="w"> </span>https://github.com/onnx/models/raw/refs/heads/main/validated/vision/classification/mobilenet/model/mobilenetv2-10.onnx
-
-<span class="c1"># Import to MLIR using IREE&#39;s ONNX importer.</span>
-pip<span class="w"> </span>install<span class="w"> </span>iree-base-compiler<span class="o">[</span>onnx<span class="o">]</span>
-iree-import-onnx<span class="w"> </span>mobilenetv2-10.onnx<span class="w"> </span>--opset-version<span class="w"> </span><span class="m">17</span><span class="w"> </span>-o<span class="w"> </span>mobilenetv2.mlir
-</code></pre></div>
-<p>Then run the following command to compile with the <code>llvm-cpu</code> target:</p>
+<p>Using MobileNet v2 as an example, you can download the SavedModel with trained
+weights from
+<a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">TensorFlow Hub</a>
+and convert it using IREE's
+<a href="../../ml-frameworks/tensorflow/">TensorFlow importer</a>. Then run the following
+command to compile with the <code>llvm-cpu</code> target:</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">    </span>--iree-llvmcpu-target-cpu<span class="o">=</span>host<span class="w"> </span><span class="se">\</span>
-</span><span class="w">    </span>mobilenetv2.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_cpu.vmfb
+</span><span class="w">    </span>mobilenet_iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_cpu.vmfb
 </code></pre></div>
-<details class="tip" open="open">
-<summary>Tip - Target CPUs and CPU features</summary>
-<p>By default, the compiler will use a generic CPU target which will result in
-poor performance. A target CPU or target CPU feature set should be selected
-using one of these options:</p>
-<ul>
-<li><code>--iree-llvmcpu-target-cpu=...</code></li>
-<li><code>--iree-llvmcpu-target-cpu-features=...</code></li>
-</ul>
-<p>When not cross compiling, passing <code>--iree-llvmcpu-target-cpu=host</code> is
-usually sufficient on most devices.</p>
-</details>
-<details class="tip" open="open">
-<summary>Tip - CPU targets</summary>
+<div class="admonition tip">
+<p class="admonition-title">Tip - CPU targets</p>
 <p>The <code>--iree-llvmcpu-target-triple</code> flag tells the compiler to generate code
 for a specific type of CPU. You can see the list of supported targets with
-<code>iree-compile --iree-llvmcpu-list-targets</code>, or use the default value of
-"host" to let LLVM infer the triple from your host machine
-(e.g. <code>x86_64-linux-gnu</code>).</p>
+<code>iree-compile --iree-llvmcpu-list-targets</code>, or pass "host" to let LLVM
+infer the triple from your host machine (e.g. <code>x86_64-linux-gnu</code>).</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>--iree-llvmcpu-list-targets
 
 <span class="go">  Registered Targets:</span>
@@ -4170,18 +4136,25 @@ for a specific type of CPU. You can see the list of supported targets with
 <span class="go">    x86        - 32-bit X86: Pentium-Pro and above</span>
 <span class="go">    x86-64     - 64-bit X86: EM64T and AMD64</span>
 </code></pre></div>
-</details>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip - CPU features</p>
+<p>The <code>--iree-llvmcpu-target-cpu-features</code> flag tells the compiler to generate
+code using certain CPU "features", like SIMD instruction sets. Like the
+target triple, you can pass "host" to this flag to let LLVM infer the
+features supported by your host machine.</p>
+</div>
 <h3 id="run-a-compiled-program"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25ZM7.25 8a.75.75 0 0 1-.22.53l-2.25 2.25a.749.749 0 0 1-1.275-.326.75.75 0 0 1 .215-.734L5.44 8 3.72 6.28a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215l2.25 2.25c.141.14.22.331.22.53m1.5 1.5h3a.75.75 0 0 1 0 1.5h-3a.75.75 0 0 1 0-1.5"/></svg></span> Run a compiled program<a class="headerlink" href="#run-a-compiled-program" title="Permanent link">link</a></h3>
-<p>To run the compiled program:</p>
-<div class="highlight"><pre><span></span><code>iree-run-module<span class="w"> </span><span class="se">\</span>
+<p>In the build directory, run the following command:</p>
+<div class="highlight"><pre><span></span><code>tools/iree-run-module<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">    </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
 </span><span class="w">    </span>--module<span class="o">=</span>mobilenet_cpu.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--function<span class="o">=</span>torch-jit-export<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--input<span class="o">=</span><span class="s2">&quot;1x3x224x224xf32=0&quot;</span>
+<span class="w">    </span>--function<span class="o">=</span>predict<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
 </code></pre></div>
-<p>The above assumes the exported function in the model is named <code>torch-jit-export</code>
-and it expects one 224x224 RGB image. We are feeding in an image with all 0
-values here for brevity, see <code>iree-run-module --help</code> for the format to specify
+<p>The above assumes the exported function in the model is named as <code>predict</code> and
+it expects one 224x224 RGB image. We are feeding in an image with all 0 values
+here for brevity, see <code>iree-run-module --help</code> for the format to specify
 concrete values.</p>
 <!-- TODO(??): measuring performance -->
 

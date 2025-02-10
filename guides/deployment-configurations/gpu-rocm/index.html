@@ -3986,7 +3986,7 @@ python<span class="w"> </span>./build_tools/pkgci/setup_venv.py<span class="w"> 
 <p class="admonition-title">Tip</p>
 <p><code>iree-compile</code> and other tools are installed to your python module
 installation path. If you pip install with the user mode, it is under
-<code>${HOME}/.local/bin</code>, or <code>%APPDATA%\Python</code> on Windows. You may want to
+<code>${HOME}/.local/bin</code>, or <code>%APPDATA%Python</code> on Windows. You may want to
 include the path in your system's <code>PATH</code> environment variable:</p>
 <div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/.local/bin:<span class="si">${</span><span class="nv">PATH</span><span class="si">}</span>
 </code></pre></div>
@@ -4004,17 +4004,11 @@ may want to include this path in your system's <code>PATH</code> environment var
 <h3 id="get-the-iree-runtime">Get the IREE runtime<a class="headerlink" href="#get-the-iree-runtime" title="Permanent link">link</a></h3>
 <p>Next you will need to get an IREE runtime that includes the HIP HAL driver.</p>
 <p>You can check for HIP support by looking for a matching driver and device:</p>
-<div class="highlight"><pre><span></span><code><span class="go">&lt;!-- markdownlint-disable --&gt;</span>
-<span class="gp">$ </span>iree-run-module<span class="w"> </span>--list_drivers
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--list_drivers
 
-<span class="gp"># </span><span class="o">============================================================================</span>
-<span class="gp"># </span>Available<span class="w"> </span>HAL<span class="w"> </span><span class="nv">drivers</span>
-<span class="gp"># </span><span class="o">============================================================================</span>
-<span class="gp"># </span>Use<span class="w"> </span>--list_devices<span class="o">={</span>driver<span class="w"> </span>name<span class="o">}</span><span class="w"> </span>to<span class="w"> </span>enumerate<span class="w"> </span>available<span class="w"> </span>devices.
-
-<span class="hll"><span class="go">        cuda: NVIDIA CUDA HAL driver (via dylib)</span>
-</span><span class="go">         hip: HIP HAL driver (via dylib)</span>
-<span class="go">  local-sync: Local execution using a lightweight inline synchronous queue</span>
+<span class="go">        cuda: NVIDIA CUDA HAL driver (via dylib)</span>
+<span class="hll"><span class="go">         hip: HIP HAL driver (via dylib)</span>
+</span><span class="go">  local-sync: Local execution using a lightweight inline synchronous queue</span>
 <span class="go">  local-task: Local execution using the IREE multithreading task system</span>
 <span class="go">      vulkan: Vulkan 1.x (dynamic)</span>
 </code></pre></div>
@@ -4023,7 +4017,6 @@ may want to include this path in your system's <code>PATH</code> environment var
 <span class="hll"><span class="go">  hip://GPU-00000000-1111-2222-3333-444444444444</span>
 </span><span class="go">  local-sync://</span>
 <span class="go">  local-task://</span>
-<span class="go">  vulkan://00000000-1111-2222-3333-444444444444</span>
 </code></pre></div>
 <h4 id="download-the-runtime-from-a-release"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06z"/></svg></span> Download the runtime from a release<a class="headerlink" href="#download-the-runtime-from-a-release" title="Permanent link">link</a></h4>
 <p>Python packages are distributed through multiple channels. See the
@@ -4070,40 +4063,29 @@ option.</p>
 <p>With the compiler and runtime ready, we can now compile programs and run them
 on GPUs.</p>
 <h3 id="compile-a-program"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4 1.75C4 .784 4.784 0 5.75 0h5.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v8.586A1.75 1.75 0 0 1 14.25 15h-9a.75.75 0 0 1 0-1.5h9a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 10 4.25V1.5H5.75a.25.25 0 0 0-.25.25v2.5a.75.75 0 0 1-1.5 0Zm1.72 4.97a.75.75 0 0 1 1.06 0l2 2a.75.75 0 0 1 0 1.06l-2 2a.749.749 0 0 1-1.275-.326.75.75 0 0 1 .215-.734l1.47-1.47-1.47-1.47a.75.75 0 0 1 0-1.06M3.28 7.78 1.81 9.25l1.47 1.47a.75.75 0 0 1-.018 1.042.75.75 0 0 1-1.042.018l-2-2a.75.75 0 0 1 0-1.06l2-2a.75.75 0 0 1 1.042.018.75.75 0 0 1 .018 1.042m8.22-6.218V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914z"/></svg></span> Compile a program<a class="headerlink" href="#compile-a-program" title="Permanent link">link</a></h3>
-<p>The IREE compiler transforms a model into its final deployable format in several
+<p>The IREE compiler transforms a model into its final deployable format in many
 sequential steps. A model authored with Python in an ML framework should use the
 corresponding framework's import tool to convert into a format (i.e.,
 <a href="https://mlir.llvm.org/">MLIR</a>) expected by the IREE compiler first.</p>
-<p>Using a
-<a href="https://github.com/onnx/models/tree/main/validated/vision/classification/mobilenet">MobileNet model</a>
-as an example, import using IREE's <a href="../../ml-frameworks/onnx/">ONNX importer</a>:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Download the model you want to compile and run.</span>
-wget<span class="w"> </span>https://github.com/onnx/models/raw/refs/heads/main/validated/vision/classification/mobilenet/model/mobilenetv2-10.onnx
-
-<span class="c1"># Import to MLIR using IREE&#39;s ONNX importer.</span>
-pip<span class="w"> </span>install<span class="w"> </span>iree-base-compiler<span class="o">[</span>onnx<span class="o">]</span>
-iree-import-onnx<span class="w"> </span>mobilenetv2-10.onnx<span class="w"> </span>--opset-version<span class="w"> </span><span class="m">17</span><span class="w"> </span>-o<span class="w"> </span>mobilenetv2.mlir
-</code></pre></div>
-<p>Then run the following command to compile with the <code>rocm</code> target:</p>
+<p>Using MobileNet v2 as an example, you can download the SavedModel with trained
+weights from
+<a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">TensorFlow Hub</a>
+and convert it using IREE's
+<a href="../../ml-frameworks/tensorflow/">TensorFlow importer</a>. Then run one of the
+following commands to compile:</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>rocm<span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">    </span>--iree-hip-target<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">    </span>mobilenetv2.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_rocm.vmfb
+</span><span class="hll"><span class="w">    </span>mobilenet_iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_rocm.vmfb
 </span></code></pre></div>
-<details class="tip" open="open">
-<summary>Tip - HIP bitcode files</summary>
-<p>That IREE comes with bundled bitcode files, which are used for linking
+<p>Note that IREE comes with bundled bitcode files, which are used for linking
 certain intrinsics on AMD GPUs. These will be used automatically or if the
 <code>--iree-hip-bc-dir</code> is empty. As additional support may be needed for
 different chips, users can use this flag to point to an explicit directory.
 For example, in ROCm installations on Linux, this is often found under
 <code>/opt/rocm/amdgcn/bitcode</code>.</p>
-</details>
-<details class="tip" open="open">
-<summary>Tip - HIP targets</summary>
-<p>A HIP target (<code>iree-hip-target</code>) matching the LLVM AMDGPU backend is needed
-to compile towards each GPU chip. Here is a table of commonly used
-architectures:</p>
+<p>A HIP target (<code>iree-hip-target</code>) matching the LLVM AMDGPU backend is needed to
+compile towards each GPU chip. Here is a table of commonly used architectures:</p>
 <table>
 <thead>
 <tr>
@@ -4131,6 +4113,18 @@ architectures:</p>
 <td><code>mi250</code></td>
 <td><code>gfx90a</code></td>
 <td><code>cdna2</code></td>
+</tr>
+<tr>
+<td>AMD MI300X (early units)</td>
+<td>N/A</td>
+<td><code>gfx940</code></td>
+<td><code>cdna3</code></td>
+</tr>
+<tr>
+<td>AMD MI300A (early units)</td>
+<td>N/A</td>
+<td><code>gfx941</code></td>
+<td><code>cdna3</code></td>
 </tr>
 <tr>
 <td>AMD MI300A</td>
@@ -4210,32 +4204,31 @@ architectures:</p>
 <a href="https://llvm.org/docs/AMDGPUUsage.html#processors">LLVM AMDGPU backend</a>.</p>
 <p>The <code>iree-hip-target</code> option support three schemes:</p>
 <ol>
-<li>The exact GPU product (SKU), e.g., <code>--iree-hip-target=mi300x</code>. This
-   allows the compiler to know about both the target architecture and about
-   additional hardware details like the number of compute units. This extra
-   information guides some compiler heuristics and allows for SKU-specific
-   <a href="../../../reference/tuning/">tuning specs</a>.</li>
-<li>The GPU architecture, as defined by LLVM, e.g.,
-   <code>--iree-hip-target=gfx942</code>. This scheme allows for architecture-specific
-   <a href="../../../reference/tuning/">tuning specs</a> only.</li>
-<li>The architecture code name, e.g., <code>--iree-hip-target=cdna3</code>. This scheme
-   gets translated to closes matching GPU architecture under the hood.</li>
+<li>The exact GPU product (SKU), e.g., <code>--iree-hip-target=mi300x</code>. This allows
+  the compiler to know about both the target architecture and about additional
+  hardware details like the number of compute units. This extra information
+  guides some compiler heuristics and allows for SKU-specific <a href="../../../reference/tuning/">tuning
+  specs</a>.</li>
+<li>The GPU architecture, as defined by LLVM, e.g., <code>--iree-hip-target=gfx942</code>.
+  This scheme allows for architecture-specific <a href="../../../reference/tuning/">tuning
+  specs</a> only.</li>
+<li>The architecture code name, e.g., <code>--iree-hip-target=cdna3</code>. This scheme gets
+  translated to closes matching GPU architecture under the hood.</li>
 </ol>
 <p>We support for common code/SKU names without aiming to be exhaustive. If the
-ones you want are missing, please use the GPU architecture scheme (2.) as it
-is the most general.</p>
-</details>
+ones you want are missing, please use the GPU architecture scheme (2.) as it is
+the most general.</p>
 <h3 id="run-a-compiled-program"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25ZM7.25 8a.75.75 0 0 1-.22.53l-2.25 2.25a.749.749 0 0 1-1.275-.326.75.75 0 0 1 .215-.734L5.44 8 3.72 6.28a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215l2.25 2.25c.141.14.22.331.22.53m1.5 1.5h3a.75.75 0 0 1 0 1.5h-3a.75.75 0 0 1 0-1.5"/></svg></span> Run a compiled program<a class="headerlink" href="#run-a-compiled-program" title="Permanent link">link</a></h3>
-<p>To run the compiled program:</p>
+<p>Run the following command:</p>
 <div class="highlight"><pre><span></span><code>iree-run-module<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">    </span>--device<span class="o">=</span>hip<span class="w"> </span><span class="se">\</span>
 </span><span class="w">    </span>--module<span class="o">=</span>mobilenet_rocm.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--function<span class="o">=</span>torch-jit-export<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--input<span class="o">=</span><span class="s2">&quot;1x3x224x224xf32=0&quot;</span>
+<span class="w">    </span>--function<span class="o">=</span>predict<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
 </code></pre></div>
-<p>The above assumes the exported function in the model is named <code>torch-jit-export</code>
-and it expects one 224x224 RGB image. We are feeding in an image with all 0
-values here for brevity, see <code>iree-run-module --help</code> for the format to specify
+<p>The above assumes the exported function in the model is named as <code>predict</code> and
+it expects one 224x224 RGB image. We are feeding in an image with all 0 values
+here for brevity, see <code>iree-run-module --help</code> for the format to specify
 concrete values.</p>
 
 
