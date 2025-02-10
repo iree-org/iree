@@ -89,6 +89,7 @@ iree_cc_library(
     "ConvertAccGEMMToGEMMPass.cpp"
     "ConvertBf16ArithToF32.cpp"
     "ConvertBf16ToUInt16Buffers.cpp"
+    "BubbleUpOrdinalOps.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "ConvolutionToIGEMM.cpp"
     "DecomposeAffineOpsPass.cpp"

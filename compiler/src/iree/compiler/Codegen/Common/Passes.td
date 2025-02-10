@@ -80,6 +80,11 @@ def ConvertBf16ToUInt16BuffersPass :
   let summary = "Convert BF16 buffer ops and conversions to simulated behavior with uint16.";
 }
 
+def ConvertF8ArithToF32Pass :
+    Pass<"iree-codegen-convert-f8-to-f32-buffers", ""> {
+  let summary = "Convert f8 buffer ops and conversions to simulated behavior with f32.";
+}
+
 def ConvertToDestinationPassingStylePass :
     InterfacePass<"iree-codegen-convert-to-destination-passing-style", "mlir::FunctionOpInterface"> {
   let summary =
