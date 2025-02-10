@@ -177,7 +177,7 @@ IREE::transform_dialect::MatchCastCompatibleDagFromRootOp::matchOperation(
           return emitDefiniteFailure() << "Invalid block argument in target";
         }
         int64_t argIdx = targetBlockArg.getArgNumber();
-        if (inputs[argIdx] && inputs[argIdx] != targetOperand) {
+        if (inputs[argIdx] && inputs[argIdx] != payloadOperand) {
           return emitSilenceableError()
                  << "input operand with conflicting uses";
         }

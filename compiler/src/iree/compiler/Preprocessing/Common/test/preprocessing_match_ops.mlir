@@ -136,3 +136,52 @@ module attributes {transform.with_named_sequence} {
     transform.yield
   }
 }
+
+// -----
+
+module attributes {transform.with_named_sequence} {
+
+  // CHECK: func.func @matmul_repeated_operand
+  func.func @matmul_repeated_operand(%input: tensor<32x64xi8>, %dest: tensor<32x32xi32>) -> tensor<32x32xi32> {
+    // CHECK-NEXT: linalg.matmul_transpose_b
+    // CHECK-SAME:   match_status = "matched"
+    %res = linalg.matmul_transpose_b {match_status = "unmatched"}
+          ins(%input, %input : tensor<32x64xi8>, tensor<32x64xi8>)
+          outs(%dest : tensor<32x32xi32>) -> tensor<32x32xi32>
+    return %res : tensor<32x32xi32>
+  }
+
+  // CHECK: func.func @matmul_non_repeated_operand
+  func.func @matmul_non_repeated_operand(%input0: tensor<32x64xi8>, %input1: tensor<32x64xi8>, %dest: tensor<32x32xi32>) -> tensor<32x32xi32> {
+    // CHECK-NEXT: linalg.matmul_transpose_b
+    // CHECK-SAME:   match_status = "unmatched"
+    %res = linalg.matmul_transpose_b {match_status = "unmatched"}
+          ins(%input0, %input1 : tensor<32x64xi8>, tensor<32x64xi8>)
+          outs(%dest : tensor<32x32xi32>) -> tensor<32x32xi32>
+    return %res : tensor<32x32xi32>
+  }
+
+  transform.named_sequence @match_matmul_repeated_operand(%arg0: !transform.any_op {transform.readonly}) -> !transform.any_op {
+    %inputs, %outputs = transform.iree.match.cast_compatible_dag_from_root %arg0 {
+    ^bb0(%arg1: tensor<32x64xi8>, %arg2: tensor<32x32xi32>):
+      %1 = linalg.matmul_transpose_b {match_status = "unmatched"}
+          ins(%arg1, %arg1 : tensor<32x64xi8>, tensor<32x64xi8>)
+          outs(%arg2 : tensor<32x32xi32>) -> tensor<32x32xi32>
+    } : (!transform.any_op) -> (!transform.any_value, !transform.any_value)
+    transform.yield %arg0 : !transform.any_op
+  }
+
+  transform.named_sequence @annotate(%generic: !transform.any_op {transform.readonly}) {
+    %0 = transform.param.constant "matched" -> !transform.any_param
+    transform.annotate %generic "match_status" = %0 : !transform.any_op, !transform.any_param
+    transform.yield
+  }
+
+  transform.named_sequence @__transform_main(%module: !transform.any_op) {
+    %func = transform.structured.match ops{["func.func"]} in %module : (!transform.any_op) -> !transform.any_op
+    transform.foreach_match in %module
+        @match_matmul_repeated_operand -> @annotate
+      : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
+}
