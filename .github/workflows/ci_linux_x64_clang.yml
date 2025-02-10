@@ -43,6 +43,8 @@ jobs:
             -DIREE_ENABLE_LLD=ON \
             -DIREE_ENABLE_ASSERTIONS=ON \
             -DIREE_BUILD_DOCS=ON \
+            -DIREE_TARGET_BACKEND_CUDA=ON \
+            -DIREE_TARGET_BACKEND_ROCM=ON \
             -DIREE_TARGET_BACKEND_WEBGPU_SPIRV=ON
       - name: CMake - build
         run: |
