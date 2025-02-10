@@ -750,6 +750,9 @@ bool isaHorizontallyFusedContraction(linalg::LinalgOp linalgOp) {
   };
   llvm::SmallDenseSet<unsigned> lhsDims = getResultDims(lhsIndexingMap);
 
+  // Check that all the horizontally fused gemms have common N-dims. M and K
+  // dims are already known consistent since they are what the LHS has.
+  std::optional<llvm::SmallDenseSet<unsigned>> refNDimsSet;
   for (auto [rhsIndexingMap, outputIndexingMap] :
        llvm::zip_equal(indexingMapsRef.slice(1, linalgOp.getNumDpsInputs() - 1),
                        indexingMapsRef.take_back(linalgOp.getNumDpsInits()))) {
@@ -769,6 +772,16 @@ bool isaHorizontallyFusedContraction(linalg::LinalgOp linalgOp) {
     llvm::set_intersect(kDims, rhsDims);
     if (kDims.empty()) {
       return false;
+    }
+
+    if (refNDimsSet) {
+      if (!llvm::all_of(nDims, [&](unsigned nDim) {
+            return refNDimsSet->contains(nDim);
+          })) {
+        return false;
+      }
+    } else {
+      refNDimsSet = std::move(nDims);
     }
   }
   return true;
