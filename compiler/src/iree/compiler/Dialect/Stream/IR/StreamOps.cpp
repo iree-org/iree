@@ -76,6 +76,35 @@ verifyDispatchWorkload(Operation *op, IREE::Stream::ExecutableExportOp exportOp,
   return success();
 }
 
+static LogicalResult verifyTiedOperandEncodings(Operation *op,
+                                                ArrayAttr operandEncodingsAttr,
+                                                ArrayAttr resultEncodingsAttr) {
+  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op);
+  if (!tiedOp) {
+    return op->emitOpError()
+           << "the op does not implement IREE::Util::TiedOpInterface";
+  }
+
+  ArrayRef<Attribute> operandEncodings = operandEncodingsAttr.getValue();
+  unsigned tiedOperandBase = tiedOp.getTiedOperandsIndexAndLength().first;
+  for (auto [idx, resEncoding] :
+       llvm::enumerate(resultEncodingsAttr.getValue())) {
+    auto tiedOperand = tiedOp.getTiedResultOperandIndex(idx);
+    if (!tiedOperand.has_value()) {
+      continue;
+    }
+    auto operandIndex = tiedOperand.value() - tiedOperandBase;
+    if (operandEncodings[operandIndex] != resEncoding) {
+      return op->emitError()
+             << "the " << operandIndex << "-th operandEncoding ("
+             << operandEncodings[operandIndex]
+             << ") does not match the resultEncoding (" << resEncoding << ")";
+    }
+  }
+
+  return success();
+}
+
 // Verifies that |dynamicDims| contains the appropriate number of dims for all
 // the dynamic dimensions in |type|.
 static LogicalResult verifyOpDynamicDims(Operation *op, TypeRange types,
@@ -2110,6 +2139,10 @@ LogicalResult TensorDispatchOp::verify() {
                                       op.getOperandEncodingDims())) ||
       failed(verifyOpDynamicDimsRange(op, op.getResultEncodings(),
                                       op.getResultEncodingDims()))) {
+    return failure();
+  }
+  if (failed(verifyTiedOperandEncodings(op, op.getOperandEncodings(),
+                                        op.getResultEncodings()))) {
     return failure();
   }
   return success();

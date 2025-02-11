@@ -207,12 +207,11 @@ module {
     %c3 = arith.constant 3 : index
     %c4 = arith.constant 4 : index
     %0 = stream.async.transfer %arg0 : !stream.resource<external>{%arg2} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%arg2}
-    %1 = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @executable::@dispatch[%c1, %c2, %c3](%0, %c4) : (tensor<4x?xf32, #encoding>{%arg2} in !stream.resource<*>{%arg1}, index) -> tensor<?x4xf32, #encoding>{%arg2} in %0{%arg1}
+    %1 = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @executable::@dispatch[%c1, %c2, %c3](%0, %c4) : (tensor<4x?xf32, #encoding>{%arg2} in !stream.resource<*>{%arg1}, index) -> tensor<4x?xf32, #encoding>{%arg2} in %0{%arg1}
     util.return %1 : !stream.resource<*>
   }
 }
-// CHECK-DAG:   #[[$ENCODING0:.+]] = #iree_encoding.encoding<{{.+}} layouts = [#iree_encoding.specialized_encoding<123, tensor<4x?xf32>>]
-// CHECK-DAG:   #[[$ENCODING1:.+]] = #iree_encoding.encoding<{{.+}} layouts = [#iree_encoding.specialized_encoding<123, tensor<?x4xf32>>]
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<{{.+}} layouts = [#iree_encoding.specialized_encoding<123, tensor<4x?xf32>>]
 // CHECK:       #[[TARGET:.+]] = #hal.device.target
 // CHECK:       util.global private @[[$DEVICE:.+]] = #[[TARGET]]
 // CHECK-LABEL: util.func public @tensor_dispatch_with_tied_operands
@@ -220,8 +219,8 @@ module {
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
 // CHECK:         stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE]]>)
-// CHECK-SAME:      tensor<4x?xf32, #[[$ENCODING0]]>{%[[ARG2]]}
-// CHECK-SAME:      tensor<?x4xf32, #[[$ENCODING1]]>{%[[ARG2]]}
+// CHECK-SAME:      tensor<4x?xf32, #[[$ENCODING]]>{%[[ARG2]]}
+// CHECK-SAME:      tensor<4x?xf32, #[[$ENCODING]]>{%[[ARG2]]}
 
 // -----
 
