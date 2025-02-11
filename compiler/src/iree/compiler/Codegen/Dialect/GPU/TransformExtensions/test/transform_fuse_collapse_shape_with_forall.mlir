@@ -98,13 +98,13 @@ module attributes {transform.with_named_sequence} {
 //  CHECK-SAME:     {{\[}}[0], [1, 2]] output_shape [%[[SIZE0]], %[[SIZE1]], 8] : tensor<?x?xf32> into tensor<?x?x8xf32>
 //   CHECK-DAG:   %[[SLICE_SIZE_0:.+]] = affine.min #map(%[[IDX0]])[%[[SIZE0]]]
 //   CHECK-DAG:   %[[SLICE_SIZE_1:.+]] = affine.min #map(%[[IDX1]])[%[[SIZE1]]]
+//   CHECK-DAG:   %[[LINEAR_SLICE_IDX:.+]] = affine.linearize_index disjoint [%[[IDX1]], %[[C0]]] by (%[[SIZE1]], 8) : index
+//   CHECK-DAG:   %[[COLLAPSED_SLICE_SIZE:.+]] = affine.apply #[[$MAP1]](%[[SLICE_SIZE_1]])
 //   CHECK-DAG:   %[[IN_SLICE:.+]] = tensor.extract_slice %[[ARG0]]
 //  CHECK-SAME:     [%[[IDX0]], %[[IDX1]], 0]{{.*}}[%[[SLICE_SIZE_0]], %[[SLICE_SIZE_1]], 8] [1, 1, 1] : tensor<?x?x8xf32> to tensor<?x?x8xf32>
 //   CHECK-DAG:   %[[OUT_SLICE:.+]] = tensor.extract_slice %[[EXPANDED_BBARG]]
 //  CHECK-SAME:     [%[[IDX0]], %[[IDX1]], 0] [%[[SLICE_SIZE_0]], %[[SLICE_SIZE_1]], 8] [1, 1, 1] : tensor<?x?x8xf32> to tensor<?x?x8xf32>
 //   CHECK-DAG:   %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]] : tensor<?x?x8xf32>) outs(%[[OUT_SLICE]] : tensor<?x?x8xf32>) -> tensor<?x?x8xf32>
-//   CHECK-DAG:   %[[LINEAR_SLICE_IDX:.+]] = affine.linearize_index disjoint [%[[IDX1]], %[[C0]]] by (%[[SIZE1]], 8) : index
-//   CHECK-DAG:   %[[COLLAPSED_SLICE_SIZE:.+]] = affine.apply #[[$MAP1]](%[[SLICE_SIZE_1]])
 //   CHECK-DAG:   %[[COLLAPSED_COPY:.+]] = tensor.collapse_shape %[[COPY]] {{\[}}[0], [1, 2]] : tensor<?x?x8xf32> into tensor<?x?xf32>
 //       CHECK:     scf.forall.in_parallel {
 //       CHECK:       tensor.parallel_insert_slice %[[COLLAPSED_COPY]] into %[[COLLAPSED_BBARG]]
