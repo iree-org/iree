@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-stream-specialize-encodings --verify-diagnostics %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-stream-specialize-encodings)' --verify-diagnostics %s | FileCheck %s
 
 //------------------------------------------------------------------------------
 // IREE::CPU encoding layout specialization tests.
@@ -153,11 +153,13 @@ util.func public @tensor_fill_op(%arg0: f32, %arg1: !stream.resource<*>, %arg2: 
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
 
-util.global private @device_a = #device_target_local_0_
-// expected-error @+1 {{failed on adding layouts to Stream::TensorPhaseOp with encodings}}
-util.func public @ops_with_result_encoding_only(%arg0: index) {
-  %0 = stream.tensor.constant on(#hal.device.affinity<@device_a>) : tensor<?x5x64xf32, #encoding>{%arg0} in !stream.resource<constant> = dense<0.000000e+00> : tensor<1x5x64xf32>
-  util.return
+// expected-error @+1 {{failed to add layouts to Stream::TensorPhaseOp with encodings}}
+module {
+  util.global private @device_a = #device_target_local_0_
+  util.func public @ops_with_result_encoding_only(%arg0: index) {
+    %0 = stream.tensor.constant on(#hal.device.affinity<@device_a>) : tensor<?x5x64xf32, #encoding>{%arg0} in !stream.resource<constant> = dense<0.000000e+00> : tensor<1x5x64xf32>
+    util.return
+  }
 }
 
 // -----
@@ -171,13 +173,15 @@ util.func public @ops_with_result_encoding_only(%arg0: index) {
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
 
-util.global private @device_a = #device_target_local_0_
-// expected-error @+1 {{failed on adding layouts to Stream::TensorPhaseOp with encodings}}
-util.func public @tensor_clone_op(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index, %arg4: index) {
-  %0 = stream.tensor.clone on(#hal.device.affinity<@device_a>)
-    %arg0 : tensor<?x4xf32, #encoding>{%arg1} in !stream.resource<*>{%arg2}
-    -> tensor<?x4xf32, #encoding>{%arg1} in !stream.resource<*>{%arg2}
-  util.return
+// expected-error @+1 {{failed to add layouts to Stream::TensorPhaseOp with encodings}}
+module {
+  util.global private @device_a = #device_target_local_0_
+  util.func public @tensor_clone_op(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index, %arg4: index) {
+    %0 = stream.tensor.clone on(#hal.device.affinity<@device_a>)
+      %arg0 : tensor<?x4xf32, #encoding>{%arg1} in !stream.resource<*>{%arg2}
+      -> tensor<?x4xf32, #encoding>{%arg1} in !stream.resource<*>{%arg2}
+    util.return
+  }
 }
 
 // -----
@@ -191,15 +195,17 @@ util.func public @tensor_clone_op(%arg0: !stream.resource<*>, %arg1: index, %arg
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
 
+// expected-error @+1 {{failed to add layouts to Stream::TensorPhaseOp with encodings}}
+module {
   util.global private @device_a = #device_target_local_0_
-// expected-error @+1 {{failed on adding layouts to Stream::TensorPhaseOp with encodings}}
-util.func public @tensor_slice_op_with_encoding(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index, %arg4: index) {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %1 = stream.tensor.slice on(#hal.device.affinity<@device_a>)
-    %arg0[%c0, %c1 for %arg3, %c1] : tensor<?x4xf32, #encoding>{%arg1} in !stream.resource<*>{%arg2}
-    -> tensor<?x1xf32, #encoding>{%arg3} in !stream.resource<*>{%arg4}
-  util.return
+  util.func public @tensor_slice_op_with_encoding(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index, %arg4: index) {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %1 = stream.tensor.slice on(#hal.device.affinity<@device_a>)
+      %arg0[%c0, %c1 for %arg3, %c1] : tensor<?x4xf32, #encoding>{%arg1} in !stream.resource<*>{%arg2}
+      -> tensor<?x1xf32, #encoding>{%arg3} in !stream.resource<*>{%arg4}
+    util.return
+  }
 }
 
 // -----
@@ -213,15 +219,17 @@ util.func public @tensor_slice_op_with_encoding(%arg0: !stream.resource<*>, %arg
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
 
+// expected-error @+1 {{failed to add layouts to Stream::TensorPhaseOp with encodings}}
+module {
 util.global private @device_a = #device_target_local_0_
-// expected-error @+1 {{failed on adding layouts to Stream::TensorPhaseOp with encodings}}
-util.func public @tensor_update_op(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<*>, %arg3: index, %arg4: index) {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %0 = stream.tensor.update on(#hal.device.affinity<@device_a>)
-    %arg0, %arg2[%c0, %c0] : tensor<2x2xf32, #encoding> in !stream.resource<*>{%arg1}
-    -> tensor<?x4xf32, #encoding>{%arg3} in %arg2 as !stream.resource<*>{%arg4}
-  util.return
+  util.func public @tensor_update_op(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<*>, %arg3: index, %arg4: index) {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %0 = stream.tensor.update on(#hal.device.affinity<@device_a>)
+      %arg0, %arg2[%c0, %c0] : tensor<2x2xf32, #encoding> in !stream.resource<*>{%arg1}
+      -> tensor<?x4xf32, #encoding>{%arg3} in %arg2 as !stream.resource<*>{%arg4}
+    util.return
+  }
 }
 
 // -----
