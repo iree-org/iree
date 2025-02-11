@@ -195,7 +195,7 @@ module {
     builtin.module {
       func.func @dispatch(%arg0: !stream.binding, %arg1: index) {
         %c0 = arith.constant 0 : index
-        %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<16xf32, #encoding>>
+        %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readwrite:tensor<16xf32, #encoding>>
         return
       }
     }
