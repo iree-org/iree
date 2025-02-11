@@ -138,14 +138,35 @@ updateBindingEncodings(FunctionOpInterface funcOp,
   return success();
 }
 
-/// Returns the operands encodings and result encodings from the `dispatchOp`.
-/// If a result is tied to an operand, the result encoding is skipped. Because
-/// it shares the same binding with the tied operands.
+/// Returns the operands encodings and result encodings from the `dispatchOp` in
+/// |operands| + |results| order, i.e., it returns the stripped concatenated
+/// operand encodings and result encodings. If a result is tied to an operand,
+/// the result encoding is skipped. Because it shares the same binding with the
+/// tied operands.
+///
+/// Example 1:
+///
+///   %0 = stream.tensor.dispatch ...(%arg0, %c4)
+///     : (tensor<4x?xf32, #encoding> in !resource, index)
+///     -> tensor<4x?xf32, #encoding> in !resource
+///
+/// The above dispatch op does not have tied operands. Thus, it returns
+///   |#resolved_encoding, whatever_without_encoding, #resolved_encoding|
+///
+/// Example 2:
+///
+///   %0 = stream.tensor.dispatch ...(%arg0, %c4) : tensor<4x?xf32, #encoding>
+///     -> tensor<4x?xf32, #encoding> in %arg0
+///
+/// The above dispatch op ties the result to the first operand. Thus, the result
+/// encoding is stripped. It returns
+///   |#resolved_encoding, whatever_without_encoding|
 static SmallVector<Attribute>
 getBindingLayoutAttrs(IREE::Stream::TensorDispatchOp dispatchOp) {
   SmallVector<int64_t> tiedOperands(dispatchOp.getNumResults(),
                                     IREE::Util::TiedOpInterface::kUntiedIndex);
-  if (auto tiedOperandsAttr = dispatchOp.getTiedOperands()) {
+  if (std::optional<ArrayAttr> tiedOperandsAttr =
+          dispatchOp.getTiedOperands()) {
     tiedOperands =
         llvm::map_to_vector(tiedOperandsAttr.value(), [](Attribute intAttr) {
           return llvm::cast<IntegerAttr>(intAttr).getInt();
