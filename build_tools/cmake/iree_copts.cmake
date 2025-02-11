@@ -211,6 +211,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wimplicit-fallthrough"
     "-Winfinite-recursion"
     "-Wliteral-conversion"
+    "-Wlogical-op-parentheses"
     "-Wnon-virtual-dtor"
     "-Woverloaded-virtual"
     "-Wpointer-arith"
