@@ -11,11 +11,17 @@ on:
       artifact_run_id:
         type: string
         default: ""
+      write-caches:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       artifact_run_id:
         type: string
         default: ""
+      write-caches:
+        required: true
+        type: string
 
 jobs:
   build_and_test:
@@ -55,10 +61,17 @@ jobs:
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@a1209f81afb8c005c13b4296c32e363431bffea5 # v1.2.17
+        with:
+          key: ${{ github.job }}-${{ matrix.pjrt_platform }}
+          save: ${{ inputs.write-caches == 1 }}
       - name: Build and install
         run: |
           # install editable into venv
           source ${VENV_DIR}/bin/activate
+          export CMAKE_C_COMPILER_LAUNCHER=ccache
+          export CMAKE_CXX_COMPILER_LAUNCHER=ccache
           python -m pip install -v --no-deps -e integrations/pjrt/python_packages/iree_${{ matrix.pjrt_platform }}_plugin
           # install
           python -m pip install jax==0.4.36
