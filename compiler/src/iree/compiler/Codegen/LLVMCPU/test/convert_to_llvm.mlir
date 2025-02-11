@@ -56,9 +56,9 @@ func.func @interleave_and_bitcast_lowering() {
   %c3 = arith.constant 3 : index
   %c4096 = arith.constant 4096 : index
   %c8192 = arith.constant 8192 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c4096) flags(ReadOnly) : memref<128xi8, strided<[1], offset: 4096>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c4096) flags(ReadOnly) : memref<128xi8, strided<[1], offset: ?>>
   %out_buffer = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c8192) : memref<256x64xi4, strided<[64, 1], offset: 8192>>
-  %2 = vector.load %0[%c0] : memref<128xi8, strided<[1], offset: 4096>>, vector<2xi8>
+  %2 = vector.load %0[%c0] : memref<128xi8, strided<[1], offset: ?>>, vector<2xi8>
   %3 = vector.bitcast %2 : vector<2xi8> to vector<4xi4>
   %4 = vector.insert %3, %cst_0 [3] : vector<4xi4> into vector<4x4xi4>
   %5 = vector.bitcast %4 : vector<4x4xi4> to vector<4x2xi8>

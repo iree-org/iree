@@ -89,18 +89,13 @@ findOrCreateSubspanBuffer(RewriterBase &rewriter,
   Value byteOffset = subspanOp.getByteOffset();
   MemRefLayoutAttrInterface layoutAttr = {};
   if (byteOffset && !matchPattern(byteOffset, m_Zero())) {
-    OpFoldResult elementOffset = convertByteOffsetToElementOffset(
-        rewriter, subspanOp->getLoc(), subspanOp.getByteOffset(),
-        shapedType.getBoundElementType());
-    std::optional<int64_t> elementOffsetInt =
-        getConstantIntValue(elementOffset);
-    if (!elementOffsetInt) {
-      elementOffsetInt = ShapedType::kDynamic;
-    }
+    // Using buffer resources on AMDGPU will require buffers to be relocated to
+    // offset 0, so any static offset we can compute here might change.
+    // Therefore, always use a ? for the offset field unless it's known to be 0.
     auto tensorType = llvm::cast<RankedTensorType>(shapedType.getBoundType());
     SmallVector<int64_t> strides = getStridesFromShape(tensorType.getShape());
     layoutAttr = StridedLayoutAttr::get(rewriter.getContext(),
-                                        elementOffsetInt.value(), strides);
+                                        ShapedType::kDynamic, strides);
   }
   auto memRefType =
       getMemrefTypeForTensor(shapedType, layoutAttr,
