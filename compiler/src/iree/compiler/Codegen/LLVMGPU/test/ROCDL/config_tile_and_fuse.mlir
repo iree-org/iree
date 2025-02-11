@@ -519,3 +519,138 @@ func.func @scatter_as_root_op(%arg0: tensor<4x?xi64>,
 
 // Verify that the scatter op gets a lowering config
 // CHECK:      iree_linalg_ext.scatter {{.*}}lowering_config =
+
+// -----
+
+func.func @set_encoding_gpu(%0 : tensor<1234x567xi8>) -> tensor<10x9x8x4x4x4x2x8xi8> {
+  %c0_i8 = arith.constant 0 : i8
+  %22 = tensor.empty() : tensor<10x9x128x64xi8>
+  %pack = tensor.pack %0 padding_value(%c0_i8 : i8)
+      outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [128, 64]
+      into %22 : tensor<1234x567xi8> -> tensor<10x9x128x64xi8>
+  %expanded = tensor.expand_shape %pack [[0], [1], [2, 3, 4], [5, 6, 7]]
+      output_shape [10, 9, 4, 8, 4, 2, 4, 8]
+      : tensor<10x9x128x64xi8> into tensor<10x9x4x8x4x2x4x8xi8>
+  %23 = tensor.empty() : tensor<10x9x8x4x4x4x2x8xi8>
+  %24 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d4, d2, d5, d6, d3, d7)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]}
+      ins(%expanded : tensor<10x9x4x8x4x2x4x8xi8>) outs(%23 : tensor<10x9x8x4x4x4x2x8xi8>) {
+  ^bb0(%in: i8, %out: i8):
+    linalg.yield %in : i8
+  } -> tensor<10x9x8x4x4x4x2x8xi8>
+  return %24 : tensor<10x9x8x4x4x4x2x8xi8>
+}
+
+// CHECK-LABEL: func.func @set_encoding_gpu
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1, 1, 1, 1, 1, 1, 4]
+//  CHECK-SAME:     workgroup = [1, 1, 8, 4, 4, 4, 2, 8]
+
+// -----
+
+func.func @unset_encoding_gpu(%arg0: tensor<10x5x4x8x2x4x16x4xi32>) -> tensor<1234x567xi32> {
+  %c0_i8 = arith.constant 0 : i8
+  %0 = tensor.empty() : tensor<10x5x4x8x4x4x16x2xi32>
+  %transposed = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d3, d7, d2, d6, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]}
+      ins(%arg0 : tensor<10x5x4x8x2x4x16x4xi32>) outs(%0 : tensor<10x5x4x8x4x4x16x2xi32>) {
+  ^bb0(%in: i32, %out: i32):
+    linalg.yield %in : i32
+  } -> tensor<10x5x4x8x4x4x16x2xi32>
+  %collapsed = tensor.collapse_shape %transposed [[0], [1], [2, 3, 4], [5, 6, 7]]
+      : tensor<10x5x4x8x4x4x16x2xi32> into tensor<10x5x128x128xi32>
+  %1 = tensor.empty() : tensor<1234x567xi32>
+  %unpack = tensor.unpack %collapsed
+      outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [128, 128]
+      into %1 : tensor<10x5x128x128xi32> -> tensor<1234x567xi32>
+  return %unpack : tensor<1234x567xi32>
+}
+
+// CHECK-LABEL: func.func @unset_encoding_gpu
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1, 1, 1, 1, 1, 1, 1]
+//  CHECK-SAME:     workgroup = [1, 1, 4, 8, 4, 4, 16, 2]
+
+// -----
+
+func.func @pack_dynamic_producer(%arg0: tensor<?x?xi8>, %d0: index, %d1: index, %d2: index, %d3: index) -> tensor<?x?x32x32xi8> {
+  %c0_i8 = arith.constant 0 : i8
+  %init0 = tensor.empty(%d0, %d1) : tensor<?x?xi8>
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<?x?xi8>) outs(%init0 : tensor<?x?xi8>) {
+  ^bb0(%in: i8, %out: i8):
+    linalg.yield %in : i8
+  } -> tensor<?x?xi8>
+  %init1 = tensor.empty(%d2, %d3) : tensor<?x?x32x32xi8>
+  %pack = tensor.pack %0 padding_value(%c0_i8 : i8)
+      outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [32, 32]
+      into %init1 : tensor<?x?xi8> -> tensor<?x?x32x32xi8>
+  return %pack : tensor<?x?x32x32xi8>
+}
+
+// CHECK-LABEL: func.func @pack_dynamic_producer
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [1, 1, 1] subgroup_size = 64>
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1]
+//  CHECK-SAME:     workgroup = [32, 32]
+
+// -----
+
+func.func @pack_full_tile(%arg0: tensor<32x32xi8>) -> tensor<1x1x32x32xi8> {
+  %c0_i8 = arith.constant 0 : i8
+  %init0 = tensor.empty() : tensor<32x32xi8>
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<32x32xi8>) outs(%init0 : tensor<32x32xi8>) {
+  ^bb0(%in: i8, %out: i8):
+    linalg.yield %in : i8
+  } -> tensor<32x32xi8>
+  %init1 = tensor.empty() : tensor<1x1x32x32xi8>
+  %pack = tensor.pack %0 padding_value(%c0_i8 : i8)
+      outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [32, 32]
+      into %init1 : tensor<32x32xi8> -> tensor<1x1x32x32xi8>
+  return %pack : tensor<1x1x32x32xi8>
+}
+
+// CHECK-LABEL: func.func @pack_full_tile
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 4]
+//  CHECK-SAME:     workgroup = [32, 32]
+
+// -----
+
+func.func @pack_dynamic_tile(%arg0: tensor<32x32xi8>, %d0: index, %d1: index, %tile0: index, %tile1: index) -> tensor<?x?x?x?xi8> {
+  %c0_i8 = arith.constant 0 : i8
+  %init0 = tensor.empty() : tensor<32x32xi8>
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<32x32xi8>) outs(%init0 : tensor<32x32xi8>) {
+  ^bb0(%in: i8, %out: i8):
+    linalg.yield %in : i8
+  } -> tensor<32x32xi8>
+  %init1 = tensor.empty(%d0, %d1, %tile0, %tile1) : tensor<?x?x?x?xi8>
+  %pack = tensor.pack %0 padding_value(%c0_i8 : i8)
+      outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [%tile0, %tile1]
+      into %init1 : tensor<32x32xi8> -> tensor<?x?x?x?xi8>
+  return %pack : tensor<?x?x?x?xi8>
+}
+
+// CHECK-LABEL: func.func @pack_dynamic_tile
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 4]
+//  CHECK-SAME:     workgroup = [8, 32]

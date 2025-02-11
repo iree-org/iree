@@ -197,6 +197,9 @@ class BaseCMakeBuildPy(_build_py):
             cmake_args, "MACOSX_DEPLOYMENT_TARGET", "CMAKE_OSX_DEPLOYMENT_TARGET"
         )
 
+        add_env_cmake_setting(cmake_args, "CMAKE_C_COMPILER_LAUNCHER")
+        add_env_cmake_setting(cmake_args, "CMAKE_CXX_COMPILER_LAUNCHER")
+
         # Only do a from-scratch configure if not already configured.
         cmake_cache_file = os.path.join(cmake_build_dir, "CMakeCache.txt")
         if not os.path.exists(cmake_cache_file):

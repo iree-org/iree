@@ -53,7 +53,6 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRArithDialect
     MLIRArithUtils
-    MLIRCAPIIR
     MLIRControlFlowInterfaces
     MLIRIR
     MLIRLinalgDialect

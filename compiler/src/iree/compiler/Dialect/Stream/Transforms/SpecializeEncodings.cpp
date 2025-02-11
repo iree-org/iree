@@ -176,9 +176,9 @@ getBindingLayoutAttrs(IREE::Stream::TensorDispatchOp dispatchOp) {
 /// this case, we have to duplicate the executable with updated encoding, and
 /// modify the dispatch to launch proper executable based on resolved encoding
 /// layouts.
-static LogicalResult duplicateExecutablesPerLayoutVariant(
-    ModuleOp moduleOp, SymbolTable symbolTable, FunctionOpInterface funcOp,
-    IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr) {
+static LogicalResult
+duplicateExecutablesPerLayoutVariant(ModuleOp moduleOp, SymbolTable symbolTable,
+                                     FunctionOpInterface funcOp) {
   MLIRContext *ctx = moduleOp.getContext();
   IRRewriter rewriter(ctx);
 
@@ -587,18 +587,13 @@ struct SpecializeEncodingsPass
       return signalPassFailure();
     }
 
-    SymbolTable symbolTable(moduleOp);
-    llvm::MapVector<StringRef, IREE::Stream::ExecutableOp> executableOps;
-    for (auto executableOp : moduleOp.getOps<IREE::Stream::ExecutableOp>()) {
-      executableOps[executableOp.getName()] = executableOp;
-    }
-
     IREE::Stream::AffinityAnalysis affinityAnalysis(moduleOp);
     if (failed(affinityAnalysis.run())) {
       moduleOp.emitError("failed on running affinity analysis");
       return signalPassFailure();
     }
 
+    SymbolTable symbolTable(moduleOp);
     IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr =
         usedDialects[0]->makeLayoutAttrResolver(moduleOp);
     for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
@@ -608,8 +603,8 @@ struct SpecializeEncodingsPass
             "failed on adding layouts to Stream::TensorPhaseOp with encodings");
         return signalPassFailure();
       }
-      if (failed(duplicateExecutablesPerLayoutVariant(
-              moduleOp, symbolTable, funcOp, resolveLayoutAttr))) {
+      if (failed(duplicateExecutablesPerLayoutVariant(moduleOp, symbolTable,
+                                                      funcOp))) {
         funcOp.emitError("failed on executable duplication");
         return signalPassFailure();
       }
