@@ -20,12 +20,12 @@ IREE_FLAG(
     bool, task_abort_on_failure, false,
     "Aborts the program on the first failure within a task system queue.");
 
-static iree_status_t iree_hal_local_task_driver_factory_enumerate(
+static iree_status_t iree_hal_nonlocal_task_driver_factory_enumerate(
     void* self, iree_host_size_t* out_driver_info_count,
     const iree_hal_driver_info_t** out_driver_infos) {
   static const iree_hal_driver_info_t driver_infos[1] = {
       {
-          .driver_name = IREE_SVL("local-task"),
+          .driver_name = IREE_SVL("nonlocal-task"),
           .full_name = IREE_SVL("Local execution using the "
                                 "IREE multithreading task system"),
       },
@@ -35,10 +35,10 @@ static iree_status_t iree_hal_local_task_driver_factory_enumerate(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_local_task_driver_factory_try_create(
+static iree_status_t iree_hal_nonlocal_task_driver_factory_try_create(
     void* self, iree_string_view_t driver_name, iree_allocator_t host_allocator,
     iree_hal_driver_t** out_driver) {
-  if (!iree_string_view_equal(driver_name, IREE_SV("local-task"))) {
+  if (!iree_string_view_equal(driver_name, IREE_SV("nonlocal-task"))) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
                             "no driver '%.*s' is provided by this factory",
                             (int)driver_name.size, driver_name.data);
@@ -100,12 +100,12 @@ static iree_status_t iree_hal_local_task_driver_factory_try_create(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_local_task_driver_module_register(
+IREE_API_EXPORT iree_status_t iree_hal_nonlocal_task_driver_module_register(
     iree_hal_driver_registry_t* registry) {
   static const iree_hal_driver_factory_t factory = {
       .self = NULL,
-      .enumerate = iree_hal_local_task_driver_factory_enumerate,
-      .try_create = iree_hal_local_task_driver_factory_try_create,
+      .enumerate = iree_hal_nonlocal_task_driver_factory_enumerate,
+      .try_create = iree_hal_nonlocal_task_driver_factory_try_create,
   };
   return iree_hal_driver_registry_register_factory(registry, &factory);
 }

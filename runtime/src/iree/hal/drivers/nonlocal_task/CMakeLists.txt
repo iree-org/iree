@@ -14,21 +14,21 @@ iree_cc_library(
   NAME
     task_driver
   HDRS
-    "task_command_buffer.h"
-    "task_device.h"
-    "task_driver.h"
-    "task_event.h"
-    "task_queue.h"
-    "task_queue_state.h"
-    "task_semaphore.h"
+    "command_buffer.h"
+    "device.h"
+    "driver.h"
+    "event.h"
+    "queue.h"
+    "queue_state.h"
+    "semaphore.h"
   SRCS
-    "task_command_buffer.c"
-    "task_device.c"
-    "task_driver.c"
-    "task_event.c"
-    "task_queue.c"
-    "task_queue_state.c"
-    "task_semaphore.c"
+    "command_buffer.c"
+    "device.c"
+    "driver.c"
+    "event.c"
+    "queue.c"
+    "queue_state.c"
+    "semaphore.c"
   DEPS
     iree::base
     iree::base::internal
