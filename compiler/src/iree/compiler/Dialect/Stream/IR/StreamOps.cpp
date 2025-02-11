@@ -76,6 +76,7 @@ verifyDispatchWorkload(Operation *op, IREE::Stream::ExecutableExportOp exportOp,
   return success();
 }
 
+// Verifies the tied operand types are as the same as the result types.
 static LogicalResult verifyTiedOperandEncodings(Operation *op,
                                                 ArrayAttr operandEncodingsAttr,
                                                 ArrayAttr resultEncodingsAttr) {
