@@ -22,7 +22,7 @@ jobs:
     name: "test_sharktank_models :: ${{ matrix.name }}"
     runs-on: ${{ matrix.runs-on }}
     # Dynamically assign container for `linux-mi300-gpu-1`
-    container: ${{ fromJSON(toJSON(matrix.container || {})) }}
+    container: ${{ fromJSON(toJSON(matrix.container)) }}
     strategy:
       fail-fast: false
       matrix:
@@ -31,11 +31,13 @@ jobs:
             target: target_cpu
             gpu: none
             runs-on: ubuntu-24.04
+            container: null
 
           - name: hip_task_w7900
             target: target_hip
             gpu: gfx1100
             runs-on: nodai-amdgpu-w7900-x86-64
+            container: null
 
           - name: hip_task_mi300
             target: target_hip
