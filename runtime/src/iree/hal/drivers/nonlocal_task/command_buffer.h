@@ -18,7 +18,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-iree_status_t iree_hal_task_command_buffer_create(
+iree_status_t iree_hal_nl_task_command_buffer_create(
     iree_hal_allocator_t* device_allocator, iree_task_scope_t* scope,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
@@ -27,7 +27,7 @@ iree_status_t iree_hal_task_command_buffer_create(
     iree_hal_command_buffer_t** out_command_buffer);
 
 // Returns true if |command_buffer| is a task system command buffer.
-bool iree_hal_task_command_buffer_isa(
+bool iree_hal_nl_task_command_buffer_isa(
     iree_hal_command_buffer_t* command_buffer);
 
 // Issues a recorded command buffer using the serial |queue_state|.
@@ -46,9 +46,9 @@ bool iree_hal_task_command_buffer_isa(
 //
 // |pending_submission| will receive the ready list of commands and must be
 // submitted to the executor (or discarded on failure) by the caller.
-iree_status_t iree_hal_task_command_buffer_issue(
+iree_status_t iree_hal_nl_task_command_buffer_issue(
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_task_queue_state_t* queue_state, iree_task_t* retire_task,
+    iree_hal_nl_task_queue_state_t* queue_state, iree_task_t* retire_task,
     iree_arena_allocator_t* arena, iree_task_submission_t* pending_submission);
 
 #ifdef __cplusplus

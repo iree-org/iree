@@ -22,7 +22,7 @@
 #include "iree/task/task.h"
 
 //===----------------------------------------------------------------------===//
-// iree_hal_task_command_buffer_t
+// iree_hal_nl_task_command_buffer_t
 //===----------------------------------------------------------------------===//
 
 // iree/task/-based command buffer.
@@ -33,7 +33,7 @@
 // additional allocations required during recording or execution. That means our
 // command buffer here is essentially just a builder for the task system types
 // and manager of the lifetime of the tasks.
-typedef struct iree_hal_task_command_buffer_t {
+typedef struct iree_hal_nl_task_command_buffer_t {
   iree_hal_command_buffer_t base;
   iree_allocator_t host_allocator;
 
@@ -77,18 +77,18 @@ typedef struct iree_hal_task_command_buffer_t {
     // All execution tasks emitted that must execute after |open_barrier|.
     iree_task_list_t open_tasks;
   } state;
-} iree_hal_task_command_buffer_t;
+} iree_hal_nl_task_command_buffer_t;
 
 static const iree_hal_command_buffer_vtable_t
-    iree_hal_task_command_buffer_vtable;
+    iree_hal_nl_task_command_buffer_vtable;
 
-static iree_hal_task_command_buffer_t* iree_hal_task_command_buffer_cast(
+static iree_hal_nl_task_command_buffer_t* iree_hal_nl_task_command_buffer_cast(
     iree_hal_command_buffer_t* base_value) {
-  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_task_command_buffer_vtable);
-  return (iree_hal_task_command_buffer_t*)base_value;
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_nl_task_command_buffer_vtable);
+  return (iree_hal_nl_task_command_buffer_t*)base_value;
 }
 
-iree_status_t iree_hal_task_command_buffer_create(
+iree_status_t iree_hal_nl_task_command_buffer_create(
     iree_hal_allocator_t* device_allocator, iree_task_scope_t* scope,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
@@ -119,7 +119,7 @@ iree_status_t iree_hal_task_command_buffer_create(
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_task_command_buffer_t* command_buffer = NULL;
+  iree_hal_nl_task_command_buffer_t* command_buffer = NULL;
   iree_status_t status = iree_allocator_malloc(
       host_allocator,
       sizeof(*command_buffer) +
@@ -129,7 +129,7 @@ iree_status_t iree_hal_task_command_buffer_create(
     iree_hal_command_buffer_initialize(
         device_allocator, mode, command_categories, queue_affinity,
         binding_capacity, (uint8_t*)command_buffer + sizeof(*command_buffer),
-        &iree_hal_task_command_buffer_vtable, &command_buffer->base);
+        &iree_hal_nl_task_command_buffer_vtable, &command_buffer->base);
     command_buffer->host_allocator = host_allocator;
     command_buffer->scope = scope;
     iree_arena_initialize(block_pool, &command_buffer->arena);
@@ -149,10 +149,10 @@ iree_status_t iree_hal_task_command_buffer_create(
   return status;
 }
 
-static void iree_hal_task_command_buffer_destroy(
+static void iree_hal_nl_task_command_buffer_destroy(
     iree_hal_command_buffer_t* base_command_buffer) {
-  iree_hal_task_command_buffer_t* command_buffer =
-      iree_hal_task_command_buffer_cast(base_command_buffer);
+  iree_hal_nl_task_command_buffer_t* command_buffer =
+      iree_hal_nl_task_command_buffer_cast(base_command_buffer);
   iree_allocator_t host_allocator = command_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -166,23 +166,23 @@ static void iree_hal_task_command_buffer_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-bool iree_hal_task_command_buffer_isa(
+bool iree_hal_nl_task_command_buffer_isa(
     iree_hal_command_buffer_t* command_buffer) {
   return iree_hal_resource_is(&command_buffer->resource,
-                              &iree_hal_task_command_buffer_vtable);
+                              &iree_hal_nl_task_command_buffer_vtable);
 }
 
 //===----------------------------------------------------------------------===//
-// iree_hal_task_command_buffer_t recording
+// iree_hal_nl_task_command_buffer_t recording
 //===----------------------------------------------------------------------===//
 
-static iree_status_t iree_hal_task_command_buffer_flush_tasks(
-    iree_hal_task_command_buffer_t* command_buffer);
+static iree_status_t iree_hal_nl_task_command_buffer_flush_tasks(
+    iree_hal_nl_task_command_buffer_t* command_buffer);
 
-static iree_status_t iree_hal_task_command_buffer_begin(
+static iree_status_t iree_hal_nl_task_command_buffer_begin(
     iree_hal_command_buffer_t* base_command_buffer) {
-  iree_hal_task_command_buffer_t* command_buffer =
-      iree_hal_task_command_buffer_cast(base_command_buffer);
+  iree_hal_nl_task_command_buffer_t* command_buffer =
+      iree_hal_nl_task_command_buffer_cast(base_command_buffer);
   if (!iree_task_list_is_empty(&command_buffer->root_tasks)) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "command buffer cannot be re-recorded");
@@ -190,14 +190,14 @@ static iree_status_t iree_hal_task_command_buffer_begin(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_task_command_buffer_end(
+static iree_status_t iree_hal_nl_task_command_buffer_end(
     iree_hal_command_buffer_t* base_command_buffer) {
-  iree_hal_task_command_buffer_t* command_buffer =
-      iree_hal_task_command_buffer_cast(base_command_buffer);
+  iree_hal_nl_task_command_buffer_t* command_buffer =
+      iree_hal_nl_task_command_buffer_cast(base_command_buffer);
 
   // Flush any open barriers.
   IREE_RETURN_IF_ERROR(
-      iree_hal_task_command_buffer_flush_tasks(command_buffer));
+      iree_hal_nl_task_command_buffer_flush_tasks(command_buffer));
 
   // Move the tasks from the leaf list (tail) to the root list (head) if this
   // was the first set of tasks recorded.
@@ -217,8 +217,8 @@ static iree_status_t iree_hal_task_command_buffer_end(
 // the one place where we can see both halves of the most recent synchronization
 // event: those tasks recorded prior (if any) and the task that marks the set of
 // tasks that will be recorded after (if any).
-static iree_status_t iree_hal_task_command_buffer_flush_tasks(
-    iree_hal_task_command_buffer_t* command_buffer) {
+static iree_status_t iree_hal_nl_task_command_buffer_flush_tasks(
+    iree_hal_nl_task_command_buffer_t* command_buffer) {
   iree_task_barrier_t* open_barrier = command_buffer->state.open_barrier;
   if (open_barrier != NULL) {
     // There is an open barrier we need to fixup the fork out to all of the open
@@ -266,13 +266,13 @@ static iree_status_t iree_hal_task_command_buffer_flush_tasks(
 // limits our concurrency: changing to fine-grained barriers (via barrier
 // buffers or events) will allow more work to overlap at the cost of more brain
 // to build out the proper task graph.
-static iree_status_t iree_hal_task_command_buffer_emit_global_barrier(
-    iree_hal_task_command_buffer_t* command_buffer) {
+static iree_status_t iree_hal_nl_task_command_buffer_emit_global_barrier(
+    iree_hal_nl_task_command_buffer_t* command_buffer) {
   // Flush open tasks to the previous barrier. This resets our state such that
   // we can assign the new open barrier and start recording tasks for it.
   // Previous tasks will be moved into the leaf_tasks list.
   IREE_RETURN_IF_ERROR(
-      iree_hal_task_command_buffer_flush_tasks(command_buffer));
+      iree_hal_nl_task_command_buffer_flush_tasks(command_buffer));
 
   // Allocate the new open barrier.
   // As we are recording forward we can't yet assign the dependent tasks (the
@@ -317,8 +317,8 @@ static iree_status_t iree_hal_task_command_buffer_emit_global_barrier(
 
 // Emits a the given execution |task| into the current open synchronization
 // scope (after state.open_barrier and before the next barrier).
-static iree_status_t iree_hal_task_command_buffer_emit_execution_task(
-    iree_hal_task_command_buffer_t* command_buffer, iree_task_t* task) {
+static iree_status_t iree_hal_nl_task_command_buffer_emit_execution_task(
+    iree_hal_nl_task_command_buffer_t* command_buffer, iree_task_t* task) {
   if (command_buffer->state.open_barrier == NULL) {
     // If there is no open barrier then we are at the head and going right into
     // the task DAG.
@@ -332,15 +332,15 @@ static iree_status_t iree_hal_task_command_buffer_emit_execution_task(
 }
 
 //===----------------------------------------------------------------------===//
-// iree_hal_task_command_buffer_t execution
+// iree_hal_nl_task_command_buffer_t execution
 //===----------------------------------------------------------------------===//
 
-iree_status_t iree_hal_task_command_buffer_issue(
+iree_status_t iree_hal_nl_task_command_buffer_issue(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_task_queue_state_t* queue_state, iree_task_t* retire_task,
+    iree_hal_nl_task_queue_state_t* queue_state, iree_task_t* retire_task,
     iree_arena_allocator_t* arena, iree_task_submission_t* pending_submission) {
-  iree_hal_task_command_buffer_t* command_buffer =
-      iree_hal_task_command_buffer_cast(base_command_buffer);
+  iree_hal_nl_task_command_buffer_t* command_buffer =
+      iree_hal_nl_task_command_buffer_cast(base_command_buffer);
   IREE_ASSERT_TRUE(command_buffer);
 
   // If the command buffer is empty (valid!) then we are a no-op.
@@ -377,17 +377,17 @@ iree_status_t iree_hal_task_command_buffer_issue(
 }
 
 //===----------------------------------------------------------------------===//
-// iree_hal_task_command_buffer_t debug utilities
+// iree_hal_nl_task_command_buffer_t debug utilities
 //===----------------------------------------------------------------------===//
 
-static void iree_hal_task_command_buffer_begin_debug_group(
+static void iree_hal_nl_task_command_buffer_begin_debug_group(
     iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
     iree_hal_label_color_t label_color,
     const iree_hal_label_location_t* location) {
   // TODO(benvanik): tracy event stack.
 }
 
-static void iree_hal_task_command_buffer_end_debug_group(
+static void iree_hal_nl_task_command_buffer_end_debug_group(
     iree_hal_command_buffer_t* base_command_buffer) {
   // TODO(benvanik): tracy event stack.
 }
@@ -396,7 +396,7 @@ static void iree_hal_task_command_buffer_end_debug_group(
 // iree_hal_command_buffer_execution_barrier
 //===----------------------------------------------------------------------===//
 
-static iree_status_t iree_hal_task_command_buffer_execution_barrier(
+static iree_status_t iree_hal_nl_task_command_buffer_execution_barrier(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_execution_stage_t source_stage_mask,
     iree_hal_execution_stage_t target_stage_mask,
@@ -405,19 +405,19 @@ static iree_status_t iree_hal_task_command_buffer_execution_barrier(
     const iree_hal_memory_barrier_t* memory_barriers,
     iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers) {
-  iree_hal_task_command_buffer_t* command_buffer =
-      iree_hal_task_command_buffer_cast(base_command_buffer);
+  iree_hal_nl_task_command_buffer_t* command_buffer =
+      iree_hal_nl_task_command_buffer_cast(base_command_buffer);
 
   // TODO(benvanik): actual DAG construction. Right now we are just doing simple
   // global barriers each time and forcing a join-fork point.
-  return iree_hal_task_command_buffer_emit_global_barrier(command_buffer);
+  return iree_hal_nl_task_command_buffer_emit_global_barrier(command_buffer);
 }
 
 //===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_signal_event
 //===----------------------------------------------------------------------===//
 
-static iree_status_t iree_hal_task_command_buffer_signal_event(
+static iree_status_t iree_hal_nl_task_command_buffer_signal_event(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask) {
   // TODO(#4518): implement events. For now we just insert global barriers.
@@ -428,7 +428,7 @@ static iree_status_t iree_hal_task_command_buffer_signal_event(
 // iree_hal_command_buffer_reset_event
 //===----------------------------------------------------------------------===//
 
-static iree_status_t iree_hal_task_command_buffer_reset_event(
+static iree_status_t iree_hal_nl_task_command_buffer_reset_event(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask) {
   // TODO(#4518): implement events. For now we just insert global barriers.
@@ -439,7 +439,7 @@ static iree_status_t iree_hal_task_command_buffer_reset_event(
 // iree_hal_command_buffer_wait_events
 //===----------------------------------------------------------------------===//
 
-static iree_status_t iree_hal_task_command_buffer_wait_events(
+static iree_status_t iree_hal_nl_task_command_buffer_wait_events(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_host_size_t event_count, const iree_hal_event_t** events,
     iree_hal_execution_stage_t source_stage_mask,
@@ -448,17 +448,17 @@ static iree_status_t iree_hal_task_command_buffer_wait_events(
     const iree_hal_memory_barrier_t* memory_barriers,
     iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers) {
-  iree_hal_task_command_buffer_t* command_buffer =
-      iree_hal_task_command_buffer_cast(base_command_buffer);
+  iree_hal_nl_task_command_buffer_t* command_buffer =
+      iree_hal_nl_task_command_buffer_cast(base_command_buffer);
   // TODO(#4518): implement events. For now we just insert global barriers.
-  return iree_hal_task_command_buffer_emit_global_barrier(command_buffer);
+  return iree_hal_nl_task_command_buffer_emit_global_barrier(command_buffer);
 }
 
 //===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_discard_buffer
 //===----------------------------------------------------------------------===//
 
-static iree_status_t iree_hal_task_command_buffer_discard_buffer(
+static iree_status_t iree_hal_nl_task_command_buffer_discard_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_buffer_ref_t buffer_ref) {
   return iree_ok_status();
@@ -476,18 +476,18 @@ static iree_status_t iree_hal_task_command_buffer_discard_buffer(
 // length so pick a power of two.
 #define IREE_HAL_TASK_CMD_FILL_SLICE_LENGTH (128 * 1024)
 
-typedef struct iree_hal_task_cmd_fill_buffer_t {
+typedef struct iree_hal_nl_task_cmd_fill_buffer_t {
   iree_task_dispatch_t task;
   iree_hal_buffer_ref_t target_ref;
   uint32_t pattern_length;
   uint8_t pattern[8];
-} iree_hal_task_cmd_fill_buffer_t;
+} iree_hal_nl_task_cmd_fill_buffer_t;
 
-static iree_status_t iree_hal_task_cmd_fill_tile(
+static iree_status_t iree_hal_nl_task_cmd_fill_tile(
     void* user_context, const iree_task_tile_context_t* tile_context,
     iree_task_submission_t* pending_submission) {
-  const iree_hal_task_cmd_fill_buffer_t* cmd =
-      (const iree_hal_task_cmd_fill_buffer_t*)user_context;
+  const iree_hal_nl_task_cmd_fill_buffer_t* cmd =
+      (const iree_hal_nl_task_cmd_fill_buffer_t*)user_context;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_device_size_t length_per_slice = tile_context->workgroup_size[0];
@@ -506,17 +506,17 @@ static iree_status_t iree_hal_task_cmd_fill_tile(
   return status;
 }
 
-static iree_status_t iree_hal_task_command_buffer_fill_buffer(
+static iree_status_t iree_hal_nl_task_command_buffer_fill_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_buffer_ref_t target_ref, const void* pattern,
     iree_host_size_t pattern_length) {
-  iree_hal_task_command_buffer_t* command_buffer =
-      iree_hal_task_command_buffer_cast(base_command_buffer);
+  iree_hal_nl_task_command_buffer_t* command_buffer =
+      iree_hal_nl_task_command_buffer_cast(base_command_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &target_ref.buffer));
 
-  iree_hal_task_cmd_fill_buffer_t* cmd = NULL;
+  iree_hal_nl_task_cmd_fill_buffer_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(
       iree_arena_allocate(&command_buffer->arena, sizeof(*cmd), (void**)&cmd));
 
@@ -532,13 +532,13 @@ static iree_status_t iree_hal_task_command_buffer_fill_buffer(
   };
   iree_task_dispatch_initialize(
       command_buffer->scope,
-      iree_task_make_dispatch_closure(iree_hal_task_cmd_fill_tile, (void*)cmd),
+      iree_task_make_dispatch_closure(iree_hal_nl_task_cmd_fill_tile, (void*)cmd),
       workgroup_size, workgroup_count, &cmd->task);
   cmd->target_ref = target_ref;
   memcpy(cmd->pattern, pattern, pattern_length);
   cmd->pattern_length = pattern_length;
 
-  return iree_hal_task_command_buffer_emit_execution_task(command_buffer,
+  return iree_hal_nl_task_command_buffer_emit_execution_task(command_buffer,
                                                           &cmd->task.header);
 }
 
@@ -546,17 +546,17 @@ static iree_status_t iree_hal_task_command_buffer_fill_buffer(
 // iree_hal_command_buffer_update_buffer
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_task_cmd_update_buffer_t {
+typedef struct iree_hal_nl_task_cmd_update_buffer_t {
   iree_task_call_t task;
   iree_hal_buffer_ref_t target_ref;
   uint8_t source_buffer[];
-} iree_hal_task_cmd_update_buffer_t;
+} iree_hal_nl_task_cmd_update_buffer_t;
 
-static iree_status_t iree_hal_task_cmd_update_buffer(
+static iree_status_t iree_hal_nl_task_cmd_update_buffer(
     void* user_context, iree_task_t* task,
     iree_task_submission_t* pending_submission) {
-  const iree_hal_task_cmd_update_buffer_t* cmd =
-      (const iree_hal_task_cmd_update_buffer_t*)user_context;
+  const iree_hal_nl_task_cmd_update_buffer_t* cmd =
+      (const iree_hal_nl_task_cmd_update_buffer_t*)user_context;
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status =
       iree_hal_buffer_map_write(cmd->target_ref.buffer, cmd->target_ref.offset,
@@ -565,31 +565,31 @@ static iree_status_t iree_hal_task_cmd_update_buffer(
   return status;
 }
 
-static iree_status_t iree_hal_task_command_buffer_update_buffer(
+static iree_status_t iree_hal_nl_task_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
     iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref) {
-  iree_hal_task_command_buffer_t* command_buffer =
-      iree_hal_task_command_buffer_cast(base_command_buffer);
+  iree_hal_nl_task_command_buffer_t* command_buffer =
+      iree_hal_nl_task_command_buffer_cast(base_command_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &target_ref.buffer));
 
   iree_host_size_t total_cmd_size =
-      sizeof(iree_hal_task_cmd_update_buffer_t) + target_ref.length;
+      sizeof(iree_hal_nl_task_cmd_update_buffer_t) + target_ref.length;
 
-  iree_hal_task_cmd_update_buffer_t* cmd = NULL;
+  iree_hal_nl_task_cmd_update_buffer_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_arena_allocate(&command_buffer->arena,
                                            total_cmd_size, (void**)&cmd));
 
   iree_task_call_initialize(
       command_buffer->scope,
-      iree_task_make_call_closure(iree_hal_task_cmd_update_buffer, (void*)cmd),
+      iree_task_make_call_closure(iree_hal_nl_task_cmd_update_buffer, (void*)cmd),
       &cmd->task);
   cmd->target_ref = target_ref;
   memcpy(cmd->source_buffer, (const uint8_t*)source_buffer + source_offset,
          cmd->target_ref.length);
 
-  return iree_hal_task_command_buffer_emit_execution_task(command_buffer,
+  return iree_hal_nl_task_command_buffer_emit_execution_task(command_buffer,
                                                           &cmd->task.header);
 }
 
@@ -605,17 +605,17 @@ static iree_status_t iree_hal_task_command_buffer_update_buffer(
 // length so pick a power of two.
 #define IREE_HAL_TASK_CMD_COPY_SLICE_LENGTH (128 * 1024)
 
-typedef struct iree_hal_task_cmd_copy_buffer_t {
+typedef struct iree_hal_nl_task_cmd_copy_buffer_t {
   iree_task_dispatch_t task;
   iree_hal_buffer_ref_t source_ref;
   iree_hal_buffer_ref_t target_ref;
-} iree_hal_task_cmd_copy_buffer_t;
+} iree_hal_nl_task_cmd_copy_buffer_t;
 
-static iree_status_t iree_hal_task_cmd_copy_tile(
+static iree_status_t iree_hal_nl_task_cmd_copy_tile(
     void* user_context, const iree_task_tile_context_t* tile_context,
     iree_task_submission_t* pending_submission) {
-  const iree_hal_task_cmd_copy_buffer_t* cmd =
-      (const iree_hal_task_cmd_copy_buffer_t*)user_context;
+  const iree_hal_nl_task_cmd_copy_buffer_t* cmd =
+      (const iree_hal_nl_task_cmd_copy_buffer_t*)user_context;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_device_size_t length_per_slice = tile_context->workgroup_size[0];
@@ -635,11 +635,11 @@ static iree_status_t iree_hal_task_cmd_copy_tile(
   return status;
 }
 
-static iree_status_t iree_hal_task_command_buffer_copy_buffer(
+static iree_status_t iree_hal_nl_task_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref) {
-  iree_hal_task_command_buffer_t* command_buffer =
-      iree_hal_task_command_buffer_cast(base_command_buffer);
+  iree_hal_nl_task_command_buffer_t* command_buffer =
+      iree_hal_nl_task_command_buffer_cast(base_command_buffer);
 
   const iree_hal_buffer_t* buffers[2] = {
       source_ref.buffer,
@@ -648,7 +648,7 @@ static iree_status_t iree_hal_task_command_buffer_copy_buffer(
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, IREE_ARRAYSIZE(buffers), buffers));
 
-  iree_hal_task_cmd_copy_buffer_t* cmd = NULL;
+  iree_hal_nl_task_cmd_copy_buffer_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(
       iree_arena_allocate(&command_buffer->arena, sizeof(*cmd), (void**)&cmd));
 
@@ -664,12 +664,12 @@ static iree_status_t iree_hal_task_command_buffer_copy_buffer(
   };
   iree_task_dispatch_initialize(
       command_buffer->scope,
-      iree_task_make_dispatch_closure(iree_hal_task_cmd_copy_tile, (void*)cmd),
+      iree_task_make_dispatch_closure(iree_hal_nl_task_cmd_copy_tile, (void*)cmd),
       workgroup_size, workgroup_count, &cmd->task);
   cmd->source_ref = source_ref;
   cmd->target_ref = target_ref;
 
-  return iree_hal_task_command_buffer_emit_execution_task(command_buffer,
+  return iree_hal_nl_task_command_buffer_emit_execution_task(command_buffer,
                                                           &cmd->task.header);
 }
 
@@ -677,7 +677,7 @@ static iree_status_t iree_hal_task_command_buffer_copy_buffer(
 // iree_hal_command_buffer_collective
 //===----------------------------------------------------------------------===//
 
-static iree_status_t iree_hal_task_command_buffer_collective(
+static iree_status_t iree_hal_nl_task_command_buffer_collective(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_channel_t* channel,
     iree_hal_collective_op_t op, uint32_t param, iree_hal_buffer_ref_t send_ref,
     iree_hal_buffer_ref_t recv_ref, iree_device_size_t element_count) {
@@ -707,7 +707,7 @@ static iree_status_t iree_hal_task_command_buffer_collective(
 // iree_hal_command_buffer_dispatch
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_task_cmd_dispatch_t {
+typedef struct iree_hal_nl_task_cmd_dispatch_t {
   iree_task_dispatch_t task;
   iree_hal_local_executable_t* executable;
   int32_t ordinal;
@@ -724,18 +724,18 @@ typedef struct iree_hal_task_cmd_dispatch_t {
   // - const uint32_t constants[constant_count];
   // - void* binding_ptrs[binding_count];
   // - const size_t binding_lengths[binding_count];
-} iree_hal_task_cmd_dispatch_t;
+} iree_hal_nl_task_cmd_dispatch_t;
 
-static iree_status_t iree_hal_task_cmd_dispatch_tile(
+static iree_status_t iree_hal_nl_task_cmd_dispatch_tile(
     void* user_context, const iree_task_tile_context_t* tile_context,
     iree_task_submission_t* pending_submission) {
-  const iree_hal_task_cmd_dispatch_t* cmd =
-      (const iree_hal_task_cmd_dispatch_t*)user_context;
+  const iree_hal_nl_task_cmd_dispatch_t* cmd =
+      (const iree_hal_nl_task_cmd_dispatch_t*)user_context;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // We could share this across all workgroups in a dispatch and reduce cache
   // pressure as all cores would be hitting the same hot read-only cache line.
-  // It'd grow the size of iree_hal_task_cmd_dispatch_t by a few dozen bytes,
+  // It'd grow the size of iree_hal_nl_task_cmd_dispatch_t by a few dozen bytes,
   // though, and so we'd need some profiling to see if it's worth it (fixed
   // command buffer cost vs potential for saving a cache miss or two).
   iree_alignas(64) iree_hal_executable_dispatch_state_v0_t dispatch_state = {
@@ -776,14 +776,14 @@ static iree_status_t iree_hal_task_cmd_dispatch_tile(
   return status;
 }
 
-static iree_status_t iree_hal_task_command_buffer_build_dispatch(
+static iree_status_t iree_hal_nl_task_command_buffer_build_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings,
-    iree_hal_task_cmd_dispatch_t** out_cmd) {
-  iree_hal_task_command_buffer_t* command_buffer =
-      iree_hal_task_command_buffer_cast(base_command_buffer);
+    iree_hal_nl_task_cmd_dispatch_t** out_cmd) {
+  iree_hal_nl_task_command_buffer_t* command_buffer =
+      iree_hal_nl_task_command_buffer_cast(base_command_buffer);
 
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
@@ -792,7 +792,7 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
     dispatch_attrs = local_executable->dispatch_attrs[entry_point];
   }
 
-  iree_hal_task_cmd_dispatch_t* cmd = NULL;
+  iree_hal_nl_task_cmd_dispatch_t* cmd = NULL;
   iree_host_size_t total_cmd_size =
       sizeof(*cmd) + dispatch_attrs.constant_count * sizeof(uint32_t) +
       dispatch_attrs.binding_count * sizeof(void*) +
@@ -809,7 +809,7 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
   const uint32_t workgroup_size[3] = {1, 1, 1};
   iree_task_dispatch_initialize(
       command_buffer->scope,
-      iree_task_make_dispatch_closure(iree_hal_task_cmd_dispatch_tile,
+      iree_task_make_dispatch_closure(iree_hal_nl_task_cmd_dispatch_tile,
                                       (void*)cmd),
       workgroup_size, workgroup_count, &cmd->task);
 
@@ -881,34 +881,34 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
       offsetof(iree_hal_buffer_ref_t, buffer), sizeof(iree_hal_buffer_ref_t)));
 
   *out_cmd = cmd;
-  return iree_hal_task_command_buffer_emit_execution_task(command_buffer,
+  return iree_hal_nl_task_command_buffer_emit_execution_task(command_buffer,
                                                           &cmd->task.header);
 }
 
-static iree_status_t iree_hal_task_command_buffer_dispatch(
+static iree_status_t iree_hal_nl_task_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
-  iree_hal_task_command_buffer_t* command_buffer =
-      iree_hal_task_command_buffer_cast(base_command_buffer);
+  iree_hal_nl_task_command_buffer_t* command_buffer =
+      iree_hal_nl_task_command_buffer_cast(base_command_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &executable));
 
-  iree_hal_task_cmd_dispatch_t* cmd = NULL;
-  return iree_hal_task_command_buffer_build_dispatch(
+  iree_hal_nl_task_cmd_dispatch_t* cmd = NULL;
+  return iree_hal_nl_task_command_buffer_build_dispatch(
       base_command_buffer, executable, entry_point, workgroup_count, constants,
       bindings, &cmd);
 }
 
-static iree_status_t iree_hal_task_command_buffer_dispatch_indirect(
+static iree_status_t iree_hal_nl_task_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
-  iree_hal_task_command_buffer_t* command_buffer =
-      iree_hal_task_command_buffer_cast(base_command_buffer);
+  iree_hal_nl_task_command_buffer_t* command_buffer =
+      iree_hal_nl_task_command_buffer_cast(base_command_buffer);
 
   const void* resources[2] = {executable, workgroups_ref.buffer};
   IREE_RETURN_IF_ERROR(
@@ -922,8 +922,8 @@ static iree_status_t iree_hal_task_command_buffer_dispatch_indirect(
       &buffer_mapping));
 
   uint32_t workgroup_count[3] = {0};  // unused with the indirect flag
-  iree_hal_task_cmd_dispatch_t* cmd = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_task_command_buffer_build_dispatch(
+  iree_hal_nl_task_cmd_dispatch_t* cmd = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_nl_task_command_buffer_build_dispatch(
       base_command_buffer, executable, entry_point, workgroup_count, constants,
       bindings, &cmd));
   cmd->task.workgroup_count.ptr = (const uint32_t*)buffer_mapping.contents.data;
@@ -936,21 +936,21 @@ static iree_status_t iree_hal_task_command_buffer_dispatch_indirect(
 //===----------------------------------------------------------------------===//
 
 static const iree_hal_command_buffer_vtable_t
-    iree_hal_task_command_buffer_vtable = {
-        .destroy = iree_hal_task_command_buffer_destroy,
-        .begin = iree_hal_task_command_buffer_begin,
-        .end = iree_hal_task_command_buffer_end,
-        .begin_debug_group = iree_hal_task_command_buffer_begin_debug_group,
-        .end_debug_group = iree_hal_task_command_buffer_end_debug_group,
-        .execution_barrier = iree_hal_task_command_buffer_execution_barrier,
-        .signal_event = iree_hal_task_command_buffer_signal_event,
-        .reset_event = iree_hal_task_command_buffer_reset_event,
-        .wait_events = iree_hal_task_command_buffer_wait_events,
-        .discard_buffer = iree_hal_task_command_buffer_discard_buffer,
-        .fill_buffer = iree_hal_task_command_buffer_fill_buffer,
-        .update_buffer = iree_hal_task_command_buffer_update_buffer,
-        .copy_buffer = iree_hal_task_command_buffer_copy_buffer,
-        .collective = iree_hal_task_command_buffer_collective,
-        .dispatch = iree_hal_task_command_buffer_dispatch,
-        .dispatch_indirect = iree_hal_task_command_buffer_dispatch_indirect,
+    iree_hal_nl_task_command_buffer_vtable = {
+        .destroy = iree_hal_nl_task_command_buffer_destroy,
+        .begin = iree_hal_nl_task_command_buffer_begin,
+        .end = iree_hal_nl_task_command_buffer_end,
+        .begin_debug_group = iree_hal_nl_task_command_buffer_begin_debug_group,
+        .end_debug_group = iree_hal_nl_task_command_buffer_end_debug_group,
+        .execution_barrier = iree_hal_nl_task_command_buffer_execution_barrier,
+        .signal_event = iree_hal_nl_task_command_buffer_signal_event,
+        .reset_event = iree_hal_nl_task_command_buffer_reset_event,
+        .wait_events = iree_hal_nl_task_command_buffer_wait_events,
+        .discard_buffer = iree_hal_nl_task_command_buffer_discard_buffer,
+        .fill_buffer = iree_hal_nl_task_command_buffer_fill_buffer,
+        .update_buffer = iree_hal_nl_task_command_buffer_update_buffer,
+        .copy_buffer = iree_hal_nl_task_command_buffer_copy_buffer,
+        .collective = iree_hal_nl_task_command_buffer_collective,
+        .dispatch = iree_hal_nl_task_command_buffer_dispatch,
+        .dispatch_indirect = iree_hal_nl_task_command_buffer_dispatch_indirect,
 };

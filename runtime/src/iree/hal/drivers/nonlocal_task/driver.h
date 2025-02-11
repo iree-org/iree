@@ -27,9 +27,9 @@ extern "C" {
 //
 // |loaders| is the set of executable loaders that are available for loading in
 // the device context. The loaders are retained for the lifetime of the device.
-iree_status_t iree_hal_task_driver_create(
+iree_status_t iree_hal_nl_task_driver_create(
     iree_string_view_t identifier,
-    const iree_hal_task_device_params_t* default_params,
+    const iree_hal_nl_task_device_params_t* default_params,
     iree_host_size_t queue_count, iree_task_executor_t* const* queue_executors,
     iree_host_size_t loader_count, iree_hal_executable_loader_t** loaders,
     iree_hal_allocator_t* device_allocator, iree_allocator_t host_allocator,

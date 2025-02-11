@@ -44,8 +44,8 @@ static iree_status_t iree_hal_local_task_driver_factory_try_create(
                             (int)driver_name.size, driver_name.data);
   }
 
-  iree_hal_task_device_params_t default_params;
-  iree_hal_task_device_params_initialize(&default_params);
+  iree_hal_nl_task_device_params_t default_params;
+  iree_hal_nl_task_device_params_initialize(&default_params);
   if (FLAG_task_abort_on_failure) {
     default_params.queue_scope_flags |= IREE_TASK_SCOPE_FLAG_ABORT_ON_FAILURE;
   }
@@ -84,7 +84,7 @@ static iree_status_t iree_hal_local_task_driver_factory_try_create(
   // Create a task driver that will use the given executors for scheduling work
   // and loaders for loading executables.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_task_driver_create(
+    status = iree_hal_nl_task_driver_create(
         driver_name, &default_params, executor_count, executors, loader_count,
         loaders, device_allocator, host_allocator, out_driver);
   }

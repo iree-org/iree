@@ -8,10 +8,10 @@
 
 #include <string.h>
 
-void iree_hal_task_queue_state_initialize(
-    iree_hal_task_queue_state_t* out_queue_state) {
+void iree_hal_nl_task_queue_state_initialize(
+    iree_hal_nl_task_queue_state_t* out_queue_state) {
   memset(out_queue_state, 0, sizeof(*out_queue_state));
 }
 
-void iree_hal_task_queue_state_deinitialize(
-    iree_hal_task_queue_state_t* queue_state) {}
+void iree_hal_nl_task_queue_state_deinitialize(
+    iree_hal_nl_task_queue_state_t* queue_state) {}

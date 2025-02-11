@@ -20,19 +20,19 @@ extern "C" {
 //
 // Thread-compatible: only intended to be used by a queue with the submission
 // lock held.
-typedef struct iree_hal_task_queue_state_t {
+typedef struct iree_hal_nl_task_queue_state_t {
   // TODO(#4518): track event state.
   int reserved;
-} iree_hal_task_queue_state_t;
+} iree_hal_nl_task_queue_state_t;
 
 // Initializes queue state with the given |identifier| used to annotate tasks
 // submitted to the queue.
-void iree_hal_task_queue_state_initialize(
-    iree_hal_task_queue_state_t* out_queue_state);
+void iree_hal_nl_task_queue_state_initialize(
+    iree_hal_nl_task_queue_state_t* out_queue_state);
 
 // Deinitializes queue state and cleans up any tracking intermediates.
-void iree_hal_task_queue_state_deinitialize(
-    iree_hal_task_queue_state_t* queue_state);
+void iree_hal_nl_task_queue_state_deinitialize(
+    iree_hal_nl_task_queue_state_t* queue_state);
 
 #ifdef __cplusplus
 }  // extern "C"
