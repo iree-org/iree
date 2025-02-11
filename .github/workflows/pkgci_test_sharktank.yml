@@ -30,10 +30,15 @@ jobs:
             gpu: none
             runs-on: ubuntu-24.04
 
-          - name: hip_task
+          - name: hip_task_w7900
             target: target_hip
             gpu: gfx1100
             runs-on: nodai-amdgpu-w7900-x86-64
+
+          - name: hip_task_mi300
+            target: target_hip
+            gpu: gfx942
+            runs-on: linux-mi300-gpu-1
 
     env:
       VENV_DIR: ${{ github.workspace }}/venv
