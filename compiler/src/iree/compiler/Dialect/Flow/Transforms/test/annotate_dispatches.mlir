@@ -705,3 +705,58 @@ flow.executable private @ex {
     }
   }
 }
+
+// -----
+
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @dispatch_horizontal_multi_contract_28x10x4096x64x640_i8xi8xi8xi8xi32xi32xi32
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !flow.dispatch.tensor<readonly:tensor<28x4096x640xi8>>,
+                        %arg1: !flow.dispatch.tensor<readonly:tensor<10x64x640xi8>>,
+                        %arg2: !flow.dispatch.tensor<readonly:tensor<10x64x640xi8>>,
+                        %arg3: !flow.dispatch.tensor<readonly:tensor<10x64x640xi8>>,
+                        %arg4: !flow.dispatch.tensor<writeonly:tensor<28x10x4096x64xi32>>,
+                        %arg5: !flow.dispatch.tensor<writeonly:tensor<28x10x4096x64xi32>>,
+                        %arg6: !flow.dispatch.tensor<writeonly:tensor<28x10x64x4096xi32>>) {
+      %c0_i32 = arith.constant 0 : i32
+      %c0 = arith.constant 0 : index
+      %49 = flow.dispatch.tensor.load %arg0, offsets = [0, 0, 0], sizes = [28, 4096, 640], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<28x4096x640xi8>> -> tensor<28x4096x640xi8>
+      %50 = flow.dispatch.tensor.load %arg1, offsets = [0, 0, 0], sizes = [10, 64, 640], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<10x64x640xi8>> -> tensor<10x64x640xi8>
+      %51 = flow.dispatch.tensor.load %arg2, offsets = [0, 0, 0], sizes = [10, 64, 640], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<10x64x640xi8>> -> tensor<10x64x640xi8>
+      %52 = flow.dispatch.tensor.load %arg3, offsets = [0, 0, 0], sizes = [10, 64, 640], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<10x64x640xi8>> -> tensor<10x64x640xi8>
+      %64 = tensor.empty() : tensor<28x10x64x4096xi32>
+      %65 = tensor.empty() : tensor<28x10x4096x64xi32>
+      %66 = linalg.fill ins(%c0_i32 : i32) outs(%65 : tensor<28x10x4096x64xi32>) -> tensor<28x10x4096x64xi32>
+      %67 = linalg.fill ins(%c0_i32 : i32) outs(%64 : tensor<28x10x64x4096xi32>) -> tensor<28x10x64x4096xi32>
+      %68:3 = linalg.generic {
+          indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>,
+                           affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>,
+                           affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>,
+                           affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>,
+                           affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>,
+                           affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>,
+                           affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d2)>],
+          iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]}
+          ins(%49, %50, %51, %52 : tensor<28x4096x640xi8>, tensor<10x64x640xi8>, tensor<10x64x640xi8>, tensor<10x64x640xi8>)
+          outs(%66, %66, %67 : tensor<28x10x4096x64xi32>, tensor<28x10x4096x64xi32>, tensor<28x10x64x4096xi32>) {
+      ^bb0(%in: i8, %in_1: i8, %in_2: i8, %in_3: i8, %out: i32, %out_4: i32, %out_5: i32):
+        %72 = arith.extsi %in : i8 to i32
+        %73 = arith.extsi %in_1 : i8 to i32
+        %74 = arith.muli %72, %73 : i32
+        %75 = arith.addi %out, %74 : i32
+        %76 = arith.extsi %in_2 : i8 to i32
+        %77 = arith.muli %72, %76 : i32
+        %78 = arith.addi %out_4, %77 : i32
+        %79 = arith.extsi %in_3 : i8 to i32
+        %80 = arith.muli %72, %79 : i32
+        %81 = arith.addi %out_5, %80 : i32
+        linalg.yield %75, %78, %81 : i32, i32, i32
+      } -> (tensor<28x10x4096x64xi32>, tensor<28x10x4096x64xi32>, tensor<28x10x64x4096xi32>)
+      flow.dispatch.tensor.store %68#0, %arg4, offsets = [0, 0, 0, 0], sizes = [28, 10, 4096, 64], strides = [1, 1, 1, 1] : tensor<28x10x4096x64xi32> -> !flow.dispatch.tensor<writeonly:tensor<28x10x4096x64xi32>>
+      flow.dispatch.tensor.store %68#1, %arg5, offsets = [0, 0, 0, 0], sizes = [28, 10, 4096, 64], strides = [1, 1, 1, 1] : tensor<28x10x4096x64xi32> -> !flow.dispatch.tensor<writeonly:tensor<28x10x4096x64xi32>>
+      flow.dispatch.tensor.store %68#2, %arg6, offsets = [0, 0, 0, 0], sizes = [28, 10, 64, 4096], strides = [1, 1, 1, 1] : tensor<28x10x64x4096xi32> -> !flow.dispatch.tensor<writeonly:tensor<28x10x64x4096xi32>>
+      return
+    }
+  }
+}
