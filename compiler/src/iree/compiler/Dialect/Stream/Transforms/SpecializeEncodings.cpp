@@ -76,6 +76,12 @@ getEncodingWithNewLayouts(Type type,
   if (!encodingAttr) {
     return std::nullopt;
   }
+  if (!llvm::all_of(
+          layoutResolvers,
+          llvm::IsaPred<
+              IREE::Encoding::SerializedEncodingLayoutAttrInterface>)) {
+    return std::nullopt;
+  }
   SmallVector<Attribute> layouts;
   for (auto attr : layoutResolvers) {
     auto encodingLayoutAttr =
