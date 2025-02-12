@@ -35,9 +35,11 @@ hal.executable @scalar_dispatch {
 
 // CHECK-LABEL: func.func @scalar_dispatch()
 //  CHECK-SAME: translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUBaseLowering workgroup_size = [1, 1, 1]>
-//       CHECK:   %[[SPAN0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//       CHECK:   %[[SPAN1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
-//       CHECK:   memref.load %[[SPAN0]][] : memref<i64, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[SPANBIND0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//       CHECK:   %[[SPAN0:.+]] = amdgpu.fat_raw_buffer_cast %[[SPANBIND0]]
+//       CHECK:   %[[SPANBIND1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//       CHECK:   %[[SPAN1:.+]] = amdgpu.fat_raw_buffer_cast %[[SPANBIND1]]
+//       CHECK:   memref.load %[[SPAN0]][] : memref<i64, #amdgpu.address_space<fat_raw_buffer>>
 //       CHECK:   arith.muli {{.+}} : i64
 //       CHECK:   arith.addi {{.+}} : i64
-//       CHECK:   memref.store %{{.+}}, %[[SPAN1]][] : memref<i64, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   memref.store %{{.+}}, %[[SPAN1]][] : memref<i64, #amdgpu.address_space<fat_raw_buffer>>

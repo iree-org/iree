@@ -24,6 +24,7 @@ iree_lit_test_suite(
     "convert_accgemm_to_gemm.mlir"
     "convert_bf16_arith_to_f32.mlir"
     "convert_bf16_to_uint16_buffers.mlir"
+    "convert_hal_descriptor_type_to_gpu_address_space.mlir"
     "convert_to_destination_passing_style.mlir"
     "convert_unsupported_float_arith.mlir"
     "convolution_to_igemm.mlir"
