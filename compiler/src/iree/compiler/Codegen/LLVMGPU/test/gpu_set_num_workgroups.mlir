@@ -559,7 +559,7 @@ func.func @inner_unit_dim() {
 //      CHECK: func.func @inner_unit_dim()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
-// CHECK-SAME:       lowering_config = #iree_gpu.lowering_config<{thread = [1, 1], workgroup = [32, 1]}>
+// CHECK-SAME:       lowering_config = #iree_gpu.lowering_config<{thread = [1, 1], workgroup = [32, 0]}>
 
 // -----
 
