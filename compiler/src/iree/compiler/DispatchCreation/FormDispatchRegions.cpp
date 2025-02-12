@@ -588,6 +588,13 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
       if (fusableUses.empty())
         continue;
 
+      // For now disable the fusing with multiple consumers for all
+      // operations other than horizontally fused gemms. This should
+      // work in general but is causing time-outs on some CI examples.
+      if (!IREE::LinalgExt::isaHorizontallyFusedContraction(root)) {
+        fusableUses = {fusableUses.front()};
+      }
+
       // Analyse the use to see if it is fusable.
       for (OpOperand *fusableUse : fusableUses) {
         Operation *consumerOp = fusableUse->getOwner();
