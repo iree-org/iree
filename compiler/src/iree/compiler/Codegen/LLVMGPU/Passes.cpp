@@ -30,6 +30,7 @@
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
@@ -288,7 +289,9 @@ static FailureOr<Value> gpuRequireMemSpaceAllocationFn(OpBuilder &builder,
   Attribute memorySpace = memRefType.getMemorySpace();
   // Bail out if the memref type specifies a nonnull memory space that is not
   // #gpu.address_space.
-  if (memorySpace && !llvm::isa<gpu::AddressSpaceAttr>(memorySpace)) {
+  if (memorySpace &&
+      !llvm::isa<gpu::AddressSpaceAttr, amdgpu::AddressSpaceAttr>(
+          memorySpace)) {
     return failure();
   }
 
