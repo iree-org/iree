@@ -210,6 +210,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:AffineUtils",
+        "@llvm-project//mlir:AMDGPUDialect",
         "@llvm-project//mlir:AMDGPUTransforms",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithDialect",

@@ -32,6 +32,11 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_CONVERTHALDESCRIPTORTYPETOGPUADDRESSSPACEPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
+static cl::opt<bool> clAMDGPUEnableBufferInsts(
+  "iree-codegen-amdgpu-enable-buffer-insts",
+  cl::desc("Use buffer instructions (by using buffer fat pointers) where possible on AMD targets")
+  cl::init(true));
+
 namespace {
 
 /// Returns true if the given `type` is considered as legal.
@@ -43,7 +48,14 @@ static bool isLegalType(Type type) {
   return true;
 }
 
-struct CastToFatBufferAlways
+/// The ABI doesn't meaningfully support passing in a buffer fat pointer directly.
+/// So, if we wanted to hal.interface.binding.subspan a buffer fat pointer,
+/// create a binding of that same resource as a global pointer and then
+/// `amdgpu.fat_raw_buffer_cast` it back to the expected type. This will
+/// require a `memref.cast` if the offset has been stripped so that the offset
+/// of the buffer looks dynamic again even though it's been folded into the base
+/// pointer by the cast.
+struct MakeBindingsGlobalCastToFatBuffer
     : public OpRewritePattern<IREE::HAL::InterfaceBindingSubspanOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op,
@@ -137,7 +149,7 @@ struct ConvertHALDescriptorTypeToGPUAddressSpacePass final
                                           /*replaceTypes=*/true);
 
     RewritePatternSet patterns(&getContext());
-    patterns.add<CastToFatBufferAlways>(op->getContext());
+    patterns.add<MakeBindingsGlobalCastToFatBuffer>(op->getContext());
     if (failed(applyPatternsGreedily(op, std::move(patterns))))
       return signalPassFailure();
   }
