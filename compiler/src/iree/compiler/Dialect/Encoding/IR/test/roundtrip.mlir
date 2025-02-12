@@ -169,3 +169,33 @@ func.func @set_encoding_ops_with_layouts(%arg0: tensor<?x?xf32>) -> tensor<?x?xf
 // CHECK:       func.func @set_encoding_ops_with_layouts(
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]:
 // CHECK:         iree_encoding.set_encoding %[[ARG0]] : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING]]>
+
+// -----
+
+#encoding = #iree_encoding.unspecialized_encoding<123>
+func.func @unspecialized_encoding(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
+  return %arg0 : tensor<?x?xf32, #encoding>
+}
+// CHECK:      func.func @unspecialized_encoding(
+// CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf32, #iree_encoding.unspecialized_encoding<123>>
+// CHECK         return %[[ARG0]]
+
+// -----
+
+#encoding = #iree_encoding.specialized_encoding<123>
+func.func @specialized_encoding_without_type(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
+  return %arg0 : tensor<?x?xf32, #encoding>
+}
+// CHECK:      func.func @specialized_encoding_without_type(
+// CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf32, #iree_encoding.specialized_encoding<123>>
+// CHECK         return %[[ARG0]]
+
+// -----
+
+#encoding = #iree_encoding.specialized_encoding<123, tensor<?x?xf32>>
+func.func @specialized_encoding_with_type(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
+  return %arg0 : tensor<?x?xf32, #encoding>
+}
+// CHECK:      func.func @specialized_encoding_with_type(
+// CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf32, #iree_encoding.specialized_encoding<123, tensor<?x?xf32>>>
+// CHECK         return %[[ARG0]]

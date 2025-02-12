@@ -75,6 +75,12 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     0, 4, 1, 5, 2, 6, 3, 7
     ```
 
+    The subgroups are placed contiguously with their shape and ordering
+    determined by:
+      - `subgroup_tile`: Sizes of this level of tiling
+      - `subgroup_strides`: Stride of this level of tiling. 0 if not distributed.
+    Tiling levels must not overlap.
+
     The total number of subgroups used (computed by multiplying each dim in
     subgroup_tile) should be a multiple of number of subgroups in the
     harware. If the total number of subgroups used exceeds the number of
@@ -218,12 +224,20 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
                      "ArrayRef<int64_t>":$threadTile,
                      "ArrayRef<int64_t>":$elementTile,
                      "ArrayRef<int64_t>":$subgroupStrides,
-                     "ArrayRef<int64_t>":$threadStrides)>
+                     "ArrayRef<int64_t>":$threadStrides)>,
+    AttrBuilder<(ins "NestedLayoutAttr":$source,
+                     "ArrayRef<int64_t>":$appendSubGroupLens,
+                     "ArrayRef<int64_t>":$appendBatchLens,
+                     "ArrayRef<int64_t>":$appendOuterLens,
+                     "ArrayRef<int64_t>":$appendThreadLens,
+                     "ArrayRef<int64_t>":$appendElementLens,
+                     "ArrayRef<int64_t>":$appendSubgroupStrides,
+                     "ArrayRef<int64_t>":$appendThreadStrides)>
   ];
 
   let extraClassDeclaration = [{
     // Returns the subgroup/lane ids delinearized from a single linearized
-    // thread ID.
+    // thread ID. Returns the empty vector on failure.
     SmallVector<Value> computeThreadIds(Value threadId, int64_t subgroupSize, RewriterBase &rewriter) const;
 
     // Get the undistributed shape that is subgroup x batch x outer x thread x element

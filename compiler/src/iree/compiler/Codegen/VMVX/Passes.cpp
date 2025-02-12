@@ -71,6 +71,7 @@ void addVMVXDefaultPassPipeline(OpPassManager &funcPassManager,
   addCPUBufferizePasses(funcPassManager);
 
   // Cleanup the IR that may now have unused loops.
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
 
   // Convert buffer-level microkernels.

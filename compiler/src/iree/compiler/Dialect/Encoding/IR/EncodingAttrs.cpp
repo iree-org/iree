@@ -4,18 +4,23 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cassert>
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/Utils.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Support/LLVM.h"
@@ -156,18 +161,15 @@ Value EncodingAttr::calculateStorageSizeInBytes(Location loc,
                                                 OpBuilder &builder,
                                                 RankedTensorType type,
                                                 ValueRange dynamicDims) const {
-  if (auto layoutsAttr = getLayouts()) {
-    if (llvm::any_of(layoutsAttr.getValue(), [](Attribute attr) {
-          return !llvm::isa<IREE::Encoding::EncodingLayoutAttrInterface>(attr);
-        })) {
-      return Value();
+  if (ArrayAttr layoutsAttr = getLayouts()) {
+    if (!llvm::all_of(layoutsAttr.getValue(),
+                      llvm::IsaPred<SerializedEncodingLayoutAttrInterface>)) {
+      return nullptr;
     }
 
-    auto layoutsAttrArray =
-        llvm::to_vector_of<IREE::Encoding::EncodingLayoutAttrInterface>(
-            layoutsAttr.getValue());
     Value res;
-    for (auto attr : layoutsAttrArray) {
+    for (auto attr :
+         layoutsAttr.getAsRange<SerializedEncodingLayoutAttrInterface>()) {
       Value requestedSize =
           attr.calculateStorageSizeInBytes(loc, builder, type, dynamicDims);
       if (!res) {
@@ -309,6 +311,113 @@ std::string stringifyOperandIndex(IntegerAttr valueAttr) {
     assert(false && "invalid index");
     return "";
   }
+}
+
+Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
+    Location loc, OpBuilder &builder, RankedTensorType type,
+    ValueRange dynamicDims) const {
+  ArrayRef<int32_t> padding = getPadding().asArrayRef();
+  assert(padding.size() == type.getRank() && "Invalid padding");
+
+  const int64_t elementSize = getRoundedElementByteWidth(type.getElementType());
+  int64_t staticProduct = elementSize;
+  Value dynamicProduct = builder.create<arith::ConstantIndexOp>(loc, 1);
+
+  size_t dynamicDimIdx = 0;
+  for (auto [dimSize, padValue] : llvm::zip_equal(type.getShape(), padding)) {
+    if (!ShapedType::isDynamic(dimSize)) {
+      staticProduct *= (dimSize + padValue);
+      continue;
+    }
+
+    Value dynamicDimSize = dynamicDims[dynamicDimIdx];
+    ++dynamicDimIdx;
+
+    if (padValue != 0) {
+      dynamicDimSize = builder.create<arith::AddIOp>(
+          loc, dynamicDimSize,
+          builder.create<arith::ConstantIndexOp>(loc, padValue),
+          arith::IntegerOverflowFlags::nsw);
+    }
+    dynamicProduct = builder.createOrFold<arith::MulIOp>(
+        loc, dynamicProduct, dynamicDimSize, arith::IntegerOverflowFlags::nsw);
+  }
+
+  return builder.createOrFold<arith::MulIOp>(
+      loc, builder.create<arith::ConstantIndexOp>(loc, staticProduct),
+      dynamicProduct, arith::IntegerOverflowFlags::nsw);
+}
+
+//===---------------------------------------------------------------------===//
+// Encoding specialization attributes, which are mainly for testing purpose.
+//===---------------------------------------------------------------------===//
+
+Attribute UnspecializedEncodingAttr::parse(AsmParser &p, Type type) {
+  if (failed(p.parseLess())) {
+    return {};
+  }
+  IntegerAttr seed;
+  if (failed(p.parseAttribute(seed))) {
+    return {};
+  }
+  if (failed(p.parseGreater())) {
+    return {};
+  }
+  return get(p.getContext(), seed);
+}
+
+void UnspecializedEncodingAttr::print(AsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << "<";
+  p.printAttributeWithoutType(getSeed());
+  os << ">";
+}
+
+Attribute
+UnspecializedEncodingAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
+  MLIRContext *ctx = getContext();
+  return SpecializedEncodingAttr::get(ctx, getSeed(), /*type=*/{});
+}
+
+Attribute SpecializedEncodingAttr::parse(AsmParser &p, Type type) {
+  if (failed(p.parseLess())) {
+    return {};
+  }
+
+  IntegerAttr seed;
+  if (failed(p.parseAttribute(seed))) {
+    return {};
+  }
+
+  TypeAttr typeAttr;
+  if (succeeded(p.parseOptionalComma()) && failed(p.parseAttribute(typeAttr))) {
+    return {};
+  }
+
+  if (failed(p.parseGreater())) {
+    return {};
+  }
+  return get(p.getContext(), seed, typeAttr);
+}
+
+void SpecializedEncodingAttr::print(AsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << "<";
+  p.printAttributeWithoutType(getSeed());
+  if (auto typeAttr = getType()) {
+    os << ", ";
+    p.printAttribute(typeAttr);
+  }
+  os << ">";
+}
+
+static RankedTensorType dropEncoding(RankedTensorType type) {
+  return RankedTensorType::get(type.getShape(), type.getElementType());
+}
+
+Attribute SpecializedEncodingAttr::getLayout(RankedTensorType type) const {
+  MLIRContext *ctx = getContext();
+  return get(ctx, getSeed(), TypeAttr::get(dropEncoding(type)));
 }
 
 } // namespace mlir::iree_compiler::IREE::Encoding

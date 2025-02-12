@@ -20,6 +20,48 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+// Fold statically-known block/grid dimensions to constants, since that's
+// stronger than just imposing an upper bound on their size.
+static void foldConstantBounds(
+    FunctionOpInterface funcOp,
+    const std::optional<SmallVector<int64_t>> &staticWorkgroupSizes,
+    ArrayRef<int64_t> staticWorkgroupCounts) {
+  IRRewriter rewriter(funcOp->getContext());
+  auto rewriteToConstant = [&](Operation *op, int64_t constant) {
+    rewriter.setInsertionPoint(op);
+    Type constType = op->getResult(0).getType();
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(
+        op, constType, IntegerAttr::get(constType, constant));
+  };
+  funcOp->walk([&](Operation *op) {
+    TypeSwitch<Operation *>(op)
+        .Case([&](gpu::BlockDimOp blockDimOp) {
+          int32_t dim = static_cast<int32_t>(blockDimOp.getDimension());
+          if (staticWorkgroupSizes.has_value() &&
+              staticWorkgroupSizes->size() > dim) {
+            rewriteToConstant(blockDimOp, (*staticWorkgroupSizes)[dim]);
+          }
+        })
+        .Case([&](IREE::HAL::InterfaceWorkgroupSizeOp wgSizeOp) {
+          size_t dim = wgSizeOp.getDimension().getZExtValue();
+          if (staticWorkgroupSizes.has_value() &&
+              staticWorkgroupSizes->size() > dim) {
+            rewriteToConstant(wgSizeOp, (*staticWorkgroupSizes)[dim]);
+          }
+        })
+        .Case([&](IREE::HAL::InterfaceWorkgroupCountOp wgCountOp) {
+          size_t dim = wgCountOp.getDimension().getZExtValue();
+          int64_t size = staticWorkgroupCounts.size() > dim
+                             ? staticWorkgroupCounts[dim]
+                             : ShapedType::kDynamic;
+          if (!ShapedType::isDynamic(size)) {
+            rewriteToConstant(wgCountOp, size);
+          }
+        })
+        .Default([](Operation *) {});
+  });
+}
+
 static void applyBounds(FunctionOpInterface funcOp,
                         ArrayRef<std::optional<int64_t>> workgroupSizes,
                         ArrayRef<std::optional<int64_t>> workgroupCounts) {
@@ -119,6 +161,7 @@ struct PropagateDispatchSizeBoundsPass final
       }
     }
 
+    foldConstantBounds(funcOp, staticWorkgroupSize, staticWorkgroupCounts);
     applyBounds(funcOp, workgroupSizes, workgroupCounts);
   }
 };

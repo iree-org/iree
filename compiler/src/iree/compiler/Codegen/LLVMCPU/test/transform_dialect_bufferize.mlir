@@ -35,7 +35,10 @@ module attributes {transform.with_named_sequence} {
     transform.print %8 : !transform.any_op
     transform.iree.eliminate_empty_tensors %8 : (!transform.any_op) -> ()
     %9 = transform.iree.bufferize %8 : (!transform.any_op) -> !transform.any_op
-    // %9 = transform.structured.match ops{["func.func"]} in %8 : (!transform.any_op) -> !transform.any_op
+    %10 = transform.structured.match ops{["func.func"]} in %9 : (!transform.any_op) -> !transform.op<"func.func">
+    transform.apply_patterns to %10 {
+      transform.apply_patterns.canonicalization
+    } : !transform.op<"func.func">
     transform.yield
   }
 }

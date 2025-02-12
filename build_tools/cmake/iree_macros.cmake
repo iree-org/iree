@@ -390,7 +390,7 @@ function(iree_select_compiler_opts OPTS)
     _IREE_SELECTS
     ""
     ""
-    "ALL;CLANG;CLANG_GTE_10;CLANG_GTE_12;CLANG_CL;MSVC;GCC;CLANG_OR_GCC;MSVC_OR_CLANG_CL"
+    "ALL;CLANG;CLANG_GTE_10;CLANG_GTE_12;CLANG_CL;MSVC;GCC;GCC_GTE_13;CLANG_OR_GCC;MSVC_OR_CLANG_CL"
   )
   # OPTS is a variable containing the *name* of the variable being populated, so
   # we need to dereference it twice.
@@ -399,6 +399,9 @@ function(iree_select_compiler_opts OPTS)
   if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     list(APPEND _OPTS "${_IREE_SELECTS_GCC}")
     list(APPEND _OPTS "${_IREE_SELECTS_CLANG_OR_GCC}")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 13)
+      list(APPEND _OPTS ${_IREE_SELECTS_GCC_GTE_13})
+    endif()
   elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
     if(MSVC)
       list(APPEND _OPTS ${_IREE_SELECTS_CLANG_CL})
@@ -596,6 +599,7 @@ function(iree_symlink_tool)
 
   add_custom_command(
     TARGET "${_TARGET}"
+    POST_BUILD
     BYPRODUCTS
       "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}"
     COMMAND

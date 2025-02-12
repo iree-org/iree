@@ -32,42 +32,6 @@ namespace mlir::iree_compiler {
 using namespace mlir::iree_compiler::IREE::VectorExt;
 using VectorValue = TypedValue<VectorType>;
 
-/// Helper to linearize the given |ids| with maximum values given as |sizes|.
-/// Gets the element ID in terms of |elementCount| and adds the element
-/// |offset|. For example,
-///
-/// IDs = [d0, d1, d2, d3]
-/// sizes = [s0, s1, s2, s3]
-/// linear_index = d0 * (s1 * s2 * s3)
-///              + d1 * (s2 * s3)
-///              + d2 * (s3)
-///              + d3
-/// return element_index = linear_index * |elementCount| + |offset|;
-static Value linearizeIndex(OpBuilder &builder, Value offset,
-                            ArrayRef<OpFoldResult> ids, ArrayRef<int64_t> sizes,
-                            int64_t elementCount) {
-  SmallVector<AffineExpr> exprs(ids.size() + 1);
-  bindSymbolsList(builder.getContext(), MutableArrayRef{exprs});
-  AffineExpr idExpr = builder.getAffineConstantExpr(0);
-
-  for (int i = 0, e = ids.size(); i < e; ++i) {
-    if (sizes[i] > 1) {
-      // Multiply by the residual threads along this dimension (which must be
-      // faster changing than all previous dimensions) and add the id for this
-      // dimension.
-      idExpr = idExpr * builder.getAffineConstantExpr(sizes[i]) + exprs[i];
-    }
-  }
-  idExpr = idExpr * builder.getAffineConstantExpr(elementCount);
-  idExpr = idExpr + exprs.back();
-  SmallVector<OpFoldResult> mapArgs(ids);
-  mapArgs.push_back(offset);
-  return affine::makeComposedAffineApply(
-             builder, offset.getLoc(),
-             AffineMap::get(0, mapArgs.size(), idExpr), mapArgs)
-      .getResult();
-}
-
 /// Given a set of base transfer |indices|, |offsets| for the batch/outer
 /// dimensions, and distributed warp and thread indices, computes the indices
 /// of the distributed transfer operation based on the |vectorLayout|.
@@ -94,16 +58,28 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
       continue;
     }
     unsigned pos = cast<AffineDimExpr>(dim).getPosition();
-    SmallVector<OpFoldResult> ids = {
-        warpIndices[i], b.getIndexAttr(batchOffsets[i]),
-        b.getIndexAttr(outerVectorOffsets[i]), threadIndices[i]};
+    Value offset = indices[pos];
+    int64_t elementCount = vectorLayout.getElementTile()[i];
+    Location loc = offset.getLoc();
+    SmallVector<Value> ids = {
+        warpIndices[i], b.create<arith::ConstantIndexOp>(loc, batchOffsets[i]),
+        b.create<arith::ConstantIndexOp>(loc, outerVectorOffsets[i]),
+        threadIndices[i], offset};
     // The order in which a vector dimension is "tiled" is
     // subgroups -> batches -> outer vectors -> threads -> elements
     SmallVector<int64_t> sizes = {
         vectorLayout.getSubgroupTile()[i], vectorLayout.getBatchTile()[i],
-        vectorLayout.getOuterTile()[i], vectorLayout.getThreadTile()[i]};
-    slicedIndices[pos] = linearizeIndex(b, indices[pos], ids, sizes,
-                                        vectorLayout.getElementTile()[i]);
+        vectorLayout.getOuterTile()[i], vectorLayout.getThreadTile()[i],
+        elementCount};
+    // The offset is often not an offset within `elementCount`, so, in general,
+    // we can't mark this `disjoint`. However, if `offset` is known to be
+    // a constant less than `elementCount`, we can do this, unlocking
+    // potential optimizations.
+    bool disjoint = false;
+    if (std::optional<int64_t> offsetConst = getConstantIntValue(offset))
+      disjoint = *offsetConst < elementCount;
+    slicedIndices[pos] =
+        b.create<affine::AffineLinearizeIndexOp>(loc, ids, sizes, disjoint);
   }
   return slicedIndices;
 }
@@ -123,19 +99,21 @@ getElementVectorTileShape(NestedLayoutAttr vectorLayout) {
 
 /// Computes the warp and thread indices for the given vector layout from a
 /// single linearized thread ID.
-static void populateWarpAndThreadIndices(RewriterBase &rewriter, Value threadId,
-                                         int64_t subgroupSize,
-                                         NestedLayoutAttr vectorLayout,
-                                         SmallVector<Value> &warpIndices,
-                                         SmallVector<Value> &threadIndices) {
+static LogicalResult populateWarpAndThreadIndices(
+    RewriterBase &rewriter, Value threadId, int64_t subgroupSize,
+    NestedLayoutAttr vectorLayout, SmallVector<Value> &warpIndices,
+    SmallVector<Value> &threadIndices) {
   // The delinearized thread IDs are returned from outer most to inner most,
   // i.e. before applying the layout described dimensions ordering.
   int64_t rank = vectorLayout.getRank();
   SmallVector<Value> threadIds =
       vectorLayout.computeThreadIds(threadId, subgroupSize, rewriter);
+  if (threadIds.empty() && rank != 0)
+    return failure();
   warpIndices = SmallVector<Value>(threadIds.begin(), threadIds.begin() + rank);
   threadIndices = SmallVector<Value>(threadIds.begin() + rank,
                                      threadIds.begin() + 2 * rank);
+  return success();
 }
 
 namespace {
@@ -189,8 +167,12 @@ struct DistributeTransferRead final
     VectorValue acc = cast<VectorValue>(zero);
 
     SmallVector<Value> warpIndices, threadIndices;
-    populateWarpAndThreadIndices(rewriter, threadId, subgroupSize, vectorLayout,
-                                 warpIndices, threadIndices);
+    if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
+                                            vectorLayout, warpIndices,
+                                            threadIndices))) {
+      return rewriter.notifyMatchFailure(
+          readOp, "warp or thread tiles have overlapping strides");
+    }
 
     ValueRange indices = readOp.getIndices();
     SmallVector<int64_t> strides(rank, 1);
@@ -259,8 +241,12 @@ struct DistributeTransferWrite final
     int64_t rank = vectorLayout.getRank();
 
     SmallVector<Value> warpIndices, threadIndices;
-    populateWarpAndThreadIndices(rewriter, threadId, subgroupSize, vectorLayout,
-                                 warpIndices, threadIndices);
+    if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
+                                            vectorLayout, warpIndices,
+                                            threadIndices))) {
+      return rewriter.notifyMatchFailure(
+          writeOp, "warp or thread tiles have overlapping strides");
+    }
 
     Value distributedVector =
         getDistributed(rewriter, writeOp.getVector(), vectorLayout);
@@ -443,10 +429,11 @@ struct DistributeMultiReduction final
 
     Type elemTy = srcVector.getType().getElementType();
     unsigned elemBitwidth = elemTy.getIntOrFloatBitWidth();
-    if (elemBitwidth != maxBitsPerShuffle) {
+    if (elemBitwidth > maxBitsPerShuffle) {
       return rewriter.notifyMatchFailure(
-          multiReduceOp, llvm::formatv("unimplemented: packed shuffle",
-                                       elemBitwidth, maxBitsPerShuffle));
+          multiReduceOp,
+          llvm::formatv("element bitwidth greater than maxBitsPerShuffle",
+                        elemBitwidth, maxBitsPerShuffle));
     }
 
     VectorValue disSrc =
@@ -698,8 +685,8 @@ struct DistributeMultiReduction final
     }
     // Insert gpu.barrier
     rewriter.create<gpu::BarrierOp>(write.getLoc());
-    auto read = rewriter.create<vector::TransferReadOp>(loc, unDistributedType,
-                                                        alloc, indices);
+    auto read = rewriter.create<vector::TransferReadOp>(
+        loc, unDistributedType, alloc, indices, inBounds);
     // Create new layout where subgroup dims are squashed to
     // element tile
     IREE::VectorExt::NestedLayoutAttr intraSubGroupLayout;
@@ -770,24 +757,18 @@ struct DistributeMultiReduction final
   int64_t maxBitsPerShuffle;
 };
 
-/// The lowering for Contract is performed in three steps (similar to above
-/// multi_reduction):
-///   1. Local Contract: Each thread performs operations on its locally
-///   distributed elements.
-///   2. Subgroup Reduction: Threads in each subgroup reduce the results from
-///   step 1 across threads using a subgroup reduction if distribution occurs
-///   along the reduction dimension.
-///   3. Accumulator Reduction: Each thread combines its intermediate results
-///   with its held accumulator.
-///
-/// Currently, reduction across multiple warps is not supported.
+/// The distribution of contract is performed by doing a local contraction where
+/// each thread performs operations on its locally distributed elements. Then,
+/// the resulting vector is interpreted in undistributed domain. The said
+/// undistributed vector is a partial reduction when contraction has been
+/// performed only thread locally. Therefore, a to-be-distributed
+/// vector.multi_reduce
+////is added to complete the contraction.
 struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
-  DistributeContract(MLIRContext *context, int64_t subgroupSize,
-                     int64_t maxBitsPerShuffle, int64_t benefit = 1)
-      : OpDistributionPattern(context, benefit), subgroupSize(subgroupSize),
-        maxBitsPerShuffle(maxBitsPerShuffle) {}
+  DistributeContract(MLIRContext *context, int64_t benefit = 1)
+      : OpDistributionPattern(context, benefit) {}
 
   LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
                                 DistributionSignature &signature,
@@ -817,6 +798,16 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
       return rewriter.notifyMatchFailure(
           contractOp, "missing nested layout for contraction rhs");
     }
+    NestedLayoutAttr resLayout;
+    if (auto contractRes = dyn_cast<VectorValue>(contractOp.getResult())) {
+      resLayout = dyn_cast<NestedLayoutAttr>(signature[contractRes]);
+    } else {
+      // Create a zero-d layout because we
+      // are going to add reduction dims
+      // back to handle the partial reduction
+      resLayout = NestedLayoutAttr::get(
+          contractOp.getContext(), ArrayRef<int64_t>{}, {}, {}, {}, {}, {}, {});
+    }
 
     Value disLhs = getDistributed(rewriter, contractOp.getLhs(), lhsLayout);
     Value disRhs = getDistributed(rewriter, contractOp.getRhs(), rhsLayout);
@@ -838,21 +829,10 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     Location loc = contractOp.getLoc();
 
     // Step 1: local contraction
+    Value localInit = getCombiningIdentityValue(
+        loc, rewriter, contractOp.getKind(), disAcc.getType());
     vector::ContractionOp localContractOp = doDistributedContraction(
-        rewriter, loc, ctx, contractOp, disLhs, disRhs, disAcc);
-
-    int64_t rank = lhsLayout.getRank();
-    SmallVector<bool> reducedDims(rank, false);
-
-    // Identify the reduction dimension and apply it for subgroup reduction.
-    for (auto [index, iteratorType] :
-         llvm::enumerate(contractOp.getIteratorTypes())) {
-      if (vector::isReductionIterator(iteratorType)) {
-        auto map = contractOp.getIndexingMapsArray()[0];
-        int64_t redIdx = *(map.getResultPosition(getAffineDimExpr(index, ctx)));
-        reducedDims[redIdx] = true;
-      }
-    }
+        rewriter, loc, ctx, contractOp, disLhs, disRhs, localInit);
 
     VectorValue localContractValue;
     if (accVector) {
@@ -865,46 +845,79 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
 
     assert(localContractValue && "result should have been a vector");
 
-    // Flatten the locally result value.
-    VectorType shaped = localContractValue.getType();
-    int64_t numElements = shaped.getNumElements();
-    SmallVector<int64_t> flatShape(1, numElements);
-    VectorType flatVecType = VectorType::get(flatShape, accElemTy);
-    VectorValue flat = rewriter.create<vector::ShapeCastOp>(loc, flatVecType,
-                                                            localContractValue);
-
-    // Step 2: Do subgroup reduction.
-    FailureOr<VectorValue> threadReduced = doThreadReduction(
-        rewriter, lhsLayout, flat, contractOp.getKind(), reducedDims);
-    if (failed(threadReduced)) {
-      return failure();
+    // Identify the reduction dimension and apply it for subgroup reduction.
+    auto lhsMap = contractOp.getIndexingMapsArray()[0];
+    SmallVector<int64_t> reductionSubGroupTile;
+    SmallVector<int64_t> reductionSubGroupStrides;
+    SmallVector<int64_t> reductionThreadTile;
+    SmallVector<int64_t> reductionThreadStrides;
+    SmallVector<int64_t> partialReductionDims;
+    for (auto [index, iteratorType] :
+         llvm::enumerate(contractOp.getIteratorTypes())) {
+      if (vector::isReductionIterator(iteratorType)) {
+        int64_t redLhsIdx =
+            *(lhsMap.getResultPosition(getAffineDimExpr(index, ctx)));
+        partialReductionDims.push_back(resLayout.getRank() +
+                                       reductionSubGroupTile.size());
+        reductionSubGroupTile.push_back(lhsLayout.getSubgroupTile()[redLhsIdx]);
+        reductionSubGroupStrides.push_back(
+            lhsLayout.getSubgroupStrides()[redLhsIdx]);
+        reductionThreadTile.push_back(lhsLayout.getThreadTile()[redLhsIdx]);
+        reductionThreadStrides.push_back(
+            lhsLayout.getThreadStrides()[redLhsIdx]);
+      }
     }
+    SmallVector<int64_t> unitBroadcastTile(reductionThreadTile.size(), 1);
 
-    // Do reduction against accumulator, which needs to be done after thread
-    // reduction.
-    VectorValue unflattened = rewriter.create<vector::ShapeCastOp>(
-        loc, shaped, threadReduced.value());
+    // Manually infer the layout of partial reduction
+    // We do this by appending the reduction dims on
+    // subgroup and thread tiles to the layout of the
+    // result.
+    IREE::VectorExt::NestedLayoutAttr reductionLayout =
+        IREE::VectorExt::NestedLayoutAttr::get(
+            contractOp.getContext(),
+            /*source=*/resLayout,
+            /*appendSubGroupLens=*/reductionSubGroupTile,
+            /*appendBatchLens=*/unitBroadcastTile,
+            /*appendOuterLens=*/unitBroadcastTile,
+            /*appendThreadLens=*/reductionThreadTile,
+            /*appendElementLens=*/unitBroadcastTile,
+            /*appendSubgroupStrides=*/reductionSubGroupStrides,
+            /*appendThreadStrides=*/reductionThreadStrides);
 
-    if (!accVector) {
-      disAcc = rewriter.create<vector::BroadcastOp>(loc, shaped, disAcc);
+    VectorType partialReducedDistributedType =
+        VectorType::get(reductionLayout.getDistributedShape(),
+                        localContractValue.getType().getElementType());
+    Value shapeCasted = rewriter.create<vector::ShapeCastOp>(
+        loc, partialReducedDistributedType, localContractValue);
+    VectorType unDistributedType =
+        VectorType::get(reductionLayout.getUndistributedShape(),
+                        localContractValue.getType().getElementType());
+    Value undistrLocalReduced = rewriter.create<IREE::VectorExt::ToSIMDOp>(
+        loc, unDistributedType, shapeCasted);
+
+    // Create the partial reduction
+    auto partialReduction = rewriter.create<vector::MultiDimReductionOp>(
+        loc, contractOp.getKind(), undistrLocalReduced, acc,
+        partialReductionDims);
+    {
+      auto unitAttr = UnitAttr::get(rewriter.getContext());
+      auto reduceAttrs =
+          SmallVector<Attribute>(partialReduction->getNumOperands(), unitAttr);
+      reduceAttrs[0] = reductionLayout;
+      ArrayAttr reduceResultsAttr =
+          ArrayAttr::get(rewriter.getContext(), {unitAttr});
+      if (auto dstLayout =
+              dyn_cast_or_null<NestedLayoutAttr>(signature[resVector])) {
+        reduceAttrs[1] = dstLayout;
+        reduceResultsAttr = ArrayAttr::get(rewriter.getContext(), {dstLayout});
+      }
+      ArrayAttr reduceOperandsAttr =
+          ArrayAttr::get(rewriter.getContext(), reduceAttrs);
+      setSignatureForRedistribution(rewriter, partialReduction.getOperation(),
+                                    reduceOperandsAttr, reduceResultsAttr);
     }
-
-    // Step 3: Accumulator Reduction
-    Value accReduction = vector::makeArithReduction(
-        rewriter, loc, contractOp.getKind(), unflattened, disAcc);
-    auto accReduced = dyn_cast<VectorValue>(accReduction);
-    if (!accReduced) {
-      return failure();
-    }
-
-    if (resVector) {
-      replaceOpWithDistributedValues(rewriter, contractOp, accReduced);
-    } else {
-      Value accReducedVal = rewriter.create<vector::ExtractOp>(
-          loc, accReduction, SmallVector<int64_t>{0});
-      replaceOpWithDistributedValues(rewriter, contractOp, accReducedVal);
-    }
-
+    rewriter.replaceOp(contractOp, partialReduction);
     return success();
   }
 
@@ -954,46 +967,6 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
 
     return localContractOp;
   }
-
-  FailureOr<VectorValue> doThreadReduction(RewriterBase &rewriter,
-                                           NestedLayoutAttr layout,
-                                           VectorValue flat,
-                                           vector::CombiningKind kind,
-                                           ArrayRef<bool> reductionMask) const {
-    VectorType flatVecType = flat.getType();
-    int64_t numElements = flatVecType.getNumElements();
-    Location loc = flat.getLoc();
-
-    auto constOp = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(flatVecType));
-    auto res = llvm::cast<VectorValue>(constOp.getResult());
-
-    for (unsigned i = 0; i < numElements; ++i) {
-      Value extracted = rewriter.create<vector::ExtractOp>(loc, flat, i);
-
-      // Reduce across all reduction dimensions 1-by-1.
-      for (unsigned i = 0, e = reductionMask.size(); i != e; ++i) {
-        if (reductionMask[i]) {
-          int64_t offset = getShuffleOffset(layout, i);
-          int64_t width = getShuffleWidth(layout, i);
-          assert(offset <= std::numeric_limits<uint32_t>::max() &&
-                 width <= std::numeric_limits<uint32_t>::max());
-
-          extracted = rewriter.create<gpu::SubgroupReduceOp>(
-              loc, extracted, combiningKindToAllReduce(kind),
-              /*uniform=*/false, /*cluster_size=*/width,
-              /*cluster_stride=*/offset);
-        }
-      }
-
-      res = rewriter.create<vector::InsertOp>(loc, extracted, res, i);
-    }
-
-    return res;
-  }
-
-  int64_t subgroupSize;
-  int64_t maxBitsPerShuffle;
 };
 
 struct DistributeTranspose final : OpDistributionPattern<vector::TransposeOp> {
@@ -1295,8 +1268,12 @@ struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
           stepOp, "missing nested layout for step op result");
     }
     SmallVector<Value> subgroupIndices, threadIndices;
-    populateWarpAndThreadIndices(rewriter, threadId, subgroupSize, resultLayout,
-                                 subgroupIndices, threadIndices);
+    if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
+                                            resultLayout, subgroupIndices,
+                                            threadIndices))) {
+      return rewriter.notifyMatchFailure(
+          stepOp, "warp or thread tiles have overlapping strides");
+    }
 
     SmallVector<int64_t> undistributedShape =
         resultLayout.getUndistributedPackedShape();
@@ -1344,8 +1321,7 @@ void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
   patterns.add<DistributeBroadcast, DistributeTranspose>(patterns.getContext());
   patterns.add<DistributeMultiReduction>(patterns.getContext(), subgroupSize,
                                          maxBitsPerShuffle);
-  patterns.add<DistributeContract>(patterns.getContext(), subgroupSize,
-                                   maxBitsPerShuffle);
+  patterns.add<DistributeContract>(patterns.getContext());
   patterns.add<DistributeBatchOuterToLayoutConversions>(patterns.getContext());
   patterns.add<DistributeStep>(patterns.getContext(), threadId, subgroupSize);
 }

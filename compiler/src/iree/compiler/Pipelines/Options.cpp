@@ -195,6 +195,12 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
           "File path to create a parameter archive of splat values out of all "
           "parameter backed globals."),
       llvm::cl::cat(category));
+
+  binder.opt<bool>(
+      "iree-opt-generalize-matmul", generalizeMatmul,
+      llvm::cl::desc("Convert named matmul ops to linalg generic ops during "
+                     "global optimization to enable better fusion."),
+      llvm::cl::cat(category));
 }
 
 void SchedulingOptions::bindOptions(OptionsBinder &binder) {
@@ -223,6 +229,26 @@ void SchedulingOptions::bindOptions(OptionsBinder &binder) {
                      "executables.")),
       llvm::cl::cat(category));
 
+  binder.opt<InitializationMode>(
+      "iree-scheduling-initialization-mode", initializationMode,
+      llvm::cl::desc(
+          "Specifies the initialization mode for parameters and globals."),
+      llvm::cl::values(
+          clEnumValN(InitializationMode::Synchronous, "sync",
+                     "Synchronously initialize all parameters and globals "
+                     "prior to returning from the module initializer."),
+          clEnumValN(InitializationMode::Asynchronous, "async",
+                     "Asynchronously initialize all parameters and globals and "
+                     "return immediately from the module initializer without "
+                     "waiting for them to complete.")),
+      llvm::cl::cat(category));
+
+  binder.opt<bool>(
+      "iree-scheduling-optimize-bindings", optimizeBindings,
+      llvm::cl::desc(
+          "Enables binding fusion and dispatch site specialization."),
+      llvm::cl::cat(category));
+
   binder.opt<DumpOutputFormat>(
       "iree-scheduling-dump-statistics-format", dumpStatisticsFormat,
       llvm::cl::desc("Dumps statistics in the specified output format."),
@@ -240,12 +266,6 @@ void SchedulingOptions::bindOptions(OptionsBinder &binder) {
                           llvm::cl::desc("File path to write statistics to; or "
                                          "`` for stderr or `-` for stdout."),
                           llvm::cl::cat(category));
-
-  binder.opt<bool>(
-      "iree-scheduling-optimize-bindings", optimizeBindings,
-      llvm::cl::desc(
-          "Enables binding fusion and dispatch site specialization."),
-      llvm::cl::cat(category));
 }
 
 } // namespace mlir::iree_compiler

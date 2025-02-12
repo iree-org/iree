@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "iree/compiler/Utils/Indexing.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -112,6 +113,19 @@ SmallVector<int64_t> NestedLayoutAttr::getUndistributedPackedShape() const {
   return shape;
 }
 
+SmallVector<int64_t> NestedLayoutAttr::getUndistributedShape() const {
+  int64_t rank = getRank();
+  SmallVector<int64_t> shape;
+  shape.reserve(rank);
+  for (int64_t i : llvm::seq<int64_t>(rank)) {
+    int64_t expectedDimLen = getSubgroupTile()[i] * getBatchTile()[i] *
+                             getOuterTile()[i] * getThreadTile()[i] *
+                             getElementTile()[i];
+    shape.push_back(expectedDimLen);
+  }
+  return shape;
+}
+
 // Gets the rank of the undistributed vector for this layout.
 int64_t NestedLayoutAttr::getRank() const {
   // The layout requires that all size lists are the same length and match
@@ -134,7 +148,7 @@ LogicalResult NestedLayoutAttr::isValidLayout(ShapedType shapeTy,
     int64_t expectedShape = getSubgroupTile()[i] * getBatchTile()[i] *
                             getOuterTile()[i] * getThreadTile()[i] *
                             getElementTile()[i];
-    if (expectedShape != shape[i]) {
+    if (!ShapedType::isDynamic(shape[i]) && expectedShape != shape[i]) {
       std::string shapeStr;
       llvm::raw_string_ostream shapeOs(shapeStr);
       llvm::interleaveComma(shape, shapeOs);
@@ -198,6 +212,42 @@ NestedLayoutAttr NestedLayoutAttr::get(
                    normalizedThreadStrides);
 }
 
+static SmallVector<int64_t> appendDims(ArrayRef<int64_t> tileLens,
+                                       ArrayRef<int64_t> appendLens) {
+  SmallVector<int64_t> tileLensResult = llvm::to_vector(tileLens);
+  tileLensResult.insert(tileLensResult.end(), appendLens.begin(),
+                        appendLens.end());
+  return tileLensResult;
+}
+
+NestedLayoutAttr NestedLayoutAttr::get(MLIRContext *context,
+                                       NestedLayoutAttr source,
+                                       ArrayRef<int64_t> appendSubGroupLens,
+                                       ArrayRef<int64_t> appendBatchLens,
+                                       ArrayRef<int64_t> appendOuterLens,
+                                       ArrayRef<int64_t> appendThreadLens,
+                                       ArrayRef<int64_t> appendElementLens,
+                                       ArrayRef<int64_t> appendSubgroupStrides,
+                                       ArrayRef<int64_t> appendThreadStrides) {
+  SmallVector<int64_t> subgroupTile =
+      appendDims(source.getSubgroupTile(), appendSubGroupLens);
+  SmallVector<int64_t> batchTile =
+      appendDims(source.getBatchTile(), appendBatchLens);
+  SmallVector<int64_t> outerTile =
+      appendDims(source.getOuterTile(), appendOuterLens);
+  SmallVector<int64_t> threadTile =
+      appendDims(source.getThreadTile(), appendThreadLens);
+  SmallVector<int64_t> elementTile =
+      appendDims(source.getElementTile(), appendElementLens);
+  SmallVector<int64_t> subgroupStrides =
+      appendDims(source.getSubgroupStrides(), appendSubgroupStrides);
+  SmallVector<int64_t> threadStrides =
+      appendDims(source.getThreadStrides(), appendThreadStrides);
+  return NestedLayoutAttr::get(context, subgroupTile, batchTile, outerTile,
+                               threadTile, elementTile, subgroupStrides,
+                               threadStrides);
+}
+
 LogicalResult NestedLayoutAttr::verify(
     llvm::function_ref<InFlightDiagnostic()> emitError,
     ArrayRef<int64_t> subgroupTile, ArrayRef<int64_t> batchTile,
@@ -237,51 +287,28 @@ NestedLayoutAttr::computeThreadIds(Value threadId, int64_t subgroupSize,
 
   Location loc = threadId.getLoc();
 
-  AffineExpr tidExpr, size, stride;
-  bindDims(rewriter.getContext(), tidExpr);
-  bindSymbols(rewriter.getContext(), size, stride);
+  SmallVector<int64_t> subgroupBasis, threadBasis;
+  SmallVector<size_t> subgroupDimToResult, threadDimToResult;
 
-  // (tid floordiv stride) mod size
-  AffineMap threadTidMap =
-      AffineMap::get(/*dims=*/1, /*syms=*/2, tidExpr.floorDiv(stride) % size);
+  if (failed(basisFromSizesStrides(getSubgroupTile(), getSubgroupStrides(),
+                                   subgroupBasis, subgroupDimToResult)))
+    return {};
+  if (failed(basisFromSizesStrides(getThreadTile(), getThreadStrides(),
+                                   threadBasis, threadDimToResult)))
+    return {};
 
-  // (tid floordiv (stride * subgroup_size)) mod size
-  AffineMap subgroupTidMap = AffineMap::get(
-      /*dims=*/1, /*syms=*/2, tidExpr.floorDiv(stride * subgroupSize) % size);
+  // Add the subgroup_size to the end of the subgroup delinearization basis.
+  subgroupBasis.push_back(subgroupSize);
 
-  for (auto [dimSize, dimStride] :
-       llvm::zip_equal(getSubgroupTile(), getSubgroupStrides())) {
-    // Dimension is not distributed.
-    if (dimStride == 0) {
-      virtualTids.push_back(rewriter.create<arith::ConstantOp>(
-          loc, rewriter.getIndexAttr(dimStride)));
-      continue;
-    }
+  auto subgroupSplit = rewriter.create<affine::AffineDelinearizeIndexOp>(
+      loc, threadId, subgroupBasis, /*hasOuterBound=*/false);
+  auto threadSplit = rewriter.create<affine::AffineDelinearizeIndexOp>(
+      loc, threadId, threadBasis, /*hasOuterBound=*/false);
 
-    auto sizeVal =
-        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(dimSize));
-    auto strideVal = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getIndexAttr(dimStride));
-    virtualTids.push_back(rewriter.create<affine::AffineApplyOp>(
-        loc, subgroupTidMap, ValueRange{threadId, sizeVal, strideVal}));
-  }
-
-  for (auto [dimSize, dimStride] :
-       llvm::zip_equal(getThreadTile(), getThreadStrides())) {
-    // Dimension is not distributed.
-    if (dimStride == 0) {
-      virtualTids.push_back(rewriter.create<arith::ConstantOp>(
-          loc, rewriter.getIndexAttr(dimStride)));
-      continue;
-    }
-
-    auto sizeVal =
-        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(dimSize));
-    auto strideVal = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getIndexAttr(dimStride));
-    virtualTids.push_back(rewriter.create<affine::AffineApplyOp>(
-        loc, threadTidMap, ValueRange{threadId, sizeVal, strideVal}));
-  }
+  llvm::transform(subgroupDimToResult, std::back_inserter(virtualTids),
+                  [&](size_t idx) { return subgroupSplit.getResult(idx); });
+  llvm::transform(threadDimToResult, std::back_inserter(virtualTids),
+                  [&](size_t idx) { return threadSplit.getResult(idx); });
 
   return virtualTids;
 }

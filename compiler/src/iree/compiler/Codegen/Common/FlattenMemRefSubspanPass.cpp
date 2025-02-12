@@ -96,7 +96,7 @@ struct FlattenMemRefTypeConverter final : public TypeConverter {
     addConversion([](MemRefType type) -> std::optional<Type> {
       int64_t offset;
       SmallVector<int64_t> strides;
-      if (failed(getStridesAndOffset(type, strides, offset))) {
+      if (failed(type.getStridesAndOffset(strides, offset))) {
         return nullptr;
       }
       // Since the memref gets linearized, use a stride 1, offset 0.
@@ -270,6 +270,9 @@ struct FlattenBindingSubspan final
     if (byteOffset && !matchPattern(byteOffset, m_Zero())) {
       elementOffset = convertByteOffsetToElementOffset(
           rewriter, loc, byteOffset, oldType.getElementType());
+      // The element offset needs to look dynamic.
+      elementOffset =
+          getValueOrCreateConstantIndexOp(rewriter, loc, elementOffset);
       AffineExpr s0, s1;
       bindSymbols(rewriter.getContext(), s0, s1);
       linearShape = affine::makeComposedFoldedAffineApply(
@@ -354,7 +357,7 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
   // dynamic.
   SmallVector<int64_t> strides;
   int64_t offset;
-  if (succeeded(getStridesAndOffset(sourceType, strides, offset))) {
+  if (succeeded(sourceType.getStridesAndOffset(strides, offset))) {
     // The memref itself might have an offset, but we should not account for it
     // when computing the linearization. The original memref might be
     // `memref<?x?xf32, strided<[?, ?], offset: ?>`

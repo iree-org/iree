@@ -204,7 +204,7 @@ ChangeResult DistributionLayout::resolveWithPossibleConflict(
   // Handle case where constantOp may have multiple consumers with different
   // layouts by creating a copy of constOp for other users.
   if (!opOperand.get().hasOneUse() && !vectorLayout &&
-      llvm::dyn_cast_or_null<arith::ConstantOp>(
+      llvm::isa_and_nonnull<arith::ConstantOp, vector::StepOp>(
           opOperand.get().getDefiningOp())) {
     builder.setInsertionPoint(opOperand.get().getDefiningOp());
     Operation *copiedConstOp = builder.clone(*opOperand.get().getDefiningOp());
@@ -305,7 +305,7 @@ void DistributionLayout::print(raw_ostream &os) const {
 void DistributionLayout::onUpdate(DataFlowSolver *solver) const {
   AnalysisState::onUpdate(solver);
 
-  Value value = anchor.get<Value>();
+  Value value = cast<Value>(anchor);
 
   if (propagation) {
     // Make propagation run again on all users of this value.

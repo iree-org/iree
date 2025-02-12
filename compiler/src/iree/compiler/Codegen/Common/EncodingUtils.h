@@ -43,9 +43,7 @@ public:
   }
 
   IREE::Codegen::MaterializeEncodingInfo
-  getEncodingInfo(RankedTensorType type) const {
-    return layoutAttr.getEncodingInfo(type);
-  }
+  getEncodingInfo(RankedTensorType type) const;
 
 private:
   const IREE::Codegen::LayoutAttrInterface layoutAttr;
@@ -79,6 +77,12 @@ protected:
 /// Returns the RankedTensorType without encodings.
 RankedTensorType dropEncoding(RankedTensorType type);
 
+/// Returns the deserialized MaterializeEncodingInfo if the `layouts` field is
+/// present in encodings and it only has a single layout. Otherwise, returns
+/// std::nullopt.
+std::optional<IREE::Codegen::MaterializeEncodingInfo>
+getEncodingInfoFromLayouts(RankedTensorType type);
+
 /// Utility method to convert from `set_encoding` op to `pack` operation.
 /// NOTE: `source` could be returned when packing is not needed.
 FailureOr<Value> lowerSetEncodingOpToPackOp(
@@ -93,12 +97,16 @@ FailureOr<Value> lowerUnsetEncodingToUnpackOp(
     Value packedValue, const MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn);
 
-/// Pouplates the set of patterns that lowers operations with encoding types to
+/// Populates the set of patterns that lowers operations with encoding types to
 /// operations without encodings.
 void populateMaterializeEncodingPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn);
+
+/// Returns true when `padLayout` adds non-zero padding to at least one
+/// dimension.
+bool isNonZeroPadding(IREE::Encoding::PadEncodingLayoutAttr padLayout);
 
 } // namespace mlir::iree_compiler
 

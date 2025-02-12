@@ -85,7 +85,7 @@ UI and CLI capture tool, is a PDF manual:
 
 You will need three things to capture a trace:
 
-1. The Tracy profiler UI (or CLI capture tool)
+1. The Tracy profiler UI or CLI capture tool
 2. A binary tool to trace, such as `iree-run-module`, built with tracing
     support enabled
 3. A program to profile, e.g. a `.vmfb` file with parameters and input values
@@ -398,7 +398,9 @@ First, refer to the upstream build instructions at either the
 <https://github.com/wolfpld/tracy/> repository itself or the
 [Tracy PDF manual](#the-tracy-manual).
 
-For example, to build the profiler GUI from an IREE checkout:
+#### Building the tracy-profiler GUI
+
+To build the profiler GUI from an IREE checkout:
 
 ```bash
 # Build using CMake:
@@ -410,60 +412,39 @@ cmake --build profiler/build --parallel --config Release
 ./profiler/build/tracy-profiler
 ```
 
-#### Additional Capstone dependencies for CPU code disassembly
+#### Building the tracy-capture CLI tool
 
-You can skip this section if you don't need disassembly of CPU code.
+To build `tracy-capture` from an IREE checkout:
 
-[Capstone](https://github.com/capstone-engine/capstone) is the disassembly
-framework used by Tracy. The default branch, which is what OS packages still
-distribute, is running a few years behind current CPU architectures.
+```bash
+# Build using CMake:
+cd third_party/tracy
+cmake -B capture/build -S capture -DCMAKE_BUILD_TYPE=Release
+cmake --build capture/build --parallel --config Release
 
-Newer CPU architectures such as RISC-V, or newer extensions of existing
-architectures (e.g. new SIMD instructions in the ARM architecture) are typically
-only supported in the
-[`next`](https://github.com/capstone-engine/capstone/tree/next) branch. If you
-need that support, check out and build that branch. Consider uninstalling any OS
-package for `capstone` or otherwise ensure that your IREE build will pick up
-your `next` branch build.
-
-##### Linux
-
-If you haven't opted to build `capstone-next` (see above section), install the
-OS package for `capstone` now (Debian-based distributions):
-
-```shell
-sudo apt install libcapstone-dev
+# Run the capture tool:
+./capture/build/tracy-capture --help
 ```
 
-Install other dependencies:
+IREE also maintains a downstream build for `tracy-capture`, renamed as
+`iree-tracy-capture`, that is bundled along with the `iree-base-runtime` Python
+package on Linux. To build this yourself, set the `-DIREE_BUILD_TRACY=ON` CMake
+option in your IREE CMake build or set the `IREE_RUNTIME_BUILD_TRACY_TOOLS=1`
+environment variable when building Python packages
+(see [`runtime/setup.py`](https://github.com/iree-org/iree/blob/main/runtime/setup.py)).
 
-```shell
-sudo apt install libtbb-dev libzstd-dev libglfw3-dev libfreetype6-dev libgtk-3-dev
-```
+#### Building the `tracy-csvexport` tool
 
-If you only build the command-line tool `iree-tracy-capture` and not the
-graphical `iree-tracy-profiler`, you can install only:
+To build `tracy-csvexport` from an IREE checkout:
 
-```shell
-sudo apt install libtbb-dev libzstd-dev
-```
+```bash
+# Build using CMake:
+cd third_party/tracy
+cmake -B csvexport/build -S csvexport -DCMAKE_BUILD_TYPE=Release
+cmake --build csvexport/build --parallel --config Release
 
-The zstd version on Ubuntu 18.04 is old. You will need to install it from source
-from <https://github.com/facebook/zstd.git>
-
-##### Mac
-
-If you haven't opted to build `capstone-next` (see above section), install the
-system `capstone` now:
-
-```shell
-brew install capstone
-```
-
-Install other dependencies:
-
-```shell
-brew install pkg-config glfw freetype tbb zstd
+# Run the csvexport tool:
+./csvexport/build/tracy-csvexport --help
 ```
 
 ### Android system settings required for Sampling and SysTrace

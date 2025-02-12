@@ -1778,7 +1778,7 @@ ParseResult ExecutableConstantBlockOp::parse(OpAsmParser &parser,
   bool isVariadic = false;
   SmallVector<DictionaryAttr> resultAttrs;
   SmallVector<Type> resultTypes;
-  if (mlir::function_interface_impl::parseFunctionSignature(
+  if (mlir::function_interface_impl::parseFunctionSignatureWithArguments(
           parser, /*allowVariadic=*/false, entryArgs, isVariadic, resultTypes,
           resultAttrs)) {
     return failure();
@@ -1826,7 +1826,7 @@ ParseResult ExecutableConstantBlockOp::parse(OpAsmParser &parser,
 
   // Add the attributes to the function arguments.
   assert(resultAttrs.size() == resultTypes.size());
-  mlir::function_interface_impl::addArgAndResultAttrs(
+  mlir::call_interface_impl::addArgAndResultAttrs(
       builder, result, entryArgs, resultAttrs, getArgAttrsAttrName(result.name),
       getResAttrsAttrName(result.name));
 

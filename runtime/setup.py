@@ -23,6 +23,10 @@
 # Select CMake options are available from environment variables:
 #   IREE_HAL_DRIVER_VULKAN
 #   IREE_ENABLE_CPUINFO
+#
+# If building from a development tree and aiming to get an "editable" install,
+# use the environment option CMAKE_INSTALL_MODE=ABS_SYMLINK on your
+# `pip install -e .` invocation.
 
 import json
 import os
@@ -41,8 +45,11 @@ from setuptools.command.build_ext import build_ext as _build_ext
 from setuptools.command.build_py import build_py as _build_py
 
 
-def getenv_bool(key, default_value="OFF"):
-    value = os.getenv(key, default_value)
+def getenv_bool(key: str, cmake_arg: str, default_value="OFF"):
+    if cmake_arg == "" or cmake_arg[0] != "@":
+        value = cmake_arg
+    else:
+        value = os.getenv(key, default_value)
     return value.upper() in ["ON", "1", "TRUE"]
 
 
@@ -53,7 +60,17 @@ def combine_dicts(*ds):
     return result
 
 
-ENABLE_TRACY = getenv_bool("IREE_RUNTIME_BUILD_TRACY", "ON")
+# This file can be run directly from the source tree or it can be CMake
+# configured so it can run from the build tree with an already existing
+# build tree. We detect the difference based on whether the following
+# are expanded by CMake.
+CONFIGURED_SOURCE_DIR = "@IREE_SOURCE_DIR@"
+CONFIGURED_BINARY_DIR = "@IREE_BINARY_DIR@"
+
+ENABLE_TRACY = getenv_bool(
+    "IREE_RUNTIME_BUILD_TRACY", "@IREE_RUNTIME_BUILD_TRACY@", "ON"
+)
+
 if ENABLE_TRACY:
     print(
         "*** Enabling Tracy instrumented runtime (disable with IREE_RUNTIME_BUILD_TRACY=OFF)",
@@ -64,7 +81,9 @@ else:
         "*** Tracy instrumented runtime not enabled (enable with IREE_RUNTIME_BUILD_TRACY=ON)",
         file=sys.stderr,
     )
-ENABLE_TRACY_TOOLS = getenv_bool("IREE_RUNTIME_BUILD_TRACY_TOOLS")
+ENABLE_TRACY_TOOLS = getenv_bool(
+    "IREE_RUNTIME_BUILD_TRACY_TOOLS", "@IREE_RUNTIME_BUILD_TRACY_TOOLS@"
+)
 if ENABLE_TRACY_TOOLS:
     print("*** Enabling Tracy tools (may error if missing deps)", file=sys.stderr)
 else:
@@ -111,21 +130,33 @@ CMAKE_INSTALL_DIR_ABS = os.path.join(SETUPPY_DIR, CMAKE_INSTALL_DIR_REL)
 CMAKE_TRACY_INSTALL_DIR_REL = os.path.join("build", "i", "t")
 CMAKE_TRACY_INSTALL_DIR_ABS = os.path.join(SETUPPY_DIR, CMAKE_TRACY_INSTALL_DIR_REL)
 
-IREE_SOURCE_DIR = os.path.join(SETUPPY_DIR, "..")
-# Note that setuptools always builds into a "build" directory that
-# is a sibling of setup.py, so we just colonize a sub-directory of that
-# by default.
-BASE_BINARY_DIR = os.getenv(
-    "IREE_RUNTIME_API_CMAKE_BUILD_DIR", os.path.join(SETUPPY_DIR, "build", "b")
-)
-IREE_BINARY_DIR = os.path.join(BASE_BINARY_DIR, "d")
-IREE_TRACY_BINARY_DIR = os.path.join(BASE_BINARY_DIR, "t")
-print(
-    f"Running setup.py from source tree: "
-    f"SOURCE_DIR = {IREE_SOURCE_DIR} "
-    f"BINARY_DIR = {IREE_BINARY_DIR}",
-    file=sys.stderr,
-)
+IS_CONFIGURED = CONFIGURED_SOURCE_DIR[0] != "@"
+if IS_CONFIGURED:
+    IREE_SOURCE_DIR = CONFIGURED_SOURCE_DIR
+    IREE_BINARY_DIR = CONFIGURED_BINARY_DIR
+    IREE_TRACY_BINARY_DIR = CONFIGURED_BINARY_DIR
+    print(
+        f"Running setup.py from build tree: "
+        f"SOURCE_DIR = {IREE_SOURCE_DIR} "
+        f"BINARY_DIR = {IREE_BINARY_DIR}",
+        file=sys.stderr,
+    )
+else:
+    IREE_SOURCE_DIR = os.path.join(SETUPPY_DIR, "..")
+    # Note that setuptools always builds into a "build" directory that
+    # is a sibling of setup.py, so we just colonize a sub-directory of that
+    # by default.
+    BASE_BINARY_DIR = os.getenv(
+        "IREE_RUNTIME_API_CMAKE_BUILD_DIR", os.path.join(SETUPPY_DIR, "build", "b")
+    )
+    IREE_BINARY_DIR = os.path.join(BASE_BINARY_DIR, "d")
+    IREE_TRACY_BINARY_DIR = os.path.join(BASE_BINARY_DIR, "t")
+    print(
+        f"Running setup.py from source tree: "
+        f"SOURCE_DIR = {IREE_SOURCE_DIR} "
+        f"BINARY_DIR = {IREE_BINARY_DIR}",
+        file=sys.stderr,
+    )
 
 # Setup and get version information.
 VERSION_FILE = os.path.join(IREE_SOURCE_DIR, "runtime/version.json")
@@ -263,61 +294,62 @@ def build_configuration(cmake_build_dir, cmake_install_dir, extra_cmake_args=())
     cfg = os.getenv("IREE_CMAKE_BUILD_TYPE", "Release")
     strip_install = cfg == "Release"
 
-    # Build from source tree.
-    os.makedirs(cmake_build_dir, exist_ok=True)
-    maybe_nuke_cmake_cache(cmake_build_dir, cmake_install_dir)
-    print(f"CMake build dir: {cmake_build_dir}", file=sys.stderr)
-    print(f"CMake install dir: {cmake_install_dir}", file=sys.stderr)
-    cmake_args = [
-        "-GNinja",
-        "--log-level=VERBOSE",
-        f"-DIREE_RUNTIME_OPTIMIZATION_PROFILE={IREE_RUNTIME_OPTIMIZATION_PROFILE}",
-        "-DIREE_BUILD_PYTHON_BINDINGS=ON",
-        "-DIREE_BUILD_COMPILER=OFF",
-        "-DIREE_BUILD_SAMPLES=OFF",
-        "-DIREE_BUILD_TESTS=OFF",
-        "-DPython3_EXECUTABLE={}".format(sys.executable),
-        "-DCMAKE_BUILD_TYPE={}".format(cfg),
-        get_env_cmake_option(
-            "IREE_HAL_DRIVER_VULKAN",
-            "OFF" if platform.system() == "Darwin" else "ON",
-        ),
-        get_env_cmake_option(
-            "IREE_HAL_DRIVER_CUDA",
-            "OFF",
-        ),
-        get_env_cmake_option(
-            "IREE_HAL_DRIVER_HIP",
-            "OFF",
-        ),
-        get_env_cmake_list("IREE_EXTERNAL_HAL_DRIVERS", ""),
-        get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
-    ] + list(extra_cmake_args)
-    add_env_cmake_setting(cmake_args, "IREE_TRACING_PROVIDER")
-    add_env_cmake_setting(cmake_args, "IREE_TRACING_PROVIDER_H")
+    if not IS_CONFIGURED:
+        # Build from source tree.
+        os.makedirs(cmake_build_dir, exist_ok=True)
+        maybe_nuke_cmake_cache(cmake_build_dir, cmake_install_dir)
+        print(f"CMake build dir: {cmake_build_dir}", file=sys.stderr)
+        print(f"CMake install dir: {cmake_install_dir}", file=sys.stderr)
+        cmake_args = [
+            "-GNinja",
+            "--log-level=VERBOSE",
+            f"-DIREE_RUNTIME_OPTIMIZATION_PROFILE={IREE_RUNTIME_OPTIMIZATION_PROFILE}",
+            "-DIREE_BUILD_PYTHON_BINDINGS=ON",
+            "-DIREE_BUILD_COMPILER=OFF",
+            "-DIREE_BUILD_SAMPLES=OFF",
+            "-DIREE_BUILD_TESTS=OFF",
+            "-DPython3_EXECUTABLE={}".format(sys.executable),
+            "-DCMAKE_BUILD_TYPE={}".format(cfg),
+            get_env_cmake_option(
+                "IREE_HAL_DRIVER_VULKAN",
+                "OFF" if platform.system() == "Darwin" else "ON",
+            ),
+            get_env_cmake_option(
+                "IREE_HAL_DRIVER_CUDA",
+                "OFF",
+            ),
+            get_env_cmake_option(
+                "IREE_HAL_DRIVER_HIP",
+                "OFF",
+            ),
+            get_env_cmake_list("IREE_EXTERNAL_HAL_DRIVERS", ""),
+            get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
+        ] + list(extra_cmake_args)
+        add_env_cmake_setting(cmake_args, "IREE_TRACING_PROVIDER")
+        add_env_cmake_setting(cmake_args, "IREE_TRACING_PROVIDER_H")
 
-    # These usually flow through the environment, but we add them explicitly
-    # so that they show clearly in logs (getting them wrong can have bad
-    # outcomes).
-    add_env_cmake_setting(cmake_args, "CMAKE_OSX_ARCHITECTURES")
-    add_env_cmake_setting(
-        cmake_args, "MACOSX_DEPLOYMENT_TARGET", "CMAKE_OSX_DEPLOYMENT_TARGET"
-    )
-
-    # Only do a from-scratch configure if not already configured.
-    cmake_cache_file = os.path.join(cmake_build_dir, "CMakeCache.txt")
-    if not os.path.exists(cmake_cache_file):
-        print(f"Configuring with: {cmake_args}", file=sys.stderr)
-        subprocess.check_call(
-            ["cmake", IREE_SOURCE_DIR] + cmake_args, cwd=cmake_build_dir
+        # These usually flow through the environment, but we add them explicitly
+        # so that they show clearly in logs (getting them wrong can have bad
+        # outcomes).
+        add_env_cmake_setting(cmake_args, "CMAKE_OSX_ARCHITECTURES")
+        add_env_cmake_setting(
+            cmake_args, "MACOSX_DEPLOYMENT_TARGET", "CMAKE_OSX_DEPLOYMENT_TARGET"
         )
-    else:
-        print(f"Not re-configuring (already configured)", file=sys.stderr)
 
-    # Build. Since we have restricted to just the runtime, build everything
-    # so as to avoid fragility with more targeted selection criteria.
-    subprocess.check_call(["cmake", "--build", "."], cwd=cmake_build_dir)
-    print("Build complete.", file=sys.stderr)
+        # Only do a from-scratch configure if not already configured.
+        cmake_cache_file = os.path.join(cmake_build_dir, "CMakeCache.txt")
+        if not os.path.exists(cmake_cache_file):
+            print(f"Configuring with: {cmake_args}", file=sys.stderr)
+            subprocess.check_call(
+                ["cmake", IREE_SOURCE_DIR] + cmake_args, cwd=cmake_build_dir
+            )
+        else:
+            print(f"Not re-configuring (already configured)", file=sys.stderr)
+
+        # Build. Since we have restricted to just the runtime, build everything
+        # so as to avoid fragility with more targeted selection criteria.
+        subprocess.check_call(["cmake", "--build", "."], cwd=cmake_build_dir)
+        print("Build complete.", file=sys.stderr)
 
     # Install the component we care about.
     install_args = [
@@ -361,7 +393,9 @@ class CMakeBuildPy(_build_py):
     def run(self):
         # The super-class handles the pure python build.
         super().run()
-        self.build_default_configuration()
+        # If we're in an existing build with tracy enabled, don't build the default config.
+        if not (IS_CONFIGURED and ENABLE_TRACY):
+            self.build_default_configuration()
         if ENABLE_TRACY:
             self.build_tracy_configuration()
 
@@ -388,7 +422,7 @@ class CMakeBuildPy(_build_py):
                 "_runtime_libs",
             ),
             target_dir,
-            symlinks=False,
+            symlinks=self.editable_mode,
         )
         print("Target populated.", file=sys.stderr)
 
@@ -424,7 +458,7 @@ class CMakeBuildPy(_build_py):
                 "_runtime_libs",
             ),
             target_dir,
-            symlinks=False,
+            symlinks=self.editable_mode,
         )
         print("Target populated.", file=sys.stderr)
 

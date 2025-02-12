@@ -49,6 +49,7 @@ iree_compiler_cc_library(
         "EncodingInterfaces.cpp.inc",
         "EncodingOps.cpp",
         "EncodingOps.cpp.inc",
+        "EncodingTypeInterfaces.cpp.inc",
         "EncodingTypes.cpp.inc",
     ],
     hdrs = [
@@ -59,6 +60,7 @@ iree_compiler_cc_library(
         "EncodingInterfaces.h.inc",
         "EncodingOps.h",
         "EncodingOps.h.inc",
+        "EncodingTypeInterfaces.h.inc",
         "EncodingTypes.h",
         "EncodingTypes.h.inc",
     ],
@@ -153,6 +155,14 @@ iree_gentbl_cc_library(
         (
             ["--gen-attr-interface-defs"],
             "EncodingInterfaces.cpp.inc",
+        ),
+        (
+            ["--gen-type-interface-decls"],
+            "EncodingTypeInterfaces.h.inc",
+        ),
+        (
+            ["--gen-type-interface-defs"],
+            "EncodingTypeInterfaces.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",

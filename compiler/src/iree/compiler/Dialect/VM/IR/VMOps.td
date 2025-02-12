@@ -4231,7 +4231,7 @@ class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
     }
 
     /// Get the argument operands to the called function as a mutable range, this is
@@ -4250,7 +4250,9 @@ def VM_CallOp : VM_CallBaseOp<"call"> {
 
   let arguments = (ins
     VM_FuncRefAttr:$callee,
-    Variadic<VM_AnyType>:$operands
+    Variadic<VM_AnyType>:$operands,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
   );
   let results = (outs
     Variadic<VM_AnyType>:$results
@@ -4309,7 +4311,9 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
     VM_FuncRefAttr:$callee,
     SignlessIntElementsAttr<16>:$segment_sizes,
     TypeArrayAttr:$segment_types,
-    Variadic<VM_AnyType>:$operands
+    Variadic<VM_AnyType>:$operands,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
   );
   let results = (outs
     Variadic<VM_AnyType>:$results

@@ -269,7 +269,8 @@ static LogicalResult convertStreamableCall(StreamableFunc &streamableFunc,
     auto calculateCallOp = builder.create<IREE::Util::CallOp>(
         callOp.getLoc(), resultDimTypes,
         streamableFunc.resultDimsFunc.getLeafReference().getValue(),
-        callOp.getOperands(), ArrayAttr{});
+        callOp.getOperands(), /*tied_operands=*/ArrayAttr{},
+        callOp.getArgAttrsAttr(), callOp.getResAttrsAttr());
     llvm::append_range(resultDims, calculateCallOp.getResults());
   } else {
     // Get the shape dimensions from existing call arguments or tied operands.

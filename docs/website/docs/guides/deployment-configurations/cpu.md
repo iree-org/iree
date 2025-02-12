@@ -13,27 +13,32 @@ IREE supports efficient program execution on CPU devices by using
 highly optimized CPU native instruction streams, which are embedded in one of
 IREE's deployable formats.
 
-To compile a program for CPU execution, pick one of IREE's supported executable
-formats:
+To compile a program for CPU execution:
 
-| Executable Format | Description                                           |
-| ----------------- | ----------------------------------------------------- |
-| embedded ELF      | portable, high performance dynamic library            |
-| system library    | platform-specific dynamic library (.so, .dll, etc.)   |
-| VMVX              | reference target                                      |
+1. Pick a CPU target supported by LLVM. By default, IREE includes these LLVM
+   targets:
 
-At runtime, CPU executables can be loaded using one of IREE's CPU HAL drivers:
+    * X86
+    * ARM
+    * AArch64
+    * RISCV
 
-* `local-task`: asynchronous, multithreaded driver built on IREE's "task"
+    Other targets may work, but in-tree test coverage and performance work is
+    focused on that list.
+
+2. Pick one of IREE's supported executable formats:
+
+    | Executable Format | Description                                           |
+    | ----------------- | ----------------------------------------------------- |
+    | Embedded ELF      | (Default) Portable, high performance dynamic library  |
+    | System library    | Platform-specific dynamic library (.so, .dll, etc.)   |
+    | VMVX              | Reference target                                      |
+
+At runtime, CPU executables can be loaded using one of IREE's CPU HAL devices:
+
+* `local-task`: asynchronous, multithreaded device built on IREE's "task"
    system
-* `local-sync`: synchronous, single-threaded driver that executes work inline
-
-!!! todo
-
-    Add IREE's CPU support matrix: what architectures are supported; what
-    architectures are well optimized; etc.
-
-<!-- TODO(??): when to use CPU vs GPU vs other backends -->
+* `local-sync`: synchronous, single-threaded devices that executes work inline
 
 ## :octicons-download-16: Prerequisites
 
@@ -44,7 +49,7 @@ At runtime, CPU executables can be loaded using one of IREE's CPU HAL drivers:
 Python packages are distributed through multiple channels. See the
 [Python Bindings](../../reference/bindings/python.md) page for more details.
 The core [`iree-base-compiler`](https://pypi.org/project/iree-base-compiler/)
-package includes the LLVM-based CPU compiler:
+package includes the compiler tools:
 
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-compiler-from-release.md"
 
@@ -52,14 +57,9 @@ package includes the LLVM-based CPU compiler:
 
 Please make sure you have followed the
 [Getting started](../../building-from-source/getting-started.md) page to build
-IREE for your host platform and the
-[Android cross-compilation](../../building-from-source/android.md) or
-[iOS cross-compilation](../../building-from-source/ios.md) page if you are cross
-compiling for a mobile device. The `llvm-cpu` compiler backend is compiled in by
-default on all platforms.
-
-Ensure that the `IREE_TARGET_BACKEND_LLVM_CPU` CMake option is `ON` when
-configuring for the host.
+IREE for your host platform. The `llvm-cpu` compiler backend is compiled in by
+default on all platforms, though you should ensure that the
+`IREE_TARGET_BACKEND_LLVM_CPU` CMake option is `ON` when configuring.
 
 !!! tip
     `iree-compile` will be built under the `iree-build/tools/` directory. You
@@ -71,10 +71,14 @@ You will need to get an IREE runtime that supports the local CPU HAL driver,
 along with the appropriate executable loaders for your application.
 
 You can check for CPU support by looking for the `local-sync` and `local-task`
-drivers:
+drivers and devices:
 
-```console hl_lines="5 6"
---8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md"
+```console hl_lines="10-11"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md:1"
+```
+
+```console hl_lines="4-5"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-device-list-amd.md"
 ```
 
 #### :octicons-download-16: Download the runtime from a release
@@ -88,16 +92,12 @@ package includes the local CPU HAL drivers:
 
 #### :material-hammer-wrench: Build the runtime from source
 
-Please make sure you have followed the
-[Getting started](../../building-from-source/getting-started.md) page to build
-IREE for your host platform and the
-[Android cross-compilation](../../building-from-source/android.md) page if you
-are cross compiling for Android. The local CPU HAL drivers are compiled in by
-default on all platforms.
-
-Ensure that the `IREE_HAL_DRIVER_LOCAL_TASK` and
-`IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF` (or other executable loader) CMake
-options are `ON` when configuring for the target.
+Please make sure you have followed one of the
+[Building from source](../../building-from-source/index.md) pages to build
+IREE for your target platform. The local CPU HAL drivers and devices are
+compiled in by default on all platforms, though you should ensure that the
+`IREE_HAL_DRIVER_LOCAL_TASK` and `IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF`
+(or other executable loader) CMake options are `ON` when configuring.
 
 ## Compile and run a program
 
@@ -105,30 +105,36 @@ With the requirements out of the way, we can now compile a model and run it.
 
 ### :octicons-file-code-16: Compile a program
 
-The IREE compiler transforms a model into its final deployable format in many
-sequential steps. A model authored with Python in an ML framework should use the
-corresponding framework's import tool to convert into a format (i.e.,
-[MLIR](https://mlir.llvm.org/)) expected by the IREE compiler first.
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-import-onnx-mobilenet.md"
 
-Using MobileNet v2 as an example, you can download the SavedModel with trained
-weights from
-[TensorFlow Hub](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification)
-and convert it using IREE's
-[TensorFlow importer](../ml-frameworks/tensorflow.md). Then run the following
-command to compile with the `llvm-cpu` target:
+Then run the following command to compile with the `llvm-cpu` target:
 
-``` shell hl_lines="2"
+``` shell hl_lines="2-3"
 iree-compile \
     --iree-hal-target-backends=llvm-cpu \
-    mobilenet_iree_input.mlir -o mobilenet_cpu.vmfb
+    --iree-llvmcpu-target-cpu=host \
+    mobilenetv2.mlir -o mobilenet_cpu.vmfb
 ```
 
-!!! tip "Tip - CPU targets"
+???+ tip "Tip - Target CPUs and CPU features"
+
+    By default, the compiler will use a generic CPU target which will result in
+    poor performance. A target CPU or target CPU feature set should be selected
+    using one of these options:
+
+    * `--iree-llvmcpu-target-cpu=...`
+    * `--iree-llvmcpu-target-cpu-features=...`
+
+    When not cross compiling, passing `--iree-llvmcpu-target-cpu=host` is
+    usually sufficient on most devices.
+
+???+ tip "Tip - CPU targets"
 
     The `--iree-llvmcpu-target-triple` flag tells the compiler to generate code
     for a specific type of CPU. You can see the list of supported targets with
-    `iree-compile --iree-llvmcpu-list-targets`, or pass "host" to let LLVM
-    infer the triple from your host machine (e.g. `x86_64-linux-gnu`).
+    `iree-compile --iree-llvmcpu-list-targets`, or use the default value of
+    "host" to let LLVM infer the triple from your host machine
+    (e.g. `x86_64-linux-gnu`).
 
     ```console
     $ iree-compile --iree-llvmcpu-list-targets
@@ -149,28 +155,21 @@ iree-compile \
         x86-64     - 64-bit X86: EM64T and AMD64
     ```
 
-!!! tip "Tip - CPU features"
-
-    The `--iree-llvmcpu-target-cpu-features` flag tells the compiler to generate
-    code using certain CPU "features", like SIMD instruction sets. Like the
-    target triple, you can pass "host" to this flag to let LLVM infer the
-    features supported by your host machine.
-
 ### :octicons-terminal-16: Run a compiled program
 
-In the build directory, run the following command:
+To run the compiled program:
 
 ``` shell hl_lines="2"
-tools/iree-run-module \
+iree-run-module \
     --device=local-task \
     --module=mobilenet_cpu.vmfb \
-    --function=predict \
-    --input="1x224x224x3xf32=0"
+    --function=torch-jit-export \
+    --input="1x3x224x224xf32=0"
 ```
 
-The above assumes the exported function in the model is named as `predict` and
-it expects one 224x224 RGB image. We are feeding in an image with all 0 values
-here for brevity, see `iree-run-module --help` for the format to specify
+The above assumes the exported function in the model is named `torch-jit-export`
+and it expects one 224x224 RGB image. We are feeding in an image with all 0
+values here for brevity, see `iree-run-module --help` for the format to specify
 concrete values.
 
 <!-- TODO(??): measuring performance -->

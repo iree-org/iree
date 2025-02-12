@@ -211,6 +211,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wimplicit-fallthrough"
     "-Winfinite-recursion"
     "-Wliteral-conversion"
+    "-Wlogical-op-parentheses"
     "-Wnon-virtual-dtor"
     "-Woverloaded-virtual"
     "-Wpointer-arith"
@@ -248,6 +249,10 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wno-unknown-pragmas"
     "-Wno-unused-but-set-variable"
     "-Wno-misleading-indentation"
+
+  GCC_GTE_13
+    # False positives? Not useful? https://stackoverflow.com/a/78760067
+    $<$<COMPILE_LANGUAGE:CXX>:-Wno-dangling-reference>
 
   MSVC_OR_CLANG_CL
     # Default warning level (severe + significant + production quality).

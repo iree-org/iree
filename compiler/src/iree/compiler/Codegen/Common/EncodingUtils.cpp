@@ -5,14 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
-#include <numeric>
+#include <optional>
 
 namespace mlir::iree_compiler {
 
@@ -79,8 +79,46 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
   });
 }
 
+IREE::Codegen::MaterializeEncodingInfo
+MaterializeEncodingTypeConverter::getEncodingInfo(RankedTensorType type) const {
+  // If the layout is present in the encoding, use it directly. It means that
+  // the layout is already resolved and some information could be dropped during
+  // the lowering. Thus, we prioritize the resolved layout.
+  if (auto maybeEncodingInfo = getEncodingInfoFromLayouts(type)) {
+    return maybeEncodingInfo.value();
+  }
+  return layoutAttr.getEncodingInfo(type);
+}
+
 RankedTensorType dropEncoding(RankedTensorType type) {
   return RankedTensorType::get(type.getShape(), type.getElementType());
+}
+
+std::optional<IREE::Codegen::MaterializeEncodingInfo>
+getEncodingInfoFromLayouts(RankedTensorType type) {
+  auto encodingAttr = IREE::Encoding::getEncodingAttr(type);
+  if (!encodingAttr) {
+    return std::nullopt;
+  }
+  ArrayAttr layoutsAttr = encodingAttr.getLayouts();
+  if (!layoutsAttr) {
+    return std::nullopt;
+  }
+  ArrayRef<Attribute> layouts = layoutsAttr.getValue();
+  assert(layouts.size() == 1 && "only single layout is supported");
+  if (auto layout = dyn_cast<IREE::Codegen::LayoutAttrInterface>(layouts[0])) {
+    return layout.getEncodingInfo(type);
+  }
+  return std::nullopt;
+}
+
+bool isNonZeroPadding(IREE::Encoding::PadEncodingLayoutAttr padLayout) {
+  if (!padLayout) {
+    return false;
+  }
+
+  return !llvm::all_of(padLayout.getPadding().asArrayRef(),
+                       [](int32_t padValue) { return padValue == 0; });
 }
 
 } // namespace mlir::iree_compiler

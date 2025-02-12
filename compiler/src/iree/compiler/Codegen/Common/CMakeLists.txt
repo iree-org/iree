@@ -74,6 +74,7 @@ iree_cc_library(
     "PassUtils.h"
     "Passes.h"
     "TensorDynamicDimAnalysis.h"
+    "TileInferenceUtils.h"
     "TileSizeSelection.h"
     "Transforms.h"
     "UserConfig.h"
@@ -120,8 +121,10 @@ iree_cc_library(
     "LowerUKernelsToCalls.cpp"
     "MaterializeEncoding.cpp"
     "MaterializeEncodingIntoNop.cpp"
+    "MaterializeEncodingIntoPadding.cpp"
     "MaterializeEncodingPatterns.cpp"
     "MaterializeTuningSpecsPass.cpp"
+    "MathTransformPass.cpp"
     "MemrefCopyToLinalg.cpp"
     "NormalizeLoopBounds.cpp"
     "OptimizeTensorInsertExtractSlices.cpp"
@@ -129,7 +132,6 @@ iree_cc_library(
     "PadDynamicAlloc.cpp"
     "PassUtils.cpp"
     "Passes.cpp"
-    "PolynomialApproximationPass.cpp"
     "PropagateDispatchSizeBounds.cpp"
     "PropagateReshapesByExpansion.cpp"
     "ReconcileTranslationInfo.cpp"
@@ -145,11 +147,14 @@ iree_cc_library(
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TileDispatchUsingForall.cpp"
     "TileDispatchUsingInterface.cpp"
+    "TileInferenceUtils.cpp"
     "TileLargeTensors.cpp"
     "TileSizeSelection.cpp"
+    "Transforms.cpp"
     "TypePropagationPass.cpp"
     "UnrollAnnotatedLoops.cpp"
     "UserConfig.cpp"
+    "VectorTransferLowering.cpp"
     "VectorizeMemrefCopy.cpp"
     "VerifyWorkgroupDistribution.cpp"
   DEPS
@@ -203,6 +208,7 @@ iree_cc_library(
     MLIRTransforms
     MLIRValueBoundsOpInterface
     MLIRVectorDialect
+    MLIRVectorToSCF
     MLIRVectorTransforms
     MLIRViewLikeInterface
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen

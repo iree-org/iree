@@ -113,8 +113,8 @@ module @add_expr {
 // CHECK-LABEL: @mod_expr
 module @mod_expr {
   func.func @main(%arg0: !torch.vtensor<[?,?],f32>, %arg1: !torch.vtensor<[?,?],f32>) {
-    // CHECK: remui
-    // CHECK-NOT: udiv
+    // CHECK: remsi
+    // CHECK-NOT: sdiv
     %0 = torch.symbolic_int "s0" {min_val = 0, max_val = 1024} : !torch.int
     %1 = torch.symbolic_int "s1" {min_val = 0, max_val = 1024} : !torch.int
     torch.bind_symbolic_shape %arg0, [%0, %1], affine_map<()[s0, s1] -> (s0, s1)> : !torch.vtensor<[?,?],f32>
@@ -127,8 +127,8 @@ module @mod_expr {
 // CHECK-LABEL: @floordiv_expr
 module @floordiv_expr {
   func.func @main(%arg0: !torch.vtensor<[?,?],f32>, %arg1: !torch.vtensor<[?,?],f32>) {
-    // CHECK: divui
-    // CHECK-NOT: udiv
+    // CHECK: divsi
+    // CHECK-NOT: sdiv
     %0 = torch.symbolic_int "s0" {min_val = 0, max_val = 1024} : !torch.int
     %1 = torch.symbolic_int "s1" {min_val = 0, max_val = 1024} : !torch.int
     torch.bind_symbolic_shape %arg0, [%0, %1], affine_map<()[s0, s1] -> (s0, s1)> : !torch.vtensor<[?,?],f32>

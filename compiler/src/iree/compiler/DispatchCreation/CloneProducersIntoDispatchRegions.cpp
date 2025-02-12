@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/IR/Iterators.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
@@ -25,19 +26,25 @@ namespace {
 struct CloneProducersIntoDispatchRegionsPass final
     : public impl::CloneProducersIntoDispatchRegionsPassBase<
           CloneProducersIntoDispatchRegionsPass> {
+  using Base::Base;
   void runOnOperation() override {
     mlir::FunctionOpInterface funcOp = getOperation();
     IRRewriter rewriter(funcOp->getContext());
 
+    IREE::Flow::ClonableIntoDispatchOptions options;
+    options.aggressive = aggressive;
     funcOp->walk([&](IREE::Flow::DispatchRegionOp regionOp) {
-      if (failed(cloneProducersToRegion(rewriter, regionOp)))
+      if (failed(cloneProducersToRegion(rewriter, regionOp, options)))
         return signalPassFailure();
     });
 
-    funcOp->walk([&](Operation *op) {
+    funcOp->walk<WalkOrder::PostOrder, ReverseIterator>([&](Operation *op) {
       if (isOpTriviallyDead(op)) {
         return rewriter.eraseOp(op);
       }
+    });
+
+    funcOp->walk([&](Operation *op) {
       if (!IREE::Flow::isNonNullAndOutsideDispatch(op) ||
           !isa<linalg::GenericOp>(op)) {
         return;
@@ -50,7 +57,7 @@ struct CloneProducersIntoDispatchRegionsPass final
     // Rerun the cloning again to move still clonable operations into
     // dispatches.
     funcOp->walk([&](IREE::Flow::DispatchRegionOp regionOp) {
-      if (failed(cloneProducersToRegion(rewriter, regionOp)))
+      if (failed(cloneProducersToRegion(rewriter, regionOp, options)))
         return signalPassFailure();
     });
   }

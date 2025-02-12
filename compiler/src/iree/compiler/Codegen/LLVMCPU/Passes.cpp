@@ -126,6 +126,7 @@ static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
 }
 
 //===---------------------------------------------------------------------===//
@@ -319,7 +320,7 @@ void buildLLVMCPUVectorLoweringPipeline(
   // lower them and can't be optimized away anymore.
   funcPassManager.addPass(createCanonicalizerPass());
 
-  LLVMCPUVectorTransferLoweringPassOptions transferLoweringOptions{};
+  VectorTransferLoweringPassOptions transferLoweringOptions{};
   if (!options.enableArmSME) {
     // The ArmSME dialect has its own (more specific) lowerings for scalable
     // vectors that occur later in the pipeline, so only enable the general
@@ -327,7 +328,7 @@ void buildLLVMCPUVectorLoweringPipeline(
     transferLoweringOptions.enableScalableLowerings = true;
   }
   funcPassManager.addPass(
-      createLLVMCPUVectorTransferLoweringPass(transferLoweringOptions));
+      createVectorTransferLoweringPass(transferLoweringOptions));
   funcPassManager.addPass(createLLVMCPUVectorTransposeLoweringPass(
       LLVMCPUVectorTransposeLoweringPassOptions{
           options.lowerVectorTransposeToAVX2}));
@@ -447,6 +448,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
   addCPUBufferizePasses(funcPassManager);
 
   // Run IREE specific passes before vector lowering expert.
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
 
   {
@@ -510,6 +512,7 @@ void addConvTileAndDecomposeExpertPassPipeline(
   addCPUBufferizePasses(funcPassManager);
 
   // Run IREE specific passes before vector lowering expert.
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
 
   {
@@ -695,8 +698,8 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass(createFoldTensorExtractOpPass)
       // Handle complex operation conversion.
       .addPass(createConvertComplexToStandardPass)
-      // math dialect elementry functions -> polynomial form.
-      .addPass(createPolynomialApproximationPass)
+      // Math dialect ops rewrites, approximations, casts.
+      .addPass(createMathTransformPass)
       .addPass(createHoistStaticallyBoundAllocationsPass)
       // Use `arith.minf/maxf` instead of `arith.minimumf/maximumf`.
       .addPredicatedPass(clUseFastMinMaxOps, createReplaceSlowMinMaxOpsPass);
@@ -731,9 +734,24 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
         .addPass(mlir::createConvertArmSMEToSCFPass);
   }
 
+  VectorTransferLoweringPassOptions transferLoweringOptions;
+  if (!enableAArch64SME) {
+    // The ArmSME dialect has its own (more specific) lowerings for scalable
+    // vectors that occur later in the pipeline, so only enable the general
+    // lowerings if SME is not available.
+    transferLoweringOptions.enableScalableLowerings = true;
+  }
+
   FunctionLikeNest(modulePassManager)
-      // Resolve get_buffer_descriptor ops. All structural buffer manipulations
-      // must conclude before this point.
+      // All structural buffer manipulations must conclude before this point.
+
+      // The subview folding doesn't like potentially-out-of-bounds
+      // vector.transfer_read and vector.transfer_write, lower them to loads and
+      // stores here.
+      .addPass([&]() {
+        return createVectorTransferLoweringPass(transferLoweringOptions);
+      })
+      .addPass(memref::createFoldMemRefAliasOpsPass)
       .addPass(createIREEExpandStridedMetadataPass)
       .addPass(createCleanupBufferAllocViewPass)
       // Checking stack allocation before converting to CF dialect is easier.

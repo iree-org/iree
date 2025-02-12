@@ -38,7 +38,7 @@ getPaddedShapeFromTensorLoad(IREE::Flow::DispatchTensorLoadOp tensorLoad,
       FailureOr<int64_t> upperBound =
           ValueBoundsConstraintSet::computeConstantBound(
               presburger::BoundType::UB,
-              {size.get<Value>(), /*dim=*/std::nullopt},
+              {cast<Value>(size), /*dim=*/std::nullopt},
               /*stopCondition=*/nullptr, /*closedUB=*/true);
       if (failed(upperBound))
         return failure();

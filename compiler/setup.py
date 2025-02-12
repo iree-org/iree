@@ -21,6 +21,10 @@
 #
 # Select CMake options are available from environment variables:
 #   IREE_ENABLE_CPUINFO
+#
+# If building from a development tree and aiming to get an "editable" install,
+# use the environment option CMAKE_INSTALL_MODE=ABS_SYMLINK on your
+# `pip install -e .` invocation.
 
 from gettext import install
 import json
@@ -337,7 +341,7 @@ class CMakeBuildPy(_build_py):
         shutil.copytree(
             os.path.join(CMAKE_INSTALL_DIR_ABS, "python_packages", "iree_compiler"),
             target_dir,
-            symlinks=False,
+            symlinks=self.editable_mode,
         )
         print("Target populated.", file=sys.stderr)
 

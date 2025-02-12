@@ -243,7 +243,8 @@ DiagnosedSilenceableFailure IREE::Util::transform_dialect::CastAndCallOp::apply(
 
   auto callOp = rewriter.create<IREE::Util::CallOp>(
       insertionPoint->getLoc(), targetFunction.getResultTypes(),
-      targetFunction.getName(), inputs, /*tied_operands=*/ArrayAttr{});
+      targetFunction.getName(), inputs, /*tied_operands=*/ArrayAttr{},
+      /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr);
 
   // Cast the call results back to the expected types. If any conversions fail
   // this is a definite failure as the call has been constructed at this point.

@@ -145,9 +145,7 @@ static LogicalResult commonRunOnOperation(
               auto packOp = cast<tensor::PackOp>(op);
 
               // Do nothing if any of inner tile sizes is dynamic.
-              if (llvm::any_of(packOp.getMixedTiles(), [](OpFoldResult tile) {
-                    return tile.is<Value>();
-                  })) {
+              if (llvm::any_of(packOp.getMixedTiles(), llvm::IsaPred<Value>)) {
                 return {};
               }
 

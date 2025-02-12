@@ -198,9 +198,9 @@ module attributes { transform.with_named_sequence } {
 
 func.func @scatter_batch_2D(
     %original: memref<?xi32>, %indices: memref<?x?x1xi32>,
-    %updates: memref<?x?x?xi32>) {
+    %updates: memref<?x?xi32>) {
   iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
-    ins(%updates, %indices : memref<?x?x?xi32>, memref<?x?x1xi32>)
+    ins(%updates, %indices : memref<?x?xi32>, memref<?x?x1xi32>)
     outs(%original : memref<?xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
     iree_linalg_ext.yield %arg0 : i32
@@ -221,27 +221,23 @@ module attributes { transform.with_named_sequence } {
 // CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:     %[[C2:.+]] = arith.constant 2 : index
 // CHECK-DAG:     %[[C20:.+]] = arith.constant 20 : index
 // CHECK-DAG:     %[[D0:.+]] = memref.dim %[[UPDATES]], %[[C0]]
 // CHECK-DAG:     %[[D1:.+]] = memref.dim %[[UPDATES]], %[[C1]]
-// CHECK-DAG:     %[[D2:.+]] = memref.dim %[[UPDATES]], %[[C2]]
 // CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[D1]] step %[[C20]]
 // CHECK:           %[[SZ:.+]] = affine.min #[[MAP]](%[[I]])[%[[D1]]]
 // CHECK:           %[[UPDATES_TILE:.+]] = memref.subview
-// CHECK-SAME:             %[[UPDATES]][0, %[[I]], 0]
-// CHECK-SAME:             [%[[D0]], %[[SZ]], %[[D2]]]
+// CHECK-SAME:             %[[UPDATES]][0, %[[I]]]
+// CHECK-SAME:             [%[[D0]], %[[SZ]]]
 // CHECK:           %[[INDICES_TILE:.+]] = memref.subview
 // CHECK-SAME:             %[[INDICES]][0, %[[I]], 0]
 // CHECK-SAME:             [%[[D0]], %[[SZ]], 1]
 // CHECK:           %[[ORIGINAL_TILE:.+]] = memref.subview
 // CHECK-SAME:             %[[ORIGINAL]][0]
-// CHECK-SAME:             [%[[D2]]]
-// CHECK:           %[[ORIG_CAST:.+]] = memref.cast %[[ORIGINAL_TILE]]
 // CHECK:           iree_linalg_ext.scatter
 // CHECK-SAME:             unique_indices(true)
 // CHECK-SAME:             ins(%[[UPDATES_TILE]], %[[INDICES_TILE]]
-// CHECK-SAME:             outs(%[[ORIG_CAST]]
+// CHECK-SAME:             outs(%[[ORIGINAL_TILE]]
 
 // -----
 
@@ -2578,13 +2574,13 @@ module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
-//      CHECK: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0 + d1 * 4)>
+//      CHECK: #[[MAP:.+]] = affine_map<(d0)[s0] -> (d0 * 4 + s0)>
 //      CHECK: func @custom_op_index_handling(%[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xindex>,
 //      CHECK:   scf.forall (%[[IV:[a-zA-Z0-9]+]],
 //      CHECK:     %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]]
 //      CHECK:     iree_linalg_ext.custom_op
 // CHECK-SAME:         ins(%[[SLICE]]
 //      CHECK:       %[[NEW_INDEX:.+]] = iree_linalg_ext.index 0 : index
-//      CHECK:       %[[INDEX:.+]] = affine.apply #[[MAP]](%[[NEW_INDEX]], %[[IV]])
+//      CHECK:       %[[INDEX:.+]] = affine.apply #[[MAP]](%[[IV]])[%[[NEW_INDEX]]]
 //      CHECK:       linalg.generic
 // CHECK-SAME:           ins(%{{.+}}, %[[INDEX]] :

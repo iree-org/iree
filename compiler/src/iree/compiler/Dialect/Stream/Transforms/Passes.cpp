@@ -37,10 +37,12 @@ using FunctionLikeNest =
     MultiOpNest<func::FuncOp, IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
 //===----------------------------------------------------------------------===//
-// Utilities
+// --iree-stream-cleanup-pipeline
 //===----------------------------------------------------------------------===//
 
-static void addCleanupPatterns(OpPassManager &passManager) {
+static void buildStreamCleanupPassPipeline(
+    OpPassManager &passManager,
+    const IREE::Stream::TransformOptions &transformOptions) {
   FunctionLikeNest(passManager)
       // Standard MLIR cleanup.
       .addPass(mlir::createCanonicalizerPass)
@@ -84,7 +86,7 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
 
   // Cleanup the program prior to outlining constants in case there is
   // propagation or fusion that needs to happen first.
-  addCleanupPatterns(passManager);
+  buildStreamCleanupPassPipeline(passManager, transformOptions);
 
   //----------------------------------------------------------------------------
   // Conversion
@@ -114,7 +116,7 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   passManager.addPass(mlir::createInlinerPass());
 
   // Cleanup globals that were created during conversion.
-  addCleanupPatterns(passManager);
+  buildStreamCleanupPassPipeline(passManager, transformOptions);
 
   // Bring all initializers together so that we can schedule them.
   passManager.addPass(IREE::Util::createCombineInitializersPass());
@@ -160,7 +162,7 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<IREE::Stream::ExecutableOp>(
       IREE::Stream::createEncodeDeviceTensorsPass());
 
-  addCleanupPatterns(passManager);
+  buildStreamCleanupPassPipeline(passManager, transformOptions);
 
   // Everything must now be in stream.async.* form but we don't yet have
   // lifetime assigned.
@@ -186,7 +188,7 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // change and it makes the IR cleaner.
   passManager.addPass(IREE::Stream::createRefineUsagePass());
 
-  addCleanupPatterns(passManager);
+  buildStreamCleanupPassPipeline(passManager, transformOptions);
 
   // Verify all stream.async.* op access ranges that we can by taking advantage
   // of statically available information or that which we can infer from data
@@ -207,6 +209,13 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
       // Group concurrently executable work into waves.
       .addPass(IREE::Stream::createScheduleConcurrencyPass);
 
+  // When synchronous initialization is requested we need to separate any work
+  // behind a timepoint in the initializer from the consumers of that timepoint.
+  if (transformOptions.initializationMode ==
+      IREE::Stream::InitializationMode::Synchronous) {
+    passManager.addPass(IREE::Stream::createSyncInitializersPass());
+  }
+
   // Materialize timepoints across the entire module. This simplifies scheduling
   // of the timeline as we can shake the IR and see what timepoints we still
   // have left.
@@ -217,7 +226,7 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // for partitioning/placement before turning them into opaque dispatches.
   passManager.addPass(IREE::Stream::createMaterializeBuiltinsPass());
 
-  addCleanupPatterns(passManager);
+  buildStreamCleanupPassPipeline(passManager, transformOptions);
 
   // Everything must now be in stream.async.* form.
   passManager.addPass(IREE::Stream::createVerifyLoweringToAsyncPass());
@@ -245,13 +254,17 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
       // Layout packed slices to emit the arithmetic required for all resource
       // offsets. This enables us to propagate the subviews across the program
       // below.
-      .addPass(IREE::Stream::createLayoutSlicesPass);
+      .addPass(IREE::Stream::createLayoutSlicesPass)
+
+      // Apply canonicalization patterns to clean up subview ops prior to
+      // propagating subranges.
+      .addPass(mlir::createCanonicalizerPass);
 
   // Propagate subviews throughout the program to unify resource storage access.
   // After propagation many resource SSA values can be deduped or folded by the
   // cleanup patterns.
   passManager.addPass(IREE::Util::createPropagateSubrangesPass());
-  addCleanupPatterns(passManager);
+  buildStreamCleanupPassPipeline(passManager, transformOptions);
 
   // TODO(benvanik): outline streams (ala dispatch regions). Note that we may
   // want to do this earlier to enable better deduplication but that makes the
@@ -270,7 +283,7 @@ void buildStreamOptimizationPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
   // Forming streams involves a fair amount of subgraph stitching, which can
   // cause duplication. Run CSE to collapse.
-  addCleanupPatterns(passManager);
+  buildStreamCleanupPassPipeline(passManager, transformOptions);
 
   // If any scf ops crept in we get rid of them here. We should be able to
   // support them all the way through the stream dialect but some passes are not
@@ -290,7 +303,7 @@ void buildStreamOptimizationPassPipeline(
     OpPassManager ipoPipeline(mlir::ModuleOp::getOperationName());
 
     // IPO and other cleanups.
-    addCleanupPatterns(ipoPipeline);
+    buildStreamCleanupPassPipeline(ipoPipeline, transformOptions);
 
     // TODO(#9747): elide timepoints that are know-reached due to host
     // synchronization via stream.timepoint.await.
@@ -333,7 +346,7 @@ void buildStreamOptimizationPassPipeline(
 
   // Folding operands requires that canonicalization/CSE folds the inputs that
   // we check for.
-  addCleanupPatterns(passManager);
+  buildStreamCleanupPassPipeline(passManager, transformOptions);
   passManager.addPass(IREE::Stream::createFoldUniformOperandsPass());
 
   // Only want to specialize after we've added all the operands we need above.
@@ -383,7 +396,7 @@ void buildStreamTransformPassPipeline(
   //----------------------------------------------------------------------------
 
   // Final cleanup after we optimize dispatches and fuse operands and bindings.
-  addCleanupPatterns(passManager);
+  buildStreamCleanupPassPipeline(passManager, transformOptions);
 
   // Symbol DCE any remaining variables/functions that are now no longer
   // required.
@@ -404,6 +417,13 @@ void registerStreamPasses() {
   registerPasses();
 
   // Pipelines.
+  PassPipelineRegistration<TransformOptions> cleanupPassPipeline(
+      "iree-stream-cleanup-pipeline",
+      "Runs the cleanup passes that are performed between stages of the full "
+      "stream pipeline.",
+      [](OpPassManager &passManager, const TransformOptions &transformOptions) {
+        buildStreamCleanupPassPipeline(passManager, transformOptions);
+      });
   PassPipelineRegistration<TransformOptions> tensorPassPipeline(
       "iree-stream-tensor-transformation-pipeline",
       "Lowers source dialects into stream.tensor.* IR.",

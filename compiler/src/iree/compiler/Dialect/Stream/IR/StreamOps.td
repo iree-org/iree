@@ -1739,6 +1739,80 @@ def Stream_TensorTraceOp : Stream_Op<"tensor.trace", [
   let hasVerifier = 1;
 }
 
+def Stream_TensorDispatchOp : Stream_Op<"tensor.dispatch", [
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+  Stream_AffinityOp,
+  Stream_TensorPhaseOp,
+  Stream_StreamableOp,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedOperandsIndexAndLength",
+  ]>,
+]> {
+  let summary = [{dispatches a parallelized grid of work}];
+  let description = [{
+    Calls the specified entry point function once for each element in the
+    specified workgroup count. Each workgroup has access to the same operands
+    and results and is able to load/store at will.
+  }];
+
+  let arguments = (ins
+    Variadic<Index>:$workload,
+    SymbolRefArrayAttr:$entry_points,
+    Variadic<AnyTypeOf<[
+      Stream_AnyStreamResource,
+      Stream_PrimitiveType,
+    ]>>:$mixed_operands,
+    Variadic<Stream_Size>:$operand_sizes,
+    TypeArrayAttr:$operand_encodings,
+    Stream_ShapeDynamicDims:$operand_encoding_dims,
+    Variadic<Stream_Size>:$result_sizes,
+    TypeArrayAttr:$result_encodings,
+    Stream_ShapeDynamicDims:$result_encoding_dims,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Variadic<Stream_AnyStreamResource>:$results
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    custom<DispatchEntryPoints>($entry_points)
+    (`[` $workload^ `]`)? ``
+    `(` $mixed_operands `)`
+    attr-dict `:`
+    custom<EncodedShapedFunctionType>(
+        ref($mixed_operands),
+        type($mixed_operands), $operand_sizes,
+        $operand_encodings, $operand_encoding_dims,
+        type($results), $result_sizes,
+        $result_encodings, $result_encoding_dims,
+        $tied_operands)
+  }];
+
+  let extraClassDeclaration = [{
+    auto getEntryPointRefs() {
+      return getEntryPoints().getAsRange<SymbolRefAttr>();
+    }
+    void forEachEntryPointAttr(std::function<void(SymbolRefAttr)> fn) {
+      for (auto entryPointAttr : getEntryPointRefs()) fn(entryPointAttr);
+    }
+
+    Value getOperandSize(unsigned idx) {
+      return IREE::Util::findValueSizeInList(idx, getOperands(), getOperandSizes());
+    }
+    Value getResultSize(unsigned idx) {
+      return IREE::Util::findValueSizeInList(idx, getResults(), getResultSizes());
+    }
+  }];
+
+  let hasVerifier = 1;
+
+  let hasCanonicalizer = 1;
+}
+
 } // OpGroupTensorOps
 
 //===----------------------------------------------------------------------===//
@@ -2217,15 +2291,25 @@ def Stream_AsyncCollectiveOp : Stream_Op<"async.collective", [
 }
 
 def Stream_AsyncBarrierOp : Stream_Op<"async.barrier", [
+  AllTypesMatch<["source", "result"]>,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   DeclareOpInterfaceMethods<Stream_StreamableOp, [
     "isMetadata",
   ]>,
   Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
 ]> {
-  let summary = [{ }];
+  let summary = [{indicates a value that must have a specific affinity}];
   let description = [{
+    Prevents fusion and scheduling of a value across an affinity boundary.
+    May introduce copy-on-write behavior if the operand value is used as well as
+    the result and users should try to keep the operand to a single use by this
+    op.
   }];
 
   let arguments = (ins
@@ -2244,11 +2328,9 @@ def Stream_AsyncBarrierOp : Stream_Op<"async.barrier", [
   );
 
   let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
     $source `:` type($source)
     `` `{` $size `}`
-    (`from` `(` $affinity^ `)`)?
-    `->`
-    type($result)
     attr-dict-with-keyword
   }];
 
@@ -2602,6 +2684,8 @@ def Stream_AsyncCallOp : Stream_Op<"async.call", [
     Variadic<Stream_Size>:$resource_operand_lengths,
     Variadic<Stream_Size>:$result_sizes,
     OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -2642,7 +2726,7 @@ def Stream_AsyncCallOp : Stream_Op<"async.call", [
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
     }
 
     Value getOperandSize(unsigned idx) {
@@ -3286,6 +3370,8 @@ def Stream_CmdCallOp : Stream_Op<"cmd.call", [
     Variadic<Stream_Size>:$resource_operand_lengths,
     Variadic<Stream_Size>:$result_sizes,
     OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs,
     Stream_ResourceAccessArrayAttr:$resource_operand_accesses
   );
   let results = (outs
@@ -3322,7 +3408,7 @@ def Stream_CmdCallOp : Stream_Op<"cmd.call", [
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
     }
 
     Value getOperandSize(unsigned idx) {
@@ -3793,7 +3879,8 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
       Stream_StagingResource,
     ]>>:$resource_operands,
     Variadic<Stream_Size>:$resource_operand_sizes,
-    Stream_Timepoint:$await_timepoint
+    Stream_Timepoint:$await_timepoint,
+    UnitAttr:$sync
   );
   let results = (outs
     Variadic<AnyTypeOf<[
@@ -3803,6 +3890,7 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   );
 
   let assemblyFormat = [{
+    (`sync` $sync^)?
     $await_timepoint `=` `` `>`
     $resource_operands `:`
     custom<ShapedTypeList>(type($resource_operands),

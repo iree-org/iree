@@ -13,7 +13,7 @@ func.func @softmax(%arg0: tensor<2x16x32xf32>) -> tensor<2x16x32xf32> {
 // CHECK:      func.func @softmax(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x16x32xf32>) -> tensor<2x16x32xf32> {
 // CHECK:        %[[D0:.+]] = tensor.empty() : tensor<2x16x32xf32>
 // CHECK:        %[[D1:.+]] = tensor.empty() : tensor<2x16xf32>
-// CHECK:        %[[CST:.+]] = arith.constant -3.40282347E+38 : f32
+// CHECK:        %[[CST:.+]] = arith.constant 0xFFC00000 : f32
 // CHECK:        %[[D2:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[D1]] : tensor<2x16xf32>) -> tensor<2x16xf32>
 // CHECK:        %[[D3:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]]], iterator_types = ["parallel",
 // CHECK-SAME:     "parallel", "reduction"]} ins(%[[ARG0]] : tensor<2x16x32xf32>) outs(%[[D2]] : tensor<2x16xf32>) {
@@ -49,7 +49,7 @@ func.func @softmax(%arg0: tensor<2x16x32xf32>) -> tensor<2x16x32xf32> {
 // CHECK-NO-FUSE:      func.func @softmax(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x16x32xf32>) -> tensor<2x16x32xf32> {
 // CHECK-NO-FUSE:        %[[D0:.+]] = tensor.empty() : tensor<2x16x32xf32>
 // CHECK-NO-FUSE:        %[[D1:.+]] = tensor.empty() : tensor<2x16xf32>
-// CHECK-NO-FUSE:        %[[CST:.+]] = arith.constant -3.40282347E+38 : f32
+// CHECK-NO-FUSE:        %[[CST:.+]] = arith.constant 0xFFC00000 : f32
 // CHECK-NO-FUSE:        %[[D2:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[D1]] : tensor<2x16xf32>) -> tensor<2x16xf32>
 // CHECK-NO-FUSE:        %[[D3:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]]], iterator_types = ["parallel",
 // CHECK-NO-FUSE-SAME:     "parallel", "reduction"]} ins(%[[ARG0]] : tensor<2x16x32xf32>) outs(%[[D2]] : tensor<2x16xf32>) {

@@ -10,6 +10,8 @@
 #include "compiler/plugins/input/Torch/InputConversion/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -61,10 +63,33 @@ struct ScatterOpConversion
     for (int i = 0; i < numIndices; i++)
       dimMap[i] = i;
 
-    auto scatterOp = rewriter.create<IREE::LinalgExt::ScatterOp>(
-        op.getLoc(), op->getResultTypes(), op.getInputs(), op.getOutputs(),
-        dimMap, op.getUniqueIndices());
+    auto updatesTy = op.getUpdateType();
 
+    // Create a reassociation that drops all unit dims from the indexed portion
+    // slice.
+    Value updateVal = op.updates();
+    SmallVector<int64_t> collapsedShape;
+    collapsedShape.push_back(updatesTy.getShape().front());
+    if (op.getUpdateSliceRank() > 0) {
+      llvm::append_range(collapsedShape,
+                         updatesTy.getShape().take_back(
+                             op.getUpdateSliceRank() - op.getIndexDepth()));
+    }
+    if (collapsedShape != updatesTy.getShape()) {
+      auto reassocIndices = getReassociationIndicesForCollapse(
+          updatesTy.getShape(), collapsedShape);
+      if (!reassocIndices.has_value()) {
+        return rewriter.notifyMatchFailure(
+            op, "failed to compute reassociation indices");
+      }
+      updateVal = rewriter.create<tensor::CollapseShapeOp>(
+          op.getLoc(), updateVal, reassocIndices.value());
+    }
+
+    Value indicesVal = op.indices();
+    auto scatterOp = rewriter.create<IREE::LinalgExt::ScatterOp>(
+        op.getLoc(), op->getResultTypes(), ValueRange{updateVal, indicesVal},
+        op.getOutputs(), dimMap, op.getUniqueIndices());
     rewriter.inlineRegionBefore(op.getRegion(), scatterOp.getRegion(),
                                 scatterOp.getRegion().begin());
     rewriter.replaceOp(op, scatterOp->getResults());

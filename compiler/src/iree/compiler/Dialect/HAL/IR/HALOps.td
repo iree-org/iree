@@ -3039,9 +3039,10 @@ class HAL_InterfaceWorkgroupOp<string mnemonic, list<Trait> traits = []>
   let results = (outs HAL_Dim:$result);
 
   let builders = [
-    OpBuilder<(ins "unsigned":$dim),
+    OpBuilder<(ins "unsigned":$dim, CArg<"std::optional<::llvm::APInt>", "std::nullopt">:$upper_bound),
     [{
-      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim), ::mlir::IntegerAttr{});
+      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim),
+        upper_bound.has_value() ? $_builder.getIndexAttr(upper_bound->getSExtValue()) : ::mlir::IntegerAttr{});
     }]>,
   ];
 

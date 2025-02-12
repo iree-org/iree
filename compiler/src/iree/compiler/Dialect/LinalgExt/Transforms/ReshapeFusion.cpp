@@ -8,7 +8,6 @@
 // The content of this file is adapted from linalg's ElemenwiseOpFusion.cpp and
 // modified to work with LinalgExt ops, specifically `LinalgExt::AttentionOp`.
 
-#include <optional>
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
@@ -18,6 +17,9 @@
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
+
+#include <cstdint>
+#include <optional>
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
@@ -315,13 +317,7 @@ getScatterReshapeInfo(LinalgExt::ScatterOp scatterOp) {
     ReshapeOperandInfo updateInfo;
     updateInfo.originalShape = scatterOp.getUpdateType().getShape();
     llvm::append_range(updateInfo.operandToIterationSpace,
-                       llvm::seq<int64_t>(0, scatterOp.getBatchRank()));
-    updateInfo.operandToIterationSpace.append(
-        updateRank - (rankOfContiguousSlice + scatterOp.getBatchRank()),
-        ReshapeOperandInfo::kNoMapping);
-    llvm::append_range(
-        updateInfo.operandToIterationSpace,
-        llvm::seq(updateRank - rankOfContiguousSlice, updateRank));
+                       llvm::seq<int64_t>(0, updateRank));
     infos.push_back(std::move(updateInfo));
   }
 
@@ -331,8 +327,9 @@ getScatterReshapeInfo(LinalgExt::ScatterOp scatterOp) {
     indicesInfo.originalShape = scatterOp.getIndicesType().getShape();
     llvm::append_range(indicesInfo.operandToIterationSpace,
                        llvm::seq<int64_t>(0, scatterOp.getBatchRank()));
-    indicesInfo.operandToIterationSpace.push_back(
-        ReshapeOperandInfo::kNoMapping);
+    if (scatterOp.getBatchRank() != scatterOp.getIndicesType().getRank())
+      indicesInfo.operandToIterationSpace.push_back(
+          ReshapeOperandInfo::kNoMapping);
     infos.push_back(std::move(indicesInfo));
   }
 
@@ -629,71 +626,30 @@ struct FoldAttentionWithProducerReshapeByExpansion final
   linalg::ControlFusionFn controlFoldingReshapes;
 };
 
-/// Remove the unit dims from `iree_linalg_ext.scatter` 's `update` operand.
-/// The dims in `update` between the batch dims and the continuous slice
-/// represent the indexed dimensions. Remove the leading unit dims from the
-/// indexed dims.
-struct FoldScatterNonIterationUnitDims final
-    : public OpRewritePattern<ScatterOp> {
-  FoldScatterNonIterationUnitDims(MLIRContext *context,
-                                  linalg::ControlDropUnitDims options,
-                                  PatternBenefit benefit = 1)
-      : OpRewritePattern<ScatterOp>(context, benefit),
-        options(std::move(options)) {}
-
+struct DropScatterUnitIndexDepth final : public OpRewritePattern<ScatterOp> {
+  using OpRewritePattern<ScatterOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(ScatterOp scatterOp,
                                 PatternRewriter &rewriter) const override {
-    if (options.rankReductionStrategy !=
-        linalg::ControlDropUnitDims::RankReductionStrategy::
-            ReassociativeReshape) {
-      return rewriter.notifyMatchFailure(
-          scatterOp, "Only reassociative reshape strategy supported");
-    }
-    llvm::SmallVector<unsigned> canDrop = options.controlFn(scatterOp);
-    const ArrayRef<int64_t> updateShape = scatterOp.getUpdateType().getShape();
-
-    // Find the number of leading unit dimensions
-    int64_t rankOfContiguousSlice =
-        scatterOp.getOriginalType().getRank() - scatterOp.getIndexDepth();
-    ArrayRef<int64_t> indexedDims =
-        scatterOp.getUpdateSliceShape().drop_back(rankOfContiguousSlice);
-    int64_t numDimsToDrop =
-        llvm::find_if(indexedDims, [](int64_t val) { return val != 1; }) -
-        scatterOp.getUpdateSliceShape().begin() - 1;
-
+    llvm::ArrayRef<int64_t> indicesShape =
+        scatterOp.getIndicesType().getShape();
     int64_t batchRank = scatterOp.getBatchRank();
-    llvm::erase_if(canDrop, [&](unsigned dimPos) {
-      return dimPos < batchRank || dimPos > batchRank + numDimsToDrop;
-    });
-    if (canDrop.empty()) {
+    if (indicesShape.size() == batchRank || indicesShape.back() != 1) {
       return failure();
     }
-
-    SmallVector<int64_t> droppedUpdateShape;
-    droppedUpdateShape.reserve(updateShape.size() - canDrop.size());
-    for (auto [idx, dimLen] : llvm::enumerate(updateShape)) {
-      if (!llvm::is_contained(canDrop, idx)) {
-        droppedUpdateShape.push_back(dimLen);
-      }
+    SmallVector<ReassociationIndices> reassoc;
+    reassoc.reserve(indicesShape.size());
+    for (auto i : llvm::seq<int64_t>(0, batchRank - 1)) {
+      reassoc.emplace_back(1, i);
     }
-
-    auto reassoc =
-        getReassociationIndicesForCollapse(updateShape, droppedUpdateShape);
-    assert(reassoc.has_value() && "expected reassociation to be valid");
+    reassoc.push_back(ReassociationIndices{batchRank - 1, batchRank});
     auto collapseOp = rewriter.create<tensor::CollapseShapeOp>(
-        scatterOp.getLoc(),
-        RankedTensorType::get(droppedUpdateShape,
-                              scatterOp.getUpdateType().getElementType()),
-        scatterOp.getUpdates(), reassoc.value());
+        scatterOp.getLoc(), scatterOp.getIndices(), reassoc);
 
     rewriter.modifyOpInPlace(scatterOp, [&]() {
-      scatterOp.setOperand(ScatterOp::kUpdatesOpNum, collapseOp.getResult());
+      scatterOp.setOperand(ScatterOp::kIndicesOpNum, collapseOp.getResult());
     });
     return success();
   }
-
-private:
-  linalg::ControlDropUnitDims options;
 };
 
 struct FoldScatterWithProducerReshapeByExpansion final
@@ -997,7 +953,7 @@ SmallVector<unsigned> defaultControlDropUnitDims(Operation *op) {
 
 void populateFoldUnitExtentDimsPatterns(
     RewritePatternSet &patterns, const linalg::ControlDropUnitDims &options) {
-  patterns.add<FoldScatterNonIterationUnitDims>(patterns.getContext(), options);
+  patterns.add<DropScatterUnitIndexDepth>(patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

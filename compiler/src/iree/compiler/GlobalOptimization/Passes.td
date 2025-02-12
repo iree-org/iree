@@ -84,6 +84,10 @@ def FuseSiluHorizontalMatmulPass:
 def GeneralizeLinalgNamedOpsPass :
     InterfacePass<"iree-global-opt-generalize-linalg-named-ops", "mlir::FunctionOpInterface"> {
   let summary = "Convert some Linalg named ops into linalg.generics.";
+  let options = [
+    Option<"enableGeneralizeMatmul", "enable-generalize-matmul", "bool",
+           /*default=*/"false", "Convert linalg named opt to generic ops.">,
+  ];
 }
 
 def InferNumericNarrowingPass :
@@ -111,6 +115,8 @@ def PropagateLinalgTransposePass :
            "Flag used for lit-testing sinking patterns only. Not for general usage">,
     Option<"testBubblingOnly", "test-bubbling-only", "bool", /*default=*/"false",
            "Flag used for lit-testing bubbling patterns only. Not for general usage">,
+    Option<"enableAttentionVTranspose", "enable-attention-v-transpose", "bool",
+            /*default=*/"true", "Enable transposition of attention v operand">,
   ];
 }
 

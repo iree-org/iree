@@ -109,44 +109,21 @@ module @fold_stream_parameter {
 
 // -----
 
-util.func public @scatter0(%arg0: tensor<?x1x2x16x4x128xf16>, %arg1: tensor<?x1xi32>, %arg2: tensor<?x2x16x4x128xf16>) -> tensor<?x2x16x4x128xf16> {
-  %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true) ins(%arg0, %arg1 : tensor<?x1x2x16x4x128xf16>, tensor<?x1xi32>) outs(%arg2 : tensor<?x2x16x4x128xf16>) {
-  ^bb0(%arg3: f16, %arg4: f16):
-    iree_linalg_ext.yield %arg3 : f16
-  } -> tensor<?x2x16x4x128xf16>
-  util.return %0 : tensor<?x2x16x4x128xf16>
+util.func public @scatter(%arg0 : tensor<4xi64>, %arg1 : tensor<4x1xi32>, %arg2 : tensor<4xi64>) -> tensor<4xi64> {
+  %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(false) ins(%arg0, %arg1: tensor<4xi64>, tensor<4x1xi32>) outs(%arg2 : tensor<4xi64>) {
+  ^bb0(%arg3: i64, %arg4: i64):
+    %16 = arith.addi %arg4, %arg3 : i64
+    iree_linalg_ext.yield %16 : i64
+  } -> tensor<4xi64>
+  util.return %0 : tensor<4xi64>
 }
-// CHECK-LABEL: func public @scatter0
-//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape
-//  CHECK-SAME:     to tensor<?x2x16x4x128xf16>
+// CHECK-LABEL: func public @scatter
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG1]]
+//  CHECK-SAME:     tensor<4x1xi32> into tensor<4xi32>
 //       CHECK:   %[[SCATTER:.+]] = iree_linalg_ext.scatter
-//  CHECK-SAME:     ins(%[[COLLAPSE]]
-
-// -----
-
-util.func public @scatter1(%arg0: tensor<?x1x1x16x4x128xf16>, %arg1: tensor<?x2xi32>, %arg2: tensor<?x2x16x4x128xf16>) -> tensor<?x2x16x4x128xf16> {
-  %0 = iree_linalg_ext.scatter dimension_map = [0, 1] unique_indices(true) ins(%arg0, %arg1 : tensor<?x1x1x16x4x128xf16>, tensor<?x2xi32>) outs(%arg2 : tensor<?x2x16x4x128xf16>) {
-  ^bb0(%arg3: f16, %arg4: f16):
-    iree_linalg_ext.yield %arg3 : f16
-  } -> tensor<?x2x16x4x128xf16>
-  util.return %0 : tensor<?x2x16x4x128xf16>
-}
-// CHECK-LABEL: func public @scatter1
-//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape
-//  CHECK-SAME:     to tensor<?x16x4x128xf16>
-//       CHECK:   %[[SCATTER:.+]] = iree_linalg_ext.scatter
-//  CHECK-SAME:     ins(%[[COLLAPSE]]
-
-// -----
-
-// TODO: remove other unit dims.
-util.func public @scatter_noop(%arg0: tensor<1x?x1x1x4x128xf16>, %arg1: tensor<1x?x1x2xi32>, %arg2: tensor<?x2x1x4x128xf16>) -> tensor<?x2x1x4x128xf16> {
-  %0 = iree_linalg_ext.scatter dimension_map = [0, 1] unique_indices(true) ins(%arg0, %arg1 : tensor<1x?x1x1x4x128xf16>, tensor<1x?x1x2xi32>) outs(%arg2 : tensor<?x2x1x4x128xf16>) {
-  ^bb0(%arg3: f16, %arg4: f16):
-    iree_linalg_ext.yield %arg3 : f16
-  } -> tensor<?x2x1x4x128xf16>
-  util.return %0 : tensor<?x2x1x4x128xf16>
-}
-// CHECK-LABEL: func public @scatter_noop
-//   CHECK-NOT:   tensor.collapse_shape
-//       CHECK:   %[[SCATTER:.+]] = iree_linalg_ext.scatter
+//  CHECK-SAME:     ins(%[[ARG0]], %[[COLLAPSED]]
+//  CHECK-SAME:     outs(%[[ARG2]]
+//       CHECK:   util.return %[[SCATTER]]

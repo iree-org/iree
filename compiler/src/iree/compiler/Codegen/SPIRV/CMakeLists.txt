@@ -129,6 +129,7 @@ iree_cc_library(
     MLIRTransformDialect
     MLIRTransformUtils
     MLIRTransforms
+    MLIRUBToSPIRV
     MLIRVectorDialect
     MLIRVectorInterfaces
     MLIRVectorToGPU

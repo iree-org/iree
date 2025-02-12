@@ -26,6 +26,7 @@ namespace {
 struct GeneralizeLinalgNamedOpsPass
     : public impl::GeneralizeLinalgNamedOpsPassBase<
           GeneralizeLinalgNamedOpsPass> {
+  using Base::Base;
   void runOnOperation() override;
 };
 } // namespace
@@ -62,7 +63,12 @@ void GeneralizeLinalgNamedOpsPass::runOnOperation() {
   auto funcOp = getOperation();
   SmallVector<linalg::LinalgOp> namedOpCandidates;
   funcOp.walk([&](linalg::LinalgOp linalgOp) {
-    if (!IREE::Flow::isNonNullAndOutsideDispatch(linalgOp)) {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(linalgOp) ||
+        isa<linalg::GenericOp>(linalgOp)) {
+      return;
+    }
+    if (enableGeneralizeMatmul && linalg::isaContractionOpInterface(linalgOp)) {
+      namedOpCandidates.push_back(linalgOp);
       return;
     }
     if (isa_and_nonnull<linalg::AbsOp, linalg::AddOp, linalg::BroadcastOp,
