@@ -58,6 +58,8 @@ SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
   return results;
 }
 
+} // namespace
+
 // Returns an updated encoding attribute if the type is a RankedTensorType
 // and an EncodingAttr is present. Otherwise, returns std::nullopt. The
 // method uses the EncodingLayoutAttrInterface from the EncodingAttr to
@@ -311,8 +313,7 @@ namespace {
 // will be needed in the work.
 class StreamTensorOpUpdater {
 public:
-  StreamTensorOpUpdater();
-  StreamTensorOpUpdater(ModuleOp moduleOp);
+  explicit StreamTensorOpUpdater(ModuleOp moduleOp) : moduleOp(moduleOp){};
   ~StreamTensorOpUpdater() {}
 
   // Collects the stream tensor op candidates, and prepares all the needed
@@ -354,10 +355,8 @@ private:
   // encodings. See StreamInterfaces.h for more details.
   IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr;
 };
-} // namespace
 
-StreamTensorOpUpdater::StreamTensorOpUpdater(ModuleOp moduleOp)
-    : moduleOp(moduleOp) {}
+} // namespace
 
 LogicalResult StreamTensorOpUpdater::init() {
   auto usedDialects = gatherUsedDialectInterfaces<
@@ -659,8 +658,8 @@ LogicalResult StreamTensorOpUpdater::run() {
   }
   return success();
 }
-} // namespace
 
+namespace {
 struct SpecializeEncodingsPass
     : public impl::SpecializeEncodingsPassBase<SpecializeEncodingsPass> {
   void runOnOperation() override {
@@ -687,5 +686,6 @@ struct SpecializeEncodingsPass
     }
   }
 };
+} // namespace
 
 } // namespace mlir::iree_compiler::IREE::Stream
