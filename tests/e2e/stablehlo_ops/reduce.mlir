@@ -142,7 +142,7 @@ func.func @reduce_sum_1x10xf32() {
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {dimensions = array<i64: 1>} : (tensor<1x10xf32>, tensor<f32>) -> tensor<1xf32>
-  check.expect_almost_eq_const(%res, dense<55.0> : tensor<1xf32>) : tensor<1xf32>
+  check.expect_almost_eq_const(%res, dense<55.0> : tensor<1xf32>, 1.0e-4) : tensor<1xf32>
   return
 }
 
@@ -157,7 +157,7 @@ func.func @reduce_max_1x10xf32() {
       "stablehlo.return"(%3) : (tensor<f32>) -> ()
   })
   {dimensions = array<i64: 1>} : (tensor<1x10xf32>, tensor<f32>) -> tensor<1xf32>
-  check.expect_almost_eq_const(%res, dense<10.0> : tensor<1xf32>) : tensor<1xf32>
+  check.expect_almost_eq_const(%res, dense<10.0> : tensor<1xf32>, 1.0e-4) : tensor<1xf32>
   return
 }
 
@@ -170,7 +170,7 @@ func.func @reduce_min_5x1x1xf32() {
       %3 = "stablehlo.minimum"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
       "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {dimensions = array<i64: 1, 2>} : (tensor<5x1x1xf32>, tensor<f32>) -> tensor<5xf32>
-  check.expect_almost_eq_const(%res, dense<[1.0, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf32>) : tensor<5xf32>
+  check.expect_almost_eq_const(%res, dense<[1.0, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf32>, 1.0e-4) : tensor<5xf32>
   return
 }
 
@@ -185,7 +185,7 @@ func.func @reduce_sum_2x3xf32_dim0() {
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {dimensions = array<i64: 0>} : (tensor<2x3xf32>, tensor<f32>) -> tensor<3xf32>
-  check.expect_almost_eq_const(%res, dense<[5.0, 7.0, 9.0]> : tensor<3xf32>) : tensor<3xf32>
+  check.expect_almost_eq_const(%res, dense<[5.0, 7.0, 9.0]> : tensor<3xf32>, 1.0e-4) : tensor<3xf32>
   return
 }
 
@@ -197,7 +197,7 @@ func.func @reduce_sum_2x3xf32_dim1() {
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {dimensions = array<i64: 1>} : (tensor<2x3xf32>, tensor<f32>) -> tensor<2xf32>
-  check.expect_almost_eq_const(%res, dense<[6.0, 15.0]> : tensor<2xf32>) : tensor<2xf32>
+  check.expect_almost_eq_const(%res, dense<[6.0, 15.0]> : tensor<2xf32>, 1.0e-4) : tensor<2xf32>
   return
 }
 
@@ -213,7 +213,7 @@ func.func @reduce_sum_4x2x3xf32_dim0() {
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {dimensions = array<i64: 0>} : (tensor<4x2x3xf32>, tensor<f32>) -> tensor<2x3xf32>
-  check.expect_almost_eq_const(%res, dense<[[4.0, 8.0, 12.0],[16.0, 20.0, 24.0]]> : tensor<2x3xf32>) : tensor<2x3xf32>
+  check.expect_almost_eq_const(%res, dense<[[4.0, 8.0, 12.0],[16.0, 20.0, 24.0]]> : tensor<2x3xf32>, 1.0e-4) : tensor<2x3xf32>
   return
 }
 
@@ -233,7 +233,7 @@ func.func @reduce_sum_4x2x3xf32_dim1() {
       [5.0, 7.0, 9.0],
       [5.0, 7.0, 9.0],
       [5.0, 7.0, 9.0],
-      [5.0, 7.0, 9.0]]> : tensor<4x3xf32>) : tensor<4x3xf32>
+      [5.0, 7.0, 9.0]]> : tensor<4x3xf32>, 1.0e-4) : tensor<4x3xf32>
   return
 }
 
@@ -253,7 +253,7 @@ func.func @reduce_sum_4x2x3xf32_dim2() {
       [6.0, 15.0],
       [6.0, 15.0],
       [6.0, 15.0],
-      [6.0, 15.0]]> : tensor<4x2xf32>) : tensor<4x2xf32>
+      [6.0, 15.0]]> : tensor<4x2xf32>, 1.0e-4) : tensor<4x2xf32>
   return
 }
 
@@ -269,7 +269,7 @@ func.func @reduce_sum_4x2x3xf32_dims_0_1() {
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {dimensions = array<i64: 0, 1>} : (tensor<4x2x3xf32>, tensor<f32>) -> tensor<3xf32>
-  check.expect_almost_eq_const(%res, dense<[20.0, 28.0, 36.0]> : tensor<3xf32>) : tensor<3xf32>
+  check.expect_almost_eq_const(%res, dense<[20.0, 28.0, 36.0]> : tensor<3xf32>, 1.0e-4) : tensor<3xf32>
   return
 }
 
@@ -285,7 +285,7 @@ func.func @reduce_sum_4x2x3xf32_dims_0_1_2() {
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {dimensions = array<i64: 0, 1, 2>} : (tensor<4x2x3xf32>, tensor<f32>) -> tensor<f32>
-  check.expect_almost_eq_const(%res, dense<84.0> : tensor<f32>) : tensor<f32>
+  check.expect_almost_eq_const(%res, dense<84.0> : tensor<f32>, 1.0e-4) : tensor<f32>
   return
 }
 

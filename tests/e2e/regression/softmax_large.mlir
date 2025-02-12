@@ -8,7 +8,7 @@
 //   %sum = tosa.reduce_sum %exp {axis = 2 : i64} : (tensor<12x128x40960xf32>) -> tensor<12x128x1xf32>
 //   %rec = tosa.reciprocal %sum : (tensor<12x128x1xf32>) -> tensor<12x128x1xf32>
 //   %mul = tosa.mul %exp, %rec {shift = 0 : i8} : (tensor<12x128x40960xf32>, tensor<12x128x1xf32>) -> tensor<12x128x40960xf32>
-//   check.expect_almost_eq_const(%mul, dense<0.0078125> : tensor<12x128x40960xf32>) : tensor<12x128x40960xf32>
+//   check.expect_almost_eq_const(%mul, dense<0.0078125> : tensor<12x128x40960xf32>, 1.0e-4) : tensor<12x128x40960xf32>
 //   return
 // }
 

@@ -78,8 +78,8 @@ util.func public @expect_eq_const(%lhs : tensor<2x2xi32>) {
 // CHECK-SAME: %[[LHS:[a-zA-Z0-9$._-]+]]
 // CHECK-SAME: %[[RHS:[a-zA-Z0-9$._-]+]]
 util.func public @expect_almost_eq(%lhs : !hal.buffer_view, %rhs : !hal.buffer_view) {
-  // CHECK: check.expect_almost_eq(%[[LHS]], %[[RHS]]) : !hal.buffer_view
-  check.expect_almost_eq(%lhs, %rhs) : !hal.buffer_view
+  // CHECK: check.expect_almost_eq(%[[LHS]], %[[RHS]], {{.*}}) : !hal.buffer_view
+  check.expect_almost_eq(%lhs, %rhs, 1.0e-4) : !hal.buffer_view
   util.return
 }
 
@@ -89,8 +89,8 @@ util.func public @expect_almost_eq(%lhs : !hal.buffer_view, %rhs : !hal.buffer_v
 // CHECK-SAME: %[[LHS:[a-zA-Z0-9$._-]+]]
 // CHECK-SAME: %[[RHS:[a-zA-Z0-9$._-]+]]
 util.func public @expect_almost_eq_tensor(%lhs : tensor<2x2xf32>, %rhs : tensor<2x2xf32>) {
-  // CHECK: check.expect_almost_eq(%[[LHS]], %[[RHS]]) : tensor<2x2xf32>
-  check.expect_almost_eq(%lhs, %rhs) : tensor<2x2xf32>
+  // CHECK: check.expect_almost_eq(%[[LHS]], %[[RHS]], {{.*}}) : tensor<2x2xf32>
+  check.expect_almost_eq(%lhs, %rhs, 1.0e-4) : tensor<2x2xf32>
   util.return
 }
 
@@ -99,7 +99,7 @@ util.func public @expect_almost_eq_tensor(%lhs : tensor<2x2xf32>, %rhs : tensor<
 // CHECK-LABEL: @expect_almost_eq_const
 // CHECK-SAME: %[[LHS:[a-zA-Z0-9$._-]+]]
 util.func public @expect_almost_eq_const(%lhs : tensor<2x2xf32>) {
-  // CHECK: check.expect_almost_eq_const(%[[LHS]], dense<1.000000e+00> : tensor<2x2xf32>) : tensor<2x2xf32>
-  check.expect_almost_eq_const(%lhs, dense<1.0> : tensor<2x2xf32>) : tensor<2x2xf32>
+  // CHECK: check.expect_almost_eq_const(%[[LHS]], dense<1.000000e+00> : tensor<2x2xf32>, {{.*}}) : tensor<2x2xf32>
+  check.expect_almost_eq_const(%lhs, dense<1.0> : tensor<2x2xf32>, 1.0e-4) : tensor<2x2xf32>
   util.return
 }

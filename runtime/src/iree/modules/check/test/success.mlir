@@ -43,13 +43,13 @@ func.func @expect_eq_const() {
 func.func @expect_almost_eq() {
   %const0 = util.unfoldable_constant dense<[1.0, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf32>
   %const1 = util.unfoldable_constant dense<[0.999999, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf32>
-  check.expect_almost_eq(%const0, %const1) : tensor<5xf32>
+  check.expect_almost_eq(%const0, %const1, 1.0e-4) : tensor<5xf32>
   return
 }
 
 func.func @expect_almost_eq_const() {
   %const0 = util.unfoldable_constant dense<[1.0, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf32>
-  check.expect_almost_eq_const(%const0, dense<[0.999999, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf32>) : tensor<5xf32>
+  check.expect_almost_eq_const(%const0, dense<[0.999999, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf32>, 1.0e-4) : tensor<5xf32>
   return
 }
 
@@ -73,6 +73,6 @@ func.func @floats() {
   %p8 = arith.addf %p7, %cp1 : tensor<f32>
   %p9 = arith.addf %p8, %cp1 : tensor<f32>
   %approximately_1 = arith.addf %p9, %cp1 : tensor<f32>
-  check.expect_almost_eq(%approximately_1, %c1) : tensor<f32>
+  check.expect_almost_eq(%approximately_1, %c1, 1.0e-4) : tensor<f32>
   return
 }

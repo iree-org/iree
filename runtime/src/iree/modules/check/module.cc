@@ -66,31 +66,28 @@ bool EqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
          memcmp(lhs_bytes.data, rhs_bytes.data, lhs_bytes.data_length) == 0;
 }
 
-static constexpr float kF32PrecisionThreshold = 0.0001f;
-
 template <typename T>
-bool AlmostEqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
+bool AlmostEqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes,
+                      float tolerance) {
   auto lhs_span = ToSpan<T>(lhs_bytes);
   auto rhs_span = ToSpan<T>(rhs_bytes);
   assert(lhs_span.size() == rhs_span.size());
   for (int i = 0; i < lhs_span.size(); ++i) {
-    if (fabs(lhs_span[i] - rhs_span[i]) > kF32PrecisionThreshold) {
+    if (std::abs(lhs_span[i] - rhs_span[i]) > tolerance) {
       return false;
     }
   }
   return true;
 }
 
-static constexpr float kF16PrecisionThreshold = 0.001f;
-
-bool AlmostEqByteSpanF16(iree_byte_span_t lhs_bytes,
-                         iree_byte_span_t rhs_bytes) {
+bool AlmostEqByteSpanF16(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes,
+                         float tolerance) {
   auto lhs_span = ToSpan<uint16_t>(lhs_bytes);
   auto rhs_span = ToSpan<uint16_t>(rhs_bytes);
   assert(lhs_span.size() == rhs_span.size());
   for (int i = 0; i < lhs_span.size(); ++i) {
-    if (fabs(iree_math_f16_to_f32(lhs_span[i]) -
-             iree_math_f16_to_f32(rhs_span[i])) > kF16PrecisionThreshold) {
+    if (std::abs(iree_math_f16_to_f32(lhs_span[i]) -
+                 iree_math_f16_to_f32(rhs_span[i])) > tolerance) {
       return false;
     }
   }
@@ -99,14 +96,15 @@ bool AlmostEqByteSpanF16(iree_byte_span_t lhs_bytes,
 
 StatusOr<bool> AlmostEqByteSpan(iree_byte_span_t lhs_bytes,
                                 iree_byte_span_t rhs_bytes,
-                                iree_hal_element_type_t element_type) {
+                                iree_hal_element_type_t element_type,
+                                float tolerance) {
   switch (element_type) {
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-      return AlmostEqByteSpan<float>(lhs_bytes, rhs_bytes);
+      return AlmostEqByteSpan<float>(lhs_bytes, rhs_bytes, tolerance);
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
-      return AlmostEqByteSpan<double>(lhs_bytes, rhs_bytes);
+      return AlmostEqByteSpan<double>(lhs_bytes, rhs_bytes, tolerance);
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      return AlmostEqByteSpanF16(lhs_bytes, rhs_bytes);
+      return AlmostEqByteSpanF16(lhs_bytes, rhs_bytes, tolerance);
     default:
       // TODO(gcmn): Consider supporting fuzzy matching for quantized integers.
       break;
@@ -381,7 +379,8 @@ class CheckModuleState final {
 
   Status ExpectAlmostEq(vm::ref<iree_hal_device_t> device,
                         vm::ref<iree_hal_buffer_view_t> lhs_ref,
-                        vm::ref<iree_hal_buffer_view_t> rhs_ref) {
+                        vm::ref<iree_hal_buffer_view_t> rhs_ref,
+                        float tolerance) {
     IREE_RETURN_IF_ERROR(TransferToHost(device.get(), lhs_ref, rhs_ref));
     auto* lhs = lhs_ref.get();
     auto* rhs = rhs_ref.get();
@@ -423,10 +422,10 @@ class CheckModuleState final {
     // Only check contents if shape and element type match. Otherwise we can't.
     bool contents_could_be_almost_eq = true;
     if (element_types_eq && shape_eq) {
-      IREE_ASSIGN_OR_RETURN(
-          contents_could_be_almost_eq,
-          AlmostEqByteSpan(lhs_mapped_memory.contents,
-                           rhs_mapped_memory.contents, lhs_element_type));
+      IREE_ASSIGN_OR_RETURN(contents_could_be_almost_eq,
+                            AlmostEqByteSpan(lhs_mapped_memory.contents,
+                                             rhs_mapped_memory.contents,
+                                             lhs_element_type, tolerance));
     }
     iree_status_ignore(iree_hal_buffer_unmap_range(&lhs_mapped_memory));
     iree_status_ignore(iree_hal_buffer_unmap_range(&rhs_mapped_memory));
@@ -441,7 +440,7 @@ class CheckModuleState final {
         os << " Shapes do not match.";
       }
       if (!contents_could_be_almost_eq) {
-        os << " Contents does not match.";
+        os << " Contents does not match to tolerance=" << tolerance << ".";
       }
       // TODO(gcmn): Propagate original variable names.
       os << "\n"

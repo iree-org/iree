@@ -18,7 +18,7 @@
 //   %var_eps = tosa.add %variance, %epsilon : (tensor<128x1xf32>, tensor<128x1xf32>) -> tensor<128x1xf32>
 //   %rsigma = tosa.rsqrt %var_eps : (tensor<128x1xf32>) -> tensor<128x1xf32>
 //   %norm = tosa.mul %x_sub_mean, %rsigma, %shift : (tensor<128x384xf32>, tensor<128x1xf32>, tensor<1xi8>) -> tensor<128x384xf32>
-//   check.expect_almost_eq_const(%norm, dense<0.0> : tensor<128x384xf32>) : tensor<128x384xf32>
+//   check.expect_almost_eq_const(%norm, dense<0.0> : tensor<128x384xf32>, 1.0e-4) : tensor<128x384xf32>
 //   return
 // }
 
@@ -69,7 +69,7 @@ func.func @layernorm() {
     %18 = arith.mulf %arg0, %17 : f32
     linalg.yield %18 : f32
   } -> tensor<128x384xf32>
-  check.expect_almost_eq(%14, %cst_1) : tensor<128x384xf32>
+  check.expect_almost_eq(%14, %cst_1, 1.0e-4) : tensor<128x384xf32>
   return
 }
 
@@ -122,6 +122,6 @@ func.func @layernorm_dynamic() {
     linalg.yield %18 : f32
   } -> tensor<?x?xf32>
   %result = tensor.cast %14 : tensor<?x?xf32> to tensor<128x384xf32>
-  check.expect_almost_eq(%result, %cst_1) : tensor<128x384xf32>
+  check.expect_almost_eq(%result, %cst_1, 1.0e-4) : tensor<128x384xf32>
   return
 }

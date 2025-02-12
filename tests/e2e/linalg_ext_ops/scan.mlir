@@ -14,12 +14,14 @@ func.func @scan_1d_dim0_inclusive_sum() {
 
   check.expect_almost_eq_const(
       %0#0,
-      dense<[1.0, 3.0, 6.0, 10.0, 15.0, 21.0]> : tensor<6xf32>
+      dense<[1.0, 3.0, 6.0, 10.0, 15.0, 21.0]> : tensor<6xf32>,
+      1.0e-4
   ) : tensor<6xf32>
 
   check.expect_almost_eq_const(
       %0#1,
-      dense<21.0> : tensor<f32>
+      dense<21.0> : tensor<f32>,
+      1.0e-4
   ) : tensor<f32>
 
   return
@@ -41,12 +43,14 @@ func.func @scan_1d_dim0_exclusive_sum() {
 
   check.expect_almost_eq_const(
       %0#0,
-      dense<[10.0, 11.0, 13.0, 16.0, 20.0, 25.0]> : tensor<6xf32>
+      dense<[10.0, 11.0, 13.0, 16.0, 20.0, 25.0]> : tensor<6xf32>,
+      1.0e-4
   ) : tensor<6xf32>
 
   check.expect_almost_eq_const(
       %0#1,
-      dense<25.0> : tensor<f32>
+      dense<25.0> : tensor<f32>,
+      1.0e-4
   ) : tensor<f32>
 
   return

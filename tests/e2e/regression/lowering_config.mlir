@@ -15,9 +15,9 @@ func.func @lowering_config_test() {
   %0 = "stablehlo.dot"(%a, %b) {compilation_info = #compilation0} : (tensor<128x256xf32>, tensor<256x512xf32>) -> tensor<128x512xf32>
   %1 = "stablehlo.dot"(%a, %c) {compilation_info = #compilation1} : (tensor<128x256xf32>, tensor<256x1024xf32>) -> tensor<128x1024xf32>
   %2 = "stablehlo.dot"(%a, %c) {compilation_info = #compilation2} : (tensor<128x256xf32>, tensor<256x1024xf32>) -> tensor<128x1024xf32>
-  check.expect_almost_eq_const(%0, dense<512.0> : tensor<128x512xf32>) : tensor<128x512xf32>
-  check.expect_almost_eq_const(%1, dense<512.0> : tensor<128x1024xf32>) : tensor<128x1024xf32>
-  check.expect_almost_eq_const(%2, dense<512.0> : tensor<128x1024xf32>) : tensor<128x1024xf32>
+  check.expect_almost_eq_const(%0, dense<512.0> : tensor<128x512xf32>, 1.0e-4) : tensor<128x512xf32>
+  check.expect_almost_eq_const(%1, dense<512.0> : tensor<128x1024xf32>, 1.0e-4) : tensor<128x1024xf32>
+  check.expect_almost_eq_const(%2, dense<512.0> : tensor<128x1024xf32>, 1.0e-4) : tensor<128x1024xf32>
   return
 }
 
@@ -51,6 +51,6 @@ func.func @conv() {
     rhs_dilation = array<i64: 1, 1>,
     window_strides = array<i64: 1, 1>
   } : (tensor<36x7x7x512xf32>, tensor<3x3x512x512xf32>) -> tensor<36x7x7x512xf32>
-  check.expect_almost_eq(%0, %1) : tensor<36x7x7x512xf32>
+  check.expect_almost_eq(%0, %1, 1.0e-4) : tensor<36x7x7x512xf32>
   return
 }

@@ -27,7 +27,7 @@ func.func @conv2d_nopadding() {
   check.expect_almost_eq_const(%res, dense<[[
       [[1310.0],[1466.0],[1622.0]],
       [[2090.0],[2246.0],[2402.0]]
-  ]]> : tensor<1x2x3x1xf32>) : tensor<1x2x3x1xf32>
+  ]]> : tensor<1x2x3x1xf32>, 1.0e-4) : tensor<1x2x3x1xf32>
   return
 }
 
@@ -65,7 +65,7 @@ func.func @conv2d_nopadding_batch_feature() {
   check.expect_almost_eq_const(%res, dense<[[
       [[1310.0],[1466.0],[1622.0]],
       [[2090.0],[2246.0],[2402.0]]
-  ]]> : tensor<1x2x3x1xf32>) : tensor<1x2x3x1xf32>
+  ]]> : tensor<1x2x3x1xf32>, 1.0e-4) : tensor<1x2x3x1xf32>
   return
 }
 
@@ -98,7 +98,7 @@ func.func @conv2d_reorder_input_spatial() {
   check.expect_almost_eq_const(%res, dense<[[
       [[1310.0],[1466.0],[1622.0]],
       [[2090.0],[2246.0],[2402.0]]
-  ]]> : tensor<1x2x3x1xf32>) : tensor<1x2x3x1xf32>
+  ]]> : tensor<1x2x3x1xf32>, 1.0e-4) : tensor<1x2x3x1xf32>
   return
 }
 
@@ -131,7 +131,7 @@ func.func @conv2d_reorder_kernel() {
   check.expect_almost_eq_const(%res, dense<[[
       [[1310.0],[1466.0],[1622.0]],
       [[2090.0],[2246.0],[2402.0]]
-  ]]> : tensor<1x2x3x1xf32>) : tensor<1x2x3x1xf32>
+  ]]> : tensor<1x2x3x1xf32>, 1.0e-4) : tensor<1x2x3x1xf32>
   return
 }
 
@@ -165,7 +165,7 @@ func.func @conv2d_reorder_output() {
       [[1310.0, 2090.0]],
       [[1466.0, 2246.0]],
       [[1622.0, 2402.0]]
-      ]]> : tensor<1x3x1x2xf32>) : tensor<1x3x1x2xf32>
+      ]]> : tensor<1x3x1x2xf32>, 1.0e-4) : tensor<1x3x1x2xf32>
   return
 }
 
@@ -201,7 +201,7 @@ func.func @conv2d_1452x3221_same() {
     [[ 600.0], [ 736.0], [ 872.0], [1008.0], [ 476.0]],
     [[1310.0], [1466.0], [1622.0], [1778.0], [ 805.0]],
     [[2090.0], [2246.0], [2402.0], [2558.0], [1135.0]],
-    [[1080.0], [1152.0], [1224.0], [1296.0], [ 524.0]]]]> : tensor<1x4x5x1xf32>) : tensor<1x4x5x1xf32>
+    [[1080.0], [1152.0], [1224.0], [1296.0], [ 524.0]]]]> : tensor<1x4x5x1xf32>, 1.0e-4) : tensor<1x4x5x1xf32>
   return
 }
 
@@ -244,7 +244,7 @@ func.func @conv2d_2451x2311_same() {
     [[[400.0], [541.0], [562.0], [583.0], [340.0]],
      [[480.0], [646.0], [667.0], [688.0], [400.0]],
      [[560.0], [751.0], [772.0], [793.0], [460.0]],
-     [[183.0], [224.0], [230.0], [236.0], [119.0]]]]> : tensor<2x4x5x1xf32>) : tensor<2x4x5x1xf32>
+     [[183.0], [224.0], [230.0], [236.0], [119.0]]]]> : tensor<2x4x5x1xf32>, 1.0e-4) : tensor<2x4x5x1xf32>
   return
 }
 
@@ -344,7 +344,7 @@ func.func @conv2d_no_padding2() {
         [91881.0,  93564.0,  95247.0,  96930.0,  98613.0, 100296.0]],
        [[100305.0, 102150.0, 103995.0, 105840.0, 107685.0, 109530.0],
         [103113.0, 105012.0, 106911.0, 108810.0, 110709.0, 112608.0],
-        [105921.0, 107874.0, 109827.0, 111780.0, 113733.0, 115686.0]]]]> : tensor<2x3x3x6xf32>) : tensor<2x3x3x6xf32>
+        [105921.0, 107874.0, 109827.0, 111780.0, 113733.0, 115686.0]]]]> : tensor<2x3x3x6xf32>, 1.0e-4) : tensor<2x3x3x6xf32>
   return
 }
 
@@ -405,7 +405,7 @@ func.func @conv2d_1452x2223_dilated_valid() {
       [[-1.4578199,   0.59465677,  0.0599021 ],
        [-0.3617443,   1.4647548,   1.2320882 ],
        [ 0.04506956,  1.4347346,  -0.22625303],
-       [-1.122044,   -0.41301775, -1.5628793 ]]]]> : tensor<1x2x4x3xf32>) : tensor<1x2x4x3xf32>
+       [-1.122044,   -0.41301775, -1.5628793 ]]]]> : tensor<1x2x4x3xf32>, 1.0e-4) : tensor<1x2x4x3xf32>
   return
 }
 
@@ -429,6 +429,6 @@ func.func @depthwise_conv_non_1_channel_multiplier() {
     padding = dense<0> : tensor<2x2xi64>,
     rhs_dilation = array<i64: 1, 1>,
     window_strides = array<i64: 1, 1>} : (tensor<2x4x5x2xf32>, tensor<2x2x1x6xf32>) -> tensor<2x3x4x6xf32>
-  check.expect_almost_eq_const(%res, dense<4.0> : tensor<2x3x4x6xf32>) : tensor<2x3x4x6xf32>
+  check.expect_almost_eq_const(%res, dense<4.0> : tensor<2x3x4x6xf32>, 1.0e-4) : tensor<2x3x4x6xf32>
   return
 }

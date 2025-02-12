@@ -23,8 +23,8 @@ func.func @simpleDAG() {
       %6 = arith.subf %b1, %b0 : f32
       linalg.yield %6 : f32
     } -> tensor<f32>
-  check.expect_almost_eq_const(%1, dense<3.0> : tensor<f32>) : tensor<f32>
-  check.expect_almost_eq_const(%5, dense<9.0> : tensor<f32>) : tensor<f32>
+  check.expect_almost_eq_const(%1, dense<3.0> : tensor<f32>, 1.0e-4) : tensor<f32>
+  check.expect_almost_eq_const(%5, dense<9.0> : tensor<f32>, 1.0e-4) : tensor<f32>
   return
 }
 
@@ -52,7 +52,7 @@ func.func @simpleHorizontal() {
       %6 = arith.addf %b0, %b0 : f32
       linalg.yield %6 : f32
     } -> tensor<f32>
-  check.expect_almost_eq_const(%3, dense<9.0> : tensor<f32>) : tensor<f32>
-  check.expect_almost_eq_const(%5, dense<8.0> : tensor<f32>) : tensor<f32>
+  check.expect_almost_eq_const(%3, dense<9.0> : tensor<f32>, 1.0e-4) : tensor<f32>
+  check.expect_almost_eq_const(%5, dense<8.0> : tensor<f32>, 1.0e-4) : tensor<f32>
   return
 }

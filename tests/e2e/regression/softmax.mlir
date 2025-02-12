@@ -9,7 +9,7 @@
 //   %rec = tosa.reciprocal %sum : (tensor<12x128x1xf32>) -> tensor<12x128x1xf32>
 //   %shift = "tosa.const"() {value = dense<0> : tensor<1xi8>} : () -> tensor<1xi8>
 //   %mul = tosa.mul %exp, %rec, %shift : (tensor<12x128x128xf32>, tensor<12x128x1xf32>, tensor<1xi8>) -> tensor<12x128x128xf32>
-//   check.expect_almost_eq_const(%mul, dense<0.0078125> : tensor<12x128x128xf32>) : tensor<12x128x128xf32>
+//   check.expect_almost_eq_const(%mul, dense<0.0078125> : tensor<12x128x128xf32>, 1.0e-4) : tensor<12x128x128xf32>
 //   return
 // }
 
@@ -54,7 +54,7 @@ func.func @softmax() {
     %11 = arith.mulf %arg0, %arg1 : f32
     linalg.yield %11 : f32
   } -> tensor<12x128x128xf32>
-  check.expect_almost_eq(%10, %cst_2) : tensor<12x128x128xf32>
+  check.expect_almost_eq(%10, %cst_2, 1.0e-4) : tensor<12x128x128xf32>
   return
 }
 
@@ -105,6 +105,6 @@ func.func @softmax_dynamic() {
     linalg.yield %11 : f32
   } -> tensor<?x?x?xf32>
   %result = tensor.cast %10 : tensor<?x?x?xf32> to tensor<12x128x128xf32>
-  check.expect_almost_eq(%result, %cst_2) : tensor<12x128x128xf32>
+  check.expect_almost_eq(%result, %cst_2, 1.0e-4) : tensor<12x128x128xf32>
   return
 }

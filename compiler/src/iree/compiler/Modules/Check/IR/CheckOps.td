@@ -150,12 +150,14 @@ def CHECK_ExpectAlmostEqOp :
   let arguments = (ins
     Optional<HAL_Device>:$device,
     AnyTypeOf<[HAL_BufferView, TensorOf<[AnyFloat]>]>:$lhs,
-    AnyTypeOf<[HAL_BufferView, TensorOf<[AnyFloat]>]>:$rhs
+    AnyTypeOf<[HAL_BufferView, TensorOf<[AnyFloat]>]>:$rhs,
+    F32Attr:$tolerance
   );
 
   let assemblyFormat = [{
     (`` `<` $device^ `>`)?
-    `` `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
+    `` `(` $lhs `,` $rhs `,` $tolerance `)`
+    attr-dict `:` type($lhs)
   }];
 }
 
@@ -172,21 +174,23 @@ def CHECK_ExpectAlmostEqConstOp :
     This op is just a convenience wrapper around the expect_almost_eq op.
 
     ```mlir
-    check.expect_almost_eq_const(%const0, dense<[0.999999, 2.0]> : tensor<5xf32>) : tensor<5xf32>
+    check.expect_almost_eq_const(%const0, dense<[0.999999, 2.0]> : tensor<5xf32>, 1.0e-4) : tensor<5xf32>
     ```
   }];
 
   let arguments = (ins
     Optional<HAL_Device>:$device,
     TensorOf<[AnyFloat]>:$lhs,
-    ElementsAttr:$value
+    ElementsAttr:$value,
+    F32Attr:$tolerance
   );
 
   let hasCanonicalizer = 1;
 
   let assemblyFormat = [{
     (`` `<` $device^ `>`)?
-    `` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)
+    `` `(` $lhs `,` $value `,` $tolerance `)`
+    attr-dict `:` type($lhs)
   }];
 }
 

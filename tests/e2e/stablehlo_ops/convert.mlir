@@ -43,7 +43,7 @@ func.func @widen_int_i32_i64() {
 func.func @int_to_float() {
   %input = util.unfoldable_constant dense<[-42, 0, 42]> : tensor<3xi32>
   %res = "stablehlo.convert"(%input) : (tensor<3xi32>) -> tensor<3xf32>
-  check.expect_almost_eq_const(%res, dense<[-42.0, 0.0, 42.0]> : tensor<3xf32>) : tensor<3xf32>
+  check.expect_almost_eq_const(%res, dense<[-42.0, 0.0, 42.0]> : tensor<3xf32>, 1.0e-4) : tensor<3xf32>
   return
 }
 

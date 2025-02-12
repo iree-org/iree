@@ -44,7 +44,7 @@ func.func @concat_f32_static_dim0() {
   %1 = util.optimization_barrier %cst_1 : tensor<1xf32>
   %2 = util.optimization_barrier %cst_2 : tensor<1xf32>
   %concat = tensor.concat dim(0) %1, %2 : (tensor<1xf32>, tensor<1xf32>) -> tensor<2xf32>
-  check.expect_almost_eq_const(%concat, dense<[1.0,2.0]> : tensor<2xf32>) : tensor<2xf32>
+  check.expect_almost_eq_const(%concat, dense<[1.0,2.0]> : tensor<2xf32>, 1.0e-4) : tensor<2xf32>
   return
 }
 
