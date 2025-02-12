@@ -698,8 +698,8 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass(createFoldTensorExtractOpPass)
       // Handle complex operation conversion.
       .addPass(createConvertComplexToStandardPass)
-      // math dialect elementry functions -> polynomial form.
-      .addPass(createPolynomialApproximationPass)
+      // Math dialect ops rewrites, approximations, casts.
+      .addPass(createMathTransformPass)
       .addPass(createHoistStaticallyBoundAllocationsPass)
       // Use `arith.minf/maxf` instead of `arith.minimumf/maximumf`.
       .addPredicatedPass(clUseFastMinMaxOps, createReplaceSlowMinMaxOpsPass);

@@ -179,10 +179,8 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
   funcPassManager.addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
       .addPass(createConvertComplexToStandardPass)
-
-      // Math dialect elementry functions -> polynomial form.
-      .addPass(createPolynomialApproximationPass)
-
+      // Math dialect ops rewrites, approximations, casts.
+      .addPass(createMathTransformPass)
       .addPass(createPadDynamicAllocPass);
 
   // TODO: query this from the target.
