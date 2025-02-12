@@ -118,8 +118,6 @@ FailureOr<Basis> getBasis(IREE::GPU::LoweringConfigAttr config,
 
 constexpr StringLiteral kPromoteOperandsName = "promote_operands";
 
-StringRef getPromotedOperandListAttrName() { return kPromoteOperandsName; }
-
 std::optional<SmallVector<int64_t>>
 getPromotedOperandList(LoweringConfigAttr config) {
   auto array = config.getAttributes().getAs<ArrayAttr>(kPromoteOperandsName);
@@ -129,12 +127,32 @@ getPromotedOperandList(LoweringConfigAttr config) {
   return getIntegerVector(array);
 }
 
-void setPromotedOperandList(MLIRContext *context,
-                            SmallVectorImpl<NamedAttribute> &attrs,
-                            ArrayRef<int64_t> operands) {
+void appendPromotedOperandsList(MLIRContext *context,
+                                SmallVectorImpl<NamedAttribute> &attrs,
+                                ArrayRef<int64_t> operands) {
   Builder b(context);
   attrs.emplace_back(StringAttr::get(context, kPromoteOperandsName),
                      b.getI64ArrayAttr(operands));
+}
+IREE::GPU::LoweringConfigAttr
+setPromotedOperandsList(MLIRContext *context,
+                        IREE::GPU::LoweringConfigAttr currAttr,
+                        ArrayRef<int64_t> operands) {
+  Builder b(context);
+  DictionaryAttr currAttributes = currAttr.getAttributes();
+  NamedAttrList attributes(currAttributes);
+  std::optional<SmallVector<int64_t>> currPromotedOperandsList =
+      getPromotedOperandList(currAttr);
+  if (currPromotedOperandsList &&
+      currPromotedOperandsList.value() == operands) {
+    return currAttr;
+  }
+
+  Attribute newPromotedOperandsListAttr = b.getI64ArrayAttr(operands);
+
+  attributes.set(kPromoteOperandsName, newPromotedOperandsListAttr);
+  return IREE::GPU::LoweringConfigAttr::get(context,
+                                            attributes.getDictionary(context));
 }
 
 constexpr StringLiteral kPaddingName = "padding";

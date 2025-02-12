@@ -50,12 +50,18 @@ void setBasis(MLIRContext *context, SmallVector<NamedAttribute> &attrs,
               IREE::GPU::TilingLevel level, const Basis &basis);
 
 /// Helper to retrieve/set a list of operand indices to promote.
-StringRef getPromotedOperandListAttrName();
 std::optional<SmallVector<int64_t>>
 getPromotedOperandList(LoweringConfigAttr config);
-void setPromotedOperandList(MLIRContext *context,
-                            SmallVectorImpl<NamedAttribute> &attrs,
-                            ArrayRef<int64_t> operands);
+/// Append to `attrs` an `ArrayAttr` for `promotedOperands`.
+void appendPromotedOperandsList(MLIRContext *context,
+                                SmallVectorImpl<NamedAttribute> &attrs,
+                                ArrayRef<int64_t> operands);
+/// Create a new `LoweringConfigAttr` from `currAttr` with the promoted operands
+/// list modified/set to `operands`.
+IREE::GPU::LoweringConfigAttr
+setPromotedOperandsList(MLIRContext *context,
+                        IREE::GPU::LoweringConfigAttr currAttr,
+                        ArrayRef<int64_t> operands);
 
 /// Helper to retrieve  list of operand to pad.
 std::optional<SmallVector<int64_t>> getPaddingList(LoweringConfigAttr config);

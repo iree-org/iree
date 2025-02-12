@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -85,27 +86,14 @@ getModifiedLoweringConfigForDecomposedGemmOp(
 
   llvm::SmallDenseSet<int64_t> promotedOperandsSet(
       promotedOperandsList->begin(), promotedOperandsList->end());
-  SmallVector<NamedAttribute> attrs;
-  auto promotedOperandsListName = IREE::GPU::getPromotedOperandListAttrName();
-  for (auto origAttr : origAttr.getAttributes().getValue()) {
-    if (origAttr.getName().getValue() != promotedOperandsListName) {
-      attrs.push_back(origAttr);
-      continue;
+  SmallVector<int64_t> newPromotedOperands;
+  for (auto [index, origOperandNum] : llvm::enumerate(keptOperands)) {
+    if (promotedOperandsSet.contains(origOperandNum)) {
+      newPromotedOperands.push_back(index);
     }
-    SmallVector<int64_t> newPromotedOperands;
-    for (auto [index, origOperandNum] : llvm::enumerate(keptOperands)) {
-      if (promotedOperandsSet.contains(origOperandNum)) {
-        newPromotedOperands.push_back(index);
-      }
-    }
-
-    attrs.emplace_back(
-        NamedAttribute{promotedOperandsListName,
-                       rewriter.getI64ArrayAttr(newPromotedOperands)});
   }
-
-  return IREE::GPU::LoweringConfigAttr::get(rewriter.getContext(),
-                                            rewriter.getDictionaryAttr(attrs));
+  return setPromotedOperandsList(rewriter.getContext(), origAttr,
+                                 newPromotedOperands);
 }
 
 static LogicalResult
@@ -179,42 +167,25 @@ decomposeHorizontallyFusedGemmOperations(RewriterBase &rewriter,
           b.create<linalg::YieldOp>(loc, regionMapping.lookup(result));
         });
 
+    // If on decomposition any dims are unused propagating lowering config isnt
+    // well defined. So propagate lowering config only when no dim is unused.
     if (unusedDims.none()) {
-      DictionaryAttr origDictAttr = linalgOp->getDiscardableAttrDictionary();
-      auto loweringConfigAttr = dyn_cast_or_null<IREE::GPU::LoweringConfigAttr>(
-          origDictAttr.get(IREE::GPU::LoweringConfigAttr::getMnemonic()));
-      DictionaryAttr newDictAttr;
-      if (loweringConfigAttr &&
-          loweringConfigAttr.getAttributes().get(
-              IREE::GPU::getPromotedOperandListAttrName())) {
-        SmallVector<NamedAttribute> newAttrList;
-        for (auto origAttr : origDictAttr.getValue()) {
-          if (origAttr.getName() !=
-              IREE::GPU::LoweringConfigAttr::getMnemonic()) {
-            newAttrList.push_back(origAttr);
-            continue;
-          }
-          SmallVector<unsigned> operandNums =
-              llvm::map_to_vector(inputs, [](OpOperand *operand) {
-                return operand->getOperandNumber();
-              });
-          auto range = llvm::map_range(inits, [](OpOperand *operand) {
-            return operand->getOperandNumber();
-          });
-          operandNums.append(range.begin(), range.end());
-          auto origGPUAttr =
-              cast<IREE::GPU::LoweringConfigAttr>(origAttr.getValue());
-          IREE::GPU::LoweringConfigAttr newGPUAttr =
-              getModifiedLoweringConfigForDecomposedGemmOp(
-                  rewriter, origGPUAttr, operandNums);
-          newAttrList.emplace_back(
-              NamedAttribute{origAttr.getName(), newGPUAttr});
-        }
-        newDictAttr = DictionaryAttr::get(rewriter.getContext(), newAttrList);
-      } else {
-        newDictAttr = origDictAttr;
+      IREE::GPU::LoweringConfigAttr loweringConfigAttr =
+          getLoweringConfig<IREE::GPU::LoweringConfigAttr>(linalgOp);
+      if (loweringConfigAttr && getPromotedOperandList(loweringConfigAttr)) {
+        SmallVector<unsigned> operandNums =
+            llvm::map_to_vector(inputs, [](OpOperand *operand) {
+              return operand->getOperandNumber();
+            });
+        auto range = llvm::map_range(inits, [](OpOperand *operand) {
+          return operand->getOperandNumber();
+        });
+        operandNums.append(range.begin(), range.end());
+        IREE::GPU::LoweringConfigAttr newGPUAttr =
+            getModifiedLoweringConfigForDecomposedGemmOp(
+                rewriter, loweringConfigAttr, operandNums);
+        setLoweringConfig(newOp, newGPUAttr);
       }
-      newOp->setDiscardableAttrs(newDictAttr);
     }
 
     rewriter.replaceAllUsesWith(linalgOp->getResult(resultNumber),
