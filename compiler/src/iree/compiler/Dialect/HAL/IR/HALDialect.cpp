@@ -123,30 +123,43 @@ class HALAffinityAnalysisDialectInterface
     : public IREE::Stream::AffinityAnalysisDialectInterface {
 public:
   using AffinityAnalysisDialectInterface::AffinityAnalysisDialectInterface;
+
+  // Returns a function that gathers the corresponding
+  // EncodingLayoutAttrInterface attributes for each
+  // (IREE::Stream::Affinity, Operation) query. The attribute is extracted from
+  // the `encoding` field in the HAL::ExecutableTargetAttr configuration. If the
+  // `encoding` is not present, the target attribute is returned.
   IREE::Stream::ResolveLayoutAttrFn
   makeLayoutAttrResolver(ModuleOp moduleOp) const {
-    return [=](IREE::Stream::AffinityAttr affinityAttr, Operation *op,
-               SetVector<Attribute> &layoutAttrs) -> LogicalResult {
-      // This needs to be in the lambda because the moduleOp could be modified..
+    return [=](ArrayRef<IREE::Stream::AffinityAndOpPair> batchQueries,
+               llvm::DenseMap<IREE::Stream::AffinityAndOpPair,
+                              SetVector<Attribute>> &layoutAttrs)
+               -> LogicalResult {
+      // This needs to be in the lambda because the moduleOp could be modified.
       IREE::HAL::DeviceAnalysis deviceAnalysis(moduleOp);
       if (failed(deviceAnalysis.run())) {
-        return op->emitError("failed to run DeviceAnalysis");
+        return moduleOp->emitError("failed to run DeviceAnalysis");
       }
-      SetVector<IREE::HAL::ExecutableTargetAttr> resultSet;
-      deviceAnalysis.gatherRequiredExecutableTargets(affinityAttr, op,
-                                                     resultSet);
-      for (auto targetAttr : resultSet) {
-        Attribute result = targetAttr;
-        if (auto attr = targetAttr.getConfiguration().getNamed("encoding")) {
-          if (auto encodingLayoutAttr =
-                  dyn_cast<IREE::Encoding::EncodingLayoutAttrInterface>(
-                      attr->getValue())) {
-            result = encodingLayoutAttr.cloneWithSimplifiedConfig(
-                targetAttr.getConfiguration());
+
+      for (IREE::Stream::AffinityAndOpPair key : batchQueries) {
+        auto [affinityAttr, op] = key;
+        SetVector<IREE::HAL::ExecutableTargetAttr> resultSet;
+        deviceAnalysis.gatherRequiredExecutableTargets(affinityAttr, op,
+                                                       resultSet);
+        for (auto targetAttr : resultSet) {
+          Attribute result = targetAttr;
+          if (auto attr = targetAttr.getConfiguration().getNamed("encoding")) {
+            if (auto encodingLayoutAttr =
+                    dyn_cast<IREE::Encoding::EncodingLayoutAttrInterface>(
+                        attr->getValue())) {
+              result = encodingLayoutAttr.cloneWithSimplifiedConfig(
+                  targetAttr.getConfiguration());
+            }
           }
+          layoutAttrs[key].insert(result);
         }
-        layoutAttrs.insert(result);
       }
+
       return success();
     };
   };

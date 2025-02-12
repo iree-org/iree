@@ -17,6 +17,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
@@ -56,6 +57,8 @@ SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
       });
   return results;
 }
+
+} // namespace
 
 // Returns an updated encoding attribute if the type is a RankedTensorType
 // and an EncodingAttr is present. Otherwise, returns std::nullopt. The
@@ -274,14 +277,140 @@ static RankedTensorType cloneWithEncoding(RankedTensorType type,
                                encodingAttr);
 }
 
+/// Returns all the stream tensor ops that implement AffinityOpInterface, where
+/// a stream affinity indicates the kind of enviroment the ops are expected run
+/// in.
+static SmallVector<IREE::Stream::AffinityOpInterface>
+collectStreamTensorOps(FunctionOpInterface funcOp) {
+  SmallVector<IREE::Stream::AffinityOpInterface> result;
+  funcOp.walk([&](IREE::Stream::AffinityOpInterface affinityOp) {
+    // Only need to update encoding types for ops that have TensorPhaseOp trait.
+    if (!affinityOp->hasTrait<OpTrait::IREE::Stream::TensorPhaseOp>()) {
+      return;
+    }
+
+    // Bail out if the operation does not have an affinity attribute.
+    auto affinityAttr = affinityOp.getAffinityAttr();
+    if (!affinityAttr) {
+      return;
+    }
+    result.push_back(affinityOp);
+  });
+  return result;
+}
+
+namespace {
+
+// Adds the resolved layouts to all tensor types on stream tensor ops, if
+// encodings are present. Most of stream tensor ops implement
+// AffinityOpInterface, where a stream affinity indicates the kind of
+// enviroment the ops are expected run in. When an encoding is present in the
+// tensor type, the method resolves the layouts, strips outdated information,
+// and adds the resolved layouts to the encodings. The updated encodings should
+// have enough information for other lowering transformations.
+// TODO(hanchung): Add support for stream.tensor.load ops and
+// stream.tensor.store ops. They are not affinity ops, so additional analysis
+// will be needed in the work.
+class StreamTensorOpUpdater {
+public:
+  explicit StreamTensorOpUpdater(ModuleOp moduleOp) : moduleOp(moduleOp){};
+  ~StreamTensorOpUpdater() {}
+
+  // Collects the stream tensor op candidates, and prepares all the needed
+  // information for the update. This must be called once before calling `run`.
+  // Note that all the ops are unmodified after the execution.
+  LogicalResult init();
+
+  // Adds the resolved layouts to all tensor types of `streamOps`, if encodings
+  // are present.
+  LogicalResult run();
+
+private:
+  // Appends the query from the `affinityOp` to `queries`. Note that most of
+  // operations only care the execution affinity. There are outliers (e.g.,
+  // tensor dispatch op, etc.) that need to resolve affinities for
+  // operand resources.
+  LogicalResult addQuery(IREE::Stream::AffinityAnalysis &affinityAnalysis,
+                         IREE::Stream::AffinityOpInterface affinityOp);
+
+  // The list of the queries that can be used for batch affinity queries. The
+  // analysis could be very expensive because it could apply the whole program
+  // data flow analysis.
+  SmallVector<IREE::Stream::AffinityAndOpPair> queries;
+
+  // The layout resolvers for each query.
+  llvm::DenseMap<IREE::Stream::AffinityAndOpPair, SetVector<Attribute>>
+      cachedLayoutAttrs;
+
+  // Input moduleOp. The op is not expected to be updated during the query.
+  // Because data flow analaysis can be involved. Modifying the IR invalidates
+  // the state and may lead to crashes as pointer references into the IR
+  // structure are retained.
+  ModuleOp moduleOp;
+
+  // The ops that need to be updated.
+  SmallVector<IREE::Stream::AffinityOpInterface> streamOps;
+
+  // The layout resolver function, which is used to resolve layouts for
+  // encodings. See StreamInterfaces.h for more details.
+  IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr;
+};
+
+} // namespace
+
+LogicalResult StreamTensorOpUpdater::init() {
+  auto usedDialects = gatherUsedDialectInterfaces<
+      IREE::Stream::AffinityAnalysisDialectInterface>(moduleOp);
+  if (usedDialects.size() != 1) {
+    return moduleOp.emitError("expected only one dialect implementing "
+                              "AffinityAnalysisDialectInterface");
+  }
+  resolveLayoutAttr = usedDialects[0]->makeLayoutAttrResolver(moduleOp);
+
+  for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
+    streamOps.append(collectStreamTensorOps(funcOp));
+  }
+
+  return success();
+}
+
+LogicalResult StreamTensorOpUpdater::addQuery(
+    IREE::Stream::AffinityAnalysis &affinityAnalysis,
+    IREE::Stream::AffinityOpInterface affinityOp) {
+  queries.emplace_back(affinityOp.getAffinityAttr(), affinityOp);
+
+  if (auto dispatchOp =
+          dyn_cast<IREE::Stream::TensorDispatchOp>(affinityOp.getOperation())) {
+    for (auto [operand, typeAttr] :
+         llvm::zip_equal(dispatchOp.getMixedOperands(),
+                         dispatchOp.getOperandEncodings().getValue())) {
+      auto type = cast<TypeAttr>(typeAttr).getValue();
+      // Skip if the operand type is not AffinityType.
+      if (!isa<IREE::Stream::AffinityTypeInterface>(type)) {
+        continue;
+      }
+      SmallVector<IREE::Stream::AffinityAttr> affinityAttrs;
+      if (!affinityAnalysis.tryLookupResourceAffinity(operand, affinityAttrs)) {
+        return failure();
+      }
+      for (auto affinity : affinityAttrs) {
+        queries.emplace_back(affinity, affinityOp);
+      }
+    }
+  }
+
+  return success();
+}
+
 /// Updates the operand encondings and result encodings for the `dispatchOp`
 /// with resolved layouts.
-static LogicalResult
-updateTensorDispatchOp(RewriterBase &rewriter, ModuleOp moduleOp,
-                       IREE::Stream::AffinityAnalysis &affinityAnalysis,
-                       IREE::Stream::TensorDispatchOp dispatchOp,
-                       const SetVector<Attribute> &resLayoutResolvers,
-                       IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr) {
+static LogicalResult updateTensorDispatchOp(
+    RewriterBase &rewriter, ModuleOp moduleOp,
+    IREE::Stream::AffinityAnalysis &affinityAnalysis,
+    IREE::Stream::TensorDispatchOp dispatchOp,
+    const SetVector<Attribute> &resLayoutResolvers,
+    llvm::DenseMap<IREE::Stream::AffinityAndOpPair, SetVector<Attribute>>
+        &cachedLayoutAttrs) {
   SmallVector<Type> newOperandEncodings;
   for (auto [operand, typeAttr] :
        llvm::zip_equal(dispatchOp.getMixedOperands(),
@@ -299,11 +428,11 @@ updateTensorDispatchOp(RewriterBase &rewriter, ModuleOp moduleOp,
     if (affinityAttrs.size() != 1) {
       return failure();
     }
-    SetVector<Attribute> layoutResolvers;
-    if (failed(
-            resolveLayoutAttr(affinityAttrs[0], moduleOp, layoutResolvers))) {
-      return dispatchOp.emitError("failed on making layout resolvers");
-    }
+
+    IREE::Stream::AffinityAndOpPair key(affinityAttrs[0], dispatchOp);
+    assert(cachedLayoutAttrs.contains(key) &&
+           "the (affinity, dispatchOp) query is invalid");
+    const SetVector<Attribute> &layoutResolvers = cachedLayoutAttrs[key];
 
     std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
         getEncodingWithNewLayouts(type, layoutResolvers);
@@ -325,7 +454,6 @@ updateTensorDispatchOp(RewriterBase &rewriter, ModuleOp moduleOp,
       newResultEncodings.push_back(type);
       continue;
     }
-
     std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
         getEncodingWithNewLayouts(type, resLayoutResolvers);
     if (!encodingAttr) {
@@ -472,53 +600,34 @@ updateResultEncoding(RewriterBase &rewriter, OpTy op,
   return success();
 }
 
-/// Adds the resolved layouts to all tensor types on stream tensor ops, if
-/// encodings are present. Most of stream tensor ops implement
-/// AffinityOpInterface, where a stream affinity indicates the kind of
-/// enviroment the ops are expected run in. When an encoding is present in the
-/// tensor type, the method resolves the layouts, strips outdated information,
-/// and adds the resolved layouts to the encodings. The updated encodings should
-/// have enough information for other lowering transformations.
-/// TODO(hanchung): Add support for stream.tensor.load ops and
-/// stream.tensor.store ops. They are not affinity ops, so additional analysis
-/// will be needed in the work.
-static LogicalResult addLayoutsToTensorPhaseOps(
-    ModuleOp moduleOp, IREE::Stream::AffinityAnalysis &affinityAnalysis,
-    FunctionOpInterface funcOp,
-    IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr) {
-  SmallVector<IREE::Stream::AffinityOpInterface> candidates;
-  funcOp.walk([&](IREE::Stream::AffinityOpInterface affinityOp) {
-    // Only need to update encoding types for ops that have TensorPhaseOp trait.
-    if (!affinityOp->hasTrait<OpTrait::IREE::Stream::TensorPhaseOp>()) {
-      return;
-    }
-
-    // Bail out if the operation does not have an affinity attribute.
-    auto affinityAttr = affinityOp.getAffinityAttr();
-    if (!affinityAttr) {
-      return;
-    }
-    candidates.push_back(affinityOp);
-  });
-
-  if (candidates.empty()) {
-    return success();
+LogicalResult StreamTensorOpUpdater::run() {
+  IREE::Stream::AffinityAnalysis affinityAnalysis(moduleOp);
+  if (failed(affinityAnalysis.run())) {
+    return moduleOp.emitError("failed on running affinity analysis");
   }
 
-  IRRewriter rewriter(funcOp.getContext());
-  for (auto affinityOp : candidates) {
-    auto affinityAttr = affinityOp.getAffinityAttr();
-    SetVector<Attribute> layoutResolvers;
-    if (failed(resolveLayoutAttr(affinityAttr, moduleOp, layoutResolvers))) {
-      return affinityOp.emitError("failed on making layout resolvers");
+  for (auto op : streamOps) {
+    if (failed(addQuery(affinityAnalysis, op))) {
+      return failure();
     }
+  }
+
+  if (failed(resolveLayoutAttr(queries, cachedLayoutAttrs))) {
+    return failure();
+  }
+
+  IRRewriter rewriter(moduleOp.getContext());
+  for (auto affinityOp : streamOps) {
+    const SetVector<Attribute> &layoutResolvers =
+        cachedLayoutAttrs[IREE::Stream::AffinityAndOpPair(
+            affinityOp.getAffinityAttr(), affinityOp)];
 
     LogicalResult result =
         TypeSwitch<Operation *, LogicalResult>(affinityOp)
             .Case<IREE::Stream::TensorDispatchOp>([&](auto op) {
               return updateTensorDispatchOp(rewriter, moduleOp,
                                             affinityAnalysis, op,
-                                            layoutResolvers, resolveLayoutAttr);
+                                            layoutResolvers, cachedLayoutAttrs);
             })
             .Case<IREE::Stream::TensorSizeOfOp>([&](auto op) {
               return updateTensorSizeOfOp(rewriter, op, layoutResolvers);
@@ -549,36 +658,26 @@ static LogicalResult addLayoutsToTensorPhaseOps(
   }
   return success();
 }
-} // namespace
 
+namespace {
 struct SpecializeEncodingsPass
     : public impl::SpecializeEncodingsPassBase<SpecializeEncodingsPass> {
   void runOnOperation() override {
     ModuleOp moduleOp = getOperation();
-    auto usedDialects = gatherUsedDialectInterfaces<
-        IREE::Stream::AffinityAnalysisDialectInterface>(moduleOp);
-    if (usedDialects.size() != 1) {
-      moduleOp.emitError("expected only one dialect implementing "
-                         "AffinityAnalysisDialectInterface");
+
+    StreamTensorOpUpdater streamTensorOpUpdater(moduleOp);
+    if (failed(streamTensorOpUpdater.init())) {
+      moduleOp.emitError("failed to initialize StreamTensorOpUpdater");
       return signalPassFailure();
     }
-
-    IREE::Stream::AffinityAnalysis affinityAnalysis(moduleOp);
-    if (failed(affinityAnalysis.run())) {
-      moduleOp.emitError("failed on running affinity analysis");
+    if (failed(streamTensorOpUpdater.run())) {
+      moduleOp.emitError(
+          "failed to add layouts to Stream::TensorPhaseOp with encodings");
       return signalPassFailure();
     }
 
     SymbolTable symbolTable(moduleOp);
-    IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr =
-        usedDialects[0]->makeLayoutAttrResolver(moduleOp);
     for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
-      if (failed(addLayoutsToTensorPhaseOps(moduleOp, affinityAnalysis, funcOp,
-                                            resolveLayoutAttr))) {
-        funcOp.emitError(
-            "failed on adding layouts to Stream::TensorPhaseOp with encodings");
-        return signalPassFailure();
-      }
       if (failed(duplicateExecutablesPerLayoutVariant(moduleOp, symbolTable,
                                                       funcOp))) {
         funcOp.emitError("failed on executable duplication");
@@ -587,5 +686,6 @@ struct SpecializeEncodingsPass
     }
   }
 };
+} // namespace
 
 } // namespace mlir::iree_compiler::IREE::Stream

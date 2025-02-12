@@ -16,8 +16,13 @@
 
 namespace mlir::iree_compiler::IREE::Stream {
 
+using AffinityAndOpPair = std::pair<AffinityAttr, Operation *>;
+
+// The function could be slow, if any data flow analysis is involved. Thus, the
+// API provides the batch mode.
 using ResolveLayoutAttrFn = std::function<LogicalResult(
-    AffinityAttr, Operation *, SetVector<Attribute> &)>;
+    ArrayRef<AffinityAndOpPair> batchQueries,
+    llvm::DenseMap<AffinityAndOpPair, SetVector<Attribute>> &layoutAttrs)>;
 
 class AffinityAnalysisDialectInterface
     : public DialectInterface::Base<AffinityAnalysisDialectInterface> {
