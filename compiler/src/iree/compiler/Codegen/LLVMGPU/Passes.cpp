@@ -943,6 +943,8 @@ void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager) {
       /*expandSubgroupReduction=*/true));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+  funcPassManager.addPass(affine::createLoopCoalescingPass());
+  funcPassManager.addPass(createCanonicalizerPass());
 }
 
 void addGPUPackUnPackPasses(OpPassManager &funcPassManager) {
