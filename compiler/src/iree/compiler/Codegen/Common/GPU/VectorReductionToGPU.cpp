@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -63,17 +64,26 @@ static bool isUniformLoad(Operation *op) {
   auto loadOp = dyn_cast<memref::LoadOp>(op);
   if (!loadOp)
     return false;
-  auto space = loadOp.getMemRefType().getMemorySpace();
-  auto attr = llvm::dyn_cast_if_present<DescriptorTypeAttr>(space);
-  if (!attr)
+  if (!hasGlobalMemoryAddressSpace(loadOp.getMemRefType()))
     return false;
-
-  if (attr.getValue() == DescriptorType::UniformBuffer)
+  auto space = loadOp.getMemRefType().getMemorySpace();
+  auto descTypeAttr = llvm::dyn_cast_if_present<DescriptorTypeAttr>(space);
+  if (descTypeAttr && descTypeAttr.getValue() == DescriptorType::UniformBuffer)
     return true;
 
   auto subspan = loadOp.getMemRef().getDefiningOp<InterfaceBindingSubspanOp>();
+  if (auto fatBufferCast =
+          loadOp.getMemRef().getDefiningOp<amdgpu::FatRawBufferCastOp>()) {
+    subspan =
+        fatBufferCast.getSource().getDefiningOp<InterfaceBindingSubspanOp>();
+  }
   if (!subspan)
     return false;
+
+  descTypeAttr = dyn_cast_if_present<DescriptorTypeAttr>(
+      cast<MemRefType>(subspan.getResult().getType()).getMemorySpace());
+  if (descTypeAttr && descTypeAttr.getValue() == DescriptorType::UniformBuffer)
+    return true;
   if (auto flags = subspan.getDescriptorFlags()) {
     if (bitEnumContainsAll(*flags, IREE::HAL::DescriptorFlags::ReadOnly))
       return true;
