@@ -1092,11 +1092,11 @@ static Value getBase(Value v) {
 
     bool shouldContinue =
         TypeSwitch<Operation *, bool>(v.getDefiningOp())
-            .Case<memref::CastOp, memref::SubViewOp, memref::ViewOp>(
-                [&](auto op) {
-                  v = op.getSource();
-                  return true;
-                })
+            .Case<memref::CastOp, memref::SubViewOp, memref::ViewOp,
+                  amdgpu::FatRawBufferCastOp>([&](auto op) {
+              v = op.getSource();
+              return true;
+            })
             .Case<memref::TransposeOp>([&](auto op) {
               v = op.getIn();
               return true;
