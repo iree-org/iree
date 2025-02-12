@@ -95,7 +95,7 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
     // large to fit in shared memory, so they just want global memory and they
     // will take care of moving small chunks at a time into a shared memory
     // operand that will be created together with the ukernel op.
-    GPU::setPromotedOperandList(context, attrs, {0, 1});
+    GPU::appendPromotedOperandsList(context, attrs, {0, 1});
   }
   auto configDict = b.getDictionaryAttr(attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
@@ -346,11 +346,11 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
                      b.getI64ArrayAttr(subgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "mma_kind"), mmaKind);
   if (mustBeAligned) {
-    GPU::setPromotedOperandList(context, attrs, {0, 1});
+    GPU::appendPromotedOperandsList(context, attrs, {0, 1});
   } else {
     // TODO (nirvedhmeshram, Max191, jerryyin) : Add support so that unaligned
     // shapes do not require c promotion.
-    GPU::setPromotedOperandList(context, attrs, {0, 1, 2});
+    GPU::appendPromotedOperandsList(context, attrs, {0, 1, 2});
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
 
     // Initialize inner and outer padding sizes from reductionTileSizes.
@@ -763,7 +763,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
                      b.getI64ArrayAttr(threadTileSizes));
 
   if (isNonMatvecContraction(linalgOp)) {
-    GPU::setPromotedOperandList(context, attrs, {0, 1});
+    GPU::appendPromotedOperandsList(context, attrs, {0, 1});
   }
 
   if (llvm::any_of(loopTileSizes, [](int64_t s) { return s != 0; })) {

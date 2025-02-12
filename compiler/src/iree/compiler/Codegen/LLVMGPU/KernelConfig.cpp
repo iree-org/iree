@@ -429,7 +429,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute, 2> attrs = {
       NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
       NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
-  IREE::GPU::setPromotedOperandList(context, attrs, {0, 1});
+  IREE::GPU::appendPromotedOperandsList(context, attrs, {0, 1});
   IREE::GPU::setMmaKind(context, attrs, mmaKinds[schedule->index]);
   IREE::GPU::setSubgroupMCount(context, attrs, schedule->mSubgroupCounts[0]);
   IREE::GPU::setSubgroupNCount(context, attrs, schedule->nSubgroupCounts[0]);
@@ -712,7 +712,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
   auto promotedOperands =
       llvm::to_vector(llvm::seq<int64_t>(op.getNumDpsInputs()));
-  IREE::GPU::setPromotedOperandList(context, attrs, promotedOperands);
+  IREE::GPU::appendPromotedOperandsList(context, attrs, promotedOperands);
   IREE::GPU::setMmaKind(context, attrs, mmaKinds[schedule->index]);
   IREE::GPU::setSubgroupMCount(context, attrs, schedule->mSubgroupCounts[0]);
   IREE::GPU::setSubgroupNCount(context, attrs, schedule->nSubgroupCounts[0]);
@@ -926,7 +926,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   SmallVector<NamedAttribute, 2> attrs = {
       NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
       NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
-  IREE::GPU::setPromotedOperandList(context, attrs, {0, 1, 2});
+  IREE::GPU::appendPromotedOperandsList(context, attrs, {0, 1, 2});
 
   SmallVector<NamedAttribute, 2> qkConfig;
   SmallVector<NamedAttribute, 2> pvConfig;
@@ -941,13 +941,13 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
 
   // Configuring for qk matmul.
   // subgroup_n count for qk matmul is always 1, since we do not tile K1.
-  IREE::GPU::setPromotedOperandList(context, qkConfig, {0, 1});
+  IREE::GPU::appendPromotedOperandsList(context, qkConfig, {0, 1});
   IREE::GPU::setMmaKind(context, qkConfig, mmaKinds[schedule->index]);
   IREE::GPU::setSubgroupMCount(context, qkConfig, schedule->mSubgroupCounts[0]);
   IREE::GPU::setSubgroupNCount(context, qkConfig, 1);
 
   // Configuring for pv matmul.
-  IREE::GPU::setPromotedOperandList(context, pvConfig, {1});
+  IREE::GPU::appendPromotedOperandsList(context, pvConfig, {1});
   IREE::GPU::setMmaKind(context, pvConfig, mmaKinds[schedule->index]);
   IREE::GPU::setSubgroupMCount(context, pvConfig, schedule->mSubgroupCounts[0]);
   IREE::GPU::setSubgroupNCount(context, pvConfig, schedule->nSubgroupCounts[0]);
@@ -2164,7 +2164,7 @@ static LogicalResult setArgmaxUkernelConfig(
       NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
       NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes)),
       NamedAttribute("ukernel", ukernelConfig)};
-  IREE::GPU::setPromotedOperandList(context, attrs, {0, 1});
+  IREE::GPU::appendPromotedOperandsList(context, attrs, {0, 1});
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
   if (failed(setOpConfigAndEntryPointFnTranslation(

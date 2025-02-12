@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "decompose_horizontally_fused_gemms.mlir"
     "gpu_apply_derived_thread_config.mlir"
     "gpu_apply_tiling_level.mlir"
     "gpu_check_resource_usage.mlir"
