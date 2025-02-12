@@ -14,7 +14,6 @@
 typedef struct iree_hal_nl_task_driver_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
-  iree_hal_allocator_t* device_allocator;
 
   iree_string_view_t identifier;
   iree_hal_nl_task_device_params_t default_params;
@@ -39,12 +38,11 @@ iree_status_t iree_hal_nl_task_driver_create(
     const iree_hal_nl_task_device_params_t* default_params,
     iree_host_size_t queue_count, iree_task_executor_t* const* queue_executors,
     iree_host_size_t loader_count, iree_hal_executable_loader_t** loaders,
-    iree_hal_allocator_t* device_allocator, iree_allocator_t host_allocator,
+    iree_allocator_t host_allocator,
     iree_hal_driver_t** out_driver) {
   IREE_ASSERT_ARGUMENT(default_params);
   IREE_ASSERT_ARGUMENT(!queue_count || queue_executors);
   IREE_ASSERT_ARGUMENT(!loader_count || loaders);
-  IREE_ASSERT_ARGUMENT(device_allocator);
   IREE_ASSERT_ARGUMENT(out_driver);
   *out_driver = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -67,8 +65,6 @@ iree_status_t iree_hal_nl_task_driver_create(
     iree_hal_resource_initialize(&iree_hal_nl_task_driver_vtable,
                                  &driver->resource);
     driver->host_allocator = host_allocator;
-    driver->device_allocator = device_allocator;
-    iree_hal_allocator_retain(device_allocator);
 
     iree_string_view_append_to_buffer(identifier, &driver->identifier,
                                       (char*)driver + identifier_offset);
@@ -104,7 +100,6 @@ static void iree_hal_nl_task_driver_destroy(iree_hal_driver_t* base_driver) {
   iree_allocator_t host_allocator = driver->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_allocator_release(driver->device_allocator);
   for (iree_host_size_t i = 0; i < driver->loader_count; ++i) {
     iree_hal_executable_loader_release(driver->loaders[i]);
   }
@@ -152,7 +147,7 @@ static iree_status_t iree_hal_nl_task_driver_create_device_by_id(
   return iree_hal_nl_task_device_create(
       driver->identifier, &driver->default_params, driver->queue_count,
       driver->queue_executors, driver->loader_count, driver->loaders,
-      driver->device_allocator, host_allocator, out_device);
+      host_allocator, out_device);
 }
 
 static iree_status_t iree_hal_nl_task_driver_create_device_by_path(

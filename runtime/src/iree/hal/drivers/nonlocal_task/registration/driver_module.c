@@ -73,20 +73,12 @@ static iree_status_t iree_hal_nonlocal_task_driver_factory_try_create(
         host_allocator);
   }
 
-  // TODO(benvanik): allow this to be injected to share across drivers.
-  iree_hal_allocator_t* device_allocator = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_allocator_create_heap(iree_make_cstring_view("local"),
-                                            host_allocator, host_allocator,
-                                            &device_allocator);
-  }
-
   // Create a task driver that will use the given executors for scheduling work
   // and loaders for loading executables.
   if (iree_status_is_ok(status)) {
     status = iree_hal_nl_task_driver_create(
         driver_name, &default_params, executor_count, executors, loader_count,
-        loaders, device_allocator, host_allocator, out_driver);
+        loaders, host_allocator, out_driver);
   }
 
   for (iree_host_size_t i = 0; i < executor_count; ++i) {
@@ -96,7 +88,6 @@ static iree_status_t iree_hal_nonlocal_task_driver_factory_try_create(
     iree_hal_executable_loader_release(loaders[i]);
   }
   iree_hal_executable_plugin_manager_release(plugin_manager);
-  iree_hal_allocator_release(device_allocator);
   return status;
 }
 
