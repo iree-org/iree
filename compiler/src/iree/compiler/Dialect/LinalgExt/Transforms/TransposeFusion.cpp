@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -58,42 +59,44 @@ struct FuseTransposeWithAttentionOp final
 
   LogicalResult matchAndRewrite(LinalgExt::AttentionOp attentionOp,
                                 PatternRewriter &rewriter) const override {
-    OpOperand *transposeOperand = nullptr;
-    linalg::LinalgOp transposeOp;
+    OpOperand *operand = nullptr;
+    linalg::LinalgOp producer;
     for (OpOperand *input : attentionOp.getDpsInputOperands()) {
       if (controlFn && !controlFn(input)) {
         continue;
       }
 
-      auto maybeTransposeOp = input->get().getDefiningOp<linalg::LinalgOp>();
-      if (maybeTransposeOp && isaTranspose(maybeTransposeOp) &&
-          maybeTransposeOp->hasOneUse()) {
-        transposeOp = maybeTransposeOp;
-        transposeOperand = input;
+      auto maybeProducer = input->get().getDefiningOp<linalg::GenericOp>();
+      if (maybeProducer && maybeProducer.isSingleYieldOp()) {
+        producer = maybeProducer;
+        operand = input;
         break;
       }
     }
-    if (!transposeOperand) {
-      return rewriter.notifyMatchFailure(attentionOp, "no transpose operand");
+    if (!operand) {
+      return rewriter.notifyMatchFailure(attentionOp, "no operand found");
     }
 
-    int64_t inputIndex = transposeOperand->getOperandNumber();
-    SmallVector<int64_t> perm = getPermutation(transposeOp);
-    auto invPerm = invertPermutationVector(perm);
+    int64_t inputIndex = operand->getOperandNumber();
+
+    auto producerMaps = producer.getIndexingMapsArray();
+    AffineMap producerInputMap = producerMaps[0];
+    AffineMap producerResultMap = producerMaps[1];
+    if (!producerInputMap.isProjectedPermutation() ||
+        !producerResultMap.isPermutation()) {
+      return failure();
+    }
 
     rewriter.modifyOpInPlace(attentionOp, [&]() {
       SmallVector<AffineMap> newIndexingMaps =
           attentionOp.getIndexingMapsArray();
-      AffineMap inputMap = attentionOp.getMatchingIndexingMap(transposeOperand);
-      SmallVector<AffineExpr> newExprs =
-          applyPermutation(inputMap.getResults(), invPerm);
-      AffineMap transposedMap =
-          AffineMap::get(inputMap.getNumDims(), inputMap.getNumSymbols(),
-                         newExprs, rewriter.getContext());
-      newIndexingMaps[inputIndex] = transposedMap;
+      AffineMap consumerInputMap = attentionOp.getMatchingIndexingMap(operand);
+      AffineMap composedMap =
+          producerInputMap.compose(inversePermutation(producerResultMap));
+      newIndexingMaps[inputIndex] = composedMap.compose(consumerInputMap);
       attentionOp.setIndexingMapsAttr(
           rewriter.getAffineMapArrayAttr(newIndexingMaps));
-      attentionOp.setOperand(inputIndex, transposeOp.getDpsInputs()[0]);
+      attentionOp.setOperand(inputIndex, producer.getDpsInputs()[0]);
     });
 
     return success();

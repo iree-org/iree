@@ -37,12 +37,10 @@ void AttentionOpDetail::inferFromIndexingMaps(AffineMap qMap, AffineMap kMap,
   llvm::SmallDenseSet<int64_t> vSet = findPermutationsIndexingOperand(vMap);
   llvm::SmallDenseSet<int64_t> oSet = findPermutationsIndexingOperand(oMap);
 
-  // B = (Q & K & O) U (K & V & O)
+  // B = (Q & V) U (K & O)
   llvm::SmallDenseSet<int64_t> b1Set = qSet;
-  llvm::set_intersect(b1Set, kSet);
-  llvm::set_intersect(b1Set, oSet);
+  llvm::set_intersect(b1Set, vSet);
   llvm::SmallDenseSet<int64_t> b2Set = kSet;
-  llvm::set_intersect(b2Set, vSet);
   llvm::set_intersect(b2Set, oSet);
   llvm::SmallDenseSet<int64_t> bSet = b1Set;
   llvm::set_union(bSet, b2Set);
