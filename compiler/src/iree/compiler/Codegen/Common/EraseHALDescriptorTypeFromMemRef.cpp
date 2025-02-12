@@ -32,10 +32,10 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_CONVERTHALDESCRIPTORTYPETOGPUADDRESSSPACEPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
-static cl::opt<bool> clAMDGPUEnableBufferInsts(
+static llvm::cl::opt<bool> clAMDGPUEnableBufferInsts(
   "iree-codegen-amdgpu-enable-buffer-insts",
-  cl::desc("Use buffer instructions (by using buffer fat pointers) where possible on AMD targets")
-  cl::init(true));
+  llvm::cl::desc("Use buffer instructions (by using buffer fat pointers) where possible on AMD targets"),
+  llvm::cl::init(true));
 
 namespace {
 
