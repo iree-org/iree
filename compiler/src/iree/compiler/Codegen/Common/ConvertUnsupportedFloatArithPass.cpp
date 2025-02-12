@@ -15,10 +15,14 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+
+#define DEBUG_TYPE "iree-convert-unsupported-float-arith"
 
 namespace mlir::iree_compiler {
 
@@ -35,60 +39,48 @@ struct ConvertUnsupportedFloatArithPass final
 };
 
 } // namespace
-//
 
-static LogicalResult ParseFromOption(MLIRContext *ctx,
-                                     ArrayRef<std::string> sourceTypeStrs,
-                                     std::string targetTypeStr,
-                                     SmallVectorImpl<Type> &sourceTypes,
-                                     Type &targetType) {
-
-  std::optional<FloatType> maybeTargetType =
-      arith::parseFloatType(ctx, targetTypeStr);
-  if (!maybeTargetType) {
-    emitError(UnknownLoc::get(ctx), "could not map target type '" +
-                                        targetTypeStr +
-                                        "' to a known floating-point type");
-    return failure();
+// Populates source and target conversion types based on the target
+// architecture.
+// TODO(pashu123): Refine the patterns based on the target arch.
+static void populateSourceAndTargetType(MLIRContext *ctx, Operation *op,
+                                        SmallVectorImpl<Type> &sourceTypes,
+                                        Type &targetType) {
+  auto gpuAttr = getGPUTargetAttr(op);
+  if (!gpuAttr) {
+    return;
   }
-  targetType = *maybeTargetType;
-  for (StringRef sourceTypeStr : sourceTypeStrs) {
-    std::optional<FloatType> maybeSourceType =
-        arith::parseFloatType(ctx, sourceTypeStr);
-    if (!maybeSourceType) {
-      emitError(UnknownLoc::get(ctx), "could not map source type '" +
-                                          sourceTypeStr +
-                                          "' to a known floating-point type");
-      return failure();
-    }
-    sourceTypes.push_back(*maybeSourceType);
+  StringRef chipset = gpuAttr.getArch();
+  FailureOr<amdgpu::Chipset> maybeChipset = amdgpu::Chipset::parse(chipset);
+  if (failed(maybeChipset)) {
+    LLVM_DEBUG(llvm::dbgs() << "Invalid chip name");
+    return;
   }
-
-  return success();
+  // Add source and target conversion types for gfx94{*} series.
+  if (maybeChipset->majorVersion == 9 && maybeChipset->minorVersion == 4) {
+    sourceTypes.insert(sourceTypes.end(), {Float8E4M3FNUZType::get(ctx),
+                                           Float8E5M2FNUZType::get(ctx)});
+    targetType = Float32Type::get(ctx);
+  }
+  return;
 }
 
 void ConvertUnsupportedFloatArithPass::runOnOperation() {
-
   MLIRContext *context = &getContext();
-  Operation *op = getOperation();
+  FunctionOpInterface funcOp = getOperation();
   SmallVector<Type> sourceTypes;
-  Type targetType;
+  Type targetType = nullptr;
 
-  if (failed(ParseFromOption(context, sourceTypeStrs, targetTypeStr,
-                             sourceTypes, targetType))) {
-    return signalPassFailure();
-  }
+  populateSourceAndTargetType(context, funcOp, sourceTypes, targetType);
 
-  if (sourceTypes.empty()) {
-    (void)emitOptionalWarning(
-        std::nullopt,
-        "no source types specified, float emulation will do nothing");
-    return signalPassFailure();
+  if (sourceTypes.empty() || !targetType) {
+    LLVM_DEBUG(llvm::dbgs() << "no source or target type specified, float "
+                               "emulation will do nothing\n");
+    return;
   }
 
   if (llvm::is_contained(sourceTypes, targetType)) {
-    emitError(UnknownLoc::get(context),
-              "target type cannot be an unsupported source type");
+    funcOp->emitError() << " target type cannot be an unsupported source type";
     return signalPassFailure();
   }
 
@@ -100,8 +92,9 @@ void ConvertUnsupportedFloatArithPass::runOnOperation() {
   ConversionTarget target(*context);
   arith::populateEmulateUnsupportedFloatsLegality(target, converter);
 
-  if (failed(applyPartialConversion(op, target, std::move(patterns))))
+  if (failed(applyPartialConversion(funcOp, target, std::move(patterns)))) {
     signalPassFailure();
+  }
 }
 
 } // namespace mlir::iree_compiler

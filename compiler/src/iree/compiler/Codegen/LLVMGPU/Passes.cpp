@@ -1126,14 +1126,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
 
   if (forROCDL) {
     // convert to ROCDL.
-    funcPassManager.addPass([&]() {
-      ConvertUnsupportedFloatArithPassOptions options;
-      // Convert arith operation with the given `source types` to `target`
-      // type.
-      options.sourceTypeStrs = {"f8E4M3FNUZ", "f8E5M2FNUZ"};
-      options.targetTypeStr = "f32";
-      return createConvertUnsupportedFloatArithPass(options);
-    });
+    funcPassManager.addPass(createConvertUnsupportedFloatArithPass);
     modulePassManager.addPass(createConvertToROCDLPass());
     modulePassManager.addNestedPass<LLVM::LLVMFuncOp>(
         createROCDLAnnotateKernelForTranslationPass());

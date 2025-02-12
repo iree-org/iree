@@ -161,6 +161,8 @@ iree_cc_library(
     ::PassesIncGen
     IREELinalgTransformDialect
     LLVMSupport
+    MLIRAMDGPUDialect
+    MLIRAMDGPUUtils
     MLIRAffineAnalysis
     MLIRAffineDialect
     MLIRAffineTransforms
