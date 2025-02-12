@@ -381,13 +381,7 @@ setInsertionPointAfterLastIndexOperand(RewriterBase &rewriter,
     // For block arguments we want the insertion point to be at the start of
     // the block, so we need to set the insertion point before the first op
     // in the block.
-    if (auto blockArg = dyn_cast<BlockArgument>(val)) {
-      setInsertionPointBefore = true;
-      continue;
-    }
-    // Otherwise, there was a producer op, and we will set the insertion point
-    // after it.
-    setInsertionPointBefore = false;
+    setInsertionPointBefore = isa<BlockArgument>(val);
   }
   if (setInsertionPointBefore) {
     rewriter.setInsertionPoint(lastOp);
@@ -406,7 +400,7 @@ collapseParallelInsertOp(RewriterBase &rewriter,
                          tensor::ParallelInsertSliceOp parallelInsertOp,
                          SmallVector<ReassociationIndices> reassociations) {
   // Compute the collapsed offsets, sizes, and strides.
-  auto lastOp =
+  Operation *lastOp =
       setInsertionPointAfterLastIndexOperand(rewriter, parallelInsertOp);
   Location loc = lastOp->getLoc();
   int64_t resultIdx = parallelInsertOp.getTiedOpResult().getResultNumber();
@@ -599,7 +593,7 @@ clampParallelInsertSliceOp(RewriterBase &rewriter,
                            tensor::ParallelInsertSliceOp parallelInsertOp,
                            SmallVector<OpFoldResult> upperBoundSizes) {
   OpBuilder::InsertionGuard g(rewriter);
-  auto lastOp =
+  Operation *lastOp =
       setInsertionPointAfterLastIndexOperand(rewriter, parallelInsertOp);
   Location loc = lastOp->getLoc();
 
