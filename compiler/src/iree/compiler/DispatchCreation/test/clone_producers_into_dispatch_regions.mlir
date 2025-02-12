@@ -604,3 +604,44 @@ util.func public @attention_clone_mask(%arg0: tensor<?x?xf16>,
 //  CHECK-SAME:         ins({{.+}}, %[[MASK]] :
 //       CHECK:     flow.return %[[ATTENTION]]
 //       CHECK:   return %[[DISPATCH]]
+
+// -----
+
+util.func public @dont_clone_flow_ops(%arg0: tensor<?x?xf16>, %arg1: tensor<?x?xf16>, %arg2: tensor<?x?xf16>, %arg3: tensor<?x?xi1>) -> tensor<?x?xf16> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %dim = tensor.dim %arg0, %c0 : tensor<?x?xf16>
+  %dim_0 = tensor.dim %arg1, %c1 : tensor<?x?xf16>
+  %dim_1 = tensor.dim %arg2, %c1 : tensor<?x?xf16>
+  %dim_2 = tensor.dim %arg3, %c0 : tensor<?x?xi1>
+  %dim_3 = tensor.dim %arg3, %c1 : tensor<?x?xi1>
+  %false = arith.constant false
+  %true = arith.constant true
+  %cst = arith.constant 1.000000e+00 : f16
+  %0 = tensor.empty(%dim, %dim_0) : tensor<?x?xi1>
+  %1 = tensor.empty(%dim, %dim_1) : tensor<?x?xf16>
+  %2 = flow.tensor.transfer %arg3 : tensor<?x?xi1>{%dim_2, %dim_3} to #hal.device.promise<@dev_a>
+  %3 = flow.dispatch.region -> (tensor<?x?xf16>{%dim, %dim_1}) {
+    %4 = iree_linalg_ext.attention {
+        indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d3)>,
+                         affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
+                         affine_map<(d0, d1, d2, d3) -> (d2, d1)>,
+                         affine_map<(d0, d1, d2, d3) -> ()>,
+                         affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
+                         affine_map<(d0, d1, d2, d3) -> (d0, d1)>]}
+        ins(%arg0, %arg1, %arg2, %cst, %2 : tensor<?x?xf16>, tensor<?x?xf16>,
+            tensor<?x?xf16>, f16, tensor<?x?xi1>) outs(%1 : tensor<?x?xf16>) {
+    ^bb0(%in: f32):
+      iree_linalg_ext.yield %in : f32
+    } -> tensor<?x?xf16>
+    flow.return %4 : tensor<?x?xf16>
+  }
+  util.return %3 : tensor<?x?xf16>
+}
+// CHECK-LABEL: func public @dont_clone_flow_ops
+//       CHECK:   %[[MASK:.+]] = flow.tensor.transfer
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[ATTENTION:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:         ins({{.+}}, %[[MASK]] :
+//       CHECK:     flow.return %[[ATTENTION]]
+//       CHECK:   return %[[DISPATCH]]

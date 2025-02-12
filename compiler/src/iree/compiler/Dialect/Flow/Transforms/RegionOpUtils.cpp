@@ -807,6 +807,10 @@ static bool isAttentionMaskGenerator(Operation *op) {
 /// operations as roots.
 bool isClonableIntoDispatchOp(Operation *op,
                               ClonableIntoDispatchOptions options) {
+  if (isa<Flow::FlowDialect>(op->getDialect())) {
+    return false;
+  }
+
   // TODO(#8637): `tensor.collapse_shape` and `tensor.expand_shape` are
   // trivially clonable too, but they cause problems
   // with bufferization. Make them clonable when fixed.

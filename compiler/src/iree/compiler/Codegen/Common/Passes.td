@@ -537,15 +537,9 @@ def PadDynamicAllocPass :
   let summary = "Pass to pad dynamic alloc into static one.";
 }
 
-def PolynomialApproximationPass :
-    Pass<"iree-codegen-polynomial-approximation", ""> {
-  let summary = "Convert math operations to their polynomial approximation";
-  let options = [
-    ListOption<"noApproxOps", "no-approx-ops", "std::string",
-           [{List of operations that should not be approximated.\n"
-           "As of now, possible options are:\n"
-           "\ttan, sinh, cosh, asinh, acosh, atanh, powf, fpowf, erf\n}]>,
-  ];
+def MathTransformPass :
+    Pass<"iree-codegen-math-transform", ""> {
+  let summary = "Apply math ops transformations: approximations, rewrites to other math ops, operand casts.";
 }
 
 def PropagateDispatchSizeBoundsPass :
