@@ -38,7 +38,7 @@ iree_cc_library(
     iree::base::internal::synchronization
     iree::base::internal::wait_handle
     iree::hal
-    iree::hal::local
+    iree::hal::nonlocal
     iree::hal::local::executable_environment
     iree::hal::local::executable_library
     iree::hal::utils::deferred_command_buffer

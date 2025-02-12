@@ -14,7 +14,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/executable_library.h"
-#include "iree/hal/local/local_executable.h"
+#include "iree/hal/nonlocal/local_executable.h"
 #include "iree/hal/utils/resource_set.h"
 #include "iree/task/affinity_set.h"
 #include "iree/task/list.h"
@@ -709,7 +709,7 @@ static iree_status_t iree_hal_nl_task_command_buffer_collective(
 
 typedef struct iree_hal_nl_task_cmd_dispatch_t {
   iree_task_dispatch_t task;
-  iree_hal_local_executable_t* executable;
+  iree_hal_nonlocal_executable_t* executable;
   int32_t ordinal;
 
   // Total number of available 4 byte push constant values in |constants|.
@@ -768,7 +768,7 @@ static iree_status_t iree_hal_nl_task_cmd_dispatch_tile(
           .local_memory = tile_context->local_memory.data,
           .local_memory_size = (size_t)tile_context->local_memory.data_length,
       };
-  iree_status_t status = iree_hal_local_executable_issue_call(
+  iree_status_t status = iree_hal_nonlocal_executable_issue_call(
       cmd->executable, cmd->ordinal, &dispatch_state, &workgroup_state,
       tile_context->worker_id);
 
@@ -785,8 +785,8 @@ static iree_status_t iree_hal_nl_task_command_buffer_build_dispatch(
   iree_hal_nl_task_command_buffer_t* command_buffer =
       iree_hal_nl_task_command_buffer_cast(base_command_buffer);
 
-  iree_hal_local_executable_t* local_executable =
-      iree_hal_local_executable_cast(executable);
+  iree_hal_nonlocal_executable_t* local_executable =
+      iree_hal_nonlocal_executable_cast(executable);
   iree_hal_executable_dispatch_attrs_v0_t dispatch_attrs = {0};
   if (local_executable->dispatch_attrs) {
     dispatch_attrs = local_executable->dispatch_attrs[entry_point];

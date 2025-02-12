@@ -12,7 +12,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
 #include "driver.h"
-#include "iree/hal/local/loaders/registration/init.h"
+#include "iree/hal/nonlocal/embedded_elf_loader.h"
 #include "iree/hal/local/plugins/registration/init.h"
 #include "iree/task/api.h"
 
@@ -64,29 +64,23 @@ static iree_status_t iree_hal_nonlocal_task_driver_factory_try_create(
   iree_status_t status = iree_hal_executable_plugin_manager_create_from_flags(
       host_allocator, &plugin_manager);
 
-  // Create all executable loaders linked into the binary.
-  iree_hal_executable_loader_t* loaders[8] = {NULL};
-  iree_host_size_t loader_count = 0;
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_create_all_available_executable_loaders(
-        plugin_manager, IREE_ARRAYSIZE(loaders), &loader_count, loaders,
-        host_allocator);
-  }
+  iree_hal_executable_loader_t* loader = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_nonlocal_embedded_elf_loader_create(plugin_manager,
+      host_allocator, &loader));
 
   // Create a task driver that will use the given executors for scheduling work
   // and loaders for loading executables.
   if (iree_status_is_ok(status)) {
     status = iree_hal_nl_task_driver_create(
-        driver_name, &default_params, executor_count, executors, loader_count,
-        loaders, host_allocator, out_driver);
+        driver_name, &default_params, executor_count, executors, 1,
+        &loader, host_allocator, out_driver);
   }
 
   for (iree_host_size_t i = 0; i < executor_count; ++i) {
     iree_task_executor_release(executors[i]);
   }
-  for (iree_host_size_t i = 0; i < loader_count; ++i) {
-    iree_hal_executable_loader_release(loaders[i]);
-  }
+
+  iree_hal_executable_loader_release(loader);
   iree_hal_executable_plugin_manager_release(plugin_manager);
   return status;
 }
