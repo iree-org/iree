@@ -139,3 +139,46 @@ util.func public @math_sin() {
 //       CHECK:   %[[GENERIC:.+]]:2 = linalg.generic
 //   CHECK-DAG:   check.expect_almost_eq(%[[GENERIC]]#0,
 //   CHECK-DAG:   check.expect_almost_eq(%[[GENERIC]]#1,
+
+// -----
+
+util.func public @use_in_generic(%arg0 : tensor<1x20x128x2x8xf32>) -> tensor<1x20x128x2x8xf32> {
+  %cst = arith.constant dense_resource<__elided__> : tensor<128x2x8xf32>
+  %cst_0 = arith.constant dense_resource<__elided__> : tensor<128x2x8xf32>
+  %cst_1 = arith.constant 2.500000e-01 : f32
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %1 = tensor.empty() : tensor<1x20x128x2x8xf32>
+  %2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} ins(%arg0: tensor<1x20x128x2x8xf32>) outs(%1 : tensor<1x20x128x2x8xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %6 = arith.mulf %in, %cst_1 : f32
+    linalg.yield %6 : f32
+  } -> tensor<1x20x128x2x8xf32>
+  %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} ins(%2, %cst_0, %cst : tensor<1x20x128x2x8xf32>, tensor<128x2x8xf32>, tensor<128x2x8xf32>) outs(%1 : tensor<1x20x128x2x8xf32>) {
+  ^bb0(%in: f32, %in_2: f32, %in_3: f32, %out: f32):
+    %6 = linalg.index 0 : index
+    %7 = linalg.index 1 : index
+    %8 = linalg.index 2 : index
+    %9 = linalg.index 3 : index
+    %10 = linalg.index 4 : index
+    %11 = affine.apply affine_map<()[s0, s1] -> (s0 + s1 * 20)>()[%7, %6]
+    %12 = arith.subi %c1, %9 : index
+    %extracted = tensor.extract %2[%c0, %11, %8, %12, %10] : tensor<1x20x128x2x8xf32>
+    %13 = arith.negf %extracted : f32
+    %14 = arith.cmpi eq, %12, %c1 : index
+    %15 = arith.select %14, %13, %extracted : f32
+    %16 = arith.mulf %15, %in_3 : f32
+    %17 = arith.mulf %in, %in_2 : f32
+    %18 = arith.addf %17, %16 : f32
+    linalg.yield %18 : f32
+  } -> tensor<1x20x128x2x8xf32>
+  util.return %3 : tensor<1x20x128x2x8xf32>
+}
+
+// These cannot be fused because %2 is an operand of %3 and used in its body.
+//
+// CHECK-LABEL: util.func public @use_in_generic(
+//       CHECK:   %[[GENERIC0:.+]] = linalg.generic
+//       CHECK:   %[[GENERIC1:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[GENERIC0]]
+//       CHECK:   util.return %[[GENERIC1]]
