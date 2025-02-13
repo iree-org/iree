@@ -45,7 +45,8 @@ void TensorDimTrackingRewriter::notifyOperationErased(Operation *op) {
 void TensorDimTrackingRewriter::notifyOperationInserted(Operation *op,
                                                         InsertPoint previous) {
   IRRewriter::Listener::notifyOperationInserted(op, previous);
-  if (isa<tensor::DimOp>(op))
+  auto dimOp = dyn_cast<tensor::DimOp>(op);
+  if (dimOp && isa<OpResult>(dimOp.getSource()))
     dimOps.insert(op);
 }
 
@@ -60,16 +61,21 @@ LogicalResult simplifyDimOps(RewriterBase &rewriter,
     std::optional<int64_t> idx = dimOp.getConstantIndex();
     if (!idx.has_value())
       continue;
+
+    if (isa<BlockArgument>(dimOp.getSource())) {
+      continue;
+    }
+
     // Only DimOps with ranked tensors are supported.
     auto tensorType =
         llvm::dyn_cast<RankedTensorType>(dimOp.getSource().getType());
     if (!tensorType)
       continue;
 
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(dimOp);
     if (!tensorType.isDynamicDim(*idx)) {
       // Rewrite static dimension with constant.
-      OpBuilder::InsertionGuard g(rewriter);
-      rewriter.setInsertionPoint(dimOp);
       int64_t size = tensorType.getShape()[*idx];
       rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(dimOp, size);
       continue;
