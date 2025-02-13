@@ -176,7 +176,6 @@ file(GLOB _ConversionPasses_SRCS
   "${TORCH_MLIR_ROOT_DIR}/lib/Conversion/TorchConversionToMLProgram/*.cpp"
   "${TORCH_MLIR_ROOT_DIR}/lib/Conversion/TorchToSCF/*.cpp"
   "${TORCH_MLIR_ROOT_DIR}/lib/Conversion/TorchToTensor/*.cpp"
-  "${TORCH_MLIR_ROOT_DIR}/lib/Conversion/TorchToTosa/*.cpp"
   "${TORCH_MLIR_ROOT_DIR}/lib/Conversion/TorchToTMTensor/*.cpp"
   "${TORCH_MLIR_ROOT_DIR}/lib/Conversion/Utils/*.cpp"
   "${TORCH_MLIR_ROOT_DIR}/lib/Dialect/TorchConversion/Transforms/*.cpp"
@@ -202,7 +201,6 @@ iree_cc_library(
     MLIRMathDialect
     MLIRMLProgramDialect
     MLIRSCFDialect
-    MLIRTosaDialect
 )
 
 iree_tablegen_library(
