@@ -219,6 +219,25 @@ module {
 
 // -----
 
+module {
+  func.func @elementwise_dynamic_dim_large(%11: tensor<?x512xf16>, %12: tensor<?x512xf16>) -> tensor<?x512xf16> {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant 0.000000e+00 : f32
+    %8 = tensor.dim %11, %c0 : tensor<?x512xf16>
+    %13 = tensor.empty(%8) : tensor<?x512xf16>
+    %15 = linalg.add ins(%11, %12 : tensor<?x512xf16>, tensor<?x512xf16>) outs(%13 : tensor<?x512xf16>) -> tensor<?x512xf16>
+    return %15 : tensor<?x512xf16>
+  }
+}
+
+// CHECK-LABEL: func.func @elementwise_dynamic_dim_large
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//       CHECK:   linalg.add {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 8]
+//  CHECK-SAME:     workgroup = [1, 512]
+
+// -----
+
 module @elementwise_unaligned {
   func.func @elementwise_unaligned(%11: tensor<180x180xf16>, %12: tensor<180x180xf16>) -> tensor<180x180xf16> {
     %cst = arith.constant 0.000000e+00 : f32
