@@ -32,7 +32,8 @@
 #x86_64_target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 32 : index,
-  target_triple = "x86_64-none-elf"
+  target_triple = "x86_64-none-elf",
+  cpu = "generic"
 }>
 
 // The target devices that the program will run on. We can compile and run with
@@ -45,15 +46,17 @@
 
 module @example attributes {hal.device.targets = [#cpu_target]} {
   func.func @mlp_invocation(%lhs: tensor<2x4xf32>, %rhs : tensor<4x8xf32>) -> tensor<2x8xf32> {
-    %lhs_3D = tosa.reshape %lhs {new_shape = array<i64 : 1, 2, 4>} : (tensor<2x4xf32>) -> tensor<1x2x4xf32>
-    %rhs_3D = tosa.reshape %rhs {new_shape = array<i64 : 1, 4, 8>} : (tensor<4x8xf32>) -> tensor<1x4x8xf32>
+    %lhs_shape = tosa.const_shape {value = dense<[1, 2, 4]> : tensor<3xindex>} : () -> !tosa.shape<3>
+    %rhs_shape = tosa.const_shape {value = dense<[1, 4, 8]> : tensor<3xindex>} : () -> !tosa.shape<3>
+    %lhs_3D = tosa.reshape %lhs, %lhs_shape : (tensor<2x4xf32>, !tosa.shape<3>) -> tensor<1x2x4xf32>
+    %rhs_3D = tosa.reshape %rhs, %rhs_shape : (tensor<4x8xf32>, !tosa.shape<3>) -> tensor<1x4x8xf32>
     %0 = tosa.matmul %lhs_3D, %rhs_3D : (tensor<1x2x4xf32>, tensor<1x4x8xf32>) -> tensor<1x2x8xf32>
     %1 = tosa.clamp %0 {
-        min_int = 0 : i64, max_int = 9223372036854775807 : i64,
-        min_fp = 0.0 : f32, max_fp = 3.4028235e+38 : f32}
+        min_val = 0.0 : f32, max_val = 3.4028235e+38 : f32}
         : (tensor<1x2x8xf32>) -> tensor<1x2x8xf32>
     %2 = tosa.negate %1 : (tensor<1x2x8xf32>) -> tensor<1x2x8xf32>
-    %3 = tosa.reshape %2 {new_shape = array<i64 : 2, 8>}  : (tensor<1x2x8xf32>) -> tensor<2x8xf32>
+    %result_shape = tosa.const_shape {value = dense<[2, 8]> : tensor<2xindex>} : () -> !tosa.shape<2>
+    %3 = tosa.reshape %2, %result_shape : (tensor<1x2x8xf32>, !tosa.shape<2>) -> tensor<2x8xf32>
     return %3 : tensor<2x8xf32>
   }
 }
