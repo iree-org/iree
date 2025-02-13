@@ -99,7 +99,6 @@ static bool predicateF32Cast(StringRef name,
 
 static bool predicateApprox(StringRef name,
                             IREE::HAL::ExecutableTargetAttr target) {
-  (void)target;                // Currently unused.
   if (clNativeMathPrecision) { // Legacy.
     if (name == math::ErfOp::getOperationName()) {
       // The legacy implementation had a bug: it always applied polynomial
@@ -124,6 +123,9 @@ static bool predicateApprox(StringRef name,
   StringRef expm1 = math::ExpM1Op::getOperationName();
   StringRef cbrt = math::CbrtOp::getOperationName();
   StringRef erf = math::ErfOp::getOperationName();
+  if (isROCMBackend(target) && name == erf) {
+    return false;
+  }
   return llvm::is_contained({atan, atan2, tanh, log, log2, log1p, erf, asin,
                              acos, exp, expm1, cbrt, sin, cos},
                             name);

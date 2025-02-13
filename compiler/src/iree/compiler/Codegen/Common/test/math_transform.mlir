@@ -55,3 +55,20 @@ func.func @rewrite_erf(%arg0: f16) -> f16 attributes {
   %0 = math.erf %arg0 : f16
   return %0 : f16
 }
+
+// -----
+
+// CHECK-LABEL: @no_approx_erf_on_rocm
+func.func @no_approx_erf_on_rocm(%arg0: f16) -> f16 attributes {
+  hal.executable.target =  #hal.executable.target<"rocm", "rocm-hsaco-fb", {}>
+} {
+  // On ROCm, we want to use the native device library function, so math.erf
+  // should not get rewritten. It's OK for f16 to still get casted to f32, as
+  // the device library function for f16 is casting to f32 anyway.
+  // CHECK:         math.erf
+  // CHECK-NOT:     math.exp
+  // CHECK-NOT:     math.log
+  // CHECK-NOT:     math.fma
+  %0 = math.erf %arg0 : f16
+  return %0 : f16
+}
