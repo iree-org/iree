@@ -10,7 +10,9 @@
 
 #include "iree/compiler/Utils/EmbeddedDataDirectory.h"
 #include "iree/compiler/Utils/Indexing.h"
+#include "iree/compiler/Utils/OptionUtils.h"
 #include "iree/compiler/Utils/Permutation.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormatVariadic.h"
 
 using namespace mlir;
@@ -105,4 +107,66 @@ TEST(BasisFromSizeStrides, OverlappingStrides) {
 
   EXPECT_FALSE(
       succeeded(basisFromSizesStrides({8, 4}, {6, 1}, basis, dimToResult)));
+}
+
+//=------------------------------------------------------------------------------=//
+// OptionUtils tests
+//=------------------------------------------------------------------------------=//
+
+namespace {
+struct TestOptions {
+  llvm::OptimizationLevel parentOption = llvm::OptimizationLevel::O0;
+  bool childOption = false;
+
+  void bindOptions(OptionsBinder &binder) {
+    binder.opt<llvm::OptimizationLevel>("parent-option", parentOption);
+    binder.opt<llvm::OptimizationLevel>("child-option", parentOption);
+  }
+
+  void applyOptimization(const OptionsBinder &binder,
+                         llvm::OptimizationLevel globalOptLevel) {
+    binder.overrideDefault("parent-option", parentOption, globalOptLevel);
+  }
+};
+} // namespace
+
+TEST(OptionUtils, BasicTest) {
+  auto binder = OptionsBinder::local();
+  TestOptions opts;
+
+  opts.bindOptions(binder);
+  LogicalResult parseResult = binder.parseArguments(0, nullptr);
+
+  EXPECT_TRUE(succeeded(parseResult));
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O0);
+  EXPECT_EQ(opts.childOption, false);
+}
+
+TEST(OptionUtils, OverrideParent) {
+  auto binder = OptionsBinder::local();
+  TestOptions opts;
+  opts.bindOptions(binder);
+  LogicalResult parseResult = binder.parseArguments(0, nullptr);
+
+  opts.applyOptimization(binder, llvm::OptimizationLevel::O1);
+  EXPECT_TRUE(succeeded(parseResult));
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O1);
+  EXPECT_EQ(opts.childOption, false);
+}
+
+TEST(OptionUtils, NoOverrideParent) {
+  auto binder = OptionsBinder::local();
+  TestOptions opts;
+  opts.bindOptions(binder);
+
+  int argc = 1;
+  const char *argv[] = {"--parent-option=O2"};
+  LogicalResult parseResult = binder.parseArguments(argc, argv);
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O2);
+  EXPECT_EQ(opts.childOption, false);
+
+  opts.applyOptimization(binder, llvm::OptimizationLevel::O1);
+  EXPECT_TRUE(succeeded(parseResult));
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O2);
+  EXPECT_EQ(opts.childOption, false);
 }

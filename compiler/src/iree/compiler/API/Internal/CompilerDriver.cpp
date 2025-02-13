@@ -234,6 +234,7 @@ struct GlobalInit {
   // Our session options can optionally be bound to the global command-line
   // environment. If that is not the case, then these will be nullptr, and
   // they should be default initialized at the session level.
+  GlobalPipelineOptions *clGlobalPipelineOptions = nullptr;
   PluginManagerOptions *clPluginManagerOptions = nullptr;
   BindingOptions *clBindingOptions = nullptr;
   InputDialectOptions *clInputOptions = nullptr;
@@ -278,6 +279,7 @@ void GlobalInit::registerCommandLineOptions() {
   mlir::tracing::DebugConfig::registerCLOptions();
 
   // Bind session options to the command line environment.
+  clGlobalPipelineOptions = &GlobalPipelineOptions::FromFlags::get();
   clPluginManagerOptions = &PluginManagerOptions::FromFlags::get();
   clBindingOptions = &BindingOptions::FromFlags::get();
   clInputOptions = &InputDialectOptions::FromFlags::get();
@@ -323,6 +325,7 @@ struct Session {
     if (failed(binder.parseArguments(argc, argv, callback))) {
       return new Error(std::move(errorMessage));
     }
+
     return nullptr;
   }
 
@@ -387,6 +390,7 @@ struct Session {
   bool pluginsActivated = false;
   LogicalResult pluginActivationStatus{failure()};
 
+  GlobalPipelineOptions pipelineOptions;
   BindingOptions bindingOptions;
   InputDialectOptions inputOptions;
   PreprocessingOptions preprocessingOptions;
@@ -410,6 +414,7 @@ Session::Session(GlobalInit &globalInit)
   // Bootstrap session options from the cl environment, if enabled.
   if (globalInit.usesCommandLine) {
     debugConfig = mlir::tracing::DebugConfig::createFromCLOptions();
+    pipelineOptions = *globalInit.clGlobalPipelineOptions;
     pluginManagerOptions = *globalInit.clPluginManagerOptions;
     bindingOptions = *globalInit.clBindingOptions;
     inputOptions = *globalInit.clInputOptions;
@@ -430,6 +435,7 @@ Session::Session(GlobalInit &globalInit)
 
   // Register each options struct with the binder so we can manipulate
   // mnemonically via the API.
+  pipelineOptions.bindOptions(binder);
   bindingOptions.bindOptions(binder);
   preprocessingOptions.bindOptions(binder);
   inputOptions.bindOptions(binder);
