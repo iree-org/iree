@@ -50,8 +50,6 @@ pdl.pattern @mlp : benefit(1) {
   %lhs = pdl.operand : %lhs_type
   %rhs = pdl.operand : %rhs_type
   %matmul_type = pdl.type
-  %min_int = pdl.attribute = 0 : i64
-  %max_int = pdl.attribute
   %min_fp = pdl.attribute = 0.0 : f32
   %max_fp = pdl.attribute
   %matmul = pdl.operation "tosa.matmul"(%lhs, %rhs : !pdl.value, !pdl.value)
@@ -63,8 +61,7 @@ pdl.pattern @mlp : benefit(1) {
   %matmul_result = pdl.result 0 of %matmul
   %relu_type = pdl.type
   %relu = pdl.operation "tosa.clamp"(%matmul_result : !pdl.value) {
-      "min_int" = %min_int, "max_int" = %max_int,
-      "min_fp" = %min_fp, "max_fp" = %max_fp}
+      "min_val" = %min_fp, "max_val" = %max_fp}
       -> (%relu_type : !pdl.type)
 
   pdl.rewrite %matmul {
