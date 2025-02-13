@@ -1869,6 +1869,61 @@ def Stream_AsyncAllocaOp : Stream_Op<"async.alloca", [
   let hasCanonicalizer = 1;
 }
 
+
+def Stream_ResourceAddRefOp : Stream_Op<"async.resource.add_ref"> {
+  let summary = [{inserts ref counting for a resource}];
+  let description = [{
+    During whole-progam analysis, this op reference counts a resource
+    and propogates through the program.
+  }];
+
+  let arguments = (ins
+    Stream_AnyStreamResource:$resource,
+    ConfinedAttr<I64Attr, [IntPositive]>:$count
+  );
+
+  let assemblyFormat = [{
+    $resource attr-dict `:` type($resource)
+  }];
+
+}
+
+def Stream_ResourceDecRefOp : Stream_Op<"async.resource.dec_ref"> {
+  let summary = [{decrements ref counting for a resource}];
+  let description = [{
+    During whole-progam analysis, this op reference counts a resource
+    via tracking resource liveness and propogates through the program.
+  }];
+
+  let arguments = (ins
+    Stream_AnyStreamResource:$resource,
+    ConfinedAttr<I64Attr, [IntPositive]>:$count
+  );
+
+  let assemblyFormat = [{
+    $resource attr-dict `:` type($resource)
+  }];
+
+}
+
+
+def Stream_ResourceLastUseOp : Stream_Op<"async.resource.last_use"> {
+  let summary = [{Last-use witness op}];
+  let description = [{
+    Used to mark last-use witness op that turns into dealloca when
+    refcount drops to 0
+  }];
+
+  let arguments = (ins
+    Stream_AnyStreamResource:$resource
+  );
+
+  let assemblyFormat = [{
+    $resource attr-dict `:` type($resource)
+  }];
+
+}
+
 def Stream_AsyncConstantOp : Stream_PureOp<"async.constant", [
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
