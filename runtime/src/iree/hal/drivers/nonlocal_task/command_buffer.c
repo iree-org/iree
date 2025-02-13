@@ -21,6 +21,10 @@
 #include "iree/task/submission.h"
 #include "iree/task/task.h"
 
+#include "iree/hal/nonlocal/buffer.h"
+
+#include "iree/hal/nonlocal/debug.h"
+
 //===----------------------------------------------------------------------===//
 // iree_hal_nl_task_command_buffer_t
 //===----------------------------------------------------------------------===//
@@ -546,6 +550,67 @@ static iree_status_t iree_hal_nl_task_command_buffer_fill_buffer(
 // iree_hal_command_buffer_update_buffer
 //===----------------------------------------------------------------------===//
 
+static iree_status_t write_buffer(
+    const iree_hal_buffer_t* target_buffer, const iree_device_size_t target_offset,
+    const uint8_t source_buffer[],
+    const iree_device_size_t data_length) {
+  iree_status_t status = iree_ok_status();
+
+  if(iree_all_bits_set(iree_hal_buffer_memory_type(target_buffer),
+                                           IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+    nl_mem_copy_in((void *)((unsigned char *)iree_hal_nl_buffer_device_pointer(target_buffer) + target_offset), source_buffer, data_length);
+  } else {
+    memcpy((void *)((unsigned char *)iree_hal_nl_buffer_host_pointer(target_buffer) + target_offset), source_buffer, data_length);
+ }
+
+  return status;
+}
+
+static iree_status_t copy_buffer(
+    const iree_hal_buffer_t* source_buffer, const iree_device_size_t source_offset,
+    const iree_hal_buffer_t* target_buffer, const iree_device_size_t target_offset,
+    const iree_device_size_t data_length) {
+  void *source_ptr = NULL;
+  void *target_ptr = NULL;
+  int source_target_device = 0;
+  iree_status_t status = iree_ok_status();
+
+  if(iree_all_bits_set(iree_hal_buffer_memory_type(source_buffer),
+                                           IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+    source_ptr = (void *)((unsigned char *) iree_hal_nl_buffer_device_pointer(source_buffer) + source_offset);
+    source_target_device |= 1;
+  } else {
+    source_ptr = (void *)((unsigned char *) iree_hal_nl_buffer_host_pointer(source_buffer) + source_offset);
+  }
+
+  if(iree_all_bits_set(iree_hal_buffer_memory_type(target_buffer),
+                                           IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+    target_ptr = (void *)((unsigned char *)iree_hal_nl_buffer_device_pointer(target_buffer) + target_offset);
+    source_target_device |= 2;
+  } else {
+    target_ptr = (void *)((unsigned char *)iree_hal_nl_buffer_host_pointer(target_buffer) + target_offset);
+  }
+
+//  NL_TRACE_EVENT_BEGIN("copy buffer src_dev=%d target_dev=%d size %zu", 0, 0, source_target_device & 1, source_target_device & 2, target_ref.length);
+  switch(source_target_device) {
+    case 1:
+      nl_mem_copy_out(target_ptr, source_ptr, data_length);
+      break;
+    case 2:
+      nl_mem_copy_in(target_ptr, source_ptr, data_length);
+      break;
+    case 3:
+      nl_mem_copy(target_ptr, source_ptr, data_length);
+      break;
+    default:
+      memcpy(target_ptr, source_ptr, data_length);
+      break;
+  }
+//  NL_TRACE_EVENT_END("copy buffer src_dev=%d target_dev=%d size %zu", 0, 0, source_target_device & 1, source_target_device & 2, target_ref.length);
+
+  return status;
+}
+
 typedef struct iree_hal_nl_task_cmd_update_buffer_t {
   iree_task_call_t task;
   iree_hal_buffer_ref_t target_ref;
@@ -559,7 +624,7 @@ static iree_status_t iree_hal_nl_task_cmd_update_buffer(
       (const iree_hal_nl_task_cmd_update_buffer_t*)user_context;
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status =
-      iree_hal_buffer_map_write(cmd->target_ref.buffer, cmd->target_ref.offset,
+      write_buffer(cmd->target_ref.buffer, cmd->target_ref.offset,
                                 cmd->source_buffer, cmd->target_ref.length);
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -626,7 +691,7 @@ static iree_status_t iree_hal_nl_task_cmd_copy_tile(
       iree_min(length_per_slice, remaining_length);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)slice_length);
 
-  iree_status_t status = iree_hal_buffer_map_copy(
+  iree_status_t status = copy_buffer(
       cmd->source_ref.buffer, cmd->source_ref.offset + slice_offset,
       cmd->target_ref.buffer, cmd->target_ref.offset + slice_offset,
       slice_length);
@@ -857,15 +922,12 @@ static iree_status_t iree_hal_nl_task_command_buffer_build_dispatch(
   cmd_ptr += bindings.count * sizeof(*binding_lengths);
   for (iree_host_size_t i = 0; i < bindings.count; ++i) {
     // TODO(benvanik): track mapping so we can properly map/unmap/flush/etc.
-    iree_hal_buffer_mapping_t buffer_mapping = {{0}};
     if (IREE_LIKELY(bindings.values[i].buffer)) {
       // TODO(benvanik): batch insert by getting the resources in their own
       // list.
       const iree_hal_buffer_ref_t binding = bindings.values[i];
-      IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-          binding.buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
-          IREE_HAL_MEMORY_ACCESS_ANY, binding.offset, binding.length,
-          &buffer_mapping));
+      binding_ptrs[i] = (void *)((unsigned char *) iree_hal_nl_buffer_device_pointer(binding.buffer) + binding.offset);
+      binding_lengths[i] = binding.length;
     } else {
       return iree_make_status(
           IREE_STATUS_FAILED_PRECONDITION,
@@ -873,8 +935,7 @@ static iree_status_t iree_hal_nl_task_command_buffer_build_dispatch(
           " is NULL; all bindings must have a valid pointer",
           i);
     }
-    binding_ptrs[i] = buffer_mapping.contents.data;
-    binding_lengths[i] = buffer_mapping.contents.data_length;
+
   }
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert_strided(
       command_buffer->resource_set, bindings.count, bindings.values,
