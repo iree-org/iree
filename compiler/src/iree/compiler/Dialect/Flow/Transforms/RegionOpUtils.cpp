@@ -266,24 +266,23 @@ reifyDynamicResultDimsImpl(OpBuilder &b, Value value,
   // Value is an OpResult.
   Operation *op = value.getDefiningOp();
   OpResult opResult = llvm::cast<OpResult>(value);
-  b.setInsertionPoint(op);
 
-  // Case 3: Value is tied. Reify the dimensions of the tied operand.
-  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op);
-  if (tiedOp) {
-    Value tiedOperand = tiedOp.getTiedResultOperand(value);
-    if (tiedOperand && tiedOperand.getType() == value.getType())
-      return reifyDynamicResultDimsImpl(b, tiedOperand, dynamicDims,
-                                        createTensorDimOps);
-  }
-
-  // Case 4: Query ShapeAwareOpInterface.
+  // Case 3: Query ShapeAwareOpInterface.
   auto shapeAwareOp = dyn_cast<IREE::Util::ShapeAwareOpInterface>(op);
   if (shapeAwareOp) {
     ValueRange dims =
         shapeAwareOp.getResultDynamicDims(opResult.getResultNumber());
     dynamicDims.append(dims.begin(), dims.end());
     return success();
+  }
+
+  // Case 4: Value is tied. Reify the dimensions of the tied operand.
+  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op);
+  if (tiedOp) {
+    Value tiedOperand = tiedOp.getTiedResultOperand(value);
+    if (tiedOperand && tiedOperand.getType() == value.getType())
+      return reifyDynamicResultDimsImpl(b, tiedOperand, dynamicDims,
+                                        /*createTensorDimOps=*/true);
   }
 
   // Case 5: Query ReifyRankedShapedTypeOpInterface.
@@ -308,8 +307,14 @@ reifyDynamicResultDimsImpl(OpBuilder &b, Value value,
 }
 
 /// Reify the dynamic dimensions of the given value.
+/// Deprecated. Use `getOptimizedDynamicResultDims` instead.
 LogicalResult reifyDynamicResultDims(OpBuilder &b, Value value,
                                      SmallVectorImpl<Value> &dynamicDims) {
+
+  OpBuilder::InsertionGuard g(b);
+  if (auto op = value.getDefiningOp()) {
+    b.setInsertionPoint(op);
+  }
   return reifyDynamicResultDimsImpl(b, value, dynamicDims,
                                     /*createTensorDimOps=*/true);
 }
@@ -473,7 +478,7 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
         rewriter.setInsertionPoint(target);
         SmallVector<Value> &dims =
             dispatchOpNewResultsDynamicDims.emplace_back();
-        if (failed(reifyDynamicResultDims(rewriter, result, dims))) {
+        if (failed(getOptimizedDynamicResultDims(rewriter, result, dims))) {
           return target->emitOpError(
               "failed to reify dynamic dims of result to be yielded from "
               "dispatch region");
@@ -554,9 +559,10 @@ moveFollowingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
   for (auto [index, result] : llvm::enumerate(target->getResults())) {
     replacedValues.push_back(result);
     yieldedResults.push_back(clonedTarget->getResult(index));
-    rewriter.setInsertionPoint(target);
+    OpBuilder::InsertionGuard g1(rewriter);
+    rewriter.setInsertionPoint(regionOp);
     SmallVector<Value> &dims = dispatchOpNewResultsDynamicDims.emplace_back();
-    if (failed(reifyDynamicResultDims(rewriter, result, dims))) {
+    if (failed(getOptimizedDynamicResultDims(rewriter, result, dims))) {
       return target->emitOpError(
           "failed to reify dynamic dims of result to be yielded from "
           "dispatch region");

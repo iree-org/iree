@@ -692,7 +692,12 @@ isContractionOpSequence(Value yielded) {
 /// Recognize an operation that is horizontally fused contraction.
 /// TODO: The logic below is quite convoluted. Might be better
 /// off having a dedicated operation for this.
-bool isaHorizontallyFusedContraction(linalg::LinalgOp linalgOp) {
+bool isaHorizontallyFusedContraction(Operation *op) {
+  auto linalgOp = dyn_cast_or_null<linalg::GenericOp>(op);
+  if (!linalgOp) {
+    return false;
+  }
+
   if (linalgOp->getNumResults() == 1) {
     return false;
   }

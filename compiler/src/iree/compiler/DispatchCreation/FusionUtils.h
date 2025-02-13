@@ -10,7 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "mlir/IR/Dominance.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/IR/PatternMatch.h"
 
 namespace mlir::iree_compiler::DispatchCreation {
 
@@ -18,5 +20,12 @@ namespace mlir::iree_compiler::DispatchCreation {
 /// using elementwise op fusion transformation.
 bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *operand,
                                 bool fuseMultiReduction);
+
+/// Move the definition of operands of `operations` before `insertionPoint`.
+LogicalResult moveOperandDefs(RewriterBase &rewriter,
+                              ArrayRef<Operation *> operations,
+                              Operation *insertionPoint,
+                              DominanceInfo &dominanceInfo,
+                              ArrayRef<Operation *> ignoreOperations = {});
 
 } // namespace mlir::iree_compiler::DispatchCreation
