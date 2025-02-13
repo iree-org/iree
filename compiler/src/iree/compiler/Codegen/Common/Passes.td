@@ -80,6 +80,14 @@ def ConvertBf16ToUInt16BuffersPass :
   let summary = "Convert BF16 buffer ops and conversions to simulated behavior with uint16.";
 }
 
+def ConvertUnsupportedFloatArithPass
+    : InterfacePass<"iree-convert-unsupported-float-arith",
+                    "mlir::FunctionOpInterface"> {
+  let summary = "Convert arith operations on unsupported(source types) float "
+                "types to the target type. Populates the source and target "
+                "based on the target architecture.";
+}
+
 def ConvertToDestinationPassingStylePass :
     InterfacePass<"iree-codegen-convert-to-destination-passing-style", "mlir::FunctionOpInterface"> {
   let summary =

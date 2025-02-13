@@ -1129,6 +1129,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
 
   if (forROCDL) {
     // convert to ROCDL.
+    funcPassManager.addPass(createConvertUnsupportedFloatArithPass);
     modulePassManager.addPass(createConvertToROCDLPass());
     modulePassManager.addNestedPass<LLVM::LLVMFuncOp>(
         createROCDLAnnotateKernelForTranslationPass());

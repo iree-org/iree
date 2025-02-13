@@ -91,6 +91,7 @@ iree_cc_library(
     "ConvertBf16ArithToF32.cpp"
     "ConvertBf16ToUInt16Buffers.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
+    "ConvertUnsupportedFloatArithPass.cpp"
     "ConvolutionToIGEMM.cpp"
     "DecomposeAffineOpsPass.cpp"
     "DecomposeConvolutionToLowerDimOps.cpp"
@@ -162,6 +163,8 @@ iree_cc_library(
     ::PassesIncGen
     IREELinalgTransformDialect
     LLVMSupport
+    MLIRAMDGPUDialect
+    MLIRAMDGPUUtils
     MLIRAffineAnalysis
     MLIRAffineDialect
     MLIRAffineTransforms
