@@ -3153,10 +3153,10 @@ def VM_CastSI32F32Op :
   let hasFolder = 1;
 }
 
-def VM_CastUI32F32Op :
-    VM_ConversionOp<I32, F32, "cast.ui32.f32", VM_OPC_CastUI32F32,
+def VM_CastSI64F32Op :
+    VM_ConversionOp<I64, F32, "cast.si64.f32", VM_OPC_CastSI64F32,
                     [VM_ExtF32]> {
-  let summary = [{cast from an unsigned integer to a float-point value}];
+  let summary = [{cast from a signed integer to a float-point value}];
   let hasFolder = 1;
 }
 
@@ -3167,10 +3167,10 @@ def VM_CastSI64F64Op :
   let hasFolder = 1;
 }
 
-def VM_CastSI64F32Op :
-    VM_ConversionOp<I64, F32, "cast.si64.f32", VM_OPC_CastSI64F32,
+def VM_CastUI32F32Op :
+    VM_ConversionOp<I32, F32, "cast.ui32.f32", VM_OPC_CastUI32F32,
                     [VM_ExtF32]> {
-  let summary = [{cast from a signed integer to a float-point value}];
+  let summary = [{cast from an unsigned integer to a float-point value}];
   let hasFolder = 1;
 }
 
@@ -3180,7 +3180,6 @@ def VM_CastUI64F32Op :
   let summary = [{cast from an unsigned integer to a float-point value}];
   let hasFolder = 1;
 }
-
 
 def VM_CastUI64F64Op :
     VM_ConversionOp<I64, F64, "cast.ui64.f64", VM_OPC_CastUI64F64,

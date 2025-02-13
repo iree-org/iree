@@ -1693,7 +1693,7 @@ OpFoldResult CastSI64F32Op::fold(FoldAdaptor operands) {
       });
 }
 
-OpFoldResult CastUI64F32Op::fold(FoldAdaptor operands) {
+OpFoldResult CastUI32F32Op::fold(FoldAdaptor operands) {
   return constFoldCastOp<IntegerAttr, FloatAttr>(
       Float32Type::get(getContext()), operands.getOperand(),
       [&](const APInt &a) {
@@ -1703,7 +1703,7 @@ OpFoldResult CastUI64F32Op::fold(FoldAdaptor operands) {
       });
 }
 
-OpFoldResult CastUI32F32Op::fold(FoldAdaptor operands) {
+OpFoldResult CastUI64F32Op::fold(FoldAdaptor operands) {
   return constFoldCastOp<IntegerAttr, FloatAttr>(
       Float32Type::get(getContext()), operands.getOperand(),
       [&](const APInt &a) {

@@ -844,7 +844,7 @@ typedef enum {
     OPC(0x3A, CastF32SI64) \
     OPC(0x3B, CastF32UI64) \
     OPC(0x3C, CastSI64F32) \
-    RSV(0x3D) \
+    OPC(0x3D, CastUI64F32) \
     RSV(0x3E) \
     RSV(0x3F) \
     RSV(0x40) \
