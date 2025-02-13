@@ -11,6 +11,7 @@
 #include "compiler/src/iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 
 namespace mlir::iree_compiler::DispatchCreation {
 
@@ -43,13 +44,20 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
     }
   }
 
-  // If the generic op is "just" copy, then fuse always.
-  Block &body = producerOp->getRegion(0).front();
-  if (std::begin(body)->hasTrait<OpTrait::IsTerminator>())
-    return true;
-  if (llvm::all_of(body.getArguments(),
-                   [](BlockArgument arg) { return arg.use_empty(); })) {
+  auto shouldAlwaysFuse = [](Operation *op) {
+    // If the generic op is "just" copy, then fuse always.
+    Block &body = op->getRegion(0).front();
+    if (std::begin(body)->hasTrait<OpTrait::IsTerminator>()) {
+      return true;
+    }
     // The operands aren't used, its just an `linalg.index` op.
+    if (llvm::all_of(body.getArguments(),
+                     [](BlockArgument arg) { return arg.use_empty(); })) {
+      return true;
+    }
+    return false;
+  };
+  if (shouldAlwaysFuse(producerOp) || shouldAlwaysFuse(consumerOp)) {
     return true;
   }
 
@@ -65,7 +73,9 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   // (except for bit-extend ops). If the consumer has only one use, then this
   // fusion is fine since cloning wont result in redundant computation of the
   // producer. (Also note that the producer is always an elementwise operation).
-  if (IREE::LinalgExt::isBitExtendOp(consumerOp) && !consumerOp->hasOneUse()) {
+  if (IREE::LinalgExt::isBitExtendOp(consumerOp) ||
+      (!consumerOp->hasOneUse() ||
+       IREE::LinalgExt::isBitTruncateOp(producerOp))) {
     return false;
   }
 
