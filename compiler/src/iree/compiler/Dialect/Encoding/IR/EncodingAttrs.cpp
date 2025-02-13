@@ -119,7 +119,7 @@ EncodingAttr EncodingAttr::clone(AffineMap bcastMap) {
              AffineMapAttr::get(bcastMap), getRoundDimsTo(), getLayouts());
 }
 
-EncodingAttr EncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) {
+Attribute EncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();
   return get(ctx, getOperandIndex(), getOpType(), getElementTypes(),
              /*user_indexing_maps=*/ArrayAttr(),
@@ -277,6 +277,11 @@ bool isNarrowNResult(EncodingAttr encoding) {
   return IREE::Encoding::getMatmulNarrowDim(encoding).isN();
 }
 
+EncodingLayoutAttrInterface
+getEncodingLayoutAttrInterface(RankedTensorType type) {
+  return dyn_cast_or_null<EncodingLayoutAttrInterface>(type.getEncoding());
+}
+
 EncodingAttr getEncodingAttr(RankedTensorType type) {
   return dyn_cast_or_null<EncodingAttr>(type.getEncoding());
 }
@@ -349,8 +354,39 @@ Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
 }
 
 //===---------------------------------------------------------------------===//
-// Encoding specialization attributes, which are mainly for testing purpose.
+// Encoding attributes that are mainly for testing purpose.
 //===---------------------------------------------------------------------===//
+
+Attribute TestingEncodingAttr::parse(AsmParser &p, Type type) {
+  if (failed(p.parseLess())) {
+    return {};
+  }
+  ArrayAttr layouts;
+  OptionalParseResult parseResult = p.parseOptionalAttribute(layouts);
+  if (parseResult.has_value() && parseResult.value().failed()) {
+    p.emitError(p.getNameLoc()) << "expected array attribute";
+    return {};
+  }
+  if (failed(p.parseGreater())) {
+    return {};
+  }
+  return get(p.getContext(), layouts);
+}
+
+void TestingEncodingAttr::print(AsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << "<";
+  if (auto layouts = getLayouts()) {
+    p.printAttribute(layouts);
+  }
+  os << ">";
+}
+
+Attribute
+TestingEncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
+  MLIRContext *ctx = getContext();
+  return TestingEncodingAttr::get(ctx, ArrayAttr::get(ctx, layouts));
+}
 
 Attribute UnspecializedEncodingAttr::parse(AsmParser &p, Type type) {
   if (failed(p.parseLess())) {
