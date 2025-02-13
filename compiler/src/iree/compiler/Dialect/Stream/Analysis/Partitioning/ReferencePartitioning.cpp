@@ -169,8 +169,7 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
 
     // Synchronizing operations should join with their producers if the producer
     // is streamable.
-    if (dyn_cast<IREE::Stream::AsyncBarrierOp>(op) ||
-        dyn_cast<IREE::Stream::AsyncTransferOp>(op)) {
+    if (dyn_cast<IREE::Stream::AsyncTransferOp>(op)) {
       auto producer = op.getOperand(0).getDefiningOp();
       auto streamable =
           dyn_cast_or_null<IREE::Stream::StreamableOpInterface>(producer);

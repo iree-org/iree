@@ -2465,8 +2465,6 @@ void AsyncCollectiveOp::getAsyncAccessRanges(
 // stream.async.barrier
 //===----------------------------------------------------------------------===//
 
-bool AsyncBarrierOp::isMetadata() { return true; }
-
 LogicalResult AsyncBarrierOp::verify() { return success(); }
 
 Value AsyncBarrierOp::getTiedResult(unsigned resultIndex) {

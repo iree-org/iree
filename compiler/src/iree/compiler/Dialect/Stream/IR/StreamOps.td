@@ -2294,9 +2294,6 @@ def Stream_AsyncBarrierOp : Stream_Op<"async.barrier", [
   AllTypesMatch<["source", "result"]>,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
-  DeclareOpInterfaceMethods<Stream_StreamableOp, [
-    "isMetadata",
-  ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResult",
