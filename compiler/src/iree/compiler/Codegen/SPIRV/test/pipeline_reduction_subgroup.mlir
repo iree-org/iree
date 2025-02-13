@@ -89,3 +89,49 @@ hal.executable private @subgroup_reduce {
 
 // NOSHUFFLE-LABEL: spirv.func @subgroup_reduce()
 // NOSHUFFLE-NOT: spirv.GroupNonUniformShuffleXor
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable public @softmax{
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
+    hal.executable.export public @softmax ordinal(0) layout(#hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @softmax() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %cst_0 = arith.constant 1.000000e+00 : f32
+        %c786432 = arith.constant 786432 : index
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c786432) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<1536x128xf32>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<1536x128xf32>>
+        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1536, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1536x128xf32>> -> tensor<1536x128xf32>
+        %3 = tensor.empty() : tensor<1536xf32>
+        %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<1536xf32>) -> tensor<1536xf32>
+        %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%2 : tensor<1536x128xf32>) outs(%4 : tensor<1536xf32>) {
+        ^bb0(%in: f32, %out: f32):
+          %8 = arith.addf %in, %out : f32
+          linalg.yield %8 : f32
+        } -> tensor<1536xf32>
+        %6 = tensor.empty() : tensor<1536x128xf32>
+        %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%2, %5 : tensor<1536x128xf32>, tensor<1536xf32>) outs(%6 : tensor<1536x128xf32>) {
+        ^bb0(%in: f32, %in_1: f32, %out: f32):
+          %8 = arith.divf %cst_0, %in_1 : f32
+          %9 = arith.mulf %in, %8 : f32
+          linalg.yield %9 : f32
+        } -> tensor<1536x128xf32>
+        flow.dispatch.tensor.store %7, %1, offsets = [0, 0], sizes = [1536, 128], strides = [1, 1] : tensor<1536x128xf32> -> !flow.dispatch.tensor<writeonly:tensor<1536x128xf32>>
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: spirv.func @softmax()
+//       CHECK:   %{{.*}} = spirv.FAdd {{.*}} : vector<4xf32>

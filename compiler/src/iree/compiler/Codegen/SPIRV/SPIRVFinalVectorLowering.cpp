@@ -17,6 +17,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
@@ -48,7 +49,7 @@ class SPIRVFinalVectorLoweringPass final
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     // vector.gather lowering patterns target scf ops.
-    registry.insert<scf::SCFDialect, vector::VectorDialect>();
+    registry.insert<scf::SCFDialect, vector::VectorDialect, ub::UBDialect>();
   }
 
   void runOnOperation() override {
@@ -84,6 +85,7 @@ public:
       vector::populateVectorGatherLoweringPatterns(patterns);
       vector::populateVectorMaskOpLoweringPatterns(patterns);
       vector::CreateMaskOp::getCanonicalizationPatterns(patterns, context);
+      vector::populateVectorShapeCastLoweringPatterns(patterns);
       if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }

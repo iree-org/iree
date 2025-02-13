@@ -129,6 +129,7 @@ iree_cc_library(
     MLIRTransformDialect
     MLIRTransformUtils
     MLIRTransforms
+    MLIRUBDialect
     MLIRUBToSPIRV
     MLIRVectorDialect
     MLIRVectorInterfaces
