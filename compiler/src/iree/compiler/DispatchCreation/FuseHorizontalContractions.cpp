@@ -254,15 +254,10 @@ static std::optional<SmallVector<Operation *>> getHorizontalFusionGroupMembers(
   return contractionOps;
 }
 
-template <typename V, typename R>
-static void appendRange(V &vector, R &&range) {
-  vector.append(range.begin(), range.end());
-}
-
 /// Permute the indexing maps of the operation marked for horizontal
 /// fusion to make sure all the LHS operands of the horizontally fused
 /// ops have the same indexing map.
-LogicalResult
+static LogicalResult
 permuteIndexingMapsToMatchSeedLhs(RewriterBase &rewriter,
                                   AffineMap seedLhsIndexingMap,
                                   ArrayRef<utils::IteratorType> iteratorTypes,
@@ -377,30 +372,30 @@ fuseContractionsHorizontally(RewriterBase &rewriter, Location loc,
 
     // Append the RHS operands;
     SmallVector<OpOperand *> ins = linalgOp.getDpsInputOperands();
-    appendRange(
+    llvm::append_range(
         fusedIns,
         llvm::map_range(ArrayRef<OpOperand *>(ins).drop_front(),
                         [](OpOperand *operand) { return operand->get(); }));
 
     // Append the Outs operands.
-    appendRange(fusedOuts, llvm::map_range(linalgOp.getDpsInitsMutable(),
-                                           [](OpOperand &operand) {
-                                             return operand.get();
-                                           }));
+    llvm::append_range(fusedOuts, llvm::map_range(linalgOp.getDpsInitsMutable(),
+                                                  [](OpOperand &operand) {
+                                                    return operand.get();
+                                                  }));
 
     // Append the result types.
     fusedResultTypes.append(linalgOp->result_type_begin(),
                             linalgOp->result_type_end());
 
     // Append the rhs indexing maps.
-    appendRange(fusedInsIndexingMaps,
-                ArrayRef<AffineMap>(opIndexingMaps)
-                    .slice(1, linalgOp.getNumDpsInputs() - 1));
+    llvm::append_range(fusedInsIndexingMaps,
+                       ArrayRef<AffineMap>(opIndexingMaps)
+                           .slice(1, linalgOp.getNumDpsInputs() - 1));
 
     // Append the outs indexing maps.
-    appendRange(fusedOutsIndexingMaps,
-                ArrayRef<AffineMap>(opIndexingMaps)
-                    .drop_front(linalgOp.getNumDpsInputs()));
+    llvm::append_range(fusedOutsIndexingMaps,
+                       ArrayRef<AffineMap>(opIndexingMaps)
+                           .drop_front(linalgOp.getNumDpsInputs()));
   }
 
   SmallVector<AffineMap> fusedIndexingMaps = std::move(fusedInsIndexingMaps);
@@ -420,13 +415,13 @@ fuseContractionsHorizontally(RewriterBase &rewriter, Location loc,
     auto linalgOp = cast<linalg::LinalgOp>(op);
     Block *body = linalgOp.getBlock();
     SmallVector<Value> replacements = {fusedBody->getArgument(0)};
-    appendRange(
+    llvm::append_range(
         replacements,
         llvm::map_range(fusedBody->getArguments().slice(
                             rhsIndex + 1, linalgOp.getNumDpsInputs() - 1),
                         [](BlockArgument arg) -> Value { return arg; }));
 
-    appendRange(
+    llvm::append_range(
         replacements,
         llvm::map_range(fusedBody->getArguments().slice(
                             outsIndex, linalgOp.getNumDpsInits()),
@@ -446,9 +441,10 @@ fuseContractionsHorizontally(RewriterBase &rewriter, Location loc,
 
   auto resultsIndex = 0;
   for (auto linalgOp : linalgOps) {
-    rewriter.replaceOp(linalgOp, fusedOp->getResults().slice(
-                                     resultsIndex, linalgOp->getNumResults()));
-    resultsIndex += linalgOp->getNumResults();
+    auto numResults = linalgOp->getNumResults();
+    rewriter.replaceOp(linalgOp,
+                       fusedOp->getResults().slice(resultsIndex, numResults));
+    resultsIndex += numResults;
   }
 
   return fusedOp;
