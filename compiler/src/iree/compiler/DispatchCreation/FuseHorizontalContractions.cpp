@@ -39,6 +39,16 @@ namespace mlir::iree_compiler::DispatchCreation {
 
 namespace {
 
+static bool operator==(const linalg::ContractionDimensions &lhs,
+                       const linalg::ContractionDimensions &rhs) {
+  return lhs.batch == rhs.batch && lhs.m == rhs.m && lhs.n == rhs.n &&
+         lhs.k == rhs.k;
+}
+static bool operator!=(const linalg::ContractionDimensions &lhs,
+                       const linalg::ContractionDimensions &rhs) {
+  return !(lhs == rhs);
+}
+
 struct FuseHorizontalContractionsPass final
     : public impl::FuseHorizontalContractionsPassBase<
           FuseHorizontalContractionsPass> {
@@ -61,10 +71,31 @@ static bool checkOperationEquivalence(Operation *aOp, Operation *bOp) {
          linalg::isaContractionOpInterface(bLinalgOp) &&
          "expected lhs and rhs to be contraction ops");
 
-  // CHeck that the LHS operand is the same. Can be relaxed in the future.
+  // Check that the LHS operand is the same.
   if (aLinalgOp.getDpsInputOperand(0)->get() !=
       bLinalgOp.getDpsInputOperand(0)->get()) {
     return false;
+  }
+
+  // Check that the n-dimensions are the same
+  FailureOr<linalg::ContractionDimensions> aContactionDims =
+      linalg::inferContractionDims(aLinalgOp);
+  FailureOr<linalg::ContractionDimensions> bContactionDims =
+      linalg::inferContractionDims(bLinalgOp);
+  if (failed(aContactionDims) || failed(bContactionDims)) {
+    return false;
+  }
+  if (aContactionDims.value() != bContactionDims.value()) {
+    return false;
+  }
+
+  SmallVector<int64_t, 4> aStaticDims = aLinalgOp.getStaticLoopRanges();
+  SmallVector<int64_t, 4> bStaticDims = bLinalgOp.getStaticLoopRanges();
+  for (auto nDim : aContactionDims->n) {
+    if (aStaticDims[nDim] != bStaticDims[nDim] ||
+        ShapedType::isDynamic(aStaticDims[nDim])) {
+      return false;
+    }
   }
 
   auto checkSameRankAndElementType = [](Value aVal, Value bVal) {
