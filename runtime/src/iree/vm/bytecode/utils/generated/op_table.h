@@ -585,7 +585,7 @@ typedef enum {
   IREE_VM_OP_EXT_F32_CastF32SI64 = 0x3A,
   IREE_VM_OP_EXT_F32_CastF32UI64 = 0x3B,
   IREE_VM_OP_EXT_F32_CastSI64F32 = 0x3C,
-  IREE_VM_OP_EXT_F32_RSV_0x3D,
+  IREE_VM_OP_EXT_F32_CastUI64F32 = 0x3D,
   IREE_VM_OP_EXT_F32_RSV_0x3E,
   IREE_VM_OP_EXT_F32_RSV_0x3F,
   IREE_VM_OP_EXT_F32_RSV_0x40,
@@ -844,7 +844,7 @@ typedef enum {
     OPC(0x3A, CastF32SI64) \
     OPC(0x3B, CastF32UI64) \
     OPC(0x3C, CastSI64F32) \
-    RSV(0x3D) \
+    OPC(0x3D, CastUI64F32) \
     RSV(0x3E) \
     RSV(0x3F) \
     RSV(0x40) \
