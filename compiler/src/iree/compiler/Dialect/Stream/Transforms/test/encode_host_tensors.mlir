@@ -282,7 +282,7 @@ util.func public @denseTensorDispatch(
   // CHECK-SAME:  %[[RESOURCE1]][%[[ZERO]] to %[[RESOURCE1_SIZE]] for %[[RESOURCE1_SIZE]]])
   // CHECK-SAME: (!stream.resource<transient>{%[[RESOURCE0_SIZE]]}, !stream.resource<external>{%[[RESOURCE1_SIZE]]}) ->
   // CHECK-SAME: (!stream.resource<external>{%[[RESOURCE1_SIZE]]}, %[[RESOURCE1]]{%[[RESOURCE1_SIZE]]})
-  %results:2 = stream.tensor.dispatch @ex::@entry(%resource0, %resource1) : (tensor<4x?xf32>{%tensor0_dim} in !stream.resource<transient>{%resource0_size}, tensor<?xi32>{%tensor1_dim} in !stream.resource<external>{%resource1_size}) -> (tensor<?xi32>{%tensor1_dim} in !stream.resource<external>{%resource1_size}, tensor<?xf32>{%tensor1_dim} in %resource1{%resource1_size})
+  %results:2 = stream.tensor.dispatch @ex::@entry(%resource0, %resource1) : (tensor<4x?xf32>{%tensor0_dim} in !stream.resource<transient>{%resource0_size}, tensor<?xi32>{%tensor1_dim} in !stream.resource<external>{%resource1_size}) -> (tensor<4x?xf32>{%tensor0_dim} in !stream.resource<external>{%resource1_size}, tensor<?xi32>{%tensor1_dim} in %resource1{%resource1_size})
   // CHECK: util.return %[[RESULTS]]#0, %[[RESULTS]]#1
   util.return %results#0, %results#1 : !stream.resource<external>, !stream.resource<external>
 }
