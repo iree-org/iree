@@ -339,3 +339,29 @@ util.func public @test_horizontal_fuse_with_transpose(%arg0 : tensor<2x4096x640x
 //      CHECK:   %[[TRUNCF3:.+]] = linalg.generic
 // CHECK-SAME:       ins(%[[FUSED_OP]]#2 :
 //      CHECK:   util.return %[[TRUNCF1]], %[[TRUNCF2]], %[[TRUNCF3]]
+
+// -----
+
+util.func @dont_fuse_contractions_with_different_n(%lhs : tensor<10x20xf32>,
+    %rhs0 : tensor<20x40xf32>, %rhs1 : tensor<20x80xf32>)
+    -> (tensor<10x40xf32>, tensor<10x80xf32>) {
+  %0 = tensor.empty() : tensor<10x40xf32>
+  %cst = arith.constant 0.0 : f32
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<10x40xf32>) -> tensor<10x40xf32>
+  %2 = linalg.matmul ins(%lhs, %rhs0 : tensor<10x20xf32>, tensor<20x40xf32>)
+      outs(%1 : tensor<10x40xf32>) -> tensor<10x40xf32>
+  %3 = tensor.empty() : tensor<10x80xf32>
+  %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<10x80xf32>) -> tensor<10x80xf32>
+  %5 = linalg.matmul ins(%lhs, %rhs1 : tensor<10x20xf32>, tensor<20x80xf32>)
+      outs(%4 : tensor<10x80xf32>) -> tensor<10x80xf32>
+  util.return %2, %5 : tensor<10x40xf32>, tensor<10x80xf32>
+}
+// CHECK-LABEL: func public @dont_fuse_contractions_with_different_n(
+//  CHECK-SAME:     %[[LHS:.+]]: tensor<10x20xf32>,
+//  CHECK-SAME:     %[[RHS0:.+]]: tensor<20x40xf32>,
+//  CHECK-SAME:     %[[RHS1:.+]]: tensor<20x80xf32>)
+//       CHECK:   %[[MATMUL0:.+]] = linalg.matmul
+//  CHECK-SAME:       ins(%[[LHS]], %[[RHS0]] :
+//       CHECK:   %[[MATMUL1:.+]] = linalg.matmul
+//  CHECK-SAME:       ins(%[[LHS]], %[[RHS1]] :
+//       CHECK:   util.return %[[MATMUL0]], %[[MATMUL1]]
