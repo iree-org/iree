@@ -54,7 +54,9 @@ static std::optional<OpOperand *> getFusableUse(Operation *op,
     bool dominatesAllUsers = true;
     for (OpOperand &target : uses) {
       Operation *targetOp = target.getOwner();
-      if (!dominanceInfo.dominates(sourceOp, targetOp)) {
+      if (sourceOp != targetOp &&
+          !dominanceInfo.properlyDominates(sourceOp, targetOp,
+                                           /*enclosingOpOk=*/false)) {
         dominatesAllUsers = false;
         break;
       }
