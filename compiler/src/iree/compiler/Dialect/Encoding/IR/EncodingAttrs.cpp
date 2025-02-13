@@ -281,8 +281,12 @@ EncodingAttr getEncodingAttr(RankedTensorType type) {
   return dyn_cast_or_null<EncodingAttr>(type.getEncoding());
 }
 
-bool hasPackedStorageAttr(RankedTensorType type) {
-  return dyn_cast_or_null<PackedStorageAttr>(type.getEncoding()) != nullptr;
+bool hasPackedStorageAttr(Type type) {
+  if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
+    return dyn_cast_or_null<PackedStorageAttr>(tensorType.getEncoding()) !=
+           nullptr;
+  }
+  return false;
 }
 
 FailureOr<linalg::ContractionDimensions>

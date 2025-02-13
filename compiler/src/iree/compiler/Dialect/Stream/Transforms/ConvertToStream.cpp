@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
@@ -22,6 +23,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Patterns.h"
+#include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -246,6 +248,12 @@ struct ConvertToStreamPass final
     typeConverter.addConversion([=](Type type) -> Type {
       if (llvm::isa<IREE::Flow::ChannelType>(type)) {
         return IREE::Stream::ChannelType::get(context);
+      }
+      if (auto rankedType = llvm::dyn_cast_or_null<RankedTensorType>(type)) {
+        if (IREE::Encoding::hasPackedStorageAttr(rankedType)) {
+          return RankedTensorType::get(rankedType.getShape(),
+                                       rankedType.getElementType());
+        }
       }
       return !llvm::isa<TensorType>(type) ? type : Type{};
     });
