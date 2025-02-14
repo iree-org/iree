@@ -71,6 +71,23 @@ def IREEEncoding_EncodingLayoutAttrInterface :
         assert(false && "unimplemented interface method");
         return {};
       }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Clones an encoding with a new layout list. It is valid to drop any other
+        optional parameters used in layout resolving, because they are already
+        resolved and being attached to the encoding attribute.
+      }],
+      /*retTy=*/"::mlir::Attribute",
+      /*methodName=*/"cloneWithLayouts",
+      /*args=*/(ins
+        "ArrayRef<::mlir::Attribute>":$layoutAttr
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return {};
+      }]
     >
   ];
 }
@@ -139,7 +156,7 @@ def IREEEncoding_EncodingTypeInterface :
       /*retTy=*/"::mlir::Type",
       /*methodName=*/"updateEncoding",
       /*args=*/(ins
-        "::mlir::iree_compiler::IREE::Encoding::EncodingAttr":$encoding)
+        "::mlir::Attribute":$encoding)
     >,
   ];
 }

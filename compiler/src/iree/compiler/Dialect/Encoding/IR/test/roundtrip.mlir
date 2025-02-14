@@ -199,3 +199,25 @@ func.func @specialized_encoding_with_type(%arg0: tensor<?x?xf32, #encoding>) -> 
 // CHECK:      func.func @specialized_encoding_with_type(
 // CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf32, #iree_encoding.specialized_encoding<123, tensor<?x?xf32>>>
 // CHECK         return %[[ARG0]]
+
+// -----
+
+#encoding = #iree_encoding.testing_encoding<>
+func.func @testing_encoding_without_layouts(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
+  return %arg0 : tensor<?x?xf32, #encoding>
+}
+// CHECK:     #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
+// CHECK:      func.func @testing_encoding_without_layouts(
+// CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf32, #[[ENCODING]]>
+// CHECK         return %[[ARG0]]
+
+// -----
+
+#encoding = #iree_encoding.testing_encoding<[#iree_encoding.unspecialized_encoding<123>]>
+func.func @testing_encoding_with_layouts(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
+  return %arg0 : tensor<?x?xf32, #encoding>
+}
+// CHECK:     #[[ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.unspecialized_encoding<123>]>
+// CHECK:      func.func @testing_encoding_with_layouts(
+// CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf32, #[[ENCODING]]>
+// CHECK         return %[[ARG0]]

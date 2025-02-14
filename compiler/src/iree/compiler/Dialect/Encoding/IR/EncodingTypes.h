@@ -38,6 +38,11 @@
 
 namespace mlir::iree_compiler::IREE::Encoding {
 
+/// Returns the encoding attribute from the type if there is an encoding that
+/// implements EncodingLayoutAttrInterface. Otherwise, returns null.
+EncodingLayoutAttrInterface
+getEncodingLayoutAttrInterface(RankedTensorType type);
+
 /// Returns the encoding attribute from the type if there is an encoding.
 /// Otherwise, returns null.
 EncodingAttr getEncodingAttr(RankedTensorType type);
