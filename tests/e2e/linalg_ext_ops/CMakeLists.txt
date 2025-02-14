@@ -49,6 +49,21 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_no_dt_llvm-cpu_local-task
+  SRCS
+    "custom_op.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+  LABELS
+    "nowasm"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_vmvx_local-task
   SRCS
     "scan.mlir"
@@ -89,6 +104,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_rocm_hip
   SRCS
+    "custom_op.mlir"
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"
