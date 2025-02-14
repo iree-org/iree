@@ -1,0 +1,96 @@
+module(
+    name = "iree_core",
+    version = "main",
+    compatibility_level = 0,
+)
+
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "rules_cc", version = "0.0.17")
+bazel_dep(name = "platforms", version = "0.0.11")
+
+new_local_repository = use_repo_rule(
+    "@bazel_tools//tools/build_defs/repo:local.bzl",
+    "new_local_repository",
+)
+
+new_local_repository(
+    name = "llvm-raw",
+    path = "third_party/llvm-project",
+    build_file_content = "# Empty.",
+)
+
+bazel_dep(name = "llvm-project-overlay", version = "main")
+
+local_path_override(
+    module_name = "llvm-project-overlay",
+    path = "third_party/llvm-project/utils/bazel",
+)
+
+llvm_project_overlay = use_extension(
+    "@llvm-project-overlay//:extensions.bzl",
+    "llvm_project_overlay",
+)
+
+inject_repo(
+    llvm_project_overlay,
+    "llvm-raw",
+)
+
+llvm_project_overlay.configure(
+    targets = [
+        "AArch64",
+        "ARM",
+        "RISCV",
+        "X86",
+        "NVPTX",
+        "AMDGPU",
+        "WebAssembly",
+    ],
+)
+
+use_repo(
+    llvm_project_overlay,
+    "llvm-project",
+
+    # Vendored.
+    "gmp",
+    "mpfr",
+    "nanobind",
+    "pfm",
+    "pybind11",
+    "vulkan_sdk",
+)
+
+iree_cuda_deps = use_extension(
+    "//build_tools/bazel:extension.bzl",
+    "iree_cuda_deps",
+)
+
+iree_cuda_deps.configure()
+
+use_repo(
+    iree_cuda_deps,
+    "iree_cuda",
+)
+
+iree_submodule_deps = use_extension(
+    "//build_tools/bazel:extension.bzl",
+    "iree_submodule_deps",
+)
+
+iree_submodule_deps.configure()
+
+use_repo(
+    iree_submodule_deps,
+    "com_github_dvidelabs_flatcc",
+    "com_google_benchmark",
+    "com_google_googletest",
+    "cpuinfo",
+    "hsa_runtime_headers",
+    "nccl",
+    "spirv_cross",
+    "stablehlo",
+    "tracy_client",
+    "vulkan_headers",
+    "webgpu_headers",
+)
