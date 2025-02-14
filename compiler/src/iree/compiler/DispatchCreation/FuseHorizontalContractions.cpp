@@ -208,9 +208,6 @@ static std::optional<SmallVector<Operation *>> getHorizontalFusionGroupMembers(
     if (!dominanceInfo.properlyDominates(seedOp, linalgOp)) {
       return false;
     }
-    if (!isHorizontalToGroup(linalgOp, allOps, dominanceInfo, seedOp)) {
-      return false;
-    }
     return true;
   };
 
@@ -237,6 +234,10 @@ static std::optional<SmallVector<Operation *>> getHorizontalFusionGroupMembers(
   for (Operation *lhsUser : lhsUsers) {
     auto linalgUser = dyn_cast<linalg::LinalgOp>(lhsUser);
     if (!linalgUser) {
+      continue;
+    }
+
+    if (!isHorizontalToGroup(linalgUser, allOps, dominanceInfo, seedOp)) {
       continue;
     }
 
