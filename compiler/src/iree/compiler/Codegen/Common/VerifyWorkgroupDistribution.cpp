@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
@@ -41,9 +42,6 @@ struct VerifyWorkgroupDistributionPass final
       return;
     }
 
-    auto globalAddressSpace = IREE::HAL::DescriptorTypeAttr::get(
-        &getContext(), IREE::HAL::DescriptorType::StorageBuffer);
-
     // Walk in PreOrder so that parent operations are visited before children,
     // thus allowing all operations contained within workgroup foralls to be
     // skipped.
@@ -64,7 +62,7 @@ struct VerifyWorkgroupDistributionPass final
           }
 
           // Writes to non-global memory are fine.
-          if (type.getMemorySpace() != globalAddressSpace) {
+          if (!hasGlobalMemoryAddressSpace(type)) {
             continue;
           }
 

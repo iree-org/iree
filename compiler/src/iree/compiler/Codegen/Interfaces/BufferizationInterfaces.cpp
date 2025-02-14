@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -14,6 +15,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Arith/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/DstBufferizableOpInterfaceImpl.h"
@@ -97,10 +99,18 @@ findOrCreateSubspanBuffer(RewriterBase &rewriter,
     layoutAttr = StridedLayoutAttr::get(rewriter.getContext(),
                                         ShapedType::kDynamic, strides);
   }
-  auto memRefType =
-      getMemrefTypeForTensor(shapedType, layoutAttr,
-                             rewriter.getAttr<IREE::HAL::DescriptorTypeAttr>(
-                                 subspanOp.getDescriptorType()));
+  Attribute memorySpace = rewriter.getAttr<IREE::HAL::DescriptorTypeAttr>(
+      subspanOp.getDescriptorType());
+  if (auto *ireeGpuDialect =
+          rewriter.getContext()
+              ->getLoadedDialect<IREE::GPU::IREEGPUDialect>()) {
+    if (ireeGpuDialect->getUseAmdgpuBufferInstructionsAttrHelper()
+            .isAttrPresent(subspanOp)) {
+      memorySpace = rewriter.getAttr<amdgpu::AddressSpaceAttr>(
+          amdgpu::AddressSpace::FatRawBuffer);
+    }
+  }
+  auto memRefType = getMemrefTypeForTensor(shapedType, layoutAttr, memorySpace);
 
   // Look for an existing op.
   Block *block = subspanOp->getBlock();

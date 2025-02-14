@@ -32,11 +32,6 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_CONVERTHALDESCRIPTORTYPETOGPUADDRESSSPACEPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
-static llvm::cl::opt<bool> clAMDGPUEnableBufferInsts(
-  "iree-codegen-amdgpu-enable-buffer-insts",
-  llvm::cl::desc("Use buffer instructions (by using buffer fat pointers) where possible on AMD targets"),
-  llvm::cl::init(true));
-
 namespace {
 
 /// Returns true if the given `type` is considered as legal.
@@ -126,12 +121,8 @@ struct ConvertHALDescriptorTypeToGPUAddressSpacePass final
           if (isLegalType(memRefType))
             return std::nullopt;
 
-          // NOTE THIS IS COMMENTED OUT FOR A QUICK TEST DO NOT MERGE
-          // Attribute globalSpace = gpu::AddressSpaceAttr::get(
-          //    memRefType.getContext(), gpu::AddressSpace::Global);
-          Attribute globalSpace = amdgpu::AddressSpaceAttr::get(
-              memRefType.getContext(), amdgpu::AddressSpace::FatRawBuffer);
-
+          Attribute globalSpace = gpu::AddressSpaceAttr::get(
+              memRefType.getContext(), gpu::AddressSpace::Global);
           // Erase the #hal.descriptor_type memory space.
           if (auto rankedType = llvm::dyn_cast<MemRefType>(memRefType)) {
             return MemRefType::get(memRefType.getShape(),

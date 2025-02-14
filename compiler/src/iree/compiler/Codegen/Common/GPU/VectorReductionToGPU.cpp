@@ -63,12 +63,12 @@ static bool isUniformLoad(Operation *op) {
   auto loadOp = dyn_cast<memref::LoadOp>(op);
   if (!loadOp)
     return false;
-  auto space = loadOp.getMemRefType().getMemorySpace();
-  auto attr = llvm::dyn_cast_if_present<DescriptorTypeAttr>(space);
-  if (!attr)
+  if (!hasGlobalMemoryAddressSpace(loadOp.getMemRefType()))
     return false;
+  auto space = loadOp.getMemRefType().getMemorySpace();
+  auto descTypeAttr = llvm::dyn_cast_if_present<DescriptorTypeAttr>(space);
 
-  if (attr.getValue() == DescriptorType::UniformBuffer)
+  if (descTypeAttr && descTypeAttr.getValue() == DescriptorType::UniformBuffer)
     return true;
 
   auto subspan = loadOp.getMemRef().getDefiningOp<InterfaceBindingSubspanOp>();

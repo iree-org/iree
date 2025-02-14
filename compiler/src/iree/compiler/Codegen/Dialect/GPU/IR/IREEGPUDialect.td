@@ -30,6 +30,9 @@ def IREEGPU_Dialect : Dialect {
   }];
   let useDefaultAttributePrinterParser = 1;
 
+  let discardableAttrs = (ins
+    "::mlir::UnitAttr":$use_amdgpu_buffer_instructions
+  );
   let extraClassDeclaration = [{
     void registerAttributes();
   }];
