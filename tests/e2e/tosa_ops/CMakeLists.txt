@@ -466,7 +466,6 @@ iree_check_single_backend_test_suite(
     # "equal.mlir"  # TODO(#10906): fix (i8/i16?)
     "exp.mlir"
     "floor.mlir"
-    "fully_connected.mlir"
     "gather.mlir"
     # "greater.mlir"  # TODO(#10906): fix (i8/i16?)
     # "greater_equal.mlir"  # TODO(#10906): fix (i8/i16?)
@@ -520,7 +519,6 @@ iree_check_single_backend_test_suite(
     "equal.mlir"
     "exp.mlir"
     "floor.mlir"
-    "fully_connected.mlir"
     "gather.mlir"
     "greater.mlir"
     "greater_equal.mlir"
