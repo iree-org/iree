@@ -233,30 +233,30 @@ builtin.module attributes { transform.with_named_sequence } {
 
 #lhs = #iree_vector_ext.nested_layout<
   subgroup_tile = [2],
-  batch_tile = [2],
-  outer_tile = [2],
+  batch_tile = [1],
+  outer_tile = [1],
   thread_tile = [16],
   element_tile = [2],
 
-  subgroup_strides = [1],
-  thread_strides = [1]
+  subgroup_strides = [2],
+  thread_strides = [8]
 >
 
 #rhs = #iree_vector_ext.nested_layout<
   subgroup_tile = [2, 2],
-  batch_tile = [2, 2],
-  outer_tile = [2, 2],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
   thread_tile = [8, 16],
   element_tile = [2, 2],
 
-  subgroup_strides = [2, 1],
-  thread_strides = [16, 1]
+  subgroup_strides = [1, 2],
+  thread_strides = [1, 8]
 >
 
 #out = #iree_vector_ext.nested_layout<
   subgroup_tile = [2],
-  batch_tile = [2],
-  outer_tile = [2],
+  batch_tile = [1],
+  outer_tile = [1],
   thread_tile = [8],
   element_tile = [2],
 
@@ -267,22 +267,22 @@ builtin.module attributes { transform.with_named_sequence } {
 func.func @masked_read_write_contract(%arg0 : memref<?xf16>, %arg1 : memref<?x?xf16>, %arg2 : memref<?xf16>) {
   %c0 = arith.constant 0 : index
   %cst_6 = arith.constant 0.000000e+00 : f16
-  %acc = arith.constant dense<0.000000e+00> : vector<128xf16>
+  %acc = arith.constant dense<0.000000e+00> : vector<32xf16>
 
   %reddim = memref.dim %arg0, %c0 : memref<?xf16>
   %pardim = memref.dim %arg1, %c0 : memref<?x?xf16>
-  %arg0mask = vector.create_mask %reddim :  vector<256xi1>
-  %arg1mask = vector.create_mask %pardim, %reddim :  vector<128x256xi1>
-  %arg2mask = vector.create_mask %pardim :  vector<128xi1>
-  %opmask = vector.create_mask %reddim, %pardim :  vector<256x128xi1>
+  %arg0mask = vector.create_mask %reddim :  vector<64xi1>
+  %arg1mask = vector.create_mask %pardim, %reddim :  vector<32x64xi1>
+  %arg2mask = vector.create_mask %pardim :  vector<32xi1>
+  %opmask = vector.create_mask %reddim, %pardim :  vector<64x32xi1>
 
-  %arg0read = vector.transfer_read %arg0[%c0], %cst_6, %arg0mask {in_bounds = [true]} : memref<?xf16>, vector<256xf16>
-  %arg0readl = iree_vector_ext.to_layout %arg0read to layout(#lhs) : vector<256xf16>
-  %arg1read = vector.transfer_read %arg1[%c0, %c0], %cst_6, %arg1mask {in_bounds = [true, true]} : memref<?x?xf16>, vector<128x256xf16>
-  %arg1readl = iree_vector_ext.to_layout %arg1read to layout(#rhs) : vector<128x256xf16>
-  %gemm = vector.mask %opmask { vector.contract {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d1)>], iterator_types = ["reduction", "parallel"], kind = #vector.kind<add>} %arg0readl, %arg1readl, %acc : vector<256xf16>, vector<128x256xf16> into vector<128xf16> } : vector<256x128xi1> -> vector<128xf16>
-  %gemml = iree_vector_ext.to_layout %gemm to layout(#out) : vector<128xf16>
-  vector.transfer_write %gemml, %arg2[%c0], %arg2mask {in_bounds = [true]} : vector<128xf16>, memref<?xf16>
+  %arg0read = vector.transfer_read %arg0[%c0], %cst_6, %arg0mask {in_bounds = [true]} : memref<?xf16>, vector<64xf16>
+  %arg0readl = iree_vector_ext.to_layout %arg0read to layout(#lhs) : vector<64xf16>
+  %arg1read = vector.transfer_read %arg1[%c0, %c0], %cst_6, %arg1mask {in_bounds = [true, true]} : memref<?x?xf16>, vector<32x64xf16>
+  %arg1readl = iree_vector_ext.to_layout %arg1read to layout(#rhs) : vector<32x64xf16>
+  %gemm = vector.mask %opmask { vector.contract {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d1)>], iterator_types = ["reduction", "parallel"], kind = #vector.kind<add>} %arg0readl, %arg1readl, %acc : vector<64xf16>, vector<32x64xf16> into vector<32xf16> } : vector<64x32xi1> -> vector<32xf16>
+  %gemml = iree_vector_ext.to_layout %gemm to layout(#out) : vector<32xf16>
+  vector.transfer_write %gemml, %arg2[%c0], %arg2mask {in_bounds = [true]} : vector<32xf16>, memref<?xf16>
 
   return
 }
@@ -297,24 +297,27 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func @masked_read_write_contract
 
-// CHECK-DAG: %[[RED_IDENTITY_LHS:.+]] = arith.constant dense<0.000000e+00> : vector<2x2x2xf16>
-// CHECK-DAG: %[[RED_IDENTITY_RHS:.+]] = arith.constant dense<0.000000e+00> : vector<2x2x2x2x2x2xf16>
+// CHECK-DAG: %[[RED_IDENTITY_LHS:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x2xf16>
+// CHECK-DAG: %[[RED_IDENTITY_RHS:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x1x1x2x2xf16>
 
 // Note this this transposed to match the second indexing map
-// CHECK-DAG: %[[MASK0:.+]] = vector.create_mask %[[D1UB:.+]], %[[D0UB:.+]] : vector<8x8xi1>
+// CHECK-DAG: %[[MASK_LHS:.+]] = vector.create_mask %[[LHSUB:.+]] : vector<2xi1>
+// CHECK-DAG: %[[MASK_OP:.+]] = vector.create_mask %[[OPUB0:.+]], %[[LHSUB]] : vector<2x2xi1>
 
-// CHECK-DAG: %[[LHS_MASK_EXTRACT:.+]] = vector.extract %[[MASK0]][0] : vector<8xi1> from vector<8x8xi1>
-// CHECK-DAG: %[[LHS_MASK_PACKED:.+]] = vector.shape_cast %[[LHS_MASK_EXTRACT]] : vector<8xi1> to vector<2x2x2xi1>
+// Note MASK_OP_1D is equivalent to MASK_LHS.
+// Currently, it does not fold away.
+// CHECK-DAG: %[[MASK_OP_1D:.+]] = vector.extract %[[MASK_OP]][0] : vector<2xi1> from vector<2x2xi1>
+// CHECK-DAG: %[[MASK_OP_1D_PACKED:.+]] = vector.shape_cast %[[MASK_OP_1D]] : vector<2xi1> to vector<1x1x2xi1>
+// CHECK-DAG: %[[MASK_OP_PACKED:.+]] = vector.shape_cast %[[MASK_OP]] : vector<2x2xi1> to vector<1x1x2x1x1x2xi1>
+// CHECK-DAG: %[[MASK_OP_INTERLEAVED:.+]] = vector.transpose %[[MASK_OP_PACKED]], [0, 3, 1, 4, 2, 5] : vector<1x1x2x1x1x2xi1> to vector<1x1x1x1x2x2xi1>
+// CHECK-DAG: %[[MASK_OUT:.+]] = vector.create_mask {{.*}} : vector<2xi1>
 
-// CHECK-DAG: %[[RHS_MASK_PACKED:.+]] = vector.shape_cast %[[MASK0]] : vector<8x8xi1> to vector<2x2x2x2x2x2xi1>
-// CHECK-DAG: %[[RHS_MASK_INTERLVD:.+]] = vector.transpose %[[RHS_MASK_PACKED]], [0, 3, 1, 4, 2, 5] : vector<2x2x2x2x2x2xi1> to vector<2x2x2x2x2x2xi1>
+// CHECK-DAG: %[[LHS_READ:.+]] = vector.transfer_read %arg0{{.*}} %[[MASK_LHS]] {in_bounds = [true]} : memref<?xf16>, vector<2xf16>
+// CHECK-DAG: %[[LHS:.+]] = vector.insert_strided_slice %[[LHS_READ]]
+// CHECK-DAG: %[[RHS_READ:.+]] = vector.transfer_read %arg1{{.*}} %[[MASK_OP]] {in_bounds = [true, true]} : memref<?x?xf16>, vector<2x2xf16>
+// CHECK-DAG: %[[RHS:.+]] = vector.insert_strided_slice %[[RHS_READ]]
 
-// CHECK-DAG: %[[LHS_SELECT:.+]] = arith.select %[[LHS_MASK_PACKED]], %{{.*}}, %[[RED_IDENTITY_LHS]] : vector<2x2x2xi1>, vector<2x2x2xf16>
-// CHECK-DAG: %[[RHS_SELECT:.+]] = arith.select %[[RHS_MASK_INTERLVD]], %{{.*}}, %[[RED_IDENTITY_RHS]] : vector<2x2x2x2x2x2xi1>, vector<2x2x2x2x2x2xf16>
+// CHECK-DAG: %[[LHS_SELECT:.+]] = arith.select %[[MASK_OP_1D_PACKED]], %[[LHS]], %[[RED_IDENTITY_LHS]] : vector<1x1x2xi1>, vector<1x1x2xf16>
+// CHECK-DAG: %[[RHS_SELECT:.+]] = arith.select %[[MASK_OP_INTERLEAVED]], %[[RHS]], %[[RED_IDENTITY_RHS]] : vector<1x1x1x1x2x2xi1>, vector<1x1x1x1x2x2xf16>
 
-// This is the actual op mask.
-// CHECK-DAG: %[[MASK1:.+]] = vector.create_mask %[[D0UB]], %[[D1UB]] : vector<8x8xi1>
-// CHECK-DAG: %[[MASK1_PACKED:.+]] = vector.shape_cast %[[MASK1]] : vector<8x8xi1> to vector<2x2x2x2x2x2xi1>
-// CHECK-DAG: %[[MASK1_INTLVD:.+]] = vector.transpose %[[MASK1_PACKED]], [0, 3, 1, 4, 2, 5] : vector<2x2x2x2x2x2xi1> to vector<2x2x2x2x2x2xi1>
-
-// CHECK: vector.mask %[[MASK1_INTLVD]] { vector.contract {{.*}} %[[LHS_SELECT]], %[[RHS_SELECT]]
+// CHECK: vector.contract {{.*}} %[[LHS_SELECT]], %[[RHS_SELECT]]
