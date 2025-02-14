@@ -212,7 +212,8 @@ ChangeResult DistributionLayout::resolveWithPossibleConflict(
   // Handle case where constantOp may have multiple consumers with different
   // layouts by creating a copy of constOp for other users.
   if (!opOperand.get().hasOneUse() &&
-      llvm::isa_and_nonnull<arith::ConstantOp, vector::StepOp, vector::CreateMaskOp>(
+      llvm::isa_and_nonnull<arith::ConstantOp, vector::StepOp,
+                            vector::CreateMaskOp>(
           opOperand.get().getDefiningOp())) {
     builder.setInsertionPoint(opOperand.get().getDefiningOp());
     Operation *copiedConstOp = builder.clone(*opOperand.get().getDefiningOp());
