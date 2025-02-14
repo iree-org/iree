@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -26,6 +27,10 @@
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/RegionUtils.h"
+
+namespace mlir::iree_compiler {
+using IREE::Encoding::getEncodingAttr;
+}
 
 namespace mlir::iree_compiler::IREE::Stream {
 
@@ -1903,7 +1908,7 @@ LogicalResult TensorCloneOp::verify() {
   // information.
   auto sourceEncoding = llvm::cast<RankedTensorType>(op.getSourceEncoding());
   auto resultEncoding = llvm::cast<RankedTensorType>(op.getResultEncoding());
-  if (sourceEncoding.getEncoding() != resultEncoding.getEncoding()) {
+  if (getEncodingAttr(sourceEncoding) != getEncodingAttr(resultEncoding)) {
     return op.emitOpError() << "clones changing tensor encoding from "
                             << sourceEncoding.getEncoding() << " to "
                             << resultEncoding.getEncoding() << "; not allowed";
