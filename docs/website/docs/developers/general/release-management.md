@@ -132,9 +132,9 @@ Over the course of a release cycle there are several milestones to look out for:
 * ~1 week before the release date
     * Any unstable build/test/release workflows must be stabilized
     * Calls for release note contributions are sent out
-    * Release note drafts are drafted
-    * Release candidate selection
-    * Release candidate testing
+    * Release notes are drafted
+    * Release candidates are selected
+    * Release candidates are tested
 * Release day
     * Release candidates are promoted, release notes are published
     * The cycle repeats
