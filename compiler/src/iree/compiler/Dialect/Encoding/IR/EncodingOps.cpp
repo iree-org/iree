@@ -29,7 +29,8 @@ LogicalResult SetEncodingOp::verify() {
     return emitOpError(
         "source of set_encoding op cannot have a tensor encoding");
   }
-  if (!isa_and_nonnull<EncodingAttr>(getResultType().getEncoding())) {
+  if (!isa_and_nonnull<EncodingLayoutAttrInterface>(
+          getResultType().getEncoding())) {
     return emitOpError(
         "result of set_encoding op expected to have a valid tensor encoding");
   }
@@ -62,7 +63,8 @@ LogicalResult UnsetEncodingOp::verify() {
     return emitOpError(
         "result of unset_encoding op cannot have a tensor encoding");
   }
-  if (!isa_and_nonnull<EncodingAttr>(getSourceType().getEncoding())) {
+  if (!isa_and_nonnull<EncodingLayoutAttrInterface>(
+          getSourceType().getEncoding())) {
     return emitOpError(
         "source of unset_encoding op expected to have a valid tensor encoding");
   }

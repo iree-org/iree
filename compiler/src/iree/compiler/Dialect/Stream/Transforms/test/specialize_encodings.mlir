@@ -93,12 +93,9 @@ util.func public @with_pad_encoding(%arg0: index, %arg1: index, %scalar_f32 : f3
 // encoding is updated that carries resolved layouts.
 //------------------------------------------------------------------------------
 
-#map0 = affine_map<(m, n, k) -> (m, k)>
-#map1 = affine_map<(m, n, k) -> (k, n)>
-#map2 = affine_map<(m, n, k) -> (m, n)>
 #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
-#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
+#encoding = #iree_encoding.testing_encoding<>
 
 util.global private @device_a = #device_target_local_0_
 util.func public @ops_with_result_encoding_only(%arg0: index, %arg1: index, %scalar_f32 : f32) {
@@ -107,8 +104,8 @@ util.func public @ops_with_result_encoding_only(%arg0: index, %arg1: index, %sca
   %2 = stream.tensor.splat on(#hal.device.affinity<@device_a>) %scalar_f32 : f32 -> tensor<?x1x10xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
   util.return
 }
-// CHECK-DAG:   #[[$ENCODING0:.+]] = #iree_encoding.encoding<{{.+}} layouts = [#iree_encoding.specialized_encoding<123, tensor<?x0xf32>>]
-// CHECK-DAG:   #[[$ENCODING1:.+]] = #iree_encoding.encoding<{{.+}} layouts = [#iree_encoding.specialized_encoding<123, tensor<?x1x10xf32>>]
+// CHECK-DAG:   #[[$ENCODING0:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123, tensor<?x0xf32>>]>
+// CHECK-DAG:   #[[$ENCODING1:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123, tensor<?x1x10xf32>>]>
 // CHECK:       #[[TARGET:.+]] = #hal.device.target
 // CHECK:       util.global private @[[$DEVICE:.+]] = #[[TARGET]]
 // CHECK-LABEL: util.func public @ops_with_result_encoding_only
@@ -119,13 +116,9 @@ util.func public @ops_with_result_encoding_only(%arg0: index, %arg1: index, %sca
 
 // -----
 
-#map0 = affine_map<(m, n, k) -> (m, k)>
-#map1 = affine_map<(m, n, k) -> (k, n)>
-#map2 = affine_map<(m, n, k) -> (m, n)>
 #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
-#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
-
+#encoding = #iree_encoding.testing_encoding<>
 util.global private @device_a = #device_target_local_0_
 util.func public @tensor_fill_op(%arg0: f32, %arg1: !stream.resource<*>, %arg2: index, %arg3: index) {
   %c0 = arith.constant 0 : index
@@ -135,7 +128,7 @@ util.func public @tensor_fill_op(%arg0: f32, %arg1: !stream.resource<*>, %arg2: 
     -> tensor<?x4xf32, #encoding>{%arg2} in %arg1 as !stream.resource<*>{%arg3}
   util.return
 }
-// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<{{.+}} layouts = [#iree_encoding.specialized_encoding<123, tensor<?x4xf32>>]
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123, tensor<?x4xf32>>]>
 // CHECK:       #[[TARGET:.+]] = #hal.device.target
 // CHECK:       util.global private @[[$DEVICE:.+]] = #[[TARGET]]
 // CHECK-LABEL: util.func public @tensor_fill_op
@@ -146,12 +139,9 @@ util.func public @tensor_fill_op(%arg0: f32, %arg1: !stream.resource<*>, %arg2: 
 
 // Checks that the stream.tensor.constant op with encoding is not supported.
 
-#map0 = affine_map<(m, n, k) -> (m, k)>
-#map1 = affine_map<(m, n, k) -> (k, n)>
-#map2 = affine_map<(m, n, k) -> (m, n)>
 #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
-#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
+#encoding = #iree_encoding.testing_encoding<>
 
 // expected-error @+1 {{failed to add layouts to Stream::TensorPhaseOp with encodings}}
 module {
@@ -166,12 +156,9 @@ module {
 
 // Checks that the stream.tensor.clone op with encoding is not supported.
 
-#map0 = affine_map<(m, n, k) -> (m, k)>
-#map1 = affine_map<(m, n, k) -> (k, n)>
-#map2 = affine_map<(m, n, k) -> (m, n)>
 #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
-#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
+#encoding = #iree_encoding.testing_encoding<>
 
 // expected-error @+1 {{failed to add layouts to Stream::TensorPhaseOp with encodings}}
 module {
@@ -188,12 +175,9 @@ module {
 
 // Checks that the stream.tensor.slice op with encoding is not supported.
 
-#map0 = affine_map<(m, n, k) -> (m, k)>
-#map1 = affine_map<(m, n, k) -> (k, n)>
-#map2 = affine_map<(m, n, k) -> (m, n)>
 #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
-#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
+#encoding = #iree_encoding.testing_encoding<>
 
 // expected-error @+1 {{failed to add layouts to Stream::TensorPhaseOp with encodings}}
 module {
@@ -212,12 +196,9 @@ module {
 
 // Checks that the stream.tensor.update op with encoding is not supported.
 
-#map0 = affine_map<(m, n, k) -> (m, k)>
-#map1 = affine_map<(m, n, k) -> (k, n)>
-#map2 = affine_map<(m, n, k) -> (m, n)>
 #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
-#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
+#encoding = #iree_encoding.testing_encoding<>
 
 // expected-error @+1 {{failed to add layouts to Stream::TensorPhaseOp with encodings}}
 module {
@@ -235,13 +216,9 @@ util.global private @device_a = #device_target_local_0_
 // -----
 
 #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
-#map = affine_map<(d0) -> (d0)>
-#map0 = affine_map<(m, n, k) -> (m, k)>
-#map1 = affine_map<(m, n, k) -> (k, n)>
-#map2 = affine_map<(m, n, k) -> (m, n)>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #device_target_local_1_ = #hal.device.target<"local", {ordinal = 1 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
-#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
+#encoding = #iree_encoding.testing_encoding<>
 
 util.global private @device_a = #device_target_local_0_
 util.global private @device_b = #device_target_local_1_
@@ -279,7 +256,7 @@ util.func public @multi_device_with_same_executable_targets(%arg0: !hal.buffer_v
 }
 // CHECK-DAG:   #[[DEVICE_LOCAL_0:.+]] = #hal.device.target
 // CHECK-DAG:   #[[DEVICE_LOCAL_1:.+]] = #hal.device.target
-// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<{{.+}} layouts = [#iree_encoding.specialized_encoding<123, tensor<16xf32>>]
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123, tensor<16xf32>>]>
 // CHECK:       util.global private @[[$DEVICE_A:.+]] = #[[DEVICE_LOCAL_0]]
 // CHECK:       util.global private @[[$DEVICE_B:.+]] = #[[DEVICE_LOCAL_1]]
 // CHECK:       stream.executable private @[[$EX0:.+]] {
@@ -302,11 +279,7 @@ util.func public @multi_device_with_same_executable_targets(%arg0: !hal.buffer_v
 #executable_target_b = #hal.executable.target<"target_b", "xyz", {encoding = #iree_encoding.unspecialized_encoding<456>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_a]> : !hal.device
 #device_target_local_1_ = #hal.device.target<"local", {ordinal = 1 : index}, [#executable_target_b]> : !hal.device
-#map = affine_map<(d0) -> (d0)>
-#map0 = affine_map<(m, n, k) -> (m, k)>
-#map1 = affine_map<(m, n, k) -> (k, n)>
-#map2 = affine_map<(m, n, k) -> (m, n)>
-#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
+#encoding = #iree_encoding.testing_encoding<>
 
 util.global private @device_a = #device_target_local_0_
 util.global private @device_b = #device_target_local_1_
@@ -344,8 +317,8 @@ util.func public @multi_device_with_different_executable_targets(%arg0: !hal.buf
 }
 // CHECK-DAG:   #[[DEVICE_LOCAL_0:.+]] = #hal.device.target
 // CHECK-DAG:   #[[DEVICE_LOCAL_1:.+]] = #hal.device.target
-// CHECK-DAG:   #[[$DEVICE_A_ENCODING:.+]] = #iree_encoding.encoding{{.+}} layouts = [#iree_encoding.specialized_encoding<123, tensor<16xf32>>
-// CHECK-DAG:   #[[$DEVICE_B_ENCODING:.+]] = #iree_encoding.encoding{{.+}} layouts = [#iree_encoding.specialized_encoding<456, tensor<16xf32>>
+// CHECK-DAG:   #[[$DEVICE_A_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123, tensor<16xf32>>]>
+// CHECK-DAG:   #[[$DEVICE_B_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<456, tensor<16xf32>>]>
 // CHECK:       util.global private @[[$DEVICE_A:.+]] = #[[DEVICE_LOCAL_0]]
 // CHECK:       util.global private @[[$DEVICE_B:.+]] = #[[DEVICE_LOCAL_1]]
 // CHECK:       stream.executable private @[[$EX0:.+]] {
@@ -372,12 +345,9 @@ util.func public @multi_device_with_different_executable_targets(%arg0: !hal.buf
 
 #executable_target_a = #hal.executable.target<"target_a", "abc", {encoding = #iree_encoding.unspecialized_encoding<123>}>
 #executable_target_b = #hal.executable.target<"target_b", "xyz", {encoding = #iree_encoding.unspecialized_encoding<456>}>
-#map = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
-#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_a]> : !hal.device
 #device_target_local_1_ = #hal.device.target<"local", {ordinal = 1 : index}, [#executable_target_b]> : !hal.device
-#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>
+#encoding = #iree_encoding.testing_encoding<>
 
 util.global private @device_a = #device_target_local_0_
 util.global private @device_b = #device_target_local_1_
@@ -409,16 +379,9 @@ util.func public @multi_device_set_encoding(%arg0: !stream.resource<external>, %
   util.return
 }
 
-// CHECK-DAG:   #[[DEVICE_A_ENCODING:.+]] = #iree_encoding.encoding{{.+}} layouts = [#iree_encoding.specialized_encoding<123, tensor<?x?xf32>>]
-// CHECK-DAG:   #[[DEVICE_B_ENCODING:.+]] = #iree_encoding.encoding{{.+}} layouts = [#iree_encoding.specialized_encoding<456, tensor<?x?xf32>>]
-// CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
-// CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
-// CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-//
-// Explicitly capture the last `>` symbol because it makes sure that the
-// `layouts` is not attached in the ORIG_ENCODING.
-//
-// CHECK-DAG:   #[[ORIG_ENCODING:.+]] = #iree_encoding.encoding<{{.+}} user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]]>
+// CHECK-DAG:   #[[DEVICE_A_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123, tensor<?x?xf32>>]>
+// CHECK-DAG:   #[[DEVICE_B_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<456, tensor<?x?xf32>>]>
+// CHECK-DAG:   #[[ORIG_ENCODING:.+]] = #iree_encoding.testing_encoding<>
 // CHECK-DAG:   #[[DEVICE_LOCAL_0:.+]] = #hal.device.target
 // CHECK-DAG:   #[[DEVICE_LOCAL_1:.+]] = #hal.device.target
 // CHECK:       util.global private @[[$DEVICE_A:.+]] = #[[DEVICE_LOCAL_0]]
@@ -461,12 +424,9 @@ util.func public @multi_device_set_encoding(%arg0: !stream.resource<external>, %
 
 #executable_target_a = #hal.executable.target<"target_a", "abc", {encoding = #iree_encoding.unspecialized_encoding<123>}>
 #executable_target_b = #hal.executable.target<"target_b", "xyz", {encoding = #iree_encoding.unspecialized_encoding<456>}>
-#map = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
-#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_a]> : !hal.device
 #device_target_local_1_ = #hal.device.target<"local", {ordinal = 1 : index}, [#executable_target_b]> : !hal.device
-#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>
+#encoding = #iree_encoding.testing_encoding<>
 
 util.global private @device_a = #device_target_local_0_
 util.global private @device_b = #device_target_local_1_
@@ -497,12 +457,9 @@ util.func public @multi_device_unset_encoding(%arg0: !stream.resource<external>,
   %5 = util.optimization_barrier %4 : !stream.resource<*>
   util.return
 }
-// CHECK-DAG:   #[[DEVICE_A_ENCODING:.+]] = #iree_encoding.encoding{{.+}} layouts = [#iree_encoding.specialized_encoding<123, tensor<?x?xf32>>]
-// CHECK-DAG:   #[[DEVICE_B_ENCODING:.+]] = #iree_encoding.encoding{{.+}} layouts = [#iree_encoding.specialized_encoding<456, tensor<?x?xf32>>]
-// CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
-// CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
-// CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-// CHECK-DAG:   #[[ORIG_ENCODING:.+]] = #iree_encoding.encoding<{{.+}} user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]]>
+// CHECK-DAG:   #[[DEVICE_A_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123, tensor<?x?xf32>>]>
+// CHECK-DAG:   #[[DEVICE_B_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<456, tensor<?x?xf32>>]>
+// CHECK-DAG:   #[[ORIG_ENCODING:.+]] = #iree_encoding.testing_encoding<>
 // CHECK-DAG:   #[[DEVICE_LOCAL_0:.+]] = #hal.device.target
 // CHECK-DAG:   #[[DEVICE_LOCAL_1:.+]] = #hal.device.target
 // CHECK:       util.global private @[[$DEVICE_A:.+]] = #[[DEVICE_LOCAL_0]]

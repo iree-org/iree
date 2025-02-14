@@ -136,7 +136,7 @@ public:
   }
 
   Type getEncodingType() const;
-  Type updateEncoding(IREE::Encoding::EncodingAttr encoding) const;
+  Type updateEncoding(Attribute encoding) const;
 };
 
 void printType(DispatchTensorType &type, DialectAsmPrinter &p);

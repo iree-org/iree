@@ -54,6 +54,9 @@ def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
 
 def EncodingAttr :
     IREEEncoding_Attr<"Encoding", [
+      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutAttrInterface , [
+        "cloneWithLayouts",
+      ]>,
       DeclareAttrInterfaceMethods<IREEEncoding_SerializedEncodingAttrInterface , [
         "calculateStorageSizeInBytes",
       ]>
@@ -124,10 +127,6 @@ def EncodingAttr :
 
     /// Clones an encoding with a new bcast_map
     EncodingAttr clone(AffineMap bcastMap);
-
-    /// Clones an encoding with a new layout list and drops other optional
-    /// parameters (because they are resolved).
-    EncodingAttr cloneWithLayouts(ArrayRef<Attribute> layouts);
   }];
 
   let genVerifyDecl = 0;
@@ -165,6 +164,30 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
 //===---------------------------------------------------------------------===//
 // Encoding specialization attributes, which are mainly for testing purpose.
 //===---------------------------------------------------------------------===//
+
+def TestingEncodingAttr :
+    IREEEncoding_Attr<"TestingEncoding", [
+      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutAttrInterface, [
+        "cloneWithLayouts",
+      ]>,
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializedEncodingAttrInterface>
+    ]> {
+  let mnemonic = "testing_encoding";
+  let summary = "An encoding attribute for testing purpose";
+
+  let description = [{
+    An attribute for testing purpose. It is intended to be attached on
+    RankedTensorType as an encoding.
+  }];
+
+  let parameters = (ins
+    OptionalParameter<"ArrayAttr", "An array of attributes that describes the "
+    "layouts.">:$layouts
+  );
+
+  let hasCustomAssemblyFormat = 1;
+  let genVerifyDecl = 0;
+}
 
 def UnspecializedEncodingAttr :
     IREEEncoding_Attr<"UnspecializedEncoding", [
