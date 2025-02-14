@@ -38,12 +38,12 @@ inferWorkgroupTileMultiplesFromPackUnPack(
     std::optional<SmallVector<int64_t>> initialPackedMultiples = std::nullopt,
     std::optional<SmallVector<int64_t>> initialUnPackedMultiples =
         std::nullopt) {
-  static_assert(llvm::is_one_of<PackOrUnPackOpTy, tensor::PackOp,
-                                tensor::UnPackOp>::value);
+  static_assert(llvm::is_one_of<PackOrUnPackOpTy, linalg::PackOp,
+                                linalg::UnPackOp>::value);
   LDBG("Inferring workgroup tile size multiples from " << op->getName() << ":\n"
                                                        << op);
   // Initialize the list of multiples for the packed and unpack inputs.
-  int64_t unPackedRank = (std::is_same<PackOrUnPackOpTy, tensor::PackOp>::value)
+  int64_t unPackedRank = (std::is_same<PackOrUnPackOpTy, linalg::PackOp>::value)
                              ? op.getSourceRank()
                              : op.getDestRank();
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
@@ -103,11 +103,11 @@ inferWorkgroupTileMultiplesFromPackUnPack(
   }
 
   SmallVector<int64_t> srcMultiples =
-      (std::is_same<PackOrUnPackOpTy, tensor::PackOp>::value)
+      (std::is_same<PackOrUnPackOpTy, linalg::PackOp>::value)
           ? unPackedMultiples
           : packedMultiples;
   SmallVector<int64_t> destMultiples =
-      (std::is_same<PackOrUnPackOpTy, tensor::PackOp>::value)
+      (std::is_same<PackOrUnPackOpTy, linalg::PackOp>::value)
           ? packedMultiples
           : unPackedMultiples;
   LLVM_DEBUG({
@@ -267,14 +267,14 @@ static SmallVector<int64_t> inferResultWorkgroupTileMultiples(OpResult result) {
         });
         return resultMultiples;
       })
-      .Case<tensor::PackOp>([&](tensor::PackOp packOp) {
+      .Case<linalg::PackOp>([&](linalg::PackOp packOp) {
         SmallVector<int64_t> srcMultiples = getOperandMultiples()[0];
         return inferWorkgroupTileMultiplesFromPackUnPack(
                    packOp, /*initialPackedMultiples=*/std::nullopt,
                    /*initialUnPackedMultiples=*/srcMultiples)
             .second;
       })
-      .Case<tensor::UnPackOp>([&](tensor::UnPackOp unPackOp) {
+      .Case<linalg::UnPackOp>([&](linalg::UnPackOp unPackOp) {
         SmallVector<int64_t> srcMultiples = getOperandMultiples()[0];
         return inferWorkgroupTileMultiplesFromPackUnPack(
                    unPackOp, /*initialPackedMultiples=*/srcMultiples,
@@ -340,14 +340,14 @@ static SmallVector<int64_t> inferUseWorkgroupTileMultiples(OpOperand *use) {
         });
         return srcMultiples;
       })
-      .Case<tensor::PackOp>([&](tensor::PackOp packOp) {
+      .Case<linalg::PackOp>([&](linalg::PackOp packOp) {
         SmallVector<int64_t> destMultiples = getResultMultiples()[0];
         return inferWorkgroupTileMultiplesFromPackUnPack(
                    packOp, /*initialPackedMultiples=*/destMultiples,
                    /*initialUnPackedMultiples=*/std::nullopt)
             .first;
       })
-      .Case<tensor::UnPackOp>([&](tensor::UnPackOp unpackOp) {
+      .Case<linalg::UnPackOp>([&](linalg::UnPackOp unpackOp) {
         SmallVector<int64_t> destMultiples = getResultMultiples()[0];
         return inferWorkgroupTileMultiplesFromPackUnPack(
                    unpackOp, /*initialPackedMultiples=*/std::nullopt,

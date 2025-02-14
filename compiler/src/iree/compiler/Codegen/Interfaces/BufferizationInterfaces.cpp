@@ -364,7 +364,7 @@ template <typename OpTy>
 static FailureOr<std::pair<Value, Value>>
 getSourceAndDestFromPackUnPackOp(RewriterBase &rewriter, OpTy op,
                                  const BufferizationOptions &options) {
-  static_assert(llvm::is_one_of<OpTy, tensor::PackOp, tensor::UnPackOp>::value);
+  static_assert(llvm::is_one_of<OpTy, linalg::PackOp, linalg::UnPackOp>::value);
   Value source;
   auto maybeBuffer = getBuffer(rewriter, op.getSource(), options);
   if (failed(maybeBuffer))
@@ -385,7 +385,7 @@ getSourceAndDestFromPackUnPackOp(RewriterBase &rewriter, OpTy op,
   return std::make_pair(source, dest);
 }
 
-static LogicalResult bufferizePackOp(RewriterBase &rewriter, tensor::PackOp op,
+static LogicalResult bufferizePackOp(RewriterBase &rewriter, linalg::PackOp op,
                                      const BufferizationOptions &options) {
   // Take a guard before anything else.
   OpBuilder::InsertionGuard g(rewriter);
@@ -410,7 +410,7 @@ static LogicalResult bufferizePackOp(RewriterBase &rewriter, tensor::PackOp op,
 }
 
 static LogicalResult bufferizeUnPackOp(RewriterBase &rewriter,
-                                       tensor::UnPackOp op,
+                                       linalg::UnPackOp op,
                                        const BufferizationOptions &options) {
   // Take a guard before anything else.
   OpBuilder::InsertionGuard g(rewriter);
@@ -489,9 +489,9 @@ struct PackUnPackOpInterface
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const BufferizationOptions &options) const {
     return TypeSwitch<Operation *, LogicalResult>(op)
-        .template Case<tensor::PackOp>(
+        .template Case<linalg::PackOp>(
             [&](auto pack) { return bufferizePackOp(rewriter, pack, options); })
-        .template Case<tensor::UnPackOp>([&](auto unpack) {
+        .template Case<linalg::UnPackOp>([&](auto unpack) {
           return bufferizeUnPackOp(rewriter, unpack, options);
         })
         .Default([](auto) { return failure(); });
@@ -643,10 +643,11 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
     IREE::LinalgExt::AttentionOp::attachInterface<
         LinalgExtOpInterface<IREE::LinalgExt::AttentionOp>>(*ctx);
   });
-  registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
-    tensor::PackOp::attachInterface<PackUnPackOpInterface<tensor::PackOp>>(
+  registry.insert<linalg::LinalgDialect>();
+  registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
+    linalg::PackOp::attachInterface<PackUnPackOpInterface<linalg::PackOp>>(
         *ctx);
-    tensor::UnPackOp::attachInterface<PackUnPackOpInterface<tensor::UnPackOp>>(
+    linalg::UnPackOp::attachInterface<PackUnPackOpInterface<linalg::UnPackOp>>(
         *ctx);
   });
 }

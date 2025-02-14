@@ -137,13 +137,13 @@ FailureOr<Value> lowerSetEncodingOpToPackOp(
       loc, rewriter.getZeroAttr(resultType.getElementType()));
   SmallVector<OpFoldResult> sourceDims =
       tensor::getMixedSizes(rewriter, loc, source);
-  SmallVector<OpFoldResult> resultDims = tensor::PackOp::getResultShape(
+  SmallVector<OpFoldResult> resultDims = linalg::PackOp::getResultShape(
       rewriter, loc, sourceDims, *innerTileSizesOfr, encodingInfo.innerDimsPos,
       encodingInfo.outerDimsPerm);
   auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
                                                   resultType.getElementType());
   return rewriter
-      .create<tensor::PackOp>(loc, source, emptyOp, encodingInfo.innerDimsPos,
+      .create<linalg::PackOp>(loc, source, emptyOp, encodingInfo.innerDimsPos,
                               *innerTileSizesOfr, paddingValue,
                               encodingInfo.outerDimsPerm)
       .getResult();
@@ -176,7 +176,7 @@ FailureOr<Value> lowerUnsetEncodingToUnpackOp(
         encodingOp, "failed to generate runtime tile size query");
   }
   return rewriter
-      .create<tensor::UnPackOp>(loc, packedValue, emptyOp,
+      .create<linalg::UnPackOp>(loc, packedValue, emptyOp,
                                 encodingInfo.innerDimsPos, *innerTileSizesOfr,
                                 encodingInfo.outerDimsPerm)
       .getResult();
@@ -209,7 +209,7 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
 
   SmallVector<OpFoldResult> sourceDims = emptyOp.getMixedSizes();
   (void)foldDynamicIndexList(sourceDims);
-  SmallVector<OpFoldResult> newShape = tensor::PackOp::getResultShape(
+  SmallVector<OpFoldResult> newShape = linalg::PackOp::getResultShape(
       rewriter, loc, sourceDims, *innerTileSizesOfr, encodingInfo.innerDimsPos,
       encodingInfo.outerDimsPerm);
   newShape = getSwizzledShape(newShape, encodingInfo);
@@ -380,7 +380,7 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
     return failure();
   }
   SmallVector<OpFoldResult> convertedTargetShape =
-      tensor::PackOp::getResultShape(builder, loc, targetShape, *innerTileSizes,
+      linalg::PackOp::getResultShape(builder, loc, targetShape, *innerTileSizes,
                                      encodingInfo.innerDimsPos,
                                      encodingInfo.outerDimsPerm);
   return getSwizzledShape(convertedTargetShape, encodingInfo);
