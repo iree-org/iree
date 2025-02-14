@@ -217,6 +217,44 @@ util.global private @device_a = #device_target_local_0_
 
 #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
+#encoding = #iree_encoding.testing_encoding<>
+
+util.global private @device_a = #device_target_local_0_
+stream.executable private @executable {
+  stream.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !stream.binding, %arg1: index) {
+      %c0 = arith.constant 0 : index
+      %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readwrite:tensor<16xf32, #encoding>>
+      return
+    }
+  }
+}
+util.func public @tensor_dispatch_with_tied_operands(%arg0: !stream.resource<external>, %arg1: index, %arg2: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  %c4 = arith.constant 4 : index
+  %0 = stream.async.transfer %arg0 : !stream.resource<external>{%arg2} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%arg2}
+  %1 = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @executable::@dispatch[%c1, %c2, %c3](%0, %c4) : (tensor<4x?xf32, #encoding>{%arg2} in !stream.resource<*>{%arg1}, index) -> tensor<4x?xf32, #encoding>{%arg2} in %0{%arg1}
+  util.return %1 : !stream.resource<*>
+}
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123, tensor<4x?xf32>>]>
+// CHECK:       #[[TARGET:.+]] = #hal.device.target
+// CHECK:       util.global private @[[$DEVICE:.+]] = #[[TARGET]]
+// CHECK-LABEL: util.func public @tensor_dispatch_with_tied_operands
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK:         stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE]]>)
+// CHECK-SAME:      tensor<4x?xf32, #[[$ENCODING]]>{%[[ARG2]]}
+// CHECK-SAME:      tensor<4x?xf32, #[[$ENCODING]]>{%[[ARG2]]}
+
+// -----
+
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
+#device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #device_target_local_1_ = #hal.device.target<"local", {ordinal = 1 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.testing_encoding<>
 
