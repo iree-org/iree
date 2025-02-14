@@ -217,6 +217,9 @@ static iree_status_t iree_numpy_descr_to_element_type(
     case 'f':  // floating-point
       numerical_type = IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE;
       break;
+    case 'g':  // bf16
+      numerical_type = IREE_HAL_NUMERICAL_TYPE_FLOAT_BRAIN;
+      break;
     case 'c':  // complex-floating point
       numerical_type = IREE_HAL_NUMERICAL_TYPE_FLOAT_COMPLEX;
       break;
