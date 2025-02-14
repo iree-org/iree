@@ -44,7 +44,15 @@ in scope:
 * [iree-org/iree-turbine](https://github.com/iree-org/iree-turbine)
 * [nod-ai/shark-ai](https://github.com/nod-ai/shark-ai)
 
-With this dependency graph:
+!!! info
+
+    If you maintain a project that you would like to connect with this release
+    process, please reach out on one of our
+    [communication channels](../../index.md#communication-channels). The current
+    project list is driven by the priorities of the core project maintainers and
+    we would be happy to adapt the process to include other projects too.
+
+The dependency graph looks like this:
 
 ```mermaid
 graph TD
@@ -73,25 +81,52 @@ graph TD
   iree-base-compiler --> sharktank
   iree-turbine --> sharktank
   iree-base-runtime -. source dependency .-> shortfin
-  sharktank -- meta package --> shark-ai
-  shortfin -- meta package --> shark-ai
+  sharktank --> shark-ai
+  shortfin --> shark-ai
 ```
 
-!!! info
+#### :fontawesome-solid-circle-nodes: Types of dependency links
 
-    If you maintain a project that you would like to connect with this release
-    process, please reach out on one of our
-    [communication channels](../../index.md#communication-channels). The current
-    project list is driven by the priorities of the core project maintainers and
-    we would be happy to adapt the process to include other projects too.
+Most dependencies are loose requirements, not imposing strict limitations on
+the versions installed. This allows users to freely install similar versions of
+each package without risking issues during pip dependency resolution. This is
+important for libraries near the root or middle of a dependency graph.
+
+```text title="iree-turbine METADATA snippet" hl_lines="2-3"
+Requires-Dist: numpy
+Requires-Dist: iree-base-compiler
+Requires-Dist: iree-base-runtime
+Requires-Dist: Jinja2>=3.1.3
+Requires-Dist: ml_dtypes>=0.5.0
+```
+
+The shark-ai package is special in that it is a leaf project acting as a full
+solution for ML model development that _does_ specify precise versions. By
+installing this package, users will receive packages that have been more
+rigorously tested together:
+
+```text title="shark-ai METADATA snippet"
+Requires-Dist: iree-base-compiler==3.2.*
+Requires-Dist: iree-base-runtime==3.2.*
+Requires-Dist: iree-turbine==3.2.*
+Requires-Dist: sharktank==3.2.0
+Requires-Dist: shortfin==3.2.0
+```
+
+This feeds back into the release process - while release candidate selection
+typically flows from the base projects outwards, leaf projects are responsible
+for testing regularly and ensuring that the entire collective continues to work
+as expected.
 
 ### :octicons-calendar-16: Release timeline
 
 Over the course of a release cycle there are several milestones to look out for:
 
 * Week 0
-    * Release `X.Y.Z` is published
-    * Versions in source code are updated to `X.{Y+1}.Z`
+    * Release `X.Y.0` is published (see also
+      [Versioning scheme](./versioning-scheme.md))
+    * Versions in source code are updated to `X.{Y+1}.0` (see also
+      [Creating a patch release](#creating-a-patch-release))
     * The next release date target is set for ~6 weeks later
     * Subprojects set goals for the release
 * ~1 week before the release date
