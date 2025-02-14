@@ -69,18 +69,20 @@ static RankedTensorType cloneWithEncoding(RankedTensorType type,
 
 // Returns the type with updated encoding, if any. Returns the original type if
 // the type is not a RankedTensorType. If it is a RankedTensorType with an
-// unknown encoding, returns the type without the encoding. The method uses the
-// EncodingLayoutAttrInterface from the EncodingAttr to resolve the layouts of
-// the given `type`; returns the new encodings with the resolved layouts.
+// unknown encoding, returns the type without the encoding. The method uses
+// `layoutResolvers` to resolve the layouts of the given `type`; returns the new
+// encoding with the resolved layouts.
+// Note: The new encoding has to implement
+// SerializedEncodingLayoutAttrInterface. Otherwise, the specialization is
+// failed. Because the stream tensor ops still can not process encodings.
 static Type getTypeWithResolvedEncodingLayouts(
     Type type, const SetVector<Attribute> &layoutResolvers) {
   auto rankedTensorType = dyn_cast<RankedTensorType>(type);
   if (!rankedTensorType) {
     return type;
   }
-  // TODO(hanchung): Move the `cloneWithLayouts` to EncodingLayoutAttrInterface,
-  // so we can accept other encoding attributes that implement the interface.
-  auto encodingAttr = IREE::Encoding::getEncodingAttr(rankedTensorType);
+  auto encodingAttr =
+      IREE::Encoding::getEncodingLayoutAttrInterface(rankedTensorType);
   if (!encodingAttr) {
     return IREE::Encoding::dropEncoding(rankedTensorType);
   }
@@ -97,9 +99,11 @@ static Type getTypeWithResolvedEncodingLayouts(
         cast<IREE::Encoding::EncodingLayoutAttrInterface>(attr);
     layouts.push_back(encodingLayoutAttr.getLayout(rankedTensorType));
   }
+  Attribute newEncoding = encodingAttr.cloneWithLayouts(layouts);
+  assert(isa<IREE::Encoding::SerializedEncodingLayoutAttrInterface>(newEncoding));
   return cloneWithEncoding(rankedTensorType,
-                           encodingAttr.cloneWithLayouts(layouts));
-}
+                           newEncoding);
+};
 
 /// Updates the bindings of function arguments with encoding layouts. It only
 /// updates the uses when the argument type is stream.binding_type. The bindings
@@ -124,12 +128,12 @@ updateBindingEncodings(FunctionOpInterface funcOp,
                  << "Skip, the new type is not RankedTensorType.\n");
       continue;
     }
-    auto encodingAttr = IREE::Encoding::getEncodingAttr(newType);
+    auto encodingAttr = IREE::Encoding::getEncodingLayoutAttrInterface(newType);
     if (!encodingAttr) {
-      LLVM_DEBUG(
-          llvm::dbgs()
-          << "Skip, the binding layout attribute is not EncodingAttr, "
-             "which means that the type does not have a valid encoding.\n");
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Skip, the binding layout attribute is not "
+                    "EncodingLayoutAttrInterface, which means that the type "
+                    "does not have a valid encoding.\n");
       continue;
     }
     for (auto user : arg.getUsers()) {
@@ -454,7 +458,6 @@ static LogicalResult updateTensorDispatchOp(
       newResultEncodings.push_back(type);
       continue;
     }
-
     Type newEncodingType =
         getTypeWithResolvedEncodingLayouts(type, resLayoutResolvers);
     newResultEncodings.push_back(newEncodingType);
@@ -500,7 +503,7 @@ updateTensorConstantOp(RewriterBase &rewriter,
   if (!encodingType) {
     return success();
   }
-  if (IREE::Encoding::getEncodingAttr(encodingType)) {
+  if (encodingType.getEncoding()) {
     return failure();
   }
   return success();
