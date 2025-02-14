@@ -648,20 +648,20 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
       // Ensure vectorization works with the `workgroupTileMultiple`.
       int64_t workgroupTileMultiple = workgroupTileSizeMultiples[shapeDim];
       unsigned numVectorElements = std::max(4u, 128 / representativeBitWidth);
-      int64_t vecorizableCandidate = numVectorElements * numThreads;
+      int64_t vectorizableCandidate = numVectorElements * numThreads;
       // For smaller shapes, we reduce `numVectorElements` as we may not find
       // work for all threads otherwise and we dont have vectorization enabled
       // with loss.
-      while (vectorizable && (vecorizableCandidate > loopBound) &&
+      while (vectorizable && (vectorizableCandidate > loopBound) &&
              numVectorElements > 4) {
         numVectorElements /= 2;
-        vecorizableCandidate = numVectorElements * numThreads;
+        vectorizableCandidate = numVectorElements * numThreads;
       }
       vectorizable =
-          vectorizable && vecorizableCandidate % workgroupTileMultiple == 0;
+          vectorizable && vectorizableCandidate % workgroupTileMultiple == 0;
 
       if (vectorizable && wgDim == 0 && !lossFactor) {
-        candidates.push_back(vecorizableCandidate);
+        candidates.push_back(vectorizableCandidate);
       }
 
       // Try all power of two multiples of `workgroupTileMultiple` up to the
