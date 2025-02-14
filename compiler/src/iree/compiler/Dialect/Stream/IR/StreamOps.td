@@ -2294,9 +2294,6 @@ def Stream_AsyncBarrierOp : Stream_Op<"async.barrier", [
   AllTypesMatch<["source", "result"]>,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
-  DeclareOpInterfaceMethods<Stream_StreamableOp, [
-    "isMetadata",
-  ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResult",
@@ -2344,10 +2341,7 @@ def Stream_AsyncBarrierOp : Stream_Op<"async.barrier", [
 }
 
 def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinityAttr",
-    "setAffinityAttr",
-  ]>,
+  DeclareOpInterfaceMethods<Stream_AffinityOp>,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
   DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
@@ -2371,7 +2365,8 @@ def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
     Stream_Size:$source_size,
     Stream_Size:$result_size,
     OptionalAttr<Stream_AffinityAttr>:$source_affinity,
-    OptionalAttr<Stream_AffinityAttr>:$result_affinity
+    OptionalAttr<Stream_AffinityAttr>:$result_affinity,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
     AnyTypeOf<[
@@ -2383,6 +2378,7 @@ def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
   let assemblyFormat = [{
     $source `:` type($source)
     `` `{` $source_size `}`
+    (`on` `(` $affinity^ `)`)?
     (`from` `(` $source_affinity^ `)`)?
     `->`
     (`to` `(` $result_affinity^ `)`)?
@@ -2399,6 +2395,16 @@ def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
+
+  let builders = [
+    OpBuilder<(ins
+      "Type":$type,
+      "Value":$source,
+      "Value":$source_size,
+      "Value":$result_size,
+      "AffinityAttr":$source_affinity,
+      "AffinityAttr":$result_affinity)>,
+  ];
 }
 
 def Stream_AsyncLoadOp : Stream_PureOp<"async.load", [

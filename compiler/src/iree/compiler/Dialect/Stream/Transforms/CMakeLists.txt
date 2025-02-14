@@ -25,6 +25,7 @@ iree_cc_library(
     "ElideTimepoints.cpp"
     "EmplaceAllocations.cpp"
     "EncodeTensors.cpp"
+    "ExecutionPlacement.cpp"
     "FoldUniformOperands.cpp"
     "FuseDispatchBindings.cpp"
     "LayoutSlices.cpp"
