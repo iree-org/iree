@@ -477,10 +477,12 @@ static uint32_t
 getFlagForUserAndOperandTypes(IREE::Encoding::EncodingAttr encoding,
                               ArrayRef<Type> operandTypes) {
   // There are currently no batch_mmt4d ukernels, so check for no batch
-  // dimension.
+  // dimension. We should not reach to the case because only VMVX backend cares
+  // the dynamic inner tile sizes and the batch gemm data-tiling is disabled in
+  // the first place, if ukernel is enabled.
   auto cDims = IREE::Encoding::getEncodingContractionDims(encoding);
-  if (failed(cDims) || !cDims->batch.empty() || operandTypes.size() != 3) {
-    return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_NONE;
+  if (succeeded(cDims)) {
+    assert(cDims->batch.empty() && operandTypes.size() == 3);
   }
 
   Type lhs = operandTypes[0];
