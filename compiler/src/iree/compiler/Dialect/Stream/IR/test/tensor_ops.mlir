@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file %s --verify-diagnostics | FileCheck %s
 
 // CHECK-LABEL: @tensorImport
 util.func private @tensorImport(%arg0: !hal.buffer_view, %arg1: index) -> !stream.resource<external> {
@@ -162,7 +162,20 @@ util.func private @tensorDispatch(%arg0: !stream.resource<*>, %arg1: index, %arg
   %c3 = arith.constant 3 : index
   %c4 = arith.constant 4 : index
   // CHECK: = stream.tensor.dispatch @executable::@dispatch[%c1, %c2, %c3](%arg0, %c4) :
-  // CHECK-SAME: (tensor<4x?xf32>{%arg2} in !stream.resource<*>{%arg1}, index) -> tensor<?x4xf32>{%arg2} in %arg0{%arg1}
+  // CHECK-SAME: (tensor<4x?xf32>{%arg2} in !stream.resource<*>{%arg1}, index) -> tensor<4x?xf32>{%arg2} in %arg0{%arg1}
+  %0 = stream.tensor.dispatch @executable::@dispatch[%c1, %c2, %c3](%arg0, %c4) : (tensor<4x?xf32>{%arg2} in !stream.resource<*>{%arg1}, index) -> tensor<4x?xf32>{%arg2} in %arg0{%arg1}
+  util.return %0 : !stream.resource<*>
+}
+
+// -----
+
+util.func private @tensorDispatchMismatch(%arg0: !stream.resource<*>, %arg1: index, %arg2: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  %c4 = arith.constant 4 : index
+  // expected-error @+1 {{the 0-th operandEncoding (tensor<4x?xf32>) does not match the resultEncoding (tensor<?x4xf32>)}}
   %0 = stream.tensor.dispatch @executable::@dispatch[%c1, %c2, %c3](%arg0, %c4) : (tensor<4x?xf32>{%arg2} in !stream.resource<*>{%arg1}, index) -> tensor<?x4xf32>{%arg2} in %arg0{%arg1}
   util.return %0 : !stream.resource<*>
 }

@@ -146,6 +146,53 @@ updateBindingEncodings(FunctionOpInterface funcOp,
   return success();
 }
 
+/// Returns the operands encodings and result encodings from the `dispatchOp` in
+/// |operands| + |results| order, i.e., it returns the stripped concatenated
+/// operand encodings and result encodings. If a result is tied to an operand,
+/// the result encoding is skipped. Because it shares the same binding with the
+/// tied operands.
+///
+/// Example 1:
+///
+///   %0 = stream.tensor.dispatch ...(%arg0, %c4)
+///     : (tensor<4x?xf32, #encoding> in !resource, index)
+///     -> tensor<4x?xf32, #encoding> in !resource
+///
+/// The above dispatch op does not have tied operands. Thus, it returns
+///   |#resolved_encoding, whatever_without_encoding, #resolved_encoding|
+///
+/// Example 2:
+///
+///   %0 = stream.tensor.dispatch ...(%arg0, %c4) : tensor<4x?xf32, #encoding>
+///     -> tensor<4x?xf32, #encoding> in %arg0
+///
+/// The above dispatch op ties the result to the first operand. Thus, the result
+/// encoding is stripped. It returns
+///   |#resolved_encoding, whatever_without_encoding|
+static SmallVector<Attribute>
+getBindingLayoutAttrs(IREE::Stream::TensorDispatchOp dispatchOp) {
+  SmallVector<int64_t> tiedOperands(dispatchOp.getNumResults(),
+                                    IREE::Util::TiedOpInterface::kUntiedIndex);
+  if (std::optional<ArrayAttr> tiedOperandsAttr =
+          dispatchOp.getTiedOperands()) {
+    tiedOperands =
+        llvm::map_to_vector(tiedOperandsAttr.value(), [](Attribute intAttr) {
+          return llvm::cast<IntegerAttr>(intAttr).getInt();
+        });
+  }
+
+  SmallVector<Attribute> result(dispatchOp.getOperandEncodings().getValue());
+  for (auto [resultEncoding, tiedOperand] : llvm::zip_equal(
+           dispatchOp.getResultEncodings().getValue(), tiedOperands)) {
+    if (tiedOperand != IREE::Util::TiedOpInterface::kUntiedIndex) {
+      continue;
+    }
+    result.push_back(resultEncoding);
+  }
+
+  return result;
+}
+
 /// Duplicates stream.executables based on the operand encodings and result
 /// encodings of stream.tensor.dispatch ops. Some executables can be launched by
 /// different devices. It can produce wrong codegen artifacts when bindings
@@ -183,10 +230,8 @@ duplicateExecutablesPerLayoutVariant(ModuleOp moduleOp, SymbolTable symbolTable,
   llvm::MapVector<IREE::Stream::TensorDispatchOp, SmallVector<Attribute>>
       dispatchOpBindingLayouts;
   for (auto dispatchOp : candidates) {
-    SmallVector<Attribute> bindingLayoutAttrs(
-        dispatchOp.getOperandEncodings().getValue());
-    llvm::append_range(bindingLayoutAttrs,
-                       dispatchOp.getResultEncodings().getValue());
+    SmallVector<Attribute> bindingLayoutAttrs =
+        getBindingLayoutAttrs(dispatchOp);
     dispatchOpBindingLayouts[dispatchOp] = bindingLayoutAttrs;
     dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPoint) {
       auto exportOp = cast<IREE::Stream::ExecutableExportOp>(
