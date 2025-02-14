@@ -60,34 +60,46 @@ SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
 
 } // namespace
 
-// Returns an updated encoding attribute if the type is a RankedTensorType
-// and an EncodingAttr is present. Otherwise, returns std::nullopt. The
-// method uses the EncodingLayoutAttrInterface from the EncodingAttr to
-// resolve the layouts of the given `type`; returns the new encodings with
-// the resolved layouts.
-static std::optional<IREE::Encoding::EncodingAttr>
-getEncodingWithNewLayouts(Type type,
-                          const SetVector<Attribute> &layoutResolvers) {
+// TODO(hanchung): Add "cloneWithEncoding" method to RankedTensorType.
+static RankedTensorType cloneWithEncoding(RankedTensorType type,
+                                          Attribute encodingAttr) {
+  return RankedTensorType::get(type.getShape(), type.getElementType(),
+                               encodingAttr);
+}
+
+// Returns the type with updated encoding, if any. Returns the original type if
+// the type is not a RankedTensorType. If it is a RankedTensorType with an
+// unknown encoding, returns the type without the encoding. The method uses the
+// EncodingLayoutAttrInterface from the EncodingAttr to resolve the layouts of
+// the given `type`; returns the new encodings with the resolved layouts.
+static Type getTypeWithResolvedEncodingLayouts(
+    Type type, const SetVector<Attribute> &layoutResolvers) {
   auto rankedTensorType = dyn_cast<RankedTensorType>(type);
   if (!rankedTensorType) {
-    return std::nullopt;
+    return type;
   }
+  // TODO(hanchung): Move the `cloneWithLayouts` to EncodingLayoutAttrInterface,
+  // so we can accept other encoding attributes that implement the interface.
   auto encodingAttr = IREE::Encoding::getEncodingAttr(rankedTensorType);
   if (!encodingAttr) {
-    return std::nullopt;
+    return IREE::Encoding::dropEncoding(rankedTensorType);
+  }
+  if (!llvm::all_of(
+          layoutResolvers,
+          llvm::IsaPred<IREE::Encoding::EncodingLayoutAttrInterface>)) {
+    // Drop the encoding if one of attributes does not implement the interface.
+    // Because there is no way to query the layout.
+    return IREE::Encoding::dropEncoding(rankedTensorType);
   }
   SmallVector<Attribute> layouts;
   for (auto attr : layoutResolvers) {
     auto encodingLayoutAttr =
-        dyn_cast<IREE::Encoding::EncodingLayoutAttrInterface>(attr);
-    if (!encodingLayoutAttr) {
-      layouts.push_back(attr);
-      continue;
-    }
+        cast<IREE::Encoding::EncodingLayoutAttrInterface>(attr);
     layouts.push_back(encodingLayoutAttr.getLayout(rankedTensorType));
   }
-  return encodingAttr.cloneWithLayouts(layouts);
-};
+  return cloneWithEncoding(rankedTensorType,
+                           encodingAttr.cloneWithLayouts(layouts));
+}
 
 /// Updates the bindings of function arguments with encoding layouts. It only
 /// updates the uses when the argument type is stream.binding_type. The bindings
@@ -270,13 +282,6 @@ duplicateExecutablesPerLayoutVariant(ModuleOp moduleOp, SymbolTable symbolTable,
   return success();
 }
 
-// TODO(hanchung): Add "cloneWithEncoding" method to RankedTensorType.
-static RankedTensorType cloneWithEncoding(RankedTensorType type,
-                                          Attribute encodingAttr) {
-  return RankedTensorType::get(type.getShape(), type.getElementType(),
-                               encodingAttr);
-}
-
 /// Returns all the stream tensor ops that implement AffinityOpInterface, where
 /// a stream affinity indicates the kind of enviroment the ops are expected run
 /// in.
@@ -434,14 +439,9 @@ static LogicalResult updateTensorDispatchOp(
            "the (affinity, dispatchOp) query is invalid");
     const SetVector<Attribute> &layoutResolvers = cachedLayoutAttrs[key];
 
-    std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
-        getEncodingWithNewLayouts(type, layoutResolvers);
-    if (!encodingAttr) {
-      newOperandEncodings.push_back(type);
-      continue;
-    }
-    newOperandEncodings.push_back(
-        cloneWithEncoding(cast<RankedTensorType>(type), encodingAttr.value()));
+    Type newEncodingType =
+        getTypeWithResolvedEncodingLayouts(type, layoutResolvers);
+    newOperandEncodings.push_back(newEncodingType);
   }
   dispatchOp.setOperandEncodingsAttr(
       rewriter.getTypeArrayAttr(newOperandEncodings));
@@ -454,14 +454,10 @@ static LogicalResult updateTensorDispatchOp(
       newResultEncodings.push_back(type);
       continue;
     }
-    std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
-        getEncodingWithNewLayouts(type, resLayoutResolvers);
-    if (!encodingAttr) {
-      newResultEncodings.push_back(type);
-      continue;
-    }
-    newResultEncodings.push_back(
-        cloneWithEncoding(cast<RankedTensorType>(type), encodingAttr.value()));
+
+    Type newEncodingType =
+        getTypeWithResolvedEncodingLayouts(type, resLayoutResolvers);
+    newResultEncodings.push_back(newEncodingType);
   }
   dispatchOp.setResultEncodingsAttr(
       rewriter.getTypeArrayAttr(newResultEncodings));
@@ -475,14 +471,10 @@ updateTensorSizeOfOp(RewriterBase &rewriter,
                      IREE::Stream::TensorSizeOfOp sizeOfOp,
                      const SetVector<Attribute> &layoutResolvers) {
   auto encodingType = dyn_cast<RankedTensorType>(sizeOfOp.getEncoding());
-  std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
-      getEncodingWithNewLayouts(encodingType, layoutResolvers);
-  if (!encodingAttr) {
-    return success();
-  }
-  rewriter.modifyOpInPlace(sizeOfOp, [&] {
-    sizeOfOp.setEncoding(cloneWithEncoding(encodingType, encodingAttr.value()));
-  });
+  Type newEncodingType =
+      getTypeWithResolvedEncodingLayouts(encodingType, layoutResolvers);
+  rewriter.modifyOpInPlace(sizeOfOp,
+                           [&] { sizeOfOp.setEncoding(newEncodingType); });
   return success();
 }
 
@@ -491,14 +483,9 @@ static LogicalResult
 updateTensorFillOp(RewriterBase &rewriter, IREE::Stream::TensorFillOp op,
                    const SetVector<Attribute> &layoutResolvers) {
   auto encodingType = dyn_cast<RankedTensorType>(op.getTargetEncoding());
-  std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
-      getEncodingWithNewLayouts(encodingType, layoutResolvers);
-  if (!encodingAttr) {
-    return success();
-  }
-  rewriter.modifyOpInPlace(op, [&] {
-    op.setTargetEncoding(cloneWithEncoding(encodingType, encodingAttr.value()));
-  });
+  Type newEncodingType =
+      getTypeWithResolvedEncodingLayouts(encodingType, layoutResolvers);
+  rewriter.modifyOpInPlace(op, [&] { op.setTargetEncoding(newEncodingType); });
   return success();
 }
 
@@ -571,14 +558,9 @@ static LogicalResult
 updateSourceEncoding(RewriterBase &rewriter, OpTy op,
                      const SetVector<Attribute> &layoutResolvers) {
   auto encodingType = dyn_cast<RankedTensorType>(op.getSourceEncoding());
-  std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
-      getEncodingWithNewLayouts(encodingType, layoutResolvers);
-  if (!encodingAttr) {
-    return success();
-  }
-  rewriter.modifyOpInPlace(op, [&] {
-    op.setSourceEncoding(cloneWithEncoding(encodingType, encodingAttr.value()));
-  });
+  Type newEncodingType =
+      getTypeWithResolvedEncodingLayouts(encodingType, layoutResolvers);
+  rewriter.modifyOpInPlace(op, [&] { op.setSourceEncoding(newEncodingType); });
   return success();
 }
 
@@ -589,14 +571,9 @@ static LogicalResult
 updateResultEncoding(RewriterBase &rewriter, OpTy op,
                      const SetVector<Attribute> &layoutResolvers) {
   auto encodingType = dyn_cast<RankedTensorType>(op.getResultEncoding());
-  std::optional<IREE::Encoding::EncodingAttr> encodingAttr =
-      getEncodingWithNewLayouts(encodingType, layoutResolvers);
-  if (!encodingAttr) {
-    return success();
-  }
-  rewriter.modifyOpInPlace(op, [&] {
-    op.setResultEncoding(cloneWithEncoding(encodingType, encodingAttr.value()));
-  });
+  Type newEncodingType =
+      getTypeWithResolvedEncodingLayouts(encodingType, layoutResolvers);
+  rewriter.modifyOpInPlace(op, [&] { op.setResultEncoding(newEncodingType); });
   return success();
 }
 
