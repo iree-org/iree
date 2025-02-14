@@ -1782,7 +1782,12 @@ void SetupHalBindings(nanobind::module_ m) {
         new (self) HalShape(indices);
       });
 
-  py::class_<HalCommandBuffer>(m, "HalCommandBuffer")
+  auto hal_command_buffer = py::class_<HalCommandBuffer>(m, "HalCommandBuffer");
+  VmRef::BindRefProtocol(hal_command_buffer, iree_hal_command_buffer_type,
+                         iree_hal_command_buffer_retain_ref,
+                         iree_hal_command_buffer_deref,
+                         iree_hal_command_buffer_isa);
+  hal_command_buffer
       .def(
           "__init__",
           [](HalCommandBuffer* new_self, HalDevice& device,
