@@ -511,6 +511,9 @@ static unsigned getRepresentativeBitWidth(linalg::LinalgOp linalgOp) {
   std::optional<unsigned> maxBitWidth;
   auto updateElementTypeBitWidth = [&](Value v) {
     auto elementType = getElementTypeOrSelf(v);
+    if (!elementType.isIntOrFloat()) {
+      return;
+    }
     unsigned bitWidth = elementType.getIntOrFloatBitWidth();
     if (maxBitWidth) {
       maxBitWidth = std::max(maxBitWidth.value(), bitWidth);
