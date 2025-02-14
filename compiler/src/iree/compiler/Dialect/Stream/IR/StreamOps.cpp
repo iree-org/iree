@@ -88,18 +88,19 @@ static LogicalResult verifyTiedOperandEncodings(Operation *op,
 
   ArrayRef<Attribute> operandEncodings = operandEncodingsAttr.getValue();
   unsigned tiedOperandBase = tiedOp.getTiedOperandsIndexAndLength().first;
-  for (auto [idx, resEncoding] :
+  for (auto [idx, resultEncoding] :
        llvm::enumerate(resultEncodingsAttr.getValue())) {
     auto tiedOperand = tiedOp.getTiedResultOperandIndex(idx);
     if (!tiedOperand.has_value()) {
       continue;
     }
     auto operandIndex = tiedOperand.value() - tiedOperandBase;
-    if (operandEncodings[operandIndex] != resEncoding) {
+    if (operandEncodings[operandIndex] != resultEncoding) {
       return op->emitError()
              << "the " << operandIndex << "-th operandEncoding ("
              << operandEncodings[operandIndex]
-             << ") does not match the resultEncoding (" << resEncoding << ")";
+             << ") does not match the resultEncoding (" << resultEncoding
+             << ")";
     }
   }
 
