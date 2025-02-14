@@ -753,3 +753,37 @@ util.func public @uncollapsable_consumer_partial(%arg0: tensor<10x20x30x2304xf32
 // CHECK-SAME:         iterator_types = ["parallel", "parallel", "reduction"]
 //     CHECK:        %[[BARRIER:.+]] = util.optimization_barrier %[[RES]]
 //     CHECK:        flow.return %[[RES]]
+
+// -----
+
+util.func @elementwise_dynamic(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32>{
+  %cst_0 = arith.constant 0 : index
+  %cst_1 = arith.constant 1 : index
+  %0 = tensor.dim %arg0, %cst_0 : tensor<?x?xf32>
+  %1 = tensor.dim %arg0, %cst_1 : tensor<?x?xf32>
+  %3 = flow.dispatch.region -> (tensor<?x?xf32>{%0, %1}) {
+    %5 = tensor.empty(%0, %1) : tensor<?x?xf32>
+    %cst = arith.constant 1.000000e+02 : f32
+    %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%arg0 : tensor<?x?xf32>) outs(%5 : tensor<?x?xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %7 = arith.addf %in, %cst : f32
+      linalg.yield %7 : f32
+    } -> tensor<?x?xf32>
+    flow.return %6 : tensor<?x?xf32>
+  }
+  util.return %3 : tensor<?x?xf32>
+}
+// CHECK-LABEL: util.func public @elementwise_dynamic
+//  CHECK-SAME:   %[[ARG0:[0-9a-zA-Z]+]]
+//  CHECK-SAME:   %[[ARG1:[0-9a-zA-Z]+]]
+//   CHECK-DAG:   %[[CST0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[CST1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[DIM0:.+]] = tensor.dim %[[ARG0]], %[[CST0]]
+//   CHECK-DAG:   %[[DIM1:.+]] = tensor.dim %[[ARG0]], %[[CST1]]
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[VAL:.+]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel"]
+//       CHECK:     flow.return %[[VAL]] : tensor<?xf32>
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[DISPATCH]]
+//  CHECK-SAME:     {{.+}} output_shape [%[[DIM0]], %[[DIM1]]]
+//       CHECK:   util.return %[[EXPAND]] : tensor<?x?xf32>
