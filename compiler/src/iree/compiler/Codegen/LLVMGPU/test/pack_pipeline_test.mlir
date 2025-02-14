@@ -10,7 +10,7 @@ func.func @static_pack() {
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4x16x16x32xi32>>
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [128, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x256xi32>> -> tensor<128x256xi32>
   %3 = tensor.empty() : tensor<4x16x16x32xi32>
-  %pack = tensor.pack %2 inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %3 : tensor<128x256xi32> -> tensor<4x16x16x32xi32>
+  %pack = linalg.pack %2 inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %3 : tensor<128x256xi32> -> tensor<4x16x16x32xi32>
   flow.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [4, 16, 16, 32], strides = [1, 1, 1, 1] : tensor<4x16x16x32xi32> -> !flow.dispatch.tensor<writeonly:tensor<4x16x16x32xi32>>
   return
 }

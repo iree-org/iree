@@ -525,7 +525,7 @@ func.func @scatter_as_root_op(%arg0: tensor<4x?xi64>,
 func.func @set_encoding_gpu(%0 : tensor<1234x567xi8>) -> tensor<10x9x8x4x4x4x2x8xi8> {
   %c0_i8 = arith.constant 0 : i8
   %22 = tensor.empty() : tensor<10x9x128x64xi8>
-  %pack = tensor.pack %0 padding_value(%c0_i8 : i8)
+  %pack = linalg.pack %0 padding_value(%c0_i8 : i8)
       outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [128, 64]
       into %22 : tensor<1234x567xi8> -> tensor<10x9x128x64xi8>
   %expanded = tensor.expand_shape %pack [[0], [1], [2, 3, 4], [5, 6, 7]]
@@ -565,7 +565,7 @@ func.func @unset_encoding_gpu(%arg0: tensor<10x5x4x8x2x4x16x4xi32>) -> tensor<12
   %collapsed = tensor.collapse_shape %transposed [[0], [1], [2, 3, 4], [5, 6, 7]]
       : tensor<10x5x4x8x4x4x16x2xi32> into tensor<10x5x128x128xi32>
   %1 = tensor.empty() : tensor<1234x567xi32>
-  %unpack = tensor.unpack %collapsed
+  %unpack = linalg.unpack %collapsed
       outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [128, 128]
       into %1 : tensor<10x5x128x128xi32> -> tensor<1234x567xi32>
   return %unpack : tensor<1234x567xi32>
@@ -591,7 +591,7 @@ func.func @pack_dynamic_producer(%arg0: tensor<?x?xi8>, %d0: index, %d1: index, 
     linalg.yield %in : i8
   } -> tensor<?x?xi8>
   %init1 = tensor.empty(%d2, %d3) : tensor<?x?x32x32xi8>
-  %pack = tensor.pack %0 padding_value(%c0_i8 : i8)
+  %pack = linalg.pack %0 padding_value(%c0_i8 : i8)
       outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [32, 32]
       into %init1 : tensor<?x?xi8> -> tensor<?x?x32x32xi8>
   return %pack : tensor<?x?x32x32xi8>
@@ -617,7 +617,7 @@ func.func @pack_full_tile(%arg0: tensor<32x32xi8>) -> tensor<1x1x32x32xi8> {
     linalg.yield %in : i8
   } -> tensor<32x32xi8>
   %init1 = tensor.empty() : tensor<1x1x32x32xi8>
-  %pack = tensor.pack %0 padding_value(%c0_i8 : i8)
+  %pack = linalg.pack %0 padding_value(%c0_i8 : i8)
       outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [32, 32]
       into %init1 : tensor<32x32xi8> -> tensor<1x1x32x32xi8>
   return %pack : tensor<1x1x32x32xi8>
@@ -643,7 +643,7 @@ func.func @pack_dynamic_tile(%arg0: tensor<32x32xi8>, %d0: index, %d1: index, %t
     linalg.yield %in : i8
   } -> tensor<32x32xi8>
   %init1 = tensor.empty(%d0, %d1, %tile0, %tile1) : tensor<?x?x?x?xi8>
-  %pack = tensor.pack %0 padding_value(%c0_i8 : i8)
+  %pack = linalg.pack %0 padding_value(%c0_i8 : i8)
       outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [%tile0, %tile1]
       into %init1 : tensor<32x32xi8> -> tensor<?x?x?x?xi8>
   return %pack : tensor<?x?x?x?xi8>

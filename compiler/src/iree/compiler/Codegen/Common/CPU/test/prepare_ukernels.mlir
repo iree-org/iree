@@ -158,7 +158,7 @@ func.func @pack_without_outer_dims_perm(%arg0: tensor<1x16384x512xbf16>, %arg1: 
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "pack", target_triple="x86_64-xyz-xyz", cpu_features=""}>
 } {
   %cst = arith.constant 0.000000e+00 : bf16
-  %pack = tensor.pack %arg0 inner_dims_pos = [1, 2] inner_tiles = [16, 2] into %arg1 : tensor<1x16384x512xbf16> -> tensor<1x1024x256x16x2xbf16>
+  %pack = linalg.pack %arg0 inner_dims_pos = [1, 2] inner_tiles = [16, 2] into %arg1 : tensor<1x16384x512xbf16> -> tensor<1x1024x256x16x2xbf16>
   return %pack : tensor<1x1024x256x16x2xbf16>
 }
 // CHECK:      func.func @pack_without_outer_dims_perm
@@ -168,7 +168,7 @@ func.func @pack_without_outer_dims_perm(%arg0: tensor<1x16384x512xbf16>, %arg1: 
 // CHECK-SAME:     tensor<1x16384x512xbf16> to tensor<16384x512xbf16>
 // CHECK:        %[[DEST_SLICE:.+]] = tensor.extract_slice %[[DEST]]
 // CHECK-SAME:      tensor<1x1024x256x16x2xbf16> to tensor<1024x256x16x2xbf16>
-// CHECK:        %[[PACK:.+]] = tensor.pack %[[SRC_SLICE]]
+// CHECK:        %[[PACK:.+]] = linalg.pack %[[SRC_SLICE]]
 // CHECK-SAME:     inner_dims_pos = [0, 1] inner_tiles = [16, 2]
 // CHECK-SAME:     into %[[DEST_SLICE]]
 
@@ -178,7 +178,7 @@ func.func @pack_with_outer_dims_perm(%arg0: tensor<484x16x64xbf16>, %arg1: tenso
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "pack", target_triple="x86_64-xyz-xyz", cpu_features=""}>
 } {
   %cst = arith.constant 0.000000e+00 : bf16
-  %pack = tensor.pack %arg0 padding_value(%cst : bf16) outer_dims_perm = [2, 0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 2] into %arg1 : tensor<484x16x64xbf16> -> tensor<64x31x8x16x2xbf16>
+  %pack = linalg.pack %arg0 padding_value(%cst : bf16) outer_dims_perm = [2, 0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 2] into %arg1 : tensor<484x16x64xbf16> -> tensor<64x31x8x16x2xbf16>
   return %pack : tensor<64x31x8x16x2xbf16>
 }
 // CHECK:      func.func @pack_with_outer_dims_perm
@@ -190,7 +190,7 @@ func.func @pack_with_outer_dims_perm(%arg0: tensor<484x16x64xbf16>, %arg1: tenso
 // CHECK-SAME:       tensor<484x16x64xbf16> to tensor<484x16xbf16>
 // CHECK:          %[[DEST_SLICE:.+]] = tensor.extract_slice %[[ITER]]
 // CHECK-SAME:       tensor<64x31x8x16x2xbf16> to tensor<31x8x16x2xbf16>
-// CHECK:          %[[PACK:.+]] = tensor.pack %[[SRC_SLICE]]
+// CHECK:          %[[PACK:.+]] = linalg.pack %[[SRC_SLICE]]
 // CHECK-SAME:       padding_value(%[[PAD_VAL]] : bf16)
 // CHECK-SAME:       outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 2]
 // CHECK-SAME:       into %[[DEST_SLICE]]
@@ -202,11 +202,11 @@ func.func @do_not_decompose_pack(%arg0: tensor<1x16384x512xbf16>, %arg1: tensor<
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "", target_triple="x86_64-xyz-xyz", cpu_features=""}>
 } {
   %cst = arith.constant 0.000000e+00 : bf16
-  %pack = tensor.pack %arg0 inner_dims_pos = [1, 2] inner_tiles = [16, 2] into %arg1 : tensor<1x16384x512xbf16> -> tensor<1x1024x256x16x2xbf16>
+  %pack = linalg.pack %arg0 inner_dims_pos = [1, 2] inner_tiles = [16, 2] into %arg1 : tensor<1x16384x512xbf16> -> tensor<1x1024x256x16x2xbf16>
   return %pack : tensor<1x1024x256x16x2xbf16>
 }
 // CHECK-LABEL: func.func @do_not_decompose_pack
-// CHECK:         tensor.pack {{.+}} : tensor<1x16384x512xbf16> -> tensor<1x1024x256x16x2xbf16>
+// CHECK:         linalg.pack {{.+}} : tensor<1x16384x512xbf16> -> tensor<1x1024x256x16x2xbf16>
 
 // -----
 
@@ -214,7 +214,7 @@ func.func @unpack_without_transpose(%arg0: tensor<1828x8x64x16x16xf32>) -> tenso
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "unpack", target_triple="x86_64-xyz-xyz", cpu_features=""}>
 } {
   %6 = tensor.empty() : tensor<1828x128x1024xf32>
-  %unpack = tensor.unpack %arg0
+  %unpack = linalg.unpack %arg0
       outer_dims_perm = [0, 1, 2]
       inner_dims_pos = [1, 2]
       inner_tiles = [16, 16]
@@ -233,7 +233,7 @@ func.func @unpack_without_transpose(%arg0: tensor<1828x8x64x16x16xf32>) -> tenso
 // CHECK-SAME:          : tensor<1828x8x64x16x16xf32> to tensor<8x64x16x16xf32>
 // CHECK:             %[[DEST_SLICE:.*]] = tensor.extract_slice %[[ITER_ARG]][%[[ITER]], 0, 0] [1, 128, 1024] [1, 1, 1]
 // CHECK-SAME:          : tensor<1828x128x1024xf32> to tensor<128x1024xf32>
-// CHECK:             %[[UNPACK:.*]] = tensor.unpack %[[SRC_SLICE]]
+// CHECK:             %[[UNPACK:.*]] = linalg.unpack %[[SRC_SLICE]]
 // CHECK-SAME:         outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16]
 // CHECK-SAME:         into %[[DEST_SLICE]] : tensor<8x64x16x16xf32> -> tensor<128x1024xf32>
 // CHECK:             %[[NEW_ITER_ARG:.*]] = tensor.insert_slice %[[UNPACK]] into %[[ITER_ARG]][%[[ITER]], 0, 0] [1, 128, 1024] [1, 1, 1]
@@ -250,7 +250,7 @@ func.func @unpack_outer_dim_transpose(%arg0: tensor<4x8x29241x16x16xf32>) -> ten
 } {
   %cst = arith.constant 0.000000e+00 : bf16
   %4 = tensor.empty() : tensor<29241x128x64xf32>
-  %unpack = tensor.unpack %arg0 outer_dims_perm = [2, 1, 0] inner_dims_pos = [1, 2] inner_tiles = [16, 16] into %4 : tensor<4x8x29241x16x16xf32> -> tensor<29241x128x64xf32>
+  %unpack = linalg.unpack %arg0 outer_dims_perm = [2, 1, 0] inner_dims_pos = [1, 2] inner_tiles = [16, 16] into %4 : tensor<4x8x29241x16x16xf32> -> tensor<29241x128x64xf32>
   return %unpack : tensor<29241x128x64xf32>
 }
 // CHECK-LABEL:   func.func @unpack_outer_dim_transpose(
@@ -265,7 +265,7 @@ func.func @unpack_outer_dim_transpose(%arg0: tensor<4x8x29241x16x16xf32>) -> ten
 // CHECK-SAME:          : tensor<4x8x29241x16x16xf32> to tensor<4x8x16x16xf32>
 // CHECK:             %[[DEST_SLICE:.*]] = tensor.extract_slice %[[ITER_ARG]][%[[ITER]], 0, 0] [1, 128, 64] [1, 1, 1]
 // CHECK-SAME:          : tensor<29241x128x64xf32> to tensor<128x64xf32>
-// CHECK:             %[[UNPACK:.*]] = tensor.unpack %[[SRC_SLICE]]
+// CHECK:             %[[UNPACK:.*]] = linalg.unpack %[[SRC_SLICE]]
 // CHECK-SAME:         outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [16, 16]
 // CHECK-SAME:         into %[[DEST_SLICE]] : tensor<4x8x16x16xf32> -> tensor<128x64xf32>
 // CHECK:             %[[NEW_ITER_ARG:.*]] = tensor.insert_slice %[[UNPACK]] into %[[ITER_ARG]][%[[ITER]], 0, 0] [1, 128, 64] [1, 1, 1]

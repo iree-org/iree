@@ -407,7 +407,7 @@ func.func @fuse_inputs_reduction() attributes {hal.executable.target = #executab
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0, 0], sizes = [64, 1, 1, 16, 16], strides = [1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x1x1x16x16xf32>> -> tensor<64x1x1x16x16xf32>
   %3 = tensor.empty() : tensor<64x16x16xf32>
   %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<64x16x16xf32>) -> tensor<64x16x16xf32>
-  %unpack = tensor.unpack %2 outer_dims_perm = [0, 1, 2] inner_dims_pos = [1, 2] inner_tiles = [16, 16] into %3 : tensor<64x1x1x16x16xf32> -> tensor<64x16x16xf32>
+  %unpack = linalg.unpack %2 outer_dims_perm = [0, 1, 2] inner_dims_pos = [1, 2] inner_tiles = [16, 16] into %3 : tensor<64x1x1x16x16xf32> -> tensor<64x16x16xf32>
   %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d3, d1, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%unpack : tensor<64x16x16xf32>) outs(%4 : tensor<64x16x16xf32>) {
   ^bb0(%in: f32, %out: f32):
     %6 = arith.addf %out, %in : f32

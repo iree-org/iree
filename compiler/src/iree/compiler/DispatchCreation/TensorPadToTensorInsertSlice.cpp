@@ -65,7 +65,7 @@ struct TensorPadOpConversion : public OpRewritePattern<tensor::PadOp> {
           return failure();
         }
       }
-      // (pad + set_encoding) gets folded in to tensor.pack in the
+      // (pad + set_encoding) gets folded in to linalg.pack in the
       // MaterializeEncoding pass. Rewriting those pads into insert_slice would
       // defeat that.
       if (isa<IREE::Encoding::SetEncodingOp>(use)) {

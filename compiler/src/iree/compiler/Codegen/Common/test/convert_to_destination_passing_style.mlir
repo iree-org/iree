@@ -795,7 +795,7 @@ func.func @pack() {
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x2x2x2xi32>>
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [4, 4], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4x4xi32>> -> tensor<4x4xi32>
   %3 = tensor.empty() : tensor<2x2x2x2xi32>
-  %pack = tensor.pack %2 inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %3 : tensor<4x4xi32> -> tensor<2x2x2x2xi32>
+  %pack = linalg.pack %2 inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %3 : tensor<4x4xi32> -> tensor<2x2x2x2xi32>
   flow.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [2, 2, 2, 2], strides = [1, 1, 1, 1] : tensor<2x2x2x2xi32> -> !flow.dispatch.tensor<writeonly:tensor<2x2x2x2xi32>>
   return
 }
@@ -804,7 +804,7 @@ func.func @pack() {
 // CHECK-DAG:     %[[OUT_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 // CHECK-DAG:     %[[IN:.+]] = flow.dispatch.tensor.load %[[IN_BINDING]]
 // CHECK-DAG:     %[[OUT:.+]] = flow.dispatch.tensor.load %[[OUT_BINDING]]
-// CHECK:         tensor.pack %[[IN]] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %[[OUT]]
+// CHECK:         linalg.pack %[[IN]] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %[[OUT]]
 
 // -----
 
@@ -818,7 +818,7 @@ func.func @unpack() {
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4x4xi32>>
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 2, 2, 2], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x2x2x2xi32>> -> tensor<2x2x2x2xi32>
   %3 = tensor.empty() : tensor<4x4xi32>
-  %4 = tensor.unpack %2 inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %3 : tensor<2x2x2x2xi32> -> tensor<4x4xi32>
+  %4 = linalg.unpack %2 inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %3 : tensor<2x2x2x2xi32> -> tensor<4x4xi32>
   flow.dispatch.tensor.store %4, %1, offsets = [0, 0], sizes = [4, 4], strides = [1, 1] : tensor<4x4xi32> -> !flow.dispatch.tensor<writeonly:tensor<4x4xi32>>
   return
 }
@@ -827,7 +827,7 @@ func.func @unpack() {
 // CHECK-DAG:     %[[OUT_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 // CHECK-DAG:     %[[IN:.+]] = flow.dispatch.tensor.load %[[IN_BINDING]]
 // CHECK-DAG:     %[[OUT:.+]] = flow.dispatch.tensor.load %[[OUT_BINDING]]
-// CHECK:         tensor.unpack %[[IN]] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %[[OUT]]
+// CHECK:         linalg.unpack %[[IN]] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %[[OUT]]
 
 // -----
 
@@ -864,7 +864,7 @@ func.func @non_perfect_tiling_unpack() {
       %16 = affine.apply affine_map<(d0)[s0] -> (d0 floordiv s0)>(%arg1)[%0#1]
       %17 = flow.dispatch.tensor.load %3, offsets = [%15, %16, 0, 0], sizes = [%c1, %c1, %0#0, %0#1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%1, %2, %0#0, %0#1} -> tensor<?x?x?x?xi32>
       %18 = tensor.empty(%0#0, %0#1) : tensor<?x?xi32>
-      %19 = tensor.unpack %17 inner_dims_pos = [0, 1] inner_tiles = [%0#0, %0#1] into %18 : tensor<?x?x?x?xi32> -> tensor<?x?xi32>
+      %19 = linalg.unpack %17 inner_dims_pos = [0, 1] inner_tiles = [%0#0, %0#1] into %18 : tensor<?x?x?x?xi32> -> tensor<?x?xi32>
       %extracted_slice = tensor.extract_slice %19[%13, %14] [1, 1] [1, 1] : tensor<?x?xi32> to tensor<1x1xi32>
       %cast = tensor.cast %extracted_slice : tensor<1x1xi32> to tensor<?x?xi32>
       flow.dispatch.tensor.store %cast, %4, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:tensor<1x1xi32>>
@@ -874,7 +874,7 @@ func.func @non_perfect_tiling_unpack() {
 }
 // CHECK-LABEL: func.func @non_perfect_tiling_unpack
 // CHECK:         %[[ALLOC:.+]] = bufferization.alloc_tensor
-// CHECK:         %[[UNPACK:.+]] = tensor.unpack
+// CHECK:         %[[UNPACK:.+]] = linalg.unpack
 // CHECK-SAME:      into %[[ALLOC]]
 // CHECK:         %[[SLICE:.+]] = tensor.extract_slice %[[UNPACK]]
 

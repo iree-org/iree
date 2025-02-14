@@ -24,7 +24,7 @@ util.func public @pack_elementwise_fusion(%arg0 : tensor<?xf32>,
   %8 = tensor.empty(%6, %7) : tensor<?x?x8x32xf32>
   // TODO(#12746) : The inner_tiles could be dynamic here. It is disabled
   // due to unrelated codegen issue.
-  %9 = tensor.pack %5 padding_value(%cst : f32)
+  %9 = linalg.pack %5 padding_value(%cst : f32)
       inner_dims_pos = [0, 1] inner_tiles = [8, 32]
       into %8 : tensor<?x?xf32> -> tensor<?x?x8x32xf32>
   util.return %9 : tensor<?x?x8x32xf32>
@@ -39,7 +39,7 @@ util.func public @pack_elementwise_fusion(%arg0 : tensor<?xf32>,
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:         iterator_types = ["parallel", "parallel"]
 //  CHECK-SAME:         ins(%[[ARG1]], %[[ARG0]] :
-//       CHECK:     %[[PACK:.+]] = tensor.pack %[[GENERIC]]
+//       CHECK:     %[[PACK:.+]] = linalg.pack %[[GENERIC]]
 //       CHECK:     flow.return %[[PACK]]
 //       CHECK:   util.return %[[RETURN]]
 
@@ -80,7 +80,7 @@ util.func public @pack_fusion(%arg0 : tensor<?x?xf32>,
   %8 = tensor.empty(%6, %7) : tensor<?x?x8x32xf32>
   // TODO(#12746) : The inner_tiles could be dynamic here. It is disabled
   // due to unrelated codegen issue.
-  %9 = tensor.pack %5 padding_value(%cst : f32)
+  %9 = linalg.pack %5 padding_value(%cst : f32)
       inner_dims_pos = [0, 1] inner_tiles = [8, 32]
       into %8 : tensor<?x?xf32> -> tensor<?x?x8x32xf32>
   util.return %9 : tensor<?x?x8x32xf32>
@@ -95,7 +95,7 @@ util.func public @pack_fusion(%arg0 : tensor<?x?xf32>,
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:         iterator_types = ["parallel", "parallel"]
 //  CHECK-SAME:         ins(%[[ARG1]], %[[REDUCTION]] :
-//       CHECK:     %[[PACK:.+]] = tensor.pack %[[GENERIC]]
+//       CHECK:     %[[PACK:.+]] = linalg.pack %[[GENERIC]]
 //       CHECK:     flow.return %[[PACK]]
 //       CHECK:   util.return %[[RETURN]]
 
@@ -119,7 +119,7 @@ util.func public @tranpose_pack_fusion(%arg0: tensor<?x?xf32>) -> tensor<?x?x8x3
   %2 = affine.apply #map2()[%dim]
   %3 = affine.apply #map3()[%dim_0]
   %4 = tensor.empty(%2, %3) : tensor<?x?x8x32xf32>
-  %pack = tensor.pack %1 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 32] into %4 : tensor<?x?xf32> -> tensor<?x?x8x32xf32>
+  %pack = linalg.pack %1 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 32] into %4 : tensor<?x?xf32> -> tensor<?x?x8x32xf32>
   util.return %pack : tensor<?x?x8x32xf32>
 }
 // No fusion as the CPU backend currently can't handle fusion with transpose
@@ -131,7 +131,7 @@ util.func public @tranpose_pack_fusion(%arg0: tensor<?x?xf32>) -> tensor<?x?x8x3
 //  CHECK-SAME:         iterator_types = ["parallel", "parallel"]
 //       CHECK:     flow.return %[[GENERIC]]
 //       CHECK:   %[[DISPATCH2:.+]] = flow.dispatch.region
-//       CHECK:     %[[PACK:.+]] = tensor.pack %[[DISPATCH1]]
+//       CHECK:     %[[PACK:.+]] = linalg.pack %[[DISPATCH1]]
 //       CHECK:     flow.return %[[PACK]]
 //       CHECK:   util.return %[[DISPATCH2]]
 
@@ -351,7 +351,7 @@ util.func public @unpack_elementwise_fusion(
   %folded_dim0 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%d0, %d2]
   %folded_dim1 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%d1, %d3]
   %dest = tensor.empty(%folded_dim0, %folded_dim1) : tensor<?x?xf32>
-  %0 = tensor.unpack %arg0 inner_dims_pos = [0, 1] inner_tiles = [%d2, %d3]
+  %0 = linalg.unpack %arg0 inner_dims_pos = [0, 1] inner_tiles = [%d2, %d3]
       into %dest : tensor<?x?x?x?xf32> -> tensor<?x?xf32>
   %1 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
@@ -370,7 +370,7 @@ util.func public @unpack_elementwise_fusion(
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?x?x?xf32>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>)
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.region
-//       CHECK:     %[[UNPACK:.+]] = tensor.unpack %[[ARG0]]
+//       CHECK:     %[[UNPACK:.+]] = linalg.unpack %[[ARG0]]
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[UNPACK]], %[[ARG1]]
 //       CHECK:     flow.return %[[GENERIC]]
@@ -406,7 +406,7 @@ util.func public @unpack_non_intersecting_reduction(
   %folded_dim = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%d1, %d2]
   %dest0 = tensor.empty(%d0, %folded_dim) : tensor<?x?xf32>
   %dest1 = tensor.empty(%folded_dim) : tensor<?xf32>
-  %0 = tensor.unpack %arg0 inner_dims_pos = [1] inner_tiles = [%d2]
+  %0 = linalg.unpack %arg0 inner_dims_pos = [1] inner_tiles = [%d2]
       into %dest0 : tensor<?x?x?xf32> -> tensor<?x?xf32>
   %1 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>,
@@ -426,7 +426,7 @@ util.func public @unpack_non_intersecting_reduction(
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?x?xf32>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>)
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.region
-//       CHECK:     %[[UNPACK:.+]] = tensor.unpack %[[ARG0]]
+//       CHECK:     %[[UNPACK:.+]] = linalg.unpack %[[ARG0]]
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[UNPACK]], %[[ARG1]]
 //       CHECK:     flow.return %[[GENERIC]]
@@ -1014,7 +1014,7 @@ util.func @scatter_index_producer_fusion(%arg0 : tensor<?x1xi64>,
 util.func @move_captured_from_above_ops(%arg0 : tensor<1x1x2x4xi32>,
     %arg1 : f64, %arg2 : f64) -> tensor<2x3xi8> {
   %empty = tensor.empty() : tensor<2x3xi32>
-  %unpack = tensor.unpack %arg0 outer_dims_perm = [0, 1]
+  %unpack = linalg.unpack %arg0 outer_dims_perm = [0, 1]
       inner_dims_pos = [0, 1] inner_tiles = [2, 4] into %empty : tensor<1x1x2x4xi32> -> tensor<2x3xi32>
   %0 = arith.mulf %arg1, %arg2 : f64
   %1 = tensor.empty() : tensor<2x3xi8>
@@ -1034,7 +1034,7 @@ util.func @move_captured_from_above_ops(%arg0 : tensor<1x1x2x4xi32>,
 // CHECK-LABEL: func public @move_captured_from_above_ops
 //       CHECK:   %[[OP:.+]] = arith.mulf
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
-//       CHECK:     %[[UNPACK:.+]] = tensor.unpack
+//       CHECK:     %[[UNPACK:.+]] = linalg.unpack
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[UNPACK]] :
 //       CHECK:       %[[TRUNCF:.+]] = arith.truncf %[[OP]]

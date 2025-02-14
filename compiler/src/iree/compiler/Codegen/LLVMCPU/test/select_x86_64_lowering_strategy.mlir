@@ -1064,7 +1064,7 @@ func.func @pack() attributes {hal.executable.target = #executable_target_embedde
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x48x16x1xf32>>
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [20, 40], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<20x40xf32>> -> tensor<20x40xf32>
   %3 = tensor.empty() : tensor<2x48x16x1xf32>
-  %pack = tensor.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %3 : tensor<20x40xf32> -> tensor<2x48x16x1xf32>
+  %pack = linalg.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %3 : tensor<20x40xf32> -> tensor<2x48x16x1xf32>
   flow.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [2, 48, 16, 1], strides = [1, 1, 1, 1] : tensor<2x48x16x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x48x16x1xf32>>
   return
 }
@@ -1073,7 +1073,7 @@ func.func @pack() attributes {hal.executable.target = #executable_target_embedde
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDataTiling>
 //      CHECK: func.func @pack()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK:   tensor.pack
+//      CHECK:   linalg.pack
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
@@ -1090,7 +1090,7 @@ func.func @pack_f16() attributes {hal.executable.target = #executable_target_emb
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x48x16x1xf16>>
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [20, 40], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<20x40xf16>> -> tensor<20x40xf16>
   %3 = tensor.empty() : tensor<2x48x16x1xf16>
-  %pack = tensor.pack %2 padding_value(%cst : f16) inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %3 : tensor<20x40xf16> -> tensor<2x48x16x1xf16>
+  %pack = linalg.pack %2 padding_value(%cst : f16) inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %3 : tensor<20x40xf16> -> tensor<2x48x16x1xf16>
   flow.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [2, 48, 16, 1], strides = [1, 1, 1, 1] : tensor<2x48x16x1xf16> -> !flow.dispatch.tensor<writeonly:tensor<2x48x16x1xf16>>
   return
 }
@@ -1099,7 +1099,7 @@ func.func @pack_f16() attributes {hal.executable.target = #executable_target_emb
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDataTiling>
 //      CHECK: func.func @pack_f16()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK:   tensor.pack
+//      CHECK:   linalg.pack
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
@@ -1115,7 +1115,7 @@ func.func @pack_many_elements() attributes {hal.executable.target = #executable_
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<31250x1200x16x1xf32>>
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1200, 500000], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1200x500000xf32>> -> tensor<1200x500000xf32>
   %3 = tensor.empty() : tensor<31250x1200x16x1xf32>
-  %pack = tensor.pack %2 outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %3 : tensor<1200x500000xf32> -> tensor<31250x1200x16x1xf32>
+  %pack = linalg.pack %2 outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %3 : tensor<1200x500000xf32> -> tensor<31250x1200x16x1xf32>
   flow.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [31250, 1200, 16, 1], strides = [1, 1, 1, 1] : tensor<31250x1200x16x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<31250x1200x16x1xf32>>
   return
 }
@@ -1124,7 +1124,7 @@ func.func @pack_many_elements() attributes {hal.executable.target = #executable_
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDataTiling>
 //      CHECK: func.func @pack_many_elements()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK:   tensor.pack
+//      CHECK:   linalg.pack
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
@@ -1148,7 +1148,7 @@ func.func @unpack_generic_pack(%arg0: !stream.binding {stream.alignment = 64 : i
   %4 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [512], strides = [1] : !flow.dispatch.tensor<readonly:tensor<512xf32>> -> tensor<512xf32>
   %5 = tensor.empty() : tensor<24x512x16x1xf32>
   %6 = tensor.empty() : tensor<384x512xf32>
-  %unpack = tensor.unpack %3 inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %6 : tensor<24x32x16x16xf32> -> tensor<384x512xf32>
+  %unpack = linalg.unpack %3 inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %6 : tensor<24x32x16x16xf32> -> tensor<384x512xf32>
   %7 = linalg.generic {indexing_maps = [#map, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%4, %unpack : tensor<512xf32>, tensor<384x512xf32>) outs(%6 : tensor<384x512xf32>) {
   ^bb0(%in: f32, %in_1: f32, %out: f32):
     %8 = arith.addf %in, %in_1 : f32
@@ -1156,7 +1156,7 @@ func.func @unpack_generic_pack(%arg0: !stream.binding {stream.alignment = 64 : i
     %10 = arith.maximumf %9, %cst_0 : f32
     linalg.yield %10 : f32
   } -> tensor<384x512xf32>
-  %pack = tensor.pack %7 inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %5 : tensor<384x512xf32> -> tensor<24x512x16x1xf32>
+  %pack = linalg.pack %7 inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %5 : tensor<384x512xf32> -> tensor<24x512x16x1xf32>
   flow.dispatch.tensor.store %pack, %2, offsets = [0, 0, 0, 0], sizes = [24, 512, 16, 1], strides = [1, 1, 1, 1] : tensor<24x512x16x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<24x512x16x1xf32>>
   return
 }
@@ -1166,11 +1166,11 @@ func.func @unpack_generic_pack(%arg0: !stream.binding {stream.alignment = 64 : i
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 //      CHECK: func.func @unpack_generic_pack(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK:   tensor.unpack
+//      CHECK:   linalg.unpack
 // CHECK-SAME:       lowering_config = #[[CONFIG2]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG2]]
-//      CHECK:   tensor.pack
+//      CHECK:   linalg.pack
 // CHECK-SAME:       lowering_config = #[[CONFIG1]]
 
 // -----
@@ -1193,7 +1193,7 @@ func.func @elem_pack() attributes {hal.executable.target = #executable_target_em
     linalg.yield %6 : f32
   } -> tensor<128x384xf32>
   %5 = tensor.empty() : tensor<16x384x8x1xf32>
-  %pack = tensor.pack %4 inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %5 : tensor<128x384xf32> -> tensor<16x384x8x1xf32>
+  %pack = linalg.pack %4 inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %5 : tensor<128x384xf32> -> tensor<16x384x8x1xf32>
   flow.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [16, 384, 8, 1], strides = [1, 1, 1, 1] : tensor<16x384x8x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<16x384x8x1xf32>>
   return
 }
@@ -1205,7 +1205,7 @@ func.func @elem_pack() attributes {hal.executable.target = #executable_target_em
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG1]]
-//      CHECK:   tensor.pack
+//      CHECK:   linalg.pack
 // CHECK-SAME:       lowering_config = #[[CONFIG2]]
 
 // -----
@@ -1230,7 +1230,7 @@ func.func @transpose_pack() attributes {hal.executable.target = #executable_targ
     linalg.yield %in : f32
   } -> tensor<768x30522xf32>
   %5 = tensor.empty() : tensor<1908x768x16x1xf32>
-  %pack = tensor.pack %4 padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %5 : tensor<768x30522xf32> -> tensor<1908x768x16x1xf32>
+  %pack = linalg.pack %4 padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %5 : tensor<768x30522xf32> -> tensor<1908x768x16x1xf32>
   flow.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [1908, 768, 16, 1], strides = [1, 1, 1, 1] : tensor<1908x768x16x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<1908x768x16x1xf32>>
   return
 }
@@ -1242,7 +1242,7 @@ func.func @transpose_pack() attributes {hal.executable.target = #executable_targ
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG1]]
-//      CHECK:   tensor.pack
+//      CHECK:   linalg.pack
 // CHECK-SAME:       lowering_config = #[[CONFIG2]]
 
 // -----
@@ -1295,7 +1295,7 @@ func.func @reduction_broadcast_pack() attributes {hal.executable.target = #execu
     %22 = arith.addf %21, %20 : f32
     linalg.yield %22 : f32
   } -> tensor<384x1024xf32>
-  %pack = tensor.pack %14 inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %9 : tensor<384x1024xf32> -> tensor<24x1024x16x1xf32>
+  %pack = linalg.pack %14 inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %9 : tensor<384x1024xf32> -> tensor<24x1024x16x1xf32>
   flow.dispatch.tensor.store %pack, %4, offsets = [0, 0, 0, 0], sizes = [24, 1024, 16, 1], strides = [1, 1, 1, 1] : tensor<24x1024x16x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<24x1024x16x1xf32>>
   return
 }
@@ -1313,7 +1313,7 @@ func.func @reduction_broadcast_pack() attributes {hal.executable.target = #execu
 // CHECK-SAME:       lowering_config = #[[CONFIG2]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG3]]
-//      CHECK:   tensor.pack
+//      CHECK:   linalg.pack
 // CHECK-SAME:       lowering_config = #[[CONFIG4]]
 
 // -----
@@ -1345,7 +1345,7 @@ func.func @reduction_pack() attributes {hal.executable.target = #executable_targ
     %12 = arith.addf %out, %11 : f32
     linalg.yield %12 : f32
   } -> tensor<384x1024xf32>
-  %pack = tensor.pack %9 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %5 : tensor<384x1024xf32> -> tensor<1024x24x16x1xf32>
+  %pack = linalg.pack %9 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %5 : tensor<384x1024xf32> -> tensor<1024x24x16x1xf32>
   flow.dispatch.tensor.store %pack, %2, offsets = [0, 0, 0, 0], sizes = [1024, 24, 16, 1], strides = [1, 1, 1, 1] : tensor<1024x24x16x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<1024x24x16x1xf32>>
   return
 }
@@ -1360,7 +1360,7 @@ func.func @reduction_pack() attributes {hal.executable.target = #executable_targ
 // CHECK-SAME:       lowering_config = #[[CONFIG1]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG2]]
-//      CHECK:   tensor.pack
+//      CHECK:   linalg.pack
 // CHECK-SAME:       lowering_config = #[[CONFIG3]]
 
 // -----
@@ -1377,7 +1377,7 @@ func.func @unpack_static() attributes {hal.executable.target = #executable_targe
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1024x4096xf32>>
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [64, 256, 16, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x256x16x16xf32>> -> tensor<64x256x16x16xf32>
   %3 = tensor.empty() : tensor<1024x4096xf32>
-  %unpack = tensor.unpack %2 inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %3 : tensor<64x256x16x16xf32> -> tensor<1024x4096xf32>
+  %unpack = linalg.unpack %2 inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %3 : tensor<64x256x16x16xf32> -> tensor<1024x4096xf32>
   flow.dispatch.tensor.store %unpack, %1, offsets = [0, 0], sizes = [1024, 4096], strides = [1, 1] : tensor<1024x4096xf32> -> !flow.dispatch.tensor<writeonly:tensor<1024x4096xf32>>
   return
 }
@@ -1386,7 +1386,7 @@ func.func @unpack_static() attributes {hal.executable.target = #executable_targe
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDataTiling>
 //      CHECK: func.func @unpack_static()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK:   tensor.unpack
+//      CHECK:   linalg.unpack
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
@@ -1409,7 +1409,7 @@ func.func @unpack_elem() attributes {hal.executable.target = #executable_target_
   %4 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [128], strides = [1] : !flow.dispatch.tensor<readonly:tensor<128xf32>> -> tensor<128xf32>
   %5 = tensor.empty() : tensor<128x384xf32>
   %6 = tensor.empty() : tensor<384x128xf32>
-  %unpack = tensor.unpack %3 inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %6 : tensor<48x64x8x2xf32> -> tensor<384x128xf32>
+  %unpack = linalg.unpack %3 inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %6 : tensor<48x64x8x2xf32> -> tensor<384x128xf32>
   %7 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel"]} ins(%4, %unpack : tensor<128xf32>, tensor<384x128xf32>) outs(%5 : tensor<128x384xf32>) {
   ^bb0(%in: f32, %in_0: f32, %out: f32):
     %8 = arith.addf %in, %in_0 : f32

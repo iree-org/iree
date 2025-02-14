@@ -169,7 +169,7 @@ func.func @unpack_outer_dynamic() attributes {hal.executable.target = #executabl
   %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c131072) : !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
   %10 = flow.dispatch.tensor.load %8, offsets = [0, 0, 0, 0], sizes = [%4, %5, 32, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x32x16xi32>>{%4, %5} -> tensor<?x?x32x16xi32>
   %11 = tensor.empty(%6, %7) : tensor<?x?xi32>
-  %unpack = tensor.unpack %10 inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %11 : tensor<?x?x32x16xi32> -> tensor<?x?xi32>
+  %unpack = linalg.unpack %10 inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %11 : tensor<?x?x32x16xi32> -> tensor<?x?xi32>
   flow.dispatch.tensor.store %unpack, %9, offsets = [0, 0], sizes = [%6, %7], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
   return
 }
@@ -178,7 +178,7 @@ func.func @unpack_outer_dynamic() attributes {hal.executable.target = #executabl
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = VMVXDefault>
 //      CHECK: func.func @unpack_outer_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK:   tensor.unpack
+//      CHECK:   linalg.unpack
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
@@ -210,7 +210,7 @@ func.func @elem_pack_ukernels() attributes {hal.executable.target = #executable_
   %9 = affine.apply #map()[%8#0]
   %10 = affine.apply #map1()[%8#1]
   %11 = tensor.empty(%9, %10, %8#0, %8#1) : tensor<?x?x?x?xf32>
-  %pack = tensor.pack %7 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [%8#0, %8#1] into %11 : tensor<1024x2048xf32> -> tensor<?x?x?x?xf32>
+  %pack = linalg.pack %7 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [%8#0, %8#1] into %11 : tensor<1024x2048xf32> -> tensor<?x?x?x?xf32>
   %12:2 = iree_codegen.query_tile_sizes tensor<1024x2048xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>> -> index, index
   %13 = affine.apply #map()[%12#0]
   %14 = affine.apply #map1()[%12#1]

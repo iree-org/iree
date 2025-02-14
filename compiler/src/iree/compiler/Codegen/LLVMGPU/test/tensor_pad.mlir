@@ -114,7 +114,7 @@ func.func @unpack_dynamic() {
       %c0_i32 = arith.constant 0 : i32
       %22 = arith.subi %c16, %12 : index
       %23 = arith.subi %c16, %15 : index
-      %unpack = tensor.unpack %21 inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %16 : tensor<?x?x2x2xi32> -> tensor<?x?xi32>
+      %unpack = linalg.unpack %21 inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %16 : tensor<?x?x2x2xi32> -> tensor<?x?xi32>
       flow.dispatch.tensor.store %unpack, %9, offsets = [%arg0, %arg1], sizes = [%12, %15], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
     }
   }
@@ -124,6 +124,6 @@ func.func @unpack_dynamic() {
 // CHECK:         %[[DEST_BUF:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 // CHECK:           %[[LOAD:.+]] = flow.dispatch.tensor.load %[[DEST_BUF]]
 // CHECK:           %[[PAD:.+]] = tensor.pad %[[LOAD]]
-// CHECK:           %[[UNPACK:.+]] = tensor.unpack {{.+}} into %[[PAD]]
+// CHECK:           %[[UNPACK:.+]] = linalg.unpack {{.+}} into %[[PAD]]
 // CHECK:           %[[SLICE:.+]] = tensor.extract_slice %[[UNPACK]]
 // CHECK:           flow.dispatch.tensor.store %[[SLICE]], %[[DEST_BUF]]

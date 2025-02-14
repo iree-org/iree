@@ -96,7 +96,7 @@ module {
         %3 = affine.apply #map1(%arg2)
         %extracted_slice = tensor.extract_slice %arg0[%3, %arg4] [16, %2] [1, 1] : tensor<?x?xf32> to tensor<16x?xf32>
         %extracted_slice_1 = tensor.extract_slice %arg5[%arg2, %arg4, 0, 0] [1, %2, 16, 1] [1, 1, 1, 1] : tensor<?x?x16x1xf32> to tensor<1x?x16x1xf32>
-        %pack = tensor.pack %extracted_slice inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %extracted_slice_1 {lowering_config = #config} : tensor<16x?xf32> -> tensor<1x?x16x1xf32>
+        %pack = linalg.pack %extracted_slice inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %extracted_slice_1 {lowering_config = #config} : tensor<16x?xf32> -> tensor<1x?x16x1xf32>
         %inserted_slice = tensor.insert_slice %pack into %arg5[%arg2, %arg4, 0, 0] [1, %2, 16, 1] [1, 1, 1, 1] : tensor<1x?x16x1xf32> into tensor<?x?x16x1xf32>
         scf.yield %inserted_slice : tensor<?x?x16x1xf32>
       }
@@ -108,6 +108,6 @@ module {
 // CHECK-LABEL: func.func @peel_pack
 // CHECK:         scf.for
 // CHECK:           scf.for
-// CHECK:             tensor.pack {{.*}} : tensor<16x16xf32> -> tensor<1x16x16x1xf32>
+// CHECK:             linalg.pack {{.*}} : tensor<16x16xf32> -> tensor<1x16x16x1xf32>
 // CHECK:           scf.for
-// CHECK:             tensor.pack {{.*}} : tensor<16x?xf32> -> tensor<1x?x16x1xf32>
+// CHECK:             linalg.pack {{.*}} : tensor<16x?xf32> -> tensor<1x?x16x1xf32>

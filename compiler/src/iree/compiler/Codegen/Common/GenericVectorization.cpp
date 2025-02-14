@@ -56,7 +56,7 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
           scalableFlags = result->vectorScalableFlags;
         }
       })
-      .Case<tensor::PackOp, tensor::UnPackOp>([&](auto op) {
+      .Case<linalg::PackOp, linalg::UnPackOp>([&](auto op) {
         std::optional<VectorizationTileSizes> result = inferSizesFromIR(op);
         if (result) {
           vectorSizes = result->vectorSizes;
@@ -122,7 +122,7 @@ void GenericVectorizationPass::runOnOperation() {
                isa<tensor::PadOp>(op)) {
       candidates.push_back(op);
     } else if (enableVectorMasking &&
-               isa<tensor::PackOp, tensor::UnPackOp>(op)) {
+               isa<linalg::PackOp, linalg::UnPackOp>(op)) {
       candidates.push_back(op);
     }
   });

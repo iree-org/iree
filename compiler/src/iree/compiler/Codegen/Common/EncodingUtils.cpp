@@ -36,7 +36,7 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
       return IREE::Encoding::dropEncoding(type);
     }
-    auto packedType = cast<RankedTensorType>(tensor::PackOp::inferPackedType(
+    auto packedType = cast<RankedTensorType>(linalg::PackOp::inferPackedType(
         type, encodingInfo.innerTileSizes, encodingInfo.innerDimsPos,
         encodingInfo.outerDimsPerm));
 

@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -107,7 +108,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
   {
     RewritePatternSet patterns(ctx);
     tensor::CastOp::getCanonicalizationPatterns(patterns, ctx);
-    tensor::populateFoldIntoPackAndUnpackPatterns(patterns);
+    linalg::populateFoldIntoPackAndUnpackPatterns(patterns);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError("folding patterns failed");
