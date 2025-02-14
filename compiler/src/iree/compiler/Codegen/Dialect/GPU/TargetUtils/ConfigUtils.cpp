@@ -503,6 +503,48 @@ static bool isNonMatvecContraction(linalg::LinalgOp linalgOp) {
          getElementCount(contractionDims->n) != 1;
 }
 
+// To find the number of vector elements per work-item, find a
+// bit width that is representative of the computation.
+static unsigned getRepresentativeBitWidth(linalg::LinalgOp linalgOp) {
+  // Check all the inputs with permutation indexing maps. Use
+  // the maximum of those to get the bit width.
+  std::optional<unsigned> maxBitWidth;
+  auto updateElementTypeBitWidth = [&](Value v) {
+    auto elementType = getElementTypeOrSelf(v);
+    if (!elementType.isIntOrFloat()) {
+      return;
+    }
+    unsigned bitWidth = elementType.getIntOrFloatBitWidth();
+    if (maxBitWidth) {
+      maxBitWidth = std::max(maxBitWidth.value(), bitWidth);
+      return;
+    }
+    maxBitWidth = bitWidth;
+  };
+  for (OpOperand *input : linalgOp.getDpsInputOperands()) {
+    AffineMap inputOperandMap = linalgOp.getMatchingIndexingMap(input);
+    if (!inputOperandMap.isPermutation()) {
+      continue;
+    }
+    updateElementTypeBitWidth(input->get());
+  }
+  if (maxBitWidth) {
+    return maxBitWidth.value();
+  }
+
+  // If none of the operands have permutation inputs, use the result.
+  // Dont bother about the indexing map.
+  for (OpOperand &output : linalgOp.getDpsInitsMutable()) {
+    updateElementTypeBitWidth(output.get());
+  }
+  if (maxBitWidth) {
+    return maxBitWidth.value();
+  }
+
+  // Fall back, just be a word.
+  return 32;
+}
+
 LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
                                            mlir::FunctionOpInterface entryPoint,
                                            Operation *op) {
@@ -572,6 +614,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   bool vectorizable = projPerm && powTwo;
 
   const unsigned minBitwidth = getMinElementBitwidth(linalgOp);
+  const unsigned representativeBitWidth = getRepresentativeBitWidth(linalgOp);
   // Make sure we use a tile size that results in some integral number of bytes.
   const unsigned scaleToByte =
       std::max(8 / minBitwidth, static_cast<unsigned>(1));
@@ -580,7 +623,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   auto distributeToThreads = [&](int64_t numThreads,
                                  std::optional<int64_t> lossFactor =
                                      std::nullopt) {
-    LDBG("Loss factor: " << lossFactor << "\n");
+    LDBG("Loss factor: " << lossFactor);
     // Initialize the configuration.
     flatWorkgroupSize = 1;
     // Initialize thread tiling along all partitioned loops with size 1, and
@@ -607,13 +650,23 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
 
       // Ensure vectorization works with the `workgroupTileMultiple`.
       int64_t workgroupTileMultiple = workgroupTileSizeMultiples[shapeDim];
-      vectorizable =
-          vectorizable && 4 * numThreads % workgroupTileMultiple == 0;
-      // For the inner most workgroup dim, try to see if we can have 4
-      // elements per thread. This enables vectorization.
-      if (vectorizable && wgDim == 0 && !lossFactor) {
-        candidates.push_back(4 * numThreads);
+      unsigned numVectorElements = std::max(4u, 128 / representativeBitWidth);
+      int64_t vectorizableCandidate = numVectorElements * numThreads;
+      // For smaller shapes, we reduce `numVectorElements` as we may not find
+      // work for all threads otherwise and we dont have vectorization enabled
+      // with loss.
+      while (vectorizable && (vectorizableCandidate > loopBound) &&
+             numVectorElements > 4) {
+        numVectorElements /= 2;
+        vectorizableCandidate = numVectorElements * numThreads;
       }
+      vectorizable =
+          vectorizable && vectorizableCandidate % workgroupTileMultiple == 0;
+
+      if (vectorizable && wgDim == 0 && !lossFactor) {
+        candidates.push_back(vectorizableCandidate);
+      }
+
       // Try all power of two multiples of `workgroupTileMultiple` up to the
       // subgroup size.
       uint64_t maxCandidate =
@@ -645,17 +698,17 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
             llvm::divideCeil(loopBound, scaledTileSize) <= 2) {
           continue;
         }
-
         // Try to let each thread handle 4 elements if this is the workgroup x
         // dimension.
         // TODO: Try to take into account element type bit width to get
         // 4xdword reads instead of 4x{elements}.
-        if (vectorizable && wgDim == 0 && !lossFactor && candidate % 4 == 0) {
+        if (vectorizable && wgDim == 0 && !lossFactor &&
+            candidate % numVectorElements == 0) {
           // Use size-1 vectors to increase parallelism if larger ones causes
           // idle threads in the subgroup.
           bool hasIdleThreads =
               partitionableLoops.size() == 1 && candidate <= subgroupSize;
-          int vectorSize = hasIdleThreads ? 1 : 4;
+          int vectorSize = hasIdleThreads ? 1 : numVectorElements;
           LLVM_DEBUG(llvm::dbgs() << "Use vector size: " << vectorSize << "\n");
           threadTileSizes[shapeDim] = vectorSize * scaleToByte;
           candidateWorkgroupSize = candidate / vectorSize;
