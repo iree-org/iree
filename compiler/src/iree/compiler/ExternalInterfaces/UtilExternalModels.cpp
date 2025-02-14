@@ -510,6 +510,9 @@ void registerUtilExternalModels(DialectRegistry &registry) {
 #define GET_OP_LIST
 #include "mlir/Dialect/Linalg/IR/LinalgOps.cpp.inc"
             >::registerOpInterface(context);
+
+        AlwaysHoistableOpInterfaceHelper<
+            linalg::PackOp, linalg::UnPackOp>::registerOpInterface(context);
       });
   // Register hoistable type interfaces for tensor ops.
   registry.addExtension(
@@ -521,9 +524,8 @@ void registerUtilExternalModels(DialectRegistry &registry) {
             tensor::ExtractSliceOp>::registerOpInterface(context);
         // Cases of trivial pack/unpack should be handled as canonicalizations
         // before we get here, thus we're safe to always hoist.
-        AlwaysHoistableOpInterfaceHelper<
-            tensor::PadOp, tensor::PackOp,
-            tensor::UnPackOp>::registerOpInterface(context);
+        AlwaysHoistableOpInterfaceHelper<tensor::PadOp>::registerOpInterface(
+            context);
       });
   registry.addExtension(
       +[](MLIRContext *context, IREE::Util::UtilDialect *dialect) {

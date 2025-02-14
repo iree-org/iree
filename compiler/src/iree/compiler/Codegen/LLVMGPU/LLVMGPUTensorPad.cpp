@@ -49,8 +49,8 @@ getPaddedShapeFromTensorLoad(IREE::Flow::DispatchTensorLoadOp tensorLoad,
 }
 
 static FailureOr<Value> rewriteAsPaddedOp(IRRewriter &rewriter,
-                                          tensor::UnPackOp op,
-                                          tensor::UnPackOp &paddedOp) {
+                                          linalg::UnPackOp op,
+                                          linalg::UnPackOp &paddedOp) {
   Location loc = op.getLoc();
 
   // Set IP after op because we also take the dims of the original output.
@@ -68,7 +68,7 @@ static FailureOr<Value> rewriteAsPaddedOp(IRRewriter &rewriter,
     return failure();
   auto paddedShape = *maybePaddedShape;
 
-  // Pad to the shape that makes tensor.unpack ops produce full tiles.
+  // Pad to the shape that makes linalg.unpack ops produce full tiles.
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
   ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
   for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
@@ -85,7 +85,7 @@ static FailureOr<Value> rewriteAsPaddedOp(IRRewriter &rewriter,
 
   SmallVector<Value> paddedOperands = {op.getSource(), paddedValue};
   paddedOperands.append(op.getInnerTiles().begin(), op.getInnerTiles().end());
-  paddedOp = rewriter.create<tensor::UnPackOp>(
+  paddedOp = rewriter.create<linalg::UnPackOp>(
       loc, TypeRange{paddedValue.getType()}, paddedOperands, op->getAttrs());
 
   // Slice out the original shape from the padded result to pass on to
@@ -154,8 +154,8 @@ struct LLVMGPUTensorPadPass final
       rewriter.replaceOp(linalgOp, newResults);
     });
 
-    funcOp.walk([&](tensor::UnPackOp unpackOp) {
-      tensor::UnPackOp paddedOp;
+    funcOp.walk([&](linalg::UnPackOp unpackOp) {
+      linalg::UnPackOp paddedOp;
       FailureOr<Value> newResult =
           rewriteAsPaddedOp(rewriter, unpackOp, paddedOp);
       if (failed(newResult)) {

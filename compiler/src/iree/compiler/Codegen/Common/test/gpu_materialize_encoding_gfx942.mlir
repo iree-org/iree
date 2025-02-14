@@ -46,7 +46,7 @@ func.func @set_encoding_LHS_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 }
 
 // CHECK-LABEL: func.func @set_encoding_LHS_unroll8x8x4_MFMA_F32_16x16x4_F32
-// CHECK:         %[[PACK:.*]] = tensor.pack %{{.+}} padding_value(%{{.+}} : f32)
+// CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f32)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
 // CHECK-SAME:      inner_tiles = [128, 16]
@@ -79,7 +79,7 @@ func.func @set_encoding_LHS_narrow_unroll1x8x4_MFMA_F32_16x16x4_F32() {
 }
 
 // CHECK-LABEL: func.func @set_encoding_LHS_narrow_unroll1x8x4_MFMA_F32_16x16x4_F32
-// CHECK:         %[[PACK:.*]] = tensor.pack %{{.+}} padding_value(%{{.+}} : f32)
+// CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f32)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
 // CHECK-SAME:      inner_tiles = [16, 16]
@@ -122,7 +122,7 @@ func.func @set_encoding_LHS_dynamic_unroll8x8x4_MFMA_F32_16x16x4_F32() {
   return
 }
 // CHECK-LABEL: func.func @set_encoding_LHS_dynamic_unroll8x8x4_MFMA_F32_16x16x4_F32
-// CHECK:         %[[PACK:.*]] = tensor.pack %{{.+}} padding_value(%{{.+}} : f32)
+// CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f32)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
 // CHECK-SAME:      inner_tiles = [128, 16]
@@ -155,7 +155,7 @@ func.func @set_encoding_RHS_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 }
 
 // CHECK-LABEL: func.func @set_encoding_RHS_unroll8x8x4_MFMA_F32_16x16x4_F32
-// CHECK:         %[[PACK:.*]] = tensor.pack %{{.+}} padding_value(%{{.+}} : f32)
+// CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f32)
 // CHECK-SAME:      outer_dims_perm = [1, 0]
 // CHECK-SAME:      inner_dims_pos = [1, 0]
 // CHECK-SAME:      inner_tiles = [128, 16]
@@ -188,7 +188,7 @@ func.func @set_encoding_RHS_narrow_unroll8x1x4_MFMA_F32_16x16x4_F32() {
 }
 
 // CHECK-LABEL: func.func @set_encoding_RHS_narrow_unroll8x1x4_MFMA_F32_16x16x4_F32
-// CHECK:         %[[PACK:.*]] = tensor.pack %{{.+}} padding_value(%{{.+}} : f32)
+// CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f32)
 // CHECK-SAME:      outer_dims_perm = [1, 0]
 // CHECK-SAME:      inner_dims_pos = [1, 0]
 // CHECK-SAME:      inner_tiles = [16, 16]
@@ -221,7 +221,7 @@ func.func @set_encoding_ACC_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 }
 
 // CHECK-LABEL: func.func @set_encoding_ACC_unroll8x8x4_MFMA_F32_16x16x4_F32
-// CHECK:         %[[PACK:.*]] = tensor.pack %{{.+}} padding_value(%{{.+}} : f32)
+// CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f32)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
 // CHECK-SAME:      inner_tiles = [128, 128]
@@ -260,7 +260,7 @@ func.func @unset_encoding_ACC_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 // CHECK-SAME:       permutation = [0, 1, 5, 3, 7, 2, 6, 4]
 // CHECK:         %[[COLLAPSE:.*]] = tensor.collapse_shape %[[TRANSPOSE]]
 // CHECK-SAME:      : tensor<2x5x4x8x4x4x16x2xf32> into tensor<2x5x128x128xf32>
-// CHECK:         %[[UNPACK:.*]] = tensor.unpack %[[COLLAPSE]]
+// CHECK:         %[[UNPACK:.*]] = linalg.unpack %[[COLLAPSE]]
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
 // CHECK-SAME:      inner_tiles = [128, 128]
@@ -303,7 +303,7 @@ func.func @unset_encoding_ACC_dynamic_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 // CHECK-SAME:       permutation = [0, 1, 5, 3, 7, 2, 6, 4]
 // CHECK:         %[[COLLAPSE:.*]] = tensor.collapse_shape %[[TRANSPOSE]]
 // CHECK-SAME:      : tensor<?x?x4x8x4x4x16x2xf32> into tensor<?x?x128x128xf32>
-// CHECK:         %[[UNPACK:.*]] = tensor.unpack %[[COLLAPSE]]
+// CHECK:         %[[UNPACK:.*]] = linalg.unpack %[[COLLAPSE]]
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
 // CHECK-SAME:      inner_tiles = [128, 128]
@@ -453,7 +453,7 @@ func.func @set_encoding_LHS_unroll8x8x2_MFMA_I32_16x16x32_I8() {
 }
 
 // CHECK-LABEL: func.func @set_encoding_LHS_unroll8x8x2_MFMA_I32_16x16x32_I8
-// CHECK:         %[[PACK:.*]] = tensor.pack %{{.+}} padding_value(%{{.+}} : i8)
+// CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : i8)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
 // CHECK-SAME:      inner_tiles = [128, 64]
@@ -486,7 +486,7 @@ func.func @set_encoding_RHS_unroll8x8x2_MFMA_I32_16x16x32_I8() {
 }
 
 // CHECK-LABEL: func.func @set_encoding_RHS_unroll8x8x2_MFMA_I32_16x16x32_I8
-// CHECK:         %[[PACK:.*]] = tensor.pack %{{.+}} padding_value(%{{.+}} : i8)
+// CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : i8)
 // CHECK-SAME:      outer_dims_perm = [1, 0]
 // CHECK-SAME:      inner_dims_pos = [1, 0]
 // CHECK-SAME:      inner_tiles = [128, 64]
@@ -519,7 +519,7 @@ func.func @set_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x32_I8() {
 }
 
 // CHECK-LABEL: func.func @set_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x32_I8
-// CHECK:         %[[PACK:.*]] = tensor.pack %{{.+}} padding_value(%{{.+}} : i32)
+// CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : i32)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
 // CHECK-SAME:      inner_tiles = [128, 128]
@@ -558,7 +558,7 @@ func.func @unset_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x32_I8() {
 // CHECK-SAME:       permutation = [0, 1, 5, 3, 7, 2, 6, 4]
 // CHECK:         %[[COLLAPSE:.*]] = tensor.collapse_shape %[[TRANSPOSE]]
 // CHECK-SAME:      : tensor<2x5x4x8x4x4x16x2xi32> into tensor<2x5x128x128xi32>
-// CHECK:         %[[UNPACK:.*]] = tensor.unpack %[[COLLAPSE]]
+// CHECK:         %[[UNPACK:.*]] = linalg.unpack %[[COLLAPSE]]
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
 // CHECK-SAME:      inner_tiles = [128, 128]
