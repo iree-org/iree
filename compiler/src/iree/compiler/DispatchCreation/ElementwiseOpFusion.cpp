@@ -111,8 +111,21 @@ void ElementwiseOpFusionPass::runOnOperation() {
       [&](OpOperand *fusedOperand) {
         Operation *producer = fusedOperand->get().getDefiningOp();
         Operation *consumer = fusedOperand->getOwner();
+        if (!producer || !consumer) {
+          return false;
+        }
 
-        if (!IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer})) {
+        // If `intraDispatch` is true, make sure that producer and consumer are
+        // inside dispatch.
+        if (intraDispatch &&
+            IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer})) {
+          return false;
+        }
+
+        // If `intraDispatch` is false, make sure that the producer and consumer
+        // are outside dispatch.
+        if (!intraDispatch &&
+            !IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer})) {
           return false;
         }
 
@@ -131,11 +144,14 @@ void ElementwiseOpFusionPass::runOnOperation() {
         if (operands.size() >= kIreeMaxOperandCount)
           return false;
 
-        return areFusableAsElementwiseOps(context, fusedOperand,
-                                          fuseMultiReduction);
+        ElementwiseOpsFusabilityOptions options;
+        options.fuseMultiReduction = fuseMultiReduction;
+        options.fuseTruncateOps = fuseTruncateOps;
+        return areFusableAsElementwiseOps(context, fusedOperand, options);
       };
 
   RewritePatternSet linalgFusionPatterns(context);
+  linalgFusionPatterns.insert<GatherFusionPattern>(context);
   linalg::populateElementwiseOpsFusionPatterns(linalgFusionPatterns,
                                                fuseElementwiseOpsControlFn);
 
@@ -158,7 +174,6 @@ void ElementwiseOpFusionPass::runOnOperation() {
   RewritePatternSet linalgExtFusionPatterns(context);
   IREE::LinalgExt::populateFuseLinalgExtOpsWithTransposes(
       linalgExtFusionPatterns, foldTransposeControlFn);
-  linalgExtFusionPatterns.insert<GatherFusionPattern>(context);
   if (failed(applyPatternsGreedily(
           getOperation(), std::move(linalgExtFusionPatterns), rewriteConfig))) {
     getOperation()->emitOpError(
