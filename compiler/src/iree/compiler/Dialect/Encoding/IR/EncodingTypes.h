@@ -93,9 +93,12 @@ MatmulNarrowDim getMatmulNarrowDim(linalg::LinalgOp linalgOp,
 /// value.
 MatmulNarrowDim getMatmulNarrowDim(EncodingAttr encoding);
 
-// Returns true if `encoding` represents a narrow-N matmul RESULT, e.g. the
-// result of a matvec.
+/// Returns true if `encoding` represents a narrow-N matmul RESULT, e.g. the
+/// result of a matvec.
 bool isNarrowNResult(EncodingAttr encoding);
+
+/// Returns the same RankedTensoType without the encoding.
+RankedTensorType dropEncoding(RankedTensorType type);
 
 } // namespace mlir::iree_compiler::IREE::Encoding
 

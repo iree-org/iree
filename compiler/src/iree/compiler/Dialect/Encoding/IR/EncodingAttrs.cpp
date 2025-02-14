@@ -411,7 +411,7 @@ void SpecializedEncodingAttr::print(AsmPrinter &p) const {
   os << ">";
 }
 
-static RankedTensorType dropEncoding(RankedTensorType type) {
+RankedTensorType dropEncoding(RankedTensorType type) {
   return RankedTensorType::get(type.getShape(), type.getElementType());
 }
 
