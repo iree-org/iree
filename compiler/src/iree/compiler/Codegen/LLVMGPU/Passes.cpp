@@ -838,6 +838,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
 
   // Set anchors at tensor level for vector distribution later and hoist out
   // loop invariant anchors.
+  funcPassManager.addPass(createDecomposeHorizontallyFusedGemmsPass());
   funcPassManager.addPass(createLLVMGPUConfigureTensorLayoutsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
 
@@ -1128,6 +1129,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
 
   if (forROCDL) {
     // convert to ROCDL.
+    funcPassManager.addPass(createConvertUnsupportedFloatArithPass);
     modulePassManager.addPass(createConvertToROCDLPass());
     modulePassManager.addNestedPass<LLVM::LLVMFuncOp>(
         createROCDLAnnotateKernelForTranslationPass());

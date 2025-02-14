@@ -654,3 +654,25 @@ func.func @pack_dynamic_tile(%arg0: tensor<32x32xi8>, %d0: index, %d1: index, %t
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     thread = [1, 4]
 //  CHECK-SAME:     workgroup = [8, 32]
+
+// -----
+
+module {
+  func.func @erf(%13 : tensor<2x1024x5120xf16>, %12 : tensor<2x1024x5120xf16>, %9 : tensor<5120xf16>, %10 : tensor<f32>) -> tensor<2x1024x5120xi8> {
+    %cst = arith.constant 0.000000e+00 : f16
+    %11 = tensor.empty() : tensor<2x1024x5120xi8>
+    %14 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d2)>, affine_map<(d0, d1, d2) -> ()>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%13, %12, %9, %10 : tensor<2x1024x5120xf16>, tensor<2x1024x5120xf16>, tensor<5120xf16>, tensor<f32>) outs(%11 : tensor<2x1024x5120xi8>) {
+    ^bb0(%in: f16, %in_4: f16, %in_5: f16, %in_6: f32, %out: i8):
+      %17 = math.erf %in : f16
+      %30 = arith.fptosi %17 : f16 to i8
+      linalg.yield %30 : i8
+    } -> tensor<2x1024x5120xi8>
+    return %14 : tensor<2x1024x5120xi8>
+  }
+}
+
+// CHECK-LABEL: func.func @erf
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1, 8]
+//  CHECK-SAME:     workgroup = [1, 1, 512]
