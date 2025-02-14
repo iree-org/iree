@@ -63,12 +63,15 @@ static void populateMathFunctionsRewritePatterns(
 
 static bool predicateRewrite(StringRef name,
                              IREE::HAL::ExecutableTargetAttr target) {
-  (void)target;                // Currently unused.
   if (clNativeMathPrecision) { // Legacy.
     if (name == math::Exp2Op::getOperationName() ||
         name == math::RoundEvenOp::getOperationName()) {
       return false;
     }
+  }
+  if (isROCMBackend(target)) {
+    // On ROCm, we want to use device library functions.
+    return false;
   }
   // Currently enable all non-approximative rewrites.
   return true;
@@ -99,7 +102,6 @@ static bool predicateF32Cast(StringRef name,
 
 static bool predicateApprox(StringRef name,
                             IREE::HAL::ExecutableTargetAttr target) {
-  (void)target;                // Currently unused.
   if (clNativeMathPrecision) { // Legacy.
     if (name == math::ErfOp::getOperationName()) {
       // The legacy implementation had a bug: it always applied polynomial
@@ -108,6 +110,10 @@ static bool predicateApprox(StringRef name,
       // clNativeMathPrecision but fail unless math.erf is approximated.
       return true;
     }
+    return false;
+  }
+  if (isROCMBackend(target)) {
+    // On ROCm, we want to use device library functions.
     return false;
   }
   StringRef acos = math::AcosOp::getOperationName();
