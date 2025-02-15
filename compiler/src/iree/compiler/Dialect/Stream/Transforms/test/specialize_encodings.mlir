@@ -215,24 +215,33 @@ util.global private @device_a = #device_target_local_0_
 
 // -----
 
-// Test that the encoding is dropped if the pass can not interpret the encoding.
-// E.g., the `encoding` attribute is not present in the target configuration, or
-// the `encoding` attribute does not implement the EncodingLayoutAttrInterface
-// interface.
+// Drop encodings if encoding attribute is not available in the target
+// configuration.
 
-#map0 = affine_map<(m, n, k) -> (m, k)>
-#map1 = affine_map<(m, n, k) -> (k, n)>
-#map2 = affine_map<(m, n, k) -> (m, n)>
 #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
-#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
-
+#encoding = #iree_encoding.testing_encoding<>
 util.global private @device_a = #device_target_local_0_
 util.func public @drop_encoding(%arg0: index, %arg1: index, %scalar_f32 : f32) {
   %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x0xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
   util.return
 }
 // CHECK-LABEL: util.func public @drop_encoding
+// CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32>
+
+// -----
+
+// Drop encodings if the attached encoding attribute can not figure the layout.
+
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", { encoding = #iree_encoding.unsupported_encoding }>
+#device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
+#encoding = #iree_encoding.testing_encoding<>
+util.global private @device_a = #device_target_local_0_
+util.func public @drop_encoding_by_unsupported_encoding(%arg0: index, %arg1: index, %scalar_f32 : f32) {
+  %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x0xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
+  util.return
+}
+// CHECK-LABEL: util.func public @drop_encoding_by_unsupported_encoding
 // CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32>
 
 // -----

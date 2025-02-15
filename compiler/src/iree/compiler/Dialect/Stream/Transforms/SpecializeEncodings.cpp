@@ -97,7 +97,12 @@ static Type getTypeWithResolvedEncodingLayouts(
   for (auto attr : layoutResolvers) {
     auto encodingLayoutAttr =
         cast<IREE::Encoding::EncodingLayoutAttrInterface>(attr);
-    layouts.push_back(encodingLayoutAttr.getLayout(rankedTensorType));
+    Attribute layout = encodingLayoutAttr.getLayout(rankedTensorType);
+    if (!layout) {
+      // Drop the encoding if the layout is not resolved.
+      return IREE::Encoding::dropEncoding(rankedTensorType);
+    }
+    layouts.push_back(layout);
   }
   Attribute newEncoding = encodingAttr.cloneWithLayouts(layouts);
   assert(isa<IREE::Encoding::SerializedEncodingLayoutAttrInterface>(newEncoding));
