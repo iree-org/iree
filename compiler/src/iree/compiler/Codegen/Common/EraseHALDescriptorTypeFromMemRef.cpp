@@ -19,7 +19,6 @@
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/IR/Attributes.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -43,14 +42,14 @@ static bool isLegalType(Type type) {
   return true;
 }
 
-/// The ABI doesn't meaningfully support passing in a buffer fat pointer directly.
-/// So, if we wanted to hal.interface.binding.subspan a buffer fat pointer,
-/// create a binding of that same resource as a global pointer and then
-/// `amdgpu.fat_raw_buffer_cast` it back to the expected type. This will
-/// require a `memref.cast` if the offset has been stripped so that the offset
-/// of the buffer looks dynamic again even though it's been folded into the base
-/// pointer by the cast.
-struct MakeBindingsGlobalCastToFatBuffer
+/// The ABI doesn't meaningfully support passing in a buffer fat pointer
+/// directly. So, if we have a hal.interface.binding.subspan that produces a
+/// buffer fat pointer, create a binding of that same resource as a global
+/// pointer and then `amdgpu.fat_raw_buffer_cast` it back to the expected type.
+/// This will require a `memref.cast` if the offset has been stripped so that
+/// the offset of the buffer looks dynamic again even though it's been folded
+/// into the base pointer by the cast.
+struct MakeFatBufferBindingsGlobalCastToFatBuffer
     : public OpRewritePattern<IREE::HAL::InterfaceBindingSubspanOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op,
@@ -60,7 +59,8 @@ struct MakeBindingsGlobalCastToFatBuffer
       return failure();
     auto addrSpace = dyn_cast_if_present<amdgpu::AddressSpaceAttr>(
         memRefType.getMemorySpace());
-    if (!addrSpace)
+    if (!addrSpace ||
+        addrSpace.getValue() != amdgpu::AddressSpace::FatRawBuffer)
       return failure();
     MemRefType::Builder asGlobal(memRefType);
     asGlobal.setMemorySpace(
@@ -140,7 +140,7 @@ struct ConvertHALDescriptorTypeToGPUAddressSpacePass final
                                           /*replaceTypes=*/true);
 
     RewritePatternSet patterns(&getContext());
-    patterns.add<MakeBindingsGlobalCastToFatBuffer>(op->getContext());
+    patterns.add<MakeFatBufferBindingsGlobalCastToFatBuffer>(op->getContext());
     if (failed(applyPatternsGreedily(op, std::move(patterns))))
       return signalPassFailure();
   }

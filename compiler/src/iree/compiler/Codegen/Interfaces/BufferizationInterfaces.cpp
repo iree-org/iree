@@ -104,8 +104,8 @@ findOrCreateSubspanBuffer(RewriterBase &rewriter,
   if (auto *ireeGpuDialect =
           rewriter.getContext()
               ->getLoadedDialect<IREE::GPU::IREEGPUDialect>()) {
-    if (ireeGpuDialect->getUseAmdgpuBufferInstructionsAttrHelper()
-            .isAttrPresent(subspanOp)) {
+    if (ireeGpuDialect->getUseRocdlBufferInstructionsAttrHelper().isAttrPresent(
+            subspanOp)) {
       memorySpace = rewriter.getAttr<amdgpu::AddressSpaceAttr>(
           amdgpu::AddressSpace::FatRawBuffer);
     }

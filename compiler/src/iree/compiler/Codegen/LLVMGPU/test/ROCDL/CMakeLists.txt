@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "config_vector_distribute_gfx1100.mlir"
     "config_vector_distribute_gfx942.mlir"
     "config_vector_distribute_reduction_gfx942.mlir"
+    "configure_buffer_instructions.mlir"
     "lowering_scalar_dispatch.mlir"
     "pipeline_igemm_tile_and_fuse.mlir"
     "pipeline_tile_and_fuse.mlir"

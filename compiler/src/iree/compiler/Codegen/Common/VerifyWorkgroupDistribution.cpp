@@ -61,8 +61,10 @@ struct VerifyWorkgroupDistributionPass final
             continue;
           }
 
-          // Writes to non-global memory are fine.
-          if (!hasGlobalMemoryAddressSpace(type)) {
+          // Writes to non-global memory are fine. hasGlobalMemoryAddressSpace()
+          // treats the unspecified address space as global, but we don't have
+          // that assumption yet.
+          if (!type.getMemorySpace() || !hasGlobalMemoryAddressSpace(type)) {
             continue;
           }
 

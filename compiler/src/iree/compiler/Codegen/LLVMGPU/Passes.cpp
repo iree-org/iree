@@ -177,6 +177,7 @@ static ReorderWorkgroupsStrategy getReorderWorkgroupsStrategy(
 //===----------------------------------------------------------------------===//
 
 static void addBufferizePasses(OpPassManager &funcPassManager) {
+  funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass());
   BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
   addIREEComprehensiveBufferizePasses(funcPassManager, allocationFn, memcpyFn);
@@ -317,6 +318,7 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createEliminateEmptyTensorsPass());
   funcPassManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
   funcPassManager.addPass(createGPUInferMemorySpacePass());
+  funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass());
   BufferizationOptions::AllocationFn allocationFn =
       gpuRequireMemSpaceAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = [](OpBuilder &builder, Location loc,
@@ -784,6 +786,7 @@ static LogicalResult gpuVectorCopyFn(OpBuilder &builder, Location loc,
 }
 
 static void addVectorBufferizePasses(OpPassManager &funcPassManager) {
+  funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass());
   BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
   addIREEComprehensiveBufferizePasses(funcPassManager, allocationFn, memcpyFn);

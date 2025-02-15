@@ -4,25 +4,28 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
 #include "llvm/Support/Debug.h"
-#define DEBUG_TYPE "iree-codegen-amdgpu-configure-buffer-instructions"
+#define DEBUG_TYPE "iree-codegen-rocdl-configure-buffer-instructions"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_AMDGPUCONFIGUREBUFFERINSTRUCTIONSPASS
-#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
+#define GEN_PASS_DEF_ROCDLCONFIGUREBUFFERINSTRUCTIONSPASS
+#include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h.inc"
 
-static llvm::cl::opt<bool> clAMDGPUEnableBufferInstructions(
-    "iree-codegen-amdgpu-enable-buffer-instructions",
+static llvm::cl::opt<bool> clROCDLlEnableBufferInstructions(
+    "iree-rocdl-enable-buffer-instructions",
     llvm::cl::desc("Use buffer instructions (by using buffer fat pointers) "
                    "where possible on AMD targets"),
     llvm::cl::init(true));
@@ -37,7 +40,7 @@ static bool isDefinitelyWorkgroupUniform(Value arg) {
     Value thisVal = worklist.pop_back_val();
     Operation *thisOp = thisVal.getDefiningOp();
     if (!thisOp)
-      continue; // block arguments
+      return false; // block arguments, no idea what's going on there
     if (isa<IREE::HAL::InterfaceConstantLoadOp>(thisOp))
       continue;
     if (matchPattern(thisOp, m_Constant()))
@@ -47,9 +50,10 @@ static bool isDefinitelyWorkgroupUniform(Value arg) {
           assumeOp.getOperand(cast<OpResult>(thisVal).getResultNumber()));
       continue;
     }
-    if (isa<arith::ArithDialect>(thisOp->getDialect())) {
+    if (isa_and_nonnull<arith::ArithDialect>(thisOp->getDialect())) {
+      llvm::append_range(worklist, thisOp->getOperands());
+      continue;
     }
-    { llvm::append_range(worklist, thisOp->getOperands()); }
     return false;
   }
   return true;
@@ -82,7 +86,11 @@ static std::optional<int64_t> getDynamicSizeMax(Value size) {
 static std::optional<int64_t>
 getSpannedBytes(IREE::HAL::InterfaceBindingSubspanOp binding) {
   int64_t maxNumElems = 1;
-  auto resultTy = dyn_cast<ShapedType>(binding.getType());
+  ShapedType resultTy = dyn_cast<ShapedType>(binding.getType());
+  if (auto tensorType =
+          dyn_cast<IREE::Flow::DispatchTensorType>(binding.getType())) {
+    resultTy = tensorType.asRankedTensorType();
+  }
   if (!resultTy || !resultTy.hasRank())
     return std::nullopt;
   for (Value dynArg : binding.getResultDynamicDims(0)) {
@@ -102,22 +110,26 @@ getSpannedBytes(IREE::HAL::InterfaceBindingSubspanOp binding) {
 
 namespace {
 
-struct AMDGPUConfigureBufferInstructionsPass final
-    : impl::AMDGPUConfigureBufferInstructionsPassBase<
-          AMDGPUConfigureBufferInstructionsPass> {
+struct ROCDLConfigureBufferInstructionsPass final
+    : impl::ROCDLConfigureBufferInstructionsPassBase<
+          ROCDLConfigureBufferInstructionsPass> {
   void runOnOperation() override {
-    if (!clAMDGPUEnableBufferInstructions)
+    if (!clROCDLlEnableBufferInstructions)
       return;
     FunctionOpInterface func = getOperation();
+    // Is this really he best way to skip this pass on non-rocdl targets?
+    IREE::GPU::TargetAttr target = getGPUTargetAttr(func);
+    if (!target || !target.isAMD())
+      return;
     auto *gpuDialect =
         getContext().getLoadedDialect<IREE::GPU::IREEGPUDialect>();
     auto annotationHelper =
-        gpuDialect->getUseAmdgpuBufferInstructionsAttrHelper();
+        gpuDialect->getUseRocdlBufferInstructionsAttrHelper();
     auto unitAttr = UnitAttr::get(&getContext());
     func.walk([&](IREE::HAL::InterfaceBindingSubspanOp binding) {
-      if (!isDefinitelyWorkgroupUniform(binding.getByteOffset())) {
-        LDBG("Binding offset " << binding.getByteOffset()
-                               << " not known workgroup-uniform\n");
+      Value offset = binding.getByteOffset();
+      if (offset && !isDefinitelyWorkgroupUniform(offset)) {
+        LDBG("Binding offset " << offset << " not known workgroup-uniform\n");
         return;
       }
       std::optional<int64_t> maxBytes = getSpannedBytes(binding);

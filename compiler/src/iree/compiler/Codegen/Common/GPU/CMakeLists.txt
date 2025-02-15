@@ -47,7 +47,6 @@ iree_cc_library(
     "GPUVectorDistribution.h"
     "Passes.h"
   SRCS
-    "AMDGPUConfigureBufferInstructions.cpp"
     "AMDGPUDistributeContract.cpp"
     "DecomposeHorizontallyFusedGemms.cpp"
     "ExpandGPUOps.cpp"
