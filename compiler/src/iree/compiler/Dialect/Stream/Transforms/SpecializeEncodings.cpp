@@ -105,9 +105,9 @@ static Type getTypeWithResolvedEncodingLayouts(
     layouts.push_back(layout);
   }
   Attribute newEncoding = encodingAttr.cloneWithLayouts(layouts);
-  assert(isa<IREE::Encoding::SerializedEncodingLayoutAttrInterface>(newEncoding));
-  return cloneWithEncoding(rankedTensorType,
-                           newEncoding);
+  assert(
+      isa<IREE::Encoding::SerializedEncodingLayoutAttrInterface>(newEncoding));
+  return cloneWithEncoding(rankedTensorType, newEncoding);
 };
 
 /// Updates the bindings of function arguments with encoding layouts. It only
