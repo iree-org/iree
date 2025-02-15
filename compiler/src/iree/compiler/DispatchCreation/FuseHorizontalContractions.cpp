@@ -59,7 +59,7 @@ struct FuseHorizontalContractionsPass final
 } // namespace
 
 /// Helper method to check operations equivalence
-static bool checkOperationEquivalence(Operation *aOp, Operation *bOp) {
+static bool checkContractionOpEquivalence(Operation *aOp, Operation *bOp) {
   auto aLinalgOp = dyn_cast<linalg::LinalgOp>(aOp);
   auto bLinalgOp = dyn_cast<linalg::LinalgOp>(bOp);
 
@@ -112,7 +112,7 @@ static bool checkOperationEquivalence(Operation *aOp, Operation *bOp) {
   }
 
   // Check that the output rank and element type are the same. We dont check the
-  // type cause we allow RHS to be transposes.
+  // type cause we allow output to be transposes.
   if (!checkSameRankAndElementType(aLinalgOp.getDpsInitOperand(0)->get(),
                                    bLinalgOp.getDpsInitOperand(0)->get())) {
     return false;
@@ -133,7 +133,7 @@ static bool checkOperationEquivalence(Operation *aOp, Operation *bOp) {
   return true;
 }
 
-/// Check that an operation is a `empty -> fill -> contraction`
+/// Check that an operation is a `contraction`
 static bool isEquivalentContractionOp(
     linalg::LinalgOp linalgOp,
     std::optional<linalg::LinalgOp> seedContractionOp = std::nullopt) {
@@ -141,7 +141,7 @@ static bool isEquivalentContractionOp(
     return false;
   }
   if (seedContractionOp) {
-    return checkOperationEquivalence(seedContractionOp.value(), linalgOp);
+    return checkContractionOpEquivalence(seedContractionOp.value(), linalgOp);
   }
   return true;
 }
@@ -345,9 +345,9 @@ fuseContractionsHorizontally(RewriterBase &rewriter, Location loc,
   SmallVector<AffineMap> fusedInsIndexingMaps;
   SmallVector<AffineMap> fusedOutsIndexingMaps;
 
-  linalg::LinalgOp seedOp = cast<linalg::LinalgOp>(linalgOps.front());
+  auto seedOp = cast<linalg::LinalgOp>(linalgOps.front());
   SmallVector<utils::IteratorType> fusedIteratorTypes =
-      cast<linalg::LinalgOp>(linalgOps.front()).getIteratorTypesArray();
+      cast<linalg::LinalgOp>(seedOp).getIteratorTypesArray();
 
   OpOperand *seedOpLhs = seedOp.getDpsInputOperand(0);
   AffineMap seedOpLhsIndexingMap = seedOp.getMatchingIndexingMap(seedOpLhs);
@@ -459,7 +459,7 @@ static void fuseGroup(RewriterBase &rewriter,
       })) {
     return;
   }
-  linalg::LinalgOp baseContractOp = cast<linalg::LinalgOp>(fusionGroup.front());
+  auto baseContractOp = cast<linalg::LinalgOp>(fusionGroup.front());
   Location loc = baseContractOp.getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(baseContractOp);

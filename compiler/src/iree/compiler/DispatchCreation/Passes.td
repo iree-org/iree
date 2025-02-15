@@ -67,7 +67,31 @@ def FoldUnitExtentDimsPass :
 
 def FuseHorizontalContractionsPass:
     InterfacePass<"iree-dispatch-creation-fuse-horizontal-contractions", "mlir::FunctionOpInterface"> {
-  let summary = "Fuses horizontal contraction ops without fusions";
+  let summary = "Fuses horizontal contraction ops";
+  let description = [{
+    For cases where multiple contractions
+    - that dont have a direct dependence
+    - that have the same LHS operand
+    - all the N dimensions of the RHS operands used are the same
+    Such contractions can be executed as a single contraction, i.e.
+
+    A = matmul(lhs, rhs0);
+    B = matmul(lhs, rhs1);
+    C = matmul(lhs, rhs2);
+
+    can be combined into
+    result = matmul(lhs, concat_along_N(rhs0, rhs1, rhs2));
+    A = slice0(result)
+    B = slice1(result)
+    C = slice2(result)
+
+    Instead of doing an actual concat of the RHS operands,
+    and extracting slices of the result, the pass generates a single
+    operation with
+    - the lhs operands
+    - all the rhs operands
+    - multiple results representing the individual matmuls
+  }];
   let dependentDialects = [
     "mlir::arith::ArithDialect",
     "mlir::tensor::TensorDialect",
