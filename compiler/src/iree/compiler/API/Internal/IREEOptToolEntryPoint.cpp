@@ -110,6 +110,19 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
   const_cast<TargetRegistry &>(TargetRegistry::getGlobal())
       .mergeFrom(pluginTargetBackendList);
 
+  // brought from mlir-opt MlirOptMain.cpp
+  // printRegisteredDialects and printRegisteredPassesAndReturn
+  if (config.shouldShowDialects()) {
+    llvm::outs() << "Available Dialects: ";
+    interleave(registry.getDialectNames(), llvm::outs(), ",");
+    llvm::outs() << "\n";
+    return success();
+  }
+  if (config.shouldListPasses()) {
+    mlir::printRegisteredPasses();
+    return success();
+  }
+
   // When reading from stdin and the input is a tty, it is often a user mistake
   // and the process "appears to be stuck". Print a message to let the user know
   // about it!
