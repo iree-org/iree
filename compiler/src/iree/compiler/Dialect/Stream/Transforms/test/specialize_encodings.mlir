@@ -689,7 +689,6 @@ util.func public @multi_device_gemm(%arg0: !stream.resource<external>, %arg1: !s
 // Negative tests. The pass should do nothing for the cases.
 //------------------------------------------------------------------------------
 
-
 hal.executable.source public @executable {
   hal.executable.export public @dispatch ordinal(0) layout(#hal.pipeline.layout<constants = 0, bindings = [
     #hal.pipeline.binding<storage_buffer>
