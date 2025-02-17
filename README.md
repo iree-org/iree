@@ -26,13 +26,15 @@ guides, and instructions on building from source.
 Releases notes are
 [published on GitHub releases](https://github.com/iree-org/iree/releases?q=prerelease%3Afalse).
 
-
 | Package | Release status |
 | -- | -- |
 GitHub release (stable) | [![GitHub Release](https://img.shields.io/github/v/release/iree-org/iree)](https://github.com/iree-org/iree/releases/latest)
 GitHub release (nightly) | [![GitHub Release](https://img.shields.io/github/v/release/iree-org/iree?include_prereleases)](https://github.com/iree-org/iree/releases)
-Python iree-base-compiler | [![PyPI version](https://badge.fury.io/py/iree-base-compiler.svg)](https://badge.fury.io/py/iree-base-compiler)
-Python iree-base-runtime | [![PyPI version](https://badge.fury.io/py/iree-base-runtime.svg)](https://badge.fury.io/py/iree-base-runtime)
+`iree-base-compiler` | [![PyPI version](https://badge.fury.io/py/iree-base-compiler.svg)](https://pypi.org/project/iree-base-compiler)
+`iree-base-runtime` | [![PyPI version](https://badge.fury.io/py/iree-base-runtime.svg)](https://pypi.org/project/iree-base-runtime)
+
+For more details on the release process, see
+https://iree.dev/developers/general/release-management/.
 
 ### Build status
 
