@@ -176,7 +176,7 @@ def UnsupportedEncodingAttr :
   let summary = "A layout resolver attribute that always fails to get layout";
   let description = [{
     An layout resolver that never resolves the layout. I.e., it always fails on
-    getting a layout. It can be used in testing or a default unkown attribute
+    getting a layout. It can be used in testing or a default unknown attribute
     for encoding.
   }];
 

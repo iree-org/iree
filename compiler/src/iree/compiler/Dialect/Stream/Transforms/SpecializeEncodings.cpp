@@ -90,7 +90,7 @@ static Type getTypeWithResolvedEncodingLayouts(
   if (!llvm::all_of(
           layoutResolvers,
           llvm::IsaPred<IREE::Encoding::EncodingLayoutAttrInterface>)) {
-    // Drop the encoding if one of attributes does not implement the interface.
+    // Drop the encoding if any attribute does not implement the interface.
     // Because there is no way to query the layout.
     return IREE::Encoding::dropEncoding(rankedTensorType);
   }
