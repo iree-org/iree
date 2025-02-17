@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.h"
@@ -60,38 +61,54 @@ SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
 
 } // namespace
 
-// Returns an updated encoding attribute if the type is a RankedTensorType
-// and an EncodingLayoutAttrInterface encoding is present. Otherwise, returns
-// nullptr. The method uses `layoutResolvers` to resolve the layouts of the
-// given `type`; returns the new encoding with the resolved layouts.
+// TODO(hanchung): Add "cloneWithEncoding" method to RankedTensorType.
+static RankedTensorType cloneWithEncoding(RankedTensorType type,
+                                          Attribute encodingAttr) {
+  return RankedTensorType::get(type.getShape(), type.getElementType(),
+                               encodingAttr);
+}
+
+// Returns the type with updated encoding, if any. Returns the original type if
+// the type is not a RankedTensorType. If it is a RankedTensorType with an
+// unknown encoding, returns the type without the encoding. The method uses
+// `layoutResolvers` to resolve the layouts of the given `type`; returns the new
+// encoding with the resolved layouts.
 // Note: The new encoding has to implement
 // SerializedEncodingLayoutAttrInterface. Otherwise, the specialization is
 // failed. Because the stream tensor ops still can not process encodings.
-static Attribute
-getEncodingWithNewLayouts(Type type,
-                          const SetVector<Attribute> &layoutResolvers) {
+static Type getTypeWithResolvedEncodingLayouts(
+    Type type, const SetVector<Attribute> &layoutResolvers) {
   auto rankedTensorType = dyn_cast<RankedTensorType>(type);
   if (!rankedTensorType) {
-    return nullptr;
+    return type;
   }
   auto encodingAttr =
       IREE::Encoding::getEncodingLayoutAttrInterface(rankedTensorType);
   if (!encodingAttr) {
-    return nullptr;
+    return IREE::Encoding::dropEncoding(rankedTensorType);
+  }
+  if (!llvm::all_of(
+          layoutResolvers,
+          llvm::IsaPred<IREE::Encoding::EncodingLayoutAttrInterface>)) {
+    // Drop the encoding if any attribute does not implement the interface.
+    // Because there is no way to query the layout.
+    return IREE::Encoding::dropEncoding(rankedTensorType);
   }
   SmallVector<Attribute> layouts;
   for (auto attr : layoutResolvers) {
     auto encodingLayoutAttr =
-        dyn_cast<IREE::Encoding::EncodingLayoutAttrInterface>(attr);
-    if (!encodingLayoutAttr) {
-      layouts.push_back(attr);
-      continue;
+        cast<IREE::Encoding::EncodingLayoutAttrInterface>(attr);
+    Attribute layout = encodingLayoutAttr.getLayout(rankedTensorType);
+    if (!layout) {
+      // Drop the encoding if the layout is not resolved.
+      return IREE::Encoding::dropEncoding(rankedTensorType);
     }
-    layouts.push_back(encodingLayoutAttr.getLayout(rankedTensorType));
+    layouts.push_back(layout);
   }
-  Attribute result = encodingAttr.cloneWithLayouts(layouts);
-  assert(isa<IREE::Encoding::SerializedEncodingLayoutAttrInterface>(result));
-  return result;
+  Attribute newEncoding = encodingAttr.cloneWithLayouts(layouts);
+  assert(
+      isa<IREE::Encoding::SerializedEncodingLayoutAttrInterface>(newEncoding));
+  return cloneWithEncoding(rankedTensorType, newEncoding);
 };
 
 /// Updates the bindings of function arguments with encoding layouts. It only
@@ -320,13 +337,6 @@ duplicateExecutablesPerLayoutVariant(ModuleOp moduleOp, SymbolTable symbolTable,
   return success();
 }
 
-// TODO(hanchung): Add "cloneWithEncoding" method to RankedTensorType.
-static RankedTensorType cloneWithEncoding(RankedTensorType type,
-                                          Attribute encodingAttr) {
-  return RankedTensorType::get(type.getShape(), type.getElementType(),
-                               encodingAttr);
-}
-
 /// Returns all the stream tensor ops that implement AffinityOpInterface, where
 /// a stream affinity indicates the kind of enviroment the ops are expected run
 /// in.
@@ -484,13 +494,9 @@ static LogicalResult updateTensorDispatchOp(
            "the (affinity, dispatchOp) query is invalid");
     const SetVector<Attribute> &layoutResolvers = cachedLayoutAttrs[key];
 
-    Attribute encodingAttr = getEncodingWithNewLayouts(type, layoutResolvers);
-    if (!encodingAttr) {
-      newOperandEncodings.push_back(type);
-      continue;
-    }
-    newOperandEncodings.push_back(
-        cloneWithEncoding(cast<RankedTensorType>(type), encodingAttr));
+    Type newEncodingType =
+        getTypeWithResolvedEncodingLayouts(type, layoutResolvers);
+    newOperandEncodings.push_back(newEncodingType);
   }
   dispatchOp.setOperandEncodingsAttr(
       rewriter.getTypeArrayAttr(newOperandEncodings));
@@ -503,14 +509,9 @@ static LogicalResult updateTensorDispatchOp(
       newResultEncodings.push_back(type);
       continue;
     }
-    Attribute encodingAttr =
-        getEncodingWithNewLayouts(type, resLayoutResolvers);
-    if (!encodingAttr) {
-      newResultEncodings.push_back(type);
-      continue;
-    }
-    newResultEncodings.push_back(
-        cloneWithEncoding(cast<RankedTensorType>(type), encodingAttr));
+    Type newEncodingType =
+        getTypeWithResolvedEncodingLayouts(type, resLayoutResolvers);
+    newResultEncodings.push_back(newEncodingType);
   }
   dispatchOp.setResultEncodingsAttr(
       rewriter.getTypeArrayAttr(newResultEncodings));
@@ -524,14 +525,10 @@ updateTensorSizeOfOp(RewriterBase &rewriter,
                      IREE::Stream::TensorSizeOfOp sizeOfOp,
                      const SetVector<Attribute> &layoutResolvers) {
   auto encodingType = dyn_cast<RankedTensorType>(sizeOfOp.getEncoding());
-  Attribute encodingAttr =
-      getEncodingWithNewLayouts(encodingType, layoutResolvers);
-  if (!encodingAttr) {
-    return success();
-  }
-  rewriter.modifyOpInPlace(sizeOfOp, [&] {
-    sizeOfOp.setEncoding(cloneWithEncoding(encodingType, encodingAttr));
-  });
+  Type newEncodingType =
+      getTypeWithResolvedEncodingLayouts(encodingType, layoutResolvers);
+  rewriter.modifyOpInPlace(sizeOfOp,
+                           [&] { sizeOfOp.setEncoding(newEncodingType); });
   return success();
 }
 
@@ -540,14 +537,9 @@ static LogicalResult
 updateTensorFillOp(RewriterBase &rewriter, IREE::Stream::TensorFillOp op,
                    const SetVector<Attribute> &layoutResolvers) {
   auto encodingType = dyn_cast<RankedTensorType>(op.getTargetEncoding());
-  Attribute encodingAttr =
-      getEncodingWithNewLayouts(encodingType, layoutResolvers);
-  if (!encodingAttr) {
-    return success();
-  }
-  rewriter.modifyOpInPlace(op, [&] {
-    op.setTargetEncoding(cloneWithEncoding(encodingType, encodingAttr));
-  });
+  Type newEncodingType =
+      getTypeWithResolvedEncodingLayouts(encodingType, layoutResolvers);
+  rewriter.modifyOpInPlace(op, [&] { op.setTargetEncoding(newEncodingType); });
   return success();
 }
 
@@ -620,14 +612,9 @@ static LogicalResult
 updateSourceEncoding(RewriterBase &rewriter, OpTy op,
                      const SetVector<Attribute> &layoutResolvers) {
   auto encodingType = dyn_cast<RankedTensorType>(op.getSourceEncoding());
-  Attribute encodingAttr =
-      getEncodingWithNewLayouts(encodingType, layoutResolvers);
-  if (!encodingAttr) {
-    return success();
-  }
-  rewriter.modifyOpInPlace(op, [&] {
-    op.setSourceEncoding(cloneWithEncoding(encodingType, encodingAttr));
-  });
+  Type newEncodingType =
+      getTypeWithResolvedEncodingLayouts(encodingType, layoutResolvers);
+  rewriter.modifyOpInPlace(op, [&] { op.setSourceEncoding(newEncodingType); });
   return success();
 }
 
@@ -638,14 +625,9 @@ static LogicalResult
 updateResultEncoding(RewriterBase &rewriter, OpTy op,
                      const SetVector<Attribute> &layoutResolvers) {
   auto encodingType = dyn_cast<RankedTensorType>(op.getResultEncoding());
-  Attribute encodingAttr =
-      getEncodingWithNewLayouts(encodingType, layoutResolvers);
-  if (!encodingAttr) {
-    return success();
-  }
-  rewriter.modifyOpInPlace(op, [&] {
-    op.setResultEncoding(cloneWithEncoding(encodingType, encodingAttr));
-  });
+  Type newEncodingType =
+      getTypeWithResolvedEncodingLayouts(encodingType, layoutResolvers);
+  rewriter.modifyOpInPlace(op, [&] { op.setResultEncoding(newEncodingType); });
   return success();
 }
 

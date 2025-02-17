@@ -215,6 +215,41 @@ util.global private @device_a = #device_target_local_0_
 
 // -----
 
+// Drop encodings if encoding attribute is not available in the target
+// configuration.
+
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {}>
+#device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
+#encoding = #iree_encoding.testing_encoding<>
+util.global private @device_a = #device_target_local_0_
+util.func public @drop_encoding(%arg0: index, %arg1: index, %scalar_f32 : f32) {
+  %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x0xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
+  util.return
+}
+// CHECK-LABEL: util.func public @drop_encoding
+// CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32>
+
+// -----
+
+// Drop encodings if the attached encoding attribute can not figure the layout.
+
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", { encoding = #iree_encoding.unsupported_encoding }>
+#device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
+#encoding = #iree_encoding.testing_encoding<>
+util.global private @device_a = #device_target_local_0_
+util.func public @drop_encoding_by_unsupported_encoding(%arg0: index, %arg1: index, %scalar_f32 : f32) {
+  %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x0xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
+  util.return
+}
+// CHECK-LABEL: util.func public @drop_encoding_by_unsupported_encoding
+// CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32>
+
+// -----
+
+//------------------------------------------------------------------------------
+// This test suite tests the executable duplication logic.
+//------------------------------------------------------------------------------
+
 #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.testing_encoding<>
