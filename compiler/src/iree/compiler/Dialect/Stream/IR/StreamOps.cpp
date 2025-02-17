@@ -2644,6 +2644,15 @@ static void printDispatchOperands(OpAsmPrinter &p, Operation *op,
   p << ")";
 }
 
+bool AsyncDispatchOp::preferCloneToConsumers() {
+  for (auto operand : getResourceOperands()) {
+    if (isa<Stream::ResourceType>(operand.getType())) {
+      return false;
+    }
+  }
+  return true;
+}
+
 LogicalResult AsyncDispatchOp::verify() {
   AsyncDispatchOp op = *this;
   if (failed(verifyOpValueSizes(op, op.getResourceOperands(),

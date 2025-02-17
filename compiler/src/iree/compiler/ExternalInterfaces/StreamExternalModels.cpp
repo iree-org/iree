@@ -76,7 +76,7 @@ struct FlowTransferTargetAffinityAttrExternalModel
         FlowTransferTargetAffinityAttrExternalModel>(*context);
   }
 
-  bool requiresAffinity(Operation *op) const { return true; }
+  bool requiresAffinity(Operation *op) const { return false; }
 
   IREE::Stream::AffinityAttr getAffinityAttr(Operation *op) const {
     return op->getAttrOfType<IREE::Stream::AffinityAttr>("target");
