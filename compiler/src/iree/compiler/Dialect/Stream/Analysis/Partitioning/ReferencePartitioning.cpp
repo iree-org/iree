@@ -153,7 +153,8 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
       // region - we must still block on loads though.
       LLVM_DEBUG(llvm::dbgs() << "(ignoring global store)\n");
       continue;
-    } else if (!isa<IREE::Stream::StreamableOpInterface>(op)) {
+    } else if (!isa<IREE::Stream::StreamableOpInterface>(op) &&
+               !isa<IREE::Stream::AsyncBarrierOp>(op)) {
       // Not a streamable op. If it has side-effects then we force a hazard on
       // all builders so that we don't move ops across it.
       if (!mlir::wouldOpBeTriviallyDead(&op)) {
