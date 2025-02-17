@@ -21,10 +21,6 @@ iree_compiler_cc_library(
     name = "CUDA",
     srcs = [
         "CUDATarget.cpp",
-        "SetBlockIdsRangePass.cpp",
-    ],
-    hdrs = [
-        "SetBlockIdsRangePass.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Codegen",
