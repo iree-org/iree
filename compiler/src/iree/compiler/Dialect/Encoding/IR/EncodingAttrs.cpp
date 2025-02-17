@@ -354,6 +354,19 @@ Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
 }
 
 //===---------------------------------------------------------------------===//
+// encoding.unsupported_encoding
+//===---------------------------------------------------------------------===//
+
+Attribute
+UnsupportedEncodingAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
+  return *this;
+}
+
+Attribute UnsupportedEncodingAttr::getLayout(RankedTensorType) const {
+  return nullptr;
+}
+
+//===---------------------------------------------------------------------===//
 // Encoding attributes that are mainly for testing purpose.
 //===---------------------------------------------------------------------===//
 

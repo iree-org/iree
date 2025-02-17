@@ -128,7 +128,7 @@ public:
   // EncodingLayoutAttrInterface attributes for each
   // (IREE::Stream::Affinity, Operation) query. The attribute is extracted from
   // the `encoding` field in the HAL::ExecutableTargetAttr configuration. If the
-  // `encoding` is not present, the target attribute is returned.
+  // `encoding` is not present, UnsupportedEncodingAttr is returned.
   IREE::Stream::ResolveLayoutAttrFn
   makeLayoutAttrResolver(ModuleOp moduleOp) const {
     return [=](ArrayRef<IREE::Stream::AffinityAndOpPair> batchQueries,
@@ -141,13 +141,14 @@ public:
         return moduleOp->emitError("failed to run DeviceAnalysis");
       }
 
+      MLIRContext *ctx = getContext();
       for (IREE::Stream::AffinityAndOpPair key : batchQueries) {
         auto [affinityAttr, op] = key;
         SetVector<IREE::HAL::ExecutableTargetAttr> resultSet;
         deviceAnalysis.gatherRequiredExecutableTargets(affinityAttr, op,
                                                        resultSet);
         for (auto targetAttr : resultSet) {
-          Attribute result = targetAttr;
+          Attribute result = IREE::Encoding::UnsupportedEncodingAttr::get(ctx);
           if (auto attr = targetAttr.getConfiguration().getNamed("encoding")) {
             if (auto encodingLayoutAttr =
                     dyn_cast<IREE::Encoding::EncodingLayoutAttrInterface>(

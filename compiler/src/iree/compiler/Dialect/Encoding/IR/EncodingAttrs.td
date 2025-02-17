@@ -162,6 +162,28 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
 }
 
 //===---------------------------------------------------------------------===//
+// encoding.unsupported_encoding
+//===---------------------------------------------------------------------===//
+
+def UnsupportedEncodingAttr :
+    IREEEncoding_Attr<"UnsupportedEncoding", [
+      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutAttrInterface, [
+        "cloneWithSimplifiedConfig",
+        "getLayout",
+      ]>
+    ]> {
+  let mnemonic = "unsupported_encoding";
+  let summary = "A layout resolver attribute that always fails to get layout";
+  let description = [{
+    An layout resolver that never resolves the layout. I.e., it always fails on
+    getting a layout. It can be used in testing or a default unknown attribute
+    for encoding.
+  }];
+
+  let genVerifyDecl = 0;
+}
+
+//===---------------------------------------------------------------------===//
 // Encoding specialization attributes, which are mainly for testing purpose.
 //===---------------------------------------------------------------------===//
 

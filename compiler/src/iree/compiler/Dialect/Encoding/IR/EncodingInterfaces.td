@@ -60,6 +60,7 @@ def IREEEncoding_EncodingLayoutAttrInterface :
         calculate the storage size. Otherwise, we will need a hook from
         external, and the hook can come from an attribute that implements the
         interface.
+        Returns nullptr if it fails to get the layout.
       }],
       /*retTy=*/"::mlir::Attribute",
       /*methodName=*/"getLayout",
