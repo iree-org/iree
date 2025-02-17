@@ -685,6 +685,8 @@ util.func public @multi_device_gemm(%arg0: !stream.resource<external>, %arg1: !s
 // CHECK:         stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_A]]>) @[[$EX0]]::@gemm
 // CHECK:         stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_B]]>) @[[$EX1]]::@gemm
 
+// -----
+
 //------------------------------------------------------------------------------
 // Negative tests. The pass should do nothing for the cases.
 //------------------------------------------------------------------------------
