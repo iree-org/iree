@@ -89,7 +89,9 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
     // producer dispatch regions, so we need to resolve tensor.dim ops.
     RewritePatternSet patterns(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
-    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+    GreedyRewriteConfig config;
+    config.cseConstants = false;
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns), config))) {
       return signalPassFailure();
     }
   }

@@ -212,6 +212,9 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
 
 // Pipeline to first create `flow.dispatch.region` ops and then lower to
 // `flow.dispatch.workgroup` ops.
+// Note that we should not hoist out small constants before the dispatch regions
+// are converted to workgroups. E.g., the `cseConstant` option needs to be false
+// in greedy pattern rewriting drivers.
 static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
   FunctionLikeNest(passManager)
       // Create dispatches for scalar operations as roots.

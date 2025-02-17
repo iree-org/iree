@@ -44,8 +44,6 @@ util.func public @matmul_f32f32f32_dynamic(%arg0 : tensor<?x?xf32>, %arg1 : tens
 //  CHECK-DAG: #[[OUT_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 32, 32, 32>>
 //      CHECK: util.func public @matmul_f32f32f32_dynamic(
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>, %[[ARG1:.+]]: tensor<?x?xf32>, %[[ARG2:.+]]: tensor<?x?xf32>
-//  CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
-//  CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 //      CHECK:   %[[LHS:.+]] = iree_encoding.set_encoding %[[ARG0]]
 // CHECK-SAME:       tensor<?x?xf32, #[[LHS_ENCODING]]>
 //      CHECK:   %[[RHS:.+]] = iree_encoding.set_encoding %[[ARG1]]
@@ -55,6 +53,8 @@ util.func public @matmul_f32f32f32_dynamic(%arg0 : tensor<?x?xf32>, %arg1 : tens
 //      CHECK:   %[[MATMUL:.+]] = linalg.matmul
 // CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
 // CHECK-SAME:       outs(%[[OUTS]] :
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG2]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG2]], %[[C1]]
 //      CHECK:   %[[RESULT:.+]] = iree_encoding.unset_encoding %[[MATMUL]] : tensor<?x?xf32, #[[OUT_ENCODING]]> -> tensor<?x?xf32>{%[[D0]], %[[D1]]}
@@ -256,9 +256,6 @@ util.func public @batch_matmul_f32f32f32_dynamic(%arg0 : tensor<?x?x?xf32>, %arg
 //  CHECK-DAG: #[[OUT_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 32, 32, 32>>
 //      CHECK: util.func public @batch_matmul_f32f32f32_dynamic(
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?x?xf32>, %[[ARG1:.+]]: tensor<?x?x?xf32>, %[[ARG2:.+]]: tensor<?x?x?xf32>
-//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
 //      CHECK:   %[[LHS:.+]] = iree_encoding.set_encoding %[[ARG0]]
 // CHECK-SAME:       tensor<?x?x?xf32, #[[LHS_ENCODING]]>
 //      CHECK:   %[[RHS:.+]] = iree_encoding.set_encoding %[[ARG1]]
@@ -268,6 +265,9 @@ util.func public @batch_matmul_f32f32f32_dynamic(%arg0 : tensor<?x?x?xf32>, %arg
 //      CHECK:   %[[BATCH_MATMUL:.+]] = linalg.batch_matmul
 // CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
 // CHECK-SAME:       outs(%[[OUTS]] :
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG2]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG2]], %[[C1]]
 //  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG2]], %[[C2]]
@@ -530,8 +530,6 @@ util.func public @batch_matvec_f32f32f32_dynamic(%arg0 : tensor<?x?x?xf32>, %arg
 //  CHECK-DAG: #[[OUT_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 32, 1, 32>>
 //      CHECK: util.func public @batch_matvec_f32f32f32_dynamic(
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?x?xf32>, %[[ARG1:.+]]: tensor<?x?xf32>, %[[ARG2:.+]]: tensor<?x?xf32>
-//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //      CHECK:   %[[LHS:.+]] = iree_encoding.set_encoding %[[ARG0]]
 // CHECK-SAME:       tensor<?x?x?xf32, #[[LHS_ENCODING]]>
 //      CHECK:   %[[RHS:.+]] = iree_encoding.set_encoding %[[ARG1]]
@@ -541,6 +539,8 @@ util.func public @batch_matvec_f32f32f32_dynamic(%arg0 : tensor<?x?x?xf32>, %arg
 //      CHECK:   %[[BATCH_MATVEC:.+]] = linalg.batch_matvec
 // CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
 // CHECK-SAME:       outs(%[[OUTS]] :
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG2]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG2]], %[[C1]]
 //      CHECK:   %[[RESULT:.+]] = iree_encoding.unset_encoding %[[BATCH_MATVEC]]{{.+}} -> tensor<?x?xf32>{%[[D0]], %[[D1]]}
