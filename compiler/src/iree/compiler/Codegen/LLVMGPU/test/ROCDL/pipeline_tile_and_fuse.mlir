@@ -554,7 +554,7 @@ hal.executable public @main {
 //       CHECK:   scf.forall ({{.*}}) in (32, 98) {
 //       CHECK:     scf.for %{{.*}} = %c0 to %c256 step %c4 {{.*}} -> (vector<1x4xf32>)
 //       CHECK:       scf.for %{{.*}} = %[[LINID1]] to %c4 step %c32
-//       CHECK:         %[[READ:.+]] = vector.transfer_read {{.*}} : memref<128x256xf32, {{.*}}storage_buffer>>, vector<4xf32>
+//       CHECK:         %[[READ:.+]] = vector.transfer_read {{.*}} : memref<128x256xf32, {{.*}}#amdgpu.address_space<fat_raw_buffer>>, vector<4xf32>
 //       CHECK:         vector.transfer_write %[[READ]], %{{.*}} : vector<4xf32>, memref<4x6xf32, #gpu.address_space<workgroup>>
 //       CHECK:       vector.contract
 //       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
@@ -626,8 +626,8 @@ hal.executable public @main {
 // CHECK-DAG:      memref.alloc() : memref<64x72xi8, #gpu.address_space<workgroup>>
 // CHECK-DAG:      memref.alloc() : memref<64x136xi8, #gpu.address_space<workgroup>>
 // CHECK-COUNT-32: amdgpu.wmma {{.*}} : vector<16xi8>, vector<16xi8>, vector<8xi32>
-// CHECK:          vector.transfer_write {{.*}} : vector<4x1x2x8x1xi8>, memref<16x16x196x8x2xi8, #hal.descriptor_type<storage_buffer>>
-// CHECK:          vector.transfer_write {{.*}} : vector<2x8x1x4x1xi8>, memref<196x8x2x16x16xi8, #hal.descriptor_type<storage_buffer>>
+// CHECK:          vector.transfer_write {{.*}} : vector<4x1x2x8x1xi8>, memref<16x16x196x8x2xi8, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK:          vector.transfer_write {{.*}} : vector<2x8x1x4x1xi8>, memref<196x8x2x16x16xi8, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
 
@@ -906,7 +906,7 @@ hal.executable public @main {
 
 // Verify that the write does not get hoisted out of the single threaded
 // for loop.
-//       CHECK:       vector.transfer_write %{{.*}}, %[[B2]]{{.*}} memref<10x1xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:       vector.transfer_write %{{.*}}, %[[B2]]{{.*}} memref<10x1xf32, #amdgpu.address_space<fat_raw_buffer>>
 //  CHECK-NEXT:     }
 //  CHECK-NEXT:   gpu.barrier
 //  CHECK-NEXT:   } {mapping = [#iree_codegen.workgroup_mapping<x>]}
@@ -1015,7 +1015,7 @@ hal.executable public @main {
 //       CHECK:   scf.for %{{.*}} = %{{.*}} to %c16 step %c1
 //       CHECK:     scf.for
 // CHECK-COUNT-4:     arith.addf {{.*}} : vector<9xf32>
-//       CHECK:       vector.transfer_write {{.*}} vector<9xi8>, memref<32x16x9x9xi8, #hal.descriptor_type<storage_buffer>>
+//       CHECK:       vector.transfer_write {{.*}} vector<9xi8>, memref<32x16x9x9xi8, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
 
@@ -1158,6 +1158,6 @@ hal.executable public @main {
 //       CHECK:     %[[LOOP_T:.+]] = vector.shape_cast %[[LOOP]] : vector<1x1x1x4x1xf32> to vector<4xf32>
 //       CHECK:     vector.transfer_write %[[LOOP_T]]
 //       CHECK:     scf.for {{.*}} {
-//       CHECK:       memref.copy {{.*}}#gpu.address_space<workgroup>> to {{.*}}#hal.descriptor_type<storage_buffer>
+//       CHECK:       memref.copy {{.*}}#gpu.address_space<workgroup>> to {{.*}}#amdgpu.address_space<fat_raw_buffer>
 //       CHECK:    }
 //       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
