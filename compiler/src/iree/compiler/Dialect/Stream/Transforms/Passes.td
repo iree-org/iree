@@ -465,6 +465,9 @@ def SpecializeEncodingsPass :
     types to implement EncodingTypeInterface, so it can updates the types
     without accessing any other dialects.
   }];
+  let dependentDialects = [
+    "IREE::Encoding::IREEEncodingDialect"
+  ];
 }
 
 def AnnotateDispatchArgumentsPass :
