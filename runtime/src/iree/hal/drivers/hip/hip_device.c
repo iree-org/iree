@@ -1392,7 +1392,7 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
     for (iree_host_size_t i = 0; i < data->base.signal_semaphore_list.count;
          ++i) {
       iree_hal_semaphore_fail(data->base.signal_semaphore_list.semaphores[i],
-                              iree_status_clone(data->base.status));
+                              iree_status_clone(status));
     }
     iree_hal_hip_device_destroy_buffer_callback_data(data);
   }
@@ -1919,7 +1919,7 @@ static iree_status_t iree_hal_hip_device_perform_queue_read_now(
     for (iree_host_size_t i = 0; i < data->base.signal_semaphore_list.count;
          ++i) {
       iree_hal_semaphore_fail(data->base.signal_semaphore_list.semaphores[i],
-                              iree_status_clone(data->base.status));
+                              iree_status_clone(status));
     }
     iree_hal_hip_device_destroy_queue_read_callback_data(data);
   }
@@ -2240,7 +2240,7 @@ static iree_status_t iree_hal_hip_device_execute_now(void* user_data,
     for (iree_host_size_t i = 0; i < data->base.signal_semaphore_list.count;
          ++i) {
       iree_hal_semaphore_fail(data->base.signal_semaphore_list.semaphores[i],
-                              iree_status_clone(data->base.status));
+                              iree_status_clone(status));
     }
     iree_hal_hip_device_destroy_callback_data(data);
   }
