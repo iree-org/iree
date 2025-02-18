@@ -32,6 +32,12 @@ namespace mlir::iree_compiler {
 using namespace mlir::iree_compiler::IREE::VectorExt;
 using VectorValue = TypedValue<VectorType>;
 
+static bool isBroadcast(AffineExpr expr) {
+  if (auto constExpr = dyn_cast<AffineConstantExpr>(expr))
+    return constExpr.getValue() == 0;
+  return false;
+}
+
 /// Given a set of base transfer |indices|, |offsets| for the batch/outer
 /// dimensions, and distributed warp and thread indices, computes the indices
 /// of the distributed transfer operation based on the |vectorLayout|.
@@ -39,11 +45,7 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
     OpBuilder &b, ValueRange indices, ArrayRef<int64_t> offsets,
     NestedLayoutAttr vectorLayout, AffineMap permutationMap,
     ArrayRef<Value> warpIndices, ArrayRef<Value> threadIndices) {
-  auto isBroadcast = [](AffineExpr expr) {
-    if (auto constExpr = dyn_cast<AffineConstantExpr>(expr))
-      return constExpr.getValue() == 0;
-    return false;
-  };
+
   int64_t rank = vectorLayout.getRank();
   // Permute the batch and outer vector offsets to match the order of
   // the vector dimensions using the inverse of the batch/offset order.
@@ -84,12 +86,11 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
   return slicedIndices;
 }
 
-static SmallVector<int64_t> getDistributedTransferOffsetsFromNestedLayout(
-    OpBuilder &b, ArrayRef<int64_t> offsets, NestedLayoutAttr vectorLayout) {
+static SmallVector<int64_t>
+getDistributedTransferOffsetsFromNestedLayout(ArrayRef<int64_t> offsets,
+                                              NestedLayoutAttr vectorLayout) {
 
   int64_t rank = vectorLayout.getRank();
-  // Permute the batch and outer vector offsets to match the order of
-  // the vector dimensions using the inverse of the batch/offset order.
   ArrayRef<int64_t> batchOffsets(offsets.begin(), rank);
   ArrayRef<int64_t> outerOffsets(offsets.begin() + rank, rank);
   ArrayRef<int64_t> outerSizes = vectorLayout.getOuterTile();
@@ -226,6 +227,23 @@ static LogicalResult populateWarpAndThreadIndices(
   return success();
 }
 
+static FailureOr<VectorValue>
+getSlicedPermutedMask(PatternRewriter &rewriter, Location loc,
+                      AffineMap permMap, ArrayRef<int64_t> offsets,
+                      NestedLayoutAttr vectorLayout, VectorValue mask) {
+  SmallVector<int64_t> sliceMaskOffsets =
+      getDistributedTransferOffsetsFromNestedLayout(offsets, vectorLayout);
+  SmallVector<int64_t> strides(vectorLayout.getElementTile().size(), 1);
+  VectorValue slicedMask = rewriter.create<vector::ExtractStridedSliceOp>(
+      loc, mask, sliceMaskOffsets, vectorLayout.getElementTile(), strides);
+  if (llvm::any_of(permMap.getResults(),
+                   [](AffineExpr dim) { return isBroadcast(dim); })) {
+    return rewriter.notifyMatchFailure(
+        loc, "broadcasted masked reads/writes are not supported");
+  }
+  return slicedMask;
+}
+
 namespace {
 
 /// Pattern to distribute `vector.transfer_read` ops with nested layouts.
@@ -250,8 +268,9 @@ struct DistributeTransferRead final
     }
 
     VectorValue mask = readOp.getMask();
+    NestedLayoutAttr maskLayout;
     if (mask) {
-      auto maskLayout = dyn_cast<NestedLayoutAttr>(signature[mask]);
+      maskLayout = dyn_cast<NestedLayoutAttr>(signature[mask]);
       if (!maskLayout) {
         return rewriter.notifyMatchFailure(readOp,
                                            "non-nested mask vector layout");
@@ -293,22 +312,22 @@ struct DistributeTransferRead final
     }
 
     ValueRange indices = readOp.getIndices();
+    AffineMap permMap = readOp.getPermutationMap();
     SmallVector<int64_t> strides(rank, 1);
     for (SmallVector<int64_t> offsets :
          StaticTileOffsetRange(distShape, tileShape)) {
       SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
-          rewriter, indices, offsets, vectorLayout, readOp.getPermutationMap(),
-          warpIndices, threadIndices);
+          rewriter, indices, offsets, vectorLayout, permMap, warpIndices,
+          threadIndices);
 
       VectorValue slicedMask = nullptr;
       if (mask) {
-        SmallVector<int64_t> sliceMaskOffsets =
-            getDistributedTransferOffsetsFromNestedLayout(rewriter, offsets,
-                                                          vectorLayout);
-        SmallVector<int64_t> strides(innerVectorType.getRank(), 1);
-        slicedMask = rewriter.create<vector::ExtractStridedSliceOp>(
-            readOp.getLoc(), mask, sliceMaskOffsets, innerVectorType.getShape(),
-            strides);
+        FailureOr<VectorValue> maybeSlicedMask = getSlicedPermutedMask(
+            rewriter, readOp.getLoc(), permMap, offsets, maskLayout, mask);
+        if (failed(maybeSlicedMask)) {
+          return failure();
+        }
+        slicedMask = maybeSlicedMask.value();
       }
 
       VectorValue slicedRead = rewriter.create<vector::TransferReadOp>(
@@ -361,8 +380,9 @@ struct DistributeTransferWrite final
     }
 
     VectorValue mask = writeOp.getMask();
+    NestedLayoutAttr maskLayout;
     if (mask) {
-      auto maskLayout = dyn_cast<NestedLayoutAttr>(signature[mask]);
+      maskLayout = dyn_cast<NestedLayoutAttr>(signature[mask]);
       if (!maskLayout) {
         return rewriter.notifyMatchFailure(writeOp,
                                            "non-nested mask vector layout");
@@ -387,11 +407,12 @@ struct DistributeTransferWrite final
         getDistributed(rewriter, writeOp.getVector(), vectorLayout);
 
     ValueRange indices = writeOp.getIndices();
+    AffineMap permMap = writeOp.getPermutationMap();
     for (SmallVector<int64_t> offsets :
          StaticTileOffsetRange(distShape, tileShape)) {
       SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
-          rewriter, indices, offsets, vectorLayout, writeOp.getPermutationMap(),
-          warpIndices, threadIndices);
+          rewriter, indices, offsets, vectorLayout, permMap, warpIndices,
+          threadIndices);
 
       // Extract the "element vector" from the inner most dimensions. All outer
       // dimensions are either unrolled or distributed such that this is a
@@ -410,13 +431,14 @@ struct DistributeTransferWrite final
 
       VectorValue slicedMask = nullptr;
       if (mask) {
-        SmallVector<int64_t> sliceMaskOffsets =
-            getDistributedTransferOffsetsFromNestedLayout(rewriter, offsets,
-                                                          vectorLayout);
-        SmallVector<int64_t> strides(vectorLayout.getElementTile().size(), 1);
-        slicedMask = rewriter.create<vector::ExtractStridedSliceOp>(
-            writeOp.getLoc(), mask, sliceMaskOffsets,
-            vectorLayout.getElementTile(), strides);
+        if (mask) {
+          FailureOr<VectorValue> maybeSlicedMask = getSlicedPermutedMask(
+              rewriter, writeOp.getLoc(), permMap, offsets, maskLayout, mask);
+          if (failed(maybeSlicedMask)) {
+            return failure();
+          }
+          slicedMask = maybeSlicedMask.value();
+        }
       }
 
       rewriter.create<vector::TransferWriteOp>(

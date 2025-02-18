@@ -817,9 +817,21 @@ static void enforceLayoutToTransferReadOp(
   if (result->isUninitialized()) {
     return;
   }
+
+  // Build a transposed layout.
+  SmallVector<unsigned> permutation;
+  AffineMap permMap = read.getPermutationMap();
+  bool isSupportedPerm =
+      permMap.isPermutationOfMinorIdentityWithBroadcasting(permutation);
+  VectorLayoutInterface layout = result->getLayout();
+  SmallVector<int64_t> transposePerm(permutation.begin(), permutation.end());
+  if (isSupportedPerm) {
+    layout = layout.permute(transposePerm);
+  }
+
   for (auto [index, operandLattice] : llvm::enumerate(operandLattices)) {
     ChangeResult changed = operandLattice->resolveWithPossibleConflict(
-        result, getOpOperand(read, index));
+        layout, getOpOperand(read, index));
     update(operandLattice, changed);
   }
 }
@@ -842,10 +854,22 @@ static void enforceLayoutToTransferWriteOp(
   if (writeOperand->isUninitialized()) {
     return;
   }
+
+  // Build a transposed layout.
+  SmallVector<unsigned> permutation;
+  AffineMap permMap = write.getPermutationMap();
+  bool isSupportedPerm =
+      permMap.isPermutationOfMinorIdentityWithBroadcasting(permutation);
+  VectorLayoutInterface layout = writeOperand->getLayout();
+  SmallVector<int64_t> transposePerm(permutation.begin(), permutation.end());
+  if (isSupportedPerm) {
+    layout = layout.permute(transposePerm);
+  }
+
   for (auto [index, operandLattice] :
        llvm::enumerate(operandLattices.slice(1))) {
     ChangeResult changed = operandLattice->resolveWithPossibleConflict(
-        writeOperand, getOpOperand(write, index + 1));
+        layout, getOpOperand(write, index + 1));
     update(operandLattice, changed);
   }
 }
