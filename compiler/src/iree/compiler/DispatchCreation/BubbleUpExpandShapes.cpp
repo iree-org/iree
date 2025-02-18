@@ -173,8 +173,6 @@ void BubbleUpExpandShapesPass::runOnOperation() {
                                                      context);
   tensor::CollapseShapeOp::getCanonicalizationPatterns(
       bubbleExpandShapePatterns, context);
-  tensor::populateReassociativeReshapeFoldingPatterns(
-      bubbleExpandShapePatterns);
 
   GreedyRewriteConfig rewriteConfig;
   rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
