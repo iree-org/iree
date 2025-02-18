@@ -827,12 +827,20 @@ static void enforceLayoutToTransferReadOp(
   SmallVector<int64_t> transposePerm(permutation.begin(), permutation.end());
   if (isSupportedPerm) {
     layout = layout.permute(transposePerm);
-  }
+    AffineMap toMinorIdentity =
+        AffineMap::getPermutationMap(permutation, permMap.getContext());
+    AffineMap orderedMap = toMinorIdentity.compose(permMap);
+    SmallVector<bool> droppedDims(layout.getRank(), false);
+    for (unsigned bdim : orderedMap.getBroadcastDims()) {
+      droppedDims[bdim] = true;
+    }
+    layout = layout.project(droppedDims);
 
-  for (auto [index, operandLattice] : llvm::enumerate(operandLattices)) {
-    ChangeResult changed = operandLattice->resolveWithPossibleConflict(
-        layout, getOpOperand(read, index));
-    update(operandLattice, changed);
+    for (auto [index, operandLattice] : llvm::enumerate(operandLattices)) {
+      ChangeResult changed = operandLattice->resolveWithPossibleConflict(
+          layout, getOpOperand(read, index));
+      update(operandLattice, changed);
+    }
   }
 }
 

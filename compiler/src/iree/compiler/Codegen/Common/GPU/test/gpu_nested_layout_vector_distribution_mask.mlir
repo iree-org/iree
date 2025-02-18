@@ -140,3 +140,44 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[DISTR_MASK:.+]] = vector.create_mask %c8, {{.*}} : vector<8x8xi1>
 // CHECK: %[[DISTR_MASK_0:.+]] = vector.extract_strided_slice %[[DISTR_MASK]] {offsets = [0, 0], sizes = [8, 2], strides = [1, 1]} : vector<8x8xi1> to vector<8x2xi1>
 // CHECK: vector.transfer_read %arg0{{.*}} %[[DISTR_MASK_0]]
+
+// -----
+
+#nested = #iree_vector_ext.nested_layout<
+  subgroup_tile = [2, 1],
+  batch_tile = [2, 1],
+  outer_tile = [2, 1],
+  thread_tile = [16, 16],
+  element_tile = [2, 8],
+
+  subgroup_strides = [1, 0],
+  thread_strides = [16, 1]
+>
+
+func.func @masked_read_write_perm_bcast(%arg0 : memref<128x?x1xf16>, %arg1 : memref<128x?x1xf16>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c128 = arith.constant 128 : index
+  %cst_6 = arith.constant 0.000000e+00 : f16
+  %dyn = memref.dim %arg0, %c1 : memref<128x?x1xf16>
+  %41 = vector.create_mask %dyn : vector<256xi1>
+  %42 = vector.transfer_read %arg0[%c0, %c0, %c0], %cst_6, %41 {in_bounds = [true, true], permutation_map = affine_map<(d0, d1, d2) -> (d1, 0)>} : memref<128x?x1xf16>, vector<256x128xf16>
+  %43 = iree_vector_ext.to_layout %42 to layout(#nested) : vector<256x128xf16>
+  %44 = vector.create_mask %dyn, %c128 : vector<256x128xi1>
+  vector.transfer_write %43, %arg1[%c0, %c0, %c0], %44 {in_bounds = [true, true], permutation_map = affine_map<(d0, d1, d2) -> (d1, d2)>} : vector<256x128xf16>, memref<128x?x1xf16>
+  return
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @masked_read_write_perm_bcast
+
+// CHECK: %[[DISTR_MASK:.+]] = vector.create_mask {{.*}} : vector<8xi1>
+// CHECK: %[[DISTR_MASK_0:.+]] = vector.extract_strided_slice %16 {offsets = [0], sizes = [2], strides = [1]} : vector<8xi1> to vector<2xi1>
+// CHECK: vector.transfer_read %arg0{{.*}} %[[DISTR_MASK_0]]

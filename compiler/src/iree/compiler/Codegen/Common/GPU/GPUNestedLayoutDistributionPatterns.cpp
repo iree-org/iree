@@ -227,20 +227,16 @@ static LogicalResult populateWarpAndThreadIndices(
   return success();
 }
 
-static FailureOr<VectorValue>
-getSlicedPermutedMask(PatternRewriter &rewriter, Location loc,
-                      AffineMap permMap, ArrayRef<int64_t> offsets,
-                      NestedLayoutAttr vectorLayout, VectorValue mask) {
+static VectorValue getSlicedPermutedMask(PatternRewriter &rewriter,
+                                         Location loc, AffineMap permMap,
+                                         ArrayRef<int64_t> offsets,
+                                         NestedLayoutAttr vectorLayout,
+                                         VectorValue mask) {
   SmallVector<int64_t> sliceMaskOffsets =
       getDistributedTransferOffsetsFromNestedLayout(offsets, vectorLayout);
   SmallVector<int64_t> strides(vectorLayout.getElementTile().size(), 1);
   VectorValue slicedMask = rewriter.create<vector::ExtractStridedSliceOp>(
       loc, mask, sliceMaskOffsets, vectorLayout.getElementTile(), strides);
-  if (llvm::any_of(permMap.getResults(),
-                   [](AffineExpr dim) { return isBroadcast(dim); })) {
-    return rewriter.notifyMatchFailure(
-        loc, "broadcasted masked reads/writes are not supported");
-  }
   return slicedMask;
 }
 
@@ -336,12 +332,8 @@ struct DistributeTransferRead final
         SmallVector<int64_t> maskTileShape =
             getElementVectorTileShape(maskLayout);
         SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
-        FailureOr<VectorValue> maybeSlicedMask = getSlicedPermutedMask(
-            rewriter, readOp.getLoc(), permMap, maskOffsets, maskLayout, mask);
-        if (failed(maybeSlicedMask)) {
-          return failure();
-        }
-        slicedMask = maybeSlicedMask.value();
+        slicedMask = getSlicedPermutedMask(rewriter, readOp.getLoc(), permMap,
+                                           maskOffsets, maskLayout, mask);
       }
 
       VectorValue slicedRead = rewriter.create<vector::TransferReadOp>(
@@ -459,12 +451,8 @@ struct DistributeTransferWrite final
         SmallVector<int64_t> maskTileShape =
             getElementVectorTileShape(maskLayout);
         SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
-        FailureOr<VectorValue> maybeSlicedMask = getSlicedPermutedMask(
-            rewriter, writeOp.getLoc(), permMap, maskOffsets, maskLayout, mask);
-        if (failed(maybeSlicedMask)) {
-          return failure();
-        }
-        slicedMask = maybeSlicedMask.value();
+        slicedMask = getSlicedPermutedMask(rewriter, writeOp.getLoc(), permMap,
+                                           maskOffsets, maskLayout, mask);
       }
 
       rewriter.create<vector::TransferWriteOp>(
