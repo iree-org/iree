@@ -453,6 +453,12 @@ iree_status_t iree_hal_hip_device_create(
           hipStreamCreateWithFlags(&device->devices[i].hip_dispatch_stream,
                                    hipStreamNonBlocking));
     }
+    if (iree_status_is_ok(status)) {
+      status = IREE_HIP_CALL_TO_STATUS(
+          symbols,
+          hipStreamCreateWithFlags(&device->devices[i].hip_async_memory_stream,
+                                   hipStreamNonBlocking));
+    }
 
     if (iree_status_is_ok(status)) {
       int hip_device_count = 0;
@@ -553,6 +559,8 @@ static void iree_hal_hip_device_destroy(iree_hal_device_t* base_device) {
   for (iree_host_size_t i = 0; i < device->device_count; ++i) {
     IREE_HIP_IGNORE_ERROR(
         symbols, hipStreamDestroy(device->devices[i].hip_dispatch_stream));
+    IREE_HIP_IGNORE_ERROR(
+        symbols, hipStreamDestroy(device->devices[i].hip_async_memory_stream));
     // NOTE: This function return hipSuccess though doesn't release the
     // primaryCtx by design on HIP/HCC path.
     IREE_HIP_IGNORE_ERROR(
@@ -1110,7 +1118,8 @@ static iree_status_t iree_hal_hip_device_stream_add_cleanup(
 
 static iree_status_t
 iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
-    iree_hal_hip_device_t* device, iree_hal_hip_cleanup_thread_t* thread,
+    iree_hal_hip_device_t* device, hipStream_t stream,
+    iree_hal_hip_cleanup_thread_t* thread,
     iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t device_ordinal, iree_hal_hip_cleanup_callback_t callback,
     void* user_data) {
@@ -1120,8 +1129,7 @@ iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
   for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
     status = iree_hal_hip_semaphore_create_event_and_record_if_necessary(
         signal_semaphore_list.semaphores[i],
-        signal_semaphore_list.payload_values[i],
-        device->devices[device_ordinal].hip_dispatch_stream,
+        signal_semaphore_list.payload_values[i], stream,
         device->devices[device_ordinal].device_event_pool);
     if (!iree_status_is_ok(status)) {
       break;
@@ -1174,7 +1182,7 @@ static iree_status_t iree_hal_hip_device_make_buffer_free_callback_data(
 }
 
 static iree_status_t iree_hal_hip_device_stream_wait_for_semaphores(
-    iree_hal_hip_device_t* device,
+    iree_hal_hip_device_t* device, hipStream_t stream,
     iree_hal_semaphore_list_t wait_semaphore_list,
     iree_host_size_t device_ordinal) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -1186,25 +1194,32 @@ static iree_status_t iree_hal_hip_device_stream_wait_for_semaphores(
   // to work across multiple device/streams, we need these waits.
   for (iree_host_size_t i = 0;
        i < wait_semaphore_list.count && iree_status_is_ok(status); ++i) {
+    IREE_TRACE_ZONE_BEGIN_NAMED(
+        z1, "iree_hal_hip_device_stream_wait_for_semaphores_get_hip_event");
     iree_hal_hip_event_t* event = NULL;
     status = iree_hal_hip_semaphore_get_hip_event(
         wait_semaphore_list.semaphores[i],
         wait_semaphore_list.payload_values[i],
         device->devices[device_ordinal].device_event_pool, &event);
     if (!iree_status_is_ok(status)) {
+      IREE_TRACE_ZONE_END(z1);
       break;
     }
     // If we don't have an event, then we don't have to wait for it since it
     // has already been signaled on the host.
     if (!event) {
+      IREE_TRACE_ZONE_END(z1);
       continue;
     }
 
+    IREE_TRACE_ZONE_BEGIN_NAMED(
+        z3, "iree_hal_hip_device_stream_wait_for_semaphores_wait_hip_event");
     status = IREE_HIP_CALL_TO_STATUS(
         device->hip_symbols,
-        hipStreamWaitEvent(device->devices[device_ordinal].hip_dispatch_stream,
-                           iree_hal_hip_event_handle(event), 0));
+        hipStreamWaitEvent(stream, iree_hal_hip_event_handle(event), 0));
     iree_hal_hip_event_release(event);
+    IREE_TRACE_ZONE_END(z3);
+    IREE_TRACE_ZONE_END(z1);
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -1316,9 +1331,23 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
   }
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, device_ordinal);
 
+  // If we have an async alloc FOR ANOTHER GPU, it may be ordered randomly
+  // in the stream. This means if we are running dispatch work, the semaphore
+  // signal may get ordered after some dispatch work that the async alloc
+  // does not depend on.
+
+  // In order to improve this situation, move the async allocs onto another
+  // stream. (But not the deallocs). We could be more clever, (if the semaphore
+  // the alloc) is waiting on was signaled on the dispatch stream, and was the
+  // last thing signaled, we could keep it on the dispatch stream.
+  hipStream_t stream =
+      data->type == IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_ALLOC
+          ? device->devices[device_ordinal].hip_async_memory_stream
+          : device->devices[device_ordinal].hip_dispatch_stream;
+
   if (iree_status_is_ok(status)) {
     status = iree_hal_hip_device_stream_wait_for_semaphores(
-        device, data->base.wait_semaphore_list, device_ordinal);
+        device, stream, data->base.wait_semaphore_list, device_ordinal);
   }
 
   // We have satisfied all of the waits.
@@ -1330,8 +1359,7 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
         if (device->supports_memory_pools) {
           status = iree_hal_hip_memory_pools_allocate_pointer(
               &device->devices[device_ordinal].memory_pools, data->buffer,
-              device->devices[device_ordinal].hip_dispatch_stream,
-              iree_hal_buffer_allocation_size(data->buffer));
+              stream, iree_hal_buffer_allocation_size(data->buffer));
           break;
         }
         status = iree_hal_hip_allocator_alloc_async(
@@ -1357,8 +1385,9 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
     // Data may get deleted any time after adding it to the cleanup,
     // so retain the symbols here.
     status = iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
-        device, device->cleanup_thread, data->base.signal_semaphore_list,
-        device_ordinal, &iree_hal_hip_device_complete_buffer_operation, data);
+        device, stream, device->cleanup_thread,
+        data->base.signal_semaphore_list, device_ordinal,
+        &iree_hal_hip_device_complete_buffer_operation, data);
   } else {
     for (iree_host_size_t i = 0; i < data->base.signal_semaphore_list.count;
          ++i) {
@@ -1789,7 +1818,8 @@ static iree_status_t iree_hal_hip_device_perform_queue_read_now(
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_hip_device_stream_wait_for_semaphores(
-        device, data->base.wait_semaphore_list, device_ordinal);
+        device, device->devices[device_ordinal].hip_dispatch_stream,
+        data->base.wait_semaphore_list, device_ordinal);
   }
 
   const iree_hal_hip_dynamic_symbols_t* symbols = device->hip_symbols;
@@ -1867,7 +1897,8 @@ static iree_status_t iree_hal_hip_device_perform_queue_read_now(
       // chunk.
       if (i == data->num_read_chunks - 1) {
         status = iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
-            device, device->cleanup_thread, data->base.signal_semaphore_list,
+            device, device->devices[device_ordinal].hip_dispatch_stream,
+            device->cleanup_thread, data->base.signal_semaphore_list,
             device_ordinal, &iree_hal_hip_device_complete_queue_read_operation,
             data);
         // Break here because data could immediately be cleaned up before the
@@ -2128,7 +2159,8 @@ static iree_status_t iree_hal_hip_device_execute_now(void* user_data,
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_hip_device_stream_wait_for_semaphores(
-        device, data->base.wait_semaphore_list, device_ordinal);
+        device, device->devices[device_ordinal].hip_dispatch_stream,
+        data->base.wait_semaphore_list, device_ordinal);
   }
 
   // We have satisfied all of the waits.
@@ -2196,7 +2228,8 @@ static iree_status_t iree_hal_hip_device_execute_now(void* user_data,
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
-        device, device->cleanup_thread, data->base.signal_semaphore_list,
+        device, device->devices[device_ordinal].hip_dispatch_stream,
+        device->cleanup_thread, data->base.signal_semaphore_list,
         device_ordinal, iree_hal_hip_device_complete_submission, data);
   }
 
