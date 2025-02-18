@@ -229,8 +229,20 @@ duplicateExecutablesPerLayoutVariant(ModuleOp moduleOp, SymbolTable symbolTable,
   IRRewriter rewriter(ctx);
 
   SmallVector<IREE::Stream::TensorDispatchOp> candidates;
-  funcOp.walk(
-      [&](IREE::Stream::TensorDispatchOp op) { candidates.push_back(op); });
+  funcOp.walk([&](IREE::Stream::TensorDispatchOp op) {
+    // Filter out the cases that are not from the normal pipeline. E.g., custom
+    // dispatch could embed hal.executables.
+    bool recognizedInput = true;
+    op.forEachEntryPointAttr([&](SymbolRefAttr entryPoint) {
+      if (!isa<IREE::Stream::ExecutableExportOp>(
+              symbolTable.lookupSymbolIn(moduleOp, entryPoint))) {
+        recognizedInput = false;
+      }
+    });
+    if (recognizedInput) {
+      candidates.push_back(op);
+    }
+  });
 
   //===--------------------------------------------------------------------===//
   // Gather per-export [binding layouts] map. A function in an executable can be

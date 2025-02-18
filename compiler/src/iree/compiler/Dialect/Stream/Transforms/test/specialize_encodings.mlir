@@ -719,3 +719,20 @@ util.func public @multi_device_gemm(%arg0: !stream.resource<external>, %arg1: !s
 // CHECK-LABEL: util.func public @multi_device_gemm
 // CHECK:         stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_A]]>) @[[$EX0]]::@gemm
 // CHECK:         stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_B]]>) @[[$EX1]]::@gemm
+
+// -----
+
+//------------------------------------------------------------------------------
+// Negative tests. The pass should do nothing for the cases.
+//------------------------------------------------------------------------------
+
+hal.executable.source public @executable {
+  hal.executable.export public @dispatch ordinal(0) layout(#hal.pipeline.layout<constants = 0, bindings = [
+    #hal.pipeline.binding<storage_buffer>
+  ]>)
+}
+util.func public @dispatch_hal_executable(%arg0: !stream.resource<*>, %arg1: index, %arg2: index) -> !stream.resource<*> {
+  %0 = stream.tensor.dispatch @executable::@dispatch(%arg0) : (tensor<4x?xf32>{%arg2} in !stream.resource<*>{%arg1}) -> tensor<4x?xf32>{%arg2} in !stream.resource<*>{%arg1}
+  util.return %0 : !stream.resource<*>
+}
+// CHECK-LABEL: util.func public @dispatch_hal_executable
