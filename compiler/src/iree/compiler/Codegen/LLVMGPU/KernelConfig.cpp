@@ -23,6 +23,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
@@ -44,6 +45,7 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Interfaces/TilingInterface.h"
 
 #define DEBUG_TYPE "iree-llvmgpu-kernel-config"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
@@ -59,6 +61,11 @@ llvm::cl::opt<bool> clGPUTestTileAndFuseVectorize(
     "iree-codegen-llvmgpu-test-tile-and-fuse-vectorize",
     llvm::cl::desc(
         "test the tile and fuse pipeline for all supported operations"),
+    llvm::cl::init(false));
+
+llvm::cl::opt<bool> clGPUTestVectorDistributeOnGenerics(
+    "iree-codegen-llvmgpu-test-vector-distribution-on-generics",
+    llvm::cl::desc("test vector distribute on generics."),
     llvm::cl::init(false));
 
 llvm::cl::opt<bool> clLLVMGPUVectorizePipeline(
@@ -178,6 +185,43 @@ getMatmulConfig(IREE::GPU::TargetAttr target) {
   return tileSizes;
 }
 
+/// Returns true if it's MatVec like i.e., either the bound of M or N dim = 1,
+/// or one of M, N dim isn't present.
+static bool isMatvecLike(linalg::LinalgOp linalgOp) {
+
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<unsigned> parallelDims;
+  linalgOp.getParallelDims(parallelDims);
+
+  // Validate that there's exactly one parallel dimension with size != 1.
+  unsigned nonUnitParallelDimsCount = llvm::count_if(
+      parallelDims, [&bounds](unsigned idx) { return bounds[idx] != 1; });
+
+  // No. of parallel dims size shouldn't exceed 2.
+  // There should be exactly one reduction loop.
+  if (parallelDims.size() > 2 || nonUnitParallelDimsCount != 1 ||
+      linalgOp.getNumReductionLoops() != 1) {
+    return false;
+  }
+
+  // TODO: Allow for matvec with fused dequantization.
+  FailureOr<linalg::ContractionDimensions> dims =
+      linalg::inferContractionDims(linalgOp);
+  if (failed(dims))
+    return false;
+
+  // TODO: Support batch matvec.
+  if (!dims->batch.empty())
+    return false;
+
+  if (dims->m.size() >= 2 || dims->n.size() >= 2 ||
+      !llvm::hasSingleElement(dims->k)) {
+    return false;
+  }
+
+  return true;
+}
+
 /// Return the best combination of tile size and wg size when using tensorcore
 /// operations.
 static void
@@ -262,44 +306,114 @@ static CodeGenPipeline getTensorCorePipeline(Type elementType) {
   return codegenPipeline;
 }
 //====---------------------------------------------------------------------===//
-// Vector Distribution MatVec Pipeline Configuration
+// Vector Distribution On the Reduction Operation Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
+static SmallVector<int64_t> getIntegerVector(ArrayAttr array) {
+  if (!array || !llvm::all_of(array.getValue(), llvm::IsaPred<IntegerAttr>)) {
+    return {};
+  }
+  return llvm::map_to_vector(array.getValue(), [](Attribute s) -> int64_t {
+    return cast<IntegerAttr>(s).getInt();
+  });
+}
+
+// Get the bitwidth of the operation.
+static llvm::FailureOr<int64_t> getBitWidth(linalg::LinalgOp op) {
+
+  Value init = op.getDpsInitOperand(0)->get();
+  Value src = op.getDpsInputOperand(0)->get();
+  Type initElemType = getElementTypeOrSelf(init);
+  Type srcElemType = getElementTypeOrSelf(src);
+
+  if (auto initOp = init.getDefiningOp<linalg::GenericOp>()) {
+    if (IREE::LinalgExt::isBitExtendOp(initOp))
+      initElemType = getElementTypeOrSelf(initOp.getDpsInputs()[0]);
+  }
+
+  if (auto srcOp = src.getDefiningOp<linalg::GenericOp>()) {
+    if (IREE::LinalgExt::isBitExtendOp(srcOp))
+      srcElemType = getElementTypeOrSelf(srcOp.getDpsInputs()[0]);
+  }
+
+  if (!initElemType.isIntOrFloat() || !srcElemType.isIntOrFloat())
+    return failure();
+
+  int64_t bitWidth = std::min(initElemType.getIntOrFloatBitWidth(),
+                              srcElemType.getIntOrFloatBitWidth());
+
+  // Reduction distribution only supports 8/16/32 bit types now.
+  if (!llvm::is_contained({8, 16, 32}, bitWidth))
+    return failure();
+
+  return bitWidth;
+}
+
+// Sets the vector distribute config for linalg op with
+// all parallel iterators.
 static LogicalResult
-setMatVecVectorDistributionConfig(IREE::GPU::TargetAttr target,
-                                  mlir::FunctionOpInterface entryPoint,
-                                  linalg::LinalgOp op) {
+getParallelVectorDistributeConfig(IREE::GPU::TargetAttr target,
+                                  linalg::LinalgOp op,
+                                  MutableArrayRef<int64_t> wgpTileSize,
+                                  MutableArrayRef<int64_t> threadTileSizes,
+                                  MutableArrayRef<int64_t> threadCounts) {
+  SmallVector<unsigned int> partitionableLoops;
+  op.getParallelDims(partitionableLoops);
+  IREE::GPU::TargetWgpAttr wgp = target.getWgp();
+
+  // Bail out if op is not tilable.
+  if (partitionableLoops.empty()) {
+    return failure();
+  }
+
+  auto bitWidth = getBitWidth(op);
+
+  if (failed(bitWidth)) {
+    return failure();
+  }
+  const std::optional<int64_t> maxLoadBits = wgp.getMaxLoadInstructionBits();
+  const unsigned largestLoadSizeInBits =
+      maxLoadBits.has_value() ? *maxLoadBits : 128;
+  int64_t threadLoads = largestLoadSizeInBits / *bitWidth;
+
+  SmallVector<unsigned> parallelDims;
+  op.getParallelDims(parallelDims);
+
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  int64_t lastDimSize = bounds[parallelDims.back()];
+
+  // Update thread loads to be minm of lastDim size.
+  threadLoads = std::min(lastDimSize, threadLoads);
+
+  // TODO(pashu123): Set the right wgpTile size and threadTile sizes.
+
+  wgpTileSize.back() = 16;
+  threadTileSizes.back() = 8;
+  threadCounts.back() = 2;
+  return success();
+}
+
+static LogicalResult getReductionVectorDistributeConfig(
+    IREE::GPU::TargetAttr target, linalg::LinalgOp op,
+    MutableArrayRef<int64_t> partialReductionTileSizes,
+    MutableArrayRef<int64_t> threadTileSizes,
+    MutableArrayRef<int64_t> threadCounts) {
+
   SmallVector<unsigned> parallelDims;
   SmallVector<unsigned> reductionDims;
   op.getParallelDims(parallelDims);
   op.getReductionDims(reductionDims);
+
   SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
 
-  // TODO(pashu123): Support multiple reduction dims.
-  if (reductionDims.size() > 1) {
-    return failure();
-  }
+  IREE::GPU::TargetWgpAttr wgp = target.getWgp();
 
-  // TODO(pashu123): Support dynamic reduction dimension.
-  if (ShapedType::isDynamic(bounds[reductionDims.front()])) {
-    return failure();
-  }
+  int64_t reductionSize = 1;
+  for (int64_t dim : reductionDims)
+    reductionSize *= bounds[dim];
 
-  // Only support projected permutation, this could be extended to projected
-  // permutated with broadcast.
-  if (llvm::any_of(op.getDpsInputOperands(), [&](OpOperand *input) {
-        return !op.getMatchingIndexingMap(input).isProjectedPermutation();
-      }))
-    return failure();
-
-  // Tile the parallel dimension by 1.
-  // TODO(pashu123): Improve the basic cost model for workgroup tile sizes.
-  SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 1);
-  workgroupTileSizes[reductionDims.front()] = 0;
-
-  int64_t reductionSize = bounds[reductionDims.front()];
   int64_t subgroupSize = 0;
-  for (int s : target.getWgp().getSubgroupSizeChoices().asArrayRef()) {
+  for (int s : wgp.getSubgroupSizeChoices().asArrayRef()) {
     if (reductionSize % s == 0) {
       subgroupSize = s;
       break;
@@ -308,103 +422,384 @@ setMatVecVectorDistributionConfig(IREE::GPU::TargetAttr target,
   if (subgroupSize == 0)
     return failure();
 
-  const Type elementType =
-      llvm::cast<ShapedType>(op.getDpsInitOperand(0)->get().getType())
-          .getElementType();
-  if (!elementType.isIntOrFloat())
+  auto bitWidth = getBitWidth(op);
+  if (failed(bitWidth)) {
     return failure();
-  unsigned bitWidth = elementType.getIntOrFloatBitWidth();
-
-  // Reduction distribution only supports 8/16/32 bit types now.
-  if (bitWidth != 32 && bitWidth != 16 && bitWidth != 8)
-    return failure();
-
-  const unsigned largestLoadSizeInBits = 128;
-  unsigned vectorSize = largestLoadSizeInBits / bitWidth;
-  while ((reductionSize / vectorSize) % subgroupSize != 0) {
-    vectorSize /= 2;
   }
 
-  // Deduce the workgroup size we should use for reduction. Currently a
-  // workgroup processes all elements in reduction dimensions. Need to make sure
-  // the workgroup size we use can divide the total reduction size, and it's
-  // also within hardware limitations.
-  const int64_t maxWorkgroupSize = 1024;
-  int64_t groupSize = reductionSize / vectorSize;
-  if (groupSize > maxWorkgroupSize) {
-    groupSize = llvm::APIntOps::GreatestCommonDivisor(
-                    {64, uint64_t(groupSize)}, {64, uint64_t(maxWorkgroupSize)})
-                    .getZExtValue();
+  // const std::optional<int32_t> maxLoadBits = wgp.getMaxLoadInstructionBits();
+  // const unsigned largestLoadSizeInBits =
+  //     maxLoadBits.has_value() ? *maxLoadBits : 128;
+  // int64_t threadLoads = largestLoadSizeInBits / *bitWidth;
+  // if (reductionSize % threadLoads != 0)
+  //   return failure();
+
+  // int64_t lastDimSize = bounds[reductionDims.back()];
+  // int64_t kPartialReductionSize = subgroupSize * threadLoads;
+
+  // while(lastDimSize % kPartialReductionSize != 0)
+  //   kPartialReductionSize >>=1;
+
+  // threadLoads = std::min(lastDimSize, threadLoads);
+
+  // int64_t threadBasis = kPartialReductionSize / threadLoads;
+
+  partialReductionTileSizes.back() = 64;
+  threadTileSizes.back() = 4;
+  threadCounts.back() = 16;
+
+  return success();
+}
+
+static llvm::FailureOr<IREE::GPU::LoweringConfigAttr>
+attachLoweringConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
+                     IREE::GPU::LoweringConfigAttr consumerAttr,
+                     ArrayRef<int64_t> copyDim) {
+
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  int numDynamicDims = llvm::count_if(bounds, ShapedType::isDynamic);
+
+  if (numDynamicDims) {
+    return failure();
   }
 
-  std::optional<int64_t> parallelSize = 1;
-  for (int64_t dim : parallelDims) {
-    if (ShapedType::isDynamic(bounds[dim])) {
-      parallelSize = std::nullopt;
-      break;
+  auto getTileSizesFromName =
+      [](IREE::GPU::LoweringConfigAttr config,
+         StringRef str) -> std::optional<SmallVector<int64_t>> {
+    auto array = config.getAttributes().getAs<ArrayAttr>(str);
+    if (!array) {
+      return std::nullopt;
     }
-    *parallelSize *= bounds[dim];
-  }
+    return getIntegerVector(array);
+  };
 
-  // Total parallel size that can fill the GPU with enough workgorups.
-  // TODO: query from the target device; roughly 2x hardware compute unit.
-  const int parallelThreshold = 256;
-  // How many 128-bit vectors each thread should at least read.
-  const int targetVectorCount = 8;
-  while (parallelSize && *parallelSize > parallelThreshold &&
-         (groupSize / 2) % subgroupSize == 0 &&
-         reductionSize / (groupSize * vectorSize) < targetVectorCount) {
-    // Use less subgroups per workgroup..
-    groupSize /= 2;
-    // in order to host more workgroups per hardware compute unit.
-    *parallelSize /= 2;
-  }
-
-  std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
-  SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
-  SmallVector<int64_t> threadTileSizes(op.getNumLoops(), 0);
-
-  threadTileSizes[reductionDims.back()] = vectorSize;
-
-  APInt size = llvm::APIntOps::GreatestCommonDivisor(
-      {64, uint64_t(groupSize)}, {64, uint64_t(bounds[reductionDims.front()])});
-  reductionTileSizes[reductionDims.front()] = size.getSExtValue() * vectorSize;
+  SmallVector<unsigned> parallelDims;
+  SmallVector<unsigned> reductionDims;
+  op.getParallelDims(parallelDims);
+  op.getReductionDims(reductionDims);
 
   auto context = op.getContext();
   Builder b(context);
   SmallVector<NamedAttribute, 1> attrs;
 
-  SmallVector<int64_t> counts(op.getNumLoops(), 1);
+  if (reductionDims.empty()) {
+    SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 1);
+    SmallVector<int64_t> threadTileSizes(op.getNumLoops(), 0);
+    SmallVector<int64_t> threadCounts(op.getNumLoops(), 1);
+
+    if (failed(getParallelVectorDistributeConfig(
+            target, op, workgroupTileSizes, threadTileSizes, threadCounts))) {
+      return failure();
+    }
+
+    SmallVector<int64_t> subGroupCounts(op.getNumLoops(), 1);
+    SmallVector<int64_t> mapping(op.getNumLoops());
+    std::iota(mapping.begin(), mapping.end(), 0);
+    ArrayAttr subgroupBasisAttr = b.getArrayAttr(
+        {b.getI64ArrayAttr(subGroupCounts), b.getI64ArrayAttr(mapping)});
+
+    // Add the update logic here based on copyDim and loweringConfigAttr.
+    if (consumerAttr) {
+      auto consumerWorkgroupTileSize =
+          getTileSizesFromName(consumerAttr, "workgroup");
+      auto consumerThreadTileSize =
+          getTileSizesFromName(consumerAttr, "thread");
+      auto consumerThreadBasisAttr =
+          consumerAttr.getAttributes().getAs<ArrayAttr>("thread_basis");
+      auto consumerThreadBasis =
+          getIntegerVector(cast<ArrayAttr>(*consumerThreadBasisAttr.begin()));
+
+      for (auto i : copyDim) {
+        workgroupTileSizes[i] = consumerWorkgroupTileSize.value()[i];
+        // if(i == (workgroupTileSizes.size()-1)){
+        threadTileSizes[i] = consumerThreadTileSize.value()[i];
+        threadCounts[i] = consumerThreadBasis[i];
+        // }
+      }
+    }
+    ArrayAttr threadBasisAttr = b.getArrayAttr(
+        {b.getI64ArrayAttr(threadCounts), b.getI64ArrayAttr(mapping)});
+
+    attrs.emplace_back(b.getStringAttr("workgroup"),
+                       b.getI64ArrayAttr(workgroupTileSizes));
+    attrs.emplace_back(b.getStringAttr("thread"),
+                       b.getI64ArrayAttr(threadTileSizes));
+    attrs.emplace_back(b.getNamedAttr("thread_basis", threadBasisAttr));
+    attrs.emplace_back(b.getNamedAttr("subgroup_basis", subgroupBasisAttr));
+    auto configDict = b.getDictionaryAttr(attrs);
+    auto loweringConfig =
+        IREE::GPU::LoweringConfigAttr::get(context, configDict);
+
+    return loweringConfig;
+  }
+
+  SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
+  SmallVector<int64_t> threadTileSizes(op.getNumLoops(), 0);
+  SmallVector<int64_t> partialReductionTileSizes(op.getNumLoops(), 0);
+  for (int64_t dim : reductionDims) {
+    threadTileSizes[dim] = 1;
+    partialReductionTileSizes[dim] = 1;
+  }
+  SmallVector<int64_t> threadCounts(op.getNumLoops(), 1);
+  if (failed(getReductionVectorDistributeConfig(
+          target, op, partialReductionTileSizes, threadTileSizes,
+          threadCounts))) {
+    return failure();
+  }
+
+  SmallVector<int64_t> subGroupCounts(op.getNumLoops(), 1);
   SmallVector<int64_t> mapping(op.getNumLoops());
   std::iota(mapping.begin(), mapping.end(), 0);
 
-  ArrayAttr basisAttr =
-      b.getArrayAttr({b.getI64ArrayAttr(counts), b.getI64ArrayAttr(mapping)});
+  // Default subgroup basis attribute for now.
+  ArrayAttr subgroupBasisAttr = b.getArrayAttr(
+      {b.getI64ArrayAttr(subGroupCounts), b.getI64ArrayAttr(mapping)});
 
+  if (consumerAttr) {
+    auto consumerWorkgroupTileSize =
+        getTileSizesFromName(consumerAttr, "workgroup");
+    auto consumerThreadTileSize = getTileSizesFromName(consumerAttr, "thread");
+    auto consumerPartialReductionTileSizes =
+        getTileSizesFromName(consumerAttr, "partial_reduction");
+    auto consumerThreadBasisAttr =
+        consumerAttr.getAttributes().getAs<ArrayAttr>("thread_basis");
+    auto consumerThreadBasis =
+        getIntegerVector(cast<ArrayAttr>(*consumerThreadBasisAttr.begin()));
+
+    for (auto i : copyDim) {
+    workgroupTileSizes[i] = consumerWorkgroupTileSize.value()[i];
+    // if(i == (workgroupTileSizes.size()-1)){
+      threadTileSizes[i] = consumerThreadTileSize.value()[i];
+      threadCounts[i] = consumerThreadBasis[i];
+      if (consumerPartialReductionTileSizes.has_value()) {
+        partialReductionTileSizes[i] =
+            consumerPartialReductionTileSizes.value()[i];
+        }
+      // }
+    }
+  }
+  ArrayAttr threadBasisAttr = b.getArrayAttr(
+      {b.getI64ArrayAttr(threadCounts), b.getI64ArrayAttr(mapping)});
+
+  // Add the update logic here based on copyDim and loweringConfigAttr.
   attrs.emplace_back(b.getStringAttr("workgroup"),
                      b.getI64ArrayAttr(workgroupTileSizes));
-  attrs.emplace_back(b.getStringAttr("reduction"),
-                     b.getI64ArrayAttr(reductionTileSizes));
+  attrs.emplace_back(b.getStringAttr("partial_reduction"),
+                     b.getI64ArrayAttr(partialReductionTileSizes));
   attrs.emplace_back(b.getStringAttr("thread"),
                      b.getI64ArrayAttr(threadTileSizes));
-  attrs.emplace_back(b.getNamedAttr("thread_basis", basisAttr));
-  attrs.emplace_back(b.getNamedAttr("subgroup_basis", basisAttr));
+  attrs.emplace_back(b.getNamedAttr("thread_basis", threadBasisAttr));
+  attrs.emplace_back(b.getNamedAttr("subgroup_basis", subgroupBasisAttr));
   auto configDict = b.getDictionaryAttr(attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
+
+  return loweringConfig;
+}
+
+static Operation *matchLinalgReduction(OpOperand *outputOperand) {
+  auto linalgOp = cast<linalg::LinalgOp>(outputOperand->getOwner());
+  unsigned outputPos =
+      outputOperand->getOperandNumber() - linalgOp.getNumDpsInputs();
+  // Only single combiner operations are supported for now.
+  SmallVector<Operation *, 4> combinerOps;
+  if (!matchReduction(linalgOp.getRegionOutputArgs(), outputPos, combinerOps) ||
+      combinerOps.size() != 1)
+    return nullptr;
+
+  // Return the combiner operation.
+  return combinerOps[0];
+}
+
+/// Currently, finds the lowering config of the last operation and then
+/// propagates the config backward by finding the right tile sizes. It updates
+/// the lowering config of the producer by find the shared tile sizes between
+/// the producer and consumer.
+///
+/// TODO(pashu123): The above approach is suboptimal, it greedily sets the
+/// config based on the consumer operation.
+/// To find the right tile sizes first iterate through the entire dispatch and
+/// find shared_parallel, and shared_partial_reduction tile sizes. The shared
+/// tile sizes are the sizes which are shared between every operation in the
+/// dispatch. After knowing the shared tile sizes find the right tile sizes for
+/// every operation in the dispatch.
+static LogicalResult
+setAndPropagateVectorDistributeConfig(mlir::FunctionOpInterface funcOp,
+                              IREE::GPU::TargetAttr target,
+                              linalg::LinalgOp op) {
+
+  auto context = funcOp.getContext();
+  Builder b(context);
+
+  Operation *storeOp = nullptr;
+  // Currently looking for a single tensor store op.
+  funcOp.walk([&](Operation *op) {
+    if (auto firstStore = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(op)) {
+      storeOp = firstStore;
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+
+  if (!storeOp) {
+    funcOp->emitOpError("No tensor store op found");
+  }
+  BackwardSliceOptions sliceOptions;
+  sliceOptions.inclusive = false;
+  sliceOptions.omitBlockArguments = true;
+  sliceOptions.omitUsesFromAbove = false;
+  SetVector<Operation *> slice;
+
+  getBackwardSlice(storeOp, &slice, sliceOptions);
+
+  SetVector<linalg::LinalgOp> computeOps;
+  for (auto op : llvm::reverse(slice)) {
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+      if (isa<linalg::FillOp>(op))
+        continue;
+      computeOps.insert(linalgOp);
+    }
+  }
+
+  auto getDimPositions = [](AffineMap &indexingMap) -> SmallVector<int64_t> {
+    SmallVector<int64_t> dimPositions;
+    for (unsigned i = 0, e = indexingMap.getNumResults(); i < e; ++i) {
+      // If you need to skip specific dimensions, add filter logic here
+      dimPositions.push_back(indexingMap.getDimPosition(i));
+    }
+    return dimPositions;
+  };
+
+  IREE::GPU::LoweringConfigAttr loweringConfig = nullptr;
+  auto val =
+      attachLoweringConfig(target, computeOps.front(), loweringConfig, {});
+  if (failed(val)) {
+    return failure();
+  }
+  loweringConfig = *val;
+  setLoweringConfig(computeOps.front(), loweringConfig);
+
+  for (auto linalgOp : computeOps) {
+    loweringConfig = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(linalgOp);
+    for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
+      auto index = linalgOp.getIndexingMapIndex(operand);
+      auto indexingMap = linalgOp.getIndexingMapsArray()[index];
+
+      // Check whether the producer exist.
+      Operation *producer = dyn_cast<OpResult>(operand->get()).getOwner();
+      auto testOp = dyn_cast<linalg::LinalgOp>(producer);
+      if (!testOp || !computeOps.contains(testOp))
+        continue;
+
+      auto updatePos = getDimPositions(indexingMap);
+      auto val =
+          attachLoweringConfig(target, testOp, loweringConfig, updatePos);
+      if (failed(val)) {
+        return failure();
+      }
+      setLoweringConfig(testOp, val.value());
+    }
+  }
+
+
+  // for (auto linalgOp : computeOps) {
+  // SmallVector<unsigned> reductionDims;
+  // linalgOp.getReductionDims(reductionDims);
+  //   if(reductionDims.empty()){
+  //     linalgOp->removeAttr("lowering_config");
+  //   }
+  //   else{
+  //     break;
+  //   }
+  // }
+
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       context, /*prefetchSharedMemory=*/false,
       /*no_reduce_shared_memory_bank_conflicts=*/true,
       /*use_igemm_convolution=*/false,
       /*reorder_workgroups_strategy=*/std::nullopt);
+
   pipelineAttrs.emplace_back(
       b.getStringAttr(IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
       pipelineOptions);
   auto pipelineConfig = b.getDictionaryAttr(pipelineAttrs);
 
+  auto attachedFinalConfig =
+      getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
+  if (!attachedFinalConfig)
+    return failure();
+
+  // Setting the workgroup and subgroup sizes as hardcoded for now.
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUVectorDistribute,
-      workgroupSize, subgroupSize, pipelineConfig);
+      funcOp, op, attachedFinalConfig, CodeGenPipeline::LLVMGPUVectorDistribute,
+      {64, 1, 1}, 64, pipelineConfig);
+}
+
+static LogicalResult
+setVectorDistributeOnGenerics(IREE::GPU::TargetAttr target,
+                              mlir::FunctionOpInterface entryPoint,
+                              linalg::LinalgOp op) {
+
+  // Checking part is copied from warpReductionPipeline.
+  if (isMatvecLike(op)) {
+    return failure();
+  }
+
+  SmallVector<unsigned> parallelDims;
+  SmallVector<unsigned> reductionDims;
+  op.getParallelDims(parallelDims);
+  op.getReductionDims(reductionDims);
+
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+
+  if (reductionDims.empty())
+    return failure();
+
+  int numDynamicDims = llvm::count_if(bounds, ShapedType::isDynamic);
+  if (numDynamicDims > 0)
+    return failure();
+
+  if (op.getRegionOutputArgs().size() != 1)
+    return failure();
+
+  // Only support projected permutation, this could be extended to projected
+  // permutated with broadcast.
+  if (llvm::any_of(op.getDpsInputOperands(), [&](OpOperand *input) {
+        return !op.getMatchingIndexingMap(input).isProjectedPermutation();
+      }))
+    return failure();
+
+  bool foundSingleReductionOutput = false;
+  for (auto [index, initOpOperand] : llvm::enumerate(op.getDpsInitsMutable())) {
+    // Only single combiner operations are supported for now.
+    SmallVector<Operation *> combinerOps;
+    if (matchReduction(op.getRegionOutputArgs(), index, combinerOps) &&
+        combinerOps.size() == 1) {
+      if (foundSingleReductionOutput)
+        return failure();
+      foundSingleReductionOutput = true;
+      continue;
+    }
+    if (!op.getMatchingIndexingMap(&initOpOperand).isIdentity())
+      return failure();
+  }
+  if (!foundSingleReductionOutput)
+    return failure();
+
+  for (OpOperand &opOperand : op.getDpsInitsMutable()) {
+    AffineMap indexingMap = op.getMatchingIndexingMap(&opOperand);
+    if (indexingMap.isPermutation())
+      continue;
+
+    Operation *reduceOp = matchLinalgReduction(&opOperand);
+    if (!reduceOp || !linalg::getCombinerOpKind(reduceOp)) {
+      LDBG("reduction precondition failed: reduction detection failed\n");
+      return failure();
+    }
+  }
+
+  // Just for testing.
+  return setAndPropagateVectorDistributeConfig(entryPoint, target, op);
 }
 
 //====---------------------------------------------------------------------===//
@@ -627,6 +1022,10 @@ static LogicalResult
 setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
                                   mlir::FunctionOpInterface entryPoint,
                                   linalg::LinalgOp op) {
+
+  if (target.getWgp().getMma().empty())
+    return failure();
+
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
 
   SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
@@ -643,16 +1042,10 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   }
   assert(succeeded(contractionDims) && "Could not infer contraction dims");
 
-  if (contractionDims->k.size() < 1) {
+  if (contractionDims->k.size() < 1 || contractionDims->m.size() < 1 ||
+      contractionDims->n.size() < 1) {
     return failure();
   }
-
-  if (contractionDims->m.size() < 1 || contractionDims->n.size() < 1) {
-    return setMatVecVectorDistributionConfig(target, entryPoint, op);
-  }
-
-  if (target.getWgp().getMma().empty())
-    return failure();
 
   LLVM_DEBUG(debugPrintContractionInfo("Problem size", op.getNumLoops(),
                                        *contractionDims, bounds));
@@ -1943,43 +2336,6 @@ static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
                                                preferredSubgroupSize);
 }
 
-/// Returns true if it's MatVec like i.e., either the bound of M or N dim = 1,
-/// or one of M, N dim isn't present.
-static bool isMatvecLike(linalg::LinalgOp linalgOp) {
-
-  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
-  SmallVector<unsigned> parallelDims;
-  linalgOp.getParallelDims(parallelDims);
-
-  // Validate that there's exactly one parallel dimension with size != 1.
-  unsigned nonUnitParallelDimsCount = llvm::count_if(
-      parallelDims, [&bounds](unsigned idx) { return bounds[idx] != 1; });
-
-  // No. of parallel dims size shouldn't exceed 2.
-  // There should be exactly one reduction loop.
-  if (parallelDims.size() > 2 || nonUnitParallelDimsCount != 1 ||
-      linalgOp.getNumReductionLoops() != 1) {
-    return false;
-  }
-
-  // TODO: Allow for matvec with fused dequantization.
-  FailureOr<linalg::ContractionDimensions> dims =
-      linalg::inferContractionDims(linalgOp);
-  if (failed(dims))
-    return false;
-
-  // TODO: Support batch matvec.
-  if (!dims->batch.empty())
-    return false;
-
-  if (dims->m.size() >= 2 || dims->n.size() >= 2 ||
-      !llvm::hasSingleElement(dims->k)) {
-    return false;
-  }
-
-  return true;
-}
-
 //====---------------------------------------------------------------------===//
 // Warp Reduction Pipeline Configuration
 //====---------------------------------------------------------------------===//
@@ -2549,6 +2905,13 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     if (succeeded(setContractConfig(target, entryPointFn, linalgOp))) {
       LDBG("Contract Config");
       return success();
+    }
+    if (clGPUTestVectorDistributeOnGenerics) {
+      if (succeeded(
+              setVectorDistributeOnGenerics(target, entryPointFn, linalgOp))) {
+        LDBG("Vector distribute on  Generics with right config propagation.");
+        return success();
+      }
     }
     if (succeeded(setWarpReductionConfig(target, entryPointFn, linalgOp))) {
       LDBG("Warp Reduction Config");
