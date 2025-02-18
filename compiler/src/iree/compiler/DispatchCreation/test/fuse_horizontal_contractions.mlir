@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-fuse-horizontal-contractions))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-fuse-horizontal-contractions, cse))" --mlir-print-local-scope --split-input-file %s | FileCheck %s
 
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>
@@ -51,38 +51,55 @@ util.func public @test_horizontal_fuse(%arg0 : tensor<2x4096x640xf16>, %arg1: te
   util.return %6, %8, %10 : tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>
 }
 
-//  CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d3, d5)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d4, d5)>
-//  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4)>
-//  CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
 //      CHECK: util.func public @test_horizontal_fuse
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<2x4096x640xf16>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<10x64x640xf16>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<10x64x640xf16>
 // CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: tensor<10x64x640xf16>
-//  CHECK-DAG:    %[[CST:.+]] = arith.constant 0.0
-//  CHECK-DAG:    %[[EXP:.+]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1], [2], [3]] output_shape {{.*}} : tensor<10x64x640xf16> into tensor<1x10x64x640xf16>
-//  CHECK-DAG:    %[[EXP1:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2], [3]] output_shape {{.*}} : tensor<10x64x640xf16> into tensor<1x10x64x640xf16>
-//  CHECK-DAG:    %[[EXP2:.+]] = tensor.expand_shape %[[ARG3]] {{\[}}[0, 1], [2], [3]] output_shape {{.*}} : tensor<10x64x640xf16> into tensor<1x10x64x640xf16>
-//      CHECK:    %[[INP:.+]] = tensor.empty() : tensor<3x10x64x640xf16>
-//      CHECK:    %[[SLC:.+]] = tensor.insert_slice %[[EXP]] into %[[INP]][0, 0, 0, 0] [1, 10, 64, 640] [1, 1, 1, 1] : tensor<1x10x64x640xf16> into tensor<3x10x64x640xf16>
-//      CHECK:    %[[SLC1:.+]] = tensor.insert_slice %[[EXP1]] into %[[SLC]][1, 0, 0, 0] [1, 10, 64, 640] [1, 1, 1, 1] : tensor<1x10x64x640xf16> into tensor<3x10x64x640xf16>
-//      CHECK:    %[[SLC2:.+]] = tensor.insert_slice %[[EXP2]] into %[[SLC1]][2, 0, 0, 0] [1, 10, 64, 640] [1, 1, 1, 1] : tensor<1x10x64x640xf16> into tensor<3x10x64x640xf16>
-//      CHECK:    %[[OUT:.+]] = tensor.empty() : tensor<3x2x10x4096x64xf32>
-//      CHECK:    %[[FILL:.+]] = linalg.fill
-// CHECK-SAME:        ins(%[[CST]]
-// CHECK-SAME:        outs(%[[OUT]]
-//      CHECK:    %[[GEN1:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction"]} ins(%[[ARG0]], %[[SLC2]] : tensor<2x4096x640xf16>, tensor<3x10x64x640xf16>) outs(%[[FILL]] : tensor<3x2x10x4096x64xf32>)
-//      CHECK:    %[[EMPTY:.+]] = tensor.empty() : tensor<3x2x10x4096x64xf16>
-//      CHECK:    %[[GEN2:.+]] = linalg.generic {indexing_maps = [#[[MAP3]], #[[MAP3]]], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} ins(%[[GEN1]] : tensor<3x2x10x4096x64xf32>) outs(%[[EMPTY]] : tensor<3x2x10x4096x64xf16>) {
-//      CHECK:    %[[R1:.+]] = tensor.extract_slice %[[GEN2]][0, 0, 0, 0, 0] [1, 2, 10, 4096, 64] [1, 1, 1, 1, 1] : tensor<3x2x10x4096x64xf16> to tensor<2x10x4096x64xf16>
-//      CHECK:    %[[R2:.+]] = tensor.extract_slice %[[GEN2]][1, 0, 0, 0, 0] [1, 2, 10, 4096, 64] [1, 1, 1, 1, 1] : tensor<3x2x10x4096x64xf16> to tensor<2x10x4096x64xf16>
-//      CHECK:    %[[R3:.+]] = tensor.extract_slice %[[GEN2]][2, 0, 0, 0, 0] [1, 2, 10, 4096, 64] [1, 1, 1, 1, 1] : tensor<3x2x10x4096x64xf16> to tensor<2x10x4096x64xf16>
-//      CHECK:    util.return %[[R1]], %[[R2]], %[[R3]]
+//      CHECK:   %[[FILL:.+]] = linalg.fill
+//      CHECK:   %[[FUSED_OP:.+]]:3 = linalg.generic
+// CHECK-SAME:       indexing_maps
+// CHECK-SAME:           affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
+// CHECK-SAME:           affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>
+// CHECK-SAME:           affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>
+// CHECK-SAME:           affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>
+// CHECK-SAME:           affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
+// CHECK-SAME:           affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
+// CHECK-SAME:           affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
+// CHECK-SAME:       iterator_types =
+// CHECK-SAME:           ["parallel", "parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]] :
+// CHECK-SAME:       outs(%[[FILL]], %[[FILL]], %[[FILL]] :
+// CHECK-NEXT:     ^bb0(
+// CHECK-SAME:         %[[IN0:[a-zA-Z0-9_]+]]: f16
+// CHECK-SAME:         %[[IN1:[a-zA-Z0-9_]+]]: f16
+// CHECK-SAME:         %[[IN2:[a-zA-Z0-9_]+]]: f16
+// CHECK-SAME:         %[[IN3:[a-zA-Z0-9_]+]]: f16
+// CHECK-SAME:         %[[OUT0:[a-zA-Z0-9_]+]]: f32
+// CHECK-SAME:         %[[OUT1:[a-zA-Z0-9_]+]]: f32
+// CHECK-SAME:         %[[OUT2:[a-zA-Z0-9_]+]]: f32
+//  CHECK-DAG:       %[[EXT_IN0:.+]] = arith.extf %[[IN0]]
+//  CHECK-DAG:       %[[EXT_IN1:.+]] = arith.extf %[[IN1]]
+//  CHECK-DAG:       %[[MULF0:.+]] = arith.mulf %[[EXT_IN0]], %[[EXT_IN1]]
+//  CHECK-DAG:       %[[ADDF0:.+]] = arith.addf %[[OUT0]], %[[MULF0]]
+//  CHECK-DAG:       %[[EXT_IN2:.+]] = arith.extf %[[IN2]]
+//  CHECK-DAG:       %[[MULF1:.+]] = arith.mulf %[[EXT_IN0]], %[[EXT_IN2]]
+//  CHECK-DAG:       %[[ADDF1:.+]] = arith.addf %[[OUT1]], %[[MULF1]]
+//  CHECK-DAG:       %[[EXT_IN3:.+]] = arith.extf %[[IN3]]
+//  CHECK-DAG:       %[[MULF2:.+]] = arith.mulf %[[EXT_IN0]], %[[EXT_IN3]]
+//  CHECK-DAG:       %[[ADDF2:.+]] = arith.addf %[[OUT2]], %[[MULF2]]
+//      CHECK:       linalg.yield %[[ADDF0]], %[[ADDF1]], %[[ADDF2]]
+//      CHECK:   %[[TRUNCF1:.+]] = linalg.generic
+// CHECK-SAME:       ins(%[[FUSED_OP]]#0 :
+//      CHECK:   %[[TRUNCF2:.+]] = linalg.generic
+// CHECK-SAME:       ins(%[[FUSED_OP]]#1 :
+//      CHECK:   %[[TRUNCF3:.+]] = linalg.generic
+// CHECK-SAME:       ins(%[[FUSED_OP]]#2 :
+//      CHECK:   util.return %[[TRUNCF1]], %[[TRUNCF2]], %[[TRUNCF3]]
 
 // -----
 
-util.func public @test_horizontal_fuse(%arg0 : tensor<4096x640xf32>, %arg1: tensor<640x640xf32>, %arg2: tensor<640x640xf32>, %arg3: tensor<640x640xf32>) -> (tensor<4096x640xf32>, tensor<4096x640xf32>, tensor<4096x640xf32>) {
+util.func public @test_horizontal_fuse1(%arg0 : tensor<4096x640xf32>, %arg1: tensor<640x640xf32>, %arg2: tensor<640x640xf32>, %arg3: tensor<640x640xf32>) -> (tensor<4096x640xf32>, tensor<4096x640xf32>, tensor<4096x640xf32>) {
   %cst = arith.constant 0.000000e+00 : f32
   %2 = tensor.empty() : tensor<4096x640xf32>
   %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<4096x640xf32>) -> tensor<4096x640xf32>
@@ -91,32 +108,16 @@ util.func public @test_horizontal_fuse(%arg0 : tensor<4096x640xf32>, %arg1: tens
   %9 = linalg.matmul ins(%arg0, %arg3 : tensor<4096x640xf32>, tensor<640x640xf32>) outs(%3 : tensor<4096x640xf32>) -> tensor<4096x640xf32>
   util.return %4, %7, %9 : tensor<4096x640xf32>, tensor<4096x640xf32>, tensor<4096x640xf32>
 }
-
-// CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d3)>
-// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
-// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-//     CHECK: util.func public @test_horizontal_fuse
+//      CHECK: util.func public @test_horizontal_fuse1
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<4096x640xf32>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<640x640xf32>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<640x640xf32>
 // CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: tensor<640x640xf32>
-// CHECK-DAG:    %[[CST:.+]] = arith.constant 0.0
-// CHECK-DAG:    %[[EXP:.+]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1], [2]] output_shape {{.*}} : tensor<640x640xf32> into tensor<1x640x640xf32>
-// CHECK-DAG:    %[[EXP1:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2]] output_shape {{.*}} : tensor<640x640xf32> into tensor<1x640x640xf32>
-// CHECK-DAG:    %[[EXP2:.+]] = tensor.expand_shape %[[ARG3]] {{\[}}[0, 1], [2]] output_shape {{.*}} : tensor<640x640xf32> into tensor<1x640x640xf32>
-//     CHECK:    %[[INP:.+]] = tensor.empty() : tensor<3x640x640xf32>
-//     CHECK:    %[[SLC:.+]] = tensor.insert_slice %[[EXP]] into %[[INP]][0, 0, 0] [1, 640, 640] [1, 1, 1] : tensor<1x640x640xf32> into tensor<3x640x640xf32>
-//     CHECK:    %[[SLC1:.+]] = tensor.insert_slice %[[EXP1]] into %[[SLC]][1, 0, 0] [1, 640, 640] [1, 1, 1] : tensor<1x640x640xf32> into tensor<3x640x640xf32>
-//     CHECK:    %[[SLC2:.+]] = tensor.insert_slice %[[EXP2]] into %[[SLC1]][2, 0, 0] [1, 640, 640] [1, 1, 1] : tensor<1x640x640xf32> into tensor<3x640x640xf32>
-//     CHECK:    %[[OUT:.+]] = tensor.empty() : tensor<3x4096x640xf32>
-//     CHECK:    %[[FILL:.+]] = linalg.fill
-// CHECK-SAME:       ins(%[[CST]] :
-// CHECK-SAME:       outs(%[[OUT]] :
-//     CHECK:    %[[GEN1:.+]] = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%[[ARG0]], %[[SLC2]] : tensor<4096x640xf32>, tensor<3x640x640xf32>) outs(%[[FILL]] : tensor<3x4096x640xf32>)
-//     CHECK:    %[[R1:.+]] = tensor.extract_slice %[[GEN1]][0, 0, 0] [1, 4096, 640] [1, 1, 1] : tensor<3x4096x640xf32> to tensor<4096x640xf32>
-//     CHECK:    %[[R2:.+]] = tensor.extract_slice %[[GEN1]][1, 0, 0] [1, 4096, 640] [1, 1, 1] : tensor<3x4096x640xf32> to tensor<4096x640xf32>
-//     CHECK:    %[[R3:.+]] = tensor.extract_slice %[[GEN1]][2, 0, 0] [1, 4096, 640] [1, 1, 1] : tensor<3x4096x640xf32> to tensor<4096x640xf32>
-//     CHECK:    util.return %[[R1]], %[[R2]], %[[R3]]
+//      CHECK:   %[[FILL:.+]] = linalg.fill
+//      CHECK:   %[[FUSED_OP:.+]]:3 = linalg.generic
+// CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]] :
+// CHECK-SAME:       outs(%[[FILL]], %[[FILL]], %[[FILL]] :
+//      CHECK:   util.return %[[FUSED_OP]]#0, %[[FUSED_OP]]#1, %[[FUSED_OP]]#2
 
 // -----
 
@@ -204,79 +205,31 @@ util.func @horizontal_fusion_i8(%arg0: tensor<2x4096x640xi8>,
   } -> tensor<2x4096x640xf16>
   util.return %7, %9 : tensor<2x4096x640xf16>, tensor<2x4096x640xf16>
 }
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-//  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d4)>
-//  CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
-//  CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
-//  CHECK-DAG: #[[MAP5:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-//  CHECK-DAG: #[[MAP6:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-//  CHECK-DAG: #[[MAP7:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
-//  CHECK-DAG: #[[MAP8:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3)>
-//  CHECK-DAG: #[[MAP9:.+]] = affine_map<(d0, d1, d2, d3) -> (d0)>
-//      CHECK: util.func public @horizontal_fusion_i8
-// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<2x4096x640xi8>
-// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<640x640xi8>
-// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<640xi8>
-// CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: tensor<f32>
-// CHECK-SAME:     %[[ARG4:[a-zA-Z0-9]+]]: tensor<640x640xi8>
-// CHECK-SAME:     %[[ARG5:[a-zA-Z0-9]+]]: tensor<640xi8>
-// CHECK-SAME:     %[[ARG6:[a-zA-Z0-9]+]]: tensor<f32>
-
-// First check the hoisted operand definitions.
-//      CHECK:   %[[RHS0:.+]] = linalg.generic
-// CHECK-SAME:       ins(%[[ARG1]] :
-//      CHECK:   %[[RHS1:.+]] = linalg.generic
-// CHECK-SAME:       ins(%[[ARG4]] :
-
-// Concatanetion of the RHS
-//  CHECK-DAG:   %[[EXPANDED_RHS0:.+]] = tensor.expand_shape %[[RHS0]] {{\[}}[0, 1], [2], [3]{{\]}}
-//  CHECK-DAG:   %[[EXPANDED_RHS1:.+]] = tensor.expand_shape %[[RHS1]] {{\[}}[0, 1], [2], [3]{{\]}}
-//      CHECK:   %[[INSERT_RHS0:.+]] = tensor.insert_slice %[[EXPANDED_RHS0]]
-//      CHECK:   %[[INSERT_RHS1:.+]] = tensor.insert_slice %[[EXPANDED_RHS1]] into %[[INSERT_RHS0]]
-
-// Check empty and fill for the concatenated contraction
-//      CHECK:   %[[CONTRACT_EMPTY:.+]] = tensor.empty()
-//      CHECK:   %[[CONTRACT_FILL:.+]] = linalg.fill
-// CHECK-SAME:       outs(%[[CONTRACT_EMPTY]] :
-//      CHECK:   %[[CONTRACT:.+]] = linalg.generic
-// CHECK-SAME:       indexing_maps = [#[[MAP2]], #[[MAP3]], #[[MAP4]]]
-// CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
-// CHECK-SAME:       ins(%[[ARG0]], %[[INSERT_RHS1]] :
-// CHECK-SAME:       outs(%[[CONTRACT_FILL]] :
-
-// The reduction that is adjacent to matmuls does not need to be hoisted. Is kept as is
-//      CHECK:   %[[UNTOUCHED_REDUCTION:.+]] = linalg.generic
-// CHECK-SAME:       ins(%[[ARG0]] :
-
-// Concatenation of non-common truncation operation operand
-//  CHECK-DAG:   %[[EXPANDED_OPERAND1_1:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1]{{\]}}
-//  CHECK-DAG:   %[[EXPANDED_OPERAND1_2:.+]] = tensor.expand_shape %[[ARG5]] {{\[}}[0, 1]{{\]}}
-//      CHECK:   %[[INSERT_OPERAND1_1:.+]] = tensor.insert_slice %[[EXPANDED_OPERAND1_1]]
-//      CHECK:   %[[INSERT_OPERAND1_2:.+]] = tensor.insert_slice %[[EXPANDED_OPERAND1_2]] into %[[INSERT_OPERAND1_1]]
-
-// Concatenation of non-common truncation operation zero-rank tensor operand
-//  CHECK-DAG:   %[[EXPANDED_OPERAND2_1:.+]] = tensor.expand_shape %[[ARG3]] []
-//  CHECK-DAG:   %[[EXPANDED_OPERAND2_2:.+]] = tensor.expand_shape %[[ARG6]] []
-//      CHECK:   %[[INSERT_OPERAND2_1:.+]] = tensor.insert_slice %[[EXPANDED_OPERAND2_1]]
-//      CHECK:   %[[INSERT_OPERAND2_2:.+]] = tensor.insert_slice %[[EXPANDED_OPERAND2_2]] into %[[INSERT_OPERAND2_1]]
-
-// Concatanated truncate operation
-//      CHECK:   %[[TRUNC_EMPTY:.+]] = tensor.empty()
-//      CHECK:   %[[TRUNCATE:.+]] = linalg.generic
-// CHECK-SAME:       indexing_maps = [#[[MAP6]], #[[MAP7]], #[[MAP8]], #[[MAP9]], #[[MAP6]]]
-// CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel", "parallel"]
-// CHECK-SAME:       ins(%[[CONTRACT]], %[[UNTOUCHED_REDUCTION]], %[[INSERT_OPERAND1_2]], %[[INSERT_OPERAND2_2]] :
-// CHECK-SAME:       outs(%[[TRUNC_EMPTY]] :
-
-// Extract the slices for replacement
-//  CHECK-DAG:   %[[SLICE1:.+]] = tensor.extract_slice %[[TRUNCATE]][0, 0, 0, 0]
-//  CHECK-DAG:   %[[SLICE2:.+]] = tensor.extract_slice %[[TRUNCATE]][1, 0, 0, 0]
-//      CHECK:   util.return %[[SLICE1]], %[[SLICE2]]
+// CHECK-LABEL: func public @horizontal_fusion_i8
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<2x4096x640xi8>
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<640x640xi8>
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<640xi8>
+//  CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: tensor<f32>
+//  CHECK-SAME:     %[[ARG4:[a-zA-Z0-9]+]]: tensor<640x640xi8>
+//  CHECK-SAME:     %[[ARG5:[a-zA-Z0-9]+]]: tensor<640xi8>
+//  CHECK-SAME:     %[[ARG6:[a-zA-Z0-9]+]]: tensor<f32>
+//       CHECK:   %[[GENERIC1:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[ARG1]] :
+//       CHECK:   %[[GENERIC2:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[ARG4]] :
+//       CHECK:   %[[FUSED_OP:.+]]:2 = linalg.generic
+//  CHECK-SAME:       ins(%[[ARG0]], %[[GENERIC1]], %[[GENERIC2]] :
+//       CHECK:   %[[REDUCTION:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[ARG0]] :
+//       CHECK:   %[[GENERIC3:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[FUSED_OP]]#0, %[[REDUCTION]], %[[ARG2]], %[[ARG3]] :
+//       CHECK:   %[[GENERIC4:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[FUSED_OP]]#1, %[[REDUCTION]], %[[ARG5]], %[[ARG6]] :
+//       CHECK:   util.return %[[GENERIC3]], %[[GENERIC4]]
 
 // -----
 
-util.func public @dont_fuse_when_same_trunc_op(%arg0: tensor<2x4096x640xi8>, %arg1: tensor<2x640x640xi8>, %arg2: tensor<640xi8>, %arg3: tensor<f32>, %arg4: tensor<2x640x640xi8>, %arg5: tensor<640xi8>, %arg6: tensor<f32>) -> tensor<2x4096x640xf16> {
+util.func public @fusion_same_trunc_op(%arg0: tensor<2x4096x640xi8>, %arg1: tensor<2x640x640xi8>, %arg2: tensor<640xi8>, %arg3: tensor<f32>, %arg4: tensor<2x640x640xi8>, %arg5: tensor<640xi8>, %arg6: tensor<f32>) -> tensor<2x4096x640xf16> {
   %c0_i32 = arith.constant 0 : i32
   %0 = tensor.empty() : tensor<2x4096x640xf16>
   %1 = tensor.empty() : tensor<2x4096x640xi32>
@@ -294,11 +247,149 @@ util.func public @dont_fuse_when_same_trunc_op(%arg0: tensor<2x4096x640xi8>, %ar
   } -> tensor<2x4096x640xf16>
   util.return %5 : tensor<2x4096x640xf16>
 }
+// CHECK-LABEL: func public @fusion_same_trunc_op
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<2x4096x640xi8>
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<2x640x640xi8>
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<640xi8>
+//  CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: tensor<f32>
+//  CHECK-SAME:     %[[ARG4:[a-zA-Z0-9]+]]: tensor<2x640x640xi8>
+//  CHECK-SAME:     %[[ARG5:[a-zA-Z0-9]+]]: tensor<640xi8>
+//  CHECK-SAME:     %[[ARG6:[a-zA-Z0-9]+]]: tensor<f32>
+//       CHECK:   %[[FILL:.+]] = linalg.fill
+//       CHECK:   %[[FUSED_OP:.+]]:2 = linalg.generic
+//  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]], %[[ARG4]] :
+//       CHECK:       outs(%[[FILL]], %[[FILL]] :
+//       CHECK:   %[[TRUNCF:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[FUSED_OP]]#1, %[[FUSED_OP]]#0 :
 
-// Don't support multiple operands of the trunc being from different matmuls.
-//      CHECK: util.func public @dont_fuse_when_same_trunc_op
-//      CHECK:   %[[CONTRACT1:.+]] = linalg.batch_matmul_transpose_b
-//      CHECK:   %[[CONTRACT2:.+]] = linalg.batch_matmul_transpose_b
-//      CHECK:   %[[GENERIC:.+]] = linalg.generic
-// CHECK-SAME:       ins(%[[CONTRACT2]], %[[CONTRACT1]]
-//      CHECK:   util.return %[[GENERIC]]
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
+#map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d2)>
+util.func public @test_horizontal_fuse_with_transpose(%arg0 : tensor<2x4096x640xf16>, %arg1: tensor<10x64x640xf16>, %arg2: tensor<10x64x640xf16>, %arg3: tensor<10x64x640xf16>) -> (tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, tensor<2x10x64x4096xf16>) {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<2x10x64x4096xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<2x10x64x4096xf32>) -> tensor<2x10x64x4096xf32>
+  %2 = tensor.empty() : tensor<2x10x4096x64xf32>
+  %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<2x10x4096x64xf32>) -> tensor<2x10x4096x64xf32>
+  %4 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<2x4096x640xf16>, tensor<10x64x640xf16>) outs(%3 : tensor<2x10x4096x64xf32>) {
+  ^bb0(%in: f16, %in_5: f16, %out: f32):
+    %11 = arith.extf %in : f16 to f32
+    %12 = arith.extf %in_5 : f16 to f32
+    %13 = arith.mulf %11, %12 : f32
+    %14 = arith.addf %out, %13 : f32
+    linalg.yield %14 : f32
+  } -> tensor<2x10x4096x64xf32>
+  %5 = tensor.empty() : tensor<2x10x4096x64xf16>
+  %6 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%4 : tensor<2x10x4096x64xf32>) outs(%5 : tensor<2x10x4096x64xf16>) {
+  ^bb0(%in: f32, %out: f16):
+    %11 = arith.truncf %in : f32 to f16
+    linalg.yield %11 : f16
+  } -> tensor<2x10x4096x64xf16>
+  %7 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]} ins(%arg0, %arg2 : tensor<2x4096x640xf16>, tensor<10x64x640xf16>) outs(%3 : tensor<2x10x4096x64xf32>) {
+  ^bb0(%in: f16, %in_5: f16, %out: f32):
+    %11 = arith.extf %in : f16 to f32
+    %12 = arith.extf %in_5 : f16 to f32
+    %13 = arith.mulf %11, %12 : f32
+    %14 = arith.addf %out, %13 : f32
+    linalg.yield %14 : f32
+  } -> tensor<2x10x4096x64xf32>
+  %8 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%7 : tensor<2x10x4096x64xf32>) outs(%5 : tensor<2x10x4096x64xf16>) {
+  ^bb0(%in: f32, %out: f16):
+    %11 = arith.truncf %in : f32 to f16
+    linalg.yield %11 : f16
+  } -> tensor<2x10x4096x64xf16>
+  %9 = linalg.generic {indexing_maps = [#map, #map1, #map4], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]} ins(%arg0, %arg3 : tensor<2x4096x640xf16>, tensor<10x64x640xf16>) outs(%1 : tensor<2x10x64x4096xf32>) {
+  ^bb0(%in: f16, %in_5: f16, %out: f32):
+    %11 = arith.extf %in : f16 to f32
+    %12 = arith.extf %in_5 : f16 to f32
+    %13 = arith.mulf %11, %12 : f32
+    %14 = arith.addf %out, %13 : f32
+    linalg.yield %14 : f32
+  } -> tensor<2x10x64x4096xf32>
+  %11 = tensor.empty() : tensor<2x10x64x4096xf16>
+  %10 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%9 : tensor<2x10x64x4096xf32>) outs(%11 : tensor<2x10x64x4096xf16>) {
+  ^bb0(%in: f32, %out: f16):
+    %12 = arith.truncf %in : f32 to f16
+    linalg.yield %12 : f16
+  } -> tensor<2x10x64x4096xf16>
+  util.return %6, %8, %10 : tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, tensor<2x10x64x4096xf16>
+}
+//      CHECK: util.func public @test_horizontal_fuse_with_transpose
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<2x4096x640xf16>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<10x64x640xf16>
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<10x64x640xf16>
+// CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: tensor<10x64x640xf16>
+//      CHECK:   %[[EMPTY0:.+]] = tensor.empty() : tensor<2x10x64x4096xf32>
+//      CHECK:   %[[FILL0:.+]] = linalg.fill
+// CHECK-SAME:       outs(%[[EMPTY0]] :
+//      CHECK:   %[[EMPTY1:.+]] = tensor.empty() : tensor<2x10x4096x64xf32>
+//      CHECK:   %[[FILL1:.+]] = linalg.fill
+// CHECK-SAME:       outs(%[[EMPTY1]] :
+//      CHECK:   %[[FUSED_OP:.+]]:3 = linalg.generic
+// CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]] :
+// CHECK-SAME:       outs(%[[FILL1]], %[[FILL1]], %[[FILL0]] :
+//      CHECK:   %[[TRUNCF1:.+]] = linalg.generic
+// CHECK-SAME:       ins(%[[FUSED_OP]]#0 :
+//      CHECK:   %[[TRUNCF2:.+]] = linalg.generic
+// CHECK-SAME:       ins(%[[FUSED_OP]]#1 :
+//      CHECK:   %[[TRUNCF3:.+]] = linalg.generic
+// CHECK-SAME:       ins(%[[FUSED_OP]]#2 :
+//      CHECK:   util.return %[[TRUNCF1]], %[[TRUNCF2]], %[[TRUNCF3]]
+
+// -----
+
+util.func @dont_fuse_contractions_with_different_n(%lhs : tensor<10x20xf32>,
+    %rhs0 : tensor<20x40xf32>, %rhs1 : tensor<20x80xf32>)
+    -> (tensor<10x40xf32>, tensor<10x80xf32>) {
+  %0 = tensor.empty() : tensor<10x40xf32>
+  %cst = arith.constant 0.0 : f32
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<10x40xf32>) -> tensor<10x40xf32>
+  %2 = linalg.matmul ins(%lhs, %rhs0 : tensor<10x20xf32>, tensor<20x40xf32>)
+      outs(%1 : tensor<10x40xf32>) -> tensor<10x40xf32>
+  %3 = tensor.empty() : tensor<10x80xf32>
+  %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<10x80xf32>) -> tensor<10x80xf32>
+  %5 = linalg.matmul ins(%lhs, %rhs1 : tensor<10x20xf32>, tensor<20x80xf32>)
+      outs(%4 : tensor<10x80xf32>) -> tensor<10x80xf32>
+  util.return %2, %5 : tensor<10x40xf32>, tensor<10x80xf32>
+}
+// CHECK-LABEL: func public @dont_fuse_contractions_with_different_n(
+//  CHECK-SAME:     %[[LHS:.+]]: tensor<10x20xf32>,
+//  CHECK-SAME:     %[[RHS0:.+]]: tensor<20x40xf32>,
+//  CHECK-SAME:     %[[RHS1:.+]]: tensor<20x80xf32>)
+//       CHECK:   %[[MATMUL0:.+]] = linalg.matmul
+//  CHECK-SAME:       ins(%[[LHS]], %[[RHS0]] :
+//       CHECK:   %[[MATMUL1:.+]] = linalg.matmul
+//  CHECK-SAME:       ins(%[[LHS]], %[[RHS1]] :
+//       CHECK:   util.return %[[MATMUL0]], %[[MATMUL1]]
+
+// -----
+
+util.func public @check_horizontal_independence(%arg0: tensor<640x640xf32>,
+    %arg1: tensor<640x640xf32>, %arg2: tensor<640x640xf32>,
+    %arg3: tensor<640x640xf32>)
+    -> (tensor<640x640xf32>, tensor<640x640xf32>, tensor<640x640xf32>) {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<640x640xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<640x640xf32>) -> tensor<640x640xf32>
+  %2 = linalg.matmul ins(%arg0, %arg1 : tensor<640x640xf32>, tensor<640x640xf32>)
+      outs(%1 : tensor<640x640xf32>) -> tensor<640x640xf32>
+  %3 = linalg.matmul ins(%arg0, %arg2 : tensor<640x640xf32>, tensor<640x640xf32>)
+      outs(%1 : tensor<640x640xf32>) -> tensor<640x640xf32>
+  %4 = linalg.matmul ins(%arg0, %3 : tensor<640x640xf32>, tensor<640x640xf32>)
+      outs(%1 : tensor<640x640xf32>) -> tensor<640x640xf32>
+  util.return %2, %3, %4 : tensor<640x640xf32>, tensor<640x640xf32>, tensor<640x640xf32>
+}
+// CHECK-LABEL: func public @check_horizontal_independence
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9_]+]]: tensor<640x640xf32>
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9_]+]]: tensor<640x640xf32>
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9_]+]]: tensor<640x640xf32>
+//  CHECK-SAME:     %[[ARG3:[a-zA-Z0-9_]+]]: tensor<640x640xf32>
+//       CHECK:   %[[FUSED_OP:.+]]:2 = linalg.generic
+//  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]], %[[ARG2]] :
+//       CHECK:   %[[OP:.+]] = linalg.matmul
+//       CHECK:       ins(%[[ARG0]], %[[FUSED_OP]]#1 :
+//       CHECK:   util.return %[[FUSED_OP]]#0, %[[FUSED_OP]]#1, %[[OP]]

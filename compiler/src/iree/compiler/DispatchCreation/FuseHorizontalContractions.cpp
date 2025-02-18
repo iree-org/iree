@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
@@ -38,6 +39,16 @@ namespace mlir::iree_compiler::DispatchCreation {
 
 namespace {
 
+static bool operator==(const linalg::ContractionDimensions &lhs,
+                       const linalg::ContractionDimensions &rhs) {
+  return lhs.batch == rhs.batch && lhs.m == rhs.m && lhs.n == rhs.n &&
+         lhs.k == rhs.k;
+}
+static bool operator!=(const linalg::ContractionDimensions &lhs,
+                       const linalg::ContractionDimensions &rhs) {
+  return !(lhs == rhs);
+}
+
 struct FuseHorizontalContractionsPass final
     : public impl::FuseHorizontalContractionsPassBase<
           FuseHorizontalContractionsPass> {
@@ -47,63 +58,78 @@ struct FuseHorizontalContractionsPass final
 
 } // namespace
 
-/// Structs that captures the ops that are to be fused
-struct HorizontalFusionGroup {
-  // Contractions op that are to be fused.
-  SmallVector<linalg::LinalgOp> contractionOps;
-  // Optional truncate operations that could be following the contraction op.
-  std::optional<SmallVector<linalg::GenericOp>> truncateOps;
-};
-
 /// Helper method to check operations equivalence
-static bool checkOperationEquivalence(Operation *lhsOp, Operation *rhsOp) {
-  // During equivalence check, it would have been easier if `checkEquivalence`
-  // would just use `OpOperands *`. Since it takes `Value`s for now, just
-  // check that the values are the same as operands. This is potentially
-  // making the match too broad, but is an OK work-around for now.
-  // TODO(MaheshRavishankar): Fix upstream `checkEquivalence` signater in
-  // `OperationEquivalence::isEquivalentTo`.
-  llvm::SmallDenseSet<Value, 8> operands;
-  operands.insert(lhsOp->operand_begin(), lhsOp->operand_end());
-  operands.insert(rhsOp->operand_begin(), rhsOp->operand_end());
+static bool checkContractionOpEquivalence(Operation *aOp, Operation *bOp) {
+  auto aLinalgOp = dyn_cast<linalg::LinalgOp>(aOp);
+  auto bLinalgOp = dyn_cast<linalg::LinalgOp>(bOp);
 
-  llvm::DenseMap<Value, Value> equivalentValues;
-  auto checkEquivalent = [&](Value lhsValue, Value rhsValue) {
-    if (operands.contains(lhsValue) && operands.contains(rhsValue)) {
-      return success();
+  if (!aLinalgOp || !bLinalgOp) {
+    return false;
+  }
+  // Contraction ops verifies that there are two operands and one result.
+  assert(linalg::isaContractionOpInterface(aLinalgOp) &&
+         linalg::isaContractionOpInterface(bLinalgOp) &&
+         "expected lhs and rhs to be contraction ops");
+
+  // Check that the LHS operand is the same.
+  if (aLinalgOp.getDpsInputOperand(0)->get() !=
+      bLinalgOp.getDpsInputOperand(0)->get()) {
+    return false;
+  }
+
+  // Check that the n-dimensions are the same
+  FailureOr<linalg::ContractionDimensions> aContractionDims =
+      linalg::inferContractionDims(aLinalgOp);
+  FailureOr<linalg::ContractionDimensions> bContactionDims =
+      linalg::inferContractionDims(bLinalgOp);
+  if (failed(aContractionDims) || failed(bContactionDims)) {
+    return false;
+  }
+  if (aContractionDims.value() != bContactionDims.value()) {
+    return false;
+  }
+
+  SmallVector<int64_t, 4> aStaticDims = aLinalgOp.getStaticLoopRanges();
+  SmallVector<int64_t, 4> bStaticDims = bLinalgOp.getStaticLoopRanges();
+  for (auto nDim : aContractionDims->n) {
+    if (aStaticDims[nDim] != bStaticDims[nDim] ||
+        ShapedType::isDynamic(aStaticDims[nDim])) {
+      return false;
     }
-    return success(equivalentValues.lookup(lhsValue) == rhsValue ||
-                   equivalentValues.lookup(rhsValue) == lhsValue);
-  };
-  auto markEquivalent = [&](Value v1, Value v2) { equivalentValues[v1] = v2; };
-  return OperationEquivalence::isEquivalentTo(
-      lhsOp, rhsOp, checkEquivalent, markEquivalent,
-      /*flags=*/OperationEquivalence::IgnoreLocations);
-}
+  }
 
-/// Check that an operation is a `empty -> fill -> contraction`
-static bool isEmptyFillContractionDAGRootOp(
-    linalg::LinalgOp linalgOp,
-    std::optional<linalg::LinalgOp> seedContractionOp = std::nullopt) {
-  if (!linalg::isaContractionOpInterface(linalgOp)) {
+  auto checkSameRankAndElementType = [](Value aVal, Value bVal) {
+    auto aType = dyn_cast<ShapedType>(aVal.getType());
+    auto bType = dyn_cast<ShapedType>(bVal.getType());
+    return aType && bType && aType.getRank() == bType.getRank() &&
+           aType.getElementType() == bType.getElementType();
+  };
+  // Check that the RHS rank and element type are the same. We dont check the
+  // type cause we allow RHS to be transposes.
+  if (!checkSameRankAndElementType(aLinalgOp.getDpsInputOperand(1)->get(),
+                                   bLinalgOp.getDpsInputOperand(1)->get())) {
     return false;
   }
-  auto fillOp = linalgOp.getDpsInits()[0].getDefiningOp<linalg::FillOp>();
-  if (!fillOp) {
+
+  // Check that the output rank and element type are the same. We dont check the
+  // type cause we allow output to be transposes.
+  if (!checkSameRankAndElementType(aLinalgOp.getDpsInitOperand(0)->get(),
+                                   bLinalgOp.getDpsInitOperand(0)->get())) {
     return false;
   }
-  // For convenience check that the fill value is 0. This is not
-  // a necessity, but easier to handle the rewrite this way.
-  if (!matchPattern(fillOp.getDpsInputOperand(0)->get(), m_AnyZeroFloat()) &&
-      !matchPattern(fillOp.getDpsInputOperand(0)->get(), m_Zero())) {
+
+  // Check that the iterator types are the same.
+  if (aLinalgOp.getIteratorTypesArray() != bLinalgOp.getIteratorTypesArray()) {
     return false;
   }
-  if (!fillOp.getDpsInitOperand(0)->get().getDefiningOp<tensor::EmptyOp>()) {
+
+  // Check region equivalence.
+  if (!OperationEquivalence::isRegionEquivalentTo(
+          &aLinalgOp->getRegion(0), &bLinalgOp->getRegion(0),
+          OperationEquivalence::IgnoreLocations)) {
     return false;
   }
-  if (seedContractionOp) {
-    return checkOperationEquivalence(linalgOp, seedContractionOp.value());
-  }
+
   return true;
 }
 
@@ -127,37 +153,6 @@ static bool isHorizontalToGroup(Operation *op,
   });
 }
 
-/// Get user of operation that is a truncate operation.
-static std::optional<linalg::GenericOp>
-getTruncateOp(Operation *op,
-              const llvm::SetVector<Operation *> &groupedOperations,
-              const DominanceInfo &dominanceInfo,
-              std::optional<linalg::GenericOp> seedTruncateOp = std::nullopt) {
-  if (!op->hasOneUse()) {
-    return std::nullopt;
-  }
-  Operation *user = *op->user_begin();
-  // TODO: This test should not be really needed. We should be able to check
-  // for ANY elementwise operation.
-  if (!IREE::LinalgExt::isBitTruncateOp(user)) {
-    return std::nullopt;
-  }
-  auto genericOp = dyn_cast<linalg::GenericOp>(user);
-  if (!genericOp) {
-    return std::nullopt;
-  }
-  if (seedTruncateOp) {
-    if (!checkOperationEquivalence(genericOp, seedTruncateOp.value())) {
-      return std::nullopt;
-    }
-    if (!isHorizontalToGroup(genericOp, groupedOperations, dominanceInfo,
-                             seedTruncateOp.value())) {
-      return std::nullopt;
-    }
-  }
-  return genericOp;
-}
-
 /// Find all candidates that can be used for horizontal fusion. For example
 /// ```
 /// %0 = linalg.matmul ins(%arg0, %arg1)
@@ -171,39 +166,17 @@ getTruncateOp(Operation *op,
 /// %4 = linalg.matmul ins(%arg0, concat(%arg1, %arg2, %arg3))
 /// ```
 ///
-/// This method recognizes such patterns. It also accounts for the quantized
-/// case where individual operations might be have lower-precision operands and
-/// accumulate in higher precision, followed by a `linalg.generic` that performs
-/// the `truncf` on the result.
-static std::optional<HorizontalFusionGroup> getHorizontalFusionGroupMembers(
+/// Note: The actual operation generated does not concat the RHS.
+static std::optional<SmallVector<Operation *>> getHorizontalFusionGroupMembers(
     linalg::LinalgOp seedOp,
-    const llvm::SmallDenseSet<linalg::LinalgOp> &groupedOperations,
+    const llvm::SmallDenseSet<Operation *> &groupedOperations,
     const DominanceInfo &dominanceInfo, int fusionLimit) {
 
   Value lhs = seedOp->getOperand(0);
-  auto lhsType = cast<RankedTensorType>(lhs.getType());
-  Value rhs = seedOp->getOperand(1);
-  auto rhsType = cast<RankedTensorType>(rhs.getType());
-  Value out = seedOp->getOperand(2);
-  auto outType = cast<RankedTensorType>(out.getType());
-
-  if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape() ||
-      !outType.hasStaticShape()) {
-    return std::nullopt;
-  }
 
   SetVector<Operation *> allOps;
-  SmallVector<linalg::LinalgOp> contractionOps = {seedOp};
-  std::optional<linalg::GenericOp> seedTruncOp =
-      getTruncateOp(seedOp, allOps, dominanceInfo);
-  std::optional<SmallVector<linalg::GenericOp>> truncateOps;
-  if (seedTruncOp) {
-    truncateOps = {seedTruncOp.value()};
-  }
+  SmallVector<Operation *> contractionOps = {seedOp};
   allOps.insert(seedOp);
-  if (seedTruncOp) {
-    allOps.insert(seedTruncOp.value());
-  }
 
   auto canBeGrouped = [&](linalg::LinalgOp linalgOp) -> bool {
     if (linalgOp->getParentOp() != seedOp->getParentOp()) {
@@ -211,12 +184,8 @@ static std::optional<HorizontalFusionGroup> getHorizontalFusionGroupMembers(
     }
 
     // Constraints of the operation itself.
-    if (!isEmptyFillContractionDAGRootOp(linalgOp, seedOp)) {
-      return false;
-    }
-    if (linalgOp->getOperand(0).getType() != lhsType ||
-        linalgOp->getOperand(1).getType() != rhsType ||
-        linalgOp->getOperand(2).getType() != outType) {
+    if (!linalg::isaContractionOpInterface(linalgOp) ||
+        !checkContractionOpEquivalence(linalgOp, seedOp)) {
       return false;
     }
     if (groupedOperations.contains(linalgOp)) {
@@ -225,9 +194,6 @@ static std::optional<HorizontalFusionGroup> getHorizontalFusionGroupMembers(
 
     // Structural constraints related to being able to fuse the operations.
     if (!dominanceInfo.properlyDominates(seedOp, linalgOp)) {
-      return false;
-    }
-    if (!isHorizontalToGroup(linalgOp, allOps, dominanceInfo, seedOp)) {
       return false;
     }
     return true;
@@ -248,8 +214,8 @@ static std::optional<HorizontalFusionGroup> getHorizontalFusionGroupMembers(
   }
 
   // Sort the users so that the order is deterministic
-  llvm::sort(lhsUsers, [&](Operation *lhs, Operation *rhs) {
-    return dominanceInfo.properlyDominates(lhs, rhs);
+  llvm::sort(lhsUsers, [&](Operation *a, Operation *b) {
+    return dominanceInfo.properlyDominates(a, b);
   });
 
   // Collect all contraction op users of lhs.
@@ -259,21 +225,12 @@ static std::optional<HorizontalFusionGroup> getHorizontalFusionGroupMembers(
       continue;
     }
 
-    std::optional<linalg::GenericOp> userTruncOp =
-        getTruncateOp(linalgUser, allOps, dominanceInfo, seedTruncOp);
-    // If there are truncate ops to fuse and current contraction op
-    // does not have a compatible truncate op to fuse as well, ignore
-    // the op for horizontal fusion.
-    if (truncateOps && !userTruncOp) {
+    if (!isHorizontalToGroup(linalgUser, allOps, dominanceInfo, seedOp)) {
       continue;
     }
 
     contractionOps.push_back(linalgUser);
     allOps.insert(linalgUser);
-    if (truncateOps) {
-      truncateOps.value().push_back(userTruncOp.value());
-      allOps.insert(userTruncOp.value());
-    }
     if (contractionOps.size() >= fusionLimit) {
       break;
     }
@@ -283,328 +240,239 @@ static std::optional<HorizontalFusionGroup> getHorizontalFusionGroupMembers(
     return std::nullopt;
   }
 
-  return HorizontalFusionGroup{contractionOps, truncateOps};
+  return contractionOps;
 }
 
-/// Concatenate the given tensor `values`. The assumption here
-/// is that all the `values` are the same type. These are concatanted
-/// by adding a extra outer dimension to each value and concatenating
-/// along the outer-most dim.
-static Value concatenateValues(RewriterBase &rewriter, Location loc,
-                               ArrayRef<Value> values) {
-  assert((values.size() >= 2) && "Invalid number of operands to concatenate");
-  auto valueType = cast<RankedTensorType>(values[0].getType());
-
-  SmallVector<Value> concatOperands;
-  for (auto v : values) {
-    auto t = cast<RankedTensorType>(v.getType());
-    SmallVector<int64_t> expandedTypeShape = {1};
-    expandedTypeShape.append(t.getShape().begin(), t.getShape().end());
-    auto expandedType =
-        RankedTensorType::get(expandedTypeShape, t.getElementType());
-    SmallVector<OpFoldResult> expandedShape = {rewriter.getIndexAttr(1)};
-    auto mixedSizes = tensor::getMixedSizes(rewriter, loc, v);
-    expandedShape.append(mixedSizes.begin(), mixedSizes.end());
-
-    SmallVector<ReassociationIndices> reassoc;
-    if (t.getRank() != 0) {
-      reassoc.push_back({0, 1});
-      for (int i = 0, e = valueType.getRank() - 1; i < e; ++i) {
-        reassoc.push_back({i + 2});
-      }
-    }
-
-    Value expanded = rewriter.create<tensor::ExpandShapeOp>(
-        loc, expandedType, v, reassoc, expandedShape);
-    concatOperands.push_back(expanded);
-  }
-
-  Value concatedVal =
-      rewriter.create<tensor::ConcatOp>(loc, /*dim=*/0, concatOperands);
-  return concatedVal;
-}
-
-/// Compute the indexing map used in the concatenated operation.
-/// The indexing map is either
-/// 1) when shiftOnly = false, adds an extra outermost dimension to the indexing
-///    map and adding that dimension as the outermost dimension in the range.
-///    This is used for case where the original operands of the operations are
-///    concatanated as well to get the operand for the horizontally-fused
-///    operation.
-/// 2) when shiftOnly = true,  adds an extra outermost dimension to the indexing
-///    map without adding that dimension as the outermost dimension in the
-///    range. This is used for case where the same value is used as an operand
-///    for all the concatenated operations. In such cases the original operand
-///    can just be broadcasted along the concatenated dimension in the
-///    horizontally-fused operation.
-static AffineMap getConcatenatedIndexingMap(RewriterBase &rewriter,
-                                            AffineMap origIndexingMap,
-                                            bool shiftOnly = false) {
-  AffineMap newIndexingMap = origIndexingMap.shiftDims(1);
-  if (shiftOnly) {
-    return newIndexingMap;
-  }
-  return newIndexingMap.insertResult(rewriter.getAffineDimExpr(0), 0);
-}
-
-/// During horizontal fusion, there might be operands of the fused operations
-/// whose definitions are interspersed between the fused operations. For groups
-/// chosen to fuse horizontally, such operations can be moved before the
-/// seed contraction operation (where the fused operation is generated).
-template <typename T>
+/// Permute the indexing maps of the operation marked for horizontal
+/// fusion to make sure all the LHS operands of the horizontally fused
+/// ops have the same indexing map.
 static LogicalResult
-moveOperandDefs(RewriterBase &rewriter, ArrayRef<T> operations,
-                Operation *insertionPoint, DominanceInfo &dominanceInfo,
-                ArrayRef<linalg::LinalgOp> ignoreOperations = {}) {
-  BackwardSliceOptions options;
-  llvm::DenseSet<Operation *> ignoreOperationsSet;
-  ignoreOperationsSet.insert(ignoreOperations.begin(), ignoreOperations.end());
-  options.filter = [&](Operation *op) {
-    return !dominanceInfo.properlyDominates(op, insertionPoint) &&
-           !ignoreOperationsSet.contains(op);
-  };
-  // Set inclusive to true cause the slice is computed from the operand, and
-  // we want to include the defining op (which is the point here)
-  options.inclusive = true;
+permuteIndexingMapsToMatchSeedLhs(RewriterBase &rewriter,
+                                  AffineMap seedLhsIndexingMap,
+                                  ArrayRef<utils::IteratorType> iteratorTypes,
+                                  SmallVector<AffineMap> &indexingMaps) {
+  if (indexingMaps.empty()) {
+    return failure();
+  }
+  AffineMap lhsIndexingMap = indexingMaps[0];
+  if (seedLhsIndexingMap == lhsIndexingMap) {
+    return success();
+  }
 
-  llvm::SetVector<Operation *> slice;
-  for (auto op : operations) {
-    for (auto operand : op->getOperands()) {
-      getBackwardSlice(operand, &slice, options);
+  assert(lhsIndexingMap.getNumDims() == seedLhsIndexingMap.getNumDims());
+  if (!lhsIndexingMap.isProjectedPermutation() ||
+      !seedLhsIndexingMap.isProjectedPermutation() ||
+      lhsIndexingMap.getNumResults() != seedLhsIndexingMap.getNumResults()) {
+    return failure();
+  }
+
+  auto getResultDimsRange = [](ArrayRef<AffineExpr> exprs) {
+    return llvm::map_range(exprs, [](AffineExpr expr) {
+      return cast<AffineDimExpr>(expr).getPosition();
+    });
+  };
+  auto seedLhsResultDimsRange =
+      getResultDimsRange(seedLhsIndexingMap.getResults());
+  auto lhsResultDimsRange = getResultDimsRange(lhsIndexingMap.getResults());
+
+  // Start with an identity permutations. For now try to only swap dimensions
+  // which is not a general solution.
+  SmallVector<int64_t> interchangeVector =
+      llvm::to_vector(llvm::seq<int64_t>(0, lhsIndexingMap.getNumDims()));
+  for (auto [seedDimPos, lhsDimPos] :
+       llvm::zip_equal(seedLhsResultDimsRange, lhsResultDimsRange)) {
+    if (seedDimPos == lhsDimPos) {
+      continue;
+    }
+    // If the current positions are what we started with, swap the positions.
+    if (interchangeVector[lhsDimPos] == lhsDimPos &&
+        interchangeVector[seedDimPos] == seedDimPos) {
+      std::swap(interchangeVector[lhsDimPos], interchangeVector[seedDimPos]);
+      continue;
+    }
+    // If this was a changed dimension, check that it is consistent.
+    if (interchangeVector[lhsDimPos] != seedDimPos ||
+        interchangeVector[seedDimPos] != lhsDimPos) {
+      return failure();
     }
   }
 
-  mlir::topologicalSort(slice);
-  for (auto op : slice) {
-    rewriter.moveOpBefore(op, insertionPoint);
+  // Check that the iterator types remain the same
+  SmallVector<utils::IteratorType> permutedIteratorTypes =
+      llvm::to_vector(iteratorTypes);
+  applyPermutationToVector(permutedIteratorTypes, interchangeVector);
+  if (permutedIteratorTypes != iteratorTypes) {
+    return failure();
+  }
+
+  AffineMap interchangeMap =
+      AffineMap::getPermutationMap(interchangeVector, rewriter.getContext());
+  for (auto &map : indexingMaps) {
+    if (!map.isEmpty()) {
+      map = map.compose(interchangeMap);
+    }
   }
   return success();
 }
 
-/// On finding this pattern
-/// ```
-/// %0 = linalg.matmul ins(%arg0, %arg1)
-/// %1 = linalg.matmul ins(%arg0, %arg2)
-/// %2 = linalg.matmul ins(%arg0, %arg3)
-/// ```
-///
-/// where all matmul share an operand can be combined into
-/// rewrite to
-///
-/// ```
-/// %arg1_r = tensor.expand_shape %arg1 [[0, 1], ...] : tensor<?x?xf32> to
-///     tensor<1x?x?xf32>
-/// %arg2_r = tensor.expand_shape %arg2 [[0, 1], ...] : tensor<?x?xf32> to
-///     tensor<1x?x?xf32>
-/// %arg3_r = tensor.expand_shape %arg3 [[0, 1], ...] : tensor<?x?xf32> to
-///     tensor<1x?x?xf32>
-/// %rhs = tensor.concat(%arg1_r, %arg2_r, %arg3_r)
-/// %fused = linalg.generic {
-///     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d1, d3)>,
-///                      affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>,
-///                      affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>}],
-///     iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
-///   ins(%arg0, %rhs) ... { ... }
-/// %0 = tensor.extract_slice %fused [0, 0, 0] ... : tensor<1x?x?xf32> to
-///     tensor<?x?xf32>
-/// %1 = tensor.extract_slice %fused [1, 0, 0] ... : tensor<1x?x?xf32> to
-///     tensor<?x?xf32>
-/// %2 = tensor.extract_slice %fused [2, 0, 0] ... : tensor<1x?x?xf32> to
-///     tensor<?x?xf32>
-/// ```
-///
-/// Also accounts for quantized cases where inputs are at lower precision and
-/// accumulate is in higher-precision with truncate getting back to the
-/// quantized sizes.
-static LogicalResult fuseGroup(RewriterBase &rewriter,
-                               HorizontalFusionGroup &fusionGroup,
-                               DominanceInfo &dominanceInfo) {
-  linalg::LinalgOp baseContractOp = fusionGroup.contractionOps.front();
+/// Generate the horizontally fused operation as an operation with multiple
+/// results, corresponding to the results of the fused operations. It is assumed
+/// that the LHS of the contraction operations fused horizontally is the same
+/// and have the same indexing map for all the operations. The RHS/outputs of
+/// the operations can be different, but share the same iteration space.
+/// Returns the generated fused op, or `std::nullopt` when the fused op
+/// could not be generated.
+static std::optional<linalg::GenericOp>
+fuseContractionsHorizontally(RewriterBase &rewriter, Location loc,
+                             MutableArrayRef<Operation *> linalgOps) {
+  if (linalgOps.empty()) {
+    return std::nullopt;
+  }
+
+  SmallVector<Value> fusedIns;
+  SmallVector<Value> fusedOuts;
+  SmallVector<Type> fusedResultTypes;
+  SmallVector<AffineMap> fusedInsIndexingMaps;
+  SmallVector<AffineMap> fusedOutsIndexingMaps;
+
+  auto seedOp = cast<linalg::LinalgOp>(linalgOps.front());
+  SmallVector<utils::IteratorType> fusedIteratorTypes =
+      seedOp.getIteratorTypesArray();
+
+  OpOperand *seedOpLhs = seedOp.getDpsInputOperand(0);
+  AffineMap seedOpLhsIndexingMap = seedOp.getMatchingIndexingMap(seedOpLhs);
+  fusedIns.push_back(seedOpLhs->get());
+  fusedInsIndexingMaps.push_back(seedOpLhsIndexingMap);
+
+  llvm::SmallDenseSet<Operation *> droppedOps;
+  for (auto op : linalgOps) {
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+    if (!linalgOp ||
+        linalgOp.getDpsInputOperand(0)->get() != seedOpLhs->get()) {
+      droppedOps.insert(op);
+      continue;
+    }
+
+    SmallVector<AffineMap> opIndexingMaps = linalgOp.getIndexingMapsArray();
+    if (failed(permuteIndexingMapsToMatchSeedLhs(rewriter, seedOpLhsIndexingMap,
+                                                 fusedIteratorTypes,
+                                                 opIndexingMaps))) {
+      droppedOps.insert(op);
+      continue;
+    }
+
+    // Append the RHS operands.
+    SmallVector<OpOperand *> ins = linalgOp.getDpsInputOperands();
+    llvm::append_range(
+        fusedIns,
+        llvm::map_range(ArrayRef<OpOperand *>(ins).drop_front(),
+                        [](OpOperand *operand) { return operand->get(); }));
+
+    // Append the Outs operands.
+    llvm::append_range(fusedOuts, llvm::map_range(linalgOp.getDpsInitsMutable(),
+                                                  [](OpOperand &operand) {
+                                                    return operand.get();
+                                                  }));
+
+    // Append the result types.
+    fusedResultTypes.append(linalgOp->result_type_begin(),
+                            linalgOp->result_type_end());
+
+    // Append the rhs indexing maps.
+    llvm::append_range(fusedInsIndexingMaps,
+                       ArrayRef<AffineMap>(opIndexingMaps)
+                           .slice(1, linalgOp.getNumDpsInputs() - 1));
+
+    // Append the outs indexing maps.
+    llvm::append_range(fusedOutsIndexingMaps,
+                       ArrayRef<AffineMap>(opIndexingMaps)
+                           .drop_front(linalgOp.getNumDpsInputs()));
+  }
+
+  SmallVector<AffineMap> fusedIndexingMaps = std::move(fusedInsIndexingMaps);
+  fusedIndexingMaps.append(fusedOutsIndexingMaps);
+  auto fusedOp = rewriter.create<linalg::GenericOp>(
+      loc, fusedResultTypes, fusedIns, fusedOuts, fusedIndexingMaps,
+      fusedIteratorTypes, [](OpBuilder &, Location, ValueRange) {});
+
+  Block *fusedBody = fusedOp.getBlock();
+  int64_t rhsIndex = 0;
+  int64_t outsIndex = fusedOp.getNumDpsInputs();
+  SmallVector<Value> yieldVals;
+  for (auto op : linalgOps) {
+    if (droppedOps.contains(op)) {
+      continue;
+    }
+    auto linalgOp = cast<linalg::LinalgOp>(op);
+    Block *body = linalgOp.getBlock();
+    SmallVector<Value> replacements = {fusedBody->getArgument(0)};
+    llvm::append_range(
+        replacements,
+        llvm::map_range(fusedBody->getArguments().slice(
+                            rhsIndex + 1, linalgOp.getNumDpsInputs() - 1),
+                        [](BlockArgument arg) -> Value { return arg; }));
+
+    llvm::append_range(
+        replacements,
+        llvm::map_range(fusedBody->getArguments().slice(
+                            outsIndex, linalgOp.getNumDpsInits()),
+                        [](BlockArgument arg) -> Value { return arg; }));
+
+    rewriter.mergeBlocks(body, fusedBody, replacements);
+    rhsIndex += linalgOp.getNumDpsInputs() - 1;
+    outsIndex += linalgOp.getNumDpsInits();
+
+    auto yieldOp = cast<linalg::YieldOp>(fusedBody->getTerminator());
+    yieldVals.append(yieldOp->operand_begin(), yieldOp->operand_end());
+    rewriter.eraseOp(yieldOp);
+  }
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPointToEnd(fusedBody);
+  rewriter.create<linalg::YieldOp>(loc, yieldVals);
+
+  unsigned resultsIndex = 0;
+  for (auto linalgOp : linalgOps) {
+    unsigned numResults = linalgOp->getNumResults();
+    rewriter.replaceOp(linalgOp,
+                       fusedOp->getResults().slice(resultsIndex, numResults));
+    resultsIndex += numResults;
+  }
+
+  return fusedOp;
+}
+
+static void fuseGroup(RewriterBase &rewriter,
+                      MutableArrayRef<Operation *> fusionGroup,
+                      DominanceInfo &dominanceInfo) {
+  if (!llvm::all_of(fusionGroup, [](Operation *op) {
+        return isa_and_nonnull<linalg::LinalgOp>(op);
+      })) {
+    return;
+  }
+  auto baseContractOp = cast<linalg::LinalgOp>(fusionGroup.front());
   Location loc = baseContractOp.getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(baseContractOp);
 
-  if (failed(moveOperandDefs(
-          rewriter, ArrayRef<linalg::LinalgOp>(fusionGroup.contractionOps),
-          baseContractOp, dominanceInfo))) {
-    return baseContractOp.emitOpError("failed to re-order operand definitions");
+  if (failed(moveOperandDefs(rewriter, fusionGroup, baseContractOp,
+                             dominanceInfo))) {
+    return;
   }
 
-  SmallVector<Value> rhsValues;
-  SmallVector<Value> initValues;
-  for (auto op : fusionGroup.contractionOps) {
-    Value rhs = op.getDpsInputOperand(1)->get();
-    Value init = op.getDpsInitOperand(0)->get();
-    rhsValues.push_back(rhs);
-    initValues.push_back(init);
-  }
-  Value newContractRhs = concatenateValues(rewriter, loc, rhsValues);
-  Value newContractInit = concatenateValues(rewriter, loc, initValues);
-
-  auto baseContractResultType =
-      cast<RankedTensorType>(baseContractOp->getResult(0).getType());
-  SmallVector<int64_t> newContractResultShape = {
-      static_cast<int64_t>(rhsValues.size())};
-  newContractResultShape.append(baseContractResultType.getShape().begin(),
-                                baseContractResultType.getShape().end());
-  auto newContractResultType = RankedTensorType::get(
-      newContractResultShape, baseContractResultType.getElementType());
-
-  Value lhs = baseContractOp->getOperand(0);
-
-  SmallVector<utils::IteratorType> newContractIteratorTypes = {
-      utils::IteratorType::parallel};
-  newContractIteratorTypes.append(baseContractOp.getIteratorTypesArray());
-
-  SmallVector<AffineMap> newContractIndexingMaps =
-      baseContractOp.getIndexingMapsArray();
-  newContractIndexingMaps[0] = getConcatenatedIndexingMap(
-      rewriter, newContractIndexingMaps[0], /*shiftOnly=*/true);
-  newContractIndexingMaps[1] =
-      getConcatenatedIndexingMap(rewriter, newContractIndexingMaps[1]);
-  newContractIndexingMaps[2] =
-      getConcatenatedIndexingMap(rewriter, newContractIndexingMaps[2]);
-
-  linalg::GenericOp newContractOp = rewriter.create<linalg::GenericOp>(
-      loc, newContractResultType, ValueRange{lhs, newContractRhs},
-      newContractInit, newContractIndexingMaps, newContractIteratorTypes);
-  rewriter.cloneRegionBefore(baseContractOp->getRegion(0),
-                             newContractOp.getRegion(),
-                             newContractOp.getRegion().begin());
-
-  linalg::LinalgOp concatResultOp = newContractOp;
-  if (fusionGroup.truncateOps) {
-    SmallVector<Value> newTruncOperands;
-    SmallVector<AffineMap> newTruncIndexingMaps;
-    linalg::GenericOp baseTruncOp = fusionGroup.truncateOps->front();
-    SmallVector<AffineMap> baseTruncOpIndexingMaps =
-        baseTruncOp.getIndexingMapsArray();
-
-    rewriter.setInsertionPoint(baseTruncOp);
-    if (failed(moveOperandDefs(
-            rewriter,
-            ArrayRef<linalg::GenericOp>(fusionGroup.truncateOps.value()),
-            baseTruncOp, dominanceInfo, fusionGroup.contractionOps))) {
-      return baseTruncOp.emitOpError(
-          "failed to move operand defs for truncate operations");
-    }
-
-    for (auto [operandIndex, baseTruncOperand, baseIndexingMap] :
-         llvm::enumerate(baseTruncOp->getOperands(), baseTruncOpIndexingMaps)) {
-      // Collect all the operands for the trunc operation.
-      SmallVector<Value> truncOperands;
-      for (auto truncOp : fusionGroup.truncateOps.value()) {
-        truncOperands.push_back(truncOp.getOperand(operandIndex));
-      }
-
-      // Three cases to handle here.
-      // Case 1. the operand is the contraction op.
-      if (llvm::all_of(llvm::zip(truncOperands, fusionGroup.contractionOps),
-                       [](auto it) {
-                         Value operand = std::get<0>(it);
-                         return operand.getDefiningOp<linalg::LinalgOp>() ==
-                                std::get<1>(it);
-                       })) {
-        // Use the result of the concatanted generic op
-        newTruncOperands.push_back(newContractOp.getResult(0));
-        newTruncIndexingMaps.push_back(
-            getConcatenatedIndexingMap(rewriter, baseIndexingMap));
-        continue;
-      }
-
-      // Case 2. all the operands are the same.
-      if (operandIndex < baseTruncOp.getNumDpsInputs() &&
-          llvm::all_equal(truncOperands)) {
-        newTruncOperands.push_back(truncOperands.front());
-        newTruncIndexingMaps.push_back(getConcatenatedIndexingMap(
-            rewriter, baseIndexingMap, /*shiftOnly=*/true));
-        continue;
-      }
-
-      // Case 3. Concatenate all the operands.
-      newTruncOperands.push_back(
-          concatenateValues(rewriter, loc, truncOperands));
-      newTruncIndexingMaps.push_back(
-          getConcatenatedIndexingMap(rewriter, baseIndexingMap));
-    }
-
-    // Insert truncate operator.
-    auto baseTruncType =
-        cast<RankedTensorType>(baseTruncOp.getResult(0).getType());
-    SmallVector<int64_t> newTruncShape = {
-        static_cast<int64_t>(rhsValues.size())};
-    newTruncShape.append(baseTruncType.getShape().begin(),
-                         baseTruncType.getShape().end());
-    auto newTruncType =
-        RankedTensorType::get(newTruncShape, baseTruncType.getElementType());
-    SmallVector<utils::IteratorType> newTruncIteratorTypes = {
-        utils::IteratorType::parallel};
-    newTruncIteratorTypes.append(baseTruncOp.getIteratorTypesArray());
-
-    ArrayRef newTruncOperandsRef(newTruncOperands);
-    linalg::GenericOp newTruncOp = rewriter.create<linalg::GenericOp>(
-        loc, newTruncType,
-        newTruncOperandsRef.take_front(baseTruncOp.getNumDpsInputs()),
-        newTruncOperandsRef.take_back(baseTruncOp.getNumDpsInits()),
-        newTruncIndexingMaps, newTruncIteratorTypes);
-
-    rewriter.cloneRegionBefore(baseTruncOp->getRegion(0),
-                               newTruncOp.getRegion(),
-                               newTruncOp.getRegion().begin());
-
-    concatResultOp = cast<linalg::LinalgOp>(newTruncOp.getOperation());
-  }
-
-  SmallVector<SmallVector<OpFoldResult>> concatResultShape;
-  if (failed(concatResultOp.reifyResultShapes(rewriter, concatResultShape))) {
-    return baseContractOp.emitOpError(
-        "failed to get shape of concatenated result op");
-  }
-  Value concatResult = concatResultOp->getResult(0);
-  MutableArrayRef<OpFoldResult> extractSizes(concatResultShape[0]);
-  extractSizes[0] = rewriter.getIndexAttr(1);
-  auto concatResultType = cast<RankedTensorType>(concatResult.getType());
-
-  SmallVector<OpFoldResult> extractOffsets(extractSizes.size(),
-                                           rewriter.getIndexAttr(0));
-  SmallVector<OpFoldResult> extractStrides(extractSizes.size(),
-                                           rewriter.getIndexAttr(1));
-
-  auto concatResultTypeShape =
-      llvm::map_to_vector(concatResultType.getShape(),
-                          [](size_t s) { return static_cast<int64_t>(s); });
-  auto resultOutType =
-      RankedTensorType::get(ArrayRef(concatResultTypeShape).drop_front(),
-                            concatResultType.getElementType());
-
-  SmallVector<Value> replacements;
-  for (auto i : llvm::seq<size_t>(0, rhsValues.size())) {
-    extractOffsets[0] = rewriter.getIndexAttr(static_cast<int64_t>(i));
-    replacements.push_back(rewriter.create<tensor::ExtractSliceOp>(
-        loc, resultOutType, concatResult, extractOffsets, extractSizes,
-        extractStrides));
-  }
-
-  for (auto [index, op, replacement] :
-       llvm::enumerate(fusionGroup.contractionOps, replacements)) {
-    Operation *replacedOp = op;
-    if (fusionGroup.truncateOps) {
-      replacedOp = fusionGroup.truncateOps.value()[index];
-    }
-    rewriter.replaceOp(replacedOp, replacement);
-  }
-  return success();
+  std::optional<linalg::GenericOp> fusedOp =
+      fuseContractionsHorizontally(rewriter, loc, fusionGroup);
+  (void)fusedOp;
 }
 
 void FuseHorizontalContractionsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   DominanceInfo dominanceInfo(getOperation());
 
-  SmallVector<HorizontalFusionGroup> horizontalFusionGroups;
-  llvm::SmallDenseSet<linalg::LinalgOp> groupedOperations;
+  SmallVector<SmallVector<Operation *>> horizontalFusionGroups;
+  llvm::SmallDenseSet<Operation *> groupedOperations;
 
   getOperation()->walk([&](linalg::LinalgOp linalgOp) {
-    if (!isEmptyFillContractionDAGRootOp(linalgOp)) {
+    if (!linalg::isaContractionOpInterface(linalgOp)) {
       return;
     }
     // Avoid already grouped operations;
@@ -612,7 +480,7 @@ void FuseHorizontalContractionsPass::runOnOperation() {
       return;
     }
 
-    std::optional<HorizontalFusionGroup> fusionGroup =
+    std::optional<SmallVector<Operation *>> fusionGroup =
         getHorizontalFusionGroupMembers(linalgOp, groupedOperations,
                                         dominanceInfo, fusionLimit);
 
@@ -622,7 +490,7 @@ void FuseHorizontalContractionsPass::runOnOperation() {
 
     // Update statistics.
     numFusionGroups++;
-    switch (fusionGroup->contractionOps.size()) {
+    switch (fusionGroup->size()) {
     case 2:
       numSize2FusionGroups++;
       break;
@@ -633,8 +501,7 @@ void FuseHorizontalContractionsPass::runOnOperation() {
       break;
     }
 
-    groupedOperations.insert(fusionGroup->contractionOps.begin(),
-                             fusionGroup->contractionOps.end());
+    groupedOperations.insert(fusionGroup->begin(), fusionGroup->end());
     horizontalFusionGroups.emplace_back(std::move(fusionGroup.value()));
   });
 
@@ -644,38 +511,7 @@ void FuseHorizontalContractionsPass::runOnOperation() {
 
   IRRewriter rewriter(context);
   for (auto &fusionGroup : horizontalFusionGroups) {
-    if (failed(fuseGroup(rewriter, fusionGroup, dominanceInfo))) {
-      return signalPassFailure();
-    }
-  }
-
-  {
-    RewritePatternSet foldReshapePatterns(context);
-    tensor::populateFoldTensorEmptyPatterns(foldReshapePatterns);
-    linalg::FillOp::getCanonicalizationPatterns(foldReshapePatterns, context);
-    if (failed(applyPatternsGreedily(getOperation(),
-                                     std::move(foldReshapePatterns)))) {
-      getOperation()->emitOpError("failed during reshape folding patterns");
-      return signalPassFailure();
-    }
-
-    RewritePatternSet foldPatterns(context);
-    tensor::populateFoldTensorEmptyPatterns(foldPatterns);
-    linalg::FillOp::getCanonicalizationPatterns(foldPatterns, context);
-    if (failed(
-            applyPatternsGreedily(getOperation(), std::move(foldPatterns)))) {
-      getOperation()->emitOpError("failed to fold empty/fill with concats");
-      return signalPassFailure();
-    }
-  }
-
-  // Note: Currently these patterns are required due to early lowering of
-  // tensor.concat. When we choose  to move the lowering of tensor.concat later,
-  // these patterns should be dropped.
-  RewritePatternSet patterns(context);
-  tensor::populateDecomposeTensorConcatPatterns(patterns);
-  if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
-    return signalPassFailure();
+    fuseGroup(rewriter, fusionGroup, dominanceInfo);
   }
 }
 } // namespace mlir::iree_compiler::DispatchCreation

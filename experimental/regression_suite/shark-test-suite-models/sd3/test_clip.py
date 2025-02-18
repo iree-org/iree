@@ -111,7 +111,6 @@ ROCM_COMPILE_FLAGS = [
     "--iree-hip-waves-per-eu=2",
     "--iree-llvmgpu-enable-prefetch",
     "--iree-dispatch-creation-enable-aggressive-fusion",
-    "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
     "--iree-opt-aggressively-propagate-transposes=true",
     "--iree-codegen-llvmgpu-use-vector-distribution=true",
     "--iree-execution-model=async-external",
