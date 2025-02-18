@@ -6940,7 +6940,7 @@ May introduce copy-on-write behavior if the operand value is used as well as
 the result and users should try to keep the operand to a single use by this
 op.</p>
 <p>Traits: <code>Stream_AsyncPhaseOp</code></p>
-<p>Interfaces: <code>InferTypeOpInterface</code>, <code>Stream_AffinityOp</code>, <code>StreamableOpInterface</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Interfaces: <code>InferTypeOpInterface</code>, <code>Stream_AffinityOp</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7664,6 +7664,7 @@ value.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.transfer` $source `:` type($source)
               `` `{` $source_size `}`
+              (`on` `(` $affinity^ `)`)?
               (`from` `(` $source_affinity^ `)`)?
               `-&gt;`
               (`to` `(` $result_affinity^ `)`)?
@@ -7681,6 +7682,7 @@ devices with discrete memory spaces or pools.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>source_affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
 <tr><td><code>result_affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
 </table>
 
 <h5 id="operands_15">Operands:<a class="headerlink" href="#operands_15" title="Permanent link">link</a></h5>
