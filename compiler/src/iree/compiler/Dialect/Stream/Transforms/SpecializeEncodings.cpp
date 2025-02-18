@@ -373,7 +373,7 @@ namespace {
 // will be needed in the work.
 class StreamTensorOpUpdater {
 public:
-  explicit StreamTensorOpUpdater(ModuleOp moduleOp) : moduleOp(moduleOp){};
+  explicit StreamTensorOpUpdater(ModuleOp moduleOp) : moduleOp(moduleOp) {}
   ~StreamTensorOpUpdater() {}
 
   // Collects the stream tensor op candidates, and prepares all the needed
@@ -451,7 +451,9 @@ LogicalResult StreamTensorOpUpdater::addQuery(
       }
       SmallVector<IREE::Stream::AffinityAttr> affinityAttrs;
       if (!affinityAnalysis.tryLookupResourceAffinity(operand, affinityAttrs)) {
-        return failure();
+        return dispatchOp.emitError(
+                   "failed to determine resource affinity for operand ")
+               << operand;
       }
       for (auto affinity : affinityAttrs) {
         queries.emplace_back(affinity, affinityOp);
@@ -462,7 +464,7 @@ LogicalResult StreamTensorOpUpdater::addQuery(
   return success();
 }
 
-/// Updates the operand encondings and result encodings for the `dispatchOp`
+/// Updates the operand encodings and result encodings for the `dispatchOp`
 /// with resolved layouts.
 static LogicalResult updateTensorDispatchOp(
     RewriterBase &rewriter, ModuleOp moduleOp,
