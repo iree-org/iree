@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -51,8 +52,29 @@ public:
           rewriter.getType<IntegerType>(dtype.getIntOrFloatBitWidth()));
     }
 
+    SmallVector<Value> inDynamicDims =
+        IREE::Util::buildDynamicDimsForValue(loc, builtinCast, rewriter);
+    SmallVector<Value> outDynamicDims(inDynamicDims);
+    if (bType.isDynamicDim(bType.getRank() - 1)) {
+      auto inElemWidth = IREE::Util::getTypeBitWidth(bType.getElementType());
+      auto outElemWidth = IREE::Util::getTypeBitWidth(rType.getElementType());
+      if (inElemWidth > outElemWidth) {
+        auto scale = rewriter.create<arith::ConstantIndexOp>(
+            loc, inElemWidth / outElemWidth);
+        outDynamicDims.back() = rewriter.create<arith::DivSIOp>(
+            loc, inDynamicDims.back(), scale.getResult());
+
+      } else if (inElemWidth < outElemWidth) {
+        auto scale = rewriter.create<arith::ConstantIndexOp>(
+            loc, outElemWidth / inElemWidth);
+        outDynamicDims.back() = rewriter.create<arith::MulIOp>(
+            loc, outDynamicDims.back(), scale.getResult(),
+            arith::IntegerOverflowFlags::nsw);
+      }
+    }
+
     Value flowBitcast = rewriter.create<IREE::Flow::TensorBitCastOp>(
-        loc, rType, builtinCast, ValueRange(), ValueRange());
+        loc, rType, builtinCast, inDynamicDims, outDynamicDims);
 
     auto torchCast =
         rewriter.create<torch::TorchConversion::FromBuiltinTensorOp>(

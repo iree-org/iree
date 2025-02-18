@@ -17,10 +17,53 @@ func.func @forward(%arg0: !torch.vtensor<[1,1,8],f16>) -> !torch.vtensor<[1,1,8]
 
 // -----
 
-// CHECK-LABEL: @view_type
-func.func @view_type(%arg0 : !torch.vtensor<[295501824],ui8>) -> !torch.vtensor<[147750912],si16> {
+// CHECK-LABEL: @view_type0
+func.func @view_type0(%arg0 : !torch.vtensor<[295501824],ui8>) -> !torch.vtensor<[147750912],si16> {
     %int4 = torch.constant.int 4
     // CHECK: flow.tensor.bitcast %[[IN:.+]] : tensor<295501824xi8> -> tensor<147750912xi16>
     %0 = torch.aten.view.dtype %arg0, %int4 : !torch.vtensor<[295501824],ui8>, !torch.int -> !torch.vtensor<[147750912],si16>
     return %0 : !torch.vtensor<[147750912],si16>
+}
+
+// -----
+
+// CHECK-LABEL: @view_type1
+func.func @view_type1(%arg0 : !torch.vtensor<[?],ui8>) -> !torch.vtensor<[?],si16> {
+    %int4 = torch.constant.int 4
+    //  CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+    //  CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+    //      CHECK: %[[DIM:.+]] = tensor.dim %[[IN:.+]], %[[C0]] : tensor<?xi8>
+    //      CHECK: %[[OUT:.+]] = arith.muli %[[DIM]], %[[C2]]
+    //      CHECK: flow.tensor.bitcast %[[IN]] :
+    // CHECK-SAME:   tensor<?xi8>{%[[DIM]]} -> tensor<?xi16>{%[[OUT]]}
+    %0 = torch.aten.view.dtype %arg0, %int4 : !torch.vtensor<[?],ui8>, !torch.int -> !torch.vtensor<[?],si16>
+    return %0 : !torch.vtensor<[?],si16>
+}
+
+// -----
+
+// CHECK-LABEL: @view_type2
+func.func @view_type2(%arg0 : !torch.vtensor<[?],f64>) -> !torch.vtensor<[?],f16> {
+    %int4 = torch.constant.int 4
+    //  CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+    //  CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+    //      CHECK: %[[DIM:.+]] = tensor.dim %[[IN:.+]], %[[C0]] : tensor<?xf64>
+    //      CHECK: %[[OUT:.+]] = arith.divsi %[[DIM]], %[[C4]] : index
+    //      CHECK: flow.tensor.bitcast %[[IN]] :
+    // CHECK-SAME:   tensor<?xf64>{%[[DIM]]} -> tensor<?xf16>{%[[OUT]]}
+    %0 = torch.aten.view.dtype %arg0, %int4 : !torch.vtensor<[?],f64>, !torch.int -> !torch.vtensor<[?],f16>
+    return %0 : !torch.vtensor<[?],f16>
+}
+
+// -----
+
+// CHECK-LABEL: @view_type3
+func.func @view_type3(%arg0 : !torch.vtensor<[?,295501824],ui8>) -> !torch.vtensor<[?,147750912],si16> {
+    %int4 = torch.constant.int 4
+    //      CHECK: %[[C0:.+]] = arith.constant 0 : index
+    //      CHECK: %[[DIM:.+]] = tensor.dim %[[IN:.+]], %[[C0]] : tensor<?x295501824xi8>
+    //      CHECK: flow.tensor.bitcast %[[IN]] :
+    // CHECK-SAME:   tensor<?x295501824xi8>{%[[DIM]]} -> tensor<?x147750912xi16>{%[[DIM]]}
+    %0 = torch.aten.view.dtype %arg0, %int4 : !torch.vtensor<[?,295501824],ui8>, !torch.int -> !torch.vtensor<[?,147750912],si16>
+    return %0 : !torch.vtensor<[?,147750912],si16>
 }
