@@ -99,17 +99,16 @@ findOrCreateSubspanBuffer(RewriterBase &rewriter,
     layoutAttr = StridedLayoutAttr::get(rewriter.getContext(),
                                         ShapedType::kDynamic, strides);
   }
-  Attribute memorySpace = rewriter.getAttr<IREE::HAL::DescriptorTypeAttr>(
-      subspanOp.getDescriptorType());
+  bool useRocdlBuffers = false;
   if (auto *ireeGpuDialect =
           rewriter.getContext()
               ->getLoadedDialect<IREE::GPU::IREEGPUDialect>()) {
-    if (ireeGpuDialect->getUseRocdlBufferInstructionsAttrHelper().isAttrPresent(
-            subspanOp)) {
-      memorySpace = rewriter.getAttr<amdgpu::AddressSpaceAttr>(
-          amdgpu::AddressSpace::FatRawBuffer);
-    }
+    useRocdlBuffers =
+        ireeGpuDialect->getUseRocdlBufferInstructionsAttrHelper().isAttrPresent(
+            subspanOp);
   }
+  Attribute memorySpace = rewriter.getAttr<IREE::HAL::DescriptorTypeAttr>(
+      subspanOp.getDescriptorType());
   auto memRefType = getMemrefTypeForTensor(shapedType, layoutAttr, memorySpace);
 
   // Look for an existing op.
@@ -134,6 +133,14 @@ findOrCreateSubspanBuffer(RewriterBase &rewriter,
         bufferSubspanOp.getAlignment() != subspanOp.getAlignment() ||
         memRefType != bufferMemrefType)
       continue;
+
+    if (useRocdlBuffers && bufferSubspanOp->hasOneUse()) {
+      auto castOp = llvm::dyn_cast<amdgpu::FatRawBufferCastOp>(
+          *bufferSubspanOp->getUsers().begin());
+      if (!castOp)
+        continue;
+      return castOp.getResult();
+    }
     return bufferSubspanOp.getResult();
   }
 
@@ -146,6 +153,12 @@ findOrCreateSubspanBuffer(RewriterBase &rewriter,
       subspanOp.getBinding(), subspanOp.getByteOffset(),
       subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
       subspanOp.getDescriptorFlagsAttr());
+  if (useRocdlBuffers) {
+    buffer = rewriter.create<amdgpu::FatRawBufferCastOp>(
+        subspanOp->getLoc(), buffer, /*validBytes=*/Value{},
+        /*cacheSwizzleStride=*/Value{}, /*boundsCheck=*/true,
+        /*resetOffset=*/true);
+  }
   rewriter.create<memref::AssumeAlignmentOp>(
       subspanOp->getLoc(), buffer, subspanOp.calculateAlignment().value());
   return buffer;

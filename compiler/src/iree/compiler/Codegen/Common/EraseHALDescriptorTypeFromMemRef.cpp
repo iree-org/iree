@@ -16,12 +16,10 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-erase-hal-descriptor-type"
 
@@ -41,47 +39,6 @@ static bool isLegalType(Type type) {
   }
   return true;
 }
-
-/// The ABI doesn't meaningfully support passing in a buffer fat pointer
-/// directly. So, if we have a hal.interface.binding.subspan that produces a
-/// buffer fat pointer, create a binding of that same resource as a global
-/// pointer and then `amdgpu.fat_raw_buffer_cast` it back to the expected type.
-/// This will require a `memref.cast` if the offset has been stripped so that
-/// the offset of the buffer looks dynamic again even though it's been folded
-/// into the base pointer by the cast.
-struct MakeFatBufferBindingsGlobalCastToFatBuffer
-    : public OpRewritePattern<IREE::HAL::InterfaceBindingSubspanOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op,
-                                PatternRewriter &rewriter) const override {
-    auto memRefType = dyn_cast<MemRefType>(op.getResult().getType());
-    if (!memRefType)
-      return failure();
-    auto addrSpace = dyn_cast_if_present<amdgpu::AddressSpaceAttr>(
-        memRefType.getMemorySpace());
-    if (!addrSpace ||
-        addrSpace.getValue() != amdgpu::AddressSpace::FatRawBuffer)
-      return failure();
-    MemRefType::Builder asGlobal(memRefType);
-    asGlobal.setMemorySpace(
-        gpu::AddressSpaceAttr::get(op.getContext(), gpu::AddressSpace::Global));
-    rewriter.modifyOpInPlace(
-        op, [&]() { op.getResult().setType((MemRefType)(asGlobal)); });
-    rewriter.setInsertionPointAfter(op);
-    auto asFatBuf = rewriter.create<amdgpu::FatRawBufferCastOp>(
-        op.getLoc(), op.getResult(), /*validBytes=*/Value{},
-        /*cacheSwizzleStride=*/Value{}, /*boundsCheck=*/true,
-        /*resetOffset=*/true);
-    Value newDesc = asFatBuf;
-    // Un-reset dynamic offsets
-    if (asFatBuf.getType() != memRefType) {
-      newDesc =
-          rewriter.create<memref::CastOp>(op.getLoc(), memRefType, newDesc);
-    }
-    rewriter.replaceAllUsesExcept(op, newDesc, asFatBuf);
-    return success();
-  }
-};
 
 struct EraseHALDescriptorTypeFromMemRefPass final
     : impl::EraseHALDescriptorTypeFromMemRefPassBase<
@@ -138,11 +95,6 @@ struct ConvertHALDescriptorTypeToGPUAddressSpacePass final
     replacer.recursivelyReplaceElementsIn(op, /*replaceAttrs=*/false,
                                           /*replaceLocs=*/false,
                                           /*replaceTypes=*/true);
-
-    RewritePatternSet patterns(&getContext());
-    patterns.add<MakeFatBufferBindingsGlobalCastToFatBuffer>(op->getContext());
-    if (failed(applyPatternsGreedily(op, std::move(patterns))))
-      return signalPassFailure();
   }
 };
 
