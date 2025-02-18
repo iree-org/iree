@@ -1750,7 +1750,7 @@ bool iree_hal_hip_transfer_buffer_size_check_condition(void* user_data) {
   iree_hal_hip_transfer_buffer_size_check_data_t* data =
       (iree_hal_hip_transfer_buffer_size_check_data_t*)user_data;
   return iree_hal_hip_transfer_buffer_size_left(
-             data->device, &data->device->devices[data->device_ordinal]) >
+             data->device, &data->device->devices[data->device_ordinal]) >=
          data->num_bytes;
 }
 
@@ -1788,6 +1788,9 @@ void iree_hal_hip_transfer_buffer_reserve_chunks(
     out_chunks[1].size = 0;
     info->file_transfer_staging_buffer.head += size;
   }
+  info->file_transfer_staging_buffer.head %=
+      device->params.file_transfer_buffer_size;
+
   iree_slim_mutex_unlock(&info->file_transfer_staging_buffer.mutex);
 }
 
