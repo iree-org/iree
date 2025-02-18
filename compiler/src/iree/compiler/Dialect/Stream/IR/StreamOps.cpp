@@ -1818,6 +1818,8 @@ LogicalResult TensorImportOp::verify() {
   return success();
 }
 
+bool TensorImportOp::pinsValueAffinity() { return true; }
+
 Value TensorImportOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
@@ -1844,6 +1846,8 @@ LogicalResult TensorExportOp::verify() {
   }
   return success();
 }
+
+bool TensorExportOp::pinsValueAffinity() { return true; }
 
 Value TensorExportOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());

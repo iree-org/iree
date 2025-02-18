@@ -1083,7 +1083,9 @@ def OpGroupPseudoOps : OpDocGroup {
 let opDocGroup = OpGroupPseudoOps in {
 
 def Stream_TensorImportOp : Stream_PureOp<"tensor.import", [
-  Stream_AffinityOp,
+  DeclareOpInterfaceMethods<Stream_AffinityOp, [
+    "pinsValueAffinity",
+  ]>,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -1136,7 +1138,9 @@ def Stream_TensorImportOp : Stream_PureOp<"tensor.import", [
 }
 
 def Stream_TensorExportOp : Stream_PureOp<"tensor.export", [
-  Stream_AffinityOp,
+  DeclareOpInterfaceMethods<Stream_AffinityOp, [
+    "pinsValueAffinity",
+  ]>,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
