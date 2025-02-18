@@ -93,12 +93,14 @@ static SmallVector<int64_t> getDistributedTransferOffsetsFromNestedLayout(
   ArrayRef<int64_t> batchOffsets(offsets.begin(), rank);
   ArrayRef<int64_t> outerOffsets(offsets.begin() + rank, rank);
   ArrayRef<int64_t> outerSizes = vectorLayout.getOuterTile();
+  ArrayRef<int64_t> elementSizes = vectorLayout.getElementTile();
 
   SmallVector<int64_t> slicedOffsets;
   slicedOffsets.reserve(rank);
-  for (auto [batchOffset, outerOffset, outerSize] :
-       llvm::zip(batchOffsets, outerOffsets, outerSizes)) {
-    slicedOffsets.push_back(batchOffset * outerSize + outerOffset);
+  for (auto [batchOffset, outerOffset, outerSize, elementSize] :
+       llvm::zip(batchOffsets, outerOffsets, outerSizes, elementSizes)) {
+    slicedOffsets.push_back(batchOffset * outerSize * elementSize +
+                            outerOffset * elementSize);
   }
   return slicedOffsets;
 }
@@ -1485,7 +1487,7 @@ struct DistributeCreateMask final
                                       undistributedShape[elementIdx]};
       int64_t elementPerThread = ShapedType::getNumElements(distrShape);
       auto allValid =
-          rewriter.create<arith::ConstantIndexOp>(loc, elementPerThread - 1);
+          rewriter.create<arith::ConstantIndexOp>(loc, elementPerThread);
       int64_t elementTileSize = distrShape.back();
       auto elementTileLastIdx =
           rewriter.create<arith::ConstantIndexOp>(loc, elementTileSize - 1);
@@ -1521,20 +1523,7 @@ struct DistributeCreateMask final
       // Bound is defined as lastIdx + 1;
       auto distrUpperBoundPreThreads = rewriter.create<arith::AddIOp>(
           loc, linearizedLastValidIdxPreThreads, one);
-      // When subgroup id is equal to the subgroup that encounters the bound,
-      // Every [vtid] larger than [vtid that encounters last valid element]
-      // should have a all invalid element tile
-      auto linearizedLastValidIdxPostThreads =
-          rewriter.create<affine::AffineLinearizeIndexOp>(
-              loc,
-              ValueRange{packedLastValidIdx[batchIdx],
-                         packedLastValidIdx[outerIdx], zero},
-              distrShape);
-      // Bound is defined as lastIdx + 1;
-      auto distrUpperBoundPostThreads = rewriter.create<arith::AddIOp>(
-          loc, linearizedLastValidIdxPostThreads, one);
-      // When subgroup id and thread id encounters the bound,
-      // the distributed bound should be used.
+
       auto linearizedLastValidIdx =
           rewriter.create<affine::AffineLinearizeIndexOp>(
               loc,
@@ -1557,7 +1546,7 @@ struct DistributeCreateMask final
       //   if tid < u3:
       //     [u1][u2][max]
       //   if tid > u3:
-      //     [u1][u2][0]
+      //     all invalid.
       //   if tid == u3:
       //     [u1][u2][u4]
 
@@ -1578,10 +1567,9 @@ struct DistributeCreateMask final
           loc, arith::CmpIPredicate::slt, subgroupIndices[unDistributedDim],
           packedLastValidIdx[subgroupIdx]);
 
-      // selectTid0 = tid < u3 ? [u1][u2][max] : [u1][u2][0]
+      // selectTid0 = tid < u3 ? [u1][u2][max] : all invalid
       auto selectTid0 = rewriter.create<arith::SelectOp>(
-          loc, cmpBoundTidSlt, distrUpperBoundPreThreads,
-          distrUpperBoundPostThreads);
+          loc, cmpBoundTidSlt, distrUpperBoundPreThreads, zero);
       // selectTid1 = tid == u3 : [u1][u2][u4] : selectTid0
       auto selectTid1 = rewriter.create<arith::SelectOp>(
           loc, cmpBoundTidEq, distrUpperBound, selectTid0);
