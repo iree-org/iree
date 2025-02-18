@@ -271,7 +271,7 @@ util.func public @tensor_dispatch_with_tied_operands(%arg0: !stream.resource<ext
   %c2 = arith.constant 2 : index
   %c3 = arith.constant 3 : index
   %c4 = arith.constant 4 : index
-  %0 = stream.async.transfer %arg0 : !stream.resource<external>{%arg2} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%arg2}
+  %0 = stream.async.transfer %arg0 : !stream.resource<external>{%arg2} on(#hal.device.affinity<@device_a>) from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%arg2}
   %1 = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @executable::@dispatch[%c1, %c2, %c3](%0, %c4) : (tensor<4x?xf32, #encoding>{%arg2} in !stream.resource<*>{%arg1}, index) -> tensor<4x?xf32, #encoding>{%arg2} in %0{%arg1}
   util.return %1 : !stream.resource<*>
 }
@@ -316,14 +316,14 @@ util.func public @multi_device_with_same_executable_targets(%arg0: !hal.buffer_v
   %0 = stream.tensor.import on(#hal.device.affinity<@device_a>) %arg0 : !hal.buffer_view -> tensor<4xf32> in !stream.resource<external>{%c16}
   %1 = stream.timepoint.import on(#hal.device.affinity<@device_a>) %arg1 : (!hal.fence) => !stream.timepoint
   %2 = stream.timepoint.await %1 => %0 : !stream.resource<external>{%c16}
-  %3 = stream.async.transfer %2 : !stream.resource<external>{%c16} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%c16}
+  %3 = stream.async.transfer %2 : !stream.resource<external>{%c16} on(#hal.device.affinity<@device_a>) from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%c16}
   %4 = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @ex::@dispatch(%3) : (tensor<16xf32, #encoding> in !stream.resource<*>{%c16}) -> tensor<16xf32, #encoding> in !stream.resource<*>{%c16}
-  %5 = stream.async.transfer %4 : !stream.resource<*>{%c16} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_b>) !stream.resource<*>{%c16}
+  %5 = stream.async.transfer %4 : !stream.resource<*>{%c16} on(#hal.device.affinity<@device_a>) from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_b>) !stream.resource<*>{%c16}
   %6 = stream.tensor.dispatch on(#hal.device.affinity<@device_b>) @ex::@dispatch(%5) : (tensor<16xf32, #encoding> in !stream.resource<*>{%c16}) -> tensor<16xf32, #encoding> in !stream.resource<*>{%c16}
-  %7 = stream.async.transfer %6 : !stream.resource<*>{%c16} from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%c16}
+  %7 = stream.async.transfer %6 : !stream.resource<*>{%c16} on(#hal.device.affinity<@device_a>) from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%c16}
   %result, %result_timepoint = stream.timepoint.barrier on(#hal.device.affinity<@device_a>) %7 : !stream.resource<*>{%c16} => !stream.timepoint
   stream.timepoint.chain_external on(#hal.device.affinity<@device_a>) %result_timepoint => (%arg2 : !hal.fence)
-  %8 = stream.async.transfer %result : !stream.resource<*>{%c16} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<external>{%c16}
+  %8 = stream.async.transfer %result : !stream.resource<*>{%c16} on(#hal.device.affinity<@device_a>) from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<external>{%c16}
   %9 = stream.tensor.export on(#hal.device.affinity<@device_a>) %8 : tensor<4xf32> in !stream.resource<external>{%c16} -> !hal.buffer_view
   util.return %9 : !hal.buffer_view
 }
@@ -377,11 +377,11 @@ util.func public @multi_device_with_different_executable_targets(%arg0: !hal.buf
   %0 = stream.tensor.import on(#hal.device.affinity<@device_a>) %arg0 : !hal.buffer_view -> tensor<4xf32> in !stream.resource<external>{%c16}
   %1 = stream.timepoint.import on(#hal.device.affinity<@device_a>) %arg1 : (!hal.fence) => !stream.timepoint
   %2 = stream.timepoint.await %1 => %0 : !stream.resource<external>{%c16}
-  %3 = stream.async.transfer %2 : !stream.resource<external>{%c16} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%c16}
+  %3 = stream.async.transfer %2 : !stream.resource<external>{%c16} on(#hal.device.affinity<@device_a>) from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%c16}
   %4 = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @ex::@dispatch(%3) : (tensor<16xf32, #encoding> in !stream.resource<*>{%c16}) -> tensor<16xf32, #encoding> in !stream.resource<*>{%c16}
-  %5 = stream.async.transfer %4 : !stream.resource<*>{%c16} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_b>) !stream.resource<*>{%c16}
+  %5 = stream.async.transfer %4 : !stream.resource<*>{%c16} on(#hal.device.affinity<@device_b>) from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_b>) !stream.resource<*>{%c16}
   %6 = stream.tensor.dispatch on(#hal.device.affinity<@device_b>) @ex::@dispatch(%5) : (tensor<16xf32, #encoding> in !stream.resource<*>{%c16}) -> tensor<16xf32, #encoding> in !stream.resource<*>{%c16}
-  %7 = stream.async.transfer %6 : !stream.resource<*>{%c16} from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%c16}
+  %7 = stream.async.transfer %6 : !stream.resource<*>{%c16} on(#hal.device.affinity<@device_a>) from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%c16}
   %result, %result_timepoint = stream.timepoint.barrier on(#hal.device.affinity<@device_a>) %7 : !stream.resource<*>{%c16} => !stream.timepoint
   stream.timepoint.chain_external on(#hal.device.affinity<@device_a>) %result_timepoint => (%arg2 : !hal.fence)
   %8 = stream.async.transfer %result : !stream.resource<*>{%c16} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<external>{%c16}
@@ -443,10 +443,10 @@ stream.executable private @ex {
 util.func public @multi_device_set_encoding(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>, %N : index, %K : index) {
   %c16 = arith.constant 16 : index
   %c0 = arith.constant 0 : index
-  %0 = stream.async.transfer %arg0 : !stream.resource<external>{%c16} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%c16}
+  %0 = stream.async.transfer %arg0 : !stream.resource<external>{%c16} on(#hal.device.affinity<@device_a>) from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%c16}
   %1 = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @ex::@set_encoding(%0, %N, %K) : (tensor<?x?xf32>{%N, %K} in !stream.resource<*>{%c16}, index, index) -> (tensor<?x?xf32, #encoding>{%N, %K} in !stream.resource<*>{%c16})
   %2 = util.optimization_barrier %1 : !stream.resource<*>
-  %3 = stream.async.transfer %arg1 : !stream.resource<external>{%c16} from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_b>) !stream.resource<*>{%c16}
+  %3 = stream.async.transfer %arg1 : !stream.resource<external>{%c16} on(#hal.device.affinity<@device_b>) from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_b>) !stream.resource<*>{%c16}
   %4 = stream.tensor.dispatch on(#hal.device.affinity<@device_b>) @ex::@set_encoding(%3, %N, %K) : (tensor<?x?xf32>{%N, %K} in !stream.resource<*>{%c16}, index, index) -> (tensor<?x?xf32, #encoding>{%N, %K} in !stream.resource<*>{%c16})
   %5 = util.optimization_barrier %4 : !stream.resource<*>
   util.return
@@ -522,10 +522,10 @@ stream.executable private @ex {
 util.func public @multi_device_unset_encoding(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>, %M: index, %N: index) {
   %c16 = arith.constant 16 : index
   %c0 = arith.constant 0 : index
-  %0 = stream.async.transfer %arg0 : !stream.resource<external>{%c16} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%c16}
+  %0 = stream.async.transfer %arg0 : !stream.resource<external>{%c16} on(#hal.device.affinity<@device_a>) from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%c16}
   %1 = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @ex::@unset_encoding(%0, %M, %N) : (tensor<?x?xf32, #encoding>{%M, %N} in !stream.resource<*>{%c16}, index, index) -> (tensor<?x?xf32>{%M, %N} in !stream.resource<*>{%c16})
   %2 = util.optimization_barrier %1 : !stream.resource<*>
-  %3 = stream.async.transfer %arg1 : !stream.resource<external>{%c16} from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_b>) !stream.resource<*>{%c16}
+  %3 = stream.async.transfer %arg1 : !stream.resource<external>{%c16} on(#hal.device.affinity<@device_b>) from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_b>) !stream.resource<*>{%c16}
   %4 = stream.tensor.dispatch on(#hal.device.affinity<@device_b>) @ex::@unset_encoding(%3, %M, %N) : (tensor<?x?xf32, #encoding>{%M, %N} in !stream.resource<*>{%c16}, index, index) -> (tensor<?x?xf32>{%M, %N} in !stream.resource<*>{%c16})
   %5 = util.optimization_barrier %4 : !stream.resource<*>
   util.return
@@ -629,15 +629,15 @@ util.func public @multi_device_gemm(%arg0: !stream.resource<external>, %arg1: !s
   %MK = util.optimization_barrier %cst_MK : index
   %NK = util.optimization_barrier %cst_NK : index
   %MN = util.optimization_barrier %cst_MN : index
-  %LHS_A = stream.async.transfer %arg0 : !stream.resource<external>{%MK} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%MK}
-  %RHS_A = stream.async.transfer %arg1 : !stream.resource<external>{%NK} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%NK}
+  %LHS_A = stream.async.transfer %arg0 : !stream.resource<external>{%MK} on(#hal.device.affinity<@device_a>) from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%MK}
+  %RHS_A = stream.async.transfer %arg1 : !stream.resource<external>{%NK} on(#hal.device.affinity<@device_a>) from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%NK}
   %RES_A = stream.tensor.dispatch on(#hal.device.affinity<@device_a>)
     @ex::@gemm(%LHS_A, %RHS_A, %K, %K, %M, %N)
     : (tensor<?x?xf32, #encoding>{%M, %K} in !stream.resource<*>{%MK}, tensor<?x?xf32, #encoding1>{%N, %K} in !stream.resource<*>{%NK}, index, index, index, index)
     -> (tensor<?x?xf32, #encoding2>{%M, %N} in !stream.resource<*>{%MN})
   %barrier_0 = util.optimization_barrier %RES_A : !stream.resource<*>
-  %LHS_B = stream.async.transfer %arg2 : !stream.resource<external>{%MK} from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_b>) !stream.resource<*>{%MK}
-  %RHS_B = stream.async.transfer %arg3 : !stream.resource<external>{%NK} from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_b>) !stream.resource<*>{%NK}
+  %LHS_B = stream.async.transfer %arg2 : !stream.resource<external>{%MK} on(#hal.device.affinity<@device_b>) from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_b>) !stream.resource<*>{%MK}
+  %RHS_B = stream.async.transfer %arg3 : !stream.resource<external>{%NK} on(#hal.device.affinity<@device_b>) from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_b>) !stream.resource<*>{%NK}
   %RES_B = stream.tensor.dispatch on(#hal.device.affinity<@device_b>)
     @ex::@gemm(%LHS_B, %RHS_B, %K, %K, %M, %N)
     : (tensor<?x?xf32, #encoding>{%M, %K} in !stream.resource<*>{%MK}, tensor<?x?xf32, #encoding1>{%N, %K} in !stream.resource<*>{%NK}, index, index, index, index)
