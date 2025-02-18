@@ -479,7 +479,7 @@ getFlagForUserAndOperandTypes(IREE::Encoding::EncodingAttr encoding,
   // There are currently no batch_mmt4d ukernels, so check for no batch
   // dimension.
   auto cDims = IREE::Encoding::getEncodingContractionDims(encoding);
-  if (failed(cDims) || !cDims->batch.empty() || operandTypes.size() != 3) {
+  if (succeeded(cDims) && (!cDims->batch.empty() || operandTypes.size() != 3)) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_NONE;
   }
 
