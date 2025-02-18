@@ -621,10 +621,11 @@ static void iree_hal_hip_buffer_release_callback(void* user_data,
         iree_hal_hip_buffer_device_pointer(buffer);
     release_async_data->host_pointer = iree_hal_hip_buffer_host_pointer(buffer);
     release_async_data->buffer_type = iree_hal_hip_buffer_type(buffer);
-    IREE_STATISTICS(release_async_data->memory_type =
-                        iree_hal_buffer_memory_type(buffer);
-                    release_async_data->allocation_size =
-                        iree_hal_buffer_allocation_size(buffer);)
+    IREE_STATISTICS({
+      release_async_data->memory_type = iree_hal_buffer_memory_type(buffer);
+      release_async_data->allocation_size =
+          iree_hal_buffer_allocation_size(buffer);
+    })
     status = iree_hal_hip_device_add_asynchronous_cleanup(
         allocator->parent_device, &iree_hal_hip_buffer_release_callback_async,
         (void*)release_async_data);
