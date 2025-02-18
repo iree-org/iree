@@ -307,7 +307,6 @@ util.func public @multi_device_with_same_executable_targets(%arg0: !stream.resou
   %1 = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @ex::@dispatch(%0) : (tensor<16xf32, #encoding> in !stream.resource<*>{%arg1}) -> tensor<16xf32, #encoding> in !stream.resource<*>{%arg1}
   %2 = stream.async.transfer %1 : !stream.resource<*>{%arg1} on(#hal.device.affinity<@device_a>) from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_b>) !stream.resource<*>{%arg1}
   %3 = stream.tensor.dispatch on(#hal.device.affinity<@device_b>) @ex::@dispatch(%2) : (tensor<16xf32, #encoding> in !stream.resource<*>{%arg1}) -> tensor<16xf32, #encoding> in !stream.resource<*>{%arg1}
-  %4 = stream.async.transfer %3 : !stream.resource<*>{%arg1} from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%arg1}
   util.return
 }
 // CHECK-DAG:   #[[DEVICE_LOCAL_0:.+]] = #hal.device.target
@@ -355,7 +354,6 @@ util.func public @multi_device_with_different_executable_targets(%arg0: !stream.
   %1 = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @ex::@dispatch(%0) : (tensor<16xf32, #encoding> in !stream.resource<*>{%arg1}) -> tensor<16xf32, #encoding> in !stream.resource<*>{%arg1}
   %2 = stream.async.transfer %1 : !stream.resource<*>{%arg1} on(#hal.device.affinity<@device_a>) from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_b>) !stream.resource<*>{%arg1}
   %3 = stream.tensor.dispatch on(#hal.device.affinity<@device_b>) @ex::@dispatch(%2) : (tensor<16xf32, #encoding> in !stream.resource<*>{%arg1}) -> tensor<16xf32, #encoding> in !stream.resource<*>{%arg1}
-  %4 = stream.async.transfer %3 : !stream.resource<*>{%arg1} from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%arg1}
   util.return
 }
 // CHECK-DAG:   #[[DEVICE_LOCAL_0:.+]] = #hal.device.target
