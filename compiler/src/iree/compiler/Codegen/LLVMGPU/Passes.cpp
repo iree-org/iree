@@ -1104,7 +1104,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
         return createGPUCheckResourceUsagePass(getIndexBitwidth);
       })
       // SCF -> CF
-      .addPass(createConvertSCFToCFPass)
+      .addPass(createSCFToControlFlowPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
       // Handle complex operation conversion.
