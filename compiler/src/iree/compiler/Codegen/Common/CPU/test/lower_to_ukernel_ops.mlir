@@ -545,6 +545,25 @@ func.func @query_tile_sizes_2d() -> (index, index)  attributes {
 
 // -----
 
+//     CHECK: func @query_tile_sizes_2d_with_layouts(
+// CHECK-DAG: %[[DYNAMIC:.+]] = arith.constant -9223372036854775808 : index
+// CHECK-DAG: %[[FLAGS:.+]] = arith.constant {{[0-9]+}} : i32
+// CHECK:     %[[RESULT:.+]]:2 = iree_codegen.ukernel.generic "vmvx.query_tile_sizes.2d"
+// CHECK-SAME: ins(%[[DYNAMIC]], %[[DYNAMIC]], %[[FLAGS]] : index, index, i32)
+// CHECK:     return %[[RESULT]]#0, %[[RESULT]]#1 : index, index
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], layouts = [#iree_cpu.vmvx_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [-9223372036854775808, -9223372036854775808], outerDimsPerm = [0, 1]}}>]>
+func.func @query_tile_sizes_2d_with_layouts() -> (index, index)  attributes {
+  hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {ukernels = "all"}>
+} {
+  %result:2 = iree_codegen.query_tile_sizes tensor<?x?xf32, #encoding> -> index, index
+  return %result#0, %result#1 : index, index
+}
+
+// -----
+
 func.func @mmt4d_i16u4i32_extend_producers(%arg0: tensor<10x10x1x8xi16>, %arg1: tensor<10x10x32x8xi4>, %arg2: tensor<10x10x1x32xi32>) -> tensor<10x10x1x32xi32> attributes {
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "all", target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni"}>
 } {
