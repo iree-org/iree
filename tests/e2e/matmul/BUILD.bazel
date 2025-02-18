@@ -208,6 +208,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     compiler_flags = [
         "--iree-opt-data-tiling",
         "--iree-global-opt-enable-early-materialization=false",
+        "--iree-stream-experimental-specialize-encodings",
     ] + ["--iree-llvmcpu-enable-ukernels=%s" % ("all" if use_uk else "none")],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -274,6 +275,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     compiler_flags = [
         "--iree-opt-data-tiling",
         "--iree-global-opt-enable-early-materialization=false",
+        "--iree-stream-experimental-specialize-encodings",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -304,6 +306,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     compiler_flags = [
         "--iree-opt-data-tiling",
         "--iree-global-opt-enable-early-materialization=false",
+        "--iree-stream-experimental-specialize-encodings",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -331,6 +334,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     compiler_flags = [
         "--iree-opt-data-tiling",
         "--iree-global-opt-enable-early-materialization=false",
+        "--iree-stream-experimental-specialize-encodings",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [

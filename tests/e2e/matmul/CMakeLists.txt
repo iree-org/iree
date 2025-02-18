@@ -537,6 +537,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
     "--iree-global-opt-enable-early-materialization=false"
+    "--iree-stream-experimental-specialize-encodings"
     "--iree-llvmcpu-enable-ukernels=none"
   LABELS
 
@@ -566,6 +567,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
     "--iree-global-opt-enable-early-materialization=false"
+    "--iree-stream-experimental-specialize-encodings"
     "--iree-llvmcpu-enable-ukernels=none"
   LABELS
 
@@ -594,6 +596,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
     "--iree-global-opt-enable-early-materialization=false"
+    "--iree-stream-experimental-specialize-encodings"
     "--iree-llvmcpu-enable-ukernels=none"
   LABELS
     "noriscv"
@@ -624,6 +627,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
     "--iree-global-opt-enable-early-materialization=false"
+    "--iree-stream-experimental-specialize-encodings"
     "--iree-llvmcpu-enable-ukernels=none"
   LABELS
     "noriscv"
@@ -654,6 +658,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
     "--iree-global-opt-enable-early-materialization=false"
+    "--iree-stream-experimental-specialize-encodings"
     "--iree-llvmcpu-enable-ukernels=none"
   LABELS
     "noriscv"
@@ -685,6 +690,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
     "--iree-global-opt-enable-early-materialization=false"
+    "--iree-stream-experimental-specialize-encodings"
     "--iree-llvmcpu-enable-ukernels=none"
   LABELS
     "noriscv"
@@ -716,6 +722,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
     "--iree-global-opt-enable-early-materialization=false"
+    "--iree-stream-experimental-specialize-encodings"
     "--iree-llvmcpu-enable-ukernels=all"
   LABELS
 
@@ -745,6 +752,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
     "--iree-global-opt-enable-early-materialization=false"
+    "--iree-stream-experimental-specialize-encodings"
     "--iree-llvmcpu-enable-ukernels=all"
   LABELS
 
@@ -773,6 +781,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
     "--iree-global-opt-enable-early-materialization=false"
+    "--iree-stream-experimental-specialize-encodings"
     "--iree-llvmcpu-enable-ukernels=all"
   LABELS
     "noriscv"
@@ -803,6 +812,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
     "--iree-global-opt-enable-early-materialization=false"
+    "--iree-stream-experimental-specialize-encodings"
     "--iree-llvmcpu-enable-ukernels=all"
   LABELS
     "noriscv"
@@ -833,6 +843,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
     "--iree-global-opt-enable-early-materialization=false"
+    "--iree-stream-experimental-specialize-encodings"
     "--iree-llvmcpu-enable-ukernels=all"
   LABELS
     "noriscv"
@@ -864,6 +875,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
     "--iree-global-opt-enable-early-materialization=false"
+    "--iree-stream-experimental-specialize-encodings"
     "--iree-llvmcpu-enable-ukernels=all"
   LABELS
     "noriscv"
@@ -896,6 +908,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
     "--iree-global-opt-enable-early-materialization=false"
+    "--iree-stream-experimental-specialize-encodings"
   LABELS
 
 )
@@ -920,6 +933,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
     "--iree-global-opt-enable-early-materialization=false"
+    "--iree-stream-experimental-specialize-encodings"
   LABELS
 
 )
@@ -944,6 +958,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
     "--iree-global-opt-enable-early-materialization=false"
+    "--iree-stream-experimental-specialize-encodings"
   LABELS
 
 )
@@ -968,6 +983,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
     "--iree-global-opt-enable-early-materialization=false"
+    "--iree-stream-experimental-specialize-encodings"
   LABELS
 
 )
