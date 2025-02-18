@@ -314,16 +314,30 @@ struct DistributeTransferRead final
     ValueRange indices = readOp.getIndices();
     AffineMap permMap = readOp.getPermutationMap();
     SmallVector<int64_t> strides(rank, 1);
-    for (SmallVector<int64_t> offsets :
-         StaticTileOffsetRange(distShape, tileShape)) {
+
+    SmallVector<SmallVector<int64_t>> allMaskOffsets;
+    if (mask) {
+      SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
+      SmallVector<int64_t> maskTileShape =
+          getElementVectorTileShape(maskLayout);
+      allMaskOffsets =
+          llvm::to_vector(StaticTileOffsetRange(maskDistShape, maskTileShape));
+    }
+
+    for (auto [idx, offsets] :
+         llvm::enumerate(StaticTileOffsetRange(distShape, tileShape))) {
       SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
           rewriter, indices, offsets, vectorLayout, permMap, warpIndices,
           threadIndices);
 
       VectorValue slicedMask = nullptr;
       if (mask) {
+        SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
+        SmallVector<int64_t> maskTileShape =
+            getElementVectorTileShape(maskLayout);
+        SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
         FailureOr<VectorValue> maybeSlicedMask = getSlicedPermutedMask(
-            rewriter, readOp.getLoc(), permMap, offsets, maskLayout, mask);
+            rewriter, readOp.getLoc(), permMap, maskOffsets, maskLayout, mask);
         if (failed(maybeSlicedMask)) {
           return failure();
         }
@@ -408,8 +422,18 @@ struct DistributeTransferWrite final
 
     ValueRange indices = writeOp.getIndices();
     AffineMap permMap = writeOp.getPermutationMap();
-    for (SmallVector<int64_t> offsets :
-         StaticTileOffsetRange(distShape, tileShape)) {
+
+    SmallVector<SmallVector<int64_t>> allMaskOffsets;
+    if (mask) {
+      SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
+      SmallVector<int64_t> maskTileShape =
+          getElementVectorTileShape(maskLayout);
+      allMaskOffsets =
+          llvm::to_vector(StaticTileOffsetRange(maskDistShape, maskTileShape));
+    }
+
+    for (auto [idx, offsets] :
+         llvm::enumerate(StaticTileOffsetRange(distShape, tileShape))) {
       SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
           rewriter, indices, offsets, vectorLayout, permMap, warpIndices,
           threadIndices);
@@ -431,14 +455,16 @@ struct DistributeTransferWrite final
 
       VectorValue slicedMask = nullptr;
       if (mask) {
-        if (mask) {
-          FailureOr<VectorValue> maybeSlicedMask = getSlicedPermutedMask(
-              rewriter, writeOp.getLoc(), permMap, offsets, maskLayout, mask);
-          if (failed(maybeSlicedMask)) {
-            return failure();
-          }
-          slicedMask = maybeSlicedMask.value();
+        SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
+        SmallVector<int64_t> maskTileShape =
+            getElementVectorTileShape(maskLayout);
+        SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
+        FailureOr<VectorValue> maybeSlicedMask = getSlicedPermutedMask(
+            rewriter, writeOp.getLoc(), permMap, maskOffsets, maskLayout, mask);
+        if (failed(maybeSlicedMask)) {
+          return failure();
         }
+        slicedMask = maybeSlicedMask.value();
       }
 
       rewriter.create<vector::TransferWriteOp>(
