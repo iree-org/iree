@@ -198,10 +198,17 @@ void HoistEncodingOpsPass::runOnOperation() {
 
   SmallVector<IREE::Encoding::SetEncodingOp> candidates;
   funcOp->walk([&](IREE::Encoding::SetEncodingOp setEncodingOp) {
-    if (setEncodingOp->getParentOfType<IREE::Flow::DispatchRegionOp>()) {
-      candidates.push_back(setEncodingOp);
+    if (!setEncodingOp->getParentOfType<IREE::Flow::DispatchRegionOp>()) {
+      return;
     }
+    if (!hoistInfusibleEncodings &&
+        !setEncodingOp.getSource()
+             .getDefiningOp<IREE::Flow::DispatchRegionOp>()) {
+      return;
+    }
+    candidates.push_back(setEncodingOp);
   });
+
   IRRewriter rewriter(ctx);
   for (auto setEncodingOp : candidates) {
     if (failed(IREE::Flow::hoistOutOfDispatch(rewriter, setEncodingOp))) {

@@ -42,6 +42,9 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
 
     SmallVector<IREE::Encoding::SetEncodingOp> encodingOps;
     funcOp->walk([&](IREE::Encoding::SetEncodingOp encodingOp) {
+      if (encodingOp->getParentOfType<IREE::Flow::DispatchRegionOp>()) {
+        return;
+      }
       encodingOps.push_back(encodingOp);
     });
 

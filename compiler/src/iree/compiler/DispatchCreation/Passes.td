@@ -244,6 +244,10 @@ def FuseEncodingOpsIntoDispatchRegionsPass :
 def HoistEncodingOpsPass :
     InterfacePass<"iree-dispatch-creation-hoist-encoding-ops", "mlir::FunctionOpInterface"> {
   let summary = "Hoists tensor encoding ops out of flow dispatch regions.";
+  let options = [
+    Option<"hoistInfusibleEncodings", "hoist-infusible-encodings", "bool", /*default=*/"true",
+           "Unconditionally hoist encoding ops out of dispatch regions.">,
+  ];
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
     "IREE::Flow::FlowDialect",
