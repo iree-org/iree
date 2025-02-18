@@ -68,22 +68,22 @@ static bool isUniformLoad(Operation *op) {
     return false;
   auto space = loadOp.getMemRefType().getMemorySpace();
   auto descTypeAttr = llvm::dyn_cast_if_present<DescriptorTypeAttr>(space);
+  if (descTypeAttr && descTypeAttr.getValue() == DescriptorType::UniformBuffer)
+    return true;
 
   auto subspan = loadOp.getMemRef().getDefiningOp<InterfaceBindingSubspanOp>();
   if (auto fatBufferCast =
           loadOp.getMemRef().getDefiningOp<amdgpu::FatRawBufferCastOp>()) {
     subspan =
         fatBufferCast.getSource().getDefiningOp<InterfaceBindingSubspanOp>();
-    if (subspan) {
-      // Recover the descriptor type from the subspan now that we see it
-      descTypeAttr = dyn_cast_if_present<DescriptorTypeAttr>(
-          cast<MemRefType>(subspan.getResult().getType()).getMemorySpace());
-    }
   }
-  if (descTypeAttr && descTypeAttr.getValue() == DescriptorType::UniformBuffer)
-    return true;
   if (!subspan)
     return false;
+
+  descTypeAttr = dyn_cast_if_present<DescriptorTypeAttr>(
+      cast<MemRefType>(subspan.getResult().getType()).getMemorySpace());
+  if (descTypeAttr && descTypeAttr.getValue() == DescriptorType::UniformBuffer)
+    return true;
   if (auto flags = subspan.getDescriptorFlags()) {
     if (bitEnumContainsAll(*flags, IREE::HAL::DescriptorFlags::ReadOnly))
       return true;

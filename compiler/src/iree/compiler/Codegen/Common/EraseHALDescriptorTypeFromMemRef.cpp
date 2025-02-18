@@ -14,7 +14,6 @@
 #include <memory>
 
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/IR/Attributes.h"

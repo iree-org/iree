@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
 #include "llvm/Support/Debug.h"
@@ -30,33 +31,40 @@ static llvm::cl::opt<bool> clROCDLlEnableBufferInstructions(
                    "where possible on AMD targets"),
     llvm::cl::init(true));
 
+static Value stripIntegerCasts(Value val) {
+  while (isa_and_nonnull<arith::IndexCastOp, arith::IndexCastUIOp,
+                         arith::ExtSIOp, arith::ExtUIOp>(val.getDefiningOp())) {
+    val = val.getDefiningOp()->getOperand(0);
+  }
+  return val;
+}
+
 /// Determine if `arg` is an arithmetic function of constants or HAL constant
 /// loads, which is a conservative approximatino for workgroup-uniformity that
 /// can be made more extensive if needed.
 static bool isDefinitelyWorkgroupUniform(Value arg) {
-  SmallVector<Value> worklist;
-  worklist.push_back(arg);
-  while (!worklist.empty()) {
-    Value thisVal = worklist.pop_back_val();
-    Operation *thisOp = thisVal.getDefiningOp();
-    if (!thisOp)
-      return false; // block arguments, no idea what's going on there
-    if (isa<IREE::HAL::InterfaceConstantLoadOp>(thisOp))
-      continue;
-    if (matchPattern(thisOp, m_Constant()))
-      continue;
-    if (auto assumeOp = dyn_cast<IREE::Util::AssumeIntOp>(thisOp)) {
-      worklist.push_back(
-          assumeOp.getOperand(cast<OpResult>(thisVal).getResultNumber()));
-      continue;
+  if (!arg)
+    return true;
+  SetVector<Operation *> dependencies;
+  BackwardSliceOptions opts;
+  arg = stripIntegerCasts(arg);
+  if (auto assume = arg.getDefiningOp<IREE::Util::AssumeIntOp>()) {
+    arg = assume.getOperand(cast<OpResult>(arg).getResultNumber());
+  }
+  // Note: this is a bit conservative, in that it will traverse all the
+  // arguments to a util.assume.int that isn't the immediate parent of val.
+  mlir::getBackwardSlice(arg, &dependencies, opts);
+  return llvm::all_of(dependencies, [&](Operation *op) {
+    if (matchPattern(op, m_Constant()))
+      return true;
+    if (isa<IREE::HAL::InterfaceConstantLoadOp, IREE::Util::AssumeIntOp>(op)) {
+      return true;
     }
-    if (isa_and_nonnull<arith::ArithDialect>(thisOp->getDialect())) {
-      llvm::append_range(worklist, thisOp->getOperands());
-      continue;
+    if (isa_and_nonnull<arith::ArithDialect>(op->getDialect())) {
+      return true;
     }
     return false;
-  }
-  return true;
+  });
 }
 
 /// Return the maximum value that has been `util.assume.int`'d about this value
@@ -64,11 +72,7 @@ static bool isDefinitelyWorkgroupUniform(Value arg) {
 /// TODO: it'd be nice to be able to run the IntRangeAnalysis just up to the
 /// value in question, but we don't have that, so we approximate it.
 static std::optional<int64_t> getDynamicSizeMax(Value size) {
-  while (
-      isa_and_nonnull<arith::IndexCastOp, arith::IndexCastUIOp, arith::ExtSIOp,
-                      arith::ExtUIOp>(size.getDefiningOp())) {
-    size = size.getDefiningOp()->getOperand(0);
-  }
+  size = stripIntegerCasts(size);
   // Special case for constants that're still dynamic.
   APInt constVal;
   if (matchPattern(size, m_ConstantInt(&constVal))) {
