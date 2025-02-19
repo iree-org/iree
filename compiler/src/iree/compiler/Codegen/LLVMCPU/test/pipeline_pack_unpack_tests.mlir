@@ -27,7 +27,7 @@ module {
       %10 = arith.maximumf %9, %cst_0 : f32
       linalg.yield %10 : f32
     } -> tensor<384x512xf32>
-    %pack = tensor.pack %7 inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %5 : tensor<384x512xf32> -> tensor<24x512x16x1xf32>
+    %pack = linalg.pack %7 inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %5 : tensor<384x512xf32> -> tensor<24x512x16x1xf32>
     flow.dispatch.tensor.store %pack, %2, offsets = [0, 0, 0, 0], sizes = [24, 512, 16, 1], strides = [1, 1, 1, 1] : tensor<24x512x16x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<24x512x16x1xf32>>
     return
   }
@@ -64,7 +64,7 @@ module {
     %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [24, 32, 16, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<24x32x16x16xf32>> -> tensor<24x32x16x16xf32>
     %4 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [512], strides = [1] : !flow.dispatch.tensor<readonly:tensor<512xf32>> -> tensor<512xf32>
     %5 = tensor.empty() : tensor<384x512xf32>
-    %unpack = tensor.unpack %3 inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %5 : tensor<24x32x16x16xf32> -> tensor<384x512xf32>
+    %unpack = linalg.unpack %3 inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %5 : tensor<24x32x16x16xf32> -> tensor<384x512xf32>
     %6 = linalg.generic {indexing_maps = [#map, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%4, %unpack : tensor<512xf32>, tensor<384x512xf32>) outs(%5 : tensor<384x512xf32>) {
     ^bb0(%in: f32, %in_1: f32, %out: f32):
       %7 = arith.addf %in, %in_1 : f32
@@ -101,7 +101,7 @@ module {
     %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<24x512x16x1xf32>>
     %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [383, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<383x512xf32>> -> tensor<383x512xf32>
     %3 = tensor.empty() : tensor<24x512x16x1xf32>
-    %pack = tensor.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %3 : tensor<383x512xf32> -> tensor<24x512x16x1xf32>
+    %pack = linalg.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %3 : tensor<383x512xf32> -> tensor<24x512x16x1xf32>
     flow.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [24, 512, 16, 1], strides = [1, 1, 1, 1] : tensor<24x512x16x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<24x512x16x1xf32>>
     return
   }

@@ -23,7 +23,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -1720,7 +1719,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       DispatchLoweringPassPipeline::Mmt4dTilingExpert);
 }
 
-static bool isPackMatmulLHS(tensor::PackOp op) {
+static bool isPackMatmulLHS(linalg::PackOp op) {
   // linalg.batch_matmul LHS shape
   if (op.getSourceRank() == 3 && op.getInnerDimsPos().size() == 2 &&
       op.getInnerDimsPos()[0] == 1 && op.getInnerDimsPos()[1] == 2) {
@@ -1735,7 +1734,7 @@ static bool isPackMatmulLHS(tensor::PackOp op) {
 /// configurations and target CPU features.
 static SmallVector<int64_t>
 getPackVectorTileSizes(mlir::FunctionOpInterface entryPointFn,
-                       tensor::PackOp op) {
+                       linalg::PackOp op) {
   SmallVector<int64_t> tileSizes(op.getSourceRank(), 1);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
@@ -1755,7 +1754,7 @@ getPackVectorTileSizes(mlir::FunctionOpInterface entryPointFn,
 }
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
-                                   tensor::PackOp op) {
+                                   linalg::PackOp op) {
   assert(!getLoweringConfig(op) && "expected lowering_config is not set");
 
   int srcRank = op.getSourceRank();
@@ -1803,7 +1802,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 }
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
-                                   tensor::UnPackOp op) {
+                                   linalg::UnPackOp op) {
   DistributionHeuristicConfig distConfig;
   distConfig.maxTileSizes.resize(op.getDestRank(), clDefaultDistTileSize);
   SmallVector<int64_t> distTileSizes =
@@ -2629,7 +2628,7 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
                                                   initCPULaunchConfig);
         })
         .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::FftOp,
-              tensor::PackOp, tensor::PadOp, tensor::UnPackOp, linalg::Mmt4DOp,
+              linalg::PackOp, tensor::PadOp, linalg::UnPackOp, linalg::Mmt4DOp,
               linalg::BatchMmt4DOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case<IREE::LinalgExt::WinogradFilterTransformOp,
@@ -2668,7 +2667,7 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
 /// pack op wants to tile-and-fuse it.
 static LogicalResult
 adjustTileSizesForPackOp(mlir::FunctionOpInterface entryPointFn,
-                         tensor::PackOp packOp,
+                         linalg::PackOp packOp,
                          SmallVector<int64_t> &distTileSizes,
                          SmallVector<int64_t> &parallelVecTileSizes) {
 
@@ -2716,9 +2715,9 @@ adjustTileSizesForPackOp(mlir::FunctionOpInterface entryPointFn,
 }
 
 /// Adjusts the tile sizes (carried by `rootOp`) to be aligned with
-/// tensor.unpack inner tile sizes, if there are tensor.unpack producers. If the
+/// linalg.unpack inner tile sizes, if there are linalg.unpack producers. If the
 /// tile sizes are not aligned, a stack buffer is needed because of
-/// tensor.unpack tiling implementations.
+/// linalg.unpack tiling implementations.
 static LogicalResult
 adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
                            Operation *rootOp) {
@@ -2733,7 +2732,7 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
   bool foundUnPackOp = false;
   SmallVector<int64_t> alignedSizes(linalgOp.getNumLoops(), 1);
   for (OpOperand *opOperand : linalgOp.getDpsInputOperands()) {
-    auto unpackOp = opOperand->get().getDefiningOp<tensor::UnPackOp>();
+    auto unpackOp = opOperand->get().getDefiningOp<linalg::UnPackOp>();
     if (!unpackOp)
       continue;
 
@@ -2874,7 +2873,7 @@ adjustTileSizesForGenericOp(mlir::FunctionOpInterface entryPointFn,
 ///   ^bb0(%in: f32, %in_2: f32, %out: f32):
 ///     ...
 ///   } -> tensor<384x1024xf32>
-///   %pack = tensor.pack %13
+///   %pack = linalg.pack %13
 ///     inner_dims_pos = [0, 1]
 ///     inner_tiles = [16, 1]
 ///     into %14 : tensor<384x1024xf32> -> tensor<24x1024x16x1xf32>
@@ -2944,7 +2943,7 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
   // Given there are 3 generic ops in the dispatch:
   // %rootOp = linalg.generic {iterator_types = ["reduction", "parallel"]} ...
   // %2 = linalg.generic {iterator_types = ["parallel", "parallel"]}
-  // %3 = tensor.pack %2
+  // %3 = linalg.pack %2
   // Assume the distribution and parallel vector tile sizes from %rootOp is:
   // [[X1, 0], [X2, 0]]
   // Then the generic op %2 set the missing parallel vector tile sizes on its
@@ -2970,7 +2969,7 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
     if (op == rootOperation)
       continue;
 
-    if (auto packOp = dyn_cast<tensor::PackOp>(op)) {
+    if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
       if (failed(adjustTileSizesForPackOp(entryPointFn, packOp, distTileSizes,
                                           parallelVecTileSizes))) {
         return failure();
@@ -3065,7 +3064,7 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
       scalableTileFlagsList.push_back(commonVecScalableTileFlags);
       bool setUpOK =
           TypeSwitch<Operation *, bool>(op)
-              .Case<tensor::PackOp>([&](auto packOp) {
+              .Case<linalg::PackOp>([&](auto packOp) {
                 for (auto flags :
                      rootLoweringConfig.getScalableTileFlagVals()) {
                   // TODO: Handle scalable flags
@@ -3119,7 +3118,7 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
               });
 
       // TODO: (awarzynski) This is effectively tracking the case of
-      // tensor.pack + scalable flags, which is not support ATM (see TODO
+      // linalg.pack + scalable flags, which is not support ATM (see TODO
       // above). Remove once that's implemented.
       if (!setUpOK)
         return failure();

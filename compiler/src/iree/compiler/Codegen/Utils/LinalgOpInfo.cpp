@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 
 using namespace mlir::linalg;
 

@@ -874,7 +874,7 @@ hal.executable private @generalized_pool {
 //   CHECK-LABEL: hal.executable private @generalized_pool
 //         CHECK:   hal.executable.variant public @cuda
 //         CHECK:     llvm.load %{{.*}} : !llvm.ptr<1> -> f32
-//         CHECK:     llvm.intr.maxnum
+//         CHECK:     llvm.call @__nv_fmaxf
 //         CHECK:     llvm.store %{{.*}}, %{{.*}} : f32, !llvm.ptr<1>
 
 // -----

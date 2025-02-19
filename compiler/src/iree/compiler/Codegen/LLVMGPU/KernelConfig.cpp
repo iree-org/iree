@@ -33,7 +33,6 @@
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -1637,7 +1636,7 @@ getDefaultWorkgroupTileSizesForPackUnPack(TilingInterface op,
 
 static LogicalResult setPackConfig(IREE::GPU::TargetAttr target,
                                    mlir::FunctionOpInterface entryPoint,
-                                   tensor::PackOp packOp) {
+                                   linalg::PackOp packOp) {
   SmallVector<int64_t> tileSizes = getDefaultWorkgroupTileSizesForPackUnPack(
       cast<TilingInterface>(packOp.getOperation()),
       target.getPreferredSubgroupSize());
@@ -2436,7 +2435,7 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
         LDBG("Winograd Config");
         return setWinogradOpConfig(target, entryPointFn, winogradOp);
       })
-      .Case<tensor::PackOp>([&](auto packOp) {
+      .Case<linalg::PackOp>([&](auto packOp) {
         LDBG("Pack Config");
         return setPackConfig(target, entryPointFn, packOp);
       })
@@ -2534,15 +2533,15 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
 
   Operation *rootOperation = nullptr;
 
-  // Find the root operation. linalg.generic, linalg.fill, tensor.pack,
-  // tensor.unpack, and scatter are not root operations if there are other
+  // Find the root operation. linalg.generic, linalg.fill, linalg.pack,
+  // linalg.unpack, and scatter are not root operations if there are other
   // compute operations present. Also, construct a set of generic ops that
   // are to be skipped. These generic ops that are used to compute scatter
   // indices are not root operations.
   llvm::SmallDenseSet<Operation *, 4> genericToSkip;
   for (Operation *op : llvm::reverse(computeOps)) {
     if (!isa<linalg::GenericOp, linalg::FillOp, IREE::LinalgExt::ScatterOp,
-             tensor::PackOp, tensor::UnPackOp>(op)) {
+             linalg::PackOp, linalg::UnPackOp>(op)) {
       rootOperation = op;
       break;
     }
@@ -2583,7 +2582,7 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
   // Pack and unpack ops take priority over scatter and fill ops as the root op.
   if (!rootOperation) {
     for (Operation *op : llvm::reverse(computeOps)) {
-      if (isa<tensor::PackOp, tensor::UnPackOp>(op)) {
+      if (isa<linalg::PackOp, linalg::UnPackOp>(op)) {
         rootOperation = op;
         break;
       }

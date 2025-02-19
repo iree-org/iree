@@ -178,7 +178,7 @@ func.func @set_encoding_dynamic() attributes {
 //  CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<?x?x8x4xf32>>{%[[TILED_D0]], %[[TILED_D1]]}
 //       CHECK:   %[[INPUT:.+]] = flow.dispatch.tensor.load %[[INPUT_BINDING]]
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty
-//       CHECK:   %[[PACK:.+]] = tensor.pack
+//       CHECK:   %[[PACK:.+]] = linalg.pack
 //  CHECK-SAME:       %[[INPUT]] padding_value(%[[CST]] : f32)
 //  CHECK-SAME:       inner_dims_pos = [0, 1] inner_tiles = [8, 4] into %[[EMPTY]]
 //       CHECK:   flow.dispatch.tensor.store %[[PACK]], %[[OUTPUT_BINDING]]
@@ -229,7 +229,7 @@ func.func @unset_encoding_dynamic() attributes {
 //       CHECK:   %[[INPUT:.+]] = flow.dispatch.tensor.load %[[INPUT_BINDING]]
 //  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_D0]], %[[TILED_D1]], 8, 4], strides = [1, 1, 1, 1]
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty(%[[D0]], %[[D1]])
-//       CHECK:   %[[UNPACK:.+]] = tensor.unpack %[[INPUT]]
+//       CHECK:   %[[UNPACK:.+]] = linalg.unpack %[[INPUT]]
 //  CHECK-SAME:       inner_dims_pos = [0, 1] inner_tiles = [8, 4] into %[[EMPTY]]
 //   CHECK-DAG:   flow.dispatch.tensor.store %[[UNPACK]], %[[OUTPUT_BINDING]]
 

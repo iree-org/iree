@@ -42,16 +42,16 @@ namespace {
 // Shared rewrite patterns
 //===----------------------------------------------------------------------===//
 
-/// A wrapper pattern that calls linalg::lowerPack on tensor::PackOp. It lowers
-/// a tensor.pack op to tensor.pad + tensor.expand_shape + linalg.transpose ops.
-struct LowerPackPattern : public OpRewritePattern<tensor::PackOp> {
-  using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
+/// A wrapper pattern that calls linalg::lowerPack on linalg::PackOp. It lowers
+/// a linalg.pack op to tensor.pad + tensor.expand_shape + linalg.transpose ops.
+struct LowerPackPattern : public OpRewritePattern<linalg::PackOp> {
+  using OpRewritePattern<linalg::PackOp>::OpRewritePattern;
 
   explicit LowerPackPattern(MLIRContext *context,
                             std::optional<PackUnPackControlFn> controlFn)
       : OpRewritePattern(context), controlFn(controlFn) {}
 
-  LogicalResult matchAndRewrite(tensor::PackOp op,
+  LogicalResult matchAndRewrite(linalg::PackOp op,
                                 PatternRewriter &rewriter) const override {
     if (controlFn && failed(controlFn.value()(op))) {
       return failure();
@@ -69,17 +69,17 @@ private:
   std::optional<PackUnPackControlFn> controlFn;
 };
 
-/// A warpper pattern that calls linalg::lowerUnPack on tensor::UnPackOp. It
-/// lowers a tensor.unpack op to tensor.empty + linalg.transpose +
+/// A warpper pattern that calls linalg::lowerUnPack on linalg::UnPackOp. It
+/// lowers a linalg.unpack op to tensor.empty + linalg.transpose +
 /// tensor.collapse_shape + tensor.extract_slice ops.
-struct LowerUnPackPattern : public OpRewritePattern<tensor::UnPackOp> {
-  using OpRewritePattern<tensor::UnPackOp>::OpRewritePattern;
+struct LowerUnPackPattern : public OpRewritePattern<linalg::UnPackOp> {
+  using OpRewritePattern<linalg::UnPackOp>::OpRewritePattern;
 
   explicit LowerUnPackPattern(MLIRContext *context,
                               std::optional<PackUnPackControlFn> controlFn)
       : OpRewritePattern(context), controlFn(controlFn) {}
 
-  LogicalResult matchAndRewrite(tensor::UnPackOp op,
+  LogicalResult matchAndRewrite(linalg::UnPackOp op,
                                 PatternRewriter &rewriter) const override {
     if (controlFn && failed(controlFn.value()(op))) {
       return failure();
@@ -132,7 +132,7 @@ static LogicalResult commonRunOnOperation(
     }
   }
 
-  // TODO(hanchung): Below is a fallback solution for tensor.pack/unpack
+  // TODO(hanchung): Below is a fallback solution for linalg.pack/unpack
   // decomposition. They will be retired after lowerPack and lowerUnPack handle
   // all the cases.
 
@@ -142,7 +142,7 @@ static LogicalResult commonRunOnOperation(
     auto packOptions = scf::SCFTileAndFuseOptions().setTilingOptions(
         scf::SCFTilingOptions().setTileSizeComputationFunction(
             [](OpBuilder &builder, Operation *op) -> SmallVector<OpFoldResult> {
-              auto packOp = cast<tensor::PackOp>(op);
+              auto packOp = cast<linalg::PackOp>(op);
 
               // Do nothing if any of inner tile sizes is dynamic.
               if (llvm::any_of(packOp.getMixedTiles(), llvm::IsaPred<Value>)) {
@@ -155,7 +155,7 @@ static LogicalResult commonRunOnOperation(
               return tileSizes;
             }));
     {
-      WalkResult status = funcOp->walk([&](tensor::PackOp op) {
+      WalkResult status = funcOp->walk([&](linalg::PackOp op) {
         if (controlFn && failed(controlFn.value()(op))) {
           return WalkResult::advance();
         }
@@ -176,7 +176,7 @@ static LogicalResult commonRunOnOperation(
     auto unpackTilingOptions =
         scf::SCFTilingOptions().setTileSizeComputationFunction(
             [](OpBuilder &builder, Operation *op) {
-              auto unpackOp = cast<tensor::UnPackOp>(op);
+              auto unpackOp = cast<linalg::UnPackOp>(op);
               int numLoops = unpackOp.getDestRank();
               auto dimAndTileMapping = unpackOp.getDimAndTileMapping();
               SmallVector<OpFoldResult> tileSizes;
@@ -190,7 +190,7 @@ static LogicalResult commonRunOnOperation(
               return tileSizes;
             });
     {
-      WalkResult status = funcOp->walk([&](tensor::UnPackOp op) {
+      WalkResult status = funcOp->walk([&](linalg::UnPackOp op) {
         if (controlFn && failed(controlFn.value()(op))) {
           return WalkResult::advance();
         }
@@ -299,12 +299,12 @@ static bool hasPadding(Operation *op) {
     }
     return false;
   };
-  auto packOp = dyn_cast<tensor::PackOp>(op);
+  auto packOp = dyn_cast<linalg::PackOp>(op);
   if (packOp && needsPad(packOp.getSourceType(), packOp.getInnerDimsPos(),
                          packOp.getStaticInnerTiles())) {
     return true;
   }
-  auto unPackOp = dyn_cast<tensor::UnPackOp>(op);
+  auto unPackOp = dyn_cast<linalg::UnPackOp>(op);
   if (unPackOp && needsPad(unPackOp.getDestType(), unPackOp.getInnerDimsPos(),
                            unPackOp.getStaticInnerTiles())) {
     return true;
@@ -320,7 +320,7 @@ static bool hasPadding(Operation *op) {
 /// 3. If the op is an UnPackOp, then all of its consumers must be dispatch
 ///    tensor stores.
 static LogicalResult isUnpaddedAndAtBoundary(Operation *op) {
-  if (!isa<tensor::PackOp>(op) && !isa<tensor::UnPackOp>(op)) {
+  if (!isa<linalg::PackOp>(op) && !isa<linalg::UnPackOp>(op)) {
     return failure();
   }
   if (hasPadding(op)) {
@@ -329,13 +329,13 @@ static LogicalResult isUnpaddedAndAtBoundary(Operation *op) {
 
   // If the producer is a dispatch tensor load, then the `op` is decomposable
   // if it is a PackOp.
-  if (isa<tensor::PackOp>(op) &&
+  if (isa<linalg::PackOp>(op) &&
       op->getOperand(0).getDefiningOp<IREE::Flow::DispatchTensorLoadOp>()) {
     return success();
   }
   // If all consumers are dispatch tensor stores, then the `op` is decomposable
   // if it is an UnPackOp.
-  if (isa<tensor::UnPackOp>(op) &&
+  if (isa<linalg::UnPackOp>(op) &&
       llvm::all_of(op->getUsers(), [&](Operation *user) {
         return isa<IREE::Flow::DispatchTensorStoreOp>(user);
       })) {

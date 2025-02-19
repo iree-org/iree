@@ -10,7 +10,6 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -180,9 +179,9 @@ getUnitOuterDimPackReassociationMap(SmallVector<int64_t> targetIndices,
 }
 
 // Transpose the given tensor based on the given transpose indices using a
-// tensor.pack. Additionally returns a new AffineMap for the packed value
+// linalg.pack. Additionally returns a new AffineMap for the packed value
 // assuming otherwise the same iteration space.
-static std::tuple<Value, std::optional<tensor::PackOp>, AffineMap>
+static std::tuple<Value, std::optional<linalg::PackOp>, AffineMap>
 createTransposeAsTensorPack(
     PatternRewriter &rewriter, Location loc, Value input, AffineMap inputMap,
     SmallVector<int64_t> targetIndices, int tilingFactor,
@@ -209,10 +208,10 @@ createTransposeAsTensorPack(
   }
 
   // Pack the input tensor.
-  auto empty = tensor::PackOp::createDestinationTensor(
+  auto empty = linalg::PackOp::createDestinationTensor(
       rewriter, loc, input, transposedTileSizes, targetIndices,
       SmallVector<int64_t>{});
-  auto packedInput = rewriter.create<tensor::PackOp>(
+  auto packedInput = rewriter.create<linalg::PackOp>(
       loc, input, empty, targetIndices, transposedTileSizes,
       /*padding=*/std::nullopt, SmallVector<int64_t>{});
 
@@ -220,7 +219,7 @@ createTransposeAsTensorPack(
   AffineMap transposedMap;
 
   Value packedOperand = packedInput;
-  // Collapse the unit dims created by tensor.pack if the pack is just a
+  // Collapse the unit dims created by linalg.pack if the pack is just a
   // transpose.
   if (tilingFactor <= 0) {
     auto reassociationMap =
@@ -256,7 +255,7 @@ createTransposeAsTensorPack(
 // unit dimensions necessary for the unpack.
 static Value createTransposeAsTensorUnPack(PatternRewriter &rewriter,
                                            Location loc, Value output,
-                                           tensor::PackOp packOp,
+                                           linalg::PackOp packOp,
                                            int tilingFactor) {
   Value packedOutput = output;
   if (tilingFactor <= 0) {
@@ -289,11 +288,11 @@ static Value createTransposeAsTensorUnPack(PatternRewriter &rewriter,
             .getResult();
   }
 
-  Value empty = tensor::UnPackOp::createDestinationTensor(
+  Value empty = linalg::UnPackOp::createDestinationTensor(
       rewriter, loc, packedOutput, packOp.getMixedTiles(),
       packOp.getInnerDimsPos(), packOp.getOuterDimsPerm());
 
-  auto unpackedOutput = rewriter.create<tensor::UnPackOp>(
+  auto unpackedOutput = rewriter.create<linalg::UnPackOp>(
       loc, packedOutput, empty, packOp.getInnerDimsPos(),
       packOp.getMixedTiles(), packOp.getOuterDimsPerm());
   return unpackedOutput.getResult();
@@ -509,7 +508,7 @@ getTilingReassociationMap(const int64_t rank, SetTy innerDims) {
 // dims. Produces a transpose on the tiled dimensions followed by an
 // expand_shape to introduce the outer unit dims. For example,
 //
-// tensor.pack inner_dims_pos = [1] inner_tiles = [64]
+// linalg.pack inner_dims_pos = [1] inner_tiles = [64]
 //   : tensor<32x64x16xf32> to tensor<32x1x16x64xf32>
 //
 // Generalizes to:
@@ -517,14 +516,14 @@ getTilingReassociationMap(const int64_t rank, SetTy innerDims) {
 // linalg.transpose ... tensor<32x64x16xf32> to tensor<32x16x64xf32>
 // tensor.expand_shape ... tensor<32x16x64xf32> to tensor<32x1x16x64xf32>
 class GeneralizeOuterUnitDimsPackOp final
-    : public OpRewritePattern<tensor::PackOp> {
+    : public OpRewritePattern<linalg::PackOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
   GeneralizeOuterUnitDimsPackOp(MLIRContext *context,
                                 PatternBenefit benefit = 2)
-      : OpRewritePattern<tensor::PackOp>(context, benefit) {}
+      : OpRewritePattern<linalg::PackOp>(context, benefit) {}
 
-  LogicalResult matchAndRewrite(tensor::PackOp packOp,
+  LogicalResult matchAndRewrite(linalg::PackOp packOp,
                                 PatternRewriter &rewriter) const override {
     if (!packOp.getOuterDimsPerm().empty())
       return failure();
@@ -591,7 +590,7 @@ public:
 // and thus no padding. Produces a collapse_shape to remove the unit dimensions
 // followed by a transpose. For example:
 //
-// tensor.unpack inner_dims_pos = [1] inner_tiles = [64]
+// linalg.unpack inner_dims_pos = [1] inner_tiles = [64]
 //   : tensor<32x1x16x64xf32> to tensor<32x64x16xf32>
 //
 // Generalizes to:
@@ -599,14 +598,14 @@ public:
 // tensor.collapse_shape ... tensor<32x1x16x64xf32> to tensor<32x16x64xf32>
 // linalg.transpose ... tensor<32x16x64xf32> to tensor<32x64x16xf32>
 class GeneralizeOuterUnitDimsUnPackOp final
-    : public OpRewritePattern<tensor::UnPackOp> {
+    : public OpRewritePattern<linalg::UnPackOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
   GeneralizeOuterUnitDimsUnPackOp(MLIRContext *context,
                                   PatternBenefit benefit = 2)
-      : OpRewritePattern<tensor::UnPackOp>(context, benefit) {}
+      : OpRewritePattern<linalg::UnPackOp>(context, benefit) {}
 
-  LogicalResult matchAndRewrite(tensor::UnPackOp unpackOp,
+  LogicalResult matchAndRewrite(linalg::UnPackOp unpackOp,
                                 PatternRewriter &rewriter) const override {
     if (!unpackOp.getOuterDimsPerm().empty())
       return failure();
@@ -697,8 +696,8 @@ public:
     // Run pack/unpack canonicalization to try to cancel any packs.
     {
       RewritePatternSet patterns(context);
-      tensor::PackOp::getCanonicalizationPatterns(patterns, context);
-      tensor::UnPackOp::getCanonicalizationPatterns(patterns, context);
+      linalg::PackOp::getCanonicalizationPatterns(patterns, context);
+      linalg::UnPackOp::getCanonicalizationPatterns(patterns, context);
       linalg::FillOp::getCanonicalizationPatterns(patterns, context);
       if (failed(applyPatternsGreedily(op, std::move(patterns)))) {
         return signalPassFailure();

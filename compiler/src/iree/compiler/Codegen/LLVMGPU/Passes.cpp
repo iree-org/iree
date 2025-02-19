@@ -333,12 +333,12 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
 /// op is a PackOp with a DispatchTensorLoadOp producer, or an UnPackOp with
 /// only DispatchTensorStoreOp consumers.
 LogicalResult isAtBoundary(Operation *op) {
-  if (isa<tensor::PackOp>(op)) {
+  if (isa<linalg::PackOp>(op)) {
     if (isa_and_nonnull<IREE::Flow::DispatchTensorLoadOp>(
             op->getOperand(0).getDefiningOp())) {
       return success();
     }
-  } else if (isa<tensor::UnPackOp>(op)) {
+  } else if (isa<linalg::UnPackOp>(op)) {
     if (llvm::all_of(op->getUsers(), [](Operation *user) {
           return isa<IREE::Flow::DispatchTensorStoreOp>(user);
         })) {
@@ -1104,7 +1104,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
         return createGPUCheckResourceUsagePass(getIndexBitwidth);
       })
       // SCF -> CF
-      .addPass(createConvertSCFToCFPass)
+      .addPass(createSCFToControlFlowPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
       // Handle complex operation conversion.

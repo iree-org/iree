@@ -382,17 +382,17 @@ module attributes {hal.device.targets = [#device_target_llvm_cpu]} {
     %8 = hal.tensor.import %arg2 "input2" : !hal.buffer_view -> tensor<?x?xf32>{%6, %7}
     %9 = affine.apply #map()[%0]
     %10 = tensor.empty(%9, %1) : tensor<?x?x16x1xf32>
-    %pack = tensor.pack %2 padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %10 : tensor<?x?xf32> -> tensor<?x?x16x1xf32>
+    %pack = linalg.pack %2 padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %10 : tensor<?x?xf32> -> tensor<?x?x16x1xf32>
     %11 = affine.apply #map()[%4]
     %12 = tensor.empty(%11, %3) : tensor<?x?x16x1xf32>
-    %pack_0 = tensor.pack %5 padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %12 : tensor<?x?xf32> -> tensor<?x?x16x1xf32>
+    %pack_0 = linalg.pack %5 padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %12 : tensor<?x?xf32> -> tensor<?x?x16x1xf32>
     %13 = affine.apply #map()[%6]
     %14 = affine.apply #map()[%7]
     %15 = tensor.empty(%13, %14) : tensor<?x?x16x16xf32>
-    %pack_1 = tensor.pack %8 padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %15 : tensor<?x?xf32> -> tensor<?x?x16x16xf32>
+    %pack_1 = linalg.pack %8 padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %15 : tensor<?x?xf32> -> tensor<?x?x16x16xf32>
     %16 = linalg.mmt4d ins(%pack, %pack_0 : tensor<?x?x16x1xf32>, tensor<?x?x16x1xf32>) outs(%pack_1 : tensor<?x?x16x16xf32>) -> tensor<?x?x16x16xf32>
     %17 = tensor.empty(%6, %7) : tensor<?x?xf32>
-    %unpack = tensor.unpack %16 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %17 : tensor<?x?x16x16xf32> -> tensor<?x?xf32>
+    %unpack = linalg.unpack %16 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %17 : tensor<?x?x16x16xf32> -> tensor<?x?xf32>
     %18 = hal.tensor.export %unpack "output0" : tensor<?x?xf32>{%6, %7} -> !hal.buffer_view
     return %18 : !hal.buffer_view
   }
