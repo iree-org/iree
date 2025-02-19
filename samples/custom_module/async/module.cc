@@ -232,7 +232,8 @@ class CustomModuleState final {
         iree_hal_fence_semaphore_list(wait_fence.get()),
         iree_hal_fence_semaphore_list(alloca_fence.get()),
         IREE_HAL_ALLOCATOR_POOL_DEFAULT, buffer_params,
-        iree_hal_buffer_view_byte_length(arg_view.get()), &result_buffer));
+        iree_hal_buffer_view_byte_length(arg_view.get()),
+        IREE_HAL_ALLOCA_FLAG_NONE, &result_buffer));
 
     // Wrap the buffer in a buffer view that provides the metadata for
     // runtime verification.

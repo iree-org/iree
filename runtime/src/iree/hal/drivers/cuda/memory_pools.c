@@ -214,7 +214,7 @@ static void iree_hal_cuda_async_buffer_release_callback(
 iree_status_t iree_hal_cuda_memory_pools_alloca(
     iree_hal_cuda_memory_pools_t* pools, CUstream stream,
     iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size,
+    iree_device_size_t allocation_size, iree_hal_dealloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)allocation_size);
@@ -279,7 +279,7 @@ iree_status_t iree_hal_cuda_memory_pools_alloca(
 
 iree_status_t iree_hal_cuda_memory_pools_dealloca(
     iree_hal_cuda_memory_pools_t* pools, CUstream stream,
-    iree_hal_buffer_t* buffer) {
+    iree_hal_buffer_t* buffer, iree_hal_dealloca_flags_t flags) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(
       z0, (int64_t)iree_hal_buffer_allocation_size(buffer));

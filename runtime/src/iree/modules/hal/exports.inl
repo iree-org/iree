@@ -27,6 +27,9 @@
 EXPORT_FN("allocator.allocate", iree_hal_module_allocator_allocate, rIiiI, r)
 EXPORT_FN("allocator.import", iree_hal_module_allocator_import, riIiirII, r)
 
+EXPORT_FN("buffer.allocation.discard", iree_hal_module_buffer_allocation_discard, r, i)
+EXPORT_FN("buffer.allocation.is_terminal", iree_hal_module_buffer_allocation_is_terminal, r, i)
+EXPORT_FN("buffer.allocation.preserve", iree_hal_module_buffer_allocation_preserve, r, v)
 EXPORT_FN("buffer.assert", iree_hal_module_buffer_assert, rrrIii, v)
 EXPORT_FN("buffer.length", iree_hal_module_buffer_length, r, I)
 EXPORT_FN("buffer.load", iree_hal_module_buffer_load, rIi, i)
@@ -60,9 +63,9 @@ EXPORT_FN("command_buffer.update_buffer", iree_hal_module_command_buffer_update_
 
 EXPORT_FN("device.allocator", iree_hal_module_device_allocator, r, r)
 EXPORT_FN("device.query.i64", iree_hal_module_device_query_i64, rrr, iI)
-EXPORT_FN("device.queue.alloca", iree_hal_module_device_queue_alloca, rIrriiiI, r)
+EXPORT_FN("device.queue.alloca", iree_hal_module_device_queue_alloca, rIrrIiiII, r)
 EXPORT_FN("device.queue.copy", iree_hal_module_device_queue_copy, rIrrrIrIII, v)
-EXPORT_FN("device.queue.dealloca", iree_hal_module_device_queue_dealloca, rIrrr, v)
+EXPORT_FN("device.queue.dealloca", iree_hal_module_device_queue_dealloca, rIrrrI, v)
 EXPORT_FN("device.queue.execute", iree_hal_module_device_queue_execute, rIrrCrD, v)
 EXPORT_FN("device.queue.execute.indirect", iree_hal_module_device_queue_execute_indirect, rIrrrCrIID, v)
 EXPORT_FN("device.queue.fill", iree_hal_module_device_queue_fill, rIrrrIIIiI, v)

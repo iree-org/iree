@@ -168,126 +168,136 @@ typedef intptr_t iree_atomic_intptr_t;
 
 #define iree_atomic_thread_fence(order) MemoryBarrier()
 
-#define iree_atomic_load(object, order)                          \
-  _Generic((object),                                             \
-      iree_atomic_int32_t *: _InterlockedExchangeAdd(            \
-                               (volatile int32_t*)(object), 0),  \
-      iree_atomic_int64_t *: _InterlockedExchangeAdd64(          \
-                               (volatile int64_t*)(object), 0),  \
-      iree_atomic_uint32_t *: _InterlockedExchangeAdd(           \
-                                (volatile int32_t*)(object), 0), \
-      iree_atomic_uint64_t *: _InterlockedExchangeAdd64(         \
-                                (volatile int64_t*)(object), 0))
-#define iree_atomic_store(object, desired, order)                              \
-  _Generic((object),                                                           \
-      iree_atomic_int32_t *: _InterlockedExchange((volatile int32_t*)(object), \
-                                                  (int32_t)(desired)),         \
-      iree_atomic_int64_t *: _InterlockedExchange64(                           \
-                               (volatile int64_t*)(object),                    \
-                               (int64_t)(desired)),                            \
-      iree_atomic_uint32_t *: _InterlockedExchange(                            \
-                                (volatile int32_t*)(object),                   \
-                                (int32_t)(desired)),                           \
-      iree_atomic_uint64_t *: _InterlockedExchange64(                          \
-                                (volatile int64_t*)(object),                   \
+#define iree_atomic_load(object, order)                           \
+  _Generic((object),                                              \
+      iree_atomic_int32_t *: _InterlockedExchangeAdd(             \
+                               (volatile int32_t *)(object), 0),  \
+      iree_atomic_int64_t *: _InterlockedExchangeAdd64(           \
+                               (volatile int64_t *)(object), 0),  \
+      iree_atomic_uint32_t *: _InterlockedExchangeAdd(            \
+                                (volatile int32_t *)(object), 0), \
+      iree_atomic_uint64_t *: _InterlockedExchangeAdd64(          \
+                                (volatile int64_t *)(object), 0), \
+      const iree_atomic_int32_t *: _InterlockedExchangeAdd(       \
+               (volatile int32_t *)(object), 0),                  \
+      const iree_atomic_int64_t *: _InterlockedExchangeAdd64(     \
+               (volatile int64_t *)(object), 0),                  \
+      const iree_atomic_uint32_t *: _InterlockedExchangeAdd(      \
+               (volatile int32_t *)(object), 0),                  \
+      const iree_atomic_uint64_t *: _InterlockedExchangeAdd64(    \
+               (volatile int64_t *)(object), 0))
+#define iree_atomic_store(object, desired, order)             \
+  _Generic((object),                                          \
+      iree_atomic_int32_t *: _InterlockedExchange(            \
+                               (volatile int32_t *)(object),  \
+                               (int32_t)(desired)),           \
+      iree_atomic_int64_t *: _InterlockedExchange64(          \
+                               (volatile int64_t *)(object),  \
+                               (int64_t)(desired)),           \
+      iree_atomic_uint32_t *: _InterlockedExchange(           \
+                                (volatile int32_t *)(object), \
+                                (int32_t)(desired)),          \
+      iree_atomic_uint64_t *: _InterlockedExchange64(         \
+                                (volatile int64_t *)(object), \
                                 (int64_t)(desired)))
-#define iree_atomic_fetch_add(object, operand, order)        \
-  _Generic((object),                                         \
-      iree_atomic_int32_t *: _InterlockedExchangeAdd(        \
-                               (volatile int32_t*)(object),  \
-                               (int32_t)(operand)),          \
-      iree_atomic_int64_t *: _InterlockedExchangeAdd64(      \
-                               (volatile int64_t*)(object),  \
-                               (int64_t)(operand)),          \
-      iree_atomic_uint32_t *: _InterlockedExchangeAdd(       \
-                                (volatile int32_t*)(object), \
-                                (int32_t)(operand)),         \
-      iree_atomic_uint64_t *: _InterlockedExchangeAdd64(     \
-                                (volatile int64_t*)(object), \
+#define iree_atomic_fetch_add(object, operand, order)         \
+  _Generic((object),                                          \
+      iree_atomic_int32_t *: _InterlockedExchangeAdd(         \
+                               (volatile int32_t *)(object),  \
+                               (int32_t)(operand)),           \
+      iree_atomic_int64_t *: _InterlockedExchangeAdd64(       \
+                               (volatile int64_t *)(object),  \
+                               (int64_t)(operand)),           \
+      iree_atomic_uint32_t *: _InterlockedExchangeAdd(        \
+                                (volatile int32_t *)(object), \
+                                (int32_t)(operand)),          \
+      iree_atomic_uint64_t *: _InterlockedExchangeAdd64(      \
+                                (volatile int64_t *)(object), \
                                 (int64_t)(operand)))
-#define iree_atomic_fetch_sub(object, operand, order)        \
-  _Generic((object),                                         \
-      iree_atomic_int32_t *: _InterlockedExchangeAdd(        \
-                               (volatile int32_t*)(object),  \
-                               -((int32_t)(operand))),       \
-      iree_atomic_int64_t *: _InterlockedExchangeAdd64(      \
-                               (volatile int64_t*)(object),  \
-                               -((int64_t)(operand))),       \
-      iree_atomic_uint32_t *: _InterlockedExchangeAdd(       \
-                                (volatile int32_t*)(object), \
-                                -((int32_t)(operand))),      \
-      iree_atomic_uint64_t *: _InterlockedExchangeAdd64(     \
-                                (volatile int64_t*)(object), \
+#define iree_atomic_fetch_sub(object, operand, order)         \
+  _Generic((object),                                          \
+      iree_atomic_int32_t *: _InterlockedExchangeAdd(         \
+                               (volatile int32_t *)(object),  \
+                               -((int32_t)(operand))),        \
+      iree_atomic_int64_t *: _InterlockedExchangeAdd64(       \
+                               (volatile int64_t *)(object),  \
+                               -((int64_t)(operand))),        \
+      iree_atomic_uint32_t *: _InterlockedExchangeAdd(        \
+                                (volatile int32_t *)(object), \
+                                -((int32_t)(operand))),       \
+      iree_atomic_uint64_t *: _InterlockedExchangeAdd64(      \
+                                (volatile int64_t *)(object), \
                                 -((int64_t)(operand))))
-#define iree_atomic_fetch_and(object, operand, order)                        \
-  _Generic((object),                                                         \
-      iree_atomic_int32_t *: _InterlockedAnd((volatile int32_t*)(object),    \
-                                             (int32_t)(operand)),            \
-      iree_atomic_int64_t *: _InterlockedAnd64((volatile int64_t*)(object),  \
-                                               (int64_t)(operand)),          \
-      iree_atomic_uint32_t *: _InterlockedAnd((volatile int32_t*)(object),   \
-                                              (int32_t)(operand)),           \
-      iree_atomic_uint64_t *: _InterlockedAnd64((volatile int64_t*)(object), \
+#define iree_atomic_fetch_and(object, operand, order)                         \
+  _Generic((object),                                                          \
+      iree_atomic_int32_t *: _InterlockedAnd((volatile int32_t *)(object),    \
+                                             (int32_t)(operand)),             \
+      iree_atomic_int64_t *: _InterlockedAnd64((volatile int64_t *)(object),  \
+                                               (int64_t)(operand)),           \
+      iree_atomic_uint32_t *: _InterlockedAnd((volatile int32_t *)(object),   \
+                                              (int32_t)(operand)),            \
+      iree_atomic_uint64_t *: _InterlockedAnd64((volatile int64_t *)(object), \
                                                 (int64_t)(operand)))
-#define iree_atomic_fetch_or(object, operand, order)                        \
-  _Generic((object),                                                        \
-      iree_atomic_int32_t *: _InterlockedOr((volatile int32_t*)(object),    \
-                                            (int32_t)(operand)),            \
-      iree_atomic_int64_t *: _InterlockedOr64((volatile int64_t*)(object),  \
-                                              (int64_t)(operand)),          \
-      iree_atomic_uint32_t *: _InterlockedOr((volatile int32_t*)(object),   \
-                                             (int32_t)(operand)),           \
-      iree_atomic_uint64_t *: _InterlockedOr64((volatile int64_t*)(object), \
+#define iree_atomic_fetch_or(object, operand, order)                         \
+  _Generic((object),                                                         \
+      iree_atomic_int32_t *: _InterlockedOr((volatile int32_t *)(object),    \
+                                            (int32_t)(operand)),             \
+      iree_atomic_int64_t *: _InterlockedOr64((volatile int64_t *)(object),  \
+                                              (int64_t)(operand)),           \
+      iree_atomic_uint32_t *: _InterlockedOr((volatile int32_t *)(object),   \
+                                             (int32_t)(operand)),            \
+      iree_atomic_uint64_t *: _InterlockedOr64((volatile int64_t *)(object), \
                                                (int64_t)(operand)))
-#define iree_atomic_fetch_xor(object, operand, order)                        \
-  _Generic((object),                                                         \
-      iree_atomic_int32_t *: _InterlockedXor((volatile int32_t*)(object),    \
-                                             (int32_t)(operand)),            \
-      iree_atomic_int64_t *: _InterlockedXor64((volatile int64_t*)(object),  \
-                                               (int64_t)(operand)),          \
-      iree_atomic_uint32_t *: _InterlockedXor((volatile int32_t*)(object),   \
-                                              (int32_t)(operand)),           \
-      iree_atomic_uint64_t *: _InterlockedXor64((volatile int64_t*)(object), \
+#define iree_atomic_fetch_xor(object, operand, order)                         \
+  _Generic((object),                                                          \
+      iree_atomic_int32_t *: _InterlockedXor((volatile int32_t *)(object),    \
+                                             (int32_t)(operand)),             \
+      iree_atomic_int64_t *: _InterlockedXor64((volatile int64_t *)(object),  \
+                                               (int64_t)(operand)),           \
+      iree_atomic_uint32_t *: _InterlockedXor((volatile int32_t *)(object),   \
+                                              (int32_t)(operand)),            \
+      iree_atomic_uint64_t *: _InterlockedXor64((volatile int64_t *)(object), \
                                                 (int64_t)(operand)))
-#define iree_atomic_exchange(object, desired, order)                           \
-  _Generic((object),                                                           \
-      iree_atomic_int32_t *: _InterlockedExchange((volatile int32_t*)(object), \
-                                                  (int32_t)(desired)),         \
-      iree_atomic_int64_t *: _InterlockedExchange64(                           \
-                               (volatile int64_t*)(object),                    \
-                               (int64_t)(desired)),                            \
-      iree_atomic_uint32_t *: _InterlockedExchange(                            \
-                                (volatile int32_t*)(object),                   \
-                                (int32_t)(desired)),                           \
-      iree_atomic_uint64_t *: _InterlockedExchange64(                          \
-                                (volatile int64_t*)(object),                   \
+#define iree_atomic_exchange(object, desired, order)          \
+  _Generic((object),                                          \
+      iree_atomic_int32_t *: _InterlockedExchange(            \
+                               (volatile int32_t *)(object),  \
+                               (int32_t)(desired)),           \
+      iree_atomic_int64_t *: _InterlockedExchange64(          \
+                               (volatile int64_t *)(object),  \
+                               (int64_t)(desired)),           \
+      iree_atomic_uint32_t *: _InterlockedExchange(           \
+                                (volatile int32_t *)(object), \
+                                (int32_t)(desired)),          \
+      iree_atomic_uint64_t *: _InterlockedExchange64(         \
+                                (volatile int64_t *)(object), \
                                 (int64_t)(desired)))
 #define iree_atomic_compare_exchange_strong(object, expected, desired,        \
                                             order_succ, order_fail)           \
   _Generic((object),                                                          \
       iree_atomic_int32_t *: iree_atomic_compare_exchange_strong_int32_impl(  \
-                               (volatile iree_atomic_int32_t*)(object),       \
-                               (int32_t*)(expected), (int32_t)(desired),      \
+                               (volatile iree_atomic_int32_t *)(object),      \
+                               (int32_t *)(expected), (int32_t)(desired),     \
                                (order_succ), (order_fail)),                   \
       iree_atomic_int64_t *: iree_atomic_compare_exchange_strong_int64_impl(  \
-                               (volatile iree_atomic_int64_t*)(object),       \
-                               (int64_t*)(expected), (int64_t)(desired),      \
+                               (volatile iree_atomic_int64_t *)(object),      \
+                               (int64_t *)(expected), (int64_t)(desired),     \
                                (order_succ), (order_fail)),                   \
       iree_atomic_uint32_t *: iree_atomic_compare_exchange_strong_int32_impl( \
-                                (volatile iree_atomic_int32_t*)(object),      \
-                                (int32_t*)(expected), (int32_t)(desired),     \
+                                (volatile iree_atomic_int32_t *)(object),     \
+                                (int32_t *)(expected), (int32_t)(desired),    \
                                 (order_succ), (order_fail)),                  \
       iree_atomic_uint64_t *: iree_atomic_compare_exchange_strong_int64_impl( \
-                                (volatile iree_atomic_int64_t*)(object),      \
-                                (int64_t*)(expected), (int64_t)(desired),     \
+                                (volatile iree_atomic_int64_t *)(object),     \
+                                (int64_t *)(expected), (int64_t)(desired),    \
                                 (order_succ), (order_fail)))
 #define iree_atomic_compare_exchange_weak iree_atomic_compare_exchange_strong
 
 static inline bool iree_atomic_compare_exchange_strong_int32_impl(
-    volatile iree_atomic_int32_t* object, int32_t* expected, int32_t desired,
+    volatile iree_atomic_int32_t *object, int32_t *expected, int32_t desired,
     iree_memory_order_t order_succ, iree_memory_order_t order_fail) {
   int32_t expected_value = *expected;
-  int32_t old_value = InterlockedCompareExchange((volatile LONG*)object,
+  int32_t old_value = InterlockedCompareExchange((volatile LONG *)object,
                                                  desired, expected_value);
   if (old_value == expected_value) {
     return true;
@@ -298,10 +308,10 @@ static inline bool iree_atomic_compare_exchange_strong_int32_impl(
 }
 
 static inline bool iree_atomic_compare_exchange_strong_int64_impl(
-    volatile iree_atomic_int64_t* object, int64_t* expected, int64_t desired,
+    volatile iree_atomic_int64_t *object, int64_t *expected, int64_t desired,
     iree_memory_order_t order_succ, iree_memory_order_t order_fail) {
   int64_t expected_value = *expected;
-  int64_t old_value = InterlockedCompareExchange64((volatile LONG64*)object,
+  int64_t old_value = InterlockedCompareExchange64((volatile LONG64 *)object,
                                                    desired, expected_value);
   if (old_value == expected_value) {
     return true;

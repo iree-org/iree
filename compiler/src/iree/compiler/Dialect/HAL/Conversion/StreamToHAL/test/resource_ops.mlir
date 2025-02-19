@@ -28,7 +28,8 @@ util.func public @resourceAlloca(%size: index) -> (!stream.resource<transient>, 
   // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
   // CHECK-SAME: pool(%c0
   // CHECK-SAME: type("DeviceVisible|DeviceLocal")
-  // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}")
+  // CHECK-SAME: usage("{{.+}}Transfer{{.+}}DispatchStorage")
+  // CHECK-SAME: flags("None")
   // CHECK-SAME: : !hal.buffer{%[[SIZE]]}
   %0:2 = stream.resource.alloca uninitialized on(#hal.device.affinity<@device>) : !stream.resource<transient>{%size} => !stream.timepoint
   // CHECK: util.return %[[RET0]], %[[SIGNAL_FENCE]]
@@ -49,7 +50,8 @@ util.func public @resourceAllocaAwait(%size: index, %await_timepoint: !stream.ti
   // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
   // CHECK-SAME: pool(%c0
   // CHECK-SAME: type("DeviceVisible|DeviceLocal")
-  // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}")
+  // CHECK-SAME: usage("{{.+}}Transfer{{.+}}DispatchStorage")
+  // CHECK-SAME: flags("None")
   // CHECK-SAME: : !hal.buffer{%[[SIZE]]}
   %0:2 = stream.resource.alloca uninitialized on(#hal.device.affinity<@device>) await(%await_timepoint) => !stream.resource<transient>{%size} => !stream.timepoint
   // CHECK: util.return %[[RET0]], %[[SIGNAL_FENCE]]

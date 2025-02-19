@@ -926,7 +926,7 @@ static iree_status_t iree_hal_cuda_device_queue_alloca(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size,
+    iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
 
@@ -945,7 +945,7 @@ static iree_status_t iree_hal_cuda_device_queue_alloca(
       !iree_all_bits_set(params.type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
     status = iree_hal_cuda_memory_pools_alloca(
         &device->memory_pools, device->dispatch_cu_stream, pool, params,
-        allocation_size, out_buffer);
+        allocation_size, flags, out_buffer);
   } else {
     status = iree_hal_allocator_allocate_buffer(
         iree_hal_device_allocator(base_device), params, allocation_size,
@@ -969,7 +969,7 @@ static iree_status_t iree_hal_cuda_device_queue_dealloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_buffer_t* buffer) {
+    iree_hal_buffer_t* buffer, iree_hal_dealloca_flags_t flags) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
 
   // NOTE: block on the semaphores here; we could avoid this by properly
@@ -983,7 +983,7 @@ static iree_status_t iree_hal_cuda_device_queue_dealloca(
   iree_status_t status = iree_ok_status();
   if (device->supports_memory_pools) {
     status = iree_hal_cuda_memory_pools_dealloca(
-        &device->memory_pools, device->dispatch_cu_stream, buffer);
+        &device->memory_pools, device->dispatch_cu_stream, buffer, flags);
   }
 
   // Only signal if not returning a synchronous error - synchronous failure

@@ -990,7 +990,7 @@ void iree_hal_hip_async_buffer_release(void* user_data,
 
 static iree_status_t iree_hal_hip_device_prepare_async_alloc(
     iree_hal_hip_device_t* device, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size,
+    iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)allocation_size);
@@ -1499,7 +1499,7 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size,
+    iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -1520,8 +1520,8 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
        iree_hal_hip_allocator_isa(iree_hal_device_allocator(base_device)))) {
     iree_hal_buffer_t* buffer = NULL;
 
-    status = iree_hal_hip_device_prepare_async_alloc(device, params,
-                                                     allocation_size, &buffer);
+    status = iree_hal_hip_device_prepare_async_alloc(
+        device, params, allocation_size, flags, &buffer);
 
     iree_hal_hip_device_semaphore_buffer_operation_callback_data_t*
         callback_data = NULL;
@@ -1592,7 +1592,7 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_buffer_t* buffer) {
+    iree_hal_buffer_t* buffer, iree_hal_dealloca_flags_t flags) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
