@@ -100,7 +100,7 @@ module @hoist_constant_pack_computation {
     %pad = arith.constant 5 : i4
     %val1 = stablehlo.constant dense<3> : tensor<7x15xi4>
     %val2 = tensor.empty() : tensor<4x1x16x2xi4>
-    %ret = tensor.pack %val1 padding_value(%pad : i4) inner_dims_pos = [1, 0] inner_tiles = [16, 2] into %val2 : tensor<7x15xi4> -> tensor<4x1x16x2xi4>
+    %ret = linalg.pack %val1 padding_value(%pad : i4) inner_dims_pos = [1, 0] inner_tiles = [16, 2] into %val2 : tensor<7x15xi4> -> tensor<4x1x16x2xi4>
     util.return %ret : tensor<4x1x16x2xi4>
   }
 }

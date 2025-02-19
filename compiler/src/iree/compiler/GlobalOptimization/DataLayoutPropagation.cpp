@@ -27,10 +27,10 @@ struct DataLayoutPropagationPass
         patterns, [](OpOperand *opOperand) {
           Operation *producer = opOperand->get().getDefiningOp();
           Operation *consumer = opOperand->getOwner();
-          if (isa<tensor::PackOp>(consumer)) {
+          if (isa<linalg::PackOp>(consumer)) {
             return isa<tensor::CollapseShapeOp>(producer);
           }
-          if (isa<tensor::UnPackOp>(producer)) {
+          if (isa<linalg::UnPackOp>(producer)) {
             return isa<tensor::ExpandShapeOp>(consumer);
           }
           return false;

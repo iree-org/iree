@@ -44,9 +44,9 @@ util.func @conv_nchw_nhwc(%arg0: tensor<8x256x16x16xf32>, %arg1: tensor<16x256x3
 // TILE16: #[[$MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d8)>
 
 // TILE16-LABEL: util.func public @conv_nchw_nhwc
-// TILE16:      %[[IMG:.+]] = tensor.pack {{.*}} inner_dims_pos = [1] inner_tiles = [16]
+// TILE16:      %[[IMG:.+]] = linalg.pack {{.*}} inner_dims_pos = [1] inner_tiles = [16]
 // TILE16-SAME:   tensor<8x256x16x16xf32> -> tensor<8x16x16x16x16xf32>
-// TILE16:      %[[FILTER:.+]] = tensor.pack {{.*}} inner_dims_pos = [1, 0] inner_tiles = [16, 16]
+// TILE16:      %[[FILTER:.+]] = linalg.pack {{.*}} inner_dims_pos = [1, 0] inner_tiles = [16, 16]
 // TILE16-SAME:   tensor<16x256x3x3xf32> -> tensor<1x16x3x3x16x16xf32>
 // TILE16:      %[[OUT:.+]] = linalg.transpose ins(%{{.*}} : tensor<8x16x14x14xf32>)
 // TILE16-SAME:   outs(%{{.*}} : tensor<8x14x14x16xf32>) permutation = [0, 2, 3, 1]
@@ -104,17 +104,17 @@ module {
 // TILE16: #[[$MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d8)>
 
 // TILE16-LABEL: util.func public @generic_conv_nchw
-// TILE16:      %[[IMG:.+]] = tensor.pack {{.*}} inner_dims_pos = [1] inner_tiles = [16]
+// TILE16:      %[[IMG:.+]] = linalg.pack {{.*}} inner_dims_pos = [1] inner_tiles = [16]
 // TILE16-SAME:   tensor<8x256x16x16xf32> -> tensor<8x16x16x16x16xf32>
-// TILE16:      %[[FILTER:.+]] = tensor.pack {{.*}} inner_dims_pos = [1, 0] inner_tiles = [16, 16]
+// TILE16:      %[[FILTER:.+]] = linalg.pack {{.*}} inner_dims_pos = [1, 0] inner_tiles = [16, 16]
 // TILE16-SAME:   tensor<64x256x3x3xf32> -> tensor<4x16x3x3x16x16xf32>
-// TILE16:      %[[OUT:.+]] = tensor.pack {{.*}} inner_dims_pos = [1] inner_tiles = [16]
+// TILE16:      %[[OUT:.+]] = linalg.pack {{.*}} inner_dims_pos = [1] inner_tiles = [16]
 // TILE16-SAME:   tensor<8x64x14x14xf32> -> tensor<8x4x14x14x16xf32>
 // TILE16:      %[[TILED_CONV:.+]] = linalg.generic {indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]]
 // TILE16-SAME:    iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "reduction", "parallel"]}
 // TILE16-SAME:    ins(%[[IMG]], %[[FILTER]] : tensor<8x16x16x16x16xf32>, tensor<4x16x3x3x16x16xf32>)
 // TILE16-SAME:    outs(%[[OUT]] : tensor<8x4x14x14x16xf32>) {
-// TILE16:      tensor.unpack %[[TILED_CONV]] inner_dims_pos = [1] inner_tiles = [16]
+// TILE16:      linalg.unpack %[[TILED_CONV]] inner_dims_pos = [1] inner_tiles = [16]
 // TILE16-SAME:   tensor<8x4x14x14x16xf32> -> tensor<8x64x14x14xf32>
 
 // -----
@@ -143,7 +143,7 @@ util.func @mmt_no_transpose(%arg0: tensor<2048x1280xf16>, %arg1: tensor<1280x128
 
 util.func @test_unit_dims_pack(%arg0: tensor<10x20x5xf32>) -> tensor<1x1x5x20x10xf32> {
   %dst = tensor.empty() : tensor<1x1x5x20x10xf32>
-  %packed = tensor.pack %arg0 inner_dims_pos = [1, 0] inner_tiles = [20, 10]
+  %packed = linalg.pack %arg0 inner_dims_pos = [1, 0] inner_tiles = [20, 10]
     into %dst : tensor<10x20x5xf32> -> tensor<1x1x5x20x10xf32>
 
   util.return %packed : tensor<1x1x5x20x10xf32>

@@ -12,9 +12,9 @@ module {
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: tensor<64x64xf16>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<64x64xf16>
 //  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: tensor<64x64xf32>
-//   CHECK-DAG:   %[[A_PACK:.+]] = tensor.pack %[[A]] inner_dims_pos = [0, 1] inner_tiles = [32, 8]
-//   CHECK-DAG:   %[[B_PACK:.+]] = tensor.pack %[[B]] inner_dims_pos = [1, 0] inner_tiles = [32, 8]
-//   CHECK-DAG:   %[[C_PACK:.+]] = tensor.pack %[[C]] inner_dims_pos = [0, 1] inner_tiles = [32, 32]
+//   CHECK-DAG:   %[[A_PACK:.+]] = linalg.pack %[[A]] inner_dims_pos = [0, 1] inner_tiles = [32, 8]
+//   CHECK-DAG:   %[[B_PACK:.+]] = linalg.pack %[[B]] inner_dims_pos = [1, 0] inner_tiles = [32, 8]
+//   CHECK-DAG:   %[[C_PACK:.+]] = linalg.pack %[[C]] inner_dims_pos = [0, 1] inner_tiles = [32, 32]
 //       CHECK:   iree_gpu.multi_mma %[[A_PACK]], %[[B_PACK]], %[[C_PACK]]
 //  CHECK-SAME:     indexing_maps =
 //  CHECK-SAME:       affine_map<(d0, d1, d2) -> (d0, d2)>

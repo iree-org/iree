@@ -11,7 +11,6 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
@@ -381,7 +380,7 @@ static std::string summarizeDispatchRegion(Region &region) {
                                   << "', cost: " << bestEstimatedCost << "\n");
         })
         .Case<IREE::Encoding::SetEncodingOp, IREE::Encoding::UnsetEncodingOp,
-              tensor::PackOp, tensor::UnPackOp>([&](auto op) {
+              linalg::PackOp, linalg::UnPackOp>([&](auto op) {
           // SetEncoding/UnsetEncoding/PackOp/UnPackOp is the bestOp only if
           // there are no other operations.
           int64_t estimatedCost = kMinEstimatedCost + 1;
@@ -429,7 +428,7 @@ static std::string summarizeDispatchRegion(Region &region) {
           [&](auto op) { bestSummary = summarizeLinalgExtOp(op); })
       .Case<linalg::LinalgOp>(
           [&](auto op) { bestSummary = summarizeLinalgOp(op); })
-      .Case<tensor::PackOp, tensor::UnPackOp>([&](auto op) {
+      .Case<linalg::PackOp, linalg::UnPackOp>([&](auto op) {
         auto opName = getOpNameWithoutDialectName(op);
         bestSummary = opName + "_" + operandTypeToString(op.getSource());
       })
@@ -462,12 +461,12 @@ static std::string summarizeDispatchRegion(Region &region) {
   // Add heuristic hint to dispatch name if the unpack op is the first op and
   // the pack op is the last op.
   if (!tileableOps.empty()) {
-    if (!isa<tensor::UnPackOp>(bestOp) &&
-        isa<tensor::UnPackOp>(tileableOps.front())) {
+    if (!isa<linalg::UnPackOp>(bestOp) &&
+        isa<linalg::UnPackOp>(tileableOps.front())) {
       bestSummary = "unpack_" + bestSummary;
     }
-    if (!isa<tensor::PackOp>(bestOp) &&
-        isa<tensor::PackOp>(tileableOps.back())) {
+    if (!isa<linalg::PackOp>(bestOp) &&
+        isa<linalg::PackOp>(tileableOps.back())) {
       bestSummary = bestSummary + "_pack";
     }
   }

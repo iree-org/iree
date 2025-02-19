@@ -267,15 +267,15 @@ struct VectorizationTileSizes {
 /// chain.
 std::optional<VectorizationTileSizes> inferSizesFromIR(Value val);
 
-/// Returns the result sizes and vector input sizes of the tensor.unpack op. The
+/// Returns the result sizes and vector input sizes of the linalg.unpack op. The
 /// inferred bounding size is returned if it is dynamic shape. Returns
 /// std::nullopt if the shape inference failed.
-std::optional<VectorizationTileSizes> inferSizesFromIR(tensor::UnPackOp op);
+std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op);
 
-/// Returns the result sizes and vector input sizes of the tensor.pack op. The
+/// Returns the result sizes and vector input sizes of the linalg.pack op. The
 /// inferred bounding size is returned if it is dynamic shape. Returns
 /// std::nullopt if the shape inference failed.
-std::optional<VectorizationTileSizes> inferSizesFromIR(tensor::PackOp op);
+std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op);
 
 /// Tries to infer the vector sizes from an IR using ValueBounds analysis. If
 /// `opResult` is provided, it stores the bounded result shapes to destShape.

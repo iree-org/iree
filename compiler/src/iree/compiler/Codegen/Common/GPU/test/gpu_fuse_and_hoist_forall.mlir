@@ -527,7 +527,7 @@ func.func @fuse_imperfectly_aligned_unpack(%arg0: tensor<5x31xf16>, %arg1: index
   %c128 = arith.constant 128 : index
   %c0 = arith.constant 0 : index
   %0 = tensor.empty() : tensor<128xf16>
-  %unpack = tensor.unpack %arg0 inner_dims_pos = [0] inner_tiles = [31] into %0 : tensor<5x31xf16> -> tensor<128xf16>
+  %unpack = linalg.unpack %arg0 inner_dims_pos = [0] inner_tiles = [31] into %0 : tensor<5x31xf16> -> tensor<128xf16>
   %1 = scf.forall (%arg2) in (2) shared_outs(%arg3 = %0) -> (tensor<128xf16>) {
     %2 = affine.apply #map(%arg2)
     %extracted_slice = tensor.extract_slice %unpack[%2] [64] [1] : tensor<128xf16> to tensor<64xf16>
@@ -542,7 +542,7 @@ func.func @fuse_imperfectly_aligned_unpack(%arg0: tensor<5x31xf16>, %arg1: index
 
 // CHECK-LABEL: func @fuse_imperfectly_aligned_unpack
 //       CHECK:   scf.forall
-//       CHECK:     tensor.unpack
+//       CHECK:     linalg.unpack
 //       CHECK:     linalg.copy
 //       CHECK:   scf.forall.in_parallel
 //       CHECK:   return

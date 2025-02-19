@@ -543,7 +543,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
   // TODO(benvanik): remove the need for this; some cleanup passes such as
   // SimplifyGlobalAccesses are currently broken with scf present.
-  FunctionLikeNest(passManager).addPass(mlir::createConvertSCFToCFPass);
+  FunctionLikeNest(passManager).addPass(mlir::createSCFToControlFlowPass);
 
   //----------------------------------------------------------------------------
   // Executable serialization

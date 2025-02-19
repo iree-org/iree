@@ -28,9 +28,9 @@ struct TOSASession
                            PluginActivationPolicy::DefaultActivated> {
   static void registerPasses() {
     registerTOSAConversionPasses();
-    registerTosaToArith();
+    registerTosaToArithPass();
     registerTosaToLinalg();
-    registerTosaToTensor();
+    registerTosaToTensorPass();
   }
 
   void onRegisterDialects(DialectRegistry &registry) override {

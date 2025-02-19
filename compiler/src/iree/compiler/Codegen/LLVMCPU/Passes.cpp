@@ -761,7 +761,7 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
                 clFailOnOutOfBoundsStackAllocation});
       })
       // SCF -> CF
-      .addPass(createConvertSCFToCFPass)
+      .addPass(createSCFToControlFlowPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
       // (HAL, IREE, Linalg, CF) -> LLVM

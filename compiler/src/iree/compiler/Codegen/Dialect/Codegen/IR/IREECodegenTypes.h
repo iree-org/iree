@@ -84,7 +84,7 @@ struct TileSwizzle {
 
 /// Container of information needed to materialize the layout transformations.
 struct MaterializeEncodingInfo {
-  // The next 3 fields are used to create a `tensor.pack` or `tensor.unpack` op,
+  // The next 3 fields are used to create a `linalg.pack` or `linalg.unpack` op,
   // changing the overall layout between row-major and tiled (where each tile is
   // row-major).
   SmallVector<int64_t> innerDimsPos;

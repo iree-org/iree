@@ -36,7 +36,7 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   // Currently we don't handle SCF ops well and have to convert them all to CFG.
   // In the future it would be nice if we could have all of flow be both scf
   // and cfg compatible.
-  passManager.addNestedPass<func::FuncOp>(tosa::createTosaToSCF());
+  passManager.addNestedPass<func::FuncOp>(createTosaToSCFPass());
 
   // We also don't handle calls well on the old codepath; until we remove the
   // use of the CFG we can continue inlining.
@@ -44,8 +44,8 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
 
   passManager.addNestedPass<func::FuncOp>(
       tosa::createTosaMakeBroadcastablePass());
-  passManager.addNestedPass<func::FuncOp>(tosa::createTosaToArith());
-  passManager.addNestedPass<func::FuncOp>(tosa::createTosaToTensor());
+  passManager.addNestedPass<func::FuncOp>(createTosaToArithPass());
+  passManager.addNestedPass<func::FuncOp>(createTosaToTensorPass());
   passManager.addNestedPass<func::FuncOp>(
       iree_compiler::createTosaToLinalgExtPass());
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
@@ -60,8 +60,8 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
       iree_compiler::createConverti48Toi64Pass());
 
   // Sometimes we generate more TOSA operations during the lowering to linalg.
-  passManager.addNestedPass<func::FuncOp>(tosa::createTosaToArith());
-  passManager.addNestedPass<func::FuncOp>(tosa::createTosaToTensor());
+  passManager.addNestedPass<func::FuncOp>(createTosaToArithPass());
+  passManager.addNestedPass<func::FuncOp>(createTosaToTensorPass());
 
   passManager.addNestedPass<func::FuncOp>(
       iree_compiler::createStripSignednessPass());

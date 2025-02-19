@@ -34,7 +34,7 @@ util.func public @do_not_collapse_cst_in_place(%arg0: tensor<1x1x2304xf32>) {
 util.func public @unpack_collapse(%arg0: tensor<2x320x128x128xf32>, %arg1: tensor<320xf32>, %arg2: tensor<320xf32>, %arg3: tensor<1x5x2x64xf32>) -> tensor<2x320x128x128xf16> {
   %dispatch = flow.dispatch.region -> (tensor<2x320x128x128xf16>) {
     %0 = tensor.empty() : tensor<2x320xf32>
-    %unpack = tensor.unpack %arg3 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [2, 64] into %0 : tensor<1x5x2x64xf32> -> tensor<2x320xf32>
+    %unpack = linalg.unpack %arg3 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [2, 64] into %0 : tensor<1x5x2x64xf32> -> tensor<2x320xf32>
     %1 = tensor.empty() : tensor<2x320x128x128xf16>
     %2 = linalg.generic {
       indexing_maps = [#map, #map1, #map2, #map1, #map],
@@ -83,7 +83,7 @@ util.func public @unpack_elementwise_collapse(%arg0: tensor<2x320x128x128xf32>, 
       linalg.yield %22 : f32
     } -> tensor<2x320x128x128xf32>
 
-    %unpack = tensor.unpack %arg3 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [2, 64] into %1 : tensor<1x5x2x64xf32> -> tensor<2x320xf32>
+    %unpack = linalg.unpack %arg3 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [2, 64] into %1 : tensor<1x5x2x64xf32> -> tensor<2x320xf32>
 
     %3 = linalg.generic {indexing_maps = [#map, #map1, #map2, #map1, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%elementwise, %arg1, %unpack, %arg2 : tensor<2x320x128x128xf32>, tensor<320xf32>, tensor<2x320xf32>, tensor<320xf32>) outs(%2 : tensor<2x320x128x128xf16>) {
     ^bb0(%in: f32, %in_0: f32, %in_1: f32, %in_2: f32, %out: f16):
@@ -133,7 +133,7 @@ util.func public @prevent_collapse(%arg0: tensor<2x320x128x128xf32>, %arg1: tens
     } -> tensor<2x320x128x128xf32>
 
     %barrier = util.optimization_barrier %elementwise : tensor<2x320x128x128xf32>
-    %unpack = tensor.unpack %arg3 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [2, 64] into %1 : tensor<1x5x2x64xf32> -> tensor<2x320xf32>
+    %unpack = linalg.unpack %arg3 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [2, 64] into %1 : tensor<1x5x2x64xf32> -> tensor<2x320xf32>
 
     %3 = linalg.generic {indexing_maps = [#map, #map1, #map2, #map1, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%barrier, %arg1, %unpack, %arg2 : tensor<2x320x128x128xf32>, tensor<320xf32>, tensor<2x320xf32>, tensor<320xf32>) outs(%2 : tensor<2x320x128x128xf16>) {
     ^bb0(%in: f32, %in_0: f32, %in_1: f32, %in_2: f32, %out: f16):

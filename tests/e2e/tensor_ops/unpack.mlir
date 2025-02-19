@@ -24,7 +24,7 @@ func.func private @generate_4D_source(%d0: index, %d1: index, %d2: index, %d3: i
 func.func @static_unpack_simple() {
   %iree_input = util.unfoldable_constant dense<[[[[0, 1], [4, 5]], [[2, 3], [6, 7]]], [[[8, 9], [12, 13]], [[10 ,11], [14, 15]]]]> : tensor<2x2x2x2xi32>
   %init = tensor.empty() : tensor<4x4xi32>
-  %unpack = tensor.unpack %iree_input inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %init
+  %unpack = linalg.unpack %iree_input inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %init
       : tensor<2x2x2x2xi32> -> tensor<4x4xi32>
   check.expect_eq_const(%unpack, dense<[[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]> : tensor<4x4xi32>) : tensor<4x4xi32>
   return
@@ -40,7 +40,7 @@ func.func @dynamic_unpack_simple() {
   %out_d0 = arith.muli %in_d0, %c2 : index
   %out_d1 = arith.muli %in_d1, %c2 : index
   %init = tensor.empty(%out_d0, %out_d1) : tensor<?x?xi32>
-  %unpack = tensor.unpack %iree_input inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %init
+  %unpack = linalg.unpack %iree_input inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %init
       : tensor<?x?x2x2xi32> -> tensor<?x?xi32>
   %cast = tensor.cast %unpack : tensor<?x?xi32> to tensor<4x4xi32>
   check.expect_eq_const(%cast, dense<[[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]> : tensor<4x4xi32>) : tensor<4x4xi32>
@@ -53,7 +53,7 @@ func.func @static_unpack_simple_extract_slice() {
                                       [[[12, 13, 14], [0, 0, 0], [0, 0, 0]],
                                        [[15, 0, 0], [0, 0, 0], [0, 0, 0]]]]> : tensor<2x2x3x3xi32>
   %init = tensor.empty() : tensor<4x4xi32>
-  %unpack = tensor.unpack %iree_input inner_dims_pos = [0, 1] inner_tiles = [3, 3] into %init
+  %unpack = linalg.unpack %iree_input inner_dims_pos = [0, 1] inner_tiles = [3, 3] into %init
       : tensor<2x2x3x3xi32> -> tensor<4x4xi32>
   check.expect_eq_const(%unpack, dense<[[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]> : tensor<4x4xi32>) : tensor<4x4xi32>
   return
@@ -75,7 +75,7 @@ func.func @dynamic_unpack_simple_extract_slice() {
   %out_d0 = arith.subi %full_out_d0, %c2 : index
   %out_d1 = arith.subi %full_out_d1, %c2 : index
   %init = tensor.empty(%out_d0, %out_d1) : tensor<?x?xi32>
-  %unpack = tensor.unpack %iree_input inner_dims_pos = [0, 1] inner_tiles = [3, 3] into %init
+  %unpack = linalg.unpack %iree_input inner_dims_pos = [0, 1] inner_tiles = [3, 3] into %init
       : tensor<?x?x3x3xi32> -> tensor<?x?xi32>
   %cast = tensor.cast %unpack : tensor<?x?xi32> to tensor<4x4xi32>
   check.expect_eq_const(%cast, dense<[[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]> : tensor<4x4xi32>) : tensor<4x4xi32>
@@ -91,7 +91,7 @@ func.func @static_unpack_large() {
   %source = tensor.cast %0 : tensor<?x?x?x?xi32> to tensor<4x16x32x16xi32>
 
   %init_unpack = tensor.empty() : tensor<128x256xi32>
-  %unpack = tensor.unpack %source inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
+  %unpack = linalg.unpack %source inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
       : tensor<4x16x32x16xi32> -> tensor<128x256xi32>
 
   %init_transpose = tensor.empty() : tensor<4x32x16x16xi32>
@@ -116,7 +116,7 @@ func.func @dynamic_unpack_large() {
   %packed_d0 = util.unfoldable_constant 128 : index
   %packed_d1 = util.unfoldable_constant 256 : index
   %init_unpack = tensor.empty(%packed_d0, %packed_d1) : tensor<?x?xi32>
-  %unpack = tensor.unpack %source inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
+  %unpack = linalg.unpack %source inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
       : tensor<?x?x32x16xi32> -> tensor<?x?xi32>
   %cast_unpack = tensor.cast %unpack : tensor<?x?xi32> to tensor<128x256xi32>
 
@@ -144,7 +144,7 @@ func.func @dynamic_unpack_transpose_inner_dims_large() {
   %packed_d0 = util.unfoldable_constant 128 : index
   %packed_d1 = util.unfoldable_constant 256 : index
   %init_unpack = tensor.empty(%packed_d0, %packed_d1) : tensor<?x?xi32>
-  %unpack = tensor.unpack %source inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
+  %unpack = linalg.unpack %source inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
       : tensor<?x?x16x32xi32> -> tensor<?x?xi32>
   %cast_unpack = tensor.cast %unpack : tensor<?x?xi32> to tensor<128x256xi32>
 
@@ -173,7 +173,7 @@ func.func @dynamic_unpack_transpose_outer_dims_large() {
   %packed_d0 = util.unfoldable_constant 128 : index
   %packed_d1 = util.unfoldable_constant 256 : index
   %init_unpack = tensor.empty(%packed_d0, %packed_d1) : tensor<?x?xi32>
-  %unpack = tensor.unpack %source outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
+  %unpack = linalg.unpack %source outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
       : tensor<?x?x32x16xi32> -> tensor<?x?xi32>
   %cast_unpack = tensor.cast %unpack : tensor<?x?xi32> to tensor<128x256xi32>
 
@@ -202,7 +202,7 @@ func.func @dynamic_unpack_transpose_inner_and_outer_dims_large() {
   %packed_d0 = util.unfoldable_constant 128 : index
   %packed_d1 = util.unfoldable_constant 256 : index
   %init_unpack = tensor.empty(%packed_d0, %packed_d1) : tensor<?x?xi32>
-  %unpack = tensor.unpack %source outer_dims_perm = [1, 0]  inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
+  %unpack = linalg.unpack %source outer_dims_perm = [1, 0]  inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
       : tensor<?x?x16x32xi32> -> tensor<?x?xi32>
   %cast_unpack = tensor.cast %unpack : tensor<?x?xi32> to tensor<128x256xi32>
 
@@ -229,7 +229,7 @@ func.func @static_unpack_extract_slice_large() {
   %source = tensor.cast %0 : tensor<?x?x?x?xi32> to tensor<4x16x32x16xi32>
 
   %init_unpack = tensor.empty() : tensor<100x250xi32>
-  %unpack = tensor.unpack %source inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
+  %unpack = linalg.unpack %source inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
       : tensor<4x16x32x16xi32> -> tensor<100x250xi32>
 
   %init_transpose = tensor.empty() : tensor<4x32x16x16xi32>
@@ -256,7 +256,7 @@ func.func @dynamic_unpack_extract_slice_large() {
   %packed_d0 = util.unfoldable_constant 100 : index
   %packed_d1 = util.unfoldable_constant 250 : index
   %init_unpack = tensor.empty(%packed_d0, %packed_d1) : tensor<?x?xi32>
-  %unpack = tensor.unpack %source inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
+  %unpack = linalg.unpack %source inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
       : tensor<?x?x32x16xi32> -> tensor<?x?xi32>
   %cast_unpack = tensor.cast %unpack : tensor<?x?xi32> to tensor<100x250xi32>
 
@@ -284,7 +284,7 @@ func.func @static_unpack_extract_slice_transpose_inner_dims_large() {
   %source = tensor.cast %0 : tensor<?x?x?x?xi32> to tensor<4x16x16x32xi32>
 
   %init_unpack = tensor.empty() : tensor<100x250xi32>
-  %unpack = tensor.unpack %source
+  %unpack = linalg.unpack %source
       inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
       : tensor<4x16x16x32xi32> -> tensor<100x250xi32>
 
@@ -310,7 +310,7 @@ func.func @static_unpack_extract_slice_transpose_outer_dims_large() {
   %source = tensor.cast %0 : tensor<?x?x?x?xi32> to tensor<16x4x32x16xi32>
 
   %init_unpack = tensor.empty() : tensor<100x250xi32>
-  %unpack = tensor.unpack %source outer_dims_perm = [1, 0]  inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
+  %unpack = linalg.unpack %source outer_dims_perm = [1, 0]  inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
       : tensor<16x4x32x16xi32> -> tensor<100x250xi32>
 
   %init_transpose = tensor.empty() : tensor<4x32x16x16xi32>
@@ -335,7 +335,7 @@ func.func @static_unpack_extract_slice_transpose_inner_and_outer_dims_large() {
   %source = tensor.cast %0 : tensor<?x?x?x?xi32> to tensor<16x4x16x32xi32>
 
   %init_unpack = tensor.empty() : tensor<100x250xi32>
-  %unpack = tensor.unpack %source
+  %unpack = linalg.unpack %source
       outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
       : tensor<16x4x16x32xi32> -> tensor<100x250xi32>
 
@@ -364,7 +364,7 @@ func.func @dynamic_unpack_extract_slice_transpose_inner_dims_large() {
   %packed_d0 = util.unfoldable_constant 100 : index
   %packed_d1 = util.unfoldable_constant 250 : index
   %init_unpack = tensor.empty(%packed_d0, %packed_d1) : tensor<?x?xi32>
-  %unpack = tensor.unpack %source
+  %unpack = linalg.unpack %source
       inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
       : tensor<?x?x16x32xi32> -> tensor<?x?xi32>
   %cast_unpack = tensor.cast %unpack : tensor<?x?xi32> to tensor<100x250xi32>
@@ -395,7 +395,7 @@ func.func @dynamic_unpack_extract_slice_transpose_outer_dims_large() {
   %packed_d0 = util.unfoldable_constant 100 : index
   %packed_d1 = util.unfoldable_constant 250 : index
   %init_unpack = tensor.empty(%packed_d0, %packed_d1) : tensor<?x?xi32>
-  %unpack = tensor.unpack %source outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
+  %unpack = linalg.unpack %source outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
       : tensor<?x?x32x16xi32> -> tensor<?x?xi32>
   %cast_unpack = tensor.cast %unpack : tensor<?x?xi32> to tensor<100x250xi32>
 
@@ -425,7 +425,7 @@ func.func @dynamic_unpack_extract_slice_transpose_inner_and_outer_dims_large() {
   %packed_d0 = util.unfoldable_constant 100 : index
   %packed_d1 = util.unfoldable_constant 250 : index
   %init_unpack = tensor.empty(%packed_d0, %packed_d1) : tensor<?x?xi32>
-  %unpack = tensor.unpack %source
+  %unpack = linalg.unpack %source
       outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
       : tensor<?x?x16x32xi32> -> tensor<?x?xi32>
   %cast_unpack = tensor.cast %unpack : tensor<?x?xi32> to tensor<100x250xi32>

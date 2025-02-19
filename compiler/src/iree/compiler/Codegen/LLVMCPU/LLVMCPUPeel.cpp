@@ -36,7 +36,7 @@ void collectLoopsToPeel(Operation *op,
                               .Case<linalg::LinalgOp>([](auto linalgOp) {
                                 return linalgOp.getNumLoops();
                               })
-                              .Case<tensor::PackOp>([](auto packOp) {
+                              .Case<linalg::PackOp>([](auto packOp) {
                                 return packOp.getSourceRank();
                               })
                               .Default([](auto) { return 0; });
@@ -66,7 +66,7 @@ void LLVMCPUPeelPass::runOnOperation() {
 
   llvm::SmallSetVector<scf::ForOp, 8> uniqueLoopsToPeel;
   funcOp.walk([&](Operation *op) {
-    if (isa<linalg::LinalgOp, tensor::PackOp>(op)) {
+    if (isa<linalg::LinalgOp, linalg::PackOp>(op)) {
       LLVM_DEBUG(llvm::dbgs() << "Gather loops to peel from candidate op:\n"
                               << *op << "\n");
       collectLoopsToPeel(op, uniqueLoopsToPeel);

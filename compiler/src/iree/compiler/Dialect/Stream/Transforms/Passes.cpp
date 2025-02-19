@@ -290,7 +290,7 @@ void buildStreamOptimizationPassPipeline(
   // If any scf ops crept in we get rid of them here. We should be able to
   // support them all the way through the stream dialect but some passes are not
   // currently set up to handle them (such as elide timepoints).
-  FunctionLikeNest(passManager).addPass(mlir::createConvertSCFToCFPass);
+  FunctionLikeNest(passManager).addPass(mlir::createSCFToControlFlowPass);
 
   //----------------------------------------------------------------------------
   // Whole-program scheduling optimization

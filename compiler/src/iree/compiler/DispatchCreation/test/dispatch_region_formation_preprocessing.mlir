@@ -524,7 +524,7 @@ util.func public @fix_issue_16835(%arg0: tensor<49x6x16x16xf32>, %arg1: tensor<9
   %cst_2 = arith.constant 0.166666672 : f32
   %0 = tensor.empty() : tensor<784x96xf32>
   %1 = tensor.empty() : tensor<784x96xf32>
-  %unpack = tensor.unpack %arg0 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %0 : tensor<49x6x16x16xf32> -> tensor<784x96xf32>
+  %unpack = linalg.unpack %arg0 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %0 : tensor<49x6x16x16xf32> -> tensor<784x96xf32>
   %2 = linalg.generic {indexing_maps = [#map, #map1, #map], iterator_types = ["parallel", "parallel"]} ins(%unpack, %arg1 : tensor<784x96xf32>, tensor<96xf32>) outs(%1 : tensor<784x96xf32>) {
   ^bb0(%in: f32, %in_3: f32, %out: f32):
     %3 = arith.addf %in, %in_3 : f32
@@ -539,7 +539,7 @@ util.func public @fix_issue_16835(%arg0: tensor<49x6x16x16xf32>, %arg1: tensor<9
   util.return %expanded : tensor<28x28x96xf32>
 }
 // CHECK-LABEL: util.func public @fix_issue_16835
-//       CHECK:   tensor.unpack
+//       CHECK:   linalg.unpack
 //       CHECK:   linalg.generic
 //       CHECK:   tensor.expand_shape
 

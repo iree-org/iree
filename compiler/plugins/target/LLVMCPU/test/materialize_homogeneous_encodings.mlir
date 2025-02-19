@@ -19,5 +19,5 @@ module attributes {hal.device.targets = [#device_target_llvm_cpu]} {
   }
 }
 // CHECK-LABEL: util.func public @lhs_encoding
-// CHECK:         tensor.pack
-// CHECK:         tensor.unpack
+// CHECK:         linalg.pack
+// CHECK:         linalg.unpack

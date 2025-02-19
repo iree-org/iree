@@ -110,11 +110,11 @@ static void removeFusionGroupsAttribute(Operation *op) {
 //===----------------------------------------------------------------------===//
 
 /// Returns true if the reduced dimensions in the linalgOp of the unpack result
-/// are not unpacked by the producer tensor::UnPackOp. This means the reduced
+/// are not unpacked by the producer linalg::UnPackOp. This means the reduced
 /// dimensions of the unpack result are not part of the inner_dims_pos.
 static bool hasNoPackedReductionDimensions(linalg::LinalgOp linalgOp,
                                            Operation *producer) {
-  auto unpack = dyn_cast<tensor::UnPackOp>(producer);
+  auto unpack = dyn_cast<linalg::UnPackOp>(producer);
   if (!unpack) {
     return false;
   }
@@ -148,7 +148,7 @@ static bool hasNoPackedReductionDimensions(linalg::LinalgOp linalgOp,
 /// Returns true if the linalgOp is fusable with an unpack producer
 static bool hasFusableUnpackProducer(linalg::LinalgOp linalgOp) {
   return llvm::any_of(linalgOp->getOperands(), [&](Value operand) {
-    auto producer = operand.getDefiningOp<tensor::UnPackOp>();
+    auto producer = operand.getDefiningOp<linalg::UnPackOp>();
     return producer && hasNoPackedReductionDimensions(linalgOp, producer);
   });
 }
@@ -173,27 +173,27 @@ static bool isRootOp(Operation *op) {
     return !isa<linalg::FillOp>(op);
   }
   if (isa<TilingInterface>(op)) {
-    return !isa<tensor::PadOp, tensor::PackOp>(op);
+    return !isa<tensor::PadOp, linalg::PackOp>(op);
   }
-  return isa<IREE::Encoding::UnsetEncodingOp, tensor::UnPackOp>(op);
+  return isa<IREE::Encoding::UnsetEncodingOp, linalg::UnPackOp>(op);
 }
 
 /// Returns true if the operation is a `pack` op or a `set_encoding` op that
 /// has pack semantics.
 // TODO(ravishankarm): This seems like a use case for an interface.
 static bool isPackLikeOp(Operation *op) {
-  return isa<IREE::Encoding::SetEncodingOp, tensor::PackOp>(op);
+  return isa<IREE::Encoding::SetEncodingOp, linalg::PackOp>(op);
 }
 
 /// Returns true if the operation is an `unpack` op or an `unset_encoding` op.
 static bool isUnpackLikeOp(Operation *op) {
-  return isa<IREE::Encoding::UnsetEncodingOp, tensor::UnPackOp>(op);
+  return isa<IREE::Encoding::UnsetEncodingOp, linalg::UnPackOp>(op);
 }
 
 /// Since `iree_encoding.set_encoding` doesnt have padding semantics a
 /// `tensor.pad` is introduced to get the shapes of the input and output to
 /// match. The `tensor.pad` -> `set_encoding` can be folded later on into a
-/// single `tensor.pack` operation. But it means the fusion has to try to keep
+/// single `linalg.pack` operation. But it means the fusion has to try to keep
 /// these in the same dispatch.
 // TODO(ravishankarm): Maybe make `set_encoding` have pad semantics that can be
 // explicitly broken down if needed.
@@ -648,7 +648,7 @@ isFusableWithProducer(OpOperand &operand,
     return TypeSwitch<Operation *, bool>(producer)
         .Case<tensor::PadOp>([&](auto padOp) { return true; })
         .Case<linalg::LinalgOp>([&](auto linalgOp) {
-          if (auto packOp = dyn_cast<tensor::PackOp>(consumer)) {
+          if (auto packOp = dyn_cast<linalg::PackOp>(consumer)) {
             // TODO(#12746): fusion of pack with dynamic inner tile size
             // causes an error in backend. Disable for now.
             if (!packOp.getInnerTiles().empty()) {
@@ -777,7 +777,7 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // to convert them to splats. Also avoid moving dequantization-like ops
       // into their own dispatch since it is better to clone these ops and avoid
       // materializing large tensors between dispatches.
-      if (!isa<linalg::LinalgOp, tensor::PadOp, tensor::PackOp,
+      if (!isa<linalg::LinalgOp, tensor::PadOp, linalg::PackOp,
                IREE::Encoding::SetEncodingOp>(op) ||
           IREE::Flow::isClonableIntoDispatchOp(&op, clonableOptions)) {
         continue;

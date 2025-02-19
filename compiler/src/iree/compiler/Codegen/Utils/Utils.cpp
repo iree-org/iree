@@ -22,7 +22,6 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -1605,7 +1604,7 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
   std::optional<vector::VscaleRange> vscaleRange;
   if (!opResult) {
     // Note: Inferring scalable sizes is not supported is `opResult` is set
-    // (which is used to compute sizes for tensor.pack/unpack).
+    // (which is used to compute sizes for linalg.pack/unpack).
     auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(linalgOp);
     vscaleRange = getDefaultVscaleRange(targetAttr);
   }
@@ -1672,7 +1671,7 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
   return result;
 }
 
-std::optional<VectorizationTileSizes> inferSizesFromIR(tensor::PackOp op) {
+std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op) {
   LLVM_DEBUG(llvm::dbgs() << "Inferring dest sizes for:\n" << op << "\n");
 
   if (llvm::any_of(op.getInnerTiles(), [](OpFoldResult v) {
@@ -1715,7 +1714,7 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(tensor::PackOp op) {
   return result;
 }
 
-std::optional<VectorizationTileSizes> inferSizesFromIR(tensor::UnPackOp op) {
+std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op) {
   LLVM_DEBUG(llvm::dbgs() << "Inferring dest sizes for:\n" << op << "\n");
 
   if (llvm::any_of(op.getInnerTiles(), [](OpFoldResult v) {
@@ -1766,7 +1765,7 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
   TypeSwitch<Operation *, void>(val.getDefiningOp())
       .Case<linalg::LinalgOp>(
           [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
-      .Case<tensor::PackOp>([&](auto op) { result = inferSizesFromIR(op); })
+      .Case<linalg::PackOp>([&](auto op) { result = inferSizesFromIR(op); })
       .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp op) {
         // tensor::ExtractSliceOp is not vectorizable, so only `destShape` has
         // the values.

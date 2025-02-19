@@ -30,7 +30,7 @@ func.func @static_pack_vnni_lhs_large() {
   %source = tensor.cast %0 : tensor<?x?xi8> to tensor<128x256xi8>
 
   %init_pack = tensor.empty() : tensor<8x128x16x2xi8>
-  %pack = tensor.pack %source
+  %pack = linalg.pack %source
     outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 2]
     into %init_pack : tensor<128x256xi8> -> tensor<8x128x16x2xi8>
 
@@ -52,7 +52,7 @@ func.func @static_pack_vnni_rhs_large() {
   %source = tensor.cast %0 : tensor<?x?xi8> to tensor<256x512xi8>
 
   %init_pack = tensor.empty() : tensor<32x128x16x2xi8>
-  %pack = tensor.pack %source
+  %pack = linalg.pack %source
     outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 2]
     into %init_pack : tensor<256x512xi8> -> tensor<32x128x16x2xi8>
 
@@ -75,7 +75,7 @@ func.func @static_pack_vnni_lhs_large_with_pad() {
   %c0_i8 = arith.constant 0 : i8
 
   %init_pack = tensor.empty() : tensor<8x128x16x2xi8>
-  %pack = tensor.pack %source padding_value(%c0_i8 : i8)
+  %pack = linalg.pack %source padding_value(%c0_i8 : i8)
     outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 2]
     into %init_pack : tensor<127x255xi8> -> tensor<8x128x16x2xi8>
 
@@ -101,7 +101,7 @@ func.func @static_pack_vnni_rhs_large_with_pad() {
   %c0_i8 = arith.constant 0 : i8
 
   %init_pack = tensor.empty() : tensor<32x128x16x2xi8>
-  %pack = tensor.pack %source padding_value(%c0_i8 : i8)
+  %pack = linalg.pack %source padding_value(%c0_i8 : i8)
     outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 2]
     into %init_pack : tensor<255x511xi8> -> tensor<32x128x16x2xi8>
 

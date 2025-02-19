@@ -50,14 +50,14 @@ inline void registerMlirPasses() {
   registerStripDebugInfoPass();
   registerSymbolDCEPass();
   bufferization::registerBufferizationPasses();
-  registerConvertComplexToStandard();
+  registerConvertComplexToStandardPass();
 
   // Generic conversions
   registerReconcileUnrealizedCastsPass();
 
   // Affine
   affine::registerAffinePasses();
-  registerConvertAffineToStandardPass();
+  registerLowerAffinePass();
 
   // Arm SME
   arm_sme::registerArmSMEPasses();

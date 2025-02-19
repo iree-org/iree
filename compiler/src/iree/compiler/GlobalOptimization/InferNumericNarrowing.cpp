@@ -13,7 +13,7 @@
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 
 using llvm::SmallPtrSet;
 

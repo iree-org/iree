@@ -238,8 +238,8 @@ static void addSPIRVLoweringPasses(OpPassManager &modulePassManager) {
       // Lower ApplyScale before the i64 Emulation Pass so that new 64-bit ops
       // are also emulated if not supported by the target.
       .addPass([&]() {
-        return tosa::createTosaToArith(/*includeApplyRescale=*/true,
-                                       /*use32BitApplyRescale=*/true);
+        return createTosaToArithPass({/*includeApplyRescale=*/true,
+                                      /*use32BitApplyRescale=*/true});
       })
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
