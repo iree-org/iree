@@ -12,6 +12,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/hip/api.h"
+#include "iree/hal/drivers/hip/cleanup_thread.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/rccl_dynamic_symbols.h"
 
@@ -48,5 +49,9 @@ static inline hipDeviceptr_t iree_hal_hip_device_size_to_hip_device_prt(
     iree_device_size_t p) {
   return (hipDeviceptr_t)p;
 }
+
+iree_status_t iree_hal_hip_device_add_asynchronous_cleanup(
+    iree_hal_device_t* base_device, iree_hal_hip_cleanup_callback_t callback,
+    void* user_data);
 
 #endif  // IREE_HAL_DRIVERS_HIP_DEVICE_H_
