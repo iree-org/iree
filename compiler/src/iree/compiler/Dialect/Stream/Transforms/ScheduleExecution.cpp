@@ -162,6 +162,12 @@ struct ExecutePartitionBuilder {
       if (affinityOp.getAffinityAttr() == partition->affinity) {
         affinityOp.setAffinityAttr(nullptr);
       }
+
+      auto streamableOp =
+          dyn_cast<IREE::Stream::StreamableOpInterface>(clonedOp);
+      if (streamableOp && streamableOp.preferCloneToConsumers()) {
+        affinityOp.setAffinityAttr(nullptr);
+      }
     }
 
     return true;

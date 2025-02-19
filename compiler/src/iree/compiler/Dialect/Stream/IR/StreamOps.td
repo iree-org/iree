@@ -1744,7 +1744,9 @@ def Stream_TensorDispatchOp : Stream_Op<"tensor.dispatch", [
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   Stream_AffinityOp,
   Stream_TensorPhaseOp,
-  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_StreamableOp, [
+    "preferCloneToConsumers",
+  ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedOperandsIndexAndLength",

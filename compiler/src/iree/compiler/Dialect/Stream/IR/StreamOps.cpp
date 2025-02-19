@@ -2189,6 +2189,15 @@ TensorDispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
                                   getWorkload(), symbolTable);
 }
 
+bool TensorDispatchOp::preferCloneToConsumers() {
+  for (auto operand : getMixedOperands()) {
+    if (isa<Stream::ResourceType>(operand.getType())) {
+      return false;
+    }
+  }
+  return true;
+}
+
 std::pair<unsigned, unsigned>
 TensorDispatchOp::getTiedOperandsIndexAndLength() {
   return getODSOperandIndexAndLength(1); // $operands
