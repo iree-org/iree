@@ -71,7 +71,7 @@ util.func private @constant_op() -> (tensor<1xi32>, tensor<1xi32>) {
 
 // Tests that splats (not constant-like but no consumed values) are placed with
 // their consumer(s). These are always best to rematerialize where they are
-// consumed to avoid allocating/transfering a bunch of repeated values.
+// consumed to avoid allocating/transferring a bunch of repeated values.
 
 // CHECK-LABEL: @splat_op
 util.func private @splat_op() -> tensor<1xi32> {

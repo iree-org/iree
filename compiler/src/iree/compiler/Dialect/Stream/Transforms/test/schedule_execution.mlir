@@ -221,35 +221,35 @@ util.func public @partitioningWithConcurrentAffinities(%arg0: !stream.resource<e
 //    ↓    ↓
 // P2 4    5 P3
 //
-// CHECK-LABEL: @partitionWithInterdependentInterleavedDeviceAffinites
-util.func public @partitionWithInterdependentInterleavedDeviceAffinites(
-// CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>,
+// CHECK-LABEL: @partitionWithInterdependentInterleavedDeviceAffinities
+util.func public @partitionWithInterdependentInterleavedDeviceAffinities(
+  // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>,
   %arg0: !stream.resource<external>,
-// CHECK-SAME: %[[ARG1:.+]]: !stream.resource<external>)
+  // CHECK-SAME: %[[ARG1:.+]]: !stream.resource<external>)
   %arg1: !stream.resource<external>) -> (!stream.resource<external>, !stream.resource<external>) {
   // CHECK: %[[C1:.+]] = arith.constant 1 : index
   %c1 = arith.constant 1 : index
 
   %0 = stream.async.dispatch on(#hal.device.affinity<@device_0>) @ex::@e00[%c1](
     %arg0[%c1 to %c1 for %c1]
-    ) : (!stream.resource<external>{%c1}) -> !stream.resource<transient>{%c1}
+  ) : (!stream.resource<external>{%c1}) -> !stream.resource<transient>{%c1}
   %1 = stream.async.dispatch on(#hal.device.affinity<@device_1>) @ex::@e01[%c1](
     %arg1[%c1 to %c1 for %c1]
-    ) : (!stream.resource<external>{%c1}) -> !stream.resource<transient>{%c1}
+  ) : (!stream.resource<external>{%c1}) -> !stream.resource<transient>{%c1}
 
   %2 = stream.async.dispatch on(#hal.device.affinity<@device_0>) @ex::@e10[%c1](
     %0[%c1 to %c1 for %c1], %1[%c1 to %c1 for %c1]
-    ) : (!stream.resource<transient>{%c1}, !stream.resource<transient>{%c1}) -> !stream.resource<transient>{%c1}
+  ) : (!stream.resource<transient>{%c1}, !stream.resource<transient>{%c1}) -> !stream.resource<transient>{%c1}
   %3 = stream.async.dispatch on(#hal.device.affinity<@device_1>) @ex::@e11[%c1](
     %0[%c1 to %c1 for %c1], %1[%c1 to %c1 for %c1]
-    ) : (!stream.resource<transient>{%c1}, !stream.resource<transient>{%c1}) -> !stream.resource<transient>{%c1}
+  ) : (!stream.resource<transient>{%c1}, !stream.resource<transient>{%c1}) -> !stream.resource<transient>{%c1}
 
   %4 = stream.async.dispatch on(#hal.device.affinity<@device_0>) @ex::@e20[%c1](
     %2[%c1 to %c1 for %c1], %3[%c1 to %c1 for %c1]
-    ) : (!stream.resource<transient>{%c1}, !stream.resource<transient>{%c1}) -> !stream.resource<external>{%c1}
+  ) : (!stream.resource<transient>{%c1}, !stream.resource<transient>{%c1}) -> !stream.resource<external>{%c1}
   %5 = stream.async.dispatch on(#hal.device.affinity<@device_1>) @ex::@e21[%c1](
     %2[%c1 to %c1 for %c1], %3[%c1 to %c1 for %c1]
-    ) : (!stream.resource<transient>{%c1}, !stream.resource<transient>{%c1}) -> !stream.resource<external>{%c1}
+  ) : (!stream.resource<transient>{%c1}, !stream.resource<transient>{%c1}) -> !stream.resource<external>{%c1}
 
   // Partition 0
   // CHECK: %[[RESULTS:.+]], %[[RESULT_TIMEPOINT:.+]] = stream.async.execute on(#hal.device.affinity<@device_0>)
