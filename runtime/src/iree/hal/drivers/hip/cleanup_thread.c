@@ -63,7 +63,9 @@ static int iree_hal_hip_cleanup_thread_main(void* param) {
       iree_hal_hip_callback_queue_pop_front(&thread->queue, 1);
       iree_slim_mutex_unlock(&thread->mutex);
 
-      if (iree_status_is_ok(status)) {
+      // If we have a null event then we don't have to wait
+      // on the GPU to synchronize.
+      if (iree_status_is_ok(status) && callback.event) {
         status = IREE_HIP_CALL_TO_STATUS(
             thread->symbols,
             hipEventSynchronize(iree_hal_hip_event_handle(callback.event)));

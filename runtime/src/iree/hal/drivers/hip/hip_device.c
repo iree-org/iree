@@ -1116,6 +1116,14 @@ static iree_status_t iree_hal_hip_device_stream_add_cleanup(
   return status;
 }
 
+iree_status_t iree_hal_hip_device_add_asynchronous_cleanup(
+    iree_hal_device_t* base_device, iree_hal_hip_cleanup_callback_t callback,
+    void* user_data) {
+  iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
+  return iree_hal_hip_cleanup_thread_add_cleanup(device->cleanup_thread, NULL,
+                                                 callback, user_data);
+}
+
 static iree_status_t
 iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
     iree_hal_hip_device_t* device, hipStream_t stream,
