@@ -138,7 +138,8 @@ struct ResourceAllocaOpPattern
     auto pool = rewriter.create<arith::ConstantIntOp>(loc, 0, 64);
     auto allocateOp = rewriter.create<IREE::HAL::DeviceQueueAllocaOp>(
         loc, bufferType, device, queueAffinity, waitFence, signalFence, pool,
-        memoryTypes, bufferUsage, adaptor.getStorageSize());
+        memoryTypes, bufferUsage, adaptor.getStorageSize(),
+        IREE::HAL::AllocaFlagBitfield::None);
 
     rewriter.replaceOp(allocaOp, {allocateOp.getResult(), signalFence});
     return success();
@@ -163,8 +164,11 @@ struct ResourceDeallocaOpPattern
         loc, device, deallocaOp.getResultTimepoint(), rewriter);
 
     // Queue deallocation.
+    IREE::HAL::DeallocaFlagBitfield flags =
+        IREE::HAL::DeallocaFlagBitfield::None;
     rewriter.create<IREE::HAL::DeviceQueueDeallocaOp>(
         loc, device, queueAffinity, waitFence, signalFence,
+        rewriter.getAttr<IREE::HAL::DeallocaFlagBitfieldAttr>(flags),
         adaptor.getOperand());
 
     rewriter.replaceOp(deallocaOp, {signalFence});

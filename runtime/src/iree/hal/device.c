@@ -82,7 +82,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_alloca(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size,
+    iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(
@@ -96,7 +96,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_alloca(
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = _VTABLE_DISPATCH(device, queue_alloca)(
       device, queue_affinity, wait_semaphore_list, signal_semaphore_list, pool,
-      params, allocation_size, out_buffer);
+      params, allocation_size, flags, out_buffer);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -105,7 +105,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_dealloca(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_buffer_t* buffer) {
+    iree_hal_buffer_t* buffer, iree_hal_dealloca_flags_t flags) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(
       !wait_semaphore_list.count ||
@@ -115,9 +115,32 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_dealloca(
                         signal_semaphore_list.payload_values));
   IREE_ASSERT_ARGUMENT(buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_status_t status = _VTABLE_DISPATCH(device, queue_dealloca)(
-      device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
-      buffer);
+
+  // If the buffer has an origin then use it for the deallocation. Some buffers
+  // may not have an origin and we'll use the provided device.
+  const iree_hal_buffer_placement_t placement =
+      iree_hal_buffer_allocation_placement(buffer);
+  if (iree_all_bits_set(flags, IREE_HAL_DEALLOCA_FLAG_PREFER_ORIGIN) &&
+      placement.device != NULL) {
+    device = placement.device;
+    queue_affinity = placement.queue_affinity;
+  }
+
+  // If the buffer was not allocated asynchronously then this is just a barrier.
+  iree_status_t status = iree_ok_status();
+  if (iree_all_bits_set(placement.flags,
+                        IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS) &&
+      !iree_all_bits_set(
+          placement.flags,
+          IREE_HAL_BUFFER_PLACEMENT_FLAG_INDETERMINATE_LIFETIME)) {
+    status = _VTABLE_DISPATCH(device, queue_dealloca)(
+        device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+        buffer, flags);
+  } else {
+    status = iree_hal_device_queue_barrier(
+        device, queue_affinity, wait_semaphore_list, signal_semaphore_list);
+  }
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
