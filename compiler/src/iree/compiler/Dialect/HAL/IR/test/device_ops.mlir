@@ -37,8 +37,10 @@ util.func public @device_queue_alloca(
       wait(%wait_fence) signal(%signal_fence)
       // CHECK-SAME: pool(%c100_i64)
       pool(%c100_i64)
-      // CHECK-SAME: type({{.+}}) usage({{.+}})
+      // CHECK-SAME: type({{.+}}) usage("{{.+}}Transfer")
       type(DeviceLocal) usage(Transfer)
+      // CHECK-SAME: flags("None")
+      flags("None")
       // CHECK-SAME: : !hal.buffer{%[[SIZE]]}
       : !hal.buffer{%size}
   util.return %buffer : !hal.buffer
@@ -62,6 +64,8 @@ util.func public @device_queue_dealloca(
       wait(%wait_fence) signal(%signal_fence)
       // CHECK-SAME: buffer(%[[BUFFER]] : !hal.buffer)
       buffer(%buffer : !hal.buffer)
+      // CHECK-SAME: flags(PreferOrigin)
+      flags(PreferOrigin)
   util.return
 }
 

@@ -470,10 +470,10 @@ static iree_status_t iree_io_parameter_op_batch_enqueue_alloca(
                                         batch, /*op_byte_length=*/0, &step));
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_device_queue_alloca(batch->device, batch->queue_affinity,
-                                       step.wait_semaphore_list,
-                                       step.signal_semaphore_list, pool, params,
-                                       allocation_size, out_buffer));
+      z0, iree_hal_device_queue_alloca(
+              batch->device, batch->queue_affinity, step.wait_semaphore_list,
+              step.signal_semaphore_list, pool, params, allocation_size,
+              IREE_HAL_ALLOCA_FLAG_NONE, out_buffer));
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();

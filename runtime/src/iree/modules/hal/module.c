@@ -456,6 +456,33 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_assert,  //
   return iree_ok_status();
 }
 
+IREE_VM_ABI_EXPORT(iree_hal_module_buffer_allocation_preserve,  //
+                   iree_hal_module_state_t,                     //
+                   r, v) {
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &buffer));
+  iree_hal_buffer_allocation_preserve(buffer);
+  return iree_ok_status();
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_buffer_allocation_discard,  //
+                   iree_hal_module_state_t,                    //
+                   r, i) {
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &buffer));
+  rets->i0 = iree_hal_buffer_allocation_discard(buffer) ? 1 : 0;
+  return iree_ok_status();
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_buffer_allocation_is_terminal,  //
+                   iree_hal_module_state_t,                        //
+                   r, i) {
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &buffer));
+  rets->i0 = iree_hal_buffer_allocation_is_terminal(buffer) ? 1 : 0;
+  return iree_ok_status();
+}
+
 IREE_VM_ABI_EXPORT(iree_hal_module_buffer_subspan,  //
                    iree_hal_module_state_t,         //
                    rII, r) {
@@ -1159,7 +1186,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_query_i64,  //
 
 IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_alloca,  //
                    iree_hal_module_state_t,              //
-                   rIrriiiI, r) {
+                   rIrrIiiII, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_hal_queue_affinity_t queue_affinity =
@@ -1170,6 +1197,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_alloca,  //
   iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i5;
   iree_hal_buffer_usage_t buffer_usage = (iree_hal_buffer_usage_t)args->i6;
   iree_device_size_t allocation_size = iree_hal_cast_device_size(args->i7);
+  iree_hal_alloca_flags_t flags = (iree_hal_alloca_flags_t)args->i8;
 
   const iree_hal_buffer_params_t params = {
       .type = memory_types,
@@ -1179,7 +1207,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_alloca,  //
   IREE_RETURN_IF_ERROR(iree_hal_device_queue_alloca(
       device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
       iree_hal_fence_semaphore_list(signal_fence), pool, params,
-      allocation_size, &buffer));
+      allocation_size, flags, &buffer));
 
   rets->r0 = iree_hal_buffer_move_ref(buffer);
   return iree_ok_status();
@@ -1187,7 +1215,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_alloca,  //
 
 IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_dealloca,  //
                    iree_hal_module_state_t,                //
-                   rIrrr, v) {
+                   rIrrrI, v) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_hal_queue_affinity_t queue_affinity =
@@ -1196,9 +1224,10 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_dealloca,  //
   iree_hal_fence_t* signal_fence = iree_hal_fence_deref(args->r3);
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r4, &buffer));
+  iree_hal_dealloca_flags_t flags = (iree_hal_dealloca_flags_t)args->i5;
   return iree_hal_device_queue_dealloca(
       device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
-      iree_hal_fence_semaphore_list(signal_fence), buffer);
+      iree_hal_fence_semaphore_list(signal_fence), buffer, flags);
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_fill,  //

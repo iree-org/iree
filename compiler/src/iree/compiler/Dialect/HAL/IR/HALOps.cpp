@@ -865,6 +865,24 @@ Value AllocatorImportOp::getOperandSize(unsigned idx) { return {}; }
 Value AllocatorImportOp::getResultSize(unsigned idx) { return getLength(); }
 
 //===----------------------------------------------------------------------===//
+// hal.buffer.allocation.discard
+//===----------------------------------------------------------------------===//
+
+void BufferAllocationDiscardOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "was_terminal");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.buffer.allocation.is_terminal
+//===----------------------------------------------------------------------===//
+
+void BufferAllocationIsTerminalOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "is_terminal");
+}
+
+//===----------------------------------------------------------------------===//
 // hal.buffer.subspan
 //===----------------------------------------------------------------------===//
 
