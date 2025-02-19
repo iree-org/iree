@@ -142,22 +142,38 @@ public:
       }
 
       MLIRContext *ctx = getContext();
+      std::optional<IREE::Encoding::UnsupportedEncodingAttr> defaultAttr;
+      auto getDefaultAttr = [&]() {
+        if (defaultAttr) {
+          return defaultAttr.value();
+        }
+        defaultAttr = IREE::Encoding::UnsupportedEncodingAttr::get(ctx);
+        return defaultAttr.value();
+      };
       for (IREE::Stream::AffinityAndOpPair key : batchQueries) {
         auto [affinityAttr, op] = key;
         SetVector<IREE::HAL::ExecutableTargetAttr> resultSet;
         deviceAnalysis.gatherRequiredExecutableTargets(affinityAttr, op,
                                                        resultSet);
         for (auto targetAttr : resultSet) {
-          Attribute result = IREE::Encoding::UnsupportedEncodingAttr::get(ctx);
-          if (auto attr = targetAttr.getConfiguration().getNamed("encoding")) {
-            if (auto encodingLayoutAttr =
-                    dyn_cast<IREE::Encoding::EncodingLayoutAttrInterface>(
-                        attr->getValue())) {
-              result = encodingLayoutAttr.cloneWithSimplifiedConfig(
-                  targetAttr.getConfiguration());
-            }
+          if (!targetAttr.hasConfigurationAttr("encoding")) {
+            layoutAttrs[key].insert(getDefaultAttr());
+            continue;
           }
-          layoutAttrs[key].insert(result);
+          auto attr = targetAttr.getConfiguration().getNamed("encoding");
+          if (!attr) {
+            layoutAttrs[key].insert(getDefaultAttr());
+            continue;
+          }
+          auto encodingLayoutAttr =
+              dyn_cast<IREE::Encoding::EncodingLayoutAttrInterface>(
+                  attr->getValue());
+          if (!encodingLayoutAttr) {
+            layoutAttrs[key].insert(getDefaultAttr());
+            continue;
+          }
+          layoutAttrs[key].insert(encodingLayoutAttr.cloneWithSimplifiedConfig(
+              targetAttr.getConfiguration()));
         }
       }
 

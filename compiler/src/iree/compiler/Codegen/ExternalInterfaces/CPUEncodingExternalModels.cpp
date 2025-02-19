@@ -689,9 +689,9 @@ struct CPUHostEncodingLayoutAttrInterface final
   }
 };
 
-struct CPUHostSerializedEncodingLayoutAttrInterface final
-    : IREE::Encoding::SerializedEncodingLayoutAttrInterface::ExternalModel<
-          CPUHostSerializedEncodingLayoutAttrInterface, CPUEncodingLayoutAttr> {
+struct CPUHostSerializableEncodingAttrInterface final
+    : IREE::Encoding::SerializableEncodingAttrInterface::ExternalModel<
+          CPUHostSerializableEncodingAttrInterface, CPUEncodingLayoutAttr> {
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
@@ -819,10 +819,9 @@ struct VMVXHostEncodingLayoutAttrInterface final
   }
 };
 
-struct VMVXHostSerializedEncodingLayoutAttrInterface final
-    : IREE::Encoding::SerializedEncodingLayoutAttrInterface::ExternalModel<
-          VMVXHostSerializedEncodingLayoutAttrInterface,
-          VMVXEncodingLayoutAttr> {
+struct VMVXHostSerializableEncodingAttrInterface final
+    : IREE::Encoding::SerializableEncodingAttrInterface::ExternalModel<
+          VMVXHostSerializableEncodingAttrInterface, VMVXEncodingLayoutAttr> {
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
                                     ValueRange dynamicDims) const {
@@ -839,11 +838,11 @@ void registerCPUEncodingExternalModels(DialectRegistry &registry) {
         IREE::CPU::CPUEncodingLayoutAttr::attachInterface<
             CPUDeviceEncodingLayoutAttrInterface,
             CPUHostEncodingLayoutAttrInterface,
-            CPUHostSerializedEncodingLayoutAttrInterface>(*ctx);
+            CPUHostSerializableEncodingAttrInterface>(*ctx);
         IREE::CPU::VMVXEncodingLayoutAttr::attachInterface<
             VMVXDeviceEncodingLayoutAttrInterface,
             VMVXHostEncodingLayoutAttrInterface,
-            VMVXHostSerializedEncodingLayoutAttrInterface>(*ctx);
+            VMVXHostSerializableEncodingAttrInterface>(*ctx);
       });
 }
 
