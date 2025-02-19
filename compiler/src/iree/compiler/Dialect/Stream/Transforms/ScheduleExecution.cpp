@@ -149,7 +149,8 @@ struct ExecutePartitionBuilder {
 
     // If the op has the same affinity as the partition region we can strip it.
     // Note that some ops may have affinities that are more specific and we
-    // want to preserve those as long as possible.
+    // want to preserve those as long as possible. Other ops don't really care
+    // about affinities and can take on whatever we want.
     if (auto transferOp = dyn_cast<IREE::Stream::AsyncTransferOp>(clonedOp)) {
       if (transferOp.getSourceAffinityAttr() == partition->affinity) {
         transferOp.setSourceAffinityAttr(nullptr);
@@ -159,7 +160,12 @@ struct ExecutePartitionBuilder {
       }
     } else if (auto affinityOp =
                    dyn_cast<IREE::Stream::AffinityOpInterface>(clonedOp)) {
-      if (affinityOp.getAffinityAttr() == partition->affinity) {
+      auto streamableOp =
+          dyn_cast<IREE::Stream::StreamableOpInterface>(clonedOp);
+      const bool preferCloneToConsumers =
+          streamableOp ? streamableOp.preferCloneToConsumers() : false;
+      if (affinityOp.getAffinityAttr() == partition->affinity ||
+          preferCloneToConsumers) {
         affinityOp.setAffinityAttr(nullptr);
       }
     }
