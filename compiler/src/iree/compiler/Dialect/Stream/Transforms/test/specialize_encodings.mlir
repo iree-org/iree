@@ -35,6 +35,51 @@ util.func public @tensor_sizeof(%d0: index, %d1: index) -> (index, index) {
 // -----
 
 //------------------------------------------------------------------------------
+// #iree_gpu.gpu_encoding_layout specialization tests.
+// These get serialized to the layout attributes.
+//------------------------------------------------------------------------------
+
+#map0 = affine_map<(m, n, k) -> (m, k)>
+#map1 = affine_map<(m, n, k) -> (k, n)>
+#map2 = affine_map<(m, n, k) -> (m, n)>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
+  {
+    abi = "hip",
+    encoding = #iree_gpu.gpu_encoding_layout<>,
+    iree.gpu.target = #iree_gpu.target<arch = "gfx942",
+                                       features = "",
+                                       wgp = <compute = fp32,
+                                              storage =  b32,
+                                              subgroup =  none,
+                                              dot =  none,
+                                              mma = [<MFMA_F32_16x16x4_F32>],
+                                              subgroup_size_choices = [64],
+                                              max_workgroup_sizes = [1024, 1024, 1024],
+                                              max_thread_count_per_workgroup = 1024,
+                                              max_workgroup_memory_bytes = 65536,
+                                              max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+                                              max_load_instruction_bits = 128,
+                                              simds_per_wgp = 4,
+                                              vgpr_space_bits = 16384>>
+  }>
+#device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_rocm_hsaco_fb]> : !hal.device
+#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
+
+util.global private @device_a = #device_target_local_0_
+util.func public @gpu_with_encoding_layout(%d0: index, %d1: index) -> index {
+  %size0 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<?x?xf32, #encoding>{%d0, %d1} : index
+  util.return %size0 : index
+}
+// CHECK:       #[[$ENCODING:.+]] = #iree_encoding.encoding
+// CHECK-SAME:    #iree_gpu.gpu_encoding_layout
+// CHECK-SAME:    encoding_info = {innerDimsPos = [{{.+}}], innerTileSizes = [{{.+}}], outerDimsPerm = [{{.+}}]}
+// CHECK-LABEL: util.func public @gpu_with_encoding_layout
+// CHECK:         %[[RES:.+]] = stream.tensor.sizeof {{.+}} tensor<?x?xf32, #[[$ENCODING]]>
+// CHECK:         return %[[RES]]
+
+// -----
+
+//------------------------------------------------------------------------------
 // iree_gpu.gpu_pad_encoding specialization tests.
 // These get serialized to iree_encoding.pad_encoding_layout attributes.
 //------------------------------------------------------------------------------
