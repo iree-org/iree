@@ -102,4 +102,13 @@ DictionaryAttr getLayoutImpl(Attribute attr, RankedTensorType type) {
       ctx, NamedAttribute(kEncodingInfoAttrName, encodingInfoAttr));
 }
 
+void storeNamedAttrIfPresent(SmallVectorImpl<NamedAttribute> &config,
+                             DictionaryAttr dictAttr, StringRef name) {
+  auto attr = dictAttr.getNamed(name);
+  if (!attr) {
+    return;
+  }
+  config.push_back(attr.value());
+}
+
 } // namespace mlir::iree_compiler::IREE

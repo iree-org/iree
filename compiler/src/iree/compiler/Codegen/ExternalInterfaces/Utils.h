@@ -25,6 +25,11 @@ Value calculateStorageSizeInBytesImpl(Attribute attr, Location loc,
 /// Requirement: `attr` must implement IREE::Codegen::LayoutAttrInterface.
 DictionaryAttr getLayoutImpl(Attribute attr, RankedTensorType type);
 
+/// Appends the NamedAttribute into `config` if there is a `name` NamedAttribute
+/// in the `dictAttr`.
+void storeNamedAttrIfPresent(SmallVectorImpl<NamedAttribute> &config,
+                             DictionaryAttr dictAttr, StringRef name);
+
 } // namespace mlir::iree_compiler::IREE
 
 #endif // IREE_COMPILER_CODEGEN_EXTERNALINTERFACES_UTILSS_H_
