@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -14,6 +15,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Arith/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/DstBufferizableOpInterfaceImpl.h"
@@ -97,10 +99,17 @@ findOrCreateSubspanBuffer(RewriterBase &rewriter,
     layoutAttr = StridedLayoutAttr::get(rewriter.getContext(),
                                         ShapedType::kDynamic, strides);
   }
-  auto memRefType =
-      getMemrefTypeForTensor(shapedType, layoutAttr,
-                             rewriter.getAttr<IREE::HAL::DescriptorTypeAttr>(
-                                 subspanOp.getDescriptorType()));
+  bool useRocdlBuffers = false;
+  if (auto *ireeGpuDialect =
+          rewriter.getContext()
+              ->getLoadedDialect<IREE::GPU::IREEGPUDialect>()) {
+    useRocdlBuffers =
+        ireeGpuDialect->getUseRocdlBufferInstructionsAttrHelper().isAttrPresent(
+            subspanOp);
+  }
+  Attribute memorySpace = rewriter.getAttr<IREE::HAL::DescriptorTypeAttr>(
+      subspanOp.getDescriptorType());
+  auto memRefType = getMemrefTypeForTensor(shapedType, layoutAttr, memorySpace);
 
   // Look for an existing op.
   Block *block = subspanOp->getBlock();
@@ -124,6 +133,14 @@ findOrCreateSubspanBuffer(RewriterBase &rewriter,
         bufferSubspanOp.getAlignment() != subspanOp.getAlignment() ||
         memRefType != bufferMemrefType)
       continue;
+
+    if (useRocdlBuffers && bufferSubspanOp->hasOneUse()) {
+      auto castOp = llvm::dyn_cast<amdgpu::FatRawBufferCastOp>(
+          *bufferSubspanOp->getUsers().begin());
+      if (!castOp)
+        continue;
+      return castOp.getResult();
+    }
     return bufferSubspanOp.getResult();
   }
 
@@ -136,6 +153,12 @@ findOrCreateSubspanBuffer(RewriterBase &rewriter,
       subspanOp.getBinding(), subspanOp.getByteOffset(),
       subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
       subspanOp.getDescriptorFlagsAttr());
+  if (useRocdlBuffers) {
+    buffer = rewriter.create<amdgpu::FatRawBufferCastOp>(
+        subspanOp->getLoc(), buffer, /*validBytes=*/Value{},
+        /*cacheSwizzleStride=*/Value{}, /*boundsCheck=*/true,
+        /*resetOffset=*/true);
+  }
   rewriter.create<memref::AssumeAlignmentOp>(
       subspanOp->getLoc(), buffer, subspanOp.calculateAlignment().value());
   return buffer;

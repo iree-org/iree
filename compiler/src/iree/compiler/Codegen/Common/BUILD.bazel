@@ -205,6 +205,7 @@ iree_compiler_cc_library(
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AMDGPUDialect",
+        "@llvm-project//mlir:AMDGPUTransforms",
         "@llvm-project//mlir:AMDGPUUtils",
         "@llvm-project//mlir:AffineAnalysis",
         "@llvm-project//mlir:AffineDialect",

@@ -140,10 +140,10 @@ hal.executable private @i4_dequant_matvec {
 //   CDNA3-SAME:    translation_info = #[[$TRANSLATION]]
 //         CDNA3:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x8xf16>
 //         CDNA3:   %[[FOR:.+]] = scf.for %{{.+}} = %c0 to %c32 step %c4 iter_args(%[[ARG:.+]] = %[[CST]]) -> (vector<1x8xf16>)
-//         CDNA3:     %[[READ0:.+]] = vector.transfer_read {{.+}} : memref<4096x32x128xi4, #hal.descriptor_type<storage_buffer>>, vector<1x8xi4>
-//         CDNA3:     %[[READ1:.+]] = vector.transfer_read {{.+}} : memref<4096x32xf16, #hal.descriptor_type<storage_buffer>>, vector<1x8xf16>
-//         CDNA3:     %[[READ2:.+]] = vector.transfer_read {{.+}} : memref<4096x32xf16, #hal.descriptor_type<storage_buffer>>, vector<1x8xf16>
-//         CDNA3:     %[[READ3:.+]] = vector.transfer_read {{.+}} : memref<32x128xf16, #hal.descriptor_type<storage_buffer>>, vector<1x8xf16>
+//         CDNA3:     %[[READ0:.+]] = vector.transfer_read {{.+}} : memref<4096x32x128xi4, #amdgpu.address_space<fat_raw_buffer>>, vector<1x8xi4>
+//         CDNA3:     %[[READ1:.+]] = vector.transfer_read {{.+}} : memref<4096x32xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x8xf16>
+//         CDNA3:     %[[READ2:.+]] = vector.transfer_read {{.+}} : memref<4096x32xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x8xf16>
+//         CDNA3:     %[[READ3:.+]] = vector.transfer_read {{.+}} : memref<32x128xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x8xf16>
 //         CDNA3:     %[[EXTEND:.+]] = arith.extui %[[READ0]] : vector<1x8xi4> to vector<1x8xi32>
 //         CDNA3:     %[[CVT:.+]] = arith.uitofp %[[EXTEND]] : vector<1x8xi32> to vector<1x8xf16>
 //         CDNA3:     %[[SUB:.+]] = arith.subf %[[CVT]], %[[READ1]] : vector<1x8xf16>
@@ -265,15 +265,15 @@ hal.executable private @matvec_fp16 {
 //      CHECK-DAG:   %[[C4096:.+]] = arith.constant 4096 : index
 //      CHECK-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<8x8xf16>
 //          CHECK:   scf.for %{{.+}} = %[[C0]] to %[[C4096]] step %[[C512]] iter_args(%[[ARG:.+]] = %[[CST]]) -> (vector<8x8xf16>)
-//      CHECK-DAG:     %[[MAT:.+]] = vector.transfer_read {{.+}} : memref<32000x4096xf16, #hal.descriptor_type<storage_buffer>>, vector<8x8xf16>
-//      CHECK-DAG:     %[[VEC:.+]] = vector.transfer_read {{.+}} : memref<1x4096xf16, #hal.descriptor_type<storage_buffer>>, vector<8x8xf16>
+//      CHECK-DAG:     %[[MAT:.+]] = vector.transfer_read {{.+}} : memref<32000x4096xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8x8xf16>
+//      CHECK-DAG:     %[[VEC:.+]] = vector.transfer_read {{.+}} : memref<1x4096xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8x8xf16>
 //          CHECK:     %[[MUL:.+]] = arith.mulf %[[VEC]], %[[MAT]] : vector<8x8xf16>
 //          CHECK:     %[[ADD:.+]] = arith.addf %[[ARG]], %[[MUL]] : vector<8x8xf16>
 
 //          CHECK:   vector.reduction <add>, %{{.+}} : vector<8xf16> into f16
 // CHECK-COUNT-24:   gpu.shuffle xor
 //          CHECK:   scf.if
-//          CHECK:     vector.transfer_write {{.+}} : vector<8xf16>, memref<1x32000xf16, #hal.descriptor_type<storage_buffer>>
+//          CHECK:     vector.transfer_write {{.+}} : vector<8xf16>, memref<1x32000xf16, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
 
@@ -324,15 +324,15 @@ hal.executable private @matvec_fp16 {
 //      CDNA3-DAG:   %[[C4096:.+]] = arith.constant 4096 : index
 //      CDNA3-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<8x8xf16>
 //          CDNA3:   scf.for %{{.+}} = %[[C0]] to %[[C4096]] step %[[C512]] iter_args(%[[ARG:.+]] = %[[CST]]) -> (vector<8x8xf16>)
-//      CDNA3-DAG:     %[[MAT:.+]] = vector.transfer_read {{.+}} : memref<32000x4096xf16, #hal.descriptor_type<storage_buffer>>, vector<8x8xf16>
-//      CDNA3-DAG:     %[[VEC:.+]] = vector.transfer_read {{.+}} : memref<1x4096xf16, #hal.descriptor_type<storage_buffer>>, vector<8x8xf16>
+//      CDNA3-DAG:     %[[MAT:.+]] = vector.transfer_read {{.+}} : memref<32000x4096xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8x8xf16>
+//      CDNA3-DAG:     %[[VEC:.+]] = vector.transfer_read {{.+}} : memref<1x4096xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8x8xf16>
 //          CDNA3:     %[[MUL:.+]] = arith.mulf %[[VEC]], %[[MAT]] : vector<8x8xf16>
 //          CDNA3:     %[[ADD:.+]] = arith.addf %[[ARG]], %[[MUL]] : vector<8x8xf16>
 
 //          CDNA3:   vector.reduction <add>, %{{.+}} : vector<8xf16> into f16
 // CDNA3-COUNT-24:   gpu.shuffle xor
 //          CDNA3:   scf.if
-//          CDNA3:     vector.transfer_write {{.+}} : vector<8xf16>, memref<1x32000xf16, #hal.descriptor_type<storage_buffer>>
+//          CDNA3:     vector.transfer_write {{.+}} : vector<8xf16>, memref<1x32000xf16, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
 
