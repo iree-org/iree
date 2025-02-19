@@ -48,7 +48,7 @@ func.func @view_type2(%arg0 : !torch.vtensor<[?],f64>) -> !torch.vtensor<[?],f16
     //  CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
     //  CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
     //      CHECK: %[[DIM:.+]] = tensor.dim %[[IN:.+]], %[[C0]] : tensor<?xf64>
-    //      CHECK: %[[OUT:.+]] = arith.divui %[[DIM]], %[[C4]] : index
+    //      CHECK: %[[OUT:.+]] = arith.divsi %[[DIM]], %[[C4]] : index
     //      CHECK: flow.tensor.bitcast %[[IN]] :
     // CHECK-SAME:   tensor<?xf64>{%[[DIM]]} -> tensor<?xf16>{%[[OUT]]}
     %0 = torch.aten.view.dtype %arg0, %int4 : !torch.vtensor<[?],f64>, !torch.int -> !torch.vtensor<[?],f16>

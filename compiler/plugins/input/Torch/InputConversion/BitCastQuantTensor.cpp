@@ -61,7 +61,7 @@ public:
       if (inElemWidth > outElemWidth) {
         auto scale = rewriter.create<arith::ConstantIndexOp>(
             loc, inElemWidth / outElemWidth);
-        outDynamicDims.back() = rewriter.create<arith::DivUIOp>(
+        outDynamicDims.back() = rewriter.create<arith::DivSIOp>(
             loc, inDynamicDims.back(), scale.getResult());
 
       } else if (inElemWidth < outElemWidth) {
