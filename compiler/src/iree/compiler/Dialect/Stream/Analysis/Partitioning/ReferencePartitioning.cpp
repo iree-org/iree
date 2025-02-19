@@ -100,7 +100,8 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
     if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op))
       affinityAttr = affinityOp.getAffinityAttr();
     bool preferCloneToConsumers = streamableOp.preferCloneToConsumers();
-    if (!preferCloneToConsumers && !IREE::Stream::AffinityAttr::canExecuteTogether(
+    if (!preferCloneToConsumers &&
+        !IREE::Stream::AffinityAttr::canExecuteTogether(
             affinityAttr, builders[partitionOrdinal]->affinity))
       return false;
 
