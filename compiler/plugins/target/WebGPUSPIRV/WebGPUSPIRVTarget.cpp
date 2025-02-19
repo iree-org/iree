@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/WGSL/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -87,7 +88,7 @@ public:
     Builder b(context);
     SmallVector<NamedAttribute, 1> configItems;
     if (auto target = GPU::getWebGPUTargetDetails(context)) {
-      configItems.emplace_back("iree.gpu.target", target);
+      configItems.emplace_back(kGPUTargetAttrName, target);
     }
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
