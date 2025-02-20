@@ -115,6 +115,10 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // Run inlining after having baked out affinities.
   passManager.addPass(mlir::createInlinerPass());
 
+  // Elide any redundant transfers now that affinities are baked out and we know
+  // where resources are located.
+  passManager.addPass(IREE::Stream::createElideAsyncTransfersPass());
+
   // Cleanup globals that were created during conversion.
   buildStreamCleanupPassPipeline(passManager, transformOptions);
 
