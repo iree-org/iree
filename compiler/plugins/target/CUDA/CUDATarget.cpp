@@ -423,7 +423,7 @@ public:
 
     if (auto target = GPU::getCUDATargetDetails(
             options.clTarget, options.clTargetFeatures, context)) {
-      configItems.emplace_back("iree.gpu.target", target);
+      configItems.emplace_back(kGPUTargetAttrName, target);
     }
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(

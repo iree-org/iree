@@ -252,7 +252,7 @@ public:
 
     if (auto target = GPU::getHIPTargetDetails(
             options.target, options.targetFeatures, context)) {
-      addConfig("iree.gpu.target", target);
+      addConfig(kGPUTargetAttrName, target);
       if (options.experimentalPadLayout) {
         if (Attribute encoding = GPU::getHIPTargetEncodingLayoutAttr(target)) {
           addConfig("encoding", encoding);
