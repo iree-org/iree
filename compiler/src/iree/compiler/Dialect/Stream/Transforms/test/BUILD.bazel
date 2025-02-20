@@ -22,6 +22,7 @@ iree_lit_test_suite(
             "convert_to_stream.mlir",
             "dump_statistics.mlir",
             "elide_async_copies.mlir",
+            "elide_async_transfers.mlir",
             "elide_timepoints_coverage.mlir",
             "elide_timepoints_immediate.mlir",
             "emplace_allocations.mlir",

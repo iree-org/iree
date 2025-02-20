@@ -680,8 +680,9 @@ struct ElideAsyncCopiesPass
           ElideAsyncCopiesPass> {
   void runOnOperation() override {
     auto moduleOp = getOperation();
-    if (moduleOp.getBody()->empty())
+    if (moduleOp.getBody()->empty()) {
       return;
+    }
 
     // Try analyzing the program and eliding the unneeded copies until we reach
     // a fixed point (no more copies can be elided).
@@ -692,7 +693,7 @@ struct ElideAsyncCopiesPass
       // TODO(benvanik): reuse allocator across iterations.
       ElisionAnalysis analysis(moduleOp);
       if (failed(analysis.run())) {
-        moduleOp.emitError() << "failed to solve for last users";
+        moduleOp.emitError() << "failed to solve for elision analysis";
         return signalPassFailure();
       }
 
@@ -711,7 +712,7 @@ struct ElideAsyncCopiesPass
     if (iterationCount == maxIterationCount) {
       // If you find yourself hitting this we can evaluate increasing the
       // iteration count (if it would eventually converge) or whether we allow
-      // this to happen without remarking. For now all our programs coverge in
+      // this to happen without remarking. For now all our programs converge in
       // just one or two iterations and this needs to be tuned with more complex
       // control flow.
       moduleOp.emitRemark()
