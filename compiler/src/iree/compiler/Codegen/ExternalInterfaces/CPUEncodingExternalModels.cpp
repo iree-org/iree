@@ -54,17 +54,6 @@ namespace {
 // Utilities.
 //===----------------------------------------------------------------------===//
 
-/// Appends the NamedAttribute into `config` if there is a `name` NamedAttribute
-/// in the `dictAttr`.
-static void storeNamedAttrIfPresent(SmallVectorImpl<NamedAttribute> &config,
-                                    DictionaryAttr dictAttr, StringRef name) {
-  auto attr = dictAttr.getNamed(name);
-  if (!attr) {
-    return;
-  }
-  config.push_back(attr.value());
-}
-
 static void transposeInPlace(MaterializeEncodingInfo &info) {
   // Vector cases: nothing to do.
   if (info.innerTileSizes.size() < 2) {

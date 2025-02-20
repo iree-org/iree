@@ -80,13 +80,18 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     } else if (isROCMBackend(targetAttr)) {
       LDBG("Select GPUEncodingLayoutAttr attribute as the layout attribute.");
       layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
-          IREE::GPU::GPUEncodingLayoutAttr::get(ctx,
-                                                getGPUTargetAttr(targetAttr)));
+          IREE::GPU::GPUEncodingLayoutAttr::get(
+              ctx, DictionaryAttr::get(
+                       ctx, NamedAttribute(kGPUTargetAttrName,
+                                           getGPUTargetAttr(targetAttr)))));
     } else if (testCLGPUTarget) {
       LDBG("Select GPUEncodingLayoutAttr attribute as the layout attribute. "
            "(testCLGPUTarget)");
       layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
-          IREE::GPU::GPUEncodingLayoutAttr::get(ctx, getCLGPUTarget(ctx)));
+          IREE::GPU::GPUEncodingLayoutAttr::get(
+              ctx,
+              DictionaryAttr::get(ctx, NamedAttribute(kGPUTargetAttrName,
+                                                      getCLGPUTarget(ctx)))));
     } else {
       LDBG("Select EncodingNopLayoutAttr attribute as the layout attribute.");
       layoutAttr = IREE::Codegen::EncodingNopLayoutAttr::get(ctx);

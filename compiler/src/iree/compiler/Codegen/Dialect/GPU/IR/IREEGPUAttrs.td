@@ -295,9 +295,8 @@ def IREEGPU_GPUEncodingLayoutAttr :
   let assemblyFormat = "`<` struct(params) `>`";
 
   let parameters = (ins
-    OptionalParameter<"::mlir::iree_compiler::IREE::GPU::TargetAttr",
-     "IREE GPU target attribute. It is expected to be used in a pass scope, "
-     "but not the final IR output.">:$targetAttr
+    OptionalParameter<"DictionaryAttr", "Executable target configuration. It is "
+     "expected to be used in a pass scope, but not the final IR output.">:$configuration
   );
 }
 

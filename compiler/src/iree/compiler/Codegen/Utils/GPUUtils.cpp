@@ -967,12 +967,25 @@ IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context) {
   return IREE::GPU::getFullTarget(backend, arch, features, context);
 }
 
-IREE::GPU::TargetAttr getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr target) {
-  if (auto config = target.getConfiguration()) {
-    if (auto attr = config.getAs<IREE::GPU::TargetAttr>(kGPUTargetAttrName))
-      return attr;
+IREE::GPU::TargetAttr getGPUTargetAttr(Attribute attr) {
+  if (!attr) {
+    return {};
   }
-  return getCLGPUTarget(target.getContext());
+  DictionaryAttr config;
+  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(attr);
+  if (targetAttr) {
+    config = targetAttr.getConfiguration();
+  } else {
+    config = dyn_cast<DictionaryAttr>(attr);
+  }
+  if (!config) {
+    return getCLGPUTarget(attr.getContext());
+  }
+  auto gpuAttr = config.getAs<IREE::GPU::TargetAttr>(kGPUTargetAttrName);
+  if (!gpuAttr) {
+    return getCLGPUTarget(attr.getContext());
+  }
+  return gpuAttr;
 }
 
 IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op) {

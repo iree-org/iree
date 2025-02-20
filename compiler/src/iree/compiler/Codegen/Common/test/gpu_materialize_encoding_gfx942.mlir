@@ -1190,3 +1190,37 @@ func.func @batch_matmul_lowering_MFMA_F32_16x16x16_BF16() {
 // CHECK-SAME:    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>]
 // CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x16_BF16, intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 2>
 // CHECK:       flow.dispatch.tensor.store %[[MMA]], %[[ACC_BINDING]]
+
+// -----
+
+//----------------------------------------------------------------------------//
+// Test suite for encodings with resolved layouts.
+//----------------------------------------------------------------------------//
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip"}>
+#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], layouts = [#iree_gpu.gpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [128, 16], outerDimsPerm = [0, 1]}}>]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @set_encoding_with_layout() attributes {
+  hal.executable.target = #executable_target_rocm_hsaco_fb
+} {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<255x513xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<255x513xf32, #encoding>>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<255x513xf32>> -> tensor<255x513xf32>
+  %3 = iree_encoding.set_encoding %2 : tensor<255x513xf32> -> tensor<255x513xf32, #encoding>
+  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : tensor<255x513xf32, #encoding> -> !flow.dispatch.tensor<writeonly:tensor<255x513xf32,  #encoding>>
+  return
+}
+// CHECK-LABEL: func.func @set_encoding_with_layout
+//   CHECK-DAG:   %[[INPUT_BINDING:.+]] = hal.interface.binding.subspan {{.*}} binding(0) {{.*}} : !flow.dispatch.tensor<readonly:tensor<255x513xf32>>
+//   CHECK-DAG:   %[[RESULT_BINDING:.+]] = hal.interface.binding.subspan {{.*}} binding(1) {{.*}} : !flow.dispatch.tensor<writeonly:tensor<2x33x128x16xf32>
+//       CHECK:   %[[INPUT:.+]] = flow.dispatch.tensor.load %[[INPUT_BINDING]]
+//       CHECK:   %[[PACK:.+]] = linalg.pack %[[INPUT]]
+//  CHECK-SAME:     outer_dims_perm = [0, 1]
+//  CHECK-SAME:     inner_dims_pos = [0, 1]
+//  CHECK-SAME:     inner_tiles = [128, 16]
+//  CHECK-SAME:     tensor<255x513xf32> -> tensor<2x33x128x16xf32>
+//       CHECK:   flow.dispatch.tensor.store %[[PACK]], %[[RESULT_BINDING]]
