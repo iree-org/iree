@@ -171,10 +171,12 @@ struct ConcretizeMmaOperandShape final : OpRewritePattern<MultiMmaOp> {
           idx -= outerRank;
         }
       }
+      SmallVector<int64_t> invertPerm = invertPermutationVector(perm.value());
       SmallVector<int64_t> expandedPerm;
-      for (auto reInd : applyPermutation(innerReInds, perm.value())) {
+      for (auto reInd : applyPermutation(innerReInds, invertPerm)) {
         expandedPerm.append(reInd);
       }
+      expandedPerm = invertPermutationVector(expandedPerm);
       return rewriter.getDenseI64ArrayAttr(expandedPerm);
     };
     std::optional<DenseI64ArrayAttr> lhsPerm = expandPerm(
