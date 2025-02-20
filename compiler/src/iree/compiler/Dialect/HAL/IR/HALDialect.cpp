@@ -125,7 +125,7 @@ public:
   using AffinityAnalysisDialectInterface::AffinityAnalysisDialectInterface;
 
   // Returns a function that gathers the corresponding
-  // EncodingLayoutAttrInterface attributes for each
+  // EncodingLayoutResolverAttrInterface attributes for each
   // (IREE::Stream::Affinity, Operation) query. The attribute is extracted from
   // the `encoding` field in the HAL::ExecutableTargetAttr configuration. If the
   // `encoding` is not present, UnsupportedEncodingAttr is returned.
@@ -162,7 +162,7 @@ public:
           }
           auto encodingLayoutAttr =
               targetAttr.getConfiguration()
-                  .getAs<IREE::Encoding::EncodingLayoutAttrInterface>(
+                  .getAs<IREE::Encoding::EncodingLayoutResolverAttrInterface>(
                       "encoding");
           if (!encodingLayoutAttr) {
             layoutAttrs[key].insert(getDefaultAttr());

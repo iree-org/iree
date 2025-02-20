@@ -77,7 +77,7 @@ static RankedTensorType cloneWithEncoding(RankedTensorType type,
 /// There are requirements to get the resolved layouts. Otherwise, the encodings
 /// are dropped unconditionally.
 ///   - All attributes in the `layoutResolvers` must implement
-///     EncodingLayoutAttrInterface. Otherwise, there is no way to query
+///     EncodingLayoutResolverAttrInterface. Otherwise, there is no way to query
 ///     layouts.
 ///   - The encoding on the type must implement
 ///     SerializableEncodingAttrInterface. Otherwise, there is no way to update
@@ -98,13 +98,13 @@ static Type getTypeWithResolvedEncodingLayouts(
   }
   if (!llvm::all_of(
           layoutResolvers,
-          llvm::IsaPred<IREE::Encoding::EncodingLayoutAttrInterface>)) {
+          llvm::IsaPred<IREE::Encoding::EncodingLayoutResolverAttrInterface>)) {
     return IREE::Encoding::dropEncoding(rankedTensorType);
   }
   SmallVector<Attribute> layouts;
   for (auto attr : layoutResolvers) {
     auto encodingLayoutAttr =
-        cast<IREE::Encoding::EncodingLayoutAttrInterface>(attr);
+        cast<IREE::Encoding::EncodingLayoutResolverAttrInterface>(attr);
     Attribute layout = encodingLayoutAttr.getLayout(rankedTensorType);
     if (!layout) {
       // Drop the encoding if the layout is not resolved.
