@@ -142,8 +142,7 @@ iree_hal_cuda_deferred_work_queue_device_interface_create_native_event(
       (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
   return IREE_CURESULT_TO_STATUS(
       device_interface->cuda_symbols,
-      cuEventCreate((CUevent*)out_event, CU_EVENT_WAIT_DEFAULT),
-      "cuEventCreate");
+      cuEventCreate((CUevent*)out_event, CU_EVENT_DEFAULT), "cuEventCreate");
 }
 
 static iree_status_t
