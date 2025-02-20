@@ -313,10 +313,10 @@ def IREEGPU_GPUPadLayoutAttr : AttrDef<IREEGPU_Dialect, "GPUPadLayout"> {
   let description = [{
     Describes padding preferences for a given GPU target.
     This attribute can implement any encoding interface for data-tiling,
-    e.g., Encoding::EncodingLayoutAttrInterface, etc. They should be implemented
-    through external model mechanism because we do not want to relocate
-    domain-specific logic to the dialect implementation, and we can have better
-    code structure. See the implementation in
+    e.g., Encoding::EncodingLayoutResolverAttrInterface, etc. They should be
+    implemented through external model mechanism because we do not want to
+    relocate domain-specific logic to the dialect implementation, and we can
+    have better code structure. See the implementation in
     compiler/Codegen/ExternalInterfaces/*.
   }];
 

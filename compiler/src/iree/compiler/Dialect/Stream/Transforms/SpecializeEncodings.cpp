@@ -68,14 +68,20 @@ static RankedTensorType cloneWithEncoding(RankedTensorType type,
                                encodingAttr);
 }
 
-// Returns the type with updated encoding, if any. Returns the original type if
-// the type is not a RankedTensorType. If it is a RankedTensorType with an
-// unknown encoding, returns the type without the encoding. The method uses
-// `layoutResolvers` to resolve the layouts of the given `type`; returns the new
-// encoding with the resolved layouts.
-// Note: The new encoding has to implement
-// SerializedEncodingLayoutAttrInterface. Otherwise, the specialization is
-// failed. Because the stream tensor ops still can not process encodings.
+/// Returns the type with updated encoding, if any. Returns the original type if
+/// the type is not a RankedTensorType. If it is a RankedTensorType with an
+/// unknown encoding, returns the type without the encoding. The method uses
+/// `layoutResolvers` to resolve the layouts of the given `type`; returns the
+/// new encoding with the resolved layouts.
+///
+/// There are requirements to get the resolved layouts. Otherwise, the encodings
+/// are dropped unconditionally.
+///   - All attributes in the `layoutResolvers` must implement
+///     EncodingLayoutResolverAttrInterface. Otherwise, there is no way to query
+///     layouts.
+///   - The encoding on the type must implement
+///     SerializableEncodingAttrInterface. Otherwise, there is no way to update
+///     encodings.
 static Type getTypeWithResolvedEncodingLayouts(
     Type type, const SetVector<Attribute> &layoutResolvers) {
   auto rankedTensorType = dyn_cast<RankedTensorType>(type);
@@ -83,21 +89,22 @@ static Type getTypeWithResolvedEncodingLayouts(
     return type;
   }
   auto encodingAttr =
-      IREE::Encoding::getEncodingLayoutAttrInterface(rankedTensorType);
+      IREE::Encoding::getSerializableEncodingAttrInterface(rankedTensorType);
   if (!encodingAttr) {
     return IREE::Encoding::dropEncoding(rankedTensorType);
   }
+  if (encodingAttr.isSerialized()) {
+    return type;
+  }
   if (!llvm::all_of(
           layoutResolvers,
-          llvm::IsaPred<IREE::Encoding::EncodingLayoutAttrInterface>)) {
-    // Drop the encoding if any attribute does not implement the interface.
-    // Because there is no way to query the layout.
+          llvm::IsaPred<IREE::Encoding::EncodingLayoutResolverAttrInterface>)) {
     return IREE::Encoding::dropEncoding(rankedTensorType);
   }
   SmallVector<Attribute> layouts;
   for (auto attr : layoutResolvers) {
     auto encodingLayoutAttr =
-        cast<IREE::Encoding::EncodingLayoutAttrInterface>(attr);
+        cast<IREE::Encoding::EncodingLayoutResolverAttrInterface>(attr);
     Attribute layout = encodingLayoutAttr.getLayout(rankedTensorType);
     if (!layout) {
       // Drop the encoding if the layout is not resolved.
@@ -106,8 +113,7 @@ static Type getTypeWithResolvedEncodingLayouts(
     layouts.push_back(layout);
   }
   Attribute newEncoding = encodingAttr.cloneWithLayouts(layouts);
-  assert(
-      isa<IREE::Encoding::SerializedEncodingLayoutAttrInterface>(newEncoding));
+  assert(isa<IREE::Encoding::SerializableEncodingAttrInterface>(newEncoding));
   return cloneWithEncoding(rankedTensorType, newEncoding);
 };
 
@@ -134,12 +140,14 @@ updateBindingEncodings(FunctionOpInterface funcOp,
                  << "Skip, the new type is not RankedTensorType.\n");
       continue;
     }
-    auto encodingAttr = IREE::Encoding::getEncodingLayoutAttrInterface(newType);
+    auto encodingAttr =
+        IREE::Encoding::getSerializableEncodingAttrInterface(newType);
     if (!encodingAttr) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Skip, the binding layout attribute is not "
-                    "EncodingLayoutAttrInterface, which means that the type "
-                    "does not have a valid encoding.\n");
+      LLVM_DEBUG(
+          llvm::dbgs()
+          << "Skip, the binding layout attribute is not "
+             "SerializableEncodingAttrInterface, which means that the type "
+             "does not have a valid encoding.\n");
       continue;
     }
     for (auto user : arg.getUsers()) {

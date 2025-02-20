@@ -246,6 +246,22 @@ util.func public @drop_encoding_by_unsupported_encoding(%arg0: index, %arg1: ind
 
 // -----
 
+// Do not drop encodings if they are already serialized.
+
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
+#device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
+#encoding = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123>]>
+util.global private @device_a = #device_target_local_0_
+util.func public @keep_encoding_if_serialized(%arg0: index, %arg1: index, %scalar_f32 : f32) {
+  %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x0xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
+  util.return
+}
+// CHECK:       #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123>]>
+// CHECK-LABEL: util.func public @keep_encoding_if_serialized
+// CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32, #[[$ENCODING]]>
+
+// -----
+
 //------------------------------------------------------------------------------
 // This test suite tests the executable duplication logic.
 //------------------------------------------------------------------------------
