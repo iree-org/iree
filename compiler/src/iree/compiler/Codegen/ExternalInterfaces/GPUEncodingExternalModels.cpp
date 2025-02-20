@@ -341,7 +341,12 @@ struct GPUDeviceEncodingLayoutResolverAttrInterface
     // based on its operand index in the matmul.
     TileMxNxK innerTile;
     std::tie(innerTile.M, innerTile.N, innerTile.K) = mma.getMNKShape();
-    info = getEncodingInfoForMatmul(encoding, innerTile);
+    FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
+        getEncodingInfoForMatmul(encoding, innerTile);
+    if (failed(maybeEncodingInfo)) {
+      return info;
+    }
+    info = std::move(maybeEncodingInfo.value());
     auto fragment = static_cast<IREE::GPU::MMAFragment>(
         encoding.getOperandIndex().getInt());
     info.swizzle = getSwizzle(mma, fragment);
