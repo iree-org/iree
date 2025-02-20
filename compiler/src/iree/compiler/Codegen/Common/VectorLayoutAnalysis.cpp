@@ -801,6 +801,87 @@ static void enforceLayoutToGatherOp(
   }
 }
 
+static void enforceLayoutToTransferReadOp(
+    vector::TransferReadOp read, ArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+  if (resultLattices.empty()) {
+    return;
+  }
+  if (!read.getMask()) {
+    return;
+  }
+  // transfer_read has only one vector result.
+  const DistributionLayout *result = resultLattices[0];
+  // Cannot enforce layout if result is uninitialized.
+  if (result->isUninitialized()) {
+    return;
+  }
+
+  // Build a transposed layout.
+  SmallVector<unsigned> permutation;
+  AffineMap permMap = read.getPermutationMap();
+  bool isSupportedPerm =
+      permMap.isPermutationOfMinorIdentityWithBroadcasting(permutation);
+  VectorLayoutInterface layout = result->getLayout();
+  SmallVector<int64_t> transposePerm(permutation.begin(), permutation.end());
+  if (isSupportedPerm) {
+    layout = layout.permute(transposePerm);
+    AffineMap toMinorIdentity =
+        AffineMap::getPermutationMap(permutation, permMap.getContext());
+    AffineMap orderedMap = toMinorIdentity.compose(permMap);
+    SmallVector<bool> droppedDims(layout.getRank(), false);
+    for (unsigned bdim : orderedMap.getBroadcastDims()) {
+      droppedDims[bdim] = true;
+    }
+    layout = layout.project(droppedDims);
+
+    for (auto [index, operandLattice] : llvm::enumerate(operandLattices)) {
+      ChangeResult changed = operandLattice->resolveWithPossibleConflict(
+          layout, getOpOperand(read, index));
+      update(operandLattice, changed);
+    }
+  }
+}
+
+static void enforceLayoutToTransferWriteOp(
+    vector::TransferWriteOp write,
+    ArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+  if (operandLattices.empty()) {
+    return;
+  }
+  if (!write.getMask()) {
+    return;
+  }
+  // transfer_write may have layout set on the vector
+  // that is to be written
+  const DistributionLayout *writeOperand = operandLattices[0];
+  // Cannot enforce layout if writeOperand is uninitialized.
+  if (writeOperand->isUninitialized()) {
+    return;
+  }
+
+  // Build a transposed layout.
+  SmallVector<unsigned> permutation;
+  AffineMap permMap = write.getPermutationMap();
+  bool isSupportedPerm =
+      permMap.isPermutationOfMinorIdentityWithBroadcasting(permutation);
+  VectorLayoutInterface layout = writeOperand->getLayout();
+  SmallVector<int64_t> transposePerm(permutation.begin(), permutation.end());
+  if (isSupportedPerm) {
+    layout = layout.permute(transposePerm);
+  }
+
+  for (auto [index, operandLattice] :
+       llvm::enumerate(operandLattices.slice(1))) {
+    ChangeResult changed = operandLattice->resolveWithPossibleConflict(
+        layout, getOpOperand(write, index + 1));
+    update(operandLattice, changed);
+  }
+}
+
 void enforcementTransferFunction(
     Operation *op, ArrayRef<DistributionLayout *> operandLattices,
     ArrayRef<const DistributionLayout *> resultLattices,
@@ -842,6 +923,18 @@ void enforcementTransferFunction(
   if (auto contraction = dyn_cast<vector::ContractionOp>(op)) {
     enforceLayoutToContractionOp(contraction, operandLattices, resultLattices,
                                  update);
+    return;
+  }
+
+  if (auto read = dyn_cast<vector::TransferReadOp>(op)) {
+    enforceLayoutToTransferReadOp(read, operandLattices, resultLattices,
+                                  update);
+    return;
+  }
+
+  if (auto write = dyn_cast<vector::TransferWriteOp>(op)) {
+    enforceLayoutToTransferWriteOp(write, operandLattices, resultLattices,
+                                   update);
     return;
   }
 }

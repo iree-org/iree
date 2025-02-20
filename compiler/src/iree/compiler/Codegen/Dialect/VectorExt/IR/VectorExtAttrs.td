@@ -242,6 +242,12 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
 
     // Get the undistributed shape that is subgroup x batch x outer x thread x element
     SmallVector<int64_t> getUndistributedPackedShape() const;
+
+    // Get the subgroup x batch x outer x thread x element shape for original dim
+    SmallVector<int64_t> getPackedShapeForUndistributedDim(int64_t dim) const;
+
+    // Get the distributed shape but has the same rank as the undistributed shape.
+    SmallVector<int64_t> getDistributedUnpackedShape() const;
   }];
 
   let genVerifyDecl = 1;
