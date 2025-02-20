@@ -64,7 +64,8 @@ iree_status_t iree_tooling_resolve_module_dependency(
                                    IREE_VM_MODULE_DEPENDENCY_FLAG_REQUIRED)) {
     // Required but not found; fail.
     return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "required module '%.*s' not available in the build",
+                            "required module '%.*s' not available in the build "
+                            "(note: module registration order matters)",
                             (int)dependency->name.size, dependency->name.data);
   }
   *out_module = module;
