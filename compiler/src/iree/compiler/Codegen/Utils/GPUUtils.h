@@ -21,6 +21,7 @@ namespace mlir::iree_compiler {
 
 static constexpr int32_t kNumGPUDims = 3;
 static constexpr int32_t kWarpSize = 32;
+static constexpr char kGPUTargetAttrName[] = "iree.gpu.target";
 
 //===----------------------------------------------------------------------===//
 // GPU processor IDs and sizes
