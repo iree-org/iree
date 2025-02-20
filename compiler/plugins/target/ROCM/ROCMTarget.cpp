@@ -19,6 +19,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Utils/ExecutableDebugInfoUtils.h"
@@ -255,7 +256,7 @@ public:
       addConfig(kGPUTargetAttrName, target);
       if (options.experimentalPadLayout) {
         if (Attribute encoding = GPU::getHIPTargetEncodingLayoutAttr(target)) {
-          addConfig("encoding", encoding);
+          addConfig(IREE::Encoding::kEncodingResolverAttrName, encoding);
         }
       }
     }
