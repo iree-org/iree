@@ -903,6 +903,13 @@ static LogicalResult setGPULoweringConfigLayout(
   Location loc = candidate.getLoc();
 
   SmallVector<int64_t> bounds = candidate.getStaticLoopRanges();
+  std::optional<VectorizationTileSizes> sizes =
+      inferSizesFromIR(candidate, std::nullopt);
+  // Even though the opShape could be dynamic, we could potentially
+  // infer the vector shape
+  if (sizes.has_value()) {
+    bounds = sizes.value().vectorSizes;
+  }
 
   // Subgroup distribution layouts.
   SmallVector<int64_t> subgroupSizes, subgroupStrides;
