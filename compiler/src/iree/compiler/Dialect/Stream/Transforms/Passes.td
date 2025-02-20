@@ -476,7 +476,7 @@ def SpecializeEncodingsPass :
     - At least one of the dialect implements AffinityAnalysisDialectInterface
       dialect interface, because Stream does not need to know any dialect other
       than itself.
-    - The binding types have to implement IREE::EncodingEncodingTypeInterface,
+    - The binding types have to implement IREE::Encoding::EncodingTypeInterface,
       so it can updates the types without accessing any other dialects.
     - All the encodings attached on the types have to implement
       SerializableEncodingAttrInterface. Because the pass updates the encodings

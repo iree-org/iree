@@ -160,14 +160,10 @@ public:
             layoutAttrs[key].insert(getDefaultAttr());
             continue;
           }
-          auto attr = targetAttr.getConfiguration().getNamed("encoding");
-          if (!attr) {
-            layoutAttrs[key].insert(getDefaultAttr());
-            continue;
-          }
           auto encodingLayoutAttr =
-              dyn_cast<IREE::Encoding::EncodingLayoutAttrInterface>(
-                  attr->getValue());
+              targetAttr.getConfiguration()
+                  .getAs<IREE::Encoding::EncodingLayoutAttrInterface>(
+                      "encoding");
           if (!encodingLayoutAttr) {
             layoutAttrs[key].insert(getDefaultAttr());
             continue;

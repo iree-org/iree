@@ -85,19 +85,19 @@ def IREEEncoding_SerializableEncodingAttrInterface :
     with high level encoded information, e.g., operation type, element types of
     operands, etc. During the lowering, the virtual encodings are progressively
     lowered to physical encodings/operations. At some point, an encoding could
-    in the middle state, where the serialized data is encoded in the attribute.
-    I.e., the high level information is replaced with serialized information,
-    and they are no longer needed. The interface methods are intended to help
-    the lowering.
+    in the middle state, where the final serialized data is encoded in the
+    attribute. I.e., the high level information is replaced with serialized
+    information, and they are no longer needed. The interface methods are
+    intended to help the lowering.
 
     There are few core methods:
 
-    - isSerialized: checks if the encoding is serialized or not.
-    - cloneWithLayouts: creates a serializable encoding with the layouts
+    - `isSerialized`: checks if the encoding is serialized or not.
+    - `cloneWithLayouts`: creates a serializable encoding with the layouts
       information.
     - The rest of methods that interpret the encodings. E.g.,
-      calculateStorageSizeInBytes is the method to parse layouts and produce the
-      storage size in bytes.
+      `calculateStorageSizeInBytes` is the method to parse layouts and produce
+      the storage size in bytes.
 
     The attributes implementing this interface may be target-specific or general
     enough to be shared across backends, depending on the layouts used.
@@ -109,8 +109,7 @@ def IREEEncoding_SerializableEncodingAttrInterface :
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
-        Returns true if the attribute already has the serialized information.
-        Otherwise, returns false.
+        Returns true iff the attribute already has the serialized information.
       }],
       /*retTy=*/"bool",
       /*methodName=*/"isSerialized",
