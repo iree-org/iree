@@ -33,7 +33,7 @@ bool hasPackedStorageAttr(RankedTensorType type) {
 
 FailureOr<linalg::ContractionDimensions>
 getEncodingContractionDims(EncodingAttr encoding) {
-  auto indexingMapsAttr = encoding.getUserIndexingMaps();
+  ArrayAttr indexingMapsAttr = encoding.getUserIndexingMaps();
   if (!indexingMapsAttr) {
     return failure();
   }
@@ -45,7 +45,7 @@ getEncodingContractionDims(EncodingAttr encoding) {
 }
 
 std::string stringifyOperandIndex(IntegerAttr valueAttr) {
-  auto value = valueAttr.getValue().getZExtValue();
+  uint64_t value = valueAttr.getValue().getZExtValue();
   switch (value) {
   case MATMUL_LHS:
     return "LHS";
@@ -63,7 +63,7 @@ MatmulNarrowDim getMatmulNarrowDim(linalg::LinalgOp linalgOp,
                                    int narrowThreshold) {
   linalg::ContractionDimensions cDims =
       linalg::inferContractionDims(linalgOp).value();
-  auto map = linalgOp.getIndexingMapsArray().back();
+  AffineMap map = linalgOp.getIndexingMapsArray().back();
   auto outType = llvm::cast<ShapedType>(linalgOp.getDpsInits()[0].getType());
   auto getOutputSizeAtDimPos = [=](unsigned dimPos) -> int64_t {
     return outType.getDimSize(
