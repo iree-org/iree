@@ -54,10 +54,9 @@ def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
 
 def EncodingAttr :
     IREEEncoding_Attr<"Encoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutAttrInterface , [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+        "isSerialized",
         "cloneWithLayouts",
-      ]>,
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializedEncodingAttrInterface , [
         "calculateStorageSizeInBytes",
       ]>
     ]> {
@@ -92,7 +91,7 @@ def EncodingAttr :
     OptionalParameter<"ArrayAttr", "An array of attributes that describes the "
     "potential layouts on the device. It is an array because a device could "
     "have several executable targets. Note that it can be any attribute that "
-    "implements EncodingLayoutAttrInterface. The expectation of the field "
+    "implements EncodingLayoutResolverAttrInterface. The expectation of the field "
     "is to bridge the logics between host codes and device codes. If an "
     "attribute does not implement the interface, it could be discarded anytime.">:$layouts
   );
@@ -137,7 +136,7 @@ def EncodingAttr :
 //===---------------------------------------------------------------------===//
 
 def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializedEncodingAttrInterface,
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface,
         ["calculateStorageSizeInBytes"]>
     ]> {
   let mnemonic = "pad_encoding_layout";
@@ -149,7 +148,7 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
     The logical dimensions of the tensors do not change, and the elements in the
     padded regions are left uninitialized.
 
-    This attribute implements `Encoding::SerializedEncodingLayoutAttrInterface`,
+    This attribute implements `Encoding::SerializedEncodingLayoutResolverAttrInterface`,
     to provide a hook for tensor sizeof lowering. The implementation of this
     interface is backend-agnostic, but the emission of the pad encoding attribute
     itself can be target- or domain-specific.
@@ -167,7 +166,7 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
 
 def UnsupportedEncodingAttr :
     IREEEncoding_Attr<"UnsupportedEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
         "cloneWithSimplifiedConfig",
         "getLayout",
       ]>
@@ -189,10 +188,10 @@ def UnsupportedEncodingAttr :
 
 def TestingEncodingAttr :
     IREEEncoding_Attr<"TestingEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+        "isSerialized",
         "cloneWithLayouts",
-      ]>,
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializedEncodingAttrInterface>
+      ]>
     ]> {
   let mnemonic = "testing_encoding";
   let summary = "An encoding attribute for testing purpose";
@@ -213,7 +212,7 @@ def TestingEncodingAttr :
 
 def UnspecializedEncodingAttr :
     IREEEncoding_Attr<"UnspecializedEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
         "cloneWithSimplifiedConfig",
       ]>
     ]> {
@@ -223,7 +222,7 @@ def UnspecializedEncodingAttr :
 
   let description = [{
     This attribute indicates this is an unspecialized encoding. It implements
-    very basic interface methods of EncodingLayoutAttrInterface that converts
+    very basic interface methods of EncodingLayoutResolverAttrInterface that converts
     it to the SpecializeEncodingAttr during encoding specialization. It is
     mainly for testing purpose as some transformations do not depend on actual
     dialects that implement the attribute interface.
@@ -240,7 +239,7 @@ def UnspecializedEncodingAttr :
 
 def SpecializedEncodingAttr :
     IREEEncoding_Attr<"SpecializedEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
         "getLayout",
       ]>
     ]> {

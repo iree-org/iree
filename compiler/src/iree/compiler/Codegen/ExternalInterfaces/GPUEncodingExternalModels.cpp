@@ -6,7 +6,7 @@
 //===- GPUEncodingExternalModels.cpp --------------------------------------===//
 //
 // This file implements the IREE::Codegen::LayoutAttrInterface and
-// IREE::Encoding::EncodingLayoutAttrInterface for GPU backends.
+// IREE::Encoding::EncodingLayoutResolverAttrInterface for GPU backends.
 // Different from CPU backends, we do not transpose narrow-N to narrow-M for a
 // combination of reasons:
 //
@@ -297,9 +297,9 @@ static Operation *lowerContractionOpToMultiMmaOp(OpBuilder &builder,
   return mmaOp;
 }
 
-struct GPUDeviceEncodingLayoutAttrInterface
+struct GPUDeviceEncodingLayoutResolverAttrInterface
     : public Codegen::LayoutAttrInterface::ExternalModel<
-          GPUDeviceEncodingLayoutAttrInterface, GPUEncodingLayoutAttr> {
+          GPUDeviceEncodingLayoutResolverAttrInterface, GPUEncodingLayoutAttr> {
   MaterializeEncodingInfo getEncodingInfo(Attribute attr,
                                           RankedTensorType type) const {
     auto layoutAttr = cast<GPUEncodingLayoutAttr>(attr);
@@ -341,9 +341,9 @@ struct GPUDeviceEncodingLayoutAttrInterface
   }
 };
 
-struct GPUPadEncodingLayoutAttrInterface final
-    : Encoding::EncodingLayoutAttrInterface::ExternalModel<
-          GPUPadEncodingLayoutAttrInterface, GPUPadLayoutAttr> {
+struct GPUPadEncodingLayoutResolverAttrInterface final
+    : Encoding::EncodingLayoutResolverAttrInterface::ExternalModel<
+          GPUPadEncodingLayoutResolverAttrInterface, GPUPadLayoutAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr /*config*/) const {
     // This attribute is self-contained and does not need to look anything up
@@ -435,9 +435,9 @@ void registerGPUEncodingExternalModels(DialectRegistry &registry) {
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::GPU::IREEGPUDialect *dialect) {
         IREE::GPU::GPUEncodingLayoutAttr::attachInterface<
-            GPUDeviceEncodingLayoutAttrInterface>(*ctx);
+            GPUDeviceEncodingLayoutResolverAttrInterface>(*ctx);
         IREE::GPU::GPUPadLayoutAttr::attachInterface<
-            GPUPadEncodingLayoutAttrInterface>(*ctx);
+            GPUPadEncodingLayoutResolverAttrInterface>(*ctx);
       });
 }
 
