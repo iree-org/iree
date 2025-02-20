@@ -54,10 +54,9 @@ def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
 
 def EncodingAttr :
     IREEEncoding_Attr<"Encoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutAttrInterface , [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+        "isSerialized",
         "cloneWithLayouts",
-      ]>,
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializedEncodingAttrInterface , [
         "calculateStorageSizeInBytes",
       ]>
     ]> {
@@ -137,7 +136,7 @@ def EncodingAttr :
 //===---------------------------------------------------------------------===//
 
 def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializedEncodingAttrInterface,
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface,
         ["calculateStorageSizeInBytes"]>
     ]> {
   let mnemonic = "pad_encoding_layout";
@@ -189,10 +188,10 @@ def UnsupportedEncodingAttr :
 
 def TestingEncodingAttr :
     IREEEncoding_Attr<"TestingEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+        "isSerialized",
         "cloneWithLayouts",
-      ]>,
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializedEncodingAttrInterface>
+      ]>
     ]> {
   let mnemonic = "testing_encoding";
   let summary = "An encoding attribute for testing purpose";

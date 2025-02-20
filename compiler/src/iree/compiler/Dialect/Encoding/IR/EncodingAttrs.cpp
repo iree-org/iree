@@ -119,6 +119,8 @@ EncodingAttr EncodingAttr::clone(AffineMap bcastMap) {
              AffineMapAttr::get(bcastMap), getRoundDimsTo(), getLayouts());
 }
 
+bool EncodingAttr::isSerialized() const { return getLayouts() ? true : false; }
+
 Attribute EncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();
   return get(ctx, getOperandIndex(), getOpType(), getElementTypes(),
@@ -163,13 +165,13 @@ Value EncodingAttr::calculateStorageSizeInBytes(Location loc,
                                                 ValueRange dynamicDims) const {
   if (ArrayAttr layoutsAttr = getLayouts()) {
     if (!llvm::all_of(layoutsAttr.getValue(),
-                      llvm::IsaPred<SerializedEncodingLayoutAttrInterface>)) {
+                      llvm::IsaPred<SerializableEncodingAttrInterface>)) {
       return nullptr;
     }
 
     Value res;
     for (auto attr :
-         layoutsAttr.getAsRange<SerializedEncodingLayoutAttrInterface>()) {
+         layoutsAttr.getAsRange<SerializableEncodingAttrInterface>()) {
       Value requestedSize =
           attr.calculateStorageSizeInBytes(loc, builder, type, dynamicDims);
       if (!res) {
@@ -277,9 +279,10 @@ bool isNarrowNResult(EncodingAttr encoding) {
   return IREE::Encoding::getMatmulNarrowDim(encoding).isN();
 }
 
-EncodingLayoutAttrInterface
-getEncodingLayoutAttrInterface(RankedTensorType type) {
-  return dyn_cast_or_null<EncodingLayoutAttrInterface>(type.getEncoding());
+SerializableEncodingAttrInterface
+getSerializableEncodingAttrInterface(RankedTensorType type) {
+  return dyn_cast_or_null<SerializableEncodingAttrInterface>(
+      type.getEncoding());
 }
 
 EncodingAttr getEncodingAttr(RankedTensorType type) {
@@ -393,6 +396,10 @@ void TestingEncodingAttr::print(AsmPrinter &p) const {
     p.printAttribute(layouts);
   }
   os << ">";
+}
+
+bool TestingEncodingAttr::isSerialized() const {
+  return getLayouts() ? true : false;
 }
 
 Attribute
