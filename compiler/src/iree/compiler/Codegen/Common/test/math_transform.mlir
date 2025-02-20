@@ -1,6 +1,9 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-codegen-math-transform))' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-codegen-math-transform))' '--iree-codegen-math-transform-tweaks=approx:-math.tan,rewrite:-math.tan,f32cast:-math.tan' --split-input-file %s | FileCheck %s --check-prefix=FLAGS1
+// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-codegen-math-transform))' '--iree-codegen-math-transform-tweaks=approx:-math.tan,rewrite:-math.tan,f32cast:+math.tan' --split-input-file %s | FileCheck %s --check-prefix=FLAGS2
+// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-codegen-math-transform))' '--iree-codegen-math-transform-tweaks=approx:-math.tan,approx:-math.cos,approx:-math.sin,rewrite:+math.tan' --split-input-file %s | FileCheck %s --check-prefix=FLAGS3
 
-// CHECK-LABEL: @rewrite_tan
+// CHECK-ALL-LABEL: @rewrite_tan
 func.func @rewrite_tan(%arg0: f16) -> f16 attributes {
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz"}>
 } {
@@ -11,16 +14,20 @@ func.func @rewrite_tan(%arg0: f16) -> f16 attributes {
   // CHECK-NOT:     math.tan
   // CHECK-NOT:     math.sin
   // CHECK-NOT:     math.cos
-  // CHECK:        math.fma {{.*}} : f32
+  // CHECK:         math.fma {{.*}} : f32
   // Final division after cast to f16.
   // CHECK:         arith.divf {{.*}} : f16
+  // FLAGS1:        math.tan {{.*}} : f16
+  // FLAGS2:        math.tan {{.*}} : f32
+  // FLAGS3-DAG:    math.sin
+  // FLAGS3-DAG:    math.cos
   %0 = math.tan %arg0 : f16
   return %0 : f16
 }
 
 // -----
 
-// CHECK-LABEL: @rewrite_pow
+// CHECK-ALL-LABEL: @rewrite_pow
 func.func @rewrite_pow(%arg0: f16, %arg1: f16) -> f16 attributes {
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz"}>
 } {
@@ -40,7 +47,7 @@ func.func @rewrite_pow(%arg0: f16, %arg1: f16) -> f16 attributes {
 
 // -----
 
-// CHECK-LABEL: @rewrite_erf
+// CHECK-ALL-LABEL: @rewrite_erf
 func.func @rewrite_erf(%arg0: f16) -> f16 attributes {
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz"}>
 } {
@@ -58,7 +65,7 @@ func.func @rewrite_erf(%arg0: f16) -> f16 attributes {
 
 // -----
 
-// CHECK-LABEL: @no_approx_erf_on_rocm
+// CHECK-ALL-LABEL: @no_approx_erf_on_rocm
 func.func @no_approx_erf_on_rocm(%arg0: f16) -> f16 attributes {
   hal.executable.target =  #hal.executable.target<"rocm", "rocm-hsaco-fb", {}>
 } {
