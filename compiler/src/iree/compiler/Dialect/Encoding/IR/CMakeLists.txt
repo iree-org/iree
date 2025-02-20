@@ -34,6 +34,7 @@ iree_cc_library(
     "EncodingOps.cpp"
     "EncodingOps.cpp.inc"
     "EncodingTypeInterfaces.cpp.inc"
+    "EncodingTypes.cpp"
     "EncodingTypes.cpp.inc"
   DEPS
     ::EncodingEnumsGen
