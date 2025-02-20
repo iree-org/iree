@@ -21,6 +21,8 @@ jobs:
   test_sharktank_models:
     name: "test_sharktank_models :: ${{ matrix.name }}"
     runs-on: ${{ matrix.runs-on }}
+    # Dynamically assign container for `linux-mi300-gpu-1`
+    container: ${{ fromJSON(toJSON(matrix.container)) }}
     strategy:
       fail-fast: false
       matrix:
@@ -29,15 +31,31 @@ jobs:
             target: target_cpu
             gpu: none
             runs-on: ubuntu-24.04
+            container: null
 
-          - name: hip_task
+          - name: hip_task_w7900
             target: target_hip
             gpu: gfx1100
             runs-on: nodai-amdgpu-w7900-x86-64
+            container: null
+
+          - name: hip_task_mi300
+            target: target_hip
+            gpu: gfx942
+            runs-on: linux-mi300-gpu-1
+            container:
+              image: rocm/dev-ubuntu-22.04:6.3
+              options: --user root --device=/dev/kfd --device=/dev/dri --ipc=host --group-add video --cap-add=SYS_PTRACE --security-opt seccomp=unconfined
 
     env:
       VENV_DIR: ${{ github.workspace }}/venv
     steps:
+      - name: "Install dependencies"
+        # Only run if a container is defined in the matrix (i.e., not null)
+        if: ${{ matrix.container != null }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang lld git
       - name: Checking out IREE repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
