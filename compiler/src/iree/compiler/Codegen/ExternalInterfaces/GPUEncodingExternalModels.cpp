@@ -28,6 +28,8 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Codegen/ExternalInterfaces/Utils.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "llvm/Support/Debug.h"
@@ -303,6 +305,20 @@ struct GPUDeviceEncodingLayoutAttrInterface
   MaterializeEncodingInfo getEncodingInfo(Attribute attr,
                                           RankedTensorType type) const {
     auto layoutAttr = cast<GPUEncodingLayoutAttr>(attr);
+    DictionaryAttr config = layoutAttr.getConfiguration();
+
+    // If the layout is already resolved, use it directly.
+    if (config) {
+      if (std::optional<NamedAttribute> namedAttr =
+              config.getNamed(kEncodingInfoAttrName)) {
+        std::optional<MaterializeEncodingInfo> info =
+            Codegen::deserializeEncodingInfo(
+                cast<DictionaryAttr>(namedAttr->getValue()));
+        assert(info && "encoding_info is invalid");
+        return info.value();
+      }
+    }
+
     auto encoding = llvm::dyn_cast_or_null<IREE::Encoding::EncodingAttr>(
         type.getEncoding());
 
@@ -311,8 +327,12 @@ struct GPUDeviceEncodingLayoutAttrInterface
       return info;
     }
 
+    IREE::GPU::TargetAttr gpuAttr = getGPUTargetAttr(config);
+    if (!gpuAttr) {
+      return info;
+    }
     DataTiledMMAAttr mma = chooseDataTiledMMAAttr(
-        encoding.getElementTypesArray(), layoutAttr.getTargetAttr(), encoding);
+        encoding.getElementTypesArray(), gpuAttr, encoding);
     if (!mma) {
       return info;
     }
@@ -336,8 +356,37 @@ struct GPUDeviceEncodingLayoutAttrInterface
     if (!linalgOp) {
       return nullptr;
     }
+    DictionaryAttr config = layoutAttr.getConfiguration();
+    IREE::GPU::TargetAttr gpuAttr = getGPUTargetAttr(config);
+    if (!gpuAttr) {
+      return nullptr;
+    }
     return lowerContractionOpToMultiMmaOp(b, linalgOp, convertedOperands,
-                                          layoutAttr.getTargetAttr());
+                                          gpuAttr);
+  }
+};
+
+struct GPUHostEncodingLayoutAttrInterface final
+    : IREE::Encoding::EncodingLayoutAttrInterface::ExternalModel<
+          GPUHostEncodingLayoutAttrInterface, GPUEncodingLayoutAttr> {
+  Attribute cloneWithSimplifiedConfig(Attribute attr,
+                                      DictionaryAttr config) const {
+    MLIRContext *ctx = attr.getContext();
+    SmallVector<NamedAttribute> configItems;
+    DictionaryAttr existingConfig =
+        cast<GPUEncodingLayoutAttr>(attr).getConfiguration();
+    if (existingConfig) {
+      configItems.append(existingConfig.getValue().begin(),
+                         existingConfig.getValue().end());
+    }
+    storeNamedAttrIfPresent(configItems, config, kGPUTargetAttrName);
+    return GPUEncodingLayoutAttr::get(ctx,
+                                      DictionaryAttr::get(ctx, configItems));
+  }
+
+  Attribute getLayout(Attribute attr, RankedTensorType type) const {
+    MLIRContext *ctx = attr.getContext();
+    return GPUEncodingLayoutAttr::get(ctx, getLayoutImpl(attr, type));
   }
 };
 
@@ -435,7 +484,8 @@ void registerGPUEncodingExternalModels(DialectRegistry &registry) {
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::GPU::IREEGPUDialect *dialect) {
         IREE::GPU::GPUEncodingLayoutAttr::attachInterface<
-            GPUDeviceEncodingLayoutAttrInterface>(*ctx);
+            GPUDeviceEncodingLayoutAttrInterface,
+            GPUHostEncodingLayoutAttrInterface>(*ctx);
         IREE::GPU::GPUPadLayoutAttr::attachInterface<
             GPUPadEncodingLayoutAttrInterface>(*ctx);
       });
