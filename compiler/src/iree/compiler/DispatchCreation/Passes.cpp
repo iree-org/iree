@@ -86,6 +86,13 @@ static llvm::cl::opt<bool> clEnableDataTiling(
                    "path, --iree-opt-data-tiling=false must be set as wells"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clHoistInfusibleEncodings(
+    "iree-dispatch-creation-hoist-infusible-encodings",
+    llvm::cl::desc("Enable the hoisting of infusible encoding ops. The "
+                   "encoding ops may result in their own dispatch. To use this "
+                   "path, --iree-opt-data-tiling=false must be set as wells"),
+    llvm::cl::init(true));
+
 namespace mlir::iree_compiler::DispatchCreation {
 
 //===----------------------------------------------------------------------===//
@@ -253,7 +260,10 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
         // op, so hoist them out of their current dispatch regions. Also, bubble
         // SetEncodingOps through special operations like bit-extending ops and
         // broadcasting ops.
-        .addPass(DispatchCreation::createHoistEncodingOpsPass)
+        .addPass([&]() {
+          return DispatchCreation::createHoistEncodingOpsPass(
+              HoistEncodingOpsPassOptions{clHoistInfusibleEncodings});
+        })
         // After SetEncodingOps are hoisted, try to fuse them with their
         // producer dispatches to try to hide packing costs.
         .addPass(
