@@ -240,6 +240,36 @@ static VectorValue getSlicedPermutedMask(PatternRewriter &rewriter,
   return slicedMask;
 }
 
+/// Project a vector based on a provided projection map.
+/// Firstly, this will tranpose the vector in a way sliced out
+/// dims become outermost. Then it performs a vector.extract
+/// remove the dims that are not present in the results of the map.
+static VectorValue projectVector(RewriterBase &rewriter, Location loc,
+                                 VectorValue val, AffineMap projectionMap) {
+  llvm::SmallVector<int64_t> remaningDims;
+  SmallVector<int64_t> allDims =
+      llvm::to_vector(llvm::seq<int64_t>(projectionMap.getNumDims()));
+  llvm::SmallDenseSet<int64_t> slicedDims{allDims.begin(), allDims.end()};
+  for (int64_t resultIdx : llvm::seq<int64_t>(projectionMap.getNumResults())) {
+    int64_t iterSpacePos = projectionMap.getDimPosition(resultIdx);
+    remaningDims.push_back(iterSpacePos);
+    slicedDims.erase(iterSpacePos);
+  }
+
+  SmallVector<int64_t> transposePerm;
+  for (int64_t slicedDim : slicedDims) {
+    transposePerm.push_back(slicedDim);
+  }
+  transposePerm.append(remaningDims);
+  auto transposed =
+      rewriter.create<vector::TransposeOp>(loc, val, transposePerm);
+
+  SmallVector<int64_t> extractedPos(slicedDims.size(), 0);
+  auto sliced =
+      rewriter.create<vector::ExtractOp>(loc, transposed, extractedPos);
+  return cast<VectorValue>(sliced.getResult());
+}
+
 namespace {
 
 /// Pattern to distribute `vector.transfer_read` ops with nested layouts.
@@ -587,17 +617,20 @@ static int64_t getShuffleWidth(NestedLayoutAttr layout, int64_t dim) {
 ///      to shared memory and will be reloaded into a layout where partial
 ///      reductions will be placed inside threads.
 struct DistributeMultiReduction final
-    : OpDistributionPattern<vector::MultiDimReductionOp> {
-  using OpDistributionPattern::OpDistributionPattern;
+    : MaskedOpDistributionPattern<vector::MultiDimReductionOp> {
+  using MaskedOpDistributionPattern::MaskedOpDistributionPattern;
 
   DistributeMultiReduction(MLIRContext *context, int64_t subgroupSize,
                            int64_t maxBitsPerShuffle, int64_t benefit = 1)
-      : OpDistributionPattern(context, benefit), subgroupSize(subgroupSize),
-        maxBitsPerShuffle(maxBitsPerShuffle) {}
+      : MaskedOpDistributionPattern(context, benefit),
+        subgroupSize(subgroupSize), maxBitsPerShuffle(maxBitsPerShuffle) {}
 
-  LogicalResult matchAndRewrite(vector::MultiDimReductionOp multiReduceOp,
-                                DistributionSignature &signature,
-                                PatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(vector::MultiDimReductionOp multiReduceOp,
+                  DistributionSignature &signature, vector::MaskOp maskOp,
+                  std::optional<DistributionSignature> &maskSignature,
+                  PatternRewriter &rewriter) const {
+    Location loc = multiReduceOp.getLoc();
     VectorValue srcVector = multiReduceOp.getSource();
     Value acc = multiReduceOp.getAcc();
     Value res = multiReduceOp.getResult();
@@ -630,7 +663,22 @@ struct DistributeMultiReduction final
       disAcc = multiReduceOp.getAcc();
     }
 
-    Location loc = multiReduceOp.getLoc();
+    VectorValue mask = nullptr;
+    if (maskOp) {
+      auto maskLayout = dyn_cast_or_null<NestedLayoutAttr>(
+          maskSignature.value()[maskOp.getMask()]);
+      if (!maskLayout) {
+        return rewriter.notifyMatchFailure(maskOp,
+                                           "expected nested layout attr");
+      }
+      mask = getDistributed(rewriter, maskOp.getMask(), maskLayout);
+      Value passThruSrc = getCombiningIdentityValue(
+          loc, rewriter, multiReduceOp.getKind(), disSrc.getType());
+      disSrc = cast<VectorValue>(
+          rewriter.create<arith::SelectOp>(loc, mask, disSrc, passThruSrc)
+              .getResult());
+    }
+
     SmallVector<bool> reducedDims = multiReduceOp.getReductionMask();
     int64_t rank = srcVector.getType().getRank();
 
@@ -645,18 +693,23 @@ struct DistributeMultiReduction final
     }
     Value localInit = getCombiningIdentityValue(
         loc, rewriter, multiReduceOp.getKind(), disAcc.getType());
-    auto localReduction = rewriter.create<vector::MultiDimReductionOp>(
+    Value localReduction = rewriter.create<vector::MultiDimReductionOp>(
         loc, disSrc, localInit, distributedReductionMask,
         multiReduceOp.getKind());
+    if (mask) {
+      localReduction =
+          vector::maskOperation(rewriter, localReduction.getDefiningOp(), mask)
+              ->getResult(0);
+    }
 
     VectorValue locallyReduced;
     if (accVector) {
-      locallyReduced = dyn_cast<VectorValue>(localReduction.getResult());
+      locallyReduced = dyn_cast<VectorValue>(localReduction);
     } else {
       // Broadcast scalar accumulator to vector.
       VectorType vecType = VectorType::get(ArrayRef{int64_t(1)}, elemTy);
-      locallyReduced = rewriter.create<vector::BroadcastOp>(
-          loc, vecType, localReduction.getResult());
+      locallyReduced =
+          rewriter.create<vector::BroadcastOp>(loc, vecType, localReduction);
     }
 
     assert(locallyReduced && "result should have been a vector");
@@ -739,7 +792,6 @@ struct DistributeMultiReduction final
 
     for (unsigned i = 0; i < numElements; ++i) {
       Value extracted = rewriter.create<vector::ExtractOp>(loc, flat, i);
-
       // Reduce across all reduction dimensions 1-by-1.
       for (unsigned i = 0, e = reductionMask.size(); i != e; ++i) {
         if (reductionMask[i]) {
@@ -947,15 +999,19 @@ struct DistributeMultiReduction final
 /// performed only thread locally. Therefore, a to-be-distributed
 /// vector.multi_reduce
 ////is added to complete the contraction.
-struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
-  using OpDistributionPattern::OpDistributionPattern;
+struct DistributeContract final
+    : MaskedOpDistributionPattern<vector::ContractionOp> {
+  using MaskedOpDistributionPattern::MaskedOpDistributionPattern;
 
   DistributeContract(MLIRContext *context, int64_t benefit = 1)
-      : OpDistributionPattern(context, benefit) {}
+      : MaskedOpDistributionPattern(context, benefit) {}
 
-  LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
-                                DistributionSignature &signature,
-                                PatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(vector::ContractionOp contractOp,
+                  DistributionSignature &signature, vector::MaskOp maskOp,
+                  std::optional<DistributionSignature> &maskSignature,
+                  PatternRewriter &rewriter) const override {
+    Location loc = contractOp.getLoc();
     FailureOr<VectorContractOpInfo> maybeOpInfo =
         VectorContractOpInfo::inferFromIndexingMaps(
             contractOp.getIndexingMapsArray());
@@ -995,6 +1051,44 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     Value disLhs = getDistributed(rewriter, contractOp.getLhs(), lhsLayout);
     Value disRhs = getDistributed(rewriter, contractOp.getRhs(), rhsLayout);
 
+    VectorValue mask = nullptr;
+    if (maskOp) {
+      auto maskLayout = dyn_cast_or_null<NestedLayoutAttr>(
+          maskSignature.value()[maskOp.getMask()]);
+      if (!maskLayout) {
+        return rewriter.notifyMatchFailure(maskOp,
+                                           "expected nested layout attr");
+      }
+      mask = getDistributed(rewriter, maskOp.getMask(), maskLayout);
+      Value passThruLhs = getCombiningIdentityValue(
+          loc, rewriter, contractOp.getKind(), disLhs.getType());
+      Value passThruRhs = getCombiningIdentityValue(
+          loc, rewriter, contractOp.getKind(), disRhs.getType());
+
+      VectorValue deInterleavedMask =
+          getDeinterleavedUnpackedForm(rewriter, mask, maskLayout);
+      VectorValue maskLhs = projectVector(rewriter, loc, deInterleavedMask,
+                                          contractOp.getIndexingMapsArray()[0]);
+      VectorValue interleavedMaskLhs =
+          getInterleavedPackedForm(rewriter, maskLhs, lhsLayout);
+
+      VectorValue maskRhs = projectVector(rewriter, loc, deInterleavedMask,
+                                          contractOp.getIndexingMapsArray()[1]);
+      VectorValue interleavedMaskRhs =
+          getInterleavedPackedForm(rewriter, maskRhs, rhsLayout);
+
+      disLhs = cast<VectorValue>(
+          rewriter
+              .create<arith::SelectOp>(loc, interleavedMaskLhs, disLhs,
+                                       passThruLhs)
+              .getResult());
+      disRhs = cast<VectorValue>(
+          rewriter
+              .create<arith::SelectOp>(loc, interleavedMaskRhs, disRhs,
+                                       passThruRhs)
+              .getResult());
+    }
+
     Value acc = contractOp.getAcc();
     Value res = contractOp.getResult();
     auto accVector = dyn_cast<VectorValue>(acc);
@@ -1009,21 +1103,25 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     Type accElemTy = getElementTypeOrSelf(acc.getType());
 
     MLIRContext *ctx = contractOp.getContext();
-    Location loc = contractOp.getLoc();
 
     // Step 1: local contraction
     Value localInit = getCombiningIdentityValue(
         loc, rewriter, contractOp.getKind(), disAcc.getType());
-    vector::ContractionOp localContractOp = doDistributedContraction(
+    Value localContract = doDistributedContraction(
         rewriter, loc, ctx, contractOp, disLhs, disRhs, localInit);
+    if (mask) {
+      localContract =
+          vector::maskOperation(rewriter, localContract.getDefiningOp(), mask)
+              ->getResult(0);
+    }
 
     VectorValue localContractValue;
     if (accVector) {
-      localContractValue = dyn_cast<VectorValue>(localContractOp.getResult());
+      localContractValue = dyn_cast<VectorValue>(localContract);
     } else {
       VectorType vecType = VectorType::get(ArrayRef{int64_t(1)}, accElemTy);
-      localContractValue = rewriter.create<vector::BroadcastOp>(
-          loc, vecType, localContractOp.getResult());
+      localContractValue =
+          rewriter.create<vector::BroadcastOp>(loc, vecType, localContract);
     }
 
     assert(localContractValue && "result should have been a vector");
