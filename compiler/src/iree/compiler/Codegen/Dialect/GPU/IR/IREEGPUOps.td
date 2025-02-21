@@ -209,6 +209,9 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
     It does so semi-opaquely by including optional permutations of each MMA
     fragment with respect to the "canonical" MNK row major matrix multiply.
 
+    The permutations represents the permutation that takes the canonical
+    (row major) layout and converts it to the current layout.
+
     Since the canonical dimensionality of the inner dimensions are somewhat
     intrinsic specific, verification of this op requires only that element
     counts of the inner dimensions match the intrinsic.
