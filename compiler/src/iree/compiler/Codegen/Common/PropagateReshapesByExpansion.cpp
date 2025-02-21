@@ -312,6 +312,22 @@ void PropagateReshapesByExpansionPass::runOnOperation() {
   }
 
   RewritePatternSet bubbleExpandShapePatterns(context);
+  // Add patterns to do some additional cleanup (on top of canonicalizations
+  // that can be done later) of reshape ops.
+  // TODO (nirvedhmeshram, Max191) : The canonicalization patterns need to run
+  // before rest of the patterns to prevent other patterns from generalizing ops
+  // like linalg.fill which then get handled by lower-level codegen differently.
+  // We need to add benefit to these patterns upstream to not depend on this
+  // fragile ordering.
+  tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
+  linalg::FillOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
+                                              context);
+  tensor::CollapseShapeOp::getCanonicalizationPatterns(
+      bubbleExpandShapePatterns, context);
+  tensor::EmptyOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
+                                               context);
+  tensor::ExpandShapeOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
+                                                     context);
   linalg::ControlFusionFn bubbleUpExpansionControlFn =
       [](OpOperand *fusedOperand) {
         Operation *producer = fusedOperand->get().getDefiningOp();
@@ -326,17 +342,6 @@ void PropagateReshapesByExpansionPass::runOnOperation() {
       };
   linalg::populateFoldReshapeOpsByExpansionPatterns(bubbleExpandShapePatterns,
                                                     bubbleUpExpansionControlFn);
-  // Add patterns to do some additional cleanup (on top of canonicalizations
-  // that can be done later) of reshape ops.
-  tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
-  linalg::FillOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
-                                              context);
-  tensor::CollapseShapeOp::getCanonicalizationPatterns(
-      bubbleExpandShapePatterns, context);
-  tensor::EmptyOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
-                                               context);
-  tensor::ExpandShapeOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
-                                                     context);
   populateReshapeToInterfaceTensorPatterns(bubbleExpandShapePatterns);
   bubbleExpandShapePatterns.add<ExpandDestinationForallOp>(context);
 
