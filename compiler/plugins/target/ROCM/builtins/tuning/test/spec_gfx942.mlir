@@ -54,3 +54,56 @@ hal.executable public @main {
     }
   }
 }
+
+// -----
+
+// CHECK-LABEL:  func.func @attention_2x10x4096x64xf16
+// CHECK:          iree_linalg_ext.attention
+// CHECK-SAME:       __tuning_spec_applied__
+
+// MI300X-LABEL:  func.func @attention_2x10x4096x64xf16
+// MI300X:          iree_linalg_ext.attention
+// MI300X-SAME:       __tuning_spec_applied__
+
+hal.executable public @main {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @attention ordinal(0) layout(#hal.pipeline.layout<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      // expected-remark@+1 {{Applied transform configuration strategy @iree_default_tuning_spec_gfx942::@__kernel_config}}
+      func.func @attention_2x10x4096x64xf16() {
+        %c496640 = arith.constant 496640 : index
+        %cst = arith.constant 1.250000e-01 : f16
+        %0 = hal.interface.constant.load layout(<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(0) : i32
+        %1 = hal.interface.constant.load layout(<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(1) : i32
+        %2 = arith.index_castui %0 : i32 to index
+        %3 = arith.index_castui %1 : i32 to index
+        %4:2 = util.assume.int
+            %2[<umin = 90496512, umax = 90496512, udiv = 90496512>, <umin = 90496512, umax = 90496512, udiv = 90496512>, <umin = 85253632, umax = 85253632, udiv = 85253632>],
+            %3[<umin = 80010752, umax = 80010752, udiv = 80010752>, <umin = 80010752, umax = 80010752, udiv = 80010752>, <umin = 74767872, umax = 74767872, udiv = 74767872>]
+          : index, index
+        %5 = hal.interface.binding.subspan layout(<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c496640) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<3x2x10x64x64xf16>>
+        %6 = hal.interface.binding.subspan layout(<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%4#0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<2x10x4096x64xf16>>
+        %7 = hal.interface.binding.subspan layout(<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%4#1) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<2x4096x10x64xf16>>
+        %8 = flow.dispatch.tensor.load %6, offsets = [0, 0, 0, 0], sizes = [2, 10, 4096, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x10x4096x64xf16>> -> tensor<2x10x4096x64xf16>
+        %9 = tensor.empty() : tensor<2x4096x10x64xf16>
+        %10 = tensor.empty() : tensor<2x10x4096x64xf16>
+        %11 = flow.dispatch.tensor.load %5, offsets = [2, 0, 0, 0, 0], sizes = [1, 2, 10, 64, 64], strides = [1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x2x10x64x64xf16>> -> tensor<2x10x64x64xf16>
+        %12 = flow.dispatch.tensor.load %5, offsets = [1, 0, 0, 0, 0], sizes = [1, 2, 10, 64, 64], strides = [1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x2x10x64x64xf16>> -> tensor<2x10x64x64xf16>
+        %13 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>]} ins(%8, %12, %11, %cst : tensor<2x10x4096x64xf16>, tensor<2x10x64x64xf16>, tensor<2x10x64x64xf16>, f16) outs(%10 : tensor<2x10x4096x64xf16>) {
+        ^bb0(%arg0: f32):
+          iree_linalg_ext.yield %arg0 : f32
+        } -> tensor<2x10x4096x64xf16>
+        %14 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d2, d1, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%13 : tensor<2x10x4096x64xf16>) outs(%9 : tensor<2x4096x10x64xf16>) {
+        ^bb0(%in: f16, %out: f16):
+          linalg.yield %in : f16
+        } -> tensor<2x4096x10x64xf16>
+        flow.dispatch.tensor.store %14, %7, offsets = [0, 0, 0, 0], sizes = [2, 4096, 10, 64], strides = [1, 1, 1, 1] : tensor<2x4096x10x64xf16> -> !flow.dispatch.tensor<writeonly:tensor<2x4096x10x64xf16>>
+        return
+      }
+    }
+  }
+}
