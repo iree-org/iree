@@ -183,14 +183,15 @@ FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config);
 FailureOr<ArrayAttr> getSupportedMmaTypes(mlir::FunctionOpInterface entryPoint);
 
 /// Returns the GPU target attribute from `iree-gpu-test-target` if provided.
-/// Returns null TargetAttr othersise.
+/// Returns null TargetAttr otherwise.
 IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context);
 
-/// Returns the GPU target attribute from executable |target| if found.
-/// Returns null TargetAttr othersise.
-IREE::GPU::TargetAttr getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr target);
+/// Returns the GPU target attribute from attribute `attr` if found. The `attr`
+/// can be either IREE::HAL::ExecutableTargetAttr or DictionaryAttr.
+/// Returns null TargetAttr otherwise.
+IREE::GPU::TargetAttr getGPUTargetAttr(Attribute attr);
 /// Returns the GPU target attribute from the executable target wrapping |op|
-/// if found. Returns null TargetAttr othersise.
+/// if found. Returns null TargetAttr otherwise.
 IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
 
 /// Returns the GPU subgroup size chosen for the current CodeGen pipeline if
