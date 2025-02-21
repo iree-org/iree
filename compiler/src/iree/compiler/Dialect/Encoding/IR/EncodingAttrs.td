@@ -210,6 +210,17 @@ def TestingEncodingAttr :
   let genVerifyDecl = 0;
 }
 
+def UnknownEncodingAttr : IREEEncoding_Attr<"UnknownEncoding"> {
+  let mnemonic = "unknown_encoding";
+  let summary = "A pure encoding attribute for testing purpose";
+
+  let description = [{
+    An attribute for testing purpose. It is intended to be attached on
+    RankedTensorType as an encoding.
+  }];
+  let genVerifyDecl = 0;
+}
+
 def UnspecializedEncodingAttr :
     IREEEncoding_Attr<"UnspecializedEncoding", [
       DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
