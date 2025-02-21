@@ -237,7 +237,9 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
         return DispatchCreation::createCloneProducersIntoDispatchRegionsPass(
             CloneProducersIntoDispatchRegionsPassOptions{
                 clEnableAggressiveFusion});
-      });
+      })
+      // Collapse dimensions of linalg Ops.
+      .addPass(DispatchCreation::createCollapseDimensionsPass);
 
   // Experimental data tiling path. The intent of this path is to set encodings
   // after fusion decisions have already been made, so encodings can be
@@ -259,9 +261,6 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
         .addPass(
             DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass);
   }
-  FunctionLikeNest(passManager)
-      // Collapse dimensions of linalg Ops.
-      .addPass(DispatchCreation::createCollapseDimensionsPass);
 }
 
 // Apply preprocessing and form dispatch regions
