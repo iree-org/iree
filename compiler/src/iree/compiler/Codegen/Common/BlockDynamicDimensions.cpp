@@ -24,15 +24,6 @@ static llvm::cl::opt<bool> clEnableBlockedMatmuls(
                    "contraction-like ops"),
     llvm::cl::Hidden, llvm::cl::init(true));
 
-// This pass doesn't handle lowering config projection
-// when the dimension split happens for the dynamic
-// dimension. Therefore, keep the default to be disabled.
-static llvm::cl::opt<bool> clEnableBlockedAttentions(
-    "iree-codegen-block-dynamic-dimensions-of-attention",
-    llvm::cl::desc("developer flag to guard blocking dynamic dimensions of "
-                   "attention ops"),
-    llvm::cl::Hidden, llvm::cl::init(false));
-
 namespace mlir::iree_compiler {
 
 #define GEN_PASS_DEF_BLOCKDYNAMICDIMENSIONSPASS
@@ -301,10 +292,8 @@ blockDynamicDimensions(RewriterBase &rewriter,
                        Operation *operation) {
   return TypeSwitch<Operation *, LogicalResult>(operation)
       .Case<IREE::LinalgExt::AttentionOp>([&](auto attentionOp) {
-        if (clEnableBlockedAttentions) {
-          return blockDynamicDimensions(rewriter, dynamicDimAnalysis,
-                                        attentionOp);
-        }
+        return blockDynamicDimensions(rewriter, dynamicDimAnalysis,
+                                      attentionOp);
         return success();
       })
       .Case<linalg::LinalgOp>([&](auto linalgOp) {
@@ -327,6 +316,13 @@ void BlockDynamicDimensionsPass::runOnOperation() {
   IRRewriter rewriter(context);
   auto walkResult = operation->walk([&](Operation *op) -> WalkResult {
     rewriter.setInsertionPoint(op);
+    // If lowering config is set, changing the dimensionality of
+    // of the op will break the mapping. Therefore, skip operations
+    // that has lowering config set.
+    if (op->hasAttrOfType<IREE::Codegen::LoweringConfigAttrInterface>(
+            "lowering_config")) {
+      return success();
+    }
     return blockDynamicDimensions(rewriter, dynamicDimAnalysis, op);
   });
   if (walkResult.wasInterrupted()) {
