@@ -28,30 +28,67 @@ transform.named_sequence @apply_attn_op_config(%attention: !transform.any_op {tr
   transform.yield
 }
 
-transform.named_sequence @match_attention_f16(%attention: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param, !transform.any_param) {
-    transform.match.operation_name %attention ["iree_linalg_ext.attention"] : !transform.any_op
-    %in0 = transform.get_operand %attention[0] : (!transform.any_op) -> !transform.any_value
-    transform.iree.match.cast_compatible_type %in0 = tensor<?x?x?x?xf16> : !transform.any_value
+transform.named_sequence @match_attention_f16(%root: !transform.any_op {transform.readonly})
+  -> !transform.any_op {
+  transform.match.operation_name %root ["iree_linalg_ext.attention"] : !transform.any_op
+  %ins, %outs = transform.iree.match.cast_compatible_dag_from_root %root {
+    ^bb0(%query: tensor<?x?x?x?xf16>,
+         %key: tensor<?x?x?x?xf16>,
+         %value: tensor<?x?x?x?xf16>,
+         %softmax_scale: f16,
+         %out: tensor<?x?x?x?xf16>):
 
-    %config = transform.param.constant #iree_codegen.compilation_info<
-            lowering_config = #iree_gpu.lowering_config<{workgroup = [1, 1, 128, 0, 0, 0], reduction=[0, 0, 0, 0, 0, 64], promote_operands = [1, 2]}>,
-            translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-                                                              workgroup_size = [64, 4]
-                                                              subgroup_size = 64 ,
-              {llvm_func_attrs = { "amdgpu-waves-per-eu" = "2", "denormal-fp-math-f32" = "preserve-sign" }}>>
-    -> !transform.any_param
+      %attn = iree_linalg_ext.attention {indexing_maps = [
+                                          affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>,
+                                          affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>,
+                                          affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>,
+                                          affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
+                                          affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>]}
+        ins(%query, %key, %value, %softmax_scale :
+            tensor<?x?x?x?xf16>, tensor<?x?x?x?xf16>, tensor<?x?x?x?xf16>, f16)
+        outs(%out : tensor<?x?x?x?xf16>){
+          ^bb0(%arg0: f32):
+            iree_linalg_ext.yield %arg0 : f32
+        } -> tensor<?x?x?x?xf16>
+  } : (!transform.any_op) -> (!transform.any_value, !transform.any_value)
 
-    %decomposition_config = transform.param.constant {
-      qk_attrs = {attention_qk_matmul,
-                  lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.virtual_mma_layout<intrinsic = VMFMA_F32_32x32x16_F16>,
-                                                               subgroup_m_count = 4, subgroup_n_count = 1, promote_operands = [1] }>},
-      pv_attrs = {attention_pv_matmul,
-                  lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
-                                                               subgroup_m_count = 4, subgroup_n_count = 1, promote_operands = [1] }>}
-    } -> !transform.any_param
+  transform.yield %root : !transform.any_op
+}
 
-    transform.yield %attention, %config, %decomposition_config : !transform.any_op, !transform.any_param, !transform.any_param
-  }
+transform.named_sequence
+@match_attention_2x10x4096x64x64x64_f16(%attention: !transform.any_op {transform.readonly})
+  -> (!transform.any_op, !transform.any_param, !transform.any_param) {
+
+  %matched = transform.include @match_attention_f16 failures(propagate) (%attention)
+    : (!transform.any_op) -> !transform.any_op
+
+  %query = transform.get_operand %attention[0] : (!transform.any_op) -> !transform.any_value
+  %key = transform.get_operand %attention[1] : (!transform.any_op) -> !transform.any_value
+  %value = transform.get_operand %attention[2] : (!transform.any_op) -> !transform.any_value
+
+  transform.iree.match.cast_compatible_type %query = tensor<2x10x4096x64xf16> : !transform.any_value
+  transform.iree.match.cast_compatible_type %key = tensor<2x10x64x64xf16> : !transform.any_value
+  transform.iree.match.cast_compatible_type %value = tensor<2x10x64x64xf16> : !transform.any_value
+
+  %config = transform.param.constant #iree_codegen.compilation_info<
+          lowering_config = #iree_gpu.lowering_config<{workgroup = [1, 1, 128, 0, 0, 0], reduction=[0, 0, 0, 0, 0, 64], promote_operands = [1, 2]}>,
+          translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+                                                            workgroup_size = [64, 4]
+                                                            subgroup_size = 64 ,
+            {llvm_func_attrs = { "amdgpu-waves-per-eu" = "2", "denormal-fp-math-f32" = "preserve-sign" }}>>
+  -> !transform.any_param
+
+  %decomposition_config = transform.param.constant {
+    qk_attrs = {attention_qk_matmul,
+                lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.virtual_mma_layout<intrinsic = VMFMA_F32_32x32x16_F16>,
+                                                              subgroup_m_count = 4, subgroup_n_count = 1, promote_operands = [1] }>},
+    pv_attrs = {attention_pv_matmul,
+                lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
+                                                              subgroup_m_count = 4, subgroup_n_count = 1, promote_operands = [1] }>}
+  } -> !transform.any_param
+
+  transform.yield %attention, %config, %decomposition_config : !transform.any_op, !transform.any_param, !transform.any_param
+}
 
 transform.named_sequence @match_mmt_f16_f16_f32(%root: !transform.any_op {transform.readonly}) -> !transform.any_op {
   transform.match.operation_name %root ["linalg.generic"] : !transform.any_op
@@ -100,7 +137,7 @@ transform.named_sequence
 @__kernel_config(%variant_op: !transform.any_op {transform.consumed}) -> !transform.any_op
   attributes { iree_codegen.tuning_spec_entrypoint } {
   %res = transform.foreach_match in %variant_op
-    @match_attention_f16 -> @apply_attn_op_config
+    @match_attention_2x10x4096x64x64x64_f16 -> @apply_attn_op_config
     , @match_mmt_2048x1280x5120_f16_f16_f32 -> @apply_op_config
     : (!transform.any_op) -> !transform.any_op
   transform.yield %res : !transform.any_op
