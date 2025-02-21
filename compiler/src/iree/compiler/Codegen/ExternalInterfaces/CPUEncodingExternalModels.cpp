@@ -635,7 +635,12 @@ struct CPUDeviceEncodingLayoutResolverAttrInterface
     // taking narrow dimensions into account.
     TileMxNxK chosenTileMxNxK = chooseMatmulTile(
         enumeratedTileMxNxK, narrowDim, encoding.getRoundDimsToArray());
-    info = getEncodingInfoForMatmul(encoding, chosenTileMxNxK);
+    FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
+        getEncodingInfoForMatmul(encoding, chosenTileMxNxK);
+    if (failed(maybeEncodingInfo)) {
+      return info;
+    }
+    info = std::move(maybeEncodingInfo.value());
     if (Encoding::isNarrowNResult(encoding)) {
       transposeInPlace(info);
     }
@@ -767,7 +772,12 @@ struct VMVXDeviceEncodingLayoutResolverAttrInterface final
     // taking narrow dimensions into account.
     TileMxNxK chosenTileMxNxK = chooseMatmulTile(
         enumeratedTileMxNxK, narrowDim, encoding.getRoundDimsToArray());
-    info = getEncodingInfoForMatmul(encoding, chosenTileMxNxK);
+    FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
+        getEncodingInfoForMatmul(encoding, chosenTileMxNxK);
+    if (failed(maybeEncodingInfo)) {
+      return info;
+    }
+    info = std::move(maybeEncodingInfo.value());
     if (Encoding::isNarrowNResult(encoding)) {
       transposeInPlace(info);
     }
