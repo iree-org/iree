@@ -171,6 +171,9 @@ struct ConcretizeMmaOperandShape final : OpRewritePattern<MultiMmaOp> {
           idx -= outerRank;
         }
       }
+      // |perm| represents the permutation that takes the canonical (row major)
+      // layout and converts it to the current layout. Take the inverse to
+      // update to the expanded permutation and then invert back
       SmallVector<int64_t> invertPerm = invertPermutationVector(perm.value());
       SmallVector<int64_t> expandedPerm;
       for (auto reInd : applyPermutation(innerReInds, invertPerm)) {
