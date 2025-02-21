@@ -209,6 +209,7 @@ static void tileAndDistributeToWorkgroup(
   // TODO(#16421): Disable decomposition due to failure in bufferization.
   // funcPassManager.addPass(
   //     IREE::LinalgExt::createTileAndDecomposeAttentionPass());
+  funcPassManager.addPass(IREE::LinalgExt::createDecomposeAggregateOpsPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 }
