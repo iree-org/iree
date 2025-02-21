@@ -104,7 +104,7 @@ Next you will need to get an IREE runtime that supports the Vulkan HAL driver.
 You can check for Vulkan support by looking for a matching driver and device:
 
 ```console hl_lines="12"
---8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md:1"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md:2"
 ```
 
 ```console hl_lines="6"
