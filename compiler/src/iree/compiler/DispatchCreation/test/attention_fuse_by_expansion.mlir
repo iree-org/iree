@@ -482,6 +482,41 @@ util.func public @dont_sink_through_k2(%0 : tensor<128x64x1x1x128xf16>, %1 : ten
 
 // -----
 
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
+#map3 = affine_map<(d0, d1, d2, d3, d4) -> ()>
+#map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+
+util.func public @dont_sink_through_k1(%0 : tensor<128x64x128xf16>, %1 : tensor<128x64x128xf16>, %2 : tensor<128x64x2x64xf16>, %cst : f16) -> (tensor<128x64x128xf16>) {
+  %13 = tensor.empty() : tensor<4x32x64x128xf16>
+  %collapsed_12 = tensor.collapse_shape %2 [[0], [1], [2, 3]] : tensor<128x64x2x64xf16> into tensor<128x64x128xf16>
+  %17 = tensor.empty() : tensor<128x64x128xf16>
+  %18 = iree_linalg_ext.attention {indexing_maps = [#map, #map1, #map2, #map3, #map4]} ins(%collapsed_12, %1, %0, %cst : tensor<128x64x128xf16>, tensor<128x64x128xf16>, tensor<128x64x128xf16>, f16) outs(%17 : tensor<128x64x128xf16>) {
+    ^bb0(%score: f16):
+      iree_linalg_ext.yield %score: f16
+  } -> tensor<128x64x128xf16>
+  util.return %18 : tensor<128x64x128xf16>
+}
+
+// CHECK-LABEL: util.func public @dont_sink_through_k1
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[ARG3:.+]]: f16
+//   CHECK-DAG:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG2]]
+//       CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:       indexing_maps =
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> ()>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+//  CHECK-SAME:       ins(%[[COLLAPSED]], %[[ARG1]], %[[ARG0]], %[[ARG3]] :
+//       CHECK:   util.return %[[ATTENTION]]
+
+// -----
+
 util.func @scatter_collapse_updates(%arg0: tensor<4x?x2x16x4x128xf16>, %arg1: tensor<?x1xi32>, %arg2: tensor<?x2x16x4x128xf16>) -> tensor<?x2x16x4x128xf16> {
   %collapsed = tensor.collapse_shape %arg0[[0, 1], [2], [3], [4], [5]] : tensor<4x?x2x16x4x128xf16> into tensor<?x2x16x4x128xf16>
   %1 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true) ins(%collapsed, %arg1 : tensor<?x2x16x4x128xf16>, tensor<?x1xi32>) outs(%arg2 : tensor<?x2x16x4x128xf16>) {
