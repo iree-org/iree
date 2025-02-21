@@ -39,7 +39,7 @@ util.func public @transpose_attention(%arg0: tensor<4x64x32x128xf16>, %arg1: ten
 //  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d4, d1, d3)>
 //  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d4, d1, d5)>
 //  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
-//  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
+//  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d1, d5)>
 //  CHECK-SAME:     ins(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
 
 // -----
@@ -90,7 +90,7 @@ util.func public @transposed_attention_masked(%arg0: tensor<4x64x32x128xf16>, %a
 //  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d4, d1, d5)>
 //  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
 //  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d1, d4)>
-//  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
+//  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d1, d5)>
 //  CHECK-SAME:     ins(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
 
 // -----
