@@ -4039,8 +4039,7 @@ may want to include this path in your system's <code>PATH</code> environment var
 along with the appropriate executable loaders for your application.</p>
 <p>You can check for CPU support by looking for the <code>local-sync</code> and <code>local-task</code>
 drivers and devices:</p>
-<div class="highlight"><pre><span></span><code><span class="go">&lt;!-- markdownlint-disable --&gt;</span>
-<span class="gp">$ </span>iree-run-module<span class="w"> </span>--list_drivers
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--list_drivers
 
 <span class="gp"># </span><span class="o">============================================================================</span>
 <span class="gp"># </span>Available<span class="w"> </span>HAL<span class="w"> </span><span class="nv">drivers</span>
@@ -4048,10 +4047,10 @@ drivers and devices:</p>
 <span class="gp"># </span>Use<span class="w"> </span>--list_devices<span class="o">={</span>driver<span class="w"> </span>name<span class="o">}</span><span class="w"> </span>to<span class="w"> </span>enumerate<span class="w"> </span>available<span class="w"> </span>devices.
 
 <span class="go">        cuda: NVIDIA CUDA HAL driver (via dylib)</span>
-<span class="hll"><span class="go">         hip: HIP HAL driver (via dylib)</span>
-</span><span class="hll"><span class="go">  local-sync: Local execution using a lightweight inline synchronous queue</span>
-</span><span class="go">  local-task: Local execution using the IREE multithreading task system</span>
-<span class="go">      vulkan: Vulkan 1.x (dynamic)</span>
+<span class="go">         hip: HIP HAL driver (via dylib)</span>
+<span class="hll"><span class="go">  local-sync: Local execution using a lightweight inline synchronous queue</span>
+</span><span class="hll"><span class="go">  local-task: Local execution using the IREE multithreading task system</span>
+</span><span class="go">      vulkan: Vulkan 1.x (dynamic)</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--list_devices
 

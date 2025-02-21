@@ -3996,17 +3996,16 @@ may want to include this path in your system's <code>PATH</code> environment var
 <h3 id="get-the-iree-runtime">Get the IREE runtime<a class="headerlink" href="#get-the-iree-runtime" title="Permanent link">link</a></h3>
 <p>Next you will need to get an IREE runtime that includes the HIP HAL driver.</p>
 <p>You can check for HIP support by looking for a matching driver and device:</p>
-<div class="highlight"><pre><span></span><code><span class="go">&lt;!-- markdownlint-disable --&gt;</span>
-<span class="gp">$ </span>iree-run-module<span class="w"> </span>--list_drivers
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--list_drivers
 
 <span class="gp"># </span><span class="o">============================================================================</span>
 <span class="gp"># </span>Available<span class="w"> </span>HAL<span class="w"> </span><span class="nv">drivers</span>
 <span class="gp"># </span><span class="o">============================================================================</span>
 <span class="gp"># </span>Use<span class="w"> </span>--list_devices<span class="o">={</span>driver<span class="w"> </span>name<span class="o">}</span><span class="w"> </span>to<span class="w"> </span>enumerate<span class="w"> </span>available<span class="w"> </span>devices.
 
-<span class="hll"><span class="go">        cuda: NVIDIA CUDA HAL driver (via dylib)</span>
-</span><span class="go">         hip: HIP HAL driver (via dylib)</span>
-<span class="go">  local-sync: Local execution using a lightweight inline synchronous queue</span>
+<span class="go">        cuda: NVIDIA CUDA HAL driver (via dylib)</span>
+<span class="hll"><span class="go">         hip: HIP HAL driver (via dylib)</span>
+</span><span class="go">  local-sync: Local execution using a lightweight inline synchronous queue</span>
 <span class="go">  local-task: Local execution using the IREE multithreading task system</span>
 <span class="go">      vulkan: Vulkan 1.x (dynamic)</span>
 </code></pre></div>
