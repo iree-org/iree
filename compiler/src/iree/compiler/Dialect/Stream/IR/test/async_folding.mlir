@@ -485,6 +485,23 @@ util.func private @ElideImmediateAsyncExecuteWaits(%arg0: !stream.resource<*>, %
 
 // -----
 
+// CHECK-LABEL: @DedeuplicateASyncExecuteReturns
+util.func private @DedeuplicateASyncExecuteReturns(%arg0: !stream.resource<*>, %arg1: index) -> (!stream.resource<*>, !stream.resource<*>, !stream.resource<*>, !stream.timepoint) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // CHECK: %[[VAL:.+]], %[[TP:.+]] = stream.async.execute
+  %0:4 = stream.async.execute with(%arg0 as %arg2: !stream.resource<*>{%arg1}) -> %arg0 as !stream.resource<*>{%arg1}, %arg0 as !stream.resource<*>{%arg1}, %arg0 as !stream.resource<*>{%arg1} {
+    // CHECK: %[[VAL:.+]]:2 = stream.async.dispatch
+    %1, %2 = stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%arg2[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1}, !stream.resource<*>{%arg1}
+    // CHECK: stream.yield %[[VAL]]#0, %[[VAL]]#1
+    stream.yield %1, %2, %1 : !stream.resource<*>{%arg1}, !stream.resource<*>{%arg1}, !stream.resource<*>{%arg1}
+  } => !stream.timepoint
+  util.return %0#0, %0#1, %0#2, %0#3 : !stream.resource<*>, !stream.resource<*>, !stream.resource<*>, !stream.timepoint
+}
+
+
+// -----
+
 // CHECK-LABEL: @ChainAsyncExecuteWaits
 util.func private @ChainAsyncExecuteWaits(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.timepoint) -> (!stream.resource<*>, !stream.timepoint) {
   %c0 = arith.constant 0 : index
