@@ -2319,9 +2319,7 @@ struct DeduplicateYieldCmdExecuteOp : public OpRewritePattern<AsyncExecuteOp> {
     auto newExecuteOp = rewriter.create<IREE::Stream::AsyncExecuteOp>(
         op.getLoc(), newTypes, newResultSizes, op.getAwaitTimepoint(),
         op.getResourceOperands(), op.getResourceOperandSizes(),
-        llvm::map_to_vector(op.getTiedOperandsAttr(), [](Attribute intAttr) {
-          return llvm::cast<IntegerAttr>(intAttr).getInt();
-        }));
+        llvm::SmallVector<int64_t>());
 
     newExecuteOp.setAffinityAttr(op.getAffinityAttr());
 
