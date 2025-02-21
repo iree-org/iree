@@ -12,7 +12,6 @@
 #include "iree/compiler/Utils/Indexing.h"
 #include "iree/compiler/Utils/OptionUtils.h"
 #include "iree/compiler/Utils/Permutation.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormatVariadic.h"
 
 using namespace mlir;
@@ -120,19 +119,24 @@ struct TestOptions {
 
   void bindOptions(OptionsBinder &binder) {
     binder.opt<llvm::OptimizationLevel>("parent-option", parentOption);
-    binder.opt<llvm::OptimizationLevel>("child-option", parentOption);
+    binder.opt<bool>("child-option", childOption);
   }
 
   void applyOptimization(const OptionsBinder &binder,
                          llvm::OptimizationLevel globalOptLevel) {
     binder.overrideDefault("parent-option", parentOption, globalOptLevel);
+    if (parentOption == llvm::OptimizationLevel::O3) {
+      binder.overrideDefault("child-option", childOption, true);
+    }
   }
 };
 } // namespace
 
-TEST(OptionUtils, BasicTest) {
+TEST(OptionUtils, DefaultTest) {
   auto binder = OptionsBinder::local();
   TestOptions opts;
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O0);
+  EXPECT_EQ(opts.childOption, false);
 
   opts.bindOptions(binder);
   LogicalResult parseResult = binder.parseArguments(0, nullptr);
@@ -169,4 +173,19 @@ TEST(OptionUtils, NoOverrideParent) {
   EXPECT_TRUE(succeeded(parseResult));
   EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O2);
   EXPECT_EQ(opts.childOption, false);
+}
+
+TEST(OptionUtils, OverrideParentAndChild) {
+  auto binder = OptionsBinder::local();
+  TestOptions opts;
+  opts.bindOptions(binder);
+
+  LogicalResult parseResult = binder.parseArguments(0, nullptr);
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O0);
+  EXPECT_EQ(opts.childOption, false);
+
+  opts.applyOptimization(binder, llvm::OptimizationLevel::O3);
+  EXPECT_TRUE(succeeded(parseResult));
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O3);
+  EXPECT_EQ(opts.childOption, true);
 }
