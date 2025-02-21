@@ -32,10 +32,10 @@ static llvm::cl::opt<std::string> clMathTransformTweaks(
     "iree-codegen-math-transform-tweaks",
     llvm::cl::desc(
         "Comma-separated list of tweaks to apply to default math transforms. "
-        "Each entry has the form transform:+op or transform:-op to "
+        "Each entry has the form +transform:op or -transform:op to "
         "enable/disable a transform on an op. Allowed values for `op` are the "
-        "math dialect ops, math.cos. Allowed values for `transform` "
-        "are: rewrite, approx, f32cast. Example: approx:-math.cos ."),
+        "math dialect ops, e.g. math.cos. Allowed values for `transform` "
+        "are: rewrite, approx, f32cast. Example: -approx:math.cos."),
     llvm::cl::init(""));
 
 struct MathTransformTweaks {
@@ -70,35 +70,28 @@ getMathTransformTweaksFromString(StringRef tweaksString) {
     if (flag.empty()) {
       return error("Empty entry in comma-separated list");
     }
-    auto [transform, plusMinusOp] = flag.split(':');
-    if (plusMinusOp.empty()) {
+    auto [transform, op] = flag.split(':');
+    if (op.empty()) {
       return error("No `:` separator found in `{}`", flag);
     }
-    if (plusMinusOp.size() < 2) {
-      return error("Expected at least 2 characters to the right of `:` in `{}`",
+    if (transform.size() < 2) {
+      return error("Expected at least 2 characters to the left of `:` in `{}`",
                    flag);
     }
-    StringRef op = plusMinusOp.ltrim("-+");
-    if (op.size() + 1 != plusMinusOp.size()) {
-      // Check that exactly one left prefix char is '-' or '+'.
-      return error(
-          "Expected exactly one + or - character on the right of : in `{}`",
-          flag);
+    if (transform[0] != '-' && transform[0] != '+') {
+      return error("Expected the first character to be + or - in `{}`", flag);
     }
-    char plusMinus = plusMinusOp[0];
-    // User input already validated. This assert is just an internal check.
-    assert(plusMinus == '+' || plusMinus == '-');
     SmallVector<std::string> *dstVecPtr =
         llvm::StringSwitch<SmallVector<std::string> *>(transform)
-            .Case("rewrite", plusMinus == '+' ? &tweaks.enableRewrite
-                                              : &tweaks.disableRewrite)
-            .Case("f32cast", plusMinus == '+' ? &tweaks.enableF32Cast
-                                              : &tweaks.disableF32Cast)
-            .Case("approx", plusMinus == '+' ? &tweaks.enableApprox
-                                             : &tweaks.disableApprox)
+            .Case("+rewrite", &tweaks.enableRewrite)
+            .Case("-rewrite", &tweaks.disableRewrite)
+            .Case("+f32cast", &tweaks.enableF32Cast)
+            .Case("-f32cast", &tweaks.disableF32Cast)
+            .Case("+approx", &tweaks.enableApprox)
+            .Case("-approx", &tweaks.disableApprox)
             .Default(nullptr);
     if (!dstVecPtr) {
-      return error("Unknown key on left of the : separator in {}", flag);
+      return error("Unknown key on the left of the : separator in {}", flag);
     }
     dstVecPtr->emplace_back(op);
   }

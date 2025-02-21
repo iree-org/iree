@@ -1,7 +1,7 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-codegen-math-transform))' --split-input-file %s | FileCheck %s
-// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-codegen-math-transform))' '--iree-codegen-math-transform-tweaks=approx:-math.tan,rewrite:-math.tan,f32cast:-math.tan' --split-input-file %s | FileCheck %s --check-prefix=FLAGS1
-// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-codegen-math-transform))' '--iree-codegen-math-transform-tweaks=approx:-math.tan,rewrite:-math.tan,f32cast:+math.tan' --split-input-file %s | FileCheck %s --check-prefix=FLAGS2
-// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-codegen-math-transform))' '--iree-codegen-math-transform-tweaks=approx:-math.tan,approx:-math.cos,approx:-math.sin,rewrite:+math.tan' --split-input-file %s | FileCheck %s --check-prefix=FLAGS3
+// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-codegen-math-transform))' '--iree-codegen-math-transform-tweaks=-approx:math.tan,-rewrite:math.tan,-f32cast:math.tan' --split-input-file %s | FileCheck %s --check-prefix=FLAGS1
+// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-codegen-math-transform))' '--iree-codegen-math-transform-tweaks=-approx:math.tan,-rewrite:math.tan,+f32cast:math.tan' --split-input-file %s | FileCheck %s --check-prefix=FLAGS2
+// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-codegen-math-transform))' '--iree-codegen-math-transform-tweaks=-approx:math.tan,-approx:math.cos,-approx:math.sin,+rewrite:math.tan' --split-input-file %s | FileCheck %s --check-prefix=FLAGS3
 
 // CHECK-ALL-LABEL: @rewrite_tan
 func.func @rewrite_tan(%arg0: f16) -> f16 attributes {
