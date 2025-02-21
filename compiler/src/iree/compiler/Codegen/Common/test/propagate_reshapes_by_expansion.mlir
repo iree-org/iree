@@ -137,6 +137,7 @@ func.func @expand_dest_forall() {
 //  CHECK-SAME:   !flow.dispatch.tensor<writeonly:tensor<?x64x4x4x2xf32>>{%[[LOAD_CONST]]}
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
     #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @expand_dest_forall_multiresult() {
@@ -235,6 +236,7 @@ func.func @noexpand_dest_forall_dynamicpacked() {
 //  CHECK-SAME:   !flow.dispatch.tensor<writeonly:tensor<32xf32>>
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
     #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @expand_dest_forall_unsupporteduse() {
@@ -339,10 +341,10 @@ func.func @noexpand_dest_forall_notfullslicestore() {
 //  CHECK-SAME:   !flow.dispatch.tensor<writeonly:tensor<34xf32>>
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
     #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @expand_dest_forall_chained() {
-  %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
   %index = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
@@ -388,3 +390,42 @@ func.func @expand_dest_forall_chained() {
 //       CHECK:   flow.dispatch.tensor.store %[[SCFFORALL]], %[[SUBSPAN]]
 //  CHECK-SAME:   offsets = [0, 0, 0, 0, 0, 0], sizes = [%[[LOAD_CONST]], 32, 2, 4, 4, 2], strides = [1, 1, 1, 1, 1, 1]
 //  CHECK-SAME:   !flow.dispatch.tensor<writeonly:tensor<?x32x2x4x4x2xf32>>{%[[LOAD_CONST]]}
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @fillandreshapes_in_forall() {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %index = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+      flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<?x64x32xf32>>{%index}
+  %1 = tensor.empty(%index) : tensor<?x64x32xf32>
+  %2 = scf.forall (%arg0, %arg1) = (0, 0) to (64, 32) step (16, 16)
+    shared_outs(%arg2 = %1) -> (tensor<?x64x32xf32>) {
+    %empty = tensor.empty() : tensor<1x16x16xf32>
+    %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<1x16x16xf32>) -> tensor<1x16x16xf32>
+    %transpose1 = linalg.transpose ins(%fill : tensor<1x16x16xf32>)
+              outs(%empty: tensor<1x16x16xf32>) permutation = [0, 2, 1]
+    %expanded = tensor.expand_shape %transpose1 [[0], [1], [2, 3, 4]]
+              output_shape [1, 16, 2, 4, 2] : tensor<1x16x16xf32> into tensor<1x16x2x4x2xf32>
+    %expanded_barrier = util.optimization_barrier %expanded : tensor<1x16x2x4x2xf32>
+    %collapsed = tensor.collapse_shape %expanded_barrier [[0], [1], [2, 3, 4]] : tensor<1x16x2x4x2xf32> into tensor<1x16x16xf32>
+    %transpose2 = linalg.transpose ins(%collapsed : tensor<1x16x16xf32>)
+              outs(%empty: tensor<1x16x16xf32>) permutation = [0, 2, 1]
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %transpose2 into %arg2[%c0, %arg0, %arg1] [1, 16, 16] [1, 1, 1]
+        : tensor<1x16x16xf32> into tensor<?x64x32xf32>
+    }
+  } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+  flow.dispatch.tensor.store %2, %0, offsets = [0, 0, 0], sizes = [%index, 64, 32], strides = [1, 1, 1]
+     : tensor<?x64x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x64x32xf32>>{%index}
+  return
+}
+
+// This test is to show that fill and transpose do not get generalized in a forall.
+// CHECK-LABEL: func @fillandreshapes_in_forall(
+//       CHECK:   linalg.fill {{.*}} -> tensor<1x16x2x4x2xf32>
+//       CHECK:   linalg.transpose ins(%{{.*}} : tensor<1x16x2x4x2xf32>)
+//  CHECK-SAME:     outs(%{{.*}} : tensor<1x2x4x2x16xf32>) permutation = [0, 2, 3, 4, 1]

@@ -11,6 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Utils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
@@ -298,66 +299,6 @@ private:
   bool allowGeneralizing = false;
 };
 
-// Bubbles a transpose through a tensor.collapse_shape.
-class BubbleTransposeThroughCollapseShape
-    : public OpRewritePattern<linalg::TransposeOp> {
-public:
-  using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::TransposeOp transposeOp,
-                                PatternRewriter &rewriter) const override {
-    if (!IREE::Flow::isNonNullAndOutsideDispatch(transposeOp)) {
-      return failure();
-    }
-    Value source = transposeOp.getDpsInputOperand(0)->get();
-    auto collapseOp = source.getDefiningOp<tensor::CollapseShapeOp>();
-    // Do not propagate through reshapes if the transpose has multiple users, as
-    // this could end up duplicating the transposes. We should only propagate
-    // through reshape when it is free to do so.
-    if (!collapseOp || !collapseOp->hasOneUse()) {
-      return rewriter.notifyMatchFailure(
-          transposeOp, "transpose input is not a single-use collapse shape");
-    }
-
-    SmallVector<ReassociationIndices> reassociations =
-        collapseOp.getReassociationIndices();
-
-    // Because we are doing transpose(collapse_shape), all expanded groups are
-    // transposed together. As a result, to get the permutation of the new
-    // transpose, we can just flatten the transposed reassociation indices.
-    // For example,
-    //
-    // reassociation_map = [[0, 1, 2], [3], [4, 5]]
-    // permutation = [1, 2, 0]
-    //
-    // Becomes
-    //
-    // permutation = [3, 4, 5, 0, 1, 2]
-    // reassociation_map = [[0], [1, 2], [3, 4, 5]]
-    applyPermutationToVector(reassociations, transposeOp.getPermutation());
-
-    SmallVector<int64_t> newPerm;
-    SmallVector<ReassociationIndices> newReassociations;
-    int64_t expandedDim = 0;
-    for (auto reassoc : reassociations) {
-      ReassociationIndices newReassoc;
-      for (auto dim : reassoc) {
-        newPerm.push_back(dim);
-        newReassoc.push_back(expandedDim++);
-      }
-      newReassociations.push_back(newReassoc);
-    }
-
-    Value newTranspose =
-        createTranspose(rewriter, collapseOp.getSrc(), newPerm);
-    Value newReshape = rewriter.create<tensor::CollapseShapeOp>(
-        collapseOp.getLoc(), transposeOp.getResultTypes()[0], newTranspose,
-        newReassociations);
-    rewriter.replaceOp(transposeOp, newReshape);
-    return success();
-  }
-};
-
 } // namespace
 
 //===----------------------------------------------------------------------===//
@@ -491,71 +432,6 @@ public:
       slice = createTranspose(rewriter, slice, rankReducedPerm);
     }
     rewriter.replaceOp(extractOp, slice);
-    return success();
-  }
-};
-
-// Sinks a transpose through a tensor.expand_shape.
-class SinkTransposeThroughExpandShape
-    : public OpRewritePattern<tensor::ExpandShapeOp> {
-public:
-  using OpRewritePattern<tensor::ExpandShapeOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::ExpandShapeOp expandOp,
-                                PatternRewriter &rewriter) const override {
-    if (!IREE::Flow::isNonNullAndOutsideDispatch(expandOp)) {
-      return failure();
-    }
-    Value source = expandOp.getSrc();
-    auto transposeOp = source.getDefiningOp<linalg::TransposeOp>();
-    // Do not propagate through reshapes if the transpose has multiple users, as
-    // this could end up duplicating the transposes. We should only propagate
-    // through reshape when it is free to do so.
-    if (!transposeOp || !transposeOp->hasOneUse()) {
-      return rewriter.notifyMatchFailure(
-          expandOp, "expand shape input is not a single-use transpose");
-    }
-
-    auto invPerm = invertPermutationVector(transposeOp.getPermutation());
-    SmallVector<ReassociationIndices> reassociations =
-        expandOp.getReassociationIndices();
-
-    // Because we are doing expand_shape(transpose), all expanded groups are
-    // transposed together. As a result, to get the permutation of the new
-    // transpose, we can just flatten the transposed reassociation indices.
-    // For example,
-    //
-    // permutation = [0, 2, 1]
-    // reassociation_map = [[0, 1, 2], [3], [4, 5]]
-    //
-    // Becomes
-    //
-    // reassociation_map = [[0, 1, 2], [3, 4], [5]]
-    // permutation = [0, 1, 2, 4, 5, 3]
-    applyPermutationToVector(reassociations, invPerm);
-
-    SmallVector<int64_t> newInvPerm;
-    SmallVector<ReassociationIndices> newReassociations;
-    int64_t expandedDim = 0;
-    for (auto reassoc : reassociations) {
-      ReassociationIndices newReassoc;
-      for (auto dim : reassoc) {
-        newInvPerm.push_back(dim);
-        newReassoc.push_back(expandedDim++);
-      }
-      newReassociations.push_back(newReassoc);
-    }
-
-    auto newPerm = invertPermutationVector(newInvPerm);
-
-    RankedTensorType expandedType = getPermutedTensorType(
-        cast<RankedTensorType>(expandOp.getType()), newInvPerm);
-    Value transposedReshape = rewriter.create<tensor::ExpandShapeOp>(
-        expandOp.getLoc(), expandedType, transposeOp.getInput(),
-        newReassociations);
-    Value originalReshape =
-        createTranspose(rewriter, transposedReshape, newPerm);
-    rewriter.replaceOp(expandOp, originalReshape);
     return success();
   }
 };
@@ -1031,13 +907,20 @@ void PropagateLinalgTransposePass::runOnOperation() {
     llvm::dbgs() << "\n\n";
   });
 
+  ControlFnTy outsideDispatchControlFn = [](Operation *op) {
+    if (IREE::Flow::isNonNullAndOutsideDispatch(op)) {
+      return true;
+    }
+    return false;
+  };
   // First try to fuse transposes with some consumer linalg named ops before
   // any reshape propagation. Some transposes may be adjacent to named ops,
   // and it is more canonical if we can fuse the ops into a new named op.
   if (!testBubblingOnly) {
     RewritePatternSet sinkingPatterns(context);
     sinkingPatterns.insert<SinkTransposeThroughExtractSlice>(context);
-    sinkingPatterns.insert<SinkTransposeThroughExpandShape>(context);
+    populateLinalgTransposeThroughExpandShapePattern(sinkingPatterns,
+                                                     outsideDispatchControlFn);
     populateNamedOpSinkingPatterns(context, sinkingPatterns);
     populateCommonCanonicalizationPatterns(context, sinkingPatterns);
     sinkingPatterns.add<SinkTransposeThroughUnaryElementwiseInput>(
@@ -1106,7 +989,8 @@ void PropagateLinalgTransposePass::runOnOperation() {
     }
     bubblingPatterns.insert<FuseTransposeWithProducerLinalgOp>(
         context, enableAggressivePropagation);
-    bubblingPatterns.insert<BubbleTransposeThroughCollapseShape>(context);
+    populateLinalgTransposeThroughCollapseShapePattern(
+        bubblingPatterns, outsideDispatchControlFn);
     bubblingPatterns.add<BubbleTransposeThroughUnaryElementwiseDpsInit>(
         context, /*benefit=*/2);
     bubblingPatterns.insert<ComposeTransposes>(context);
@@ -1161,7 +1045,8 @@ void PropagateLinalgTransposePass::runOnOperation() {
     linalg::populateFoldReshapeOpsByExpansionPatterns(sinkingPatterns,
                                                       reshapePropagationFn);
     sinkingPatterns.insert<SinkTransposeThroughExtractSlice>(context);
-    sinkingPatterns.insert<SinkTransposeThroughExpandShape>(context);
+    populateLinalgTransposeThroughExpandShapePattern(sinkingPatterns,
+                                                     outsideDispatchControlFn);
     sinkingPatterns.insert<FuseTransposeWithLinalgOpConsumer>(
         context, enableAggressivePropagation);
     sinkingPatterns.insert<ComposeTransposes>(context);

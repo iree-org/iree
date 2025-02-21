@@ -316,6 +316,13 @@ void PropagateReshapesByExpansionPass::runOnOperation() {
       [](OpOperand *fusedOperand) {
         Operation *producer = fusedOperand->get().getDefiningOp();
         Operation *consumer = fusedOperand->getOwner();
+        // We do not want to use upstream reshape patterns for fill and
+        // transpose as that will generalize the ops and we want to retain the
+        // named ops.
+        if (isa<linalg::FillOp, linalg::TransposeOp>(producer) ||
+            isa<linalg::FillOp, linalg::TransposeOp>(consumer)) {
+          return false;
+        }
 
         // Block only if one of the operations has a lowering configuration
         // which means it likely expects tiling specific to its original shape.
@@ -339,6 +346,8 @@ void PropagateReshapesByExpansionPass::runOnOperation() {
                                                      context);
   populateReshapeToInterfaceTensorPatterns(bubbleExpandShapePatterns);
   bubbleExpandShapePatterns.add<ExpandDestinationForallOp>(context);
+  populateLinalgTransposeThroughCollapseShapePattern(bubbleExpandShapePatterns);
+  populateLinalgTransposeThroughExpandShapePattern(bubbleExpandShapePatterns);
 
   if (failed(applyPatternsGreedily(getOperation(),
                                    std::move(bubbleExpandShapePatterns)))) {

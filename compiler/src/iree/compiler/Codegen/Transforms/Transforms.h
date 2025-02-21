@@ -256,6 +256,17 @@ distributeLinalgOpsWithFilter(mlir::FunctionOpInterface funcOp,
                               linalg::LinalgTilingOptions tilingOptions,
                               LinalgTransformationFilter filter);
 
+using ControlFnTy = std::function<bool(Operation *)>;
+
+/// Patterns to propagate linalg tranpose ops through reshapes.
+void populateLinalgTransposeThroughCollapseShapePattern(
+    RewritePatternSet &patterns,
+    std::optional<ControlFnTy> controlFn = std::nullopt);
+
+void populateLinalgTransposeThroughExpandShapePattern(
+    RewritePatternSet &patterns,
+    std::optional<ControlFnTy> controlFn = std::nullopt);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_TRANSFORMS_TRANSFORMS_H_

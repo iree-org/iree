@@ -1608,4 +1608,191 @@ void populateForallLoopHoistingPattern(RewritePatternSet &patterns) {
   patterns.insert<HoistForallFromFor>(patterns.getContext());
 }
 
+// Constructs a transpose of the given tensor and permutation.
+static Value createTransposeInit(OpBuilder &builder, Value source,
+                                 ArrayRef<int64_t> perm) {
+  SmallVector<OpFoldResult> mixedSizes =
+      tensor::getMixedSizes(builder, source.getLoc(), source);
+  applyPermutationToVector(mixedSizes, perm);
+  Type elemType = cast<RankedTensorType>(source.getType()).getElementType();
+  Value empty =
+      builder.create<tensor::EmptyOp>(source.getLoc(), mixedSizes, elemType)
+          .getResult();
+  return empty;
+}
+
+// Constructs a transpose of the given tensor and permutation,
+// or produces a transposed version of the producing tensor.empty op.
+static Value createTranspose(OpBuilder &builder, Value source,
+                             ArrayRef<int64_t> perm) {
+  if (auto empty = source.getDefiningOp<tensor::EmptyOp>()) {
+    Type elementType = empty.getType().getElementType();
+    SmallVector<OpFoldResult> mixedSizes = empty.getMixedSizes();
+    applyPermutationToVector(mixedSizes, perm);
+    return builder.create<tensor::EmptyOp>(empty.getLoc(), mixedSizes,
+                                           elementType);
+  }
+  Value empty = createTransposeInit(builder, source, perm);
+  return builder
+      .create<linalg::TransposeOp>(source.getLoc(), source, empty, perm)
+      ->getResult(0);
+}
+
+static RankedTensorType getPermutedTensorType(RankedTensorType type,
+                                              SmallVector<int64_t> perm) {
+  SmallVector<int64_t> permutedShape = applyPermutation(type.getShape(), perm);
+  return RankedTensorType::get(permutedShape, type.getElementType());
+}
+
+// Bubbles a transpose through a tensor.collapse_shape.
+class BubbleTransposeThroughCollapseShape
+    : public OpRewritePattern<linalg::TransposeOp> {
+public:
+  BubbleTransposeThroughCollapseShape(MLIRContext *context,
+                                      std::optional<ControlFnTy> controlFn,
+                                      PatternBenefit benefit = 1)
+      : OpRewritePattern<linalg::TransposeOp>(context, benefit),
+        controlFn(controlFn) {}
+  LogicalResult matchAndRewrite(linalg::TransposeOp transposeOp,
+                                PatternRewriter &rewriter) const override {
+    if (controlFn.has_value() && !controlFn.value()(transposeOp)) {
+      return rewriter.notifyMatchFailure(transposeOp, "controlFn failed.");
+    }
+
+    Value source = transposeOp.getDpsInputOperand(0)->get();
+    auto collapseOp = source.getDefiningOp<tensor::CollapseShapeOp>();
+    // Do not propagate through reshapes if the transpose has multiple users, as
+    // this could end up duplicating the transposes. We should only propagate
+    // through reshape when it is free to do so.
+    if (!collapseOp || !collapseOp->hasOneUse()) {
+      return rewriter.notifyMatchFailure(
+          transposeOp, "transpose input is not a single-use collapse shape");
+    }
+
+    SmallVector<ReassociationIndices> reassociations =
+        collapseOp.getReassociationIndices();
+
+    // Because we are doing transpose(collapse_shape), all expanded groups are
+    // transposed together. As a result, to get the permutation of the new
+    // transpose, we can just flatten the transposed reassociation indices.
+    // For example,
+    //
+    // reassociation_map = [[0, 1, 2], [3], [4, 5]]
+    // permutation = [1, 2, 0]
+    //
+    // Becomes
+    //
+    // permutation = [3, 4, 5, 0, 1, 2]
+    // reassociation_map = [[0], [1, 2], [3, 4, 5]]
+    applyPermutationToVector(reassociations, transposeOp.getPermutation());
+
+    SmallVector<int64_t> newPerm;
+    SmallVector<ReassociationIndices> newReassociations;
+    int64_t expandedDim = 0;
+    for (auto reassoc : reassociations) {
+      ReassociationIndices newReassoc;
+      for (auto dim : reassoc) {
+        newPerm.push_back(dim);
+        newReassoc.push_back(expandedDim++);
+      }
+      newReassociations.push_back(newReassoc);
+    }
+
+    Value newTranspose =
+        createTranspose(rewriter, collapseOp.getSrc(), newPerm);
+    Value newReshape = rewriter.create<tensor::CollapseShapeOp>(
+        collapseOp.getLoc(), transposeOp.getResultTypes()[0], newTranspose,
+        newReassociations);
+    rewriter.replaceOp(transposeOp, newReshape);
+    return success();
+  }
+
+private:
+  std::optional<ControlFnTy> controlFn;
+};
+
+// Sinks a transpose through a tensor.expand_shape.
+class SinkTransposeThroughExpandShape
+    : public OpRewritePattern<tensor::ExpandShapeOp> {
+public:
+  SinkTransposeThroughExpandShape(MLIRContext *context,
+                                  std::optional<ControlFnTy> controlFn,
+                                  PatternBenefit benefit = 1)
+      : OpRewritePattern<tensor::ExpandShapeOp>(context, benefit),
+        controlFn(controlFn) {}
+
+  LogicalResult matchAndRewrite(tensor::ExpandShapeOp expandOp,
+                                PatternRewriter &rewriter) const override {
+    if (controlFn.has_value() && !controlFn.value()(expandOp)) {
+      return rewriter.notifyMatchFailure(expandOp, "controlFn failed.");
+    }
+    Value source = expandOp.getSrc();
+    auto transposeOp = source.getDefiningOp<linalg::TransposeOp>();
+    // Do not propagate through reshapes if the transpose has multiple users, as
+    // this could end up duplicating the transposes. We should only propagate
+    // through reshape when it is free to do so.
+    if (!transposeOp || !transposeOp->hasOneUse()) {
+      return rewriter.notifyMatchFailure(
+          expandOp, "expand shape input is not a single-use transpose");
+    }
+
+    auto invPerm = invertPermutationVector(transposeOp.getPermutation());
+    SmallVector<ReassociationIndices> reassociations =
+        expandOp.getReassociationIndices();
+
+    // Because we are doing expand_shape(transpose), all expanded groups are
+    // transposed together. As a result, to get the permutation of the new
+    // transpose, we can just flatten the transposed reassociation indices.
+    // For example,
+    //
+    // permutation = [0, 2, 1]
+    // reassociation_map = [[0, 1, 2], [3], [4, 5]]
+    //
+    // Becomes
+    //
+    // reassociation_map = [[0, 1, 2], [3, 4], [5]]
+    // permutation = [0, 1, 2, 4, 5, 3]
+    applyPermutationToVector(reassociations, invPerm);
+
+    SmallVector<int64_t> newInvPerm;
+    SmallVector<ReassociationIndices> newReassociations;
+    int64_t expandedDim = 0;
+    for (auto reassoc : reassociations) {
+      ReassociationIndices newReassoc;
+      for (auto dim : reassoc) {
+        newInvPerm.push_back(dim);
+        newReassoc.push_back(expandedDim++);
+      }
+      newReassociations.push_back(newReassoc);
+    }
+
+    auto newPerm = invertPermutationVector(newInvPerm);
+
+    RankedTensorType expandedType = getPermutedTensorType(
+        cast<RankedTensorType>(expandOp.getType()), newInvPerm);
+    Value transposedReshape = rewriter.create<tensor::ExpandShapeOp>(
+        expandOp.getLoc(), expandedType, transposeOp.getInput(),
+        newReassociations);
+    Value originalReshape =
+        createTranspose(rewriter, transposedReshape, newPerm);
+    rewriter.replaceOp(expandOp, originalReshape);
+    return success();
+  }
+
+private:
+  std::optional<ControlFnTy> controlFn;
+};
+
+void populateLinalgTransposeThroughCollapseShapePattern(
+    RewritePatternSet &patterns, std::optional<ControlFnTy> controlFn) {
+  patterns.add<BubbleTransposeThroughCollapseShape>(patterns.getContext(),
+                                                    controlFn);
+}
+
+void populateLinalgTransposeThroughExpandShapePattern(
+    RewritePatternSet &patterns, std::optional<ControlFnTy> controlFn) {
+  patterns.add<SinkTransposeThroughExpandShape>(patterns.getContext(),
+                                                controlFn);
+}
+
 } // namespace mlir::iree_compiler
