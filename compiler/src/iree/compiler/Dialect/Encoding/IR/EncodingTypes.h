@@ -38,6 +38,8 @@
 
 namespace mlir::iree_compiler::IREE::Encoding {
 
+static constexpr char kEncodingResolverAttrName[] = "iree.encoding.resolver";
+
 /// Returns the encoding attribute from the type if there is an encoding that
 /// implements SerializableEncodingAttrInterface. Otherwise, returns null.
 SerializableEncodingAttrInterface
