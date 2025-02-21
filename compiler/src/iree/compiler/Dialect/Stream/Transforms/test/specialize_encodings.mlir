@@ -8,8 +8,8 @@
 #map0 = affine_map<(m, n, k) -> (m, k)>
 #map1 = affine_map<(m, n, k) -> (k, n)>
 #map2 = affine_map<(m, n, k) -> (m, n)>
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_cpu.vmvx_encoding_layout<>}>
-#executable_target_x86_64 = #hal.executable.target<"llvm-cpu", "xyz", {encoding = #iree_cpu.cpu_encoding_layout<>, target_triple="x86_64-xyz-xyz", cpu_features="+avx512f"}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_cpu.vmvx_encoding_layout<>}>
+#executable_target_x86_64 = #hal.executable.target<"llvm-cpu", "xyz", {iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>, target_triple="x86_64-xyz-xyz", cpu_features="+avx512f"}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #device_target_local_1_ = #hal.device.target<"local", {ordinal = 1 : index}, [#executable_target_x86_64]> : !hal.device
 #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
@@ -45,7 +45,7 @@ util.func public @tensor_sizeof(%d0: index, %d1: index) -> (index, index) {
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
   {
     abi = "hip",
-    encoding = #iree_gpu.gpu_encoding_layout<>,
+    iree.encoding.resolver = #iree_gpu.gpu_encoding_layout<>,
     iree.gpu.target = #iree_gpu.target<arch = "gfx942",
                                        features = "",
                                        wgp = <compute = fp32,
@@ -89,7 +89,7 @@ util.func public @gpu_with_encoding_layout(%d0: index, %d1: index) -> index {
 #map2 = affine_map<(m, n, k) -> (m, n)>
 #map3 = affine_map<(m, n, k) -> (n, k)>
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip",
-  encoding = #iree_gpu.gpu_pad_layout<cache_line_bytes = 128, cache_sets = 4>, ukernels = "none"}>
+  iree.encoding.resolver = #iree_gpu.gpu_pad_layout<cache_line_bytes = 128, cache_sets = 4>, ukernels = "none"}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_rocm_hsaco_fb]> : !hal.device
 #encodingA = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map1, #map2]>
 #encodingB = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map1, #map2]>
@@ -138,7 +138,7 @@ util.func public @with_pad_encoding(%arg0: index, %arg1: index, %scalar_f32 : f3
 // encoding is updated that carries resolved layouts.
 //------------------------------------------------------------------------------
 
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.testing_encoding<>
 
@@ -161,7 +161,7 @@ util.func public @ops_with_result_encoding_only(%arg0: index, %arg1: index, %sca
 
 // -----
 
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.testing_encoding<>
 util.global private @device_a = #device_target_local_0_
@@ -184,7 +184,7 @@ util.func public @tensor_fill_op(%arg0: f32, %arg1: !stream.resource<*>, %arg2: 
 
 // Checks that the stream.tensor.constant op with encoding is not supported.
 
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.testing_encoding<>
 
@@ -201,7 +201,7 @@ module {
 
 // Checks that the stream.tensor.clone op with encoding is not supported.
 
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.testing_encoding<>
 
@@ -220,7 +220,7 @@ module {
 
 // Checks that the stream.tensor.slice op with encoding is not supported.
 
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.testing_encoding<>
 
@@ -241,7 +241,7 @@ module {
 
 // Checks that the stream.tensor.update op with encoding is not supported.
 
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.testing_encoding<>
 
@@ -278,7 +278,7 @@ util.func public @drop_encoding(%arg0: index, %arg1: index, %scalar_f32 : f32) {
 
 // Drop encodings if the attached encoding attribute can not figure the layout.
 
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", { encoding = #iree_encoding.unsupported_encoding }>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", { iree.encoding.resolver = #iree_encoding.unsupported_encoding }>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.testing_encoding<>
 util.global private @device_a = #device_target_local_0_
@@ -311,7 +311,7 @@ util.func public @keep_encoding_if_serialized(%arg0: index, %arg1: index, %scala
 // This test suite tests the executable duplication logic.
 //------------------------------------------------------------------------------
 
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.testing_encoding<>
 
@@ -345,7 +345,7 @@ util.func public @tensor_dispatch_with_tied_operands(%arg0: !stream.resource<ext
 
 // -----
 
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_encoding.unspecialized_encoding<123>}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #device_target_local_1_ = #hal.device.target<"local", {ordinal = 1 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.testing_encoding<>
@@ -391,8 +391,8 @@ util.func public @multi_device_with_same_executable_targets(%arg0: !stream.resou
 // launch it on device_b. Thus, the incoming layout of second tensor dispatch op
 // has device_a layout, and it produces device_b layout.
 
-#executable_target_a = #hal.executable.target<"target_a", "abc", {encoding = #iree_encoding.unspecialized_encoding<123>}>
-#executable_target_b = #hal.executable.target<"target_b", "xyz", {encoding = #iree_encoding.unspecialized_encoding<456>}>
+#executable_target_a = #hal.executable.target<"target_a", "abc", {iree.encoding.resolver = #iree_encoding.unspecialized_encoding<123>}>
+#executable_target_b = #hal.executable.target<"target_b", "xyz", {iree.encoding.resolver = #iree_encoding.unspecialized_encoding<456>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_a]> : !hal.device
 #device_target_local_1_ = #hal.device.target<"local", {ordinal = 1 : index}, [#executable_target_b]> : !hal.device
 #encoding = #iree_encoding.testing_encoding<>
@@ -445,8 +445,8 @@ util.func public @multi_device_with_different_executable_targets(%arg0: !stream.
 // executable on both devices. We check that the executable is duplicated and
 // the encodings on bindings are updated.
 
-#executable_target_a = #hal.executable.target<"target_a", "abc", {encoding = #iree_encoding.unspecialized_encoding<123>}>
-#executable_target_b = #hal.executable.target<"target_b", "xyz", {encoding = #iree_encoding.unspecialized_encoding<456>}>
+#executable_target_a = #hal.executable.target<"target_a", "abc", {iree.encoding.resolver = #iree_encoding.unspecialized_encoding<123>}>
+#executable_target_b = #hal.executable.target<"target_b", "xyz", {iree.encoding.resolver = #iree_encoding.unspecialized_encoding<456>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_a]> : !hal.device
 #device_target_local_1_ = #hal.device.target<"local", {ordinal = 1 : index}, [#executable_target_b]> : !hal.device
 #encoding = #iree_encoding.testing_encoding<>
@@ -520,8 +520,8 @@ util.func public @multi_device_set_encoding(%arg0: !stream.resource<external>, %
 
 // This test is simliar to the set_encoding test, but with unset_encoding ops.
 
-#executable_target_a = #hal.executable.target<"target_a", "abc", {encoding = #iree_encoding.unspecialized_encoding<123>}>
-#executable_target_b = #hal.executable.target<"target_b", "xyz", {encoding = #iree_encoding.unspecialized_encoding<456>}>
+#executable_target_a = #hal.executable.target<"target_a", "abc", {iree.encoding.resolver = #iree_encoding.unspecialized_encoding<123>}>
+#executable_target_b = #hal.executable.target<"target_b", "xyz", {iree.encoding.resolver = #iree_encoding.unspecialized_encoding<456>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_a]> : !hal.device
 #device_target_local_1_ = #hal.device.target<"local", {ordinal = 1 : index}, [#executable_target_b]> : !hal.device
 #encoding = #iree_encoding.testing_encoding<>
@@ -599,8 +599,8 @@ util.func public @multi_device_unset_encoding(%arg0: !stream.resource<external>,
 // This tests the computation ops on tensor encodings, where all the tensor
 // types are encoded. The computation body is fill + matmul.
 
-#executable_target_a = #hal.executable.target<"target_a", "abc", {encoding = #iree_encoding.unspecialized_encoding<123>}>
-#executable_target_b = #hal.executable.target<"target_b", "xyz", {encoding = #iree_encoding.unspecialized_encoding<456>}>
+#executable_target_a = #hal.executable.target<"target_a", "abc", {iree.encoding.resolver = #iree_encoding.unspecialized_encoding<123>}>
+#executable_target_b = #hal.executable.target<"target_b", "xyz", {iree.encoding.resolver = #iree_encoding.unspecialized_encoding<456>}>
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>

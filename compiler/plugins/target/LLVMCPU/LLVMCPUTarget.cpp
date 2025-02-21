@@ -21,6 +21,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/Target/Devices/LocalDevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
@@ -172,7 +173,7 @@ public:
     SmallVector<NamedAttribute> configItems;
     target.storeToConfigAttrs(context, configItems);
     configItems.emplace_back(
-        b.getStringAttr("encoding"),
+        b.getStringAttr(IREE::Encoding::kEncodingResolverAttrName),
         IREE::CPU::CPUEncodingLayoutAttr::get(context, {}));
 
     // Compute the format used at runtime to select the executable loader.

@@ -156,14 +156,15 @@ public:
         deviceAnalysis.gatherRequiredExecutableTargets(affinityAttr, op,
                                                        resultSet);
         for (auto targetAttr : resultSet) {
-          if (!targetAttr.hasConfigurationAttr("encoding")) {
+          if (!targetAttr.hasConfigurationAttr(
+                  IREE::Encoding::kEncodingResolverAttrName)) {
             layoutAttrs[key].insert(getDefaultAttr());
             continue;
           }
           auto encodingLayoutAttr =
               targetAttr.getConfiguration()
                   .getAs<IREE::Encoding::EncodingLayoutResolverAttrInterface>(
-                      "encoding");
+                      IREE::Encoding::kEncodingResolverAttrName);
           if (!encodingLayoutAttr) {
             layoutAttrs[key].insert(getDefaultAttr());
             continue;
