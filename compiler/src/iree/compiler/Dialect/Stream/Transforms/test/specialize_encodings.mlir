@@ -45,7 +45,7 @@ util.func public @tensor_sizeof(%d0: index, %d1: index) -> (index, index) {
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
   {
     abi = "hip",
-    encoding = #iree_gpu.gpu_encoding_layout<>,
+    iree.encoding.resolver = #iree_gpu.gpu_encoding_layout<>,
     iree.gpu.target = #iree_gpu.target<arch = "gfx942",
                                        features = "",
                                        wgp = <compute = fp32,
