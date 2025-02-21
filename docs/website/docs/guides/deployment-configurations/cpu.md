@@ -74,7 +74,7 @@ You can check for CPU support by looking for the `local-sync` and `local-task`
 drivers and devices:
 
 ```console hl_lines="10-11"
---8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md:1"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md:2"
 ```
 
 ```console hl_lines="4-5"
