@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/AffineMap.h"
@@ -16,8 +17,13 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Support/LLVM.h"
+#include "llvm/Support/Debug.h"
 
 #include <cassert>
+
+#define DEBUG_TYPE "iree-encoding-attrs"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::IREE::Encoding {
 
@@ -223,6 +229,9 @@ Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
     ValueRange dynamicDims) const {
   ArrayRef<int32_t> padding = getPadding().asArrayRef();
   assert(padding.size() == type.getRank() && "Invalid padding");
+  LLVM_DEBUG(if (llvm::any_of(padding, [](int32_t x) { return x != 0; })) {
+    llvm::dbgs() << "Non-zero padding: " << type << "\n";
+  });
 
   const int64_t elementSize = getRoundedElementByteWidth(type.getElementType());
   int64_t staticProduct = elementSize;

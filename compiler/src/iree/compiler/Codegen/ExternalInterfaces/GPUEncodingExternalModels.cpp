@@ -42,6 +42,9 @@
 
 #define DEBUG_TYPE "iree-gpu-encoding-external-models"
 
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
+
 namespace mlir::iree_compiler::IREE::GPU {
 
 using Codegen::MaterializeEncodingInfo;
@@ -405,6 +408,7 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     auto padLayoutAttr = cast<GPUPadLayoutAttr>(attr);
     auto encodingAttr = cast<Encoding::EncodingAttr>(type.getEncoding());
 
+    LDBG("Get Layout: " <<  type);
     const int64_t rank = type.getRank();
     SmallVector<int32_t> padValues(rank, 0);
     auto noPaddingAttr = Encoding::PadEncodingLayoutAttr::get(
@@ -427,14 +431,18 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     FailureOr<linalg::ContractionDimensions> contractionDims =
         Encoding::getEncodingContractionDims(encodingAttr);
     if (failed(contractionDims) || contractionDims->k.size() != 1) {
+      LDBG("\tfound more than one contraction dim");
       return noPaddingAttr;
     }
 
     std::optional<unsigned> padDimensionIndex =
         encodingAttr.mapDimToOperandIndex(contractionDims->k[0]);
     if (!padDimensionIndex || padDimensionIndex != rank - 1) {
+      LDBG("\tfailed to find pad dimension index for contraction dim "
+           << contractionDims->k[0]);
       return noPaddingAttr;
     }
+
     ArrayRef<int64_t> shape = type.getShape();
     if (ShapedType::isDynamic(shape[*padDimensionIndex])) {
       return noPaddingAttr;
@@ -443,6 +451,7 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     const int64_t elementBits = type.getElementTypeBitWidth();
     const int64_t cacheLineBytes = padLayoutAttr.getCacheLineBytes();
     if (elementBits % 8 != 0 || elementBits > cacheLineBytes) {
+      LDBG("\tunaligned elem type");
       // We do not support unaligned element types.
       return noPaddingAttr;
     }
@@ -455,6 +464,11 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
         padLayoutAttr.getCacheSets() * cacheLineBytes;
     const int64_t dimSizeInBytes =
         type.getDimSize(*padDimensionIndex) * (elementBits / 8);
+    if (dimSizeInBytes < cacheSetSpanBytes) {
+      // Very small dimension, leave as-is.
+      return noPaddingAttr;
+    }
+
     int64_t padBytes = 0;
     if (int64_t unalignedBytes = dimSizeInBytes % cacheLineBytes;
         unalignedBytes != 0) {

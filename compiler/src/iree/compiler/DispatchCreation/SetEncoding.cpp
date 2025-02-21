@@ -20,11 +20,15 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-set-encoding"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::DispatchCreation {
 #define GEN_PASS_DEF_SETENCODINGPASS
@@ -145,6 +149,9 @@ static LogicalResult isSupportedContractionOp(PatternRewriter &rewriter,
         linalgOp, "Expected M or N dims and K dim to not be empty");
   }
   if (!hasMatmulLikeBody(linalgOp)) {
+    LDBG("Unsuported op (body)");
+    LLVM_DEBUG(linalgOp->print(llvm::dbgs(), OpPrintingFlags().skipRegions());
+               llvm::dbgs() << "\n");
     return rewriter.notifyMatchFailure(
         linalgOp, "Expected op to have a matmul body, i.e. yield(add(out, "
                   "mul(cast(in0), cast(in1))))");
@@ -187,6 +194,10 @@ public:
     }
     Value lhs = inputs[0];
     Value rhs = inputs[1];
+    if (!lhs.hasOneUse() || !rhs.hasOneUse()) {
+      LDBG("Not setting encoding: matmul operands with more than one use");
+      return failure();
+    }
     Value out = outputs[0];
 
     Type lhsElemType = getContractionInputTypeWithSignedness(
