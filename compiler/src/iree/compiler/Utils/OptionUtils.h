@@ -296,7 +296,7 @@ public:
 namespace llvm {
 inline raw_ostream &operator<<(raw_ostream &os,
                                const llvm::OptimizationLevel &opt) {
-  return os << opt.getSpeedupLevel();
+  return os << 'O' << opt.getSpeedupLevel();
 }
 } // namespace llvm
 

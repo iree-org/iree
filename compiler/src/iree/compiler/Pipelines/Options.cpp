@@ -136,6 +136,11 @@ void GlobalOptimizationOptions::applyOptimization(
     const OptionsBinder &binder, const GlobalPipelineOptions &globalLevel) {
   binder.overrideDefault("iree-global-optimization-opt-level", optLevel,
                          globalLevel.optLevel);
+
+  if (optLevel != llvm::OptimizationLevel::O0) {
+    binder.overrideDefault("iree-opt-strip-assertions", stripAssertions, true);
+    llvm::dbgs() << "stripAssertions " << stripAssertions << '\n';
+  }
 };
 
 void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
