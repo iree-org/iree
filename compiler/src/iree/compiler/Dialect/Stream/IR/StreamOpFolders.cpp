@@ -2275,10 +2275,91 @@ struct ElideNoOpAsyncExecuteOp : public OpRewritePattern<AsyncExecuteOp> {
   }
 };
 
+struct DeduplicateYieldCmdExecuteOp : public OpRewritePattern<AsyncExecuteOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(AsyncExecuteOp op,
+                                PatternRewriter &rewriter) const override {
+    llvm::SmallVector<bool> keepYield;
+    llvm::SmallVector<Value> yieldOperands;
+    llvm::SmallVector<int> remapping;
+
+    auto yield =
+        cast<IREE::Stream::YieldOp>(op.getBody().front().getTerminator());
+    int64_t oldYieldCount = yield.getResourceOperands().size();
+    for (int i = 0, s = oldYieldCount; i < s; ++i) {
+      auto operand = yield.getResourceOperands()[i];
+
+      auto find =
+          std::find(yieldOperands.begin(), yieldOperands.end(), operand);
+      if (find != yieldOperands.end()) {
+        keepYield.push_back(false);
+        remapping.push_back(find - yieldOperands.begin());
+        continue;
+      }
+
+      remapping.push_back(yieldOperands.size());
+      keepYield.push_back(true);
+      yieldOperands.push_back(operand);
+    }
+
+    if (oldYieldCount == yieldOperands.size()) {
+      return failure();
+    }
+
+    llvm::SmallVector<Type> newTypes;
+    llvm::SmallVector<Value> newResultSizes;
+
+    for (int i = 0; i < oldYieldCount; ++i) {
+      if (!keepYield[i])
+        continue;
+      newTypes.push_back(op.getResults()[i].getType());
+      newResultSizes.push_back(op.getResultSizes()[i]);
+    }
+
+    auto newExecuteOp = rewriter.create<IREE::Stream::AsyncExecuteOp>(
+        op.getLoc(), newTypes, newResultSizes, op.getAwaitTimepoint(),
+        op.getResourceOperands(), op.getResourceOperandSizes(),
+        llvm::map_to_vector(op.getTiedOperandsAttr(), [](Attribute intAttr) {
+          return llvm::cast<IntegerAttr>(intAttr).getInt();
+        }));
+
+    newExecuteOp.setAffinityAttr(op.getAffinityAttr());
+
+    rewriter.inlineRegionBefore(op.getRegion(), newExecuteOp.getRegion(),
+                                newExecuteOp.getRegion().end());
+
+    llvm::SmallVector<Value> newYieldVals;
+    llvm::SmallVector<Value> newYieldSizes;
+    yield = cast<IREE::Stream::YieldOp>(
+        newExecuteOp.getBody().front().getTerminator());
+    for (int i = 0; i < oldYieldCount; ++i) {
+      if (!keepYield[i])
+        continue;
+      newYieldVals.push_back(yield.getResourceOperands()[i]);
+      newYieldSizes.push_back(yield.getResourceOperandSizes()[i]);
+    }
+
+    rewriter.setInsertionPoint(yield);
+    rewriter.replaceOpWithNewOp<IREE::Stream::YieldOp>(yield, newYieldVals,
+                                                       newYieldSizes);
+
+    llvm::SmallVector<Value> replace;
+    for (auto i : remapping) {
+      replace.push_back(newExecuteOp.getResult(i));
+    }
+
+    replace.push_back(newExecuteOp.getResultTimepoint());
+    rewriter.replaceOp(op, replace);
+
+    return success();
+  }
+};
+
 } // namespace
 
 void AsyncExecuteOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                  MLIRContext *context) {
+  results.insert<DeduplicateYieldCmdExecuteOp>(context);
   results.insert<ElideImmediateTimepointWait<AsyncExecuteOp>>(context);
   results.insert<ChainDependentAwaits<AsyncExecuteOp>>(context);
   results.insert<CloneCapturedAsyncExecuteSubviewOps>(context);
