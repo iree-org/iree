@@ -52,6 +52,19 @@ else:
             with self.assertRaises(ValueError):
                 session.set_flags("--does-not-exist=1")
 
+        def testOptFlags(self):
+            session = Session()
+            flags = session.get_flags()
+            self.assertIn("--iree-opt-level=O0", flags)
+            self.assertIn("--iree-global-optimization-opt-level=O0", flags)
+            self.assertIn("--iree-opt-strip-assertions=false", flags)
+
+            session.set_flags("--iree-opt-level=O2")
+            flags = session.get_flags()
+            self.assertIn("--iree-opt-level=O2", flags)
+            self.assertIn("--iree-global-optimization-opt-level=O0", flags)
+            self.assertIn("--iree-opt-strip-assertions=false", flags)
+
     class DlInvocationTest(unittest.TestCase):
         def testCreate(self):
             session = Session()
