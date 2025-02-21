@@ -135,16 +135,18 @@ static LogicalResult isSupportedContractionOp(PatternRewriter &rewriter,
                                        "Expected isaContractionOpInterface");
   }
   auto cDims = linalg::inferContractionDims(linalgOp);
-  if (failed(cDims) || cDims->batch.size() > 1 || cDims->m.size() > 1 ||
-      cDims->n.size() > 1 || cDims->k.size() > 1) {
+  if (failed(cDims) || cDims->k.size() > 1) {
+    llvm::errs() << "Unsuported op (dims)" << linalgOp << "\n";
     return rewriter.notifyMatchFailure(
         linalgOp, "Expected {|Batch|, |M|, |N|, |K|} <= 1");
   }
   if ((cDims->n.empty() && cDims->m.empty()) || cDims->k.empty()) {
+    llvm::errs() << "Unsuported op (empty dims)" << linalgOp << "\n";
     return rewriter.notifyMatchFailure(
         linalgOp, "Expected M or N dims and K dim to not be empty");
   }
   if (!hasMatmulLikeBody(linalgOp)) {
+    llvm::errs() << "Unsuported op (body)" << linalgOp << "\n";
     return rewriter.notifyMatchFailure(
         linalgOp, "Expected op to have a matmul body, i.e. yield(add(out, "
                   "mul(cast(in0), cast(in1))))");

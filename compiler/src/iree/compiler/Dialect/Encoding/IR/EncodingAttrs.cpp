@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/AffineMap.h"
@@ -223,6 +224,9 @@ Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
     ValueRange dynamicDims) const {
   ArrayRef<int32_t> padding = getPadding().asArrayRef();
   assert(padding.size() == type.getRank() && "Invalid padding");
+  if (!llvm::all_equal(padding)) {
+    llvm::errs() << "Non zero sz: " << type << "\n";
+  }
 
   const int64_t elementSize = getRoundedElementByteWidth(type.getElementType());
   int64_t staticProduct = elementSize;

@@ -405,6 +405,7 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     auto padLayoutAttr = cast<GPUPadLayoutAttr>(attr);
     auto encodingAttr = cast<Encoding::EncodingAttr>(type.getEncoding());
 
+    llvm::errs() << "Get Layout: " <<  type << "\n";
     const int64_t rank = type.getRank();
     SmallVector<int32_t> padValues(rank, 0);
     auto noPaddingAttr = Encoding::PadEncodingLayoutAttr::get(
@@ -463,6 +464,9 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     }
 
     if ((dimSizeInBytes + padBytes) % cacheSetSpanBytes == 0) {
+      // Pad by one cache line to engage all cache sets.
+      padBytes += cacheLineBytes;
+    } else if ((dimSizeInBytes + padBytes) % (cacheSetSpanBytes / 2) == 0) {
       // Pad by one cache line to engage all cache sets.
       padBytes += cacheLineBytes;
     }

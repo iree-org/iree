@@ -198,7 +198,9 @@ void HoistEncodingOpsPass::runOnOperation() {
 
   SmallVector<IREE::Encoding::SetEncodingOp> candidates;
   funcOp->walk([&](IREE::Encoding::SetEncodingOp setEncodingOp) {
-    if (setEncodingOp->getParentOfType<IREE::Flow::DispatchRegionOp>()) {
+    if (setEncodingOp->getParentOfType<IREE::Flow::DispatchRegionOp>() &&
+        setEncodingOp.getSource()
+            .getDefiningOp<IREE::Flow::DispatchRegionOp>()) {
       candidates.push_back(setEncodingOp);
     }
   });
