@@ -227,4 +227,4 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[MASK_ITL_PCK:.+]] = vector.transpose %[[MASK_PCK]], [0, 3, 1, 4, 2, 5] : vector<2x2x2x1x1x8xi1> to vector<2x1x2x1x2x8xi1>
 
 // CHECK: %[[SELECT:.+]] = arith.select %[[MASK_ITL_PCK]], {{.*}}, %[[RED_IDENTITY]] : vector<2x1x2x1x2x8xi1>, vector<2x1x2x1x2x8xf16>
-// CHECK: vector.mask %[[MASK_ITL_PCK]] { vector.multi_reduction <add>, %[[SELECT]], {{.*}} [0, 2, 4] : vector<2x1x2x1x2x8xf16> to vector<1x1x8xf16> } : vector<2x1x2x1x2x8xi1> -> vector<1x1x8xf16>
+// CHECK: vector.multi_reduction <add>, %[[SELECT]], {{.*}} [0, 2, 4] : vector<2x1x2x1x2x8xf16> to vector<1x1x8xf16>

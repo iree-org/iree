@@ -644,6 +644,7 @@ struct DistributeMultiReduction final
       mask = getDistributed(rewriter, maskOp.getMask(), maskLayout);
       Value passThruSrc = getCombiningIdentityValue(
           loc, rewriter, multiReduceOp.getKind(), disSrc.getType());
+
       disSrc = cast<VectorValue>(
           rewriter.create<arith::SelectOp>(loc, mask, disSrc, passThruSrc)
               .getResult());
@@ -666,11 +667,17 @@ struct DistributeMultiReduction final
     Value localReduction = rewriter.create<vector::MultiDimReductionOp>(
         loc, disSrc, localInit, distributedReductionMask,
         multiReduceOp.getKind());
-    if (mask) {
-      localReduction =
-          vector::maskOperation(rewriter, localReduction.getDefiningOp(), mask)
-              ->getResult(0);
-    }
+
+    // TODO: As per current upstream lowering implementations, there is no point
+    // in doing this because it does a select much later in a finer granularity
+    // rather than supporting predication. Moreover, since we are doing a select
+    // to cater reductions accross the distribution, we can choose not to mask
+    // the op post-distribution. if (mask) {
+    //   localReduction =
+    //       vector::maskOperation(rewriter, localReduction.getDefiningOp(),
+    //       mask)
+    //           ->getResult(0);
+    // }
 
     VectorValue locallyReduced;
     if (accVector) {

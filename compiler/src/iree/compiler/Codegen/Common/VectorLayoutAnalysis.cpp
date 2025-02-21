@@ -984,7 +984,7 @@ void PropagateLayout::visitMaskOp(
     std::function<void(DistributionLayout *, mlir::ChangeResult)> update) {
   mask.getBody()->walk(
       [&](Operation *traversed) { visitOperation(traversed); });
-  // Propogate from body to results
+  // Propagate from body to results.
   SmallVector<OpResult> vectorResults =
       llvm::filter_to_vector(mask.getResults(), [](OpResult result) {
         return isa<VectorType>(result.getType());
