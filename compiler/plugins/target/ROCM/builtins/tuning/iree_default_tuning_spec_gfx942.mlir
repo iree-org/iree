@@ -137,6 +137,7 @@ transform.named_sequence
 @__kernel_config(%variant_op: !transform.any_op {transform.consumed}) -> !transform.any_op
   attributes { iree_codegen.tuning_spec_entrypoint } {
   %res = transform.foreach_match in %variant_op
+    // Notice approximately 1.22x speedup over the baseline by using this atten_op_config
     @match_attention_2x10x4096x64x64x64_f16 -> @apply_attn_op_config
     , @match_mmt_2048x1280x5120_f16_f16_f32 -> @apply_op_config
     : (!transform.any_op) -> !transform.any_op
