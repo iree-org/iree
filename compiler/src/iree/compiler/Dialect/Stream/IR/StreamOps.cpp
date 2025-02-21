@@ -2718,6 +2718,16 @@ void AsyncDispatchOp::getAsyncAccessRanges(
   }
 }
 
+bool AsyncDispatchOp::preferCloneToConsumers() {
+  // If the dispatch does not consume any resources then it is effectively a
+  // slow splat and should be treated like one.
+  const bool consumesAny = llvm::any_of(
+      getResourceOperands(), +[](Value operand) {
+        return isa<IREE::Stream::AffinityTypeInterface>(operand.getType());
+      });
+  return !consumesAny;
+}
+
 //===----------------------------------------------------------------------===//
 // stream.async.func
 //===----------------------------------------------------------------------===//
