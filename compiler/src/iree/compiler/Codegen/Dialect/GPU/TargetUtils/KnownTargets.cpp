@@ -235,9 +235,15 @@ const WgpDetails *getCDNA1WgpDetails() {
 const WgpDetails *getRDNA4WgpDetails() {
   // XXX: Actively incorrect, semantics change
   static const MMAIntrinsic rdna4MMAOps[] = {
-      MMAIntrinsic::WMMA_F32_16x16x16_F16, MMAIntrinsic::WMMA_F16_16x16x16_F16,
-      MMAIntrinsic::WMMA_I32_16x16x16_I8,  MMAIntrinsic::WMMA_I32_16x16x16_I8,
-      MMAIntrinsic::WMMA_I32_16x16x16_I8,
+      MMAIntrinsic::WMMAR4_F32_16x16x16_F16,
+      MMAIntrinsic::WMMAR4_F16_16x16x16_F16,
+      MMAIntrinsic::WMMAR4_F32_16x16x16_BF16,
+      MMAIntrinsic::WMMAR4_BF16_16x16x16_BF16,
+      MMAIntrinsic::WMMAR4_F32_16x16x16_F8E5M2,
+      MMAIntrinsic::WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN,
+      MMAIntrinsic::WMMAR4_F32_16x16x16_F8E4M3FN,
+      MMAIntrinsic::WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2,
+      MMAIntrinsic::WMMAR4_I32_16x16x16_I8,
 
   };
   static const WgpDetails rdna4Wgp = {allComputeBits,
@@ -259,9 +265,11 @@ const WgpDetails *getRDNA4WgpDetails() {
 
 const WgpDetails *getRDNA3WgpDetails() {
   static const MMAIntrinsic rdna3MMAOps[] = {
-      MMAIntrinsic::WMMA_F32_16x16x16_F16, MMAIntrinsic::WMMA_F16_16x16x16_F16,
-      MMAIntrinsic::WMMA_I32_16x16x16_I8,  MMAIntrinsic::WMMA_I32_16x16x16_I8,
-      MMAIntrinsic::WMMA_I32_16x16x16_I8,
+      MMAIntrinsic::WMMAR3_F32_16x16x16_F16,
+      MMAIntrinsic::WMMAR3_F16_16x16x16_F16,
+      MMAIntrinsic::WMMAR3_F32_16x16x16_BF16,
+      MMAIntrinsic::WMMAR3_BF16_16x16x16_BF16,
+      MMAIntrinsic::WMMAR3_I32_16x16x16_I8,
 
   };
   static const WgpDetails rdna3Wgp = {allComputeBits,
