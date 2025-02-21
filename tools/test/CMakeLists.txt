@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "benchmark_flags.txt"
+    "compile_flags.mlir"
     "compile_pipelines.mlir"
     "compile_to_continuation.mlir"
     "compile_to_phase.mlir"
