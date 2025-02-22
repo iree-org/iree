@@ -189,6 +189,9 @@ public:
     }
     Value lhs = inputs[0];
     Value rhs = inputs[1];
+    if (!lhs.hasOneUse() || !rhs.hasOneUse()) {
+      return failure();
+    }
     Value out = outputs[0];
 
     Type lhsElemType = getContractionInputTypeWithSignedness(

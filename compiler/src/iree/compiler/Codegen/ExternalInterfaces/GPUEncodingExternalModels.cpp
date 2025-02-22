@@ -466,9 +466,6 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     if ((dimSizeInBytes + padBytes) % cacheSetSpanBytes == 0) {
       // Pad by one cache line to engage all cache sets.
       padBytes += cacheLineBytes;
-    } else if ((dimSizeInBytes + padBytes) % (cacheSetSpanBytes / 2) == 0) {
-      // Pad by one cache line to engage all cache sets.
-      padBytes += cacheLineBytes;
     }
 
     assert((dimSizeInBytes + padBytes) % cacheLineBytes == 0 &&
