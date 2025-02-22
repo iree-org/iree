@@ -18,6 +18,29 @@
 
 namespace mlir::iree_compiler {
 
+struct opt_initializer_base {};
+
+template <typename Ty>
+struct opt_initializer : opt_initializer_base {
+  const Ty init;
+  llvm::OptimizationLevel optLevel;
+  opt_initializer(const llvm::OptimizationLevel opt, const Ty &val)
+      : init(val), optLevel(opt) {}
+  void apply(const llvm::OptimizationLevel inLevel, Ty &val) const {
+    assert(inLevel.getSizeLevel() == 0 && "size level not implemented");
+    if (inLevel.getSpeedupLevel() >= optLevel.getSpeedupLevel())
+      val = init;
+  }
+};
+
+/// Initialize the value of a variable if the optimization level is at least
+/// the specified level.
+template <typename Ty>
+opt_initializer<Ty> init_at_opt(llvm::OptimizationLevel optLevel,
+                                const Ty &val) {
+  return opt_initializer<Ty>(optLevel, val);
+}
+
 // Base class that can bind named options to fields of structs.
 //
 // Typically use by adding the following to your struct:
@@ -69,6 +92,41 @@ public:
       getOptionsStorage()[name] = OptionInfo{
           std::move(option), /*print=*/printCallback,
           /*isChanged=*/changedCallback, /*isDefault*/ defaultCallback};
+    }
+  }
+
+  template <typename T, typename V, typename K, typename... Ks,
+            typename... Mods>
+  void opt(llvm::StringRef name, V &value, opt_initializer<K> init,
+           opt_initializer<Ks>... inits, Mods... Ms) {
+    opt<V>(name, value, Ms...);
+    getOptionsStorage()[name].setOptLevels.push_back(
+        std::make_unique<opt_initializer<K>>(init));
+    (getOptionsStorage()[name].setOptLevels.push_back(
+         std::make_unique<opt_initializer<Ks>>(inits)),
+     ...);
+  }
+
+  template <typename... Mods>
+  void optimizationLevel(llvm::StringRef name, llvm::OptimizationLevel &value,
+                         Mods... Ms) {
+    opt<llvm::OptimizationLevel>(name, value, Ms...);
+  }
+
+  template <typename T>
+  void applyOptimization(llvm::StringRef name, T &value,
+                         llvm::OptimizationLevel optLevel) const {
+    const auto infoIt = getOptionsStorage().find(name);
+    assert(infoIt != getOptionsStorage().end() && "Option not found");
+    auto changedCallback = infoIt->getSecond().isChanged;
+    assert(changedCallback && "Expected changed callback");
+    if (changedCallback()) {
+      return;
+    }
+    const auto &setOptLevels = infoIt->getSecond().setOptLevels;
+    for (const auto &init : setOptLevels) {
+      reinterpret_cast<opt_initializer<T> *>(init.get())
+          ->apply(optLevel, value);
     }
   }
 
@@ -139,6 +197,8 @@ private:
     PrintCallback print;
     ChangedCallback isChanged;
     DefaultCallback isDefault;
+
+    llvm::SmallVector<std::unique_ptr<opt_initializer_base>> setOptLevels;
   };
   using OptionsStorage = llvm::DenseMap<llvm::StringRef, OptionInfo>;
 

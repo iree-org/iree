@@ -139,9 +139,8 @@ struct GlobalOptimizationOptions {
   // Converts linalg named matmul ops to linalg generic ops.
   bool generalizeMatmul = false;
 
-  void applyOptimization(const OptionsBinder &binder = OptionsBinder::global(),
-                         const GlobalPipelineOptions &globalLevel =
-                             GlobalPipelineOptions::FromFlags::get());
+  void applyOptimization(const OptionsBinder &binder,
+                         const GlobalPipelineOptions &globalLevel);
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalOptimizationOptions>;
 };

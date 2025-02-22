@@ -136,17 +136,14 @@ void GlobalOptimizationOptions::applyOptimization(
     const OptionsBinder &binder, const GlobalPipelineOptions &globalLevel) {
   binder.overrideDefault("iree-global-optimization-opt-level", optLevel,
                          globalLevel.optLevel);
-
-  if (optLevel != llvm::OptimizationLevel::O0) {
-    binder.overrideDefault("iree-opt-strip-assertions", stripAssertions, true);
-    llvm::dbgs() << "stripAssertions " << stripAssertions << '\n';
-  }
+  binder.applyOptimization("iree-opt-strip-assertions", stripAssertions,
+                           optLevel);
 };
 
 void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category(
       "IREE options for controlling global optimizations.");
-  binder.opt<llvm::OptimizationLevel>(
+  binder.optimizationLevel(
       "iree-global-optimization-opt-level", optLevel,
       llvm::cl::desc("Optimization level for the this pipeline"),
       llvm::cl::cat(category));
@@ -187,6 +184,7 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
           "Reduces numeric precision to lower bit depths where possible."),
       llvm::cl::cat(category));
   binder.opt<bool>("iree-opt-strip-assertions", stripAssertions,
+                   init_at_opt(llvm::OptimizationLevel::O1, true),
                    llvm::cl::desc("Strips debug assertions after any useful "
                                   "information has been extracted."),
                    llvm::cl::cat(category));
