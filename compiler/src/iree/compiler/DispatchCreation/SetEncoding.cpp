@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/TypeUtilities.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/Support/Debug.h"
@@ -155,6 +156,11 @@ static LogicalResult isSupportedContractionOp(PatternRewriter &rewriter,
     return rewriter.notifyMatchFailure(
         linalgOp, "Expected op to have a matmul body, i.e. yield(add(out, "
                   "mul(cast(in0), cast(in1))))");
+  }
+  if (getElementTypeOrSelf(linalgOp->getResult(0).getType()) !=
+      rewriter.getI32Type()) {
+    return rewriter.notifyMatchFailure(
+        linalgOp, "[HACK] Shape not on allow list for SDXL");
   }
   return success();
 }
