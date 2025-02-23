@@ -6,6 +6,7 @@
 
 #include "iree/compiler/DispatchCreation/Passes.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
@@ -258,7 +259,21 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
         .addPass(DispatchCreation::createHoistEncodingOpsPass)
         // After SetEncodingOps are hoisted, try to fuse them with their
         // producer dispatches to try to hide packing costs.
-        .addPass(DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass)
+        .addPass(
+            DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass);
+
+    // Hoist encoding operations into initializers when possible.
+    IREE::Util::ExprHoistingOptions hoistingOptions;
+    hoistingOptions.maxSizeIncreaseThreshold = 0;
+    hoistingOptions.registerDependentDialectsFn =
+        [](DialectRegistry &registry) {
+          registry.insert<IREE::Encoding::IREEEncodingDialect,
+                          IREE::Flow::FlowDialect>();
+        };
+    passManager.addPass(
+        IREE::Util::createHoistIntoGlobalsPass(hoistingOptions));
+
+    FunctionLikeNest(passManager)
         .addPass(DispatchCreation::createWrapEncodingOpInDispatchRegionPass);
   }
 }
