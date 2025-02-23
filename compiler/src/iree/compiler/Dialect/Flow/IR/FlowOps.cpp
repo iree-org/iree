@@ -603,6 +603,10 @@ bool dropUnusedAndRedundantDispatchRegionResults(
     RewriterBase &rewriter, Flow::DispatchRegionOp regionOp) {
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(regionOp);
+  if (!llvm::hasSingleElement(regionOp.getBody())) {
+    // Bail on case where there are more than one blocks in the dispatch.
+    return false;
+  }
 
   // Determine unused/redunduant results and result types + dynamic dimensions
   // of the new op. If the result is redundant, record which result number it is
