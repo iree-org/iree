@@ -6,7 +6,7 @@ module attributes {transform.with_named_sequence} {
 
   transform.named_sequence @apply_op_config(%arg0: !transform.any_op {transform.readonly}, %arg1: !transform.any_param {transform.readonly}) {
     transform.annotate %arg0 "compilation_info" = %arg1 : !transform.any_op, !transform.any_param
-    transform.yield 
+    transform.yield
   }
   transform.named_sequence @apply_attn_op_config(%attention: !transform.any_op {transform.readonly},
                                                  %config: !transform.any_param {transform.readonly},
@@ -990,7 +990,7 @@ transform.named_sequence @match_attention_f8_m_4096(%attention: !transform.any_o
 //===----------------------------------------------------------------------===//
 
   transform.named_sequence @__kernel_config(%arg0: !transform.any_op {transform.consumed}) -> !transform.any_op attributes {iree_codegen.tuning_spec_entrypoint} {
-    %updated_root = transform.foreach_match in %arg0 
+    %updated_root = transform.foreach_match in %arg0
         // Attention.
         @match_attention_f16 -> @apply_attn_op_config
         , @match_attention_f8_m_1024 -> @apply_attn_op_config
