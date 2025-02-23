@@ -256,8 +256,8 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
         .addPass(DispatchCreation::createHoistEncodingOpsPass)
         // After SetEncodingOps are hoisted, try to fuse them with their
         // producer dispatches to try to hide packing costs.
-        .addPass(
-            DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass);
+        .addPass(DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass)
+        .addPass(DispatchCreation::createWrapEncodingOpInDispatchRegionPass);
   }
   FunctionLikeNest(passManager)
       // Collapse dimensions of linalg Ops.
