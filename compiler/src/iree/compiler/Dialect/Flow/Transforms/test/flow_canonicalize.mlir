@@ -54,3 +54,20 @@ util.func public @dont_fold_not_full_static_insert_into_empty(
 // CHECK-LABEL: util.func public @dont_fold_not_full_static_insert_into_empty
 //       CHECK:   %[[INSERT:.+]] = tensor.insert_slice
 //       CHECK:   util.return %[[INSERT]]
+
+// -----
+
+util.func @remove_redundant_results(%arg0 : tensor<?xf32>) -> (tensor<?xf32>, tensor<?xf32>) {
+  %c0 = arith.constant 0 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?xf32>
+  %0:3 = flow.dispatch.region -> (tensor<?xf32>{%d0}, tensor<?xf32>{%d0}, tensor<?xf32>{%d0}) {
+    flow.return %arg0, %arg0, %arg0 : tensor<?xf32>, tensor<?xf32>, tensor<?xf32>
+  }
+  util.return %0#0, %0#2 : tensor<?xf32>, tensor<?xf32>
+}
+// CHECK-LABEL: func public @remove_redundant_results
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<?xf32>
+//       CHECK:   %[[DIM:.+]] = tensor.dim %[[ARG0]]
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<?xf32>{%[[DIM]]}
+//  CHECK-NEXT:     flow.return %[[ARG0]] : tensor<?xf32>
+//       CHECK:   util.return %[[DISPATCH]], %[[DISPATCH]]
