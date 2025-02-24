@@ -69,8 +69,19 @@ struct StripAttentionOpCompilationInfo final
       eraseLoweringConfig(attentionOp);
     }
 
-    if (attentionOp.getDecompositionConfigAttr()) {
-      attentionOp.removeDecompositionConfigAttr();
+    DictionaryAttr decompositionConfig =
+        attentionOp.getDecompositionConfigAttr();
+    if (decompositionConfig) {
+      decompositionConfig = DictionaryAttr::get(
+          decompositionConfig.getContext(),
+          llvm::to_vector(llvm::make_filter_range(
+              decompositionConfig, [&](NamedAttribute attr) {
+                return attr.getName() !=
+                           IREE::LinalgExt::AttentionOp::getQKAttrStr() &&
+                       attr.getName() !=
+                           IREE::LinalgExt::AttentionOp::getPVAttrStr();
+              })));
+      attentionOp.setDecompositionConfigAttr(decompositionConfig);
     }
     return success();
   }
