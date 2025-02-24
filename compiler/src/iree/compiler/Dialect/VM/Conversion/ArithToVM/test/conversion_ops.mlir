@@ -395,6 +395,18 @@ module @fptoui_fp32_i64 {
 
 // -----
 
+// CHECK-LABEL: @extf_f32_f64
+module @extf_f32_f64 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: f32)
+  func.func @fn(%arg0: f32) -> f64 {
+    // CHECK: ext.f32.f64 %[[ARG0]] : f32 -> f64
+    %0 = arith.extf %arg0 : f32 to f64
+    return %0 : f64
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @bitcast_i32_f32
 module @bitcast_i32_f32 {
   // CHECK: vm.func private @fn(%[[ARG0:.+]]: i32)
