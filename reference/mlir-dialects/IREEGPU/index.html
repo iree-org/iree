@@ -5619,11 +5619,20 @@ See IREEGPUEnums.td for the definition of the intrinsics.</p>
 * MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ (<code>MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ</code>)
 * MFMA_I32_16x16x32_I8 (<code>MFMA_I32_16x16x32_I8</code>)
 * MFMA_I32_32x32x16_I8 (<code>MFMA_I32_32x32x16_I8</code>)
-* WMMA_F32_16x16x16_F16 (<code>WMMA_F32_16x16x16_F16</code>)
-* WMMA_F16_16x16x16_F16 (<code>WMMA_F16_16x16x16_F16</code>)
-* WMMA_F32_16x16x16_BF16 (<code>WMMA_F32_16x16x16_BF16</code>)
-* WMMA_BF16_16x16x16_BF16 (<code>WMMA_BF16_16x16x16_BF16</code>)
-* WMMA_I32_16x16x16_I8 (<code>WMMA_I32_16x16x16_I8</code>)
+* WMMAR3_F32_16x16x16_F16 (<code>WMMAR3_F32_16x16x16_F16</code>)
+* WMMAR3_F16_16x16x16_F16 (<code>WMMAR3_F16_16x16x16_F16</code>)
+* WMMAR3_F32_16x16x16_BF16 (<code>WMMAR3_F32_16x16x16_BF16</code>)
+* WMMAR3_BF16_16x16x16_BF16 (<code>WMMAR3_BF16_16x16x16_BF16</code>)
+* WMMAR3_I32_16x16x16_I8 (<code>WMMAR3_I32_16x16x16_I8</code>)
+* WMMAR4_F32_16x16x16_F16 (<code>WMMAR4_F32_16x16x16_F16</code>)
+* WMMAR4_F16_16x16x16_F16 (<code>WMMAR4_F16_16x16x16_F16</code>)
+* WMMAR4_F32_16x16x16_BF16 (<code>WMMAR4_F32_16x16x16_BF16</code>)
+* WMMAR4_BF16_16x16x16_BF16 (<code>WMMAR4_BF16_16x16x16_BF16</code>)
+* WMMAR4_F32_16x16x16_F8E5M2 (<code>WMMAR4_F32_16x16x16_F8E5M2</code>)
+* WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN (<code>WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN</code>)
+* WMMAR4_F32_16x16x16_F8E4M3FN (<code>WMMAR4_F32_16x16x16_F8E4M3FN</code>)
+* WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2 (<code>WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2</code>)
+* WMMAR4_I32_16x16x16_I8 (<code>WMMAR4_I32_16x16x16_I8</code>)
 * NV_WMMA_F32_16x16x16_F16 (<code>NV_WMMA_F32_16x16x16_F16</code>)
 * NV_WMMA_F16_16x16x16_F16 (<code>NV_WMMA_F16_16x16x16_F16</code>)</p>
 <h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
@@ -6296,29 +6305,74 @@ in a chained-matmul operation.</p>
 <td>MFMA_I32_32x32x16_I8</td>
 </tr>
 <tr>
-<td style="text-align: center;">WMMA_F32_16x16x16_F16</td>
+<td style="text-align: center;">WMMAR3_F32_16x16x16_F16</td>
 <td style="text-align: center;"><code>6176</code></td>
-<td>WMMA_F32_16x16x16_F16</td>
+<td>WMMAR3_F32_16x16x16_F16</td>
 </tr>
 <tr>
-<td style="text-align: center;">WMMA_F16_16x16x16_F16</td>
+<td style="text-align: center;">WMMAR3_F16_16x16x16_F16</td>
 <td style="text-align: center;"><code>6177</code></td>
-<td>WMMA_F16_16x16x16_F16</td>
+<td>WMMAR3_F16_16x16x16_F16</td>
 </tr>
 <tr>
-<td style="text-align: center;">WMMA_F32_16x16x16_BF16</td>
+<td style="text-align: center;">WMMAR3_F32_16x16x16_BF16</td>
 <td style="text-align: center;"><code>6178</code></td>
-<td>WMMA_F32_16x16x16_BF16</td>
+<td>WMMAR3_F32_16x16x16_BF16</td>
 </tr>
 <tr>
-<td style="text-align: center;">WMMA_BF16_16x16x16_BF16</td>
+<td style="text-align: center;">WMMAR3_BF16_16x16x16_BF16</td>
 <td style="text-align: center;"><code>6179</code></td>
-<td>WMMA_BF16_16x16x16_BF16</td>
+<td>WMMAR3_BF16_16x16x16_BF16</td>
 </tr>
 <tr>
-<td style="text-align: center;">WMMA_I32_16x16x16_I8</td>
+<td style="text-align: center;">WMMAR3_I32_16x16x16_I8</td>
 <td style="text-align: center;"><code>6336</code></td>
-<td>WMMA_I32_16x16x16_I8</td>
+<td>WMMAR3_I32_16x16x16_I8</td>
+</tr>
+<tr>
+<td style="text-align: center;">WMMAR4_F32_16x16x16_F16</td>
+<td style="text-align: center;"><code>6432</code></td>
+<td>WMMAR4_F32_16x16x16_F16</td>
+</tr>
+<tr>
+<td style="text-align: center;">WMMAR4_F16_16x16x16_F16</td>
+<td style="text-align: center;"><code>6433</code></td>
+<td>WMMAR4_F16_16x16x16_F16</td>
+</tr>
+<tr>
+<td style="text-align: center;">WMMAR4_F32_16x16x16_BF16</td>
+<td style="text-align: center;"><code>6434</code></td>
+<td>WMMAR4_F32_16x16x16_BF16</td>
+</tr>
+<tr>
+<td style="text-align: center;">WMMAR4_BF16_16x16x16_BF16</td>
+<td style="text-align: center;"><code>6435</code></td>
+<td>WMMAR4_BF16_16x16x16_BF16</td>
+</tr>
+<tr>
+<td style="text-align: center;">WMMAR4_F32_16x16x16_F8E5M2</td>
+<td style="text-align: center;"><code>6448</code></td>
+<td>WMMAR4_F32_16x16x16_F8E5M2</td>
+</tr>
+<tr>
+<td style="text-align: center;">WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN</td>
+<td style="text-align: center;"><code>6449</code></td>
+<td>WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN</td>
+</tr>
+<tr>
+<td style="text-align: center;">WMMAR4_F32_16x16x16_F8E4M3FN</td>
+<td style="text-align: center;"><code>6450</code></td>
+<td>WMMAR4_F32_16x16x16_F8E4M3FN</td>
+</tr>
+<tr>
+<td style="text-align: center;">WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2</td>
+<td style="text-align: center;"><code>6451</code></td>
+<td>WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2</td>
+</tr>
+<tr>
+<td style="text-align: center;">WMMAR4_I32_16x16x16_I8</td>
+<td style="text-align: center;"><code>6592</code></td>
+<td>WMMAR4_I32_16x16x16_I8</td>
 </tr>
 <tr>
 <td style="text-align: center;">NV_WMMA_F32_16x16x16_F16</td>
