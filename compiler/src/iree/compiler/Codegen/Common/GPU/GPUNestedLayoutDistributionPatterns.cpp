@@ -587,17 +587,20 @@ static int64_t getShuffleWidth(NestedLayoutAttr layout, int64_t dim) {
 ///      to shared memory and will be reloaded into a layout where partial
 ///      reductions will be placed inside threads.
 struct DistributeMultiReduction final
-    : OpDistributionPattern<vector::MultiDimReductionOp> {
-  using OpDistributionPattern::OpDistributionPattern;
+    : MaskedOpDistributionPattern<vector::MultiDimReductionOp> {
+  using MaskedOpDistributionPattern::MaskedOpDistributionPattern;
 
   DistributeMultiReduction(MLIRContext *context, int64_t subgroupSize,
                            int64_t maxBitsPerShuffle, int64_t benefit = 1)
-      : OpDistributionPattern(context, benefit), subgroupSize(subgroupSize),
-        maxBitsPerShuffle(maxBitsPerShuffle) {}
+      : MaskedOpDistributionPattern(context, benefit),
+        subgroupSize(subgroupSize), maxBitsPerShuffle(maxBitsPerShuffle) {}
 
-  LogicalResult matchAndRewrite(vector::MultiDimReductionOp multiReduceOp,
-                                DistributionSignature &signature,
-                                PatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(vector::MultiDimReductionOp multiReduceOp,
+                  DistributionSignature &signature, vector::MaskOp maskOp,
+                  std::optional<DistributionSignature> &maskSignature,
+                  PatternRewriter &rewriter) const {
+    Location loc = multiReduceOp.getLoc();
     VectorValue srcVector = multiReduceOp.getSource();
     Value acc = multiReduceOp.getAcc();
     Value res = multiReduceOp.getResult();
@@ -630,7 +633,23 @@ struct DistributeMultiReduction final
       disAcc = multiReduceOp.getAcc();
     }
 
-    Location loc = multiReduceOp.getLoc();
+    VectorValue mask = nullptr;
+    if (maskOp) {
+      auto maskLayout = dyn_cast_or_null<NestedLayoutAttr>(
+          maskSignature.value()[maskOp.getMask()]);
+      if (!maskLayout) {
+        return rewriter.notifyMatchFailure(maskOp,
+                                           "expected nested layout attr");
+      }
+      mask = getDistributed(rewriter, maskOp.getMask(), maskLayout);
+      Value passThruSrc = getCombiningIdentityValue(
+          loc, rewriter, multiReduceOp.getKind(), disSrc.getType());
+
+      disSrc = cast<VectorValue>(
+          rewriter.create<arith::SelectOp>(loc, mask, disSrc, passThruSrc)
+              .getResult());
+    }
+
     SmallVector<bool> reducedDims = multiReduceOp.getReductionMask();
     int64_t rank = srcVector.getType().getRank();
 
@@ -645,18 +664,29 @@ struct DistributeMultiReduction final
     }
     Value localInit = getCombiningIdentityValue(
         loc, rewriter, multiReduceOp.getKind(), disAcc.getType());
-    auto localReduction = rewriter.create<vector::MultiDimReductionOp>(
+    Value localReduction = rewriter.create<vector::MultiDimReductionOp>(
         loc, disSrc, localInit, distributedReductionMask,
         multiReduceOp.getKind());
 
+    // TODO: As per current upstream lowering implementations, there is no point
+    // in doing this because it does a select much later in a finer granularity
+    // rather than supporting predication. Moreover, since we are doing a select
+    // to cater reductions accross the distribution, we can choose not to mask
+    // the op post-distribution. if (mask) {
+    //   localReduction =
+    //       vector::maskOperation(rewriter, localReduction.getDefiningOp(),
+    //       mask)
+    //           ->getResult(0);
+    // }
+
     VectorValue locallyReduced;
     if (accVector) {
-      locallyReduced = dyn_cast<VectorValue>(localReduction.getResult());
+      locallyReduced = dyn_cast<VectorValue>(localReduction);
     } else {
       // Broadcast scalar accumulator to vector.
       VectorType vecType = VectorType::get(ArrayRef{int64_t(1)}, elemTy);
-      locallyReduced = rewriter.create<vector::BroadcastOp>(
-          loc, vecType, localReduction.getResult());
+      locallyReduced =
+          rewriter.create<vector::BroadcastOp>(loc, vecType, localReduction);
     }
 
     assert(locallyReduced && "result should have been a vector");
@@ -739,7 +769,6 @@ struct DistributeMultiReduction final
 
     for (unsigned i = 0; i < numElements; ++i) {
       Value extracted = rewriter.create<vector::ExtractOp>(loc, flat, i);
-
       // Reduce across all reduction dimensions 1-by-1.
       for (unsigned i = 0, e = reductionMask.size(); i != e; ++i) {
         if (reductionMask[i]) {
