@@ -128,3 +128,18 @@ func.func @no_tile_fill(%arg0: f32) -> tensor<64x256xf32> {
 //   CHECK-NOT:   scf.for
 //       CHECK:   %[[FILL:.+]] = linalg.fill
 //       CHECK:   return %[[FILL]]
+
+
+func.func @no_tile_reshape(%arg0: tensor<1x4x4x1x4x4xi32>) -> tensor<1x4x1x4x4x4xi32> {
+  %empty = tensor.empty() : tensor<1x4x1x4x4x4xi32>
+  %0 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d2, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]} ins(%arg0 : tensor<1x4x4x1x4x4xi32>) outs(%empty : tensor<1x4x1x4x4x4xi32>) {
+        ^bb0(%in: i32, %out: i32):
+          linalg.yield %in : i32
+    } -> tensor<1x4x1x4x4x4xi32>
+    return %0 : tensor<1x4x1x4x4x4xi32>
+}
+
+// CHECK-LABEL: func.func @no_tile_reshape
+//   CHECK-NOT:   scf.for
+//       CHECK:   %[[RESHAPE:.+]] = linalg.generic
+//       CHECK:   return %[[RESHAPE]]

@@ -184,7 +184,11 @@ static void processRegion(RewriterBase &rewriter, Region *region,
         // significant computation anyway. Equivalent generics are still tiled
         // as they typically arise organically. Fills in particular are almost
         // never found on their own and will be fused when tiling if need be.
-        if (isa<linalg::TransposeOp, linalg::CopyOp, linalg::FillOp>(op)) {
+        // Additonally, if linalg.yeild is the only op in the linalg payload
+        // then it is a reshape/ broadcast type op and same expectations of them
+        // being carefully introduced holds. E.g, they could be transpose ops
+        // which got generalized by a reshape fusion pattern.
+        if (linalgOp.getBlock()->getOperations().size() == 1) {
           continue;
         }
         tileToMaxVectorSize(rewriter, linalgOp, maxVectorSize);
