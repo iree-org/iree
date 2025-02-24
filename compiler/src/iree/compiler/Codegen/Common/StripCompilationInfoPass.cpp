@@ -40,7 +40,6 @@ struct StripLinalgOpCompilationInfo final
                                 PatternRewriter &rewriter) const final {
     if (!getCompilationInfo(linalgOp) && !getLoweringConfig(linalgOp))
       return failure();
-
     rewriter.modifyOpInPlace(linalgOp, [&]() {
       if (getCompilationInfo(linalgOp)) {
         // Erase the compilation info configuration if it exists.
@@ -57,6 +56,26 @@ struct StripLinalgOpCompilationInfo final
   }
 };
 
+struct StripAttentionOpCompilationInfo
+    : public OpRewritePattern<IREE::LinalgExt::AttentionOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::LinalgExt::AttentionOp attentionOp,
+                                PatternRewriter &rewriter) const override {
+    if (getCompilationInfo(attentionOp)) {
+      eraseCompilationInfo(attentionOp);
+    }
+
+    if (getLoweringConfig(attentionOp)) {
+      eraseLoweringConfig(attentionOp);
+    }
+
+    if (attentionOp.getDecompositionConfigAttr()) {
+      attentionOp.removeDecompositionConfigAttr();
+    }
+    return success();
+  }
+};
+
 struct StripCompilationInfoPass final
     : impl::StripCompilationInfoPassBase<StripCompilationInfoPass> {
   void runOnOperation() override {
@@ -64,6 +83,7 @@ struct StripCompilationInfoPass final
     RewritePatternSet patterns(ctx);
     patterns.add<StripFuncOpTranslationInfo>(ctx);
     patterns.add<StripLinalgOpCompilationInfo>(ctx);
+    patterns.add<StripAttentionOpCompilationInfo>(ctx);
     walkAndApplyPatterns(getOperation(), std::move(patterns));
   }
 };
