@@ -366,6 +366,18 @@ struct GPUDeviceEncodingLayoutResolverAttrInterface
   }
 };
 
+struct GPUHostSerializableEncodingAttrInterface final
+    : IREE::Encoding::SerializableEncodingAttrInterface::ExternalModel<
+          GPUHostSerializableEncodingAttrInterface, GPUEncodingLayoutAttr> {
+
+  Value calculateStorageSizeInBytes(Attribute attr, Location loc,
+                                    OpBuilder &builder, RankedTensorType type,
+                                    ValueRange dynamicDims) const {
+    return calculateStorageSizeInBytesImpl(attr, loc, builder, type,
+                                           dynamicDims);
+  }
+};
+
 struct GPUHostEncodingLayoutResolverAttrInterface final
     : IREE::Encoding::EncodingLayoutResolverAttrInterface::ExternalModel<
           GPUHostEncodingLayoutResolverAttrInterface, GPUEncodingLayoutAttr> {
@@ -485,7 +497,8 @@ void registerGPUEncodingExternalModels(DialectRegistry &registry) {
       +[](MLIRContext *ctx, IREE::GPU::IREEGPUDialect *dialect) {
         IREE::GPU::GPUEncodingLayoutAttr::attachInterface<
             GPUDeviceEncodingLayoutResolverAttrInterface,
-            GPUHostEncodingLayoutResolverAttrInterface>(*ctx);
+            GPUHostEncodingLayoutResolverAttrInterface,
+            GPUHostSerializableEncodingAttrInterface>(*ctx);
         IREE::GPU::GPUPadLayoutAttr::attachInterface<
             GPUPadEncodingLayoutResolverAttrInterface>(*ctx);
       });
