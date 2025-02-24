@@ -601,38 +601,38 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // A: shape = 16x16, layout = layoutA
 #layout_a = #iree_vector_ext.nested_layout<
-  subgroup_tile = [1, 1],
-  batch_tile    = [1, 1],
-  outer_tile        = [1, 1],
-  thread_tile       = [16, 2],
+  subgroup_tile    = [1, 1],
+  batch_tile       = [1, 1],
+  outer_tile       = [1, 1],
+  thread_tile      = [16, 2],
   element_tile     = [1, 8],
 
-  subgroup_strides        = [1, 1],
-  thread_strides          = [1, 16]
+  subgroup_strides = [1, 1],
+  thread_strides   = [1, 16]
 >
 
 // B: shape = 16x16, layout = layoutB
 #layout_b = #iree_vector_ext.nested_layout<
-  subgroup_tile = [1, 1],
-  batch_tile    = [1, 1],
-  outer_tile        = [1, 1],
-  thread_tile       = [2, 16],
+  subgroup_tile    = [1, 1],
+  batch_tile       = [1, 1],
+  outer_tile       = [1, 1],
+  thread_tile      = [2, 16],
   element_tile     = [8, 1],
 
-  subgroup_strides        = [1, 1],
-  thread_strides          = [16, 1]
+  subgroup_strides = [1, 1],
+  thread_strides   = [16, 1]
 >
 
 // C: shape = 16x16, layout = layoutC
 #layout_c = #iree_vector_ext.nested_layout<
-  subgroup_tile = [1, 1],
-  batch_tile    = [1, 1],
-  outer_tile        = [1, 1],
-  thread_tile       = [2, 16],
+  subgroup_tile    = [1, 1],
+  batch_tile       = [1, 1],
+  outer_tile       = [1, 1],
+  thread_tile      = [2, 16],
   element_tile     = [8, 1],
 
-  subgroup_strides        = [1, 1],
-  thread_strides          = [16, 1]
+  subgroup_strides = [1, 1],
+  thread_strides   = [16, 1]
 >
 
 func.func @contract_to_WMMAR4_16x16x16_mm(%a : vector<16x16xf16>, %b : vector<16x16xf16>, %c : vector<16x16xf32>) -> vector<16x16xf32> {
