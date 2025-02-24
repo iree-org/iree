@@ -221,34 +221,37 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
       .addPass(DispatchCreation::createFormScalarDispatchesPass)
       // Create `flow.dispatch.region` centered around a root and fuse with
       // producers and consumers.
-      .addPass([&]() {
+      .addPass([] {
         return DispatchCreation::createFormDispatchRegionsPass(
             FormDispatchRegionsPassOptions{
                 clEnableAggressiveFusion,
                 clEnableFusePaddingIntoLinalgConsumerOps,
                 clEnableFusePaddingIntoLinalgProducerOps});
       })
-      // Clone all producers into the dispatch region to perpare for being
+      // Clone all producers into the dispatch region to prepare for being
       // isolated from above. This enables running additional transformations
       // afterwards that would need the full dispatch content but don't want to
       // handle explicit captures as materialized as dispatch workgroup operands
       // and block arguments.
-      .addPass([&]() {
+      .addPass([] {
         return DispatchCreation::createCloneProducersIntoDispatchRegionsPass(
             CloneProducersIntoDispatchRegionsPassOptions{
                 clEnableAggressiveFusion});
-      });
+      })
+      // Collapse dimensions of linalg Ops.
+      .addPass(DispatchCreation::createCollapseDimensionsPass);
 
   // Experimental data tiling path. The intent of this path is to set encodings
   // after fusion decisions have already been made, so encodings can be
   // separated from compiler fusion decisions.
   if (clEnableDataTiling) {
-    SetEncodingPassOptions options{clPadFactor};
     FunctionLikeNest(passManager)
         // Set encodings on all eligible ops. All ops should be in compiler
         // formed dispatch regions, so encodings will be placed inside of the
         // dispatch regions with the data-tiled op.
-        .addPass([&]() { return createSetEncodingPass(options); })
+        .addPass([] {
+          return createSetEncodingPass(SetEncodingPassOptions{clPadFactor});
+        })
         // SetEncodingOps should not be in the same dispatch as the data-tiled
         // op, so hoist them out of their current dispatch regions. Also, bubble
         // SetEncodingOps through special operations like bit-extending ops and
@@ -259,9 +262,6 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
         .addPass(
             DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass);
   }
-  FunctionLikeNest(passManager)
-      // Collapse dimensions of linalg Ops.
-      .addPass(DispatchCreation::createCollapseDimensionsPass);
 }
 
 // Apply preprocessing and form dispatch regions
