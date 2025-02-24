@@ -56,8 +56,8 @@ struct StripLinalgOpCompilationInfo final
   }
 };
 
-struct StripAttentionOpCompilationInfo
-    : public OpRewritePattern<IREE::LinalgExt::AttentionOp> {
+struct StripAttentionOpCompilationInfo final
+    : OpRewritePattern<IREE::LinalgExt::AttentionOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::LinalgExt::AttentionOp attentionOp,
                                 PatternRewriter &rewriter) const override {
@@ -81,9 +81,8 @@ struct StripCompilationInfoPass final
   void runOnOperation() override {
     MLIRContext *ctx = &getContext();
     RewritePatternSet patterns(ctx);
-    patterns.add<StripFuncOpTranslationInfo>(ctx);
-    patterns.add<StripLinalgOpCompilationInfo>(ctx);
-    patterns.add<StripAttentionOpCompilationInfo>(ctx);
+    patterns.add<StripFuncOpTranslationInfo, StripLinalgOpCompilationInfo,
+                 StripAttentionOpCompilationInfo>(ctx);
     walkAndApplyPatterns(getOperation(), std::move(patterns));
   }
 };
