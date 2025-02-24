@@ -54,6 +54,7 @@ class CompilationInfoId(enum.Enum):
     LLVMGPUMatmulTensorCoreMmaSync = "LLVMGPUMatmulTensorCoreMmaSync"
     LLVMGPUVectorDistributeMFMA = "LLVMGPUVectorDistributeMFMA"
     LLVMGPUVectorDistributeWMMAR3 = "LLVMGPUVectorDistributeWMMAR3"
+    LLVMGPUVectorDistributeWMMAR4 = "LLVMGPUVectorDistributeWMMAR4"
     SPIRVCooperativeMatrixVectorize = "SPIRVCooperativeMatrixVectorize"
     SPIRVVectorizeMali = "SPIRVVectorizeMali"
     SPIRVVectorizeNVIDIA = "SPIRVVectorizeNVIDIA"
@@ -312,6 +313,8 @@ def get_rocm_test_compilation_infos(
         intrinsic = "MFMA"
     elif compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeWMMAR3:
         intrinsic = "WMMAR3"
+    elif compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeWMMAR4:
+        intrinsic = "WMMAR4"
     else:
         raise ValueError("Unknown pipeline for rocm")
 
@@ -374,6 +377,24 @@ def get_rocm_test_compilation_infos(
             MMASchedule("WMMAR3_I32_16x16x16_I8", 2, 4, 2, 1, 2),
             MMASchedule("WMMAR3_I32_16x16x16_I8", 4, 2, 4, 2, 2),
         ]
+    elif intrinsic == "WMMAR4":
+        # TODO(kdrewnia) FP8 intrinsics
+        schedules = [
+            MMASchedule("WMMAR4_F32_16x16x16_F16", 1, 1, 1, 1, 1),
+            MMASchedule("WMMAR4_F32_16x16x16_F16", 1, 1, 1, 1, 2),
+            MMASchedule("WMMAR4_F32_16x16x16_F16", 1, 1, 1, 2, 1),
+            MMASchedule("WMMAR4_F32_16x16x16_F16", 1, 1, 2, 1, 1),
+            MMASchedule("WMMAR4_F32_16x16x16_F16", 2, 2, 1, 1, 1),
+            MMASchedule("WMMAR4_F32_16x16x16_F16", 2, 4, 2, 1, 2),
+            MMASchedule("WMMAR4_F32_16x16x16_F16", 4, 2, 4, 2, 2),
+            MMASchedule("WMMAR4_I32_16x16x16_I8", 1, 1, 1, 1, 1),
+            MMASchedule("WMMAR4_I32_16x16x16_I8", 1, 1, 1, 1, 2),
+            MMASchedule("WMMAR4_I32_16x16x16_I8", 1, 1, 1, 2, 1),
+            MMASchedule("WMMAR4_I32_16x16x16_I8", 1, 1, 2, 1, 1),
+            MMASchedule("WMMAR4_I32_16x16x16_I8", 2, 2, 1, 1, 1),
+            MMASchedule("WMMAR4_I32_16x16x16_I8", 2, 4, 2, 1, 2),
+            MMASchedule("WMMAR4_I32_16x16x16_I8", 4, 2, 4, 2, 2),
+        ]
     else:
         raise NotImplementedError("unhandled intrinsic case")
 
@@ -418,11 +439,12 @@ def get_rocm_test_compilation_infos(
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 32
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
             wg_tile_k = schedule.k_tile_count * 16
-        elif schedule.intrinsic == "WMMAR3_F32_16x16x16_F16":
-            wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
-            wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
-            wg_tile_k = schedule.k_tile_count * 16
-        elif schedule.intrinsic == "WMMAR3_I32_16x16x16_I8":
+        elif (
+            schedule.intrinsic == "WMMAR3_F32_16x16x16_F16"
+            or schedule.intrinsic == "WMMAR3_I32_16x16x16_I8"
+            or schedule.intrinsic == "WMMAR4_F32_16x16x16_F16"
+            or schedule.intrinsic == "WMMAR4_I32_16x16x16_I8"
+        ):
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
             wg_tile_k = schedule.k_tile_count * 16
@@ -455,6 +477,7 @@ def get_test_compilation_infos(
     if compilation_info_id in [
         CompilationInfoId.LLVMGPUVectorDistributeMFMA,
         CompilationInfoId.LLVMGPUVectorDistributeWMMAR3,
+        CompilationInfoId.LLVMGPUVectorDistributeWMMAR4,
     ]:
         return get_rocm_test_compilation_infos(compilation_info_id, lhs_rhs_type)
 
