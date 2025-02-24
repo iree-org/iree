@@ -111,8 +111,10 @@ class IREEGPU_I32EnumAttr<string name, string summary, list<I32EnumAttrCase> cas
 //   - v_mfma_f32_16x16x4_f32 on CDNA3.
 // * Each enum value corresponds to one fully type-specialized intrinsic, in
 //   contrast to target intrinsics which are sometimes type-generic. For
-//   instance, on RDNA3, our WMMA_I32_16x16x16_I8 lowers to
+//   instance, on RDNA3, our WMMAR3_I32_16x16x16_I8 lowers to
 //   v_wmma_i32_16x16x16_iu8 specialized for signed int8 operands.
+// * Since RDNA3 and RDNA4 have mutually-incompatible WMMA instructions that
+//   share a name, we use WMMAR3 and WMMAR4as their prefixes.
 // * Each enum value uses IREE-style naming of element type. For example,
 //   our MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ lowers to
 //   v_mfma_f32_16x16x32_bf8_fp8.
@@ -130,6 +132,7 @@ class IREEGPU_I32EnumAttr<string name, string summary, list<I32EnumAttrCase> cas
 //     * 1 = CDNA2
 //     * 2 = CDNA3
 //     * 8 = RDNA3
+//     * 9 = RDNA4
 // * C = element type of A-matrix:
 //   * 0 = 64-bit float (e.g. IEEE754 double precision)
 //   * 1 = 32-bit float (e.g. IEEE754 single precision, and "xf32" fast variants)
@@ -166,11 +169,22 @@ def MFMA_I32_16x16x32_I8 : I32EnumAttrCase<"MFMA_I32_16x16x32_I8", 0x12C0>;
 def MFMA_I32_32x32x16_I8 : I32EnumAttrCase<"MFMA_I32_32x32x16_I8", 0x12C1>;
 
 // Introduced in RDNA3
-def WMMA_F32_16x16x16_F16 : I32EnumAttrCase<"WMMA_F32_16x16x16_F16", 0x1820>;
-def WMMA_F16_16x16x16_F16 : I32EnumAttrCase<"WMMA_F16_16x16x16_F16", 0x1821>;
-def WMMA_F32_16x16x16_BF16 : I32EnumAttrCase<"WMMA_F32_16x16x16_BF16", 0x1822>;
-def WMMA_BF16_16x16x16_BF16 : I32EnumAttrCase<"WMMA_BF16_16x16x16_BF16", 0x1823>;
-def WMMA_I32_16x16x16_I8 : I32EnumAttrCase<"WMMA_I32_16x16x16_I8", 0x18C0>;
+def WMMAR3_F32_16x16x16_F16 : I32EnumAttrCase<"WMMAR3_F32_16x16x16_F16", 0x1820>;
+def WMMAR3_F16_16x16x16_F16 : I32EnumAttrCase<"WMMAR3_F16_16x16x16_F16", 0x1821>;
+def WMMAR3_F32_16x16x16_BF16 : I32EnumAttrCase<"WMMAR3_F32_16x16x16_BF16", 0x1822>;
+def WMMAR3_BF16_16x16x16_BF16 : I32EnumAttrCase<"WMMAR3_BF16_16x16x16_BF16", 0x1823>;
+def WMMAR3_I32_16x16x16_I8 : I32EnumAttrCase<"WMMAR3_I32_16x16x16_I8", 0x18C0>;
+
+// Introduced in RDNA4
+def WMMAR4_F32_16x16x16_F16 : I32EnumAttrCase<"WMMAR4_F32_16x16x16_F16", 0x1920>;
+def WMMAR4_F16_16x16x16_F16 : I32EnumAttrCase<"WMMAR4_F16_16x16x16_F16", 0x1921>;
+def WMMAR4_F32_16x16x16_BF16 : I32EnumAttrCase<"WMMAR4_F32_16x16x16_BF16", 0x1922>;
+def WMMAR4_BF16_16x16x16_BF16 : I32EnumAttrCase<"WMMAR4_BF16_16x16x16_BF16", 0x1923>;
+def WMMAR4_F32_16x16x16_F8E5M2 : I32EnumAttrCase<"WMMAR4_F32_16x16x16_F8E5M2", 0x1930>;
+def WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN : I32EnumAttrCase<"WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN", 0x1931>;
+def WMMAR4_F32_16x16x16_F8E4M3FN : I32EnumAttrCase<"WMMAR4_F32_16x16x16_F8E4M3FN", 0x1932>;
+def WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2 : I32EnumAttrCase<"WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2", 0x1933>;
+def WMMAR4_I32_16x16x16_I8 : I32EnumAttrCase<"WMMAR4_I32_16x16x16_I8", 0x19C0>;
 
 // NV intrinsics
 def NV_WMMA_F32_16x16x16_F16 : I32EnumAttrCase<"NV_WMMA_F32_16x16x16_F16", 0x2020>;
@@ -205,11 +219,22 @@ def IREEGPU_MMAIntrinsic : IREEGPU_I32EnumAttr<"MMAIntrinsic",
       MFMA_I32_32x32x16_I8,
 
       // RDNA3 intrinsics
-      WMMA_F32_16x16x16_F16,
-      WMMA_F16_16x16x16_F16,
-      WMMA_F32_16x16x16_BF16,
-      WMMA_BF16_16x16x16_BF16,
-      WMMA_I32_16x16x16_I8,
+      WMMAR3_F32_16x16x16_F16,
+      WMMAR3_F16_16x16x16_F16,
+      WMMAR3_F32_16x16x16_BF16,
+      WMMAR3_BF16_16x16x16_BF16,
+      WMMAR3_I32_16x16x16_I8,
+
+      // RDNA4 intrinsics
+      WMMAR4_F32_16x16x16_F16,
+      WMMAR4_F16_16x16x16_F16,
+      WMMAR4_F32_16x16x16_BF16,
+      WMMAR4_BF16_16x16x16_BF16,
+      WMMAR4_F32_16x16x16_F8E5M2,
+      WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN,
+      WMMAR4_F32_16x16x16_F8E4M3FN,
+      WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2,
+      WMMAR4_I32_16x16x16_I8,
 
       // NV intrinsics
       NV_WMMA_F32_16x16x16_F16,

@@ -80,6 +80,8 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
                                                        MMAIntrinsic intrinsic) {
   Type f8E4M3FNUZ = Float8E4M3FNUZType::get(context);
   Type f8E5M2FNUZ = Float8E5M2FNUZType::get(context);
+  Type f8E4M3FN = Float8E4M3FNType::get(context);
+  Type f8E5M2 = Float8E5M2Type::get(context);
   Type f16 = Float16Type::get(context);
   Type bf16 = BFloat16Type::get(context);
   Type f32 = Float32Type::get(context);
@@ -93,19 +95,23 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
     return {f32, f32, f32};
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
   case MMAIntrinsic::MFMA_F32_32x32x8_F16:
-  case MMAIntrinsic::WMMA_F32_16x16x16_F16:
+  case MMAIntrinsic::WMMAR3_F32_16x16x16_F16:
+  case MMAIntrinsic::WMMAR4_F32_16x16x16_F16:
   case MMAIntrinsic::NV_WMMA_F32_16x16x16_F16:
     return {f16, f16, f32};
-  case MMAIntrinsic::WMMA_F16_16x16x16_F16:
+  case MMAIntrinsic::WMMAR3_F16_16x16x16_F16:
+  case MMAIntrinsic::WMMAR4_F16_16x16x16_F16:
   case MMAIntrinsic::NV_WMMA_F16_16x16x16_F16:
     return {f16, f16, f16};
   case MMAIntrinsic::MFMA_F32_16x16x8_BF16:
   case MMAIntrinsic::MFMA_F32_32x32x4_BF16:
   case MMAIntrinsic::MFMA_F32_16x16x16_BF16:
   case MMAIntrinsic::MFMA_F32_32x32x8_BF16:
-  case MMAIntrinsic::WMMA_F32_16x16x16_BF16:
+  case MMAIntrinsic::WMMAR3_F32_16x16x16_BF16:
+  case MMAIntrinsic::WMMAR4_F32_16x16x16_BF16:
     return {bf16, bf16, f32};
-  case MMAIntrinsic::WMMA_BF16_16x16x16_BF16:
+  case MMAIntrinsic::WMMAR3_BF16_16x16x16_BF16:
+  case MMAIntrinsic::WMMAR4_BF16_16x16x16_BF16:
     return {bf16, bf16, bf16};
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
   case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ:
@@ -119,11 +125,20 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ:
   case MMAIntrinsic::MFMA_F32_32x32x16_F8E5M2FNUZ_F8E4M3FNUZ:
     return {f8E5M2FNUZ, f8E4M3FNUZ, f32};
+  case MMAIntrinsic::WMMAR4_F32_16x16x16_F8E5M2:
+    return {f8E5M2, f8E5M2, f32};
+  case MMAIntrinsic::WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN:
+    return {f8E5M2, f8E4M3FN, f32};
+  case MMAIntrinsic::WMMAR4_F32_16x16x16_F8E4M3FN:
+    return {f8E4M3FN, f8E4M3FN, f32};
+  case MMAIntrinsic::WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2:
+    return {f8E4M3FN, f8E5M2, f32};
   case MMAIntrinsic::MFMA_I32_16x16x16_I8:
   case MMAIntrinsic::MFMA_I32_32x32x8_I8:
   case MMAIntrinsic::MFMA_I32_16x16x32_I8:
   case MMAIntrinsic::MFMA_I32_32x32x16_I8:
-  case MMAIntrinsic::WMMA_I32_16x16x16_I8:
+  case MMAIntrinsic::WMMAR3_I32_16x16x16_I8:
+  case MMAIntrinsic::WMMAR4_I32_16x16x16_I8:
     return {i8, i8, i32};
   }
   assert(false && "unexpected enum value");
@@ -257,9 +272,9 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
       return {/*outer=*/{4, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
               /*element=*/{4, 1}};
     }
-  case MMAIntrinsic::WMMA_F32_16x16x16_F16:
-  case MMAIntrinsic::WMMA_F32_16x16x16_BF16:
-  case MMAIntrinsic::WMMA_I32_16x16x16_I8:
+  case MMAIntrinsic::WMMAR3_F32_16x16x16_F16:
+  case MMAIntrinsic::WMMAR3_F32_16x16x16_BF16:
+  case MMAIntrinsic::WMMAR3_I32_16x16x16_I8:
     switch (fragment) {
     case MMAFragment::Lhs:
       return {/*outer=*/{1, 1}, /*thread=*/{16, 1}, /*strides=*/{1, 0},
@@ -271,8 +286,8 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
       return {/*outer=*/{8, 1}, /*thread=*/{2, 16}, /*tstrides=*/{16, 1},
               /*element=*/{1, 1}};
     }
-  case MMAIntrinsic::WMMA_F16_16x16x16_F16:
-  case MMAIntrinsic::WMMA_BF16_16x16x16_BF16:
+  case MMAIntrinsic::WMMAR3_F16_16x16x16_F16:
+  case MMAIntrinsic::WMMAR3_BF16_16x16x16_BF16:
     switch (fragment) {
     case MMAFragment::Lhs:
       return {/*outer=*/{1, 1}, /*thread=*/{16, 1}, /*strides=*/{1, 0},
@@ -283,6 +298,44 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
     case MMAFragment::Acc:
       return {/*outer=*/{16, 1}, /*thread=*/{1, 16}, /*tstrides=*/{0, 1},
               /*element=*/{1, 1}};
+    }
+  // Note: We specify here that, for examplee, lane 0 takes A[0, 0..7] and that
+  // lane 16 takes A[0, 8..15]. The hardware will internally bounce between
+  // the low halves and high halves of lanes every two registers - that is,
+  // the value used for A[0, 4] comes out of lane 16's first register in an F16
+  // or BF16 computation. This is noted here in case someone starts chasing
+  // some unusual rounding failure or is confused by why the tiling in the
+  // manual doesn't *technically* match the below.
+  case MMAIntrinsic::WMMAR4_F32_16x16x16_F16:
+  case MMAIntrinsic::WMMAR4_F32_16x16x16_BF16:
+  case MMAIntrinsic::WMMAR4_F32_16x16x16_F8E5M2:
+  case MMAIntrinsic::WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN:
+  case MMAIntrinsic::WMMAR4_F32_16x16x16_F8E4M3FN:
+  case MMAIntrinsic::WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2:
+  case MMAIntrinsic::WMMAR4_I32_16x16x16_I8:
+    switch (fragment) {
+    case MMAFragment::Lhs:
+      return {/*outer=*/{1, 1}, /*thread=*/{16, 2}, /*strides=*/{1, 16},
+              /*element=*/{1, 8}};
+    case MMAFragment::Rhs:
+      return {/*outer=*/{1, 1}, /*thread=*/{2, 16}, /*tstrides=*/{16, 1},
+              /*element=*/{8, 1}};
+    case MMAFragment::Acc:
+      return {/*outer=*/{1, 1}, /*thread=*/{2, 16}, /*tstrides=*/{16, 1},
+              /*element=*/{8, 1}};
+    }
+  case MMAIntrinsic::WMMAR4_F16_16x16x16_F16:
+  case MMAIntrinsic::WMMAR4_BF16_16x16x16_BF16:
+    switch (fragment) {
+    case MMAFragment::Lhs:
+      return {/*outer=*/{1, 1}, /*thread=*/{16, 2}, /*strides=*/{1, 16},
+              /*element=*/{1, 8}};
+    case MMAFragment::Rhs:
+      return {/*outer=*/{1, 1}, /*thread=*/{2, 16}, /*tstrides=*/{16, 1},
+              /*element=*/{8, 1}};
+    case MMAFragment::Acc:
+      return {/*outer=*/{1, 1}, /*thread=*/{2, 16}, /*tstrides=*/{16, 1},
+              /*element=*/{8, 1}};
     }
   case MMAIntrinsic::NV_WMMA_F32_16x16x16_F16:
   case MMAIntrinsic::NV_WMMA_F16_16x16x16_F16:

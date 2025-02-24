@@ -53,7 +53,7 @@ class CompilationInfoId(enum.Enum):
     LLVMGPUMatmulTensorCore = "LLVMGPUMatmulTensorCore"
     LLVMGPUMatmulTensorCoreMmaSync = "LLVMGPUMatmulTensorCoreMmaSync"
     LLVMGPUVectorDistributeMFMA = "LLVMGPUVectorDistributeMFMA"
-    LLVMGPUVectorDistributeWMMA = "LLVMGPUVectorDistributeWMMA"
+    LLVMGPUVectorDistributeWMMAR3 = "LLVMGPUVectorDistributeWMMAR3"
     SPIRVCooperativeMatrixVectorize = "SPIRVCooperativeMatrixVectorize"
     SPIRVVectorizeMali = "SPIRVVectorizeMali"
     SPIRVVectorizeNVIDIA = "SPIRVVectorizeNVIDIA"
@@ -310,8 +310,8 @@ def get_rocm_test_compilation_infos(
     intrinsic = ""
     if compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeMFMA:
         intrinsic = "MFMA"
-    elif compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeWMMA:
-        intrinsic = "WMMA"
+    elif compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeWMMAR3:
+        intrinsic = "WMMAR3"
     else:
         raise ValueError("Unknown pipeline for rocm")
 
@@ -357,22 +357,22 @@ def get_rocm_test_compilation_infos(
             MMASchedule("VMFMA_F32_16x16x32_F8E4M3FNUZ", 1, 1, 1, 1, 1),
             MMASchedule("VMFMA_F32_16x16x32_F8E4M3FNUZ", 4, 1, 4, 1, 1),
         ]
-    elif intrinsic == "WMMA":
+    elif intrinsic == "WMMAR3":
         schedules = [
-            MMASchedule("WMMA_F32_16x16x16_F16", 1, 1, 1, 1, 1),
-            MMASchedule("WMMA_F32_16x16x16_F16", 1, 1, 1, 1, 2),
-            MMASchedule("WMMA_F32_16x16x16_F16", 1, 1, 1, 2, 1),
-            MMASchedule("WMMA_F32_16x16x16_F16", 1, 1, 2, 1, 1),
-            MMASchedule("WMMA_F32_16x16x16_F16", 2, 2, 1, 1, 1),
-            MMASchedule("WMMA_F32_16x16x16_F16", 2, 4, 2, 1, 2),
-            MMASchedule("WMMA_F32_16x16x16_F16", 4, 2, 4, 2, 2),
-            MMASchedule("WMMA_I32_16x16x16_I8", 1, 1, 1, 1, 1),
-            MMASchedule("WMMA_I32_16x16x16_I8", 1, 1, 1, 1, 2),
-            MMASchedule("WMMA_I32_16x16x16_I8", 1, 1, 1, 2, 1),
-            MMASchedule("WMMA_I32_16x16x16_I8", 1, 1, 2, 1, 1),
-            MMASchedule("WMMA_I32_16x16x16_I8", 2, 2, 1, 1, 1),
-            MMASchedule("WMMA_I32_16x16x16_I8", 2, 4, 2, 1, 2),
-            MMASchedule("WMMA_I32_16x16x16_I8", 4, 2, 4, 2, 2),
+            MMASchedule("WMMAR3_F32_16x16x16_F16", 1, 1, 1, 1, 1),
+            MMASchedule("WMMAR3_F32_16x16x16_F16", 1, 1, 1, 1, 2),
+            MMASchedule("WMMAR3_F32_16x16x16_F16", 1, 1, 1, 2, 1),
+            MMASchedule("WMMAR3_F32_16x16x16_F16", 1, 1, 2, 1, 1),
+            MMASchedule("WMMAR3_F32_16x16x16_F16", 2, 2, 1, 1, 1),
+            MMASchedule("WMMAR3_F32_16x16x16_F16", 2, 4, 2, 1, 2),
+            MMASchedule("WMMAR3_F32_16x16x16_F16", 4, 2, 4, 2, 2),
+            MMASchedule("WMMAR3_I32_16x16x16_I8", 1, 1, 1, 1, 1),
+            MMASchedule("WMMAR3_I32_16x16x16_I8", 1, 1, 1, 1, 2),
+            MMASchedule("WMMAR3_I32_16x16x16_I8", 1, 1, 1, 2, 1),
+            MMASchedule("WMMAR3_I32_16x16x16_I8", 1, 1, 2, 1, 1),
+            MMASchedule("WMMAR3_I32_16x16x16_I8", 2, 2, 1, 1, 1),
+            MMASchedule("WMMAR3_I32_16x16x16_I8", 2, 4, 2, 1, 2),
+            MMASchedule("WMMAR3_I32_16x16x16_I8", 4, 2, 4, 2, 2),
         ]
     else:
         raise NotImplementedError("unhandled intrinsic case")
@@ -418,11 +418,11 @@ def get_rocm_test_compilation_infos(
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 32
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
             wg_tile_k = schedule.k_tile_count * 16
-        elif schedule.intrinsic == "WMMA_F32_16x16x16_F16":
+        elif schedule.intrinsic == "WMMAR3_F32_16x16x16_F16":
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
             wg_tile_k = schedule.k_tile_count * 16
-        elif schedule.intrinsic == "WMMA_I32_16x16x16_I8":
+        elif schedule.intrinsic == "WMMAR3_I32_16x16x16_I8":
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
             wg_tile_k = schedule.k_tile_count * 16
@@ -454,7 +454,7 @@ def get_test_compilation_infos(
 
     if compilation_info_id in [
         CompilationInfoId.LLVMGPUVectorDistributeMFMA,
-        CompilationInfoId.LLVMGPUVectorDistributeWMMA,
+        CompilationInfoId.LLVMGPUVectorDistributeWMMAR3,
     ]:
         return get_rocm_test_compilation_infos(compilation_info_id, lhs_rhs_type)
 

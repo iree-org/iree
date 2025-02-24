@@ -77,9 +77,9 @@ func.func @mfma_matmul_96x64x16_mm_cannot_downcast(%lhs: vector<96x16xf16>, %rhs
 
 // -----
 
-func.func @wmma_matmul_48x32x32_mm(%lhs: vector<48x32xf16>, %rhs: vector<32x32xf16>, %init: vector<48x32xf16>) -> vector<48x32xf16> attributes {
+func.func @wmmar3_matmul_48x32x32_mm(%lhs: vector<48x32xf16>, %rhs: vector<32x32xf16>, %init: vector<48x32xf16>) -> vector<48x32xf16> attributes {
     mma_schedule = #iree_gpu.mma_schedule<
-      intrinsic = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>,
+      intrinsic = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>,
       subgroup_m_count = 1, subgroup_n_count = 1>,
     workgroup_size = [32, 1, 1]} {
     %0 = vector.contract {
@@ -89,11 +89,11 @@ func.func @wmma_matmul_48x32x32_mm(%lhs: vector<48x32xf16>, %rhs: vector<32x32xf
     %1 = iree_vector_ext.to_layout %0 to layout(#iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [3, 2],
                                       outer_tile = [8, 1], thread_tile = [2, 16], element_tile = [1, 1],
                                       subgroup_strides = [0, 0], thread_strides = [16, 1]>)
-                                      {mma_kind = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>} : vector<48x32xf16>
+                                      {mma_kind = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>} : vector<48x32xf16>
   return %1 : vector<48x32xf16>
 }
 
-// CHECK-LABEL: func.func @wmma_matmul_48x32x32_mm
+// CHECK-LABEL: func.func @wmmar3_matmul_48x32x32_mm
 //  CHECK-SAME: (%[[A:.+]]: vector<48x32xf16>, %[[B:.+]]: vector<32x32xf16>, %[[INIT:.+]]: vector<48x32xf16>)
 //       CHECK:   %[[EXT:.+]] = arith.extf %[[INIT]] : vector<48x32xf16> to vector<48x32xf32>
 //       CHECK:   %[[MM:.+]] = vector.contract
