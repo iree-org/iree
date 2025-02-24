@@ -143,18 +143,18 @@ hal.executable public @main {
   workgroup = [64, 64, 0],
   reduction = [0, 0, 2],
   subgroup = [2, 2],
-  mma_kind = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>,
+  mma_kind = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>,
   promote_operands = [0, 1]
 }>
 hal.executable public @main {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @matmul_transpose_b_wmma ordinal(0) layout(#pipeline_layout) {
+    hal.executable.export public @matmul_transpose_b_wmmar3 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
-      func.func @matmul_transpose_b_wmma()
+      func.func @matmul_transpose_b_wmmar3()
         attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>} {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
@@ -175,7 +175,7 @@ hal.executable public @main {
   }
 }
 
-// CHECK-LABEL: func @matmul_transpose_b_wmma
+// CHECK-LABEL: func @matmul_transpose_b_wmmar3
 //   CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //   CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //   CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
@@ -378,7 +378,7 @@ hal.executable public @main {
   workgroup = [64, 64, 0],
   reduction = [0, 0, 2],
   subgroup = [2, 2],
-  mma_kind = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F16>,
+  mma_kind = #iree_gpu.mma_layout<WMMAR3_F16_16x16x16_F16>,
   promote_operands = [0, 1]
 }>
 
@@ -387,13 +387,13 @@ hal.executable public @main {
 
 hal.executable public @main {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @matmul_transpose_b_wmma_f16_16x16x16_f16 ordinal(0) layout(#pipeline_layout) {
+    hal.executable.export public @matmul_transpose_b_wmmar3_f16_16x16x16_f16 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
-      func.func @matmul_transpose_b_wmma_f16_16x16x16_f16()
+      func.func @matmul_transpose_b_wmmar3_f16_16x16x16_f16()
         attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>} {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
@@ -414,7 +414,7 @@ hal.executable public @main {
   }
 }
 
-// CHECK-LABEL: func @matmul_transpose_b_wmma_f16_16x16x16_f16
+// CHECK-LABEL: func @matmul_transpose_b_wmmar3_f16_16x16x16_f16
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //       CHECK:   scf.forall ({{.*}}) in (32, 160) {
@@ -571,7 +571,7 @@ hal.executable public @main {
 #translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
 
 #lowering_config = #iree_gpu.lowering_config<{
-  mma_kind = #iree_gpu.mma_layout<WMMA_I32_16x16x16_I8>,
+  mma_kind = #iree_gpu.mma_layout<WMMAR3_I32_16x16x16_I8>,
   reduction = [0, 0, 4],
   subgroup = [2, 4, 0],
   workgroup = [64, 128, 0],

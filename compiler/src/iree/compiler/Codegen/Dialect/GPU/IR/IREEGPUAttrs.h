@@ -26,6 +26,12 @@ namespace mlir::iree_compiler::IREE::GPU {
 // Together with element type information and subgroup size, it completes the
 // full description of the semantics of a MMA intrinsic.
 //
+// All of these fields hold two values corresponding to the two dimensions of a
+// matrix in order. That is, a SingleSubgroupLayout for MmaFragment::LHS (matrix
+// A) holds the values for the M and K dimension in indices 0 and 1 of each
+// component, respectively, the RHS fragment is K x N, and the Acc fragment (for
+// accululators) is M x N.
+//
 // Note: It is not possible to infer subgroup size from the information in this
 // struct. The product of the `thread` sizes here is often, but not always equal
 // to subgroup size. When the product of the `thread` sizes (call that product

@@ -232,11 +232,43 @@ const WgpDetails *getCDNA1WgpDetails() {
   return &cdna1Wgp;
 }
 
+const WgpDetails *getRDNA4WgpDetails() {
+  static const MMAIntrinsic rdna4MMAOps[] = {
+      MMAIntrinsic::WMMAR4_F32_16x16x16_F16,
+      MMAIntrinsic::WMMAR4_F16_16x16x16_F16,
+      MMAIntrinsic::WMMAR4_F32_16x16x16_BF16,
+      MMAIntrinsic::WMMAR4_BF16_16x16x16_BF16,
+      MMAIntrinsic::WMMAR4_F32_16x16x16_F8E5M2,
+      MMAIntrinsic::WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN,
+      MMAIntrinsic::WMMAR4_F32_16x16x16_F8E4M3FN,
+      MMAIntrinsic::WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2,
+      MMAIntrinsic::WMMAR4_I32_16x16x16_I8,
+
+  };
+  static const WgpDetails rdna4Wgp = {allComputeBits,
+                                      allStorageBits,
+                                      allSubgroupOps,
+                                      allDotProductOps,
+                                      ARRAY_SIZE(rdna4MMAOps),
+                                      rdna4MMAOps,
+                                      {32, 64},
+                                      {1024, 1024, 1024},
+                                      1024,
+                                      64 * 1024,
+                                      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+                                      /*maxLoadInstructionBits=*/128,
+                                      /*simdsPerWgp=*/4,
+                                      /*vgprSpaceBits=*/256 * 32};
+  return &rdna4Wgp;
+}
+
 const WgpDetails *getRDNA3WgpDetails() {
   static const MMAIntrinsic rdna3MMAOps[] = {
-      MMAIntrinsic::WMMA_F32_16x16x16_F16, MMAIntrinsic::WMMA_F16_16x16x16_F16,
-      MMAIntrinsic::WMMA_I32_16x16x16_I8,  MMAIntrinsic::WMMA_I32_16x16x16_I8,
-      MMAIntrinsic::WMMA_I32_16x16x16_I8,
+      MMAIntrinsic::WMMAR3_F32_16x16x16_F16,
+      MMAIntrinsic::WMMAR3_F16_16x16x16_F16,
+      MMAIntrinsic::WMMAR3_F32_16x16x16_BF16,
+      MMAIntrinsic::WMMAR3_BF16_16x16x16_BF16,
+      MMAIntrinsic::WMMAR3_I32_16x16x16_I8,
 
   };
   static const WgpDetails rdna3Wgp = {allComputeBits,
@@ -282,6 +314,7 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   const WgpDetails *cdna3Wgp = getCDNA3WgpDetails();
   const WgpDetails *cdna2Wgp = getCDNA2WgpDetails();
   const WgpDetails *cdna1Wgp = getCDNA1WgpDetails();
+  const WgpDetails *rdna4Wgp = getRDNA4WgpDetails();
   const WgpDetails *rdna3Wgp = getRDNA3WgpDetails();
   const WgpDetails *rdna2Wgp = getRDNA2WgpDetails();
   const WgpDetails *rdna1Wgp = getRDNA1WgpDetails();
@@ -327,6 +360,8 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
       .Cases("cdna2", "gfx90a", TargetDetails{cdna2Wgp, nullptr})
       .Case("mi100", TargetDetails{cdna1Wgp, &mi100Chip})
       .Cases("cdna1", "gfx908", TargetDetails{cdna1Wgp, nullptr})
+      // Preliminary listing - chip details not available.
+      .Cases("gfx1200", "gfx1201", TargetDetails{rdna4Wgp, nullptr})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-7900-xtx.c3941
       .Case("rx7900xtx", TargetDetails{rdna3Wgp, &rx7900xtxChip})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-7900-xt.c3912
