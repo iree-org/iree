@@ -114,8 +114,15 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp)
     for (auto &use : constOp->getUses()) {
       Operation *useOp = use.getOwner();
       // For now ignore operations that are not in the same scope.
-      if (constOp->getParentOp() != useOp->getParentOp())
+      if (constOp->getParentOp() != useOp->getParentOp()) {
+        // check if we can expand to the parent op instead
+        if (auto parentOp = useOp->getParentOp()) {
+          if (constOp->getParentOp() == parentOp->getParentOp()) {
+            expandToOp(parentOp);
+          }
+        }
         continue;
+      }
       expandToOp(useOp);
     }
   }
