@@ -290,8 +290,8 @@ module {
 }
 
 // -----
-// CHECK-LABEL: @t017_cmp_one_f64
-module @t017_cmp_one_f64 {
+// CHECK-LABEL: @t018_cmp_one_f64
+module @t018_cmp_one_f64 {
 
 module {
   // CHECK: vm.func private @my_fn
@@ -307,8 +307,8 @@ module {
 }
 
 // -----
-// CHECK-LABEL: @t017_cmp_ord_f64
-module @t017_cmp_ord_f64 {
+// CHECK-LABEL: @t019_cmp_ord_f64
+module @t019_cmp_ord_f64 {
 
 module {
   // CHECK: vm.func private @my_fn
@@ -329,8 +329,8 @@ module {
 }
 
 // -----
-// CHECK-LABEL: @t017_cmp_ueq_f64
-module @t017_cmp_ueq_f64 {
+// CHECK-LABEL: @t020_cmp_ueq_f64
+module @t020_cmp_ueq_f64 {
 
 module {
   // CHECK: vm.func private @my_fn
@@ -346,8 +346,8 @@ module {
 }
 
 // -----
-// CHECK-LABEL: @t017_cmp_ugt_f64
-module @t017_cmp_ugt_f64 {
+// CHECK-LABEL: @t021_cmp_ugt_f64
+module @t021_cmp_ugt_f64 {
 
 module {
   // CHECK: vm.func private @my_fn
@@ -363,8 +363,8 @@ module {
 }
 
 // -----
-// CHECK-LABEL: @t017_cmp_uge_f64
-module @t017_cmp_uge_f64 {
+// CHECK-LABEL: @t022_cmp_uge_f64
+module @t022_cmp_uge_f64 {
 
 module {
   // CHECK: vm.func private @my_fn
@@ -380,8 +380,8 @@ module {
 }
 
 // -----
-// CHECK-LABEL: @t017_cmp_ult_f64
-module @t017_cmp_ult_f64 {
+// CHECK-LABEL: @t023_cmp_ult_f64
+module @t023_cmp_ult_f64 {
 
 module {
   // CHECK: vm.func private @my_fn
@@ -397,8 +397,8 @@ module {
 }
 
 // -----
-// CHECK-LABEL: @t017_cmp_ule_f64
-module @t017_cmp_ule_f64 {
+// CHECK-LABEL: @t024_cmp_ule_f64
+module @t024_cmp_ule_f64 {
 
 module {
   // CHECK: vm.func private @my_fn
@@ -414,8 +414,8 @@ module {
 }
 
 // -----
-// CHECK-LABEL: @t017_cmp_une_f64
-module @t017_cmp_une_f64 {
+// CHECK-LABEL: @t025_cmp_une_f64
+module @t025_cmp_une_f64 {
 
 module {
   // CHECK: vm.func private @my_fn
@@ -431,8 +431,8 @@ module {
 }
 
 // -----
-// CHECK-LABEL: @t017_cmp_uno_f64
-module @t017_cmp_uno_f64 {
+// CHECK-LABEL: @t026_cmp_uno_f64
+module @t026_cmp_uno_f64 {
 
 module {
   // CHECK: vm.func private @my_fn
@@ -452,8 +452,8 @@ module {
 
 
 // -----
-// CHECK-LABEL: @t017_cmp_true_f64
-module @t017_cmp_true_f64 {
+// CHECK-LABEL: @t027_cmp_true_f64
+module @t027_cmp_true_f64 {
 
 module {
   // CHECK: vm.func private @my_fn
