@@ -55,6 +55,21 @@ class BufferMappingTest : public CTSTestBase<> {
         &device_buffer));
     *out_buffer = device_buffer;
   }
+  void AllocateUninitializedBuffer(iree_device_size_t buffer_size,
+                                   iree_hal_buffer_t** out_buffer,
+                                   iree_hal_memory_access_t access) {
+    iree_hal_buffer_params_t params = {0};
+    params.type =
+        IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+    params.usage =
+        IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING;
+    params.access = access;
+    iree_hal_buffer_t* device_buffer = NULL;
+    IREE_CHECK_OK(iree_hal_allocator_allocate_buffer(
+        iree_hal_device_allocator(device_), params, buffer_size,
+        &device_buffer));
+    *out_buffer = device_buffer;
+  }
 };
 
 TEST_F(BufferMappingTest, AllocatorSupportsBufferMapping) {
@@ -388,6 +403,42 @@ TEST_F(BufferMappingTest, WriteDataWholeBuffer) {
       buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
 
+  iree_hal_buffer_release(buffer);
+}
+
+TEST_F(BufferMappingTest, Transferd2d) {
+  iree_device_size_t buffer_size = 16;
+  iree_hal_buffer_t* buffer = NULL;
+  AllocateUninitializedBuffer(buffer_size, &buffer);
+
+  iree_hal_buffer_t* target_buffer = NULL;
+  AllocateUninitializedBuffer(buffer_size, &target_buffer,
+                              IREE_HAL_MEMORY_ACCESS_ANY);
+  // Zero the entire buffer.
+  IREE_ASSERT_OK(iree_hal_buffer_map_zero(buffer, 0, IREE_HAL_WHOLE_BUFFER));
+
+  // Write over part of the buffer.
+  std::vector<uint8_t> fill_buffer{0x11, 0x22, 0x33, 0x44,  //
+                                   0x55, 0x66, 0x77, 0x88};
+  IREE_ASSERT_OK(iree_hal_buffer_map_write(
+      buffer, /*target_offset=*/4, fill_buffer.data(), fill_buffer.size()));
+
+  iree_hal_device_transfer_d2d(
+      device_, buffer, 0, target_buffer, 0, buffer_size,
+      IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
+
+  // Check that the contents match what we expect.
+  std::vector<uint8_t> actual_data(buffer_size);
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(target_buffer, /*source_offset=*/0,
+                                          actual_data.data(),
+                                          actual_data.size()));
+  std::vector<uint8_t> reference_buffer{0x00, 0x00, 0x00, 0x00,  //
+                                        0x11, 0x22, 0x33, 0x44,  //
+                                        0x55, 0x66, 0x77, 0x88,  //
+                                        0x00, 0x00, 0x00, 0x00};
+  EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
+
+  iree_hal_buffer_release(target_buffer);
   iree_hal_buffer_release(buffer);
 }
 
