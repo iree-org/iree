@@ -233,7 +233,6 @@ const WgpDetails *getCDNA1WgpDetails() {
 }
 
 const WgpDetails *getRDNA4WgpDetails() {
-  // XXX: Actively incorrect, semantics change
   static const MMAIntrinsic rdna4MMAOps[] = {
       MMAIntrinsic::WMMAR4_F32_16x16x16_F16,
       MMAIntrinsic::WMMAR4_F16_16x16x16_F16,
