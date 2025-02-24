@@ -1879,11 +1879,11 @@ def Stream_ResourceAddRefOp : Stream_Op<"async.resource.add_ref"> {
 
   let arguments = (ins
     Stream_AnyStreamResource:$resource,
-    ConfinedAttr<I64Attr, [IntPositive]>:$count
+    I64:$count
   );
 
   let assemblyFormat = [{
-    $resource attr-dict `:` type($resource)
+    $resource attr-dict `:` type($resource) `,` $count
   }];
 
 }
@@ -1897,11 +1897,11 @@ def Stream_ResourceDecRefOp : Stream_Op<"async.resource.dec_ref"> {
 
   let arguments = (ins
     Stream_AnyStreamResource:$resource,
-    ConfinedAttr<I64Attr, [IntPositive]>:$count
+    I64:$count
   );
 
   let assemblyFormat = [{
-    $resource attr-dict `:` type($resource)
+    $resource attr-dict `:` type($resource) `,` $count
   }];
 
 }

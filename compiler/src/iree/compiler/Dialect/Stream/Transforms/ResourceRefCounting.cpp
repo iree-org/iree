@@ -355,7 +355,7 @@ private:
 
 llvm::DenseMap<Value, int> refCountMap;
 llvm::DenseMap<Value, Operation *> lastUseMap;
-void insertDealloca(Value, Operation *);
+llvm::DenseMap<Value, Value> resourceTimepoints;
 
 // on alloca, find all users and add reference counts
 // at each execute region block  resource is used
@@ -367,86 +367,149 @@ void insertDealloca(Value, Operation *);
 static void performRefCountingInRegion(Region &region,
                                        LivenessAnalysis &analysis) {
 
-  region.walk([&](Operation *op) {
-    TypeSwitch<Operation *>(op)
-        .Case<IREE::Stream::ResourceAllocaOp>([&](auto allocaOp) {
-          auto resource =
-              cast<IREE::Stream::ResourceAllocaOp>(op)->getResult(0);
-          // Adds refCounting
-          if (!resource.getUses().empty()) {
-            refCountMap.insert(std::make_pair(resource, 0));
-            for (Operation *user : resource.getUsers()) {
-              refCountMap[resource]++;
-              if (analysis.isLastUser(resource, user))
-                lastUseMap[resource] = user;
-            }
-          }
-        })
-        .Case<IREE::Stream::ResourceDeallocaOp>([&](auto deallocaOp) {
-          auto resource =
-              cast<IREE::Stream::ResourceDeallocaOp>(op)->getResult(0);
+  // region.walk([&](Operation *op) {
+  for (auto &block : region) {
+    block.walk([&](Operation *op) {
+      return TypeSwitch<Operation *, WalkResult>(op)
+          .Case<IREE::Stream::ResourceAllocaOp>([&](auto allocaOp) {
+            AsmState asmState(op->getParentOp());
 
-          refCountMap[resource]--;
-          LLVM_DEBUG({
-            llvm::dbgs() << "\n last user is dealloca, just decrement refcount "
-                            "and do nothing: "
-                         << resource;
-          });
-        })
-        .Case<IREE::Stream::CmdExecuteOp>([&](auto executeOp) {
-          for (auto operand : executeOp->getOperands()) {
-            if (refCountMap.count(operand)) {
+            auto resource =
+                cast<IREE::Stream::ResourceAllocaOp>(op)->getResult(0);
 
-              // Decrement reference after last use
-              if (analysis.isLastUser(operand, executeOp)) {
-                lastUseMap.insert(std::make_pair(operand, executeOp));
+            LLVM_DEBUG({
+              llvm::dbgs() << "\n ----- resource: ";
+              resource.printAsOperand(llvm::dbgs(), asmState);
+            });
+            // Adds refCounting
+            if (!resource.getUses().empty()) {
+              SmallVector<Value> joinTimepoints;
 
-                if (refCountMap[operand] > 0) {
-                  refCountMap[operand]--;
+              refCountMap.insert(std::make_pair(resource, 0));
+              for (Operation *user : resource.getUsers()) {
+                if (isa<IREE::Stream::ResourceDeallocaOp,
+                        IREE::Stream::ResourceAddRefOp,
+                        IREE::Stream::ResourceDecRefOp>(user)) {
+                  return WalkResult::advance();
                 }
 
-                if (refCountMap[operand] == 0) {
-                  insertDealloca(operand, executeOp);
+                // Keep analysis check here before the IR mutates by add/dec ref
+                // Ops
+                if (analysis.isLastUser(resource, user)) {
+                  OpBuilder builder(user);
+                  auto loc = user->getLoc();
+                  builder.setInsertionPointAfter(user);
+                  auto lastUseOp =
+                      builder.create<IREE::Stream::ResourceLastUseOp>(loc,
+                                                                      resource);
+                  lastUseMap.insert(
+                      std::make_pair(resource, lastUseOp.getOperation()));
                 }
-              } else {
-                refCountMap[operand]--;
+                if (auto execop = dyn_cast<IREE::Stream::CmdExecuteOp>(*user)) {
+                  joinTimepoints.push_back(execop.getResultTimepoint());
+                  LLVM_DEBUG({
+                    llvm::dbgs() << "\n jointimepoint: ";
+                    execop.getResultTimepoint().printAsOperand(llvm::dbgs(),
+                                                               asmState);
+                  });
+                }
+
+                OpBuilder builder(user);
+                auto loc = user->getLoc();
+                refCountMap[resource]++;
+
+                builder.setInsertionPoint(user);
+
+                Value countVal = builder.create<arith::ConstantIntOp>(
+                    loc, refCountMap[resource], 64);
+                Value one = builder.create<arith::ConstantIntOp>(loc, 1, 64);
+
+                builder.create<IREE::Stream::ResourceAddRefOp>(loc, resource,
+                                                               countVal);
+
+                builder.setInsertionPointAfter(user);
+                auto Val =
+                    builder.createOrFold<arith::SubIOp>(loc, countVal, one);
+
+                builder.create<IREE::Stream::ResourceDecRefOp>(loc, resource,
+                                                               Val);
+              }
+
+              {
+                if (lastUseMap.count(resource)) {
+                  auto lastUseOp = cast<IREE::Stream::ResourceLastUseOp>(
+                      lastUseMap[resource]);
+                  OpBuilder builder(lastUseOp);
+                  builder.setInsertionPoint(lastUseOp);
+
+                  Value newAwaitTimepoint = IREE::Stream::TimepointJoinOp::join(
+                      joinTimepoints, builder);
+
+                  resourceTimepoints.insert(
+                      std::make_pair(resource, newAwaitTimepoint));
+                }
               }
             }
-          }
-        });
-  });
+            return WalkResult::advance();
+          })
+          .Default([&](auto *op) { return WalkResult::advance(); });
+    });
+  }
 }
 
-void insertDealloca(Value resource, Operation *lastuseOp) {
-  auto refCount = refCountMap[resource];
-  auto definingOp = resource.getDefiningOp();
+void insertDealloca(Region &region) {
+  OpBuilder builder(region);
 
-  auto allocaOp = cast<IREE::Stream::ResourceAllocaOp>(definingOp);
+  region.walk([&](Operation *op) {
+    TypeSwitch<Operation *>(op)
 
-  OpBuilder builder(lastuseOp);
-  builder.setInsertionPointAfter(lastuseOp);
-  auto loc = lastuseOp->getLoc();
-  auto timepoint = allocaOp.getResultTimepoint();
-  if (auto op = dyn_cast<IREE::Stream::CmdExecuteOp>(lastuseOp)) {
-    timepoint = op.getResultTimepoint();
-  }
+        .Case<IREE::Stream::ResourceDecRefOp>([&](auto decRefOp) {
+          AsmState asmState(op->getParentOp());
+          auto resource = decRefOp.getResource();
+          LLVM_DEBUG({
+            llvm::dbgs() << "\n ----- resource: ";
+            resource.printAsOperand(llvm::dbgs(), asmState);
+          });
 
-  Type i32Type = builder.getIntegerType(32);
-  Value countVal = builder.create<arith::ConstantOp>(
-      loc, builder.getIntegerAttr(i32Type, refCount));
-  Value zero = builder.create<arith::ConstantOp>(
-      loc, builder.getIntegerAttr(i32Type, 0));
+          auto loc = decRefOp.getLoc();
+          builder.setInsertionPoint(decRefOp);
 
-  auto cond = builder.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
-                                            countVal, zero);
-  builder.create<mlir::scf::IfOp>(
-      loc, cond, [&](OpBuilder &builder, Location loc) {
-        builder.create<IREE::Stream::ResourceDeallocaOp>(
-            loc, resource, allocaOp.getResultSize(0), timepoint,
-            allocaOp.getAffinityAttr());
+          auto allocaOp =
+              cast<IREE::Stream::ResourceAllocaOp>(resource.getDefiningOp());
+          Value newTimepoint = resourceTimepoints[resource];
+          if (lastUseMap.count(resource)) {
+            auto lastUseOp =
+                cast<IREE::Stream::ResourceLastUseOp>(lastUseMap[resource]);
+            loc = lastUseOp->getLoc();
+            builder.setInsertionPoint(lastUseOp);
+          }
 
-        builder.create<mlir::scf::YieldOp>(loc);
-      });
+          Value zero = builder.create<arith::ConstantIntOp>(loc, 0, 64);
+
+          auto cond = builder.create<arith::CmpIOp>(
+              loc, arith::CmpIPredicate::eq, decRefOp.getCount(), zero);
+
+          builder.create<mlir::scf::IfOp>(
+              loc, cond, [&](OpBuilder &builder, Location loc) {
+                builder.create<IREE::Stream::ResourceDeallocaOp>(
+                    loc, resource, allocaOp.getResultSize(0), newTimepoint,
+                    allocaOp.getAffinityAttr());
+
+                builder.create<mlir::scf::YieldOp>(loc);
+              });
+        });
+  });
+
+  // TODO: erase only when needed ?
+  region.walk([&](Operation *op) {
+    TypeSwitch<Operation *>(op)
+        .Case<IREE::Stream::ResourceAddRefOp>(
+            [&](auto addRefOp) { addRefOp.erase(); })
+        .Case<IREE::Stream::ResourceDecRefOp>(
+            [&](auto decRefOp) { decRefOp.erase(); })
+        .Case<IREE::Stream::ResourceLastUseOp>(
+            [&](auto lastUseOp) { lastUseOp.erase(); });
+  });
 }
 
 // This operates using a whole-program analysis to track reference counts of a
@@ -480,6 +543,8 @@ struct ResourceRefCountingPass
       // adding reference count for each user, and
       // insert dealloca when refcount reaches zero
       performRefCountingInRegion(*region, analysis);
+
+      insertDealloca(*region);
     }
   }
 };
