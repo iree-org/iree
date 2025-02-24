@@ -76,7 +76,7 @@ static bool isRecognizedEncodingType(Type type) {
   if (!rankedTensorType) {
     return false;
   }
-  auto encoding = rankedTensorType.getEncoding();
+  Attribute encoding = rankedTensorType.getEncoding();
   if (!encoding) {
     return false;
   }
@@ -723,7 +723,7 @@ LogicalResult StreamTensorOpUpdater::run() {
   for (auto op : streamOps) {
     if (failed(addQuery(affinityAnalysis, op))) {
       return moduleOp->emitError(
-          "failed to cache all the queris, it usually means that there are "
+          "failed to cache all the queries, it usually means that there are "
           "failures in affinity analysis");
     }
   }
@@ -788,7 +788,7 @@ struct SpecializeEncodingsPass
       return;
     }
 
-    // Signal a pass failure if any of following steps is failed. At this point,
+    // Signal a pass failure if any of following steps fails. At this point,
     // we recognize that all the unserialized encodings can be handled by the
     // pass.
     if (failed(streamTensorOpUpdater.run())) {
