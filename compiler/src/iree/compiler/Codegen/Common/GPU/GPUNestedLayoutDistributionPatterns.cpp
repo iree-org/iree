@@ -1116,11 +1116,19 @@ struct DistributeContract final
         loc, rewriter, contractOp.getKind(), disAcc.getType());
     Value localContract = doDistributedContraction(
         rewriter, loc, ctx, contractOp, disLhs, disRhs, localInit);
-    if (mask) {
-      localContract =
-          vector::maskOperation(rewriter, localContract.getDefiningOp(), mask)
-              ->getResult(0);
-    }
+
+    // TODO: As per current upstream lowering implementations, there is no point
+    // in doing this because it does a select much later in a finer granularity
+    // rather than supporting predication. Moreover, since we are doing a select
+    // to cater reductions accross the distribution, we can choose not to mask
+    // the op post-distribution.
+
+    // if (mask) {
+    //   localContract =
+    //       vector::maskOperation(rewriter, localContract.getDefiningOp(),
+    //       mask)
+    //           ->getResult(0);
+    // }
 
     VectorValue localContractValue;
     if (accVector) {
