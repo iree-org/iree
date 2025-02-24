@@ -262,7 +262,6 @@ util.func public @tensor_clone_op_with_unknown_encodings(%arg0: !stream.resource
 // CHECK-SAME:      tensor<?x4xf32, #[[$UNKNOWN_ENCODING]]>
 // CHECK-SAME:      tensor<?x4xf32, #[[$UNKNOWN_ENCODING]]>
 
-
 // -----
 
 #serialized_encoding = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123>]>
