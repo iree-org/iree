@@ -188,12 +188,6 @@ static bool isEligibleForCollapse(Operation *op) {
     return false;
   }
 
-  // TODO(guray) Collapsing caused performance regression in a cpu
-  // benchmark, so we disable it.
-  if (genericOp.hasIndexSemantics()) {
-    return false;
-  }
-
   // TODO(#17948) GPU codegen fails when we collapse the dimensions of softmax.
   auto isPossiblySoftmax = [&](OpOperand *operand) -> bool {
     auto genericOperand = operand->get().getDefiningOp<linalg::GenericOp>();
@@ -201,14 +195,15 @@ static bool isEligibleForCollapse(Operation *op) {
       return false;
     }
 
-    if (genericOperand.getNumReductionLoops() == 0) {
+    if (genericOperand.getNumReductionLoops() <= 1) {
       return false;
     }
 
     auto map = genericOp.getMatchingIndexingMap(operand);
     return !map.isPermutation() && map.isProjectedPermutation();
   };
-  if (llvm::any_of(genericOp.getDpsInputOperands(), isPossiblySoftmax)) {
+  if (genericOp.getNumDpsInputs() >= 2 &&
+      llvm::any_of(genericOp.getDpsInputOperands(), isPossiblySoftmax)) {
     return false;
   }
 
