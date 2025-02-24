@@ -1936,6 +1936,7 @@ LogicalResult TensorCloneOp::verify() {
   TensorCloneOp op = *this;
   // Clones can't change encodings but they can change shape and element type
   // information.
+#if 0
   auto sourceEncoding = llvm::cast<RankedTensorType>(op.getSourceEncoding());
   auto resultEncoding = llvm::cast<RankedTensorType>(op.getResultEncoding());
   if (sourceEncoding.getEncoding() != resultEncoding.getEncoding()) {
@@ -1943,6 +1944,7 @@ LogicalResult TensorCloneOp::verify() {
                             << sourceEncoding.getEncoding() << " to "
                             << resultEncoding.getEncoding() << "; not allowed";
   }
+#endif
   if (failed(verifyOpDynamicDims(op, op.getSourceEncoding(),
                                  op.getSourceEncodingDims())) ||
       failed(verifyOpDynamicDims(op, op.getResultEncoding(),

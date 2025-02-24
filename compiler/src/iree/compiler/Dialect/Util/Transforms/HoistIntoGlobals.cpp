@@ -107,6 +107,11 @@ public:
         auto *iterInfo = constExprs.lookup(iterOp);
         if (!iterInfo)
           return WalkResult::advance();
+        if (!llvm::all_of(iterOp->getResults(), [&](Value constExprResult) {
+              return constExprs.lookup(constExprResult) ? true : false;
+            })) {
+          return WalkResult::advance();
+        }
         for (Value constExprResult : iterOp->getResults()) {
           auto *resultInfo = constExprs.lookup(constExprResult);
           assert(resultInfo && "must have const-expr info");
