@@ -1213,8 +1213,6 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
 LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
                                                      Location loc,
                                                      ValueRange ivs) {
-  assert(ivs.size() == getOutputRank() &&
-         "number of ivs must match the rank of the output tensor");
   OpBuilder::InsertionGuard g(builder);
   ReifiedRankedShapedTypeDims outputShape;
   if (failed(reifyResultShapes(builder, outputShape))) {
