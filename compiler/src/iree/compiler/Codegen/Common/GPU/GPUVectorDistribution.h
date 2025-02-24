@@ -34,6 +34,11 @@ struct DistributionPattern : RewritePattern {
                                         TypedValue<VectorType> value,
                                         VectorLayoutInterface layout) const;
 
+  /// Get the distributed values that could replace the op
+  SmallVector<Value> getOpDistributedReplacements(RewriterBase &rewriter,
+                                                  Operation *op,
+                                                  ValueRange values) const;
+
   /// Replace an op with its distributed replacement values.
   void replaceOpWithDistributedValues(RewriterBase &rewriter, Operation *op,
                                       ValueRange values) const;
@@ -49,6 +54,9 @@ protected:
   void setSignatureForRedistribution(PatternRewriter &rewriter, Operation *op,
                                      Attribute inputLayoutsAttr,
                                      Attribute outputLayoutsAttr) const;
+
+  LogicalResult replaceParentMask(PatternRewriter &rewriter,
+                                  vector::MaskOp) const;
 };
 
 template <typename SourceOp>
@@ -67,6 +75,43 @@ struct OpDistributionPattern : DistributionPattern {
       return failure();
     }
     return matchAndRewrite(cast<SourceOp>(op), *opSignature, rewriter);
+  }
+};
+
+template <typename SourceOp>
+struct MaskedOpDistributionPattern : DistributionPattern {
+  MaskedOpDistributionPattern(MLIRContext *context, PatternBenefit benefit = 1)
+      : DistributionPattern(SourceOp::getOperationName(), benefit, context) {}
+
+  virtual LogicalResult
+  matchAndRewrite(SourceOp op, DistributionSignature &opSignature,
+                  vector::MaskOp maskOp,
+                  std::optional<DistributionSignature> &maskSignature,
+                  PatternRewriter &rewriter) const = 0;
+
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const final {
+    std::optional<DistributionSignature> opSignature = getOpSignature(op);
+    if (!opSignature) {
+      return failure();
+    }
+    auto maskOp = op->getParentOfType<vector::MaskOp>();
+    std::optional<DistributionSignature> maskSignature;
+    if (maskOp) {
+      maskSignature = getOpSignature(maskOp);
+      if (!maskSignature) {
+        return failure();
+      }
+    }
+    LogicalResult result = matchAndRewrite(cast<SourceOp>(op), *opSignature,
+                                           maskOp, maskSignature, rewriter);
+    if (failed(result)) {
+      return failure();
+    }
+    if (maskOp) {
+      return replaceParentMask(rewriter, maskOp);
+    }
+    return success();
   }
 };
 

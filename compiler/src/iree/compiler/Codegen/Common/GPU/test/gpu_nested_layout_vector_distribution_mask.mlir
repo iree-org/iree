@@ -181,3 +181,50 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[DISTR_MASK:.+]] = vector.create_mask {{.*}} : vector<8xi1>
 // CHECK: %[[DISTR_MASK_0:.+]] = vector.extract_strided_slice %16 {offsets = [0], sizes = [2], strides = [1]} : vector<8xi1> to vector<2xi1>
 // CHECK: vector.transfer_read %arg0{{.*}} %[[DISTR_MASK_0]]
+
+// -----
+
+#nested = #iree_vector_ext.nested_layout<
+  subgroup_tile = [2, 1],
+  batch_tile = [2, 1],
+  outer_tile = [2, 1],
+  thread_tile = [16, 16],
+  element_tile = [2, 8],
+
+  subgroup_strides = [1, 0],
+  thread_strides = [16, 1]
+>
+
+func.func @masked_read_write_reduce(%arg0 : memref<?x128xf16>, %arg1 : memref<128xf16>) {
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
+  %cst_6 = arith.constant 0.000000e+00 : f16
+  %cst_1 = arith.constant dense<0.000000e+00> : vector<128xf16>
+
+  %dyn = memref.dim %arg0, %c0 : memref<?x128xf16>
+  %41 = vector.create_mask %dyn, %c128 : vector<256x128xi1>
+  %42 = vector.transfer_read %arg0[%c0, %c0], %cst_6, %41 {in_bounds = [true, true]} : memref<?x128xf16>, vector<256x128xf16>
+  %43 = iree_vector_ext.to_layout %42 to layout(#nested) : vector<256x128xf16>
+  %44 = vector.mask %41 { vector.multi_reduction <add>, %43, %cst_1 [0] : vector<256x128xf16> to vector<128xf16> } : vector<256x128xi1> -> vector<128xf16>
+  vector.transfer_write %44, %arg1[%c0] {in_bounds = [true]} : vector<128xf16>, memref<128xf16>
+  return
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @masked_read_write_reduce
+
+// CHECK: %[[RED_IDENTITY:.+]] = arith.constant dense<0.000000e+00> : vector<2x1x2x1x2x8xf16>
+
+// CHECK: %[[MASK:.+]] = vector.create_mask
+// CHECK: %[[MASK_PCK:.+]] = vector.shape_cast %[[MASK]] : vector<8x8xi1> to vector<2x2x2x1x1x8xi1>
+// CHECK: %[[MASK_ITL_PCK:.+]] = vector.transpose %[[MASK_PCK]], [0, 3, 1, 4, 2, 5] : vector<2x2x2x1x1x8xi1> to vector<2x1x2x1x2x8xi1>
+
+// CHECK: %[[SELECT:.+]] = arith.select %[[MASK_ITL_PCK]], {{.*}}, %[[RED_IDENTITY]] : vector<2x1x2x1x2x8xi1>, vector<2x1x2x1x2x8xf16>
+// CHECK: vector.multi_reduction <add>, %[[SELECT]], {{.*}} [0, 2, 4] : vector<2x1x2x1x2x8xf16> to vector<1x1x8xf16>
