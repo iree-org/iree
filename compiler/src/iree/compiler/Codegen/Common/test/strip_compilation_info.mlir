@@ -81,6 +81,7 @@ func.func @attention(%arg0: tensor<2x10x6x4xf16>, %arg1 : tensor<2x10x4x4xf16>, 
 }
 
 // CHECK-LABEL: func.func @attention
+// CHECK:       iree_linalg_ext.attention
 // CHECK-NOT:   iree_codegen.translation_info
 // CHECK-NOT:   iree_codegen.lowering_config
 // CHECK-NOT:   translation_info =
@@ -110,6 +111,7 @@ func.func @attention_1(%arg0: tensor<2x10x6x4xf16>, %arg1 : tensor<2x10x4x4xf16>
 }
 
 // CHECK-LABEL: func.func @attention_1
+// CHECK:       iree_linalg_ext.attention
 // CHECK-NOT:   iree_codegen.compilation_info
 // CHECK-NOT:   iree_codegen.lowering_config
 // CHECK-NOT:   iree_codegen.translation_info
