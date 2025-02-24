@@ -364,23 +364,22 @@ llvm::DenseMap<Value, Value> resourceTimepoints;
 //
 // walk to another execute region, increment
 
-static void performRefCountingInRegion(Region &region,
+static bool performRefCountingInRegion(Region &region,
                                        LivenessAnalysis &analysis) {
 
   // region.walk([&](Operation *op) {
   for (auto &block : region) {
     block.walk([&](Operation *op) {
       return TypeSwitch<Operation *, WalkResult>(op)
+          // TypeSwitch<Operation *>(op)
           .Case<IREE::Stream::ResourceAllocaOp>([&](auto allocaOp) {
             AsmState asmState(op->getParentOp());
 
             auto resource =
                 cast<IREE::Stream::ResourceAllocaOp>(op)->getResult(0);
 
-            LLVM_DEBUG({
-              llvm::dbgs() << "\n ----- resource: ";
-              resource.printAsOperand(llvm::dbgs(), asmState);
-            });
+            LLVM_DEBUG({ llvm::dbgs() << "\n ----- resource: "; });
+            resource.printAsOperand(llvm::dbgs(), asmState);
             // Adds refCounting
             if (!resource.getUses().empty()) {
               SmallVector<Value> joinTimepoints;
@@ -390,6 +389,7 @@ static void performRefCountingInRegion(Region &region,
                 if (isa<IREE::Stream::ResourceDeallocaOp,
                         IREE::Stream::ResourceAddRefOp,
                         IREE::Stream::ResourceDecRefOp>(user)) {
+                  // continue;
                   return WalkResult::advance();
                 }
 
@@ -455,6 +455,7 @@ static void performRefCountingInRegion(Region &region,
           .Default([&](auto *op) { return WalkResult::advance(); });
     });
   }
+  return true;
 }
 
 void insertDealloca(Region &region) {
@@ -526,25 +527,44 @@ struct ResourceRefCountingPass
     if (moduleOp.getBody()->empty())
       return;
 
-    // Perform whole-program analysis to find last user each resource
-    LivenessAnalysis analysis(moduleOp);
-    if (failed(analysis.run())) {
-      moduleOp.emitError() << "failed to solve for liveness analysis";
-      return signalPassFailure();
-    }
+    unsigned maxIterationCount = 30;
+    unsigned iterationCount = 0;
+    for (; iterationCount < maxIterationCount; ++iterationCount) {
+      // Perform whole-program analysis to find last user each resource
+      LivenessAnalysis analysis(moduleOp);
+      if (failed(analysis.run())) {
+        moduleOp.emitError() << "failed to solve for liveness analysis";
 
-    for (auto callableOp : analysis.getTopLevelOps()) {
+        llvm::dbgs() << "\n failed to solve for liveness analysis \n ";
+        return signalPassFailure();
+      }
 
-      auto *region = callableOp.getCallableRegion();
-      if (!region)
-        continue;
+      for (auto callableOp : analysis.getTopLevelOps()) {
+        llvm::dbgs() << "\n callableOp: " << callableOp->getName();
+        auto *region = callableOp.getCallableRegion();
+        if (!region)
+          continue;
 
-      // Use analysis to find last-witness op for each resource,
-      // adding reference count for each user, and
-      // insert dealloca when refcount reaches zero
-      performRefCountingInRegion(*region, analysis);
-
-      insertDealloca(*region);
+        // Use analysis to find last-witness op for each resource,
+        // adding reference count for each user, and
+        // insert dealloca when refcount reaches zero
+        if (performRefCountingInRegion(*region, analysis)) {
+          insertDealloca(*region);
+          break;
+        }
+      }
+      if (iterationCount == maxIterationCount) {
+        // If you find yourself hitting this we can evaluate increasing the
+        // iteration count (if it would eventually converge) or whether we allow
+        // this to happen without remarking. For now all our programs coverge in
+        // just one or two iterations and this needs to be tuned with more
+        // complex control flow. moduleOp.emitRemark()
+        //     << "copy elision pass failed to reach a fixed point after "
+        //     << maxIterationCount << " iterations; unneeded copies may be
+        //     present";
+        llvm::dbgs() << "\n ** refcount: maxcount reached";
+        return;
+      }
     }
   }
 };
