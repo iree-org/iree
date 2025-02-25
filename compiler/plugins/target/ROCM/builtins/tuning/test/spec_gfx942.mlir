@@ -78,30 +78,33 @@ hal.executable public @main {
 ]>
 hal.executable public @main {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @attention ordinal(0) layout(#hal.pipeline.layout<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) {
+    hal.executable.export public @attention ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
       // expected-remark@+1 {{Applied transform configuration strategy @iree_default_tuning_spec_gfx942::@__kernel_config}}
-      func.func @attention_2x10x4096x64x64x64_f16() {
+      func.func @attention_2x10x4096x64x64x64_f16(
+        %query: tensor<2x10x4096x64xf16>,
+        %key: tensor<2x10x64x64xf16>,
+        %value: tensor<2x10x64x64xf16>
+      ) -> tensor<2x10x4096x64xf16> {
+
         %cst = arith.constant 1.250000e-01 : f16
-        %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x10x4096x64xf16>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x10x64x64xf16>>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x10x64x64xf16>>
-        %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x10x4096x64xf16>>
-        %4 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 10, 4096, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x10x4096x64xf16>> -> tensor<2x10x4096x64xf16>
-        %5 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [2, 10, 64, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x10x64x64xf16>> -> tensor<2x10x64x64xf16>
-        %6 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0, 0], sizes = [2, 10, 64, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x10x64x64xf16>> -> tensor<2x10x64x64xf16>
-        %7 = tensor.empty() : tensor<2x10x4096x64xf16>
-        %8 = iree_linalg_ext.attention {indexing_maps = [#map, #map1, #map2, #map3, #map4]} ins(%4, %5, %6, %cst : tensor<2x10x4096x64xf16>, tensor<2x10x64x64xf16>, tensor<2x10x64x64xf16>, f16) outs(%7 : tensor<2x10x4096x64xf16>) {
-        ^bb0(%arg0: f32):
-          iree_linalg_ext.yield %arg0 : f32
-        } -> tensor<2x10x4096x64xf16>
-        flow.dispatch.tensor.store %8, %3, offsets = [0, 0, 0, 0], sizes = [2, 10, 4096, 64], strides = [1, 1, 1, 1] : tensor<2x10x4096x64xf16> -> !flow.dispatch.tensor<writeonly:tensor<2x10x4096x64xf16>>
-        return
+        %output = tensor.empty() : tensor<2x10x4096x64xf16>
+
+        // Apply the attention operation directly to function inputs
+        %result = iree_linalg_ext.attention {
+            indexing_maps = [#map, #map1, #map2, #map3, #map4]
+        } ins(%query, %key, %value, %cst :
+            tensor<2x10x4096x64xf16>, tensor<2x10x64x64xf16>, tensor<2x10x64x64xf16>, f16)
+          outs(%output : tensor<2x10x4096x64xf16>) {
+            ^bb0(%arg0: f32):
+              iree_linalg_ext.yield %arg0 : f32
+          } -> tensor<2x10x4096x64xf16>
+
+        return %result : tensor<2x10x4096x64xf16>
       }
     }
   }
@@ -109,11 +112,11 @@ hal.executable public @main {
 
 // -----
 
-// CHECK-LABEL:  func.func @attention_3x10x4096x64x64x64_f16
+// CHECK-LABEL:  func.func @attention_3x10x4096x64x64x32_f16
 // CHECK:          iree_linalg_ext.attention
 // CHECK-NOT:       __tuning_spec_applied__
 
-// MI300X-LABEL:  func.func @attention_3x10x4096x64x64x64_f16
+// MI300X-LABEL:  func.func @attention_3x10x4096x64x64x32_f16
 // MI300X:          iree_linalg_ext.attention
 // MI300X-NOT:       __tuning_spec_applied__
 
@@ -130,30 +133,33 @@ hal.executable public @main {
 ]>
 hal.executable public @main {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @attention ordinal(0) layout(#hal.pipeline.layout<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) {
+    hal.executable.export public @attention ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
       // expected-remark@+1 {{Applied transform configuration strategy @iree_default_tuning_spec_gfx942::@__kernel_config}}
-      func.func @attention_3x10x4096x64x64x64_f16() {
+      func.func @attention_3x10x4096x64x64x32_f16(
+        %query: tensor<3x10x4096x64xf16>,
+        %key: tensor<3x10x32x64xf16>,
+        %value: tensor<3x10x64x32xf16>
+      ) -> tensor<3x10x4096x64xf16> {
+
         %cst = arith.constant 1.250000e-01 : f16
-        %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<3x10x4096x64xf16>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<3x10x64x64xf16>>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<3x10x64x64xf16>>
-        %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<3x10x4096x64xf16>>
-        %4 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [3, 10, 4096, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x10x4096x64xf16>> -> tensor<3x10x4096x64xf16>
-        %5 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [3, 10, 64, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x10x64x64xf16>> -> tensor<3x10x64x64xf16>
-        %6 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0, 0], sizes = [3, 10, 64, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x10x64x64xf16>> -> tensor<3x10x64x64xf16>
-        %7 = tensor.empty() : tensor<3x10x4096x64xf16>
-        %8 = iree_linalg_ext.attention {indexing_maps = [#map, #map1, #map2, #map3, #map4]} ins(%4, %5, %6, %cst : tensor<3x10x4096x64xf16>, tensor<3x10x64x64xf16>, tensor<3x10x64x64xf16>, f16) outs(%7 : tensor<3x10x4096x64xf16>) {
-        ^bb0(%arg0: f32):
-          iree_linalg_ext.yield %arg0 : f32
-        } -> tensor<3x10x4096x64xf16>
-        flow.dispatch.tensor.store %8, %3, offsets = [0, 0, 0, 0], sizes = [3, 10, 4096, 64], strides = [1, 1, 1, 1] : tensor<3x10x4096x64xf16> -> !flow.dispatch.tensor<writeonly:tensor<3x10x4096x64xf16>>
-        return
+        %output = tensor.empty() : tensor<3x10x4096x64xf16>
+
+        // Apply the attention operation directly to function inputs
+        %result = iree_linalg_ext.attention {
+            indexing_maps = [#map, #map1, #map2, #map3, #map4]
+        } ins(%query, %key, %value, %cst :
+            tensor<3x10x4096x64xf16>, tensor<3x10x32x64xf16>, tensor<3x10x64x32xf16>, f16)
+          outs(%output : tensor<3x10x4096x64xf16>) {
+            ^bb0(%arg0: f32):
+              iree_linalg_ext.yield %arg0 : f32
+          } -> tensor<3x10x4096x64xf16>
+
+        return %result : tensor<3x10x4096x64xf16>
       }
     }
   }
