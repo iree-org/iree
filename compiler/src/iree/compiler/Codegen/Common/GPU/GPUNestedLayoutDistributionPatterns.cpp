@@ -244,22 +244,21 @@ static VectorValue getSlicedPermutedMask(PatternRewriter &rewriter,
 /// Firstly, this will tranpose the vector in a way sliced out
 /// dims become outermost. Then it performs a vector.extract
 /// remove the dims that are not present in the results of the map.
+/// Note that the implementation is similiar to vector.extract_stride_slice
+/// but with projecting out the indexed/sliced dimensions from the result.
 static VectorValue projectVector(RewriterBase &rewriter, Location loc,
                                  VectorValue val, AffineMap projectionMap) {
-  llvm::SmallVector<int64_t> remaningDims;
-  SmallVector<int64_t> allDims =
+  SmallVector<int64_t> remaningDims;
+  auto allDims =
       llvm::to_vector(llvm::seq<int64_t>(projectionMap.getNumDims()));
-  llvm::SmallDenseSet<int64_t> slicedDims{allDims.begin(), allDims.end()};
+  llvm::SmallDenseSet<int64_t> slicedDims(allDims.begin(), allDims.end());
   for (int64_t resultIdx : llvm::seq<int64_t>(projectionMap.getNumResults())) {
     int64_t iterSpacePos = projectionMap.getDimPosition(resultIdx);
     remaningDims.push_back(iterSpacePos);
     slicedDims.erase(iterSpacePos);
   }
 
-  SmallVector<int64_t> transposePerm;
-  for (int64_t slicedDim : slicedDims) {
-    transposePerm.push_back(slicedDim);
-  }
+  SmallVector<int64_t> transposePerm(slicedDims.begin(), slicedDims.end());
   transposePerm.append(remaningDims);
   auto transposed =
       rewriter.create<vector::TransposeOp>(loc, val, transposePerm);
