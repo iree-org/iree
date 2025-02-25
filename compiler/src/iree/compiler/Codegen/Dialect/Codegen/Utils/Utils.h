@@ -74,7 +74,7 @@ struct TileMxNxK {
   int64_t K = 1;
 };
 
-MaterializeEncodingInfo
+FailureOr<MaterializeEncodingInfo>
 getEncodingInfoForMatmul(Encoding::EncodingAttr encoding, TileMxNxK tileMxNxK);
 
 } // namespace mlir::iree_compiler::IREE::Codegen
