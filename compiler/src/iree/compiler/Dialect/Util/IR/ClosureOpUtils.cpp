@@ -101,6 +101,88 @@ void eraseRegionResults(Region &region,
   }
 }
 
+// Finds any yielded region results that are duplicates of each other (as
+// defined by having the same SSA value). Returns a map of result indices to the
+// result index that is the leader of an equivalence class on each SSA value.
+// Example:
+//  yield %a, %b, %a, %b -> (0, 1, 0, 1)
+// Note that a result index in the map with a value of its own index indicates
+// a result that is not duplicated and that must be preserved.
+static SmallVector<unsigned> findDuplicateRegionResults(Region &region) {
+  // Gather all yield ops in the closure.
+  SmallVector<IREE::Util::ClosureYieldOpInterface> yieldOps;
+  for (auto &block : region.getBlocks()) {
+    if (block.empty()) {
+      continue;
+    }
+    auto *terminatorOp = block.getTerminator();
+    if (auto yieldOp = dyn_cast_if_present<IREE::Util::ClosureYieldOpInterface>(
+            terminatorOp)) {
+      yieldOps.push_back(yieldOp);
+    }
+  }
+  if (yieldOps.empty()) {
+    return {};
+  }
+  const unsigned resultCount =
+      yieldOps.front().getClosureResultsMutable().size();
+
+  // Build a map of result indices to its base duplicate for each yield site.
+  // Base/non-duplicated values will be identity.
+  // Example:
+  //   yield %a, %b, %a, %b -> (0, 1, 0, 1)
+  static const int kUnassigned = -1;
+  SmallVector<SmallVector<unsigned>> dupeIndexMaps(yieldOps.size());
+  for (auto yieldOp : llvm::enumerate(yieldOps)) {
+    auto &dupeIndexMap = dupeIndexMaps[yieldOp.index()];
+    dupeIndexMap.resize(resultCount, kUnassigned);
+    auto operands = yieldOp.value().getClosureResultsMutable();
+    for (unsigned i = 0; i < operands.size(); ++i) {
+      for (unsigned j = 0; j < i; ++j) {
+        if (operands[j].get() == operands[i].get()) {
+          dupeIndexMap[i] = j;
+          break;
+        }
+      }
+    }
+  }
+
+  // Per-result now find which are consistently duplicated.
+  // Note that we may have multiple yield ops and we have to ensure that one
+  // returning duplicates does not influence others that may not be.
+  llvm::BitVector sameValues(resultCount);
+  llvm::BitVector deadResultsMap(resultCount);
+  auto uniformDupeIndexMap =
+      llvm::to_vector(llvm::seq(0u, resultCount)); // old -> new
+  for (unsigned idx = 0; idx < resultCount; ++idx) {
+    if (deadResultsMap.test(idx))
+      continue;
+    // Each bit represents a result that duplicates the result at idx.
+    // We walk all the sites and AND their masks together to get the safe
+    // set of duplicate results.
+    // Example for %0: yield %a, %b, %a -> b001
+    // Example for %1: yield %a, %b, %a -> b000
+    sameValues.set(); // note reused
+    for (auto &dupeIndexMap : dupeIndexMaps) {
+      for (unsigned i = 0; i < resultCount; ++i) {
+        if (i == idx || dupeIndexMap[i] != idx) {
+          sameValues.reset(i);
+        }
+      }
+    }
+    if (sameValues.none()) {
+      uniformDupeIndexMap[idx] = idx;
+      continue;
+    }
+    deadResultsMap |= sameValues;
+    uniformDupeIndexMap[idx] = idx;
+    for (auto dupeIdx : sameValues.set_bits()) {
+      uniformDupeIndexMap[dupeIdx] = idx;
+    }
+  }
+  return uniformDupeIndexMap;
+}
+
 // Returns true if |constantOp| represents a (logically) small constant value
 // that can be inlined into a closure.
 //
@@ -227,30 +309,43 @@ LogicalResult optimizeClosureLikeOp(const ClosureOptimizationOptions &options,
   for (auto opArg : llvm::enumerate(closureOp.getClosureOperands())) {
     auto blockArg = entryBlock.getArgument(opArg.index());
     if (blockArg.use_empty()) {
-      // Not used - Drop.
+      // Not used - drop.
       elidedOperands.push_back(opArg.index());
       blockArgReplacements[opArg.index()] = BlockArgument();
       continue;
     }
     auto existingIt = argToBlockMap.find(opArg.value());
     if (existingIt == argToBlockMap.end()) {
-      // Not found - Record for deduping.
+      // Not found - record for deduping.
       argToBlockMap.insert(std::make_pair(opArg.value(), blockArg));
     } else {
-      // Found - Replace.
+      // Found - replace.
       elidedOperands.push_back(opArg.index());
       blockArgReplacements[opArg.index()] = existingIt->second;
     }
   }
 
-  // Check for unused results.
+  // Find duplicate results (where all yield sites return a duplicate value) as
+  // a map from result index to the result index it is a duplicate of. Results
+  // that are not duplicates (or are the base value) have an identity entry.
+  auto duplicateResultMap =
+      findDuplicateRegionResults(closureOp.getClosureBodyRegion());
+
+  // Check for unused or duplicate results.
   SmallVector<Value> preservedResults;
   SmallVector<unsigned> elidedResults;
+  SmallVector<std::pair<Value, Value>> resultReplacements;
   for (auto result : llvm::enumerate(closureOp.getClosureResults())) {
     // You can drop a result if the use is empty and not read via a tie.
     auto access = closureOp.getResultAccess(result.index());
     if (result.value().use_empty() && !access.isRead) {
       elidedResults.push_back(result.index());
+    } else if (!duplicateResultMap.empty() &&
+               duplicateResultMap[result.index()] != result.index()) {
+      elidedResults.push_back(result.index());
+      resultReplacements.push_back(std::make_pair(
+          result.value(),
+          closureOp.getClosureResults()[duplicateResultMap[result.index()]]));
     } else {
       preservedResults.push_back(result.value());
     }
@@ -279,6 +374,12 @@ LogicalResult optimizeClosureLikeOp(const ClosureOptimizationOptions &options,
       rewriter.replaceAllUsesWith(entryBlock.getArgument(replacement.index()),
                                   *replacement.value());
     }
+  }
+
+  // Replace duplicate results prior to cloning - the SSA values will no longer
+  // exist afterward.
+  for (auto [oldResult, newResult] : resultReplacements) {
+    rewriter.replaceAllUsesWith(oldResult, newResult);
   }
 
   // Clone the op with the elidable operands and results removed.
