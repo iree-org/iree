@@ -366,8 +366,8 @@ util.func public @tensor_update_op_with_unknown_or_serialized_encodings(%arg0: !
 
 // -----
 
-// Make encodings like NOP if encoding attribute is not available in the target
-// configuration.
+// Creates an identity encoding if encoding attribute is not available in the
+// target configuration.
 
 #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
@@ -378,26 +378,26 @@ util.func public @drop_encoding(%arg0: index, %arg1: index, %scalar_f32 : f32) {
   %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x0xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
   util.return
 }
-// CHECK-DAG:   #[[$NOP_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.pad_encoding_layout<[0, 0]>]>
+// CHECK-DAG:   #[[$IDENTITY_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.pad_encoding_layout<[0, 0]>]>
 // CHECK-LABEL: util.func public @drop_encoding
-// CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32, #[[$NOP_ENCODING]]>
+// CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32, #[[$IDENTITY_ENCODING]]>
 
 // -----
 
-// Make encodings as NOP if iree_encoding.nop_encoding is used.
+// Creates an identity encoding if iree_encoding.identity_encoding is used.
 
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", { iree.encoding.resolver = #iree_encoding.nop_encoding }>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", { iree.encoding.resolver = #iree_encoding.identity_encoding }>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.testing_encoding<>
 
 util.global private @device_a = #device_target_local_0_
-util.func public @ignore_encoding_by_nop_encoding(%arg0: index, %arg1: index, %scalar_f32 : f32) {
+util.func public @ignore_encoding_by_identity_encoding(%arg0: index, %arg1: index, %scalar_f32 : f32) {
   %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x0xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
   util.return
 }
-// CHECK-DAG:   #[[$NOP_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.pad_encoding_layout<[0, 0]>]>
-// CHECK-LABEL: util.func public @ignore_encoding_by_nop_encoding
-// CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32, #[[$NOP_ENCODING]]>
+// CHECK-DAG:   #[[$IDENTITY_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.pad_encoding_layout<[0, 0]>]>
+// CHECK-LABEL: util.func public @ignore_encoding_by_identity_encoding
+// CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32, #[[$IDENTITY_ENCODING]]>
 
 // -----
 

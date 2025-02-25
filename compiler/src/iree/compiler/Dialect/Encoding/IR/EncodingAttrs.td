@@ -161,22 +161,21 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
 }
 
 //===---------------------------------------------------------------------===//
-// encoding.nop_encoding
+// encoding.identity_encoding
 //===---------------------------------------------------------------------===//
 
-def NopEncodingAttr :
-    IREEEncoding_Attr<"NopEncoding", [
+def IdentityEncodingAttr :
+    IREEEncoding_Attr<"IdentityEncoding", [
       DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
         "cloneWithSimplifiedConfig",
         "getLayout",
       ]>
     ]> {
-  let mnemonic = "nop_encoding";
-  let summary = "A layout resolver that always treats encodings as NOP";
+  let mnemonic = "identity_encoding";
+  let summary = "A layout resolver that behaves like an identity function";
   let description = [{
-    A layout resolver that always treats encodings as NOP. I.e., it resolves the
-    layout as a nop layout using pad_encoding_layout attribute, which pads zero
-    elements along each tensor dimension.
+    A layout resolver that behaves like an identity function. I.e., it resolves
+    the layout to the same layout without encodings.
   }];
 
   let genVerifyDecl = 0;
