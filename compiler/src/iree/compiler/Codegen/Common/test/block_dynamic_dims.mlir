@@ -253,3 +253,27 @@ func.func @multiple_dynamic_dims(%arg0 : index, %arg1 : index) -> tensor<?x?x409
 //  CHECK-SAME:       outs(%[[INIT]] :
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[MATMUL]]
 //       CHECK:   return %[[COLLAPSE]]
+
+// -----
+
+func.func @block_elementwise(%arg0 : tensor<?xf16>, %dim : index)
+    -> tensor<?xf16> {
+  %0 = util.assume.int %dim<udiv = 1024> : index
+  %cst = arith.constant 0.2 : f16
+  %init = tensor.empty(%0) : tensor<?xf16>
+  %2 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%arg0 : tensor<?xf16>) outs(%init : tensor<?xf16>) {
+    ^bb0(%in : f16, %out : f16):
+      %3 = arith.addf %in, %cst : f16
+      linalg.yield %3 : f16
+  } -> tensor<?xf16>
+  return %2 : tensor<?xf16>
+}
+// CHECK-LABEL: func @block_elementwise(
+//       CHECK:   %[[ELEM:.+]] = linalg.generic
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[ELEM]]
+//  CHECK-SAME:     tensor<?x1024xf16> into tensor<?xf16>
+//       CHECK:   return %[[COLLAPSE]] : tensor<?xf16>
