@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
@@ -289,6 +290,8 @@ static std::string summarizeLinalgOp(linalg::LinalgOp op) {
       prefix = "matmul_like";
     } else if (linalg::isaContractionOpInterface(op)) {
       prefix = "contract";
+    } else if (IREE::LinalgExt::isaHorizontallyFusedContraction(op)) {
+      prefix = "horizontal_multi_contract";
     } else if (succeeded(linalg::inferConvolutionDims(op))) {
       prefix = "conv";
     }
