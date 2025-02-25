@@ -21,6 +21,7 @@ iree_lit_test_suite(
         [
             "benchmark_flags.txt",
             "compile_pipelines.mlir",
+            "compile_flags.mlir",
             "compile_to_continuation.mlir",
             "compile_to_phase.mlir",
             "executable_benchmarks.mlir",
