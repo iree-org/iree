@@ -130,8 +130,8 @@ LogicalResult setHIPGlobals(Location loc, llvm::Module *module,
   // Oldest GFX arch supported is gfx60x.
   if (major < 6)
     return failure();
-  // Latest GFX arch supported is gfx115x.
-  if (major > 11 || (major == 11 && minor > 0x5f))
+  // Latest GFX arch supported is gfx120x.
+  if (major > 12 || (major == 12 && minor > 0xf))
     return failure();
   int chipCode = major * 1000 + minor;
   auto *int32Type = llvm::Type::getInt32Ty(module->getContext());

@@ -498,7 +498,8 @@ public:
                                   : llvm::GlobalISelAbortMode::Disable;
         SmallVector<std::string> features;
         if (targetArch.starts_with("gfx10") ||
-            targetArch.starts_with("gfx11")) {
+            targetArch.starts_with("gfx11") ||
+            targetArch.starts_with("gfx12")) {
           switch (subgroupSize.value_or(64)) {
           case 32:
             features.emplace_back("+wavefrontsize32");
