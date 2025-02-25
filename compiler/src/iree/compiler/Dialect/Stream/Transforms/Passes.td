@@ -45,18 +45,6 @@ def ConvertToStreamPass :
   ];
 }
 
-def ElideAsyncTransfersPass :
-    Pass<"iree-stream-elide-async-transfers", "mlir::ModuleOp"> {
-  let summary = "Elides transfers when they are not performing meaningful work.";
-  let description = [{
-    Performs whole-program analysis to identify transfers that are not required
-    for program correctness (transfers to/from the same device, etc).
-  }];
-  let dependentDialects = [
-    "IREE::Stream::StreamDialect",
-  ];
-}
-
 def EncodeHostTensorsPass :
     Pass<"iree-stream-encode-host-tensors", ""> {
   let summary = "Encodes tensors into storage formats based on affinity and target support.";
@@ -177,6 +165,20 @@ def MaterializeCopyOnWritePass :
   ];
 }
 
+def CloneToConsumersPass :
+    Pass<"iree-stream-clone-to-consumers", "mlir::ModuleOp"> {
+  let summary = "Clones operations that opt-in to consumer affinities.";
+  let description = [{
+    Performs whole-program analysis to identify operations that are used on
+    multiple affinities that can be cloned per-affinity. The `StreamableOp`
+    interface's `preferCloneToConsumers` query is used and any ops implementing
+    the interface may opt-in to the cloning.
+  }];
+  let dependentDialects = [
+    "IREE::Stream::StreamDialect",
+  ];
+}
+
 def ElideAsyncCopiesPass :
     Pass<"iree-stream-elide-async-copies", "mlir::ModuleOp"> {
   let summary = "Elides copies when they are not performing meaningful work.";
@@ -186,6 +188,18 @@ def ElideAsyncCopiesPass :
     of a value. This eliminates copies both from input programs and those
     materialized by the `iree-stream-materialize-copy-on-write` pass.
   }];
+}
+
+def ElideAsyncTransfersPass :
+    Pass<"iree-stream-elide-async-transfers", "mlir::ModuleOp"> {
+  let summary = "Elides transfers when they are not performing meaningful work.";
+  let description = [{
+    Performs whole-program analysis to identify transfers that are not required
+    for program correctness (transfers to/from the same device, etc).
+  }];
+  let dependentDialects = [
+    "IREE::Stream::StreamDialect",
+  ];
 }
 
 def EmplaceAllocationsPass :

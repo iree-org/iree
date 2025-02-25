@@ -91,6 +91,31 @@ util.func private @splat_op() -> tensor<1xi32> {
 
 // -----
 
+// Tests that splats which cannot be resolved to a single consumer get tagged
+// with both.
+
+// CHECK-LABEL: @splat_op_ambiguous
+util.func private @splat_op_ambiguous() -> (tensor<1xi32>, tensor<1xi32>) {
+  %splat_value = arith.constant 123 : i32
+  // CHECK: flow.tensor.splat
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  %splat = flow.tensor.splat %splat_value : tensor<1xi32>
+  // CHECK: flow.tensor.transfer
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  %splat_a = flow.tensor.transfer %splat : tensor<1xi32> to #hal.device.promise<@dev_a>
+  // CHECK: flow.tensor.transfer
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  %splat_b = flow.tensor.transfer %splat : tensor<1xi32> to #hal.device.promise<@dev_b>
+  // CHECK: util.return
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>], [#hal.device.promise<@dev_b>]]
+  util.return %splat_a, %splat_b : tensor<1xi32>, tensor<1xi32>
+}
+
+// -----
+
 // Tests that imported tensor placement is inherited.
 // Frontends can use this to declare where they expect their arguments to
 // be living at the time the functions are invoked. Imports do not perform
