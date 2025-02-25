@@ -979,7 +979,7 @@ util.func @attention_clone_mask(%Q : tensor<?x?xf16>, %K : tensor<?x?xf16>, %V: 
 
 // -----
 
-util.func @scatter_index_producer_fusion(%arg0 : tensor<?x1xi64>,
+util.func @scatter_no_index_producer_fusion(%arg0 : tensor<?x1xi64>,
     %arg1 : index, %arg2 : tensor<?x1x32x8x128xf16>,
     %arg3 : tensor<?x32x8x128xf16>) -> tensor<?x32x8x128xf16> {
   %empty = tensor.empty(%arg1) : tensor<?x1xi32>
@@ -1001,9 +1001,11 @@ util.func @scatter_index_producer_fusion(%arg0 : tensor<?x1xi64>,
   } -> tensor<?x32x8x128xf16>
   util.return %1 : tensor<?x32x8x128xf16>
 }
-// CHECK-LABEL: func public @scatter_index_producer_fusion
+// Indices operand should be cloned.
+//
+// CHECK-LABEL: func public @scatter_no_index_producer_fusion
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
-//       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //       CHECK:     %[[SCATTER:.+]] = iree_linalg_ext.scatter
 //  CHECK-SAME:         ins(%{{.+}}, %[[GENERIC]] :
 //       CHECK:     flow.return %[[SCATTER]]
