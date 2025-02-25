@@ -34,6 +34,77 @@ func.func @main0(%arg0: tensor<2x130x130x4xf16>, %arg1: tensor<3x3x4x320xf16>, %
 
 // -----
 
+// CHECK-LABEL: func.func @conv_nchw_fchw(
+// CHECK-SAME:    %[[ARG0:.+]]: tensor<2x4x130x130xf16>,
+// CHECK-SAME:    %[[ARG1:.+]]: tensor<320x4x3x3xf16>,
+// CHECK-SAME:    %[[ARG2:.+]]: tensor<2x320x128x128xf32>)
+func.func @conv_nchw_fchw(%arg0: tensor<2x4x130x130xf16>, %arg1: tensor<320x4x3x3xf16>, %arg2: tensor<2x320x128x128xf32>)
+    -> tensor<2x320x128x128xf32> {
+  %conv0 = linalg.conv_2d_nchw_fchw {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
+             ins(%arg0, %arg1 : tensor<2x4x130x130xf16>, tensor<320x4x3x3xf16>)
+             outs(%arg2 : tensor<2x320x128x128xf32>) -> tensor<2x320x128x128xf32>
+  return %conv0 : tensor<2x320x128x128xf32>
+}
+
+// CHECK:      %[[CST0:.+]] = arith.constant 0.0{{.*}} : f16
+// CHECK:      %[[PAD0:.+]] = tensor.pad %[[ARG0]] low[0, 0, 0, 0] high[0, 12, 0, 0]
+// CHECK:        tensor.yield %[[CST0]] : f16
+// CHECK-NEXT:   tensor<2x4x130x130xf16> to tensor<2x16x130x130xf16>
+// CHECK:      %[[PAD1:.+]] = tensor.pad %[[ARG1]] low[0, 0, 0, 0] high[0, 12, 0, 0]
+// CHECK:        tensor<320x4x3x3xf16> to tensor<320x16x3x3xf16>
+// CHECK:      %[[CONV:.+]] = linalg.conv_2d_nchw_fchw {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
+// CHECK-SAME:   ins(%[[PAD0]], %[[PAD1]] : tensor<2x16x130x130xf16>, tensor<320x16x3x3xf16>)
+// CHECK-SAME:   outs(%[[ARG2]] : tensor<2x320x128x128xf32>)
+// CHECK:      return %[[CONV]] : tensor<2x320x128x128xf32>
+
+// CONVOLUTION:      tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 12, 0, 0]
+// CONVOLUTION:      tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 12, 0, 0]
+
+// CONTRACT-NOT:     tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 12, 0, 0]
+// CONTRACT-NOT:     tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 12, 0, 0]
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+
+// CHECK-LABEL: func.func @conv_generic_nhwc_fhwc(
+// CHECK-SAME:    %[[ARG0:.+]]: tensor<2x130x130x4xf16>,
+// CHECK-SAME:    %[[ARG1:.+]]: tensor<320x3x3x4xf16>,
+// CHECK-SAME:    %[[ARG2:.+]]: tensor<2x128x128x320xf32>)
+func.func @conv_generic_nhwc_fhwc(%arg0: tensor<2x130x130x4xf16>, %arg1: tensor<320x3x3x4xf16>, %arg2: tensor<2x128x128x320xf32>) -> tensor<2x128x128x320xf32> {
+  %1 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<2x130x130x4xf16>, tensor<320x3x3x4xf16>) outs(%arg2 : tensor<2x128x128x320xf32>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f32):
+    %2 = arith.extf %in : f16 to f32
+    %3 = arith.extf %in_0 : f16 to f32
+    %4 = arith.mulf %2, %3 : f32
+    %5 = arith.addf %out, %4 : f32
+    linalg.yield %5 : f32
+  } -> tensor<2x128x128x320xf32>
+  return %1 : tensor<2x128x128x320xf32>
+}
+
+// CHECK:      %[[CST0:.+]] = arith.constant 0.0{{.*}} : f16
+// CHECK:      %[[PAD0:.+]] = tensor.pad %[[ARG0]] low[0, 0, 0, 0] high[0, 0, 0, 12]
+// CHECK:        tensor.yield %[[CST0]] : f16
+// CHECK-NEXT:   tensor<2x130x130x4xf16> to tensor<2x130x130x16xf16>
+// CHECK:      %[[PAD1:.+]] = tensor.pad %[[ARG1]] low[0, 0, 0, 0] high[0, 0, 0, 12]
+// CHECK:        tensor<320x3x3x4xf16> to tensor<320x3x3x16xf16>
+// CHECK:      %[[CONV:.+]] = linalg.generic
+// CHECK-SAME:   indexing_maps = [#map, #map1, #map2],
+// CHECK-SAME:   ins(%[[PAD0]], %[[PAD1]] : tensor<2x130x130x16xf16>, tensor<320x3x3x16xf16>)
+// CHECK-SAME:   outs(%[[ARG2]] : tensor<2x128x128x320xf32>)
+// CHECK:      return %[[CONV]] : tensor<2x128x128x320xf32>
+
+// CONVOLUTION:      tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 0, 0, 12]
+// CONVOLUTION:      tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 0, 0, 12]
+
+// CONTRACT-NOT:     tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 0, 0, 12]
+// CONTRACT-NOT:     tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 0, 0, 12]
+
+// -----
+
 // CHECK-LABEL: func.func @main1(
 // CHECK-SAME:    %[[ARG0:.+]]: tensor<2x130x130x320xf16>,
 // CHECK-SAME:    %[[ARG1:.+]]: tensor<3x3x320x4xf16>,
