@@ -884,7 +884,7 @@ util.func public @tensor_dispatch_with_unknown_and_serialized_encodings(%arg0: !
 
 #unknown_encoding = #iree_encoding.unknown_encoding
 #encoding = #iree_encoding.testing_encoding<>
-#executable_target_a = #hal.executable.target<"target_a", "abc", {encoding = #iree_encoding.unspecialized_encoding<123>}>
+#executable_target_a = #hal.executable.target<"target_a", "abc", {iree.encoding.resolver = #iree_encoding.unspecialized_encoding<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_a]> : !hal.device
 util.global private @device_a = #device_target_local_0_
 stream.executable private @executable {
