@@ -139,6 +139,17 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       llvm::cl::desc("Dumps IR at the end of each compilation phase to the "
                      "given directory."));
 
+  llvm::cl::opt<std::string> dumpCrashReproducersTo(
+      "dump-crash-reproducers-to",
+      llvm::cl::desc("Generate a .mlir reproducer file at the given output "
+                     "path if the pass manager crashes or fails"),
+      llvm::cl::init(""));
+  llvm::cl::opt<bool> dumpLocalCrashReproducers(
+      "dump-local-crash-reproducers",
+      llvm::cl::desc("When generating a crash reproducer, generate the "
+                     "smallest possible pass pipeline possible."),
+      llvm::cl::init(false));
+
   llvm::cl::opt<bool> emitMLIRBytecode(
       "emit-mlir-bytecode",
       llvm::cl::desc(
@@ -227,6 +238,16 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     return 1;
   }
 
+  // Open crash reproducer files.
+  iree_compiler_output_t *reproducer = nullptr;
+  if (!dumpCrashReproducersTo.empty()) {
+    if (auto error = ireeCompilerOutputOpenFile(dumpCrashReproducersTo.c_str(),
+                                                &reproducer)) {
+      s.handleError(error);
+      return 1;
+    }
+  }
+
   auto processBuffer = [&](iree_compiler_source_t *source) -> bool {
     // Stash per-invocation state in an RAII instance.
     struct InvState {
@@ -235,6 +256,16 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       iree_compiler_invocation_t *inv;
     };
     InvState r(s);
+
+    auto onCrashCallback = [](iree_compiler_output_t **output,
+                              void *userData) -> iree_compiler_error_t * {
+      iree_compiler_output_t *reproOutput =
+          static_cast<iree_compiler_output_t *>(userData);
+      *output = reproOutput;
+      return nullptr;
+    };
+    ireeCompilerInvocationSetCrashHandler(r.inv, dumpLocalCrashReproducers,
+                                          onCrashCallback, reproducer);
 
     ireeCompilerInvocationEnableConsoleDiagnostics(r.inv);
     ireeCompilerInvocationSetCompileFromPhase(
