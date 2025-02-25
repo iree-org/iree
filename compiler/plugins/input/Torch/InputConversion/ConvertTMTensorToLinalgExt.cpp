@@ -6,7 +6,6 @@
 
 #include <cstdint>
 #include <numeric>
-#include <iostream>
 
 #include "compiler/plugins/input/Torch/InputConversion/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -188,12 +187,9 @@ struct AttentionOpConversion
       }
     }
     auto useExp2 = op->getAttr("use_exp2");
-    if (!useExp2) {
+    if (!useExp2)
       useExp2 = rewriter.getBoolAttr(false);
-      std::cerr << "useExp2: is false"  << std::endl;
-    } else {
-      std::cerr << "useExp2: is true"  << std::endl;
-    }
+
     auto attention = rewriter.create<IREE::LinalgExt::AttentionOp>(
         loc, result.getType(), query, key, value, scale, result,
         rewriter.getAffineMapArrayAttr(indexingMaps), optionalMask);
