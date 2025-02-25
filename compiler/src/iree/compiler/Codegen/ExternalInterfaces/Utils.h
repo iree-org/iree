@@ -16,6 +16,9 @@ namespace mlir::iree_compiler::IREE {
 
 static const char kEncodingInfoAttrName[] = "encoding_info";
 
+/// Calculates the storage size in bytes for the given `type` with a layout
+/// encoding `attr`.
+/// Requirement: `attr` must implement IREE::Codegen::LayoutAttrInterface.
 Value calculateStorageSizeInBytesImpl(Attribute attr, Location loc,
                                       OpBuilder &builder, RankedTensorType type,
                                       ValueRange dynamicDims);

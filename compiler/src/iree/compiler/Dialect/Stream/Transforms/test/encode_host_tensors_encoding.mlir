@@ -332,7 +332,8 @@ util.func public @sizeof_rhs_pad_encoding_dynamic(%arg0 : index, %arg1 : index) 
 
 #encoding_layout_0 = #iree_cpu.cpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [4, 8], outerDimsPerm = [0, 1]}}>
 #encoding_layout_1 = #iree_cpu.vmvx_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [2, 16], outerDimsPerm = [0, 1]}}>
-#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], layouts = [#encoding_layout_0, #encoding_layout_1]>
+#encoding_layout_2 = #iree_gpu.gpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [128, 16], outerDimsPerm = [0, 1]}}>
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], layouts = [#encoding_layout_0, #encoding_layout_1, #encoding_layout_2]>
 util.func public @sizeof_multi_encoding_layouts(%arg0: index, %arg1: index) -> index {
   %0 = stream.tensor.sizeof tensor<?x?xf32, #encoding>{%arg0, %arg1} : index
   util.return %0 : index
@@ -342,26 +343,37 @@ util.func public @sizeof_multi_encoding_layouts(%arg0: index, %arg1: index) -> i
 // CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : index
 // CHECK-DAG:     %[[C8:.+]] = arith.constant 8 : index
 // CHECK-DAG:     %[[C16:.+]] = arith.constant 16 : index
+// CHECK-DAG:     %[[C128:.+]] = arith.constant 128 : index
 //
 // Check for the first layout.
 //
-// CHECK:         %[[CEIL_DIV_D0:.+]] = arith.ceildivsi %arg0, %[[C4]]
-// CHECK:         %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C4]]
-// CHECK:         %[[CEIL_DIV_D1:.+]] = arith.ceildivsi %arg1, %[[C8]]
-// CHECK:         %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C8]]
-// CHECK:         %[[T0:.+]] = arith.muli %[[PAD_D0]], %[[C4]]
-// CHECK:         %[[SIZE0:.+]] = arith.muli %[[T0]], %[[PAD_D1]]
+// CHECK-DAG:     %[[CEIL_DIV_D0:.+]] = arith.ceildivsi %arg0, %[[C4]]
+// CHECK-DAG:     %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C4]]
+// CHECK-DAG:     %[[CEIL_DIV_D1:.+]] = arith.ceildivsi %arg1, %[[C8]]
+// CHECK-DAG:     %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C8]]
+// CHECK-DAG:     %[[T0:.+]] = arith.muli %[[PAD_D0]], %[[C4]]
+// CHECK-DAG:     %[[SIZE0:.+]] = arith.muli %[[T0]], %[[PAD_D1]]
 //
-// Check for the first layout.
+// Check for the second layout.
 //
-// CHECK:         %[[CEIL_DIV_D0:.+]] = arith.ceildivsi %arg0, %[[C2]]
-// CHECK:         %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C2]]
-// CHECK:         %[[CEIL_DIV_D1:.+]] = arith.ceildivsi %arg1, %[[C16]]
-// CHECK:         %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C16]]
-// CHECK:         %[[T1:.+]] = arith.muli %[[PAD_D0]], %[[C4]]
-// CHECK:         %[[SIZE1:.+]] = arith.muli %[[T1]], %[[PAD_D1]]
+// CHECK-DAG:     %[[CEIL_DIV_D0:.+]] = arith.ceildivsi %arg0, %[[C2]]
+// CHECK-DAG:     %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C2]]
+// CHECK-DAG:     %[[CEIL_DIV_D1:.+]] = arith.ceildivsi %arg1, %[[C16]]
+// CHECK-DAG:     %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C16]]
+// CHECK-DAG:     %[[T1:.+]] = arith.muli %[[PAD_D0]], %[[C4]]
+// CHECK-DAG:     %[[SIZE1:.+]] = arith.muli %[[T1]], %[[PAD_D1]]
+//
+// Check for the third layout.
+//
+// CHECK-DAG:     %[[CEIL_DIV_D0:.+]] = arith.ceildivsi %arg0, %[[C128]]
+// CHECK-DAG:     %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C128]]
+// CHECK-DAG:     %[[CEIL_DIV_D1:.+]] = arith.ceildivsi %arg1, %[[C16]]
+// CHECK-DAG:     %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C16]]
+// CHECK-DAG:     %[[T2:.+]] = arith.muli %[[PAD_D0]], %[[C4]]
+// CHECK-DAG:     %[[SIZE2:.+]] = arith.muli %[[T2]], %[[PAD_D1]]
 //
 // Return the max value.
 //
-// CHECK:         %[[RES:.+]] = arith.maxui %[[SIZE0]], %[[SIZE1]]
+// CHECK-DAG:     %[[RES_0_1:.+]] = arith.maxui %[[SIZE0]], %[[SIZE1]]
+// CHECK-DAG:     %[[RES:.+]] = arith.maxui %[[RES_0_1]], %[[SIZE2]]
 // CHECK:         return %[[RES]]
