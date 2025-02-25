@@ -186,10 +186,14 @@ struct AttentionOpConversion
         map = map.insertResult(rewriter.getAffineDimExpr(batch), batch);
       }
     }
+    auto useExp2 = op->getAttr("use_exp2");
+    if (!useExp2)
+      useExp2 = rewriter.getBoolAttr(false);
 
     auto attention = rewriter.create<IREE::LinalgExt::AttentionOp>(
         loc, result.getType(), query, key, value, scale, result,
         rewriter.getAffineMapArrayAttr(indexingMaps), optionalMask);
+    attention->setAttr("use_exp2", useExp2);
 
     {
       auto *block = rewriter.createBlock(&attention.getRegion());
