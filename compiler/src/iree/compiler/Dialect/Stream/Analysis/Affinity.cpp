@@ -737,11 +737,19 @@ ChangeStatus OpAffinityPVS::updateOperation(Operation *op,
       }
     }
   } else {
-    for (auto result : op->getResults()) {
-      if (isa<IREE::Stream::AffinityTypeInterface>(result.getType())) {
-        auto valuePVS = solver.getElementFor<ValueConsumerAffinityPVS>(
-            *this, Position::forValue(result), DFX::Resolution::REQUIRED);
-        newState ^= valuePVS;
+    // If the op prefers being cloned to consumers then we don't really care
+    // what the consumer affinity is: we'll be cloned to them later on
+    // (probably).
+    auto streamableOp = dyn_cast<IREE::Stream::StreamableOpInterface>(op);
+    const bool preferCloneToConsumers =
+        streamableOp ? streamableOp.preferCloneToConsumers() : false;
+    if (!preferCloneToConsumers) {
+      for (auto result : op->getResults()) {
+        if (isa<IREE::Stream::AffinityTypeInterface>(result.getType())) {
+          auto valuePVS = solver.getElementFor<ValueConsumerAffinityPVS>(
+              *this, Position::forValue(result), DFX::Resolution::REQUIRED);
+          newState ^= valuePVS;
+        }
       }
     }
   }
@@ -868,6 +876,13 @@ AffinityAnalysis::lookupExecutionAffinity(Operation *op) {
   }
   if (affinities.size() == 1) {
     return affinities.front();
+  }
+  if (auto streamableOp = dyn_cast<IREE::Stream::StreamableOpInterface>(op)) {
+    // If the op is cloneable then we don't give it an explicit affinity and
+    // allow it to be cloned to wherever it is use.
+    if (streamableOp.preferCloneToConsumers()) {
+      return {};
+    }
   }
   return trySelectLeadAffinity(affinities);
 }
