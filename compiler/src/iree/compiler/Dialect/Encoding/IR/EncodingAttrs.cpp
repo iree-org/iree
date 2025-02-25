@@ -254,6 +254,21 @@ Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
 }
 
 //===---------------------------------------------------------------------===//
+// encoding.nop_encoding
+//===---------------------------------------------------------------------===//
+
+Attribute NopEncodingAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
+  return *this;
+}
+
+Attribute NopEncodingAttr::getLayout(RankedTensorType type) const {
+  MLIRContext *ctx = getContext();
+  SmallVector<int32_t> zeros(type.getRank(), 0);
+  return Encoding::PadEncodingLayoutAttr::get(
+      ctx, DenseI32ArrayAttr::get(ctx, zeros));
+}
+
+//===---------------------------------------------------------------------===//
 // encoding.unsupported_encoding
 //===---------------------------------------------------------------------===//
 
