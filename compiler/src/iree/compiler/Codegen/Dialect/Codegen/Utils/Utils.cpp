@@ -280,13 +280,13 @@ getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape) {
   return result;
 }
 
-MaterializeEncodingInfo
+FailureOr<MaterializeEncodingInfo>
 getEncodingInfoForMatmul(Encoding::EncodingAttr encoding, TileMxNxK tileMxNxK) {
   MaterializeEncodingInfo encodingInfo;
   FailureOr<linalg::ContractionDimensions> cDims =
       getEncodingContractionDims(encoding);
   if (failed(cDims)) {
-    return encodingInfo;
+    return failure();
   }
   // The following expects M, N, K, and Batch sizes of at most 1 for now
   assert(cDims->m.size() <= 1 && cDims->n.size() <= 1 && cDims->k.size() == 1 &&

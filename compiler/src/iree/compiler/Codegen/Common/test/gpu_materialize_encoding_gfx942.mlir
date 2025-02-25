@@ -1224,3 +1224,33 @@ func.func @set_encoding_with_layout() attributes {
 //  CHECK-SAME:     inner_tiles = [128, 16]
 //  CHECK-SAME:     tensor<255x513xf32> -> tensor<2x33x128x16xf32>
 //       CHECK:   flow.dispatch.tensor.store %[[PACK]], %[[RESULT_BINDING]]
+
+// -----
+
+//------------------------------------------------------------------------------
+// Negative tests. The pass should do nothing for these cases.
+//------------------------------------------------------------------------------
+
+// This test ensures that no side-effects happen/errors are thrown in case of
+// missing encoding information like indexing maps.
+
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @missing_user_indexing_maps() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<255x513xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<255x513xf32, #encoding>>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<255x513xf32>> -> tensor<255x513xf32>
+  %3 = iree_encoding.set_encoding %2 : tensor<255x513xf32> -> tensor<255x513xf32, #encoding>
+  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : tensor<255x513xf32, #encoding> -> !flow.dispatch.tensor<writeonly:tensor<255x513xf32,  #encoding>>
+  return
+}
+
+// CHECK-LABEL: func.func @missing_user_indexing_maps
+// CHECK-DAG:     %[[LOAD_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(0)
+// CHECK-DAG:     %[[STORE_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(1)
+// CHECK-DAG:     %[[LOAD:.+]] = flow.dispatch.tensor.load %[[LOAD_BINDING]]{{.+}} -> tensor<255x513xf32>
+// CHECK-DAG:     flow.dispatch.tensor.store %[[LOAD]], %[[STORE_BINDING]]
