@@ -22,6 +22,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Transforms/IPO/Internalize.h"
+#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
 
@@ -116,24 +117,24 @@ static void overridePlatformGlobal(llvm::Module *module, StringRef globalName,
 }
 
 LogicalResult setHIPGlobals(Location loc, llvm::Module *module,
-                            StringRef targetChip) {
-  // TODO: This should be updated to use `amdgpu::Chipset`.
-  // Link target chip ISA version as global.
-  const int kLenOfChipPrefix = 3;
-  StringRef chipId = targetChip.substr(kLenOfChipPrefix);
-  int major = 0;
-  int minor = 0;
-  if (chipId.drop_back(2).getAsInteger(10, major))
-    return failure();
-  if (chipId.take_back(2).getAsInteger(16, minor))
-    return failure();
+                            StringRef targetChip, bool isWave64) {
+  FailureOr<amdgpu::Chipset> maybeChipset = amdgpu::Chipset::parse(targetChip);
+  if (failed(maybeChipset)) {
+    return emitError(loc, "unparsable chipset: " + Twine(targetChip));
+  }
+  auto chipset = *maybeChipset;
   // Oldest GFX arch supported is gfx60x.
-  if (major < 6)
-    return failure();
+  if (chipset.majorVersion < 6) {
+    return emitError(loc, "pre-gfx6 chipsets are not supported");
+  }
   // Latest GFX arch supported is gfx120x.
-  if (major > 12 || (major == 12 && minor > 0xf))
-    return failure();
-  int chipCode = major * 1000 + minor;
+  if (chipset.majorVersion > 12 ||
+      (chipset.majorVersion == 12 && chipset.minorVersion > 0))
+    return emitError(
+        loc, "the chipset " + Twine(targetChip) +
+                 " was not known to exist at the time this IREE was built");
+  int chipCode = chipset.majorVersion * 1000 + chipset.minorVersion * 16 +
+                 chipset.steppingVersion;
   auto *int32Type = llvm::Type::getInt32Ty(module->getContext());
   overridePlatformGlobal(module, "__oclc_ISA_version", chipCode, int32Type);
 
@@ -143,12 +144,12 @@ LogicalResult setHIPGlobals(Location loc, llvm::Module *module,
       {{"__oclc_finite_only_opt", false},
        {"__oclc_daz_opt", false},
        {"__oclc_correctly_rounded_sqrt32", true},
-       {"__oclc_unsafe_math_opt", false},
-       {"__oclc_wavefrontsize64", true}});
+       {"__oclc_unsafe_math_opt", false}});
   for (auto &globalParam : rocdlGlobalParams) {
     overridePlatformGlobal(module, globalParam.first, globalParam.second,
                            boolType);
   }
+  overridePlatformGlobal(module, "__oclc_wavefrontsize64", isWave64, boolType);
 
   return success();
 }

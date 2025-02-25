@@ -496,12 +496,14 @@ public:
         opt.GlobalISelAbort = options.globalISel
                                   ? llvm::GlobalISelAbortMode::Enable
                                   : llvm::GlobalISelAbortMode::Disable;
+        bool isWave64 = true;
         SmallVector<std::string> features;
         if (targetArch.starts_with("gfx10") ||
             targetArch.starts_with("gfx11") ||
             targetArch.starts_with("gfx12")) {
           switch (subgroupSize.value_or(64)) {
           case 32:
+            isWave64 = false;
             features.emplace_back("+wavefrontsize32");
             break;
           default:
@@ -581,8 +583,8 @@ public:
       }
 
       // Sets HIP platform globals based on the target architecture.
-      if (failed(setHIPGlobals(variantOp.getLoc(), llvmModule.get(),
-                               targetArch))) {
+      if (failed(setHIPGlobals(variantOp.getLoc(), llvmModule.get(), targetArch,
+                               isWave64))) {
         return failure();
       }
 
