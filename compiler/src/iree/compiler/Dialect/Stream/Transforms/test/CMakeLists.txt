@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "annotate_affinities.mlir"
     "annotate_dispatch_arguments.mlir"
     "annotate_dispatch_assumptions.mlir"
+    "clone_to_consumers.mlir"
     "convert_to_stream.mlir"
     "dump_statistics.mlir"
     "elide_async_copies.mlir"

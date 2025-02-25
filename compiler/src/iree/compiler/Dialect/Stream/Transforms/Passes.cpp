@@ -92,6 +92,16 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // Conversion
   //----------------------------------------------------------------------------
 
+  // TODO(benvanik): cache the affinity analysis - if this pass does nothing (or
+  // once it converges) the analysis will be usable by AnnotateAffinities and
+  // ConvertToStream.
+  //
+  // Clone operations to consumers when the operations opt-in to such behavior.
+  //
+  // NOTE: CSE must not be run between this and ConvertToStream - doing so will
+  // undo the clones.
+  passManager.addPass(IREE::Stream::createCloneToConsumersPass());
+
   // Annotate all ops/resources with the analyzed affinities.
   // This should have no behavioral changes during conversion but allows for
   // debugging of analysis errors in end-user tooling.

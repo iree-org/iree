@@ -1961,6 +1961,8 @@ LogicalResult TensorCloneOp::verify() {
   return success();
 }
 
+bool TensorCloneOp::preferCloneToConsumers() { return true; }
+
 //===----------------------------------------------------------------------===//
 // stream.tensor.encode
 //===----------------------------------------------------------------------===//
@@ -2790,6 +2792,16 @@ void AsyncDispatchOp::getAsyncAccessRanges(
     ranges.push_back({ResourceAccessBitfield::Write, result, Value{},
                       resultSize, resultSize});
   }
+}
+
+bool AsyncDispatchOp::preferCloneToConsumers() {
+  // If the dispatch does not consume any resources then it is effectively a
+  // slow splat and should be treated like one.
+  const bool consumesAny = llvm::any_of(
+      getResourceOperands(), +[](Value operand) {
+        return isa<IREE::Stream::AffinityTypeInterface>(operand.getType());
+      });
+  return !consumesAny;
 }
 
 //===----------------------------------------------------------------------===//
