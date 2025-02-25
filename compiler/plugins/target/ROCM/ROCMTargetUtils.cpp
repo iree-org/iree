@@ -117,12 +117,7 @@ static void overridePlatformGlobal(llvm::Module *module, StringRef globalName,
 }
 
 LogicalResult setHIPGlobals(Location loc, llvm::Module *module,
-                            StringRef targetChip, bool isWave64) {
-  FailureOr<amdgpu::Chipset> maybeChipset = amdgpu::Chipset::parse(targetChip);
-  if (failed(maybeChipset)) {
-    return emitError(loc, "unparsable chipset: " + Twine(targetChip));
-  }
-  auto chipset = *maybeChipset;
+                            const amdgpu::Chipset &chipset, bool isWave64) {
   // Oldest GFX arch supported is gfx60x.
   if (chipset.majorVersion < 6) {
     return emitError(loc, "pre-gfx6 chipsets are not supported");
@@ -130,9 +125,10 @@ LogicalResult setHIPGlobals(Location loc, llvm::Module *module,
   // Latest GFX arch supported is gfx120x.
   if (chipset.majorVersion > 12 ||
       (chipset.majorVersion == 12 && chipset.minorVersion > 0))
-    return emitError(
-        loc, "the chipset " + Twine(targetChip) +
-                 " was not known to exist at the time this IREE was built");
+    return emitError(loc)
+           << "a chipset with major version = " << chipset.majorVersion
+           << " and minor version = " << chipset.minorVersion
+           << " was not known to exist at the time this IREE was built";
   int chipCode = chipset.majorVersion * 1000 + chipset.minorVersion * 16 +
                  chipset.steppingVersion;
   auto *int32Type = llvm::Type::getInt32Ty(module->getContext());
