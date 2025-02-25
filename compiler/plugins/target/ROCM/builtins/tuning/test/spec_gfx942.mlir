@@ -94,7 +94,7 @@ hal.executable public @main {
         %cst = arith.constant 1.250000e-01 : f16
         %output = tensor.empty() : tensor<2x10x4096x64xf16>
 
-        // Apply the attention operation directly to function inputs
+        // Apply the attention operation directly to function inputs.
         %result = iree_linalg_ext.attention {
             indexing_maps = [#map, #map1, #map2, #map3, #map4]
         } ins(%query, %key, %value, %cst :
@@ -149,7 +149,7 @@ hal.executable public @main {
         %cst = arith.constant 1.250000e-01 : f16
         %output = tensor.empty() : tensor<3x10x4096x64xf16>
 
-        // Apply the attention operation directly to function inputs
+        // Apply the attention operation directly to function inputs.
         %result = iree_linalg_ext.attention {
             indexing_maps = [#map, #map1, #map2, #map3, #map4]
         } ins(%query, %key, %value, %cst :
