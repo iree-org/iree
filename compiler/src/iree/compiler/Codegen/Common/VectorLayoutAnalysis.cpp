@@ -212,7 +212,8 @@ ChangeResult DistributionLayout::resolveWithPossibleConflict(
   // Handle case where constantOp may have multiple consumers with different
   // layouts by creating a copy of constOp for other users.
   if (!opOperand.get().hasOneUse() &&
-      llvm::isa_and_nonnull<arith::ConstantOp, vector::StepOp>(
+      llvm::isa_and_nonnull<arith::ConstantOp, vector::StepOp,
+                            vector::CreateMaskOp>(
           opOperand.get().getDefiningOp())) {
     builder.setInsertionPoint(opOperand.get().getDefiningOp());
     Operation *copiedConstOp = builder.clone(*opOperand.get().getDefiningOp());
@@ -556,6 +557,24 @@ static void propagateLayoutToContractionOp(
   // True to resolve result with init.
   ChangeResult changed = result->resolve(init);
   update(result, changed);
+  if (changed == ChangeResult::Change) {
+    return;
+  }
+
+  // Get the operand value of the contraction.
+  const DistributionLayout *lhs = operandLattices[0];
+  const DistributionLayout *rhs = operandLattices[1];
+  if (!lhs->isUninitialized() && !rhs->isUninitialized()) {
+    VectorLayoutInterface lhsLayout = lhs->getLayout();
+    VectorLayoutInterface rhsLayout = rhs->getLayout();
+    AffineMap lhsMap = contraction.getIndexingMapsArray()[0];
+    AffineMap rhsMap = contraction.getIndexingMapsArray()[1];
+    AffineMap resMap = contraction.getIndexingMapsArray()[2];
+    VectorLayoutInterface inferredResLayout = lhsLayout.getRecombinedLayout(
+        {lhsLayout, rhsLayout}, {lhsMap, rhsMap}, resMap);
+    ChangeResult changed = result->resolve(inferredResLayout);
+    update(result, changed);
+  }
 }
 
 static void propagateLayoutToGatherOp(
@@ -1006,6 +1025,37 @@ void PropagateLayout::visitMaskOp(
       update(result, changed);
     }
   }
+
+  mask.getBody()->walk([&](Operation *op) {
+    if (vector::ContractionOp contract = dyn_cast<vector::ContractionOp>(op)) {
+      const DistributionLayout *lhs = getLatticeElement(contract.getLhs());
+      const DistributionLayout *rhs = getLatticeElement(contract.getRhs());
+      if (!lhs->isUninitialized() && !rhs->isUninitialized()) {
+        SmallVector<VectorLayoutInterface> layouts{lhs->getLayout(),
+                                                   rhs->getLayout()};
+        SmallVector<AffineMap> maps{contract.getIndexingMapsArray()[0],
+                                    contract.getIndexingMapsArray()[1]};
+        AffineMap domainIdentity = AffineMap::getMultiDimIdentityMap(
+            maps[0].getNumDims(), contract.getContext());
+        VectorLayoutInterface inferredMaskLayout =
+            layouts[0].getRecombinedLayout(layouts, maps, domainIdentity);
+        DistributionLayout *maskLayout = getLatticeElement(mask.getMask());
+        ChangeResult changed = maskLayout->resolveWithPossibleConflict(
+            inferredMaskLayout, mask->getOpOperand(0));
+        update(maskLayout, changed);
+      }
+    }
+    if (vector::MultiDimReductionOp reduce =
+            dyn_cast<vector::MultiDimReductionOp>(op)) {
+      const DistributionLayout *src = getLatticeElement(reduce.getSource());
+      if (!src->isUninitialized()) {
+        DistributionLayout *maskLayout = getLatticeElement(mask.getMask());
+        ChangeResult changed = maskLayout->resolveWithPossibleConflict(
+            src->getLayout(), mask->getOpOperand(0));
+        update(maskLayout, changed);
+      }
+    }
+  });
 }
 
 void PropagateLayout::visitOperation(Operation *op) {

@@ -52,6 +52,12 @@ def VectorLayoutInterface : AttrInterface<"VectorLayoutInterface"> {
       /*retTy=*/"int64_t",
       /*methodName=*/"getRank",
       /*args=*/(ins)
+    >,
+    StaticInterfaceMethod<
+      /*description=*/"Given operand layouts and indexing maps, create a recombined layout for result indexing map",
+      /*retTy=*/"VectorLayoutInterface",
+      /*methodName=*/"getRecombinedLayout",
+      /*args=*/(ins "::llvm::ArrayRef<VectorLayoutInterface>":$layouts, "::llvm::ArrayRef<AffineMap>":$maps, "AffineMap":$resultMap)
     >
   ];
 }
