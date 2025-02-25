@@ -112,6 +112,31 @@ def Util_ClosureOpInterface : OpInterface<"ClosureOpInterface"> {
   ];
 }
 
+def Util_ClosureYieldOpInterface : OpInterface<"ClosureYieldOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Interface for ops that yield results from a closure. These also generally
+    implement RegionBranchTerminatorOpInterface and that should be used when
+    possible for better interoperability with upstream code. Ops that have
+    special operand handling such as shape- and size-aware ops need to use this
+    interface to provide the operand range representing the yielded values.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{Returns yielded closure result values.}],
+      /*retTy=*/"MutableOperandRange",
+      /*methodName=*/"getClosureResultsMutable",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return MutableOperandRange($_op, 0, $_op->getNumOperands());
+      }]
+    >,
+  ];
+}
+
 //===----------------------------------------------------------------------===//
 // IREE::Util::InferIntDivisibilityOpInterface
 //===----------------------------------------------------------------------===//

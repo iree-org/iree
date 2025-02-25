@@ -228,10 +228,15 @@ static void eraseStreamRegionResults(Region &region,
     auto yieldOp = dyn_cast<IREE::Stream::YieldOp>(block.getTerminator());
     if (!yieldOp)
       continue;
-    llvm::SmallVector<Value> newOperands;
+    // HACK: there's no good way of updating the operand and size together today
+    // - we should add a helper to the ClosureYieldOpInterface that checks for
+    // size/shape aware traits and does this automatically.
     for (auto i : llvm::reverse(excludedResultIndices)) {
-      yieldOp.getResourceOperandsMutable().erase(i);
-      yieldOp.getResourceOperandSizesMutable().erase(i);
+      unsigned resourceIndex = i;
+      unsigned resourceSizeIndex =
+          yieldOp.getResourceOperandsMutable().size() + i;
+      yieldOp->eraseOperand(resourceSizeIndex);
+      yieldOp->eraseOperand(resourceIndex);
     }
   }
 }
@@ -4305,6 +4310,10 @@ LogicalResult DispatchWorkgroupSizeOp::verify() {
 
 MutableOperandRange
 YieldOp::getMutableSuccessorOperands(RegionBranchPoint point) {
+  return getResourceOperandsMutable();
+}
+
+MutableOperandRange YieldOp::getClosureResultsMutable() {
   return getResourceOperandsMutable();
 }
 
