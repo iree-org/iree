@@ -19,6 +19,7 @@ iree_cc_library(
     "AnnotateAffinities.cpp"
     "AnnotateDispatchArguments.cpp"
     "AnnotateDispatchAssumptions.cpp"
+    "CloneToConsumers.cpp"
     "ConvertToStream.cpp"
     "DumpStatistics.cpp"
     "ElideAsyncCopies.cpp"
