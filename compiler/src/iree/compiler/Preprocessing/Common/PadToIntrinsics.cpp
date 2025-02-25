@@ -21,7 +21,9 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/OpDefinition.h"
 
 namespace mlir::iree_compiler::Preprocessing {
 
@@ -170,13 +172,6 @@ getIntrinsics(linalg::LinalgOp linalgOp,
 static void
 padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
           ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargets) {
-  if (!isa<linalg::ConvolutionOpInterface>(*linalgOp)) {
-    return;
-  }
-  // TODO: Handle other variants.
-  if (!isa<linalg::Conv2DNhwcHwcfOp>(linalgOp))
-    return;
-
   // Early exit if cannot find intrinsics or if multiple executable targets.
   SmallVector<GPUMatmulShapeType> intrinsics =
       getIntrinsics(linalgOp, executableTargets);
@@ -209,11 +204,10 @@ padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
 
   int64_t mDim = convolutionDims->outputImage.back();
   int64_t nDim = convolutionDims->outputChannel.front();
-  // TODO: Support NCHW convolutions. This is just a matmul_transpose_a,
-  // however the distribution patterns currently do not support that variant.
-  if (mDim > nDim) {
-    return;
-  }
+  // In NCHW convolutions, mDim > nDim and the position of the input with filter
+  // tensors will be swapped in igemm passes later.
+  bool isIGemmOperandSwapped = mDim > nDim;
+
   int64_t kDim = convolutionDims->inputChannel.front();
   int64_t mSize = bounds[mDim];
   int64_t nSize = bounds[nDim];
@@ -226,8 +220,6 @@ padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
       cast<ShapedType>(linalgOp.getDpsInputOperand(1)->get().getType())
           .getElementType();
 
-  // TODO: Generalize to other dimensions.
-  // Try to search for pad value and check only filter dimension is blocked.
   SmallVector<std::array<int64_t, 3>> mnkPaddingCandidates;
   for (const GPUMatmulShapeType &intrinsic : intrinsics) {
 
@@ -241,12 +233,17 @@ padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
       return llvm::divideCeil(value, padTo) * padTo - value;
     };
 
+    auto mIntrinsicSize =
+        isIGemmOperandSwapped ? intrinsic.nSizes[0] : intrinsic.mSizes[0];
+    auto nIntrinsicSize =
+        isIGemmOperandSwapped ? intrinsic.mSizes[0] : intrinsic.nSizes[0];
+
     if (mSize % intrinsic.mSizes[0] != 0) {
-      mPadding = getPadding(mSize, intrinsic.mSizes[0]);
+      mPadding = getPadding(mSize, mIntrinsicSize);
     }
 
     if (nSize % intrinsic.nSizes[0] != 0) {
-      nPadding = getPadding(nSize, intrinsic.nSizes[0]);
+      nPadding = getPadding(nSize, nIntrinsicSize);
     }
 
     if (kSize % intrinsic.kSizes[0] != 0) {
@@ -268,32 +265,51 @@ padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
 
   Value newInput = linalgOp.getDpsInputOperand(0)->get();
   Value newFilter = linalgOp.getDpsInputOperand(1)->get();
-  Value newOuts = linalgOp.getDpsInitOperand(0)->get();
+  Value newOutput = linalgOp.getDpsInitOperand(0)->get();
+
+  auto indexingMaps = linalgOp.getIndexingMapsArray();
+  auto inputMap = indexingMaps[0];
+  auto filterMap = indexingMaps[1];
+  auto outputMap = indexingMaps[2];
 
   Location loc = linalgOp.getLoc();
   OpFoldResult mPadding = rewriter.getIndexAttr(mnkPadding[0]);
   OpFoldResult nPadding = rewriter.getIndexAttr(mnkPadding[1]);
   OpFoldResult kPadding = rewriter.getIndexAttr(mnkPadding[2]);
   OpFoldResult zero = rewriter.getIndexAttr(0);
-  if (!isConstantIntValue(mPadding, 0) || !isConstantIntValue(kPadding, 0)) {
-    // For NHWC, the m-padding is for W and k-padding is for C
-    newInput = getPaddedValue(rewriter, loc, newInput,
-                              {zero, zero, mPadding, kPadding});
-  }
-  if (!isConstantIntValue(nPadding, 0) || !isConstantIntValue(kPadding, 0)) {
-    // For HWCF, the n-padding is for F and k-padding is for C
-    newFilter = getPaddedValue(rewriter, loc, newFilter,
-                               {zero, zero, kPadding, nPadding});
-  }
-  if (!isConstantIntValue(mPadding, 0) || !isConstantIntValue(nPadding, 0)) {
-    // For output, the m-padding is for W and k-padding is for F
-    newOuts = getPaddedValue(rewriter, loc, newOuts,
-                             {zero, zero, mPadding, nPadding});
-  }
+
+  auto createExprToIdMap = [](AffineMap map) {
+    llvm::SmallDenseMap<AffineExpr, unsigned> exprToIdMap;
+    for (unsigned i = 0; i < map.getNumResults(); ++i) {
+      exprToIdMap[map.getResult(i)] = i;
+    }
+    return exprToIdMap;
+  };
+
+  auto applyPadding = [&](AffineMap map, OpFoldResult padding1,
+                          OpFoldResult padding2, unsigned dim1, unsigned dim2,
+                          Value &paddingTarget) {
+    if (!isConstantIntValue(padding1, 0) || !isConstantIntValue(padding2, 0)) {
+      llvm::SmallDenseMap<AffineExpr, unsigned> exprToIdMap =
+          createExprToIdMap(map);
+      auto id1 = exprToIdMap[getAffineDimExpr(dim1, map.getContext())];
+      auto id2 = exprToIdMap[getAffineDimExpr(dim2, map.getContext())];
+
+      llvm::SmallVector<OpFoldResult> paddingValues(4, zero);
+      paddingValues[id1] = padding1;
+      paddingValues[id2] = padding2;
+      paddingTarget =
+          getPaddedValue(rewriter, loc, paddingTarget, paddingValues);
+    }
+  };
+
+  applyPadding(inputMap, mPadding, kPadding, mDim, kDim, newInput);
+  applyPadding(filterMap, nPadding, kPadding, nDim, kDim, newFilter);
+  applyPadding(outputMap, mPadding, nPadding, mDim, nDim, newOutput);
 
   linalg::LinalgOp paddedConv2dOp =
-      mlir::clone(rewriter, linalgOp, {newOuts.getType()},
-                  ArrayRef<Value>{newInput, newFilter, newOuts});
+      mlir::clone(rewriter, linalgOp, {newOutput.getType()},
+                  ArrayRef<Value>{newInput, newFilter, newOutput});
   // Extract slice.
   IntegerAttr one = rewriter.getI64IntegerAttr(1);
   SmallVector<OpFoldResult> offsets(4, zero);
@@ -562,8 +578,7 @@ void PadToIntrinsicsPass::runOnOperation() {
   SmallVector<linalg::LinalgOp> targetContractOps;
   for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
     funcOp.walk([&](linalg::LinalgOp linalgOp) {
-      if (isa<linalg::Conv2DNhwcHwcfOp>(linalgOp.getOperation()) &&
-          padConvOps) {
+      if (linalg::isaConvolutionOpInterface(linalgOp) && padConvOps) {
         targetConvOps.push_back(linalgOp);
       } else if (isa<linalg::BatchMatmulOp, linalg::MatmulOp,
                      linalg::MatmulTransposeBOp>(linalgOp.getOperation()) &&
