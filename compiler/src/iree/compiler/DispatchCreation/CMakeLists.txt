@@ -41,6 +41,7 @@ iree_cc_library(
     "SplitReduction.cpp"
     "TensorPadToTensorInsertSlice.cpp"
     "TransposeGenericOps.cpp"
+    "WrapEncodingOpInDispatchRegion.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
