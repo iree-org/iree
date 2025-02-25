@@ -20,7 +20,7 @@
 
 static llvm::cl::opt<bool> clEnableBlockedMatmuls(
     "iree-codegen-block-dynamic-dimensions-of-contractions",
-    llvm::cl::desc("developer flag to gaurd blocking dynamic dimensions of "
+    llvm::cl::desc("developer flag to guard blocking dynamic dimensions of "
                    "contraction-like ops"),
     llvm::cl::Hidden, llvm::cl::init(true));
 
@@ -294,6 +294,7 @@ blockDynamicDimensions(RewriterBase &rewriter,
       .Case<IREE::LinalgExt::AttentionOp>([&](auto attentionOp) {
         return blockDynamicDimensions(rewriter, dynamicDimAnalysis,
                                       attentionOp);
+        return success();
       })
       .Case<linalg::LinalgOp>([&](auto linalgOp) {
         if (clEnableBlockedMatmuls) {
@@ -315,6 +316,13 @@ void BlockDynamicDimensionsPass::runOnOperation() {
   IRRewriter rewriter(context);
   auto walkResult = operation->walk([&](Operation *op) -> WalkResult {
     rewriter.setInsertionPoint(op);
+    // If lowering config is set, changing the dimensionality of
+    // of the op will break the mapping. Therefore, skip operations
+    // that has lowering config set.
+    if (op->hasAttrOfType<IREE::Codegen::LoweringConfigAttrInterface>(
+            "lowering_config")) {
+      return success();
+    }
     return blockDynamicDimensions(rewriter, dynamicDimAnalysis, op);
   });
   if (walkResult.wasInterrupted()) {

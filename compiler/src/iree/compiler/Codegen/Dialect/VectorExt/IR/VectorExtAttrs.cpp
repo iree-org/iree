@@ -270,6 +270,64 @@ NestedLayoutAttr NestedLayoutAttr::get(MLIRContext *context,
                                threadStrides);
 }
 
+NestedLayoutAttr NestedLayoutAttr::get(
+    MLIRContext *context, ArrayRef<NestedLayoutAttr> operandLayouts,
+    ArrayRef<AffineMap> operandIndexingMaps, AffineMap resultMap) {
+  int64_t resRank = resultMap.getNumResults();
+  SmallVector<int64_t> subgroupTile(resRank, 0);
+  SmallVector<int64_t> batchTile(resRank, 0);
+  SmallVector<int64_t> outerTile(resRank, 0);
+  SmallVector<int64_t> threadTile(resRank, 0);
+  SmallVector<int64_t> elementTile(resRank, 0);
+  SmallVector<int64_t> subgroupStrides(resRank, 0);
+  SmallVector<int64_t> threadStrides(resRank, 0);
+
+  for (auto [layout, indexingMap] :
+       llvm::zip(operandLayouts, operandIndexingMaps)) {
+
+    for (int64_t resultIdx : llvm::seq<int64_t>(indexingMap.getNumResults())) {
+      int64_t iterSpacePos = indexingMap.getDimPosition(resultIdx);
+      std::optional<unsigned int> mayBeResultPos =
+          resultMap.getResultPosition(getAffineDimExpr(iterSpacePos, context));
+      if (!mayBeResultPos.has_value()) {
+        continue;
+      }
+      int64_t resultPos = mayBeResultPos.value();
+      subgroupTile[resultPos] = layout.getSubgroupTile()[resultIdx];
+      batchTile[resultPos] = layout.getBatchTile()[resultIdx];
+      outerTile[resultPos] = layout.getOuterTile()[resultIdx];
+      threadTile[resultPos] = layout.getThreadTile()[resultIdx];
+      elementTile[resultPos] = layout.getElementTile()[resultIdx];
+
+      subgroupStrides[resultPos] = layout.getSubgroupStrides()[resultIdx];
+      threadStrides[resultPos] = layout.getThreadStrides()[resultIdx];
+    }
+  }
+
+  return NestedLayoutAttr::get(context, subgroupTile, batchTile, outerTile,
+                               threadTile, elementTile, subgroupStrides,
+                               threadStrides);
+}
+
+VectorLayoutInterface
+NestedLayoutAttr::getRecombinedLayout(ArrayRef<VectorLayoutInterface> layouts,
+                                      ArrayRef<AffineMap> maps,
+                                      AffineMap resultMap) {
+  if (llvm::any_of(layouts, [](VectorLayoutInterface layout) {
+        return !mlir::isa<NestedLayoutAttr>(layout);
+      })) {
+    return NestedLayoutAttr();
+  }
+
+  SmallVector<NestedLayoutAttr> nestedLayouts;
+  llvm::transform(layouts, std::back_inserter(nestedLayouts),
+                  [&](VectorLayoutInterface layout) {
+                    return mlir::cast<NestedLayoutAttr>(layout);
+                  });
+  return NestedLayoutAttr::get(resultMap.getContext(), nestedLayouts, maps,
+                               resultMap);
+}
+
 LogicalResult NestedLayoutAttr::verify(
     llvm::function_ref<InFlightDiagnostic()> emitError,
     ArrayRef<int64_t> subgroupTile, ArrayRef<int64_t> batchTile,
