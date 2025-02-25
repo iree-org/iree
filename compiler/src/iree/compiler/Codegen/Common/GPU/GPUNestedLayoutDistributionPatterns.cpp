@@ -701,12 +701,7 @@ struct DistributeMultiReduction final
     // in doing this because it does a select much later in a finer granularity
     // rather than supporting predication. Moreover, since we are doing a select
     // to cater reductions accross the distribution, we can choose not to mask
-    // the op post-distribution. if (mask) {
-    //   localReduction =
-    //       vector::maskOperation(rewriter, localReduction.getDefiningOp(),
-    //       mask)
-    //           ->getResult(0);
-    // }
+    // the op post-distribution.
 
     VectorValue locallyReduced;
     if (accVector) {
@@ -1121,13 +1116,6 @@ struct DistributeContract final
     // rather than supporting predication. Moreover, since we are doing a select
     // to cater reductions accross the distribution, we can choose not to mask
     // the op post-distribution.
-
-    // if (mask) {
-    //   localContract =
-    //       vector::maskOperation(rewriter, localContract.getDefiningOp(),
-    //       mask)
-    //           ->getResult(0);
-    // }
 
     VectorValue localContractValue;
     if (accVector) {

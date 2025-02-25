@@ -554,10 +554,10 @@ static void propagateLayoutToContractionOp(
     return;
   }
 
-  if (!init->isUninitialized()) {
-    // True to resolve result with init.
-    ChangeResult changed = result->resolve(init);
-    update(result, changed);
+  // True to resolve result with init.
+  ChangeResult changed = result->resolve(init);
+  update(result, changed);
+  if (changed == ChangeResult::Change) {
     return;
   }
 
