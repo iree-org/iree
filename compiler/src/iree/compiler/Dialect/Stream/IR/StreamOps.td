@@ -4363,6 +4363,9 @@ def Stream_YieldOp : Stream_Op<"yield", [
   DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface>,
   Terminator,
   SameVariadicOperandSize,
+  DeclareOpInterfaceMethods<Util_ClosureYieldOpInterface, [
+    "getClosureResultsMutable",
+  ]>,
   Util_SizeAwareOp,
 ]> {
   let summary = [{yields stream values from an execution region}];
