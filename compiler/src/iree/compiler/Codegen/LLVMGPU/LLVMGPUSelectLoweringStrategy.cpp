@@ -39,18 +39,25 @@ public:
 
 /// Verify that valid configuration is set for all ops within the compiled
 /// module.
-template <typename F>
+template <typename ConfigTy>
 static LogicalResult
 verifyLoweringConfiguration(FunctionOpInterface funcOp,
                             IREE::Codegen::TranslationInfoAttr translationInfo,
-                            ArrayRef<int64_t> workgroupSize, F verificationFn) {
+                            ArrayRef<int64_t> workgroupSize) {
   auto walkResult = funcOp.walk([&](Operation *op) -> WalkResult {
-    auto loweringConfig =
-        getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op);
+    auto loweringConfig = getLoweringConfig<ConfigTy>(op);
     if (!loweringConfig)
       return WalkResult::advance();
-    return verificationFn(op, loweringConfig, translationInfo, workgroupSize);
+
+    // Calls the correct overloaded function based on ConfigTy.
+    if constexpr (std::is_same_v<ConfigTy, IREE::GPU::LoweringConfigAttr>) {
+      return verifyGPUMatmulPipeline(op, loweringConfig, translationInfo);
+    } else {
+      return verifyGPUMatmulPipeline(op, loweringConfig, translationInfo,
+                                     workgroupSize);
+    }
   });
+
   return failure(walkResult.wasInterrupted());
 }
 
@@ -63,8 +70,18 @@ verifyEntryPoint(FunctionOpInterface funcOp,
         "failed to get workgroup size needed for verification");
   }
 
-  return verifyLoweringConfiguration(
-      funcOp, translationInfo, workgroupSize.value(), verifyGPUMatmulPipeline);
+  // Verify GPU-specific configuration
+  if (failed(verifyLoweringConfiguration<IREE::GPU::LoweringConfigAttr>(
+          funcOp, translationInfo, workgroupSize.value()))) {
+    return failure();
+  }
+
+  // Verify Codegen-specific configuration
+  if (failed(verifyLoweringConfiguration<IREE::Codegen::LoweringConfigAttr>(
+          funcOp, translationInfo, workgroupSize.value()))) {
+    return failure();
+  }
+
   return success();
 }
 
