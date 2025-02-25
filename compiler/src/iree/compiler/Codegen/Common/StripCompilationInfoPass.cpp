@@ -71,15 +71,15 @@ struct StripAttentionOpCompilationInfo final
 
     if (DictionaryAttr decompositionConfig =
             attentionOp.getDecompositionConfigAttr()) {
-      DictionaryAttr modifiedDecompositionConfig = DictionaryAttr::get(
+      DictionaryAttr newConfig = DictionaryAttr::get(
           decompositionConfig.getContext(),
-          llvm::filter_to_vector(decompositionConfig, [&](NamedAttribute attr) {
+          llvm::filter_to_vector(decompositionConfig, [](NamedAttribute attr) {
             return attr.getName() !=
                        IREE::LinalgExt::AttentionOp::getQKAttrStr() &&
                    attr.getName() !=
                        IREE::LinalgExt::AttentionOp::getPVAttrStr();
           }));
-      attentionOp.setDecompositionConfigAttr(modifiedDecompositionConfig);
+      attentionOp.setDecompositionConfigAttr(newConfig);
     }
     return success();
   }
