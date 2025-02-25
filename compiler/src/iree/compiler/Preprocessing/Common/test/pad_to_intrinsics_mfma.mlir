@@ -105,6 +105,44 @@ func.func @conv_generic_nhwc_fhwc(%arg0: tensor<2x130x130x4xf16>, %arg1: tensor<
 
 // -----
 
+#map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0 + d3, d1 + d4, d5)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d2, d3, d4, d5)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+
+// CHECK-LABEL: func.func @conv2d_no_batch(
+// CHECK-SAME:    %[[ARG0:.+]]: tensor<1026x1026x128xf16>
+// CHECK-SAME:    %[[ARG1:.+]]: tensor<3x3x3x128xf16>
+// CHECK-SAME:    %[[ARG2:.+]]: tensor<1024x1024x3xf32>)
+func.func @conv2d_no_batch(%arg0: tensor<1026x1026x128xf16>, %arg1: tensor<3x3x3x128xf16>, %arg2:tensor<1024x1024x3xf32>) -> tensor<1024x1024x3xf32> {
+  %conv = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<1026x1026x128xf16>, tensor<3x3x3x128xf16>) outs(%arg2 : tensor<1024x1024x3xf32>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f32):
+    %0 = arith.extf %in : f16 to f32
+    %1 = arith.extf %in_0 : f16 to f32
+    %2 = arith.mulf %0, %1 : f32
+    %3 = arith.addf %out, %2 : f32
+    linalg.yield %3 : f32
+  } -> tensor<1024x1024x3xf32>
+  return %conv : tensor<1024x1024x3xf32>
+}
+
+// CHECK:      %[[PAD0:.+]] = tensor.pad %[[ARG1]] low[0, 0, 0, 0] high[13, 0, 0, 0] {
+// CHECK:      tensor<3x3x3x128xf16> to tensor<16x3x3x128xf16>
+// CHECK:      %[[PAD1:.+]] = tensor.pad %[[ARG2]] low[0, 0, 0] high[0, 0, 13] {
+// CHECK:      tensor<1024x1024x3xf32> to tensor<1024x1024x16xf32>
+// CHECK:      %[[CONV:.+]] = linalg.generic {indexing_maps = [#map, #map1, #map2]
+// CHECK-SAME: ins(%arg0, %[[PAD0]] : tensor<1026x1026x128xf16>, tensor<16x3x3x128xf16>)
+// CHECK-SAME: outs(%[[PAD1]] : tensor<1024x1024x16xf32>) {
+// CHECK:      %[[RES:.+]] = tensor.extract_slice %[[CONV]][0, 0, 0] [1024, 1024, 3] [1, 1, 1]
+// CHECK:      return %[[RES]] : tensor<1024x1024x3xf32>
+
+// CONVOLUTION:      tensor.pad {{.*}} low[0, 0, 0, 0] high[13, 0, 0, 0]
+// CONVOLUTION:      tensor.pad {{.*}} low[0, 0, 0] high[0, 0, 13]
+
+// CONTRACT-NOT:     tensor.pad {{.*}} low[0, 0, 0, 0] high[13, 0, 0, 0]
+// CONTRACT-NOT:     tensor.pad {{.*}} low[0, 0, 0] high[0, 0, 13]
+
+// -----
+
 // CHECK-LABEL: func.func @main1(
 // CHECK-SAME:    %[[ARG0:.+]]: tensor<2x130x130x320xf16>,
 // CHECK-SAME:    %[[ARG1:.+]]: tensor<3x3x320x4xf16>,
