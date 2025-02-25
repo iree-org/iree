@@ -266,6 +266,11 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   // After propagation many resource SSA values can be deduped or folded by the
   // cleanup patterns.
   passManager.addPass(IREE::Util::createPropagateSubrangesPass());
+
+  // Tracks cross-device resource liveness, performs whole program
+  // analysis, reference counting
+  passManager.addPass(IREE::Stream::createResourceRefCountingPass());
+
   buildStreamCleanupPassPipeline(passManager, transformOptions);
 
   // TODO(benvanik): outline streams (ala dispatch regions). Note that we may

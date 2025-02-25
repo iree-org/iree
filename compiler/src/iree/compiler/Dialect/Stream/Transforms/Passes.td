@@ -210,6 +210,20 @@ def RefineUsagePass :
   ];
 }
 
+
+def ResourceRefCountingPass :
+    Pass<"iree-stream-resource-refcounting", "mlir::ModuleOp"> {
+  let summary = "Tracks resource liveness, and inserts deallcas where appropriate.";
+  let description = [{
+    Performs whole-program analysis to assign refcounting to
+    `!stream.resource<*>`
+     Upon completion all resources should have reference counted and deallocas identified
+  }];
+  let dependentDialects = [
+    "IREE::Stream::StreamDialect",
+  ];
+}
+
 //===----------------------------------------------------------------------===//
 // Stream formation and scheduling
 //===----------------------------------------------------------------------===//
