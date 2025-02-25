@@ -74,6 +74,79 @@ static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
   rewriter.eraseOp(allocOp);
 }
 
+static int64_t computeSharedMemoryUsage(mlir::FunctionOpInterface funcOp) {
+  int64_t totalSharedMemory = 0;
+
+  auto walkResult = funcOp.walk([&](memref::AllocOp allocOp) -> WalkResult {
+    if (!hasSharedMemoryAddressSpace(allocOp.getType())) {
+      return WalkResult::advance();
+    }
+
+    if (!allocOp.getType().hasStaticShape()) {
+      return WalkResult::interrupt();
+    }
+
+    MemRefType allocType = llvm::cast<MemRefType>(allocOp.getType());
+    unsigned byteWidth =
+        allocType.getElementType().isIndex()
+            ? 8 // IREE's default byteWidth for indexes
+            : IREE::Util::getTypeBitWidth(allocType.getElementType()) / 8;
+
+    int64_t numElements = 1;
+    for (auto dimSize : allocType.getShape()) {
+      numElements *= dimSize;
+    }
+
+    int64_t allocSizeBytes = byteWidth * numElements;
+    if (allocOp.getAlignment()) {
+      int64_t alignmentInBytes = *allocOp.getAlignment();
+      allocSizeBytes =
+          llvm::divideCeil(allocSizeBytes, alignmentInBytes) * alignmentInBytes;
+    }
+
+    totalSharedMemory += allocSizeBytes;
+    return WalkResult::advance();
+  });
+
+  if (walkResult.wasInterrupted()) {
+    return ShapedType::kDynamic;
+  }
+  return totalSharedMemory;
+}
+
+static unsigned computeEffectiveExtraBytes(mlir::FunctionOpInterface funcOp,
+                                           unsigned paddingBits) {
+  unsigned totalExtra = 0;
+
+  funcOp.walk([&](memref::AllocOp allocOp) {
+    if (hasSharedMemoryAddressSpace(allocOp.getType()) &&
+        allocOp.getType().hasStaticShape()) {
+      MemRefType allocType = llvm::cast<MemRefType>(allocOp.getType());
+
+      ArrayRef<int64_t> shape = allocType.getShape();
+      if (shape.empty())
+        return;
+
+      int outerProduct = 1;
+      for (std::size_t i = 0; i < shape.size() - 1; ++i) {
+        outerProduct *= shape[i];
+      }
+
+      unsigned bitWidth = 64; // IREE's default bitWidth for indexes
+      auto elemType = allocType.getElementType();
+      if (!elemType.isIndex()) {
+        bitWidth = IREE::Util::getTypeBitWidth(elemType);
+      }
+      unsigned elemSize = bitWidth / 8;
+      unsigned extraElements = paddingBits / bitWidth;
+
+      totalExtra += outerProduct * extraElements * elemSize;
+    }
+  });
+
+  return totalExtra;
+}
+
 /// Pass to reduce the number of bank conflicts when accessing shared memory in
 /// a 2D manner. This is a simple version just padding allocation.
 /// This doesn't fully remove bank conflicts and increase the shared memory
@@ -86,6 +159,27 @@ struct GPUReduceBankConflictsPass final
 
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
+
+    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+    unsigned sharedMemLimit =
+        target ? target.getWgp().getMaxWorkgroupMemoryBytes() : 64 * 1024;
+
+    int64_t currentSharedMemUsage = computeSharedMemoryUsage(funcOp);
+    if (currentSharedMemUsage == ShapedType::kDynamic) {
+      // The shape is dynamic, it may become static in later passes
+      // if it becomes static, the padding will be applied.
+      return;
+    }
+
+    unsigned effectiveExtraBytes =
+        computeEffectiveExtraBytes(funcOp, paddingBits);
+
+    if (static_cast<unsigned>(currentSharedMemUsage) + effectiveExtraBytes >
+        sharedMemLimit) {
+      // Skip the pass if an overflow would occur.
+      return;
+    }
+
     if (failed(reduceSharedMemoryBankConflicts(funcOp, paddingBits)))
       signalPassFailure();
   }
