@@ -1379,7 +1379,9 @@ def Stream_TensorSplatOp : Stream_PureOp<"tensor.splat", [
 def Stream_TensorCloneOp : Stream_PureOp<"tensor.clone", [
   AttrSizedOperandSegments,
   Stream_AffinityOp,
-  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_StreamableOp, [
+    "preferCloneToConsumers",
+  ]>,
   Stream_TensorPhaseOp,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
@@ -2545,7 +2547,9 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
-  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_StreamableOp, [
+    "preferCloneToConsumers",
+  ]>,
   DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
     "getAsyncAccessRanges",
   ]>,
