@@ -249,7 +249,7 @@ struct ConvertTensorBarrierOp
     auto barrierOp = rewriter.create<IREE::Stream::AsyncBarrierOp>(
         op.getLoc(), operand.resource.getType(), operand.resource,
         operand.resourceSize,
-        /*affinity=*/cast<IREE::Stream::AffinityAttr>(op.getTargetAttr()));
+        /*affinity=*/executionAffinityAttr);
     rewriter.replaceOpWithMultiple(op, {{barrierOp, operand.resourceSize}});
     return success();
   }
@@ -272,8 +272,7 @@ struct ConvertTensorTransferOp
         op.getLoc(), unknownType, operand.resource, operand.resourceSize,
         operand.resourceSize,
         /*source_affinity=*/operand.affinity,
-        /*result_affinity=*/
-        cast<IREE::Stream::AffinityAttr>(op.getTargetAttr()));
+        /*result_affinity=*/executionAffinityAttr);
     rewriter.replaceOpWithMultiple(op, {{transferOp, operand.resourceSize}});
     return success();
   }

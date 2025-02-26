@@ -214,19 +214,6 @@ def RefineUsagePass :
 // Stream formation and scheduling
 //===----------------------------------------------------------------------===//
 
-def ExecutionPlacementPass :
-    InterfacePass<"iree-stream-execution-placement", "mlir::CallableOpInterface"> {
-  let summary = "Runs an analysis and placement for stream executions.";
-  let description = [{
-    Handles placement analysis for `stream.async` operators that have a preferable
-    placement. This is so that more complex analsysis can be separated from the
-    execution scheduling pass.
-  }];
-  let dependentDialects = [
-    "IREE::Stream::StreamDialect",
-  ];
-}
-
 def ScheduleExecutionPass :
     InterfacePass<"iree-stream-schedule-execution", "mlir::CallableOpInterface"> {
   let summary = "Identifies and groups asynchronous operations into executable regions within function-like regions.";

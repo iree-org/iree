@@ -204,8 +204,6 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   //----------------------------------------------------------------------------
 
   FunctionLikeNest(passManager)
-      // Analyze and assign execution placement.
-      .addPass(IREE::Stream::createExecutionPlacementPass)
       // Combine async work into execution regions.
       .addPass(IREE::Stream::createScheduleExecutionPass)
       // Group concurrently executable work into waves.

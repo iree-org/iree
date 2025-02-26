@@ -29,7 +29,6 @@ iree_lit_test_suite(
     "encode_host_tensors_encoding.mlir"
     "encode_host_tensors_packing.mlir"
     "encode_host_tensors_packing_i1_experimental_clopt.mlir"
-    "execution_placement.mlir"
     "fold_globals.mlir"
     "fold_uniform_operands.mlir"
     "fuse_dispatch_bindings.mlir"
