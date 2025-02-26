@@ -128,8 +128,6 @@ public:
       LDBG("convert-filter-to-channels-last pass didn't apply since an "
            "unsupported layout is given. Please use hwfc or fhwc as pass "
            "filter-layout option.");
-      // TODO add default fallback to filter layout once we have more data
-      // about models with the two layouts
       return signalPassFailure();
     }
 

@@ -103,7 +103,8 @@ buildTransposeConvolutionPassPipeline(OpPassManager &passManager,
       .addPass(GlobalOptimization::createDetachElementwiseFromNamedOpsPass)
       .addPass(mlir::createLinalgNamedOpConversionPass)
       .addPass(GlobalOptimization::createConvert1X1FilterConv2DToMatmulPass)
-      .addPass(createConvertConvToChannelsLastPass);
+      .addPass(createConvertConvToChannelsLastPass)
+      .addPass(createConvertConvFilterToChannelsLastPass);
   passManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
