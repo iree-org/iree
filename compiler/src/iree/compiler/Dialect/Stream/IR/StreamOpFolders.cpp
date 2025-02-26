@@ -333,18 +333,25 @@ struct PropagateClonableOps : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
   LogicalResult matchAndRewrite(Op cloneOp,
                                 PatternRewriter &rewriter) const override {
-    if (cloneOp.use_empty())
+    if (cloneOp.use_empty()) {
+      // No consumers to clone for.
       return failure();
+    }
     auto sourceOp =
         cloneOp.getSource()
             .template getDefiningOp<IREE::Stream::StreamableOpInterface>();
-    if (!sourceOp || !sourceOp.preferCloneToConsumers())
+    if (!sourceOp || !sourceOp.preferCloneToConsumers()) {
+      // Only look at cloneable producer ops.
       return failure();
+    }
     for (auto &use :
          llvm::make_early_inc_range(cloneOp.getResult().getUses())) {
+      auto result = cast<OpResult>(use.get());
       rewriter.setInsertionPoint(use.getOwner());
       auto clonedOp = rewriter.clone(*sourceOp);
-      use.set(clonedOp->getResult(0));
+      auto clonedResult = clonedOp->getResult(result.getResultNumber());
+      clonedResult.setType(use.get().getType());
+      use.set(clonedResult);
     }
     if (cloneOp.use_empty()) {
       rewriter.eraseOp(cloneOp);
