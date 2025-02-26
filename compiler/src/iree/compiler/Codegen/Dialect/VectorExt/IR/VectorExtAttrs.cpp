@@ -354,7 +354,7 @@ NestedLayoutAttr::getRecombinedLayout(ArrayRef<VectorLayoutInterface> layouts,
   for (const llvm::SmallVector<int64_t> &tile :
        {subgroupTile, batchTile, outerTile, threadTile, subgroupStrides,
         threadStrides}) {
-    if (llvm::any_of(tile, [](int64_t v) { return v == kInvalid; })) {
+    if (llvm::any_of(tile, [&](int64_t v) { return v == kInvalid; })) {
       return NestedLayoutAttr();
     }
   }
