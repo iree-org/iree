@@ -124,11 +124,12 @@ LogicalResult setHIPGlobals(Location loc, llvm::Module *module,
   }
   // Latest GFX arch supported is gfx120x.
   if (chipset.majorVersion > 12 ||
-      (chipset.majorVersion == 12 && chipset.minorVersion > 0))
+      (chipset.majorVersion == 12 && chipset.minorVersion > 0)) {
     return emitError(loc)
            << "a chipset with major version = " << chipset.majorVersion
            << " and minor version = " << chipset.minorVersion
            << " was not known to exist at the time this IREE was built";
+  }
   int chipCode = chipset.majorVersion * 1000 + chipset.minorVersion * 16 +
                  chipset.steppingVersion;
   auto *int32Type = llvm::Type::getInt32Ty(module->getContext());
