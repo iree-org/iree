@@ -145,44 +145,44 @@ iree-compile \
     mobilenetv2.mlir -o mobilenet_vulkan.vmfb
 ```
 
-???+ tip "Tip - Vulkan targets"
+#### Choosing Vulkan targets
 
-    The `--iree-vulkan-target` specifies the GPU architecture to target. It
-    accepts a few schemes:
+The `--iree-vulkan-target` specifies the GPU architecture to target. It
+accepts a few schemes:
 
-    * LLVM CodeGen backend style: this is using LLVM AMDGPU/NVPTX CodeGen targets
-      like `gfx1100` for AMD RX 7900XTX and `sm_86` for NVIDIA RTX 3090 GPUs.
-    * Architecture code name style like `rdna3`/`valhall4`/`ampere`/`adreno`
-      for AMD/ARM/NVIDIA/Qualcomm GPUs.
-    * Product name style: e.g., using `rx7900xtx`/`a100` for corresponding GPUs.
+* LLVM CodeGen backend style: this is using LLVM AMDGPU/NVPTX CodeGen targets
+  like `gfx1100` for AMD RX 7900XTX and `sm_86` for NVIDIA RTX 3090 GPUs.
+* Architecture code name style like `rdna3`/`valhall4`/`ampere`/`adreno`
+  for AMD/ARM/NVIDIA/Qualcomm GPUs.
+* Product name style: e.g., using `rx7900xtx`/`a100` for corresponding GPUs.
 
-    Here are a few examples showing how you can target various recent common GPUs:
+Here are a few examples showing how you can target various recent common GPUs:
 
-    | GPU                 | Target Architecture | Architecture Code Name | Product Name
-    | ------------------- | ------------------- | ---------------------- | ------------
-    | AMD RX7900XTX       | `gfx1100`           | `rdna3`                | `rx7900xtx`
-    | AMD RX7900XT        | `gfx1100`           | `rdna3`                | `rx7900xt`
-    | AMD RX7800XT        | `gfx1101`           | `rdna3`                | `rx7800xt`
-    | AMD RX7700XT        | `gfx1101`           | `rdna3`                | `rx7700xt`
-    | AMD RX6000 series   |                     | `rdna2`                |
-    | AMD RX5000 series   |                     | `rdna1`                |
-    | ARM Mali G715       |                     | `valhall4`             | e.g., `mali-g715`
-    | ARM Mali G510       |                     | `valhall3`             | e.g., `mali-g510`
-    | ARM GPUs            |                     | `valhall`              |
-    | NVIDIA RTX40 series | `sm_89`             | `ada`                  | e.g., `rtx4090`
-    | NVIDIA RTX30 series | `sm_86`             | `ampere`               | e.g., `rtx3080ti`
-    | NVIDIA RTX20 series | `sm_75`             | `turing`               | e.g., `rtx2070super`
-    | Qualcomm GPUs       |                     | `adreno`               |
+| GPU                 | Target Architecture | Architecture Code Name | Product Name
+| ------------------- | ------------------- | ---------------------- | ------------
+| AMD RX7900XTX       | `gfx1100`           | `rdna3`                | `rx7900xtx`
+| AMD RX7900XT        | `gfx1100`           | `rdna3`                | `rx7900xt`
+| AMD RX7800XT        | `gfx1101`           | `rdna3`                | `rx7800xt`
+| AMD RX7700XT        | `gfx1101`           | `rdna3`                | `rx7700xt`
+| AMD RX6000 series   |                     | `rdna2`                |
+| AMD RX5000 series   |                     | `rdna1`                |
+| ARM Mali G715       |                     | `valhall4`             | e.g., `mali-g715`
+| ARM Mali G510       |                     | `valhall3`             | e.g., `mali-g510`
+| ARM GPUs            |                     | `valhall`              |
+| NVIDIA RTX40 series | `sm_89`             | `ada`                  | e.g., `rtx4090`
+| NVIDIA RTX30 series | `sm_86`             | `ampere`               | e.g., `rtx3080ti`
+| NVIDIA RTX20 series | `sm_75`             | `turing`               | e.g., `rtx2070super`
+| Qualcomm GPUs       |                     | `adreno`               |
 
-    If no target is specified, then a safe but more limited default will be used.
+If no target is specified, then a safe but more limited default will be used.
 
-    Note that we don't support the full spectrum of GPUs here and it is
-    impossible to capture all details of a Vulkan implementation with a target
-    triple, given the allowed variances on extensions, properties, limits, etc.
-    So the target triple is just an approximation for usage. This is more of a
-    mechanism to help us develop IREE itself--in the long term we want to
-    perform multiple targetting to generate to multiple architectures if no
-    target is given.
+Note that we don't support the full spectrum of GPUs here and it is
+impossible to capture all details of a Vulkan implementation with a target
+triple, given the allowed variances on extensions, properties, limits, etc.
+So the target triple is just an approximation for usage. This is more of a
+mechanism to help us develop IREE itself--in the long term we want to
+perform multiple targetting to generate to multiple architectures if no
+target is given.
 
 ### :octicons-terminal-16: Run a compiled program
 

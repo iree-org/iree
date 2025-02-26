@@ -128,32 +128,32 @@ iree-compile \
     When not cross compiling, passing `--iree-llvmcpu-target-cpu=host` is
     usually sufficient on most devices.
 
-???+ tip "Tip - CPU targets"
+#### Choosing CPU targets
 
-    The `--iree-llvmcpu-target-triple` flag tells the compiler to generate code
-    for a specific type of CPU. You can see the list of supported targets with
-    `iree-compile --iree-llvmcpu-list-targets`, or use the default value of
-    "host" to let LLVM infer the triple from your host machine
-    (e.g. `x86_64-linux-gnu`).
+The `--iree-llvmcpu-target-triple` flag tells the compiler to generate code
+for a specific type of CPU. You can see the list of supported targets with
+`iree-compile --iree-llvmcpu-list-targets`, or use the default value of
+"host" to let LLVM infer the triple from your host machine
+(e.g. `x86_64-linux-gnu`).
 
-    ```console
-    $ iree-compile --iree-llvmcpu-list-targets
+```console
+$ iree-compile --iree-llvmcpu-list-targets
 
-      Registered Targets:
-        aarch64    - AArch64 (little endian)
-        aarch64_32 - AArch64 (little endian ILP32)
-        aarch64_be - AArch64 (big endian)
-        arm        - ARM
-        arm64      - ARM64 (little endian)
-        arm64_32   - ARM64 (little endian ILP32)
-        armeb      - ARM (big endian)
-        riscv32    - 32-bit RISC-V
-        riscv64    - 64-bit RISC-V
-        wasm32     - WebAssembly 32-bit
-        wasm64     - WebAssembly 64-bit
-        x86        - 32-bit X86: Pentium-Pro and above
-        x86-64     - 64-bit X86: EM64T and AMD64
-    ```
+  Registered Targets:
+    aarch64    - AArch64 (little endian)
+    aarch64_32 - AArch64 (little endian ILP32)
+    aarch64_be - AArch64 (big endian)
+    arm        - ARM
+    arm64      - ARM64 (little endian)
+    arm64_32   - ARM64 (little endian ILP32)
+    armeb      - ARM (big endian)
+    riscv32    - 32-bit RISC-V
+    riscv64    - 64-bit RISC-V
+    wasm32     - WebAssembly 32-bit
+    wasm64     - WebAssembly 64-bit
+    x86        - 32-bit X86: Pentium-Pro and above
+    x86-64     - 64-bit X86: EM64T and AMD64
+```
 
 ### :octicons-terminal-16: Run a compiled program
 
