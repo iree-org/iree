@@ -32,6 +32,7 @@
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FileUtilities.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/TargetSelect.h"
@@ -530,18 +531,6 @@ public:
         // Sanitize the function name as PTX has strict requirements.
         llvmFunc->setName(sanitizeSymbolName(funcOp.getName()));
 
-        auto *annotations =
-            llvmModule->getOrInsertNamedMetadata("nvvm.annotations");
-        auto setMetadataValueI32 = [&](StringRef name, int value) {
-          llvm::Metadata *llvmMetadata[] = {
-              llvm::ValueAsMetadata::get(llvmFunc),
-              llvm::MDString::get(llvmModule->getContext(), name),
-              llvm::ValueAsMetadata::get(llvm::ConstantInt::get(
-                  llvm::Type::getInt32Ty(llvmModule->getContext()), value))};
-          annotations->addOperand(
-              llvm::MDNode::get(llvmModule->getContext(), llvmMetadata));
-        };
-
         // Mark the entry point as a kernel.
         llvmFunc->setCallingConv(llvm::CallingConv::PTX_Kernel);
 
@@ -560,9 +549,10 @@ public:
           maxWorkgroupSize[0] = std::max(maxWorkgroupSize[0], workgroupSize[0]);
           maxWorkgroupSize[1] = std::max(maxWorkgroupSize[1], workgroupSize[1]);
           maxWorkgroupSize[2] = std::max(maxWorkgroupSize[2], workgroupSize[2]);
-          setMetadataValueI32("maxntidx", workgroupSize[0]);
-          setMetadataValueI32("maxntidy", workgroupSize[1]);
-          setMetadataValueI32("maxntidz", workgroupSize[2]);
+          std::string maxntid = llvm::formatv(
+              "{0},{1},{2}", llvm::utostr(workgroupSize[0]),
+              llvm::utostr(workgroupSize[1]), llvm::utostr(workgroupSize[2]));
+          llvmFunc->addFnAttr("nvvm.maxntid", maxntid);
         }
       }
 
