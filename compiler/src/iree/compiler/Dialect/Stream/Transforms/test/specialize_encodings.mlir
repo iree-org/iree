@@ -859,7 +859,7 @@ stream.executable private @executable {
   }
 }
 util.func public @tensor_dispatch_with_unknown_and_serialized_encodings(%arg0: !stream.resource<external>, %arg1: index, %arg2: index, %arg3: index) -> !stream.resource<*> {
-  %0 = stream.async.transfer %arg0 : !stream.resource<external>{%arg2} on(#hal.device.affinity<@device_a>) from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%arg2}
+  %0 = stream.async.transfer %arg0 : !stream.resource<external>{%arg2} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%arg2}
   %1 = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @executable::@dispatch(%0, %arg3) : (tensor<4x?xf32, #unknown_encoding>{%arg2} in !stream.resource<*>{%arg1}, index) -> tensor<4x?xf32, #serialized_encoding>{%arg2} in !stream.resource<*>{%arg1}
   util.return %1 : !stream.resource<*>
 }
@@ -899,7 +899,7 @@ stream.executable private @executable {
   }
 }
 util.func public @tensor_dispatch_with_unknown_and_unserialized_encodings(%arg0: !stream.resource<external>, %arg1: index, %arg2: index, %arg3: index) -> !stream.resource<*> {
-  %0 = stream.async.transfer %arg0 : !stream.resource<external>{%arg2} on(#hal.device.affinity<@device_a>) from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%arg2}
+  %0 = stream.async.transfer %arg0 : !stream.resource<external>{%arg2} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%arg2}
   %1 = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @executable::@dispatch(%0, %arg3) : (tensor<4x?xf32, #unknown_encoding>{%arg2} in !stream.resource<*>{%arg1}, index) -> tensor<4x?xf32, #encoding>{%arg2} in !stream.resource<*>{%arg1}
   util.return %1 : !stream.resource<*>
 }
