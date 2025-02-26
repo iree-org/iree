@@ -91,8 +91,8 @@ and architectures:
 Support for hardware accelerators and APIs is also included:
 
 - [x] Vulkan
+- [x] ROCm/HIP
 - [x] CUDA
-- [x] ROCm
 - [x] Metal (for Apple silicon devices)
 - [ ] AMD AIE (experimental)
 - [ ] WebGPU (experimental)

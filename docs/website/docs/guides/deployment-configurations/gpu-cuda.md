@@ -50,16 +50,6 @@ the IREE compiler, then enable the CUDA compiler target with the
 
 Next you will need to get an IREE runtime that includes the CUDA HAL driver.
 
-You can check for CUDA support by looking for a matching driver and device:
-
-```console hl_lines="8"
---8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md:2"
-```
-
-```console hl_lines="3"
---8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-device-list-nvidia.md"
-```
-
 #### :octicons-download-16: Download the runtime from a release
 
 Python packages are distributed through multiple channels. See the
@@ -76,7 +66,19 @@ Please make sure you have followed the
 IREE from source, then enable the CUDA HAL driver with the
 `IREE_HAL_DRIVER_CUDA` option.
 
-## Compile and run a program model
+#### :octicons-checklist-24: Check for CUDA devices
+
+You can check for CUDA support by looking for a matching driver and device:
+
+```console hl_lines="8"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md:2"
+```
+
+```console hl_lines="3"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-device-list-nvidia.md"
+```
+
+## Compile and run a program
 
 With the requirements out of the way, we can now compile a model and run it.
 
@@ -93,34 +95,34 @@ iree-compile \
     mobilenetv2.mlir -o mobilenet_cuda.vmfb
 ```
 
-???+ tip "Tip - CUDA targets"
+#### Choosing CUDA targets
 
-    Canonically a CUDA target (`iree-cuda-target`) matching the LLVM NVPTX
-    backend of the form `sm_<arch_number>` is needed to compile towards each GPU
-    architecture. If no architecture is specified then we will default to
-    `sm_60`.
+Canonically a CUDA target (`iree-cuda-target`) matching the LLVM NVPTX
+backend of the form `sm_<arch_number>` is needed to compile towards each GPU
+architecture. If no architecture is specified then we will default to
+`sm_60`.
 
-    Here is a table of commonly used architectures:
+Here is a table of commonly used architectures:
 
-    | CUDA GPU            | Target Architecture | Architecture Code Name
-    | ------------------- | ------------------- | ----------------------
-    | NVIDIA P100         | `sm_60`             | `pascal`
-    | NVIDIA V100         | `sm_70`             | `volta`
-    | NVIDIA A100         | `sm_80`             | `ampere`
-    | NVIDIA H100         | `sm_90`             | `hopper`
-    | NVIDIA RTX20 series | `sm_75`             | `turing`
-    | NVIDIA RTX30 series | `sm_86`             | `ampere`
-    | NVIDIA RTX40 series | `sm_89`             | `ada`
+| CUDA GPU            | Target Architecture | Architecture Code Name
+| ------------------- | ------------------- | ----------------------
+| NVIDIA P100         | `sm_60`             | `pascal`
+| NVIDIA V100         | `sm_70`             | `volta`
+| NVIDIA A100         | `sm_80`             | `ampere`
+| NVIDIA H100         | `sm_90`             | `hopper`
+| NVIDIA RTX20 series | `sm_75`             | `turing`
+| NVIDIA RTX30 series | `sm_86`             | `ampere`
+| NVIDIA RTX40 series | `sm_89`             | `ada`
 
-    In addition to the canonical `sm_<arch_number>` scheme, `iree-cuda-target`
-    also supports two additonal schemes to make a better developer experience:
+In addition to the canonical `sm_<arch_number>` scheme, `iree-cuda-target`
+also supports two additonal schemes to make a better developer experience:
 
-    * Architecture code names like `volta` or `ampere`
-    * GPU product names like `a100` or `rtx3090`
+* Architecture code names like `volta` or `ampere`
+* GPU product names like `a100` or `rtx3090`
 
-    These two schemes are translated into the canonical form under the hood.
-    We add support for common code/product names without aiming to be exhaustive.
-    If the ones you want are missing, please use the canonical form.
+These two schemes are translated into the canonical form under the hood.
+We add support for common code/product names without aiming to be exhaustive.
+If the ones you want are missing, please use the canonical form.
 
 ### :octicons-terminal-16: Run a compiled program
 
