@@ -321,3 +321,137 @@ util.func public @fuse_attention_with_broadcast_transpose(%arg0: tensor<4x?x8x12
 //  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5)>
 //  CHECK-SAME:       ins(%[[ARG1]], %[[ARG2]], %[[ARG0]], %[[ARG3]], %[[ARG4]] :
 //       CHECK:   util.return %[[ATTENTION]]
+
+// -----
+
+util.func public @gather_fusion(%arg0: tensor<2x64x64x640xf16>, %arg1: tensor<2x64x64x640xf16>, %arg2: tensor<2xi64>, %arg3: tensor<640xi64>, %arg4: tensor<128xi64>, %arg5: tensor<640xf16>, %arg6: tensor<f32>) -> tensor<2x128x128x640xi8> {
+  %cst = arith.constant -1.280000e+02 : f16
+  %cst_0 = arith.constant 1.270000e+02 : f16
+  %0 = tensor.empty() : tensor<2x128x128x640xi8>
+  %1 = tensor.empty() : tensor<2x640x64x64xf32>
+  %2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d2, d3, d1)>, affine_map<(d0, d1, d2, d3) -> (d0, d2, d3, d1)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg0, %arg1 : tensor<2x64x64x640xf16>, tensor<2x64x64x640xf16>) outs(%1 : tensor<2x640x64x64xf32>) {
+  ^bb0(%in: f16, %in_1: f16, %out: f32):
+    %4 = arith.addf %in, %in_1 : f16
+    %5 = arith.extf %4 : f16 to f32
+    linalg.yield %5 : f32
+  } -> tensor<2x640x64x64xf32>
+  %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0)>, affine_map<(d0, d1, d2, d3) -> (d3)>, affine_map<(d0, d1, d2, d3) -> (d1)>, affine_map<(d0, d1, d2, d3) -> (d2)>, affine_map<(d0, d1, d2, d3) -> (d3)>, affine_map<(d0, d1, d2, d3) -> ()>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg2, %arg3, %arg4, %arg4, %arg5, %arg6 : tensor<2xi64>, tensor<640xi64>, tensor<128xi64>, tensor<128xi64>, tensor<640xf16>, tensor<f32>) outs(%0 : tensor<2x128x128x640xi8>) {
+  ^bb0(%in: i64, %in_1: i64, %in_2: i64, %in_3: i64, %in_4: f16, %in_5: f32, %out: i8):
+    %4 = arith.index_cast %in : i64 to index
+    %5 = arith.index_cast %in_1 : i64 to index
+    %6 = arith.index_cast %in_2 : i64 to index
+    %7 = arith.index_cast %in_3 : i64 to index
+    %extracted = tensor.extract %2[%4, %5, %6, %7] : tensor<2x640x64x64xf32>
+    %8 = arith.truncf %extracted : f32 to f16
+    %9 = arith.mulf %8, %in_4 : f16
+    %10 = arith.truncf %in_5 : f32 to f16
+    %11 = arith.divf %9, %10 : f16
+    %12 = math.roundeven %11 : f16
+    %13 = arith.cmpf ult, %12, %cst : f16
+    %14 = arith.select %13, %cst, %12 : f16
+    %15 = arith.cmpf ugt, %14, %cst_0 : f16
+    %16 = arith.select %15, %cst_0, %14 : f16
+    %17 = arith.fptosi %16 : f16 to i8
+    linalg.yield %17 : i8
+  } -> tensor<2x128x128x640xi8>
+  util.return %3 : tensor<2x128x128x640xi8>
+}
+
+// CHECK-LABEL: util.func public @gather_fusion(
+//  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG1:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG2:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG3:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG4:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG5:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG6:[A-Za-z0-9]+]]: tensor
+//       CHECK:   %[[GEN:.+]] = linalg.generic
+//  CHECK-SAME:     indexing_maps =
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d3)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d1)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d2)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d3)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> ()>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+//  CHECK-SAME:     ins(%[[ARG2]], %[[ARG3]], %[[ARG4]], %[[ARG4]], %[[ARG5]], %[[ARG6]]
+//       CHECK:     ^bb0(
+//  CHECK-SAME:       %[[IN0:[_a-zA-Z0-9]+]]: i64,
+//  CHECK-SAME:       %[[IN1:[_a-zA-Z0-9]+]]: i64,
+//  CHECK-SAME:       %[[IN2:[_a-zA-Z0-9]+]]: i64,
+//  CHECK-SAME:       %[[IN3:[_a-zA-Z0-9]+]]: i64,
+//   CHECK-DAG:     %[[CAST0:.+]] = arith.index_cast %[[IN0]] : i64 to index
+//   CHECK-DAG:     %[[CAST1:.+]] = arith.index_cast %[[IN1]] : i64 to index
+//   CHECK-DAG:     %[[CAST2:.+]] = arith.index_cast %[[IN2]] : i64 to index
+//   CHECK-DAG:     %[[CAST3:.+]] = arith.index_cast %[[IN3]] : i64 to index
+//       CHECK:     %[[EXTRACT0:.*]] = tensor.extract %[[ARG0]][%[[CAST0]], %[[CAST2]], %[[CAST3]], %[[CAST1]]] : tensor<2x64x64x640xf16>
+//       CHECK:     %[[EXTRACT1:.*]] = tensor.extract %[[ARG1]][%[[CAST0]], %[[CAST2]], %[[CAST3]], %[[CAST1]]] : tensor<2x64x64x640xf16>
+//       CHECK:     %[[ADDF:.+]] = arith.addf %[[EXTRACT0]], %[[EXTRACT1]] : f16
+//       CHECK:   util.return %[[GEN]] : tensor<2x128x128x640xi8>
+
+// -----
+
+util.func public @gather_fusion_compose_maps(%arg0: tensor<2x64x64x640xf16>, %arg1: tensor<2x64x64x640xf16>, %arg2: tensor<2xi64>, %arg3: tensor<640xi64>, %arg4: tensor<128xi64>, %arg5: tensor<640xf16>, %arg6: tensor<f32>) -> tensor<2x128x128x640xi8> {
+  %cst = arith.constant -1.280000e+02 : f16
+  %cst_0 = arith.constant 1.270000e+02 : f16
+  %0 = tensor.empty() : tensor<2x128x128x640xi8>
+  %1 = tensor.empty() : tensor<2x640x64x64xf32>
+  %2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d3, d2, d1)>, affine_map<(d0, d1, d2, d3) -> (d0, d2, d3, d1)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d3, d2)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg0, %arg1 : tensor<2x64x64x640xf16>, tensor<2x64x64x640xf16>) outs(%1 : tensor<2x640x64x64xf32>) {
+  ^bb0(%in: f16, %in_1: f16, %out: f32):
+    %4 = arith.addf %in, %in_1 : f16
+    %5 = arith.extf %4 : f16 to f32
+    linalg.yield %5 : f32
+  } -> tensor<2x640x64x64xf32>
+  %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0)>, affine_map<(d0, d1, d2, d3) -> (d3)>, affine_map<(d0, d1, d2, d3) -> (d1)>, affine_map<(d0, d1, d2, d3) -> (d2)>, affine_map<(d0, d1, d2, d3) -> (d3)>, affine_map<(d0, d1, d2, d3) -> ()>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg2, %arg3, %arg4, %arg4, %arg5, %arg6 : tensor<2xi64>, tensor<640xi64>, tensor<128xi64>, tensor<128xi64>, tensor<640xf16>, tensor<f32>) outs(%0 : tensor<2x128x128x640xi8>) {
+  ^bb0(%in: i64, %in_1: i64, %in_2: i64, %in_3: i64, %in_4: f16, %in_5: f32, %out: i8):
+    %4 = arith.index_cast %in : i64 to index
+    %5 = arith.index_cast %in_1 : i64 to index
+    %6 = arith.index_cast %in_2 : i64 to index
+    %7 = arith.index_cast %in_3 : i64 to index
+    %extracted = tensor.extract %2[%4, %5, %6, %7] : tensor<2x640x64x64xf32>
+    %8 = arith.truncf %extracted : f32 to f16
+    %9 = arith.mulf %8, %in_4 : f16
+    %10 = arith.truncf %in_5 : f32 to f16
+    %11 = arith.divf %9, %10 : f16
+    %12 = math.roundeven %11 : f16
+    %13 = arith.cmpf ult, %12, %cst : f16
+    %14 = arith.select %13, %cst, %12 : f16
+    %15 = arith.cmpf ugt, %14, %cst_0 : f16
+    %16 = arith.select %15, %cst_0, %14 : f16
+    %17 = arith.fptosi %16 : f16 to i8
+    linalg.yield %17 : i8
+  } -> tensor<2x128x128x640xi8>
+  util.return %3 : tensor<2x128x128x640xi8>
+}
+
+// CHECK-LABEL: util.func public @gather_fusion_compose_maps(
+//  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG1:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG2:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG3:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG4:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG5:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG6:[A-Za-z0-9]+]]: tensor
+//       CHECK:   %[[GEN:.+]] = linalg.generic
+//  CHECK-SAME:     indexing_maps =
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d3)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d1)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d2)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d3)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> ()>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+//  CHECK-SAME:     ins(%[[ARG2]], %[[ARG3]], %[[ARG4]], %[[ARG4]], %[[ARG5]], %[[ARG6]]
+//       CHECK:     ^bb0(
+//  CHECK-SAME:       %[[IN0:[_a-zA-Z0-9]+]]: i64,
+//  CHECK-SAME:       %[[IN1:[_a-zA-Z0-9]+]]: i64,
+//  CHECK-SAME:       %[[IN2:[_a-zA-Z0-9]+]]: i64,
+//  CHECK-SAME:       %[[IN3:[_a-zA-Z0-9]+]]: i64,
+//   CHECK-DAG:     %[[CAST0:.+]] = arith.index_cast %[[IN0]] : i64 to index
+//   CHECK-DAG:     %[[CAST1:.+]] = arith.index_cast %[[IN1]] : i64 to index
+//   CHECK-DAG:     %[[CAST2:.+]] = arith.index_cast %[[IN2]] : i64 to index
+//   CHECK-DAG:     %[[CAST3:.+]] = arith.index_cast %[[IN3]] : i64 to index
+//       CHECK:     %[[EXTRACT0:.*]] = tensor.extract %[[ARG0]][%[[CAST0]], %[[CAST2]], %[[CAST3]], %[[CAST1]]] : tensor<2x64x64x640xf16>
+//       CHECK:     %[[EXTRACT1:.*]] = tensor.extract %[[ARG1]][%[[CAST0]], %[[CAST3]], %[[CAST2]], %[[CAST1]]] : tensor<2x64x64x640xf16>
+//       CHECK:     %[[ADDF:.+]] = arith.addf %[[EXTRACT0]], %[[EXTRACT1]] : f16
+//       CHECK:   util.return %[[GEN]] : tensor<2x128x128x640xi8>
