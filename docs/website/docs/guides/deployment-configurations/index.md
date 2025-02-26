@@ -47,43 +47,37 @@ When compiling programs, a list of target backends must be specified via
 | `metal-spirv` | GPU support on Apple platforms via MSL for Metal | `metal` |
 | `webgpu-spirv` | **Experimental** <br> GPU support on the Web via WGSL for WebGPU | `webgpu` |
 
-!!! tip "Tip - listing available backends"
-    The list of compiler target backends can be queried:
+### Listing available backends
 
-    === "Command-line"
+The list of compiler target backends can be queried:
 
-        ```console
-        $ iree-compile --iree-hal-list-target-backends
+=== "Command-line"
 
-        Registered target backends:
-            cuda
-            llvm-cpu
-            metal
-            metal-spirv
-            rocm
-            vmvx
-            vmvx-inline
-            vulkan
-            vulkan-spirv
-        ```
+    ```console
+    $ iree-compile --iree-hal-list-target-backends
 
-    === "Python bindings"
+    Registered target backends:
+        cuda
+        llvm-cpu
+        metal-spirv
+        rocm
+        vmvx
+        vmvx-inline
+        vulkan-spirv
+    ```
 
-        ```python
-        iree.compiler.query_available_targets()
+=== "Python bindings"
 
-        ['cuda',
-         'llvm-cpu',
-         'metal',
-         'metal-spirv',
-         'rocm',
-         'vmvx',
-         'vmvx-inline',
-         'vulkan',
-         'vulkan-spirv']
-        ```
+    ```python
+    import iree.compiler as ireec
 
-## Runtime HAL drivers/devices
+    ireec.query_available_targets()
+    # ['cuda', 'llvm-cpu', 'metal-spirv', 'rocm', 'vmvx', 'vmvx-inline', 'vulkan-spirv']
+    ```
+
+## Runtime HAL drivers and devices
+
+Runtime HAL drivers can be used to enumerate and create HAL devices.
 
 Runtime HAL devices call into hardware APIs to load and run executable code.
 Devices may use multithreading or other system resources, depending on their
@@ -99,5 +93,69 @@ focus and the build configuration.
 | `metal`      | GPU execution on Apple platforms using Metal |
 | `webgpu`     | **Experimental** <br> GPU execution on the web using WebGPU |
 
-Additional HAL drivers can also be defined external to the core project via
-`IREE_EXTERNAL_HAL_DRIVERS`.
+!!! tip "Tip - External HAL drivers"
+
+    Additional HAL drivers can also be defined out of tree via the
+    `IREE_EXTERNAL_HAL_DRIVERS` CMake option.
+
+### Listing available drivers and devices
+
+The list of runtime HAL drivers and devices can be queried:
+
+=== "Command-line"
+
+    List drivers:
+
+    ```console
+    --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md:2"
+    ```
+
+    List devices:
+
+    ```console
+    --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-device-list-amd.md"
+    ```
+
+    Dump information about devices:
+
+    ```console
+    --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-device-dump-amd.md:2"
+    ```
+
+=== "Python bindings"
+
+    List drivers:
+
+    ```python
+    import iree.runtime as ireert
+
+    ireert.system_setup.query_available_drivers()
+    # ['cuda', 'hip', 'local-sync', 'local-task', 'vulkan']
+    ```
+
+    List devices:
+
+    ```python
+    import iree.runtime as ireert
+
+    for driver_name in ireert.system_setup.query_available_drivers():
+        print(driver_name)
+        try:
+            driver = ireert.get_driver(driver_name)
+            device_infos = driver.query_available_devices()
+            for device_info in device_infos:
+                print(f"  {device_info}")
+        except:
+            print(f"  (failed to initialize)")
+
+    # cuda
+    #   (failed to initialize)
+    # hip
+    #   {'device_id': 1, 'path': 'GPU-00000000-1111-2222-3333-444444444444', 'name': 'AMD Radeon ...'}
+    # local-sync
+    #   {'device_id': 0, 'path': '', 'name': 'default'}
+    # local-task
+    #   {'device_id': 0, 'path': '', 'name': 'default'}
+    # vulkan
+    #   {'device_id': 1234, 'path': '00000000-1111-2222-3333-444444444444', 'name': 'AMD Radeon ...'}
+    ```
