@@ -390,8 +390,17 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
   });
 
   // If this clone is performing a type change we need to preserve it.
+  //
   // TODO(benvanik): remove this carveout - could make clone not change type
   // and transfer be needed instead.
+  //
+  // HACK: the constant check is to support initializers that have lifetime
+  // transfers to constants. This is clearly bad and can lead to additional
+  // weirdness later on in the program, but without it resource usage analysis
+  // will try to treat entire IR trees that result in a constant transfer as if
+  // they are unknown. The real fix is to the analysis by possibly marking
+  // values as "eventually constant" to allow us to promote to constant
+  // lifetime.
   auto sourceType =
       llvm::cast<IREE::Stream::ResourceType>(cloneOp.getSource().getType());
   auto targetType =
@@ -701,13 +710,14 @@ struct ElideAsyncCopiesPass
       // If we can't elide any we'll consider the iteration complete and exit.
       bool didChange = false;
       for (auto callableOp : analysis.getTopLevelOps()) {
-        auto *region = callableOp.getCallableRegion();
-        if (!region)
-          continue;
-        didChange = tryElideAsyncCopiesInRegion(*region, analysis) || didChange;
+        if (auto *region = callableOp.getCallableRegion()) {
+          didChange =
+              tryElideAsyncCopiesInRegion(*region, analysis) || didChange;
+        }
       }
-      if (!didChange)
-        break;
+      if (!didChange) {
+        break; // quiesced
+      }
     }
     if (iterationCount == maxIterationCount) {
       // If you find yourself hitting this we can evaluate increasing the
