@@ -28,10 +28,10 @@ Guides for specific configurations:
   with minimal platform dependencies
 * [:octicons-server-16: GPU - Vulkan](./deployment-configurations/gpu-vulkan.md)
   for cross-platform usage and interop with graphics applications
-* [:simple-nvidia: GPU - CUDA](./deployment-configurations/gpu-cuda.md)
-  for NVIDIA-specific solutions
 * [:simple-amd: GPU - ROCm](./deployment-configurations/gpu-rocm.md)
   for AMD-specific solutions
+* [:simple-nvidia: GPU - CUDA](./deployment-configurations/gpu-cuda.md)
+  for NVIDIA-specific solutions
 * [:simple-apple: GPU - Metal](./deployment-configurations/gpu-metal.md)
   for running on Apple hardware
 

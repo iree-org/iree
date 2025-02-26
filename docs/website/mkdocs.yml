@@ -155,8 +155,8 @@ nav:
           - CPU: "guides/deployment-configurations/cpu.md"
           - CPU - Bare-Metal: "guides/deployment-configurations/bare-metal.md"
           - GPU - Vulkan: "guides/deployment-configurations/gpu-vulkan.md"
-          - GPU - CUDA: "guides/deployment-configurations/gpu-cuda.md"
           - GPU - ROCm: "guides/deployment-configurations/gpu-rocm.md"
+          - GPU - CUDA: "guides/deployment-configurations/gpu-cuda.md"
           - GPU - Metal: "guides/deployment-configurations/gpu-metal.md"
       - "General topics":
           - "guides/parameters.md"
