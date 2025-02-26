@@ -69,12 +69,15 @@ module {
 // CHECK-DAG:   #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 32, 32, 32>>
 // CHECK-LABEL: @reduction_fusion
-// CHECK:       %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<2x11008x128xf32, #[[$ENCODING]]
+// CHECK:       %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<2x11008x128xf32>)
 // CHECK:         %[[REDUCTION:.+]] = linalg.generic
-// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[REDUCTION]]
+// CHECK:         flow.return %[[REDUCTION]] :
+// CHECK:       }
+// CHECK:       %[[DISPATCH_SE:.+]] = flow.dispatch.region -> (tensor<2x11008x128xf32, #[[$ENCODING]]>)
+// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[DISPATCH]]
 // CHECK:         flow.return %[[SET_ENCODING]] :
 // CHECK:       }
-// CHECK:       util.return %[[DISPATCH]] : tensor<2x11008x128xf32, #[[$ENCODING]]>
+// CHECK:       util.return %[[DISPATCH_SE]] : tensor<2x11008x128xf32, #[[$ENCODING]]>
 
 // -----
 
