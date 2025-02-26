@@ -11,11 +11,15 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Target/TargetMachine.h"
 
+namespace mlir::amdgpu {
+struct Chipset;
+} // namespace mlir::amdgpu
+
 namespace mlir::iree_compiler::IREE::HAL {
 
 // Sets HIP platform globals based on the target architecture.
 LogicalResult setHIPGlobals(Location loc, llvm::Module *module,
-                            StringRef targetChip);
+                            const amdgpu::Chipset &targetChip, bool isWave64);
 
 // Links HIP device bitcode if the module uses any symbols from it.
 LogicalResult linkHIPBitcodeIfNeeded(Location loc, llvm::Module *module,
