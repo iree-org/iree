@@ -30,7 +30,7 @@ jobs:
             gpu: none
             runs-on: ubuntu-24.04
 
-          - name: hip_task
+          - name: rocm_hip
             target: target_hip
             gpu: gfx1100
             runs-on: nodai-amdgpu-w7900-x86-64
