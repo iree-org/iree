@@ -94,6 +94,28 @@ You can check for HIP support by looking for a matching driver and device:
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-device-list-amd.md"
 ```
 
+To see device details, including the architecture to use as a
+[HIP target](#choosing-hip-targets) when
+[compiling a program](#compile-and-run-a-program):
+
+```console hl_lines="9-10 15"
+$ iree-run-module --dump_devices
+
+...
+# ============================================================================
+# Enumerated devices for driver 'hip'
+# ============================================================================
+
+# ===----------------------------------------------------------------------===
+# --device=hip://GPU-00000000-1111-2222-3333-444444444444
+#   AMD Radeon PRO W7900 Dual Slot
+# ===----------------------------------------------------------------------===
+
+- amdhip64_dylib_path: /opt/rocm-6.1.3/lib/libamdhip64.so
+- gpu-compute-capability: 11.0
+- gpu-arch-name: gfx1100
+```
+
 #### :octicons-download-16: Download the runtime from a release
 
 Python packages are distributed through multiple channels. See the
@@ -121,8 +143,10 @@ on GPUs.
 
 Then run the following command to compile with the `rocm` target backend:
 
-```shell hl_lines="5-6"
-# See the section below for information about HIP targets.
+```shell hl_lines="7-8"
+# You need to specify a HIP target for your GPU. For this example we extract
+# the architecture name for the first device using rocm_agent_enumerator.
+# See the section below for more context and alternatives.
 IREE_HIP_TARGET=$(rocm_agent_enumerator | sed -n '2 p')  # e.g. gfx1100
 
 iree-compile \
@@ -169,7 +193,7 @@ For a more comprehensive list of prior GPU generations, you can refer to the
 
 The `iree-hip-target` option support three schemes:
 
-1. The exact GPU product (SKU), e.g., `--iree-hip-target=mi300x`. This
+1. The exact GPU product name (SKU), e.g., `--iree-hip-target=mi300x`. This
     allows the compiler to know about both the target architecture and about
     additional hardware details like the number of compute units. This extra
     information guides some compiler heuristics and allows for SKU-specific
@@ -189,7 +213,19 @@ is the most general.
     In the example above we used
     [`rocm_agent_enumerator`](https://rocm.docs.amd.com/projects/rocminfo/en/latest/how-to/use-rocm-agent-enumerator.html)
     to get target chip information for the first GPU device on our system. This
-    information can also be queried via:
+    information can be queried in several ways:
+
+    * The
+      [`rocm_agent_enumerator`](https://rocm.docs.amd.com/projects/rocminfo/en/latest/how-to/use-rocm-agent-enumerator.html)
+      program:
+
+        ```bash
+        rocm_agent_enumerator
+
+        # gfx000
+        # gfx1100
+        # gfx1100
+        ```
 
     * IREE's [`iree-run-module`](../../developers/general/developer-overview.md#iree-run-module)
       tool:
