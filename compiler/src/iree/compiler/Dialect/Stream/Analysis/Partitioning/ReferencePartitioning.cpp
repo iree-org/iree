@@ -153,8 +153,7 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
       // region - we must still block on loads though.
       LLVM_DEBUG(llvm::dbgs() << "(ignoring global store)\n");
       continue;
-    } else if (!isa<IREE::Stream::StreamableOpInterface>(op) &&
-               !isa<IREE::Stream::AsyncBarrierOp>(op)) {
+    } else if (!isa<IREE::Stream::StreamableOpInterface>(op)) {
       // Not a streamable op. If it has side-effects then we force a hazard on
       // all builders so that we don't move ops across it.
       if (!mlir::wouldOpBeTriviallyDead(&op)) {
@@ -170,18 +169,12 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
 
     // Synchronizing operations should join with their producers if the producer
     // is streamable.
-    if (dyn_cast<IREE::Stream::AsyncTransferOp>(op)) {
+    if (dyn_cast<IREE::Stream::AsyncBarrierOp>(op) ||
+        dyn_cast<IREE::Stream::AsyncTransferOp>(op)) {
       auto producer = op.getOperand(0).getDefiningOp();
       auto streamable =
           dyn_cast_or_null<IREE::Stream::StreamableOpInterface>(producer);
-
-      auto srcAffinity =
-          dyn_cast_or_null<IREE::Stream::AffinityOpInterface>(producer);
-      auto opAffinity = dyn_cast_or_null<IREE::Stream::AffinityOpInterface>(op);
-
-      if (streamable && srcAffinity && srcAffinity.getAffinityAttr() &&
-          IREE::Stream::AffinityAttr::canExecuteTogether(
-              opAffinity.getAffinityAttr(), srcAffinity.getAffinityAttr())) {
+      if (streamable) {
         if (!syncOps.contains(producer))
           syncOps[producer] = llvm::SmallVector<Operation *>();
         syncOps[producer].push_back(&op);
