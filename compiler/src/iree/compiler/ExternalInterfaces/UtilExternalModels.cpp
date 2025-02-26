@@ -350,6 +350,13 @@ struct HoistableLinalgOpInterface
     if (!genericOp) {
       return !isa<linalg::FillOp>(op);
     }
+
+    // Don't hoist ops with no inputs, their result is defined by `linalg.index`
+    // ops and should be fused with their consumers.
+    if (genericOp.getNumDpsInputs() == 0) {
+      return false;
+    }
+
     if (linalg::isaFillOpInterface(genericOp).has_value()) {
       return false;
     }

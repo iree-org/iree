@@ -101,3 +101,30 @@ module @nested_consumer {
     util.return %reshaped : tensor<1x2xf32>
   }
 }
+
+// -----
+
+// CHECK-LABEL: @do_not_hoist_sequence
+module @do_not_hoist_sequence {
+  // CHECK-NOT: util.initializer
+  //     CHECK: util.func public @main
+  //     CHECK:   linalg.generic
+  //     CHECK:   linalg.generic
+  util.func @main(%arg0 : tensor<128xf64>) -> (tensor<128xf64>){
+    %0 = arith.constant dense<0> : tensor<128xi64>
+    %1 = tensor.empty() : tensor<128xf64>
+    %2 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} outs(%0 : tensor<128xi64>) {
+    ^bb0(%out: i64):
+      %1870 = linalg.index 0 : index
+      %1871 = arith.index_cast %1870 : index to i64
+      linalg.yield %1871 : i64
+    } -> tensor<128xi64>
+    %3 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%2 : tensor<128xi64>) outs(%1 : tensor<128xf64>) {
+    ^bb0(%ins: i64 , %outs: f64):
+      %4 = arith.index_cast %ins : i64 to index
+      %5 = tensor.extract %arg0 [%4] : tensor<128xf64>
+      linalg.yield %5 : f64
+    } -> tensor<128xf64>
+    util.return %3 : tensor<128xf64>
+  }
+}
