@@ -233,8 +233,6 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeIm2colPass());
   funcPassManager.addPass(
       IREE::VectorExt::createVectorizeIREEVectorExtOpsPass());
-  funcPassManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  funcPassManager.addPass(createCanonicalizerPass());
   // Vectorize.
   GenericVectorizationPassOptions options;
   options.vectorizePadding = true;

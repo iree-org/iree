@@ -13,7 +13,6 @@
 #include "iree/compiler/Utils/Permutation.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -27,11 +26,6 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Rewrite/PatternApplicator.h"
-
-static llvm::cl::opt<bool> clEnableDistributedComputeMask(
-    "iree-codegen-distributed-compute-mask",
-    llvm::cl::desc("developer flag to enable masked compute post distribution"),
-    llvm::cl::Hidden, llvm::cl::init(false));
 
 namespace mlir::iree_compiler {
 

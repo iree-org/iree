@@ -294,7 +294,6 @@ blockDynamicDimensions(RewriterBase &rewriter,
       .Case<IREE::LinalgExt::AttentionOp>([&](auto attentionOp) {
         return blockDynamicDimensions(rewriter, dynamicDimAnalysis,
                                       attentionOp);
-        return success();
       })
       .Case<linalg::LinalgOp>([&](auto linalgOp) {
         if (clEnableBlockedMatmuls) {

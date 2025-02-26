@@ -1261,7 +1261,7 @@ hal.executable private @online_attention_split_k2 {
 
 module {
   hal.executable public @attention_gather_k {
-    hal.executable.variant public @rocm target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
       hal.executable.export public @attention_gather_k ordinal(0) layout(#pipeline_layout) {
       ^bb0(%arg0: !hal.device):
         %x, %y, %z = flow.dispatch.workgroup_count_from_slice
