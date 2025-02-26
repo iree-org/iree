@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-preprocessing-convert-conv-filter-to-channels-last{filter-layout=hwfc}))" %s | FileCheck --check-prefixes=CHECK-HWFC,CHECK-ALL %s
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-preprocessing-convert-conv-filter-to-channels-last{filter-layout=fhwc}))" %s | FileCheck --check-prefixes=CHECK-FHWC,CHECK-ALL %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-preprocessing-convert-conv-filter-to-channels-last))" %s | FileCheck --check-prefixes=CHECK-FHWC,CHECK-ALL %s
 
 // CHECK-HWFC: #[[$MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d3, d6)>
 // CHECK-FHWC: #[[$MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
