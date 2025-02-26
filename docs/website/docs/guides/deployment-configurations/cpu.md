@@ -70,17 +70,6 @@ default on all platforms, though you should ensure that the
 You will need to get an IREE runtime that supports the local CPU HAL driver,
 along with the appropriate executable loaders for your application.
 
-You can check for CPU support by looking for the `local-sync` and `local-task`
-drivers and devices:
-
-```console hl_lines="10-11"
---8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md:2"
-```
-
-```console hl_lines="4-5"
---8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-device-list-amd.md"
-```
-
 #### :octicons-download-16: Download the runtime from a release
 
 Python packages are distributed through multiple channels. See the
@@ -98,6 +87,19 @@ IREE for your target platform. The local CPU HAL drivers and devices are
 compiled in by default on all platforms, though you should ensure that the
 `IREE_HAL_DRIVER_LOCAL_TASK` and `IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF`
 (or other executable loader) CMake options are `ON` when configuring.
+
+#### :octicons-checklist-24: Check for CPU devices
+
+You can check for CPU support by looking for the `local-sync` and `local-task`
+drivers and devices:
+
+```console hl_lines="10-11"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md:2"
+```
+
+```console hl_lines="4-5"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-device-list-amd.md"
+```
 
 ## Compile and run a program
 

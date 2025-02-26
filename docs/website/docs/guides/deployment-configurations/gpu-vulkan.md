@@ -101,16 +101,6 @@ default on all platforms, though you should ensure that the
 
 Next you will need to get an IREE runtime that supports the Vulkan HAL driver.
 
-You can check for Vulkan support by looking for a matching driver and device:
-
-```console hl_lines="12"
---8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md:2"
-```
-
-```console hl_lines="6"
---8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-device-list-amd.md"
-```
-
 #### :octicons-download-16: Download the runtime from a release
 
 Python packages are distributed through multiple channels. See the
@@ -127,6 +117,36 @@ Please make sure you have followed one of the
 IREE for your target platform. The Vulkan HAL driver is compiled in by default
 on supported platforms, though you should ensure that the
 `IREE_HAL_DRIVER_VULKAN` CMake option is `ON` when configuring.
+
+#### :octicons-checklist-24: Check for Vulkan devices
+
+You can check for Vulkan support by looking for a matching driver and device:
+
+```console hl_lines="12"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md:2"
+```
+
+```console hl_lines="6"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-device-list-amd.md"
+```
+
+To see device details, including hints about what to use as a
+[Vulkan target](#choosing-vulkan-targets) when
+[compiling a program](#compile-and-run-a-program):
+
+```console hl_lines="9-10"
+$ iree-run-module --dump_devices
+
+...
+# ============================================================================
+# Enumerated devices for driver 'vulkan'
+# ============================================================================
+
+# ===----------------------------------------------------------------------===
+# --device=vulkan://00000000-1111-2222-3333-444444444444
+#   AMD Radeon PRO W7900 Dual Slot  (RADV GFX1100)
+# ===----------------------------------------------------------------------===
+```
 
 ## Compile and run a program
 

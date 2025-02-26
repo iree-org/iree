@@ -84,6 +84,24 @@ the IREE compiler, then enable the ROCm compiler target with the
 
 Next you will need to get an IREE runtime that includes the HIP HAL driver.
 
+#### :octicons-download-16: Download the runtime from a release
+
+Python packages are distributed through multiple channels. See the
+[Python Bindings](../../reference/bindings/python.md) page for more details.
+The core [`iree-base-runtime`](https://pypi.org/project/iree-base-runtime/)
+package includes the HIP HAL driver:
+
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-runtime-from-release.md"
+
+#### :material-hammer-wrench: Build the runtime from source
+
+Please make sure you have followed the
+[Getting started](../../building-from-source/getting-started.md) page to build
+IREE from source, then enable the HIP HAL driver with the `IREE_HAL_DRIVER_HIP`
+option.
+
+#### :octicons-checklist-24: Check for HIP devices
+
 You can check for HIP support by looking for a matching driver and device:
 
 ```console hl_lines="9"
@@ -115,22 +133,6 @@ $ iree-run-module --dump_devices
 - gpu-compute-capability: 11.0
 - gpu-arch-name: gfx1100
 ```
-
-#### :octicons-download-16: Download the runtime from a release
-
-Python packages are distributed through multiple channels. See the
-[Python Bindings](../../reference/bindings/python.md) page for more details.
-The core [`iree-base-runtime`](https://pypi.org/project/iree-base-runtime/)
-package includes the HIP HAL driver:
-
---8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-runtime-from-release.md"
-
-#### :material-hammer-wrench: Build the runtime from source
-
-Please make sure you have followed the
-[Getting started](../../building-from-source/getting-started.md) page to build
-IREE from source, then enable the HIP HAL driver with the `IREE_HAL_DRIVER_HIP`
-option.
 
 ## Compile and run a program
 

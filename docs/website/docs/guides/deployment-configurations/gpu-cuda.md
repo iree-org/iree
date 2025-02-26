@@ -50,16 +50,6 @@ the IREE compiler, then enable the CUDA compiler target with the
 
 Next you will need to get an IREE runtime that includes the CUDA HAL driver.
 
-You can check for CUDA support by looking for a matching driver and device:
-
-```console hl_lines="8"
---8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md:2"
-```
-
-```console hl_lines="3"
---8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-device-list-nvidia.md"
-```
-
 #### :octicons-download-16: Download the runtime from a release
 
 Python packages are distributed through multiple channels. See the
@@ -75,6 +65,18 @@ Please make sure you have followed the
 [Getting started](../../building-from-source/getting-started.md) page to build
 IREE from source, then enable the CUDA HAL driver with the
 `IREE_HAL_DRIVER_CUDA` option.
+
+#### :octicons-checklist-24: Check for CUDA devices
+
+You can check for CUDA support by looking for a matching driver and device:
+
+```console hl_lines="8"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md:2"
+```
+
+```console hl_lines="3"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-device-list-nvidia.md"
+```
 
 ## Compile and run a program
 
