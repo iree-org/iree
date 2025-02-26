@@ -127,7 +127,15 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
 
   // Elide any redundant transfers now that affinities are baked out and we know
   // where resources are located.
-  passManager.addPass(IREE::Stream::createElideAsyncTransfersPass());
+  //
+  // TODO(benvanik): enable this pass after updating usage refinement: today
+  // the clones are not handled correctly and will result in usage analysis
+  // failing. This seems to be caused by transfers having some non-trivial logic
+  // during analysis that clone does not have and just applying the same logic
+  // to clones results in other errors around lifetime changes. The resource
+  // analysis and refinement logic likely needs a larger reworking.
+  //
+  // passManager.addPass(IREE::Stream::createElideAsyncTransfersPass());
 
   // Cleanup globals that were created during conversion.
   buildStreamCleanupPassPipeline(passManager, transformOptions);
