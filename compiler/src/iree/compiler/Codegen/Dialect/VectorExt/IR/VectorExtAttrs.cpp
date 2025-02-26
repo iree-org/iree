@@ -300,7 +300,7 @@ NestedLayoutAttr::getRecombinedLayout(ArrayRef<VectorLayoutInterface> layouts,
   // a helper to perform a valid update when recombining
   // layouts. If there is a conflict, this will return
   // false.
-  auto checkedUpdate = [](int64_t &data, int64_t v) -> bool {
+  auto checkedUpdate = [&](int64_t &data, int64_t v) -> bool {
     if (data != kInvalid && data != v) {
       return false;
     }
@@ -354,7 +354,7 @@ NestedLayoutAttr::getRecombinedLayout(ArrayRef<VectorLayoutInterface> layouts,
   for (const llvm::SmallVector<int64_t> &tile :
        {subgroupTile, batchTile, outerTile, threadTile, subgroupStrides,
         threadStrides}) {
-    if (llvm::any_of(tile, [](int64_t v) { return v == kInvalid; })) {
+    if (llvm::any_of(tile, [&](int64_t v) { return v == kInvalid; })) {
       return NestedLayoutAttr();
     }
   }
