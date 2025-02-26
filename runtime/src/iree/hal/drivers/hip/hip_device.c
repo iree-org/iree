@@ -434,10 +434,13 @@ iree_status_t iree_hal_hip_device_create(
 
   iree_status_t status = iree_hal_hip_device_check_params(params);
 
-  // Get the main context for the device.
+  // Initialize each device.
   for (iree_host_size_t i = 0; i < device_count && iree_status_is_ok(status);
        ++i) {
-    device->devices[i].hip_device = devices[i];
+    hipDevice_t deviceId = devices[i];
+    device->devices[i].hip_device = deviceId;
+
+    // Get the main context for the device.
     status = IREE_HIP_CALL_TO_STATUS(
         symbols,
         hipDevicePrimaryCtxRetain(&device->devices[i].hip_context, devices[i]));
@@ -460,20 +463,44 @@ iree_status_t iree_hal_hip_device_create(
                                    hipStreamNonBlocking));
     }
 
-    if (iree_status_is_ok(status)) {
+    // If there are multiple devices, enable peering between them all.
+    if (iree_status_is_ok(status) && device_count > 1) {
       int hip_device_count = 0;
       status = IREE_HIP_CALL_TO_STATUS(
           symbols, hipGetDeviceCount(&hip_device_count), "hipGetDeviceCount");
 
       for (int j = 0; j < hip_device_count && iree_status_is_ok(status); ++j) {
-        if (j == device->devices[i].hip_device) {
+        if (j == deviceId) {
+          // Can't peer to self.
           continue;
         }
-        hipError_t hip_error = symbols->hipDeviceEnablePeerAccess(j, 0);
+
+        // Check if peering is possible. The hipDeviceEnablePeerAccess call
+        // below can also return hipErrorInvalidDevice but this gives a better
+        // error message.
+        int canAccessPeer = 0;
+        hipError_t hip_error =
+            symbols->hipDeviceCanAccessPeer(&canAccessPeer, deviceId, j);
+        if (hip_error != hipSuccess) {
+          status = IREE_HIP_RESULT_TO_STATUS(symbols, hip_error);
+          break;
+        }
+        if (canAccessPeer != 1) {
+          status = iree_make_status(IREE_STATUS_PERMISSION_DENIED,
+                                    "device %d is not able to access peer %d",
+                                    deviceId, j);
+          break;
+        }
+
+        hip_error = symbols->hipDeviceEnablePeerAccess(j, 0);
         if (hip_error == hipErrorPeerAccessAlreadyEnabled) {
+          // Already peered. That's okay.
           continue;
         }
+
+        // Unhandled error, propagate it.
         status = IREE_HIP_RESULT_TO_STATUS(symbols, hip_error);
+        break;
       }
     }
   }
