@@ -13,10 +13,10 @@ runtime entirely or interface with custom accelerators.
   with minimal platform dependencies
 * [:octicons-server-16: GPU - Vulkan](./gpu-vulkan.md)
   for cross-platform usage and interop with graphics applications
-* [:simple-nvidia: GPU - CUDA](./gpu-cuda.md)
-  for NVIDIA-specific solutions
 * [:simple-amd: GPU - ROCm](./gpu-rocm.md)
   for AMD-specific solutions
+* [:simple-nvidia: GPU - CUDA](./gpu-cuda.md)
+  for NVIDIA-specific solutions
 * [:simple-apple: GPU - Metal](./gpu-metal.md)
   for running on Apple hardware
 
@@ -42,9 +42,9 @@ When compiling programs, a list of target backends must be specified via
 | `llvm-cpu` | Code generation for CPU-like devices supported by LLVM | `local-sync`, `local-task` |
 | `vmvx` | Portable interpreter powered by a microkernel library | `local-sync`, `local-task` |
 | `vulkan-spirv` | Portable GPU support via SPIR-V for Vulkan | `vulkan` |
+| `rocm` | AMD GPU support via HSACO for HIP | `hip` |
 | `cuda` | NVIDIA GPU support via PTX for CUDA | `cuda` |
 | `metal-spirv` | GPU support on Apple platforms via MSL for Metal | `metal` |
-| `rocm` | **Experimental** <br> AMD GPU support via HSACO for ROCm | `rocm` |
 | `webgpu-spirv` | **Experimental** <br> GPU support on the Web via WGSL for WebGPU | `webgpu` |
 
 !!! tip "Tip - listing available backends"
@@ -94,9 +94,9 @@ focus and the build configuration.
 | `local-sync` | Synchronous local CPU device with inline execution |
 | `local-task` | Multithreaded local CPU device using a 'task' executor |
 | `vulkan`     | Portable GPU execution using the Vulkan API |
+| `hip`        | AMD GPU execution using HIP |
 | `cuda`       | NVIDIA GPU execution using CUDA |
 | `metal`      | GPU execution on Apple platforms using Metal |
-| `rocm`       | **Experimental** <br> AMD GPU execution using ROCm |
 | `webgpu`     | **Experimental** <br> GPU execution on the web using WebGPU |
 
 Additional HAL drivers can also be defined external to the core project via
