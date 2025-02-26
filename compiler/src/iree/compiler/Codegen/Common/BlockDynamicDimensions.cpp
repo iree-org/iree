@@ -265,7 +265,7 @@ static LogicalResult
 blockDynamicDimensions(RewriterBase &rewriter,
                        const TensorDynamicDimAnalysis &dynamicDimAnalysis,
                        linalg::LinalgOp linalgOp) {
-  if (isa<linalg::GenericOp>(linalgOp)) {
+  if (isa<linalg::GenericOp>(linalgOp) && linalgOp.isAllParallelLoops()) {
     return blockDynamicDimensionsOfAllTensorOperandsAndResults(
         rewriter, dynamicDimAnalysis, linalgOp);
   }
