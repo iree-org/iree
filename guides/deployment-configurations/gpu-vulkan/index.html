@@ -14,7 +14,7 @@
         <link rel="prev" href="../bare-metal/">
       
       
-        <link rel="next" href="../gpu-cuda/">
+        <link rel="next" href="../gpu-rocm/">
       
       
       <link rel="icon" href="../../../assets/images/IREE_Logo_Icon_Color.svg">
@@ -1081,6 +1081,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#check-for-vulkan-devices" class="md-nav__link">
+    <span class="md-ellipsis">
+      Check for Vulkan devices
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1107,6 +1116,21 @@
       Compile a program
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Compile a program">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choosing-vulkan-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      Choosing Vulkan targets
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -1140,13 +1164,13 @@
   
   
     <li class="md-nav__item">
-      <a href="../gpu-cuda/" class="md-nav__link">
+      <a href="../gpu-rocm/" class="md-nav__link">
         
   
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8.948 8.798v-1.43a7 7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851a3.7 3.7 0 0 1-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952a6 6 0 0 0-.796.035m0-4.735v2.138l.424-.027c5.45-.185 9.01 4.47 9.01 4.47s-4.08 4.964-8.33 4.964a6.5 6.5 0 0 1-1.095-.097v1.325c.3.035.61.062.91.062 3.957 0 6.82-2.023 9.593-4.408.459.371 2.34 1.263 2.73 1.652-2.633 2.208-8.772 3.984-12.253 3.984-.335 0-.653-.018-.971-.053v1.864H24V4.063zm0 10.326v1.131c-3.657-.654-4.673-4.46-4.673-4.46s1.758-1.944 4.673-2.262v1.237H8.94c-1.528-.186-2.73 1.245-2.73 1.245s.68 2.412 2.739 3.11M2.456 10.9s2.164-3.197 6.5-3.533V6.201C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m18.324 9.137 1.559 1.56h2.556v2.557L24 14.814V9.137zM2 9.52l-2 4.96h1.309l.37-.982H3.9l.408.982h1.338L3.432 9.52zm4.209 0v4.955h1.238v-3.092l1.338 1.562h.188l1.338-1.556v3.091h1.238V9.52H10.47l-1.592 1.845L7.287 9.52zm6.283 0v4.96h2.057c1.979 0 2.88-1.046 2.88-2.472 0-1.36-.937-2.488-2.747-2.488zm1.237.91h.792c1.17 0 1.63.711 1.63 1.57 0 .728-.372 1.572-1.616 1.572h-.806zm-10.985.273.791 1.932H2.008zm17.137.307-1.604 1.603v2.25h2.246l1.604-1.607h-2.246z"/></svg>
   
   <span class="md-ellipsis">
-    GPU - CUDA
+    GPU - ROCm
   </span>
   
 
@@ -1163,13 +1187,13 @@
   
   
     <li class="md-nav__item">
-      <a href="../gpu-rocm/" class="md-nav__link">
+      <a href="../gpu-cuda/" class="md-nav__link">
         
   
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m18.324 9.137 1.559 1.56h2.556v2.557L24 14.814V9.137zM2 9.52l-2 4.96h1.309l.37-.982H3.9l.408.982h1.338L3.432 9.52zm4.209 0v4.955h1.238v-3.092l1.338 1.562h.188l1.338-1.556v3.091h1.238V9.52H10.47l-1.592 1.845L7.287 9.52zm6.283 0v4.96h2.057c1.979 0 2.88-1.046 2.88-2.472 0-1.36-.937-2.488-2.747-2.488zm1.237.91h.792c1.17 0 1.63.711 1.63 1.57 0 .728-.372 1.572-1.616 1.572h-.806zm-10.985.273.791 1.932H2.008zm17.137.307-1.604 1.603v2.25h2.246l1.604-1.607h-2.246z"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8.948 8.798v-1.43a7 7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851a3.7 3.7 0 0 1-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952a6 6 0 0 0-.796.035m0-4.735v2.138l.424-.027c5.45-.185 9.01 4.47 9.01 4.47s-4.08 4.964-8.33 4.964a6.5 6.5 0 0 1-1.095-.097v1.325c.3.035.61.062.91.062 3.957 0 6.82-2.023 9.593-4.408.459.371 2.34 1.263 2.73 1.652-2.633 2.208-8.772 3.984-12.253 3.984-.335 0-.653-.018-.971-.053v1.864H24V4.063zm0 10.326v1.131c-3.657-.654-4.673-4.46-4.673-4.46s1.758-1.944 4.673-2.262v1.237H8.94c-1.528-.186-2.73 1.245-2.73 1.245s.68 2.412 2.739 3.11M2.456 10.9s2.164-3.197 6.5-3.533V6.201C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936"/></svg>
   
   <span class="md-ellipsis">
-    GPU - ROCm
+    GPU - CUDA
   </span>
   
 
@@ -3864,6 +3888,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#check-for-vulkan-devices" class="md-nav__link">
+    <span class="md-ellipsis">
+      Check for Vulkan devices
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3890,6 +3923,21 @@
       Compile a program
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Compile a program">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choosing-vulkan-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      Choosing Vulkan targets
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -4090,27 +4138,6 @@ may want to include this path in your system's <code>PATH</code> environment var
 </div>
 <h3 id="get-the-iree-runtime">Get the IREE runtime<a class="headerlink" href="#get-the-iree-runtime" title="Permanent link">link</a></h3>
 <p>Next you will need to get an IREE runtime that supports the Vulkan HAL driver.</p>
-<p>You can check for Vulkan support by looking for a matching driver and device:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--list_drivers
-
-<span class="gp"># </span><span class="o">============================================================================</span>
-<span class="gp"># </span>Available<span class="w"> </span>HAL<span class="w"> </span><span class="nv">drivers</span>
-<span class="gp"># </span><span class="o">============================================================================</span>
-<span class="gp"># </span>Use<span class="w"> </span>--list_devices<span class="o">={</span>driver<span class="w"> </span>name<span class="o">}</span><span class="w"> </span>to<span class="w"> </span>enumerate<span class="w"> </span>available<span class="w"> </span>devices.
-
-<span class="go">        cuda: NVIDIA CUDA HAL driver (via dylib)</span>
-<span class="go">         hip: HIP HAL driver (via dylib)</span>
-<span class="go">  local-sync: Local execution using a lightweight inline synchronous queue</span>
-<span class="go">  local-task: Local execution using the IREE multithreading task system</span>
-<span class="hll"><span class="go">      vulkan: Vulkan 1.x (dynamic)</span>
-</span></code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--list_devices
-
-<span class="go">  hip://GPU-00000000-1111-2222-3333-444444444444</span>
-<span class="go">  local-sync://</span>
-<span class="go">  local-task://</span>
-<span class="hll"><span class="go">  vulkan://00000000-1111-2222-3333-444444444444</span>
-</span></code></pre></div>
 <h4 id="download-the-runtime-from-a-release"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06z"/></svg></span> Download the runtime from a release<a class="headerlink" href="#download-the-runtime-from-a-release" title="Permanent link">link</a></h4>
 <p>Python packages are distributed through multiple channels. See the
 <a href="../../../reference/bindings/python/">Python Bindings</a> page for more details.
@@ -4153,6 +4180,43 @@ python<span class="w"> </span>./build_tools/pkgci/setup_venv.py<span class="w"> 
 IREE for your target platform. The Vulkan HAL driver is compiled in by default
 on supported platforms, though you should ensure that the
 <code>IREE_HAL_DRIVER_VULKAN</code> CMake option is <code>ON</code> when configuring.</p>
+<h4 id="check-for-vulkan-devices"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3.5 3.75a.25.25 0 0 1 .25-.25h13.5a.25.25 0 0 1 .25.25v10a.75.75 0 0 0 1.5 0v-10A1.75 1.75 0 0 0 17.25 2H3.75A1.75 1.75 0 0 0 2 3.75v16.5c0 .966.784 1.75 1.75 1.75h7a.75.75 0 0 0 0-1.5h-7a.25.25 0 0 1-.25-.25z"/><path d="M6.25 7a.75.75 0 0 0 0 1.5h8.5a.75.75 0 0 0 0-1.5zm-.75 4.75a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75m16.28 4.53a.75.75 0 1 0-1.06-1.06l-4.97 4.97-1.97-1.97a.75.75 0 1 0-1.06 1.06l2.5 2.5a.75.75 0 0 0 1.06 0z"/></svg></span> Check for Vulkan devices<a class="headerlink" href="#check-for-vulkan-devices" title="Permanent link">link</a></h4>
+<p>You can check for Vulkan support by looking for a matching driver and device:</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--list_drivers
+
+<span class="gp"># </span><span class="o">============================================================================</span>
+<span class="gp"># </span>Available<span class="w"> </span>HAL<span class="w"> </span><span class="nv">drivers</span>
+<span class="gp"># </span><span class="o">============================================================================</span>
+<span class="gp"># </span>Use<span class="w"> </span>--list_devices<span class="o">={</span>driver<span class="w"> </span>name<span class="o">}</span><span class="w"> </span>to<span class="w"> </span>enumerate<span class="w"> </span>available<span class="w"> </span>devices.
+
+<span class="go">        cuda: NVIDIA CUDA HAL driver (via dylib)</span>
+<span class="go">         hip: HIP HAL driver (via dylib)</span>
+<span class="go">  local-sync: Local execution using a lightweight inline synchronous queue</span>
+<span class="go">  local-task: Local execution using the IREE multithreading task system</span>
+<span class="hll"><span class="go">      vulkan: Vulkan 1.x (dynamic)</span>
+</span></code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--list_devices
+
+<span class="go">hip://GPU-00000000-1111-2222-3333-444444444444</span>
+<span class="go">local-sync://</span>
+<span class="go">local-task://</span>
+<span class="hll"><span class="go">vulkan://00000000-1111-2222-3333-444444444444</span>
+</span></code></pre></div>
+<p>To see device details, including hints about what to use as a
+<a href="#choosing-vulkan-targets">Vulkan target</a> when
+<a href="#compile-and-run-a-program">compiling a program</a>:</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--dump_devices
+
+<span class="go">...</span>
+<span class="gp"># </span><span class="o">============================================================================</span>
+<span class="gp"># </span>Enumerated<span class="w"> </span>devices<span class="w"> </span><span class="k">for</span><span class="w"> </span>driver<span class="w"> </span><span class="s1">&#39;vulkan&#39;</span>
+<span class="gp"># </span><span class="o">============================================================================</span>
+
+<span class="gp"># </span><span class="o">===</span>----------------------------------------------------------------------<span class="o">===</span>
+<span class="hll"><span class="gp"># </span>--device<span class="o">=</span>vulkan://00000000-1111-2222-3333-444444444444
+</span><span class="hll"><span class="gp">#   </span>AMD<span class="w"> </span>Radeon<span class="w"> </span>PRO<span class="w"> </span>W7900<span class="w"> </span>Dual<span class="w"> </span>Slot<span class="w">  </span><span class="o">(</span>RADV<span class="w"> </span>GFX1100<span class="o">)</span>
+</span><span class="gp"># </span><span class="o">===</span>----------------------------------------------------------------------<span class="o">===</span>
+</code></pre></div>
 <h2 id="compile-and-run-a-program">Compile and run a program<a class="headerlink" href="#compile-and-run-a-program" title="Permanent link">link</a></h2>
 <p>With the requirements out of the way, we can now compile a model and run it.</p>
 <h3 id="compile-a-program"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4 1.75C4 .784 4.784 0 5.75 0h5.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v8.586A1.75 1.75 0 0 1 14.25 15h-9a.75.75 0 0 1 0-1.5h9a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 10 4.25V1.5H5.75a.25.25 0 0 0-.25.25v2.5a.75.75 0 0 1-1.5 0Zm1.72 4.97a.75.75 0 0 1 1.06 0l2 2a.75.75 0 0 1 0 1.06l-2 2a.749.749 0 0 1-1.275-.326.75.75 0 0 1 .215-.734l1.47-1.47-1.47-1.47a.75.75 0 0 1 0-1.06M3.28 7.78 1.81 9.25l1.47 1.47a.75.75 0 0 1-.018 1.042.75.75 0 0 1-1.042.018l-2-2a.75.75 0 0 1 0-1.06l2-2a.75.75 0 0 1 1.042.018.75.75 0 0 1 .018 1.042m8.22-6.218V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914z"/></svg></span> Compile a program<a class="headerlink" href="#compile-a-program" title="Permanent link">link</a></h3>
@@ -4176,8 +4240,7 @@ iree-import-onnx<span class="w"> </span>mobilenetv2-10.onnx<span class="w"> </sp
 </span><span class="hll"><span class="w">    </span>--iree-vulkan-target<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
 </span><span class="w">    </span>mobilenetv2.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_vulkan.vmfb
 </code></pre></div>
-<details class="tip" open="open">
-<summary>Tip - Vulkan targets</summary>
+<h4 id="choosing-vulkan-targets">Choosing Vulkan targets<a class="headerlink" href="#choosing-vulkan-targets" title="Permanent link">link</a></h4>
 <p>The <code>--iree-vulkan-target</code> specifies the GPU architecture to target. It
 accepts a few schemes:</p>
 <ul>
@@ -4192,101 +4255,103 @@ accepts a few schemes:</p>
 <thead>
 <tr>
 <th>GPU</th>
+<th>Product Name</th>
 <th>Target Architecture</th>
 <th>Architecture Code Name</th>
-<th>Product Name</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>AMD RX7900XTX</td>
+<td><code>rx7900xtx</code></td>
 <td><code>gfx1100</code></td>
 <td><code>rdna3</code></td>
-<td><code>rx7900xtx</code></td>
 </tr>
 <tr>
 <td>AMD RX7900XT</td>
+<td><code>rx7900xt</code></td>
 <td><code>gfx1100</code></td>
 <td><code>rdna3</code></td>
-<td><code>rx7900xt</code></td>
 </tr>
 <tr>
 <td>AMD RX7800XT</td>
+<td><code>rx7800xt</code></td>
 <td><code>gfx1101</code></td>
 <td><code>rdna3</code></td>
-<td><code>rx7800xt</code></td>
 </tr>
 <tr>
 <td>AMD RX7700XT</td>
+<td><code>rx7700xt</code></td>
 <td><code>gfx1101</code></td>
 <td><code>rdna3</code></td>
-<td><code>rx7700xt</code></td>
 </tr>
 <tr>
 <td>AMD RX6000 series</td>
 <td></td>
-<td><code>rdna2</code></td>
 <td></td>
+<td><code>rdna2</code></td>
 </tr>
 <tr>
 <td>AMD RX5000 series</td>
 <td></td>
-<td><code>rdna1</code></td>
 <td></td>
+<td><code>rdna1</code></td>
 </tr>
 <tr>
 <td>ARM Mali G715</td>
+<td><code>mali-g715</code></td>
 <td></td>
 <td><code>valhall4</code></td>
-<td>e.g., <code>mali-g715</code></td>
 </tr>
 <tr>
 <td>ARM Mali G510</td>
+<td><code>mali-g510</code></td>
 <td></td>
 <td><code>valhall3</code></td>
-<td>e.g., <code>mali-g510</code></td>
 </tr>
 <tr>
 <td>ARM GPUs</td>
 <td></td>
-<td><code>valhall</code></td>
 <td></td>
+<td><code>valhall</code></td>
 </tr>
 <tr>
 <td>NVIDIA RTX40 series</td>
+<td><code>rtx4090</code></td>
 <td><code>sm_89</code></td>
 <td><code>ada</code></td>
-<td>e.g., <code>rtx4090</code></td>
 </tr>
 <tr>
 <td>NVIDIA RTX30 series</td>
+<td><code>rtx3080ti</code></td>
 <td><code>sm_86</code></td>
 <td><code>ampere</code></td>
-<td>e.g., <code>rtx3080ti</code></td>
 </tr>
 <tr>
 <td>NVIDIA RTX20 series</td>
+<td><code>rtx2070super</code></td>
 <td><code>sm_75</code></td>
 <td><code>turing</code></td>
-<td>e.g., <code>rtx2070super</code></td>
 </tr>
 <tr>
 <td>Qualcomm GPUs</td>
 <td></td>
-<td><code>adreno</code></td>
 <td></td>
+<td><code>adreno</code></td>
 </tr>
 </tbody>
 </table>
 <p>If no target is specified, then a safe but more limited default will be used.</p>
-<p>Note that we don't support the full spectrum of GPUs here and it is
-impossible to capture all details of a Vulkan implementation with a target
-triple, given the allowed variances on extensions, properties, limits, etc.
-So the target triple is just an approximation for usage. This is more of a
-mechanism to help us develop IREE itself--in the long term we want to
-perform multiple targetting to generate to multiple architectures if no
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>We don't support the full spectrum of GPUs here and it is impossible to
+capture all details of a Vulkan implementation with a target triple, given
+the allowed variances on extensions, properties, limits, etc. So the target
+triple is just an approximation for usage. This is more of a mechanism to
+help us develop IREE itself. In the long term we want to perform
+multi-targetting to generate code for multiple architectures if no explicit
 target is given.</p>
-</details>
+</div>
 <h3 id="run-a-compiled-program"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25ZM7.25 8a.75.75 0 0 1-.22.53l-2.25 2.25a.749.749 0 0 1-1.275-.326.75.75 0 0 1 .215-.734L5.44 8 3.72 6.28a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215l2.25 2.25c.141.14.22.331.22.53m1.5 1.5h3a.75.75 0 0 1 0 1.5h-3a.75.75 0 0 1 0-1.5"/></svg></span> Run a compiled program<a class="headerlink" href="#run-a-compiled-program" title="Permanent link">link</a></h3>
 <p>To run the compiled program:</p>
 <div class="highlight"><pre><span></span><code>iree-run-module<span class="w"> </span><span class="se">\</span>
