@@ -10,7 +10,7 @@ icon: simple/amd
 # GPU deployment using ROCm
 
 IREE can accelerate model execution on AMD GPUs using
-[ROCm](https://www.amd.com/en/graphics/servers-solutions-rocm).
+[ROCm](https://www.amd.com/en/products/software/rocm.html).
 
 ## :octicons-download-16: Prerequisites
 
