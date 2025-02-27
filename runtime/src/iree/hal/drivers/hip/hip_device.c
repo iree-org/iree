@@ -410,6 +410,46 @@ static iree_status_t iree_hal_hip_device_initialize_internal(
   return status;
 }
 
+static iree_status_t iree_hal_hip_device_enable_peering(
+    const iree_hal_hip_dynamic_symbols_t* symbols, hipDevice_t device_id) {
+  int hip_device_count = 0;
+  IREE_RETURN_IF_ERROR(IREE_HIP_CALL_TO_STATUS(
+      symbols, hipGetDeviceCount(&hip_device_count), "hipGetDeviceCount"));
+
+  for (int j = 0; j < hip_device_count; ++j) {
+    if (j == device_id) {
+      // Can't peer to self.
+      continue;
+    }
+
+    // Check if peering is possible. The hipDeviceEnablePeerAccess call
+    // below can also return hipErrorInvalidDevice but this gives a better
+    // error message.
+    int canAccessPeer = 0;
+    hipError_t hip_error =
+        symbols->hipDeviceCanAccessPeer(&canAccessPeer, device_id, j);
+    if (hip_error != hipSuccess) {
+      return IREE_HIP_RESULT_TO_STATUS(symbols, hip_error);
+    }
+    if (canAccessPeer != 1) {
+      return iree_make_status(IREE_STATUS_PERMISSION_DENIED,
+                              "device %d is not able to access peer %d",
+                              device_id, j);
+    }
+
+    hip_error = symbols->hipDeviceEnablePeerAccess(j, 0);
+    if (hip_error == hipErrorPeerAccessAlreadyEnabled) {
+      // Already peered. That's okay.
+      continue;
+    } else if (hip_error != hipSuccess) {
+      // Unhandled error, propagate it.
+      return IREE_HIP_RESULT_TO_STATUS(symbols, hip_error);
+    }
+  }
+
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_hip_device_create(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
     const iree_hal_hip_device_params_t* params,
@@ -434,10 +474,13 @@ iree_status_t iree_hal_hip_device_create(
 
   iree_status_t status = iree_hal_hip_device_check_params(params);
 
-  // Get the main context for the device.
+  // Initialize each device.
   for (iree_host_size_t i = 0; i < device_count && iree_status_is_ok(status);
        ++i) {
-    device->devices[i].hip_device = devices[i];
+    hipDevice_t device_id = devices[i];
+    device->devices[i].hip_device = device_id;
+
+    // Get the main context for the device.
     status = IREE_HIP_CALL_TO_STATUS(
         symbols,
         hipDevicePrimaryCtxRetain(&device->devices[i].hip_context, devices[i]));
@@ -460,21 +503,9 @@ iree_status_t iree_hal_hip_device_create(
                                    hipStreamNonBlocking));
     }
 
-    if (iree_status_is_ok(status)) {
-      int hip_device_count = 0;
-      status = IREE_HIP_CALL_TO_STATUS(
-          symbols, hipGetDeviceCount(&hip_device_count), "hipGetDeviceCount");
-
-      for (int j = 0; j < hip_device_count && iree_status_is_ok(status); ++j) {
-        if (j == device->devices[i].hip_device) {
-          continue;
-        }
-        hipError_t hip_error = symbols->hipDeviceEnablePeerAccess(j, 0);
-        if (hip_error == hipErrorPeerAccessAlreadyEnabled) {
-          continue;
-        }
-        status = IREE_HIP_RESULT_TO_STATUS(symbols, hip_error);
-      }
+    // If there are multiple devices, enable peering between them all.
+    if (iree_status_is_ok(status) && device_count > 1) {
+      status = iree_hal_hip_device_enable_peering(symbols, device_id);
     }
   }
 
