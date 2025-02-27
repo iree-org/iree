@@ -18,7 +18,9 @@
 
 namespace mlir::iree_compiler {
 
-struct opt_initializer_base {};
+struct opt_initializer_base {
+  virtual ~opt_initializer_base() = default;
+};
 
 template <typename Ty>
 struct opt_initializer : opt_initializer_base {
