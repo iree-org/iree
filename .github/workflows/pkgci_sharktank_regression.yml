@@ -18,13 +18,8 @@ on:
         default: ""
 
 jobs:
-<<<<<<< HEAD
   sharktank_regression_tests:
     name: "sharktank_regression_tests :: ${{ matrix.name }}"
-=======
-  sharktank_regresion_tests:
-    name: "sharktank_regresion_tests :: ${{ matrix.name }}"
->>>>>>> a3f6aa8220 (Adding combined GH action)
     runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false
