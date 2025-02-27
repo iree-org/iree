@@ -417,7 +417,7 @@ util.func public @keep_encoding_if_serialized(%arg0: index, %arg1: index, %scala
 
 // -----
 
-// Check that a failure is signaled if we are not able to resolve a recognize
+// Check that a failure is signaled if we are not able to resolve a recognized
 // encoding.
 
 #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", { iree.encoding.resolver = #iree_encoding.unsupported_encoding }>
