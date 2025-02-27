@@ -53,6 +53,16 @@ environment. It can be verified by the following steps:
 
     ``` console
     $ hipInfo.exe
+
+    --------------------------------------------------------------------------------
+    device#                           0
+    Name:                             AMD Radeon PRO W7900 Dual Slot
+    pciBusID:                         35
+    pciDeviceID:                      0
+    pciDomainID:                      0
+    multiProcessorCount:              48
+
+    ...
     ```
 
     If `hipInfo.exe` does not exist, you will need to install the latest
@@ -217,9 +227,18 @@ is the most general.
     to get target chip information for the first GPU device on our system. This
     information can be queried in several ways:
 
+    * The `amdgpu-arch` program on Linux and Windows:
+
+        ```bash
+        amdgpu-arch
+
+        # gfx1100
+        # gfx1100
+        ```
+
     * The
       [`rocm_agent_enumerator`](https://rocm.docs.amd.com/projects/rocminfo/en/latest/how-to/use-rocm-agent-enumerator.html)
-      program:
+      program on Linux:
 
         ```bash
         rocm_agent_enumerator
@@ -243,7 +262,7 @@ is the most general.
 
     * The
       [ROCmInfo](https://rocm.docs.amd.com/projects/rocminfo/en/latest/how-to/use-rocminfo.html)
-      program:
+      program on Linux:
 
         ```bash
         rocminfo
