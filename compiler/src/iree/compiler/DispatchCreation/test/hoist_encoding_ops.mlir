@@ -208,3 +208,21 @@ module {
 // CHECK:       }
 // CHECK:       %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[DISPATCH]] : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #[[$ENCODING]]>
 // CHECK:       util.return %[[DISPATCH]], %[[SET_ENCODING]]
+
+// -----
+
+#encoding = #iree_encoding.testing_encoding<>
+util.func private @get_tensor(tensor<640x320xi8, #encoding>) -> tensor<640x320xi8>
+util.func public @hoist_both_src_and_encoding() -> tensor<640x320xi8> {
+  %0 = flow.dispatch.region -> (tensor<640x320xi8>) {
+    %cst = arith.constant dense<1> : tensor<640x320xi8>
+    %1 = iree_encoding.set_encoding %cst : tensor<640x320xi8> -> tensor<640x320xi8, #encoding>
+    %2 = util.call @get_tensor(%1) : (tensor<640x320xi8, #encoding>) -> tensor<640x320xi8>
+    flow.return %2 : tensor<640x320xi8>
+  }
+  util.return %0 : tensor<640x320xi8>
+}
+// CHECK-LABEL: util.func public @hoist_both_src_and_encoding(
+// CHECK:         %[[CST:.+]] = arith.constant
+// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[CST]]
+// CHECK:         flow.dispatch.region
