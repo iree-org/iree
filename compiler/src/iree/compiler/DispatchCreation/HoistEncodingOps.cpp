@@ -204,10 +204,10 @@ void HoistEncodingOpsPass::runOnOperation() {
   });
   IRRewriter rewriter(ctx);
   for (auto setEncodingOp : candidates) {
-    Value src = setEncodingOp.getSource();
-    if (getConstantIntValue(src).has_value() &&
-        failed(IREE::Flow::hoistOutOfDispatch(rewriter, src.getDefiningOp()))) {
-      setEncodingOp->emitOpError("failed to hoist the source out of dispatch");
+    Operation *src = setEncodingOp.getSource().getDefiningOp();
+    if (src && src->hasTrait<OpTrait::ConstantLike>() &&
+        failed(IREE::Flow::hoistOutOfDispatch(rewriter, src))) {
+      src->emitOpError("failed to hoist the source out of dispatch");
       return signalPassFailure();
     }
     if (failed(IREE::Flow::hoistOutOfDispatch(rewriter, setEncodingOp))) {
