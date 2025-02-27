@@ -204,6 +204,8 @@ void HoistEncodingOpsPass::runOnOperation() {
   });
   IRRewriter rewriter(ctx);
   for (auto setEncodingOp : candidates) {
+    // TODO: Hoist the entire slice of IR up to the root if there is a ConstExpr
+    // root op.
     Operation *src = setEncodingOp.getSource().getDefiningOp();
     if (src && src->hasTrait<OpTrait::ConstantLike>() &&
         failed(IREE::Flow::hoistOutOfDispatch(rewriter, src))) {
