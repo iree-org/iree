@@ -4010,6 +4010,16 @@ can also show information about your ROCm installation.</p>
 <div class="tabbed-block">
 <p>Windows users can run <code>hipInfo.exe</code> to check their environment:</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>hipInfo.exe
+
+<span class="go">--------------------------------------------------------------------------------</span>
+<span class="go">device#                           0</span>
+<span class="go">Name:                             AMD Radeon PRO W7900 Dual Slot</span>
+<span class="go">pciBusID:                         35</span>
+<span class="go">pciDeviceID:                      0</span>
+<span class="go">pciDomainID:                      0</span>
+<span class="go">multiProcessorCount:              48</span>
+
+<span class="go">...</span>
 </code></pre></div>
 <p>If <code>hipInfo.exe</code> does not exist, you will need to install the latest
 <a href="https://rocm.docs.amd.com/en/latest/deploy/windows/quick_start.html">HIP SDK for Windows</a>.</p>
@@ -4326,9 +4336,17 @@ to get target chip information for the first GPU device on our system. This
 information can be queried in several ways:</p>
 <ul>
 <li>
+<p>The <code>amdgpu-arch</code> program on Linux and Windows:</p>
+<div class="highlight"><pre><span></span><code>amdgpu-arch
+
+<span class="c1"># gfx1100</span>
+<span class="c1"># gfx1100</span>
+</code></pre></div>
+</li>
+<li>
 <p>The
   <a href="https://rocm.docs.amd.com/projects/rocminfo/en/latest/how-to/use-rocm-agent-enumerator.html"><code>rocm_agent_enumerator</code></a>
-  program:</p>
+  program on Linux:</p>
 <div class="highlight"><pre><span></span><code>rocm_agent_enumerator
 
 <span class="c1"># gfx000</span>
@@ -4350,7 +4368,7 @@ iree-run-module<span class="w"> </span>--dump_devices<span class="w"> </span><sp
 <li>
 <p>The
   <a href="https://rocm.docs.amd.com/projects/rocminfo/en/latest/how-to/use-rocminfo.html">ROCmInfo</a>
-  program:</p>
+  program on Linux:</p>
 <div class="highlight"><pre><span></span><code>rocminfo
 
 <span class="c1"># Look for e.g. gfx1100 in the output:</span>
