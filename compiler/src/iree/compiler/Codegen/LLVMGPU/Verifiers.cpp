@@ -235,15 +235,14 @@ verifyGPUMatmulPipeline(Operation *op,
   return success();
 }
 
-/// Verifies launch configuration for matmul and batchmatmul on a GPU for CUDA
-/// and Tensor Core pipelines.
+/// Verifies pipelines that use iree_gpu.lowering_config attributes.
 LogicalResult
 verifyGPUMatmulPipeline(Operation *op,
                         IREE::GPU::LoweringConfigAttr loweringConfig,
                         IREE::Codegen::TranslationInfoAttr translationInfo) {
 
   CodeGenPipeline pipeline = translationInfo.getDispatchLoweringPassPipeline();
-
+  // TODO: add verification for other pipelines
   if (pipeline != CodeGenPipeline::LLVMGPUVectorDistribute) {
     return success();
   }
