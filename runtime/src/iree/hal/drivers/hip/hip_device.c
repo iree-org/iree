@@ -411,13 +411,13 @@ static iree_status_t iree_hal_hip_device_initialize_internal(
 }
 
 static iree_status_t iree_hal_hip_device_enable_peering(
-    const iree_hal_hip_dynamic_symbols_t* symbols, hipDevice_t deviceId) {
+    const iree_hal_hip_dynamic_symbols_t* symbols, hipDevice_t device_id) {
   int hip_device_count = 0;
   IREE_RETURN_IF_ERROR(IREE_HIP_CALL_TO_STATUS(
       symbols, hipGetDeviceCount(&hip_device_count), "hipGetDeviceCount"));
 
   for (int j = 0; j < hip_device_count; ++j) {
-    if (j == deviceId) {
+    if (j == device_id) {
       // Can't peer to self.
       continue;
     }
@@ -427,14 +427,14 @@ static iree_status_t iree_hal_hip_device_enable_peering(
     // error message.
     int canAccessPeer = 0;
     hipError_t hip_error =
-        symbols->hipDeviceCanAccessPeer(&canAccessPeer, deviceId, j);
+        symbols->hipDeviceCanAccessPeer(&canAccessPeer, device_id, j);
     if (hip_error != hipSuccess) {
       return IREE_HIP_RESULT_TO_STATUS(symbols, hip_error);
     }
     if (canAccessPeer != 1) {
       return iree_make_status(IREE_STATUS_PERMISSION_DENIED,
                               "device %d is not able to access peer %d",
-                              deviceId, j);
+                              device_id, j);
     }
 
     hip_error = symbols->hipDeviceEnablePeerAccess(j, 0);
@@ -477,8 +477,8 @@ iree_status_t iree_hal_hip_device_create(
   // Initialize each device.
   for (iree_host_size_t i = 0; i < device_count && iree_status_is_ok(status);
        ++i) {
-    hipDevice_t deviceId = devices[i];
-    device->devices[i].hip_device = deviceId;
+    hipDevice_t device_id = devices[i];
+    device->devices[i].hip_device = device_id;
 
     // Get the main context for the device.
     status = IREE_HIP_CALL_TO_STATUS(
@@ -505,7 +505,7 @@ iree_status_t iree_hal_hip_device_create(
 
     // If there are multiple devices, enable peering between them all.
     if (iree_status_is_ok(status) && device_count > 1) {
-      status = iree_hal_hip_device_enable_peering(symbols, deviceId);
+      status = iree_hal_hip_device_enable_peering(symbols, device_id);
     }
   }
 
