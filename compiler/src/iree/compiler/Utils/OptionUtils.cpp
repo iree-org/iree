@@ -90,6 +90,22 @@ OptionsBinder::printArguments(bool nonDefaultOnly) {
   return values;
 }
 
+OptionsBinder::OptionsStorage &OptionsBinder::getOptionsStorage() {
+  if (!scope) {
+    return *globalOptions;
+  } else {
+    return localOptions;
+  }
+}
+
+const OptionsBinder::OptionsStorage &OptionsBinder::getOptionsStorage() const {
+  if (!scope) {
+    return *globalOptions;
+  } else {
+    return localOptions;
+  }
+}
+
 } // namespace mlir::iree_compiler
 //
 // Examples:

@@ -95,13 +95,14 @@ public:
     }
   }
 
-  template <typename T, typename V, typename K, typename... Ks,
-            typename... Mods>
-  void opt(llvm::StringRef name, V &value, opt_initializer<K> init,
+  template <typename T, typename V, typename... Ks, typename... Mods>
+  void opt(llvm::StringRef name, V &value, opt_initializer<T> init,
            opt_initializer<Ks>... inits, Mods... Ms) {
+    static_assert((std::is_same<T, Ks>::value && ...),
+                  "All opt_initializer types must be the same");
     opt<V>(name, value, Ms...);
     getOptionsStorage()[name].setOptLevels.push_back(
-        std::make_unique<opt_initializer<K>>(init));
+        std::make_unique<opt_initializer<T>>(init));
     (getOptionsStorage()[name].setOptLevels.push_back(
          std::make_unique<opt_initializer<Ks>>(inits)),
      ...);
@@ -201,6 +202,9 @@ private:
     llvm::SmallVector<std::unique_ptr<opt_initializer_base>> setOptLevels;
   };
   using OptionsStorage = llvm::DenseMap<llvm::StringRef, OptionInfo>;
+
+  OptionsStorage &getOptionsStorage();
+  const OptionsStorage &getOptionsStorage() const;
 
   OptionsBinder() = default;
   OptionsBinder(std::unique_ptr<llvm::cl::SubCommand> scope)
@@ -303,22 +307,6 @@ private:
         os << it.value();
       }
     };
-  }
-
-  OptionsStorage &getOptionsStorage() {
-    if (!scope) {
-      return *globalOptions;
-    } else {
-      return localOptions;
-    }
-  }
-
-  const OptionsStorage &getOptionsStorage() const {
-    if (!scope) {
-      return *globalOptions;
-    } else {
-      return localOptions;
-    }
   }
 
   std::unique_ptr<llvm::cl::SubCommand> scope;
