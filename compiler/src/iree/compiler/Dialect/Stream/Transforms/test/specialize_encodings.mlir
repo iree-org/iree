@@ -366,8 +366,8 @@ util.func public @tensor_update_op_with_unknown_or_serialized_encodings(%arg0: !
 
 // -----
 
-// Drop encodings if encoding attribute is not available in the target
-// configuration.
+// Creates an identity encoding if encoding attribute is not available in the
+// target configuration.
 
 #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
@@ -378,28 +378,30 @@ util.func public @drop_encoding(%arg0: index, %arg1: index, %scalar_f32 : f32) {
   %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x0xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
   util.return
 }
+// CHECK-DAG:   #[[$IDENTITY_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.pad_encoding_layout<[0, 0]>]>
 // CHECK-LABEL: util.func public @drop_encoding
-// CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32>
+// CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32, #[[$IDENTITY_ENCODING]]>
 
 // -----
 
-// Drop encodings if the attached encoding attribute can not figure the layout.
+// Creates an identity encoding if iree_encoding.identity_encoding is used.
 
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", { iree.encoding.resolver = #iree_encoding.unsupported_encoding }>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", { iree.encoding.resolver = #iree_encoding.identity_encoding }>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding = #iree_encoding.testing_encoding<>
 
 util.global private @device_a = #device_target_local_0_
-util.func public @drop_encoding_by_unsupported_encoding(%arg0: index, %arg1: index, %scalar_f32 : f32) {
+util.func public @ignore_encoding_by_identity_encoding(%arg0: index, %arg1: index, %scalar_f32 : f32) {
   %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x0xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
   util.return
 }
-// CHECK-LABEL: util.func public @drop_encoding_by_unsupported_encoding
-// CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32>
+// CHECK-DAG:   #[[$IDENTITY_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.pad_encoding_layout<[0, 0]>]>
+// CHECK-LABEL: util.func public @ignore_encoding_by_identity_encoding
+// CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32, #[[$IDENTITY_ENCODING]]>
 
 // -----
 
-// Do not drop encodings if they are already serialized.
+// Do not update encodings if they are already serialized.
 
 #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
@@ -412,6 +414,25 @@ util.func public @keep_encoding_if_serialized(%arg0: index, %arg1: index, %scala
 // CHECK:       #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123>]>
 // CHECK-LABEL: util.func public @keep_encoding_if_serialized
 // CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32, #[[$ENCODING]]>
+
+// -----
+
+// Check that a failure is signaled if we are not able to resolve a recognized
+// encoding.
+
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", { iree.encoding.resolver = #iree_encoding.unsupported_encoding }>
+#device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
+#encoding = #iree_encoding.testing_encoding<>
+// expected-error @+1 {{failed to add layouts to Stream::TensorPhaseOp with encodings}}
+module {
+  util.global private @device_a = #device_target_local_0_
+  util.func public @fail_to_get_recognized_layout(%arg0: index, %arg1: index, %scalar_f32 : f32) {
+    // expected-error @+2 {{failed to resolve recognized layout}}
+    // expected-error @+1 {{failed to convert unserialized encoding to serialized encoding}}
+    %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x0xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
+    util.return
+  }
+}
 
 // -----
 
