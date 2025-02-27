@@ -86,12 +86,6 @@ def main(args: argparse.Namespace):
 def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
     input_dir = os.path.dirname(os.path.abspath(args.input_file))
 
-    # TODO: setup updating opset version without loading external weights.
-    if args.opset_version and args.large_model:
-        raise NotImplementedError(
-            "Updating the opset version for large models is currently unsupported."
-        )
-
     if not args.large_model:
         # Load the model, with possible external data coming from the default
         # location, or the location specified on the command line.
