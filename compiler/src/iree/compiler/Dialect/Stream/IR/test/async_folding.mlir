@@ -564,6 +564,45 @@ util.func private @ElideUnusedAsyncExecuteOp(%arg0: !stream.resource<*>, %arg1: 
   util.return
 }
 
+
+// -----
+
+// CHECK-LABEL: @FoldAsyncExecuteDuplicateResults
+// CHECK-SAME: (%[[SPLAT_A_SIZE:.+]]: index, %[[SPLAT_A_VALUE:.+]]: i32, %[[SPLAT_B_SIZE:.+]]: index, %[[SPLAT_B_VALUE:.+]]: i32)
+util.func private @FoldAsyncExecuteDuplicateResults(%splat_a_size: index, %splat_a_value: i32, %splat_b_size: index, %splat_b_value: i32) -> (!stream.resource<*>, !stream.resource<*>, !stream.resource<*>, !stream.timepoint) {
+  // CHECK: %[[RESULTS:.+]]:2, %[[TIMEPOINT:.+]] = stream.async.execute with() -> (!stream.resource<*>{%[[SPLAT_A_SIZE]]}, !stream.resource<*>{%[[SPLAT_B_SIZE]]}) {
+  %results:3, %timepoint = stream.async.execute with() -> (!stream.resource<*>{%splat_a_size}, !stream.resource<*>{%splat_b_size}, !stream.resource<*>{%splat_a_size}) {
+    // CHECK: %[[SPLAT_A:.+]] = stream.async.splat %[[SPLAT_A_VALUE]]
+    %splat_a = stream.async.splat %splat_a_value : i32 -> !stream.resource<*>{%splat_a_size}
+    // CHECK: %[[SPLAT_B:.+]] = stream.async.splat %[[SPLAT_B_VALUE]]
+    %splat_b = stream.async.splat %splat_b_value : i32 -> !stream.resource<*>{%splat_b_size}
+    // CHECK: stream.yield %[[SPLAT_A]], %[[SPLAT_B]] : !stream.resource<*>{%[[SPLAT_A_SIZE]]}, !stream.resource<*>{%[[SPLAT_B_SIZE]]}
+    stream.yield %splat_a, %splat_b, %splat_a : !stream.resource<*>{%splat_a_size}, !stream.resource<*>{%splat_b_size}, !stream.resource<*>{%splat_a_size}
+  } => !stream.timepoint
+  // CHECK: util.return %[[RESULTS]]#0, %[[RESULTS]]#1, %[[RESULTS]]#0, %[[TIMEPOINT]]
+  util.return %results#0, %results#1, %results#2, %timepoint : !stream.resource<*>, !stream.resource<*>, !stream.resource<*>, !stream.timepoint
+}
+
+// -----
+
+// CHECK-LABEL: @FoldAsyncExecuteTiedDuplicateResults
+// CHECK-SAME: (%[[TARGET:.+]]: !stream.resource<*>, %[[TARGET_SIZE:.+]]: index, %[[SPLAT_SIZE:.+]]: index, %[[SPLAT_VALUE:.+]]: i32)
+util.func private @FoldAsyncExecuteTiedDuplicateResults(%target: !stream.resource<*>, %target_size: index, %splat_size: index, %splat_value: i32) -> (!stream.resource<*>, !stream.resource<*>, !stream.resource<*>, !stream.timepoint) {
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
+  // CHECK: %[[RESULTS:.+]]:2, %[[TIMEPOINT:.+]] = stream.async.execute with({{.+}}) -> (%[[TARGET]]{%[[TARGET_SIZE]]}, !stream.resource<*>{%[[SPLAT_SIZE]]}) {
+  %results:3, %timepoint = stream.async.execute with(%target as %target_capture: !stream.resource<*>{%target_size}) -> (%target as !stream.resource<*>{%target_size}, !stream.resource<*>{%splat_size}, %target as !stream.resource<*>{%target_size}) {
+    // CHECK: %[[TARGET_FILL:.+]] = stream.async.fill
+    %target_fill = stream.async.fill %splat_value, %target_capture[%c0 to %c128 for %c128] : i32 -> %target_capture as !stream.resource<*>{%target_size}
+    // CHECK: %[[SPLAT:.+]] = stream.async.splat %[[SPLAT_VALUE]]
+    %splat = stream.async.splat %splat_value : i32 -> !stream.resource<*>{%splat_size}
+    // CHECK: stream.yield %[[TARGET_FILL]], %[[SPLAT]] : !stream.resource<*>{%[[TARGET_SIZE]]}, !stream.resource<*>{%[[SPLAT_SIZE]]}
+    stream.yield %target_fill, %splat, %target_fill : !stream.resource<*>{%target_size}, !stream.resource<*>{%splat_size}, !stream.resource<*>{%target_size}
+  } => !stream.timepoint
+  // CHECK: util.return %[[RESULTS]]#0, %[[RESULTS]]#1, %[[RESULTS]]#0, %[[TIMEPOINT]]
+  util.return %results#0, %results#1, %results#2, %timepoint : !stream.resource<*>, !stream.resource<*>, !stream.resource<*>, !stream.timepoint
+}
+
 // -----
 
 // CHECK-LABEL: @TieRegionResultsAsyncConcurrentOp

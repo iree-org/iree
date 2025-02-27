@@ -295,7 +295,7 @@ padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
       auto id1 = exprToIdMap[getAffineDimExpr(dim1, map.getContext())];
       auto id2 = exprToIdMap[getAffineDimExpr(dim2, map.getContext())];
 
-      llvm::SmallVector<OpFoldResult> paddingValues(4, zero);
+      llvm::SmallVector<OpFoldResult> paddingValues(map.getNumResults(), zero);
       paddingValues[id1] = padding1;
       paddingValues[id2] = padding2;
       paddingTarget =
@@ -310,16 +310,20 @@ padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
   linalg::LinalgOp paddedConv2dOp =
       mlir::clone(rewriter, linalgOp, {newOutput.getType()},
                   ArrayRef<Value>{newInput, newFilter, newOutput});
+
   // Extract slice.
   IntegerAttr one = rewriter.getI64IntegerAttr(1);
-  SmallVector<OpFoldResult> offsets(4, zero);
-  SmallVector<OpFoldResult> strides(4, one);
+  RankedTensorType outputType = cast<RankedTensorType>(newOutput.getType());
+  int64_t outputRank = outputType.getRank();
+  SmallVector<OpFoldResult> offsets(outputRank, zero);
+  SmallVector<OpFoldResult> strides(outputRank, one);
+
   auto resultType = cast<RankedTensorType>(linalgOp->getResult(0).getType());
   ArrayRef<int64_t> resultShape = resultType.getShape();
-  SmallVector<OpFoldResult> sizes = {rewriter.getIndexAttr(resultShape[0]),
-                                     rewriter.getIndexAttr(resultShape[1]),
-                                     rewriter.getIndexAttr(resultShape[2]),
-                                     rewriter.getIndexAttr(resultShape[3])};
+  SmallVector<OpFoldResult> sizes;
+  for (int i = 0; i < outputRank; i++) {
+    sizes.push_back(rewriter.getIndexAttr(resultShape[i]));
+  }
   Value extracted = rewriter.createOrFold<tensor::ExtractSliceOp>(
       loc, paddedConv2dOp->getResults()[0], offsets, sizes, strides);
   rewriter.replaceOp(linalgOp, extracted);

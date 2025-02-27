@@ -41,7 +41,7 @@ def ConvertConvFilterToChannelsLastPass:
   let summary = "Convert linalg convolutions filter from hwcf to channel last layout.";
   let options = [
     Option<"filterLayout", "filter-layout", "std::string",
-      /*default=*/"", "Filter layout of convolution.">,
+      /*default=*/"\"fhwc\"", "Filter layout of convolution.">,
   ];
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
