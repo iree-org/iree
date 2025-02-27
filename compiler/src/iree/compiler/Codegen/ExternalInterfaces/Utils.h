@@ -7,6 +7,8 @@
 #ifndef IREE_COMPILER_CODEGEN_EXTERNALINTERFACES_UTILS_H_
 #define IREE_COMPILER_CODEGEN_EXTERNALINTERFACES_UTILS_H_
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -15,6 +17,34 @@
 namespace mlir::iree_compiler::IREE {
 
 static const char kEncodingInfoAttrName[] = "encoding_info";
+
+template <typename DeviceEncodingLayoutResolverAttrInterface,
+          typename EncodingLayoutAttr>
+struct WrappedExternalModel
+    : public Codegen::LayoutAttrInterface::ExternalModel<
+          DeviceEncodingLayoutResolverAttrInterface, EncodingLayoutAttr> {
+public:
+  DictionaryAttr getConfiguration(Attribute attr) const {
+    return cast<EncodingLayoutAttr>(attr).getConfiguration();
+  }
+
+  Codegen::MaterializeEncodingInfo
+  getEncodingInfo(Attribute attr, RankedTensorType type) const {
+    const DeviceEncodingLayoutResolverAttrInterface *impl =
+        static_cast<const DeviceEncodingLayoutResolverAttrInterface *>(this);
+    // If the layout is already resolved, use it directly.
+    if (auto config = impl->getConfiguration(attr)) {
+      if (auto namedAttr = config.getNamed(kEncodingInfoAttrName)) {
+        std::optional<Codegen::MaterializeEncodingInfo> info =
+            Codegen::deserializeEncodingInfo(
+                cast<DictionaryAttr>(namedAttr->getValue()));
+        assert(info && "encoding_info is invalid");
+        return info.value();
+      }
+    }
+    return impl->getEncodingInfoImpl(attr, type);
+  }
+};
 
 /// Calculates the storage size in bytes for the given `type` with a layout
 /// encoding `attr`.

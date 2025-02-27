@@ -590,22 +590,12 @@ enumerateCPUMatmulTiles(IREE::Encoding::EncodingAttr encoding,
 }
 
 struct CPUDeviceEncodingLayoutResolverAttrInterface
-    : public Codegen::LayoutAttrInterface::ExternalModel<
-          CPUDeviceEncodingLayoutResolverAttrInterface, CPUEncodingLayoutAttr> {
-  MaterializeEncodingInfo getEncodingInfo(Attribute attr,
-                                          RankedTensorType type) const {
-    auto layoutAttr = cast<CPUEncodingLayoutAttr>(attr);
+    : public WrappedExternalModel<CPUDeviceEncodingLayoutResolverAttrInterface,
+                                  CPUEncodingLayoutAttr> {
 
-    // If the layout is already resolved, use it directly.
-    if (auto config = layoutAttr.getConfiguration()) {
-      if (auto namedAttr = config.getNamed(kEncodingInfoAttrName)) {
-        std::optional<MaterializeEncodingInfo> info =
-            Codegen::deserializeEncodingInfo(
-                cast<DictionaryAttr>(namedAttr->getValue()));
-        assert(info && "encoding_info is invalid");
-        return info.value();
-      }
-    }
+  MaterializeEncodingInfo getEncodingInfoImpl(Attribute attr,
+                                              RankedTensorType type) const {
+    auto layoutAttr = cast<CPUEncodingLayoutAttr>(attr);
 
     auto encoding = llvm::dyn_cast_or_null<IREE::Encoding::EncodingAttr>(
         type.getEncoding());
@@ -726,23 +716,12 @@ enumerateVMVXMatmulTiles(linalg::ContractionDimensions cDims,
 }
 
 struct VMVXDeviceEncodingLayoutResolverAttrInterface final
-    : Codegen::LayoutAttrInterface::ExternalModel<
-          VMVXDeviceEncodingLayoutResolverAttrInterface,
-          VMVXEncodingLayoutAttr> {
-  MaterializeEncodingInfo getEncodingInfo(Attribute attr,
-                                          RankedTensorType type) const {
-    auto layoutAttr = cast<VMVXEncodingLayoutAttr>(attr);
+    : WrappedExternalModel<VMVXDeviceEncodingLayoutResolverAttrInterface,
+                           VMVXEncodingLayoutAttr> {
 
-    // If the layout is already resolved, use it directly.
-    if (auto config = layoutAttr.getConfiguration()) {
-      if (auto namedAttr = config.getNamed(kEncodingInfoAttrName)) {
-        std::optional<MaterializeEncodingInfo> info =
-            Codegen::deserializeEncodingInfo(
-                cast<DictionaryAttr>(namedAttr->getValue()));
-        assert(info && "encoding_info is invalid");
-        return info.value();
-      }
-    }
+  MaterializeEncodingInfo getEncodingInfoImpl(Attribute attr,
+                                              RankedTensorType type) const {
+    auto layoutAttr = cast<VMVXEncodingLayoutAttr>(attr);
 
     auto encoding = llvm::dyn_cast_or_null<IREE::Encoding::EncodingAttr>(
         type.getEncoding());
