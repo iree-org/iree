@@ -28,14 +28,14 @@ func.func @reduce_min_int() {
 
 func.func @reduce_prod_float() {
   %0 = util.unfoldable_constant dense<[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]> : tensor<2x3xf32>
-  %result = tosa.reduce_prod %0 {axis = 0 : i32} : (tensor<2x3xf32>) -> tensor<1x3xf32>
+  %result = tosa.reduce_product %0 {axis = 0 : i32} : (tensor<2x3xf32>) -> tensor<1x3xf32>
   check.expect_almost_eq_const(%result, dense<[[4.0, 10.0, 18.0]]> : tensor<1x3xf32>) : tensor<1x3xf32>
   return
 }
 
 func.func @reduce_prod_int() {
   %0 = util.unfoldable_constant dense<[[1, 2, 3], [4, 5, 6]]> : tensor<2x3xi32>
-  %result = tosa.reduce_prod %0 {axis = 0 : i32} : (tensor<2x3xi32>) -> tensor<1x3xi32>
+  %result = tosa.reduce_product %0 {axis = 0 : i32} : (tensor<2x3xi32>) -> tensor<1x3xi32>
   check.expect_eq_const(%result, dense<[[4, 10, 18]]> : tensor<1x3xi32>) : tensor<1x3xi32>
   return
 }
