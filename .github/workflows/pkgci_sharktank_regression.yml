@@ -87,7 +87,7 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
 
       - name: "Running Sharktank regression composite action"
-        uses: iree/iree-test-suites/sharktank_models@main
+        uses: iree-org/iree-test-suites/sharktank_models@main
         with:
           MATRIX_NAME: ${{ matrix.name }}
           SKU: ${{ matrix.sku }}
