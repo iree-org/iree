@@ -84,12 +84,13 @@ static bool isRecognizedEncodingType(Type type) {
 }
 
 /// Returns the type with updated encoding, if any. Returns the original type if
-/// the the encoding type is not recognized or it is already serialized.
+/// the the encoding type is not recognized or it is already serialized. If it
+/// fails to resolve the layout, returns nullptr.
 /// The method uses `layoutResolvers` to resolve the layouts of the given
 /// `type`; returns the new encoding with the resolved layouts.
 ///
 /// There are requirements to get the resolved layouts. Otherwise, the encodings
-/// are dropped unconditionally.
+/// are dropped.
 ///   - All attributes in the `layoutResolvers` must implement
 ///     EncodingLayoutResolverAttrInterface. Otherwise, there is no way to query
 ///     layouts.
@@ -118,11 +119,7 @@ static Type getTypeWithResolvedEncodingLayouts(
         cast<IREE::Encoding::EncodingLayoutResolverAttrInterface>(attr);
     Attribute layout = encodingLayoutAttr.getLayout(rankedTensorType);
     if (!layout) {
-      // Drop the encoding if the layout is not resolved.
-      // TODO(hanchung): return a failure if we can't convert it to serialized
-      // encoding. We need to replace the `UnsupportedEncoding` resolver with
-      // `DiscardEncoding` resolver.
-      return IREE::Encoding::dropEncoding(rankedTensorType);
+      return nullptr;
     }
     layouts.push_back(layout);
   }
@@ -608,6 +605,9 @@ static LogicalResult updateTensorDispatchOp(
 
     Type newEncodingType =
         getTypeWithResolvedEncodingLayouts(type, layoutResolvers);
+    if (!newEncodingType) {
+      return dispatchOp.emitOpError("failed to resolve recognized layout");
+    }
     newOperandEncodings.push_back(newEncodingType);
   }
   dispatchOp.setOperandEncodingsAttr(
@@ -623,6 +623,9 @@ static LogicalResult updateTensorDispatchOp(
     }
     Type newEncodingType =
         getTypeWithResolvedEncodingLayouts(type, resLayoutResolvers);
+    if (!newEncodingType) {
+      return dispatchOp.emitOpError("failed to resolve recognized layout");
+    }
     newResultEncodings.push_back(newEncodingType);
   }
   dispatchOp.setResultEncodingsAttr(
@@ -639,6 +642,9 @@ updateTensorSizeOfOp(RewriterBase &rewriter,
   auto encodingType = dyn_cast<RankedTensorType>(sizeOfOp.getEncoding());
   Type newEncodingType =
       getTypeWithResolvedEncodingLayouts(encodingType, layoutResolvers);
+  if (!newEncodingType) {
+    return sizeOfOp.emitOpError("failed to resolve recognized layout");
+  }
   rewriter.modifyOpInPlace(sizeOfOp,
                            [&] { sizeOfOp.setEncoding(newEncodingType); });
   return success();
@@ -660,6 +666,9 @@ updateTensorFillOp(RewriterBase &rewriter, IREE::Stream::TensorFillOp op,
   auto encodingType = dyn_cast<RankedTensorType>(op.getTargetEncoding());
   Type newEncodingType =
       getTypeWithResolvedEncodingLayouts(encodingType, layoutResolvers);
+  if (!newEncodingType) {
+    return op.emitOpError("failed to resolve recognized layout");
+  }
   rewriter.modifyOpInPlace(op, [&] { op.setTargetEncoding(newEncodingType); });
   return success();
 }
@@ -710,6 +719,9 @@ updateResultEncoding(RewriterBase &rewriter, OpTy op,
   auto encodingType = dyn_cast<RankedTensorType>(op.getResultEncoding());
   Type newEncodingType =
       getTypeWithResolvedEncodingLayouts(encodingType, layoutResolvers);
+  if (!newEncodingType) {
+    return op.emitOpError("failed to resolve recognized layout");
+  }
   rewriter.modifyOpInPlace(op, [&] { op.setResultEncoding(newEncodingType); });
   return success();
 }

@@ -128,7 +128,7 @@ public:
   // EncodingLayoutResolverAttrInterface attributes for each
   // (IREE::Stream::Affinity, Operation) query. The attribute is extracted from
   // the `encoding` field in the HAL::ExecutableTargetAttr configuration. If the
-  // `encoding` is not present, UnsupportedEncodingAttr is returned.
+  // `encoding` is not present, IdentityEncodingAttr is returned.
   IREE::Stream::ResolveLayoutAttrFn
   makeLayoutAttrResolver(ModuleOp moduleOp) const {
     return [=](ArrayRef<IREE::Stream::AffinityAndOpPair> batchQueries,
@@ -142,12 +142,12 @@ public:
       }
 
       MLIRContext *ctx = getContext();
-      std::optional<IREE::Encoding::UnsupportedEncodingAttr> defaultAttr;
+      std::optional<IREE::Encoding::IdentityEncodingAttr> defaultAttr;
       auto getDefaultAttr = [&]() {
         if (defaultAttr) {
           return defaultAttr.value();
         }
-        defaultAttr = IREE::Encoding::UnsupportedEncodingAttr::get(ctx);
+        defaultAttr = IREE::Encoding::IdentityEncodingAttr::get(ctx);
         return defaultAttr.value();
       };
       for (IREE::Stream::AffinityAndOpPair key : batchQueries) {

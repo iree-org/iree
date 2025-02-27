@@ -161,6 +161,27 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
 }
 
 //===---------------------------------------------------------------------===//
+// encoding.identity_encoding
+//===---------------------------------------------------------------------===//
+
+def IdentityEncodingAttr :
+    IREEEncoding_Attr<"IdentityEncoding", [
+      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
+        "cloneWithSimplifiedConfig",
+        "getLayout",
+      ]>
+    ]> {
+  let mnemonic = "identity_encoding";
+  let summary = "A layout resolver that behaves like an identity function";
+  let description = [{
+    A layout resolver that behaves like an identity function. I.e., it resolves
+    the layout to the same layout without encodings.
+  }];
+
+  let genVerifyDecl = 0;
+}
+
+//===---------------------------------------------------------------------===//
 // encoding.unsupported_encoding
 //===---------------------------------------------------------------------===//
 
