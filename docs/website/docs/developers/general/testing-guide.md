@@ -536,10 +536,14 @@ Quality tests and benchmark tests for LLMs and GenAI programs are also included 
 [`sharktank_models/`](https://github.com/iree-org/iree-test-suites/tree/main/sharktank_models)
 in the
 [iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites)
+<<<<<<< HEAD
 repository. Quality tests compile mlir files then given a set of input values,
 check if the output values pass with a certain threshold. Benchmark tests run
 compiled mlir files and check if the benchmark results are less than
 the given golden values.
+=======
+repository. Quality tests compile mlir files then given a set of input values, check if the output values pass with a certain threshold. Benchmark tests run compiled mlir files and check if the benchmark results are less than the given golden values.
+>>>>>>> c2b2ca8430 (Addressing PR comments)
 
 <!-- TODO(scotttodd): document how to coordinate changes across these projects -->
 
