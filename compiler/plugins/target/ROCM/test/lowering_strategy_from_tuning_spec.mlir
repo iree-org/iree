@@ -33,7 +33,10 @@ hal.executable public @main {
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
-      // expected-remark@+1 {{Applied transform configuration strategy @iree_linked_tuning_spec::@__kernel_config}}
+      // The two commands above generate different tuning specs depending on whether linking is applied.
+      // Therefore, only verify if the spec is applied or not.
+
+      // expected-remark@+1 {{Applied transform configuration strategy}}
       func.func @matmul_transpose_b() {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
