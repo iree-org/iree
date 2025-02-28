@@ -71,6 +71,11 @@ def EncodingAttr :
     the tensor itself. When required, the encoding
     can be used to explicitly manifest the layout change
     through operations like pack/unpack.
+
+    This attribute has a verifier that will ensure that:
+    - The `operand_index` shouldn't exceed the size of
+      `user_indexing_maps`, if the latter is provided.
+    - The maps in `user_indexing_maps` should be composable.
   }];
 
   let assemblyFormat = "`<` struct(params) `>`";
@@ -80,7 +85,6 @@ def EncodingAttr :
     AttrParameter<"EncodingOpTypeAttr", "operand type">:$op_type,
     AttrParameter<"ArrayAttr", "element types of the user's operands">:$element_types,
     OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps,
-    OptionalParameter<"AffineMapAttr", "Indexing map that represents the broadcasting dims in the producer">:$bcast_map,
     // TODO(hanchung): Deprecate the round_dims_to field when we plumb the layouts
     // field through the whole stack. See https://github.com/iree-org/iree/issues/17924
     // for details. Note that today we abuse the attribute to carry narrow
@@ -101,21 +105,29 @@ def EncodingAttr :
         "EncodingOpType":$opType,
         "ArrayRef<Type>":$elemTypes,
         CArg<"ArrayRef<AffineMap>", "{}">:$maps,
-        CArg<"std::optional<AffineMap>", "{}">:$bcastMap,
         CArg<"ArrayRef<int64_t>", "{}">:$roundDimsTo,
         CArg<"ArrayRef<Attribute>", "{}">:$layouts)>
   ];
 
   let extraClassDeclaration = [{
-    /// Returns the bcast_map composed with the user_indexing_map for the
-    /// operand_index. The dimensions of the returned map are those of the
-    /// data-tiled op's iteration space, and the results of the map are in
-    /// the domain of the encoded tensor type.
+    /// Returns the composed `user_indexing_map` for the operand_index. The
+    /// dimensions of the returned map are those of the data-tiled op's
+    /// iteration space, and the results of the map are in the domain of
+    /// the encoded tensor type.
     AffineMap getMapForOperandIndex() const;
 
+    /// Returns the root/first map for every entry in `user_indexing_maps`. This
+    /// is useful for deriving layout information of the originally encoded
+    /// operation.
+    SmallVector<AffineMap> getRootMaps() const;
+
+    /// Returns the last map in the `user_indexing_maps` for the operand_index.
+    /// This is useful for checking compatibility of new maps being added with
+    /// the existing `user_indexing_maps`.
+    AffineMap getLastMapForOperandIndex() const;
+
     /// Given the dim position of the encoding `user_indexing_maps`, returns the
-    /// matching index of the given encoding's tensor, using getMapForOperandIndex
-    /// bcast_map and user_indexing_map.
+    /// matching index of the given encoding's tensor, using getMapForOperandIndex.
     std::optional<unsigned> mapDimToOperandIndex(int64_t dimPos) const;
 
     /// Returns an integer array with values in `round_dims_to`.
@@ -124,11 +136,12 @@ def EncodingAttr :
     /// Returns a vector with values in `element_types`.
     SmallVector<Type> getElementTypesArray();
 
-    /// Clones an encoding with a new bcast_map
-    EncodingAttr clone(AffineMap bcastMap);
+    /// Clones an encoding with a new indexing map being appended to the
+    /// `operand_index` entry of `user_indexing_map`.
+    EncodingAttr cloneWithNewOperandIndexingMap(AffineMap newIndexingMap);
   }];
 
-  let genVerifyDecl = 0;
+  let genVerifyDecl = 1;
 }
 
 //===---------------------------------------------------------------------===//
