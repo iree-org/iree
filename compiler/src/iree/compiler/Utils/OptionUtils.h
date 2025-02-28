@@ -97,12 +97,21 @@ public:
     return OptionsBinder(std::make_unique<llvm::cl::SubCommand>());
   }
 
+  void setApplyOptimizations(llvm::OptimizationLevel opt) {
+    currOptLevel = opt;
+    onlyApplyOptimizations = true;
+  }
+  void unsetApplyOptimizations() { onlyApplyOptimizations = false; }
+
   template <
       typename T, typename V, typename... Mods,
       std::enable_if_t<
           !(std::is_same_v<std::decay_t<Mods>, opt_initializer<T>> || ...),
           int> = 0>
   void opt(llvm::StringRef name, V &value, Mods... Ms) {
+    if (onlyApplyOptimizations) {
+      return;
+    }
     auto [changedCallback, clCallback] = makeChangedCallback<V>();
     if (!scope) {
       // Bind global options.
@@ -139,43 +148,36 @@ public:
                                opt_initializer<T> &rhs) {
       return lhs.optLevel.getSpeedupLevel() < rhs.optLevel.getSpeedupLevel();
     });
-
+    if (onlyApplyOptimizations) {
+      if (isFlagSet(name)) {
+        return;
+      }
+      for (const auto &init : initsSorted) {
+        init.apply(currOptLevel, value);
+      }
+      return;
+    }
     llvm::cl::desc &desc = filterDescription(Ms...);
     auto descStr = std::make_unique<std::string>(desc.Desc);
     for (auto &init : initsSorted) {
       init.appendToDesc(*descStr);
     }
     desc.Desc = descStr->c_str();
-
     opt<V>(name, value, Ms...);
     OptionInfo &info = getOptionsStorage()[name];
     info.extendedDesc = std::move(descStr);
-    for (auto &init : initsSorted) {
-      info.optInits.emplace_back(std::make_unique<opt_initializer<T>>(init));
-    }
   }
 
+  // Sets the optimization level for the current scope.
   template <typename... Mods>
   void optimizationLevel(llvm::StringRef name, llvm::OptimizationLevel &value,
                          Mods... Ms) {
-    opt<llvm::OptimizationLevel>(name, value, Ms...);
-  }
-
-  template <typename T>
-  void applyOptimization(llvm::StringRef name, T &value,
-                         llvm::OptimizationLevel optLevel) const {
-    const auto infoIt = getOptionsStorage().find(name);
-    assert(infoIt != getOptionsStorage().end() && "Option not found");
-    auto changedCallback = infoIt->getSecond().isChanged;
-    assert(changedCallback && "Expected changed callback");
-    if (changedCallback()) {
+    if (onlyApplyOptimizations) {
+      overrideDefault(name, value, currOptLevel);
+      currOptLevel = value;
       return;
     }
-    const auto &setOptLevels = infoIt->getSecond().optInits;
-    for (const auto &init : setOptLevels) {
-      reinterpret_cast<opt_initializer<T> *>(init.get())
-          ->apply(optLevel, value);
-    }
+    opt<llvm::OptimizationLevel>(name, value, Ms...);
   }
 
   bool isFlagSet(llvm::StringRef name) const {
@@ -195,6 +197,9 @@ public:
 
   template <typename T, typename V, typename... Mods>
   void list(llvm::StringRef name, V &value, Mods... Ms) {
+    if (onlyApplyOptimizations) {
+      return;
+    }
     if (!scope) {
       // Bind global options.
       auto list =
@@ -247,7 +252,6 @@ private:
     DefaultCallback isDefault;
 
     // For options with optimization level defaults.
-    llvm::SmallVector<std::unique_ptr<opt_initializer_base>> optInits;
     std::unique_ptr<std::string> extendedDesc;
   };
   using OptionsStorage = llvm::DenseMap<llvm::StringRef, OptionInfo>;
@@ -374,6 +378,9 @@ private:
     assert(result && "Expected llvm::cl::desc in args");
     return *result;
   }
+
+  bool onlyApplyOptimizations = false;
+  llvm::OptimizationLevel currOptLevel;
 
   std::unique_ptr<llvm::cl::SubCommand> scope;
   OptionsStorage localOptions;

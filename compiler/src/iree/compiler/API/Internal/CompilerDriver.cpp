@@ -53,6 +53,7 @@
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "iree/compiler/embedding_api.h"
 #include "iree/compiler/mlir_interop.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ManagedStatic.h"
@@ -952,8 +953,9 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
       session.highLevelOptimizationOptions;
 
   // Set optimization options on a copy of the sessions options.
-  highLevelOptimizationOptions.applyOptimization(binder,
-                                                 session.pipelineOptions);
+  binder.setApplyOptimizations(session.pipelineOptions.optLevel);
+  auto scope = llvm::make_scope_exit([&] { binder.unsetApplyOptimizations(); });
+  highLevelOptimizationOptions.bindOptions(binder);
 
   switch (pipeline) {
   case IREE_COMPILER_PIPELINE_STD: {

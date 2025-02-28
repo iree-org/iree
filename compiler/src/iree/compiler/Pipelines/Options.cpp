@@ -133,18 +133,7 @@ void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
 }
 
 void GlobalOptimizationOptions::applyOptimization(
-    const OptionsBinder &binder, const GlobalPipelineOptions &globalLevel) {
-  binder.overrideDefault("iree-global-optimization-opt-level", optLevel,
-                         globalLevel.optLevel);
-  binder.applyOptimization("iree-opt-strip-assertions", stripAssertions,
-                           optLevel);
-  binder.applyOptimization("iree-opt-aggressively-propagate-transposes",
-                           aggressiveTransposePropagation, optLevel);
-  binder.applyOptimization("iree-opt-outer-dim-concat", outerDimConcat,
-                           optLevel);
-  binder.applyOptimization("iree-opt-generalize-matmul", generalizeMatmul,
-                           optLevel);
-};
+    const OptionsBinder &binder, const GlobalPipelineOptions &globalLevel) {};
 
 void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category(
