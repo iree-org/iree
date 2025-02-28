@@ -382,7 +382,7 @@ void SpecializedEncodingAttr::print(AsmPrinter &p) const {
 
 Attribute SpecializedEncodingAttr::getLayout(RankedTensorType type) const {
   MLIRContext *ctx = getContext();
-  return get(ctx, getSeed(), TypeAttr::get(dropEncoding(type)));
+  return get(ctx, getSeed(), TypeAttr::get(type.dropEncoding()));
 }
 
 } // namespace mlir::iree_compiler::IREE::Encoding
