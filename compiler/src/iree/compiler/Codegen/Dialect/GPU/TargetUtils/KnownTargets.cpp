@@ -336,6 +336,12 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   // https://www.amd.com/content/dam/amd/en/documents/instinct-business-docs/white-papers/amd-cdna-white-paper.pdf
   static const ChipDetails mi100Chip = {120, "mi100"};
 
+  // AMD RDNA4 architecture:
+  // https://www.amd.com/en/newsroom/press-releases/2025-2-28-amd-unveils-next-generation-amd-rdna-4-architectu.html.
+  static const ChipDetails rx9070xtChip = {64, "rx9070xt"};
+  static const ChipDetails rx9070Chip = {56, "rx9070"};
+
+  // AMD RDNA3.
   static const ChipDetails rx7900xtxChip = {96, "rx7900xtx"};
   static const ChipDetails rx7900xtChip = {84, "rx7900xt"};
   static const ChipDetails rx7800xtChip = {60, "rx7800xt"};
@@ -360,8 +366,10 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
       .Cases("cdna2", "gfx90a", TargetDetails{cdna2Wgp, nullptr})
       .Case("mi100", TargetDetails{cdna1Wgp, &mi100Chip})
       .Cases("cdna1", "gfx908", TargetDetails{cdna1Wgp, nullptr})
-      // Preliminary listing - chip details not available.
-      .Cases("gfx1200", "gfx1201", TargetDetails{rdna4Wgp, nullptr})
+      // https://www.techpowerup.com/gpu-specs/radeon-rx-9070-xt.c4229
+      .Case("rx9070xt", TargetDetails{rdna4Wgp, &rx9070xtChip})
+      // https://www.techpowerup.com/gpu-specs/radeon-rx-9070.c4250
+      .Case("rx9070", TargetDetails{rdna4Wgp, &rx9070Chip})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-7900-xtx.c3941
       .Case("rx7900xtx", TargetDetails{rdna3Wgp, &rx7900xtxChip})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-7900-xt.c3912
@@ -401,6 +409,7 @@ StringRef normalizeAMDGPUTarget(StringRef target) {
       .Cases("mi300a", "mi300x", "mi308x", "mi325x", "gfx942")
       .Cases("mi250x", "mi250", "mi210", "cdna2", "gfx90a")
       .Cases("mi100", "cdna1", "gfx908")
+      .Cases("rx9070xt", "rx9070", "gfx1201")
       .Cases("rx7900xtx", "rx7900xt", "w7900", "w7800", "gfx1100")
       .Cases("rx7800xt", "rx7700xt", "v710", "w7700", "gfx1101")
       .Default("");
