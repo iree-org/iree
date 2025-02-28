@@ -61,7 +61,6 @@ iree_cc_library(
     MLIRTransformUtils
     MLIRTransforms
     MLIRVectorDialect
-    iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::Attributes
     iree::compiler::Dialect::Util::Analysis::Constant

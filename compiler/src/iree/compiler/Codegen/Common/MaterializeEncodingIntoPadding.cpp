@@ -53,7 +53,7 @@ static PadEncodingLayoutAttr getPadLayout(RankedTensorType type) {
 static RankedTensorType getPaddedType(RankedTensorType type) {
   PadEncodingLayoutAttr layout = getPadLayout(type);
   if (!isNonZeroPadding(layout)) {
-    return dropEncoding(type);
+    return type.dropEncoding();
   }
 
   ArrayRef<int32_t> padding = layout.getPadding().asArrayRef();

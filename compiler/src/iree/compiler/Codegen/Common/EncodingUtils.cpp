@@ -34,7 +34,7 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     // itself.
     MaterializeEncodingInfo encodingInfo = getEncodingInfo(type);
     if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
-      return IREE::Encoding::dropEncoding(type);
+      return type.dropEncoding();
     }
     auto packedType = cast<RankedTensorType>(linalg::PackOp::inferPackedType(
         type, encodingInfo.innerTileSizes, encodingInfo.innerDimsPos,
@@ -88,10 +88,6 @@ MaterializeEncodingTypeConverter::getEncodingInfo(RankedTensorType type) const {
     return maybeEncodingInfo.value();
   }
   return layoutAttr.getEncodingInfo(type);
-}
-
-RankedTensorType dropEncoding(RankedTensorType type) {
-  return RankedTensorType::get(type.getShape(), type.getElementType());
 }
 
 std::optional<IREE::Codegen::MaterializeEncodingInfo>

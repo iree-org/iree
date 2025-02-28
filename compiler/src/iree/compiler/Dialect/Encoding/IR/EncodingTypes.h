@@ -104,9 +104,6 @@ MatmulNarrowDim getMatmulNarrowDim(EncodingAttr encoding);
 /// result of a matvec.
 bool isNarrowNResult(EncodingAttr encoding);
 
-/// Returns the same RankedTensoType without the encoding.
-RankedTensorType dropEncoding(RankedTensorType type);
-
 } // namespace mlir::iree_compiler::IREE::Encoding
 
 #endif // IREE_COMPILER_DIALECT_ENCODING_IR_ENCODINGTYPES_H_
