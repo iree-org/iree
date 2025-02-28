@@ -113,8 +113,4 @@ bool isNarrowNResult(EncodingAttr encoding) {
   return IREE::Encoding::getMatmulNarrowDim(encoding).isN();
 }
 
-RankedTensorType dropEncoding(RankedTensorType type) {
-  return RankedTensorType::get(type.getShape(), type.getElementType());
-}
-
 } // namespace mlir::iree_compiler::IREE::Encoding

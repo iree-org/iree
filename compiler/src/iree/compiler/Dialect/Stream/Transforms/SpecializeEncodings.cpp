@@ -62,13 +62,6 @@ SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
 
 } // namespace
 
-// TODO(hanchung): Add "cloneWithEncoding" method to RankedTensorType.
-static RankedTensorType cloneWithEncoding(RankedTensorType type,
-                                          Attribute encodingAttr) {
-  return RankedTensorType::get(type.getShape(), type.getElementType(),
-                               encodingAttr);
-}
-
 /// Returns true iff the type is a RankedTensorType and it has an encoding that
 /// implements SerializableEncodingAttrInterface.
 static bool isRecognizedEncodingType(Type type) {
@@ -111,7 +104,7 @@ static Type getTypeWithResolvedEncodingLayouts(
   if (!llvm::all_of(
           layoutResolvers,
           llvm::IsaPred<IREE::Encoding::EncodingLayoutResolverAttrInterface>)) {
-    return IREE::Encoding::dropEncoding(rankedTensorType);
+    return rankedTensorType.dropEncoding();
   }
   SmallVector<Attribute> layouts;
   for (auto attr : layoutResolvers) {
@@ -125,7 +118,7 @@ static Type getTypeWithResolvedEncodingLayouts(
   }
   Attribute newEncoding = encodingAttr.cloneWithLayouts(layouts);
   assert(isa<IREE::Encoding::SerializableEncodingAttrInterface>(newEncoding));
-  return cloneWithEncoding(rankedTensorType, newEncoding);
+  return rankedTensorType.cloneWithEncoding(newEncoding);
 };
 
 /// Updates the bindings of function arguments with encoding layouts. It only

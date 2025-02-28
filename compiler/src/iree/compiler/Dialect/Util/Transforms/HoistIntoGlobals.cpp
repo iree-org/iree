@@ -4,9 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// TODO(hanchung): Drop the Encoding dep once the `dropEncoding` method is
-// upstreamed to RankedTensorType.
-#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -45,7 +42,7 @@ static std::string getHoistedName(Type type) {
   os << "__hoisted_";
   auto rankedTensorType = dyn_cast<RankedTensorType>(type);
   if (rankedTensorType && rankedTensorType.getEncoding()) {
-    IREE::Encoding::dropEncoding(rankedTensorType).print(os);
+    rankedTensorType.dropEncoding().print(os);
     os << "_encoded";
   } else {
     type.print(os);
