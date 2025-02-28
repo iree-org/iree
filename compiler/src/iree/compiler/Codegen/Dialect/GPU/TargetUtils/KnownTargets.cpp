@@ -378,6 +378,7 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
       .Case("w7800", TargetDetails{rdna3Wgp, &w7800Chip})
       // https://www.techpowerup.com/gpu-specs/radeon-pro-w7700.c4184
       .Case("w7700", TargetDetails{rdna3Wgp, &w7700Chip})
+      .Cases("rdna4", "gfx1200", "gfx1201", TargetDetails{rdna4Wgp, nullptr})
       .Cases("rdna3", "gfx1100", "gfx1101", "gfx1102", "gfx1103", "gfx1150",
              "gfx1151", TargetDetails{rdna3Wgp, nullptr})
       .Cases("rdna2", "gfx1030", "gfx1031", "gfx1032", "gfx1033", "gfx1034",

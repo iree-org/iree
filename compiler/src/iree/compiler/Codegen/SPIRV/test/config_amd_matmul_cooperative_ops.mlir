@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=rdna3@vulkan --pass-pipeline='builtin.module(iree-spirv-select-lowering-strategy-pass)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=rdna4@vulkan --pass-pipeline='builtin.module(iree-spirv-select-lowering-strategy-pass)' %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
