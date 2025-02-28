@@ -963,13 +963,14 @@ util.func public @dispatch_hal_executable(%arg0: !stream.resource<*>, %arg1: ind
 // It does not fail because the executable does not match the requirements.
 
 #encoding = #iree_encoding.unknown_encoding
+util.global private @device : !hal.device
 hal.executable.source public @executable {
   hal.executable.export public @dispatch ordinal(0) layout(#hal.pipeline.layout<constants = 0, bindings = [
     #hal.pipeline.binding<storage_buffer>
   ]>)
 }
 util.func public @dispatch_hal_executable_with_encodings(%arg0: !stream.resource<*>, %arg1: index, %arg2: index) -> !stream.resource<*> {
-  %0 = stream.tensor.dispatch @executable::@dispatch(%arg0) : (tensor<4x?xf32, #encoding>{%arg2} in !stream.resource<*>{%arg1}) -> tensor<4x?xf32, #encoding>{%arg2} in !stream.resource<*>{%arg1}
+  %0 = stream.tensor.dispatch on(#hal.device.affinity<@device>) @executable::@dispatch(%arg0) : (tensor<4x?xf32, #encoding>{%arg2} in !stream.resource<*>{%arg1}) -> tensor<4x?xf32, #encoding>{%arg2} in !stream.resource<*>{%arg1}
   util.return %0 : !stream.resource<*>
 }
 // CHECK-LABEL: util.func public @dispatch_hal_executable_with_encodings(
