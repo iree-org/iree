@@ -615,7 +615,11 @@ util.func @scatter_collapse_indices(%arg0: tensor<?x2x16x4x128xf16>, %arg1: tens
 // -----
 
 util.func @scatter_collapse_indices_partial(%arg0: tensor<?x2x16x4x128xf16>, %arg1: tensor<4x?x1x1xi32>, %arg2: tensor<?x2x16x4x128xf16>) -> tensor<?x2x16x4x128xf16> {
-  %collapsed = tensor.collapse_shape %arg1[[0, 1], [2, 3]] : tensor<4x?x1x1xi32> into tensor<?x1xi32>
+  %0 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg1 : tensor<4x?x1x1xi32>) outs(%arg1 : tensor<4x?x1x1xi32>){
+^bb0(%in : i32, %out : i32):
+    linalg.yield %in : i32
+  } -> tensor<4x?x1x1xi32>
+  %collapsed = tensor.collapse_shape %0[[0, 1], [2, 3]] : tensor<4x?x1x1xi32> into tensor<?x1xi32>
   %1 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true) ins(%arg0, %collapsed: tensor<?x2x16x4x128xf16>, tensor<?x1xi32>) outs(%arg2 : tensor<?x2x16x4x128xf16>) {
   ^bb0(%arg7: f16, %arg8: f16):
     iree_linalg_ext.yield %arg7 : f16
