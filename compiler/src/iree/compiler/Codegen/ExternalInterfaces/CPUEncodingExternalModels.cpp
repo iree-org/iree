@@ -70,10 +70,6 @@ static void transposeInPlace(MaterializeEncodingInfo &info) {
   transpose(info.outerDimsPerm);
 }
 
-static RankedTensorType dropEncoding(RankedTensorType type) {
-  return RankedTensorType::get(type.getShape(), type.getElementType());
-}
-
 static Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
                                          ValueRange convertedInputOperands,
                                          ValueRange convertedOutputOperands) {
@@ -81,10 +77,11 @@ static Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
   operands.append(convertedInputOperands.begin(), convertedInputOperands.end());
   operands.append(convertedOutputOperands.begin(),
                   convertedOutputOperands.end());
-  return mlir::clone(builder, op,
-                     {dropEncoding(cast<RankedTensorType>(
-                         convertedOutputOperands[0].getType()))},
-                     operands);
+  return mlir::clone(
+      builder, op,
+      {cast<RankedTensorType>(convertedOutputOperands[0].getType())
+           .dropEncoding()},
+      operands);
 }
 
 static RankedTensorType
