@@ -253,7 +253,7 @@ verifyGPUMatmulPipeline(Operation *op,
   }
 
   unsigned reduction = static_cast<uint32_t>(IREE::GPU::TilingLevel::Reduction);
-  uint numLoops = llvm::cast<linalg::LinalgOp>(op).getNumLoops();
+  unsigned numLoops = llvm::cast<linalg::LinalgOp>(op).getNumLoops();
   size_t size = 0;
 
   SmallVector<int64_t> reductionTileSizes =
