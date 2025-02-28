@@ -593,6 +593,10 @@ struct CPUDeviceEncodingLayoutResolverAttrInterface
     : public DeviceEncodingLayoutResolverExternalModelBase<
           CPUDeviceEncodingLayoutResolverAttrInterface, CPUEncodingLayoutAttr> {
 
+  DictionaryAttr getConfiguration(Attribute attr) const {
+    return cast<CPUEncodingLayoutAttr>(attr).getConfiguration();
+  }
+
   MaterializeEncodingInfo getEncodingInfoImpl(Attribute attr,
                                               RankedTensorType type) const {
     auto layoutAttr = cast<CPUEncodingLayoutAttr>(attr);
@@ -719,6 +723,10 @@ struct VMVXDeviceEncodingLayoutResolverAttrInterface final
     : DeviceEncodingLayoutResolverExternalModelBase<
           VMVXDeviceEncodingLayoutResolverAttrInterface,
           VMVXEncodingLayoutAttr> {
+
+  DictionaryAttr getConfiguration(Attribute attr) const {
+    return cast<VMVXEncodingLayoutAttr>(attr).getConfiguration();
+  }
 
   MaterializeEncodingInfo getEncodingInfoImpl(Attribute attr,
                                               RankedTensorType type) const {

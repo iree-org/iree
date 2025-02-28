@@ -24,10 +24,6 @@ struct DeviceEncodingLayoutResolverExternalModelBase
     : public Codegen::LayoutAttrInterface::ExternalModel<
           DeviceEncodingLayoutResolverAttrInterface, EncodingLayoutAttr> {
 public:
-  DictionaryAttr getConfiguration(Attribute attr) const {
-    return cast<EncodingLayoutAttr>(attr).getConfiguration();
-  }
-
   Codegen::MaterializeEncodingInfo
   getEncodingInfo(Attribute attr, RankedTensorType type) const {
     const DeviceEncodingLayoutResolverAttrInterface *impl =
