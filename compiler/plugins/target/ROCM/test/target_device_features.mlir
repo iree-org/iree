@@ -30,6 +30,12 @@
 //
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-hip-target=gfx1201 %s | FileCheck %s --check-prefix=GFX1201
+//
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-hip-target=rx9070xt %s | FileCheck %s --check-prefixes=GFX1201,RX9070XT
+//
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-hip-target=rx9070 %s | FileCheck %s --check-prefixes=GFX1201,RX9070
 
 // GFX942: target = #iree_gpu.target<arch = "gfx942",
 // GFX942-SAME: wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8, storage =  b64|b32|b16|b8,
@@ -64,6 +70,9 @@
 // GFX1201: target = #iree_gpu.target<arch = "gfx1201",
 // GFX1201-SAME:        mma = [<WMMAR4_F32_16x16x16_F16>, <WMMAR4_F16_16x16x16_F16>, <WMMAR4_F32_16x16x16_BF16>, <WMMAR4_BF16_16x16x16_BF16>, <WMMAR4_F32_16x16x16_F8E5M2>, <WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN>, <WMMAR4_F32_16x16x16_F8E4M3FN>, <WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2>,  <WMMAR4_I32_16x16x16_I8>]
 // GFX1201-SAME:        subgroup_size_choices = [32, 64]
+
+// RX9070XT: chip = <wgp_count = 64, sku = "rx9070xt">>
+// RX9070:   chip = <wgp_count = 56, sku = "rx9070">>
 
 stream.executable public @reduce_dispatch {
   stream.executable.export @reduce_dispatch workgroups(%arg0: index) -> (index, index, index) {
