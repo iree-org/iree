@@ -6,6 +6,10 @@
 // RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline, canonicalize, cse)))' \
 // RUN:   %s | FileCheck %s --check-prefix=RDNA3
 
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=rdna4@vulkan \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline, canonicalize, cse)))' \
+// RUN:   %s | FileCheck %s --check-prefix=RDNA4
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -192,6 +196,12 @@ hal.executable public @matmul_256x1024x128_div_exp {
 //     RDNA3-DAG:   spirv.GlobalVariable @[[C_MEM:.+]] : !spirv.ptr<!spirv.struct<(!spirv.array<1088 x vector<4xf32>>)>, Workgroup>
 //         RDNA3:   spirv.func @matmul_256x1024x128_div_exp
 
+//   RDNA4-LABEL: spirv.module Logical GLSL450
+//     RDNA4-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1088 x vector<4xf32>>)>, Workgroup>
+//     RDNA4-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<640 x vector<4xf32>>)>, Workgroup>
+//     RDNA4-DAG:   spirv.GlobalVariable @[[C_MEM:.+]] : !spirv.ptr<!spirv.struct<(!spirv.array<1088 x vector<4xf32>>)>, Workgroup>
+//         RDNA4:   spirv.func @matmul_256x1024x128_div_exp
+
 // -----
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -292,6 +302,11 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 //     RDNA3-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1088 x vector<4xf32>>)>, Workgroup>
 //     RDNA3-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<640 x vector<4xf32>>)>, Workgroup>
 //         RDNA3:   spirv.func @batch_matmul_16x128x256x512_div
+
+//   RDNA4-LABEL: spirv.module Logical GLSL450
+//     RDNA4-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1088 x vector<4xf32>>)>, Workgroup>
+//     RDNA4-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<640 x vector<4xf32>>)>, Workgroup>
+//         RDNA4:   spirv.func @batch_matmul_16x128x256x512_div
 
 // -----
 
@@ -440,3 +455,8 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
 //     RDNA3-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1088 x vector<4xf32>>)>, Workgroup>
 //     RDNA3-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<640 x vector<4xf32>>)>, Workgroup>
 //         RDNA3:   spirv.func @generic_batch_matmul_32x128x512x64
+
+//   RDNA4-LABEL: spirv.module Logical GLSL450
+//     RDNA4-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1088 x vector<4xf32>>)>, Workgroup>
+//     RDNA4-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<640 x vector<4xf32>>)>, Workgroup>
+//         RDNA4:   spirv.func @generic_batch_matmul_32x128x512x64
