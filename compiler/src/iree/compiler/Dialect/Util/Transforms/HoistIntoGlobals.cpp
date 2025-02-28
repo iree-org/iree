@@ -4,6 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// TODO(hanchung): Drop the Encoding dep once the `dropEncoding` method is
+// upstreamed to RankedTensorType.
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -13,6 +16,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/SymbolTable.h"
 
@@ -39,7 +43,13 @@ static std::string getHoistedName(Type type) {
   std::string str;
   llvm::raw_string_ostream os(str);
   os << "__hoisted_";
-  type.print(os);
+  auto rankedTensorType = dyn_cast<RankedTensorType>(type);
+  if (rankedTensorType && rankedTensorType.getEncoding()) {
+    IREE::Encoding::dropEncoding(rankedTensorType).print(os);
+    os << "_encoded";
+  } else {
+    type.print(os);
+  }
   str = sanitizeSymbolName(str);
   if (str.substr(str.size() - 1) == "_")
     str = str.substr(0, str.size() - 1); // strip trailing _
