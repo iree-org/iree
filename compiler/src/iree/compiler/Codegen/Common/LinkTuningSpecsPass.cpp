@@ -138,6 +138,178 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
   return newSpec;
 }
 
+static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
+  OpBuilder builder(module.getContext());
+  SmallVector<transform::NamedSequenceOp> namedSequenceOpsToMove;
+  SmallVector<transform::ForeachMatchOp> foreachMatchOps;
+
+  // Step 1: Collect NamedSequenceOps and ForeachMatchOps from inner modules.
+  for (auto innerModule : module.getBody()->getOps<ModuleOp>()) {
+    for (auto namedSequenceOp :
+         innerModule.getBody()->getOps<transform::NamedSequenceOp>()) {
+      if (namedSequenceOp.getSymName() == kKernelConfigSpecName) {
+        transform::ForeachMatchOp foreachMatch = nullptr;
+        int matchCount = 0;
+        // Iterate directly over ForeachMatchOp within kernelConfig
+        for (auto op : namedSequenceOp.getOps<transform::ForeachMatchOp>()) {
+          if (!foreachMatch) {
+            foreachMatch = op;
+          }
+          matchCount++;
+        }
+
+        // Emit error if multiple occurrences exist
+        if (matchCount > 1) {
+          return namedSequenceOp.emitError(
+              "Multiple ForeachMatchOp found inside '__kernel_config'");
+        }
+
+        if (!foreachMatch)
+          return namedSequenceOp.emitError("ForeachMatchOp not found");
+
+        foreachMatchOps.push_back(foreachMatch);
+      } else {
+        namedSequenceOpsToMove.push_back(namedSequenceOp);
+      }
+    }
+  }
+
+  // Step 2-a: Ensure all ForeachMatchOps have the same result types before
+  // merging.
+  SmallVector<Type, 4> expectedResultTypes =
+      llvm::to_vector<4>(foreachMatchOps.front()->getResultTypes());
+
+  for (auto foreachMatchOp : foreachMatchOps) {
+    SmallVector<Type, 4> currentResultTypes =
+        llvm::to_vector<4>(foreachMatchOp.getResultTypes());
+
+    if (!llvm::equal(currentResultTypes, expectedResultTypes)) {
+      return foreachMatchOp.emitError(
+          "Mismatched result types among foreach_match ops");
+    }
+  }
+
+  // Step 2-b: Ensure all ForeachMatchOps have the same `restrictRoot` and
+  // `flattenResults` attributes.
+  UnitAttr restrictRoot = nullptr;
+  UnitAttr flattenResults = nullptr;
+  bool hasMismatchAttr = false;
+
+  for (auto foreachMatchOp : foreachMatchOps) {
+    UnitAttr currentRestrictRoot = foreachMatchOp.getRestrictRootAttr();
+    UnitAttr currentFlattenResults = foreachMatchOp.getFlattenResultsAttr();
+
+    if (!restrictRoot) {
+      restrictRoot = currentRestrictRoot; // First encountered value.
+    } else if (restrictRoot != currentRestrictRoot) {
+      hasMismatchAttr = true;
+      break; // Exit early when a mismatch is found.
+    }
+
+    if (!flattenResults) {
+      flattenResults = currentFlattenResults; // First encountered value.
+    } else if (flattenResults != currentFlattenResults) {
+      hasMismatchAttr = true;
+      break; // Exit early when a mismatch is found.
+    }
+  }
+
+  // If there's a mismatch in attributes, do not merge.
+  if (hasMismatchAttr) {
+    return module.emitError("ForeachMatchOps have inconsistent restrictRoot or "
+                            "flattenResults attributes");
+  }
+
+  // Step 3-a: Move collected NamedSequenceOps to the top-level module.
+  for (transform::NamedSequenceOp op : namedSequenceOpsToMove) {
+    op.getOperation()->moveBefore(module.getBody(), module.getBody()->end());
+  }
+
+  // Step 3-b: Create a new NamedSequenceOp `__kernel_config` in the top-level
+  // module.
+  builder.setInsertionPointToEnd(module.getBody());
+  Location loc = module.getLoc();
+  Type anyOpType = builder.getType<transform::AnyOpType>();
+  FunctionType seqType =
+      builder.getFunctionType(TypeRange{anyOpType}, TypeRange{anyOpType});
+
+  auto newNamedSequence = builder.create<transform::NamedSequenceOp>(
+      loc, kKernelConfigSpecName, TypeAttr::get(seqType),
+      /*sym_visibility=*/StringAttr{},
+      /*arg_attrs=*/ArrayAttr{},
+      /*res_attrs*/ ArrayAttr{});
+
+  bool hasConsumedArg =
+      llvm::any_of(foreachMatchOps, [](transform::ForeachMatchOp op) {
+        Value operand = op->getOperand(0);
+        if (auto blockArg = mlir::dyn_cast<BlockArgument>(operand)) {
+          Operation *parentOp = blockArg.getOwner()->getParentOp();
+          if (auto namedSequenceOp =
+                  mlir::dyn_cast<transform::NamedSequenceOp>(parentOp)) {
+            return namedSequenceOp.getArgAttr(blockArg.getArgNumber(),
+                                              kArgConsumedAttrName) != nullptr;
+          }
+        }
+        return false;
+      });
+
+  StringRef attrName =
+      hasConsumedArg ? kArgConsumedAttrName : kArgReadOnlyAttrName;
+  newNamedSequence.setArgAttr(0, attrName, builder.getUnitAttr());
+  newNamedSequence->setAttr(kTuningSpecEntrypointAttrName,
+                            builder.getUnitAttr());
+  // Indicate the output module is a default tuning spec after merging.
+  module->setAttr(kTuningSpecDefaultEntrypointAttrName, builder.getUnitAttr());
+
+  // Step 3-C: Create a new block inside the NamedSequenceOp and merging
+  // ForeachMatchOp from each inner modules into one ForachMatchOp.
+  SmallVector<Type, 4> resultTypes;
+  llvm::append_range(resultTypes, expectedResultTypes);
+
+  SmallVector<std::pair<SymbolRefAttr, SymbolRefAttr>> matcherActionPairs;
+  SmallVector<Value, 4> forwardedInputs;
+  for (auto foreachMatchOp : foreachMatchOps) {
+    ArrayAttr matchers = foreachMatchOp.getMatchers();
+    ArrayAttr actions = foreachMatchOp.getActions();
+
+    for (size_t i = 0; i < matchers.size(); i++) {
+      matcherActionPairs.push_back({mlir::cast<SymbolRefAttr>(matchers[i]),
+                                    mlir::cast<SymbolRefAttr>(actions[i])});
+    }
+    // Collect forwarded inputs (if any).
+    for (Value input : foreachMatchOp.getForwardedInputs()) {
+      if (llvm::find(forwardedInputs, input) == forwardedInputs.end()) {
+        forwardedInputs.push_back(input); // Avoid duplicates
+      }
+    }
+  }
+
+  SmallVector<Attribute> mergedMatchers;
+  SmallVector<Attribute> mergedActions;
+
+  for (const auto &pair : matcherActionPairs) {
+    mergedMatchers.push_back(pair.first);
+    mergedActions.push_back(pair.second);
+  }
+  Region &region = newNamedSequence.getRegion();
+  Block *body = builder.createBlock(&region, region.begin(),
+                                    newNamedSequence.getArgumentTypes(), loc);
+  builder.setInsertionPointToStart(body);
+  auto mergedForeachMatch = builder.create<transform::ForeachMatchOp>(
+      loc, resultTypes, newNamedSequence.getArgument(0), forwardedInputs,
+      restrictRoot, flattenResults, builder.getArrayAttr(mergedMatchers),
+      builder.getArrayAttr(mergedActions));
+  builder.create<transform::YieldOp>(loc, mergedForeachMatch->getResult(0));
+
+  // Step 4: Remove the original inner modules after merging.
+  for (auto innerModule :
+       llvm::make_early_inc_range(module.getBody()->getOps<ModuleOp>())) {
+    innerModule.erase();
+  }
+
+  return newNamedSequence;
+}
+
 struct LinkTuningSpecsPass final
     : impl::LinkTuningSpecsPassBase<LinkTuningSpecsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -155,6 +327,22 @@ struct LinkTuningSpecsPass final
 
 FailureOr<NamedSequenceOp> linkTuningSpecs(ModuleOp module) {
   SmallVector<NamedSequenceOp> tuningSpecs;
+
+  int matchingModules = 0;
+  int totalModules = 0;
+
+  for (auto module : module.getBody()->getOps<ModuleOp>()) {
+    totalModules++;
+    if (module->hasAttr(kTuningSpecDefaultEntrypointAttrName)) {
+      matchingModules++;
+    }
+  }
+
+  // If all modules have the default attribute and there are at least two
+  // modules, merge and link the default tuning specs directly.
+  if (matchingModules == totalModules && matchingModules > 1) {
+    return emitLinkedDefaultTuningSpec(module);
+  }
 
   for (ModuleOp nested : findNestedModulesWithNamedSequences(module)) {
     llvm::append_range(tuningSpecs, findTuningSpecs(nested));
