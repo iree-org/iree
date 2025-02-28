@@ -18,8 +18,8 @@ on:
         default: ""
 
 jobs:
-  sharktank_regresion_tests:
-    name: "sharktank_regresion_tests :: ${{ matrix.name }}"
+  sharktank_regression_tests:
+    name: "sharktank_regression_tests :: ${{ matrix.name }}"
     runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false
@@ -87,7 +87,7 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
 
       - name: "Running Sharktank regression composite action"
-        uses: iree-org/iree-test-suites/sharktank_models@main
+        uses: iree-org/iree-test-suites/sharktank_models@31b131f64ab06f6f514433226ca700b1efd7cfde
         with:
           MATRIX_NAME: ${{ matrix.name }}
           SKU: ${{ matrix.sku }}
