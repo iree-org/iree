@@ -84,6 +84,14 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
       builder.getUnitAttr());
   newSpec->setAttr(kTuningSpecEntrypointAttrName, builder.getUnitAttr());
 
+  for (auto innerModule : module.getBody()->getOps<ModuleOp>()) {
+    // Remove the default tuning spec attribute from inner modules,
+    // as the top-level module is attached with default attribute.
+    if (innerModule->hasAttr(kTuningSpecDefaultEntrypointAttrName)) {
+      innerModule->removeAttr(kTuningSpecDefaultEntrypointAttrName);
+    }
+  }
+
   Region &region = newSpec.getRegion();
   Block *body = builder.createBlock(&region, region.begin(),
                                     newSpec.getArgumentTypes(), loc);
@@ -147,7 +155,7 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
       if (namedSequenceOp.getSymName() == kKernelConfigSpecName) {
         transform::ForeachMatchOp foreachMatch = nullptr;
         int matchCount = 0;
-        // Iterate directly over ForeachMatchOp within kernelConfig
+        // Iterate directly over ForeachMatchOp within kernelConfig.
         for (auto op : namedSequenceOp.getOps<transform::ForeachMatchOp>()) {
           if (!foreachMatch) {
             foreachMatch = op;
@@ -155,14 +163,13 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
           matchCount++;
         }
 
-        // Emit error if multiple occurrences exist
+        // Return failure if multiple occurrences exist.
         if (matchCount > 1) {
-          return namedSequenceOp.emitError(
-              "Multiple ForeachMatchOp found inside '__kernel_config'");
+          return failure();
         }
-
+        // Return failure if not foreach match op found.
         if (!foreachMatch)
-          return namedSequenceOp.emitError("ForeachMatchOp not found");
+          return failure();
 
         foreachMatchOps.push_back(foreachMatch);
       } else {
@@ -181,8 +188,7 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
         llvm::to_vector<4>(foreachMatchOp.getResultTypes());
 
     if (!llvm::equal(currentResultTypes, expectedResultTypes)) {
-      return foreachMatchOp.emitError(
-          "Mismatched result types among foreach_match ops");
+      return failure();
     }
   }
 
@@ -213,8 +219,7 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
 
   // If there's a mismatch in attributes, do not merge.
   if (hasMismatchAttr) {
-    return module.emitError("ForeachMatchOps have inconsistent restrictRoot or "
-                            "flattenResults attributes");
+    return failure();
   }
 
   // Step 3-a: Move collected NamedSequenceOps to the top-level module.
@@ -338,7 +343,12 @@ FailureOr<NamedSequenceOp> linkTuningSpecs(ModuleOp module) {
   // If all modules have the default attribute and there are at least two
   // modules, merge and link the default tuning specs directly.
   if (matchingModules == totalModules && matchingModules > 1) {
-    return emitLinkedDefaultTuningSpec(module);
+    FailureOr<NamedSequenceOp> result = emitLinkedDefaultTuningSpec(module);
+    // Return successfully if merging succeeds, otherwise
+    // fallback to below linking pass.
+    if (succeeded(result)) {
+      return result;
+    }
   }
 
   for (ModuleOp nested : findNestedModulesWithNamedSequences(module)) {
