@@ -150,11 +150,15 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
   binder.opt<bool>(
       "iree-opt-aggressively-propagate-transposes",
       aggressiveTransposePropagation,
+      {init_at_opt(llvm::OptimizationLevel::O0, false),
+       init_at_opt(llvm::OptimizationLevel::O3, true)},
       llvm::cl::desc(
           "Propagates transposes to named ops even when the resulting op will "
           "be a linalg.generic"),
       llvm::cl::cat(category));
   binder.opt<bool>("iree-opt-outer-dim-concat", outerDimConcat,
+                   {init_at_opt(llvm::OptimizationLevel::O0, false),
+                    init_at_opt(llvm::OptimizationLevel::O1, true)},
                    llvm::cl::desc("Transposes all concatenations to happen"
                                   "along the outer most dimension."),
                    llvm::cl::cat(category));
@@ -225,6 +229,8 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
 
   binder.opt<bool>(
       "iree-opt-generalize-matmul", generalizeMatmul,
+      {init_at_opt(llvm::OptimizationLevel::O0, false),
+       init_at_opt(llvm::OptimizationLevel::O2, true)},
       llvm::cl::desc("Convert named matmul ops to linalg generic ops during "
                      "global optimization to enable better fusion."),
       llvm::cl::cat(category));
