@@ -99,6 +99,24 @@ module @hoist_sub_byte_aligned_scalar_transitive {
 
 // -----
 
+// Checks that the name of global op is readable when encoding is present.
+
+// CHECK: #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing_encoding<>
+// CHECK-LABEL: @hoist_encoded_const_expr_with_simpler_name
+module @hoist_encoded_const_expr_with_simpler_name {
+  // CHECK: util.global private @__hoisted_tensor_64xi8__encoded : tensor<64xi8, #[[$ENCODING]]>
+  util.func public @main() -> (tensor<64xi8, #encoding>) {
+    %0 = arith.constant dense<0> : tensor<32xi8>
+    %1 = arith.constant dense<0> : tensor<32xi8>
+    %2 = "iree_unregistered.const_expr"(%0, %1)
+        : (tensor<32xi8>, tensor<32xi8>) -> tensor<64xi8, #encoding>
+    util.return %2 : tensor<64xi8, #encoding>
+  }
+}
+
+// -----
+
 // We presently expand i1 -> i8 for legacy reasons. As such, we support
 // it, even though we don't generally support sub-byte constexprs.
 
