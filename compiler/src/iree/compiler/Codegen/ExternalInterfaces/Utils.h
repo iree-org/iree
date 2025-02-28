@@ -20,7 +20,7 @@ static const char kEncodingInfoAttrName[] = "encoding_info";
 
 template <typename DeviceEncodingLayoutResolverAttrInterface,
           typename EncodingLayoutAttr>
-struct WrappedExternalModel
+struct DeviceEncodingLayoutResolverExternalModelBase
     : public Codegen::LayoutAttrInterface::ExternalModel<
           DeviceEncodingLayoutResolverAttrInterface, EncodingLayoutAttr> {
 public:

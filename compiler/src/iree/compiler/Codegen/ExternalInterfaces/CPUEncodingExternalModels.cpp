@@ -590,8 +590,8 @@ enumerateCPUMatmulTiles(IREE::Encoding::EncodingAttr encoding,
 }
 
 struct CPUDeviceEncodingLayoutResolverAttrInterface
-    : public WrappedExternalModel<CPUDeviceEncodingLayoutResolverAttrInterface,
-                                  CPUEncodingLayoutAttr> {
+    : public DeviceEncodingLayoutResolverExternalModelBase<
+          CPUDeviceEncodingLayoutResolverAttrInterface, CPUEncodingLayoutAttr> {
 
   MaterializeEncodingInfo getEncodingInfoImpl(Attribute attr,
                                               RankedTensorType type) const {
@@ -716,8 +716,9 @@ enumerateVMVXMatmulTiles(linalg::ContractionDimensions cDims,
 }
 
 struct VMVXDeviceEncodingLayoutResolverAttrInterface final
-    : WrappedExternalModel<VMVXDeviceEncodingLayoutResolverAttrInterface,
-                           VMVXEncodingLayoutAttr> {
+    : DeviceEncodingLayoutResolverExternalModelBase<
+          VMVXDeviceEncodingLayoutResolverAttrInterface,
+          VMVXEncodingLayoutAttr> {
 
   MaterializeEncodingInfo getEncodingInfoImpl(Attribute attr,
                                               RankedTensorType type) const {

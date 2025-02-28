@@ -300,8 +300,8 @@ static Operation *lowerContractionOpToMultiMmaOp(OpBuilder &builder,
 }
 
 struct GPUDeviceEncodingLayoutResolverAttrInterface
-    : public WrappedExternalModel<GPUDeviceEncodingLayoutResolverAttrInterface,
-                                  GPUEncodingLayoutAttr> {
+    : public DeviceEncodingLayoutResolverExternalModelBase<
+          GPUDeviceEncodingLayoutResolverAttrInterface, GPUEncodingLayoutAttr> {
   MaterializeEncodingInfo getEncodingInfoImpl(Attribute attr,
                                               RankedTensorType type) const {
     auto layoutAttr = cast<GPUEncodingLayoutAttr>(attr);
