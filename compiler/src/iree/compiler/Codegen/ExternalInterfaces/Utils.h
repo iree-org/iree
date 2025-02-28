@@ -18,6 +18,11 @@ namespace mlir::iree_compiler::IREE {
 
 static const char kEncodingInfoAttrName[] = "encoding_info";
 
+// This class is the base class for the external model of different encoding
+// resolver attributes. It provides a public method, `getEncodingInfo` to reduce
+// the duplicated implementations before. To inherit it, it requires the derived
+// class to implement the `getConfiguration` method and the
+// `getEncodingInfoImpl` method.
 template <typename DeviceEncodingLayoutResolverAttrInterface,
           typename EncodingLayoutAttr>
 struct DeviceEncodingLayoutResolverExternalModelBase
