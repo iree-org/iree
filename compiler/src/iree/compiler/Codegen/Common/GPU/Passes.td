@@ -263,7 +263,7 @@ def GPUApplyTilingLevelPass :
                          "Tile and fuse all annotated ops to threads")
            )}]>,
     Option<"allowZeroSlices", "allow-zero-slices", "bool",
-           /*default=*/"false",
+           /*default=*/"true",
            "Allow pad fusion to generate zero size slices">
   ];
 }
