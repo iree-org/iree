@@ -765,3 +765,41 @@ func.func @dont_transpose_less(%0 : tensor<128x128xf32>, %1 : tensor<128x128xf32
 // TRANSPOSE-LABEL: func @dont_transpose_less(
 //       TRANSPOSE:   scf.forall
 //       TRANSPOSE:    [#iree_codegen.workgroup_mapping<x>]
+
+// -----
+
+func.func @set_encoding_gpu(%arg0 : tensor<?x?xi8>) -> tensor<?x?x8x4x4x4x2x8xi8> {
+  %c0_i8 = arith.constant 0 : i8
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xi8>
+  %d1 = tensor.dim %arg0, %c1 : tensor<?x?xi8>
+  %s0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 128)>()[%d0]
+  %s1 = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%d1]
+  %22 = tensor.empty(%s0, %s1) : tensor<?x?x128x64xi8>
+  %pack = linalg.pack %arg0 padding_value(%c0_i8 : i8)
+      outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [128, 64]
+      into %22 : tensor<?x?xi8> -> tensor<?x?x128x64xi8>
+  %expanded = tensor.expand_shape %pack [[0], [1], [2, 3, 4], [5, 6, 7]]
+      output_shape [%s0, %s1, 4, 8, 4, 2, 4, 8]
+      : tensor<?x?x128x64xi8> into tensor<?x?x4x8x4x2x4x8xi8>
+  %23 = tensor.empty(%s0, %s1) : tensor<?x?x8x4x4x4x2x8xi8>
+  %24 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d4, d2, d5, d6, d3, d7)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]}
+      ins(%expanded : tensor<?x?x4x8x4x2x4x8xi8>) outs(%23 : tensor<?x?x8x4x4x4x2x8xi8>)
+      attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 0, 0, 0, 0, 0, 0]]>} {
+  ^bb0(%in: i8, %out: i8):
+    linalg.yield %in : i8
+  } -> tensor<?x?x8x4x4x4x2x8xi8>
+  return %24 : tensor<?x?x8x4x4x4x2x8xi8>
+}
+
+// CHECK-LABEL: func @set_encoding_gpu(
+//  CHECK-SAME:   %[[INPUT:[A-Za-z0-9]+]]: tensor<?x?xi8>
+//       CHECK:   %[[RESULT:.+]] = scf.forall (%[[ID0:.+]], %[[ID1:.+]])
+//       CHECK:     linalg.pack
+//       CHECK:     tensor.expand_shape
+//       CHECK:     linalg.generic
+//       CHECK:     tensor.parallel_insert_slice
