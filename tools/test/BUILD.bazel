@@ -28,6 +28,7 @@ iree_lit_test_suite(
             "executable_configurations.mlir",
             "executable_sources.mlir",
             "iree-benchmark-executable.mlir",
+            "iree-compile-help.txt",
             "iree-benchmark-module.mlir",
             "iree-convert-parameters.txt",
             "iree-dump-parameters.txt",

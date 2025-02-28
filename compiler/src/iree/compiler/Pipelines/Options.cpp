@@ -184,7 +184,8 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
           "Reduces numeric precision to lower bit depths where possible."),
       llvm::cl::cat(category));
   binder.opt<bool>("iree-opt-strip-assertions", stripAssertions,
-                   init_at_opt(llvm::OptimizationLevel::O1, true),
+                   {init_at_opt(llvm::OptimizationLevel::O0, false),
+                    init_at_opt(llvm::OptimizationLevel::O1, true)},
                    llvm::cl::desc("Strips debug assertions after any useful "
                                   "information has been extracted."),
                    llvm::cl::cat(category));

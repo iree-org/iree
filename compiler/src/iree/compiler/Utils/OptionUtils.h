@@ -16,6 +16,13 @@
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Support/LogicalResult.h"
 
+namespace llvm {
+inline raw_ostream &operator<<(raw_ostream &os,
+                               const llvm::OptimizationLevel &opt) {
+  return os << 'O' << opt.getSpeedupLevel();
+}
+} // namespace llvm
+
 namespace mlir::iree_compiler {
 
 struct opt_initializer_base {
@@ -24,7 +31,7 @@ struct opt_initializer_base {
 
 template <typename Ty>
 struct opt_initializer : opt_initializer_base {
-  const Ty init;
+  Ty init;
   llvm::OptimizationLevel optLevel;
   opt_initializer(const llvm::OptimizationLevel opt, const Ty &val)
       : init(val), optLevel(opt) {}
@@ -32,6 +39,26 @@ struct opt_initializer : opt_initializer_base {
     assert(inLevel.getSizeLevel() == 0 && "size level not implemented");
     if (inLevel.getSpeedupLevel() >= optLevel.getSpeedupLevel())
       val = init;
+  }
+
+  /// Append to the description string of the flag.
+  /// e.g. " at O2 default is true"
+  void appendToDesc(std::string &desc) {
+    llvm::raw_string_ostream os(desc);
+    os << "\nAt optimization level " << optLevel << " the default is ";
+    prettyPrint(os, init);
+  }
+
+private:
+  // TODO: merge this with the printing in `OptionsBinder`.
+  template <typename T>
+  static void prettyPrint(llvm::raw_ostream &os, T &val) {
+    os << val;
+  }
+
+  template <>
+  void prettyPrint<bool>(llvm::raw_ostream &os, bool &val) {
+    os << (val ? "true" : "false");
   }
 };
 
@@ -70,7 +97,11 @@ public:
     return OptionsBinder(std::make_unique<llvm::cl::SubCommand>());
   }
 
-  template <typename T, typename V, typename... Mods>
+  template <
+      typename T, typename V, typename... Mods,
+      std::enable_if_t<
+          !(std::is_same_v<std::decay_t<Mods>, opt_initializer<T>> || ...),
+          int> = 0>
   void opt(llvm::StringRef name, V &value, Mods... Ms) {
     auto [changedCallback, clCallback] = makeChangedCallback<V>();
     if (!scope) {
@@ -97,17 +128,31 @@ public:
     }
   }
 
-  template <typename T, typename V, typename... Ks, typename... Mods>
-  void opt(llvm::StringRef name, V &value, opt_initializer<T> init,
-           opt_initializer<Ks>... inits, Mods... Ms) {
-    static_assert((std::is_same<T, Ks>::value && ...),
-                  "All opt_initializer types must be the same");
+  // Bind a flag with a single `opt_initialier` that specifies defaults at a
+  // given optimization level.
+  template <typename T, typename V, typename... Mods>
+  void opt(llvm::StringRef name, V &value,
+           std::initializer_list<opt_initializer<T>> inits, Mods... Ms) {
+    llvm::SmallVector<opt_initializer<T>> initsSorted(inits.begin(),
+                                                      inits.end());
+    llvm::sort(initsSorted, [](opt_initializer<T> &lhs,
+                               opt_initializer<T> &rhs) {
+      return lhs.optLevel.getSpeedupLevel() < rhs.optLevel.getSpeedupLevel();
+    });
+
+    llvm::cl::desc &desc = filterDescription(Ms...);
+    auto descStr = std::make_unique<std::string>(desc.Desc);
+    for (auto &init : initsSorted) {
+      init.appendToDesc(*descStr);
+    }
+    desc.Desc = descStr->c_str();
+
     opt<V>(name, value, Ms...);
-    getOptionsStorage()[name].setOptLevels.push_back(
-        std::make_unique<opt_initializer<T>>(init));
-    (getOptionsStorage()[name].setOptLevels.push_back(
-         std::make_unique<opt_initializer<Ks>>(inits)),
-     ...);
+    OptionInfo &info = getOptionsStorage()[name];
+    info.extendedDesc = std::move(descStr);
+    for (auto &init : initsSorted) {
+      info.optInits.emplace_back(std::make_unique<opt_initializer<T>>(init));
+    }
   }
 
   template <typename... Mods>
@@ -126,7 +171,7 @@ public:
     if (changedCallback()) {
       return;
     }
-    const auto &setOptLevels = infoIt->getSecond().setOptLevels;
+    const auto &setOptLevels = infoIt->getSecond().optInits;
     for (const auto &init : setOptLevels) {
       reinterpret_cast<opt_initializer<T> *>(init.get())
           ->apply(optLevel, value);
@@ -201,7 +246,9 @@ private:
     ChangedCallback isChanged;
     DefaultCallback isDefault;
 
-    llvm::SmallVector<std::unique_ptr<opt_initializer_base>> setOptLevels;
+    // For options with optimization level defaults.
+    llvm::SmallVector<std::unique_ptr<opt_initializer_base>> optInits;
+    std::unique_ptr<std::string> extendedDesc;
   };
   using OptionsStorage = llvm::DenseMap<llvm::StringRef, OptionInfo>;
 
@@ -311,6 +358,23 @@ private:
     };
   }
 
+  // Finds the description in args
+  template <typename... Args>
+  static llvm::cl::desc &filterDescription(Args &...args) {
+    llvm::cl::desc *result = nullptr;
+    (
+        [&] {
+          if constexpr (std::is_same_v<std::decay_t<Args>, llvm::cl::desc>) {
+            assert(!result && "Multiple llvm::cl::desc in args");
+            if (!result)
+              result = &args;
+          }
+        }(),
+        ...);
+    assert(result && "Expected llvm::cl::desc in args");
+    return *result;
+  }
+
   std::unique_ptr<llvm::cl::SubCommand> scope;
   OptionsStorage localOptions;
   static llvm::ManagedStatic<OptionsStorage> globalOptions;
@@ -342,13 +406,6 @@ public:
   }
 
 } // namespace mlir::iree_compiler
-
-namespace llvm {
-inline raw_ostream &operator<<(raw_ostream &os,
-                               const llvm::OptimizationLevel &opt) {
-  return os << 'O' << opt.getSpeedupLevel();
-}
-} // namespace llvm
 
 namespace llvm::cl {
 
