@@ -7,10 +7,12 @@
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
@@ -59,7 +61,7 @@ static void tileNonPackedDimsFor3DPackOps(RewriterBase &rewriter,
     }
 
     // Skip the tiling if the size is already 1.
-    RankedTensorType srcType = packOp.getSourceType();
+    ShapedType srcType = packOp.getSourceType();
     for (auto [idx, val] : llvm::enumerate(tileSizes)) {
       if (val && srcType.getDimSize(idx) == 1)
         return;
@@ -95,7 +97,7 @@ static void tileNonPackedDimsFor5DPUnpackOps(RewriterBase &rewriter,
     }
 
     // Skip the tiling if the size is already 1.
-    RankedTensorType destType = unpackOp.getDestType();
+    ShapedType destType = unpackOp.getDestType();
     for (auto [idx, val] : llvm::enumerate(tileSizes)) {
       if (val && destType.getDimSize(idx) == 1)
         return;
@@ -299,24 +301,31 @@ struct Convert3DPackto2DPackPattern : public OpRewritePattern<linalg::PackOp> {
     }
 
     Location loc = packOp.getLoc();
-    auto reducedSrcType =
-        RankedTensorType::Builder(packOp.getSourceType()).dropDim(srcPos);
-    auto reducedSrc = tensor::createCanonicalRankReducingExtractSliceOp(
-        rewriter, loc, packOp.getSource(), reducedSrcType);
+    auto srcType = packOp.getSourceType();
+    if (isa<RankedTensorType>(srcType)) {
+      RankedTensorType srcType = cast<RankedTensorType>(packOp.getSourceType());
+      RankedTensorType dstType = cast<RankedTensorType>(packOp.getDestType());
+      auto reducedSrcType =
+          RankedTensorType::Builder(srcType).dropDim(srcPos);
+      auto reducedSrc = tensor::createCanonicalRankReducingExtractSliceOp(
+          rewriter, loc, packOp.getSource(), reducedSrcType);
 
-    auto reducedDestType =
-        RankedTensorType::Builder(packOp.getDestType()).dropDim(destPos);
-    auto reducedDest = tensor::createCanonicalRankReducingExtractSliceOp(
-        rewriter, loc, packOp.getDest(), reducedDestType);
-
-    auto newPackOp = rewriter.create<linalg::PackOp>(
-        loc, reducedSrc, reducedDest, newInnerDimsPos, packOp.getMixedTiles(),
-        packOp.getPaddingValue(), newOuterDimsPerm);
-
-    auto insertSliceOp = tensor::createCanonicalRankReducingInsertSliceOp(
-        rewriter, loc, newPackOp.getResult(), packOp.getDest());
-    rewriter.replaceOp(packOp, insertSliceOp);
-    return success();
+      auto reducedDestType =
+          RankedTensorType::Builder(dstType).dropDim(destPos);
+      auto reducedDest = tensor::createCanonicalRankReducingExtractSliceOp(
+          rewriter, loc, packOp.getDest(), reducedDestType);
+      auto newPackOp = rewriter.create<linalg::PackOp>(
+            loc, reducedSrc, reducedDest, newInnerDimsPos, packOp.getMixedTiles(),
+            packOp.getPaddingValue(), newOuterDimsPerm);
+        auto insertSliceOp = tensor::createCanonicalRankReducingInsertSliceOp(
+            rewriter, loc, newPackOp.getResult(), packOp.getDest());
+        rewriter.replaceOp(packOp, insertSliceOp);
+        return success();
+    } else {
+      MemRefType srcType = cast<MemRefType>(srcType);
+      // TODO (ita9naiwa): add this case : add this case
+      return failure();
+    }
   }
 };
 
@@ -377,24 +386,33 @@ struct Convert5DUnPackto4DUnPackPattern
     }
 
     Location loc = unpackOp.getLoc();
-    auto reducedSrcType =
-        RankedTensorType::Builder(unpackOp.getSourceType()).dropDim(srcPos);
-    auto reducedSrc = tensor::createCanonicalRankReducingExtractSliceOp(
-        rewriter, loc, unpackOp.getSource(), reducedSrcType);
+    auto srcType = unpackOp.getSourceType();
+    if (isa<RankedTensorType>(srcType)) {
+      RankedTensorType srcType = cast<RankedTensorType>(unpackOp.getSourceType());
+      RankedTensorType dstType = cast<RankedTensorType>(unpackOp.getDestType());
+      auto reducedSrcType =
+          RankedTensorType::Builder(srcType).dropDim(srcPos);
+      auto reducedSrc = tensor::createCanonicalRankReducingExtractSliceOp(
+          rewriter, loc, unpackOp.getSource(), reducedSrcType);
 
-    auto reducedDestType =
-        RankedTensorType::Builder(unpackOp.getDestType()).dropDim(destPos);
-    auto reducedDest = tensor::createCanonicalRankReducingExtractSliceOp(
-        rewriter, loc, unpackOp.getDest(), reducedDestType);
+      auto reducedDestType =
+          RankedTensorType::Builder(dstType).dropDim(destPos);
+      auto reducedDest = tensor::createCanonicalRankReducingExtractSliceOp(
+          rewriter, loc, unpackOp.getDest(), reducedDestType);
 
-    auto newUnpackOp = rewriter.create<linalg::UnPackOp>(
-        loc, reducedSrc, reducedDest, newInnerDimsPos, unpackOp.getMixedTiles(),
-        newOuterDimsPerm);
+      auto newUnpackOp = rewriter.create<linalg::UnPackOp>(
+          loc, reducedSrc, reducedDest, newInnerDimsPos, unpackOp.getMixedTiles(),
+          newOuterDimsPerm);
 
-    auto insertSliceOp = tensor::createCanonicalRankReducingInsertSliceOp(
-        rewriter, loc, newUnpackOp.getResult(), unpackOp.getDest());
-    rewriter.replaceOp(unpackOp, insertSliceOp);
-    return success();
+      auto insertSliceOp = tensor::createCanonicalRankReducingInsertSliceOp(
+          rewriter, loc, newUnpackOp.getResult(), unpackOp.getDest());
+      rewriter.replaceOp(unpackOp, insertSliceOp);
+      return success();
+    } else {
+      MemRefType srcType = cast<MemRefType>(srcType);
+      // TODO (ita9naiwa) : add this case
+      return failure();
+    }
   }
 };
 
