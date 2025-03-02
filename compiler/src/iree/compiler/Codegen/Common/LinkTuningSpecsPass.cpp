@@ -150,6 +150,12 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
   OpBuilder builder(module.getContext());
   SmallVector<transform::NamedSequenceOp> namedSequenceOpsToMove;
   SmallVector<transform::ForeachMatchOp> foreachMatchOps;
+  // foreachMatchMap: NamedSequenceOp -> ForeachMatchOps that reference it
+  // (either as a matcher or an action). It ensures
+  // that when a NamedSequenceOp is renamed for uniqueness, the corresponding
+  // ForeachMatchOp is also updated.
+  llvm::DenseMap<transform::NamedSequenceOp, transform::ForeachMatchOp>
+      foreachMatchMap;
 
   // Step 1: Collect NamedSequenceOps and ForeachMatchOps from inner modules.
   for (auto innerModule : module.getBody()->getOps<ModuleOp>()) {
@@ -175,6 +181,29 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
           return failure();
 
         foreachMatchOps.push_back(foreachMatch);
+
+        for (auto matcher : foreachMatch.getMatchers()) {
+          if (auto matcherSymRef = dyn_cast<SymbolRefAttr>(matcher)) {
+            if (auto matcherOp = dyn_cast_or_null<transform::NamedSequenceOp>(
+                    SymbolTable::lookupNearestSymbolFrom(innerModule,
+                                                         matcherSymRef))) {
+              if (!foreachMatchMap.count(matcherOp)) {
+                foreachMatchMap[matcherOp] = foreachMatch;
+              }
+            }
+          }
+        }
+        for (auto action : foreachMatch.getActions()) {
+          if (auto actionSymRef = dyn_cast<SymbolRefAttr>(action)) {
+            if (auto actionOp = dyn_cast_or_null<transform::NamedSequenceOp>(
+                    SymbolTable::lookupNearestSymbolFrom(innerModule,
+                                                         actionSymRef))) {
+              if (!foreachMatchMap.count(actionOp)) {
+                foreachMatchMap[actionOp] = foreachMatch;
+              }
+            }
+          }
+        }
       } else {
         namedSequenceOpsToMove.push_back(namedSequenceOp);
       }
@@ -225,8 +254,46 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
     return failure();
   }
 
-  // Step 3-a: Move collected NamedSequenceOps to the top-level module.
+  llvm::StringMap<unsigned> specNameCounts;
+  // Step 3-a: Make sure the name sequence names are unique, and then move
+  // collected NamedSequenceOps to the top-level module.
   for (transform::NamedSequenceOp op : namedSequenceOpsToMove) {
+    StringRef specName = op.getSymName();
+    unsigned specNameSeenCount = specNameCounts[specName]++;
+    std::string newSpecName = specName.str();
+    if (specNameSeenCount > 0) {
+      newSpecName = llvm::formatv("{}_{}", specName, specNameSeenCount).str();
+      op.setSymName(newSpecName);
+    }
+
+    // Only update ForeachMatchOp if there's a reference and the name has
+    // changed.
+    if (foreachMatchMap.count(op) && newSpecName != specName) {
+      transform::ForeachMatchOp foreachMatchOp = foreachMatchMap[op];
+
+      SmallVector<Attribute> updatedMatchers, updatedActions;
+      for (auto matcherAttr : foreachMatchOp.getMatchers()) {
+        StringRef matcherName =
+            cast<SymbolRefAttr>(matcherAttr).getRootReference();
+        updatedMatchers.push_back(
+            (matcherName == specName)
+                ? SymbolRefAttr::get(builder.getContext(), newSpecName)
+                : matcherAttr);
+      }
+
+      for (auto actionAttr : foreachMatchOp.getActions()) {
+        StringRef actionName =
+            cast<SymbolRefAttr>(actionAttr).getRootReference();
+        updatedActions.push_back(
+            (actionName == specName)
+                ? SymbolRefAttr::get(builder.getContext(), newSpecName)
+                : actionAttr);
+      }
+
+      // Apply the updated matchers and actions.
+      foreachMatchOp.setMatchersAttr(builder.getArrayAttr(updatedMatchers));
+      foreachMatchOp.setActionsAttr(builder.getArrayAttr(updatedActions));
+    }
     op.getOperation()->moveBefore(module.getBody(), module.getBody()->end());
   }
 

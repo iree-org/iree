@@ -46,9 +46,9 @@
 // BOTH:         transform.named_sequence @__kernel_config
 // BOTH-SAME:    attributes {iree_codegen.tuning_spec_entrypoint}
 // BOTH:         transform.foreach_match
-// BOTH:         @match_mmt -> @apply_mmt_op_config
+// BOTH:         @match_mmt -> @apply_op_config
 // BOTH-NEXT:    @match_attention_2x10x4096x64x64x64_f16 -> @apply_attn_op_config
-// BOTH-NEXT:    @match_mmt_2048x1280x5120_f16_f16_f32 -> @apply_op_config
+// BOTH-NEXT:    @match_mmt_2048x1280x5120_f16_f16_f32 -> @apply_op_config_1
 
 
 // BOTH:        module attributes
