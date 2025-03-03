@@ -14,7 +14,7 @@
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
-#define GEN_PASS_DEF_CONVERTCONV2DTOIM2COLOPPASS
+#define GEN_PASS_DEF_CONVERTCONVTOIM2COLOPPASS
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc"
 
 static bool hasAllOneValues(ArrayRef<int64_t> attr) {
@@ -254,14 +254,14 @@ private:
   std::optional<ControlFnTy> controlFn;
 };
 
-struct ConvertConv2DToIm2ColOpPass final
-    : impl::ConvertConv2DToIm2ColOpPassBase<ConvertConv2DToIm2ColOpPass> {
+struct ConvertConvToIm2ColOpPass final
+    : impl::ConvertConvToIm2ColOpPassBase<ConvertConvToIm2ColOpPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<tensor::TensorDialect, IREELinalgExtDialect>();
   }
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    populateConv2DToIm2colOpPatterns(patterns);
+    populateConvToIm2colOpPatterns(patterns);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
@@ -270,8 +270,8 @@ struct ConvertConv2DToIm2ColOpPass final
 
 } // namespace
 
-void populateConv2DToIm2colOpPatterns(RewritePatternSet &patterns,
-                                      std::optional<ControlFnTy> controlFn) {
+void populateConvToIm2colOpPatterns(RewritePatternSet &patterns,
+                                    std::optional<ControlFnTy> controlFn) {
   patterns.insert<ConvertConvGeneric>(patterns.getContext(),
                                       std::move(controlFn));
 }
