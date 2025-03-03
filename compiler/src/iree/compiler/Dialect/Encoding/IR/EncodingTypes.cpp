@@ -23,6 +23,23 @@ getSerializableEncodingAttrInterface(RankedTensorType type) {
       type.getEncoding());
 }
 
+// static
+bool SerializableEncodingAttrInterface::areCompatible(Attribute lhs,
+                                                      Attribute rhs) {
+  if (lhs == rhs) {
+    return true;
+  }
+  auto lhsEncoding =
+      llvm::dyn_cast_or_null<SerializableEncodingAttrInterface>(lhs);
+  auto rhsEncoding =
+      llvm::dyn_cast_or_null<SerializableEncodingAttrInterface>(rhs);
+  if (!lhsEncoding || !rhsEncoding) {
+    return false;
+  }
+  return lhsEncoding.isCompatibleWith(rhsEncoding) &&
+         rhsEncoding.isCompatibleWith(lhsEncoding);
+}
+
 EncodingAttr getEncodingAttr(RankedTensorType type) {
   return dyn_cast_or_null<EncodingAttr>(type.getEncoding());
 }
