@@ -138,7 +138,7 @@ static void reference_matmul_bf16_bf16_f32_f32(
   }
 
 REFERENCE_MATMUL_F8(f8e5m2, f8e5m2)
-REFERENCE_MATMUL_F8(f8e4m3, f8e4m3)
+REFERENCE_MATMUL_F8(f8e4m3fn, f8e4m3fn)
 REFERENCE_MATMUL_F8(f8e5m2fnuz, f8e5m2fnuz)
 REFERENCE_MATMUL_F8(f8e4m3fnuz, f8e4m3fnuz)
 
@@ -213,10 +213,10 @@ static iree_status_t reference_matmul_element(
         m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_rhs,
         (const uint8_t*)lhs_data, (const uint8_t*)rhs_data,
         (const float*)acc_data, (float*)result_data, m, n);
-  } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3 &&
-             rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3 &&
+  } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FN &&
+             rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FN &&
              acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
-    reference_matmul_f8e4m3_f8e4m3_f32_f32(
+    reference_matmul_f8e4m3fn_f8e4m3fn_f32_f32(
         m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_rhs,
         (const uint8_t*)lhs_data, (const uint8_t*)rhs_data,
         (const float*)acc_data, (float*)result_data, m, n);
