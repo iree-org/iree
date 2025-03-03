@@ -30,7 +30,7 @@ class MatrixElemTypeId(enum.Enum):
     F16 = "f16"
     BF16 = "bf16"
     F8E5M2 = "f8E5M2"
-    F8E4M3 = "f8E4M3"
+    F8E4M3FN = "f8E4M3FN"
     F8E5M2FNUZ = "f8E5M2FNUZ"
     F8E4M3FNUZ = "f8E4M3FNUZ"
 
@@ -387,6 +387,13 @@ def get_rocm_test_compilation_infos(
             MMASchedule("WMMAR4_F32_16x16x16_F16", 2, 2, 1, 1, 1),
             MMASchedule("WMMAR4_F32_16x16x16_F16", 2, 4, 2, 1, 2),
             MMASchedule("WMMAR4_F32_16x16x16_F16", 4, 2, 4, 2, 2),
+            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 1, 1, 1, 1, 1),
+            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 1, 1, 1, 1, 2),
+            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 1, 1, 1, 2, 1),
+            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 1, 1, 2, 1, 1),
+            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 2, 2, 1, 1, 1),
+            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 2, 4, 2, 1, 2),
+            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 4, 2, 4, 2, 2),
             MMASchedule("WMMAR4_I32_16x16x16_I8", 1, 1, 1, 1, 1),
             MMASchedule("WMMAR4_I32_16x16x16_I8", 1, 1, 1, 1, 2),
             MMASchedule("WMMAR4_I32_16x16x16_I8", 1, 1, 1, 2, 1),
@@ -443,6 +450,7 @@ def get_rocm_test_compilation_infos(
             schedule.intrinsic == "WMMAR3_F32_16x16x16_F16"
             or schedule.intrinsic == "WMMAR3_I32_16x16x16_I8"
             or schedule.intrinsic == "WMMAR4_F32_16x16x16_F16"
+            or schedule.intrinsic == "WMMAR4_F32_16x16x16_F8E4M3FN"
             or schedule.intrinsic == "WMMAR4_I32_16x16x16_I8"
         ):
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
@@ -918,7 +926,7 @@ def parse_arguments():
             "f16",
             "bf16",
             "f8E5M2",
-            "f8E4M3",
+            "f8E4M3FN",
             "f8E5M2FNUZ",
             "f8E4M3FNUZ",
         ],
