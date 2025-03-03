@@ -487,8 +487,10 @@ IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(bf16, uint16_t, 8, 7, /*have_infinity=*/true,
 IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f8e5m2, uint8_t, 5, 2, /*have_infinity=*/true,
                                   /*bias_tweak=*/0, /*nan_as_neg_zero=*/false)
 
-// F8E4M3 type, https://arxiv.org/abs/2209.05433.
-IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f8e4m3, uint8_t, 4, 3,
+// F8E4M3FN type, https://arxiv.org/abs/2209.05433. The paper doesn't use the FN
+// suffix, but APFloat and MLIR do to indicate that the float is Finite and has
+// one NaN (or maybe just that it's FiNite, can't recall).
+IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f8e4m3fn, uint8_t, 4, 3,
                                   /*have_infinity=*/false, /*bias_tweak=*/0,
                                   /*nan_as_neg_zero=*/false)
 

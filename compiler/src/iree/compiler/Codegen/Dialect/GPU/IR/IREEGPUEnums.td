@@ -137,7 +137,7 @@ class IREEGPU_I32EnumAttr<string name, string summary, list<I32EnumAttrCase> cas
 //   * 0 = 64-bit float (e.g. IEEE754 double precision)
 //   * 1 = 32-bit float (e.g. IEEE754 single precision, and "xf32" fast variants)
 //   * 2 = 16-bit float (incl. IREE754 half and bf16)
-//   * 3 = 8-bit float (incl. f8E5M2, f8E4M3, and "FNUZ" variants)
+//   * 3 = 8-bit float (incl. f8E5M2, f8E4M3FN and "FNUZ" variants)
 //   * C = 8-bit integer (any signedness)
 // * D enumerates intrinsics that share the same 0xABC* bits.
 //

@@ -902,7 +902,7 @@ enum class NumericalType : uint32_t {
   kFloatBrain = kFloat | 0x02,
   kFloatComplex = kFloat | 0x03,
   kFloat8E5M2 = kFloat | 0x04,
-  kFloat8E4M3 = kFloat | 0x05,
+  kFloat8E4M3FN = kFloat | 0x05,
   kFloat8E5M2FNUZ = kFloat | 0x06,
   kFloat8E4M3FNUZ = kFloat | 0x07,
 };
@@ -934,8 +934,8 @@ std::optional<int32_t> ElementTypeOp::getTypeValue(Type type) {
     switch (APFloat::SemanticsToEnum(floatType.getFloatSemantics())) {
     case APFloat::S_Float8E5M2:
       return makeElementTypeValue(NumericalType::kFloat8E5M2, 8);
-    case APFloat::S_Float8E4M3:
-      return makeElementTypeValue(NumericalType::kFloat8E4M3, 8);
+    case APFloat::S_Float8E4M3FN:
+      return makeElementTypeValue(NumericalType::kFloat8E4M3FN, 8);
     case APFloat::S_Float8E5M2FNUZ:
       return makeElementTypeValue(NumericalType::kFloat8E5M2FNUZ, 8);
     case APFloat::S_Float8E4M3FNUZ:

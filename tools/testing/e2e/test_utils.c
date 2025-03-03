@@ -100,9 +100,9 @@ iree_test_utils_e2e_value_t iree_test_utils_value_make_f8E5M2(uint8_t value) {
   return result;
 }
 
-iree_test_utils_e2e_value_t iree_test_utils_value_make_f8E4M3(uint8_t value) {
+iree_test_utils_e2e_value_t iree_test_utils_value_make_f8E4M3FN(uint8_t value) {
   iree_test_utils_e2e_value_t result;
-  result.type = IREE_TEST_UTILS_VALUE_TYPE_F8E4M3;
+  result.type = IREE_TEST_UTILS_VALUE_TYPE_F8E4M3FN;
   result.f8_u8 = value;
   return result;
 }
@@ -162,8 +162,8 @@ iree_test_utils_e2e_value_t iree_test_utils_read_buffer_element(
     return iree_test_utils_value_make_i32(((int32_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2) {
     return iree_test_utils_value_make_f8E5M2(((uint8_t*)data)[index]);
-  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3) {
-    return iree_test_utils_value_make_f8E4M3(((uint8_t*)data)[index]);
+  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FN) {
+    return iree_test_utils_value_make_f8E4M3FN(((uint8_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ) {
     return iree_test_utils_value_make_f8E5M2FNUZ(((uint8_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ) {
@@ -201,9 +201,9 @@ int iree_test_utils_snprintf_value(char* buf, size_t bufsize,
     case IREE_TEST_UTILS_VALUE_TYPE_F8E5M2:
       return snprintf(buf, bufsize, "%.3g",
                       iree_math_f8e5m2_to_f32(value.f8_u8));
-    case IREE_TEST_UTILS_VALUE_TYPE_F8E4M3:
+    case IREE_TEST_UTILS_VALUE_TYPE_F8E4M3FN:
       return snprintf(buf, bufsize, "%.3g",
-                      iree_math_f8e4m3_to_f32(value.f8_u8));
+                      iree_math_f8e4m3fn_to_f32(value.f8_u8));
     case IREE_TEST_UTILS_VALUE_TYPE_F8E5M2FNUZ:
       return snprintf(buf, bufsize, "%.3g",
                       iree_math_f8e5m2fnuz_to_f32(value.f8_u8));
@@ -322,8 +322,8 @@ void iree_test_utils_write_element(iree_hal_element_type_t element_type,
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2:
       *(uint8_t*)dst = iree_math_f32_to_f8e5m2((float)value);
       break;
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3:
-      *(uint8_t*)dst = iree_math_f32_to_f8e4m3((float)value);
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FN:
+      *(uint8_t*)dst = iree_math_f32_to_f8e4m3fn((float)value);
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ:
       *(uint8_t*)dst = iree_math_f32_to_f8e5m2fnuz((float)value);
@@ -371,7 +371,7 @@ void iree_test_utils_get_min_max_for_element_type(
       break;
     case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2:
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3:
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FN:
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ:
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ:
       *min = -2;
