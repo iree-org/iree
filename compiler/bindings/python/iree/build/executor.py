@@ -677,6 +677,8 @@ class Scheduler:
             self.reporter.start_dep(dep)
             if dep.concurrency == ActionConcurrency.NONE:
                 invoke()
+                dep.start(concurrent.futures.Future())
+                dep.finish()
             elif (
                 dep.concurrency == ActionConcurrency.THREAD
                 or dep.concurrency == ActionConcurrency.PROCESS
