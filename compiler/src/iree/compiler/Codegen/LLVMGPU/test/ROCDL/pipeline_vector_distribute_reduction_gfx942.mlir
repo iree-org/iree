@@ -448,3 +448,15 @@ hal.executable private @attention_20x1x64x4096x64_dynamic {
     }
   }
 }
+
+// CHECK-LABEL: func.func @attention_20x1x64x4096x64
+// CHECK:         scf.for %{{.*}} = %c0 to %c4096 step %c128
+// QK Matmul
+// CHECK:           vector.contract
+// CHECK-SAME:      vector<1x1x32xf16>, vector<1x1x1x1x4x32xf16> into vector<1x1x4xf32>
+// CHECK-COUNT-4:   gpu.subgroup_reduce  add
+
+// No subgroup reduction in the loop other than QK reductions
+// CHECK-NOT: gpu.subgroup_reduce
+
+// CHECK:           scf.yield
