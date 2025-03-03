@@ -939,4 +939,6 @@ LogicalResult ResourceUsageAnalysis::run() {
   return solver.run();
 }
 
+void ResourceUsageAnalysis::print(llvm::raw_ostream &os) { solver.print(os); }
+
 } // namespace mlir::iree_compiler::IREE::Stream
