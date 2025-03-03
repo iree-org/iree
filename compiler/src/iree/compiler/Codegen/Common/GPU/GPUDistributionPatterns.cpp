@@ -157,6 +157,10 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
     newForOp->setAttrs(forOp->getAttrs());
     Block *loopBody = newForOp.getBody();
 
+    // Erase the terminator, since we will merge a new terminator from the old
+    // block.
+    rewriter.eraseOp(loopBody->getTerminator());
+
     // Set up new iter_args. The loop body uses SIMD, so wrap the SIMD iter_args
     // of the new loop op into ToSIMDOps.
     rewriter.setInsertionPointToStart(loopBody);
