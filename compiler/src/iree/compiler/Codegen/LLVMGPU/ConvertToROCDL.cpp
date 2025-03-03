@@ -82,22 +82,24 @@ static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
 static LogicalResult validateDataTypes(Operation *op,
                                        const amdgpu::Chipset &chipset) {
   constexpr amdgpu::Chipset kGfx942 = amdgpu::Chipset(9, 4, 2);
-  if (chipset == kGfx942) {
+  if (!amdgpu::hasOcpFp8(chipset)) {
     auto pred = llvm::IsaPred<Float8E5M2Type, Float8E4M3FNType>;
     if (llvm::any_of(op->getOperandTypes(), pred) ||
         llvm::any_of(op->getResultTypes(), pred)) {
-      return op->emitOpError(
-          "F8E5M2 and F8E4M3FN types are not supported on "
-          "gfx942 (MI-300) chipsets; try F8E5M2FNUZ or F8E4M3FNUZ instead.");
+      return op->emitOpError("F8E5M2 and F8E4M3FN types are not supported on "
+                             "gfx942 (MI-300) or older chipsets; try "
+                             "F8E5M2FNUZ or F8E4M3FNUZ instead.");
     }
   }
 
-  auto pred = llvm::IsaPred<Float8E5M2FNUZType, Float8E4M3FNUZType>;
-  if (llvm::any_of(op->getOperandTypes(), pred) ||
-      llvm::any_of(op->getResultTypes(), pred)) {
-    return op->emitOpError(
-        "F8E5M2FNUZ and F8E4M3FNUZ types are not supported on non-gfx942 "
-        "(MI-300) chipsets; try F8E5M2 or F8E4M3FN instead.");
+  if (chipset != kGfx942) {
+    auto pred = llvm::IsaPred<Float8E5M2FNUZType, Float8E4M3FNUZType>;
+    if (llvm::any_of(op->getOperandTypes(), pred) ||
+        llvm::any_of(op->getResultTypes(), pred)) {
+      return op->emitOpError(
+          "F8E5M2FNUZ and F8E4M3FNUZ types are not supported on non-gfx942 "
+          "(MI-300) chipsets; try F8E5M2 or F8E4M3FN instead.");
+    }
   }
 
   return success();
