@@ -26,6 +26,7 @@ ALL_SRCS = enforce_glob(
     include = ["*.mlir"],
     exclude = [
         "attention_i1_mask.mlir",
+        "custom_op.mlir",
     ],
 )
 
@@ -55,6 +56,21 @@ iree_check_single_backend_test_suite(
     tags = [
         # attention fails with a wasm target, just disable the tests there for now
         #   error: Yield operand #2 is not equivalent to the corresponding iter bbArg
+        "nowasm",
+    ],
+    target_backend = "llvm-cpu",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_no_dt_llvm-cpu_local-task",
+    srcs = [
+        "custom_op.mlir",
+    ],
+    compiler_flags = [
+        "--iree-opt-data-tiling=false",
+    ],
+    driver = "local-task",
+    tags = [
         "nowasm",
     ],
     target_backend = "llvm-cpu",
@@ -120,6 +136,7 @@ iree_check_single_backend_test_suite(
 ROCM_HIP_SRCS = enforce_glob(
     # keep sorted
     [
+        "custom_op.mlir",
         "scan.mlir",
         "scatter.mlir",
         "sort.mlir",
