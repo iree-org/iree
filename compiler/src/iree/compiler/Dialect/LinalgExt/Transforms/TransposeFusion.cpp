@@ -135,6 +135,11 @@ struct BubbleTransposeVFromAttentionOp
       return failure();
     }
 
+    // Only handle single dim for K2 and N for now.
+    if (maybeOpInfo->getK2Dims().size() != 1 ||
+        maybeOpInfo->getNDims().size() != 1) {
+      return failure();
+    }
     // Check that V has standard map/non transposed V.
     AffineExpr k2Dim =
         rewriter.getAffineDimExpr(maybeOpInfo->getK2Dims().back());

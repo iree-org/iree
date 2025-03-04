@@ -11,7 +11,6 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
-#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Debug.h"
@@ -189,7 +188,9 @@ static bool isEligibleForCollapse(Operation *op) {
     return false;
   }
 
-  if (IREE::LinalgExt::isGatherlikeOp(genericOp)) {
+  // TODO(guray) Collapsing caused performance regression in a cpu
+  // benchmark, so we disable it.
+  if (genericOp.hasIndexSemantics()) {
     return false;
   }
 
