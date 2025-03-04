@@ -300,10 +300,14 @@ static Operation *lowerContractionOpToMultiMmaOp(OpBuilder &builder,
 }
 
 struct GPUDeviceEncodingLayoutResolverAttrInterface
-    : public Codegen::LayoutAttrInterface::ExternalModel<
+    : public DeviceEncodingLayoutResolverExternalModelBase<
           GPUDeviceEncodingLayoutResolverAttrInterface, GPUEncodingLayoutAttr> {
-  MaterializeEncodingInfo getEncodingInfo(Attribute attr,
-                                          RankedTensorType type) const {
+  DictionaryAttr getConfiguration(Attribute attr) const {
+    return cast<GPUEncodingLayoutAttr>(attr).getConfiguration();
+  }
+
+  MaterializeEncodingInfo getEncodingInfoImpl(Attribute attr,
+                                              RankedTensorType type) const {
     auto layoutAttr = cast<GPUEncodingLayoutAttr>(attr);
     DictionaryAttr config = layoutAttr.getConfiguration();
 
@@ -313,18 +317,6 @@ struct GPUDeviceEncodingLayoutResolverAttrInterface
     MaterializeEncodingInfo info;
     if (!encoding) {
       return info;
-    }
-
-    // If the layout is already resolved, use it directly.
-    if (config) {
-      if (std::optional<NamedAttribute> namedAttr =
-              config.getNamed(kEncodingInfoAttrName)) {
-        std::optional<MaterializeEncodingInfo> preresolvedInfo =
-            Codegen::deserializeEncodingInfo(
-                cast<DictionaryAttr>(namedAttr->getValue()));
-        assert(preresolvedInfo && "encoding_info is invalid");
-        return preresolvedInfo.value();
-      }
     }
 
     IREE::GPU::TargetAttr gpuAttr = getGPUTargetAttr(config);
