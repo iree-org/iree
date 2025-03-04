@@ -20,7 +20,7 @@
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/LoweringOptions.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
-#include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
+#include "mlir/Conversion/MathToROCDL/MathToROCDL.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/UBToLLVM/UBToLLVM.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
@@ -217,7 +217,6 @@ struct ConvertToROCDLPass final
       populateLowerHALInterfaceOp(llvmPatterns);
       populateLLVMConversionPatterns(&getContext(), llvmPatterns, converter);
       populateComplexToLLVMConversionPatterns(converter, llvmPatterns);
-      populateMathToLLVMConversionPatterns(converter, llvmPatterns);
       iree_compiler::populateIREEResolveExtractStridedMetadataPatterns(
           llvmPatterns);
       populateFinalizeMemRefToLLVMConversionPatterns(converter, llvmPatterns);
@@ -240,6 +239,7 @@ struct ConvertToROCDLPass final
       LLVMConversionTarget target(getContext());
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToROCDLConversionLegality(target);
+      populateMathToROCDLConversionPatterns(converter, llvmPatterns);
       ub::populateUBToLLVMConversionPatterns(converter, llvmPatterns);
 
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns))))
