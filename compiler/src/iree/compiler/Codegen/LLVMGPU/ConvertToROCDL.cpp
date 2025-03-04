@@ -75,6 +75,12 @@ static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
 
 } // namespace
 
+template <typename... Floats>
+static bool containsAPred(Type type) {
+  type = getElementTypeOrSelf(type);
+  return llvm::isa<Floats...>(type);
+}
+
 // Function to check valid data types on the ROCm backend.
 // Note to readers: diffreest chips take diffeent FP8 formats but re-use the
 // same instruction and intrinsic names, so we must filter out the "wrong" FP8
@@ -83,7 +89,7 @@ static LogicalResult validateDataTypes(Operation *op,
                                        const amdgpu::Chipset &chipset) {
   constexpr amdgpu::Chipset kGfx942 = amdgpu::Chipset(9, 4, 2);
   if (!amdgpu::hasOcpFp8(chipset)) {
-    auto pred = llvm::IsaPred<Float8E5M2Type, Float8E4M3FNType>;
+    auto pred = containsAPred<Float8E5M2Type, Float8E4M3FNType>;
     if (llvm::any_of(op->getOperandTypes(), pred) ||
         llvm::any_of(op->getResultTypes(), pred)) {
       return op->emitOpError("F8E5M2 and F8E4M3FN types are not supported on "
@@ -93,7 +99,7 @@ static LogicalResult validateDataTypes(Operation *op,
   }
 
   if (chipset != kGfx942) {
-    auto pred = llvm::IsaPred<Float8E5M2FNUZType, Float8E4M3FNUZType>;
+    auto pred = containsAPred<Float8E5M2FNUZType, Float8E4M3FNUZType>;
     if (llvm::any_of(op->getOperandTypes(), pred) ||
         llvm::any_of(op->getResultTypes(), pred)) {
       return op->emitOpError(
@@ -162,10 +168,14 @@ struct ConvertToROCDLPass final
         m.emitOpError() << "Invalid chipset name: " << chipset;
         return signalPassFailure();
       }
-      m.walk([&](Operation *op) {
-        if (failed(validateDataTypes(op, *maybeChipset)))
-          return signalPassFailure();
+      WalkResult allTypesValid = m.walk([&](Operation *op) {
+        if (failed(validateDataTypes(op, *maybeChipset))) {
+          return WalkResult::interrupt();
+        }
+        return WalkResult::advance();
       });
+      if (allTypesValid.wasInterrupted())
+        return signalPassFailure();
 
       arith::populateArithToAMDGPUConversionPatterns(
           patterns, /*convertFP8Arithmetic=*/true, /*saturateFP8Truncf=*/false,
