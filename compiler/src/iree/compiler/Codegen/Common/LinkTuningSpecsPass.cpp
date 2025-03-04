@@ -61,6 +61,53 @@ static bool consumesInputOp(NamedSequenceOp op) {
   return false;
 }
 
+static bool hasConsumedArgument(transform::ForeachMatchOp op) {
+  Value operand = op->getOperand(0);
+  if (auto blockArg = mlir::dyn_cast<BlockArgument>(operand)) {
+    Operation *parentOp = blockArg.getOwner()->getParentOp();
+    if (auto namedSequenceOp =
+            mlir::dyn_cast<transform::NamedSequenceOp>(parentOp)) {
+      return namedSequenceOp.getArgAttr(blockArg.getArgNumber(),
+                                        kArgConsumedAttrName) != nullptr;
+    }
+  }
+  return false;
+}
+
+static std::string
+getUniqueSpecName(StringRef specName,
+                  llvm::StringMap<unsigned> &specNameCounts) {
+  unsigned specNameSeenCount = specNameCounts[specName]++;
+  if (specNameSeenCount > 0) {
+    return llvm::formatv("{}_{}", specName, specNameSeenCount).str();
+  }
+  return specName.str();
+}
+
+static LogicalResult
+validateForeachMatchOpTypes(transform::ForeachMatchOp foreachMatchOp,
+                            Type anyOpType) {
+  auto argTypes = llvm::to_vector_of<Type, 1>(foreachMatchOp.getOperandTypes());
+  auto resultTypes =
+      llvm::to_vector_of<Type, 1>(foreachMatchOp.getResultTypes());
+
+  // Ensure the operation has exactly one argument of type any_op.
+  if (argTypes.size() != 1 || argTypes.front() != anyOpType) {
+    foreachMatchOp->emitWarning(
+        "ForeachMatchOp must take exactly one any_op argument.");
+    return failure();
+  }
+
+  // Ensure the operation has exactly one result of type any_op.
+  if (resultTypes.size() != 1 || resultTypes.front() != anyOpType) {
+    foreachMatchOp->emitWarning(
+        "ForeachMatchOp must return exactly one any_op result.");
+    return failure();
+  }
+
+  return success();
+}
+
 static FailureOr<NamedSequenceOp>
 emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
   OpBuilder builder(module->getContext());
@@ -87,11 +134,13 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
   // module->setAttr(kTuningSpecDefaultEntrypointAttrName,
   // builder.getUnitAttr());
 
-  for (auto innerModule : module.getBody()->getOps<ModuleOp>()) {
-    // Remove the default tuning spec attribute from inner modules,
-    // as the top-level module is attached with default attribute.
-    if (innerModule->hasAttr(kTuningSpecDefaultEntrypointAttrName)) {
-      innerModule->removeAttr(kTuningSpecDefaultEntrypointAttrName);
+  // Remove the default tuning spec attribute from the parent modules of
+  // specsToLink.
+  for (NamedSequenceOp spec : specsToLink) {
+    if (auto parentModule = spec->getParentOfType<ModuleOp>()) {
+      if (parentModule->hasAttr(kTuningSpecDefaultEntrypointAttrName)) {
+        parentModule->removeAttr(kTuningSpecDefaultEntrypointAttrName);
+      }
     }
   }
 
@@ -116,12 +165,7 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
     assert(parentModule);
     StringAttr parentSymbol = parentModule.getSymNameAttr();
     assert(parentSymbol);
-    StringRef specName = spec.getSymName();
-    unsigned specNameSeenCount = specNameCounts[specName]++;
-    if (specNameSeenCount > 0) {
-      spec.setSymName(
-          llvm::formatv("{}_{}", specName, specNameSeenCount).str());
-    }
+    spec.setSymName(getUniqueSpecName(spec.getSymName(), specNameCounts));
 
     auto symbol = SymbolRefAttr::get(
         parentSymbol, FlatSymbolRefAttr::get(spec.getSymNameAttr()));
@@ -150,56 +194,51 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
   OpBuilder builder(module.getContext());
   SmallVector<transform::NamedSequenceOp> namedSequenceOpsToMove;
   SmallVector<transform::ForeachMatchOp> foreachMatchOps;
-  // foreachMatchMap: NamedSequenceOp -> ForeachMatchOps that reference it
-  // (either as a matcher or an action). It ensures
-  // that when a NamedSequenceOp is renamed for uniqueness, the corresponding
-  // ForeachMatchOp is also updated.
   llvm::DenseMap<transform::NamedSequenceOp, transform::ForeachMatchOp>
-      foreachMatchMap;
+      namedSequenceToForeachMatch;
 
   // Step 1: Collect NamedSequenceOps and ForeachMatchOps from inner modules.
   for (auto innerModule : module.getBody()->getOps<ModuleOp>()) {
     for (auto namedSequenceOp :
          innerModule.getBody()->getOps<transform::NamedSequenceOp>()) {
       if (namedSequenceOp.getSymName() == kKernelConfigSpecName) {
-        transform::ForeachMatchOp foreachMatch = nullptr;
-        int matchCount = 0;
+        transform::ForeachMatchOp foreachMatch;
+        int numForeachMatchOps = 0;
         // Iterate directly over ForeachMatchOp within kernelConfig.
         for (auto op : namedSequenceOp.getOps<transform::ForeachMatchOp>()) {
           if (!foreachMatch) {
             foreachMatch = op;
           }
-          matchCount++;
+          ++numForeachMatchOps;
         }
 
-        // Return failure if multiple occurrences exist.
-        if (matchCount > 1) {
+        if (numForeachMatchOps == 0 || numForeachMatchOps > 1) {
+          module->emitWarning("Expected 1 ForeachMatchOp in '")
+              << kKernelConfigSpecName << "', but found " << numForeachMatchOps
+              << ".";
           return failure();
         }
-        // Return failure if not foreach match op found.
-        if (!foreachMatch)
-          return failure();
 
         foreachMatchOps.push_back(foreachMatch);
 
         for (auto matcher : foreachMatch.getMatchers()) {
           if (auto matcherSymRef = dyn_cast<SymbolRefAttr>(matcher)) {
-            if (auto matcherOp = dyn_cast_or_null<transform::NamedSequenceOp>(
+            if (auto matcherOp = cast<transform::NamedSequenceOp>(
                     SymbolTable::lookupNearestSymbolFrom(innerModule,
                                                          matcherSymRef))) {
-              if (!foreachMatchMap.count(matcherOp)) {
-                foreachMatchMap[matcherOp] = foreachMatch;
+              if (!namedSequenceToForeachMatch.contains(matcherOp)) {
+                namedSequenceToForeachMatch[matcherOp] = foreachMatch;
               }
             }
           }
         }
         for (auto action : foreachMatch.getActions()) {
           if (auto actionSymRef = dyn_cast<SymbolRefAttr>(action)) {
-            if (auto actionOp = dyn_cast_or_null<transform::NamedSequenceOp>(
+            if (auto actionOp = cast<transform::NamedSequenceOp>(
                     SymbolTable::lookupNearestSymbolFrom(innerModule,
                                                          actionSymRef))) {
-              if (!foreachMatchMap.count(actionOp)) {
-                foreachMatchMap[actionOp] = foreachMatch;
+              if (!namedSequenceToForeachMatch.contains(actionOp)) {
+                namedSequenceToForeachMatch[actionOp] = foreachMatch;
               }
             }
           }
@@ -212,40 +251,36 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
 
   // Step 2-a: Ensure all ForeachMatchOps have the same result types before
   // merging.
-  SmallVector<Type, 4> expectedResultTypes =
-      llvm::to_vector<4>(foreachMatchOps.front()->getResultTypes());
-
+  Type anyOpType = builder.getType<transform::AnyOpType>();
   for (auto foreachMatchOp : foreachMatchOps) {
-    SmallVector<Type, 4> currentResultTypes =
-        llvm::to_vector<4>(foreachMatchOp.getResultTypes());
-
-    if (!llvm::equal(currentResultTypes, expectedResultTypes)) {
+    if (failed(validateForeachMatchOpTypes(foreachMatchOp, anyOpType))) {
       return failure();
     }
   }
 
   // Step 2-b: Ensure all ForeachMatchOps have the same `restrictRoot` and
   // `flattenResults` attributes.
-  UnitAttr restrictRoot = nullptr;
-  UnitAttr flattenResults = nullptr;
+  UnitAttr restrictRoot = foreachMatchOps.front().getRestrictRootAttr();
+  UnitAttr flattenResults = foreachMatchOps.front().getFlattenResultsAttr();
   bool hasMismatchAttr = false;
 
-  for (auto foreachMatchOp : foreachMatchOps) {
+  for (size_t i = 1, e = foreachMatchOps.size(); i < e; ++i) {
+    auto foreachMatchOp = foreachMatchOps[i];
     UnitAttr currentRestrictRoot = foreachMatchOp.getRestrictRootAttr();
     UnitAttr currentFlattenResults = foreachMatchOp.getFlattenResultsAttr();
 
-    if (!restrictRoot) {
-      restrictRoot = currentRestrictRoot; // First encountered value.
-    } else if (restrictRoot != currentRestrictRoot) {
+    // Check for restrict_root mismatches
+    if (restrictRoot != currentRestrictRoot) {
       hasMismatchAttr = true;
-      break; // Exit early when a mismatch is found.
+      foreachMatchOp->emitWarning(
+          "Mismatched 'restrict_root' attributes across ForeachMatchOps.");
     }
 
-    if (!flattenResults) {
-      flattenResults = currentFlattenResults; // First encountered value.
-    } else if (flattenResults != currentFlattenResults) {
+    // Check for flatten_results mismatches
+    if (flattenResults != currentFlattenResults) {
       hasMismatchAttr = true;
-      break; // Exit early when a mismatch is found.
+      foreachMatchOp->emitWarning(
+          "Mismatched 'flatten_results' attributes across ForeachMatchOps.");
     }
   }
 
@@ -259,17 +294,15 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
   // collected NamedSequenceOps to the top-level module.
   for (transform::NamedSequenceOp op : namedSequenceOpsToMove) {
     StringRef specName = op.getSymName();
-    unsigned specNameSeenCount = specNameCounts[specName]++;
-    std::string newSpecName = specName.str();
-    if (specNameSeenCount > 0) {
-      newSpecName = llvm::formatv("{}_{}", specName, specNameSeenCount).str();
-      op.setSymName(newSpecName);
-    }
+    std::string newSpecName = getUniqueSpecName(specName, specNameCounts);
+    op.setSymName(newSpecName);
 
-    // Only update ForeachMatchOp if there's a reference and the name has
+    // Only update ForeachMatchOp if the NamedSequenceOp is used as an argument
+    // in `ForeachMatchOp ` either as a matcher or action and its name has
     // changed.
-    if (foreachMatchMap.count(op) && newSpecName != specName) {
-      transform::ForeachMatchOp foreachMatchOp = foreachMatchMap[op];
+    if (namedSequenceToForeachMatch.contains(op) && newSpecName != specName) {
+      transform::ForeachMatchOp foreachMatchOp =
+          namedSequenceToForeachMatch[op];
 
       SmallVector<Attribute> updatedMatchers, updatedActions;
       for (auto matcherAttr : foreachMatchOp.getMatchers()) {
@@ -301,7 +334,6 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
   // module.
   builder.setInsertionPointToEnd(module.getBody());
   Location loc = module.getLoc();
-  Type anyOpType = builder.getType<transform::AnyOpType>();
   FunctionType seqType =
       builder.getFunctionType(TypeRange{anyOpType}, TypeRange{anyOpType});
 
@@ -311,19 +343,7 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
       /*arg_attrs=*/ArrayAttr{},
       /*res_attrs*/ ArrayAttr{});
 
-  bool hasConsumedArg =
-      llvm::any_of(foreachMatchOps, [](transform::ForeachMatchOp op) {
-        Value operand = op->getOperand(0);
-        if (auto blockArg = mlir::dyn_cast<BlockArgument>(operand)) {
-          Operation *parentOp = blockArg.getOwner()->getParentOp();
-          if (auto namedSequenceOp =
-                  mlir::dyn_cast<transform::NamedSequenceOp>(parentOp)) {
-            return namedSequenceOp.getArgAttr(blockArg.getArgNumber(),
-                                              kArgConsumedAttrName) != nullptr;
-          }
-        }
-        return false;
-      });
+  bool hasConsumedArg = llvm::any_of(foreachMatchOps, hasConsumedArgument);
 
   StringRef attrName =
       hasConsumedArg ? kArgConsumedAttrName : kArgReadOnlyAttrName;
@@ -336,7 +356,7 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
   // Step 3-C: Create a new block inside the NamedSequenceOp and merging
   // ForeachMatchOp from each inner modules into one ForachMatchOp.
   SmallVector<Type, 4> resultTypes;
-  llvm::append_range(resultTypes, expectedResultTypes);
+  llvm::append_range(resultTypes, TypeRange{anyOpType});
 
   SmallVector<std::pair<SymbolRefAttr, SymbolRefAttr>> matcherActionPairs;
   SmallVector<Value, 4> forwardedInputs;
@@ -344,14 +364,14 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
     ArrayAttr matchers = foreachMatchOp.getMatchers();
     ArrayAttr actions = foreachMatchOp.getActions();
 
-    for (size_t i = 0; i < matchers.size(); i++) {
+    for (size_t i = 0, e = matchers.size(); i < e; ++i) {
       matcherActionPairs.push_back({mlir::cast<SymbolRefAttr>(matchers[i]),
                                     mlir::cast<SymbolRefAttr>(actions[i])});
     }
     // Collect forwarded inputs (if any).
     for (Value input : foreachMatchOp.getForwardedInputs()) {
-      if (llvm::find(forwardedInputs, input) == forwardedInputs.end()) {
-        forwardedInputs.push_back(input); // Avoid duplicates
+      if (!llvm::is_contained(forwardedInputs, input)) {
+        forwardedInputs.push_back(input); // Avoid duplicates.
       }
     }
   }
@@ -359,9 +379,9 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
   SmallVector<Attribute> mergedMatchers;
   SmallVector<Attribute> mergedActions;
 
-  for (const auto &pair : matcherActionPairs) {
-    mergedMatchers.push_back(pair.first);
-    mergedActions.push_back(pair.second);
+  for (const auto &[matcher, action] : matcherActionPairs) {
+    mergedMatchers.push_back(matcher);
+    mergedActions.push_back(action);
   }
   Region &region = newNamedSequence.getRegion();
   Block *body = builder.createBlock(&region, region.begin(),
@@ -400,19 +420,19 @@ struct LinkTuningSpecsPass final
 FailureOr<NamedSequenceOp> linkTuningSpecs(ModuleOp module) {
   SmallVector<NamedSequenceOp> tuningSpecs;
 
-  int matchingModules = 0;
-  int totalModules = 0;
+  int numInnerModules = 0;
+  int numDefaultEntrypoint = 0;
 
   for (auto module : module.getBody()->getOps<ModuleOp>()) {
-    totalModules++;
+    ++numInnerModules;
     if (module->hasAttr(kTuningSpecDefaultEntrypointAttrName)) {
-      matchingModules++;
+      ++numDefaultEntrypoint;
     }
   }
 
   // If all modules have the default attribute and there are at least two
   // modules, merge and link the default tuning specs directly.
-  if (matchingModules == totalModules && matchingModules > 1) {
+  if (numDefaultEntrypoint == numInnerModules && numDefaultEntrypoint > 1) {
     FailureOr<NamedSequenceOp> result = emitLinkedDefaultTuningSpec(module);
     // Return successfully if merging succeeds, otherwise
     // fallback to below linking pass.
