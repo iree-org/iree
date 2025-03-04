@@ -19,6 +19,37 @@ namespace mlir::iree_compiler {
 namespace {
 
 template <typename OpT>
+struct PreferCloneToConsumersStreamableOpExternalModel
+    : public IREE::Stream::StreamableOpInterface::ExternalModel<
+          PreferCloneToConsumersStreamableOpExternalModel<OpT>, OpT> {
+  static void add(MLIRContext *context) {
+    OpT::template attachInterface<
+        PreferCloneToConsumersStreamableOpExternalModel<OpT>>(*context);
+  }
+
+  bool preferCloneToConsumers(Operation *op) const { return true; }
+};
+
+struct FlowDispatchStreamableOpExternalModel
+    : public IREE::Stream::StreamableOpInterface::ExternalModel<
+          FlowDispatchStreamableOpExternalModel, IREE::Flow::DispatchOp> {
+  static void add(MLIRContext *context) {
+    IREE::Flow::DispatchOp::attachInterface<
+        FlowDispatchStreamableOpExternalModel>(*context);
+  }
+
+  bool preferCloneToConsumers(Operation *op) const {
+    // If the dispatch does not consume any resources then it is effectively a
+    // slow splat and should be treated like one.
+    const bool consumesAny = llvm::any_of(
+        op->getOperandTypes(), +[](Type type) {
+          return isa<IREE::Stream::AffinityTypeInterface>(type);
+        });
+    return !consumesAny;
+  }
+};
+
+template <typename OpT>
 struct OptionalOpAffinityAttrExternalModel
     : public IREE::Stream::AffinityOpInterface::ExternalModel<
           OptionalOpAffinityAttrExternalModel<OpT>, OpT> {
@@ -193,8 +224,19 @@ void registerStreamExternalModels(DialectRegistry &registry) {
   registry.insert<IREE::Flow::FlowDialect>();
   registry.addExtension(+[](MLIRContext *context,
                             IREE::Flow::FlowDialect *dialect) {
+    PreferCloneToConsumersStreamableOpExternalModel<
+        IREE::Flow::TensorReshapeOp>::add(context);
+    PreferCloneToConsumersStreamableOpExternalModel<
+        IREE::Flow::TensorAllocaOp>::add(context);
+    PreferCloneToConsumersStreamableOpExternalModel<
+        IREE::Flow::TensorEmptyOp>::add(context);
+    PreferCloneToConsumersStreamableOpExternalModel<
+        IREE::Flow::TensorSplatOp>::add(context);
+    FlowDispatchStreamableOpExternalModel::add(context);
+
     FlowBarrierTargetAffinityAttrExternalModel::add(context);
     FlowTransferTargetAffinityAttrExternalModel::add(context);
+
     AffinityOpAttrExternalModel<IREE::Flow::DispatchRegionOp>::add(context);
     AffinityOpAttrExternalModel<IREE::Flow::DispatchWorkgroupsOp>::add(context);
     AffinityOpAttrExternalModel<IREE::Flow::DispatchOp>::add(context);
