@@ -40,7 +40,7 @@ struct BubbleUpExtract : OpRewritePattern<tensor::ExtractSliceOp> {
                    "single result");
     }
 
-    if (!genericOp.isAllParallelLoops() && !genericOp->hasOneUse()) {
+    if (!IREE::LinalgExt::isBitExtendOp(genericOp) && !genericOp->hasOneUse()) {
       return rewriter.notifyMatchFailure(
           sliceOp,
           "expected source to be dequantize-like op or have a single use");
@@ -143,7 +143,6 @@ struct BubbleUpExtractSlicesPass
       patterns.insert<BubbleUpExtract>(context);
       patterns.insert<SwapExtractSliceOfFill>(context);
       tensor::populateFoldTensorEmptyPatterns(patterns, false);
-      tensor::populateReassociativeReshapeFoldingPatterns(patterns);
       if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
         return signalPassFailure();
       }
