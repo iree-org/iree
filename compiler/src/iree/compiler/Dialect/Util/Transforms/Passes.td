@@ -48,7 +48,7 @@ def FixedPointIteratorPass : Pass<"iree-util-fixed-point-iterator", ""> {
   let summary = "Iterates a sub-pipeline to a fixed point.";
   let constructor = [{
     mlir::iree_compiler::IREE::Util::createFixedPointIteratorPass(
-        mlir::OpPassManager("dummy_op"))
+        mlir::OpPassManager())
   }];
 }
 
