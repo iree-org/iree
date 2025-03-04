@@ -140,6 +140,31 @@ def IREEEncoding_SerializableEncodingAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Returns true if the encoding is compatible with `other`. By default,
+        they are always compatible if any attribute is not serialized. If they
+        are both serialized, the method checks if they are identical or not.
+        We could do a less fuzzier match by overriding the implementation.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isCompatibleWith",
+      /*args=*/(ins
+        "IREE::Encoding::SerializableEncodingAttrInterface":$other
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        auto attr =
+          llvm::dyn_cast_or_null<SerializableEncodingAttrInterface>($_attr);
+        if (!attr) {
+          return false;
+        }
+        if (attr.isSerialized() && other.isSerialized()) {
+          return $_attr == other;
+        }
+        return true;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Returns the storage size (in bytes) for the tensor types with an
         optional encoding. Returns Value() if the size is unknown, i.e., it can
         not be inferred with existing information.
@@ -159,6 +184,13 @@ def IREEEncoding_SerializableEncodingAttrInterface :
       }]
     >
   ];
+
+  let extraClassDeclaration = [{
+    /// Returns true if they are the same attribute. Otherwise, returns true if
+    /// both attributes implement SerializableEncodingAttrInterface interface
+    /// and they are compatible with each other.
+    static bool areCompatible(Attribute lhs, Attribute rhs);
+  }];
 }
 
 //===----------------------------------------------------------------------===//
