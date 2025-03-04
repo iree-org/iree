@@ -26,6 +26,7 @@ iree_lit_test_suite(
     cfg = "//compiler:lit.cfg.py",
     data = [
         "tuning_spec_mmt_tile_and_fuse.mlir",
+        "tuning_spec_mmt_tile_and_fuse_default.mlir",
     ],
     tools = [
         "//tools:iree-opt",
