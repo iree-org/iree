@@ -740,6 +740,19 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
+// Helper function to change arith.constant to i64 attribute.
+static void changeArithCstToI64Attr(OpBuilder &b,
+                                    MutableArrayRef<OpFoldResult> constants) {
+  for (OpFoldResult &val : constants) {
+    if (auto dyn_cast = llvm::dyn_cast_if_present<Value>(val)) {
+      APInt intVal;
+      if (matchPattern(dyn_cast, m_ConstantInt(&intVal))) {
+        val = b.getI64IntegerAttr(intVal.getSExtValue());
+      }
+    }
+  }
+}
+
 FailureOr<TilingResult>
 ScanOp::getTiledImplementation(OpBuilder &builder,
                                ArrayRef<OpFoldResult> offsets,
@@ -747,15 +760,19 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
   int64_t rank = getOperandRank();
   assert(offsets.size() == static_cast<size_t>(rank) &&
          sizes.size() == static_cast<size_t>(rank));
+
   auto oneAttr = builder.getI64IntegerAttr(1);
   SmallVector<OpFoldResult> strides(rank, oneAttr);
   SmallVector<Value> tiledOperands;
   SmallVector<Operation *> slices;
 
+  SmallVector<OpFoldResult> sizesAttr(sizes);
+  changeArithCstToI64Attr(builder, sizesAttr);
+
   // Input
   {
     Operation *inputSlice =
-        getSlice(builder, getLoc(), getInput(), offsets, sizes, strides);
+        getSlice(builder, getLoc(), getInput(), offsets, sizesAttr, strides);
     if (!inputSlice) {
       return emitOpError("failed to get input slice");
     }
@@ -766,7 +783,7 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
   // Output 0
   {
     Operation *output0Slice =
-        getSlice(builder, getLoc(), getOutputs()[0], offsets, sizes, strides);
+        getSlice(builder, getLoc(), getOutputs()[0], offsets, sizesAttr, strides);
     if (!output0Slice) {
       return emitOpError("failed to get slice of output 0");
     }
@@ -776,7 +793,7 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
 
   if (rank > 1) {
     SmallVector<OpFoldResult> accumOffsets, accumSizes;
-    if (failed(getResultTilePosition(builder, 1, offsets, sizes, accumOffsets,
+    if (failed(getResultTilePosition(builder, 1, offsets, sizesAttr, accumOffsets,
                                      accumSizes))) {
       return {};
     }
