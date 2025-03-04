@@ -58,7 +58,7 @@ func.func @tensor_f32() {
   %lhs = util.unfoldable_constant dense<[1.0, 2.0, 7.0, 4.0]> : tensor<4xf32>
   %rhs = util.unfoldable_constant dense<[5.0, 2.0, 3.0, 4.0]> : tensor<4xf32>
   %result = "stablehlo.minimum"(%lhs, %rhs) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
-  check.expect_almost_eq_const(%result, dense<[1.0, 2.0, 3.0, 4.0]> : tensor<4xf32>) : tensor<4xf32>
+  check.expect_almost_eq_const(%result, dense<[1.0, 2.0, 3.0, 4.0]> : tensor<4xf32>, 1.0e-4) : tensor<4xf32>
   return
 }
 
@@ -66,7 +66,7 @@ func.func @scalar_f32() {
   %lhs = util.unfoldable_constant dense<1.0> : tensor<f32>
   %rhs = util.unfoldable_constant dense<2.0> : tensor<f32>
   %result = "stablehlo.minimum"(%lhs, %rhs) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  check.expect_almost_eq_const(%result, dense<1.0> : tensor<f32>) : tensor<f32>
+  check.expect_almost_eq_const(%result, dense<1.0> : tensor<f32>, 1.0e-4) : tensor<f32>
   return
 }
 
@@ -74,7 +74,7 @@ func.func @double() {
   %lhs = util.unfoldable_constant dense<1.0> : tensor<f64>
   %rhs = util.unfoldable_constant dense<2.0> : tensor<f64>
   %result = "stablehlo.minimum"(%lhs, %rhs) : (tensor<f64>, tensor<f64>) -> tensor<f64>
-  check.expect_almost_eq_const(%result, dense<1.0> : tensor<f64>) : tensor<f64>
+  check.expect_almost_eq_const(%result, dense<1.0> : tensor<f64>, 1.0e-4) : tensor<f64>
   return
 }
 
@@ -82,6 +82,6 @@ func.func @negative_f32() {
   %lhs = util.unfoldable_constant dense<1.0> : tensor<f32>
   %rhs = util.unfoldable_constant dense<-2.0> : tensor<f32>
   %result = "stablehlo.minimum"(%lhs, %rhs) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  check.expect_almost_eq_const(%result, dense<-2.0> : tensor<f32>) : tensor<f32>
+  check.expect_almost_eq_const(%result, dense<-2.0> : tensor<f32>, 1.0e-4) : tensor<f32>
   return
 }

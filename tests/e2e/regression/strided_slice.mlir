@@ -87,6 +87,6 @@ func.func @issue_8825() {
       linalg.yield %17 : f32
     } -> tensor<?xf32>
   %17 = tensor.cast %16 : tensor<?xf32> to tensor<2xf32>
-  check.expect_almost_eq_const(%17, dense<[6.0, 9.0]> : tensor<2xf32>) : tensor<2xf32>
+  check.expect_almost_eq_const(%17, dense<[6.0, 9.0]> : tensor<2xf32>, 1.0e-4) : tensor<2xf32>
   return
 }

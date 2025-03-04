@@ -131,8 +131,8 @@ util.func public @math_sin() {
     %9 = arith.divf %8, %cst : f32
     linalg.yield %9 : f32
   } -> tensor<4xf32>
-  check.expect_almost_eq(%4#1, %cst_1) : tensor<4xf32>
-  check.expect_almost_eq(%5, %cst_0) : tensor<4xf32>
+  check.expect_almost_eq(%4#1, %cst_1, 1.0e-4) : tensor<4xf32>
+  check.expect_almost_eq(%5, %cst_0, 1.0e-4) : tensor<4xf32>
   util.return
 }
 // CHECK-LABEL: util.func public @math_sin()

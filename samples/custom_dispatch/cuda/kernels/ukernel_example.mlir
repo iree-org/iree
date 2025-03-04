@@ -43,6 +43,6 @@ func.func @ukernel_example() {
   } count() -> (index, index, index) {
     flow.return %c3, %c1, %c1 : index, index, index
   }
-  check.expect_almost_eq_const(%0, dense<[0.0, 2.0, 8.0, 18.0, 32.0, 50.0, 72.0, 98.0, 128.0, 162.0]> : tensor<10xf32>) : tensor<10xf32>
+  check.expect_almost_eq_const(%0, dense<[0.0, 2.0, 8.0, 18.0, 32.0, 50.0, 72.0, 98.0, 128.0, 162.0]> : tensor<10xf32>, 1.0e-4) : tensor<10xf32>
   return
 }

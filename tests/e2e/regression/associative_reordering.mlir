@@ -62,6 +62,6 @@ func.func @check_reordering() {
     %7 = arith.addf %6, %arg5 : f32
     linalg.yield %7 : f32
   } -> tensor<f32>
-  check.expect_almost_eq_const(%4, dense<79898.343750> : tensor<f32>) : tensor<f32>
+  check.expect_almost_eq_const(%4, dense<79898.343750> : tensor<f32>, 1.0e-4) : tensor<f32>
   return
 }

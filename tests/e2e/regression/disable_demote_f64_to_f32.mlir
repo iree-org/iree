@@ -18,6 +18,6 @@ func.func @demote() {
     %res = arith.truncf %arg1 : f64 to f32
     linalg.yield %res : f32
   } -> tensor<1xf32>
-  check.expect_almost_eq_const(%result, dense<[25165824.0]> : tensor<1xf32>) : tensor<1xf32>
+  check.expect_almost_eq_const(%result, dense<[25165824.0]> : tensor<1xf32>, 1.0e-4) : tensor<1xf32>
   return
 }

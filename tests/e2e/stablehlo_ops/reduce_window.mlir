@@ -45,7 +45,7 @@ func.func @reduce_window_max_4x6xf32() {
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {window_dimensions = array<i64: 1, 2, 3, 1>,
       window_strides = array<i64: 1, 2, 3, 1>} : (tensor<1x4x6x1xf32>, tensor<f32>) -> tensor<1x2x2x1xf32>
-  check.expect_almost_eq_const(%res, dense<[[[[9.0], [12.0]], [[21.0], [24.0]]]]> : tensor<1x2x2x1xf32>) : tensor<1x2x2x1xf32>
+  check.expect_almost_eq_const(%res, dense<[[[[9.0], [12.0]], [[21.0], [24.0]]]]> : tensor<1x2x2x1xf32>, 1.0e-4) : tensor<1x2x2x1xf32>
   return
 }
 
@@ -61,7 +61,7 @@ func.func @reduce_window_min_4x6xf32() {
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {window_dimensions = array<i64: 1, 2, 3, 1>,
       window_strides = array<i64: 1, 2, 3, 1>} : (tensor<1x4x6x1xf32>, tensor<f32>) -> tensor<1x2x2x1xf32>
-  check.expect_almost_eq_const(%res, dense<[[[[1.0], [4.0]], [[13.0], [14.0]]]]> : tensor<1x2x2x1xf32>) : tensor<1x2x2x1xf32>
+  check.expect_almost_eq_const(%res, dense<[[[[1.0], [4.0]], [[13.0], [14.0]]]]> : tensor<1x2x2x1xf32>, 1.0e-4) : tensor<1x2x2x1xf32>
   return
 }
 
@@ -78,7 +78,7 @@ func.func @reduce_window_max_with_padding_4x6xf32() {
   }) {window_dimensions = array<i64: 1, 2, 3, 1>,
       window_strides = array<i64: 1, 2, 3, 1>,
       padding = dense<[[0, 0], [1, 1], [0, 0], [0, 0]]> : tensor<4x2xi64>} : (tensor<1x4x6x1xf32>, tensor<f32>) -> tensor<1x3x2x1xf32>
-  check.expect_almost_eq_const(%res, dense<[[[[3.0], [6.0]], [[15.0], [18.0]], [[21.0], [24.0]]]]> : tensor<1x3x2x1xf32>) : tensor<1x3x2x1xf32>
+  check.expect_almost_eq_const(%res, dense<[[[[3.0], [6.0]], [[15.0], [18.0]], [[21.0], [24.0]]]]> : tensor<1x3x2x1xf32>, 1.0e-4) : tensor<1x3x2x1xf32>
   return
 }
 
@@ -93,6 +93,6 @@ func.func @cumsum_f32() {
       window_dimensions = array<i64: 2, 1, 1>,
       window_strides = array<i64: 1, 1, 1>
   } : (tensor<2x2x2xf32>, tensor<f32>) -> tensor<2x2x2xf32>
-  check.expect_almost_eq_const(%res, dense<[[[1.0, 1.0], [1.0, 1.0]], [[2.0, 2.0], [2.0, 2.0]]]> : tensor<2x2x2xf32>) : tensor<2x2x2xf32>
+  check.expect_almost_eq_const(%res, dense<[[[1.0, 1.0], [1.0, 1.0]], [[2.0, 2.0], [2.0, 2.0]]]> : tensor<2x2x2xf32>, 1.0e-4) : tensor<2x2x2xf32>
   return
 }

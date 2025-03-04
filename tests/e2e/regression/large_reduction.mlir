@@ -46,7 +46,7 @@ func.func @reduction_aligned_larger() {
       %2 = arith.addf %arg3, %arg4 : f32
       linalg.yield %2 : f32
     } -> tensor<2xf32>
-  check.expect_almost_eq_const(%result, dense<40.96> : tensor<2xf32>) : tensor<2xf32>
+  check.expect_almost_eq_const(%result, dense<40.96> : tensor<2xf32>, 1.0e-4) : tensor<2xf32>
   return
 }
 
@@ -63,7 +63,7 @@ func.func @half_reduction_aligned() {
       %2 = arith.addf %arg3, %arg4 : f16
       linalg.yield %2 : f16
     } -> tensor<2xf16>
-  check.expect_almost_eq_const(%result, dense<4.096> : tensor<2xf16>) : tensor<2xf16>
+  check.expect_almost_eq_const(%result, dense<4.096> : tensor<2xf16>, 1.0e-3) : tensor<2xf16>
   return
 }
 

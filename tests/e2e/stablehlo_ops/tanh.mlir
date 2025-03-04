@@ -5,6 +5,6 @@ func.func @tanh() {
   %result = "stablehlo.tanh"(%input) : (tensor<2x4xf32>) -> tensor<2x4xf32>
   check.expect_almost_eq_const(%result, dense<
       [[-1.0000, -0.9999, -0.4622, 0.7616],
-       [ 0.8337,  0.9640,  0.9951, 1.0000]]> : tensor<2x4xf32>) : tensor<2x4xf32>
+       [ 0.8337,  0.9640,  0.9951, 1.0000]]> : tensor<2x4xf32>, 1.0e-4) : tensor<2x4xf32>
   return
 }

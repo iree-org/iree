@@ -22,6 +22,6 @@ func.func @conv2d_nopadding() {
   check.expect_almost_eq_const(%result, dense<[[
         [[1310.0, 1466.0, 1622.0],
          [2090.0, 2246.0, 2402.0]]
-  ]]> : tensor<1x1x2x3xf32>) : tensor<1x1x2x3xf32>
+  ]]> : tensor<1x1x2x3xf32>, 1.0e-4) : tensor<1x1x2x3xf32>
   return
 }

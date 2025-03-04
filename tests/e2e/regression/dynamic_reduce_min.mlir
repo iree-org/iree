@@ -7,6 +7,6 @@ func.func @reduce_min() {
     %2 = stablehlo.minimum %arg1, %arg2 : tensor<f32>
     "stablehlo.return"(%2) : (tensor<f32>) -> ()
   }) {dimensions = array<i64: 0, 1>} : (tensor<?x?xf32>, tensor<f32>) -> tensor<f32>
-  check.expect_almost_eq_const(%1, dense<-4.0> : tensor<f32>) : tensor<f32>
+  check.expect_almost_eq_const(%1, dense<-4.0> : tensor<f32>, 1.0e-4) : tensor<f32>
   return
 }

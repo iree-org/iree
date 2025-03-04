@@ -12,7 +12,7 @@ func.func @matmul_2048x512x1024_f32_f32() {
   %CC = linalg.fill ins(%c0 : f32) outs(%init : tensor<2048x512xf32>) -> tensor<2048x512xf32>
   %D = linalg.matmul ins(%lhs, %rhs: tensor<2048x1024xf32>, tensor<1024x512xf32>)
                     outs(%CC: tensor<2048x512xf32>) -> tensor<2048x512xf32>
-  check.expect_almost_eq_const(%D, dense<409.596> : tensor<2048x512xf32>) : tensor<2048x512xf32>
+  check.expect_almost_eq_const(%D, dense<409.596> : tensor<2048x512xf32>, 1.0e-4) : tensor<2048x512xf32>
   return
 }
 
@@ -27,6 +27,6 @@ func.func @matmul_3456x1024x2048_f16_f16() {
   %CC = linalg.fill ins(%c0 : f16) outs(%init : tensor<3456x1024xf16>) -> tensor<3456x1024xf16>
   %D = linalg.matmul ins(%lhs, %rhs: tensor<3456x2048xf16>, tensor<2048x1024xf16>)
                     outs(%CC: tensor<3456x1024xf16>) -> tensor<3456x1024xf16>
-  check.expect_almost_eq_const(%D, dense<20.2812> : tensor<3456x1024xf16>) : tensor<3456x1024xf16>
+  check.expect_almost_eq_const(%D, dense<20.2812> : tensor<3456x1024xf16>, 1.0e-3) : tensor<3456x1024xf16>
   return
 }

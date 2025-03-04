@@ -19,7 +19,7 @@ func.func @topk_1d_dim0_max() {
 
   check.expect_almost_eq_const(
       %0#0,
-      dense<[10.0, 9.0, 8.0]> : tensor<3xf32>
+      dense<[10.0, 9.0, 8.0]> : tensor<3xf32>, 1.0e-4
   ) : tensor<3xf32>
 
   check.expect_eq_const(
@@ -50,7 +50,7 @@ func.func @topk_1d_dim0_max_optional() {
 
   check.expect_almost_eq_const(
       %0#0,
-      dense<[10.0, 9.0, 8.0]> : tensor<3xf32>
+      dense<[10.0, 9.0, 8.0]> : tensor<3xf32>, 1.0e-4
   ) : tensor<3xf32>
 
   check.expect_eq_const(
@@ -82,7 +82,7 @@ func.func @topk_1d_dim0_min() {
 
   check.expect_almost_eq_const(
       %0#0,
-      dense<[1.0, 2.0, 3.0]> : tensor<3xf32>
+      dense<[1.0, 2.0, 3.0]> : tensor<3xf32>, 1.0e-4
   ) : tensor<3xf32>
 
   check.expect_eq_const(
@@ -115,7 +115,7 @@ func.func @topk_2d_dim1_max() {
 
   check.expect_almost_eq_const(
       %0#0,
-      dense<[[6.0, 5.0, 4.0],[12.0, 11.0, 10.0]]> : tensor<2x3xf32>
+      dense<[[6.0, 5.0, 4.0],[12.0, 11.0, 10.0]]> : tensor<2x3xf32>, 1.0e-4
   ) : tensor<2x3xf32>
 
   check.expect_eq_const(
@@ -147,7 +147,7 @@ func.func @topk_2d_dim1_inverted_max() {
 
   check.expect_almost_eq_const(
       %0#0,
-      dense<[[6.0, 5.0, 4.0],[12.0, 11.0, 10.0]]> : tensor<2x3xf32>
+      dense<[[6.0, 5.0, 4.0],[12.0, 11.0, 10.0]]> : tensor<2x3xf32>, 1.0e-4
   ) : tensor<2x3xf32>
 
   check.expect_eq_const(
@@ -179,7 +179,7 @@ func.func @topk_1d_repeat_max() {
 
   check.expect_almost_eq_const(
       %0#0,
-      dense<[10.0, 5.0, 5.0, 5.0, 3.0]> : tensor<5xf32>
+      dense<[10.0, 5.0, 5.0, 5.0, 3.0]> : tensor<5xf32>, 1.0e-4
   ) : tensor<5xf32>
 
   check.expect_eq_const(
@@ -211,7 +211,7 @@ func.func @topk_1d_dim0_max_double() {
 
   check.expect_almost_eq_const(
       %0#0,
-      dense<[18.0, 17.0, 16.0]> : tensor<3xf32>
+      dense<[18.0, 17.0, 16.0]> : tensor<3xf32>, 1.0e-4
   ) : tensor<3xf32>
 
   check.expect_eq_const(

@@ -4,6 +4,6 @@ func.func @tensor() {
   %4 = stablehlo.compare EQ, %0, %1,  NOTYPE : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xi1>
   stablehlo.custom_call @shape_assertion(%4) {error_message = "Shape assertion failed", has_side_effect = true} : (tensor<4xi1>) -> ()
   %result = "stablehlo.add"(%0, %1) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
-  check.expect_almost_eq_const(%result, dense<[6.0, 8.0, 10.0, 12.0]> : tensor<4xf32>) : tensor<4xf32>
+  check.expect_almost_eq_const(%result, dense<[6.0, 8.0, 10.0, 12.0]> : tensor<4xf32>, 1.0e-4) : tensor<4xf32>
   return
 }

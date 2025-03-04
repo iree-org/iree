@@ -3,7 +3,7 @@ func.func @tensor_float() {
   %1 = util.unfoldable_constant dense<[5.0, 6.0, -3.0, 8.0]> : tensor<4xf32>
   %shift = "tosa.const"() {value = dense<0> : tensor<1xi8>} : () -> tensor<1xi8>
   %result = tosa.mul %0, %1, %shift : (tensor<4xf32>, tensor<4xf32>, tensor<1xi8>) -> tensor<4xf32>
-  check.expect_almost_eq_const(%result, dense<[5.0, 0.0, -9.0, 32.0]> : tensor<4xf32>) : tensor<4xf32>
+  check.expect_almost_eq_const(%result, dense<[5.0, 0.0, -9.0, 32.0]> : tensor<4xf32>, 1.0e-4) : tensor<4xf32>
   return
 }
 

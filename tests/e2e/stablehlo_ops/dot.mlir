@@ -15,7 +15,7 @@ func.func @f32() {
     [340.0, 307.0, 274.0, 241.0, 208.0],
     [250.0, 226.0, 202.0, 178.0, 154.0],
     [160.0, 145.0, 130.0, 115.0, 100.0],
-    [70.0, 64.0, 58.0, 52.0, 46.0]]> : tensor<5x5xf32>) : tensor<5x5xf32>
+    [70.0, 64.0, 58.0, 52.0, 46.0]]> : tensor<5x5xf32>, 1.0e-4) : tensor<5x5xf32>
   return
 }
 
@@ -47,7 +47,7 @@ func.func @large() {
   %lhs = util.unfoldable_constant dense<1.0> : tensor<15x16xf32>
   %rhs = util.unfoldable_constant dense<0.4> : tensor<16x17xf32>
   %res = "stablehlo.dot"(%lhs, %rhs) : (tensor<15x16xf32>, tensor<16x17xf32>) -> tensor<15x17xf32>
-  check.expect_almost_eq_const(%res, dense<6.4> : tensor<15x17xf32>) : tensor<15x17xf32>
+  check.expect_almost_eq_const(%res, dense<6.4> : tensor<15x17xf32>, 1.0e-4) : tensor<15x17xf32>
   return
 }
 
@@ -55,7 +55,7 @@ func.func @matvec() {
   %lhs = util.unfoldable_constant dense<1.0> : tensor<15x32xf32>
   %rhs = util.unfoldable_constant dense<0.5> : tensor<32xf32>
   %res = "stablehlo.dot"(%lhs, %rhs) : (tensor<15x32xf32>, tensor<32xf32>) -> tensor<15xf32>
-  check.expect_almost_eq_const(%res, dense<16.0> : tensor<15xf32>) : tensor<15xf32>
+  check.expect_almost_eq_const(%res, dense<16.0> : tensor<15xf32>, 1.0e-4) : tensor<15xf32>
   return
 }
 
@@ -63,6 +63,6 @@ func.func @dot() {
   %lhs = util.unfoldable_constant dense<1.0> : tensor<1024xf32>
   %rhs = util.unfoldable_constant dense<0.5> : tensor<1024xf32>
   %res = "stablehlo.dot"(%lhs, %rhs) : (tensor<1024xf32>, tensor<1024xf32>) -> tensor<f32>
-  check.expect_almost_eq_const(%res, dense<512.0> : tensor<f32>) : tensor<f32>
+  check.expect_almost_eq_const(%res, dense<512.0> : tensor<f32>, 1.0e-4) : tensor<f32>
   return
 }

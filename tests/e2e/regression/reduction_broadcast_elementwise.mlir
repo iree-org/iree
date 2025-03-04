@@ -5,7 +5,7 @@
 //   %red = tosa.reduce_max %0 {axis = 2 : i64} : (tensor<12x128x128xf32>) -> tensor<12x128x1xf32>
 //   %sub = tosa.sub %0, %red : (tensor<12x128x128xf32>, tensor<12x128x1xf32>) -> tensor<12x128x128xf32>
 //   %exp = tosa.exp %sub : (tensor<12x128x128xf32>) -> tensor<12x128x128xf32>
-//   check.expect_almost_eq_const(%exp, dense<1.0> : tensor<12x128x128xf32>) : tensor<12x128x128xf32>
+//   check.expect_almost_eq_const(%exp, dense<1.0> : tensor<12x128x128xf32>, 1.0e-4) : tensor<12x128x128xf32>
 //   return
 // }
 
@@ -33,7 +33,7 @@ func.func @max_sub_exp() {
     %8 = math.exp %arg0 : f32
     linalg.yield %8 : f32
   } -> tensor<12x128x128xf32>
-  check.expect_almost_eq(%7, %cst_0) : tensor<12x128x128xf32>
+  check.expect_almost_eq(%7, %cst_0, 1.0e-4) : tensor<12x128x128xf32>
   return
 }
 
@@ -67,6 +67,6 @@ func.func @max_sub_exp_dynamic() {
     linalg.yield %8 : f32
   } -> tensor<?x?x?xf32>
   %result = tensor.cast %7 : tensor<?x?x?xf32> to tensor<12x128x128xf32>
-  check.expect_almost_eq(%result, %cst_0) : tensor<12x128x128xf32>
+  check.expect_almost_eq(%result, %cst_0, 1.0e-4) : tensor<12x128x128xf32>
   return
 }

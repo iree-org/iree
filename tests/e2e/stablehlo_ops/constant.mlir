@@ -21,6 +21,6 @@ func.func @high_rank () {
 
 // func.func @f32 () {
 //   %c = stablehlo.constant dense<[1.1, 2.1]> : tensor<2xf32>
-//   check.expect_almost_eq_const(%c, dense<[1.1, 2.1]> : tensor<2xf32>) : tensor<2xf32>
+//   check.expect_almost_eq_const(%c, dense<[1.1, 2.1]> : tensor<2xf32>, 1.0e-4) : tensor<2xf32>
 //   return
 // }

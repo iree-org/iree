@@ -1,7 +1,7 @@
 func.func @tensor_float() {
   %0 = util.unfoldable_constant dense<[1.0, 0.0, 4.5, 2.0]> : tensor<4xf32>
   %result = tosa.clamp %0 {min_val = 1.0 : f32, max_val = 4.0 : f32} : (tensor<4xf32>) -> tensor<4xf32>
-  check.expect_almost_eq_const(%result, dense<[1.0, 1.0, 4.0, 2.0]> : tensor<4xf32>) : tensor<4xf32>
+  check.expect_almost_eq_const(%result, dense<[1.0, 1.0, 4.0, 2.0]> : tensor<4xf32>, 1.0e-4) : tensor<4xf32>
   return
 }
 
