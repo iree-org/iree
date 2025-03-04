@@ -559,9 +559,10 @@ static void iree_hal_hip_device_destroy(iree_hal_device_t* base_device) {
         device->devices[i].dispatch_thread);
   }
 
+  // Join with the threads and clear them so that subsequent resource
+  // cleanup does not get scheduled on these threads.
   iree_hal_hip_cleanup_thread_deinitialize(device->cleanup_thread);
   iree_hal_hip_cleanup_thread_deinitialize(device->buffer_free_thread);
-
   device->cleanup_thread = NULL;
   device->buffer_free_thread = NULL;
 
@@ -1156,7 +1157,7 @@ iree_status_t iree_hal_hip_device_add_asynchronous_cleanup(
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
 
   // Perform cleanup synchronously on main thread if cleanup thread is
-  // deinitialized
+  // deinitialized.
   if (device->cleanup_thread) {
     return iree_hal_hip_cleanup_thread_add_cleanup(device->cleanup_thread, NULL,
                                                    callback, user_data);
