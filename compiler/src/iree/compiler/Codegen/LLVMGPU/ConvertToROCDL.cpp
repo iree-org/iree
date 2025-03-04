@@ -75,18 +75,38 @@ static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
 
 } // namespace
 
+template <typename... Floats>
+static bool containsAPred(Type type) {
+  type = getElementTypeOrSelf(type);
+  return llvm::isa<Floats...>(type);
+}
+
 // Function to check valid data types on the ROCm backend.
-static LogicalResult validateDataTypes(Operation *op) {
-  auto operandTypes = llvm::to_vector(op->getOperandTypes());
-  auto resultTypes = llvm::to_vector(op->getResultTypes());
-  if (llvm::any_of(llvm::concat<Type>(operandTypes, resultTypes),
-                   llvm::IsaPred<Float8E4M3FNType, Float8E5M2Type>)) {
-    op->emitOpError()
-        << "F8E5M2 and F8E4M3FN types are not supported on "
-           "the ROCm backend; try F8E5M2FNUZ or F8E4M3FNUZ instead.";
-    return failure();
+// Note to readers: different chips take different FP8 formats but re-use the
+// same instruction and intrinsic names, so we must filter out the "wrong" FP8
+// here.
+static LogicalResult validateDataTypes(Operation *op,
+                                       const amdgpu::Chipset &chipset) {
+  constexpr amdgpu::Chipset kGfx942 = amdgpu::Chipset(9, 4, 2);
+  if (!amdgpu::hasOcpFp8(chipset)) {
+    auto pred = containsAPred<Float8E5M2Type, Float8E4M3FNType>;
+    if (llvm::any_of(op->getOperandTypes(), pred) ||
+        llvm::any_of(op->getResultTypes(), pred)) {
+      return op->emitOpError("F8E5M2 and F8E4M3FN types are not supported on "
+                             "gfx942 (MI-300) or older chipsets; try "
+                             "F8E5M2FNUZ or F8E4M3FNUZ instead.");
+    }
   }
 
+  if (chipset != kGfx942) {
+    auto pred = containsAPred<Float8E5M2FNUZType, Float8E4M3FNUZType>;
+    if (llvm::any_of(op->getOperandTypes(), pred) ||
+        llvm::any_of(op->getResultTypes(), pred)) {
+      return op->emitOpError(
+          "F8E5M2FNUZ and F8E4M3FNUZ types are not supported on non-gfx942 "
+          "(MI-300) chipsets; try F8E5M2 or F8E4M3FN instead.");
+    }
+  }
   return success();
 }
 
@@ -107,11 +127,6 @@ struct ConvertToROCDLPass final
   }
   void runOnOperation() override {
     ModuleOp m = getOperation();
-
-    m.walk([&](Operation *op) {
-      if (failed(validateDataTypes(op)))
-        return signalPassFailure();
-    });
 
     if (clROCMIndexingBits != 32 && clROCMIndexingBits != 64) {
       m.emitOpError() << "unsupported: ROCm index bit widths must either be "
@@ -152,6 +167,16 @@ struct ConvertToROCDLPass final
         m.emitOpError() << "Invalid chipset name: " << chipset;
         return signalPassFailure();
       }
+      WalkResult allTypesValid = m.walk([&](Operation *op) {
+        if (failed(validateDataTypes(op, *maybeChipset))) {
+          return WalkResult::interrupt();
+        }
+        return WalkResult::advance();
+      });
+      if (allTypesValid.wasInterrupted()) {
+        return signalPassFailure();
+      }
+
       arith::populateArithToAMDGPUConversionPatterns(
           patterns, /*convertFP8Arithmetic=*/true, /*saturateFP8Truncf=*/false,
           /*allowPackedF16Rtz=*/false, /*chipset=*/*maybeChipset);
