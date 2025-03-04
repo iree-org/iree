@@ -803,6 +803,13 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
     }
   }
 
+  // Set full workgroup tiles to 0 to avoid generating loops when tiling.
+  for (auto [size, bound] : llvm::zip_equal(workgroupTileSizes, loopBounds)) {
+    if (size == bound) {
+      size = 0;
+    }
+  }
+
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
   MLIRContext *context = linalgOp.getContext();
