@@ -1,6 +1,6 @@
 // RUN: iree-opt %s
 
-module @mmt_tile_and_fuse_spec attributes { transform.with_named_sequence} {
+module @mmt_tile_and_fuse_spec attributes { transform.with_named_sequence, iree_codegen.tuning_spec_with_default_entrypoint} {
 transform.named_sequence @apply_op_config(%op: !transform.any_op {transform.readonly},
                                           %config: !transform.any_param {transform.readonly}) {
   transform.annotate %op "compilation_info" = %config : !transform.any_op, !transform.any_param
@@ -22,7 +22,7 @@ transform.named_sequence @match_mmt(%matmul: !transform.any_op {transform.readon
  transform.yield %matmul, %config : !transform.any_op, !transform.any_param
 }
 
-transform.named_sequence @main(%variant_op: !transform.any_op {transform.consumed}) -> (!transform.any_op)
+transform.named_sequence @__kernel_config(%variant_op: !transform.any_op {transform.consumed}) -> (!transform.any_op)
   attributes { iree_codegen.tuning_spec_entrypoint } {
   transform.print %variant_op {name="Custom spec"} : !transform.any_op
   %res = transform.foreach_match in %variant_op
