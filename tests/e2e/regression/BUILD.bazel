@@ -193,7 +193,6 @@ iree_check_single_backend_test_suite(
     name = "check_regression_compilation_only_vmvx_ukernels",
     srcs = [
         "dynamic_matmuls_on_same_accumulator_issue_12060.mlir",
-        "dynamic_tosa_clamp.mlir",
     ],
     compiler_flags = [
         "--iree-vmvx-enable-microkernels",
