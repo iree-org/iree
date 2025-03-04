@@ -1157,9 +1157,9 @@ iree_status_t iree_hal_hip_device_add_asynchronous_cleanup(
 
   // Perform cleanup synchronously on main thread if cleanup thread is
   // deinitialized
-  if(device->cleanup_thread) {
+  if (device->cleanup_thread) {
     return iree_hal_hip_cleanup_thread_add_cleanup(device->cleanup_thread, NULL,
-                                                 callback, user_data);
+                                                   callback, user_data);
   }
   return callback(user_data, NULL, iree_ok_status());
 }
