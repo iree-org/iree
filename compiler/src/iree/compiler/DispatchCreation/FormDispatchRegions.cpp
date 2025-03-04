@@ -783,17 +783,19 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
         continue;
       }
 
-      // For now check if this is a rope computation that is to be fused with
-      // attention.
-      // TODO: Ideally this is just regular gather fusion which will be covered
-      // by the `isClonableIntoDispatchOp` call above, but for now this is done
-      // as a point fix.
-      if (IREE::LinalgExt::isGatherlikeOp(&op) &&
-          llvm::all_of(op.getUsers(), [](Operation *op) {
-            return isa<IREE::LinalgExt::AttentionOp>(op);
-          })) {
-        continue;
-      }
+      // // For now check if this is a rope computation that is to be fused with
+      // // attention.
+      // // TODO: Ideally this is just regular gather fusion which will be
+      // covered
+      // // by the `isClonableIntoDispatchOp` call above, but for now this is
+      // done
+      // // as a point fix.
+      // if (IREE::LinalgExt::isGatherlikeOp(&op) &&
+      //     llvm::all_of(op.getUsers(), [](Operation *op) {
+      //       return isa<IREE::LinalgExt::AttentionOp>(op);
+      //     })) {
+      //   continue;
+      // }
 
       unsigned newGroup = numRootOps++;
       setRootAttribute(context, &op, newGroup);

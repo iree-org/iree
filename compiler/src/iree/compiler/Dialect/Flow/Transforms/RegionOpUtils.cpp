@@ -8,8 +8,10 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
@@ -823,7 +825,8 @@ static bool isScatterIndicesGenerator(Operation *op) {
 /// operations as roots.
 bool isClonableIntoDispatchOp(Operation *op,
                               ClonableIntoDispatchOptions options) {
-  if (isa<Flow::FlowDialect>(op->getDialect())) {
+  if (isa<Flow::FlowDialect, Stream::StreamDialect, HAL::HALDialect>(
+          op->getDialect())) {
     return false;
   }
 
