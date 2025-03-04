@@ -635,14 +635,14 @@ isFusableWithProducer(OpOperand &operand,
     return true;
   }
 
-  if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(consumer)) {
-    // Fuse with the rope computation if it is a gather operation.
-    if (IREE::LinalgExt::isGatherlikeOp(producer)) {
-      return true;
-    }
-    // Disable all other producer fusion. TODO: Enable other producer fusions.
-    return false;
-  }
+  // if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(consumer)) {
+  //   // Fuse with the rope computation if it is a gather operation.
+  //   if (IREE::LinalgExt::isGatherlikeOp(producer)) {
+  //     return true;
+  //   }
+  //   // Disable all other producer fusion. TODO: Enable other producer
+  //   fusions. return false;
+  // }
 
   if (isPackLikeOp(consumer)) {
     return TypeSwitch<Operation *, bool>(producer)
