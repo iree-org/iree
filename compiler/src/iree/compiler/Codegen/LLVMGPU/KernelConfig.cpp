@@ -1038,40 +1038,33 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
           op.getQueryMap(), op.getKeyMap(), op.getValueMap(), op.getOutputMap())
           .value();
 
-  SmallVector<int64_t> parallelDims;
-  SmallVector<int64_t> reductionDims;
-  for (auto [dim, itType] : llvm::enumerate(op.getLoopIteratorTypes())) {
-    switch (itType) {
-    case utils::IteratorType::parallel:
-      parallelDims.push_back(dim);
-      break;
-    case utils::IteratorType::reduction:
-      reductionDims.push_back(dim);
-      break;
-    }
-  }
-
-  auto distributeDimensionsToBasis = [&bounds](int64_t available,
-                                               ArrayRef<int64_t> dims,
-                                               IREE::GPU::Basis &basis) {
-    for (int64_t dim : dims) {
-      basis.mapping[dim] = dim;
-      int64_t dimSize = bounds[dim];
-      if (ShapedType::isDynamic(dimSize)) {
-        basis.counts[dim] = 1;
-        continue;
-      }
-      int64_t used = std::gcd(available, dimSize);
-      available /= used;
-      bounds[dim] /= used;
-      basis.counts[dim] = used;
-    }
-    return available;
-  };
+  auto distributeDimensionsToBasis =
+      [&bounds](int64_t available, ArrayRef<int64_t> dims,
+                IREE::GPU::Basis &basis, int64_t &currDim) {
+        for (int64_t dim : dims) {
+          basis.mapping[dim] = currDim;
+          int64_t dimSize = bounds[dim];
+          if (ShapedType::isDynamic(dimSize)) {
+            basis.counts[currDim] = 1;
+            ++currDim;
+            continue;
+          }
+          int64_t used = std::gcd(available, dimSize);
+          available /= used;
+          bounds[dim] /= used;
+          basis.counts[currDim] = used;
+          ++currDim;
+        }
+        return available;
+      };
 
   SmallVector<int64_t> workgroupTileSizes(opInfo.getDomainRank(), 0);
-  // Distribute all batch dimensions to workgroups.
+  // Distribute all batch and M dimensions to workgroups.
   for (int64_t dim : opInfo.getBatchDims()) {
+    workgroupTileSizes[dim] = 1;
+    bounds[dim] = 1;
+  }
+  for (int64_t dim : opInfo.getMDims()) {
     workgroupTileSizes[dim] = 1;
     bounds[dim] = 1;
   }
@@ -1080,26 +1073,31 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       SmallVector<int64_t>(opInfo.getDomainRank(), 1),
       SmallVector<int64_t>(opInfo.getDomainRank())};
   int64_t remainingThreads = targetSubgroupSize;
-  if (!target.supportsSubgroupShuffle()) {
+  if (target.supportsSubgroupShuffle()) {
     // If target does not support subgroup shuffles, don't distribute threads on
     // reduction dimensions.
-    distributeDimensionsToBasis(1, reductionDims, threadBasis);
-  } else {
-    remainingThreads = distributeDimensionsToBasis(remainingThreads,
-                                                   reductionDims, threadBasis);
+    int64_t currDim = 0;
+    remainingThreads = distributeDimensionsToBasis(
+        remainingThreads, opInfo.getK2Dims(), threadBasis, currDim);
+    // Distribute rest of the dimensions on no threads.
+    distributeDimensionsToBasis(1, opInfo.getBatchDims(), threadBasis, currDim);
+    distributeDimensionsToBasis(1, opInfo.getMDims(), threadBasis, currDim);
+    distributeDimensionsToBasis(1, opInfo.getK1Dims(), threadBasis, currDim);
+    distributeDimensionsToBasis(1, opInfo.getNDims(), threadBasis, currDim);
   }
-  remainingThreads =
-      distributeDimensionsToBasis(remainingThreads, parallelDims, threadBasis);
 
+  // Do not distribute on subgroups for now.
   IREE::GPU::Basis subgroupBasis = {
       SmallVector<int64_t>(opInfo.getDomainRank(), 1),
-      SmallVector<int64_t>(opInfo.getDomainRank())};
-  int64_t remainingSubgroups = target.getWgp().getSimdsPerWgp().value_or(1);
-  // TODO: We cannot distribute subgroups on reduction dimensions yet, because
-  // VectorDistribution does not know how to do workgroup reduction right now.
-  distributeDimensionsToBasis(1, reductionDims, subgroupBasis);
-  remainingSubgroups = distributeDimensionsToBasis(remainingSubgroups,
-                                                   parallelDims, subgroupBasis);
+      llvm::to_vector(llvm::seq<int64_t>(opInfo.getDomainRank()))};
+  // int64_t remainingSubgroups = target.getWgp().getSimdsPerWgp().value_or(1);
+  // // TODO: We cannot distribute subgroups on reduction dimensions yet,
+  // because
+  // // VectorDistribution does not know how to do workgroup reduction right
+  // now. distributeDimensionsToBasis(1, reductionDims, subgroupBasis);
+  // remainingSubgroups = distributeDimensionsToBasis(remainingSubgroups,
+  //                                                  parallelDims,
+  //                                                  subgroupBasis);
 
   LDBG("Thread Basis");
   LLVM_DEBUG({
@@ -1116,15 +1114,13 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     llvm::dbgs() << "\n";
   });
 
-  // Tile remaining parallel dimensions to workgroups.
-  for (int64_t dim : parallelDims) {
+  // Tile N parallel dimensions if they are to big to workgroups.
+  for (int64_t dim : opInfo.getNDims()) {
     if (ShapedType::isDynamic(dim)) {
       workgroupTileSizes[dim] = 1;
     }
-    if (bounds[dim] != 1) {
-      int64_t threadCount = threadBasis.counts[threadBasis.mapping[dim]];
-      int64_t subgroupCount = subgroupBasis.counts[subgroupBasis.mapping[dim]];
-      workgroupTileSizes[dim] = threadCount * subgroupCount;
+    if (bounds[dim] >= 128) {
+      workgroupTileSizes[dim] = 128;
     }
   }
 
@@ -1149,7 +1145,8 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   SmallVector<NamedAttribute, 2> attrs = {
       NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
-      NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
+      NamedAttribute("partial_reduction",
+                     b.getI64ArrayAttr(reductionTileSizes))};
 
   SmallVector<NamedAttribute> qkConfig;
   IREE::GPU::setBasis(context, qkConfig, IREE::GPU::TilingLevel::Subgroup,
