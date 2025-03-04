@@ -503,7 +503,7 @@ func.func @multi_result(%arg0: tensor<64x128xf32>, %arg1: tensor<128x256xf32>, %
       ins(%2, %arg2 : tensor<64x256xf32>, tensor<256xf32>)
       outs(%0 : tensor<64x256xf32>)
       attrs = {lowering_config =
-        #iree_codegen.lowering_config<tile_sizes = [[16, 64, 0]]>} {
+        #iree_codegen.lowering_config<tile_sizes = [[16, 64]]>} {
   ^bb0(%in: f32, %in_0: f32, %out: f32):
     %4 = arith.addf %in, %in_0 : f32
     linalg.yield %4 : f32
@@ -789,7 +789,7 @@ func.func @set_encoding_gpu(%arg0 : tensor<?x?xi8>) -> tensor<?x?x8x4x4x4x2x8xi8
                        affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>],
       iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]}
       ins(%expanded : tensor<?x?x4x8x4x2x4x8xi8>) outs(%23 : tensor<?x?x8x4x4x4x2x8xi8>)
-      attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 0, 0, 0, 0, 0, 0]]>} {
+      attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 8, 4, 4, 4, 2, 8]]>} {
   ^bb0(%in: i8, %out: i8):
     linalg.yield %in : i8
   } -> tensor<?x?x8x4x4x4x2x8xi8>
