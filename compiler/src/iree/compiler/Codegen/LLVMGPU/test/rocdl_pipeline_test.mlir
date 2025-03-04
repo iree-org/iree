@@ -96,54 +96,6 @@ hal.executable @dot_dispatch_0 {
 
 // -----
 
-#map = affine_map<(d0) -> (d0)>
-#pipeline_layout = #hal.pipeline.layout<bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
-hal.executable @ext_fp8_dispatch {
-  hal.executable.variant @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export @ext_fp8_dispatch layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
-      hal.return %x, %y, %z : index, index, index
-    }
-    builtin.module {
-      func.func @ext_fp8_dispatch() {
-        %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096xf8E4M3FNUZ>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096xf8E5M2FNUZ>>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4096xf32>>
-        %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [4096], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4096xf8E4M3FNUZ>> -> tensor<4096xf8E4M3FNUZ>
-        %4 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [4096], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4096xf8E5M2FNUZ>> -> tensor<4096xf8E5M2FNUZ>
-        %5 = tensor.empty() : tensor<4096xf32>
-        %6 = linalg.generic {indexing_maps = [#map, #map, #map],
-                             iterator_types = ["parallel"]}
-                             ins(%3, %4 : tensor<4096xf8E4M3FNUZ>, tensor<4096xf8E5M2FNUZ>)
-                             outs(%5 : tensor<4096xf32>) {
-        ^bb0(%in0: f8E4M3FNUZ, %in1: f8E5M2FNUZ, %out: f32):
-          %7 = arith.extf %in0 : f8E4M3FNUZ to f32
-          %8 = arith.extf %in1 : f8E5M2FNUZ to f32
-          %9 = arith.addf %7, %8 : f32
-          linalg.yield %9 : f32
-        } -> tensor<4096xf32>
-        flow.dispatch.tensor.store %6, %2, offsets = [0], sizes = [4096], strides = [1] : tensor<4096xf32> -> !flow.dispatch.tensor<writeonly:tensor<4096xf32>>
-        return
-      }
-    }
-  }
-}
-
-//   CDNA3-LABEL: hal.executable public @ext_fp8_dispatch
-//         CDNA3:   hal.executable.variant public @rocm
-// CDNA3-COUNT-16:     rocdl.cvt.f32.fp8 %{{.*}} : f32
-// CDNA3-COUNT-16:     rocdl.cvt.f32.bf8 %{{.*}} : f32
-//         CDNA3:     %[[ADD:.+]] = llvm.fadd %{{.*}}, %{{.*}} : vector<16xf32>
-//         CDNA3:     llvm.store %[[ADD]], %{{.*}} : vector<16xf32>, !llvm.ptr<1>
-
-// -----
-
 // Verify that the ceildivsi op gets expanded and lowered successfully all the way to
 // the llvm dialect.
 

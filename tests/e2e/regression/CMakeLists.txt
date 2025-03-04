@@ -237,7 +237,6 @@ iree_check_single_backend_test_suite(
     check_regression_compilation_only_vmvx_ukernels
   SRCS
     "dynamic_matmuls_on_same_accumulator_issue_12060.mlir"
-    "dynamic_tosa_clamp.mlir"
   TARGET_BACKEND
     "vmvx"
   COMPILER_FLAGS

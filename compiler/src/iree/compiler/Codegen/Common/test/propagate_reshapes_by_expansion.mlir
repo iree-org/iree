@@ -10,7 +10,7 @@ func.func @reshape_and_lowering_config(%src: tensor<3x4xf16>, %dest: tensor<12xf
 
 // CHECK-LABEL: func @reshape_and_lowering_config
 //  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: tensor<3x4xf16>
-//       CHECK:   %[[COPY1:.+]] = linalg.generic {{.*}} ins(%[[SRC]]
+//       CHECK:   %[[COPY1:.+]] = linalg.copy{{.*}} ins(%[[SRC]]
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[COPY1]]
 //       CHECK:   linalg.copy
 //  CHECK-SAME:     lowering_config = #iree_gpu.derived_thread_config
