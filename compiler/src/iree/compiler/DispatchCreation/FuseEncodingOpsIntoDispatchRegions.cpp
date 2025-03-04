@@ -33,6 +33,7 @@ namespace {
 // backends can support it.
 static bool isFusableWithSetEncoding(Operation *op) {
   auto parentRegion = op->getParentOfType<IREE::Flow::DispatchRegionOp>();
+  // Make sure the dispatch region has only one block.
   if (!llvm::hasSingleElement(parentRegion.getBody())) {
     return false;
   }
@@ -40,8 +41,7 @@ static bool isFusableWithSetEncoding(Operation *op) {
   // ops in the dispatch region.
   Block &regionBlock = parentRegion.getBody().getBlocks().front();
   for (Operation &op : regionBlock.getOperations()) {
-    if (llvm::none_of(op.getResultTypes(),
-                      [](Type v) { return isa<ShapedType>(v); })) {
+    if (llvm::none_of(op.getResultTypes(), llvm::IsaPred<ShapedType>)) {
       continue;
     }
     if (isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp, tensor::EmptyOp>(
