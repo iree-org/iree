@@ -378,7 +378,6 @@ def get_rocm_test_compilation_infos(
             MMASchedule("WMMAR3_I32_16x16x16_I8", 4, 2, 4, 2, 2),
         ]
     elif intrinsic == "WMMAR4":
-        # TODO(kdrewnia) FP8 intrinsics
         schedules = [
             MMASchedule("WMMAR4_F32_16x16x16_F16", 1, 1, 1, 1, 1),
             MMASchedule("WMMAR4_F32_16x16x16_F16", 1, 1, 1, 1, 2),

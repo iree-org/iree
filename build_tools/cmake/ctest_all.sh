@@ -100,7 +100,7 @@ if (( IREE_AMD_RDNA3_TESTS_DISABLE == 1 )); then
   label_exclude_args+=("^requires-gpu-rdna3$")
 fi
 if (( IREE_AMD_RDNA4_TESTS_DISABLE == 1 )); then
-  label_exclude_args+=("^requires-gpu-rdna3$")
+  label_exclude_args+=("^requires-gpu-rdna4$")
 fi
 if (( IREE_MULTI_DEVICE_TESTS_DISABLE == 1 )); then
   label_exclude_args+=("^requires-multiple-devices$")
