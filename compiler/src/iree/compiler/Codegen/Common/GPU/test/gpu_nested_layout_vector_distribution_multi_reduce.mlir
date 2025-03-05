@@ -161,7 +161,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[THREAD_RED3:.+]] = vector.insert %[[THREAD_RED2]], %[[THREAD_RED1]] [1] : f32 into vector<2xf32>
 // CHECK: %[[THREAD_RED4:.+]] = vector.shape_cast %[[THREAD_RED3]] : vector<2xf32> to vector<2x1x1xf32>
 // Subgroup reduction
-// CHECK-DAG: %[[ALLOC:.+]] = memref.alloc() : memref<32x2xf32, #gpu.address_space<workgroup>>
+// CHECK-DAG: %[[ALLOC:.+]] = memref.alloca() : memref<32x2xf32, #gpu.address_space<workgroup>>
 // CHECK: gpu.barrier
 // CHECK-DAG: %[[SGID:.+]]:3 = affine.delinearize_index %thread_id_x into (2, 64)
 // CHECK-DAG: %[[TIDX:.+]]:2 = affine.delinearize_index %thread_id_x into (16)
@@ -171,9 +171,9 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: vector.transfer_write %[[EXTRACT0]], %[[ALLOC]][%[[TIDX]]#1, %[[SGID]]#1]
 // CHECK-DAG: vector.transfer_write %[[EXTRACT1]], %[[ALLOC]][%[[TIDX1]], %[[SGID]]#1]
 // CHECK: gpu.barrier
-// CHECK-DAG: %[[READ0:.+]] = vector.transfer_read %alloc[%[[TIDX]]#1, %c0], {{.*}} {in_bounds = [true, true]} : memref<32x2xf32, #gpu.address_space<workgroup>>, vector<1x2xf32>
+// CHECK-DAG: %[[READ0:.+]] = vector.transfer_read %[[ALLOC]][%[[TIDX]]#1, %c0], {{.*}} {in_bounds = [true, true]} : memref<32x2xf32, #gpu.address_space<workgroup>>, vector<1x2xf32>
 // CHECK-DAG: %[[GATHER0:.+]] = vector.insert_strided_slice %[[READ0]], %[[CST]] {offsets = [0, 0, 0, 0, 0, 0], strides = [1, 1]} : vector<1x2xf32> into vector<2x1x1x1x1x2xf32>
-// CHECK-DAG: %[[READ1:.+]] = vector.transfer_read %alloc[%[[TIDX1]], %c0], %cst_0 {in_bounds = [true, true]} : memref<32x2xf32, #gpu.address_space<workgroup>>, vector<1x2xf32>
+// CHECK-DAG: %[[READ1:.+]] = vector.transfer_read %[[ALLOC]][%[[TIDX1]], %c0], %cst_0 {in_bounds = [true, true]} : memref<32x2xf32, #gpu.address_space<workgroup>>, vector<1x2xf32>
 // CHECK-DAG: %[[GATHER1:.+]] = vector.insert_strided_slice %[[READ1]], %[[GATHER0]] {offsets = [1, 0, 0, 0, 0, 0], strides = [1, 1]} : vector<1x2xf32> into vector<2x1x1x1x1x2xf32>
 // CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_simt %arg1 : vector<32xf32> -> vector<2x1x1xf32>
 // CHECK-DAG: %[[SGRED:.+]] = vector.multi_reduction <maximumf>, %[[GATHER1]], {{.*}} [1, 3, 5] : vector<2x1x1x1x1x2xf32> to vector<2x1x1xf32>

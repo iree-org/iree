@@ -301,13 +301,14 @@ static Value createFlatId(mlir::FunctionOpInterface funcOp,
 }
 
 /// Hoist allocations to the top of the loop if they have no dependencies.
+template <typename AllocTy>
 static void hoistAlloc(mlir::FunctionOpInterface funcOp) {
-  SmallVector<memref::AllocOp> allocs;
-  funcOp.walk([&](memref::AllocOp alloc) {
+  SmallVector<AllocTy> allocs;
+  funcOp.walk([&](AllocTy alloc) {
     if (alloc.getOperands().empty())
       allocs.push_back(alloc);
   });
-  for (memref::AllocOp alloc : allocs) {
+  for (AllocTy alloc : allocs) {
     alloc->moveBefore(&(*funcOp.getBlocks().begin()),
                       funcOp.getBlocks().begin()->begin());
   }
@@ -381,7 +382,8 @@ LogicalResult gpuDistributeSharedMemoryCopy(mlir::FunctionOpInterface funcOp) {
     return success();
 
   // Step 0. First clean up the IR.
-  hoistAlloc(funcOp);
+  hoistAlloc<memref::AllocOp>(funcOp);
+  hoistAlloc<memref::AllocaOp>(funcOp);
   removeRedundantBarriers(funcOp);
 
   int64_t flatWorkgroupSize =

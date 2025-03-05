@@ -544,10 +544,8 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 // Basic pipeline test to make sure it generates the instructions we expect.
 
 // CHECK-LABEL: func.func @unaligned_nk_batch_matmul()
-// CHECK-DAG:     %[[RHS_SHARED:.+]] = memref.alloc() : memref<1x16x20xf16, #gpu.address_space<workgroup>>
-// CHECK-DAG:     %[[RHS_SHARED_SUB:.+]] =  memref.subview %[[RHS_SHARED]][0, 0, 0] [1, 16, 16] [1, 1, 1]
-// CHECK-DAG:     %[[LHS_SHARED:.+]] = memref.alloc() : memref<1x16x20xf16, #gpu.address_space<workgroup>>
-// CHECK-DAG:     %[[LHS_SHARED_SUB:.+]] =  memref.subview %[[LHS_SHARED]][0, 0, 0] [1, 16, 16] [1, 1, 1]
+// CHECK-DAG:     %[[RHS_SHARED:.+]] = memref.alloca() : memref<1x16x20xf16, #gpu.address_space<workgroup>>
+// CHECK-DAG:     %[[LHS_SHARED:.+]] = memref.alloca() : memref<1x16x20xf16, #gpu.address_space<workgroup>>
 // CHECK-DAG:     %[[LHS_GLOBAL:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<64x968x1281xf16, #hal.descriptor_type<storage_buffer>>
 // CHECK-DAG:     %[[RHS_GLOBAL:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<64x1281x1281xf16, #hal.descriptor_type<storage_buffer>>
 // CHECK-DAG:     %[[OUT_GLOBAL:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%c0) : memref<64x968x1281xf16, #hal.descriptor_type<storage_buffer>>
@@ -690,10 +688,8 @@ hal.executable public @contract_schedule_considering_read_layout {
 // Basic pipeline test to make sure it generates the instructions we expect.
 
 // CHECK-LABEL: func.func @contract_schedule_considering_read_layout()
-// CHECK-DAG:     %[[RHS_SHARED:.+]] = memref.alloc() : memref<128x132xf16, #gpu.address_space<workgroup>>
-// CHECK-DAG:     %[[RHS_SHARED_SUB:.+]] =  memref.subview %[[RHS_SHARED]][0, 0] [128, 128] [1, 1]
-// CHECK-DAG:     %[[LHS_SHARED:.+]] = memref.alloc() : memref<16x132xf16, #gpu.address_space<workgroup>>
-// CHECK-DAG:     %[[LHS_SHARED_SUB:.+]] =  memref.subview %[[LHS_SHARED]][0, 0] [16, 128] [1, 1]
+// CHECK-DAG:     %[[RHS_SHARED:.+]] = memref.alloca() : memref<128x132xf16, #gpu.address_space<workgroup>>
+// CHECK-DAG:     %[[LHS_SHARED:.+]] = memref.alloca() : memref<16x132xf16, #gpu.address_space<workgroup>>
 // CHECK:   scf.for {{.*}} = %c0 to %c1408 step %c128 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<1x2x1x1x4x1xf16>)
 // CHECK-COUNT-16:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 // CHECK:     scf.yield
@@ -851,8 +847,8 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 }
 
 // CHECK-LABEL: func @virtual_intrinsic_256x256x256_16x16x32xf8E4M3FNUZ_f32
-// CHECK-DAG:     %[[ALLOC_LHS:.+]] = memref.alloc() : memref<32x136xf8E4M3FNUZ, #gpu.address_space<workgroup>>
-// CHECK-DAG:     %[[ALLOC_RHS:.+]] = memref.alloc() : memref<128x40xf8E4M3FNUZ, #gpu.address_space<workgroup>>
+// CHECK-DAG:     %[[ALLOC_LHS:.+]] = memref.alloca() : memref<32x136xf8E4M3FNUZ, #gpu.address_space<workgroup>>
+// CHECK-DAG:     %[[ALLOC_RHS:.+]] = memref.alloca() : memref<128x40xf8E4M3FNUZ, #gpu.address_space<workgroup>>
 // CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<1x1x1x1x4x1xf32>)
 
 // Validate that VMFMA do 2 interleaved reads, combine them for every MFMA:
@@ -1023,8 +1019,8 @@ hal.executable private @attention_20x4096x64x4096x64 {
 // Check that we only use alloc for Q, K, and V. No shared memory for S is
 // needed because the intrinsic layout mathes.
 // MEMORY-LABEL: func.func @attention_20x4096x64x4096x64()
-// MEMORY-COUNT-3: memref.alloc
-// MEMORY-NOT: memref.alloc
+// MEMORY-COUNT-3: memref.alloca
+// MEMORY-NOT: memref.alloca
 
 // -----
 
@@ -1091,8 +1087,8 @@ hal.executable private @attention_multiple_m_transpose {
 // Check that we only use alloc for Q, K, and V. No shared memory for S is
 // needed because the intrinsic layout mathes.
 // MEMORY-LABEL: func.func @attention_multiple_m_transpose()
-// MEMORY-COUNT-3: memref.alloc
-// MEMORY-NOT: memref.alloc
+// MEMORY-COUNT-3: memref.alloca
+// MEMORY-NOT: memref.alloca
 
 // -----
 
@@ -1159,8 +1155,8 @@ hal.executable private @attention_mfma_32x32x8 {
 // Check that we only use alloc for Q, K, and V. No shared memory for S is
 // needed because the intrinsic layout mathes.
 // MEMORY-LABEL: func.func @attention_mfma_32x32x8()
-// MEMORY-COUNT-3: memref.alloc
-// MEMORY-NOT: memref.alloc
+// MEMORY-COUNT-3: memref.alloca
+// MEMORY-NOT: memref.alloca
 
 // -----
 
@@ -1238,8 +1234,8 @@ hal.executable private @online_attention_split_k2 {
 // Check that we only use alloc for Q, K, and V. No shared memory for S is
 // needed because the intrinsic layout mathes.
 // MEMORY-LABEL: func.func @online_attention_split_k2()
-// MEMORY-COUNT-3: memref.alloc
-// MEMORY-NOT: memref.alloc
+// MEMORY-COUNT-3: memref.alloca
+// MEMORY-NOT: memref.alloca
 
 // -----
 
@@ -1310,5 +1306,5 @@ module {
 // CHECK: scf.yield
 
 // MEMORY-LABEL: func.func @attention_gather_k
-// MEMORY-COUNT-3: memref.alloc
-// MEMORY-NOT:     memref.alloc
+// MEMORY-COUNT-3: memref.alloca
+// MEMORY-NOT:     memref.alloca

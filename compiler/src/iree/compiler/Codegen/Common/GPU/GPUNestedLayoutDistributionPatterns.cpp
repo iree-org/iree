@@ -867,7 +867,7 @@ struct DistributeMultiReduction final
     MemRefType allocType = MemRefType::get(
         partialReductionShape, srcVector.getType().getElementType(),
         AffineMap(), workgroupMemoryAddressSpace);
-    auto alloc = rewriter.create<memref::AllocOp>(loc, allocType);
+    auto alloc = rewriter.create<memref::AllocaOp>(loc, allocType);
     VectorType unDistributedType = VectorType::get(
         partialReductionShape, srcVector.getType().getElementType());
     Value undistrWrite = rewriter.create<IREE::VectorExt::ToSIMDOp>(

@@ -97,10 +97,10 @@ static bool hasThreadMapping(scf::ForallOp forall) {
 // scf.forall op with a thread mapping. If not present, we allocate workgroup
 // memory. Pipelines that choose to distribute in a different order will have
 // to use a different allocation function.
-static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
-                                        MemRefType memRefType,
-                                        ValueRange dynamicSizes,
-                                        unsigned alignment) {
+template <typename SharedMemAllocTy>
+static FailureOr<Value>
+gpuAllocationFnBase(OpBuilder &builder, Location loc, MemRefType memRefType,
+                    ValueRange dynamicSizes, unsigned alignment) {
   Block *insertionBlock = builder.getInsertionBlock();
   Operation *parent = insertionBlock->getParentOp();
   scf::ForallOp enclosingForall = dyn_cast<scf::ForallOp>(parent);
@@ -122,8 +122,16 @@ static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
   auto allocType =
       MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
                       AffineMap(), addressSpace);
-  return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes)
+  return builder.create<SharedMemAllocTy>(loc, allocType, dynamicSizes)
       .getResult();
+}
+
+static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
+                                        MemRefType memRefType,
+                                        ValueRange dynamicSizes,
+                                        unsigned alignment) {
+  return gpuAllocationFnBase<memref::AllocOp>(builder, loc, memRefType,
+                                              dynamicSizes, alignment);
 }
 
 // Barriers are only needed when copying to/from workgroup memory. The only
@@ -307,11 +315,7 @@ static FailureOr<Value> gpuRequireMemSpaceAllocationFn(OpBuilder &builder,
     memorySpace = privateSpace;
   }
 
-  if (memorySpace == privateSpace) {
-    return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes)
-        .getResult();
-  }
-  return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes)
+  return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes)
       .getResult();
 }
 
@@ -785,8 +789,16 @@ static LogicalResult gpuVectorCopyFn(OpBuilder &builder, Location loc,
   return success();
 }
 
+static FailureOr<Value> vectorGpuAllocationFn(OpBuilder &builder, Location loc,
+                                              MemRefType memRefType,
+                                              ValueRange dynamicSizes,
+                                              unsigned alignment) {
+  return gpuAllocationFnBase<memref::AllocaOp>(builder, loc, memRefType,
+                                               dynamicSizes, alignment);
+}
+
 static void addVectorBufferizePasses(OpPassManager &funcPassManager) {
-  BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
+  BufferizationOptions::AllocationFn allocationFn = vectorGpuAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
   addIREEComprehensiveBufferizePasses(funcPassManager, allocationFn, memcpyFn);
   funcPassManager.addPass(createCanonicalizerPass());

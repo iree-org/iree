@@ -1195,16 +1195,18 @@ void analyseAllocsForPacking(mlir::FunctionOpInterface funcOp,
   }
 }
 
+template <typename AllocTy>
 static int64_t getAllocSize(Operation *op, DataLayout &dataLayout) {
-  auto allocOp = cast<memref::AllocOp>(op);
+  auto allocOp = cast<AllocTy>(op);
   int64_t numElements = allocOp.getType().getNumElements();
   return (dataLayout.getTypeSizeInBits(allocOp.getType().getElementType()) *
           numElements) /
          8;
 }
 
-void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
-                ArrayRef<AliasGroup> aliasGroups) {
+template <typename AllocTy>
+static void packAllocsImpl(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
+                           ArrayRef<AliasGroup> aliasGroups) {
   if (aliasGroups.empty())
     return;
   DataLayout dataLayout = DataLayout::closest(funcOp);
@@ -1213,7 +1215,7 @@ void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
   for (size_t i = 0; i < aliasGroups.size(); i++) {
     int64_t allocSize = 0;
     for (Operation *alloc : aliasGroups[i]) {
-      allocSize += getAllocSize(alloc, dataLayout);
+      allocSize += getAllocSize<AllocTy>(alloc, dataLayout);
     }
     maxAlloc = std::max(maxAlloc, allocSize);
   }
@@ -1222,8 +1224,7 @@ void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
           .getMemorySpace();
   MemRefType allocType = MemRefType::get({maxAlloc}, builder.getI8Type(),
                                          AffineMap(), memorySpace);
-  Value packedAlloc =
-      builder.create<memref::AllocOp>(funcOp.getLoc(), allocType);
+  Value packedAlloc = builder.create<AllocTy>(funcOp.getLoc(), allocType);
   for (size_t i = 0; i < aliasGroups.size(); i++) {
     int64_t offset = 0;
     for (Operation *alloc : aliasGroups[i]) {
@@ -1233,11 +1234,21 @@ void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
       Value newAlloc = builder.create<memref::ViewOp>(
           packedAlloc.getLoc(), alloc->getResultTypes()[0], packedAlloc,
           offsetValue, ArrayRef<Value>({}));
-      offset += getAllocSize(alloc, dataLayout);
+      offset += getAllocSize<AllocTy>(alloc, dataLayout);
       alloc->replaceAllUsesWith(ArrayRef<Value>({newAlloc}));
       alloc->erase();
     }
   }
+}
+
+void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
+                ArrayRef<AliasGroup> aliasGroups) {
+  packAllocsImpl<memref::AllocOp>(builder, funcOp, aliasGroups);
+}
+
+void packAllocas(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
+                 ArrayRef<AliasGroup> aliasGroups) {
+  packAllocsImpl<memref::AllocaOp>(builder, funcOp, aliasGroups);
 }
 
 LogicalResult tileLinalgOpsWithFilter(mlir::FunctionOpInterface funcOp,

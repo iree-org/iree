@@ -53,8 +53,8 @@ hal.executable private @main {
 //      CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //      CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //      CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//      CHECK-DAG:   memref.alloc() : memref<1x4x16x36xf16, #gpu.address_space<workgroup>>
-//      CHECK-DAG:   memref.alloc() : memref<32x260xf16, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   memref.alloca() : memref<1x4x16x36xf16, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   memref.alloca() : memref<32x260xf16, #gpu.address_space<workgroup>>
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK-DAG:   %[[C720:.+]] = arith.constant 720 : index
 //      CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
@@ -133,9 +133,9 @@ hal.executable private @main {
 //      CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //      CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //      CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//      CHECK-DAG:   memref.alloc() : memref<2x1x32x18xf32, #gpu.address_space<workgroup>>
-//      CHECK-DAG:   memref.alloc() : memref<16x20xf16, #gpu.address_space<workgroup>>
-//      CHECK-DAG:   memref.alloc() : memref<2x1x32x20xf16, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   memref.alloca() : memref<2x1x32x18xf32, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   memref.alloca() : memref<16x20xf16, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   memref.alloca() : memref<2x1x32x20xf16, #gpu.address_space<workgroup>>
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK-DAG:   %[[C721:.+]] = arith.constant 721 : index
 //      CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
