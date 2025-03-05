@@ -40,7 +40,7 @@ struct BubbleUpExtract : OpRewritePattern<tensor::ExtractSliceOp> {
                    "single result");
     }
 
-    if (!IREE::LinalgExt::isBitExtendOp(genericOp) && !genericOp->hasOneUse()) {
+    if (!genericOp.isAllParallelLoops() && !genericOp->hasOneUse()) {
       return rewriter.notifyMatchFailure(
           sliceOp,
           "expected source to be dequantize-like op or have a single use");
@@ -56,11 +56,6 @@ struct BubbleUpExtract : OpRewritePattern<tensor::ExtractSliceOp> {
       return rewriter.notifyMatchFailure(
           genericOp,
           "expected generic op to have all projected permutation maps");
-    }
-
-    if (genericOp.hasIndexSemantics()) {
-      return rewriter.notifyMatchFailure(
-          genericOp, "pattern doesn't support index semantics");
     }
 
     Value replacement;
@@ -148,6 +143,7 @@ struct BubbleUpExtractSlicesPass
       patterns.insert<BubbleUpExtract>(context);
       patterns.insert<SwapExtractSliceOfFill>(context);
       tensor::populateFoldTensorEmptyPatterns(patterns, false);
+      tensor::populateReassociativeReshapeFoldingPatterns(patterns);
       if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
         return signalPassFailure();
       }
