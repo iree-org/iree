@@ -11,6 +11,7 @@
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -25,10 +26,37 @@ namespace mlir::iree_compiler::DispatchCreation {
 
 namespace {
 
-// Return true if the op is fusable with a SetEncodingOp consumer.
-// For now, just check if it is a LinalgOp.
+// Return true if the op is fusable with a SetEncodingOp consumer. For now,
+// the op's containing dispatch region must not contain any ops other than
+// element-wise linalg ops and some tensor ops. This is quite conservative,
+// and could be extended to more ops when we are confident that the codegen
+// backends can support it.
 static bool isFusableWithSetEncoding(Operation *op) {
-  return isa<linalg::LinalgOp>(op);
+  auto parentRegion = op->getParentOfType<IREE::Flow::DispatchRegionOp>();
+  // Make sure the dispatch region has only one block.
+  if (!llvm::hasSingleElement(parentRegion.getBody())) {
+    return false;
+  }
+  // Check that there are no ops other than reshapes and element-wise linalg
+  // ops in the dispatch region.
+  Block &regionBlock = parentRegion.getBody().getBlocks().front();
+  for (Operation &op : regionBlock.getOperations()) {
+    if (llvm::none_of(op.getResultTypes(), llvm::IsaPred<ShapedType>)) {
+      continue;
+    }
+    if (isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp, tensor::EmptyOp>(
+            op)) {
+      continue;
+    }
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+    if (!linalgOp) {
+      return false;
+    }
+    if (linalgOp.getNumReductionLoops() != 0) {
+      return false;
+    }
+  }
+  return true;
 }
 
 struct FuseEncodingOpsIntoDispatchRegionsPass
