@@ -58,11 +58,6 @@ struct BubbleUpExtract : OpRewritePattern<tensor::ExtractSliceOp> {
           "expected generic op to have all projected permutation maps");
     }
 
-    if (genericOp.hasIndexSemantics()) {
-      return rewriter.notifyMatchFailure(
-          genericOp, "pattern doesn't support index semantics");
-    }
-
     Value replacement;
     linalg::GenericOp swappedOp;
     {
