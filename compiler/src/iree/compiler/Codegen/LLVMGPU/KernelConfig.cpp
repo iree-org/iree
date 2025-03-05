@@ -1059,6 +1059,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       };
 
   SmallVector<int64_t> workgroupTileSizes(opInfo.getDomainRank(), 0);
+  SmallVector<int64_t> threadTileSizes(opInfo.getDomainRank(), 0);
   // Distribute all batch and M dimensions to workgroups.
   for (int64_t dim : opInfo.getBatchDims()) {
     workgroupTileSizes[dim] = 1;
@@ -1068,6 +1069,11 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     workgroupTileSizes[dim] = 1;
     bounds[dim] = 1;
   }
+  // Make thread tile sizes for K1 and N read 128bits (assume fp16 for now :D).
+  threadTileSizes[opInfo.getK1Dims().back()] = 8;
+  bounds[opInfo.getK1Dims().back()] /= 8;
+  threadTileSizes[opInfo.getNDims().back()] = 8;
+  bounds[opInfo.getNDims().back()] /= 8;
 
   IREE::GPU::Basis threadBasis = {
       SmallVector<int64_t>(opInfo.getDomainRank(), 1),
@@ -1148,13 +1154,29 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       NamedAttribute("partial_reduction",
                      b.getI64ArrayAttr(reductionTileSizes))};
 
-  SmallVector<NamedAttribute> qkConfig;
+  SmallVector<int64_t> qkThreadTileSizes;
+  for (auto [i, tile] : llvm::enumerate(threadTileSizes)) {
+    if (llvm::find(opInfo.getNDims(), i) != opInfo.getNDims().end()) {
+      continue;
+    }
+    qkThreadTileSizes.push_back(tile);
+  }
+  SmallVector<NamedAttribute> qkConfig = {
+      NamedAttribute("thread", b.getI64ArrayAttr(qkThreadTileSizes))};
   IREE::GPU::setBasis(context, qkConfig, IREE::GPU::TilingLevel::Subgroup,
                       projectBasis(subgroupBasis, opInfo.getNDims()));
   IREE::GPU::setBasis(context, qkConfig, IREE::GPU::TilingLevel::Thread,
                       projectBasis(threadBasis, opInfo.getNDims()));
 
-  SmallVector<NamedAttribute> pvConfig;
+  SmallVector<int64_t> pvThreadTileSizes;
+  for (auto [i, tile] : llvm::enumerate(threadTileSizes)) {
+    if (llvm::find(opInfo.getK1Dims(), i) != opInfo.getK1Dims().end()) {
+      continue;
+    }
+    pvThreadTileSizes.push_back(tile);
+  }
+  SmallVector<NamedAttribute> pvConfig = {
+      NamedAttribute("thread", b.getI64ArrayAttr(pvThreadTileSizes))};
   IREE::GPU::setBasis(context, pvConfig, IREE::GPU::TilingLevel::Subgroup,
                       projectBasis(subgroupBasis, opInfo.getK1Dims()));
   IREE::GPU::setBasis(context, pvConfig, IREE::GPU::TilingLevel::Thread,
@@ -1194,7 +1216,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       workgroupSize, targetSubgroupSize);
 
   return success();
-}
+} // namespace mlir::iree_compiler
 
 static LogicalResult
 setVectorDistributionConfig(IREE::GPU::TargetAttr target,
