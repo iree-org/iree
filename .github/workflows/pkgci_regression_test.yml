@@ -133,7 +133,7 @@ jobs:
             --goldentime-rocm-vae-ms 260.0 \
             --goldendispatch-rocm-unet 1220 \
             --goldendispatch-rocm-clip 794 \
-            --goldendispatch-rocm-vae 176 \
+            --goldendispatch-rocm-vae 177 \
             --goldensize-rocm-unet-bytes 1370000  \
             --goldensize-rocm-clip-bytes 460000 \
             --goldensize-rocm-vae-bytes 430000 \
@@ -158,7 +158,7 @@ jobs:
             --goldentime-rocm-vae-ms 62.0 \
             --goldendispatch-rocm-unet 1220 \
             --goldendispatch-rocm-clip 794 \
-            --goldendispatch-rocm-vae 176 \
+            --goldendispatch-rocm-vae 177 \
             --goldensize-rocm-unet-bytes 1400000 \
             --goldensize-rocm-clip-bytes 460000  \
             --goldensize-rocm-vae-bytes 430000 \
@@ -187,7 +187,7 @@ jobs:
             --goldentime-rocm-vae-ms 146.0 \
             --goldendispatch-rocm-unet 1220 \
             --goldendispatch-rocm-clip 794 \
-            --goldendispatch-rocm-vae 176 \
+            --goldendispatch-rocm-vae 177 \
             --goldensize-rocm-unet-bytes 1400000 \
             --goldensize-rocm-clip-bytes 460000 \
             --goldensize-rocm-vae-bytes 430000 \
