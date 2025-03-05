@@ -398,7 +398,7 @@ util.func public @collapse11(%input : !type_in) -> !type_out {
 // -----
 
 !type = tensor<16x32xi32>
-util.func public @dont_collapse_dueto_index(%height : index, %width : index) -> !type {
+util.func public @collapse_index(%height : index, %width : index) -> !type {
   %init_source = tensor.empty() : !type
   %source = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
@@ -415,8 +415,9 @@ util.func public @dont_collapse_dueto_index(%height : index, %width : index) -> 
   util.return %source : !type
 }
 
-// CHECK-LABEL: util.func public @dont_collapse
-//       CHECK:   linalg.generic {indexing_maps = [#[[$MAP:.+]]], iterator_types = ["parallel", "parallel"]}
+// CHECK-LABEL: util.func public @collapse_index
+//       CHECK:   linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>] , iterator_types = ["parallel"]}
+//   CHECK-NOT: affine.apply
 
 // -----
 
