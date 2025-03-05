@@ -1075,21 +1075,38 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   threadTileSizes[opInfo.getNDims().back()] = 8;
   bounds[opInfo.getNDims().back()] /= 8;
 
-  IREE::GPU::Basis threadBasis = {
+  IREE::GPU::Basis qkThreadBasis = {
       SmallVector<int64_t>(opInfo.getDomainRank(), 1),
       SmallVector<int64_t>(opInfo.getDomainRank())};
-  int64_t remainingThreads = targetSubgroupSize;
+  IREE::GPU::Basis pvThreadBasis = {
+      SmallVector<int64_t>(opInfo.getDomainRank(), 1),
+      SmallVector<int64_t>(opInfo.getDomainRank())};
   if (target.supportsSubgroupShuffle()) {
+    int64_t qkRemainingThreads = targetSubgroupSize;
     // If target does not support subgroup shuffles, don't distribute threads on
     // reduction dimensions.
-    int64_t currDim = 0;
-    remainingThreads = distributeDimensionsToBasis(
-        remainingThreads, opInfo.getK2Dims(), threadBasis, currDim);
-    // Distribute rest of the dimensions on no threads.
-    distributeDimensionsToBasis(1, opInfo.getBatchDims(), threadBasis, currDim);
-    distributeDimensionsToBasis(1, opInfo.getMDims(), threadBasis, currDim);
-    distributeDimensionsToBasis(1, opInfo.getK1Dims(), threadBasis, currDim);
-    distributeDimensionsToBasis(1, opInfo.getNDims(), threadBasis, currDim);
+
+    // Distribute both basis on K2 equally.
+    int64_t qkCurrDim = 0;
+    qkRemainingThreads = distributeDimensionsToBasis(
+        qkRemainingThreads, opInfo.getK2Dims(), qkThreadBasis, qkCurrDim);
+    distributeDimensionsToBasis(1, opInfo.getBatchDims(), qkThreadBasis,
+                                qkCurrDim);
+    distributeDimensionsToBasis(1, opInfo.getMDims(), qkThreadBasis, qkCurrDim);
+
+    pvThreadBasis = qkThreadBasis;
+    int64_t pvRemainingThreads = qkRemainingThreads;
+    int64_t pvCurrDim = qkCurrDim;
+
+    // Distribute K1 on QK basis and N on nothing.
+    qkRemainingThreads = distributeDimensionsToBasis(
+        qkRemainingThreads, opInfo.getK1Dims(), qkThreadBasis, qkCurrDim);
+    distributeDimensionsToBasis(1, opInfo.getNDims(), qkThreadBasis, qkCurrDim);
+    // Distribute N on PV basis and K1 on nothing.
+    pvRemainingThreads = distributeDimensionsToBasis(
+        pvRemainingThreads, opInfo.getNDims(), pvThreadBasis, pvCurrDim);
+    distributeDimensionsToBasis(1, opInfo.getK1Dims(), pvThreadBasis,
+                                pvCurrDim);
   }
 
   // Do not distribute on subgroups for now.
@@ -1105,11 +1122,28 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   //                                                  parallelDims,
   //                                                  subgroupBasis);
 
+  LDBG("QK Basis");
   LDBG("Thread Basis");
   LLVM_DEBUG({
-    llvm::interleaveComma(threadBasis.counts, llvm::dbgs());
+    llvm::interleaveComma(qkThreadBasis.counts, llvm::dbgs());
     llvm::dbgs() << "\n";
-    llvm::interleaveComma(threadBasis.mapping, llvm::dbgs());
+    llvm::interleaveComma(qkThreadBasis.mapping, llvm::dbgs());
+    llvm::dbgs() << "\n";
+  });
+  LDBG("Subgroup Basis");
+  LLVM_DEBUG({
+    llvm::interleaveComma(subgroupBasis.counts, llvm::dbgs());
+    llvm::dbgs() << "\n";
+    llvm::interleaveComma(subgroupBasis.mapping, llvm::dbgs());
+    llvm::dbgs() << "\n";
+  });
+
+  LDBG("PV Basis");
+  LDBG("Thread Basis");
+  LLVM_DEBUG({
+    llvm::interleaveComma(pvThreadBasis.counts, llvm::dbgs());
+    llvm::dbgs() << "\n";
+    llvm::interleaveComma(pvThreadBasis.mapping, llvm::dbgs());
     llvm::dbgs() << "\n";
   });
   LDBG("Subgroup Basis");
@@ -1137,7 +1171,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       reductionTileSizes[dim] = 1;
     }
     if (bounds[dim] != 1) {
-      int64_t threadCount = threadBasis.counts[threadBasis.mapping[dim]];
+      int64_t threadCount = qkThreadBasis.counts[qkThreadBasis.mapping[dim]];
       int64_t subgroupCount = subgroupBasis.counts[subgroupBasis.mapping[dim]];
       reductionTileSizes[dim] = threadCount * subgroupCount;
     }
@@ -1166,7 +1200,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   IREE::GPU::setBasis(context, qkConfig, IREE::GPU::TilingLevel::Subgroup,
                       projectBasis(subgroupBasis, opInfo.getNDims()));
   IREE::GPU::setBasis(context, qkConfig, IREE::GPU::TilingLevel::Thread,
-                      projectBasis(threadBasis, opInfo.getNDims()));
+                      projectBasis(qkThreadBasis, opInfo.getNDims()));
 
   SmallVector<int64_t> pvThreadTileSizes;
   for (auto [i, tile] : llvm::enumerate(threadTileSizes)) {
@@ -1180,7 +1214,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   IREE::GPU::setBasis(context, pvConfig, IREE::GPU::TilingLevel::Subgroup,
                       projectBasis(subgroupBasis, opInfo.getK1Dims()));
   IREE::GPU::setBasis(context, pvConfig, IREE::GPU::TilingLevel::Thread,
-                      projectBasis(threadBasis, opInfo.getK1Dims()));
+                      projectBasis(pvThreadBasis, opInfo.getK1Dims()));
 
   SmallVector<NamedAttribute, 2> qkAttrs;
   SmallVector<NamedAttribute, 2> pvAttrs;
