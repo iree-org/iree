@@ -26,6 +26,8 @@ iree_lit_test_suite(
             "config_vector_distribute_reduction_gfx942.mlir",
             "config_user_vector_distribute.mlir",
             "lowering_scalar_dispatch.mlir",
+            "pipeline_elementwise_f8fnuz.mlir",
+            "pipeline_elementwise_f8ocp.mlir",
             "pipeline_igemm_tile_and_fuse.mlir",
             "pipeline_tile_and_fuse.mlir",
             "pipeline_vector_distribute_gfx942.mlir",
@@ -39,5 +41,6 @@ iree_lit_test_suite(
     tools = [
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",
+        "@llvm-project//llvm:not",
     ],
 )
