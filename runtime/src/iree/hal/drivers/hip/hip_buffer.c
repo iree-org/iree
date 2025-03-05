@@ -20,6 +20,7 @@ typedef struct iree_hal_hip_buffer_t {
   iree_hal_hip_buffer_type_t type;
   void* host_ptr;
   hipDeviceptr_t device_ptr;
+  iree_hal_buffer_t* wrapped_buffer;
   iree_hal_buffer_release_callback_t release_callback;
   iree_slim_mutex_t device_ptr_lock;
   iree_notification_t device_ptr_notification;
@@ -71,6 +72,7 @@ iree_status_t iree_hal_hip_buffer_wrap(
     buffer->type = buffer_type;
     buffer->host_ptr = host_ptr;
     buffer->device_ptr = device_ptr;
+    buffer->wrapped_buffer = NULL;
     buffer->release_callback = release_callback;
     buffer->empty = false;
     iree_slim_mutex_initialize(&buffer->device_ptr_lock);
@@ -95,6 +97,9 @@ void iree_hal_hip_buffer_set_device_pointer(iree_hal_buffer_t* base_buffer,
 
 void iree_hal_hip_buffer_set_allocation_empty(iree_hal_buffer_t* base_buffer) {
   iree_hal_hip_buffer_t* buffer = iree_hal_hip_buffer_cast(base_buffer);
+  if (buffer->wrapped_buffer != NULL) {
+    iree_hal_hip_buffer_set_allocation_empty(buffer->wrapped_buffer);
+  }
   iree_slim_mutex_lock(&buffer->device_ptr_lock);
   buffer->empty = true;
   buffer->device_ptr = NULL;
@@ -104,6 +109,9 @@ void iree_hal_hip_buffer_set_allocation_empty(iree_hal_buffer_t* base_buffer) {
 
 static void iree_hal_hip_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   iree_hal_hip_buffer_t* buffer = iree_hal_hip_buffer_cast(base_buffer);
+  if (buffer->wrapped_buffer != NULL) {
+    iree_hal_hip_buffer_destroy(buffer->wrapped_buffer);
+  }
   iree_allocator_t host_allocator = buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
   if (buffer->release_callback.fn) {
@@ -122,6 +130,12 @@ static iree_status_t iree_hal_hip_buffer_map_range(
     iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
     iree_hal_buffer_mapping_t* mapping) {
   iree_hal_hip_buffer_t* buffer = iree_hal_hip_buffer_cast(base_buffer);
+
+  if (buffer->wrapped_buffer != NULL) {
+    return iree_hal_hip_buffer_map_range(buffer->wrapped_buffer, mapping_mode,
+                                         memory_access, local_byte_offset,
+                                         local_byte_length, mapping);
+  }
 
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
       iree_hal_buffer_memory_type(base_buffer),
@@ -186,6 +200,9 @@ static bool iree_hal_hip_buffer_has_device_ptr(void* arg) {
 hipDeviceptr_t iree_hal_hip_buffer_device_pointer(
     iree_hal_buffer_t* base_buffer) {
   iree_hal_hip_buffer_t* buffer = iree_hal_hip_buffer_cast(base_buffer);
+  if (buffer->type == IREE_HAL_HIP_BUFFER_TYPE_WRAPPER) {
+    buffer = iree_hal_hip_buffer_cast(buffer->wrapped_buffer);
+  }
   iree_notification_await(&buffer->device_ptr_notification,
                           iree_hal_hip_buffer_has_device_ptr, buffer,
                           iree_infinite_timeout());
@@ -201,6 +218,19 @@ void* iree_hal_hip_buffer_host_pointer(const iree_hal_buffer_t* base_buffer) {
 void iree_hal_hip_buffer_drop_release_callback(iree_hal_buffer_t* base_buffer) {
   iree_hal_hip_buffer_t* buffer = iree_hal_hip_buffer_cast(base_buffer);
   buffer->release_callback = iree_hal_buffer_release_callback_null();
+}
+
+void iree_hal_hip_buffer_get_wrapped_buffer(iree_hal_buffer_t* base_buffer,
+                                            iree_hal_buffer_t** out_buffer) {
+  IREE_ASSERT_ARGUMENT(out_buffer);
+  iree_hal_hip_buffer_t* buffer = iree_hal_hip_buffer_cast(base_buffer);
+  *out_buffer = buffer->wrapped_buffer;
+}
+
+void iree_hal_hip_buffer_set_wrapped_buffer(iree_hal_buffer_t* base_buffer,
+                                            iree_hal_buffer_t* wrapped_buffer) {
+  iree_hal_hip_buffer_t* buffer = iree_hal_hip_buffer_cast(base_buffer);
+  buffer->wrapped_buffer = wrapped_buffer;
 }
 
 static const iree_hal_buffer_vtable_t iree_hal_hip_buffer_vtable = {
