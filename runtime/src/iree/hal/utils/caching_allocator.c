@@ -795,6 +795,10 @@ static iree_status_t iree_hal_caching_allocator_export_buffer(
                                           out_external_buffer);
 }
 
+bool iree_hal_caching_allocator_isa(iree_hal_allocator_t* base_value) {
+  return iree_hal_resource_is(base_value, &iree_hal_caching_allocator_vtable);
+}
+
 static const iree_hal_allocator_vtable_t iree_hal_caching_allocator_vtable = {
     .destroy = iree_hal_caching_allocator_destroy,
     .host_allocator = iree_hal_caching_allocator_host_allocator,

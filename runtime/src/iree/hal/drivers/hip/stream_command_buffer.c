@@ -14,6 +14,7 @@
 #include "iree/hal/utils/collective_batch.h"
 #include "iree/hal/utils/resource_set.h"
 #include "iree/hal/utils/stream_tracing.h"
+#include "iree/hal/utils/wrapped_buffer.h"
 
 typedef struct iree_hal_hip_stream_command_buffer_t {
   iree_hal_command_buffer_t base;
@@ -322,10 +323,15 @@ static iree_status_t iree_hal_hip_stream_command_buffer_fill_buffer(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_stream_command_buffer_flush_collectives(command_buffer));
 
+  iree_hal_buffer_t* target_ref_buffer = target_ref.buffer;
+  if (iree_hal_wrapped_buffer_isa(target_ref.buffer)) {
+    iree_hal_wrapped_buffer_get_wrapped_buffer(target_ref.buffer,
+                                               &target_ref_buffer);
+  }
   hipDeviceptr_t target_device_buffer = iree_hal_hip_buffer_device_pointer(
-      iree_hal_buffer_allocated_buffer(target_ref.buffer));
+      iree_hal_buffer_allocated_buffer(target_ref_buffer));
   iree_device_size_t target_offset =
-      iree_hal_buffer_byte_offset(target_ref.buffer) + target_ref.offset;
+      iree_hal_buffer_byte_offset(target_ref_buffer) + target_ref.offset;
   hipDeviceptr_t dst = (uint8_t*)target_device_buffer + target_offset;
   size_t num_elements = target_ref.length / pattern_length;
   IREE_HAL_STREAM_TRACE_ZONE_BEGIN(command_buffer->tracing_context,
@@ -396,11 +402,16 @@ static iree_status_t iree_hal_hip_stream_command_buffer_update_buffer(
     src = storage;
   }
 
+  iree_hal_buffer_t* target_ref_buffer = target_ref.buffer;
+  if (iree_hal_wrapped_buffer_isa(target_ref.buffer)) {
+    iree_hal_wrapped_buffer_get_wrapped_buffer(target_ref.buffer,
+                                               &target_ref_buffer);
+  }
   // Issue the copy using the scratch memory as the source.
   hipDeviceptr_t target_device_buffer = iree_hal_hip_buffer_device_pointer(
-      iree_hal_buffer_allocated_buffer(target_ref.buffer));
+      iree_hal_buffer_allocated_buffer(target_ref_buffer));
   hipDeviceptr_t dst = (uint8_t*)target_device_buffer +
-                       iree_hal_buffer_byte_offset(target_ref.buffer) +
+                       iree_hal_buffer_byte_offset(target_ref_buffer) +
                        target_ref.offset;
   IREE_HAL_STREAM_TRACE_ZONE_BEGIN(command_buffer->tracing_context,
                                    &command_buffer->tracing_event_list,
@@ -431,14 +442,25 @@ static iree_status_t iree_hal_hip_stream_command_buffer_copy_buffer(
                                    &command_buffer->tracing_event_list,
                                    IREE_HAL_STREAM_TRACING_VERBOSITY_FINE);
 
+  iree_hal_buffer_t* target_ref_buffer = target_ref.buffer;
+  if (iree_hal_wrapped_buffer_isa(target_ref.buffer)) {
+    iree_hal_wrapped_buffer_get_wrapped_buffer(target_ref.buffer,
+                                               &target_ref_buffer);
+  }
+  iree_hal_buffer_t* source_ref_buffer = source_ref.buffer;
+  if (iree_hal_wrapped_buffer_isa(source_ref.buffer)) {
+    iree_hal_wrapped_buffer_get_wrapped_buffer(source_ref.buffer,
+                                               &source_ref_buffer);
+  }
+
   hipDeviceptr_t target_device_buffer = iree_hal_hip_buffer_device_pointer(
-      iree_hal_buffer_allocated_buffer(target_ref.buffer));
+      iree_hal_buffer_allocated_buffer(target_ref_buffer));
   iree_device_size_t target_offset =
-      iree_hal_buffer_byte_offset(target_ref.buffer) + target_ref.offset;
+      iree_hal_buffer_byte_offset(target_ref_buffer) + target_ref.offset;
   hipDeviceptr_t source_device_buffer = iree_hal_hip_buffer_device_pointer(
-      iree_hal_buffer_allocated_buffer(source_ref.buffer));
+      iree_hal_buffer_allocated_buffer(source_ref_buffer));
   iree_device_size_t source_offset =
-      iree_hal_buffer_byte_offset(source_ref.buffer) + source_ref.offset;
+      iree_hal_buffer_byte_offset(source_ref_buffer) + source_ref.offset;
   hipDeviceptr_t dst = (uint8_t*)target_device_buffer + target_offset;
   hipDeviceptr_t src = (uint8_t*)source_device_buffer + source_offset;
 
@@ -552,12 +574,17 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
     const iree_hal_buffer_ref_t* binding = &bindings.values[i];
     hipDeviceptr_t device_ptr = NULL;
     if (binding->buffer) {
+      iree_hal_buffer_t* binding_buffer = binding->buffer;
+      if (iree_hal_wrapped_buffer_isa(binding->buffer)) {
+        iree_hal_wrapped_buffer_get_wrapped_buffer(binding->buffer,
+                                                   &binding_buffer);
+      }
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
           z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
-                                           &binding->buffer));
+                                           &binding_buffer));
       hipDeviceptr_t device_buffer = iree_hal_hip_buffer_device_pointer(
-          iree_hal_buffer_allocated_buffer(binding->buffer));
-      iree_device_size_t offset = iree_hal_buffer_byte_offset(binding->buffer);
+          iree_hal_buffer_allocated_buffer(binding_buffer));
+      iree_device_size_t offset = iree_hal_buffer_byte_offset(binding_buffer);
       device_ptr = (uint8_t*)device_buffer + offset + binding->offset;
     }
     payload_ptr[i] = device_ptr;

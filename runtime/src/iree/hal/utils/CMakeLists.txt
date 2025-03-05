@@ -293,4 +293,17 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    wrapped_buffer
+  HDRS
+    "wrapped_buffer.h"
+  SRCS
+    "wrapped_buffer.c"
+  DEPS
+    iree::base
+    iree::hal
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
