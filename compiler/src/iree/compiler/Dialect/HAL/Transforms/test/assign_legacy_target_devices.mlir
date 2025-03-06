@@ -2,6 +2,8 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-hal-assign-legacy-target-devices{targetBackends=vmvx})' %s | FileCheck %s --check-prefix=CHECK --check-prefix=TARGET-1
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-hal-assign-legacy-target-devices{targetBackends=vmvx,vmvx-inline})' %s | FileCheck %s --check-prefix=CHECK --check-prefix=TARGET-2
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-hal-assign-legacy-target-devices{targetBackends=vmvx,vmvx})' %s | FileCheck %s --check-prefix=CHECK --check-prefix=TARGET-EQ
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-hal-assign-legacy-target-devices{target-registry=xyz targetBackends=vmvx,vmvx})' %s | FileCheck %s --check-prefix=CHECK --check-prefix=TARGET-EQ
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-hal-assign-legacy-target-devices{target-registry=global targetBackends=vmvx,vmvx})' %s | FileCheck %s --check-prefix=CHECK --check-prefix=TARGET-EQ
 
 // TARGET-1: #device_target_local = #hal.device.target<"local"
 
