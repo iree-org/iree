@@ -20,7 +20,7 @@ The program runs a matmul on a device targeting zen4 CPU, and the other matmul o
 Note: it's hard to pass flags for the device configs today because MLIR attributes don't really work well in shells with all the #'s and such. In this case, we hardcoded the executable target in the IR for the demo.
 
 ```mlir
-// Zen4 CPU
+// x86 CPU that has `+avx512f` feature.
 #executable_target_embedded_elf_x86_64_with_encoding_layout = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64",
   {cpu = "znver4", cpu_features = "+avx512f",
    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128",
