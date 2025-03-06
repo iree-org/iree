@@ -97,6 +97,35 @@ util.func public @resourceDeallocaAwait(%size: index, %resource: !stream.resourc
 
 // -----
 
+// CHECK-LABEL: @resourceRetain
+util.func private @resourceRetain(%arg0: !stream.resource<transient>, %arg1: index) {
+  // CHECK: hal.buffer.allocation.preserve<%arg0 : !hal.buffer>
+  stream.resource.retain %arg0 : !stream.resource<transient>{%arg1}
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @resourceRelease
+util.func private @resourceRelease(%arg0: !stream.resource<transient>, %arg1: index) -> i1 {
+  // CHECK: %[[WAS_TERMINAL:.+]] = hal.buffer.allocation.discard<%arg0 : !hal.buffer>
+  %was_terminal = stream.resource.release %arg0 : !stream.resource<transient>{%arg1}
+  // CHECK: util.return %[[WAS_TERMINAL]]
+  util.return %was_terminal : i1
+}
+
+// -----
+
+// CHECK-LABEL: @resourceIsTerminal
+util.func private @resourceIsTerminal(%arg0: !stream.resource<transient>, %arg1: index) -> i1 {
+  // CHECK: %[[IS_TERMINAL:.+]] = hal.buffer.allocation.is_terminal<%arg0 : !hal.buffer>
+  %is_terminal = stream.resource.is_terminal %arg0 : !stream.resource<transient>{%arg1}
+  // CHECK: util.return %[[IS_TERMINAL]]
+  util.return %is_terminal : i1
+}
+
+// -----
+
 // CHECK-LABEL: @resourceSize
 util.func public @resourceSize(%arg0: !stream.resource<transient>) -> index {
   // CHECK: %[[SIZE:.+]] = hal.buffer.length<%arg0 : !hal.buffer> : index
