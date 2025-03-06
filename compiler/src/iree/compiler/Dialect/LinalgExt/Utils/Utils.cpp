@@ -445,6 +445,7 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   auto outputShape = outputType.getShape();
   auto indexingMaps = linalgOp.getIndexingMapsArray();
   auto filterMap = indexingMaps[1];
+  auto outputMap = indexingMaps[2];
 
   SmallVector<int64_t> reductionDims;
   for (auto iter : llvm::enumerate(linalgOp.getIteratorTypesArray())) {
@@ -452,13 +453,32 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
       reductionDims.push_back(iter.index());
     }
   }
+
+  bool isOutputChannelFirst = false;
+  auto outputChannelPos = convDims.outputChannel;
+  auto outputImagePos = convDims.outputImage;
+
+  std::optional<int64_t> outputChannelLastDim = outputMap.getResultPosition(
+      getAffineDimExpr(outputChannelPos.back(), outputMap.getContext()));
+  std::optional<int64_t> outputImageFirstDim = outputMap.getResultPosition(
+      getAffineDimExpr(outputImagePos[0], outputMap.getContext()));
+  if (!outputImageFirstDim || !outputChannelLastDim) {
+    LDBG("output image or output channel dim not found in output.");
+    return failure();
+  }
+  if (outputChannelLastDim.value() < outputImageFirstDim.value())
+    isOutputChannelFirst = true;
+
   SmallVector<int64_t> filterkPos;
   for (auto reductionDim : reductionDims) {
     std::optional<int64_t> maybeDim = filterMap.getResultPosition(
         getAffineDimExpr(reductionDim, filterMap.getContext()));
     filterkPos.push_back(maybeDim.value());
   }
-  // group together adjacent reduction dimensions in the filter
+  // group together adjacent reduction dimensions in the filter.
+  // First we want to sort the dims as the look up from the filterMap
+  // can place the dims in arbitarty order.
+  std::sort(filterkPos.begin(), filterkPos.end());
   SmallVector<ReassociationIndices> collapsedFilterReductionDim;
   int64_t prevFilterIndex = filterkPos[0];
   int64_t currCollapsedIndex = 0;
@@ -526,12 +546,6 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
       SmallVector<AffineExpr>(dims.begin(), dims.begin() + numParallelDims),
       ctx);
 
-  bool isOutputChannelFirst = false;
-  auto outputChannelPos = convDims.outputChannel;
-  auto outputImagePos = convDims.outputImage;
-  if (outputChannelPos.back() < outputImagePos[0])
-    isOutputChannelFirst = true;
-
   // prepare the input map.
   SmallVector<AffineExpr> inputDims;
   // Add the batch dimensions.
@@ -579,7 +593,6 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   SmallVector<int64_t> igemmLoopBounds;
   igemmLoopBounds.insert(igemmLoopBounds.end(), outputShape.begin(),
                          outputShape.begin() + numParallelDims);
-
   SmallVector<utils::IteratorType> igemmLoopIterators(outputShape.size(),
                                                       parallel);
 
@@ -594,7 +607,6 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   igemmDetails.isOutputChannelFirst = isOutputChannelFirst;
   igemmDetails.convDims = convDims;
   igemmDetails.igemmLoopIterators = igemmLoopIterators;
-
   return igemmDetails;
 }
 

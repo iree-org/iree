@@ -32,7 +32,7 @@ splitReduction(RewriterBase &rewriter, LinalgExt::TopkOp topkOp,
 /// op and reshapes on the inputs.
 /// TODO(Max191): Maybe move to transforms and use a funcOp walk instead of a
 ///               rewrite pattern for this.
-void populateConv2DToIm2colOpPatterns(
+void populateConvToIm2colOpPatterns(
     RewritePatternSet &patterns,
     std::optional<std::function<bool(Operation *)>> controlFn = std::nullopt);
 
