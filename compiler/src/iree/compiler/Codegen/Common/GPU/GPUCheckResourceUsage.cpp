@@ -24,8 +24,9 @@ static unsigned getDatalayoutIndexBitwidth(mlir::FunctionOpInterface func) {
   return options.getIndexBitwidth();
 }
 
+template <typename AllocTy>
 static int shapedTypeStaticSize(
-    memref::AllocOp allocOp, ShapedType shapedType,
+    AllocTy allocOp, ShapedType shapedType,
     std::function<unsigned(mlir::FunctionOpInterface)> getIndexBitwidth) {
   int allocSize = 1;
   for (auto dimSize : shapedType.getShape()) {
@@ -39,12 +40,36 @@ static int shapedTypeStaticSize(
   } else {
     auto eltTy = shapedType.getElementType();
     if (eltTy.isIndex()) {
-      auto func = allocOp->getParentOfType<mlir::FunctionOpInterface>();
+      auto func =
+          allocOp->template getParentOfType<mlir::FunctionOpInterface>();
       assert(getIndexBitwidth &&
              "getIndexBitwidth should have been set earlier");
       allocSize *= getIndexBitwidth(func);
     } else
       allocSize *= IREE::Util::getTypeBitWidth(shapedType.getElementType());
+  }
+  return allocSize;
+}
+
+template <typename AllocTy>
+static FailureOr<int64_t> getAllocSize(
+    AllocTy allocOp,
+    std::function<unsigned(mlir::FunctionOpInterface)> getIndexBitwidth) {
+  auto allocType = llvm::cast<MemRefType>(allocOp.getType());
+  if (!hasSharedMemoryAddressSpace(allocType)) {
+    return 0;
+  }
+
+  if (!allocOp.getDynamicSizes().empty()) {
+    return allocOp.emitOpError(
+        "has unsupported dynamic shared memory allocations");
+  }
+
+  int allocSize = shapedTypeStaticSize(allocOp, allocType, getIndexBitwidth);
+  if (allocOp.getAlignment()) {
+    int64_t alignmentInBits = *allocOp.getAlignment() * 8;
+    allocSize =
+        (llvm::divideCeil(allocSize, alignmentInBits) * alignmentInBits);
   }
   return allocSize;
 }
@@ -57,29 +82,24 @@ static LogicalResult checkGPUAllocationSize(
   if (funcOp.getFunctionBody().empty())
     return success();
 
-  SmallVector<memref::AllocOp> allocOps;
+  SmallVector<Operation *> allocOps;
   funcOp.walk([&](memref::AllocOp allocOp) { allocOps.push_back(allocOp); });
+  funcOp.walk([&](memref::AllocaOp allocOp) { allocOps.push_back(allocOp); });
   if (allocOps.empty())
     return success();
 
   int cumSize = 0;
-  for (auto allocOp : allocOps) {
-    auto allocType = llvm::cast<MemRefType>(allocOp.getType());
-    if (!hasSharedMemoryAddressSpace(allocType))
-      continue;
-
-    if (!allocOp.getDynamicSizes().empty()) {
-      return allocOp.emitOpError(
-          "has unsupported dynamic shared memory allocations");
+  for (auto op : allocOps) {
+    FailureOr<int64_t> allocSize = failure();
+    if (auto allocOp = dyn_cast<memref::AllocOp>(op)) {
+      allocSize = getAllocSize(allocOp, getIndexBitwidth);
+    } else if (auto allocOp = dyn_cast<memref::AllocaOp>(op)) {
+      allocSize = getAllocSize(allocOp, getIndexBitwidth);
     }
-
-    int allocSize = shapedTypeStaticSize(allocOp, allocType, getIndexBitwidth);
-    if (allocOp.getAlignment()) {
-      int64_t alignmentInBits = *allocOp.getAlignment() * 8;
-      allocSize =
-          (llvm::divideCeil(allocSize, alignmentInBits) * alignmentInBits);
+    if (failed(allocSize)) {
+      return failure();
     }
-    cumSize += allocSize / 8;
+    cumSize += allocSize.value() / 8;
   }
   if (cumSize > limit) {
     return funcOp.emitOpError("uses ")

@@ -363,7 +363,8 @@ void addBarrier(mlir::FunctionOpInterface funcOp, Operation *alloc,
         needBarrier = true;
         break;
       }
-      if (isa<memref::AllocOp>(&op) && !llvm::is_contained(aliasGroup, &op)) {
+      if (isa<memref::AllocOp, memref::AllocaOp>(&op) &&
+          !llvm::is_contained(aliasGroup, &op)) {
         needBarrier = true;
         break;
       }
@@ -387,6 +388,11 @@ void packSharedMemoryAlloc(mlir::FunctionOpInterface funcOp) {
   DominanceInfo dominators(funcOp);
   SmallVector<Operation *> allocs;
   funcOp.walk([&](memref::AllocOp alloc) {
+    if (hasSharedMemoryAddressSpace(alloc.getType())) {
+      allocs.push_back(alloc);
+    }
+  });
+  funcOp.walk([&](memref::AllocaOp alloc) {
     if (hasSharedMemoryAddressSpace(alloc.getType())) {
       allocs.push_back(alloc);
     }
