@@ -261,6 +261,103 @@ def Stream_ResourceDeallocaOp : Stream_Op<"resource.dealloca", [
   let hasCanonicalizer = 1;
 }
 
+def Stream_ResourceRetainOp : Stream_Op<"resource.retain", [
+  Stream_CmdPhaseOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{retains ownership of the resource}];
+  let description = [{
+    Retains ownership of the resource for the parent code until a corresponding
+    `stream.resource.release` is used to release the ownership claim. A
+    particular resource may have multiple owners at any given time indicating
+    that multiple parts of the program are sharing responsibility for
+    deallocating the resource.
+
+    This is primarily only relevant for resources allocated asynchronously and
+    that need `stream.resource.dealloca` operations scheduled on timelines.
+    Synchronously allocated resources have their lifetimes tied directly to
+    their reference-type and do not need additional ownership management.
+  }];
+
+  let arguments = (ins
+    Stream_AnyResource:$operand,
+    Stream_Size:$operand_size
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand) `{` $operand_size `}`
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getOperandSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+}
+
+def Stream_ResourceReleaseOp : Stream_Op<"resource.release", [
+  Stream_CmdPhaseOp,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{releases an ownership claim on the resource}];
+  let description = [{
+    A resource is allowed to be deallocated or reused once the last owner
+    releases their ownership. Returns a boolean indicating whether the owner
+    releasing their claim was the last owner (equivalent to having used
+    `stream.resource.is_terminal`).
+  }];
+
+  let arguments = (ins
+    Stream_AnyResource:$operand,
+    Stream_Size:$operand_size
+  );
+  let results = (outs
+    I1:$result
+  );
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand) `{` $operand_size `}`
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getOperandSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+}
+
+def Stream_ResourceIsTerminalOp : Stream_Op<"resource.is_terminal", [
+  Stream_CmdPhaseOp,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{returns true if the resource has no other claims to ownership}];
+  let description = [{
+    Resources may have multiple conceptual owners and are generally only safe to
+    deallocate if the code performing the deallocation is the last owner. This
+    op can be used to see if the current owner is the last one claiming
+    ownership and can deallocate or reuse the resource for other purposes.
+  }];
+
+  let arguments = (ins
+    Stream_AnyResource:$operand,
+    Stream_Size:$operand_size
+  );
+  let results = (outs
+    I1:$result
+  );
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand) `{` $operand_size `}`
+  }];
+
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getOperandSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+}
+
 def Stream_ResourceSizeOp : Stream_PureOp<"resource.size", [
   Util_SizeAwareOp,
 ]> {
