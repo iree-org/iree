@@ -31,6 +31,33 @@ util.func private @resourceDealloca(%arg0: index, %arg1: !stream.resource<stagin
 
 // -----
 
+// CHECK-LABEL: @resourceRetain
+util.func private @resourceRetain(%arg0: !stream.resource<*>, %arg1: index) {
+  // CHECK: stream.resource.retain %arg0 : !stream.resource<*>{%arg1}
+  stream.resource.retain %arg0 : !stream.resource<*>{%arg1}
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @resourceRelease
+util.func private @resourceRelease(%arg0: !stream.resource<*>, %arg1: index) -> i1 {
+  // CHECK: = stream.resource.release %arg0 : !stream.resource<*>{%arg1}
+  %0 = stream.resource.release %arg0 : !stream.resource<*>{%arg1}
+  util.return %0 : i1
+}
+
+// -----
+
+// CHECK-LABEL: @resourceIsTerminal
+util.func private @resourceIsTerminal(%arg0: !stream.resource<*>, %arg1: index) -> i1 {
+  // CHECK: = stream.resource.is_terminal %arg0 : !stream.resource<*>{%arg1}
+  %0 = stream.resource.is_terminal %arg0 : !stream.resource<*>{%arg1}
+  util.return %0 : i1
+}
+
+// -----
+
 // CHECK-LABEL: @resourceSize
 util.func private @resourceSize(%arg0: !stream.resource<*>) -> index {
   // CHECK: = stream.resource.size %arg0 : !stream.resource<*>
