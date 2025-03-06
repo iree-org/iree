@@ -27,8 +27,8 @@ iree_cc_library(
     "Passes.h.inc"
     "Transforms.h"
   SRCS
-    "ConvertConv2DToIm2ColOp.cpp"
     "ConvertConv2DToWinograd.cpp"
+    "ConvertConvToIm2ColOp.cpp"
     "ConvertToLoops.cpp"
     "DecomposeAttention.cpp"
     "DecomposeIm2col.cpp"
