@@ -464,8 +464,8 @@ isFusableWithConsumer(OpOperand &fusedOperand,
         .Case<linalg::LinalgOp>([&](auto linalgOp) {
           auto producerIndexingMap = linalgOp.getIndexingMapMatchingResult(
               llvm::cast<OpResult>(fusedOperand.get()));
-          // Make sure the producer op has an identitiy result indexing map. As
-          // CPU backend currently can't handle tranpose between fused ops.
+          // Make sure the producer op has an identity result indexing map. As
+          // CPU backend currently can't handle transpose between fused ops.
           return hasCompatibleOuterParallelLoops(
               cast<TilingInterface>(linalgOp.getOperation()),
               producerIndexingMap, rootOuterParallelLoops);
@@ -657,8 +657,8 @@ isFusableWithProducer(OpOperand &operand,
           }
           auto producerIndexingMap = linalgOp.getIndexingMapMatchingResult(
               llvm::cast<OpResult>(operand.get()));
-          // Make sure the producer op has an identitiy result indexing map. As
-          // CPU backend currently can't handle tranpose between fused ops.
+          // Make sure the producer op has an identity result indexing map. As
+          // CPU backend currently can't handle transpose between fused ops.
           return hasCompatibleOuterParallelLoops(
               cast<TilingInterface>(linalgOp.getOperation()),
               producerIndexingMap, rootOuterParallelLoops);

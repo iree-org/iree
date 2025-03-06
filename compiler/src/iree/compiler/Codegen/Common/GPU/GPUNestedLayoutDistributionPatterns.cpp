@@ -241,7 +241,7 @@ static VectorValue getSlicedPermutedMask(PatternRewriter &rewriter,
 }
 
 /// Project a vector based on a provided projection map.
-/// Firstly, this will tranpose the vector in a way sliced out
+/// Firstly, this will transpose the vector in a way sliced out
 /// dims become outermost. Then it performs a vector.extract
 /// remove the dims that are not present in the results of the map.
 /// Note that the implementation is similiar to vector.extract_stride_slice

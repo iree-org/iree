@@ -105,7 +105,7 @@ util.func public @pack_fusion(%arg0 : tensor<?x?xf32>,
 #map1 = affine_map<(d0, d1) -> (d1, d0)>
 #map2 = affine_map<()[s0] -> (s0 ceildiv 8)>
 #map3 = affine_map<()[s0] -> (s0 ceildiv 32)>
-util.func public @tranpose_pack_fusion(%arg0: tensor<?x?xf32>) -> tensor<?x?x8x32xf32> {
+util.func public @transpose_pack_fusion(%arg0: tensor<?x?xf32>) -> tensor<?x?x8x32xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -124,7 +124,7 @@ util.func public @tranpose_pack_fusion(%arg0: tensor<?x?xf32>) -> tensor<?x?x8x3
 }
 // No fusion as the CPU backend currently can't handle fusion with transpose
 // between ops.
-// CHECK-LABEL: util.func public @tranpose_pack_fusion(
+// CHECK-LABEL: util.func public @transpose_pack_fusion(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 //       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
