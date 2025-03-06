@@ -42,8 +42,8 @@ public:
       for (int i : consumedOperands) {
         Operation *defOp = linalgOp->getOperands()[i].getDefiningOp();
         if (isa_and_nonnull<tensor::EmptyOp>(defOp)) {
-          linalgOp.emitOpError(
-              "has an uninitialized operand (produced by a tensor.empty op)");
+          linalgOp.emitOpError("reads uninitialized values from an operand "
+                               "produced by a tensor.empty op");
           return WalkResult::interrupt();
         }
       }
