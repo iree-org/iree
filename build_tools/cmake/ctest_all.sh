@@ -42,6 +42,8 @@ export IREE_NVIDIA_GPU_TESTS_DISABLE="${IREE_NVIDIA_GPU_TESTS_DISABLE:-1}"
 export IREE_NVIDIA_SM80_TESTS_DISABLE="${IREE_NVIDIA_SM80_TESTS_DISABLE:-1}"
 # Respect the user setting, but default to skipping tests that require RDNA3 AMD GPU.
 export IREE_AMD_RDNA3_TESTS_DISABLE="${IREE_AMD_RDNA3_TESTS_DISABLE:-1}"
+# Respect the user setting, but default to skipping tests that require RDNA4 AMD GPU.
+export IREE_AMD_RDNA4_TESTS_DISABLE="${IREE_AMD_RDNA4_TESTS_DISABLE:-1}"
 # Respect the user setting, but default to skipping tests that require more than one device(GPU).
 export IREE_MULTI_DEVICE_TESTS_DISABLE="${IREE_MULTI_DEVICE_TESTS_DISABLE:-1}"
 # Respect the user setting, default to no --repeat-until-fail.
@@ -96,6 +98,9 @@ if (( IREE_NVIDIA_SM80_TESTS_DISABLE == 1 )); then
 fi
 if (( IREE_AMD_RDNA3_TESTS_DISABLE == 1 )); then
   label_exclude_args+=("^requires-gpu-rdna3$")
+fi
+if (( IREE_AMD_RDNA4_TESTS_DISABLE == 1 )); then
+  label_exclude_args+=("^requires-gpu-rdna4$")
 fi
 if (( IREE_MULTI_DEVICE_TESTS_DISABLE == 1 )); then
   label_exclude_args+=("^requires-multiple-devices$")

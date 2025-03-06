@@ -18,6 +18,7 @@
 #   * IREE_VULKAN_DISABLE
 #   * IREE_NVIDIA_GPU_TESTS_DISABLE
 #   * IREE_AMD_RDNA3_GPU_TESTS_DISABLE
+#   * IREE_AMD_RDNA4_GPU_TESTS_DISABLE
 #   * IREE_ARM_SME_DISABLE
 #
 # Freeform filters can be appended using:
@@ -57,6 +58,9 @@ fi
 if ! [[ -v IREE_AMD_RDNA3_GPU_TESTS_DISABLE ]]; then
   IREE_AMD_RDNA3_GPU_TESTS_DISABLE=1
 fi
+if ! [[ -v IREE_AMD_RDNA4_GPU_TESTS_DISABLE ]]; then
+  IREE_AMD_RDNA4_GPU_TESTS_DISABLE=1
+fi
 if ! [[ -v IREE_ARM_SME_DISABLE ]]; then
   IREE_ARM_SME_DISABLE=1
 fi
@@ -69,6 +73,7 @@ declare -a test_env_args=(
   --test_env=IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE}"
   --test_env=IREE_NVIDIA_GPU_TESTS_DISABLE="${IREE_NVIDIA_GPU_TESTS_DISABLE}"
   --test_env=IREE_AMD_RDNA3_GPU_TESTS_DISABLE="${IREE_AMD_RDNA3_GPU_TESTS_DISABLE}"
+  --test_env=IREE_AMD_RDNA4_GPU_TESTS_DISABLE="${IREE_AMD_RDNA4_GPU_TESTS_DISABLE}"
 )
 
 if ! [[ -n IREE_LLVM_SYSTEM_LINKER_PATH ]]; then
@@ -99,6 +104,9 @@ if (( IREE_NVIDIA_GPU_TESTS_DISABLE == 1 )); then
 fi
 if (( IREE_AMD_RDNA3_GPU_TESTS_DISABLE == 1 )); then
   default_test_tag_filters+=("-requires-gpu-rdna3")
+fi
+if (( IREE_AMD_RDNA4_GPU_TESTS_DISABLE == 1 )); then
+  default_test_tag_filters+=("-requires-gpu-rdna4")
 fi
 if (( IREE_ARM_SME_DISABLE == 1 )); then
   default_test_tag_filters+=("-requires-arm-sme")
