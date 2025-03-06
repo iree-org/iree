@@ -24,12 +24,13 @@ class UninitializedValueValidationPass final
 public:
   void runOnOperation() override {
     Operation *op = getOperation();
-
-    WalkResult walkResult = op->walk([&](linalg::LinalgOp linalgOp)
-                                         -> WalkResult {
+    op->walk([&](linalg::LinalgOp linalgOp) -> WalkResult {
       Block &body = linalgOp->getRegion(0).front();
       llvm::SmallSet<int, 4> consumedOperands;
       for (Operation &op : body.getOperations()) {
+        if (&op == body.getTerminator()) {
+          continue;
+        }
         for (auto operand : op.getOperands()) {
           for (auto [i, arg] : llvm::enumerate((body.getArguments()))) {
             if (operand == arg) {
@@ -42,17 +43,13 @@ public:
       for (int i : consumedOperands) {
         Operation *defOp = linalgOp->getOperands()[i].getDefiningOp();
         if (isa_and_nonnull<tensor::EmptyOp>(defOp)) {
-          linalgOp.emitOpError("reads uninitialized values from an operand "
-                               "produced by a tensor.empty op");
+          linalgOp->emitWarning("reads uninitialized values from an operand "
+                                "produced by a tensor.empty op");
           return WalkResult::interrupt();
         }
       }
       return WalkResult::advance();
     });
-
-    if (walkResult.wasInterrupted()) {
-      return signalPassFailure();
-    }
   }
 };
 
