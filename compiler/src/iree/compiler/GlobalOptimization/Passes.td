@@ -152,7 +152,7 @@ def DataLayoutPropagationPass : InterfacePass<"iree-global-opt-data-layout-propa
   let summary = "Propagate pack/unpack ops across other ops to improve fusion";
 }
 
-def UninitializedValueValidationPass : InterfacePass<"iree-global-opt-uninitialized-value-validation", "mlir::FunctionOpInterface"> {
+def WarnOnUninitializedValuesPass : InterfacePass<"iree-global-opt-warn-on-uninitialized-values", "mlir::FunctionOpInterface"> {
   let summary = "Catch some uses of uninitialized values";
 }
 

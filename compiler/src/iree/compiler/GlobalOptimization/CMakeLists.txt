@@ -62,7 +62,7 @@ iree_cc_library(
     "RaiseSpecialOps.cpp"
     "RemoveZeroExtentTensors.cpp"
     "SimplifyPackUnpack.cpp"
-    "UninitializedValueValidation.cpp"
+    "WarnOnUninitializedValues.cpp"
     "Utils.cpp"
   DEPS
     ::PassHeaders

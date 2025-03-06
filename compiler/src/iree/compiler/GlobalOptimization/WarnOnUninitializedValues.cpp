@@ -6,45 +6,48 @@
 
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/ADT/SmallSet.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
-#define GEN_PASS_DEF_UNINITIALIZEDVALUEVALIDATIONPASS
+#define GEN_PASS_DEF_WARNONUNINITIALIZEDVALUESPASS
 #include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
 namespace {
 
-class UninitializedValueValidationPass final
-    : public impl::UninitializedValueValidationPassBase<
-          UninitializedValueValidationPass> {
+using OperandsIndicesSet = llvm::SmallSet<int, 8>;
+
+static OperandsIndicesSet getConsumedOperandsIndices(Block &body) {
+  OperandsIndicesSet consumedOperandsIndices;
+  for (auto [i, arg] : llvm::enumerate(body.getArguments())) {
+    for (auto user : arg.getUsers()) {
+      if (user != body.getTerminator()) {
+        consumedOperandsIndices.insert(i);
+      }
+    }
+  }
+  return consumedOperandsIndices;
+}
+
+class WarnOnUninitializedValuesPass final
+    : public impl::WarnOnUninitializedValuesPassBase<
+          WarnOnUninitializedValuesPass> {
 public:
   void runOnOperation() override {
     Operation *op = getOperation();
     op->walk([&](linalg::LinalgOp linalgOp) -> WalkResult {
       Block &body = linalgOp->getRegion(0).front();
-      llvm::SmallSet<int, 4> consumedOperands;
-      for (Operation &op : body.getOperations()) {
-        if (&op == body.getTerminator()) {
-          continue;
-        }
-        for (auto operand : op.getOperands()) {
-          for (auto [i, arg] : llvm::enumerate((body.getArguments()))) {
-            if (operand == arg) {
-              consumedOperands.insert(i);
-              break;
-            }
-          }
-        }
-      }
-      for (int i : consumedOperands) {
+      OperandsIndicesSet consumedOperandsIndices =
+          getConsumedOperandsIndices(body);
+      for (int i : consumedOperandsIndices) {
         Operation *defOp = linalgOp->getOperands()[i].getDefiningOp();
         if (isa_and_nonnull<tensor::EmptyOp>(defOp)) {
-          linalgOp->emitWarning("reads uninitialized values from an operand "
-                                "produced by a tensor.empty op");
+          linalgOp->emitWarning(
+              "reads uninitialized values from an operand "
+              "produced by a tensor.empty op. To disable this warning, pass "
+              "--iree-global-opt-enable-warn-on-uninitialized-values=false .");
           return WalkResult::interrupt();
         }
       }

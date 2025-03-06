@@ -1,4 +1,4 @@
-// RUN: iree-opt --verify-diagnostics --pass-pipeline="builtin.module(util.func(iree-global-opt-uninitialized-value-validation))" %s
+// RUN: iree-opt --verify-diagnostics --pass-pipeline="builtin.module(util.func(iree-global-opt-warn-on-uninitialized-values))" %s
 
 // Common error: forgetting to fill the input accumulator of a matmul.
 util.func @matmul_uninitialized_accumulator(%input : tensor<128x128xf32>) -> (tensor<128x128xf32>) {
