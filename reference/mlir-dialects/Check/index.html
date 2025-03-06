@@ -3891,13 +3891,20 @@ check.expect_all_true(%arg1) : tensor&lt;2x2xi32&gt;
 <p><em>Checks that the operands are almost equal</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `check.expect_almost_eq` (`` `&lt;` $device^ `&gt;`)?
-              `` `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
+              `` `(` $lhs `,` $rhs `` custom&lt;OptionalFloatTolerance&gt;($tolerance) `)`
+              attr-dict `:` type($lhs)
 </code></pre></div>
 <p>Verifies that the buffer view or tensor operands with float elements are
 almost equal to within an implementation-defined "reasonable" tolerance.</p>
 <p>Issues a non-fatal failure if the verification fails.</p>
 <div class="highlight"><pre><span></span><code>check.expect_almost_eq(%arg0, %arg1) : tensor&lt;5xf32&gt;
 </code></pre></div>
+<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>tolerance</code></td><td>::mlir::FloatAttr</td><td>32-bit float attribute</td></tr>
+</table>
+
 <h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -3925,7 +3932,8 @@ almost equal to within an implementation-defined "reasonable" tolerance.</p>
 <p><em>Checks that the tensor operand is almost equal to some constant</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `check.expect_almost_eq_const` (`` `&lt;` $device^ `&gt;`)?
-              `` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)
+              `` `(` $lhs `,` $value `` custom&lt;OptionalFloatTolerance&gt;($tolerance) `)`
+              attr-dict `:` type($lhs)
 </code></pre></div>
 <p>Verifies that the tensor operand with float elements is almost equal to the
 constant attribute within an implementation-defined "reasonable" tolerance.</p>
@@ -3933,10 +3941,11 @@ constant attribute within an implementation-defined "reasonable" tolerance.</p>
 <p>This op is just a convenience wrapper around the expect_almost_eq op.</p>
 <div class="highlight"><pre><span></span><code>check.expect_almost_eq_const(%const0, dense&lt;[0.999999, 2.0]&gt; : tensor&lt;5xf32&gt;) : tensor&lt;5xf32&gt;
 </code></pre></div>
-<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
+<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>value</code></td><td>::mlir::ElementsAttr</td><td>constant vector/tensor attribute</td></tr>
+<tr><td><code>tolerance</code></td><td>::mlir::FloatAttr</td><td>32-bit float attribute</td></tr>
 </table>
 
 <h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
@@ -4002,7 +4011,7 @@ constant attribute within an implementation-defined "reasonable" tolerance.</p>
 <p>This op is just a convenience wrapper around the expect_eq op.</p>
 <div class="highlight"><pre><span></span><code>check.expect_eq_const(%arg0, dense&lt;[1, 2]&gt; : tensor&lt;2xi32&gt;) : tensor&lt;2xi32&gt;
 </code></pre></div>
-<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
+<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>value</code></td><td>::mlir::ElementsAttr</td><td>constant vector/tensor attribute</td></tr>
