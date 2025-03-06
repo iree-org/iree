@@ -66,3 +66,40 @@ module @iree_default_tuning_spec attributes { iree_codegen.tuning_spec_with_defa
     return
   }
 }
+
+// -----
+
+module @iree_default_tuning_spec attributes { iree_codegen.tuning_spec_with_default_entrypoint } {
+  // expected-error @+1{{The named sequence '__kernel_config' must have the attribute 'iree_codegen.tuning_spec_entrypoint'}}
+  transform.named_sequence @__kernel_config(%arg0: !transform.any_op {transform.consumed})
+      -> (!transform.any_op) {
+      transform.yield %arg0 : !transform.any_op
+  }
+}
+
+// -----
+
+module @iree_default_tuning_spec attributes { iree_codegen.tuning_spec_with_default_entrypoint } {
+  transform.named_sequence @match_a(%arg: !transform.any_op {transform.readonly}) -> (!transform.any_op) {
+      transform.yield %arg : !transform.any_op
+  }
+
+  transform.named_sequence @match_b(%arg: !transform.any_op {transform.readonly}) -> (!transform.any_op) {
+      transform.yield %arg : !transform.any_op
+  }
+
+  transform.named_sequence @apply_op_config(%op: !transform.any_op {transform.readonly}) {
+      transform.yield
+  }
+
+  // expected-error @+1{{The named sequence '__kernel_config' must contain exactly one 'ForeachMatchOp', but found 2}}
+  transform.named_sequence @__kernel_config(%arg0: !transform.any_op {transform.consumed})
+      -> (!transform.any_op) attributes { iree_codegen.tuning_spec_entrypoint } {
+
+      %res_a = transform.foreach_match in %arg0 @match_a -> @apply_op_config
+        : (!transform.any_op) -> (!transform.any_op)
+      %res_b = transform.foreach_match in %res_a @match_b -> @apply_op_config
+        : (!transform.any_op) -> (!transform.any_op)
+      transform.yield %res_b : !transform.any_op
+  }
+}

@@ -72,14 +72,39 @@ IREECodegenDialect::verifyOperationAttribute(Operation *op,
 
   if (symbol == kTuningSpecDefaultEntrypointAttrName) {
     if (auto moduleOp = dyn_cast<ModuleOp>(op)) {
-      if (!llvm::any_of(moduleOp.getOps<transform::NamedSequenceOp>(),
+      auto kernelConfigOpIt =
+          llvm::find_if(moduleOp.getOps<transform::NamedSequenceOp>(),
                         [](transform::NamedSequenceOp op) {
                           return op.getName() == kKernelConfigSpecName;
-                        })) {
+                        });
+
+      if (kernelConfigOpIt ==
+          moduleOp.getOps<transform::NamedSequenceOp>().end()) {
         return moduleOp.emitError()
-               << "The tuning specification must include a named "
-                  "sequence with the symbol name '"
+               << "The tuning specification must include a named sequence with "
+                  "the symbol name '"
                << kKernelConfigSpecName << "'.";
+      }
+
+      transform::NamedSequenceOp kernelConfigOp = *kernelConfigOpIt;
+
+      // Verify that the kernelConfigOp has the attribute
+      // `iree_codegen.tuning_spec_entrypoint`.
+      if (!kernelConfigOp->hasAttr(kTuningSpecEntrypointAttrName)) {
+        return kernelConfigOp.emitError()
+               << "The named sequence '" << kKernelConfigSpecName
+               << "' must have the attribute '" << kTuningSpecEntrypointAttrName
+               << "'.";
+      }
+
+      // Ensure there is exactly one ForeachMatchOp inside the kernelConfigOp.
+      auto foreachMatchOps =
+          llvm::to_vector(kernelConfigOp.getOps<transform::ForeachMatchOp>());
+      if (foreachMatchOps.size() != 1) {
+        return kernelConfigOp.emitError()
+               << "The named sequence '" << kKernelConfigSpecName
+               << "' must contain exactly one 'ForeachMatchOp', but found "
+               << foreachMatchOps.size() << ".";
       }
     }
   }
