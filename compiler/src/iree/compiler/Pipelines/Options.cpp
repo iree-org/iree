@@ -21,12 +21,16 @@ void GlobalPipelineOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category(
       "IREE global pipeline options controlling the entire compilation flow.");
 
-  binder.opt<llvm::OptimizationLevel>(
-      "iree-opt-level", optLevel,
+  binder.topLevelOpt(
+      globalOptFlag, optLevel,
       llvm::cl::desc("Global optimization level to apply to the entire "
                      "compilation flow."),
       llvm::cl::cat(category));
 }
+
+// FIX!!! This is a WAR for the fact that no other options may be initialized
+// before this one because they must append to it.
+static auto &_ = OptionsFromFlags<GlobalPipelineOptions>::get();
 
 void BindingOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category(
@@ -138,7 +142,7 @@ void GlobalOptimizationOptions::applyOptimization(
 void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category(
       "IREE options for controlling global optimizations.");
-  binder.optimizationLevel(
+  auto init_at_opt = binder.optimizationLevel(
       "iree-global-optimization-opt-level", optLevel,
       llvm::cl::desc("Optimization level for the this pipeline"),
       llvm::cl::cat(category));

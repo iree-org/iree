@@ -25,16 +25,17 @@ inline raw_ostream &operator<<(raw_ostream &os,
 
 namespace mlir::iree_compiler {
 
-struct opt_initializer_base {
-  virtual ~opt_initializer_base() = default;
-};
+constexpr llvm::StringRef globalOptFlag = "iree-opt-level";
 
 template <typename Ty>
-struct opt_initializer : opt_initializer_base {
+struct opt_initializer {
+  llvm::StringRef parentName;
   Ty init;
   llvm::OptimizationLevel optLevel;
-  opt_initializer(const llvm::OptimizationLevel opt, const Ty &val)
-      : init(val), optLevel(opt) {}
+
+  opt_initializer(llvm::StringRef parentName, const llvm::OptimizationLevel opt,
+                  const Ty &val)
+      : parentName(parentName), init(val), optLevel(opt) {}
   void apply(const llvm::OptimizationLevel inLevel, Ty &val) const {
     assert(inLevel.getSizeLevel() == 0 && "size level not implemented");
     if (inLevel.getSpeedupLevel() >= optLevel.getSpeedupLevel())
@@ -62,13 +63,14 @@ private:
   }
 };
 
-/// Initialize the value of a variable if the optimization level is at least
-/// the specified level.
-template <typename Ty>
-opt_initializer<Ty> init_at_opt(llvm::OptimizationLevel optLevel,
-                                const Ty &val) {
-  return opt_initializer<Ty>(optLevel, val);
-}
+struct opt_scope {
+  llvm::StringRef name;
+
+  template <typename T>
+  opt_initializer<T> operator()(llvm::OptimizationLevel optLevel, T init) {
+    return opt_initializer<T>(name, optLevel, init);
+  }
+};
 
 // Base class that can bind named options to fields of structs.
 //
@@ -97,21 +99,8 @@ public:
     return OptionsBinder(std::make_unique<llvm::cl::SubCommand>());
   }
 
-  void setApplyOptimizations(llvm::OptimizationLevel opt) {
-    currOptLevel = opt;
-    onlyApplyOptimizations = true;
-  }
-  void unsetApplyOptimizations() { onlyApplyOptimizations = false; }
-
-  template <
-      typename T, typename V, typename... Mods,
-      std::enable_if_t<
-          !(std::is_same_v<std::decay_t<Mods>, opt_initializer<T>> || ...),
-          int> = 0>
+  template <typename T, typename V, typename... Mods>
   void opt(llvm::StringRef name, V &value, Mods... Ms) {
-    if (onlyApplyOptimizations) {
-      return;
-    }
     auto [changedCallback, clCallback] = makeChangedCallback<V>();
     if (!scope) {
       // Bind global options.
@@ -148,36 +137,67 @@ public:
                                opt_initializer<T> &rhs) {
       return lhs.optLevel.getSpeedupLevel() < rhs.optLevel.getSpeedupLevel();
     });
-    if (onlyApplyOptimizations) {
-      if (isFlagSet(name)) {
-        return;
-      }
-      for (const auto &init : initsSorted) {
-        init.apply(currOptLevel, value);
-      }
-      return;
-    }
+
     llvm::cl::desc &desc = filterDescription(Ms...);
     auto descStr = std::make_unique<std::string>(desc.Desc);
     for (auto &init : initsSorted) {
       init.appendToDesc(*descStr);
     }
     desc.Desc = descStr->c_str();
+
     opt<V>(name, value, Ms...);
     OptionInfo &info = getOptionsStorage()[name];
     info.extendedDesc = std::move(descStr);
+
+    auto sharedValue = std::make_shared<V>();
+    llvm::StringRef parentName = inits.begin()->parentName;
+
+    auto changedCallback = info.isChanged;
+
+    assert(getOptionsStorage().count(parentName) && "Parent option not found");
+    auto &parentInfo = getOptionsStorage()[parentName];
+    auto optDef = std::make_unique<OptOverride<T>>(
+        value, std::move(initsSorted), info.isChanged);
+    parentInfo.optOverrides->children.push_back(optDef.get());
+    info.optOverrides = std::move(optDef);
   }
 
-  // Sets the optimization level for the current scope.
   template <typename... Mods>
-  void optimizationLevel(llvm::StringRef name, llvm::OptimizationLevel &value,
-                         Mods... Ms) {
-    if (onlyApplyOptimizations) {
-      overrideDefault(name, value, currOptLevel);
-      currOptLevel = value;
-      return;
-    }
+  void topLevelOpt(llvm::StringRef name, llvm::OptimizationLevel &value,
+                   Mods... Ms) {
+    assert(name == globalOptFlag);
+    assert(getOptionsStorage().find(name) == getOptionsStorage().end() &&
+           "Option already exists");
     opt<llvm::OptimizationLevel>(name, value, Ms...);
+    auto &info = getOptionsStorage()[name];
+    info.optOverrides =
+        std::make_unique<ScopedOptOverride>(value, info.isChanged);
+  }
+
+  void applyOptimizationDefaults(llvm::OptimizationLevel opt) {
+    // Recursively applies overrides.
+    getOptionsStorage()[globalOptFlag].optOverrides->backupAndApplyOpt(opt);
+  }
+
+  void restoreOptimizationDefaults() {
+    for (auto &[_, info] : getOptionsStorage()) {
+      if (info.optOverrides)
+        info.optOverrides->restoreBackup();
+    }
+  }
+
+  template <typename... Mods>
+  opt_scope optimizationLevel(llvm::StringRef name,
+                              llvm::OptimizationLevel &value, Mods... Ms) {
+    assert(getOptionsStorage().find(name) == getOptionsStorage().end() &&
+           "Option already exists");
+    opt<llvm::OptimizationLevel>(name, value, Ms...);
+    auto &info = getOptionsStorage()[name];
+    auto optDef = std::make_unique<ScopedOptOverride>(value, info.isChanged);
+    getOptionsStorage()[globalOptFlag].optOverrides->children.push_back(
+        optDef.get());
+    info.optOverrides = std::move(optDef);
+    return opt_scope{name};
   }
 
   bool isFlagSet(llvm::StringRef name) const {
@@ -197,9 +217,6 @@ public:
 
   template <typename T, typename V, typename... Mods>
   void list(llvm::StringRef name, V &value, Mods... Ms) {
-    if (onlyApplyOptimizations) {
-      return;
-    }
     if (!scope) {
       // Bind global options.
       auto list =
@@ -242,6 +259,63 @@ public:
   llvm::SmallVector<std::string> printArguments(bool nonDefaultOnly = false);
 
 private:
+  class OptOverrideBase {
+  public:
+    virtual ~OptOverrideBase() = default;
+    virtual void backupAndApplyOpt(llvm::OptimizationLevel opt) = 0;
+    virtual void restoreBackup() = 0;
+
+    llvm::SmallVector<OptOverrideBase *> children;
+  };
+
+  template <typename T>
+  class OptOverride : public OptOverrideBase {
+  public:
+    OptOverride(T &value, llvm::SmallVector<opt_initializer<T>> inits,
+                std::function<bool()> isChanged)
+        : backup(value), value(&value), inits(std::move(inits)),
+          isChanged(std::move(isChanged)) {}
+
+    void backupAndApplyOpt(llvm::OptimizationLevel opt) override {
+      backup = *value;
+      assert(children.empty());
+      if (!isChanged()) {
+        for (auto &init : inits) {
+          init.apply(opt, *value);
+        }
+      }
+    }
+    void restoreBackup() override { *value = backup; }
+
+  private:
+    T backup;
+    T *value;
+    llvm::SmallVector<opt_initializer<T>> inits;
+    std::function<bool()> isChanged;
+  };
+
+  class ScopedOptOverride : public OptOverrideBase {
+  public:
+    ScopedOptOverride(llvm::OptimizationLevel &value,
+                      std::function<bool()> isChanged)
+        : backup(value), value(&value), isChanged(std::move(isChanged)) {}
+    void backupAndApplyOpt(llvm::OptimizationLevel opt) override {
+      backup = *value;
+      if (!isChanged()) {
+        *value = opt;
+      }
+      for (auto &child : children) {
+        child->backupAndApplyOpt(*value);
+      }
+    }
+    void restoreBackup() override { *value = backup; }
+
+  private:
+    llvm::OptimizationLevel backup;
+    llvm::OptimizationLevel *value;
+    std::function<bool()> isChanged;
+  };
+
   struct OptionInfo {
     using PrintCallback = std::function<void(llvm::raw_ostream &)>;
     using ChangedCallback = std::function<bool()>;
@@ -252,6 +326,7 @@ private:
     DefaultCallback isDefault;
 
     // For options with optimization level defaults.
+    std::unique_ptr<OptOverrideBase> optOverrides = nullptr;
     std::unique_ptr<std::string> extendedDesc;
   };
   using OptionsStorage = llvm::DenseMap<llvm::StringRef, OptionInfo>;
@@ -378,9 +453,6 @@ private:
     assert(result && "Expected llvm::cl::desc in args");
     return *result;
   }
-
-  bool onlyApplyOptimizations = false;
-  llvm::OptimizationLevel currOptLevel;
 
   std::unique_ptr<llvm::cl::SubCommand> scope;
   OptionsStorage localOptions;

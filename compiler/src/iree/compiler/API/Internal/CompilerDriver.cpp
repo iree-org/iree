@@ -414,6 +414,9 @@ Session::Session(GlobalInit &globalInit)
 
   // Bootstrap session options from the cl environment, if enabled.
   if (globalInit.usesCommandLine) {
+    auto binder = OptionsBinder::global();
+    binder.applyOptimizationDefaults(
+        globalInit.clGlobalPipelineOptions->optLevel);
     debugConfig = mlir::tracing::DebugConfig::createFromCLOptions();
     pipelineOptions = *globalInit.clGlobalPipelineOptions;
     pluginManagerOptions = *globalInit.clPluginManagerOptions;
@@ -946,16 +949,14 @@ void Invocation::dumpCompilationPhase(IREEVMPipelinePhase phase,
 bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
   auto passManager = createPassManager();
 
-  auto globalBinder = OptionsBinder::global();
-  auto &binder =
-      session.globalInit.usesCommandLine ? globalBinder : session.binder;
-  GlobalOptimizationOptions highLevelOptimizationOptions =
-      session.highLevelOptimizationOptions;
-
-  // Set optimization options on a copy of the sessions options.
-  binder.setApplyOptimizations(session.pipelineOptions.optLevel);
-  auto scope = llvm::make_scope_exit([&] { binder.unsetApplyOptimizations(); });
-  highLevelOptimizationOptions.bindOptions(binder);
+  if (!session.globalInit.usesCommandLine) {
+    session.binder.applyOptimizationDefaults(session.pipelineOptions.optLevel);
+  }
+  auto resetDefaults = llvm::make_scope_exit([&]() {
+    if (!session.globalInit.usesCommandLine) {
+      session.binder.restoreOptimizationDefaults();
+    }
+  });
 
   switch (pipeline) {
   case IREE_COMPILER_PIPELINE_STD: {
@@ -981,7 +982,7 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
 
     buildIREEVMTransformPassPipeline(
         session.targetRegistry, session.bindingOptions, session.inputOptions,
-        session.preprocessingOptions, highLevelOptimizationOptions,
+        session.preprocessingOptions, session.highLevelOptimizationOptions,
         session.schedulingOptions, session.halTargetOptions,
         session.vmTargetOptions, pipelineHooks, *passManager, compileFrom,
         compileTo);
@@ -1014,7 +1015,7 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     }
     buildIREEPrecompileTransformPassPipeline(
         session.targetRegistry, session.bindingOptions, session.inputOptions,
-        session.preprocessingOptions, highLevelOptimizationOptions,
+        session.preprocessingOptions, session.highLevelOptimizationOptions,
         session.schedulingOptions, session.halTargetOptions, pipelineHooks,
         *passManager, compileFrom, compileTo);
     break;
