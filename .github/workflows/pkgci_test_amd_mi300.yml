@@ -21,8 +21,7 @@ jobs:
   test_mi300:
     runs-on: linux-mi300-gpu-1
     container:
-      # TODO(#19955): switch from 'main' to a version hash once the first image is published
-      image: ghcr.io/iree-org/rocm_ubuntu_jammy@main
+      image: ghcr.io/iree-org/rocm_ubuntu_jammy@sha256:54aaf6cb8913a4c33c9504e19c393569e0eb64a8638659992c756a06275bf961
       options: --user root --device=/dev/kfd --device=/dev/dri --ipc=host --group-add video --cap-add=SYS_PTRACE --security-opt seccomp=unconfined
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
