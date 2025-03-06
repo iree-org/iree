@@ -30,8 +30,8 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
-        "ConvertConv2DToIm2ColOp.cpp",
         "ConvertConv2DToWinograd.cpp",
+        "ConvertConvToIm2ColOp.cpp",
         "ConvertToLoops.cpp",
         "DecomposeAttention.cpp",
         "DecomposeIm2col.cpp",
