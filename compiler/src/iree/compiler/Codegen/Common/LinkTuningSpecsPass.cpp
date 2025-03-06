@@ -219,15 +219,8 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
         continue;
       }
 
-      auto foreachOpIter = namedSequenceOp.getOps<transform::ForeachMatchOp>();
-      if (!llvm::hasSingleElement(foreachOpIter)) {
-        module->emitWarning("Expected 1 ForeachMatchOp in '")
-            << kKernelConfigSpecName << "', but found "
-            << std::distance(foreachOpIter.begin(), foreachOpIter.end()) << ".";
-        return failure();
-      }
-
-      transform::ForeachMatchOp foreachMatch = *foreachOpIter.begin();
+      transform::ForeachMatchOp foreachMatch =
+          *namedSequenceOp.getOps<transform::ForeachMatchOp>().begin();
       foreachMatchOps.push_back(foreachMatch);
 
       for (auto matcher : foreachMatch.getMatchers()) {
