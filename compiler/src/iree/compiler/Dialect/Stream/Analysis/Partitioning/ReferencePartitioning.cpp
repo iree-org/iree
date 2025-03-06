@@ -85,8 +85,9 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
     // If we are to make partition with ordinal targetOrdinal to
     // depend on partition with ordinal sourceOrdinal,
     // will this create a circular dependency.
-    if (sourceOrdinal == targetOrdinal)
+    if (sourceOrdinal == targetOrdinal) {
       return false;
+    }
     return builders[sourceOrdinal]->hazards.size() > targetOrdinal &&
            builders[sourceOrdinal]->hazards[targetOrdinal];
   };
@@ -94,14 +95,21 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
   auto canAddOpToPartition = [&](Operation &op, OpInfo &opInfo,
                                  unsigned partitionOrdinal) {
     auto streamableOp = dyn_cast<IREE::Stream::StreamableOpInterface>(op);
-    if (!streamableOp)
+    if (!streamableOp) {
       return false;
+    }
+
+    // Most ops should have affinity at this point. If they do not then we allow
+    // them to be placed anywhere (and whatever performance implications that
+    // has is on the higher layers for not explicitly saying).
     IREE::Stream::AffinityAttr affinityAttr;
-    if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op))
+    if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
       affinityAttr = affinityOp.getAffinityAttr();
+    }
     if (!IREE::Stream::AffinityAttr::canExecuteTogether(
-            affinityAttr, builders[partitionOrdinal]->affinity))
+            affinityAttr, builders[partitionOrdinal]->affinity)) {
       return false;
+    }
 
     bool preferCloneToConsumers = streamableOp.preferCloneToConsumers();
     llvm::BitVector *opHazards = nullptr;
@@ -115,11 +123,13 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
       // it should not produce invalid partitioning.
       opHazards = &opHazardsInCandidatePartition;
       for (auto user : op.getUsers()) {
-        if (builders[partitionOrdinal]->ops.contains(user))
+        if (builders[partitionOrdinal]->ops.contains(user)) {
           opHazardsInCandidatePartition |= opInfos[user].hazards;
+        }
       }
-    } else
+    } else {
       opHazards = &opInfo.hazards;
+    }
 
     for (auto opHazardOrdinal : opHazards->set_bits()) {
       if (partitionOrdinal < opHazardOrdinal) {
@@ -132,8 +142,9 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
       }
       // Check for formation of circular dependency between partitions.
       if (willCreateCircularDependencyBetweenPartitions(opHazardOrdinal,
-                                                        partitionOrdinal))
+                                                        partitionOrdinal)) {
         return false;
+      }
     }
     return true;
   };
@@ -175,8 +186,9 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
       auto streamable =
           dyn_cast_or_null<IREE::Stream::StreamableOpInterface>(producer);
       if (streamable) {
-        if (!syncOps.contains(producer))
+        if (!syncOps.contains(producer)) {
           syncOps[producer] = llvm::SmallVector<Operation *>();
+        }
         syncOps[producer].push_back(&op);
         continue;
       }
@@ -203,8 +215,9 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
     llvm::BitVector consumers(builders.size(), /*t=*/false);
     for (auto user : op.getUsers()) {
       auto userInfoIt = opInfos.find(user);
-      if (userInfoIt == opInfos.end())
+      if (userInfoIt == opInfos.end()) {
         continue;
+      }
       auto &userInfo = userInfoIt->second;
       LLVM_DEBUG({
         llvm::dbgs() << "Testing user:\n";
@@ -225,8 +238,9 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
     for (auto syncOp : syncOps[&op]) {
       for (auto user : syncOp->getUsers()) {
         auto userInfoIt = opInfos.find(user);
-        if (userInfoIt == opInfos.end())
+        if (userInfoIt == opInfos.end()) {
           continue;
+        }
         auto &userInfo = userInfoIt->second;
         opInfo.hazards |= userInfo.membership;
         opInfo.hazards |= userInfo.hazards;
@@ -458,8 +472,9 @@ partitionRegionConcurrencyReference(IREE::Stream::PartitioningConfigAttr config,
     // dependency chain down the use-def chain to a wave.
     for (auto user : op.getUsers()) {
       auto userInfoIt = opInfos.find(user);
-      if (userInfoIt == opInfos.end())
+      if (userInfoIt == opInfos.end()) {
         continue;
+      }
       auto &userInfo = userInfoIt->second;
       LLVM_DEBUG({
         llvm::dbgs() << "Testing user:\n";
@@ -488,18 +503,22 @@ partitionRegionConcurrencyReference(IREE::Stream::PartitioningConfigAttr config,
     // For each resource operand of this op we scan back through previously
     // created waves to see if there are any partitioned ops that have a hazard.
     for (auto operand : op.getOperands()) {
-      if (!isa<IREE::Stream::ResourceType>(operand.getType()))
+      if (!isa<IREE::Stream::ResourceType>(operand.getType())) {
         continue;
+      }
       for (auto user : operand.getUsers()) {
         if (user == &op || user->getBlock() != block ||
-            user->isBeforeInBlock(&op))
+            user->isBeforeInBlock(&op)) {
           continue;
+        }
         auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(user);
-        if (!tiedOp || !tiedOp.hasAnyTiedUses(operand))
+        if (!tiedOp || !tiedOp.hasAnyTiedUses(operand)) {
           continue;
+        }
         auto userInfoIt = opInfos.find(user);
-        if (userInfoIt == opInfos.end())
+        if (userInfoIt == opInfos.end()) {
           continue;
+        }
         auto &userInfo = userInfoIt->second;
         LLVM_DEBUG({
           llvm::dbgs() << "Testing tied user:\n";
