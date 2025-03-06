@@ -58,17 +58,25 @@ IREECodegenDialect::verifyOperationAttribute(Operation *op,
   StringRef symbol = attribute.getName().strref();
   Attribute attr = attribute.getValue();
   // This function verifies the validity of a specific operation attribute.
-  // - If the attribute's name matches `kTuningDefaultSpecAttrName`, make
-  //   sure it contains a single named sequence op with name `__kernel_config`.
+  // - If the attribute's name matches kTuningSpecDefaultEntrypointAttrName
+  // (`iree_codegen.tuning_spec_with_default_entrypoint`):
+  //   1. Ensure that the module contains a single named sequence operation with
+  //   the name `__kernel_config`.
+  //   2. Verify that this `__kernel_config` named sequence operation has the
+  //   attribute `iree_codegen.tuning_spec_entrypoint`.
+  //   3. Ensure that the named sequence operation contains exactly **one**
+  //   `ForeachMatchOp`.
+  //   4. Ensure that only one named sequence operation with the
+  //   `iree_codegen.tuning_spec_entrypoint` attribute.
   // - If the attribute's name matches `kTuningSpecEntrypointAttrName`
-  // ("iree_codegen.tuning_spec_entrypoint"):
+  // (`iree_codegen.tuning_spec_entrypoint`):
   //   1. The attribute value must be a UnitAttr.
   //   2. If the operation is a transform::NamedSequenceOp:
   //      - The operation's function signature must satisfy the following:
-  //         a. It must have exactly one result type, and the result must be of
-  //         type `transform::AnyOpType`.
-  //         b. It must have exactly one argument type, and the argument must be
-  //         of type `transform::AnyOpType`.
+  //         a. It must have exactly one result type, and the result must be
+  //         of type `transform::AnyOpType`. b. It must have exactly one
+  //         argument type, and the argument must be of type
+  //         `transform::AnyOpType`.
 
   if (symbol == kTuningSpecDefaultEntrypointAttrName) {
     if (auto moduleOp = dyn_cast<ModuleOp>(op)) {
@@ -95,6 +103,19 @@ IREECodegenDialect::verifyOperationAttribute(Operation *op,
                << "The named sequence '" << kKernelConfigSpecName
                << "' must have the attribute '" << kTuningSpecEntrypointAttrName
                << "'.";
+      }
+
+      auto tuningSpecOps = llvm::filter_to_vector(
+          moduleOp.getOps<transform::NamedSequenceOp>(),
+          [](transform::NamedSequenceOp op) {
+            return op->hasAttr(kTuningSpecEntrypointAttrName);
+          });
+
+      if (tuningSpecOps.size() != 1) {
+        return moduleOp.emitError()
+               << "Expected exactly one NamedSequenceOp with the attribute '"
+               << kTuningSpecEntrypointAttrName << "', but found "
+               << tuningSpecOps.size() << ".";
       }
 
       // Ensure there is exactly one ForeachMatchOp inside the kernelConfigOp.
