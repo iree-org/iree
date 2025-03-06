@@ -67,6 +67,10 @@ static llvm::cl::opt<int> clPadFactor(
                    "encodings."),
     llvm::cl::init(32));
 
+static llvm::cl::opt<bool> clWarnOnUninitializedValues(
+    "iree-global-opt-enable-warn-on-uninitialized-values",
+    llvm::cl::desc("Warn on some classes of uses of uninitialized values."),
+    llvm::cl::init(true));
 void buildGlobalOptExprHoistingPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
   IREE::Util::ExprHoistingOptions options;
@@ -94,6 +98,11 @@ void buildGlobalOptimizationPassPipeline(
         transformOptions.options.parameterImportMaximumSize;
     mainPassManager.addPass(IREE::IO::Parameters::createImportParametersPass(
         importParametersOptions));
+  }
+
+  if (clWarnOnUninitializedValues) {
+    FunctionLikeNest(mainPassManager)
+        .addPass(createWarnOnUninitializedValuesPass);
   }
 
   // Preprocessing passes to get the program into a canonical state.

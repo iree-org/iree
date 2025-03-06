@@ -6,7 +6,7 @@ func.func @demote() {
   %cst_0 = arith.constant 0.000000e+00 : f64
   %init = tensor.empty() : tensor<1xf64>
   %zeros = linalg.fill ins(%cst_0 : f64) outs(%init : tensor<1xf64>) -> tensor<1xf64>
-  %accum = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["reduction"]} ins(%input : tensor<8388608xf32>) outs(%init : tensor<1xf64>) {
+  %accum = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["reduction"]} ins(%input : tensor<8388608xf32>) outs(%zeros : tensor<1xf64>) {
   ^bb0(%arg1: f32, %arg2: f64):
     %ext = arith.extf %arg1 : f32 to f64
     %add = arith.addf %ext, %arg2 : f64
