@@ -48,7 +48,7 @@ public:
               "reads uninitialized values from an operand "
               "produced by a tensor.empty op. To disable this warning, pass "
               "--iree-global-opt-enable-warn-on-uninitialized-values=false .");
-          return WalkResult::interrupt();
+          return WalkResult::advance();
         }
       }
       return WalkResult::advance();
