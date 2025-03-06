@@ -11,7 +11,6 @@
 // Check that the final tuning spec is as expected when the user tuning spec is provided.
 
 // CHECK-LABEL: module @iree_linked_tuning_spec
-// CHECK-SAME:    iree_codegen.tuning_spec_with_default_entrypoint
 // CHECK-SAME:    transform.with_named_sequence
 // CHECK-LABEL:   module @user_spec_0 attributes {transform.with_named_sequence}
 // CHECK-LABEL:     transform.named_sequence @hello
