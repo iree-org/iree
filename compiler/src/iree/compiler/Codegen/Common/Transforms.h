@@ -73,7 +73,7 @@ struct IREETilingResult {
   SmallVector<OpFoldResult> tileSizes;
 };
 FailureOr<IREETilingResult>
-tileDispatchUsingSCFFopOp(RewriterBase &rewriter, TilingInterface op,
+tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
                           linalg::LinalgTilingOptions options);
 
 /// Populate patterns related to clean up the IR after tile and distribute

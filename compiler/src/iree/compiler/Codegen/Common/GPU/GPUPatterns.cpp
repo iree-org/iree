@@ -132,17 +132,17 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
 
     Value readBroadcast = rewriter.create<vector::BroadcastOp>(
         loc, vectorTypeBroadcast, readCollapse);
-    SmallVector<int64_t> tranposePermutation;
+    SmallVector<int64_t> transposePermutation;
     for (int i = 0; i < vectorType.getRank(); i++) {
       if (i == vectorType.getRank() - 2)
         continue;
-      tranposePermutation.push_back(i);
+      transposePermutation.push_back(i);
     }
-    tranposePermutation.insert(tranposePermutation.begin() +
-                                   indexOfOuterNonUnitDim,
-                               vectorType.getRank() - 2);
+    transposePermutation.insert(transposePermutation.begin() +
+                                    indexOfOuterNonUnitDim,
+                                vectorType.getRank() - 2);
     rewriter.replaceOpWithNewOp<vector::TransposeOp>(
-        transferReadOp, readBroadcast, tranposePermutation);
+        transferReadOp, readBroadcast, transposePermutation);
     return success();
   }
 };

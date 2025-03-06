@@ -184,7 +184,7 @@ getTensorCoreConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes,
                     Type elementType, int64_t M, int64_t N, int64_t K) {
   // Based on early analysis we found that 128x256x32_3 gives acceptable
   // performance across many of the large matrix sizes for f16 and fp32. This
-  // needs to be refined into a better startegy based on empircal data but this
+  // needs to be refined into a better strategy based on empircal data but this
   // gives us a quick solution to achieve performance in the right order of
   // magnitude for large square like cases.
   int64_t parallelDim = M * N;

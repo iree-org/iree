@@ -45,7 +45,7 @@ enum class GPUPromoteSharedMemPattern {
 
 FailureOr<scf::ForOp>
 pipelineSharedMemoryCopy(RewriterBase &rewriter, scf::ForOp forOp,
-                         PipeliningSchedulingStrategy startegy,
+                         PipeliningSchedulingStrategy strategy,
                          bool peelEpilogue, int64_t depth);
 
 /// Tiles Linalg ops in the given `funcOp` along reduction dimensions to serial
