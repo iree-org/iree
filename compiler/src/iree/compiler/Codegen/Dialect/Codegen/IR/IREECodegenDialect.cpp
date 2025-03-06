@@ -74,9 +74,9 @@ IREECodegenDialect::verifyOperationAttribute(Operation *op,
   //   2. If the operation is a transform::NamedSequenceOp:
   //      - The operation's function signature must satisfy the following:
   //         a. It must have exactly one result type, and the result must be
-  //         of type `transform::AnyOpType`. b. It must have exactly one
-  //         argument type, and the argument must be of type
-  //         `transform::AnyOpType`.
+  //         of type `transform::AnyOpType`.
+  //         b. It must have exactly one argument type, and the argument must be
+  //         of type `transform::AnyOpType`.
 
   if (symbol == kTuningSpecDefaultEntrypointAttrName) {
     if (auto moduleOp = dyn_cast<ModuleOp>(op)) {
