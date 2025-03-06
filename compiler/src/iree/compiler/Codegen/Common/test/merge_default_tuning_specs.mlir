@@ -217,6 +217,7 @@ module @test_module_mismatched_restrict_root attributes { transform.with_named_s
 
     transform.named_sequence @__kernel_config(%arg0: !transform.any_op {transform.consumed})
       -> (!transform.any_op) attributes { iree_codegen.tuning_spec_entrypoint } {
+      // expected-warning @+1 {{Mismatched 'restrict_root' attributes across ForeachMatchOps.}}
       %res = transform.foreach_match in %arg0 @match -> @apply_op_config
         : (!transform.any_op) -> (!transform.any_op)
       transform.yield %res : !transform.any_op
@@ -235,7 +236,6 @@ module @test_module_mismatched_restrict_root attributes { transform.with_named_s
 
     transform.named_sequence @__kernel_config(%arg0: !transform.any_op {transform.consumed})
       -> (!transform.any_op) attributes { iree_codegen.tuning_spec_entrypoint } {
-      // expected-warning @+1 {{Mismatched 'restrict_root' attributes across ForeachMatchOps.}}
       %res = transform.foreach_match restrict_root in %arg0 @match -> @apply_op_config
         : (!transform.any_op) -> (!transform.any_op)
       transform.yield %res : !transform.any_op
@@ -265,6 +265,7 @@ module @test_module_mismatched_flatten_results attributes { transform.with_named
 
     transform.named_sequence @__kernel_config(%arg0: !transform.any_op {transform.consumed})
       -> (!transform.any_op) attributes { iree_codegen.tuning_spec_entrypoint } {
+      // expected-warning @+1 {{Mismatched 'flatten_results' attributes across ForeachMatchOps.}}
       %res = transform.foreach_match in %arg0 @match -> @apply_op_config
         : (!transform.any_op) -> (!transform.any_op)
       transform.yield %res : !transform.any_op
@@ -283,7 +284,6 @@ module @test_module_mismatched_flatten_results attributes { transform.with_named
 
     transform.named_sequence @__kernel_config(%arg0: !transform.any_op {transform.consumed})
       -> (!transform.any_op) attributes { iree_codegen.tuning_spec_entrypoint } {
-      // expected-warning @+1 {{Mismatched 'flatten_results' attributes across ForeachMatchOps.}}
       %res = transform.foreach_match flatten_results in %arg0 @match -> @apply_op_config
         : (!transform.any_op) -> (!transform.any_op)
       transform.yield %res : !transform.any_op
