@@ -118,6 +118,44 @@ struct ResourceDeallocaOpPattern
   }
 };
 
+struct ResourceRetainOpPattern
+    : public OpConversionPattern<IREE::Stream::ResourceRetainOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ResourceRetainOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Allocation tracking not supported in the inline HAL.
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+struct ResourceReleaseOpPattern
+    : public OpConversionPattern<IREE::Stream::ResourceReleaseOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ResourceReleaseOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Allocation tracking not supported in the inline HAL.
+    rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(op, 0,
+                                                      rewriter.getI1Type());
+    return success();
+  }
+};
+
+struct ResourceIsTerminalOpPattern
+    : public OpConversionPattern<IREE::Stream::ResourceIsTerminalOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ResourceIsTerminalOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Allocation tracking not supported in the inline HAL.
+    rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(op, 0,
+                                                      rewriter.getI1Type());
+    return success();
+  }
+};
+
 struct ResourceSizeOpPattern
     : public OpConversionPattern<IREE::Stream::ResourceSizeOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -765,10 +803,11 @@ void populateStreamToHALInlinePatterns(MLIRContext *context,
       });
 
   patterns.insert<ResourceAllocOpPattern, ResourceAllocaOpPattern,
-                  ResourceDeallocaOpPattern, ResourceSizeOpPattern,
-                  ResourceTryMapOpPattern, ResourceLoadOpPattern,
-                  ResourceStoreOpPattern, ResourceSubviewOpPattern>(
-      typeConverter, context);
+                  ResourceDeallocaOpPattern, ResourceRetainOpPattern,
+                  ResourceReleaseOpPattern, ResourceIsTerminalOpPattern,
+                  ResourceSizeOpPattern, ResourceTryMapOpPattern,
+                  ResourceLoadOpPattern, ResourceStoreOpPattern,
+                  ResourceSubviewOpPattern>(typeConverter, context);
 
   patterns.insert<FileConstantOpPattern, FileReadOpPattern, FileWriteOpPattern>(
       typeConverter, context);

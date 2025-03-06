@@ -1519,6 +1519,28 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
 }
 
 //===----------------------------------------------------------------------===//
+// stream.resource.retain
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+// stream.resource.release
+//===----------------------------------------------------------------------===//
+
+void ResourceReleaseOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "is_terminal");
+}
+
+//===----------------------------------------------------------------------===//
+// stream.resource.is_terminal
+//===----------------------------------------------------------------------===//
+
+void ResourceIsTerminalOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "is_terminal");
+}
+
+//===----------------------------------------------------------------------===//
 // stream.resource.try_map
 //===----------------------------------------------------------------------===//
 
