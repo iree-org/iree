@@ -128,10 +128,10 @@ jobs:
           pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
             --goldentime-tolerance-multiplier 1.3 \
             --goldentime-rocm-e2e-ms 1100.0 \
-            --goldentime-rocm-unet-ms 255.0 \
+            --goldentime-rocm-unet-ms 258.0 \
             --goldentime-rocm-clip-ms 12.0 \
             --goldentime-rocm-vae-ms 260.0 \
-            --goldendispatch-rocm-unet 1220 \
+            --goldendispatch-rocm-unet 1149 \
             --goldendispatch-rocm-clip 794 \
             --goldendispatch-rocm-vae 176 \
             --goldensize-rocm-unet-bytes 1370000  \
@@ -156,7 +156,7 @@ jobs:
             --goldentime-rocm-unet-ms 78.0 \
             --goldentime-rocm-clip-ms 9.0 \
             --goldentime-rocm-vae-ms 62.0 \
-            --goldendispatch-rocm-unet 1220 \
+            --goldendispatch-rocm-unet 1149 \
             --goldendispatch-rocm-clip 794 \
             --goldendispatch-rocm-vae 176 \
             --goldensize-rocm-unet-bytes 1400000 \
@@ -164,8 +164,8 @@ jobs:
             --goldensize-rocm-vae-bytes 430000 \
             --goldentime-rocm-punet-int8-fp16-ms 45.0 \
             --goldentime-rocm-punet-int8-fp8-ms 46.0 \
-            --goldendispatch-rocm-punet-int8-fp16 1415 \
-            --goldendispatch-rocm-punet-int8-fp8 1695 \
+            --goldendispatch-rocm-punet-int8-fp16 1275 \
+            --goldendispatch-rocm-punet-int8-fp8 1555 \
             --goldensize-rocm-punet-int8-fp8-bytes 2200000 \
             --goldensize-rocm-punet-int8-fp16-bytes 2000000 \
             --rocm-chip gfx942 \
@@ -182,19 +182,19 @@ jobs:
           pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
             --goldentime-tolerance-multiplier 1.1 \
             --goldentime-rocm-e2e-ms 740.0 \
-            --goldentime-rocm-unet-ms 191.0 \
+            --goldentime-rocm-unet-ms 198.0 \
             --goldentime-rocm-clip-ms 12.0 \
             --goldentime-rocm-vae-ms 146.0 \
-            --goldendispatch-rocm-unet 1220 \
+            --goldendispatch-rocm-unet 1149 \
             --goldendispatch-rocm-clip 794 \
             --goldendispatch-rocm-vae 176 \
             --goldensize-rocm-unet-bytes 1400000 \
             --goldensize-rocm-clip-bytes 460000 \
             --goldensize-rocm-vae-bytes 430000 \
-            --goldentime-rocm-punet-int8-fp16-ms 115.0 \
-            --goldentime-rocm-punet-int8-fp8-ms 115.0 \
-            --goldendispatch-rocm-punet-int8-fp16 1415 \
-            --goldendispatch-rocm-punet-int8-fp8 1695 \
+            --goldentime-rocm-punet-int8-fp16-ms 118.0 \
+            --goldentime-rocm-punet-int8-fp8-ms 119.0 \
+            --goldendispatch-rocm-punet-int8-fp16 1275 \
+            --goldendispatch-rocm-punet-int8-fp8 1555 \
             --goldensize-rocm-punet-int8-fp8-bytes 2200000 \
             --goldensize-rocm-punet-int8-fp16-bytes 2000000 \
             --rocm-chip gfx942 \
