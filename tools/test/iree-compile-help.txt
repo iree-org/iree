@@ -1,0 +1,10 @@
+// RUN: iree-compile --help | \
+// RUN: FileCheck %s
+
+// Basic checks of optimization level defaults and printing.
+
+//       CHECK: --iree-opt-level=<optimization level>
+//       CHECK: --iree-global-optimization-opt-level=<optimization level>
+//       CHECK: --iree-opt-strip-assertions
+//  CHECK-NEXT:   At optimization level O0 the default is false
+//  CHECK-NEXT:   At optimization level O1 the default is true
