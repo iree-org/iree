@@ -551,17 +551,17 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 // CHECK-DAG:     %[[LHS_GLOBAL:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<64x968x1281xf16, #hal.descriptor_type<storage_buffer>>
 // CHECK-DAG:     %[[RHS_GLOBAL:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<64x1281x1281xf16, #hal.descriptor_type<storage_buffer>>
 // CHECK-DAG:     %[[OUT_GLOBAL:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%c0) : memref<64x968x1281xf16, #hal.descriptor_type<storage_buffer>>
-// CHECK-DAG:     %[[LHS_GLOBAL_SUB:.+]] = memref.subview %[[LHS_GLOBAL]]
-// CHECK-DAG:     %[[LHS_LOAD:.+]] = vector.transfer_read %[[LHS_GLOBAL_SUB]]{{.+}} {in_bounds = [true, false, false]}
-// CHECK-DAG:     %[[RHS_GLOBAL_SUB:.+]] = memref.subview %[[RHS_GLOBAL]]
-// CHECK-DAG:     %[[RHS_LOAD:.+]] = vector.transfer_read %[[RHS_GLOBAL_SUB]]{{.+}} {in_bounds = [true, false, false]}
+// CHECK-DAG:     %[[MASK0:.+]] = vector.create_mask %c1, %[[M0UB0:.+]], %{{.+}} : vector<1x1x4xi1>
+// CHECK-DAG:     %[[MASK1:.+]] = vector.create_mask %c1, %{{.+}}, %[[M1UB1:.+]] : vector<1x1x4xi1>
+// CHECK-DAG:     %[[LHS_LOAD:.+]] = vector.transfer_read %[[LHS_GLOBAL]]{{.+}} %[[MASK0]] {in_bounds = [true, true, true]}
+// CHECK-DAG:     %[[RHS_LOAD:.+]] = vector.transfer_read %[[RHS_GLOBAL]]{{.+}} %[[MASK1]] {in_bounds = [true, true, true]}
 // CHECK:         vector.transfer_write %[[LHS_LOAD]], %[[LHS_SHARED]]
 // CHECK:         vector.transfer_write %[[RHS_LOAD]], %[[RHS_SHARED]]
 // CHECK:         %[[RES:.+]] scf.for {{.*}} = %c0 to %c1280 step %c16 iter_args({{.*}}) -> (vector<1x1x1x1x1x1x1x4x1xf16>)
-// CHECK-DAG:       %[[LHS_GLOBAL_SUB:.+]] = memref.subview %[[LHS_GLOBAL]]
-// CHECK-DAG:       %[[LHS_LOAD:.+]] = vector.transfer_read %[[LHS_GLOBAL_SUB]]
-// CHECK-DAG:       %[[RHS_GLOBAL_SUB:.+]] = memref.subview %[[RHS_GLOBAL]]
-// CHECK-DAG:       %[[RHS_LOAD:.+]] = vector.transfer_read %[[RHS_GLOBAL_SUB]]{{.+}} {in_bounds = [true, false, false]}
+// CHECK-DAG:       %[[MASK0:.+]] = vector.create_mask %c1, %[[M0UB0]], %{{.+}} : vector<1x1x4xi1>
+// CHECK-DAG:       %[[MASK1:.+]] = vector.create_mask %c1, %{{.+}}, %[[M1UB1]] : vector<1x1x4xi1>
+// CHECK-DAG:       %[[LHS_LOAD:.+]] = vector.transfer_read %[[LHS_GLOBAL]]{{.+}} %[[MASK0]] {in_bounds = [true, true, true]}
+// CHECK-DAG:       %[[RHS_LOAD:.+]] = vector.transfer_read %[[RHS_GLOBAL]]{{.+}} %[[MASK1]] {in_bounds = [true, true, true]}
 // CHECK:           gpu.barrier
 // CHECK-DAG:       %{{.+}} = vector.transfer_read %[[LHS_SHARED]]
 // CHECK-DAG:       %{{.+}} = vector.transfer_read %[[RHS_SHARED]]
@@ -629,9 +629,11 @@ hal.executable public @pad_batch_matmul {
 // RHS
 // The dynamic dimension should be removed after:
 // https://github.com/llvm/llvm-project/pull/112236
+// CHECK: %[[MASK:.+]] = vector.create_mask %c1, %{{.+}}, %{{.+}} : vector<1x1x2xi1>
 // CHECK:             vector.transfer_read
-// CHECK-SAME:        in_bounds = [true, false, false]
-// CHECK-SAME:        memref<1x?x24xf32
+// CHECK-SAME:        %[[MASK]]
+// CHECK-SAME:        in_bounds = [true, true, true]
+// CHECK-SAME:        memref<196x24x24xf32
 // CHECK-SAME:        vector<1x1x2xf32>
 // CHECK:           scf.yield
 // OUTPUT
