@@ -1,6 +1,6 @@
 // RUN: iree-opt %s
 
-module @mmt_tile_and_fuse_spec attributes { transform.with_named_sequence} {
+module @mmt_tile_and_fuse_spec attributes { transform.with_named_sequence } {
 transform.named_sequence @apply_op_config(%op: !transform.any_op {transform.readonly},
                                           %config: !transform.any_param {transform.readonly}) {
   transform.annotate %op "compilation_info" = %config : !transform.any_op, !transform.any_param
