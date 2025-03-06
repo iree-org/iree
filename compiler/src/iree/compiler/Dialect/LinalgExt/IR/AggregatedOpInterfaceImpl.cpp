@@ -256,9 +256,9 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
 }
 
 // Compute output = exp2(output - input)
-static Value computeSubAndExp2(OpBuilder &builder, Location loc,
-                               AffineMap inputMap, AffineMap outputMap,
-                               Value input, Value output) {
+static Value computeSubAndExp(OpBuilder &builder, Location loc,
+                              AffineMap inputMap, AffineMap outputMap,
+                              Value input, Value output, bool useExp2) {
   SmallVector<AffineMap> compressedMaps =
       compressUnusedDims(SmallVector<AffineMap>{inputMap, outputMap});
   inputMap = compressedMaps[0];
@@ -274,7 +274,11 @@ static Value computeSubAndExp2(OpBuilder &builder, Location loc,
         Value in = convertScalarToDtype(b, loc, args[0], args[1].getType(),
                                         /*isUnsignedCast=*/false);
         Value diff = b.create<arith::SubFOp>(loc, args[1], in);
-        Value weight = b.create<math::Exp2Op>(loc, diff);
+        Value weight;
+        if (useExp2)
+          weight = b.create<math::Exp2Op>(loc, diff);
+        else
+          weight = b.create<math::ExpOp>(loc, diff);
         b.create<linalg::YieldOp>(loc, weight);
       });
   return genericOp.getResult(0);
@@ -405,10 +409,15 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   std::optional<Value> mask = getMask();
   DictionaryAttr config = getDecompositionConfigAttr();
 
+  bool useExp2 = true;
   DictionaryAttr qkAttrs, pvAttrs;
   if (config) {
     qkAttrs = config.getAs<DictionaryAttr>(getQKAttrStr());
     pvAttrs = config.getAs<DictionaryAttr>(getPVAttrStr());
+    if (mlir::BoolAttr useExp2Attr = mlir::dyn_cast_or_null<mlir::BoolAttr>(
+            config.get(getUseExp2AttrStr()))) {
+      useExp2 = useExp2Attr.getValue();
+    }
   }
   Value output = getOutput();
 
@@ -475,7 +484,7 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
 
   // P = exp2(S - max)
   AffineMap pMap = sMap;
-  Value p = computeSubAndExp2(b, loc, maxMap, sMap, max, s);
+  Value p = computeSubAndExp(b, loc, maxMap, sMap, max, s, useExp2);
 
   // sum = rowSum(P)
   Value sum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, sumFill);
@@ -524,10 +533,15 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Type elementType = getElementTypeOrSelf(getOutput().getType());
   DictionaryAttr config = getDecompositionConfigAttr();
 
+  bool useExp2 = true;
   DictionaryAttr qkAttrs, pvAttrs;
   if (config) {
     qkAttrs = config.getAs<DictionaryAttr>(getQKAttrStr());
     pvAttrs = config.getAs<DictionaryAttr>(getPVAttrStr());
+    if (mlir::BoolAttr useExp2Attr = mlir::dyn_cast_or_null<mlir::BoolAttr>(
+            config.get(getUseExp2AttrStr()))) {
+      useExp2 = useExp2Attr.getValue();
+    }
   }
 
   FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
@@ -561,7 +575,8 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   // norm = exp2(oldMax - newMax)
   // normMap = maxMap
   AffineMap normMap = getMaxMap();
-  Value norm = computeSubAndExp2(b, loc, maxMap, normMap, newMax, oldMax);
+  Value norm =
+      computeSubAndExp(b, loc, maxMap, normMap, newMax, oldMax, useExp2);
 
   // normSum = norm * oldSum
   AffineMap sumMap = getSumMap();
@@ -571,7 +586,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   // P = exp2(S - newMax)
   // PMap = SMap
   AffineMap pMap = sMap;
-  Value p = computeSubAndExp2(b, loc, maxMap, sMap, newMax, s);
+  Value p = computeSubAndExp(b, loc, maxMap, sMap, newMax, s, useExp2);
 
   // newSum = normSum + rowSum(P)
   Value newSum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, normSum);
