@@ -12,34 +12,9 @@ iree_add_all_subdirs()
 
 iree_check_single_backend_test_suite(
   NAME
-    math_ops_f16_llvm-cpu
+    math_ops_llvm-cpu
   SRCS
     "math_ops_f16_llvm-cpu.mlir"
-  TARGET_BACKEND
-    "llvm-cpu"
-  DRIVER
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-llvmcpu-target-cpu=generic"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    math_ops_f16_rocm
-  SRCS
-    "math_ops_f16_rocm.mlir"
-  TARGET_BACKEND
-    "rocm"
-  DRIVER
-    "hip"
-  COMPILER_FLAGS
-
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    math_ops_f32_llvm-cpu
-  SRCS
     "math_ops_f32_llvm-cpu.mlir"
   TARGET_BACKEND
     "llvm-cpu"
@@ -51,8 +26,9 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    math_ops_f32_rocm
+    math_ops_rocm
   SRCS
+    "math_ops_f16_rocm.mlir"
     "math_ops_f32_rocm.mlir"
   TARGET_BACKEND
     "rocm"

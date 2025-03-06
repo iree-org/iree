@@ -18,15 +18,15 @@ package(
 )
 
 [iree_check_single_backend_test_suite(
-    name = "math_ops_%s_%s" % (type, backend),
-    srcs = ["math_ops_%s_%s.mlir" % (type, backend)],
+    name = "math_ops_%s" % backend,
+    srcs = ["math_ops_%s_%s.mlir" % (type, backend) for type in [
+        "f16",
+        "f32",
+    ]],
     compiler_flags = ["--iree-llvmcpu-target-cpu=generic"] if backend == "llvm-cpu" else [],
     driver = driver,
     target_backend = backend,
-) for type in [
-    "f16",
-    "f32",
-] for backend, driver in [
+) for backend, driver in [
     ("llvm-cpu", "local-task"),
     ("rocm", "hip"),
 ]]
