@@ -180,6 +180,10 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(Location loc,
         IntegerAttr::get(inputType, APInt(inputType.getIntOrFloatBitWidth(),
                                           intAttr.getValue().getSExtValue())));
     return {{constValue}};
+  } else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(attrValue)) {
+    auto constValue = builder.create<mlir::arith::ConstantOp>(
+        loc, inputType, FloatAttr::get(inputType, floatAttr.getValue()));
+    return {{constValue}};
   } else if (auto elementsAttr =
                  llvm::dyn_cast<DenseIntElementsAttr>(attrValue)) {
     SmallVector<Value> elementValues;

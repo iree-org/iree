@@ -150,12 +150,14 @@ def CHECK_ExpectAlmostEqOp :
   let arguments = (ins
     Optional<HAL_Device>:$device,
     AnyTypeOf<[HAL_BufferView, TensorOf<[AnyFloat]>]>:$lhs,
-    AnyTypeOf<[HAL_BufferView, TensorOf<[AnyFloat]>]>:$rhs
+    AnyTypeOf<[HAL_BufferView, TensorOf<[AnyFloat]>]>:$rhs,
+    F32Attr:$tolerance
   );
 
   let assemblyFormat = [{
     (`` `<` $device^ `>`)?
-    `` `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
+    `` `(` $lhs `,` $rhs `` custom<OptionalFloatTolerance>($tolerance) `)`
+    attr-dict `:` type($lhs)
   }];
 }
 
@@ -179,14 +181,16 @@ def CHECK_ExpectAlmostEqConstOp :
   let arguments = (ins
     Optional<HAL_Device>:$device,
     TensorOf<[AnyFloat]>:$lhs,
-    ElementsAttr:$value
+    ElementsAttr:$value,
+    F32Attr:$tolerance
   );
 
   let hasCanonicalizer = 1;
 
   let assemblyFormat = [{
     (`` `<` $device^ `>`)?
-    `` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)
+    `` `(` $lhs `,` $value `` custom<OptionalFloatTolerance>($tolerance) `)`
+    attr-dict `:` type($lhs)
   }];
 }
 

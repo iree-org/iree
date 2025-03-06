@@ -28,7 +28,8 @@ vm.import private optional @expect_eq(
 vm.import private optional @expect_almost_eq(
   %device : !vm.ref<!hal.device>,
   %lhs : !vm.ref<!hal.buffer_view>,
-  %rhs : !vm.ref<!hal.buffer_view>
+  %rhs : !vm.ref<!hal.buffer_view>,
+  %tolerance : f32
 )
 
 }  // vm.module
