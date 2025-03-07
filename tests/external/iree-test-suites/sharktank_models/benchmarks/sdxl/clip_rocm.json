@@ -5,7 +5,7 @@
         "1x64xi64",
         "1x64xi64"
     ],
-    "function_run": "encode_prompts", 
+    "function_run": "encode_prompts",
     "benchmark_flags": [
         "--benchmark_repetitions=10",
         "--benchmark_min_warmup_time=3.0",

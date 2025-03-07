@@ -24,7 +24,7 @@
         "sdxl_unet_fp16",
         "sdxl_vae"
     ],
-    "function_run": "tokens_to_image", 
+    "function_run": "tokens_to_image",
     "benchmark_flags": [
         "--benchmark_repetitions=10",
         "--benchmark_min_warmup_time=3.0",

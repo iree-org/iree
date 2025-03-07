@@ -2,7 +2,7 @@
     "inputs": [
         "1x4x128x128xf16"
     ],
-    "function_run": "main", 
+    "function_run": "main",
     "benchmark_flags": [
         "--benchmark_repetitions=10",
         "--benchmark_min_warmup_time=3.0",
