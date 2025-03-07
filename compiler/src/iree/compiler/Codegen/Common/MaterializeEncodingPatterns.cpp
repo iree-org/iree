@@ -464,7 +464,7 @@ struct MaterializeInterfaceBindingEncoding
   }
 };
 
-/// Pattern to convert `flow.dispatch.tensor.store` operation when
+/// Pattern to convert `flow.dispatch.tensor.load` operation when
 /// materializing the encoding.
 struct MaterializeFlowDispatchTensorLoadOp
     : public OpMaterializeEncodingPattern<IREE::Flow::DispatchTensorLoadOp> {
