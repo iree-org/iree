@@ -77,6 +77,10 @@ jobs:
       - name: Install gh
         uses: ksivamuthu/actions-setup-gh-cli@c78dbed4be2f8d6133a14a9a597ee12fd4ed5c93 # v3
         if: ${{ inputs.artifact_run_id != '' }}
+      - name: Check gh
+        run: |
+          which gh
+          gh --version
       - name: Setup venv
         run: |
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
