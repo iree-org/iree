@@ -114,20 +114,18 @@ TEST(BasisFromSizeStrides, OverlappingStrides) {
 
 namespace {
 struct TestOptions {
+  llvm::OptimizationLevel rootOption = llvm::OptimizationLevel::O0;
   llvm::OptimizationLevel parentOption = llvm::OptimizationLevel::O0;
   bool childOption = false;
+  static constexpr llvm::StringRef kRootOptFlag = "root-option";
 
   void bindOptions(OptionsBinder &binder) {
-    binder.opt<llvm::OptimizationLevel>("parent-option", parentOption);
-    binder.opt<bool>("child-option", childOption);
-  }
-
-  void applyOptimization(const OptionsBinder &binder,
-                         llvm::OptimizationLevel globalOptLevel) {
-    binder.overrideDefault("parent-option", parentOption, globalOptLevel);
-    if (parentOption == llvm::OptimizationLevel::O3) {
-      binder.overrideDefault("child-option", childOption, true);
-    }
+    binder.topLevelOpt(kRootOptFlag, rootOption);
+    auto init_at_opt =
+        binder.optimizationLevel(kRootOptFlag, "parent-option", parentOption);
+    binder.opt<bool>("child-option", childOption,
+                     {init_at_opt(llvm::OptimizationLevel::O3, true)},
+                     llvm::cl::desc("test desc."));
   }
 };
 } // namespace
@@ -142,6 +140,7 @@ TEST(OptionUtils, DefaultTest) {
   LogicalResult parseResult = binder.parseArguments(0, nullptr);
 
   EXPECT_TRUE(succeeded(parseResult));
+  EXPECT_EQ(opts.rootOption, llvm::OptimizationLevel::O0);
   EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O0);
   EXPECT_EQ(opts.childOption, false);
 }
@@ -150,42 +149,67 @@ TEST(OptionUtils, OverrideParent) {
   auto binder = OptionsBinder::local();
   TestOptions opts;
   opts.bindOptions(binder);
-  LogicalResult parseResult = binder.parseArguments(0, nullptr);
 
-  opts.applyOptimization(binder, llvm::OptimizationLevel::O1);
+  int argc = 1;
+  const char *argv[] = {"--parent-option=O3"};
+  LogicalResult parseResult = binder.parseArguments(argc, argv);
+  EXPECT_EQ(opts.rootOption, llvm::OptimizationLevel::O0);
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O3);
+  EXPECT_EQ(opts.childOption, false);
+
+  binder.applyOptimizationDefaults();
   EXPECT_TRUE(succeeded(parseResult));
-  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O1);
+  EXPECT_EQ(opts.rootOption, llvm::OptimizationLevel::O0);
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O3);
+  EXPECT_EQ(opts.childOption, true);
+
+  binder.restoreOptimizationDefaults();
+  EXPECT_EQ(opts.rootOption, llvm::OptimizationLevel::O0);
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O3);
   EXPECT_EQ(opts.childOption, false);
 }
 
-TEST(OptionUtils, NoOverrideParent) {
+TEST(OptionUtils, OverrideRoot) {
   auto binder = OptionsBinder::local();
   TestOptions opts;
   opts.bindOptions(binder);
 
   int argc = 1;
-  const char *argv[] = {"--parent-option=O2"};
+  const char *argv[] = {"--root-option=O3"};
   LogicalResult parseResult = binder.parseArguments(argc, argv);
-  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O2);
-  EXPECT_EQ(opts.childOption, false);
 
-  opts.applyOptimization(binder, llvm::OptimizationLevel::O1);
+  binder.applyOptimizationDefaults();
   EXPECT_TRUE(succeeded(parseResult));
-  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O2);
+  EXPECT_EQ(opts.rootOption, llvm::OptimizationLevel::O3);
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O3);
+  EXPECT_EQ(opts.childOption, true);
+
+  binder.restoreOptimizationDefaults();
+  EXPECT_EQ(opts.rootOption, llvm::OptimizationLevel::O3);
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O0);
   EXPECT_EQ(opts.childOption, false);
 }
 
-TEST(OptionUtils, OverrideParentAndChild) {
+TEST(OptionUtils, OverrideRootAndSetChild) {
   auto binder = OptionsBinder::local();
   TestOptions opts;
   opts.bindOptions(binder);
 
-  LogicalResult parseResult = binder.parseArguments(0, nullptr);
-  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O0);
-  EXPECT_EQ(opts.childOption, false);
-
-  opts.applyOptimization(binder, llvm::OptimizationLevel::O3);
+  int argc = 2;
+  const char *argv[] = {"--root-option=O3", "--child-option=true"};
+  LogicalResult parseResult = binder.parseArguments(argc, argv);
   EXPECT_TRUE(succeeded(parseResult));
+  EXPECT_EQ(opts.rootOption, llvm::OptimizationLevel::O3);
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O0);
+  EXPECT_EQ(opts.childOption, true);
+
+  binder.applyOptimizationDefaults();
+  EXPECT_EQ(opts.rootOption, llvm::OptimizationLevel::O3);
   EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O3);
+  EXPECT_EQ(opts.childOption, true);
+
+  binder.restoreOptimizationDefaults();
+  EXPECT_EQ(opts.rootOption, llvm::OptimizationLevel::O3);
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O0);
   EXPECT_EQ(opts.childOption, true);
 }

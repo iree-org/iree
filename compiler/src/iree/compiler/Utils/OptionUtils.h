@@ -167,17 +167,17 @@ public:
                    Mods... Ms) {
     opt<llvm::OptimizationLevel>(name, value, Ms...);
     auto &info = getOptionsStorage()[name];
-    info.optOverrides = std::make_unique<ScopedOptOverride>(
-        value, info.isChanged, *info.children);
+    info.optOverrides = std::make_unique<RootOptOverride>(value, info.isChanged,
+                                                          *info.children);
     getTopLevelOptimizations().push_back(name);
   }
 
-  void applyOptimizationDefaults(llvm::OptimizationLevel opt) {
+  void applyOptimizationDefaults() {
     // Recursively applies overrides.
     for (llvm::StringRef name : getTopLevelOptimizations()) {
       auto it = getOptionsStorage().find(name);
       assert(it != getOptionsStorage().end() && "Option not found");
-      it->second.optOverrides->backupAndApplyOpt(opt);
+      it->second.optOverrides->applyFromRoot();
     }
   }
 
@@ -191,8 +191,6 @@ public:
   template <typename... Mods>
   opt_scope optimizationLevel(llvm::StringRef parentName, llvm::StringRef name,
                               llvm::OptimizationLevel &value, Mods... Ms) {
-    assert(getOptionsStorage().find(name) == getOptionsStorage().end() &&
-           "Option already exists");
     opt<llvm::OptimizationLevel>(name, value, Ms...);
     auto &info = getOptionsStorage()[name];
     auto optDef = std::make_unique<ScopedOptOverride>(value, info.isChanged,
@@ -200,21 +198,6 @@ public:
     getOptionsStorage()[parentName].children->push_back(optDef.get());
     info.optOverrides = std::move(optDef);
     return opt_scope{name};
-  }
-
-  bool isFlagSet(llvm::StringRef name) const {
-    const auto infoIt = getOptionsStorage().find(name);
-    assert(infoIt != getOptionsStorage().end() && "Option not found");
-    const auto &isChanged = infoIt->getSecond().isChanged;
-    assert(isChanged && "Expected changed callback");
-    return isChanged();
-  }
-
-  template <typename T>
-  void overrideDefault(llvm::StringRef name, T &val, const T &update) const {
-    if (!isFlagSet(name)) {
-      val = update;
-    }
   }
 
   template <typename T, typename V, typename... Mods>
@@ -265,6 +248,7 @@ private:
     virtual ~OptOverrideBase() = default;
     virtual void backupAndApplyOpt(llvm::OptimizationLevel opt) = 0;
     virtual void restoreBackup() = 0;
+    virtual void applyFromRoot() { llvm_unreachable("Not implemented"); }
   };
 
   template <typename T>
@@ -310,11 +294,25 @@ private:
     }
     void restoreBackup() override { *value = backup; }
 
-  private:
+  protected:
     llvm::OptimizationLevel backup;
     llvm::OptimizationLevel *value;
     std::function<bool()> isChanged;
     llvm::SmallVector<OptOverrideBase *> &children;
+  };
+
+  class RootOptOverride : public ScopedOptOverride {
+  public:
+    using ScopedOptOverride::ScopedOptOverride;
+    void applyFromRoot() override {
+      for (auto &child : children) {
+        child->backupAndApplyOpt(*value);
+      }
+    }
+    void backupAndApplyOpt(llvm::OptimizationLevel opt) override {
+      llvm_unreachable("Not implemented");
+    }
+    void restoreBackup() override {}
   };
 
   struct OptionInfo {

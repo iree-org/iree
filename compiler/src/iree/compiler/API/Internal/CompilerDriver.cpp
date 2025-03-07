@@ -415,8 +415,7 @@ Session::Session(GlobalInit &globalInit)
   // Bootstrap session options from the cl environment, if enabled.
   if (globalInit.usesCommandLine) {
     auto binder = OptionsBinder::global();
-    binder.applyOptimizationDefaults(
-        globalInit.clGlobalPipelineOptions->optLevel);
+    binder.applyOptimizationDefaults();
     debugConfig = mlir::tracing::DebugConfig::createFromCLOptions();
     pipelineOptions = *globalInit.clGlobalPipelineOptions;
     pluginManagerOptions = *globalInit.clPluginManagerOptions;
@@ -950,7 +949,7 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
   auto passManager = createPassManager();
 
   if (!session.globalInit.usesCommandLine) {
-    session.binder.applyOptimizationDefaults(session.pipelineOptions.optLevel);
+    session.binder.applyOptimizationDefaults();
   }
   auto resetDefaults = llvm::make_scope_exit([&]() {
     if (!session.globalInit.usesCommandLine) {
