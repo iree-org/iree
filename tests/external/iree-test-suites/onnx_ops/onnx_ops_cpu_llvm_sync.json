@@ -25,6 +25,7 @@
     "onnx/node/generated/test_affine_grid_3d_align_corners",
     "onnx/node/generated/test_affine_grid_3d_align_corners_expanded",
     "onnx/node/generated/test_affine_grid_3d_expanded",
+    "onnx/node/generated/test_averagepool_2d_ceil",
     "onnx/node/generated/test_averagepool_2d_precomputed_same_upper",
     "onnx/node/generated/test_averagepool_2d_same_lower",
     "onnx/node/generated/test_averagepool_2d_same_upper",
