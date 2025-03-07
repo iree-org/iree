@@ -1511,6 +1511,57 @@ void AsyncAllocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
+// stream.async.retain
+//===----------------------------------------------------------------------===//
+
+void AsyncRetainOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {}
+
+//===----------------------------------------------------------------------===//
+// stream.async.release
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Elides a retain+release pair where there are no ops in-between that may
+// change the reference count. This is a local analysis intended to clean up the
+// IR while whole-program-aware elision is left to dedicated passes.
+struct ElideAsyncRetainRelease : public OpRewritePattern<AsyncReleaseOp> {
+  using OpRewritePattern<AsyncReleaseOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(AsyncReleaseOp releaseOp,
+                                PatternRewriter &rewriter) const override {
+    Value resourceValue = releaseOp.getOperand();
+    if (auto retainOp = dyn_cast_if_present<IREE::Stream::AsyncRetainOp>(
+            resourceValue.getDefiningOp())) {
+      if (resourceValue.hasOneUse()) {
+        // Direct retain+release, can trivially elide.
+        Value timepointValue = releaseOp.getAwaitTimepoint();
+        if (!timepointValue) {
+          timepointValue = rewriter.create<IREE::Stream::TimepointImmediateOp>(
+              releaseOp.getLoc());
+        }
+        rewriter.replaceOp(releaseOp, {retainOp.getOperand(), timepointValue});
+        rewriter.eraseOp(retainOp);
+        return success();
+      }
+      return failure();
+    }
+    // TODO(benvanik): handle cases of use-def chains with tied ops; we should
+    // be able to walk and hasOneUse (or user) each and ignore any that don't
+    // change the reference count.
+    return failure();
+  }
+};
+
+} // namespace
+
+void AsyncReleaseOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
+  results.insert<ElideAsyncRetainRelease>(context);
+  results.insert<ElideImmediateTimepointWait<AsyncReleaseOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // stream.async.constant
 //===----------------------------------------------------------------------===//
 

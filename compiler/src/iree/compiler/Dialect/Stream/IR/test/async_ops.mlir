@@ -9,6 +9,36 @@ util.func private @asyncAlloca(%arg0: index) -> !stream.resource<transient> {
 
 // -----
 
+// CHECK-LABEL: @asyncRetain
+// CHECK-SAME: (%[[RESOURCE:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index)
+util.func private @asyncRetain(%resource: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+  // CHECK: = stream.async.retain %[[RESOURCE]] : !stream.resource<*>{%[[SIZE]]}
+  %result = stream.async.retain %resource : !stream.resource<*>{%size}
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @asyncReleaseImmediate
+// CHECK-SAME: (%[[RESOURCE:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index)
+util.func private @asyncReleaseImmediate(%resource: !stream.resource<*>, %size: index) -> (!stream.resource<*>, !stream.timepoint) {
+  // CHECK: = stream.async.release %[[RESOURCE]] : !stream.resource<*>{%[[SIZE]]} => !stream.timepoint
+  %result, %result_timepoint = stream.async.release %resource : !stream.resource<*>{%size} => !stream.timepoint
+  util.return %result, %result_timepoint : !stream.resource<*>, !stream.timepoint
+}
+
+// -----
+
+// CHECK-LABEL: @asyncRelease
+// CHECK-SAME: (%[[RESOURCE:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index, %[[AWAIT_TIMEPOINT:.+]]: !stream.timepoint)
+util.func private @asyncRelease(%resource: !stream.resource<*>, %size: index, %await_timepoint: !stream.timepoint) -> (!stream.resource<*>, !stream.timepoint) {
+  // CHECK: = stream.async.release await(%[[AWAIT_TIMEPOINT]]) => %[[RESOURCE]] : !stream.resource<*>{%[[SIZE]]} => !stream.timepoint
+  %result, %result_timepoint = stream.async.release await(%await_timepoint) => %resource : !stream.resource<*>{%size} => !stream.timepoint
+  util.return %result, %result_timepoint : !stream.resource<*>, !stream.timepoint
+}
+
+// -----
+
 // CHECK-LABEL: @asyncConstant
 util.func private @asyncConstant(%arg0: index) -> !stream.resource<transient> {
   // CHECK: = stream.async.constant : !stream.resource<transient>{%arg0} = dense<3> : tensor<8xi32>

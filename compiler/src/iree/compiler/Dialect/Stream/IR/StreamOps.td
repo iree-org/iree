@@ -2043,6 +2043,118 @@ def Stream_AsyncAllocaOp : Stream_Op<"async.alloca", [
   let hasCanonicalizer = 1;
 }
 
+def Stream_AsyncRetainOp : Stream_Op<"async.retain", [
+  AllTypesMatch<["operand", "result"]>,
+  Stream_AsyncPhaseOp,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperand",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+    "getTiedResultsIndexAndLength",
+  ]>,
+]> {
+  let summary = [{retains a resource until a corresponding release}];
+  let description = [{
+    Increments the reference count of an asynchronously allocated resource until
+    a release is performed. Resources are allocated with a reference count of +1
+    and may be deallocated when the reference count reaches 0. Reference
+    counting is only used as a compiler optimization and is not used at runtime
+    for safety reasons. If reference counting is not performed on a resource it
+    will still be deallocated once all runtime references are released.
+
+    The compiler is allowed to remove any retain and release ops that are known
+    to not be required. For example, `A => retain => B => release => C` would be
+    safe to rewrite to `A => B => C`.
+  }];
+
+  let arguments = (ins
+    Stream_AnyResource:$operand,
+    Stream_Size:$operand_size
+  );
+  let results = (outs
+    Stream_AnyResource:$result
+  );
+
+  let assemblyFormat = [{
+    $operand `:` type($operand) `{` $operand_size `}`
+    attr-dict
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getOperandSize(); }
+    Value getResultSize(unsigned idx) { return getOperandSize(); }
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Stream_AsyncReleaseOp : Stream_Op<"async.release", [
+  AllTypesMatch<["operand", "result"]>,
+  Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
+  Stream_TimelineOp,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperand",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+    "getTiedResultsIndexAndLength",
+  ]>,
+]> {
+  let summary = [{releases a resource and possibly deallocates it}];
+  let description = [{
+    Decrements the reference count of an asynchronous allocated resource that
+    had previously been retained. Resources are allocated with a reference count
+    of +1 but may be retained and released any number of times. Resources are
+    deallocated when their reference count is known to have reached 0.
+
+    If the release op decrements the reference count to 0 it is treated as-if
+    it had been a `stream.resource.dealloca` op.
+
+    The provided resource is released in timeline order: it is not released
+    until the await timepoint is reached and and the result timepoint is
+    signaled. Though the op may become a no-op the timeline allows for detecting
+    when the resource is used as opposed to just where it is used as defined by
+    producers and consumers.
+
+    The compiler is allowed to remove any retain and release ops that are known
+    to not be required. For example, `A => retain => B => release => C` would be
+    safe to rewrite to `A => B => C`.
+  }];
+
+  let arguments = (ins
+    Stream_AnyResource:$operand,
+    Stream_Size:$operand_size,
+    Optional<Stream_Timepoint>:$await_timepoint,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_AnyResource:$result,
+    Stream_Timepoint:$result_timepoint
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    (`await` `(` $await_timepoint^ `)` `=` `` `>`)?
+    $operand `:` type($operand) `{` $operand_size `}`
+    `=` `` `>` type($result_timepoint)
+    attr-dict
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getOperandSize(); }
+    Value getResultSize(unsigned idx) { return getOperandSize(); }
+    SmallVector<Value> getAwaitTimepoints() {
+      if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
+    }
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
 def Stream_AsyncConstantOp : Stream_PureOp<"async.constant", [
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,

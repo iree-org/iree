@@ -2243,6 +2243,54 @@ bool AsyncAllocaOp::isMetadata() { return true; }
 bool AsyncAllocaOp::preferCloneToConsumers() { return true; }
 
 //===----------------------------------------------------------------------===//
+// stream.async.retain
+//===----------------------------------------------------------------------===//
+
+Value AsyncRetainOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getOperand());
+}
+
+Value AsyncRetainOp::getTiedResultOperand(Value result) { return getOperand(); }
+
+::std::optional<unsigned>
+AsyncRetainOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // operand
+}
+
+SmallVector<int64_t> AsyncRetainOp::getTiedResultOperandIndices() {
+  return {0}; // operand
+}
+
+std::pair<unsigned, unsigned> AsyncRetainOp::getTiedResultsIndexAndLength() {
+  return {0, 1};
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.release
+//===----------------------------------------------------------------------===//
+
+Value AsyncReleaseOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getOperand());
+}
+
+Value AsyncReleaseOp::getTiedResultOperand(Value result) {
+  return getOperand();
+}
+
+::std::optional<unsigned>
+AsyncReleaseOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // operand
+}
+
+SmallVector<int64_t> AsyncReleaseOp::getTiedResultOperandIndices() {
+  return {0}; // operand
+}
+
+std::pair<unsigned, unsigned> AsyncReleaseOp::getTiedResultsIndexAndLength() {
+  return {0, 1};
+}
+
+//===----------------------------------------------------------------------===//
 // stream.async.constant
 //===----------------------------------------------------------------------===//
 

@@ -1,5 +1,43 @@
 // RUN: iree-opt --split-input-file --canonicalize=test-convergence=true %s | FileCheck %s
 
+// CHECK-LABEL: @ElideAsyncRetainReleaseImmediate
+// CHECK-SAME: (%[[RESOURCE:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index)
+util.func private @ElideAsyncRetainReleaseImmediate(%resource: !stream.resource<*>, %size: index) -> (!stream.resource<*>, !stream.timepoint) {
+  // CHECK-NOT: stream.async.retain
+  %retained = stream.async.retain %resource : !stream.resource<*>{%size}
+  // CHECK-NOT: stream.async.release
+  %released, %released_timepoint = stream.async.release %retained : !stream.resource<*>{%size} => !stream.timepoint
+  // CHECK: %[[TIMEPOINT:.+]] = stream.timepoint.immediate
+  // CHECK: util.return %[[RESOURCE]], %[[TIMEPOINT]]
+  util.return %released, %released_timepoint : !stream.resource<*>, !stream.timepoint
+}
+
+// -----
+
+// CHECK-LABEL: @ElideAsyncRetainRelease
+// CHECK-SAME: (%[[RESOURCE:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index, %[[TIMEPOINT:.+]]: !stream.timepoint)
+util.func private @ElideAsyncRetainRelease(%resource: !stream.resource<*>, %size: index, %timepoint: !stream.timepoint) -> (!stream.resource<*>, !stream.timepoint) {
+  // CHECK-NOT: stream.async.retain
+  %retained = stream.async.retain %resource : !stream.resource<*>{%size}
+  // CHECK-NOT: stream.async.release
+  %released, %released_timepoint = stream.async.release await(%timepoint) => %retained : !stream.resource<*>{%size} => !stream.timepoint
+  // CHECK: util.return %[[RESOURCE]], %[[TIMEPOINT]]
+  util.return %released, %released_timepoint : !stream.resource<*>, !stream.timepoint
+}
+
+// -----
+
+// CHECK-LABEL: @ElideImmediateAsyncReleaseWaits
+util.func private @ElideImmediateAsyncReleaseWaits(%resource: !stream.resource<*>, %size: index) -> (!stream.resource<*>, !stream.timepoint) {
+  // CHECK-NOT: stream.timepoint.immediate
+  %immediate = stream.timepoint.immediate => !stream.timepoint
+  // CHECK: stream.async.release %
+  %result, %result_timepoint = stream.async.release await(%immediate) => %resource : !stream.resource<*>{%size} => !stream.timepoint
+  util.return %result, %result_timepoint : !stream.resource<*>, !stream.timepoint
+}
+
+// -----
+
 // Ensures that the splat moves to the first common dominator of bb2/bb3.
 // We likely want to clone instead to reduce lifetime of the splats.
 

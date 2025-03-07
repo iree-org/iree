@@ -420,6 +420,19 @@ def LayoutSlicesPass :
   ];
 }
 
+def ReifyReferenceCountingPass :
+    InterfacePass<"iree-stream-reify-reference-counting", "mlir::CallableOpInterface"> {
+  let summary = "Converts async-phase referencing counting ops to cmd-phase.";
+  let description = [{
+    Converts `stream.async.retain` and `stream.async.release` ops that remain to
+    their low-level resource retain and release ops.
+  }];
+  let dependentDialects = [
+    "mlir::scf::SCFDialect",
+    "IREE::Stream::StreamDialect",
+  ];
+}
+
 //===----------------------------------------------------------------------===//
 // Memoization
 //===----------------------------------------------------------------------===//

@@ -281,6 +281,13 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   passManager.addPass(IREE::Util::createPropagateSubrangesPass());
   buildStreamCleanupPassPipeline(passManager, transformOptions);
 
+  // Convert stream.async.retain/release ops into lower-level resource
+  // primitives. Once we reify we lose the information required for analysis and
+  // it's nearly a guarantee that the remaining retain/release ops will make it
+  // to runtime.
+  FunctionLikeNest(passManager)
+      .addPass(IREE::Stream::createReifyReferenceCountingPass);
+
   // Everything must now be in explicit stream.cmd.* form.
   passManager.addPass(IREE::Stream::createVerifyLoweringToCmdPass());
 }
