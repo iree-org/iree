@@ -24,7 +24,6 @@
     "onnx/node/generated/test_affine_grid_3d_align_corners",
     "onnx/node/generated/test_affine_grid_3d_align_corners_expanded",
     "onnx/node/generated/test_affine_grid_3d_expanded",
-    "onnx/node/generated/test_averagepool_2d_ceil",
     "onnx/node/generated/test_averagepool_2d_precomputed_same_upper",
     "onnx/node/generated/test_averagepool_2d_same_lower",
     "onnx/node/generated/test_averagepool_2d_same_upper",
@@ -303,6 +302,7 @@
     "onnx/node/generated/test_wrap_pad"
   ],
   "expected_run_failures": [
+    "onnx/node/generated/test_averagepool_2d_ceil",
     "onnx/node/generated/test_averagepool_3d_dilations_large_count_include_pad_is_0_ceil_mode_is_True",
     "onnx/node/generated/test_bernoulli",
     "onnx/node/generated/test_bernoulli_double",
