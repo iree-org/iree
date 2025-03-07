@@ -14,6 +14,8 @@ namespace mlir::iree_compiler {
 
 llvm::ManagedStatic<llvm::DenseMap<llvm::StringRef, OptionsBinder::OptionInfo>>
     OptionsBinder::globalOptions;
+llvm::ManagedStatic<llvm::SmallVector<llvm::StringRef>>
+    OptionsBinder::globalTopLevelOptimizations;
 
 LogicalResult OptionsBinder::parseArguments(int argc, const char *const *argv,
                                             ErrorCallback onError) {
@@ -91,19 +93,20 @@ OptionsBinder::printArguments(bool nonDefaultOnly) {
 }
 
 OptionsBinder::OptionsStorage &OptionsBinder::getOptionsStorage() {
-  if (!scope) {
-    return *globalOptions;
-  } else {
-    return localOptions;
-  }
+  return scope ? localOptions : *globalOptions;
 }
 
 const OptionsBinder::OptionsStorage &OptionsBinder::getOptionsStorage() const {
-  if (!scope) {
-    return *globalOptions;
-  } else {
-    return localOptions;
-  }
+  return scope ? localOptions : *globalOptions;
+}
+
+llvm::SmallVector<llvm::StringRef> &OptionsBinder::getTopLevelOptimizations() {
+  return scope ? topLevelOptimizations : *globalTopLevelOptimizations;
+}
+
+const llvm::SmallVector<llvm::StringRef> &
+OptionsBinder::getTopLevelOptimizations() const {
+  return scope ? topLevelOptimizations : *globalTopLevelOptimizations;
 }
 
 } // namespace mlir::iree_compiler

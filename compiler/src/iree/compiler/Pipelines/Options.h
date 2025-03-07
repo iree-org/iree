@@ -13,6 +13,8 @@ namespace mlir::iree_compiler {
 
 struct GlobalPipelineOptions {
   llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
+
+  static constexpr llvm::StringRef kGlobalOptFlag = "iree-opt-level";
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalPipelineOptions>;
 };
@@ -139,8 +141,6 @@ struct GlobalOptimizationOptions {
   // Converts linalg named matmul ops to linalg generic ops.
   bool generalizeMatmul = false;
 
-  void applyOptimization(const OptionsBinder &binder,
-                         const GlobalPipelineOptions &globalLevel);
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalOptimizationOptions>;
 };
