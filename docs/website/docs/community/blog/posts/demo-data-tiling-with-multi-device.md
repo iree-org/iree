@@ -10,9 +10,11 @@ tags:
 
 # Demo: Data-tiling with multi-device
 
-## Setup
+This write-up demonstrates how data-tiling works when there are multiple devices. It is the write-up followed by [How data-tiling works with encoding specialization](./data-tiling-with-encoding-specialization.md).
 
-This is the write-up followed by [How data-tiling works with encoding specialization](./data-tiling-with-encoding-specialization.md).
+<!-- more -->
+
+## Setup
 
 Test source program: dt_multi_device.mlir
 The program runs a matmul on a device targeting zen4 CPU, and the other matmul on a device targeting VMVX. At the end, the sum of two matmul results is printed.
@@ -93,7 +95,7 @@ Most of the details are as the same as the [previous write-up](./data-tiling-wit
 
 ### SpecializeEncoding
 
-IREE deduplicates executables after it outlines dispatches to executables. It is very reasonable in a program because we do not want to generate duplicated artifacts. However, there are issues when multi-device and encodings are involed.
+IREE deduplicates executables after it outlines dispatches to executables. It is very reasonable in a program because we do not want to generate duplicated artifacts. However, there are issues when multi-device and encodings are involved.
 
 Take a look at the below snippet. There is an executable that set encodings on the source tensor, and there are two dispatch ops. One launch the kernel on device_a, and the other launch the kernel on device_b. It can produce wrong codegen artifacts when bindings types are encoded (i.e., the tensor type has an encoding attribute). Because they can result in different layouts. It is confusing what the input layouts for the executable because there are two possibilities. In this case, we have to duplicate the executable with updated encoding, and modify the dispatch to launch proper executable based on resolved encoding layouts.
 
@@ -223,4 +225,4 @@ The fact is that the attribute attached in the encoding knows the details. We ca
 
 In this context, the `flow.dispatch.tensor.load/store` materialization patterns can call the interface methods and finish the layout transfer.
 
-This is not done yet, and the work is tracked in https://github.com/iree-org/iree/issues/19896.
+This is not done yet, and the work is being [tracked](https://github.com/iree-org/iree/issues/19896).
