@@ -97,6 +97,6 @@ jobs:
           VENV_DIR: ${{ env.VENV_DIR }}
           TARGET: ${{ matrix.target }}
           GPU: ${{ matrix.gpu }}
-          EXTERNAL_TEST_FILE_DIRECTORY: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
+          EXTERNAL_TEST_FILE_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/test_suite_files
           QUALITY_TEST_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/sharktank_models/quality_tests
           BENCHMARK_TEST_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/sharktank_models/benchmarks
