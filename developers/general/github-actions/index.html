@@ -2418,6 +2418,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#faster-iteration-on-pkgci-workflows" class="md-nav__link">
+    <span class="md-ellipsis">
+      Faster iteration on PkgCI workflows
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3943,6 +3952,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#faster-iteration-on-pkgci-workflows" class="md-nav__link">
+    <span class="md-ellipsis">
+      Faster iteration on PkgCI workflows
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4146,6 +4164,13 @@ build and test coverage across a variety of platforms and hardware accelerators.
   fetch from model repositories like
   <a href="https://huggingface.co/models">Hugging Face</a> as needed to run test suites.</li>
 </ul>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>PkgCI workflows can be triggered directly to skip the 5-10 minute build
+"build packages" job when testing workflows. See the
+<a href="#faster-iteration-on-pkgci-workflows">faster iteration on PkgCI workflows</a>
+section below for details.</p>
+</div>
 <table>
 <thead>
 <tr>
@@ -4379,6 +4404,26 @@ in touch with us on one of our
 <a href="../../../#communication-channels">communication channels</a> and we'd be
 happy to discuss the options available.</p>
 </div>
+<h3 id="faster-iteration-on-pkgci-workflows">Faster iteration on PkgCI workflows<a class="headerlink" href="#faster-iteration-on-pkgci-workflows" title="Permanent link">link</a></h3>
+<p>Each pkgci workflow can be triggered directly with <code>workflow_dispatch</code> to
+run tests using a previous run of the build_packages job.</p>
+<ol>
+<li>Find the <code>artifact_run_id</code> from a prior run to use packages from. You can
+   go through the history at
+   <a href="https://github.com/iree-org/iree/actions/workflows/pkgci.yml">https://github.com/iree-org/iree/actions/workflows/pkgci.yml</a> for this. For
+   example, <a href="https://github.com/iree-org/iree/actions/runs/13723791082">https://github.com/iree-org/iree/actions/runs/13723791082</a> has
+   run id <code>13723791082</code>.</li>
+<li>Choose which workflow you want to run and navigate to its control page on
+   <a href="https://github.com/iree-org/iree/actions">https://github.com/iree-org/iree/actions</a>, like
+   <a href="https://github.com/iree-org/iree/actions/workflows/pkgci_unit_test.yml">https://github.com/iree-org/iree/actions/workflows/pkgci_unit_test.yml</a>
+   for
+   <a href="https://github.com/iree-org/iree/blob/main/.github/workflows/pkgci_unit_test.yml"><code>pkgci_unit_test.yml</code></a>.</li>
+<li>
+<p>Run the workflow using the <code>workflow_dispatch</code> trigger, selecting the branch
+   you want to test and providing the <code>artifact_run_id</code> from step 1:</p>
+<p><img alt="ci-extra" src="../pkgci-workflow-dispatch.png" /></p>
+</li>
+</ol>
 <h2 id="maintenance-tips"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 4H3a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2M3 19V6h8v13zm18 0h-8V6h8zm-7-9.5h6V11h-6zm0 2.5h6v1.5h-6zm0 2.5h6V16h-6z"/></svg></span> Maintenance tips<a class="headerlink" href="#maintenance-tips" title="Permanent link">link</a></h2>
 <ul>
 <li>Certain workflow failures are posted in the <code>#github-ci</code> channel in IREE's
