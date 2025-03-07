@@ -47,7 +47,7 @@ jobs:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
       - name: Install gh
-        uses: actions4gh/setup-gh@44a12005484c53be5bf51bebe8c985b4be8ba8de # v1.0.2
+        uses: ksivamuthu/actions-setup-gh-cli@c78dbed4be2f8d6133a14a9a597ee12fd4ed5c93 # v3
         if: ${{ inputs.artifact_run_id != '' }}
       - name: Setup base venv
         run: |
