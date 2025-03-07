@@ -1,0 +1,54 @@
+{
+    "inputs": [
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_input.0.bin",
+            "value": "1x77x2xi64"
+        },
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_input.1.bin",
+            "value": "1x77x2xi64"
+        },
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_input.2.bin",
+            "value": "1x77x2xi64"
+        },
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_input.3.bin",
+            "value": "1x77x2xi64"
+        },
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_input.4.bin",
+            "value": "1x77x2xi64"
+        },
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_input.5.bin",
+            "value": "1x77x2xi64"
+        }
+    ],
+    "outputs": [
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_output.0.bin",
+            "value": "2x154x4096xf32"
+        },
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_output.1.bin",
+            "value": "2x2048xf32"
+        }
+    ],
+    "real_weights": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/real_weights.irpa",
+    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/model.mlir",
+    "device": "local-task",
+    "compiler_flags": [
+        "--iree-hal-target-backends=llvm-cpu",
+        "--iree-llvmcpu-target-cpu-features=host",
+        "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false",
+        "--iree-llvmcpu-distribution-size=32",
+        "--iree-opt-const-eval=false",
+        "--iree-llvmcpu-enable-ukernels=all",
+        "--iree-global-opt-enable-quantized-matmul-reassociation"
+    ],
+    "threshold_args": [
+        "--expected_f32_threshold=0.15f"
+    ],
+    "run_function": "encode_tokens"
+}

@@ -1,0 +1,14 @@
+{
+    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduler/11-26-2024/model.mlir",
+    "compiler_flags": [
+        "--iree-hal-target-backends=llvm-cpu",
+        "--iree-llvmcpu-target-cpu-features=host",
+        "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false",
+        "--iree-llvmcpu-distribution-size=32",
+        "--iree-opt-const-eval=false",
+        "--iree-opt-strip-assertions=true",
+        "--iree-llvmcpu-enable-ukernels=all",
+        "--iree-global-opt-enable-quantized-matmul-reassociation"
+    ],
+    "compile_only": true
+}
