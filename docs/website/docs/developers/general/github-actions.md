@@ -325,7 +325,8 @@ run tests using a previous run of the build_packages job.
    <https://github.com/iree-org/iree/actions/workflows/pkgci.yml> for this. For
    example, <https://github.com/iree-org/iree/actions/runs/13723791082> has
    run id `13723791082`.
-2. Choose which workflow you want to run and navigate to its control page, like
+2. Choose which workflow you want to run and navigate to its control page on
+   <https://github.com/iree-org/iree/actions>, like
    <https://github.com/iree-org/iree/actions/workflows/pkgci_unit_test.yml>
    for
    [`pkgci_unit_test.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/pkgci_unit_test.yml)
