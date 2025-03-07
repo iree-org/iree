@@ -329,9 +329,9 @@ run tests using a previous run of the build_packages job.
    <https://github.com/iree-org/iree/actions>, like
    <https://github.com/iree-org/iree/actions/workflows/pkgci_unit_test.yml>
    for
-   [`pkgci_unit_test.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/pkgci_unit_test.yml)
+   [`pkgci_unit_test.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/pkgci_unit_test.yml).
 3. Run the workflow using the `workflow_dispatch` trigger, selecting the branch
-   you want to test and providing the `artifact_run_id` from step 1
+   you want to test and providing the `artifact_run_id` from step 1:
 
     ![ci-extra](./pkgci-workflow-dispatch.png)
 
