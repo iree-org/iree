@@ -37,6 +37,7 @@ jobs:
 
     env:
       VENV_DIR: ${{ github.workspace }}/venv
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checking out IREE repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -47,6 +48,7 @@ jobs:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
       - uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
+        if: ${{ inputs.artifact_run_id == '' }}
         with:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
