@@ -11,9 +11,9 @@ is served using [GitHub Pages](https://pages.github.com/).
 Follow <https://squidfunk.github.io/mkdocs-material/getting-started/> and read
 <https://www.mkdocs.org/>.
 
-All steps below are from this docs/website/ folder.
+All steps below are from this `docs/website/` folder.
 
-Setup (as needed):
+**Setup** as needed:
 
 ```shell
 python3 -m venv .venv
@@ -21,23 +21,42 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Develop:
+**Develop** by building and running a local webserver:
 
 ```shell
-./generate_extra_files.sh
+# Optionally generate extra files, e.g. MLIR dialect pages produced by tablegen
+# The website will still work without these pages.
+# ./generate_extra_files.sh
+
 mkdocs serve
 ```
 
-Deploy:
+### Deploying the documentation
 
-* This force pushes to `gh-pages` on `<your remote>`. Please don't push to the
-  main repository :)
-* The `publish_website.yml` workflow takes care of publishing from the central
-  repository automatically
+The
+[`publish_website.yml`](https://github.com/iree-org/iree/actions/workflows/publish_website.yml)
+workflow in <https://github.com/iree-org/iree> builds the website and deploys
+it automatically.
+
+If you want to host the documentation on your own GitHub Pages site, such as to
+allow code reviewers to preview your changes, you can deploy the documentation
+yourself.
+
+> [!IMPORTANT]
+> If you are just previewing changes locally, you don't need this!
+>
+> This force pushes to the `gh-pages` branch on `<your remote>`. Please don't
+> push to the main <https://github.com/iree-org/iree> repository :)
+
+To deploy to a remote:
 
 ```shell
 mkdocs gh-deploy --remote-name <your remote>
 ```
+
+Assuming you have GitHub Pages configured for your remote from the `gh-pages`
+branch (see `https://github.com/<your remote>/iree/settings/pages`), the
+website should be live shortly at `https://<your remote>.github.io/iree`.
 
 ## Website sections and authoring tips
 
