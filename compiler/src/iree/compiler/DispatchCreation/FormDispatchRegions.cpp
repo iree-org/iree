@@ -24,6 +24,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -384,6 +385,89 @@ static bool areOpsFusable(Operation *producer, Operation *consumer,
   return true;
 }
 
+/// The logic to decide fusability (using the `hasCompatibleOuterParallelLoops`)
+/// currently works when the indexing map corresponding to result of the
+/// producer and indexing map corresponding to operand in the result are not
+/// transposed with respect to each other. To find more fusion opportunities for
+/// consumer elementwise operation, the indexing maps in the consumer can be
+/// made to "align" with the indexing map of the producer to enhance fusion.
+static bool makeConsumerFusableViaInterchange(
+    OpOperand &fusableOperand,
+    const llvm::SmallBitVector &rootOuterParallelLoops) {
+  auto producer =
+      fusableOperand.get()
+          .getDefiningOp<IREE::LinalgExt::LinalgFusionOpInterface>();
+  if (!producer) {
+    return false;
+  }
+
+  auto consumer = dyn_cast<linalg::GenericOp>(fusableOperand.getOwner());
+  if (!consumer) {
+    return false;
+  }
+
+  if (!linalg::isElementwise(consumer) || consumer.getNumResults() != 1) {
+    return false;
+  }
+
+  // If the indexing map in the consumer is already "compatible" with the
+  // indexing map in the producer, do nothing.
+  AffineMap producerIndexingMap = producer.getIndexingMapMatchingResult(
+      cast<OpResult>(fusableOperand.get()));
+  producerIndexingMap = getProjectedMap(
+      producerIndexingMap, getUnusedDimsBitVector(producerIndexingMap));
+  AffineMap consumerIndexingMap =
+      consumer.getMatchingIndexingMap(&fusableOperand);
+
+  // Since the iteration space of the consumer is going to be permuted
+  // to make it match with the indexing map in the producer, the interchange
+  // requires the indexing map in the consumer to be a permutation.
+  // If the producer indexing map and consumer indexing map are the same,
+  // then the permutation of iteration space becomes a no-op, in which
+  // case the permutation wasnt required for fusion. Return false here
+  // to indicate that the permutation is not going to "enhance" the
+  // fusion opportunities.
+  if (!consumerIndexingMap.isPermutation() ||
+      producerIndexingMap == consumerIndexingMap) {
+    return false;
+  }
+  OpResult result = cast<OpResult>(consumer.getResult(0));
+  if (!consumer.getIndexingMapMatchingResult(result).isPermutation()) {
+    return false;
+  }
+
+  // For now this is restricting that all indexing maps corresponding to the
+  // input are same as the indexing map of the fused operand, or are projected
+  // permutations. This avoids ping-ponging between different iteration space
+  // permutations without having any way to pick which is better.
+  if (!llvm::all_of(
+          consumer.getDpsInputOperands(), [&](OpOperand *inputOperand) {
+            AffineMap map = consumer.getMatchingIndexingMap(inputOperand);
+            return map == consumerIndexingMap ||
+                   (map.isProjectedPermutation() && !map.isPermutation());
+          })) {
+    return false;
+  }
+
+  // Make the input map match the producer map by applying a permutation map
+  // computed with consumerIndexingMap.compose(inv(producerIndexingMap))
+  AffineMap invProducerIndexingMap = inversePermutation(producerIndexingMap);
+  AffineMap permutationMap =
+      consumerIndexingMap.compose(invProducerIndexingMap);
+  auto perm = llvm::map_to_vector(permutationMap.getResults(),
+                                  [](AffineExpr e) -> unsigned {
+                                    return cast<AffineDimExpr>(e).getPosition();
+                                  });
+  IRRewriter rewriter(consumer->getContext());
+  FailureOr<linalg::GenericOp> interchangedOp =
+      linalg::interchangeGenericOp(rewriter, consumer, perm);
+  (void)interchangedOp;
+  assert(succeeded(interchangedOp) && "expected interchange to succeed");
+  assert(interchangedOp.value() == consumer &&
+         "expected interchange to happen in place");
+  return true;
+}
+
 /// For the fusion of root op -> elementwise operation to be bufferized
 /// in-place without use of extra memory, the result of the root operation
 /// must be able to reuse the buffer for the result of the elementwise
@@ -517,7 +601,14 @@ isFusableWithConsumer(OpOperand &fusedOperand,
   }
 
   if (!areOpsFusable(producer, consumer, rootOuterParallelLoops)) {
-    return false;
+    // Check if interchange in the consumer makes it fusable.
+    // Currently limit it to horizontally fused gemms.
+    // TODO(#20019) to remove this restriction.
+    if (!IREE::LinalgExt::isaHorizontallyFusedContraction(producer) ||
+        !makeConsumerFusableViaInterchange(fusedOperand,
+                                           rootOuterParallelLoops)) {
+      return false;
+    }
   }
 
   // Check if the iteration spaces of the producer and consumer are same.

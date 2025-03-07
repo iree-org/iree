@@ -705,11 +705,10 @@ isContractionOpSequence(Value yielded) {
 /// TODO: The logic below is quite convoluted. Might be better
 /// off having a dedicated operation for this.
 bool isaHorizontallyFusedContraction(Operation *op) {
-  auto linalgOp = dyn_cast_or_null<linalg::GenericOp>(op);
+  auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op);
   if (!linalgOp) {
     return false;
   }
-
   if (linalgOp->getNumResults() == 1) {
     return false;
   }
