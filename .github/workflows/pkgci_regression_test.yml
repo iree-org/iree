@@ -58,6 +58,7 @@ jobs:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
       VENV_DIR: ${{ github.workspace }}/venv
+      GH_TOKEN: ${{ github.token }}
       TEST_OUTPUT_ARTIFACTS: ${{ github.workspace }}/model_output_artifacts
     steps:
       - name: Checking out IREE repository
@@ -69,6 +70,7 @@ jobs:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
       - uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
+        if: ${{ inputs.artifact_run_id == '' }}
         with:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}

@@ -120,6 +120,13 @@ graph LR
   fetch from model repositories like
   [Hugging Face](https://huggingface.co/models) as needed to run test suites.
 
+!!! Tip
+
+    PkgCI workflows can be triggered directly to skip the 5-10 minute build
+    "build packages" job when testing workflows. See the
+    [faster iteration on PkgCI workflows](#faster-iteration-on-pkgci-workflows)
+    section below for details.
+
 Workflow file | Build status | Event triggers
 -- | --: | --
 Package tests | |
@@ -307,6 +314,26 @@ We group runners into categories:
     in touch with us on one of our
     [communication channels](../../index.md#communication-channels) and we'd be
     happy to discuss the options available.
+
+### Faster iteration on PkgCI workflows
+
+Each pkgci workflow can be triggered directly with `workflow_dispatch` to
+run tests using a previous run of the build_packages job.
+
+1. Find the `artifact_run_id` from a prior run to use packages from. You can
+   go through the history at
+   <https://github.com/iree-org/iree/actions/workflows/pkgci.yml> for this. For
+   example, <https://github.com/iree-org/iree/actions/runs/13723791082> has
+   run id `13723791082`.
+2. Choose which workflow you want to run and navigate to its control page on
+   <https://github.com/iree-org/iree/actions>, like
+   <https://github.com/iree-org/iree/actions/workflows/pkgci_unit_test.yml>
+   for
+   [`pkgci_unit_test.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/pkgci_unit_test.yml).
+3. Run the workflow using the `workflow_dispatch` trigger, selecting the branch
+   you want to test and providing the `artifact_run_id` from step 1:
+
+    ![ci-extra](./pkgci-workflow-dispatch.png)
 
 ## :material-book-open-outline: Maintenance tips
 
