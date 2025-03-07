@@ -167,11 +167,6 @@ jobs:
         with:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
-      - name: Install dependencies
-        if: ${{ inputs.artifact_run_id != '' }} && contains(matrix.name, 'cpu_llvm_task')
-        run: |
-          apt-get update
-          apt-get install gh
       - name: Setup venv
         run: |
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
