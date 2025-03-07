@@ -56,8 +56,8 @@ jobs:
       - name: Install dependencies
         if: ${{ inputs.artifact_run_id != '' }}
         run: |
-          apt-get update
-          apt-get install gh
+          sudo apt-get update
+          sudo apt-get install gh
       - name: Setup base venv
         run: |
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
