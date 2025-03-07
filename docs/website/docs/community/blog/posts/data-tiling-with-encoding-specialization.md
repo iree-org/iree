@@ -405,7 +405,9 @@ module {
 // CHECK:         return %[[D0_RES]], %[[D1_RES]]
 ```
 
-On the executable side, the encodings attached on stream.bindings are also updated with resolved layouts, which is consistent with the stream tensor ops changes. E.g.,
+On the executable side, the encodings attached on stream.bindings are also
+updated with resolved layouts, which is consistent with the stream tensor ops
+changes. E.g.,
 
 ```mlir
 #pipeline_layout = #hal.pipeline.layout<bindings = [
