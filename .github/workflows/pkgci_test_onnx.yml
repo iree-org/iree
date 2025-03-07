@@ -77,11 +77,9 @@ jobs:
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
-      - name: Install dependencies
+      - name: Install gh
+        uses: actions4gh/setup-gh@44a12005484c53be5bf51bebe8c985b4be8ba8de # v1.0.2
         if: ${{ inputs.artifact_run_id != '' }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install gh
       - uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
         if: ${{ inputs.artifact_run_id == '' }}
         with:
@@ -172,11 +170,9 @@ jobs:
         with:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
-      - name: Install dependencies
+      - name: Install gh
+        uses: actions4gh/setup-gh@44a12005484c53be5bf51bebe8c985b4be8ba8de # v1.0.2
         if: ${{ inputs.artifact_run_id != '' }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install gh
       - name: Setup venv
         run: |
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
