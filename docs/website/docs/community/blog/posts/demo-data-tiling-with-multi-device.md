@@ -10,16 +10,23 @@ tags:
 
 # Demo: Data-tiling with multi-device
 
-This write-up demonstrates how data-tiling works when there are multiple devices. It is the write-up followed by [How data-tiling works with encoding specialization](./data-tiling-with-encoding-specialization.md).
+This write-up demonstrates how data-tiling works when there are multiple
+devices. It is the write-up followed by [How data-tiling works with encoding
+specialization](./data-tiling-with-encoding-specialization.md).
 
 <!-- more -->
 
 ## Setup
 
 Test source program: dt_multi_device.mlir
-The program runs a matmul on a device targeting zen4 CPU, and the other matmul on a device targeting VMVX. At the end, the sum of two matmul results is printed.
 
-Note: it's hard to pass flags for the device configs today because MLIR attributes don't really work well in shells with all the #'s and such. In this case, we hardcoded the executable target in the IR for the demo.
+The program runs a matmul on a device targeting zen4 CPU, and the other matmul
+on a device targeting VMVX. At the end, the sum of two matmul results is
+printed.
+
+Note: it's hard to pass flags for the device configs today because MLIR
+attributes don't really work well in shells with all the #'s and such. In this
+case, we hardcoded the executable target in the IR for the demo.
 
 ```mlir
 // x86 CPU that has `+avx512f` feature.
@@ -91,13 +98,26 @@ iree-compile \
 
 ## Walkthrough
 
-Most of the details are as the same as the [previous write-up](./data-tiling-with-encoding-specialization.md). The key is in SpecializeEncoding pass and how we materialize the encodings in backends.
+Most of the details are as the same as the [previous
+write-up](./data-tiling-with-encoding-specialization.md). The key is in
+SpecializeEncoding pass and how we materialize the encodings in backends.
 
 ### SpecializeEncoding
 
-IREE deduplicates executables after it outlines dispatches to executables. It is very reasonable in a program because we do not want to generate duplicated artifacts. However, there are issues when multi-device and encodings are involved.
+IREE deduplicates executables after it outlines dispatches to executables. It is
+very reasonable in a program because we do not want to generate duplicated
+artifacts. However, there are issues when multi-device and encodings are
+involved.
 
-Take a look at the below snippet. There is an executable that set encodings on the source tensor, and there are two dispatch ops. One launch the kernel on device_a, and the other launch the kernel on device_b. It can produce wrong codegen artifacts when bindings types are encoded (i.e., the tensor type has an encoding attribute). Because they can result in different layouts. It is confusing what the input layouts for the executable because there are two possibilities. In this case, we have to duplicate the executable with updated encoding, and modify the dispatch to launch proper executable based on resolved encoding layouts.
+Take a look at the below snippet. There is an executable that set encodings on
+the source tensor, and there are two dispatch ops. One launch the kernel on
+device_a, and the other launch the kernel on device_b. It can produce wrong
+codegen artifacts when bindings types are encoded (i.e., the tensor type has an
+encoding attribute). Because they can result in different layouts. It is
+confusing what the input layouts for the executable because there are two
+possibilities. In this case, we have to duplicate the executable with updated
+encoding, and modify the dispatch to launch proper executable based on resolved
+encoding layouts.
 
 ```mlir
 stream.executable private @ex {
@@ -124,9 +144,13 @@ util.func public @multi_device_set_encoding() {
 }
 ```
 
-Thus, the SpecializeEncoding pass collects all the layout variants per executable, duplicate the executables with updated encodings, and update the dispatch op to launch the corresponding executable. See the below example.
+Thus, the SpecializeEncoding pass collects all the layout variants per
+executable, duplicate the executables with updated encodings, and update the
+dispatch op to launch the corresponding executable. See the below example.
 
-Note that the duplication does not only look at execution affinity, but also look at the layouts for each input operands. Because the actual layout can vary based on where the input operands come from.
+Note that the duplication does not only look at execution affinity, but also
+look at the layouts for each input operands. Because the actual layout can vary
+based on where the input operands come from.
 
 ```mlir
 #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], layouts = [#iree_encoding.specialized_encoding<123, tensor<?x?xf32>>]>
@@ -187,13 +211,20 @@ util.func public @multi_device_set_encoding() {
 }
 ```
 
-For more examples, see the [lit tests](https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Dialect/Stream/Transforms/test/specialize_encodings.mlir)
+For more examples, see the [lit
+tests](https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Dialect/Stream/Transforms/test/specialize_encodings.mlir)
 
 ### MaterializeEncoding
 
-As shown in the previous section, the encodings attached on bindings are updated. They now have the resolved layouts information. Thus, there are two kind of encodings in an executable. One is for incoming buffers with resolved layouts, and the other is original layout that attached on computation ops (e.g., set_encoding, unset_encoding, matmul, etc). The encodings on the computation ops are materialized to the target device preferred layout.
+As shown in the previous section, the encodings attached on bindings are
+updated. They now have the resolved layouts information. Thus, there are two
+kind of encodings in an executable. One is for incoming buffers with resolved
+layouts, and the other is original layout that attached on computation ops
+(e.g., set_encoding, unset_encoding, matmul, etc). The encodings on the
+computation ops are materialized to the target device preferred layout.
 
-If multi-device are not involved, they result in the same layout. In this context, we do not need to transfer layouts.
+If multi-device are not involved, they result in the same layout. In this
+context, we do not need to transfer layouts.
 
 ```mlir
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -219,10 +250,18 @@ func.func @set_encoding_LHS_with_layout() attributes {
 }
 ```
 
-The issue is what if the layouts mismatch? I.e., the incoming buffer layouts are different from the resolved layouts on load/store ops.
+The issue is what if the layouts mismatch? I.e., the incoming buffer layouts are
+different from the resolved layouts on load/store ops.
 
-The fact is that the attribute attached in the encoding knows the details. We can introduce a `bringToGlobalLayout` interface method, and the attribute implement it. It generates a sequence of operations that bring the current layout to the global layout (e.g., the tensor type without encoding). Then we can introduce a `bringToTiledLayout` interface method. It generates operations that bring the global layout to the target preferred layout.
+The fact is that the attribute attached in the encoding knows the details. We
+can introduce a `bringToGlobalLayout` interface method, and the attribute
+implement it. It generates a sequence of operations that bring the current
+layout to the global layout (e.g., the tensor type without encoding). Then we
+can introduce a `bringToTiledLayout` interface method. It generates operations
+that bring the global layout to the target preferred layout.
 
-In this context, the `flow.dispatch.tensor.load/store` materialization patterns can call the interface methods and finish the layout transfer.
+In this context, the `flow.dispatch.tensor.load/store` materialization patterns
+can call the interface methods and finish the layout transfer.
 
-This is not done yet, and the work is being [tracked](https://github.com/iree-org/iree/issues/19896).
+This is not done yet, and the work is being
+[tracked](https://github.com/iree-org/iree/issues/19896).

@@ -10,7 +10,13 @@ tags:
 
 # How data-tiling works with encoding specialization
 
-Data-tiling is a technique that transforms the input data to be in a particular layout for good performance. It allows you to access data through the cache hierarchy efficiently and do the computation with very less latency. IREE is a compiler which sees the whole graph. There are many opportunities to remove layout-transformation overheads. They may be propagated, fused into other operations, or be constant-evaluated for weights. IREE uses encodings to apply data-tiling technique, and the post explores how encodings work in data-tiling.
+Data-tiling is a technique that transforms the input data to be in a particular
+layout for good performance. It allows you to access data through the cache
+hierarchy efficiently and do the computation with very less latency. IREE is a
+compiler which sees the whole graph. There are many opportunities to remove
+layout-transformation overheads. They may be propagated, fused into other
+operations, or be constant-evaluated for weights. IREE uses encodings to apply
+data-tiling technique, and the post explores how encodings work in data-tiling.
 
 <!-- more -->
 
@@ -47,17 +53,26 @@ iree-compile \
   ~/matmul_f32.mlir -o ~/matmul_f32.vmfb
 ```
 
-Note that we have to disable the early materialization. Otherwise, the encodings are resolved way before specialization.
+Note that we have to disable the early materialization. Otherwise, the encodings
+are resolved way before specialization.
 
 ## Walkthrough
 
-Below is the IR dump after selected data-tiling passes. For more information see the [full IR dump](https://gist.github.com/hanhanW/df11ad072e40cbb776307c503dbc8f45).
+Below is the IR dump after selected data-tiling passes. For more information see
+the [full IR
+dump](https://gist.github.com/hanhanW/df11ad072e40cbb776307c503dbc8f45).
 
 ### Set Encodings
 
-This can happen either in GlobalOptimization phase or DispatchCreation phase. The former one is the current default, and the latter one is for data-tiling fusion which is still on experimental path. In the example, we focus on the default path, thus it happens in GlobalOptimization phase.
+This can happen either in GlobalOptimization phase or DispatchCreation phase.
+The former one is the current default, and the latter one is for data-tiling
+fusion which is still on experimental path. In the example, we focus on the
+default path, thus it happens in GlobalOptimization phase.
 
-The pass set the encodings on matmul operands, and propagate the encodings through the fill op. Because we want to fuse the fill op into the matmul kernel. The `round_dims_to` is redundant in the configuration, you can ignore it for now.
+The pass set the encodings on matmul operands, and propagate the encodings
+through the fill op. Because we want to fuse the fill op into the matmul kernel.
+The `round_dims_to` is redundant in the configuration, you can ignore it for
+now.
 
 ```mlir
 // -----// IR Dump After SetEncodingPass (iree-dispatch-creation-set-encoding) //----- //
@@ -91,7 +106,9 @@ module {
 
 ### Outline dispatches
 
-There are four dispatches in total. `dispatch_0` packs the LHS operand, `dispatch_1` packs the RHS operand, `dispatch_2` is `fill + gemm`, and `dispatch_3` unpacks the result of matmul.
+There are four dispatches in total. `dispatch_0` packs the LHS operand,
+`dispatch_1` packs the RHS operand, `dispatch_2` is `fill + gemm`, and
+`dispatch_3` unpacks the result of matmul.
 
 #### IR dump after the pass
 
@@ -205,9 +222,15 @@ module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} 
 
 ### ConvertToStream
 
-The flow executables all become stream executables, and the function arguments become opaque types which are `stream.binding`. At the Stream level, it does not need to know anything about Flow.
+The flow executables all become stream executables, and the function arguments
+become opaque types which are `stream.binding`. At the Stream level, it does not
+need to know anything about Flow.
 
-The host code is mostly about `stream.tensor.sizeof` and `stream.tensor.dispatch`. The `sizeof` op takes a tensor type with an optional encoding. It indicates the storage buffer size that will be used to issue the allocation later on. The `dispatch` op describes how we call the functions in the program.
+The host code is mostly about `stream.tensor.sizeof` and
+`stream.tensor.dispatch`. The `sizeof` op takes a tensor type with an optional
+encoding. It indicates the storage buffer size that will be used to issue the
+allocation later on. The `dispatch` op describes how we call the functions in
+the program.
 
 #### IR dump after the pass
 
@@ -339,7 +362,17 @@ module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} 
 
 ### Specialize Encoding
 
-There are few key operations in the IR. They are categorized as Stream tensor ops. They all have the `IREE::Stream::TensorPhase` trait. The SpecializeEncoding pass uses the `encoding` attribute from the executable_target to resolve the layouts for the encodings. In this example, the attribute is `#iree_cpu.cpu_encoding_layout<>`. The attribute implements [the device encoding layout attribute interface and host encoding layout attribute interface](https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Codegen/ExternalInterfaces/CPUEncodingExternalModels.cpp). E.g., Before the specialization, only the op information is encoded. After the specialization, the layout is resolved into a serialized IR. In this example, they are dictionary attributes representing the [MaterializeEncodingInfo struct](https://github.com/iree-org/iree/blob/d7c6c7bae479324676eb3b25234a312581d9350c/compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h#L85-L96).
+There are few key operations in the IR. They are categorized as Stream tensor
+ops. They all have the `IREE::Stream::TensorPhase` trait. The SpecializeEncoding
+pass uses the `encoding` attribute from the executable_target to resolve the
+layouts for the encodings. In this example, the attribute is
+`#iree_cpu.cpu_encoding_layout<>`. The attribute implements [the device encoding
+layout attribute interface and host encoding layout attribute
+interface](https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Codegen/ExternalInterfaces/CPUEncodingExternalModels.cpp).
+E.g., Before the specialization, only the op information is encoded. After the
+specialization, the layout is resolved into a serialized IR. In this example,
+they are dictionary attributes representing the [MaterializeEncodingInfo
+struct](https://github.com/iree-org/iree/blob/d7c6c7bae479324676eb3b25234a312581d9350c/compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h#L85-L96).
 
 ```mlir
 #map0 = affine_map<(m, n, k) -> (m, k)>
@@ -532,7 +565,11 @@ module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} 
 
 ### Encode Host Tensors
 
-Later on, the `stream.tensor.sizeof` op is lowered to the storage buffer size calculation. Since the new encoding attribute implements the [SerializableEncodingAttrInterface](https://github.com/iree-org/iree/blob/298faa58c64bf7db4d65a16e0fa30fa153d2fef2/compiler/src/iree/compiler/Dialect/Encoding/IR/EncodingInterfaces.td#L79-L194) and it already has all the information. We are able to serve the needs from exectuable targets.
+Later on, the `stream.tensor.sizeof` op is lowered to the storage buffer size
+calculation. Since the new encoding attribute implements the
+[SerializableEncodingAttrInterface](https://github.com/iree-org/iree/blob/298faa58c64bf7db4d65a16e0fa30fa153d2fef2/compiler/src/iree/compiler/Dialect/Encoding/IR/EncodingInterfaces.td#L79-L194)
+and it already has all the information. We are able to serve the needs from
+executable targets.
 
 #### IR dump after the pass
 
@@ -585,8 +622,14 @@ util.func public @foo(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.
 
 ### CodeGen Encoding
 
-At this moment, all the stream ops are lowered to HAL ops. It is CodeGen's responsibility to materialize the encodings within the executables.
+At this moment, all the stream ops are lowered to HAL ops. It is CodeGen's
+responsibility to materialize the encodings within the executables.
 
-The layout transfer is not scoped in the doc, so we are not going to talk the details. The rest of the work is as the same as the configuration without encoding specialization.
+The layout transfer is not scoped in the doc, so we are not going to talk the
+details. The rest of the work is as the same as the configuration without
+encoding specialization.
 
-For more information, see [CPU data-tiling demo](https://gist.github.com/bjacob/32e540ad948a86c07e2cdb49a1a97421) and [GPU data-tiling demo](https://gist.github.com/bjacob/51f7d0e308a26f124a4c2aa17762a553).
+For more information, see [CPU data-tiling
+demo](https://gist.github.com/bjacob/32e540ad948a86c07e2cdb49a1a97421) and [GPU
+data-tiling
+demo](https://gist.github.com/bjacob/51f7d0e308a26f124a4c2aa17762a553).
