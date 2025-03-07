@@ -1173,12 +1173,13 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
     FunctionLikeNest funcPassManager(modulePassManager);
     if (clLLVMGPUEnableExperimentalDataTiling) {
       funcPassManager.addPass(createMaterializeDeviceEncodingPass);
+    } else {
+      addEncodingToPaddingPasses(funcPassManager);
     }
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
     // This materializes into 'nop' in the absence of pad encoding layout
     // attributes.
-    addEncodingToPaddingPasses(funcPassManager);
     funcPassManager.addPass(createBlockDynamicDimensionsPass);
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass);
     funcPassManager.addPass(createCSEPass);
