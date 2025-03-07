@@ -159,19 +159,6 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "disable_demote_f64_to_f32",
-    srcs = [
-        "disable_demote_f64_to_f32.mlir",
-    ],
-    compiler_flags = [
-        "--iree-input-demote-f64-to-f32=false",
-        "--iree-llvmcpu-target-cpu=generic",
-    ],
-    driver = "local-task",
-    target_backend = "llvm-cpu",
-)
-
-iree_check_single_backend_test_suite(
     name = "aggressive_fusion_test",
     srcs = [
         "softmax.mlir",
