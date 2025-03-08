@@ -76,6 +76,7 @@ through the fill op. Because we want to fuse the fill op into the matmul kernel.
 The `round_dims_to` is redundant in the configuration, you can ignore it for
 now.
 
+<!-- markdownlint-disable -->
 <details><summary>IR dump after the pass</summary>
 ```mlir linenums="1" hl_lines="18-23"
 // -----// IR Dump After SetEncodingPass (iree-dispatch-creation-set-encoding) //----- //
@@ -107,6 +108,7 @@ module {
 }
 ```
 </details>
+<!-- markdownlint-restore -->
 
 ### Outline dispatches
 
@@ -114,6 +116,7 @@ There are four dispatches in total. `dispatch_0` packs the LHS operand,
 `dispatch_1` packs the RHS operand, `dispatch_2` is `fill + gemm`, and
 `dispatch_3` unpacks the result of matmul.
 
+<!-- markdownlint-disable -->
 <details><summary>IR dump after the pass</summary>
 ```mlir linenums="1" hl_lines="19-28 37-46 55-71 80-89 99-102"
 // -----// IR Dump After OutlineDispatchRegionsPass (iree-flow-outline-dispatch-regions) //----- //
@@ -224,6 +227,7 @@ module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} 
 }
 ```
 </details>
+<!-- markdownlint-restore -->
 
 ### ConvertToStream
 
@@ -238,6 +242,7 @@ The host code is mostly composed of `stream.tensor.sizeof` and
   the storage buffer size that will be used to issue the allocation later on.
 * The `dispatch` op describes how we call the functions in the program.
 
+<!-- markdownlint-disable -->
 <details><summary>IR dump after the pass</summary>
 ```mlir linenums="1" hl_lines="100-118"
 // -----// IR Dump After ConvertToStreamPass (iree-stream-conversion) //----- //
@@ -367,6 +372,7 @@ module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} 
 }
 ```
 </details>
+<!-- markdownlint-restore -->
 
 ### Specialize Encoding
 
@@ -468,6 +474,7 @@ func.func @set_encoding_LHS_with_layout() attributes {
 }
 ```
 
+<!-- markdownlint-disable -->
 <details><summary>IR dump after the pass</summary>
 ```mlir linenums="1"
 // -----// IR Dump After SpecializeEncodingsPass (iree-stream-specialize-encodings) //----- //
@@ -598,6 +605,7 @@ module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} 
 }
 ```
 </details>
+<!-- markdownlint-restore -->
 
 ### Encode Host Tensors
 
@@ -607,6 +615,7 @@ calculation. Since the new encoding attribute implements the
 and it already has all the information. We are able to serve the needs from
 target devices.
 
+<!-- markdownlint-disable -->
 <details><summary>IR dump after the pass</summary>
 ```mlir linenums="1"
 // -----// IR Dump After EncodeHostTensorsPass (iree-stream-encode-host-tensors) //----- //
@@ -657,6 +666,7 @@ util.func public @foo(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.
 }
 ```
 </details>
+<!-- markdownlint-restore -->
 
 ### CodeGen Encoding
 
