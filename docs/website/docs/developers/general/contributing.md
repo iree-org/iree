@@ -317,7 +317,6 @@ ci-skip: jobs,to,skip
 ci-extra: extra,jobs,to,run
 ci-exactly: exact,set,of,jobs,to,run
 skip-ci: free form reason
-runner-env: [testing|prod]
 ```
 
 ??? info - "Using `skip-ci`"
@@ -354,17 +353,6 @@ runner-env: [testing|prod]
     dependencies are satisfied. Thus, if you request skipping the
     `build_packages` job, all the jobs that depend on it will fail, not be
     skipped.
-
-??? info - "Using `runner-env`"
-
-    The `runner-env` option controls which runner environment to target for our
-    self-hosted runners. We maintain a test environment to allow testing out new
-    configurations prior to rolling them out. This trailer is for advanced users
-    who are working on the CI infrastructure itself.
-
-    ``` text
-    runner-env: [testing|prod]
-    ```
 
 ##### CI configuration recipes
 
