@@ -109,6 +109,8 @@ iree_status_t iree_hal_caching_allocator_create_from_spec(
     iree_string_view_t config_pairs, iree_hal_allocator_t* device_allocator,
     iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator);
 
+bool iree_hal_caching_allocator_isa(iree_hal_allocator_t* base_value);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
