@@ -148,6 +148,14 @@ template class basic_parser<TargetRegistryRef>;
 
 using TargetRegistryRef = llvm::cl::TargetRegistryRef;
 
+void llvm::cl::parser<TargetRegistryRef>::print(
+    raw_ostream &os, const TargetRegistryRef &value) {
+  if (value.isGlobal())
+    os << "global";
+  else
+    os << "unknown";
+}
+
 // Return true on error.
 bool llvm::cl::parser<TargetRegistryRef>::parse(Option &O, StringRef ArgName,
                                                 StringRef Arg,
@@ -156,7 +164,8 @@ bool llvm::cl::parser<TargetRegistryRef>::parse(Option &O, StringRef ArgName,
   // of target backends and create a new registry with just that subset but
   // ownership gets tricky.
   if (Arg != "global")
-    return true;
+    llvm::errs() << "Cannot parse target registery: " << Arg
+                 << ". Defaulting to global.\n";
   Val.value = &mlir::iree_compiler::IREE::HAL::TargetRegistry::getGlobal();
   return false;
 }
