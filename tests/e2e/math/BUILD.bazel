@@ -1,0 +1,32 @@
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Tests of end-to-end IREE support for individual ops in the TOSA dialect.
+# Each test file should have a name matching the corresponding TOSA op and test only the
+# functionality of that op (though may make use of other ops where necessary). Tests should be
+# written using the IREE Check framework.
+# See https://iree.dev/developers/general/testing-guide/#iree-core-end-to-end-e2e-tests.
+
+load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
+
+package(
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+[iree_check_single_backend_test_suite(
+    name = "math_ops_%s" % backend,
+    srcs = ["math_ops_%s_%s.mlir" % (type, backend) for type in [
+        "f16",
+        "f32",
+    ]],
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"] if backend == "llvm-cpu" else [],
+    driver = driver,
+    target_backend = backend,
+) for backend, driver in [
+    ("llvm-cpu", "local-task"),
+    ("rocm", "hip"),
+]]
