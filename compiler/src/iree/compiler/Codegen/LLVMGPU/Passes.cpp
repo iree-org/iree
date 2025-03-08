@@ -1073,6 +1073,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   modulePassManager.addPass(createLowerUKernelOpsToCallsPass());
 
   FunctionLikeNest(modulePassManager)
+      // Pack non-overlapping memory allocations.
+      .addPass(createGPUReuseSharedMemoryAllocsPass)
       // LinalgExt -> SCF
       .addPass(IREE::LinalgExt::createLinalgExtToLoopsPass)
 
