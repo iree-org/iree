@@ -1,11 +1,12 @@
 ---
-date: 2025-03-06
+date: 2025-03-07
 authors:
   - hanhanW
 categories:
   - Performance
 tags:
   - CPU
+readtime: 7
 ---
 
 # Demo: Data-tiling with multi-device
@@ -18,28 +19,27 @@ specialization](./data-tiling-with-encoding-specialization.md).
 
 ## Setup
 
-Test source program: dt_multi_device.mlir
-
 The program runs a matmul on a device targeting zen4 CPU, and the other matmul
-on a device targeting VMVX. At the end, the sum of two matmul results is
-printed.
+on a device targeting VMVX. At the end, the sum of two matmul is returned.
 
 Note: it's hard to pass flags for the device configs today because MLIR
 attributes don't really work well in shells with all the #'s and such. In this
 case, we hardcoded the executable target in the IR for the demo.
 
-```mlir
+```mlir title="dt_multi_device.mlir" linenums="1" hl_lines="1-8 10-13 26 40 46 52 55"
 // x86 CPU that has `+avx512f` feature.
 #executable_target_embedded_elf_x86_64_with_encoding_layout = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64",
   {cpu = "znver4", cpu_features = "+avx512f",
    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128",
    native_vector_size = 64 : i64,
    target_triple = "x86_64-unknown-unknown-eabi-elf",
-   iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>
-   }>
+   iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}
+>
 
 // VMVX with ukernels enabled.
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_cpu.vmvx_encoding_layout<>, ukernels = "all"}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb",
+  {iree.encoding.resolver = #iree_cpu.vmvx_encoding_layout<>, ukernels = "all"}
+>
 
 util.global private @device_a = #hal.device.target<"local", {ordinal = 0 : index}, [
   #executable_target_embedded_elf_x86_64_with_encoding_layout
@@ -52,6 +52,7 @@ func.func @foo(
   %lhs: tensor<?x?xf32> {iree.abi.affinity = #hal.device.affinity<@device_a>},
   %rhs: tensor<?x?xf32> {iree.abi.affinity = #hal.device.affinity<@device_a>}) -> (tensor<?x?xf32> {iree.abi.affinity = #hal.device.affinity<@device_a>}) {
 
+  // Execute matmul on device_a and transfer the result to device_b
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %M = tensor.dim %lhs, %c0 : tensor<?x?xf32>
@@ -63,7 +64,6 @@ func.func @foo(
   %op = linalg.matmul
       ins(%lhs, %rhs : tensor<?x?xf32>, tensor<?x?xf32>)
       outs(%fill : tensor<?x?xf32>) -> tensor<?x?xf32>
-  // Execute matmul on device_a and transfer the result to device_b
   %transient_op = flow.tensor.transfer %op : tensor<?x?xf32>{%M, %N} to #hal.device.affinity<@device_b>
 
   // Transfer input data to device_b
@@ -88,17 +88,16 @@ func.func @foo(
 
 Compilation:
 
-```mlir
+```bash
 iree-compile \
   --iree-execution-model=async-external \
   --iree-global-opt-enable-early-materialization=false \
-  --iree-stream-experimental-specialize-encodings \
   ~/dt_multi_device.mlir -o ~/dt_multi_device.vmfb
 ```
 
 ## Walkthrough
 
-Most of the details are as the same as the [previous
+Most of the details are as the same as [the previous
 write-up](./data-tiling-with-encoding-specialization.md). The key is in
 SpecializeEncoding pass and how we materialize the encodings in backends.
 
@@ -111,7 +110,7 @@ involved.
 
 Take a look at the below snippet. There is an executable that set encodings on
 the source tensor, and there are two dispatch ops. One launch the kernel on
-device_a, and the other launch the kernel on device_b. It can produce wrong
+`device_a`, and the other launch the kernel on `device_b`. It can produce wrong
 codegen artifacts when bindings types are encoded (i.e., the tensor type has an
 encoding attribute). Because they can result in different layouts. It is
 confusing what the input layouts for the executable because there are two
@@ -119,7 +118,7 @@ possibilities. In this case, we have to duplicate the executable with updated
 encoding, and modify the dispatch to launch proper executable based on resolved
 encoding layouts.
 
-```mlir
+```mlir linenums="1" hl_lines="19 20"
 stream.executable private @ex {
   stream.executable.export public @set_encoding
   builtin.module {
@@ -152,14 +151,30 @@ Note that the duplication does not only look at execution affinity, but also
 look at the layouts for each input operands. Because the actual layout can vary
 based on where the input operands come from.
 
-```mlir
-#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], layouts = [#iree_encoding.specialized_encoding<123, tensor<?x?xf32>>]>
-#encoding1 = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], layouts = [#iree_encoding.specialized_encoding<456, tensor<?x?xf32>>]>
+```mlir linenums="1" hl_lines="1-6 8-13 15-23 36-41 59-64 70 71 73 74"
+#encoding = #iree_encoding.encoding<
+  operand_index = 0 : index,
+  op_type =  matmul,
+  element_types = [f32, f32, f32],
+  layouts = [#iree_encoding.specialized_encoding<123, tensor<?x?xf32>>]
+>
+
+#encoding1 = #iree_encoding.encoding<
+  operand_index = 0 : index,
+  op_type =  matmul,
+  element_types = [f32, f32, f32],
+  layouts = [#iree_encoding.specialized_encoding<456, tensor<?x?xf32>>]
+>
 
 // -------------------------------- //
-// encoding2 does not have layouts. //
+// #encoding2 does not have layouts. //
 // -------------------------------- //
-#encoding2 = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>
+#encoding2 = #iree_encoding.encoding<
+  operand_index = 0 : index,
+  op_type =  matmul,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#map, #map1, #map2]
+>
 stream.executable private @ex {
   stream.executable.export public @set_encoding
   builtin.module {
@@ -175,7 +190,9 @@ stream.executable private @ex {
       // --------------------------------------------------------------- //
       // This is the key, which is a #encoding2 -> #encoding conversion. //
       // --------------------------------------------------------------- //
-      flow.dispatch.tensor.store %5, %3, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : tensor<?x?xf32, #encoding2> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding>>{%0, %1}
+      flow.dispatch.tensor.store %5, %3, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1]
+        : tensor<?x?xf32, #encoding2>
+        -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding>>{%0, %1}
       return
     }
   }
@@ -194,9 +211,11 @@ stream.executable private @ex_dup0 {
       %5 = iree_encoding.set_encoding %4 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding2>
 
       // --------------------------------------------------------------- //
-      // This is the key, which is a #encoding1 -> #encoding conversion. //
+      // This is the key, which is a #encoding2 -> #encoding1 conversion. //
       // --------------------------------------------------------------- //
-      flow.dispatch.tensor.store %5, %3, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : tensor<?x?xf32, #encoding2> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding1>>{%0, %1}
+      flow.dispatch.tensor.store %5, %3, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1]
+        : tensor<?x?xf32, #encoding2>
+        -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding1>>{%0, %1}
       return
     }
   }
@@ -212,31 +231,45 @@ util.func public @multi_device_set_encoding() {
 ```
 
 For more examples, see the [lit
-tests](https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Dialect/Stream/Transforms/test/specialize_encodings.mlir)
+tests](https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Dialect/Stream/Transforms/test/specialize_encodings.mlir).
 
 ### MaterializeEncoding
 
 As shown in the previous section, the encodings attached on bindings are
 updated. They now have the resolved layouts information. Thus, there are two
 kind of encodings in an executable. One is for incoming buffers with resolved
-layouts, and the other is original layout that attached on computation ops
+layouts, and the other is the original encoding that attached on computation ops
 (e.g., set_encoding, unset_encoding, matmul, etc). The encodings on the
 computation ops are materialized to the target device preferred layout.
 
 If multi-device are not involved, they result in the same layout. In this
 context, we do not need to transfer layouts.
 
-```mlir
+```mlir linenums="1" hl_lines="6-13 15-24 33-35"
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f", encoding = #iree_cpu.cpu_encoding_layout<>}>
-#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], layouts = [#iree_cpu.cpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [1, 1], outerDimsPerm = [0, 1]}}>]>
+#encoding = #iree_encoding.encoding<
+  operand_index = 0 : index,
+  op_type =  matmul,
+  element_types = [f32, f32, f32],
+  layouts = [#iree_cpu.cpu_encoding_layout<configuration = {
+    encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [1, 1], outerDimsPerm = [0, 1]}}>
+  ]
+>
+
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#encoding1 = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 1, 32, 32>>
+#encoding1 = #iree_encoding.encoding<
+  operand_index = 0 : index,
+  op_type =  matmul,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#map, #map1, #map2],
+  round_dims_to = array<i64: 1, 32, 32>
+>
 func.func @set_encoding_LHS_with_layout() attributes {
   hal.executable.target = #executable_target
 } {
@@ -245,23 +278,26 @@ func.func @set_encoding_LHS_with_layout() attributes {
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<1x256xf32, #encoding>>
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x256xf32>> -> tensor<1x256xf32>
   %3 = iree_encoding.set_encoding %2 : tensor<1x256xf32> -> tensor<1x256xf32, #encoding1>
-  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [1, 256], strides = [1, 1] : tensor<1x256xf32, #encoding1> -> !flow.dispatch.tensor<writeonly:tensor<1x256xf32, #encoding>>
+  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [1, 256], strides = [1, 1]
+    : tensor<1x256xf32, #encoding1>
+    -> !flow.dispatch.tensor<writeonly:tensor<1x256xf32, #encoding>>
   return
 }
 ```
 
-The issue is what if the layouts mismatch? I.e., the incoming buffer layouts are
-different from the resolved layouts on load/store ops.
+The problem is what if the layouts mismatch? I.e., the incoming buffer layouts
+are different from the resolved layouts on load/store ops.
 
-The fact is that the attribute attached in the encoding knows the details. We
-can introduce a `bringToGlobalLayout` interface method, and the attribute
-implement it. It generates a sequence of operations that bring the current
-layout to the global layout (e.g., the tensor type without encoding). Then we
-can introduce a `bringToTiledLayout` interface method. It generates operations
-that bring the global layout to the target preferred layout.
+The fact is that the encoding layout resolver attached in the `#encoding` knows
+the details. We can introduce a `bringToGlobalLayout` interface method, and the
+resolver attribute implement it. It generates a sequence of operations that
+bring the current layout to the global layout (e.g., the tensor type without
+encoding).  Then we can introduce a `bringToTiledLayout` interface method. It
+generates operations that bring the global layout to the target preferred
+layout.
 
 In this context, the `flow.dispatch.tensor.load/store` materialization patterns
 can call the interface methods and finish the layout transfer.
 
-This is not done yet, and the work is being
+The work is not done yet, and it has been
 [tracked](https://github.com/iree-org/iree/issues/19896).

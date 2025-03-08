@@ -6,6 +6,7 @@ categories:
   - Performance
 tags:
   - CPU
+readtime: 10
 ---
 
 # How data-tiling works with encoding specialization
@@ -22,9 +23,9 @@ data-tiling technique, and the post explores how encodings work in data-tiling.
 
 ## Setup
 
-Test source program: dynamic matmul_f32.mlir:
+The program runs a matmul that has dynamic shapes and f32 element types.
 
-```mlir
+```mlir title="matmul_f32.mlir" linenums="1"
 func.func @foo(%lhs: tensor<?x?xf32>, %rhs: tensor<?x?xf32>) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -42,14 +43,13 @@ func.func @foo(%lhs: tensor<?x?xf32>, %rhs: tensor<?x?xf32>) -> tensor<?x?xf32> 
 
 Compile for zen4 CPU target:
 
-```mlir
+```bash
 iree-compile \
   --output-format=vm-bytecode \
   --iree-hal-target-backends=llvm-cpu \
   --iree-llvmcpu-target-cpu=znver4 \
   --iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu \
   --iree-global-opt-enable-early-materialization=false \
-  --iree-stream-experimental-specialize-encodings \
   ~/matmul_f32.mlir -o ~/matmul_f32.vmfb
 ```
 
@@ -58,9 +58,9 @@ are resolved way before specialization.
 
 ## Walkthrough
 
-Below is the IR dump after selected data-tiling passes. For more information see
-the [full IR
-dump](https://gist.github.com/hanhanW/df11ad072e40cbb776307c503dbc8f45).
+Below is the IR dump after selected data-tiling passes. For more information,
+see the [full IR
+dump](https://gist.github.com/hanhanW/dc109593d4464937486b037192a2f3e4).
 
 ### Set Encodings
 
@@ -74,7 +74,8 @@ through the fill op. Because we want to fuse the fill op into the matmul kernel.
 The `round_dims_to` is redundant in the configuration, you can ignore it for
 now.
 
-```mlir
+<details><summary>IR dump after the pass</summary>
+```mlir linenums="1" hl_lines="18-23"
 // -----// IR Dump After SetEncodingPass (iree-dispatch-creation-set-encoding) //----- //
 
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -103,6 +104,7 @@ module {
   }
 }
 ```
+</details>
 
 ### Outline dispatches
 
@@ -110,11 +112,11 @@ There are four dispatches in total. `dispatch_0` packs the LHS operand,
 `dispatch_1` packs the RHS operand, `dispatch_2` is `fill + gemm`, and
 `dispatch_3` unpacks the result of matmul.
 
-#### IR dump after the pass
-
-```mlir
+<details><summary>IR dump after the pass</summary>
+```mlir linenums="1" hl_lines="19-28 37-46 55-71 80-89 99-102"
 // -----// IR Dump After OutlineDispatchRegionsPass (iree-flow-outline-dispatch-regions) //----- //
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "znver4", cpu_features = "+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+sse4a,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vbmi,+avx512ifma,+avx512vpopcntdq,+avx512vbmi2,+gfni,+vpclmulqdq,+avx512vnni,+avx512bitalg,+avx512bf16,+adx,+clflushopt,+clwb,+clzero,+cx16,+cx8,+f16c,+fsgsbase,+crc32,+invpcid,+rdpru,+sahf,+lzcnt,+movbe,+mwaitx,+x87,+pku,+evex512,+prfchw,+rdpid,+rdrnd,+rdseed,+sha,+shstk,+vaes,+wbnoinvd,+xsave,+xsavec,+xsaveopt,+xsaves,+fxsr", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", encoding = #iree_cpu.cpu_encoding_layout<>, native_vector_size = 64 : i64, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "znver4", cpu_features = "+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+sse4a,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vbmi,+avx512ifma,+avx512vpopcntdq,+avx512vbmi2,+gfni,+vpclmulqdq,+avx512vnni,+avx512bitalg,+avx512bf16,+adx,+clflushopt,+clwb,+clzero,+cx16,+cx8,+f16c,+fsgsbase,+crc32,+invpcid,+rdpru,+sahf,+lzcnt,+movbe,+mwaitx,+x87,+pku,+evex512,+prfchw,+rdpid,+rdrnd,+rdseed,+sha,+shstk,+vaes,+wbnoinvd,+xsave,+xsavec,+xsaveopt,+xsaves,+fxsr", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", iree.encoding.resolver= #iree_cpu.cpu_encoding_layout<>, native_vector_size = 64 : i64, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -219,12 +221,13 @@ module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} 
   }
 }
 ```
+</details>
 
 ### ConvertToStream
 
 The flow executables all become stream executables, and the function arguments
-become opaque types which are `stream.binding`. At the Stream level, it does not
-need to know anything about Flow.
+become opaque types (i.e., `stream.binding` types). At the Stream level, it does
+not need to know anything about Flow.
 
 The host code is mostly about `stream.tensor.sizeof` and
 `stream.tensor.dispatch`. The `sizeof` op takes a tensor type with an optional
@@ -232,10 +235,9 @@ encoding. It indicates the storage buffer size that will be used to issue the
 allocation later on. The `dispatch` op describes how we call the functions in
 the program.
 
-#### IR dump after the pass
-
-```mlir
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "znver4", cpu_features = "+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+sse4a,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vbmi,+avx512ifma,+avx512vpopcntdq,+avx512vbmi2,+gfni,+vpclmulqdq,+avx512vnni,+avx512bitalg,+avx512bf16,+adx,+clflushopt,+clwb,+clzero,+cx16,+cx8,+f16c,+fsgsbase,+crc32,+invpcid,+rdpru,+sahf,+lzcnt,+movbe,+mwaitx,+x87,+pku,+evex512,+prfchw,+rdpid,+rdrnd,+rdseed,+sha,+shstk,+vaes,+wbnoinvd,+xsave,+xsavec,+xsaveopt,+xsaves,+fxsr", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", encoding = #iree_cpu.cpu_encoding_layout<>, native_vector_size = 64 : i64, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+<details><summary>IR dump after the pass</summary>
+```mlir linenums="1" hl_lines="100-118"
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "znver4", cpu_features = "+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+sse4a,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vbmi,+avx512ifma,+avx512vpopcntdq,+avx512vbmi2,+gfni,+vpclmulqdq,+avx512vnni,+avx512bitalg,+avx512bf16,+adx,+clflushopt,+clwb,+clzero,+cx16,+cx8,+f16c,+fsgsbase,+crc32,+invpcid,+rdpru,+sahf,+lzcnt,+movbe,+mwaitx,+x87,+pku,+evex512,+prfchw,+rdpid,+rdrnd,+rdseed,+sha,+shstk,+vaes,+wbnoinvd,+xsave,+xsavec,+xsaveopt,+xsaves,+fxsr", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", iree.encoding.resolver= #iree_cpu.cpu_encoding_layout<>, native_vector_size = 64 : i64, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -359,30 +361,39 @@ module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} 
   }
 }
 ```
+</details>
 
 ### Specialize Encoding
 
 There are few key operations in the IR. They are categorized as Stream tensor
 ops. They all have the `IREE::Stream::TensorPhase` trait. The SpecializeEncoding
 pass uses the `encoding` attribute from the executable_target to resolve the
-layouts for the encodings. In this example, the attribute is
-`#iree_cpu.cpu_encoding_layout<>`. The attribute implements [the device encoding
-layout attribute interface and host encoding layout attribute
+layouts for the encodings.
+
+In this example, the encoding layout resolver is
+`#iree_cpu.cpu_encoding_layout<>`. The attribute implements [the device/host
+encoding layout attribute
 interface](https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Codegen/ExternalInterfaces/CPUEncodingExternalModels.cpp).
-E.g., Before the specialization, only the op information is encoded. After the
-specialization, the layout is resolved into a serialized IR. In this example,
+
+Before the specialization, only the op information is encoded. After the
+specialization, the layout is resolved into a serialized IR.  In this example,
 they are dictionary attributes representing the [MaterializeEncodingInfo
 struct](https://github.com/iree-org/iree/blob/d7c6c7bae479324676eb3b25234a312581d9350c/compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h#L85-L96).
 
-```mlir
+```mlir linenums="1" hl_lines="8-13 24-29"
 #map0 = affine_map<(m, n, k) -> (m, k)>
 #map1 = affine_map<(m, n, k) -> (k, n)>
 #map2 = affine_map<(m, n, k) -> (m, n)>
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {encoding = #iree_cpu.vmvx_encoding_layout<>}>
-#executable_target_x86_64 = #hal.executable.target<"llvm-cpu", "xyz", {encoding = #iree_cpu.cpu_encoding_layout<>, target_triple="x86_64-xyz-xyz", cpu_features="+avx512f"}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver= #iree_cpu.vmvx_encoding_layout<>}>
+#executable_target_x86_64 = #hal.executable.target<"llvm-cpu", "xyz", {iree.encoding.resolver= #iree_cpu.cpu_encoding_layout<>, target_triple="x86_64-xyz-xyz", cpu_features="+avx512f"}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #device_target_local_1_ = #hal.device.target<"local", {ordinal = 1 : index}, [#executable_target_x86_64]> : !hal.device
-#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
+#encoding = #iree_encoding.encoding<
+  operand_index = 0 : index,
+  op_type =  matmul,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#map0, #map1, #map2]
+>
 module {
   util.global private @device_a = #device_target_local_0_
   util.global private @device_b = #device_target_local_1_
@@ -406,43 +417,58 @@ module {
 ```
 
 On the executable side, the encodings attached on stream.bindings are also
-updated with resolved layouts, which is consistent with the stream tensor ops
-changes. E.g.,
+updated with resolved layouts, which is consistent with the changes in stream
+tensor ops. The encodings on other operations (e.g., set_encoding) will be
+materialized later on in CodeGen pipeline.
 
-```mlir
+```mlir linenums="1" hl_lines="7-15 17-25 32-33 35-36"
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#executable_target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f", encoding = #iree_cpu.cpu_encoding_layout<>}> #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], layouts = [#iree_cpu.cpu_encoding_layout<configuration
-= {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [1, 1], outerDimsPerm = [0, 1]}}>]>
-#map = affine_map<(d0, d1, d2) -> (d0, d2)>                                                                                                                               #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#executable_target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f", iree.encoding.resolver= #iree_cpu.cpu_encoding_layout<>}>
+
+#encoding = #iree_encoding.encoding<
+  operand_index = 0 : index,
+  op_type =  matmul,
+  element_types = [f32, f32, f32],
+  layouts = [#iree_cpu.cpu_encoding_layout<configuration = {
+    encoding_info = {innerDimsPos = [0, 1],
+                     innerTileSizes = [1, 1],
+                     outerDimsPerm = [0, 1]}
+  }>]>
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#encoding1 = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_
-to = array<i64: 1, 32, 32>>
+#encoding1 = #iree_encoding.encoding<
+  operand_index = 0 : index,
+  op_type =  matmul,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#map, #map1, #map2],
+  round_dims_to = array<i64: 1, 32, 32>>
+
 func.func @set_encoding_LHS_with_layout() attributes {
   hal.executable.target = #executable_target
 } {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<1x25
-6xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<1x256xf32, #en
-coding>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<1x256xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(Indirect)
+    : !flow.dispatch.tensor<writeonly:tensor<1x256xf32, #encoding>>
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x256xf32>> -> tensor<1x256xf32>
-  %3 = iree_encoding.set_encoding %2 : tensor<1x256xf32> -> tensor<1x256xf32, #encoding1>
-  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [1, 256], strides = [1, 1] : tensor<1x256xf32, #encoding1> -> !flow.dispatch.tensor<writeonly:tensor<1x256x
-f32, #encoding>>
+  %3 = iree_encoding.set_encoding %2
+    : tensor<1x256xf32> -> tensor<1x256xf32, #encoding1>
+  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [1, 256], strides = [1, 1] : tensor<1x256xf32, #encoding1> -> !flow.dispatch.tensor<writeonly:tensor<1x256xf32, #encoding>>
   return
 }
 ```
 
-#### IR dump after the pass
-
-```mlir
+<details><summary>IR dump after the pass</summary>
+```mlir linenums="1"
 #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], layouts = [#iree_cpu.cpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [16, 1], outerDimsPerm = [0, 1]}}>]>
 #encoding1 = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], layouts = [#iree_cpu.cpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [1, 0], innerTileSizes = [16, 1], outerDimsPerm = [1, 0]}}>]>
 #encoding2 = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], layouts = [#iree_cpu.cpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [16, 16], outerDimsPerm = [0, 1]}}>]>
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "znver4", cpu_features = "+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+sse4a,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vbmi,+avx512ifma,+avx512vpopcntdq,+avx512vbmi2,+gfni,+vpclmulqdq,+avx512vnni,+avx512bitalg,+avx512bf16,+adx,+clflushopt,+clwb,+clzero,+cx16,+cx8,+f16c,+fsgsbase,+crc32,+invpcid,+rdpru,+sahf,+lzcnt,+movbe,+mwaitx,+x87,+pku,+evex512,+prfchw,+rdpid,+rdrnd,+rdseed,+sha,+shstk,+vaes,+wbnoinvd,+xsave,+xsavec,+xsaveopt,+xsaves,+fxsr", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", encoding = #iree_cpu.cpu_encoding_layout<>, native_vector_size = 64 : i64, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "znver4", cpu_features = "+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+sse4a,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vbmi,+avx512ifma,+avx512vpopcntdq,+avx512vbmi2,+gfni,+vpclmulqdq,+avx512vnni,+avx512bitalg,+avx512bf16,+adx,+clflushopt,+clwb,+clzero,+cx16,+cx8,+f16c,+fsgsbase,+crc32,+invpcid,+rdpru,+sahf,+lzcnt,+movbe,+mwaitx,+x87,+pku,+evex512,+prfchw,+rdpid,+rdrnd,+rdseed,+sha,+shstk,+vaes,+wbnoinvd,+xsave,+xsavec,+xsaveopt,+xsaves,+fxsr", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", iree.encoding.resolver= #iree_cpu.cpu_encoding_layout<>, native_vector_size = 64 : i64, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -564,6 +590,7 @@ module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} 
   }
 }
 ```
+</details>
 
 ### Encode Host Tensors
 
@@ -571,11 +598,10 @@ Later on, the `stream.tensor.sizeof` op is lowered to the storage buffer size
 calculation. Since the new encoding attribute implements the
 [SerializableEncodingAttrInterface](https://github.com/iree-org/iree/blob/298faa58c64bf7db4d65a16e0fa30fa153d2fef2/compiler/src/iree/compiler/Dialect/Encoding/IR/EncodingInterfaces.td#L79-L194)
 and it already has all the information. We are able to serve the needs from
-executable targets.
+target devices.
 
-#### IR dump after the pass
-
-```mlir
+<details><summary>IR dump after the pass</summary>
+```mlir linenums="1"
 util.func public @foo(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.reflection = {iree.abi.declaration = "sync func @foo(%input0: tensor<?x?xf32>, %input1: tensor<?x?xf32>) -> (%output0: tensor<?x?xf32>)"}} {
   %c0 = arith.constant 0 : index
   %c16 = arith.constant 16 : index
@@ -621,6 +647,7 @@ util.func public @foo(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.
   util.return %33 : !hal.buffer_view
 }
 ```
+</details>
 
 ### CodeGen Encoding
 
