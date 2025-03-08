@@ -2200,6 +2200,15 @@ TensorDispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
                                   getWorkload(), symbolTable);
 }
 
+bool TensorDispatchOp::preferCloneToConsumers() {
+  for (auto operand : getMixedOperands()) {
+    if (isa<Stream::ResourceType>(operand.getType())) {
+      return false;
+    }
+  }
+  return true;
+}
+
 std::pair<unsigned, unsigned>
 TensorDispatchOp::getTiedOperandsIndexAndLength() {
   return getODSOperandIndexAndLength(1); // $operands
@@ -2703,6 +2712,15 @@ static void printDispatchOperands(OpAsmPrinter &p, Operation *op,
     }
   });
   p << ")";
+}
+
+bool AsyncDispatchOp::preferCloneToConsumers() {
+  for (auto operand : getResourceOperands()) {
+    if (isa<Stream::ResourceType>(operand.getType())) {
+      return false;
+    }
+  }
+  return true;
 }
 
 LogicalResult AsyncDispatchOp::verify() {

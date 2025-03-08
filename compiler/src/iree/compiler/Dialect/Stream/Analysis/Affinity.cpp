@@ -723,26 +723,11 @@ void OpAffinityPVS::initializeOperation(Operation *op, DFX::Solver &solver) {
 ChangeStatus OpAffinityPVS::updateOperation(Operation *op,
                                             DFX::Solver &solver) {
   StateType newState;
-
-  const bool consumesAny = llvm::any_of(
-      op->getOperandTypes(), +[](Type type) {
-        return isa<IREE::Stream::AffinityTypeInterface>(type);
-      });
-  if (consumesAny) {
-    for (auto operand : op->getOperands()) {
-      if (isa<IREE::Stream::AffinityTypeInterface>(operand.getType())) {
-        auto valuePVS = solver.getElementFor<ValueProducerAffinityPVS>(
-            *this, Position::forValue(operand), DFX::Resolution::REQUIRED);
-        newState ^= valuePVS;
-      }
-    }
-  } else {
-    for (auto result : op->getResults()) {
-      if (isa<IREE::Stream::AffinityTypeInterface>(result.getType())) {
-        auto valuePVS = solver.getElementFor<ValueConsumerAffinityPVS>(
-            *this, Position::forValue(result), DFX::Resolution::REQUIRED);
-        newState ^= valuePVS;
-      }
+  for (auto operand : op->getOperands()) {
+    if (isa<IREE::Stream::AffinityTypeInterface>(operand.getType())) {
+      auto valuePVS = solver.getElementFor<ValueProducerAffinityPVS>(
+          *this, Position::forValue(operand), DFX::Resolution::REQUIRED);
+      newState ^= valuePVS;
     }
   }
 
