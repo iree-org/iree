@@ -92,6 +92,7 @@ Compilation:
 iree-compile \
   --iree-execution-model=async-external \
   --iree-global-opt-enable-early-materialization=false \
+  --iree-stream-experimental-specialize-encodings=true \
   ~/dt_multi_device.mlir -o ~/dt_multi_device.vmfb
 ```
 

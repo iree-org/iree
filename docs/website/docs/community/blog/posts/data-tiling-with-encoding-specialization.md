@@ -13,9 +13,10 @@ readtime: 10
 
 Data-tiling is a technique that transforms the input data to be in a particular
 layout for good performance. It allows you to access data through the cache
-hierarchy efficiently and do the computation with very less latency. IREE is a
-compiler which sees the whole graph. There are many opportunities to remove
-layout-transformation overheads. They may be propagated, fused into other
+hierarchy efficiently and do the computation with very less latency.
+
+IREE is a compiler which sees the whole graph. There are many opportunities to
+remove layout-transformation overheads. They may be propagated, fused into other
 operations, or be constant-evaluated for weights. IREE uses encodings to apply
 data-tiling technique, and the post explores how encodings work in data-tiling.
 
@@ -50,6 +51,7 @@ iree-compile \
   --iree-llvmcpu-target-cpu=znver4 \
   --iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu \
   --iree-global-opt-enable-early-materialization=false \
+  --iree-stream-experimental-specialize-encodings=true \
   ~/matmul_f32.mlir -o ~/matmul_f32.vmfb
 ```
 
@@ -60,7 +62,7 @@ are resolved way before specialization.
 
 Below is the IR dump after selected data-tiling passes. For more information,
 see the [full IR
-dump](https://gist.github.com/hanhanW/dc109593d4464937486b037192a2f3e4).
+dump](https://gist.github.com/hanhanW/216b00ebd2d5d6742ecb69af4c1acd9a).
 
 ### Set Encodings
 
@@ -229,14 +231,17 @@ The flow executables all become stream executables, and the function arguments
 become opaque types (i.e., `stream.binding` types). At the Stream level, it does
 not need to know anything about Flow.
 
-The host code is mostly about `stream.tensor.sizeof` and
-`stream.tensor.dispatch`. The `sizeof` op takes a tensor type with an optional
-encoding. It indicates the storage buffer size that will be used to issue the
-allocation later on. The `dispatch` op describes how we call the functions in
-the program.
+The host code is mostly composed of `stream.tensor.sizeof` and
+`stream.tensor.dispatch` ops.
+
+* The `sizeof` op takes a tensor type with an optional encoding and indicates
+  the storage buffer size that will be used to issue the allocation later on.
+* The `dispatch` op describes how we call the functions in the program.
 
 <details><summary>IR dump after the pass</summary>
 ```mlir linenums="1" hl_lines="100-118"
+// -----// IR Dump After ConvertToStreamPass (iree-stream-conversion) //----- //
+
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "znver4", cpu_features = "+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+sse4a,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vbmi,+avx512ifma,+avx512vpopcntdq,+avx512vbmi2,+gfni,+vpclmulqdq,+avx512vnni,+avx512bitalg,+avx512bf16,+adx,+clflushopt,+clwb,+clzero,+cx16,+cx8,+f16c,+fsgsbase,+crc32,+invpcid,+rdpru,+sahf,+lzcnt,+movbe,+mwaitx,+x87,+pku,+evex512,+prfchw,+rdpid,+rdrnd,+rdseed,+sha,+shstk,+vaes,+wbnoinvd,+xsave,+xsavec,+xsaveopt,+xsaves,+fxsr", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", iree.encoding.resolver= #iree_cpu.cpu_encoding_layout<>, native_vector_size = 64 : i64, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
@@ -377,7 +382,7 @@ interface](https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler
 
 Before the specialization, only the op information is encoded. After the
 specialization, the layout is resolved into a serialized IR.  In this example,
-they are dictionary attributes representing the [MaterializeEncodingInfo
+that is dictionary attribute representing the [MaterializeEncodingInfo
 struct](https://github.com/iree-org/iree/blob/d7c6c7bae479324676eb3b25234a312581d9350c/compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h#L85-L96).
 
 ```mlir linenums="1" hl_lines="8-13 24-29"
@@ -465,6 +470,8 @@ func.func @set_encoding_LHS_with_layout() attributes {
 
 <details><summary>IR dump after the pass</summary>
 ```mlir linenums="1"
+// -----// IR Dump After SpecializeEncodingsPass (iree-stream-specialize-encodings) //----- //
+
 #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], layouts = [#iree_cpu.cpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [16, 1], outerDimsPerm = [0, 1]}}>]>
 #encoding1 = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], layouts = [#iree_cpu.cpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [1, 0], innerTileSizes = [16, 1], outerDimsPerm = [1, 0]}}>]>
 #encoding2 = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], layouts = [#iree_cpu.cpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [16, 16], outerDimsPerm = [0, 1]}}>]>
@@ -602,6 +609,8 @@ target devices.
 
 <details><summary>IR dump after the pass</summary>
 ```mlir linenums="1"
+// -----// IR Dump After EncodeHostTensorsPass (iree-stream-encode-host-tensors) //----- //
+
 util.func public @foo(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.reflection = {iree.abi.declaration = "sync func @foo(%input0: tensor<?x?xf32>, %input1: tensor<?x?xf32>) -> (%output0: tensor<?x?xf32>)"}} {
   %c0 = arith.constant 0 : index
   %c16 = arith.constant 16 : index
