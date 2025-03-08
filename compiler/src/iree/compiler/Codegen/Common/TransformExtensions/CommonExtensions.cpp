@@ -637,6 +637,8 @@ DiagnosedSilenceableFailure transform_dialect::HoistStaticAllocOp::applyToOne(
     transform::TransformState &state) {
   mlir::iree_compiler::hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(
       rewriter, target);
+  mlir::iree_compiler::hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(
+      rewriter, target);
   return DiagnosedSilenceableFailure::success();
 }
 

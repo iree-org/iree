@@ -157,7 +157,7 @@ hal.executable @transpose_3d_no_dispatch_0_generic_768x2048x1024 {
 
 // CHECK-LABEL:   hal.executable public @transpose_3d_no_dispatch_0_generic_768x2048x1024 {
 //   CHECK-NOT:   gpu.barrier
-//   CHECK-NOT:   memref.alloc
+//   CHECK-NOT:   memref.alloc{{.*}}#gpu.address_space<workgroup>
 //       CHECK:   return
 
 // -----
@@ -350,5 +350,5 @@ hal.executable @transpose_3d_diff_dispatch_0_generic_10x768x2048 {
 
 // CHECK-LABEL:   hal.executable public @transpose_3d_diff_dispatch_0_generic_10x768x2048 {
 //   CHECK-NOT:   gpu.barrier
-//   CHECK-NOT:   memref.alloc
+//   CHECK-NOT:   memref.alloc{{.*}}#gpu.address_space<workgroup>
 //       CHECK:   return

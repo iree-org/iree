@@ -32,7 +32,7 @@ using LivenessRange = std::pair<Operation *, Operation *>;
 /// specifically, the liveness range is the range in the `parentRegion` between
 /// the first and last operations that belong to `parentRegion` and contain a
 /// use of the alloc (or subview of the alloc) within their child regions.
-static LivenessRange getLivenessRange(memref::AllocOp alloc,
+static LivenessRange getLivenessRange(memref::AllocaOp alloc,
                                       DominanceInfo &dominanceInfo,
                                       Region &parentRegion) {
   Operation *begin = nullptr, *end = nullptr;
@@ -70,7 +70,7 @@ static LivenessRange getLivenessRange(memref::AllocOp alloc,
 /// 3. `rootOp` must have at least 2 shared memory allocations.
 static LogicalResult populateLivenessRanges(
     Operation *rootOp, DenseMap<Operation *, LivenessRange> &livenessMap,
-    SmallVector<memref::AllocOp> &allocs, DominanceInfo &dominanceInfo) {
+    SmallVector<memref::AllocaOp> &allocs, DominanceInfo &dominanceInfo) {
   if (rootOp->getNumRegions() != 1) {
     return failure();
   }
@@ -85,8 +85,8 @@ static LogicalResult populateLivenessRanges(
   }
 
   // Collect all shared memory allocations.
-  SmallVector<memref::AllocOp> sharedMemAllocs;
-  for (auto alloc : rootBlock.getOps<memref::AllocOp>()) {
+  SmallVector<memref::AllocaOp> sharedMemAllocs;
+  for (auto alloc : rootBlock.getOps<memref::AllocaOp>()) {
     if (hasSharedMemoryAddressSpace(alloc.getType())) {
       sharedMemAllocs.push_back(alloc);
     }
@@ -97,7 +97,7 @@ static LogicalResult populateLivenessRanges(
     return failure();
   }
 
-  for (memref::AllocOp alloc : sharedMemAllocs) {
+  for (memref::AllocaOp alloc : sharedMemAllocs) {
     LivenessRange livenessRange =
         getLivenessRange(alloc, dominanceInfo, rootOp->getRegion(0));
     livenessMap.insert(std::make_pair(alloc, livenessRange));
@@ -125,9 +125,9 @@ static bool livenessRangesOverlap(LivenessRange range, LivenessRange other,
 ///
 /// Example:
 /// ```
-/// %alloc0 = memref.alloc()
-/// %alloc1 = memref.alloc()
-/// %alloc2 = memref.alloc()
+/// %alloc0 = memref.alloca()
+/// %alloc1 = memref.alloca()
+/// %alloc2 = memref.alloca()
 /// %w0 = memref.store %val0, %alloc0
 /// %w1 = memref.store %val1, %alloc1
 /// %r0 = memref.load %alloc0
@@ -139,10 +139,10 @@ static bool livenessRangesOverlap(LivenessRange range, LivenessRange other,
 /// overlaps with `%alloc1` and `%alloc1` overlaps with `%alloc2`.
 static SmallVector<AliasGroup>
 computeAliasGroups(DenseMap<Operation *, LivenessRange> livenessMap,
-                   SmallVector<memref::AllocOp> allocs,
+                   SmallVector<memref::AllocaOp> allocs,
                    DominanceInfo &dominanceInfo, Block *entryBlock) {
   SmallVector<AliasGroup> aliasGroups;
-  for (memref::AllocOp alloc : allocs) {
+  for (memref::AllocaOp alloc : allocs) {
     LivenessRange livenessRange = livenessMap[alloc];
     // Check for overlapping liveness with other alias groups. Combine all
     // groups that overlap with the `alloc`.
@@ -212,7 +212,7 @@ struct GPUReuseSharedMemoryAllocsPass final
     // just be a pair of operations representing the first and last use of the
     // buffer.
     DenseMap<Operation *, LivenessRange> livenessMap;
-    SmallVector<memref::AllocOp> allocs;
+    SmallVector<memref::AllocaOp> allocs;
 
     DominanceInfo dominanceInfo(funcOp);
     // If the funcOp does not meet the conditions for the analysis, do nothing.
@@ -261,7 +261,7 @@ struct GPUReuseSharedMemoryAllocsPass final
     }
 
     // Pack all the allocations into one i8 alloc.
-    packAllocs(builder, funcOp, aliasGroups);
+    packAllocas(builder, funcOp, aliasGroups);
   }
 };
 } // namespace
