@@ -276,10 +276,13 @@ void addIREEComprehensiveBufferizePasses(
 }
 
 void addConstantBufferizePasses(OpPassManager &funcPassManager) {
-  OneShotBufferizationOptions options;
+  bufferization::OneShotBufferizePassOptions options;
   options.copyBeforeWrite = true;
-  options.enforceAliasingInvariants = false;
-  options.opFilter.allowOperation(arith::ConstantOp::getOperationName());
+  options.bufferizeFunctionBoundaries = true;
+  // options.enforceAliasingInvariants = false;
+  // options.opFilter.allowOperation(arith::ConstantOp::getOperationName());
+  options.noAnalysisFuncFilter.push_back(
+      arith::ConstantOp::getOperationName().str());
   funcPassManager.addPass(bufferization::createOneShotBufferizePass(options));
 }
 

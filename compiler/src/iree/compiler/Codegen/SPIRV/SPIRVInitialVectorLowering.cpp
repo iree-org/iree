@@ -420,10 +420,8 @@ public:
     // elementwise ops.
     {
       RewritePatternSet patterns(context);
-      auto options =
-          vector::VectorTransformsOptions().setVectorTransformsOptions(
-              vector::VectorContractLowering::ParallelArith);
-      vector::populateVectorContractLoweringPatterns(patterns, options);
+      vector::populateVectorContractLoweringPatterns(
+          patterns, vector::VectorContractLowering::ParallelArith);
       // The pattern can generate transpose ops. Try to fold it if possible to
       // avoid lowering them into extract/insert later.
       vector::TransposeOp::getCanonicalizationPatterns(patterns, context);
@@ -443,10 +441,8 @@ public:
     // to canonicalize/cancel.
     {
       RewritePatternSet patterns(context);
-      auto options =
-          vector::VectorTransformsOptions().setVectorTransposeLowering(
-              vector::VectorTransposeLowering::EltWise);
-      vector::populateVectorTransposeLoweringPatterns(patterns, options);
+      vector::populateVectorTransposeLoweringPatterns(
+          patterns, vector::VectorTransposeLowering::EltWise);
       vector::populateVectorShapeCastLoweringPatterns(patterns);
       if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();

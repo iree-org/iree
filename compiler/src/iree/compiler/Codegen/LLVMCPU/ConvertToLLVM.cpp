@@ -975,7 +975,7 @@ void ConvertToLLVMPass::runOnOperation() {
     // TODO: doubtful that the "default" does what one want here, it is likely
     // better to use outerproduct.
     vector::populateVectorContractLoweringPatterns(
-        patterns, vector::VectorTransformsOptions());
+        patterns, vector::VectorContractLowering::Dot);
     vector::populateVectorMaskMaterializationPatterns(
         patterns, /*force32BitVectorIndices=*/false);
     vector::populateVectorMaskOpLoweringPatterns(patterns);
@@ -983,7 +983,7 @@ void ConvertToLLVMPass::runOnOperation() {
     // TODO: doubtful that the "default" does what one want here, it is likely
     // better to use shuffle.
     vector::populateVectorTransposeLoweringPatterns(
-        patterns, vector::VectorTransformsOptions());
+        patterns, vector::VectorTransposeLowering::EltWise);
     populateConvertArmNeon2dToIntrPatterns(patterns);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();

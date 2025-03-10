@@ -103,8 +103,7 @@ struct LLVMGPUVectorLoweringPass final
       vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorContractLoweringPatterns(
           contractLoweringPatterns,
-          vector::VectorTransformsOptions().setVectorTransformsOptions(
-              vector::VectorContractLowering::OuterProduct));
+          vector::VectorContractLowering::OuterProduct);
       contractLoweringPatterns.add<PromoteContractOperands>(
           funcOp->getContext());
       vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
