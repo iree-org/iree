@@ -80,7 +80,7 @@
 // MERGE-NEXT:      @match_attention_2x10x4096x64x64x64_f16 -> @apply_attn_op_config
 // MERGE-NEXT:      @match_mmt_2048x1280x5120_f16_f16_f32 -> @apply_op_config_1
 
-// NOTE: Order matters above because `foreach_match` ops are merged  in a specific sequence.
+// NOTE: The order matters above because `foreach_match` ops performs matching from top to bottom.
 
 // MERGE:        module attributes
 // MERGE-SAME:     iree_codegen.tuning_spec_mlirbc = dense<{{.+}}> : vector<{{[0-9]+}}xi8>
