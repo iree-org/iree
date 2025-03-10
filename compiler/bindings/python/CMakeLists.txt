@@ -210,6 +210,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Core
 
   # Core dialects.
+  MLIRPythonSources.Dialects.affine
   MLIRPythonSources.Dialects.amdgpu
   MLIRPythonSources.Dialects.arith
   MLIRPythonSources.Dialects.builtin
