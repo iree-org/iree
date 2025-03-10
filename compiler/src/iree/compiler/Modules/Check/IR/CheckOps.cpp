@@ -40,56 +40,6 @@ struct ExpectAlmostEqConstOpToExpectAlmostEqOp
   }
 };
 
-static constexpr char kATolKeyword[] = "atol";
-static constexpr char kRTolKeyword[] = "rtol";
-static constexpr float kATolDefaultValue = 1e-4f;
-static constexpr float kRTolDefaultValue = 0;
-
-static ParseResult parseOptionalFloatTolerance(OpAsmParser &parser,
-                                               FloatAttr &atol,
-                                               FloatAttr &rtol) {
-  std::optional<float> parsedATolValue;
-  std::optional<float> parsedRTolValue;
-
-  while (succeeded(parser.parseOptionalComma())) {
-    std::optional<float> *dstParsedValuePtr = nullptr;
-    if (!parsedATolValue && succeeded(parser.parseKeyword(kATolKeyword))) {
-      dstParsedValuePtr = &parsedATolValue;
-    } else if (!parsedRTolValue &&
-               succeeded(parser.parseKeyword(kRTolKeyword))) {
-      dstParsedValuePtr = &parsedRTolValue;
-    } else {
-      return parser.emitError(parser.getCurrentLocation(),
-                              llvm::Twine("Expected keyword: ") + kATolKeyword +
-                                  " or " + kRTolKeyword);
-    }
-    llvm::APFloat parsedTolerance(APFloat::IEEEsingle());
-    if (failed(parser.parseFloat(parsedTolerance.getSemantics(),
-                                 parsedTolerance))) {
-      return parser.emitError(parser.getCurrentLocation(),
-                              "Failed to parse float tolerance value.");
-    }
-    *dstParsedValuePtr = parsedTolerance.convertToFloat();
-  }
-
-  Builder &builder = parser.getBuilder();
-  atol = builder.getF32FloatAttr(parsedATolValue.value_or(kATolDefaultValue));
-  rtol = builder.getF32FloatAttr(parsedRTolValue.value_or(kRTolDefaultValue));
-  return success();
-}
-
-static void printOptionalFloatTolerance(OpAsmPrinter &p, Operation *op,
-                                        FloatAttr atol, FloatAttr rtol) {
-  float atolValue = cast<FloatAttr>(atol).getValue().convertToFloat();
-  if (atolValue != kATolDefaultValue) {
-    p << ", " << kATolKeyword << " " << atolValue;
-  }
-  float rtolValue = cast<FloatAttr>(rtol).getValue().convertToFloat();
-  if (rtolValue != kRTolDefaultValue) {
-    p << ", " << kRTolKeyword << " " << rtolValue;
-  }
-}
-
 } // namespace
 
 void ExpectEqConstOp::getCanonicalizationPatterns(RewritePatternSet &results,
