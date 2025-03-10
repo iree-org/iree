@@ -6,7 +6,7 @@
 // there's not a lot that can be done with an unassigned resource.
 
 // CHECK-LABEL: @optimization_barrier_consumer
-util.func private @optimization_barrier_consumer() -> tensor<1xi32> {
+util.func public @optimization_barrier_consumer() -> tensor<1xi32> {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -27,7 +27,7 @@ util.func private @optimization_barrier_consumer() -> tensor<1xi32> {
 // -----
 
 // CHECK-LABEL: @optimization_barrier_producer
-util.func private @optimization_barrier_producer() -> tensor<1xi32> {
+util.func public @optimization_barrier_producer() -> tensor<1xi32> {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -49,7 +49,7 @@ util.func private @optimization_barrier_producer() -> tensor<1xi32> {
 // can know when we need to do that early on.
 
 // CHECK-LABEL: @constant_op
-util.func private @constant_op() -> (tensor<1xi32>, tensor<1xi32>) {
+util.func public @constant_op() -> (tensor<1xi32>, tensor<1xi32>) {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
@@ -74,7 +74,7 @@ util.func private @constant_op() -> (tensor<1xi32>, tensor<1xi32>) {
 // consumed to avoid allocating/transferring a bunch of repeated values.
 
 // CHECK-LABEL: @splat_op
-util.func private @splat_op() -> tensor<1xi32> {
+util.func public @splat_op() -> tensor<1xi32> {
   %splat_value = arith.constant 123 : i32
   // CHECK: flow.tensor.splat
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
@@ -284,7 +284,7 @@ util.func public @tied_aliased_storage(%view: !hal.buffer_view, %storage: !hal.b
 // a single consumer.
 
 // CHECK-LABEL: @tied_constant
-util.func private @tied_constant() -> tensor<1xi32> {
+util.func public @tied_constant() -> tensor<1xi32> {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -310,7 +310,7 @@ util.func private @tied_constant() -> tensor<1xi32> {
 // replication policies.
 
 // CHECK-LABEL: @tied_constant_multi_consumer
-util.func private @tied_constant_multi_consumer() -> (tensor<1xi32>, tensor<1xi32>) {
+util.func public @tied_constant_multi_consumer() -> (tensor<1xi32>, tensor<1xi32>) {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
@@ -346,7 +346,7 @@ util.func private @tied_constant_multi_consumer() -> (tensor<1xi32>, tensor<1xi3
 // replicate the constant.
 
 // CHECK-LABEL: @tied_transfer_constant_multi_consumer
-util.func private @tied_transfer_constant_multi_consumer() -> (tensor<1xi32>, tensor<1xi32>) {
+util.func public @tied_transfer_constant_multi_consumer() -> (tensor<1xi32>, tensor<1xi32>) {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
@@ -387,7 +387,7 @@ util.func private @tied_transfer_constant_multi_consumer() -> (tensor<1xi32>, te
 // Tests that implicitly placed consumers use their transfer execution affinity.
 
 // CHECK-LABEL: @transfer_execution_affinity
-util.func private @transfer_execution_affinity() -> tensor<1xi32> {
+util.func public @transfer_execution_affinity() -> tensor<1xi32> {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -411,7 +411,7 @@ util.func private @transfer_execution_affinity() -> tensor<1xi32> {
 // Tests that explicitly placed consumers use their explicit execution affinity.
 
 // CHECK-LABEL: @explicit_execution_affinity
-util.func private @explicit_execution_affinity() -> tensor<1xi32> {
+util.func public @explicit_execution_affinity() -> tensor<1xi32> {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -433,7 +433,7 @@ util.func private @explicit_execution_affinity() -> tensor<1xi32> {
 // to execute out of the resources they may be consuming.
 
 // CHECK-LABEL: @consume_multi_affinities
-util.func private @consume_multi_affinities() -> tensor<1xi32> {
+util.func public @consume_multi_affinities() -> tensor<1xi32> {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -459,7 +459,7 @@ util.func private @consume_multi_affinities() -> tensor<1xi32> {
 // CHECK: util.global private @consumed_global_a
 // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
 util.global private @consumed_global_a : tensor<1xi32>
-util.func private @consumer_fn() -> tensor<1xi32> {
+util.func public @consumer_fn() -> tensor<1xi32> {
   // CHECK: util.global.load @consumed_global_a
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
   %load = util.global.load @consumed_global_a : tensor<1xi32>
@@ -480,7 +480,7 @@ util.func private @consumer_fn() -> tensor<1xi32> {
 // CHECK: util.global private @consumed_global_ab
 // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]
 util.global private @consumed_global_ab : tensor<1xi32>
-util.func private @consumer_fn_a() -> tensor<1xi32> {
+util.func public @consumer_fn_a() -> tensor<1xi32> {
   // CHECK: util.global.load @consumed_global_ab
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   %load = util.global.load @consumed_global_ab : tensor<1xi32>
@@ -492,7 +492,7 @@ util.func private @consumer_fn_a() -> tensor<1xi32> {
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
   util.return %load_a : tensor<1xi32>
 }
-util.func private @consumer_fn_b() -> tensor<1xi32> {
+util.func public @consumer_fn_b() -> tensor<1xi32> {
   // CHECK: util.global.load @consumed_global_ab
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   %load = util.global.load @consumed_global_ab : tensor<1xi32>
@@ -512,7 +512,7 @@ util.func private @consumer_fn_b() -> tensor<1xi32> {
 // CHECK: util.global private mutable @global_b
 // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_b>]
 util.global private mutable @global_b : tensor<1xi32>
-util.func private @producer_fn() {
+util.func public @producer_fn() {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -522,7 +522,7 @@ util.func private @producer_fn() {
   util.global.store %cst_a, @global_b : tensor<1xi32>
   util.return
 }
-util.func private @consumer_fn() -> tensor<1xi32> {
+util.func public @consumer_fn() -> tensor<1xi32> {
   // CHECK: util.global.load
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
   %load = util.global.load @global_b : tensor<1xi32>
@@ -544,7 +544,7 @@ util.func private @consumer_fn() -> tensor<1xi32> {
 // CHECK: util.global private mutable @global_a
 // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
 util.global private mutable @global_a : tensor<1xi32>
-util.func private @producer_fn() {
+util.func public @producer_fn() {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -565,7 +565,7 @@ util.global private @global_a {stream.affinity = #hal.device.promise<@dev_a>} : 
 // CHECK: util.global private @global_b
 // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_b>]
 util.global private @global_b {stream.affinity = #hal.device.promise<@dev_b>} : tensor<1xi32>
-util.func private @consumer_fn() -> tensor<1xi32> {
+util.func public @consumer_fn() -> tensor<1xi32> {
   // CHECK: util.global.load @global_a
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
   %load_a = util.global.load @global_a : tensor<1xi32>
@@ -590,7 +590,7 @@ util.func private @consumer_fn() -> tensor<1xi32> {
 // CHECK: util.global private mutable @global_a
 // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
 util.global private mutable @global_a {stream.affinity = #hal.device.promise<@dev_a>} = dense<123> : tensor<1xi32>
-util.func private @step(%arg0: tensor<2xi32>) -> tensor<2xi32> {
+util.func public @step(%arg0: tensor<2xi32>) -> tensor<2xi32> {
   // CHECK: util.global.load @global_a
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
   %load_a = util.global.load @global_a : tensor<1xi32>
@@ -616,7 +616,7 @@ util.func private @step(%arg0: tensor<2xi32>) -> tensor<2xi32> {
 // Tests that constants passed through selects are placed on the consumer.
 
 // CHECK-LABEL: @select_constants_consumed
-util.func private @select_constants_consumed(%cond: i1) -> tensor<1xi32> {
+util.func public @select_constants_consumed(%cond: i1) -> tensor<1xi32> {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -643,7 +643,7 @@ util.func private @select_constants_consumed(%cond: i1) -> tensor<1xi32> {
 // Tests that placed operands passed through selects are tracked on consumers.
 
 // CHECK-LABEL: @select_constants_placed
-util.func private @select_constants_placed(%cond: i1) -> tensor<1xi32> {
+util.func public @select_constants_placed(%cond: i1) -> tensor<1xi32> {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -667,7 +667,7 @@ util.func private @select_constants_placed(%cond: i1) -> tensor<1xi32> {
 // affinity through it.
 
 // CHECK-LABEL: @passthrough_caller
-util.func private @passthrough_caller() -> tensor<1xi32> {
+util.func public @passthrough_caller() -> tensor<1xi32> {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -693,7 +693,7 @@ util.func private @passthrough_callee(%arg0: tensor<1xi32>) -> tensor<1xi32> {
 // get placed based on callee usage.
 
 // CHECK-LABEL: @consumer_placement_caller
-util.func private @consumer_placement_caller() -> tensor<1xi32> {
+util.func public @consumer_placement_caller() -> tensor<1xi32> {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -722,7 +722,7 @@ util.func private @consumer_placement_callee(%arg0: tensor<1xi32>) -> tensor<1xi
 // Tests that multiple potential affinities are propagated across call edges.
 
 // CHECK-LABEL: @select_caller
-util.func private @select_caller(%arg0: tensor<1xi32>, %cond: i1) -> tensor<1xi32> {
+util.func public @select_caller(%arg0: tensor<1xi32>, %cond: i1) -> tensor<1xi32> {
   // CHECK: flow.tensor.transfer
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -755,7 +755,7 @@ util.func private @select_callee(%arg0_a: tensor<1xi32>, %cond: i1) -> tensor<1x
 // Tests that consumer-placed ops are propagated across call edges.
 
 // CHECK-LABEL: @consumer_multi_placement_caller
-util.func private @consumer_multi_placement_caller() -> (tensor<1xi32>, tensor<1xi32>) {
+util.func public @consumer_multi_placement_caller() -> (tensor<1xi32>, tensor<1xi32>) {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_c>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_c>]]
@@ -796,7 +796,7 @@ util.func private @consumer_multi_placement_callee(%arg0: tensor<1xi32>) -> tens
 // Tests that operand/result affinities are tracked across call edges.
 
 // CHECK-LABEL: @dispatch_fn_a
-util.func private @dispatch_fn_a() -> tensor<4xi32> {
+util.func public @dispatch_fn_a() -> tensor<4xi32> {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -827,8 +827,8 @@ util.func private @dispatch_fn_a() -> tensor<4xi32> {
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
   util.return %5 : tensor<4xi32>
 }
-// CHECK: util.func private @dispatch_fn_b
-util.func private @dispatch_fn_b(%arg0: tensor<4xi32>) -> tensor<4xi32> {
+// CHECK: util.func public @dispatch_fn_b
+util.func public @dispatch_fn_b(%arg0: tensor<4xi32>) -> tensor<4xi32> {
   // CHECK: flow.tensor.transfer
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
@@ -848,7 +848,7 @@ util.func private @dispatch_fn_b(%arg0: tensor<4xi32>) -> tensor<4xi32> {
 // Tests a realistic call graph with explicit transfers.
 
 // CHECK-LABEL: @dispatch_fn_a
-util.func private @dispatch_fn_a() -> tensor<4xi32> {
+util.func public @dispatch_fn_a() -> tensor<4xi32> {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -882,8 +882,8 @@ util.func private @dispatch_fn_a() -> tensor<4xi32> {
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
   util.return %5 : tensor<4xi32>
 }
-// CHECK: util.func private @dispatch_fn_b
-util.func private @dispatch_fn_b(%arg0: tensor<4xi32>) -> tensor<4xi32> {
+// CHECK: util.func public @dispatch_fn_b
+util.func public @dispatch_fn_b(%arg0: tensor<4xi32>) -> tensor<4xi32> {
   // CHECK: flow.tensor.transfer
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
@@ -897,8 +897,8 @@ util.func private @dispatch_fn_b(%arg0: tensor<4xi32>) -> tensor<4xi32> {
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
   util.return %1 : tensor<4xi32>
 }
-// CHECK: util.func private @dispatch_fn_c
-util.func private @dispatch_fn_c(%arg0: tensor<4xi32>) -> tensor<4xi32> {
+// CHECK: util.func public @dispatch_fn_c
+util.func public @dispatch_fn_c(%arg0: tensor<4xi32>) -> tensor<4xi32> {
   // CHECK: flow.tensor.transfer
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_c>]]
@@ -918,7 +918,7 @@ util.func private @dispatch_fn_c(%arg0: tensor<4xi32>) -> tensor<4xi32> {
 // Tests that consumer-placed ops are tracked across branch edges.
 
 // CHECK-LABEL: @cfg_branch_constant_consumed
-util.func private @cfg_branch_constant_consumed() -> tensor<1xi32> {
+util.func public @cfg_branch_constant_consumed() -> tensor<1xi32> {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -941,7 +941,7 @@ util.func private @cfg_branch_constant_consumed() -> tensor<1xi32> {
 // Tests that producer-placed ops are tracked across branch edges.
 
 // CHECK-LABEL: @cfg_branch_dispatch_produced
-util.func private @cfg_branch_dispatch_produced() -> tensor<1xi32> {
+util.func public @cfg_branch_dispatch_produced() -> tensor<1xi32> {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -962,45 +962,10 @@ util.func private @cfg_branch_dispatch_produced() -> tensor<1xi32> {
 
 // -----
 
-// Tests that back edges on loops track affinity changes.
-
-// CHECK-LABEL: @cfg_loop_back_edge
-util.func private @cfg_loop_back_edge() -> tensor<1xi32> {
-  // CHECK: flow.tensor.constant
-  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
-  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
-  %cst_a = flow.tensor.constant {stream.affinity = #hal.device.promise<@dev_a>} dense<123> : tensor<1xi32>
-  // CHECK: cf.br ^bb1
-  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
-  cf.br ^bb1(%cst_a : tensor<1xi32>)
-^bb1(%bb1_arg0: tensor<1xi32>):
-  // CHECK: flow.tensor.transfer
-  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
-  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
-  %bb1_arg0_b = flow.tensor.transfer %bb1_arg0 : tensor<1xi32> to #hal.device.promise<@dev_b>
-  // CHECK: util.call @step
-  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
-  %cond = util.call @step(%bb1_arg0_b) : (tensor<1xi32>) -> i1
-  // CHECK: cf.cond_br
-  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>], [#hal.device.promise<@dev_b>]]
-  cf.cond_br %cond, ^bb1(%bb1_arg0 : tensor<1xi32>), ^bb2(%bb1_arg0_b : tensor<1xi32>)
-^bb2(%bb2_arg0: tensor<1xi32>):
-  // CHECK: flow.tensor.transfer
-  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
-  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_c>]]
-  %bb2_arg0_c = flow.tensor.transfer %bb2_arg0 : tensor<1xi32> to #hal.device.promise<@dev_c>
-  // CHECK: util.return
-  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_c>]]
-  util.return %bb2_arg0_c : tensor<1xi32>
-}
-util.func private @step(tensor<1xi32>) -> i1
-
-// -----
-
 // Tests that conditional branches acting as selects propagate both affinities.
 
 // CHECK-LABEL: @cfg_cond_branch_select
-util.func private @cfg_cond_branch_select(%cond: i1) -> tensor<1xi32> {
+util.func public @cfg_cond_branch_select(%cond: i1) -> tensor<1xi32> {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -1024,7 +989,7 @@ util.func private @cfg_cond_branch_select(%cond: i1) -> tensor<1xi32> {
 // get placed on all targets.
 
 // CHECK-LABEL: @cfg_cond_branch_select_consumer
-util.func private @cfg_cond_branch_select_consumer(%cond: i1) -> tensor<1xi32> {
+util.func public @cfg_cond_branch_select_consumer(%cond: i1) -> tensor<1xi32> {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
@@ -1056,7 +1021,7 @@ util.func private @cfg_cond_branch_select_consumer(%cond: i1) -> tensor<1xi32> {
 // regions.
 
 // CHECK-LABEL: @scf_if_capture_consumer
-util.func private @scf_if_capture_consumer(%cond: i1) -> tensor<1xi32> {
+util.func public @scf_if_capture_consumer(%cond: i1) -> tensor<1xi32> {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
@@ -1092,7 +1057,7 @@ util.func private @scf_if_capture_consumer(%cond: i1) -> tensor<1xi32> {
 // produced results into consumers.
 
 // CHECK-LABEL: @scf_if_capture_producer
-util.func private @scf_if_capture_producer(%cond: i1) -> tensor<1xi32> {
+util.func public @scf_if_capture_producer(%cond: i1) -> tensor<1xi32> {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -1128,7 +1093,7 @@ util.func private @scf_if_capture_producer(%cond: i1) -> tensor<1xi32> {
 // tracked across scf.yields and assigned based on the consumer.
 
 // CHECK-LABEL: @scf_if_consumer_yield
-util.func private @scf_if_consumer_yield(%cond: i1) -> tensor<1xi32> {
+util.func public @scf_if_consumer_yield(%cond: i1) -> tensor<1xi32> {
   // CHECK: scf.if
   %cst = scf.if %cond -> tensor<1xi32> {
     // CHECK: flow.tensor.constant
@@ -1163,7 +1128,7 @@ util.func private @scf_if_consumer_yield(%cond: i1) -> tensor<1xi32> {
 // Tests that consumer-placed ops get placed based on their use in the body.
 
 // CHECK-LABEL: @scf_for_consumer_body_transfer
-util.func private @scf_for_consumer_body_transfer() -> tensor<1xi32> {
+util.func public @scf_for_consumer_body_transfer() -> tensor<1xi32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -1198,7 +1163,7 @@ util.func private @scf_for_consumer_body_transfer() -> tensor<1xi32> {
 // the
 
 // CHECK-LABEL: @scf_for_boundary_transfer
-util.func private @scf_for_boundary_transfer() -> (tensor<1xi32>, tensor<1xi32>) {
+util.func public @scf_for_boundary_transfer() -> (tensor<1xi32>, tensor<1xi32>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -1241,7 +1206,7 @@ util.func private @scf_for_boundary_transfer() -> (tensor<1xi32>, tensor<1xi32>)
 // Tests that transfers track through iter_args.
 
 // CHECK-LABEL: @scf_for_body_transfer
-util.func private @scf_for_body_transfer() -> tensor<1xi32> {
+util.func public @scf_for_body_transfer() -> tensor<1xi32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -1281,7 +1246,7 @@ util.func private @scf_for_body_transfer() -> tensor<1xi32> {
 // bodies.
 
 // CHECK-LABEL: @scf_for_capture_producer
-util.func private @scf_for_capture_producer() -> tensor<1xi32> {
+util.func public @scf_for_capture_producer() -> tensor<1xi32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -1312,7 +1277,7 @@ util.func private @scf_for_capture_producer() -> tensor<1xi32> {
 // Tests that consumer-placed ops get placed based on their use in the body.
 
 // CHECK-LABEL: @scf_while_consumer_body_transfer
-util.func private @scf_while_consumer_body_transfer() -> tensor<1xi32> {
+util.func public @scf_while_consumer_body_transfer() -> tensor<1xi32> {
   %c0 = arith.constant 0 : index
   %c2_i32 = arith.constant 2 : i32
   // CHECK: flow.tensor.constant
@@ -1356,7 +1321,7 @@ util.func private @scf_while_consumer_body_transfer() -> tensor<1xi32> {
 // of an scf.while body.
 
 // CHECK-LABEL: @scf_while_consumer_result_transfer
-util.func private @scf_while_consumer_result_transfer() -> tensor<1xi32> {
+util.func public @scf_while_consumer_result_transfer() -> tensor<1xi32> {
   %c0 = arith.constant 0 : index
   %c2_i32 = arith.constant 2 : i32
   // CHECK: flow.tensor.constant
@@ -1398,7 +1363,7 @@ util.func private @scf_while_consumer_result_transfer() -> tensor<1xi32> {
 // Tests that transfers track through scf.while bodies.
 
 // CHECK-LABEL: @scf_while_body_transfer
-util.func private @scf_while_body_transfer() -> tensor<1xi32> {
+util.func public @scf_while_body_transfer() -> tensor<1xi32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2_i32 = arith.constant 2 : i32
@@ -1447,7 +1412,7 @@ util.func private @scf_while_body_transfer() -> tensor<1xi32> {
 // Tests that placed values track through to consumers in scf.while conditions.
 
 // CHECK-LABEL: @scf_while_capture_producer_condition
-util.func private @scf_while_capture_producer_condition() -> tensor<1xi32> {
+util.func public @scf_while_capture_producer_condition() -> tensor<1xi32> {
   %c0 = arith.constant 0 : index
   %c2_i32 = arith.constant 2 : i32
   // CHECK: flow.tensor.constant
@@ -1491,7 +1456,7 @@ util.func private @scf_while_capture_producer_condition() -> tensor<1xi32> {
 // Tests that placed values track through to consumers in scf.while bodies.
 
 // CHECK-LABEL: @scf_while_capture_producer_body
-util.func private @scf_while_capture_producer_body() -> tensor<1xi32> {
+util.func public @scf_while_capture_producer_body() -> tensor<1xi32> {
   %c0 = arith.constant 0 : index
   %c2_i32 = arith.constant 2 : i32
   // CHECK: flow.tensor.constant

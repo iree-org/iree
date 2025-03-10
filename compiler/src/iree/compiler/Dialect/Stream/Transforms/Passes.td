@@ -363,6 +363,19 @@ def ElideTimepointsPass :
 // Allocation and command issuing
 //===----------------------------------------------------------------------===//
 
+def AutomaticReferenceCountingPass :
+    InterfacePass<"iree-stream-automatic-reference-counting", "mlir::CallableOpInterface"> {
+  let summary = "Inserts retains and releases on asynchronous resources.";
+  let description = [{
+    Inserts `stream.async.retain` and `stream.async.release` ops where required
+    on async-phase IR. Requires that aliasing is not present on any asynchronous
+    resources (defined by no cmd-phase ops being present).
+  }];
+  let dependentDialects = [
+    "IREE::Stream::StreamDialect",
+  ];
+}
+
 def ScheduleAllocationPass :
     Pass<"iree-stream-schedule-allocation", "mlir::ModuleOp"> {
   let summary = "Allocates resources and converts to explicit stream commands.";
@@ -417,6 +430,20 @@ def LayoutSlicesPass :
     "mlir::arith::ArithDialect",
     "IREE::Stream::StreamDialect",
     "IREE::Util::UtilDialect",
+  ];
+}
+
+def ElideReferenceCountingPass :
+    Pass<"iree-stream-elide-reference-counting", "mlir::ModuleOp"> {
+  let summary = "Eliminates reference counting ops that are proven unnecessary.";
+  let description = [{
+    Performs whole-program analysis to try to eliminate as many
+    `stream.async.retain` and `stream.async.release` ops as is determined safe
+    at compile-time. Not all ops may be removed and any that remain will likely
+    make it to runtime.
+  }];
+  let dependentDialects = [
+    "IREE::Stream::StreamDialect",
   ];
 }
 
