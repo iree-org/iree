@@ -203,7 +203,7 @@ public:
     }
     void enableHoist() {
       assert(outcome == UNDECIDED &&
-             "can only disable hoisting of an undecided decision");
+             "can only enable hoisting of an undecided decision");
       outcome = ENABLE_HOIST;
     }
 
