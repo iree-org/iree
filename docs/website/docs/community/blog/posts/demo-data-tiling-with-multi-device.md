@@ -26,6 +26,7 @@ Note: it's hard to pass flags for the device configs today because MLIR
 attributes don't really work well in shells with all the #'s and such. In this
 case, we hardcoded the executable target in the IR for the demo.
 
+<!-- markdownlint-disable-next-line -->
 ```mlir title="dt_multi_device.mlir" linenums="1" hl_lines="1-8 10-13 26 40 46 52 55"
 // x86 CPU that has `+avx512f` feature.
 #executable_target_embedded_elf_x86_64_with_encoding_layout = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64",
