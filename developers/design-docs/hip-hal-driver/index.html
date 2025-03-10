@@ -4076,7 +4076,7 @@ HAL implementation and the underlying GPU driver stack is expected to be a thin
 layer without much smarts and magic.</p>
 <p>Unlike CUDA, HIP doesn't provide two separate API's with the same functionality
 in the name of driver and runtime. Instead it extends the HIP API with Modules
-and Ctx control API's that the CUDA driver API's exclusively offer.At runtime
+and Ctx control API's that the CUDA driver API's exclusively offer. At runtime
 the HIP HAL driver will load the <code>libamdhip64.so</code>/<code>amdhip64.dll</code> library dynamically.</p>
 <h2 id="gpu-objects">GPU Objects<a class="headerlink" href="#gpu-objects" title="Permanent link">link</a></h2>
 <h3 id="driver">Driver<a class="headerlink" href="#driver" title="Permanent link">link</a></h3>
@@ -4087,7 +4087,7 @@ and device enumeration and creation.</p>
 <p><code>iree_hal_hip_device_t</code> implements <a href="https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/device.h"><code>iree_hal_device_t</code></a> to provide
 the interface to HIP GPU device by wrapping a <code>hipDevice_t</code>.
 For each device, right now we create two <code>hipStream_t</code>s--one for issuing commands
-for memory allocation and kernel lauches as instructed by the program; the other
+for memory allocation and kernel launches as instructed by the program; the other
 for issue host callback functions after dispatched command buffers completes.
 See synchronization section regarding the details.</p>
 <h4 id="async-allocation">Async allocation<a class="headerlink" href="#async-allocation" title="Permanent link">link</a></h4>
