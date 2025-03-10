@@ -243,12 +243,24 @@ Write | **Established project contributors should request this access**<br>:mate
 Maintain/Admin | :material-check: Can [edit repository settings](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features)<br>:material-check: Can push to [protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) | Added case-by-case
 
 All access tiers first require joining the
-[iree-org GitHub organization](https://github.com/iree-org/).
+[iree-org GitHub organization](https://github.com/iree-org/). To request
+membership in iree-org, send an email to
+<iree-github-requests@lists.lfaidata.foundation> with this template:
+
+```text
+GitHub username:
+
+Company/organization you are associated with:
+
+Reason for requesting access:
+```
 
 <!-- markdownlint-disable-next-line -->
-[Fill out this form to request access :fontawesome-solid-paper-plane:](https://docs.google.com/forms/d/e/1FAIpQLSfEwANtMvLJWq-ED4lub_xsMch0MgNY02VxgtXE61FqNvNVUg/viewform){ .md-button .md-button--primary }
+[Send this email template to request access :fontawesome-solid-paper-plane:](mailto:iree-github-requests@lists.lfaidata.foundation?&subject=Requesting%20membership%20in%20iree-org&body=GitHub%20username:%0D%0A%0D%0ACompany/organization%20you%20are%20associated%20with:%0D%0A%0D%0AReason%20for%20requesting access:){ .md-button .md-button--primary }
 
-Once you are a member of the iree-org GitHub organization, you can request to
+If approved, an invitation will be sent to your GitHub account. You can also
+view the [invitation link](https://github.com/orgs/iree-org/invitation)
+directly. Then, once you are a member of the organization, you can request to
 join any of the teams on <https://github.com/orgs/iree-org/teams>.
 
 ### :octicons-git-branch-16: Branch naming
