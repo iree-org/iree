@@ -34,40 +34,59 @@ struct ExpectAlmostEqConstOpToExpectAlmostEqOp
                                 PatternRewriter &rewriter) const override {
     auto rhs = rewriter.create<arith::ConstantOp>(op.getLoc(), op.getValue());
     rewriter.replaceOpWithNewOp<ExpectAlmostEqOp>(
-        op, op.getDevice(), op.getLhs(), rhs, op.getToleranceAttr());
+        op, op.getDevice(), op.getLhs(), rhs, op.getAtolAttr(),
+        op.getRtolAttr());
     return success();
   }
 };
 
-static constexpr char kToleranceKeyword[] = "tolerance";
-static constexpr float kToleranceDefaultValue = 1e-4f;
+static constexpr char kATolKeyword[] = "atol";
+static constexpr char kRTolKeyword[] = "rtol";
+static constexpr float kATolDefaultValue = 1e-4f;
+static constexpr float kRTolDefaultValue = 0;
 
 static ParseResult parseOptionalFloatTolerance(OpAsmParser &parser,
-                                               FloatAttr &tolerance) {
-  float toleranceValue = kToleranceDefaultValue;
-  if (succeeded(parser.parseOptionalComma())) {
-    if (failed(parser.parseKeyword(kToleranceKeyword))) {
+                                               Attribute &atol,
+                                               Attribute &rtol) {
+  std::optional<float> parsedATolValue;
+  std::optional<float> parsedRTolValue;
+
+  while (succeeded(parser.parseOptionalComma())) {
+    std::optional<float> *dstParsedValuePtr = nullptr;
+    if (!parsedATolValue && succeeded(parser.parseKeyword(kATolKeyword))) {
+      dstParsedValuePtr = &parsedATolValue;
+    } else if (!parsedRTolValue &&
+               succeeded(parser.parseKeyword(kRTolKeyword))) {
+      dstParsedValuePtr = &parsedRTolValue;
+    } else {
       return parser.emitError(parser.getCurrentLocation(),
-                              llvm::Twine("Expected keyword: ") +
-                                  kToleranceKeyword);
+                              llvm::Twine("Expected keyword: ") + kATolKeyword +
+                                  " or " + kRTolKeyword);
     }
     llvm::APFloat parsedTolerance(APFloat::IEEEsingle());
     if (failed(parser.parseFloat(parsedTolerance.getSemantics(),
                                  parsedTolerance))) {
       return parser.emitError(parser.getCurrentLocation(),
-                              "Failed to parse optional float tolerance.");
+                              "Failed to parse float tolerance value.");
     }
-    toleranceValue = parsedTolerance.convertToFloat();
+    *dstParsedValuePtr = parsedTolerance.convertToFloat();
   }
-  tolerance = parser.getBuilder().getF32FloatAttr(toleranceValue);
+
+  Builder &builder = parser.getBuilder();
+  atol = builder.getF32FloatAttr(parsedATolValue.value_or(kATolDefaultValue));
+  rtol = builder.getF32FloatAttr(parsedRTolValue.value_or(kRTolDefaultValue));
   return success();
 }
 
 static void printOptionalFloatTolerance(OpAsmPrinter &p, Operation *op,
-                                        FloatAttr tolerance) {
-  float toleranceValue = tolerance.getValue().convertToFloat();
-  if (toleranceValue != kToleranceDefaultValue) {
-    p << ", " << kToleranceKeyword << " " << toleranceValue;
+                                        Attribute atol, Attribute rtol) {
+  float atolValue = cast<FloatAttr>(atol).getValue().convertToFloat();
+  if (atolValue != kATolDefaultValue) {
+    p << ", " << kATolKeyword << " " << atolValue;
+  }
+  float rtolValue = cast<FloatAttr>(rtol).getValue().convertToFloat();
+  if (rtolValue != kRTolDefaultValue) {
+    p << ", " << kRTolKeyword << " " << rtolValue;
   }
 }
 

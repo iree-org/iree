@@ -36,10 +36,12 @@ iree_lit_test_suite(
 iree_check_test_suite(
     name = "check",
     srcs = ["success.mlir"],
+    compiler_flags = ["--iree-input-demote-f64-to-f32=false"],
 )
 
 iree_check_test_suite(
     name = "check_failure",
     srcs = ["failure.mlir"],
+    compiler_flags = ["--iree-input-demote-f64-to-f32=false"],
     runner_args = ["--expect_failure"],
 )
