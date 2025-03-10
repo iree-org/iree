@@ -46,8 +46,8 @@ static constexpr float kATolDefaultValue = 1e-4f;
 static constexpr float kRTolDefaultValue = 0;
 
 static ParseResult parseOptionalFloatTolerance(OpAsmParser &parser,
-                                               Attribute &atol,
-                                               Attribute &rtol) {
+                                               FloatAttr &atol,
+                                               FloatAttr &rtol) {
   std::optional<float> parsedATolValue;
   std::optional<float> parsedRTolValue;
 
@@ -79,7 +79,7 @@ static ParseResult parseOptionalFloatTolerance(OpAsmParser &parser,
 }
 
 static void printOptionalFloatTolerance(OpAsmPrinter &p, Operation *op,
-                                        Attribute atol, Attribute rtol) {
+                                        FloatAttr atol, FloatAttr rtol) {
   float atolValue = cast<FloatAttr>(atol).getValue().convertToFloat();
   if (atolValue != kATolDefaultValue) {
     p << ", " << kATolKeyword << " " << atolValue;

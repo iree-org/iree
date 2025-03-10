@@ -164,13 +164,13 @@ def CHECK_ExpectAlmostEqOp :
     Optional<HAL_Device>:$device,
     AnyTypeOf<[HAL_BufferView, TensorOf<[AnyFloat]>]>:$lhs,
     AnyTypeOf<[HAL_BufferView, TensorOf<[AnyFloat]>]>:$rhs,
-    AnyAttr:$atol,
-    AnyAttr:$rtol
+    DefaultValuedAttr<F32Attr, "1.e-4f">:$atol,
+    DefaultValuedAttr<F32Attr, "0.f">:$rtol
   );
 
   let assemblyFormat = [{
     (`` `<` $device^ `>`)?
-    `` `(` $lhs `,` $rhs `` custom<OptionalFloatTolerance>($atol, $rtol) `)`
+    `` `(` $lhs `,` $rhs (`` `,` `atol` $atol^)? (`` `,` `rtol` $rtol^)? `)`
     attr-dict `:` type($lhs)
   }];
 }
@@ -197,15 +197,15 @@ def CHECK_ExpectAlmostEqConstOp :
     Optional<HAL_Device>:$device,
     TensorOf<[AnyFloat]>:$lhs,
     ElementsAttr:$value,
-    AnyAttr:$atol,
-    AnyAttr:$rtol
+    DefaultValuedAttr<F32Attr, "1.e-4f">:$atol,
+    DefaultValuedAttr<F32Attr, "0.f">:$rtol
   );
 
   let hasCanonicalizer = 1;
 
   let assemblyFormat = [{
     (`` `<` $device^ `>`)?
-    `` `(` $lhs `,` $value `` custom<OptionalFloatTolerance>($atol, $rtol) `)`
+    `` `(` $lhs `,` $value (`` `,` `atol` $atol^)? (`` `,` `rtol` $rtol^)? `)`
     attr-dict `:` type($lhs)
   }];
 }
