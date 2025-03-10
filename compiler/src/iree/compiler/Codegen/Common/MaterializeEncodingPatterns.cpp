@@ -234,12 +234,9 @@ static FailureOr<Operation *> lowerGenericOpWithEncoding(
       typeConverter.getEncodingInfo(
           cast<RankedTensorType>(outputOperand->get().getType()));
   if (IREE::Codegen::isIdentityLayout(outMaterializeEncodingInfo)) {
-    return rewriter.notifyMatchFailure(
-        genericOp, "MaterializeEncodingInfo failed for output");
-  }
-  if (outMaterializeEncodingInfo.swizzle) {
-    return rewriter.notifyMatchFailure(
-        genericOp, "generic op lowering does not support swizzle yet");
+    return dropEncodingAndCloneOp(rewriter, genericOp.getOperation(),
+                                  convertedInputOperands,
+                                  convertedOutputOperands);
   }
 
   auto convertedResultType =
@@ -248,8 +245,41 @@ static FailureOr<Operation *> lowerGenericOpWithEncoding(
                                                  utils::IteratorType::parallel);
   // Compute the new indexing maps for the packed layout. This assumes that
   // the output map is identity, and that all iterator types are parallel.
-  SmallVector<int64_t> outInnerDimsPos =
-      outMaterializeEncodingInfo.innerDimsPos;
+  ArrayRef<int64_t> outInnerDimsPos = outMaterializeEncodingInfo.innerDimsPos;
+  SmallVector<int64_t> outResultDimsPerm =
+      llvm::to_vector(llvm::seq<int64_t>(0, convertedResultType.getRank()));
+  if (outMaterializeEncodingInfo.swizzle.has_value()) {
+    int outRank =
+        cast<RankedTensorType>(outputOperand->get().getType()).getRank();
+    SmallVector<int64_t> transposePerm =
+        llvm::to_vector(llvm::seq<int64_t>(0, outRank));
+    for (auto perm : outMaterializeEncodingInfo.swizzle->permutation) {
+      transposePerm.push_back(outRank + perm);
+    }
+    applyPermutationToVector(outResultDimsPerm, transposePerm);
+  }
+  SmallVector<int64_t> invOutResultDimsPerm =
+      invertPermutationVector(outResultDimsPerm);
+
+  // Calculate the running offset for every dimension position for easy lookup
+  // when calculating the packed result dimensions for every operand.
+  // Example:
+  //   expandShape == [[4, 8, 4], [4, 4]]
+  // In this case:
+  //   outOffsetForDimsPos == [0, 3]
+  // So that whenever we need the real dimension for an entry (`outerIndex`,
+  // `innerIndex`) in the 2D expanded shape vector, we can calculate it as:
+  //   dim(outerIndex, innerIndex) = outOffsetForDimsPos[outerIndex] +
+  //   innerIndex
+  SmallVector<int64_t> outOffsetForDimsPos(outInnerDimsPos.size(), 0);
+  if (outMaterializeEncodingInfo.swizzle.has_value()) {
+    int64_t runningSize = 0;
+    for (size_t i = 0; i < outInnerDimsPos.size(); i++) {
+      outOffsetForDimsPos[i] = runningSize;
+      runningSize += outMaterializeEncodingInfo.swizzle->expandShape[i].size();
+    }
+  }
+
   SmallVector<int64_t> outInverseOuterDimsPerm =
       invertPermutationVector(outMaterializeEncodingInfo.outerDimsPerm);
   SmallVector<AffineMap> packedIndexingMaps;
@@ -277,14 +307,59 @@ static FailureOr<Operation *> lowerGenericOpWithEncoding(
     for (auto [idx, pos] : llvm::enumerate(innerDimsPos)) {
       auto dimPos = cast<AffineDimExpr>(inputMap.getResult(pos)).getPosition();
       for (auto [tileIdx, outDim] : llvm::enumerate(outInnerDimsPos)) {
-        if (dimPos == outDim) {
+        if (dimPos != outDim) {
+          continue;
+        }
+        if (!materializeEncodingInfo.swizzle.has_value()) {
           packedResultDims.push_back(outputMap.getNumDims() + tileIdx);
+          continue;
+        }
+        // In case of a layout with swizzle, an expanded set of dimensions
+        // needs to be appended as specified by the swizzle's `expandedShape`
+        // field. Note that the dimension index should be offset by the
+        // calculated output starting offset as every dimension is now
+        // transformed into an expanded sequence of indices and the correct
+        // dimension index is:
+        //   outOffsetForDimsPos[tileIdx] + innerIndex
+        assert(idx < materializeEncodingInfo.swizzle->expandShape.size() &&
+               "`innerDimsPos` index should not exceed the swizzle's "
+               "`expandShape` size");
+        const size_t dimSize =
+            materializeEncodingInfo.swizzle->expandShape[idx].size();
+        const int64_t outIdxOffset =
+            outputMap.getNumDims() + outOffsetForDimsPos[tileIdx];
+        for (size_t i = 0; i < dimSize; i++) {
+          packedResultDims.push_back(outIdxOffset + i);
         }
       }
     }
+    // In case of a layout with swizzle, the packed result dimensions need
+    // to be transposed according to the swizzle's permutation vector.
+    if (materializeEncodingInfo.swizzle.has_value()) {
+      int inRank =
+          cast<RankedTensorType>(inputOperand->get().getType()).getRank();
+      SmallVector<int64_t> transposePerm =
+          llvm::to_vector(llvm::seq<int64_t>(0, inRank));
+      for (auto perm : materializeEncodingInfo.swizzle->permutation) {
+        transposePerm.push_back(inRank + perm);
+      }
+      applyPermutationToVector(packedResultDims, transposePerm);
+    }
+    // Calculate the final packed result dimensions through the inverse result
+    // dimensions permutation map. This effectively linearizes the packed result
+    // dimensions with respect to the output dimensions. For example, if the
+    // permuted output dimensions are [D0, D2, D1], this will transform all
+    // packed operand result dimensions with the permutation map that would make
+    // the output dimensions the identity map [D0, D1, D2], i.e. {D0 -> D0, D1
+    // -> D2, D2 -> D1}. Suppose that the operand dimensions are [D0, D2], this
+    // operation would transform it into [D0, D1] to align with the output
+    // identity map.
+    SmallVector<int64_t> finalPackedResultDims = llvm::map_to_vector(
+        packedResultDims, [&](int64_t r) { return invOutResultDimsPerm[r]; });
+
     // Create the packed indexing map.
     SmallVector<AffineExpr> packedResultExprs =
-        llvm::map_to_vector(packedResultDims, [&](int64_t dim) {
+        llvm::map_to_vector(finalPackedResultDims, [&](int64_t dim) {
           return rewriter.getAffineDimExpr(dim);
         });
     auto packedInputMap = AffineMap::get(
