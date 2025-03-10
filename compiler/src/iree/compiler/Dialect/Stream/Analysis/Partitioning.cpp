@@ -56,9 +56,12 @@ void PartitionSet::dump(AsmState &asmState) {}
 LogicalResult Partition::verify(Location loc) {
   // Ensure all ops are compatible with the partition affinity.
   for (auto *op : ops) {
+    auto streamableOp =
+        dyn_cast_if_present<IREE::Stream::StreamableOpInterface>(op);
+    bool cloned = streamableOp && streamableOp.preferCloneToConsumers();
     if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
-      if (!IREE::Stream::AffinityAttr::areCompatible(
-              affinity, affinityOp.getAffinityAttr())) {
+      if (!cloned && !IREE::Stream::AffinityAttr::areCompatible(
+                         affinity, affinityOp.getAffinityAttr())) {
         return op->emitError("op affinity ")
                << affinityOp.getAffinityAttr()
                << " is not compatible with the partition affinity " << affinity;
