@@ -66,47 +66,147 @@ bool EqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
          memcmp(lhs_bytes.data, rhs_bytes.data, lhs_bytes.data_length) == 0;
 }
 
+// Numpy-compatible fuzzy comparison of floating-point values lhs, rhs with
+// respect to tolerance parameters atol, rtol.
+//
+// The meaning of the tolerance parameters atol and rtol is exactly as in:
+//   https://numpy.org/doc/stable/reference/generated/numpy.testing.assert_allclose.html
+// The condition being verified on each lhs and rhs value is:
+//   abs(lhs - rhs) <= atol + rtol * abs(rhs).
 template <typename T>
+bool NumpyFuzzyCompare(T lhs, T rhs, float atol, float rtol) {
+  return std::abs(lhs - rhs) <= atol + rtol * std::abs(rhs);
+}
+
+// Records information about some LHS/RHS scalars that failed a fuzzy comparison
+// and their possible position within arrays that were being compared.
+struct FuzzyCompareDiagnostic {
+  // Position in the LHS/RHS arrays of the values for which comparison failed.
+  // May be left as 0 if the fuzzy comparison wasn't comparing arrays.
+  int index = 0;
+  // LHS/RHS values whose difference failed the fuzzy comparison.
+  double lhs_value = 0.;
+  double rhs_value = 0.;
+};
+
+template <iree_hal_element_type_t type>
+struct FloatTypeInfo {};
+
+template <>
+struct FloatTypeInfo<IREE_HAL_ELEMENT_TYPE_FLOAT_32> {
+  using ArithmeticType = float;
+  using StorageType = float;
+  static ArithmeticType load(StorageType val) { return val; }
+};
+
+template <>
+struct FloatTypeInfo<IREE_HAL_ELEMENT_TYPE_FLOAT_64> {
+  using ArithmeticType = double;
+  using StorageType = double;
+  static ArithmeticType load(StorageType val) { return val; }
+};
+
+template <>
+struct FloatTypeInfo<IREE_HAL_ELEMENT_TYPE_FLOAT_16> {
+  using ArithmeticType = float;
+  using StorageType = uint16_t;
+  static ArithmeticType load(StorageType val) {
+    return iree_math_f16_to_f32(val);
+  }
+};
+
+template <>
+struct FloatTypeInfo<IREE_HAL_ELEMENT_TYPE_BFLOAT_16> {
+  using ArithmeticType = float;
+  using StorageType = uint16_t;
+  static ArithmeticType load(StorageType val) {
+    return iree_math_bf16_to_f32(val);
+  }
+};
+
+template <>
+struct FloatTypeInfo<IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FN> {
+  using ArithmeticType = float;
+  using StorageType = uint8_t;
+  static ArithmeticType load(StorageType val) {
+    return iree_math_f8e4m3fn_to_f32(val);
+  }
+};
+
+template <>
+struct FloatTypeInfo<IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ> {
+  using ArithmeticType = float;
+  using StorageType = uint8_t;
+  static ArithmeticType load(StorageType val) {
+    return iree_math_f8e4m3fnuz_to_f32(val);
+  }
+};
+
+template <>
+struct FloatTypeInfo<IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2> {
+  using ArithmeticType = float;
+  using StorageType = uint8_t;
+  static ArithmeticType load(StorageType val) {
+    return iree_math_f8e5m2_to_f32(val);
+  }
+};
+
+template <>
+struct FloatTypeInfo<IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ> {
+  using ArithmeticType = float;
+  using StorageType = uint8_t;
+  static ArithmeticType load(StorageType val) {
+    return iree_math_f8e5m2fnuz_to_f32(val);
+  }
+};
+
+// Fuzzy comparison of spans.
+// The meaning of atol, rtol is explained in the comment on NumpyFuzzyCompare.
+// On failure, false is returned, and information about a specific failed
+// comparison is written to *diagnostic.
+template <iree_hal_element_type_t type>
 bool AlmostEqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes,
-                      float tolerance) {
-  auto lhs_span = ToSpan<T>(lhs_bytes);
-  auto rhs_span = ToSpan<T>(rhs_bytes);
+                      float atol, float rtol,
+                      FuzzyCompareDiagnostic* diagnostic) {
+  using Info = FloatTypeInfo<type>;
+  using ArithmeticType = typename Info::ArithmeticType;
+  using StorageType = typename Info::StorageType;
+  auto lhs_span = ToSpan<StorageType>(lhs_bytes);
+  auto rhs_span = ToSpan<StorageType>(rhs_bytes);
   assert(lhs_span.size() == rhs_span.size());
   for (int i = 0; i < lhs_span.size(); ++i) {
-    if (std::abs(lhs_span[i] - rhs_span[i]) > tolerance) {
+    ArithmeticType lhs_value = Info::load(lhs_span[i]);
+    ArithmeticType rhs_value = Info::load(rhs_span[i]);
+    if (!NumpyFuzzyCompare(lhs_value, rhs_value, atol, rtol)) {
+      diagnostic->index = i;
+      diagnostic->lhs_value = lhs_value;
+      diagnostic->rhs_value = rhs_value;
       return false;
     }
   }
   return true;
 }
 
-bool AlmostEqByteSpanF16(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes,
-                         float tolerance) {
-  auto lhs_span = ToSpan<uint16_t>(lhs_bytes);
-  auto rhs_span = ToSpan<uint16_t>(rhs_bytes);
-  assert(lhs_span.size() == rhs_span.size());
-  for (int i = 0; i < lhs_span.size(); ++i) {
-    if (std::abs(iree_math_f16_to_f32(lhs_span[i]) -
-                 iree_math_f16_to_f32(rhs_span[i])) > tolerance) {
-      return false;
-    }
-  }
-  return true;
-}
-
+// The meaning of atol, rtol is explained in the comment on NumpyFuzzyCompare.
 StatusOr<bool> AlmostEqByteSpan(iree_byte_span_t lhs_bytes,
                                 iree_byte_span_t rhs_bytes,
                                 iree_hal_element_type_t element_type,
-                                float tolerance) {
+                                float atol, float rtol,
+                                FuzzyCompareDiagnostic* diagnostic) {
   switch (element_type) {
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-      return AlmostEqByteSpan<float>(lhs_bytes, rhs_bytes, tolerance);
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
-      return AlmostEqByteSpan<double>(lhs_bytes, rhs_bytes, tolerance);
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      return AlmostEqByteSpanF16(lhs_bytes, rhs_bytes, tolerance);
+#define IREE_ALMOSTEQBYTESPAN_CASE(T) \
+  case T:                             \
+    return AlmostEqByteSpan<T>(lhs_bytes, rhs_bytes, atol, rtol, diagnostic);
+    IREE_ALMOSTEQBYTESPAN_CASE(IREE_HAL_ELEMENT_TYPE_FLOAT_64)
+    IREE_ALMOSTEQBYTESPAN_CASE(IREE_HAL_ELEMENT_TYPE_FLOAT_32)
+    IREE_ALMOSTEQBYTESPAN_CASE(IREE_HAL_ELEMENT_TYPE_FLOAT_16)
+    IREE_ALMOSTEQBYTESPAN_CASE(IREE_HAL_ELEMENT_TYPE_BFLOAT_16)
+    IREE_ALMOSTEQBYTESPAN_CASE(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FN)
+    IREE_ALMOSTEQBYTESPAN_CASE(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ)
+    IREE_ALMOSTEQBYTESPAN_CASE(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2)
+    IREE_ALMOSTEQBYTESPAN_CASE(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ)
+#undef IREE_ALMOSTEQBYTESPAN_CASE
     default:
-      // TODO(gcmn): Consider supporting fuzzy matching for quantized integers.
       break;
   }
   char element_type_str[16];
@@ -379,8 +479,8 @@ class CheckModuleState final {
 
   Status ExpectAlmostEq(vm::ref<iree_hal_device_t> device,
                         vm::ref<iree_hal_buffer_view_t> lhs_ref,
-                        vm::ref<iree_hal_buffer_view_t> rhs_ref,
-                        float tolerance) {
+                        vm::ref<iree_hal_buffer_view_t> rhs_ref, float atol,
+                        float rtol) {
     IREE_RETURN_IF_ERROR(TransferToHost(device.get(), lhs_ref, rhs_ref));
     auto* lhs = lhs_ref.get();
     auto* rhs = rhs_ref.get();
@@ -421,11 +521,13 @@ class CheckModuleState final {
     bool shape_eq = lhs_shape == rhs_shape;
     // Only check contents if shape and element type match. Otherwise we can't.
     bool contents_could_be_almost_eq = true;
+    FuzzyCompareDiagnostic diagnostic;
     if (element_types_eq && shape_eq) {
-      IREE_ASSIGN_OR_RETURN(contents_could_be_almost_eq,
-                            AlmostEqByteSpan(lhs_mapped_memory.contents,
-                                             rhs_mapped_memory.contents,
-                                             lhs_element_type, tolerance));
+      IREE_ASSIGN_OR_RETURN(
+          contents_could_be_almost_eq,
+          AlmostEqByteSpan(lhs_mapped_memory.contents,
+                           rhs_mapped_memory.contents, lhs_element_type, atol,
+                           rtol, &diagnostic));
     }
     iree_status_ignore(iree_hal_buffer_unmap_range(&lhs_mapped_memory));
     iree_status_ignore(iree_hal_buffer_unmap_range(&rhs_mapped_memory));
@@ -440,7 +542,10 @@ class CheckModuleState final {
         os << " Shapes do not match.";
       }
       if (!contents_could_be_almost_eq) {
-        os << " Contents does not match to tolerance=" << tolerance << ".";
+        os << " Contents does not match to tolerance parameters atol=" << atol
+           << ", rtol=" << rtol << ". The first failure occurs at index "
+           << diagnostic.index << " as the lhs value " << diagnostic.lhs_value
+           << " differs from the rhs value " << diagnostic.rhs_value << ".";
       }
       // TODO(gcmn): Propagate original variable names.
       os << "\n"

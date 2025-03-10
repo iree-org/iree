@@ -441,7 +441,8 @@ TEST_F(CheckTest, ExpectAlmostEqSameBufferSuccess) {
       CreateFloat32BufferView(contents, shape, &input_buffer_view));
   IREE_ASSERT_OK(Invoke("expect_almost_eq",
                         {input_buffer_view, input_buffer_view},
-                        {/*tolerance=*/iree_vm_value_make_f32(0.f)}));
+                        {/*atol=*/iree_vm_value_make_f32(0.f),
+                         /*rtol=*/iree_vm_value_make_f32(0.f)}));
 }
 
 TEST_F(CheckTest, ExpectAlmostEqIdenticalBufferSuccess) {
@@ -452,19 +453,21 @@ TEST_F(CheckTest, ExpectAlmostEqIdenticalBufferSuccess) {
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, shape, &rhs));
   IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs},
-                        {/*tolerance=*/iree_vm_value_make_f32(0.f)}));
+                        {/*atol=*/iree_vm_value_make_f32(0.f),
+                         /*rtol=*/iree_vm_value_make_f32(0.f)}));
 }
 
 TEST_F(CheckTest, ExpectAlmostEqNearIdenticalBufferSuccess) {
   vm::ref<iree_hal_buffer_view_t> lhs;
   vm::ref<iree_hal_buffer_view_t> rhs;
-  float lhs_contents[] = {1.0f, 1.99999f, 0.00001f, 4.0f};
-  float rhs_contents[] = {1.00001f, 2.0f, 0.0f, 4.0f};
+  float lhs_contents[] = {1.0f, 1.99999f, 0.00001f, 10000.0f};
+  float rhs_contents[] = {1.00001f, 2.0f, 0.0f, 10000.1f};
   iree_hal_dim_t shape[] = {4};
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(rhs_contents, shape, &rhs));
   IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs},
-                        {/*tolerance=*/iree_vm_value_make_f32(1.e-4f)}));
+                        {/*atol=*/iree_vm_value_make_f32(1.e-4f),
+                         /*rtol=*/iree_vm_value_make_f32(1.e-4f)}));
 }
 
 TEST_F(CheckTest, ExpectAlmostEqIdentical3DBufferSuccess) {
@@ -475,7 +478,8 @@ TEST_F(CheckTest, ExpectAlmostEqIdentical3DBufferSuccess) {
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, shape, &rhs));
   IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs},
-                        {/*tolerance=*/iree_vm_value_make_f32(0.f)}));
+                        {/*atol=*/iree_vm_value_make_f32(0.f),
+                         /*rtol=*/iree_vm_value_make_f32(0.f)}));
 }
 
 TEST_F(CheckTest, ExpectAlmostEqDifferentShapeFailure) {
@@ -488,7 +492,8 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentShapeFailure) {
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, rhs_shape, &rhs));
   EXPECT_NONFATAL_FAILURE(
       IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs},
-                            {/*tolerance=*/iree_vm_value_make_f32(0.f)})),
+                            {/*atol=*/iree_vm_value_make_f32(0.f),
+                             /*rtol=*/iree_vm_value_make_f32(0.f)})),
       "Shapes do not match");
 }
 
@@ -505,7 +510,8 @@ TEST_F(CheckTest, ExpectAlmostEqSmallerLhsElementCountFailure) {
       CreateFloat32BufferView(bigger_contents, bigger_shape, &bigger));
   EXPECT_NONFATAL_FAILURE(
       IREE_ASSERT_OK(Invoke("expect_almost_eq", {smaller, bigger},
-                            {/*tolerance=*/iree_vm_value_make_f32(0.f)})),
+                            {/*atol=*/iree_vm_value_make_f32(0.f),
+                             /*rtol=*/iree_vm_value_make_f32(0.f)})),
       "Shapes do not match");
 }
 
@@ -522,7 +528,8 @@ TEST_F(CheckTest, ExpectAlmostEqSmallerRhsElementCountFailure) {
       CreateFloat32BufferView(bigger_contents, bigger_shape, &bigger));
   EXPECT_NONFATAL_FAILURE(
       IREE_ASSERT_OK(Invoke("expect_almost_eq", {bigger, smaller},
-                            {/*tolerance=*/iree_vm_value_make_f32(0.f)})),
+                            {/*atol=*/iree_vm_value_make_f32(0.f),
+                             /*rtol=*/iree_vm_value_make_f32(0.f)})),
       "Shapes do not match");
 }
 
@@ -536,7 +543,8 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentElementTypeFailure) {
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(rhs_contents, shape, &rhs));
   EXPECT_NONFATAL_FAILURE(
       IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs},
-                            {/*tolerance=*/iree_vm_value_make_f32(0.f)})),
+                            {/*atol=*/iree_vm_value_make_f32(0.f),
+                             /*rtol=*/iree_vm_value_make_f32(0.f)})),
       "Element types do not match");
 }
 
@@ -550,7 +558,8 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentContentsFailure) {
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(rhs_contents, shape, &rhs));
   EXPECT_NONFATAL_FAILURE(
       IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs},
-                            {/*tolerance=*/iree_vm_value_make_f32(0.1f)})),
+                            {/*atol=*/iree_vm_value_make_f32(0.1f),
+                             /*rtol=*/iree_vm_value_make_f32(0.f)})),
       "Contents does not match");
 }
 
@@ -569,7 +578,8 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentEverythingFullMessageFailure) {
   // types.
   EXPECT_NONFATAL_FAILURE(
       IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs},
-                            {/*tolerance=*/iree_vm_value_make_f32(0.f)})),
+                            {/*atol=*/iree_vm_value_make_f32(0.f),
+                             /*rtol=*/iree_vm_value_make_f32(0.f)})),
       "Expected near equality of these values. Element types do not match."
       " Shapes do not match.\n"
       "  lhs:\n"
@@ -588,9 +598,11 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentContents3DFullMessageFailure) {
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(rhs_contents, shape, &rhs));
   EXPECT_NONFATAL_FAILURE(
       IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs},
-                            {/*tolerance=*/iree_vm_value_make_f32(0.1f)})),
+                            {/*atol=*/iree_vm_value_make_f32(0.1f),
+                             /*rtol=*/iree_vm_value_make_f32(0.f)})),
       "Expected near equality of these values. Contents does not match to "
-      "tolerance=0.1.\n"
+      "tolerance parameters atol=0.1, rtol=0. The first failure occurs at "
+      "index 3 as the lhs value 4 differs from the rhs value 42.\n"
       "  lhs:\n"
       "    2x2x2xf32=[[1 2][3 4]][[5 6][7 8]]\n"
       "  rhs:\n"
@@ -605,23 +617,23 @@ TEST_F(CheckTest, ExpectAlmostEqIdenticalBufferF16Success) {
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(contents, shape, &rhs));
   IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs},
-                        {/*tolerance=*/iree_vm_value_make_f32(0.f)}));
+                        {/*atol=*/iree_vm_value_make_f32(0.f),
+                         /*rtol=*/iree_vm_value_make_f32(0.f)}));
 }
 
 TEST_F(CheckTest, ExpectAlmostEqNearIdenticalBufferF16Success) {
   vm::ref<iree_hal_buffer_view_t> lhs;
   vm::ref<iree_hal_buffer_view_t> rhs;
-  uint16_t lhs_contents[] = {
-      iree_math_f32_to_f16(1.0f), iree_math_f32_to_f16(1.999f),
-      iree_math_f32_to_f16(0.001f), iree_math_f32_to_f16(4.0f)};
-  uint16_t rhs_contents[] = {
-      iree_math_f32_to_f16(1.001f), iree_math_f32_to_f16(2.0f),
-      iree_math_f32_to_f16(0.0f), iree_math_f32_to_f16(4.0f)};
-  iree_hal_dim_t shape[] = {4};
+  uint16_t lhs_contents[] = {iree_math_f32_to_f16(10000.0f),
+                             iree_math_f32_to_f16(10000.1f)};
+  uint16_t rhs_contents[] = {iree_math_f32_to_f16(10000.1f),
+                             iree_math_f32_to_f16(10000.0f)};
+  iree_hal_dim_t shape[] = {2};
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(rhs_contents, shape, &rhs));
   IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs},
-                        {/*tolerance=*/iree_vm_value_make_f32(0.01f)}));
+                        {/*atol=*/iree_vm_value_make_f32(0.f),
+                         /*rtol=*/iree_vm_value_make_f32(1e-4f)}));
 }
 
 TEST_F(CheckTest, ExpectAlmostEqDifferentContentsF16Failure) {
@@ -634,7 +646,8 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentContentsF16Failure) {
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(rhs_contents, shape, &rhs));
   EXPECT_NONFATAL_FAILURE(
       IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs},
-                            {/*tolerance=*/iree_vm_value_make_f32(0.1f)})),
+                            {/*atol=*/iree_vm_value_make_f32(0.1f),
+                             /*rtol=*/iree_vm_value_make_f32(0.1f)})),
       "Contents does not match");
 }
 }  // namespace
