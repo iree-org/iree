@@ -1,0 +1,35 @@
+{
+    "inputs": [
+        "1x4x128x128xf16",
+        "1xf16",
+        "2x64x2048xf16",
+        "2x1280xf16",
+        "2x6xf16",
+        "1xf16"
+    ],
+    "function_run": "main",
+    "benchmark_flags": [
+        "--benchmark_repetitions=10",
+        "--benchmark_min_warmup_time=3.0",
+        "--device_allocator=caching"
+    ],
+    "device": "hip",
+    "golden_time_tolerance_multiplier": {
+        "mi300": 1.1,
+        "mi308": 1.1
+    },
+    "golden_time_ms": {
+        "mi300": 46.0,
+        "mi308": 115.0
+    },
+    "golden_dispatch": {
+        "mi300": 1695,
+        "mi308": 1695
+    },
+    "golden_size": {
+        "mi300": 2200000,
+        "mi308": 2200000
+    },
+    "specific_chip_to_ignore": ["gfx90a"],
+    "real_weights_file_name": "punet_fp8_weights.irpa"
+}
