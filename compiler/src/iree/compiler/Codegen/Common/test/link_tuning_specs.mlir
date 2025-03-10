@@ -145,25 +145,13 @@ module @td_module attributes { transform.with_named_sequence } {
         transform.named_sequence @apply_op_config(%op: !transform.any_op {transform.readonly},
                                                 %config: !transform.any_param {transform.readonly}) {
         transform.annotate %op "compilation_info" = %config : !transform.any_op, !transform.any_param
-        transform.annotate %op "__tuning_spec_applied__" : !transform.any_op
         transform.yield
         }
 
         transform.named_sequence @match_mmt_f16_f16_f32(%matmul: !transform.any_op {transform.readonly})
             -> (!transform.any_op, !transform.any_param) {
         transform.match.operation_name %matmul ["linalg.generic"] : !transform.any_op
-
-        %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
-        %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
-        transform.iree.match.cast_compatible_type %lhs = tensor<?x?xf16> : !transform.any_value
-        transform.iree.match.cast_compatible_type %rhs = tensor<?x?xf16> : !transform.any_value
-
-        // Generate `config` inside this sequence
-        %config = transform.param.constant #iree_codegen.compilation_info<
-            lowering_config = #iree_gpu.lowering_config<{x}>,
-            translation_info = #iree_codegen.translation_info<pipeline = None>
-        > -> !transform.any_param
-
+        %config = transform.param.constant {key = "custom_config"} -> !transform.any_param
         transform.yield %matmul, %config : !transform.any_op, !transform.any_param
         }
 
@@ -188,19 +176,8 @@ module @td_module attributes { transform.with_named_sequence } {
 
         transform.named_sequence @match_attention_f16(%attention: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param, !transform.any_param) {
             transform.match.operation_name %attention ["iree_linalg_ext.attention"] : !transform.any_op
-            %in0 = transform.get_operand %attention[0] : (!transform.any_op) -> !transform.any_value
-            transform.iree.match.cast_compatible_type %in0 = tensor<?x?x?x?xf16> : !transform.any_value
-
-            %config = transform.param.constant #iree_codegen.compilation_info<
-                    lowering_config = #iree_gpu.lowering_config<{x}>,
-                    translation_info = #iree_codegen.translation_info<pipeline = None>>
-            -> !transform.any_param
-
-            %decomposition_config = transform.param.constant {
-            qk_attrs = {x},
-            pv_attrs = {y}
-            } -> !transform.any_param
-
+            %config = transform.param.constant {key = "attn_config"} -> !transform.any_param
+            %decomposition_config = transform.param.constant {key = "decomp_config"} -> !transform.any_param
             transform.yield %attention, %config, %decomposition_config : !transform.any_op, !transform.any_param, !transform.any_param
         }
 
@@ -292,4 +269,4 @@ module @td_module attributes { transform.with_named_sequence } {
 // CHECK:         transform.foreach_match
 // CHECK:           @match -> @apply_op_config
 // CHECK:           @match_1 -> @apply_op_config_1
-// CHECK:           @match_2 -> @apply_op_config_1_1
+// CHECK:           @match_2 -> @apply_op_config_2

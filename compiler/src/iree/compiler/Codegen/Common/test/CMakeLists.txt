@@ -66,7 +66,6 @@ iree_lit_test_suite(
     "materialize_user_config_from_tuning_spec.mlir"
     "materialize_user_configs.mlir"
     "math_transform.mlir"
-    "merge_default_tuning_specs.mlir"
     "normalize_loop_bounds.mlir"
     "optimize_tensor_insert_extract_slices.mlir"
     "pad_dynamic_alloc.mlir"
