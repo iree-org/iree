@@ -66,6 +66,7 @@ iree_cc_library(
     iree::base::internal::wait_handle
     iree::base::internal::flatcc::parsing
     iree::hal
+    iree::hal::utils::caching_allocator
     iree::hal::utils::collective_batch
     iree::hal::utils::executable_debug_info
     iree::hal::utils::deferred_command_buffer
@@ -74,6 +75,7 @@ iree_cc_library(
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::hal::utils::stream_tracing
+    iree::hal::utils::wrapped_buffer
     iree::hal::drivers::hip::util::hip_util
     iree::schemas::executable_debug_info_c_fbs
     iree::schemas::hip_executable_def_c_fbs

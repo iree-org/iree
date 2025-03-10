@@ -30,10 +30,12 @@
 #include "iree/hal/drivers/hip/rccl_dynamic_symbols.h"
 #include "iree/hal/drivers/hip/status_util.h"
 #include "iree/hal/drivers/hip/stream_command_buffer.h"
+#include "iree/hal/utils/caching_allocator.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/file_registry.h"
 #include "iree/hal/utils/file_transfer.h"
 #include "iree/hal/utils/stream_tracing.h"
+#include "iree/hal/utils/wrapped_buffer.h"
 
 #define IREE_HAL_DEVICE_TRANSFER_DEFAULT_BUFFER_SIZE (128 * 1024 * 1024)
 #define IREE_HAL_DEVICE_MAX_TRANSFER_DEFAULT_CHUNK_SIZE (64 * 1024 * 1024)
@@ -997,27 +999,39 @@ static iree_status_t iree_hal_hip_device_prepare_async_alloc(
 
   *out_buffer = NULL;
   iree_hal_buffer_params_canonicalize(&params);
-  const iree_hal_buffer_placement_t placement = {
-      .device = (iree_hal_device_t*)device,
-      .queue_affinity = params.queue_affinity ? params.queue_affinity
-                                              : IREE_HAL_QUEUE_AFFINITY_ANY,
-      .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS,
-  };
-
-  iree_hal_buffer_release_callback_t callback = {
-      .fn = &iree_hal_hip_async_buffer_release, .user_data = (void*)device};
   iree_hal_buffer_t* buffer = NULL;
-  iree_status_t status = iree_hal_hip_buffer_wrap(
-      placement, params.type, params.access, params.usage, allocation_size,
-      /*byte_offset=*/0,
-      /*byte_length=*/allocation_size, IREE_HAL_HIP_BUFFER_TYPE_ASYNC,
-      /*device_ptr=*/NULL, /*host_ptr=*/NULL, callback, device->host_allocator,
-      &buffer);
+  iree_status_t status = iree_ok_status();
+  bool is_hip_allocator = iree_hal_hip_allocator_isa(
+      iree_hal_device_allocator((iree_hal_device_t*)device));
+  if (is_hip_allocator) {
+    const iree_hal_buffer_placement_t placement = {
+        .device = (iree_hal_device_t*)device,
+        .queue_affinity = params.queue_affinity ? params.queue_affinity
+                                                : IREE_HAL_QUEUE_AFFINITY_ANY,
+        .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS,
+    };
+
+    iree_hal_buffer_release_callback_t callback = {
+        .fn = &iree_hal_hip_async_buffer_release, .user_data = (void*)device};
+    status = iree_hal_hip_buffer_wrap(
+        placement, params.type, params.access, params.usage, allocation_size,
+        /*byte_offset=*/0,
+        /*byte_length=*/allocation_size, IREE_HAL_HIP_BUFFER_TYPE_ASYNC,
+        /*device_ptr=*/NULL, /*host_ptr=*/NULL, callback,
+        device->host_allocator, &buffer);
+  } else {
+    // device_allocator is a caching_allocator
+    status = iree_hal_wrapped_buffer_make_buffer(
+        /*wrapped_buffer=*/NULL, params, allocation_size,
+        device->host_allocator, &buffer);
+  }
 
   if (iree_status_is_ok(status)) {
     *out_buffer = buffer;
   } else if (buffer) {
-    iree_hal_hip_buffer_set_allocation_empty(buffer);
+    if (is_hip_allocator) {
+      iree_hal_hip_buffer_set_allocation_empty(buffer);
+    }
     iree_hal_buffer_release(buffer);
   }
 
@@ -1335,15 +1349,28 @@ static iree_status_t iree_hal_hip_device_complete_buffer_operation(
 
   if (data->buffer &&
       data->type == IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_DEALLOC) {
-    int device_ordinal =
-        iree_math_count_trailing_zeros_u64(data->base.queue_affinity);
-    if (data->base.device->supports_memory_pools) {
-      status = iree_status_join(
-          status,
-          iree_hal_hip_memory_pools_deallocate(
-              &data->base.device->devices[device_ordinal].memory_pools,
-              data->base.device->devices[device_ordinal].hip_dispatch_stream,
-              data->buffer));
+    iree_hal_allocator_t* device_allocator =
+        iree_hal_device_allocator((iree_hal_device_t*)data->base.device);
+    bool is_hip_allocator = iree_hal_hip_allocator_isa(device_allocator);
+    if (is_hip_allocator) {
+      int device_ordinal =
+          iree_math_count_trailing_zeros_u64(data->base.queue_affinity);
+      if (data->base.device->supports_memory_pools) {
+        status = iree_status_join(
+            status,
+            iree_hal_hip_memory_pools_deallocate(
+                &data->base.device->devices[device_ordinal].memory_pools,
+                data->base.device->devices[device_ordinal].hip_dispatch_stream,
+                data->buffer));
+      }
+    } else {
+      // device_allocator is a caching_allocator
+      iree_hal_buffer_t* buffer = NULL;
+      iree_hal_wrapped_buffer_get_wrapped_buffer(data->buffer, &buffer);
+      if (buffer != NULL) {
+        iree_hal_allocator_deallocate_buffer(device_allocator, buffer);
+        iree_hal_wrapped_buffer_set_wrapped_buffer(data->buffer, NULL);
+      }
     }
   }
 
@@ -1403,6 +1430,7 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
   IREE_TRACE_ZONE_BEGIN_NAMED(
       z3, "iree_hal_hip_device_perform_buffer_operation_now_launch_operation");
   if (iree_status_is_ok(status)) {
+    bool is_wrapped_buffer = iree_hal_wrapped_buffer_isa(data->buffer);
     switch (data->type) {
       case IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_ALLOC:
         if (device->supports_memory_pools) {
@@ -1411,12 +1439,28 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
               stream, iree_hal_buffer_allocation_size(data->buffer));
           break;
         }
+        if (is_wrapped_buffer) {
+          iree_hal_buffer_t* buffer = NULL;
+          iree_device_size_t allocation_size =
+              iree_hal_wrapped_buffer_allocation_size(data->buffer);
+          iree_hal_buffer_params_t buffer_params;
+          iree_hal_wrapped_buffer_get_buffer_params(data->buffer,
+                                                    &buffer_params);
+          status = iree_hal_allocator_allocate_buffer(
+              iree_hal_device_allocator((iree_hal_device_t*)device),
+              buffer_params, allocation_size, &buffer);
+          if (iree_status_is_ok(status)) {
+            iree_hal_wrapped_buffer_set_wrapped_buffer(data->buffer, buffer);
+          }
+          break;
+        }
         status = iree_hal_hip_allocator_alloc_async(
             iree_hal_device_allocator((iree_hal_device_t*)device),
             data->buffer);
         break;
       case IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_DEALLOC: {
-        if (!data->base.device->supports_memory_pools && data->buffer) {
+        if (!data->base.device->supports_memory_pools && data->buffer &&
+            !is_wrapped_buffer) {
           // If we support memory pools this free is done on the cleanup thread.
           status = iree_status_join(
               status, iree_hal_hip_allocator_free_async(
@@ -1517,7 +1561,9 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
   iree_status_t status = iree_ok_status();
   if (!iree_all_bits_set(params.type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) &&
       (device->supports_memory_pools ||
-       iree_hal_hip_allocator_isa(iree_hal_device_allocator(base_device)))) {
+       iree_hal_hip_allocator_isa(iree_hal_device_allocator(base_device)) ||
+       iree_hal_caching_allocator_isa(
+           iree_hal_device_allocator(base_device)))) {
     iree_hal_buffer_t* buffer = NULL;
 
     status = iree_hal_hip_device_prepare_async_alloc(device, params,
@@ -1554,7 +1600,6 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
       *out_buffer = buffer;
     } else {
       if (buffer) {
-        iree_hal_hip_buffer_set_allocation_empty(buffer);
         iree_hal_resource_release(&buffer->resource);
       }
     }
