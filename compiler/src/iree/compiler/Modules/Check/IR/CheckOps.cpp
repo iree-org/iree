@@ -34,42 +34,11 @@ struct ExpectAlmostEqConstOpToExpectAlmostEqOp
                                 PatternRewriter &rewriter) const override {
     auto rhs = rewriter.create<arith::ConstantOp>(op.getLoc(), op.getValue());
     rewriter.replaceOpWithNewOp<ExpectAlmostEqOp>(
-        op, op.getDevice(), op.getLhs(), rhs, op.getToleranceAttr());
+        op, op.getDevice(), op.getLhs(), rhs, op.getAtolAttr(),
+        op.getRtolAttr());
     return success();
   }
 };
-
-static constexpr char kToleranceKeyword[] = "tolerance";
-static constexpr float kToleranceDefaultValue = 1e-4f;
-
-static ParseResult parseOptionalFloatTolerance(OpAsmParser &parser,
-                                               FloatAttr &tolerance) {
-  float toleranceValue = kToleranceDefaultValue;
-  if (succeeded(parser.parseOptionalComma())) {
-    if (failed(parser.parseKeyword(kToleranceKeyword))) {
-      return parser.emitError(parser.getCurrentLocation(),
-                              llvm::Twine("Expected keyword: ") +
-                                  kToleranceKeyword);
-    }
-    llvm::APFloat parsedTolerance(APFloat::IEEEsingle());
-    if (failed(parser.parseFloat(parsedTolerance.getSemantics(),
-                                 parsedTolerance))) {
-      return parser.emitError(parser.getCurrentLocation(),
-                              "Failed to parse optional float tolerance.");
-    }
-    toleranceValue = parsedTolerance.convertToFloat();
-  }
-  tolerance = parser.getBuilder().getF32FloatAttr(toleranceValue);
-  return success();
-}
-
-static void printOptionalFloatTolerance(OpAsmPrinter &p, Operation *op,
-                                        FloatAttr tolerance) {
-  float toleranceValue = tolerance.getValue().convertToFloat();
-  if (toleranceValue != kToleranceDefaultValue) {
-    p << ", " << kToleranceKeyword << " " << toleranceValue;
-  }
-}
 
 } // namespace
 

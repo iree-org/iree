@@ -31,6 +31,8 @@ iree_check_test_suite(
     check
   SRCS
     "success.mlir"
+  COMPILER_FLAGS
+    "--iree-input-demote-f64-to-f32=false"
 )
 
 iree_check_test_suite(
@@ -38,6 +40,8 @@ iree_check_test_suite(
     check_failure
   SRCS
     "failure.mlir"
+  COMPILER_FLAGS
+    "--iree-input-demote-f64-to-f32=false"
   RUNNER_ARGS
     "--expect_failure"
 )
