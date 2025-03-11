@@ -510,16 +510,17 @@ LogicalResult ReturnOp::verify() {
 
 void TensorImportOp::build(OpBuilder &builder, OperationState &result,
                            Type resultType, Value source,
-                           TypeAttr targetEncoding, StringAttr name,
-                           Attribute affinity) {
-  build(builder, result, resultType, source, targetEncoding,
+                           TypeAttr targetEncoding, bool consume,
+                           StringAttr name, Attribute affinity) {
+  build(builder, result, resultType, source, targetEncoding, consume,
         /*waitFence=*/Value{}, name, affinity);
 }
 
 void TensorImportOp::build(OpBuilder &builder, OperationState &result,
                            Type resultType, Value source,
-                           TypeAttr targetEncoding, Value waitFence,
-                           StringAttr name, Attribute affinity) {
+                           TypeAttr targetEncoding, bool consume,
+                           Value waitFence, StringAttr name,
+                           Attribute affinity) {
   auto shapedType = llvm::cast<ShapedType>(resultType);
   assert((isa<IREE::HAL::BufferViewType>(source.getType()) ||
           shapedType.hasStaticShape()) &&
@@ -534,7 +535,8 @@ void TensorImportOp::build(OpBuilder &builder, OperationState &result,
         builder.getIndexAttr(i)));
   }
   build(builder, result, resultType, source, targetEncoding, dynamicDims,
-        waitFence, name, affinity);
+        consume ? builder.getUnitAttr() : UnitAttr{}, waitFence, name,
+        affinity);
 }
 
 static LogicalResult verifyTypeStorageCompatibility(Operation *op,
