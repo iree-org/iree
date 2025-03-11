@@ -104,6 +104,28 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
     }
   }
 
+  // Set tile sizes for full tiles to zero. This prevents single trip loops from
+  // being created, which can sometimes block certain cleanup patterns from
+  // applying during producer fusion.
+  if (auto tilingInterfaceOp = dyn_cast<TilingInterface>(tilableOp)) {
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(tilingInterfaceOp);
+    SmallVector<Range> bounds = tilingInterfaceOp.getIterationDomain(rewriter);
+    SmallVector<int64_t> staticLoopSizes;
+    SmallVector<Value> d;
+    for (Range bound : bounds) {
+      dispatchIndexOpFoldResult(bound.size, d, staticLoopSizes);
+    }
+    OpFoldResult zero = rewriter.getIndexAttr(0);
+    SmallVector<int64_t> tileSizesInt = tilableOpConfig.getWorkgroupTileSizes();
+    for (auto loopId : llvm::seq<unsigned>(0, tileSizesInt.size())) {
+      if (loopId < staticLoopSizes.size() &&
+          staticLoopSizes[loopId] == tileSizesInt[loopId]) {
+        tileSizes[loopId] = zero;
+      }
+    }
+  }
+
   return TilingInfo{tilableOp, tileSizes, interchange};
 }
 
