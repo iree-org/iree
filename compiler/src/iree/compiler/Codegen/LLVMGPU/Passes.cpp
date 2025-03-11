@@ -1253,9 +1253,6 @@ static void buildROCDLCodegenConfigurationPassPipelineImpl(
     OpPassManager &modulePassManager) {
   {
     FunctionLikeNest funcPassManager(modulePassManager);
-    if (clLLVMGPUEnableExperimentalDataTiling) {
-      funcPassManager.addPass(createMaterializeDeviceEncodingPass);
-    }
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
   }

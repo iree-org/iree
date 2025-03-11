@@ -363,12 +363,10 @@ LogicalResult initROCDLLaunchConfig(FunctionOpInterface funcOp) {
 
   Operation *rootOp = nullptr;
 
-  // Find the root operation. linalg.generic, linalg.fill, linalg.pack, and
-  // linalg.unpack are not root operations if there are other compute operations
-  // present.
+  // Find the root operation. linalg.generic and linalg.fill are not root
+  // operations if there are other compute operations present.
   for (Operation *op : llvm::reverse(computeOps)) {
-    if (!isa<linalg::GenericOp, linalg::FillOp, linalg::PackOp,
-             linalg::UnPackOp>(op)) {
+    if (!isa<linalg::GenericOp, linalg::FillOp>(op)) {
       rootOp = op;
       break;
     }
@@ -381,19 +379,9 @@ LogicalResult initROCDLLaunchConfig(FunctionOpInterface funcOp) {
     }
   }
 
-  // Generic and fill ops take priority over pack and unpack ops as the root op.
   if (!rootOp) {
     for (Operation *op : llvm::reverse(computeOps)) {
       if (isa<linalg::GenericOp, linalg::FillOp>(op)) {
-        rootOp = op;
-        break;
-      }
-    }
-  }
-
-  if (!rootOp) {
-    for (Operation *op : llvm::reverse(computeOps)) {
-      if (isa<linalg::PackOp, linalg::UnPackOp>(op)) {
         rootOp = op;
         break;
       }
