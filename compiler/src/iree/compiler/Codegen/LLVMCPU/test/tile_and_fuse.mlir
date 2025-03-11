@@ -214,3 +214,38 @@ func.func @ukernel_generic(%arg0: tensor<1x192x1x16xf32>, %arg1: tensor<1x768x1x
 // CHECK:           linalg.generic
 // CHECK-SAME:        ins(%[[UK_SLICE]], %[[ARG3_SLICE]]
 // CHECK-SAME:        outs(%[[ITER_SLICE]]
+
+// -----
+
+func.func @tile_linalg_ext_scan() attributes {translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>} {
+  %c0_i64 = arith.constant 0 : i64
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<128x2xf32>>
+  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<128x2xi64>>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [128, 2], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x2xf32>> -> tensor<128x2xf32>
+  %3 = tensor.empty() : tensor<2xi64>
+  %4 = tensor.empty() : tensor<128x2xi64>
+  %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<128x2xf32>) outs(%4 : tensor<128x2xi64>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 1], [0, 1], [0, 0], [1, 0]]>} {
+  ^bb0(%in: f32, %out: i64):
+    %9 = arith.fptosi %in : f32 to i64
+    linalg.yield %9 : i64
+  } -> tensor<128x2xi64>
+  %6 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [0], [0], [1]]>} ins(%c0_i64 : i64) outs(%3 : tensor<2xi64>) -> tensor<2xi64>
+  %7 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 1], [0, 1], [0, 0], [1, 0]]>} ins(%c0_i64 : i64) outs(%4 : tensor<128x2xi64>) -> tensor<128x2xi64>
+  %8:2 = iree_linalg_ext.scan {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 1], [0, 1]]>} dimension(0) inclusive(true) ins(%5 : tensor<128x2xi64>) outs(%7, %6 : tensor<128x2xi64>, tensor<2xi64>) {
+  ^bb0(%arg0: i64, %arg1: i64):
+    %9 = arith.addi %arg0, %arg1 : i64
+    iree_linalg_ext.yield %9 : i64
+  } -> tensor<128x2xi64>, tensor<2xi64>
+  flow.dispatch.tensor.store %8#0, %1, offsets = [0, 0], sizes = [128, 2], strides = [1, 1] : tensor<128x2xi64> -> !flow.dispatch.tensor<writeonly:tensor<128x2xi64>>
+  return
+}
+// CHECK-LABEL: func.func @tile_linalg_ext_scan
+// CHECK:         scf.for
+// CHECK-SAME:    {
+// CHECK:           linalg.generic
+// CHECK:           linalg.fill
+// CHECK:           linalg.fill
+// CHECK:           iree_linalg_ext.scan
+// CHECK:           scf.yield
+// CHECK:         }

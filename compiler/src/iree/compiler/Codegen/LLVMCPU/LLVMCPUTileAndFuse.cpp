@@ -81,6 +81,63 @@ foldIfGeneratedFromPadding(RewriterBase &rewriter, tensor::PadOp untiledPadOp,
   return tiledPadOp;
 }
 
+/// This function is adapted from the implementation of
+/// OpWithOffsetSizesAndStridesConstantArgumentFolder.
+///
+/// Replace the dynamic shaped results of tensor.extract_slice having constant
+/// sizes with tensor.extract_slice of static shapes.
+///
+/// ```mlir
+/// %c128 = arith.constant 128 : index
+/// %extracted_slice = tensor.extract_slice %5[%c0_0, %arg0] [%c128, 1] [1, 1] :
+///   tensor<128x2xi64> to tensor<?x1xi64>
+/// ```
+/// to
+///
+/// ```mlir
+/// %extracted_slice_3 = tensor.extract_slice %5[%c0, %arg0] [128, 1] [1, 1] :
+///   tensor<128x2xi64> to tensor<128x1xi64>
+/// %cast = tensor.cast %12 : tensor<128x1xi64> to tensor<?x1xi64>
+/// ```
+///
+/// This is required to avoid mismatches in the result types of tiled ops after
+/// applying tileAndFuseProducerOfSlice.
+static LogicalResult updateSliceSizesWithConstantValues(
+    RewriterBase &rewriter, SmallVectorImpl<Operation *> &generatedSlices) {
+  OpBuilder::InsertionGuard g(rewriter);
+
+  for (auto slice : generatedSlices) {
+    auto extractSlice = dyn_cast_or_null<tensor::ExtractSliceOp>(slice);
+    if (!extractSlice)
+      continue;
+
+    SmallVector<OpFoldResult> mixedOffsets(extractSlice.getMixedOffsets());
+    SmallVector<OpFoldResult> mixedSizes(extractSlice.getMixedSizes());
+    SmallVector<OpFoldResult> mixedStrides(extractSlice.getMixedStrides());
+
+    if (failed(foldDynamicIndexList(mixedSizes, true)))
+      continue;
+
+    auto resultType =
+        tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
+            extractSlice.getType().getRank(), extractSlice.getSourceType(),
+            mixedOffsets, mixedSizes, mixedStrides);
+    if (!resultType)
+      return failure();
+
+    rewriter.setInsertionPoint(extractSlice);
+    auto newSliceOp = rewriter.create<tensor::ExtractSliceOp>(
+        extractSlice.getLoc(), resultType, extractSlice.getSource(),
+        mixedOffsets, mixedSizes, mixedStrides);
+    Value replacement = newSliceOp.getResult();
+    if (replacement.getType() != extractSlice.getType())
+      replacement = rewriter.create<tensor::CastOp>(
+          extractSlice.getLoc(), extractSlice.getType(), replacement);
+    rewriter.replaceOp(extractSlice, replacement);
+  }
+  return success();
+}
+
 /// This pass starts with the last TilingInterface operation, tiles the op and
 /// fuses its producers recursively. The `tilingLevel` must be specified. It
 /// picks the `tilingLevel`-th list as tiling sizes from lowering_config.
@@ -124,6 +181,14 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
   if (failed(tilingResult)) {
     return failure();
   }
+
+  if (failed(updateSliceSizesWithConstantValues(
+          rewriter, tilingResult->generatedSlices))) {
+    LLVM_DEBUG(llvm::dbgs() << "\n applyTileAndFuse:: Failed to "
+                               "updateSliceSizesWithConstantValues");
+    return failure();
+  }
+
   yieldedValuesToOrigValues.append(rootOp->result_begin(),
                                    rootOp->result_end());
   // A map from untiled value to scf.for iter_arg. The iter_arg is used for DPS
@@ -157,7 +222,10 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
   auto addCandidateSlices =
       [&](Operation *fusedOp, std::deque<tensor::ExtractSliceOp> &candidates) {
         for (OpOperand &operand : fusedOp->getOpOperands()) {
-          auto sliceOp = operand.get().getDefiningOp<tensor::ExtractSliceOp>();
+          auto value = operand.get();
+          if (auto cast = value.getDefiningOp<tensor::CastOp>())
+            value = cast.getSource();
+          auto sliceOp = value.getDefiningOp<tensor::ExtractSliceOp>();
           if (!sliceOp)
             continue;
           candidates.push_back(sliceOp);
