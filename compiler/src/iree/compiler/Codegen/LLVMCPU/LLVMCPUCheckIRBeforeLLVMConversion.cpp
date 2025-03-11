@@ -99,8 +99,8 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
   }
   if (cumSize > maxAllocationSizeInBytes) {
     return funcOp.emitOpError("exceeded stack allocation limit of ")
-           << maxAllocationSizeInBytes << " bytes for function. Got "
-           << cumSize << " bytes";
+           << maxAllocationSizeInBytes << " bytes for function. Got " << cumSize
+           << " bytes";
   }
   return success();
 }
