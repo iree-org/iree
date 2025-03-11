@@ -68,7 +68,6 @@ iree_lit_test_suite(
     FileCheck
     iree-compile
     iree-opt
-    not
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
