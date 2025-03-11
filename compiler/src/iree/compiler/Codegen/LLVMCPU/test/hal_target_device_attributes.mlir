@@ -26,6 +26,12 @@
 //
 // CHECK-STACK-VALUE-SAME: }>]> : !hal.device
 
+// RUN: not iree-compile --compile-to=preprocessing --iree-hal-target-backends=llvm-cpu --iree-llvmcpu-target-triple=x86_64-linux-gnu %s \
+// RUN:                  --iree-llvmcpu-stack-allocation-limit=64266 \
+// RUN: 2>&1 | FileCheck %s --check-prefix=CHECK-INCORRECT-OPT-STACK-VALUE
+//
+// CHECK-INCORRECT-OPT-STACK-VALUE: for the --iree-llvmcpu-stack-allocation-limit option: '64266' value not a power-of-two
+
 module {
   util.func public @foo(%arg0: tensor<?xf32>) -> tensor<?xf32> {
     util.return %arg0 : tensor<?xf32>
