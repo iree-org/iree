@@ -22,7 +22,7 @@ void GlobalPipelineOptions::bindOptions(OptionsBinder &binder) {
       "IREE global pipeline options controlling the entire compilation flow.");
 
   binder.topLevelOpt(
-      kGlobalOptFlag, optLevel,
+      "iree-opt-level", optLevel,
       llvm::cl::desc("Global optimization level to apply to the entire "
                      "compilation flow."),
       llvm::cl::cat(category));
@@ -136,7 +136,6 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category(
       "IREE options for controlling global optimizations.");
   auto init_at_opt = binder.optimizationLevel(
-      GlobalPipelineOptions::kGlobalOptFlag,
       "iree-global-optimization-opt-level", optLevel,
       llvm::cl::desc("Optimization level for the this pipeline"),
       llvm::cl::cat(category));

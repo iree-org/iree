@@ -121,8 +121,7 @@ struct TestOptions {
 
   void bindOptions(OptionsBinder &binder) {
     binder.topLevelOpt(kRootOptFlag, rootOption);
-    auto init_at_opt =
-        binder.optimizationLevel(kRootOptFlag, "parent-option", parentOption);
+    auto init_at_opt = binder.optimizationLevel("parent-option", parentOption);
     binder.opt<bool>("child-option", childOption,
                      {init_at_opt(llvm::OptimizationLevel::O3, true)},
                      llvm::cl::desc("test desc."));

@@ -14,7 +14,6 @@ namespace mlir::iree_compiler {
 struct GlobalPipelineOptions {
   llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
 
-  static constexpr llvm::StringRef kGlobalOptFlag = "iree-opt-level";
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalPipelineOptions>;
 };

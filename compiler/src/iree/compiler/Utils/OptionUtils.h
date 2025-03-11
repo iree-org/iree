@@ -165,20 +165,21 @@ public:
   template <typename... Mods>
   void topLevelOpt(llvm::StringRef name, llvm::OptimizationLevel &value,
                    Mods... Ms) {
+    assert(getRootFlag() == kDummyRootFlag);
+    getOptionsStorage()[name] = std::move(getOptionsStorage()[getRootFlag()]);
+    getRootFlag() = name;
+
     opt<llvm::OptimizationLevel>(name, value, Ms...);
     auto &info = getOptionsStorage()[name];
     info.optOverrides = std::make_unique<RootOptOverride>(value, info.isChanged,
                                                           *info.children);
-    getTopLevelOptimizations().push_back(name);
   }
 
   void applyOptimizationDefaults() {
     // Recursively applies overrides.
-    for (llvm::StringRef name : getTopLevelOptimizations()) {
-      auto it = getOptionsStorage().find(name);
-      assert(it != getOptionsStorage().end() && "Option not found");
-      it->second.optOverrides->applyFromRoot();
-    }
+    auto it = getOptionsStorage().find(getRootFlag());
+    assert(it != getOptionsStorage().end() && "Option not found");
+    it->second.optOverrides->applyFromRoot();
   }
 
   void restoreOptimizationDefaults() {
@@ -189,13 +190,13 @@ public:
   }
 
   template <typename... Mods>
-  opt_scope optimizationLevel(llvm::StringRef parentName, llvm::StringRef name,
+  opt_scope optimizationLevel(llvm::StringRef name,
                               llvm::OptimizationLevel &value, Mods... Ms) {
     opt<llvm::OptimizationLevel>(name, value, Ms...);
     auto &info = getOptionsStorage()[name];
     auto optDef = std::make_unique<ScopedOptOverride>(value, info.isChanged,
                                                       *info.children);
-    getOptionsStorage()[parentName].children->push_back(optDef.get());
+    getOptionsStorage()[getRootFlag()].children->push_back(optDef.get());
     info.optOverrides = std::move(optDef);
     return opt_scope{name};
   }
@@ -336,8 +337,7 @@ private:
 
   OptionsStorage &getOptionsStorage();
   const OptionsStorage &getOptionsStorage() const;
-  llvm::SmallVector<llvm::StringRef> &getTopLevelOptimizations();
-  const llvm::SmallVector<llvm::StringRef> &getTopLevelOptimizations() const;
+  llvm::StringRef &getRootFlag();
 
   OptionsBinder() = default;
   OptionsBinder(std::unique_ptr<llvm::cl::SubCommand> scope)
@@ -464,9 +464,9 @@ private:
   OptionsStorage localOptions;
   static llvm::ManagedStatic<OptionsStorage> globalOptions;
 
-  llvm::SmallVector<llvm::StringRef> topLevelOptimizations;
-  static llvm::ManagedStatic<llvm::SmallVector<llvm::StringRef>>
-      globalTopLevelOptimizations;
+  llvm::StringRef localRootFlag = kDummyRootFlag;
+  static llvm::StringRef globalRootFlag;
+  static constexpr llvm::StringRef kDummyRootFlag = "iree-dummy-opt-level-flag";
 };
 
 // Generic class that is used for allocating an Options class that initializes

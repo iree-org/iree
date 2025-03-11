@@ -14,8 +14,8 @@ namespace mlir::iree_compiler {
 
 llvm::ManagedStatic<llvm::DenseMap<llvm::StringRef, OptionsBinder::OptionInfo>>
     OptionsBinder::globalOptions;
-llvm::ManagedStatic<llvm::SmallVector<llvm::StringRef>>
-    OptionsBinder::globalTopLevelOptimizations;
+
+llvm::StringRef OptionsBinder::globalRootFlag = kDummyRootFlag;
 
 LogicalResult OptionsBinder::parseArguments(int argc, const char *const *argv,
                                             ErrorCallback onError) {
@@ -100,13 +100,8 @@ const OptionsBinder::OptionsStorage &OptionsBinder::getOptionsStorage() const {
   return scope ? localOptions : *globalOptions;
 }
 
-llvm::SmallVector<llvm::StringRef> &OptionsBinder::getTopLevelOptimizations() {
-  return scope ? topLevelOptimizations : *globalTopLevelOptimizations;
-}
-
-const llvm::SmallVector<llvm::StringRef> &
-OptionsBinder::getTopLevelOptimizations() const {
-  return scope ? topLevelOptimizations : *globalTopLevelOptimizations;
+llvm::StringRef &OptionsBinder::getRootFlag() {
+  return scope ? localRootFlag : globalRootFlag;
 }
 
 } // namespace mlir::iree_compiler
