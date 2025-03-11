@@ -196,7 +196,7 @@ struct LLVMCPUTargetCLOptions {
   llvm::FloatABI::ABIType targetFloatABI = LLVMTarget::DEFAULT_FLOAT_ABI;
   std::string targetDataLayout = LLVMTarget::DEFAULT_DATA_LAYOUT;
   unsigned targetVectorWidthInBytes = LLVMTarget::DEFAULT_VECTOR_WIDTH_IN_BYTES;
-  unsigned targetMaxStackAllocSizeInBytes =
+  llvm::cl::PowerOf2ByteSize targetMaxStackAllocSizeInBytes =
       LLVMTarget::DEFAULT_MAX_STACK_ALLOC_SIZE_IN_BYTES;
   std::string enableUkernels = LLVMTarget::DEFAULT_ENABLE_UKERNELS;
   bool linkUKernelBitcode = LLVMTarget::DEFAULT_LINK_UKERNEL_BITCODE;

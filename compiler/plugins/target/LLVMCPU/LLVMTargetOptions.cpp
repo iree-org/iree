@@ -582,7 +582,7 @@ void LLVMCPUTargetCLOptions::bindOptions(OptionsBinder &binder) {
                        targetVectorWidthInBytes, llvm::cl::cat(category),
                        llvm::cl::desc("Overrides the native vector register "
                                       "width (in bytes) of the target."));
-  binder.opt<unsigned>(
+  binder.opt<llvm::cl::PowerOf2ByteSize>(
       "iree-llvmcpu-stack-allocation-limit", targetMaxStackAllocSizeInBytes,
       llvm::cl::cat(category),
       llvm::cl::desc(
@@ -637,7 +637,7 @@ LLVMTargetOptions LLVMCPUTargetCLOptions::getTargetOptions() {
   target.llvmTargetOptions.FloatABIType = targetFloatABI;
   target.dataLayout = targetDataLayout;
   target.vectorWidthInBytes = targetVectorWidthInBytes;
-  target.maxStackAllocSizeInBytes = targetMaxStackAllocSizeInBytes;
+  target.maxStackAllocSizeInBytes = targetMaxStackAllocSizeInBytes.value;
   target.ukernels = enableUkernels;
   target.linkUkernelBitcode = linkUKernelBitcode;
 
