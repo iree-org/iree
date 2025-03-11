@@ -11,6 +11,13 @@
 
 namespace mlir::iree_compiler {
 
+struct GlobalPipelineOptions {
+  llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
+
+  void bindOptions(OptionsBinder &binder);
+  using FromFlags = OptionsFromFlags<GlobalPipelineOptions>;
+};
+
 struct BindingOptions {
   // Whether to include runtime support functions for the IREE native ABI.
   bool native = true;
@@ -72,6 +79,7 @@ struct InputDialectOptions {
 //   2. Through a Transform dialect spec file.
 //   3. Through a PDL spec file.
 struct PreprocessingOptions {
+  llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
   std::string preprocessingPassPipeline;
   std::string preprocessingTransformSpecFilename;
   std::string preprocessingPDLSpecFilename;
@@ -82,6 +90,7 @@ struct PreprocessingOptions {
 
 // Options controlling high level optimizations.
 struct GlobalOptimizationOptions {
+  llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
   // Maximum byte size increase allowed for constant expr hoisting policy to
   // allow hoisting. The threshold is 1MB by default.
   int64_t constExprMaxSizeIncreaseThreshold = 1024 * 1024;
