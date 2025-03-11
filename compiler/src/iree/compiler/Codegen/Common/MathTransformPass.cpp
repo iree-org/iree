@@ -63,15 +63,12 @@ static void populateMathFunctionsRewritePatterns(
 
 static bool predicateRewrite(StringRef name,
                              IREE::HAL::ExecutableTargetAttr target) {
+  (void)target;                // Currently unused.
   if (clNativeMathPrecision) { // Legacy.
     if (name == math::Exp2Op::getOperationName() ||
         name == math::RoundEvenOp::getOperationName()) {
       return false;
     }
-  }
-  if (isROCMBackend(target)) {
-    // On ROCm, we want to use device library functions.
-    return false;
   }
   // Currently enable all non-approximative rewrites.
   return true;
@@ -112,10 +109,6 @@ static bool predicateApprox(StringRef name,
     }
     return false;
   }
-  if (isROCMBackend(target)) {
-    // On ROCm, we want to use device library functions.
-    return false;
-  }
   StringRef acos = math::AcosOp::getOperationName();
   StringRef asin = math::AsinOp::getOperationName();
   StringRef atan = math::AtanOp::getOperationName();
@@ -130,6 +123,9 @@ static bool predicateApprox(StringRef name,
   StringRef expm1 = math::ExpM1Op::getOperationName();
   StringRef cbrt = math::CbrtOp::getOperationName();
   StringRef erf = math::ErfOp::getOperationName();
+  if (isROCMBackend(target) && name == erf) {
+    return false;
+  }
   return llvm::is_contained({atan, atan2, tanh, log, log2, log1p, erf, asin,
                              acos, exp, expm1, cbrt, sin, cos},
                             name);
