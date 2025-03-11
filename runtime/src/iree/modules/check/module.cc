@@ -69,13 +69,17 @@ bool EqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
 // Numpy-compatible fuzzy comparison of floating-point values lhs, rhs with
 // respect to tolerance parameters atol, rtol.
 //
-// The meaning of the tolerance parameters atol and rtol is exactly as in:
-//   https://numpy.org/doc/stable/reference/generated/numpy.testing.assert_allclose.html
+// The meaning of the tolerance parameters atol and rtol is exactly as in NumPy
+// isclose():
+// https://github.com/numpy/numpy/blob/7297f3117d84745bfade1e2f9aec3531e5917500/numpy/_core/numeric.py#L2447-L2449
 // The condition being verified on each lhs and rhs value is:
-//   abs(lhs - rhs) <= atol + rtol * abs(rhs).
+//   lhs == rhs || (isfinite(rhs) && abs(lhs - rhs) <= atol + rtol * abs(rhs)).
+// Note that the `lhs == rhs` part is needed for the case (lhs=+inf, rhs+inf)
+// to return true. Indeed, in that case, lhs-rhs is NaN.
 template <typename T>
 bool NumpyFuzzyCompare(T lhs, T rhs, float atol, float rtol) {
-  return std::abs(lhs - rhs) <= atol + rtol * std::abs(rhs);
+  return lhs == rhs || (std::isfinite(rhs) &&
+                        std::abs(lhs - rhs) <= atol + rtol * std::abs(rhs));
 }
 
 // Records information about some LHS/RHS scalars that failed a fuzzy comparison
