@@ -274,12 +274,15 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
       // program.
       auto encodingAttr = importOp.getResultAttrOfType<TypeAttr>(
           resultIndex, "iree.abi.encoding");
+      auto consumeAttr = importOp.getResultAttrOfType<UnitAttr>(
+          resultIndex, "iree.abi.consume");
+      auto affinityAttr =
+          importOp.getResultAttr(resultIndex, "iree.abi.affinity");
       auto tensorImportOp = entryBuilder.create<IREE::HAL::TensorImportOp>(
           importOp.getLoc(), oldType, result,
-          fallback(encodingAttr, TypeAttr::get(oldType)), signalFence,
-          /*name=*/nullptr,
-          fallback(importOp.getResultAttr(resultIndex, "iree.abi.affinity"),
-                   defaultAffinityAttr));
+          fallback(encodingAttr, TypeAttr::get(oldType)),
+          consumeAttr ? true : false, signalFence,
+          /*name=*/nullptr, fallback(affinityAttr, defaultAffinityAttr));
       results.push_back(tensorImportOp);
     } else {
       results.push_back(result);
@@ -608,13 +611,16 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
     if (llvm::isa<TensorType>(oldType)) {
       auto encodingAttr =
           exportOp.getArgAttrOfType<TypeAttr>(argIndex, "iree.abi.encoding");
+      auto consumeAttr =
+          exportOp.getArgAttrOfType<UnitAttr>(argIndex, "iree.abi.consume");
+      auto affinityAttr = exportOp.getArgAttr(argIndex, "iree.abi.affinity");
       auto argName = inferArgumentName(entryBuilder.getContext(), argIndex,
                                        exportOp.getArgAttrDict(argIndex));
       auto tensorImportOp = entryBuilder.create<IREE::HAL::TensorImportOp>(
           arg.getLoc(), oldType, arg,
-          fallback(encodingAttr, TypeAttr::get(oldType)), waitFence, argName,
-          fallback(exportOp.getArgAttr(argIndex, "iree.abi.affinity"),
-                   defaultAffinityAttr));
+          fallback(encodingAttr, TypeAttr::get(oldType)),
+          /*consume=*/consumeAttr ? true : false, waitFence, argName,
+          fallback(affinityAttr, defaultAffinityAttr));
       arguments.push_back(tensorImportOp.getTarget());
     } else {
       arguments.push_back(arg);
@@ -673,6 +679,8 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
     if (llvm::isa<TensorType>(oldType)) {
       auto encodingAttr = exportOp.getResultAttrOfType<TypeAttr>(
           resultIndex, "iree.abi.encoding");
+      auto affinityAttr =
+          exportOp.getResultAttr(resultIndex, "iree.abi.affinity");
       auto resultName =
           inferResultName(entryBuilder.getContext(), resultIndex,
                           exportOp.getResultAttrDict(resultIndex));
@@ -681,9 +689,7 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
       auto tensorExportOp = entryBuilder.create<IREE::HAL::TensorExportOp>(
           result.getLoc(), newType, result,
           fallback(encodingAttr, TypeAttr::get(result.getType())), dynamicDims,
-          resultName,
-          fallback(exportOp.getResultAttr(resultIndex, "iree.abi.affinity"),
-                   defaultAffinityAttr));
+          resultName, fallback(affinityAttr, defaultAffinityAttr));
       results.push_back(tensorExportOp);
     } else {
       results.push_back(result);

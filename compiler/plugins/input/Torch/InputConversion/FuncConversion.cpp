@@ -403,7 +403,8 @@ LogicalResult ConvertedAsyncFunctionInfo::convertImmutableTensorArg(
                           << torchType;
   }
 
-  // Propagate explicit affinities to the read.
+  // Propagate explicit affinities and ABI behavior to the read.
+  bool consume = getTorchArgAttr(argValue, "iree.abi.consume") ? true : false;
   auto affinityAttr = getTorchArgAttr(argValue, "iree.abi.affinity");
 
   auto waitSignalFences = getEnclosingWaitSignalFences(argValue);
@@ -411,7 +412,7 @@ LogicalResult ConvertedAsyncFunctionInfo::convertImmutableTensorArg(
   Value waitFence = waitSignalFences->first;
   Value importedTensor = builder.create<IREE::HAL::TensorImportOp>(
       loc, builtinTensorType, argValue, TypeAttr::get(builtinTensorType),
-      waitFence,
+      consume, waitFence,
       /*name=*/nullptr, affinityAttr);
   if (builtinTensorType != torchType) {
     importedTensor = builder.create<TorchConversion::FromBuiltinTensorOp>(
@@ -436,7 +437,7 @@ LogicalResult ConvertedAsyncFunctionInfo::convertMutableTensorArg(
                             .toBuiltinTensor();
   }
 
-  // Propagate explicit affinities to the read and write.
+  // Propagate explicit affinities and ABI behavior to the read and write.
   auto affinityAttr = getTorchArgAttr(argValue, "iree.abi.affinity");
 
   // There are only a small set of possible users of a mutable tensor.
@@ -449,6 +450,7 @@ LogicalResult ConvertedAsyncFunctionInfo::convertMutableTensorArg(
       Value imported = rewriter.create<IREE::HAL::TensorImportOp>(
           loc, builtinTensorType, argValue,
           /*target_encoding=*/TypeAttr::get(builtinTensorType),
+          /*consume=*/false,
           /*wait_fence*/ fences->first,
           /*name=*/nullptr, affinityAttr);
       rewriter.replaceOpWithNewOp<TorchConversion::FromBuiltinTensorOp>(

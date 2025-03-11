@@ -106,9 +106,9 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
   let summary = [{imports a tensor from a HAL buffer view}];
   let description = [{
     Defines an import of an external HAL buffer view into a SSA-form tensor.
-    An optional semaphore timepoint can be specified indicating when the
-    buffer view is available for use. If no semaphore timepoint is provided it
-    is assumed the buffer view is immediately available.
+    An optional fence can be specified indicating when the buffer view is
+    available for use. If no fence is provided it is assumed the buffer view is
+    immediately available.
 
     The provided `target_encoding`, if different from the `target` type,
     indicates that the ABI-facing type may differ from the internal
@@ -116,12 +116,18 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
     dynamically shaped values must have the same number of dynamic dimensions.
     This allows for casting between rank-0 and rank-N types, different element
     types, etc.
+
+    `consume` can be used to indicate a transfer of ownership. Though the
+    imported value may still have external references when consumed a resource
+    will be conceptually released from its existing owner and retained by the
+    importer atomically.
   }];
 
   let arguments = (ins
     AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$source,
     TypeAttr:$target_encoding,
     HAL_ShapeDynamicDims:$target_dims,
+    UnitAttr:$consume,
     Optional<HAL_Fence>:$wait_fence,
     OptionalAttr<StrAttr>:$name,
     OptionalAttr<AnyAttr>:$affinity
@@ -133,6 +139,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
     (`wait` `(` $wait_fence^ `)` `=` `` `>`)?
+    (`consume` $consume^)?
     $source
     ($name^)?
     `:` type($source) `->`
@@ -145,6 +152,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
       "Type":$resultType,
       "Value":$source,
       "TypeAttr":$targetEncoding,
+      "bool":$consume,
       "StringAttr":$name,
       "Attribute":$affinity
     )>,
@@ -152,6 +160,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
       "Type":$resultType,
       "Value":$source,
       "TypeAttr":$targetEncoding,
+      "bool":$consume,
       "Value":$waitFence,
       "StringAttr":$name,
       "Attribute":$affinity
