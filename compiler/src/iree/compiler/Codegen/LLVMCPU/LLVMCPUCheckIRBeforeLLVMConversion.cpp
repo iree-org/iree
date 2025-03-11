@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "compiler/plugins/target/LLVMCPU/LLVMTargetOptions.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/CommandLine.h"
@@ -34,14 +35,16 @@ struct LLVMCPUCheckIRBeforeLLVMConversionPass
 };
 } // namespace
 
-/// Returns success if the cummulative stack allocation size is less than the
-/// limit set by clMaxAllocationSizeInBytes.
+/// Returns success if the cumulative stack allocation size is less than the
+/// limit set through --iree-llvmcpu-stack-allocation-limit (or the default
+/// defined for HAL LLVMCPU target).
 static LogicalResult
 checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
   if (funcOp.getFunctionBody().empty())
     return success();
 
-  unsigned maxAllocationSizeInBytes = 32768;
+  unsigned maxAllocationSizeInBytes =
+      IREE::HAL::LLVMTarget::DEFAULT_MAX_STACK_ALLOC_SIZE_IN_BYTES;
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
   if (targetAttr) {
     auto nativeAllocationSizeAttr =
