@@ -41,16 +41,18 @@
 //       CHECK:       tosa.negate %[[RESULT]]
 
 func.func @mlp_invocation(%lhs: tensor<2x4xf32>, %rhs : tensor<4x8xf32>) -> tensor<2x8xf32> {
-  %lhs_shape = tosa.const_shape {value = dense<[1, 2, 4]> : tensor<3xindex>} : () -> !tosa.shape<3>
-  %rhs_shape = tosa.const_shape {value = dense<[1, 4, 8]> : tensor<3xindex>} : () -> !tosa.shape<3>
+  %lhs_shape = tosa.const_shape {values = dense<[1, 2, 4]> : tensor<3xindex>} : () -> !tosa.shape<3>
+  %rhs_shape = tosa.const_shape {values = dense<[1, 4, 8]> : tensor<3xindex>} : () -> !tosa.shape<3>
   %lhs_3D = tosa.reshape %lhs, %lhs_shape : (tensor<2x4xf32>, !tosa.shape<3>) -> tensor<1x2x4xf32>
   %rhs_3D = tosa.reshape %rhs, %rhs_shape : (tensor<4x8xf32>, !tosa.shape<3>) -> tensor<1x4x8xf32>
-  %0 = tosa.matmul %lhs_3D, %rhs_3D : (tensor<1x2x4xf32>, tensor<1x4x8xf32>) -> tensor<1x2x8xf32>
+  %azp0 = "tosa.const"() <{values = dense<0.0> : tensor<1xf32>}> : () -> tensor<1xf32>
+  %bzp0 = "tosa.const"() <{values = dense<0.0> : tensor<1xf32>}> : () -> tensor<1xf32>
+  %0 = tosa.matmul %lhs_3D, %rhs_3D, %azp0, %bzp0 : (tensor<1x2x4xf32>, tensor<1x4x8xf32>, tensor<1xf32>, tensor<1xf32>) -> tensor<1x2x8xf32>
   %1 = tosa.clamp %0 {
       min_val = 0.0 : f32, max_val = 3.4028235e+38 : f32}
       : (tensor<1x2x8xf32>) -> tensor<1x2x8xf32>
   %2 = tosa.negate %1 : (tensor<1x2x8xf32>) -> tensor<1x2x8xf32>
-  %result_shape = tosa.const_shape {value = dense<[2, 8]> : tensor<2xindex>} : () -> !tosa.shape<2>
+  %result_shape = tosa.const_shape {values = dense<[2, 8]> : tensor<2xindex>} : () -> !tosa.shape<2>
   %3 = tosa.reshape %2, %result_shape : (tensor<1x2x8xf32>, !tosa.shape<2>) -> tensor<2x8xf32>
   return %3 : tensor<2x8xf32>
 }

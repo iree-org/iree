@@ -70,7 +70,7 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
     vector::populateVectorGatherLoweringPatterns(patterns);
     vector::populateVectorContractLoweringPatterns(
-        patterns, vectorTransformOptions,
+        patterns, vectorTransformOptions.vectorContractLowering,
         /*benefit=*/1,
         /*disableOuterProductLowering=*/false);
     // This pattern will transform vector loads whose elements are used in a
