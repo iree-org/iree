@@ -52,6 +52,122 @@ void IREECodegenDialect::initialize() {
   addTypes<IREE::Codegen::NullPointerType>();
 }
 
+static LogicalResult validateTuningEntrypoint(
+    ModuleOp moduleOp, transform::NamedSequenceOp &kernelConfigOp,
+    int &numTuningEntryPoints, const std::string &kRequiredByDefaultAttr) {
+  for (Operation &op : moduleOp.getBody()->getOperations()) {
+    if (auto namedSeqOp = dyn_cast<transform::NamedSequenceOp>(&op)) {
+      if (namedSeqOp.getName() == kKernelConfigSpecName) {
+        kernelConfigOp = namedSeqOp;
+      }
+    }
+
+    if (op.hasAttr(kTuningSpecEntrypointAttrName)) {
+      ++numTuningEntryPoints;
+    }
+  }
+
+  if (!kernelConfigOp) {
+    return moduleOp->emitError()
+           << "Missing named sequence '" << kKernelConfigSpecName << "'"
+           << kRequiredByDefaultAttr;
+  }
+
+  // Verify that the kernelConfigOp has the attribute
+  // `iree_codegen.tuning_spec_entrypoint`.
+  if (!kernelConfigOp->hasAttr(kTuningSpecEntrypointAttrName)) {
+    return kernelConfigOp.emitError()
+           << "Missing attribute '" << kTuningSpecEntrypointAttrName
+           << "' in named sequence '" << kKernelConfigSpecName << "'"
+           << kRequiredByDefaultAttr;
+  }
+
+  if (numTuningEntryPoints != 1) {
+    return moduleOp.emitError()
+           << "Expected one named sequence with '"
+           << kTuningSpecEntrypointAttrName << "', but found "
+           << numTuningEntryPoints << kRequiredByDefaultAttr;
+  }
+
+  return success();
+}
+
+LogicalResult
+validateKernelConfigContents(transform::NamedSequenceOp kernelConfigOp,
+                             const std::string &kRequiredByDefaultAttr) {
+  transform::ForeachMatchOp foreachMatchOp;
+  bool hasYieldOp = false;
+  for (Block &block : kernelConfigOp.getBlocks()) {
+    for (Operation &op : block) {
+      if (auto foreachOp = dyn_cast<transform::ForeachMatchOp>(op)) {
+        if (foreachMatchOp) {
+          return kernelConfigOp.emitError()
+                 << "'" << kKernelConfigSpecName
+                 << "' must contain exactly one 'ForeachMatchOp'"
+                 << kRequiredByDefaultAttr;
+        }
+        foreachMatchOp = foreachOp;
+      } else if (isa<transform::YieldOp>(op)) {
+        if (hasYieldOp) {
+          return kernelConfigOp.emitError()
+                 << "'" << kKernelConfigSpecName
+                 << "' must contain exactly one 'transform::YieldOp'"
+                 << kRequiredByDefaultAttr;
+        }
+        hasYieldOp = true;
+      } else {
+        return kernelConfigOp.emitError()
+               << "Unexpected op '" << op.getName() << "' in '"
+               << kKernelConfigSpecName << "'" << kRequiredByDefaultAttr;
+      }
+    }
+  }
+
+  // Ensure both required operations are present.
+  if (!foreachMatchOp) {
+    return kernelConfigOp.emitError()
+           << "Missing 'ForeachMatchOp' in '" << kKernelConfigSpecName << "'"
+           << kRequiredByDefaultAttr;
+  }
+
+  if (!hasYieldOp) {
+    return kernelConfigOp.emitError()
+           << "Missing 'transform::YieldOp' in '" << kKernelConfigSpecName
+           << "'" << kRequiredByDefaultAttr;
+  }
+
+  if (foreachMatchOp.getRestrictRootAttr()) {
+    return foreachMatchOp.emitError()
+           << "'ForeachMatchOp' must not have 'restrict_root' attribute"
+           << kRequiredByDefaultAttr;
+  }
+
+  if (foreachMatchOp.getFlattenResultsAttr()) {
+    return foreachMatchOp.emitError()
+           << "'ForeachMatchOp' must not have 'flatten_results' attribute"
+           << kRequiredByDefaultAttr;
+  }
+
+  Type anyOpType = transform::AnyOpType::get(kernelConfigOp.getContext());
+  SmallVector<Type> argTypes(foreachMatchOp.getOperandTypes());
+  // Ensure the operation has exactly one argument of type any_op.
+  if (argTypes.size() != 1 || argTypes.front() != anyOpType) {
+    return foreachMatchOp.emitError()
+           << "'ForeachMatchOp' must take exactly one 'any_op' argument"
+           << kRequiredByDefaultAttr;
+  }
+
+  SmallVector<Type> resultTypes(foreachMatchOp.getResultTypes());
+  // Ensure the operation has exactly one result of type any_op.
+  if (resultTypes.size() != 1 || resultTypes.front() != anyOpType) {
+    return foreachMatchOp.emitError()
+           << "'ForeachMatchOp' must return exactly one 'any_op' result"
+           << kRequiredByDefaultAttr;
+  }
+
+  return success();
+}
+
 LogicalResult
 IREECodegenDialect::verifyOperationAttribute(Operation *op,
                                              NamedAttribute attribute) {
@@ -83,105 +199,21 @@ IREECodegenDialect::verifyOperationAttribute(Operation *op,
   //         of type `transform::AnyOpType`.
 
   if (symbol == kTuningSpecDefaultEntrypointAttrName) {
+    const std::string kRequiredByDefaultAttr =
+        " (required by '" + std::string(kTuningSpecDefaultEntrypointAttrName) +
+        "').";
     if (auto moduleOp = dyn_cast<ModuleOp>(op)) {
       transform::NamedSequenceOp kernelConfigOp;
       int numTuningEntryPoints = 0;
-      for (Region &region : moduleOp->getRegions()) {
-        for (Block &block : region) {
-          for (Operation &op : block) {
-            if (auto namedSeqOp = dyn_cast<transform::NamedSequenceOp>(&op)) {
-              if (namedSeqOp.getName() == kKernelConfigSpecName) {
-                kernelConfigOp = namedSeqOp;
-              }
-            }
-
-            if (op.hasAttr(kTuningSpecEntrypointAttrName)) {
-              ++numTuningEntryPoints;
-            }
-          }
-        }
+      if (failed(validateTuningEntrypoint(moduleOp, kernelConfigOp,
+                                          numTuningEntryPoints,
+                                          kRequiredByDefaultAttr))) {
+        return failure();
       }
 
-      if (!kernelConfigOp) {
-        return moduleOp->emitError()
-               << "The tuning specification must include a named sequence with "
-               << "the symbol name '" << kKernelConfigSpecName << "'.";
-      }
-
-      // Verify that the kernelConfigOp has the attribute
-      // `iree_codegen.tuning_spec_entrypoint`.
-      if (!kernelConfigOp->hasAttr(kTuningSpecEntrypointAttrName)) {
-        return kernelConfigOp.emitError()
-               << "The named sequence '" << kKernelConfigSpecName
-               << "' must have the attribute '" << kTuningSpecEntrypointAttrName
-               << "'.";
-      }
-
-      if (numTuningEntryPoints != 1) {
-        return moduleOp.emitError()
-               << "Expected exactly one NamedSequenceOp with the attribute '"
-               << kTuningSpecEntrypointAttrName << "', but found "
-               << numTuningEntryPoints << ".";
-      }
-
-      transform::ForeachMatchOp foreachMatchOp;
-      int numForeachMatchOps = 0;
-      int numYieldOps = 0;
-
-      for (Block &block : kernelConfigOp.getBlocks()) {
-        for (Operation &op : block) {
-          if (auto foreachOp = dyn_cast<transform::ForeachMatchOp>(op)) {
-            numForeachMatchOps++;
-            foreachMatchOp = foreachOp;
-          } else if (isa<transform::YieldOp>(op)) {
-            numYieldOps++;
-          } else {
-            return kernelConfigOp.emitError()
-                   << "The named sequence '" << kKernelConfigSpecName
-                   << "but found an unsupported operation: " << op.getName();
-          }
-        }
-      }
-
-      // Ensure exactly one `ForeachMatchOp`.
-      if (numForeachMatchOps != 1) {
-        return kernelConfigOp.emitError()
-               << "The named sequence '" << kKernelConfigSpecName
-               << "' must contain exactly one 'ForeachMatchOp', but found "
-               << numForeachMatchOps << ".";
-      }
-
-      // Ensure exactly one `YieldOp`.
-      if (numYieldOps != 1) {
-        return kernelConfigOp.emitError()
-               << "The named sequence '" << kKernelConfigSpecName
-               << "' must contain exactly one 'transform::YieldOp', but found "
-               << numYieldOps << ".";
-      }
-
-      if (foreachMatchOp.getRestrictRootAttr()) {
-        return foreachMatchOp.emitError()
-               << "ForeachMatchOp must not have the 'restrict_root' attribute.";
-      }
-
-      if (foreachMatchOp.getFlattenResultsAttr()) {
-        return foreachMatchOp.emitError() << "ForeachMatchOp must not have the "
-                                             "'flatten_results' attribute.";
-      }
-
-      Type anyOpType = transform::AnyOpType::get(moduleOp.getContext());
-      SmallVector<Type> argTypes(foreachMatchOp.getOperandTypes());
-      // Ensure the operation has exactly one argument of type any_op.
-      if (argTypes.size() != 1 || argTypes.front() != anyOpType) {
-        return foreachMatchOp.emitError(
-            "ForeachMatchOp must take exactly one any_op argument.");
-      }
-
-      SmallVector<Type> resultTypes(foreachMatchOp.getResultTypes());
-      // Ensure the operation has exactly one result of type any_op.
-      if (resultTypes.size() != 1 || resultTypes.front() != anyOpType) {
-        foreachMatchOp->emitError(
-            "ForeachMatchOp must return exactly one any_op result.");
+      if (failed(validateKernelConfigContents(kernelConfigOp,
+                                              kRequiredByDefaultAttr))) {
+        return failure();
       }
     }
   }
@@ -189,6 +221,8 @@ IREECodegenDialect::verifyOperationAttribute(Operation *op,
   if (symbol != kTuningSpecEntrypointAttrName)
     return success();
 
+  const std::string kRequiredByEntrypoint =
+      " (required by '" + std::string(kTuningSpecEntrypointAttrName) + "').";
   if (!isa<UnitAttr>(attr)) {
     return op->emitError("'") << symbol << "' attribute must be a UnitAttr";
   }
@@ -197,14 +231,13 @@ IREECodegenDialect::verifyOperationAttribute(Operation *op,
     ArrayRef<Type> resTypes = namedSeqOp.getFunctionType().getResults();
     if (resTypes.size() != 1 || !isa<transform::AnyOpType>(resTypes[0])) {
       return namedSeqOp.emitError()
-             << "Tuning spec entry point expected to return any_op";
+             << "Must return one 'any_op'" << kRequiredByEntrypoint;
     }
 
     ArrayRef<Type> argTypes = namedSeqOp.getArgumentTypes();
     if (argTypes.size() != 1 || !isa<transform::AnyOpType>(argTypes[0])) {
       return namedSeqOp.emitError()
-             << "Tuning spec entry point expected to have a "
-                "single any_op argument";
+             << "Must take one 'any_op'" << kRequiredByEntrypoint;
     }
   }
 

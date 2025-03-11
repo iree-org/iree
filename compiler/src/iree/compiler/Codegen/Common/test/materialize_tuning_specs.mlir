@@ -10,8 +10,8 @@
 
 // Check that the final tuning spec is as expected when the user tuning spec is provided.
 
-// TODO: Add the default attribute (`iree_codegen.tuning_spec_with_default_entrypoint`) here once
-//       the merging logic supports cases beyond a single `foreach_match` operation.
+// TODO: Add the check for default attribute (`iree_codegen.tuning_spec_with_default_entrypoint`) here
+//       once the merging logic supports cases beyond a single `foreach_match` operation.
 
 // CHECK-LABEL: module @iree_linked_tuning_spec
 // CHECK-SAME:    transform.with_named_sequence

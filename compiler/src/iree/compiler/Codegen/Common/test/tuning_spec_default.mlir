@@ -11,7 +11,8 @@ module @user_spec attributes { transform.with_named_sequence, iree_codegen.tunin
 
   transform.named_sequence @__kernel_config(%arg0: !transform.any_op {transform.consumed})
       -> (!transform.any_op) attributes { iree_codegen.tuning_spec_entrypoint } {
-      %res = transform.foreach_match in %arg0 @match -> @apply_op_config
+      %res = transform.foreach_match in %arg0
+        @match -> @apply_op_config
         : (!transform.any_op) -> (!transform.any_op)
       transform.yield %res : !transform.any_op
   }
