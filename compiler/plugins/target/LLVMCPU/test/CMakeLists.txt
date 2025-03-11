@@ -14,7 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "hal_target_device_attributes.mlir",
+    "hal_target_device_attributes.mlir"
     "materialize_homogeneous_encodings.mlir"
     "smoketest_embedded.mlir"
     "smoketest_system.mlir"
@@ -22,6 +22,7 @@ iree_lit_test_suite(
     ${IREE_LLD_TARGET}
     FileCheck
     iree-opt
+    not
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
