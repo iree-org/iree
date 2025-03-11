@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/ScalableValueBoundsConstraintSet.h"
@@ -15,11 +16,6 @@ namespace mlir::iree_compiler {
 
 #define GEN_PASS_DEF_LLVMCPUCHECKIRBEFORELLVMCONVERSIONPASS
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
-
-static llvm::cl::opt<int> clMaxAllocationSizeInBytes(
-    "iree-llvmcpu-stack-allocation-limit",
-    llvm::cl::desc("maximum allowed stack allocation size in bytes"),
-    llvm::cl::init(32768));
 
 static llvm::cl::opt<unsigned> clAssumedVscaleValue(
     "iree-llvmcpu-stack-allocation-assumed-vscale",
@@ -44,6 +40,16 @@ static LogicalResult
 checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
   if (funcOp.getFunctionBody().empty())
     return success();
+
+  unsigned maxAllocationSizeInBytes = 32768;
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+  if (targetAttr) {
+    auto nativeAllocationSizeAttr =
+        getConfigIntegerAttr(targetAttr, "max_stack_allocation_size");
+    if (nativeAllocationSizeAttr) {
+      maxAllocationSizeInBytes = nativeAllocationSizeAttr->getInt();
+    }
+  }
 
   SmallVector<memref::AllocaOp> allocaOps;
   funcOp.walk(
@@ -91,10 +97,10 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
     }
     cumSize += allocaSize / 8;
   }
-  if (cumSize > clMaxAllocationSizeInBytes) {
+  if (cumSize > maxAllocationSizeInBytes) {
     return funcOp.emitOpError("exceeded stack allocation limit of ")
-           << clMaxAllocationSizeInBytes.getValue()
-           << " bytes for function. Got " << cumSize << " bytes";
+           << maxAllocationSizeInBytes << " bytes for function. Got "
+           << cumSize << " bytes";
   }
   return success();
 }
