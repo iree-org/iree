@@ -162,7 +162,6 @@ iree_cc_library(
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Utils
-    iree::compiler::plugins::target::LLVMCPU
     iree::schemas::cpu_data
     iree::schemas::instruments
   PUBLIC

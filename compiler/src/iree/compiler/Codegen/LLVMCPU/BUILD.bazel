@@ -88,7 +88,6 @@ iree_compiler_cc_library(
     deps = [
         ":PassHeaders",
         ":PassesIncGen",
-        "//compiler/plugins/target/LLVMCPU",
         "//compiler/src/iree/compiler/Codegen/Common",
         "//compiler/src/iree/compiler/Codegen/Common:TransformDialectInterpreterPass",
         "//compiler/src/iree/compiler/Codegen/Common/CPU:CommonCPUPasses",

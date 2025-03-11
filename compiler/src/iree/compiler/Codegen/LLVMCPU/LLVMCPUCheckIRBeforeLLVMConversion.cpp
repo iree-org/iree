@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "compiler/plugins/target/LLVMCPU/LLVMTargetOptions.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/CommandLine.h"
@@ -43,8 +42,9 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
   if (funcOp.getFunctionBody().empty())
     return success();
 
-  unsigned maxAllocationSizeInBytes =
-      IREE::HAL::LLVMTarget::DEFAULT_MAX_STACK_ALLOC_SIZE_IN_BYTES;
+  // In rare cases where the attribute is not present in the module, a value of
+  // 32KB will be taken.
+  unsigned maxAllocationSizeInBytes = 32 * 1024;
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
   if (targetAttr) {
     auto nativeAllocationSizeAttr =
