@@ -53,6 +53,7 @@
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "iree/compiler/embedding_api.h"
 #include "iree/compiler/mlir_interop.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ManagedStatic.h"
@@ -1005,6 +1006,9 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     return false;
   }
 
+  if (llvm::PrintPipelinePasses) {
+    passManager->dump();
+  }
   if (failed(passManager->run(parsedModule))) {
     return false;
   }
@@ -1018,6 +1022,10 @@ bool Invocation::runTextualPassPipeline(const char *textPassPipeline) {
   if (failed(mlir::parsePassPipeline(textPassPipeline, *passManager,
                                      llvm::errs())))
     return false;
+
+  if (llvm::PrintPipelinePasses) {
+    passManager->dump();
+  }
   if (failed(passManager->run(parsedModule))) {
     return false;
   }

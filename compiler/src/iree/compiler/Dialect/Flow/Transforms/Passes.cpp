@@ -221,9 +221,12 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
 
   // Cleanup executable contents.
   {
-    auto executablePassManager = passManager.nest<IREE::Flow::ExecutableOp>();
-    executablePassManager.addPass(IREE::Flow::createCanonicalizerPass());
-    executablePassManager.addPass(mlir::createCSEPass());
+    // Creating a new pass manager and adding that to the top-level manager
+    // breaks the pipeline string generation for reproducers.
+    // So we add these passes directly to the top-level manager.
+    passManager.addNestedPass<IREE::Flow::ExecutableOp>(
+        IREE::Flow::createCanonicalizerPass());
+    passManager.addNestedPass<IREE::Flow::ExecutableOp>(mlir::createCSEPass());
   }
 
   // Symbol DCE any remaining variables/functions that are now no longer
