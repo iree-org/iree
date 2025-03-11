@@ -186,6 +186,32 @@ util.func public @tensorCloneDynamic(%arg0 : tensor<?x4xf32>) -> tensor<?x4xf32>
 
 // -----
 
+#encoding = #iree_encoding.testing_encoding<>
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-LABEL: @tensorEncodeStatic
+// CHECK-SAME:    %[[ARG0:.[a-zA-Z0-9]+]]
+util.func public @tensorEncodeStatic(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32, #encoding> {
+  // CHECK: %[[RES:.+]] = flow.tensor.encode %[[ARG0]] : tensor<4x4xf32> -> tensor<4x4xf32, #[[$ENCODING]]>
+  %0 = flow.tensor.encode %arg0 : tensor<4x4xf32> -> tensor<4x4xf32, #encoding>
+  util.return %0 : tensor<4x4xf32, #encoding>
+}
+
+// -----
+
+#encoding = #iree_encoding.testing_encoding<>
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-LABEL: @tensorEncodeDynamic
+// CHECK-SAME:    %[[ARG0:.[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:.[a-zA-Z0-9]+]]
+util.func public @tensorEncodeDynamic(%arg0 : tensor<?x4xf32>, %arg1 : index) -> tensor<?x4xf32, #encoding> {
+  // CHECK: %[[RES:.+]] = flow.tensor.encode %[[ARG0]] : tensor<?x4xf32>{%[[ARG1]]} -> tensor<?x4xf32, #[[$ENCODING]]>
+  %0 = flow.tensor.encode %arg0 : tensor<?x4xf32>{%arg1} -> tensor<?x4xf32, #encoding>
+  util.return %0 : tensor<?x4xf32, #encoding>
+}
+
+
+// -----
+
 // CHECK-LABEL: @tensorSlice
 util.func public @tensorSlice(%arg0 : tensor<4x4xf32>, %arg1 : index, %arg2 : index) -> tensor<2x2xf32> {
   // CHECK-NEXT: %0 = flow.tensor.slice %arg0[%arg1, %arg2 for %arg2, %arg1] : tensor<4x4xf32> -> tensor<2x2xf32>
