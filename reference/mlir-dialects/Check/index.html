@@ -3895,10 +3895,13 @@ check.expect_all_true(%arg1) : tensor&lt;2x2xi32&gt;
               attr-dict `:` type($lhs)
 </code></pre></div>
 <p>Verifies that the buffer view or tensor operands with float elements satisfy
-the Numpy-style fuzzy-comparision condition with pararameters <code>atol</code>,
-<code>rtol</code>, which is the following element-wise on array elements <code>lhs</code>, <code>rhs</code>:
-<div class="highlight"><pre><span></span><code>abs(lhs - rhs) &lt;= atol + rtol * abs(rhs).
-</code></pre></div></p>
+the Numpy-style fuzzy-comparision condition with parameters <code>atol</code>,
+<code>rtol</code>, defined exactly as in NumPy isclose():
+<a href="https://github.com/numpy/numpy/blob/7297f3117d84745bfade1e2f9aec3531e5917500/numpy/_core/numeric.py#L2447-L2449">https://github.com/numpy/numpy/blob/7297f3117d84745bfade1e2f9aec3531e5917500/numpy/_core/numeric.py#L2447-L2449</a></p>
+<p>The condition being verified on each lhs and rhs value is:
+  lhs == rhs || (isfinite(rhs) &amp;&amp; abs(lhs - rhs) &lt;= atol + rtol * abs(rhs)).
+Note that the <code>lhs == rhs</code> part is needed for the case (lhs=+inf, rhs+inf)
+to return true. Indeed, in that case, lhs-rhs is NaN.</p>
 <p>Issues a non-fatal failure if the verification fails.</p>
 <p>The <code>atol</code>, <code>rtol</code> parameters may be omitted, in which case some default
 value is used. The default <code>atol</code> is nonzero, while the default <code>rtol</code> is
