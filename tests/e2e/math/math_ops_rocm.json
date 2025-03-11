@@ -2,32 +2,32 @@
   {
     "op": "acos",
     "type": "f32",
-    "atol": 1.0e-06,
-    "rtol": 1.0e-06
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "acos",
     "type": "f16",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-03
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "acosh",
     "type": "f32",
-    "atol": 1.0e-06,
-    "rtol": 1.0e-06
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "acosh",
     "type": "f16",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-03
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "asin",
     "type": "f32",
-    "atol": 1.0e-06,
-    "rtol": 1.0e-06
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "asin",
@@ -38,50 +38,50 @@
   {
     "op": "asinh",
     "type": "f32",
-    "atol": 1.0e-05,
-    "rtol": 1.0e-05
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "asinh",
     "type": "f16",
-    "atol": 5.0e-02,
-    "rtol": 5.0e-02
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "atan",
     "type": "f32",
-    "atol": 1.0e-06,
-    "rtol": 1.0e-06
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "atan",
     "type": "f16",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-03
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "atanh",
     "type": "f32",
-    "atol": 1.0e-06,
-    "rtol": 1.0e-06
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "atanh",
     "type": "f16",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-03
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "cbrt",
     "type": "f32",
-    "atol": 1.0e-06,
-    "rtol": 1.0e-06
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "cbrt",
     "type": "f16",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-03
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "ceil",
@@ -98,41 +98,38 @@
   {
     "op": "cos",
     "type": "f32",
-    "atol": 1.0e-06,
-    "rtol": 1.0e-06
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "cos",
     "type": "f16",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-03
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "cosh",
     "type": "f32",
-    "atol": 1.0e-06,
-    "rtol": 1.0e-06
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "cosh",
     "type": "f16",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-03,
-    "xmin": -8,
-    "xmax": 8,
-    "comment": "discrepancy at switch between large-finite and infinite values"
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "erf",
     "type": "f32",
-    "atol": 1.0e-06,
-    "rtol": 1.0e-06
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "erf",
     "type": "f16",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-03
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "exp",
@@ -143,20 +140,20 @@
   {
     "op": "exp",
     "type": "f16",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-03
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "exp2",
     "type": "f32",
-    "atol": 1.0e-06,
-    "rtol": 1.0e-06
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "exp2",
     "type": "f16",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-02
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "expm1",
@@ -167,8 +164,8 @@
   {
     "op": "expm1",
     "type": "f16",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-03
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "floor",
@@ -185,38 +182,38 @@
   {
     "op": "log",
     "type": "f32",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-03
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "log",
     "type": "f16",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-03
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "log1p",
     "type": "f32",
-    "atol": 1.0e-06,
-    "rtol": 1.0e-06
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "log1p",
     "type": "f16",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-03
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "log2",
     "type": "f32",
-    "atol": 1.0e-06,
-    "rtol": 1.0e-06
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "log2",
     "type": "f16",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-03
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "round",
@@ -245,8 +242,8 @@
   {
     "op": "rsqrt",
     "type": "f32",
-    "atol": 1.0e-06,
-    "rtol": 1.0e-06
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "rsqrt",
@@ -257,47 +254,44 @@
   {
     "op": "sin",
     "type": "f32",
-    "atol": 1.0e-06,
-    "rtol": 1.0e-06
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "sin",
     "type": "f16",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-03
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "sinh",
     "type": "f32",
-    "atol": 1.0e-06,
-    "rtol": 1.0e-06
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "sinh",
     "type": "f16",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-03,
-    "xmin": -8,
-    "xmax": 8,
-    "comment": "discrepancy at switch between large-finite and infinite values"
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "sqrt",
     "type": "f32",
-    "atol": 1.0e-06,
-    "rtol": 1.0e-06
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "sqrt",
     "type": "f16",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-03
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "tan",
     "type": "f32",
-    "atol": 1.0e-05,
-    "rtol": 1.0e-03
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "tan",
@@ -308,26 +302,26 @@
   {
     "op": "tanh",
     "type": "f32",
-    "atol": 1.0e-06,
-    "rtol": 1.0e-06
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "tanh",
     "type": "f16",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-03
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "atan2",
     "type": "f32",
-    "atol": 1.0e-05,
-    "rtol": 1.0e-05
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
   },
   {
     "op": "atan2",
     "type": "f16",
-    "atol": 1.0e-03,
-    "rtol": 1.0e-03
+    "atol": 0,
+    "rtol": 0
   },
   {
     "op": "powf",
@@ -339,6 +333,6 @@
     "op": "powf",
     "type": "f16",
     "atol": 1.0e-03,
-    "rtol": 1.0e-02
+    "rtol": 1.0e-03
   }
 ]
