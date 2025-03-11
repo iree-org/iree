@@ -1172,6 +1172,7 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
   {
     FunctionLikeNest funcPassManager(modulePassManager);
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
+    funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
     // This materializes into 'nop' in the absence of pad encoding layout
     // attributes.
@@ -1250,6 +1251,7 @@ static void buildROCDLCodegenConfigurationPassPipelineImpl(
   {
     FunctionLikeNest funcPassManager(modulePassManager);
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
+    funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
   }
   modulePassManager.addPass(createMaterializeTuningSpecsPass());
