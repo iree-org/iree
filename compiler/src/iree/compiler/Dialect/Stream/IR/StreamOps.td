@@ -1211,6 +1211,11 @@ def Stream_TensorImportOp : Stream_PureOp<"tensor.import", [
     is resolved during lowering into the stream dialect. This can be used to
     interoperate between levels of the stack that require specifying stream
     types and those that prior to lowering do not handle them.
+
+    `consume` can be used to indicate a transfer of ownership. Though the
+    imported value may still have external references when consumed a resource
+    will be conceptually released from its existing owner and retained by the
+    importer atomically.
   }];
 
   let arguments = (ins
@@ -1218,6 +1223,7 @@ def Stream_TensorImportOp : Stream_PureOp<"tensor.import", [
     TypeAttr:$result_encoding,
     Stream_ShapeDynamicDims:$result_encoding_dims,
     Stream_Size:$result_size,
+    UnitAttr:$consume,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -1226,6 +1232,7 @@ def Stream_TensorImportOp : Stream_PureOp<"tensor.import", [
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
+    (`consume` $consume^)?
     $source `:`
     type($source)
     `->`

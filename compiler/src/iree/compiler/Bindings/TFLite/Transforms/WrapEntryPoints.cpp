@@ -227,7 +227,8 @@ private:
       auto dynamicDims = inputDynamicDims.loadDynamicDims(recalculateBuilder);
       auto castOp = recalculateBuilder.create<IREE::HAL::TensorImportOp>(
           loc, inputValue.getType(), inputPlaceholder, inputValue.getType(),
-          dynamicDims, /*wait_fence=*/Value{}, /*name=*/nullptr,
+          dynamicDims, /*consume=*/false, /*wait_fence=*/Value{},
+          /*name=*/nullptr,
           /*affinity=*/nullptr);
       inputValue.replaceAllUsesWith(castOp.getTarget());
     }
@@ -526,7 +527,9 @@ private:
       callOperands.push_back(entryBuilder.create<IREE::HAL::TensorImportOp>(
           arg.getLoc(), inputDynamicDims.tensorType, arg,
           TypeAttr::get(inputDynamicDims.tensorType), dynamicDims,
-          /*wait_fence=*/Value{}, /*name=*/nullptr,
+          /*consume=*/UnitAttr{},
+          /*wait_fence=*/Value{},
+          /*name=*/nullptr,
           /*affinity=*/nullptr));
     }
     auto callOp = entryBuilder.create<IREE::Util::CallOp>(
