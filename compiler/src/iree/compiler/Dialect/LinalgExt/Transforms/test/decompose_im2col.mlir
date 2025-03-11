@@ -237,19 +237,19 @@ module {
 // -----
 
 module {
-  func.func @im2col_padding(%input: tensor<1x8x3x3xf32>) -> tensor<1x1x1x12xf32> {
+  func.func @im2col_padding(%input: tensor<1x8x3x3xf32>) -> tensor<1x2x2x12xf32> {
     %cst = arith.constant 0.000000e+00 : f32
-    %empty = tensor.empty() : tensor<1x1x1x12xf32>
+    %empty = tensor.empty() : tensor<1x2x2x12xf32>
     %padded = tensor.pad %input low[0, 0, 3, 3] high[0, 0, 3, 3] {
   ^bb0(%arg0: index, %arg1: index, %arg2: index, %arg3: index):
     tensor.yield %cst : f32
   } : tensor<1x8x3x3xf32> to tensor<1x8x9x9xf32>
   %im2col = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-                              m_offset = [0, 0] * [1, 1] k_offset = [0] * [1]
+                              m_offset = [0, 0] * [2, 1] k_offset = [0] * [1]
                               batch_pos = [0] m_pos = [2, 3] k_pos = [1]
                               ins(%padded : tensor<1x8x9x9xf32>)
-                              outs(%empty : tensor<1x1x1x12xf32>) -> tensor<1x1x1x12xf32>
-  return %im2col : tensor<1x1x1x12xf32>
+                              outs(%empty : tensor<1x2x2x12xf32>) -> tensor<1x2x2x12xf32>
+  return %im2col : tensor<1x2x2x12xf32>
   }
 }
 
