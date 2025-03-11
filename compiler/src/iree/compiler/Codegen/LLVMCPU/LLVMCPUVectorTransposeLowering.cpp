@@ -68,8 +68,8 @@ void LLVMCPUVectorTransposeLoweringPass::runOnOperation() {
 
   RewritePatternSet patterns(ctx);
   vector::populateVectorToVectorCanonicalizationPatterns(patterns);
-  vector::populateVectorTransposeLoweringPatterns(patterns,
-                                                  vectorTransformOptions);
+  vector::populateVectorTransposeLoweringPatterns(
+      patterns, vectorTransformOptions.vectorTransposeLowering);
   vector::populateVectorTransposeNarrowTypeRewritePatterns(
       patterns, kNarrowTypeEmulationBenefit);
 

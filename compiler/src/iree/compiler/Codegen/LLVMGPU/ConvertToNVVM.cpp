@@ -93,6 +93,9 @@ struct ConvertToNVVMPass final
     // Run Vector -> Vector transformations ahead of conversion to LLVM.
     {
       RewritePatternSet patterns(&getContext());
+      auto options =
+          vector::VectorTransformsOptions().setVectorTransformsOptions(
+              vector::VectorContractLowering::OuterProduct);
       populateVectorToSCFConversionPatterns(
           patterns, VectorTransferToSCFOptions().enableFullUnroll());
       populateDropSharedMemoryDeallocOpPatterns(patterns);
@@ -101,9 +104,7 @@ struct ConvertToNVVMPass final
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
       vector::populateVectorBroadcastLoweringPatterns(patterns);
       vector::populateVectorContractLoweringPatterns(
-          patterns,
-          vector::VectorTransformsOptions().setVectorTransformsOptions(
-              vector::VectorContractLowering::OuterProduct));
+          patterns, options.vectorContractLowering);
       vector::populateVectorMaskOpLoweringPatterns(patterns);
       // We currently always use 64 bit indices, thus ensure the bit width of
       // the mask compare is consistent.
@@ -113,7 +114,7 @@ struct ConvertToNVVMPass final
       // TODO: doubtful that the "default" does what one want here, it is likely
       // better to use something else.
       vector::populateVectorTransposeLoweringPatterns(
-          patterns, vector::VectorTransformsOptions());
+          patterns, options.vectorTransposeLowering);
       vector::populateVectorTransferLoweringPatterns(patterns);
       arith::populateExpandBFloat16Patterns(patterns);
       if (failed(applyPatternsGreedily(m, std::move(patterns)))) {

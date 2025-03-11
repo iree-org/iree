@@ -494,7 +494,7 @@ public:
 
     // Specialize the module to our target machine.
     llvmModule->setDataLayout(targetMachine->createDataLayout());
-    llvmModule->setTargetTriple(targetMachine->getTargetTriple().str());
+    llvmModule->setTargetTriple(targetMachine->getTargetTriple());
 
     // Dump just the codegen bitcode before linking and optimization.
     if (!options.dumpIntermediatesPath.empty()) {
