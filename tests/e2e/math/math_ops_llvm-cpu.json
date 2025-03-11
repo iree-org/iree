@@ -1,0 +1,346 @@
+[
+  {
+    "op": "acos",
+    "type": "f32",
+    "atol": 1.0e-06,
+    "rtol": 1.0e-06
+  },
+  {
+    "op": "acos",
+    "type": "f16",
+    "atol": 1.0e-02,
+    "rtol": 1.0e-02
+  },
+  {
+    "op": "acosh",
+    "type": "f32",
+    "atol": 1.0e-06,
+    "rtol": 1.0e-06
+  },
+  {
+    "op": "acosh",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "asin",
+    "type": "f32",
+    "atol": 1.0e-06,
+    "rtol": 1.0e-06
+  },
+  {
+    "op": "asin",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "asinh",
+    "type": "f32",
+    "atol": 1.0e-05,
+    "rtol": 1.0e-05
+  },
+  {
+    "op": "asinh",
+    "type": "f16",
+    "atol": 5.0e-02,
+    "rtol": 5.0e-02
+  },
+  {
+    "op": "atan",
+    "type": "f32",
+    "atol": 1.0e-06,
+    "rtol": 1.0e-06
+  },
+  {
+    "op": "atan",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "atanh",
+    "type": "f32",
+    "atol": 1.0e-06,
+    "rtol": 1.0e-06
+  },
+  {
+    "op": "atanh",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "cbrt",
+    "type": "f32",
+    "atol": 1.0e-06,
+    "rtol": 1.0e-06
+  },
+  {
+    "op": "cbrt",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "ceil",
+    "type": "f32",
+    "atol": 0,
+    "rtol": 0
+  },
+  {
+    "op": "ceil",
+    "type": "f16",
+    "atol": 0,
+    "rtol": 0
+  },
+  {
+    "op": "cos",
+    "type": "f32",
+    "atol": 1.0e-06,
+    "rtol": 1.0e-06
+  },
+  {
+    "op": "cos",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "cosh",
+    "type": "f32",
+    "atol": 1.0e-06,
+    "rtol": 1.0e-06
+  },
+  {
+    "op": "cosh",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03,
+    "xmin": -8,
+    "xmax": 8,
+    "comment": "discrepancy at switch between large-finite and infinite values"
+  },
+  {
+    "op": "erf",
+    "type": "f32",
+    "atol": 1.0e-06,
+    "rtol": 1.0e-06
+  },
+  {
+    "op": "erf",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "exp",
+    "type": "f32",
+    "atol": 1.0e-06,
+    "rtol": 1.0e-06
+  },
+  {
+    "op": "exp",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "exp2",
+    "type": "f32",
+    "atol": 1.0e-06,
+    "rtol": 1.0e-06
+  },
+  {
+    "op": "exp2",
+    "type": "f16",
+    "atol": 0.25,
+    "comment": "TODO(#20163)",
+    "rtol": 1.0e-02
+  },
+  {
+    "op": "expm1",
+    "type": "f32",
+    "atol": 1.0e-06,
+    "rtol": 1.0e-06
+  },
+  {
+    "op": "expm1",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "floor",
+    "type": "f32",
+    "atol": 0,
+    "rtol": 0
+  },
+  {
+    "op": "floor",
+    "type": "f16",
+    "atol": 0,
+    "rtol": 0
+  },
+  {
+    "op": "log",
+    "type": "f32",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "log",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "log1p",
+    "type": "f32",
+    "atol": 1.0e-06,
+    "rtol": 1.0e-06
+  },
+  {
+    "op": "log1p",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "log2",
+    "type": "f32",
+    "atol": 1.0e-06,
+    "rtol": 1.0e-06
+  },
+  {
+    "op": "log2",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "round",
+    "type": "f32",
+    "atol": 0,
+    "rtol": 0
+  },
+  {
+    "op": "round",
+    "type": "f16",
+    "atol": 0,
+    "rtol": 0
+  },
+  {
+    "op": "roundeven",
+    "type": "f32",
+    "atol": 0,
+    "rtol": 0
+  },
+  {
+    "op": "roundeven",
+    "type": "f16",
+    "atol": 0,
+    "rtol": 0
+  },
+  {
+    "op": "rsqrt",
+    "type": "f32",
+    "atol": 1.0e-06,
+    "rtol": 1.0e-06
+  },
+  {
+    "op": "rsqrt",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "sin",
+    "type": "f32",
+    "atol": 1.0e-05,
+    "rtol": 1.0e-05
+  },
+  {
+    "op": "sin",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "sinh",
+    "type": "f32",
+    "atol": 1.0e-06,
+    "rtol": 1.0e-06
+  },
+  {
+    "op": "sinh",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03,
+    "xmin": -8,
+    "xmax": 8,
+    "comment": "discrepancy at switch between large-finite and infinite values"
+  },
+  {
+    "op": "sqrt",
+    "type": "f32",
+    "atol": 1.0e-06,
+    "rtol": 1.0e-06
+  },
+  {
+    "op": "sqrt",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "tan",
+    "type": "f32",
+    "atol": 1.0e-05,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "tan",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "tanh",
+    "type": "f32",
+    "atol": 1.0e-06,
+    "rtol": 1.0e-06
+  },
+  {
+    "op": "tanh",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "atan2",
+    "type": "f32",
+    "atol": 1.0e-05,
+    "rtol": 1.0e-05
+  },
+  {
+    "op": "atan2",
+    "type": "f16",
+    "atol": 1.0e-03,
+    "rtol": 1.0e-03
+  },
+  {
+    "op": "powf",
+    "type": "f32",
+    "atol": 1.0e-06,
+    "rtol": 1.0e-06
+  },
+  {
+    "op": "powf",
+    "type": "f16",
+    "atol": 0.25,
+    "comment": "TODO(#20163)",
+    "rtol": 5.0e-03
+  }
+]
