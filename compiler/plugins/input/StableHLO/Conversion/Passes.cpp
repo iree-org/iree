@@ -65,7 +65,7 @@ void buildStableHLOInputConversionPassPipelineImpl(
   // style of treating shapes as tensors. We prefer to legalize these to
   // scalar ops as early as possible to avoid having them persist as tensor
   // computations.
-  passManager.addNestedPass<func::FuncOp>(createShapeToShapeLowering());
+  passManager.addNestedPass<func::FuncOp>(createShapeToShapeLoweringPass());
   passManager.addPass(createConvertShapeToStandardPass());
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());

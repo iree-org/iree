@@ -63,11 +63,11 @@ func.func @matmul_96x64x16_mfma(%lhs: tensor<96x16xf16>,
 #traits = {
   indexing_maps = #maps,
   iterator_types = ["parallel", "parallel", "reduction"],
-  lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>,
+  lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>,
                                               subgroup_m_count = 1 : i64, subgroup_n_count = 1 : i64}>
 }
 
-func.func @matmul_96x64x16_wmma(%lhs: tensor<96x16xf16>,
+func.func @matmul_96x64x16_wmmar3(%lhs: tensor<96x16xf16>,
                            %rhs: tensor<64x16xf16>,
                            %init: tensor<96x64xf32>)
                            -> tensor<96x64xf32>
@@ -89,11 +89,61 @@ func.func @matmul_96x64x16_wmma(%lhs: tensor<96x16xf16>,
 // CHECK-DAG: #[[$NESTED1:.+]] = #iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [4, 1], outer_tile = [1, 1], thread_tile = [16, 1], element_tile = [1, 16], subgroup_strides = [0, 0], thread_strides = [1, 0]>
 // CHECK-DAG: #[[$NESTED2:.+]] = #iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [6, 4], outer_tile = [8, 1], thread_tile = [2, 16], element_tile = [1, 1], subgroup_strides = [0, 0], thread_strides = [16, 1]>
 
-// CHECK-LABEL: func.func @matmul_96x64x16_wmma
+// CHECK-LABEL: func.func @matmul_96x64x16_wmmar3
 
-// CHECK-DAG: %[[LHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED]]) {mma_kind = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>}
-// CHECK-DAG: %[[RHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED1]]) {mma_kind = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>}
-// CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED2]]) {mma_kind = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>}
+// CHECK-DAG: %[[LHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED]]) {mma_kind = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>}
+// CHECK-DAG: %[[RHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED1]]) {mma_kind = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>}
+// CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED2]]) {mma_kind = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>}
+// CHECK: linalg.generic
+// CHECK-SAME: ins(%[[LHS]], %[[RHS]]
+// CHECK-SAME: outs(%[[ACC]]
+
+// -----
+
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+                                              workgroup_size = [64, 1, 1]
+                                              subgroup_size = 64>
+
+#maps = [
+  affine_map<(m, n, k) -> (m, k)>,
+  affine_map<(m, n, k) -> (n, k)>,
+  affine_map<(m, n, k) -> (m, n)>
+]
+
+#traits = {
+  indexing_maps = #maps,
+  iterator_types = ["parallel", "parallel", "reduction"],
+  lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16>,
+                                              subgroup_m_count = 1 : i64, subgroup_n_count = 1 : i64}>
+}
+
+func.func @matmul_96x64x16_wmmar4(%lhs: tensor<96x16xf16>,
+                           %rhs: tensor<64x16xf16>,
+                           %init: tensor<96x64xf32>)
+                           -> tensor<96x64xf32>
+                           attributes { translation_info = #translation } {
+  %out = linalg.generic #traits
+                        ins(%lhs, %rhs: tensor<96x16xf16>, tensor<64x16xf16>)
+                        outs(%init: tensor<96x64xf32>) {
+    ^bb0(%in: f16, %in_1: f16, %out: f32):
+      %ex   = arith.extf %in   : f16 to f32
+      %ex_1 = arith.extf %in_1 : f16 to f32
+      %mul  = arith.mulf %ex, %ex_1 : f32
+      %sum  = arith.addf %out, %mul : f32
+      linalg.yield %sum : f32
+  } -> tensor<96x64xf32>
+  return %out : tensor<96x64xf32>
+}
+
+// CHECK-DAG: #[[$NESTED:.+]] = #iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [6, 1], outer_tile = [1, 1], thread_tile = [16, 2], element_tile = [1, 8], subgroup_strides = [0, 0], thread_strides = [1, 16]>
+// CHECK-DAG: #[[$NESTED1:.+]] = #iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [4, 1], outer_tile = [1, 1], thread_tile = [16, 2], element_tile = [1, 8], subgroup_strides = [0, 0], thread_strides = [1, 16]>
+// CHECK-DAG: #[[$NESTED2:.+]] = #iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [6, 4], outer_tile = [1, 1], thread_tile = [2, 16], element_tile = [8, 1], subgroup_strides = [0, 0], thread_strides = [16, 1]>
+
+// CHECK-LABEL: func.func @matmul_96x64x16_wmmar4
+
+// CHECK-DAG: %[[LHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED]]) {mma_kind = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16>}
+// CHECK-DAG: %[[RHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED1]]) {mma_kind = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16>}
+// CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED2]]) {mma_kind = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16>}
 // CHECK: linalg.generic
 // CHECK-SAME: ins(%[[LHS]], %[[RHS]]
 // CHECK-SAME: outs(%[[ACC]]
@@ -289,4 +339,36 @@ func.func @dynamic_infer_sizes(%in : tensor<4x32x?x128xf16>) -> tensor<1x1x?x128
 // CHECK: %[[EXTRACT:.+]] = tensor.extract_slice %arg0{{.*}} : tensor<4x32x?x128xf16> to tensor<1x1x?x128xf16>
 // CHECK: %[[EMPTY:.+]] = tensor.empty({{.*}}) : tensor<1x1x?x128xf16>
 // CHECK: %[[COPY:.+]] = linalg.copy {{.*}} ins(%[[EXTRACT]] : tensor<1x1x?x128xf16>) outs(%[[EMPTY]] : tensor<1x1x?x128xf16>)
+// CHECK: iree_vector_ext.to_layout %[[COPY]] to layout(#[[LAYOUT]]) : tensor<1x1x?x128xf16>
+
+// -----
+
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+                                              workgroup_size = [64, 1, 1]
+                                              subgroup_size = 64>
+
+#lowering_config = #iree_gpu.lowering_config<{
+    subgroup_basis = [[1, 1, 2, 2], [0, 1, 2, 3]],
+    thread_basis = [[1, 1, 8, 8], [0, 1, 2, 3]],
+    thread = [0, 0, 8, 8]
+}>
+
+func.func @dynamic_infer_sizes_lowering_config(%in : tensor<4x32x?x128xf16>) -> tensor<1x1x?x128xf16> attributes { translation_info = #translation } {
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %d2 = tensor.dim %in, %c2 : tensor<4x32x?x128xf16>
+  %45 = affine.min affine_map<(d0)[s0] -> (-d0 + s0, 128)>(%c0)[%d2]
+  %extracted_slice_5 = tensor.extract_slice %in[%c0, %c0, %c0, 0] [1, 1, %45, 128] [1, 1, 1, 1] : tensor<4x32x?x128xf16> to tensor<1x1x?x128xf16>
+  %49 = tensor.empty(%45) : tensor<1x1x?x128xf16>
+  %50 = linalg.copy {lowering_config = #lowering_config} ins(%extracted_slice_5 : tensor<1x1x?x128xf16>) outs(%49 : tensor<1x1x?x128xf16>) -> tensor<1x1x?x128xf16>
+  return %50 : tensor<1x1x?x128xf16>
+}
+
+// CHECK-DAG: #[[LAYOUT:.+]] = #iree_vector_ext.nested_layout<subgroup_tile = [1, 1, 2, 2], batch_tile = [1, 1, 1, 1], outer_tile = [1, 1, 1, 1], thread_tile = [1, 1, 8, 8], element_tile = [1, 1, 8, 8], subgroup_strides = [0, 0, 2, 1], thread_strides = [0, 0, 8, 1]>
+
+// CHECK: %[[EXTRACT:.+]] = tensor.extract_slice %arg0{{.*}} : tensor<4x32x?x128xf16> to tensor<1x1x?x128xf16>
+// CHECK: %[[EMPTY:.+]] = tensor.empty({{.*}}) : tensor<1x1x?x128xf16>
+// CHECK: %[[EXTRACTL:.+]] = iree_vector_ext.to_layout %[[EXTRACT]] to layout(#[[LAYOUT]]) : tensor<1x1x?x128xf16>
+// CHECK: %[[EMPTYL:.+]] = iree_vector_ext.to_layout %[[EMPTY]] to layout(#[[LAYOUT]]) : tensor<1x1x?x128xf16>
+// CHECK: %[[COPY:.+]] = linalg.copy {{.*}} ins(%[[EXTRACTL]] : tensor<1x1x?x128xf16>) outs(%[[EMPTYL]] : tensor<1x1x?x128xf16>)
 // CHECK: iree_vector_ext.to_layout %[[COPY]] to layout(#[[LAYOUT]]) : tensor<1x1x?x128xf16>

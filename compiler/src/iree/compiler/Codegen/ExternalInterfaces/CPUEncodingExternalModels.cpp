@@ -54,17 +54,6 @@ namespace {
 // Utilities.
 //===----------------------------------------------------------------------===//
 
-/// Appends the NamedAttribute into `config` if there is a `name` NamedAttribute
-/// in the `dictAttr`.
-static void storeNamedAttrIfPresent(SmallVectorImpl<NamedAttribute> &config,
-                                    DictionaryAttr dictAttr, StringRef name) {
-  auto attr = dictAttr.getNamed(name);
-  if (!attr) {
-    return;
-  }
-  config.push_back(attr.value());
-}
-
 static void transposeInPlace(MaterializeEncodingInfo &info) {
   // Vector cases: nothing to do.
   if (info.innerTileSizes.size() < 2) {
@@ -81,10 +70,6 @@ static void transposeInPlace(MaterializeEncodingInfo &info) {
   transpose(info.outerDimsPerm);
 }
 
-static RankedTensorType dropEncoding(RankedTensorType type) {
-  return RankedTensorType::get(type.getShape(), type.getElementType());
-}
-
 static Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
                                          ValueRange convertedInputOperands,
                                          ValueRange convertedOutputOperands) {
@@ -92,10 +77,11 @@ static Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
   operands.append(convertedInputOperands.begin(), convertedInputOperands.end());
   operands.append(convertedOutputOperands.begin(),
                   convertedOutputOperands.end());
-  return mlir::clone(builder, op,
-                     {dropEncoding(cast<RankedTensorType>(
-                         convertedOutputOperands[0].getType()))},
-                     operands);
+  return mlir::clone(
+      builder, op,
+      {cast<RankedTensorType>(convertedOutputOperands[0].getType())
+           .dropEncoding()},
+      operands);
 }
 
 static RankedTensorType
@@ -603,23 +589,17 @@ enumerateCPUMatmulTiles(IREE::Encoding::EncodingAttr encoding,
   return {};
 }
 
-struct CPUDeviceEncodingLayoutAttrInterface
-    : public Codegen::LayoutAttrInterface::ExternalModel<
-          CPUDeviceEncodingLayoutAttrInterface, CPUEncodingLayoutAttr> {
-  MaterializeEncodingInfo getEncodingInfo(Attribute attr,
-                                          RankedTensorType type) const {
-    auto layoutAttr = cast<CPUEncodingLayoutAttr>(attr);
+struct CPUDeviceEncodingLayoutResolverAttrInterface
+    : public DeviceEncodingLayoutResolverExternalModelBase<
+          CPUDeviceEncodingLayoutResolverAttrInterface, CPUEncodingLayoutAttr> {
 
-    // If the layout is already resolved, use it directly.
-    if (auto config = layoutAttr.getConfiguration()) {
-      if (auto namedAttr = config.getNamed(kEncodingInfoAttrName)) {
-        std::optional<MaterializeEncodingInfo> info =
-            Codegen::deserializeEncodingInfo(
-                cast<DictionaryAttr>(namedAttr->getValue()));
-        assert(info && "encoding_info is invalid");
-        return info.value();
-      }
-    }
+  DictionaryAttr getConfiguration(Attribute attr) const {
+    return cast<CPUEncodingLayoutAttr>(attr).getConfiguration();
+  }
+
+  MaterializeEncodingInfo getEncodingInfoImpl(Attribute attr,
+                                              RankedTensorType type) const {
+    auto layoutAttr = cast<CPUEncodingLayoutAttr>(attr);
 
     auto encoding = llvm::dyn_cast_or_null<IREE::Encoding::EncodingAttr>(
         type.getEncoding());
@@ -646,7 +626,12 @@ struct CPUDeviceEncodingLayoutAttrInterface
     // taking narrow dimensions into account.
     TileMxNxK chosenTileMxNxK = chooseMatmulTile(
         enumeratedTileMxNxK, narrowDim, encoding.getRoundDimsToArray());
-    info = getEncodingInfoForMatmul(encoding, chosenTileMxNxK);
+    FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
+        getEncodingInfoForMatmul(encoding, chosenTileMxNxK);
+    if (failed(maybeEncodingInfo)) {
+      return info;
+    }
+    info = std::move(maybeEncodingInfo.value());
     if (Encoding::isNarrowNResult(encoding)) {
       transposeInPlace(info);
     }
@@ -669,9 +654,9 @@ struct CPUDeviceEncodingLayoutAttrInterface
   }
 };
 
-struct CPUHostEncodingLayoutAttrInterface final
-    : IREE::Encoding::EncodingLayoutAttrInterface::ExternalModel<
-          CPUHostEncodingLayoutAttrInterface, CPUEncodingLayoutAttr> {
+struct CPUHostEncodingLayoutResolverAttrInterface final
+    : IREE::Encoding::EncodingLayoutResolverAttrInterface::ExternalModel<
+          CPUHostEncodingLayoutResolverAttrInterface, CPUEncodingLayoutAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
@@ -688,9 +673,9 @@ struct CPUHostEncodingLayoutAttrInterface final
   }
 };
 
-struct CPUHostSerializedEncodingLayoutAttrInterface final
-    : IREE::Encoding::SerializedEncodingLayoutAttrInterface::ExternalModel<
-          CPUHostSerializedEncodingLayoutAttrInterface, CPUEncodingLayoutAttr> {
+struct CPUHostSerializableEncodingAttrInterface final
+    : IREE::Encoding::SerializableEncodingAttrInterface::ExternalModel<
+          CPUHostSerializableEncodingAttrInterface, CPUEncodingLayoutAttr> {
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
@@ -734,23 +719,18 @@ enumerateVMVXMatmulTiles(linalg::ContractionDimensions cDims,
   };
 }
 
-struct VMVXDeviceEncodingLayoutAttrInterface final
-    : Codegen::LayoutAttrInterface::ExternalModel<
-          VMVXDeviceEncodingLayoutAttrInterface, VMVXEncodingLayoutAttr> {
-  MaterializeEncodingInfo getEncodingInfo(Attribute attr,
-                                          RankedTensorType type) const {
-    auto layoutAttr = cast<VMVXEncodingLayoutAttr>(attr);
+struct VMVXDeviceEncodingLayoutResolverAttrInterface final
+    : DeviceEncodingLayoutResolverExternalModelBase<
+          VMVXDeviceEncodingLayoutResolverAttrInterface,
+          VMVXEncodingLayoutAttr> {
 
-    // If the layout is already resolved, use it directly.
-    if (auto config = layoutAttr.getConfiguration()) {
-      if (auto namedAttr = config.getNamed(kEncodingInfoAttrName)) {
-        std::optional<MaterializeEncodingInfo> info =
-            Codegen::deserializeEncodingInfo(
-                cast<DictionaryAttr>(namedAttr->getValue()));
-        assert(info && "encoding_info is invalid");
-        return info.value();
-      }
-    }
+  DictionaryAttr getConfiguration(Attribute attr) const {
+    return cast<VMVXEncodingLayoutAttr>(attr).getConfiguration();
+  }
+
+  MaterializeEncodingInfo getEncodingInfoImpl(Attribute attr,
+                                              RankedTensorType type) const {
+    auto layoutAttr = cast<VMVXEncodingLayoutAttr>(attr);
 
     auto encoding = llvm::dyn_cast_or_null<IREE::Encoding::EncodingAttr>(
         type.getEncoding());
@@ -777,7 +757,12 @@ struct VMVXDeviceEncodingLayoutAttrInterface final
     // taking narrow dimensions into account.
     TileMxNxK chosenTileMxNxK = chooseMatmulTile(
         enumeratedTileMxNxK, narrowDim, encoding.getRoundDimsToArray());
-    info = getEncodingInfoForMatmul(encoding, chosenTileMxNxK);
+    FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
+        getEncodingInfoForMatmul(encoding, chosenTileMxNxK);
+    if (failed(maybeEncodingInfo)) {
+      return info;
+    }
+    info = std::move(maybeEncodingInfo.value());
     if (Encoding::isNarrowNResult(encoding)) {
       transposeInPlace(info);
     }
@@ -800,9 +785,9 @@ struct VMVXDeviceEncodingLayoutAttrInterface final
   }
 };
 
-struct VMVXHostEncodingLayoutAttrInterface final
-    : IREE::Encoding::EncodingLayoutAttrInterface::ExternalModel<
-          VMVXHostEncodingLayoutAttrInterface, VMVXEncodingLayoutAttr> {
+struct VMVXHostEncodingLayoutResolverAttrInterface final
+    : IREE::Encoding::EncodingLayoutResolverAttrInterface::ExternalModel<
+          VMVXHostEncodingLayoutResolverAttrInterface, VMVXEncodingLayoutAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
@@ -818,10 +803,9 @@ struct VMVXHostEncodingLayoutAttrInterface final
   }
 };
 
-struct VMVXHostSerializedEncodingLayoutAttrInterface final
-    : IREE::Encoding::SerializedEncodingLayoutAttrInterface::ExternalModel<
-          VMVXHostSerializedEncodingLayoutAttrInterface,
-          VMVXEncodingLayoutAttr> {
+struct VMVXHostSerializableEncodingAttrInterface final
+    : IREE::Encoding::SerializableEncodingAttrInterface::ExternalModel<
+          VMVXHostSerializableEncodingAttrInterface, VMVXEncodingLayoutAttr> {
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
                                     ValueRange dynamicDims) const {
@@ -836,13 +820,13 @@ void registerCPUEncodingExternalModels(DialectRegistry &registry) {
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::CPU::IREECPUDialect *dialect) {
         IREE::CPU::CPUEncodingLayoutAttr::attachInterface<
-            CPUDeviceEncodingLayoutAttrInterface,
-            CPUHostEncodingLayoutAttrInterface,
-            CPUHostSerializedEncodingLayoutAttrInterface>(*ctx);
+            CPUDeviceEncodingLayoutResolverAttrInterface,
+            CPUHostEncodingLayoutResolverAttrInterface,
+            CPUHostSerializableEncodingAttrInterface>(*ctx);
         IREE::CPU::VMVXEncodingLayoutAttr::attachInterface<
-            VMVXDeviceEncodingLayoutAttrInterface,
-            VMVXHostEncodingLayoutAttrInterface,
-            VMVXHostSerializedEncodingLayoutAttrInterface>(*ctx);
+            VMVXDeviceEncodingLayoutResolverAttrInterface,
+            VMVXHostEncodingLayoutResolverAttrInterface,
+            VMVXHostSerializableEncodingAttrInterface>(*ctx);
       });
 }
 

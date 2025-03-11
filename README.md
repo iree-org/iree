@@ -87,6 +87,7 @@ Community meeting recordings: [IREE YouTube channel](https://www.youtube.com/@ir
 
 Date | Title | Recording | Slides
 ---- | ----- | --------- | ------
+2025-02-12 | The Long Tail of AI: SPIR-V in IREE and MLIR (Vulkanised) | [recording](https://youtu.be/0zwfc6UkxeE) | [slides](https://www.vulkan.org/user/pages/09.events/vulkanised-2025/T12-Jakub-Kuderski-AMD-IREE-MLIR.pdf)
 2021-06-09 | IREE Runtime Design Tech Talk | [recording](https://drive.google.com/file/d/1p0DcysaIg8rC7ErKYEgutQkOJGPFCU3s/view) | [slides](https://drive.google.com/file/d/1ikgOdZxnMz1ExqwrAiuTY9exbe3yMWbB/view?usp=sharing)
 2020-08-20 | IREE CodeGen (MLIR Open Design Meeting) | [recording](https://drive.google.com/file/d/1325zKXnNIXGw3cdWrDWJ1-bp952wvC6W/view?usp=sharing) | [slides](https://docs.google.com/presentation/d/1NetHjKAOYg49KixY5tELqFp6Zr2v8_ujGzWZ_3xvqC8/edit)
 2020-03-18 | Interactive HAL IR Walkthrough | [recording](https://drive.google.com/file/d/1_sWDgAPDfrGQZdxAapSA90AD1jVfhp-f/view?usp=sharing) |

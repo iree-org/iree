@@ -316,8 +316,8 @@ void buildLLVMCPUVectorLoweringPipeline(
       LLVMCPUVirtualVectorLoweringPassOptions{options.splitVectorTransfersTo,
                                               options.enableArmI8mm}));
 
-  // Make sure we remove redundant vector ops (e.g., vector tranposes) before we
-  // lower them and can't be optimized away anymore.
+  // Make sure we remove redundant vector ops (e.g., vector transposes) before
+  // we lower them and can't be optimized away anymore.
   funcPassManager.addPass(createCanonicalizerPass());
 
   VectorTransferLoweringPassOptions transferLoweringOptions{};

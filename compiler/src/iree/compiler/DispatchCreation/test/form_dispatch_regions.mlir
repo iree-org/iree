@@ -105,7 +105,7 @@ util.func public @pack_fusion(%arg0 : tensor<?x?xf32>,
 #map1 = affine_map<(d0, d1) -> (d1, d0)>
 #map2 = affine_map<()[s0] -> (s0 ceildiv 8)>
 #map3 = affine_map<()[s0] -> (s0 ceildiv 32)>
-util.func public @tranpose_pack_fusion(%arg0: tensor<?x?xf32>) -> tensor<?x?x8x32xf32> {
+util.func public @transpose_pack_fusion(%arg0: tensor<?x?xf32>) -> tensor<?x?x8x32xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -124,7 +124,7 @@ util.func public @tranpose_pack_fusion(%arg0: tensor<?x?xf32>) -> tensor<?x?x8x3
 }
 // No fusion as the CPU backend currently can't handle fusion with transpose
 // between ops.
-// CHECK-LABEL: util.func public @tranpose_pack_fusion(
+// CHECK-LABEL: util.func public @transpose_pack_fusion(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 //       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
@@ -979,7 +979,7 @@ util.func @attention_clone_mask(%Q : tensor<?x?xf16>, %K : tensor<?x?xf16>, %V: 
 
 // -----
 
-util.func @scatter_index_producer_fusion(%arg0 : tensor<?x1xi64>,
+util.func @scatter_no_index_producer_fusion(%arg0 : tensor<?x1xi64>,
     %arg1 : index, %arg2 : tensor<?x1x32x8x128xf16>,
     %arg3 : tensor<?x32x8x128xf16>) -> tensor<?x32x8x128xf16> {
   %empty = tensor.empty(%arg1) : tensor<?x1xi32>
@@ -1001,9 +1001,11 @@ util.func @scatter_index_producer_fusion(%arg0 : tensor<?x1xi64>,
   } -> tensor<?x32x8x128xf16>
   util.return %1 : tensor<?x32x8x128xf16>
 }
-// CHECK-LABEL: func public @scatter_index_producer_fusion
+// Indices operand should be cloned.
+//
+// CHECK-LABEL: func public @scatter_no_index_producer_fusion
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
-//       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //       CHECK:     %[[SCATTER:.+]] = iree_linalg_ext.scatter
 //  CHECK-SAME:         ins(%{{.+}}, %[[GENERIC]] :
 //       CHECK:     flow.return %[[SCATTER]]
@@ -1211,3 +1213,89 @@ util.func @avoid_use_def_violation_on_consumer_fusion(%arg0 : tensor<?xf32>,
 //  CHECK-SAME:         ins(%[[DISPATCH1]], %[[BARRIER]] :
 //       CHECK:     flow.return %[[GENERIC2]]
 //       CHECK:   util.return %[[DISPATCH2]]
+
+// -----
+
+util.func @horizontal_fusion3(%lhs : tensor<2x4096x640xf16>,
+    %rhs0 : tensor<10x64x640xf16>, %rhs1 : tensor<10x64x640xf16>,
+    %rhs2 : tensor<10x64x640xf16>) ->
+    (tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>,
+     tensor<2x10x64x4096xf16>) {
+  %0 = tensor.empty() : tensor<2x10x64x4096xf32>
+  %4 = tensor.empty() : tensor<2x10x4096x64xf32>
+  %cst = arith.constant 0.0 : f32
+  %1 = linalg.fill ins(%cst : f32)
+      outs(%0 : tensor<2x10x64x4096xf32>) -> tensor<2x10x64x4096xf32>
+  %5 = linalg.fill ins(%cst : f32)
+      outs(%4 : tensor<2x10x4096x64xf32>) -> tensor<2x10x4096x64xf32>
+  %6:3 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]}
+      ins(%lhs, %rhs0, %rhs1, %rhs2
+          : tensor<2x4096x640xf16>, tensor<10x64x640xf16>, tensor<10x64x640xf16>,
+            tensor<10x64x640xf16>)
+      outs(%5, %5, %1
+          : tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>, tensor<2x10x64x4096xf32>) {
+  ^bb0(%in: f16, %in_0: f16, %in_1: f16, %in_2: f16, %out: f32, %out_3: f32, %out_4: f32):
+    %14 = arith.extf %in : f16 to f32
+    %15 = arith.extf %in_0 : f16 to f32
+    %16 = arith.mulf %14, %15 : f32
+    %17 = arith.addf %out, %16 : f32
+    %18 = arith.extf %in_1 : f16 to f32
+    %19 = arith.mulf %14, %18 : f32
+    %20 = arith.addf %out_3, %19 : f32
+    %21 = arith.extf %in_2 : f16 to f32
+    %22 = arith.mulf %14, %21 : f32
+    %23 = arith.addf %out_4, %22 : f32
+    linalg.yield %17, %20, %23 : f32, f32, f32
+  } -> (tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>, tensor<2x10x64x4096xf32>)
+  %7 = tensor.empty() : tensor<2x10x4096x64xf16>
+  %8 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+        ins(%6#0 : tensor<2x10x4096x64xf32>) outs(%7 : tensor<2x10x4096x64xf16>) {
+  ^bb0(%in: f32, %out: f16):
+    %14 = arith.truncf %in : f32 to f16
+    linalg.yield %14 : f16
+  } -> tensor<2x10x4096x64xf16>
+  %9 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%6#1 : tensor<2x10x4096x64xf32>) outs(%7 : tensor<2x10x4096x64xf16>) {
+  ^bb0(%in: f32, %out: f16):
+    %14 = arith.truncf %in : f32 to f16
+    linalg.yield %14 : f16
+  } -> tensor<2x10x4096x64xf16>
+  %2 = tensor.empty() : tensor<2x10x64x4096xf16>
+  %10 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%6#2 : tensor<2x10x64x4096xf32>) outs(%2 : tensor<2x10x64x4096xf16>) {
+  ^bb0(%in: f32, %out: f16):
+    %14 = arith.truncf %in : f32 to f16
+    linalg.yield %14 : f16
+  } -> tensor<2x10x64x4096xf16>
+  util.return %8, %9, %10 : tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, tensor<2x10x64x4096xf16>
+}
+//      CHECK: #[[INTERCHANGED_MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3, d2)>
+//      CHECK: func public @horizontal_fusion3
+//      CHECK:   %[[DISPATCH:.+]]:3 = flow.dispatch.region
+//      CHECK:     %[[GENERIC:.+]]:3 = linalg.generic
+//      CHECK:     %[[TRUNC0:.+]] = linalg.generic
+// CHECK-SAME:         ins(%[[GENERIC]]#0 :
+//      CHECK:     %[[TRUNC1:.+]] = linalg.generic
+// CHECK-SAME:         ins(%[[GENERIC]]#1 :
+//      CHECK:     %[[TRUNC2:.+]] = linalg.generic
+// CHECK-SANE:         indexing_maps = [#[[INTERCHANGED_MAP]], #[[INTERCHANGED_MAP]]]
+// CHECK-SAME:         ins(%[[GENERIC]]#2 :
+//      CHECK:     flow.return %[[TRUNC0]], %[[TRUNC1]], %[[TRUNC2]]
+//      CHECK:   util.return %[[DISPATCH]]#0, %[[DISPATCH]]#1, %[[DISPATCH]]#2

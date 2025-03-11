@@ -13,7 +13,7 @@
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-func.func @matmul_lowering_WMMA_F32_16x16x16_F16() {
+func.func @matmul_lowering_WMMAR3_F32_16x16x16_F16() {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(0) : index
   %N = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(1) : index
@@ -46,7 +46,7 @@ func.func @matmul_lowering_WMMA_F32_16x16x16_F16() {
 // CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-// CHECK:     func.func @matmul_lowering_WMMA_F32_16x16x16_F16
+// CHECK:     func.func @matmul_lowering_WMMAR3_F32_16x16x16_F16
 // CHECK-DAG:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(0)
 // CHECK-DAG:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(1)
 // CHECK-DAG:   %[[ACC_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(2)
@@ -56,5 +56,5 @@ func.func @matmul_lowering_WMMA_F32_16x16x16_F16() {
 // CHECK:       %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
 // CHECK-SAME:    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>]
-// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = WMMA_F32_16x16x16_F16, intrinsics_m = 4, subgroups_n = 4>
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = WMMAR3_F32_16x16x16_F16, intrinsics_m = 4, subgroups_n = 4>
 // CHECK:       flow.dispatch.tensor.store %[[MMA]], %[[ACC_BINDING]]

@@ -393,3 +393,76 @@ util.func public @check_horizontal_independence(%arg0: tensor<640x640xf32>,
 //       CHECK:   %[[OP:.+]] = linalg.matmul
 //       CHECK:       ins(%[[ARG0]], %[[FUSED_OP]]#1 :
 //       CHECK:   util.return %[[FUSED_OP]]#0, %[[FUSED_OP]]#1, %[[OP]]
+
+// -----
+
+util.func public @fuse_horizontal_with_transpose(%arg0: tensor<2x4096x640xi8>,
+    %arg1: tensor<10x64x640xi8>, %arg2: tensor<10x64x640xi8>, %arg3: tensor<10x64x640xi8>)
+    -> (tensor<2x10x4096x64xi32>, tensor<2x10x4096x64xi32>, tensor<2x10x64x4096xi32>) {
+  %0 = tensor.empty() : tensor<2x10x4096x64xi32>
+  %c0_i32 = arith.constant 0 : i32
+  %1 = linalg.fill ins(%c0_i32 : i32)
+      outs(%0 : tensor<2x10x4096x64xi32>) -> tensor<2x10x4096x64xi32>
+  %2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]}
+      ins(%arg0, %arg1 : tensor<2x4096x640xi8>, tensor<10x64x640xi8>)
+      outs(%1 : tensor<2x10x4096x64xi32>) {
+  ^bb0(%in: i8, %in_0: i8, %out: i32):
+    %8 = arith.extsi %in : i8 to i32
+    %9 = arith.extsi %in_0 : i8 to i32
+    %10 = arith.muli %8, %9 : i32
+    %11 = arith.addi %out, %10 : i32
+    linalg.yield %11 : i32
+  } -> tensor<2x10x4096x64xi32>
+  %3 = tensor.empty() : tensor<2x10x4096x64xf16>
+  %4 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]}
+      ins(%arg0, %arg2 : tensor<2x4096x640xi8>, tensor<10x64x640xi8>)
+      outs(%1 : tensor<2x10x4096x64xi32>) {
+  ^bb0(%in: i8, %in_0: i8, %out: i32):
+    %8 = arith.extsi %in : i8 to i32
+    %9 = arith.extsi %in_0 : i8 to i32
+    %10 = arith.muli %8, %9 : i32
+    %11 = arith.addi %out, %10 : i32
+    linalg.yield %11 : i32
+  } -> tensor<2x10x4096x64xi32>
+  %5 = tensor.empty() : tensor<2x10x64x4096xi32>
+  %6 = linalg.fill ins(%c0_i32 : i32) outs(%5 : tensor<2x10x64x4096xi32>) -> tensor<2x10x64x4096xi32>
+  %7 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]}
+      ins(%arg0, %arg3 : tensor<2x4096x640xi8>, tensor<10x64x640xi8>)
+      outs(%6 : tensor<2x10x64x4096xi32>) {
+  ^bb0(%in: i8, %in_0: i8, %out: i32):
+    %8 = arith.extsi %in : i8 to i32
+    %9 = arith.extsi %in_0 : i8 to i32
+    %10 = arith.muli %8, %9 : i32
+    %11 = arith.addi %out, %10 : i32
+    linalg.yield %11 : i32
+  } -> tensor<2x10x64x4096xi32>
+  util.return %2, %4, %7 : tensor<2x10x4096x64xi32>, tensor<2x10x4096x64xi32>, tensor<2x10x64x4096xi32>
+}
+// CHECK-LABEL: func public @fuse_horizontal_with_transpose
+//  CHECK-SAME:     %[[LHS:.[a-zA-Z0-9]+]]: tensor<2x4096x640xi8>
+//  CHECK-SAME:     %[[RHS0:[a-zA-Z0-9]+]]: tensor<10x64x640xi8>
+//  CHECK-SAME:     %[[RHS1:[a-zA-Z0-9]+]]: tensor<10x64x640xi8>
+//  CHECK-SAME:     %[[RHS2:[1-zA-Z0-9]+]]: tensor<10x64x640xi8>
+//       CHECK:   %[[RESULT:.+]]:3 = linalg.generic
+//  CHECK-SAME:       indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
+//  CHECK-SAME:           affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>
+//  CHECK-SAME:           affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>
+//  CHECK-SAME:           affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>
+//  CHECK-SAME:           affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
+//  CHECK-SAME:           affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
+//  CHECK-SAME:           affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d2)>
+//  CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
+//  CHECK-SAME:       ins(%[[LHS]], %[[RHS0]], %[[RHS1]], %[[RHS2]] :
+//       CHECK:   util.return %[[RESULT]]#0, %[[RESULT]]#1, %[[RESULT]]#2

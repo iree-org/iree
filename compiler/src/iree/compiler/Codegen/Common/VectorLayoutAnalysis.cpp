@@ -136,6 +136,10 @@ private:
                              RegionBranchPoint branchPoint,
                              MutableArrayRef<OpOperand> operands);
 
+  void visitMaskOp(
+      vector::MaskOp maskOp,
+      std::function<void(DistributionLayout *, mlir::ChangeResult)> update);
+
   DistributionLayout *getLatticeElement(Value val);
 
   MLIRContext *ctx;
@@ -163,6 +167,10 @@ private:
   void visitRegionSuccessors(RegionBranchOpInterface branch,
                              RegionBranchPoint branchPoint,
                              OperandRange operands);
+
+  void visitMaskOp(
+      vector::MaskOp maskOp,
+      std::function<void(DistributionLayout *, mlir::ChangeResult)> update);
 
   DistributionLayout *getLatticeElement(Value val);
 
@@ -204,7 +212,8 @@ ChangeResult DistributionLayout::resolveWithPossibleConflict(
   // Handle case where constantOp may have multiple consumers with different
   // layouts by creating a copy of constOp for other users.
   if (!opOperand.get().hasOneUse() &&
-      llvm::isa_and_nonnull<arith::ConstantOp, vector::StepOp>(
+      llvm::isa_and_nonnull<arith::ConstantOp, vector::StepOp,
+                            vector::CreateMaskOp>(
           opOperand.get().getDefiningOp())) {
     builder.setInsertionPoint(opOperand.get().getDefiningOp());
     Operation *copiedConstOp = builder.clone(*opOperand.get().getDefiningOp());
@@ -548,6 +557,24 @@ static void propagateLayoutToContractionOp(
   // True to resolve result with init.
   ChangeResult changed = result->resolve(init);
   update(result, changed);
+  if (changed == ChangeResult::Change) {
+    return;
+  }
+
+  // Get the operand value of the contraction.
+  const DistributionLayout *lhs = operandLattices[0];
+  const DistributionLayout *rhs = operandLattices[1];
+  if (!lhs->isUninitialized() && !rhs->isUninitialized()) {
+    VectorLayoutInterface lhsLayout = lhs->getLayout();
+    VectorLayoutInterface rhsLayout = rhs->getLayout();
+    AffineMap lhsMap = contraction.getIndexingMapsArray()[0];
+    AffineMap rhsMap = contraction.getIndexingMapsArray()[1];
+    AffineMap resMap = contraction.getIndexingMapsArray()[2];
+    VectorLayoutInterface inferredResLayout = lhsLayout.getRecombinedLayout(
+        {lhsLayout, rhsLayout}, {lhsMap, rhsMap}, resMap);
+    ChangeResult changed = result->resolve(inferredResLayout);
+    update(result, changed);
+  }
 }
 
 static void propagateLayoutToGatherOp(
@@ -801,6 +828,87 @@ static void enforceLayoutToGatherOp(
   }
 }
 
+static void enforceLayoutToTransferReadOp(
+    vector::TransferReadOp read, ArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+  if (resultLattices.empty()) {
+    return;
+  }
+  if (!read.getMask()) {
+    return;
+  }
+  // transfer_read has only one vector result.
+  const DistributionLayout *result = resultLattices[0];
+  // Cannot enforce layout if result is uninitialized.
+  if (result->isUninitialized()) {
+    return;
+  }
+
+  // Build a transposed layout.
+  SmallVector<unsigned> permutation;
+  AffineMap permMap = read.getPermutationMap();
+  bool isSupportedPerm =
+      permMap.isPermutationOfMinorIdentityWithBroadcasting(permutation);
+  VectorLayoutInterface layout = result->getLayout();
+  SmallVector<int64_t> transposePerm(permutation.begin(), permutation.end());
+  if (isSupportedPerm) {
+    layout = layout.permute(transposePerm);
+    AffineMap toMinorIdentity =
+        AffineMap::getPermutationMap(permutation, permMap.getContext());
+    AffineMap orderedMap = toMinorIdentity.compose(permMap);
+    SmallVector<bool> droppedDims(layout.getRank(), false);
+    for (unsigned bdim : orderedMap.getBroadcastDims()) {
+      droppedDims[bdim] = true;
+    }
+    layout = layout.project(droppedDims);
+
+    for (auto [index, operandLattice] : llvm::enumerate(operandLattices)) {
+      ChangeResult changed = operandLattice->resolveWithPossibleConflict(
+          layout, getOpOperand(read, index));
+      update(operandLattice, changed);
+    }
+  }
+}
+
+static void enforceLayoutToTransferWriteOp(
+    vector::TransferWriteOp write,
+    ArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+  if (operandLattices.empty()) {
+    return;
+  }
+  if (!write.getMask()) {
+    return;
+  }
+  // transfer_write may have layout set on the vector
+  // that is to be written
+  const DistributionLayout *writeOperand = operandLattices[0];
+  // Cannot enforce layout if writeOperand is uninitialized.
+  if (writeOperand->isUninitialized()) {
+    return;
+  }
+
+  // Build a transposed layout.
+  SmallVector<unsigned> permutation;
+  AffineMap permMap = write.getPermutationMap();
+  bool isSupportedPerm =
+      permMap.isPermutationOfMinorIdentityWithBroadcasting(permutation);
+  VectorLayoutInterface layout = writeOperand->getLayout();
+  SmallVector<int64_t> transposePerm(permutation.begin(), permutation.end());
+  if (isSupportedPerm) {
+    layout = layout.permute(transposePerm);
+  }
+
+  for (auto [index, operandLattice] :
+       llvm::enumerate(operandLattices.slice(1))) {
+    ChangeResult changed = operandLattice->resolveWithPossibleConflict(
+        layout, getOpOperand(write, index + 1));
+    update(operandLattice, changed);
+  }
+}
+
 void enforcementTransferFunction(
     Operation *op, ArrayRef<DistributionLayout *> operandLattices,
     ArrayRef<const DistributionLayout *> resultLattices,
@@ -844,6 +952,18 @@ void enforcementTransferFunction(
                                  update);
     return;
   }
+
+  if (auto read = dyn_cast<vector::TransferReadOp>(op)) {
+    enforceLayoutToTransferReadOp(read, operandLattices, resultLattices,
+                                  update);
+    return;
+  }
+
+  if (auto write = dyn_cast<vector::TransferWriteOp>(op)) {
+    enforceLayoutToTransferWriteOp(write, operandLattices, resultLattices,
+                                   update);
+    return;
+  }
 }
 
 /// ==========================================================================
@@ -878,6 +998,66 @@ LogicalResult PropagateLayout::visit(ProgramPoint *point) {
   return failure();
 }
 
+void PropagateLayout::visitMaskOp(
+    vector::MaskOp mask,
+    std::function<void(DistributionLayout *, mlir::ChangeResult)> update) {
+  mask.getBody()->walk(
+      [&](Operation *traversed) { visitOperation(traversed); });
+  // Propagate from body to results.
+  SmallVector<OpResult> vectorResults =
+      llvm::filter_to_vector(mask.getResults(), [](OpResult result) {
+        return isa<VectorType>(result.getType());
+      });
+  SmallVector<DistributionLayout *> resultLayouts = llvm::map_to_vector(
+      vectorResults, [&](Value result) -> DistributionLayout * {
+        return getLatticeElement(result);
+      });
+  SmallVector<Value> vectorYieldResults = llvm::filter_to_vector(
+      mask.getBody()->getTerminator()->getOperands(),
+      [](Value result) { return isa<VectorType>(result.getType()); });
+  SmallVector<DistributionLayout *> yieldLayouts = llvm::map_to_vector(
+      vectorYieldResults, [&](Value yieldResult) -> DistributionLayout * {
+        return getLatticeElement(yieldResult);
+      });
+  for (auto [result, yieldResult] : llvm::zip(resultLayouts, yieldLayouts)) {
+    if (!result->hasLayout() && !yieldResult->isUninitialized()) {
+      ChangeResult changed = result->resolve(yieldResult);
+      update(result, changed);
+    }
+  }
+
+  mask.getBody()->walk([&](Operation *op) {
+    if (vector::ContractionOp contract = dyn_cast<vector::ContractionOp>(op)) {
+      const DistributionLayout *lhs = getLatticeElement(contract.getLhs());
+      const DistributionLayout *rhs = getLatticeElement(contract.getRhs());
+      if (!lhs->isUninitialized() && !rhs->isUninitialized()) {
+        SmallVector<VectorLayoutInterface> layouts{lhs->getLayout(),
+                                                   rhs->getLayout()};
+        SmallVector<AffineMap> maps{contract.getIndexingMapsArray()[0],
+                                    contract.getIndexingMapsArray()[1]};
+        AffineMap domainIdentity = AffineMap::getMultiDimIdentityMap(
+            maps[0].getNumDims(), contract.getContext());
+        VectorLayoutInterface inferredMaskLayout =
+            layouts[0].getRecombinedLayout(layouts, maps, domainIdentity);
+        DistributionLayout *maskLayout = getLatticeElement(mask.getMask());
+        ChangeResult changed = maskLayout->resolveWithPossibleConflict(
+            inferredMaskLayout, mask->getOpOperand(0));
+        update(maskLayout, changed);
+      }
+    }
+    if (vector::MultiDimReductionOp reduce =
+            dyn_cast<vector::MultiDimReductionOp>(op)) {
+      const DistributionLayout *src = getLatticeElement(reduce.getSource());
+      if (!src->isUninitialized()) {
+        DistributionLayout *maskLayout = getLatticeElement(mask.getMask());
+        ChangeResult changed = maskLayout->resolveWithPossibleConflict(
+            src->getLayout(), mask->getOpOperand(0));
+        update(maskLayout, changed);
+      }
+    }
+  });
+}
+
 void PropagateLayout::visitOperation(Operation *op) {
   // Handle region branching control flow.
   // TODO: Write more about what we are doing here.
@@ -893,6 +1073,15 @@ void PropagateLayout::visitOperation(Operation *op) {
                             yield->getOperands());
       return;
     }
+  }
+
+  auto changeFunc = [&](DistributionLayout *lattice, ChangeResult changed) {
+    this->propagateIfChanged(lattice, changed);
+  };
+
+  if (auto mask = dyn_cast<vector::MaskOp>(op)) {
+    visitMaskOp(mask, changeFunc);
+    return;
   }
 
   // TODO: Handle BranchOpInterface also.
@@ -924,10 +1113,6 @@ void PropagateLayout::visitOperation(Operation *op) {
   if (resultLattices.empty()) {
     return;
   }
-
-  auto changeFunc = [&](DistributionLayout *lattice, ChangeResult changed) {
-    this->propagateIfChanged(lattice, changed);
-  };
 
   propagationTransferFunction(op, operandLattices, resultLattices, changeFunc);
 }
@@ -1001,6 +1186,34 @@ LogicalResult EnforceLayout::visit(ProgramPoint *point) {
   return failure();
 }
 
+void EnforceLayout::visitMaskOp(
+    vector::MaskOp mask,
+    std::function<void(DistributionLayout *, mlir::ChangeResult)> update) {
+  mask.getBody()->walk(
+      [&](Operation *traversed) { visitOperation(traversed); });
+  SmallVector<OpResult> vectorResults =
+      llvm::filter_to_vector(mask.getResults(), [](OpResult result) {
+        return isa<VectorType>(result.getType());
+      });
+  SmallVector<DistributionLayout *> resultLayouts = llvm::map_to_vector(
+      vectorResults, [&](Value result) -> DistributionLayout * {
+        return getLatticeElement(result);
+      });
+  SmallVector<Value> vectorYieldResults = llvm::filter_to_vector(
+      mask.getBody()->getTerminator()->getOperands(),
+      [](Value result) { return isa<VectorType>(result.getType()); });
+  SmallVector<DistributionLayout *> yieldLayouts = llvm::map_to_vector(
+      vectorYieldResults, [&](Value yieldResult) -> DistributionLayout * {
+        return getLatticeElement(yieldResult);
+      });
+  for (auto [result, yieldResult] : llvm::zip(resultLayouts, yieldLayouts)) {
+    if (!yieldResult->hasLayout() && !result->isUninitialized()) {
+      ChangeResult changed = yieldResult->resolve(result);
+      update(yieldResult, changed);
+    }
+  }
+}
+
 void EnforceLayout::visitOperation(Operation *op) {
   // Handle region branching control flow.
   // TODO: Write more about what we are doing here.
@@ -1016,6 +1229,15 @@ void EnforceLayout::visitOperation(Operation *op) {
                             yield->getOpOperands());
       return;
     }
+  }
+
+  auto changeFunc = [&](DistributionLayout *lattice, ChangeResult changed) {
+    this->propagateIfChanged(lattice, changed);
+  };
+
+  if (auto mask = dyn_cast<vector::MaskOp>(op)) {
+    visitMaskOp(mask, changeFunc);
+    return;
   }
 
   // TODO: Handle BranchOpInterface also.
@@ -1048,10 +1270,6 @@ void EnforceLayout::visitOperation(Operation *op) {
     DistributionLayout *resultLattice = getLatticeElement(result);
     resultLattices.push_back(resultLattice);
   }
-
-  auto changeFunc = [&](DistributionLayout *lattice, ChangeResult changed) {
-    this->propagateIfChanged(lattice, changed);
-  };
 
   enforcementTransferFunction(op, operandLattices, resultLattices, changeFunc);
 }

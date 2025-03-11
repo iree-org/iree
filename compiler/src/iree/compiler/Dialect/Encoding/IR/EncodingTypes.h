@@ -38,10 +38,12 @@
 
 namespace mlir::iree_compiler::IREE::Encoding {
 
+static constexpr char kEncodingResolverAttrName[] = "iree.encoding.resolver";
+
 /// Returns the encoding attribute from the type if there is an encoding that
-/// implements EncodingLayoutAttrInterface. Otherwise, returns null.
-EncodingLayoutAttrInterface
-getEncodingLayoutAttrInterface(RankedTensorType type);
+/// implements SerializableEncodingAttrInterface. Otherwise, returns null.
+SerializableEncodingAttrInterface
+getSerializableEncodingAttrInterface(RankedTensorType type);
 
 /// Returns the encoding attribute from the type if there is an encoding.
 /// Otherwise, returns null.
@@ -101,9 +103,6 @@ MatmulNarrowDim getMatmulNarrowDim(EncodingAttr encoding);
 /// Returns true if `encoding` represents a narrow-N matmul RESULT, e.g. the
 /// result of a matvec.
 bool isNarrowNResult(EncodingAttr encoding);
-
-/// Returns the same RankedTensoType without the encoding.
-RankedTensorType dropEncoding(RankedTensorType type);
 
 } // namespace mlir::iree_compiler::IREE::Encoding
 

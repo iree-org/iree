@@ -856,7 +856,7 @@ HalBufferView HalDevice::FromDLPackCapsule(py::object input_capsule) {
   iree_hal_buffer_params_t params;
   memset(&params, 0, sizeof(params));
   params.usage = IREE_HAL_BUFFER_USAGE_DEFAULT;
-  params.access = IREE_HAL_MEMORY_ACCESS_ANY;
+  params.access = IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE;
   params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
   iree_hal_external_buffer_t external_buffer;
   memset(&external_buffer, 0, sizeof(external_buffer));
@@ -1356,7 +1356,7 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("BFLOAT_16", IREE_HAL_ELEMENT_TYPE_BFLOAT_16)
       .value("COMPLEX_64", IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64)
       .value("COMPLEX_128", IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128)
-      .value("FLOAT_8_E4M3", IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3)
+      .value("FLOAT_8_E4M3_FN", IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FN)
       .value("FLOAT_8_E4M3_FNUZ", IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ)
       .value("FLOAT_8_E5M2", IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2)
       .value("FLOAT_8_E5M2_FNUZ", IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ)
@@ -1782,7 +1782,12 @@ void SetupHalBindings(nanobind::module_ m) {
         new (self) HalShape(indices);
       });
 
-  py::class_<HalCommandBuffer>(m, "HalCommandBuffer")
+  auto hal_command_buffer = py::class_<HalCommandBuffer>(m, "HalCommandBuffer");
+  VmRef::BindRefProtocol(hal_command_buffer, iree_hal_command_buffer_type,
+                         iree_hal_command_buffer_retain_ref,
+                         iree_hal_command_buffer_deref,
+                         iree_hal_command_buffer_isa);
+  hal_command_buffer
       .def(
           "__init__",
           [](HalCommandBuffer* new_self, HalDevice& device,

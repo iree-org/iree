@@ -29,7 +29,7 @@ static llvm::cl::opt<bool> clSpecializeEncodings(
         "Enables SpecializeEncodingPass in Stream pass pipeline. This pass is "
         "currently under development, so it is not enabled by default. It can "
         "only handle limited cases at this moment."),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 namespace mlir::iree_compiler::IREE::Stream {
 
@@ -204,8 +204,6 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   //----------------------------------------------------------------------------
 
   FunctionLikeNest(passManager)
-      // Analyze and assign execution placement.
-      .addPass(IREE::Stream::createExecutionPlacementPass)
       // Combine async work into execution regions.
       .addPass(IREE::Stream::createScheduleExecutionPass)
       // Group concurrently executable work into waves.

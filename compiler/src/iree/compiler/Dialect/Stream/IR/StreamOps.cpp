@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -228,10 +229,15 @@ static void eraseStreamRegionResults(Region &region,
     auto yieldOp = dyn_cast<IREE::Stream::YieldOp>(block.getTerminator());
     if (!yieldOp)
       continue;
-    llvm::SmallVector<Value> newOperands;
+    // HACK: there's no good way of updating the operand and size together today
+    // - we should add a helper to the ClosureYieldOpInterface that checks for
+    // size/shape aware traits and does this automatically.
     for (auto i : llvm::reverse(excludedResultIndices)) {
-      yieldOp.getResourceOperandsMutable().erase(i);
-      yieldOp.getResourceOperandSizesMutable().erase(i);
+      unsigned resourceIndex = i;
+      unsigned resourceSizeIndex =
+          yieldOp.getResourceOperandsMutable().size() + i;
+      yieldOp->eraseOperand(resourceSizeIndex);
+      yieldOp->eraseOperand(resourceIndex);
     }
   }
 }
@@ -1938,7 +1944,8 @@ LogicalResult TensorCloneOp::verify() {
   // information.
   auto sourceEncoding = llvm::cast<RankedTensorType>(op.getSourceEncoding());
   auto resultEncoding = llvm::cast<RankedTensorType>(op.getResultEncoding());
-  if (sourceEncoding.getEncoding() != resultEncoding.getEncoding()) {
+  if (!IREE::Encoding::SerializableEncodingAttrInterface::areCompatible(
+          sourceEncoding.getEncoding(), resultEncoding.getEncoding())) {
     return op.emitOpError() << "clones changing tensor encoding from "
                             << sourceEncoding.getEncoding() << " to "
                             << resultEncoding.getEncoding() << "; not allowed";
@@ -2504,6 +2511,8 @@ void AsyncCollectiveOp::getAsyncAccessRanges(
 // stream.async.barrier
 //===----------------------------------------------------------------------===//
 
+bool AsyncBarrierOp::isMetadata() { return true; }
+
 LogicalResult AsyncBarrierOp::verify() { return success(); }
 
 Value AsyncBarrierOp::getTiedResult(unsigned resultIndex) {
@@ -2532,12 +2541,60 @@ LogicalResult AsyncTransferOp::verify() {
   return success();
 }
 
-void AsyncTransferOp::build(OpBuilder &builder, OperationState &state,
-                            Type type, Value source, Value source_size,
-                            Value result_size, AffinityAttr source_attr,
-                            AffinityAttr result_attr) {
-  build(builder, state, type, source, source_size, result_size, source_attr,
-        result_attr, nullptr);
+IREE::Stream::AffinityAttr AsyncTransferOp::getAffinityAttr() {
+  auto sourceType = cast<IREE::Stream::ResourceType>(getSource().getType());
+  auto resultType = cast<IREE::Stream::ResourceType>(getResult().getType());
+  if (sourceType.getLifetime() == IREE::Stream::Lifetime::Staging &&
+      resultType.getLifetime() == IREE::Stream::Lifetime::Staging) {
+    // TODO(multi-device): figure out how to model staging->staging transfers.
+    return getSourceAffinityAttr();
+  } else if (sourceType.getLifetime() == IREE::Stream::Lifetime::External ||
+             sourceType.getLifetime() == IREE::Stream::Lifetime::Staging) {
+    // If source is staging then the op should execute on the consumer.
+    return getResultAffinityAttr();
+  } else if (resultType.getLifetime() == IREE::Stream::Lifetime::External ||
+             resultType.getLifetime() == IREE::Stream::Lifetime::Staging) {
+    // If result is staging then the op should execute on the producer.
+    return getSourceAffinityAttr();
+  } else {
+    // Default to result affinity.
+    return getSourceAffinityAttr();
+  }
+}
+
+void AsyncTransferOp::setAffinityAttr(IREE::Stream::AffinityAttr value) {
+  auto sourceType = cast<IREE::Stream::ResourceType>(getSource().getType());
+  auto resultType = cast<IREE::Stream::ResourceType>(getResult().getType());
+  if (sourceType.getLifetime() == IREE::Stream::Lifetime::Staging &&
+      resultType.getLifetime() == IREE::Stream::Lifetime::Staging) {
+    // TODO(multi-device): figure out how to model staging->staging transfers.
+    if (value) {
+      setSourceAffinityAttr(value);
+    } else {
+      removeSourceAffinityAttr();
+    }
+  } else if (sourceType.getLifetime() == IREE::Stream::Lifetime::Staging) {
+    // If source is staging then the op should execute on the consumer.
+    if (value) {
+      setResultAffinityAttr(value);
+    } else {
+      removeResultAffinityAttr();
+    }
+  } else if (resultType.getLifetime() == IREE::Stream::Lifetime::Staging) {
+    // If result is staging then the op should execute on the producer.
+    if (value) {
+      setSourceAffinityAttr(value);
+    } else {
+      removeSourceAffinityAttr();
+    }
+  } else {
+    // Default to result affinity.
+    if (value) {
+      setResultAffinityAttr(value);
+    } else {
+      removeResultAffinityAttr();
+    }
+  }
 }
 
 void AsyncTransferOp::getAsyncAccessRanges(
@@ -4305,6 +4362,10 @@ LogicalResult DispatchWorkgroupSizeOp::verify() {
 
 MutableOperandRange
 YieldOp::getMutableSuccessorOperands(RegionBranchPoint point) {
+  return getResourceOperandsMutable();
+}
+
+MutableOperandRange YieldOp::getClosureResultsMutable() {
   return getResourceOperandsMutable();
 }
 

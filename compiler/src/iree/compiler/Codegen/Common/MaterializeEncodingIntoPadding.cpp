@@ -53,7 +53,7 @@ static PadEncodingLayoutAttr getPadLayout(RankedTensorType type) {
 static RankedTensorType getPaddedType(RankedTensorType type) {
   PadEncodingLayoutAttr layout = getPadLayout(type);
   if (!isNonZeroPadding(layout)) {
-    return dropEncoding(type);
+    return type.dropEncoding();
   }
 
   ArrayRef<int32_t> padding = layout.getPadding().asArrayRef();
@@ -87,7 +87,7 @@ struct MaterializePadEncodingTypeConverter final
   }
 };
 
-/// Pattern to convert `flow.dispatch.tensor.store` operation when
+/// Pattern to convert `flow.dispatch.tensor.load` operation when
 /// materializing the encoding. We extract a smaller tensor for the padded
 /// source. This way we do not create partial loads prematurely, which would be
 /// difficult to undo later on.

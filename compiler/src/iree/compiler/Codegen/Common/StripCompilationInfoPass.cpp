@@ -40,7 +40,6 @@ struct StripLinalgOpCompilationInfo final
                                 PatternRewriter &rewriter) const final {
     if (!getCompilationInfo(linalgOp) && !getLoweringConfig(linalgOp))
       return failure();
-
     rewriter.modifyOpInPlace(linalgOp, [&]() {
       if (getCompilationInfo(linalgOp)) {
         // Erase the compilation info configuration if it exists.
@@ -57,13 +56,42 @@ struct StripLinalgOpCompilationInfo final
   }
 };
 
+struct StripAttentionOpCompilationInfo final
+    : OpRewritePattern<IREE::LinalgExt::AttentionOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::LinalgExt::AttentionOp attentionOp,
+                                PatternRewriter &rewriter) const override {
+    if (getCompilationInfo(attentionOp)) {
+      eraseCompilationInfo(attentionOp);
+    }
+
+    if (getLoweringConfig(attentionOp)) {
+      eraseLoweringConfig(attentionOp);
+    }
+
+    if (DictionaryAttr decompositionConfig =
+            attentionOp.getDecompositionConfigAttr()) {
+      DictionaryAttr newConfig = DictionaryAttr::get(
+          decompositionConfig.getContext(),
+          llvm::filter_to_vector(decompositionConfig, [](NamedAttribute attr) {
+            return attr.getName() !=
+                       IREE::LinalgExt::AttentionOp::getQKAttrStr() &&
+                   attr.getName() !=
+                       IREE::LinalgExt::AttentionOp::getPVAttrStr();
+          }));
+      attentionOp.setDecompositionConfigAttr(newConfig);
+    }
+    return success();
+  }
+};
+
 struct StripCompilationInfoPass final
     : impl::StripCompilationInfoPassBase<StripCompilationInfoPass> {
   void runOnOperation() override {
     MLIRContext *ctx = &getContext();
     RewritePatternSet patterns(ctx);
-    patterns.add<StripFuncOpTranslationInfo>(ctx);
-    patterns.add<StripLinalgOpCompilationInfo>(ctx);
+    patterns.add<StripFuncOpTranslationInfo, StripLinalgOpCompilationInfo,
+                 StripAttentionOpCompilationInfo>(ctx);
     walkAndApplyPatterns(getOperation(), std::move(patterns));
   }
 };

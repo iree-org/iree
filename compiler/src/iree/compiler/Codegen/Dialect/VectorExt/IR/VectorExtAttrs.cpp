@@ -126,6 +126,28 @@ SmallVector<int64_t> NestedLayoutAttr::getUndistributedShape() const {
   return shape;
 }
 
+SmallVector<int64_t>
+NestedLayoutAttr::getPackedShapeForUndistributedDim(int64_t dim) const {
+  SmallVector<int64_t> shape;
+  shape.reserve(5);
+  shape.push_back(getSubgroupTile()[dim]);
+  shape.push_back(getBatchTile()[dim]);
+  shape.push_back(getOuterTile()[dim]);
+  shape.push_back(getThreadTile()[dim]);
+  shape.push_back(getElementTile()[dim]);
+  return shape;
+}
+
+SmallVector<int64_t> NestedLayoutAttr::getDistributedUnpackedShape() const {
+  SmallVector<int64_t> shape;
+  shape.reserve(getRank());
+  for (auto [batch, outer, element] :
+       llvm::zip(getBatchTile(), getOuterTile(), getElementTile())) {
+    shape.push_back(batch * outer * element);
+  }
+  return shape;
+}
+
 // Gets the rank of the undistributed vector for this layout.
 int64_t NestedLayoutAttr::getRank() const {
   // The layout requires that all size lists are the same length and match
@@ -243,6 +265,100 @@ NestedLayoutAttr NestedLayoutAttr::get(MLIRContext *context,
       appendDims(source.getSubgroupStrides(), appendSubgroupStrides);
   SmallVector<int64_t> threadStrides =
       appendDims(source.getThreadStrides(), appendThreadStrides);
+  return NestedLayoutAttr::get(context, subgroupTile, batchTile, outerTile,
+                               threadTile, elementTile, subgroupStrides,
+                               threadStrides);
+}
+
+VectorLayoutInterface
+NestedLayoutAttr::getRecombinedLayout(ArrayRef<VectorLayoutInterface> layouts,
+                                      ArrayRef<AffineMap> maps,
+                                      AffineMap resultMap) {
+  constexpr int64_t kInvalid = -1;
+  if (llvm::any_of(layouts, [](VectorLayoutInterface layout) {
+        return !mlir::isa<NestedLayoutAttr>(layout);
+      })) {
+    return NestedLayoutAttr();
+  }
+  MLIRContext *context = resultMap.getContext();
+
+  SmallVector<NestedLayoutAttr> nestedLayouts;
+  llvm::transform(layouts, std::back_inserter(nestedLayouts),
+                  [&](VectorLayoutInterface layout) {
+                    return mlir::cast<NestedLayoutAttr>(layout);
+                  });
+
+  int64_t resRank = resultMap.getNumResults();
+  SmallVector<int64_t> subgroupTile(resRank, kInvalid);
+  SmallVector<int64_t> batchTile(resRank, kInvalid);
+  SmallVector<int64_t> outerTile(resRank, kInvalid);
+  SmallVector<int64_t> threadTile(resRank, kInvalid);
+  SmallVector<int64_t> elementTile(resRank, kInvalid);
+  SmallVector<int64_t> subgroupStrides(resRank, kInvalid);
+  SmallVector<int64_t> threadStrides(resRank, kInvalid);
+
+  // a helper to perform a valid update when recombining
+  // layouts. If there is a conflict, this will return
+  // false.
+  auto checkedUpdate = [&](int64_t &data, int64_t v) -> bool {
+    if (data != kInvalid && data != v) {
+      return false;
+    }
+    data = v;
+    return true;
+  };
+
+  for (auto [layout, indexingMap] : llvm::zip(nestedLayouts, maps)) {
+    for (int64_t resultIdx : llvm::seq<int64_t>(indexingMap.getNumResults())) {
+      int64_t iterSpacePos = indexingMap.getDimPosition(resultIdx);
+      std::optional<unsigned int> mayBeResultPos =
+          resultMap.getResultPosition(getAffineDimExpr(iterSpacePos, context));
+      if (!mayBeResultPos.has_value()) {
+        continue;
+      }
+      int64_t resultPos = mayBeResultPos.value();
+      if (!checkedUpdate(subgroupTile[resultPos],
+                         layout.getSubgroupTile()[resultIdx])) {
+        return NestedLayoutAttr();
+      }
+      if (!checkedUpdate(batchTile[resultPos],
+                         layout.getBatchTile()[resultIdx])) {
+        return NestedLayoutAttr();
+      }
+      if (!checkedUpdate(outerTile[resultPos],
+                         layout.getOuterTile()[resultIdx])) {
+        return NestedLayoutAttr();
+      }
+      if (!checkedUpdate(threadTile[resultPos],
+                         layout.getThreadTile()[resultIdx])) {
+        return NestedLayoutAttr();
+      }
+      if (!checkedUpdate(elementTile[resultPos],
+                         layout.getElementTile()[resultIdx])) {
+        return NestedLayoutAttr();
+      }
+
+      if (!checkedUpdate(subgroupStrides[resultPos],
+                         layout.getSubgroupStrides()[resultIdx])) {
+        return NestedLayoutAttr();
+      }
+      if (!checkedUpdate(threadStrides[resultPos],
+                         layout.getThreadStrides()[resultIdx])) {
+        return NestedLayoutAttr();
+      }
+    }
+  }
+
+  // All the tiles should have valid data
+  // after a successful recombination.
+  for (const llvm::SmallVector<int64_t> &tile :
+       {subgroupTile, batchTile, outerTile, threadTile, subgroupStrides,
+        threadStrides}) {
+    if (llvm::any_of(tile, [&](int64_t v) { return v == kInvalid; })) {
+      return NestedLayoutAttr();
+    }
+  }
+
   return NestedLayoutAttr::get(context, subgroupTile, batchTile, outerTile,
                                threadTile, elementTile, subgroupStrides,
                                threadStrides);

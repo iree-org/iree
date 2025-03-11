@@ -232,11 +232,43 @@ const WgpDetails *getCDNA1WgpDetails() {
   return &cdna1Wgp;
 }
 
+const WgpDetails *getRDNA4WgpDetails() {
+  static const MMAIntrinsic rdna4MMAOps[] = {
+      MMAIntrinsic::WMMAR4_F32_16x16x16_F16,
+      MMAIntrinsic::WMMAR4_F16_16x16x16_F16,
+      MMAIntrinsic::WMMAR4_F32_16x16x16_BF16,
+      MMAIntrinsic::WMMAR4_BF16_16x16x16_BF16,
+      MMAIntrinsic::WMMAR4_F32_16x16x16_F8E5M2,
+      MMAIntrinsic::WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN,
+      MMAIntrinsic::WMMAR4_F32_16x16x16_F8E4M3FN,
+      MMAIntrinsic::WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2,
+      MMAIntrinsic::WMMAR4_I32_16x16x16_I8,
+
+  };
+  static const WgpDetails rdna4Wgp = {allComputeBits,
+                                      allStorageBits,
+                                      allSubgroupOps,
+                                      allDotProductOps,
+                                      ARRAY_SIZE(rdna4MMAOps),
+                                      rdna4MMAOps,
+                                      {32, 64},
+                                      {1024, 1024, 1024},
+                                      1024,
+                                      64 * 1024,
+                                      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+                                      /*maxLoadInstructionBits=*/128,
+                                      /*simdsPerWgp=*/4,
+                                      /*vgprSpaceBits=*/256 * 32};
+  return &rdna4Wgp;
+}
+
 const WgpDetails *getRDNA3WgpDetails() {
   static const MMAIntrinsic rdna3MMAOps[] = {
-      MMAIntrinsic::WMMA_F32_16x16x16_F16, MMAIntrinsic::WMMA_F16_16x16x16_F16,
-      MMAIntrinsic::WMMA_I32_16x16x16_I8,  MMAIntrinsic::WMMA_I32_16x16x16_I8,
-      MMAIntrinsic::WMMA_I32_16x16x16_I8,
+      MMAIntrinsic::WMMAR3_F32_16x16x16_F16,
+      MMAIntrinsic::WMMAR3_F16_16x16x16_F16,
+      MMAIntrinsic::WMMAR3_F32_16x16x16_BF16,
+      MMAIntrinsic::WMMAR3_BF16_16x16x16_BF16,
+      MMAIntrinsic::WMMAR3_I32_16x16x16_I8,
 
   };
   static const WgpDetails rdna3Wgp = {allComputeBits,
@@ -282,6 +314,7 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   const WgpDetails *cdna3Wgp = getCDNA3WgpDetails();
   const WgpDetails *cdna2Wgp = getCDNA2WgpDetails();
   const WgpDetails *cdna1Wgp = getCDNA1WgpDetails();
+  const WgpDetails *rdna4Wgp = getRDNA4WgpDetails();
   const WgpDetails *rdna3Wgp = getRDNA3WgpDetails();
   const WgpDetails *rdna2Wgp = getRDNA2WgpDetails();
   const WgpDetails *rdna1Wgp = getRDNA1WgpDetails();
@@ -303,6 +336,12 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   // https://www.amd.com/content/dam/amd/en/documents/instinct-business-docs/white-papers/amd-cdna-white-paper.pdf
   static const ChipDetails mi100Chip = {120, "mi100"};
 
+  // AMD RDNA4 architecture:
+  // https://www.amd.com/en/newsroom/press-releases/2025-2-28-amd-unveils-next-generation-amd-rdna-4-architectu.html.
+  static const ChipDetails rx9070xtChip = {64, "rx9070xt"};
+  static const ChipDetails rx9070Chip = {56, "rx9070"};
+
+  // AMD RDNA3.
   static const ChipDetails rx7900xtxChip = {96, "rx7900xtx"};
   static const ChipDetails rx7900xtChip = {84, "rx7900xt"};
   static const ChipDetails rx7800xtChip = {60, "rx7800xt"};
@@ -327,6 +366,10 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
       .Cases("cdna2", "gfx90a", TargetDetails{cdna2Wgp, nullptr})
       .Case("mi100", TargetDetails{cdna1Wgp, &mi100Chip})
       .Cases("cdna1", "gfx908", TargetDetails{cdna1Wgp, nullptr})
+      // https://www.techpowerup.com/gpu-specs/radeon-rx-9070-xt.c4229
+      .Case("rx9070xt", TargetDetails{rdna4Wgp, &rx9070xtChip})
+      // https://www.techpowerup.com/gpu-specs/radeon-rx-9070.c4250
+      .Case("rx9070", TargetDetails{rdna4Wgp, &rx9070Chip})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-7900-xtx.c3941
       .Case("rx7900xtx", TargetDetails{rdna3Wgp, &rx7900xtxChip})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-7900-xt.c3912
@@ -343,6 +386,7 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
       .Case("w7800", TargetDetails{rdna3Wgp, &w7800Chip})
       // https://www.techpowerup.com/gpu-specs/radeon-pro-w7700.c4184
       .Case("w7700", TargetDetails{rdna3Wgp, &w7700Chip})
+      .Cases("rdna4", "gfx1200", "gfx1201", TargetDetails{rdna4Wgp, nullptr})
       .Cases("rdna3", "gfx1100", "gfx1101", "gfx1102", "gfx1103", "gfx1150",
              "gfx1151", TargetDetails{rdna3Wgp, nullptr})
       .Cases("rdna2", "gfx1030", "gfx1031", "gfx1032", "gfx1033", "gfx1034",
@@ -365,6 +409,7 @@ StringRef normalizeAMDGPUTarget(StringRef target) {
       .Cases("mi300a", "mi300x", "mi308x", "mi325x", "gfx942")
       .Cases("mi250x", "mi250", "mi210", "cdna2", "gfx90a")
       .Cases("mi100", "cdna1", "gfx908")
+      .Cases("rx9070xt", "rx9070", "gfx1201")
       .Cases("rx7900xtx", "rx7900xt", "w7900", "w7800", "gfx1100")
       .Cases("rx7800xt", "rx7700xt", "v710", "w7700", "gfx1101")
       .Default("");

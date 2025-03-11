@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
@@ -61,54 +62,63 @@ SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
 
 } // namespace
 
-// TODO(hanchung): Add "cloneWithEncoding" method to RankedTensorType.
-static RankedTensorType cloneWithEncoding(RankedTensorType type,
-                                          Attribute encodingAttr) {
-  return RankedTensorType::get(type.getShape(), type.getElementType(),
-                               encodingAttr);
-}
-
-// Returns the type with updated encoding, if any. Returns the original type if
-// the type is not a RankedTensorType. If it is a RankedTensorType with an
-// unknown encoding, returns the type without the encoding. The method uses
-// `layoutResolvers` to resolve the layouts of the given `type`; returns the new
-// encoding with the resolved layouts.
-// Note: The new encoding has to implement
-// SerializedEncodingLayoutAttrInterface. Otherwise, the specialization is
-// failed. Because the stream tensor ops still can not process encodings.
-static Type getTypeWithResolvedEncodingLayouts(
-    Type type, const SetVector<Attribute> &layoutResolvers) {
+/// Returns true iff the type is a RankedTensorType and it has an encoding that
+/// implements SerializableEncodingAttrInterface.
+static bool isRecognizedEncodingType(Type type) {
   auto rankedTensorType = dyn_cast<RankedTensorType>(type);
   if (!rankedTensorType) {
+    return false;
+  }
+  Attribute encoding = rankedTensorType.getEncoding();
+  if (!encoding) {
+    return false;
+  }
+  return isa<IREE::Encoding::SerializableEncodingAttrInterface>(encoding);
+}
+
+/// Returns the type with updated encoding, if any. Returns the original type if
+/// the the encoding type is not recognized or it is already serialized. If it
+/// fails to resolve the layout, returns nullptr.
+/// The method uses `layoutResolvers` to resolve the layouts of the given
+/// `type`; returns the new encoding with the resolved layouts.
+///
+/// There are requirements to get the resolved layouts. Otherwise, the encodings
+/// are dropped.
+///   - All attributes in the `layoutResolvers` must implement
+///     EncodingLayoutResolverAttrInterface. Otherwise, there is no way to query
+///     layouts.
+///   - The encoding on the type must implement
+///     SerializableEncodingAttrInterface. Otherwise, there is no way to update
+///     encodings.
+static Type getTypeWithResolvedEncodingLayouts(
+    Type type, const SetVector<Attribute> &layoutResolvers) {
+  if (!isRecognizedEncodingType(type)) {
     return type;
   }
+  auto rankedTensorType = dyn_cast<RankedTensorType>(type);
   auto encodingAttr =
-      IREE::Encoding::getEncodingLayoutAttrInterface(rankedTensorType);
-  if (!encodingAttr) {
-    return IREE::Encoding::dropEncoding(rankedTensorType);
+      IREE::Encoding::getSerializableEncodingAttrInterface(rankedTensorType);
+  if (encodingAttr.isSerialized()) {
+    return type;
   }
   if (!llvm::all_of(
           layoutResolvers,
-          llvm::IsaPred<IREE::Encoding::EncodingLayoutAttrInterface>)) {
-    // Drop the encoding if any attribute does not implement the interface.
-    // Because there is no way to query the layout.
-    return IREE::Encoding::dropEncoding(rankedTensorType);
+          llvm::IsaPred<IREE::Encoding::EncodingLayoutResolverAttrInterface>)) {
+    return rankedTensorType.dropEncoding();
   }
   SmallVector<Attribute> layouts;
   for (auto attr : layoutResolvers) {
     auto encodingLayoutAttr =
-        cast<IREE::Encoding::EncodingLayoutAttrInterface>(attr);
+        cast<IREE::Encoding::EncodingLayoutResolverAttrInterface>(attr);
     Attribute layout = encodingLayoutAttr.getLayout(rankedTensorType);
     if (!layout) {
-      // Drop the encoding if the layout is not resolved.
-      return IREE::Encoding::dropEncoding(rankedTensorType);
+      return nullptr;
     }
     layouts.push_back(layout);
   }
   Attribute newEncoding = encodingAttr.cloneWithLayouts(layouts);
-  assert(
-      isa<IREE::Encoding::SerializedEncodingLayoutAttrInterface>(newEncoding));
-  return cloneWithEncoding(rankedTensorType, newEncoding);
+  assert(isa<IREE::Encoding::SerializableEncodingAttrInterface>(newEncoding));
+  return rankedTensorType.cloneWithEncoding(newEncoding);
 };
 
 /// Updates the bindings of function arguments with encoding layouts. It only
@@ -134,28 +144,20 @@ updateBindingEncodings(FunctionOpInterface funcOp,
                  << "Skip, the new type is not RankedTensorType.\n");
       continue;
     }
-    auto encodingAttr = IREE::Encoding::getEncodingLayoutAttrInterface(newType);
+    auto encodingAttr =
+        IREE::Encoding::getSerializableEncodingAttrInterface(newType);
     if (!encodingAttr) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Skip, the binding layout attribute is not "
-                    "EncodingLayoutAttrInterface, which means that the type "
-                    "does not have a valid encoding.\n");
+      LLVM_DEBUG(
+          llvm::dbgs()
+          << "Skip, the binding layout attribute is not "
+             "SerializableEncodingAttrInterface, which means that the type "
+             "does not have a valid encoding.\n");
       continue;
     }
     for (auto user : arg.getUsers()) {
-      auto subspanOp = dyn_cast<IREE::Stream::BindingSubspanOp>(user);
-      if (!subspanOp) {
-        return failure();
-      }
-
+      auto subspanOp = cast<IREE::Stream::BindingSubspanOp>(user);
       auto encodingTypeInterface =
-          dyn_cast<IREE::Encoding::EncodingTypeInterface>(subspanOp.getType());
-      if (!encodingTypeInterface) {
-        LLVM_DEBUG(llvm::dbgs()
-                   << "Can not update the binding type because the type does "
-                      "not implement EncodingTypeInterface.\n");
-        return failure();
-      }
+          cast<IREE::Encoding::EncodingTypeInterface>(subspanOp.getType());
       subspanOp.getResult().setType(
           encodingTypeInterface.updateEncoding(encodingAttr));
     }
@@ -222,27 +224,11 @@ getBindingLayoutAttrs(IREE::Stream::TensorDispatchOp dispatchOp) {
 /// this case, we have to duplicate the executable with updated encoding, and
 /// modify the dispatch to launch proper executable based on resolved encoding
 /// layouts.
-static LogicalResult
-duplicateExecutablesPerLayoutVariant(ModuleOp moduleOp, SymbolTable symbolTable,
-                                     FunctionOpInterface funcOp) {
+static LogicalResult duplicateExecutablesPerLayoutVariant(
+    ModuleOp moduleOp, SymbolTable symbolTable,
+    ArrayRef<IREE::Stream::TensorDispatchOp> candidates) {
   MLIRContext *ctx = moduleOp.getContext();
   IRRewriter rewriter(ctx);
-
-  SmallVector<IREE::Stream::TensorDispatchOp> candidates;
-  funcOp.walk([&](IREE::Stream::TensorDispatchOp op) {
-    // Filter out the cases that are not from the normal pipeline. E.g., custom
-    // dispatch could embed hal.executables.
-    bool recognizedInput = true;
-    op.forEachEntryPointAttr([&](SymbolRefAttr entryPoint) {
-      if (!isa<IREE::Stream::ExecutableExportOp>(
-              symbolTable.lookupSymbolIn(moduleOp, entryPoint))) {
-        recognizedInput = false;
-      }
-    });
-    if (recognizedInput) {
-      candidates.push_back(op);
-    }
-  });
 
   //===--------------------------------------------------------------------===//
   // Gather per-export [binding layouts] map. A function in an executable can be
@@ -307,12 +293,11 @@ duplicateExecutablesPerLayoutVariant(ModuleOp moduleOp, SymbolTable symbolTable,
       }
 
       // Update the binding encodings within the cloned executable op.
-      auto innerFuncOp =
-          cast<mlir::FunctionOpInterface>(symbolTable.lookupSymbolIn(
-              dupOp.getInnerModule(), exportOp.getSymName()));
-      if (failed(updateBindingEncodings(innerFuncOp,
+      auto funcOp = cast<mlir::FunctionOpInterface>(symbolTable.lookupSymbolIn(
+          dupOp.getInnerModule(), exportOp.getSymName()));
+      if (failed(updateBindingEncodings(funcOp,
                                         bindingLayoutTypeAttrs.getValue()))) {
-        return failure();
+        return funcOp->emitOpError("failed to update encodings for bindings");
       }
       dispatchSiteToExecutableOp[ExportAndBindingLayouts(
           exportOp, bindingLayoutTypeAttrs)] = dupOp;
@@ -349,11 +334,106 @@ duplicateExecutablesPerLayoutVariant(ModuleOp moduleOp, SymbolTable symbolTable,
   return success();
 }
 
+/// Returns true iff all the entry points are recognized by the pass:
+///   - The corresponding executable is a stream.executable op.
+///   - The function arguments, where the types are !stream.binding_type, are
+///     only used by stream.binding.subspan ops. Furthermore, the result type of
+///     subspan ops have to implement IREE::Encoding::EncodingTypeInterface.
+static bool recognizeEntryPoints(ModuleOp moduleOp, SymbolTable symbolTable,
+                                 IREE::Stream::TensorDispatchOp dispatchOp) {
+  bool result = true;
+  dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPoint) {
+    if (!result) {
+      return;
+    }
+    auto exportOp = dyn_cast<IREE::Stream::ExecutableExportOp>(
+        symbolTable.lookupSymbolIn(moduleOp, entryPoint));
+    if (!exportOp) {
+      result = false;
+      return;
+    }
+    auto executableOp = exportOp->getParentOfType<IREE::Stream::ExecutableOp>();
+    if (!executableOp) {
+      result = false;
+      return;
+    }
+
+    auto funcOp = cast<mlir::FunctionOpInterface>(symbolTable.lookupSymbolIn(
+        executableOp.getInnerModule(), exportOp.getSymName()));
+    for (auto arg : funcOp.getArguments()) {
+      if (!isa<IREE::Stream::BindingType>(arg.getType())) {
+        continue;
+      }
+      for (auto user : arg.getUsers()) {
+        auto subspanOp = dyn_cast<IREE::Stream::BindingSubspanOp>(user);
+        if (!subspanOp) {
+          result = false;
+          return;
+        }
+        auto encodingTypeInterface =
+            dyn_cast<IREE::Encoding::EncodingTypeInterface>(
+                subspanOp.getType());
+        if (!encodingTypeInterface) {
+          result = false;
+          return;
+        }
+      }
+    }
+  });
+  return result;
+}
+
+/// Returns true if any of encoding types is a recognized encoding. See
+/// `isRecognizedEncodingType` method for the definition.
+static bool hasRecognizedEncoding(ModuleOp moduleOp, SymbolTable symbolTable,
+                                  Operation *op) {
+  return TypeSwitch<Operation *, bool>(op)
+      .Case<IREE::Stream::TensorDispatchOp>([&](auto op) {
+        if (!recognizeEntryPoints(moduleOp, symbolTable, op)) {
+          return false;
+        }
+        for (TypeAttr typeAttr : llvm::concat<TypeAttr>(
+                 op.getOperandEncodings().template getAsRange<TypeAttr>(),
+                 op.getResultEncodings().template getAsRange<TypeAttr>())) {
+          if (isRecognizedEncodingType(typeAttr.getValue())) {
+            return true;
+          }
+        }
+        return false;
+      })
+      .Case<IREE::Stream::TensorSizeOfOp>(
+          [&](auto op) { return isRecognizedEncodingType(op.getEncoding()); })
+      .Case<IREE::Stream::TensorEmptyOp, IREE::Stream::TensorSplatOp>(
+          [&](auto op) {
+            return isRecognizedEncodingType(op.getResultEncoding());
+          })
+      .Case<IREE::Stream::TensorConstantOp>([&](auto op) {
+        return isRecognizedEncodingType(op.getResultEncoding());
+      })
+      .Case<IREE::Stream::TensorFillOp>([&](auto op) {
+        return isRecognizedEncodingType(op.getTargetEncoding());
+      })
+      .Case<IREE::Stream::TensorCloneOp>([&](auto op) {
+        return isRecognizedEncodingType(op.getSourceEncoding()) ||
+               isRecognizedEncodingType(op.getResultEncoding());
+      })
+      .Case<IREE::Stream::TensorSliceOp>([&](auto op) {
+        return isRecognizedEncodingType(op.getSourceEncoding()) ||
+               isRecognizedEncodingType(op.getResultEncoding());
+      })
+      .Case<IREE::Stream::TensorUpdateOp>([&](auto op) {
+        return isRecognizedEncodingType(op.getTargetEncoding()) ||
+               isRecognizedEncodingType(op.getUpdateEncoding());
+      })
+      .Default([](Operation *op) { return false; });
+}
+
 /// Returns all the stream tensor ops that implement AffinityOpInterface, where
 /// a stream affinity indicates the kind of enviroment the ops are expected run
 /// in.
 static SmallVector<IREE::Stream::AffinityOpInterface>
-collectStreamTensorOps(FunctionOpInterface funcOp) {
+collectStreamTensorOps(ModuleOp moduleOp, SymbolTable symbolTable,
+                       FunctionOpInterface funcOp) {
   SmallVector<IREE::Stream::AffinityOpInterface> result;
   funcOp.walk([&](IREE::Stream::AffinityOpInterface affinityOp) {
     // Only need to update encoding types for ops that have TensorPhaseOp trait.
@@ -366,6 +446,11 @@ collectStreamTensorOps(FunctionOpInterface funcOp) {
     if (!affinityAttr) {
       return;
     }
+
+    if (!hasRecognizedEncoding(moduleOp, symbolTable, affinityOp)) {
+      return;
+    }
+
     result.push_back(affinityOp);
   });
   return result;
@@ -396,6 +481,13 @@ public:
   // Adds the resolved layouts to all tensor types of `streamOps`, if encodings
   // are present.
   LogicalResult run();
+
+  SmallVector<IREE::Stream::TensorDispatchOp> getTensorDispatchOps() {
+    return llvm::map_to_vector(
+        llvm::filter_to_vector(streamOps,
+                               llvm::IsaPred<IREE::Stream::TensorDispatchOp>),
+        [](Operation *op) { return cast<IREE::Stream::TensorDispatchOp>(op); });
+  }
 
 private:
   // Appends the query from the `affinityOp` to `queries`. Note that most of
@@ -434,13 +526,15 @@ LogicalResult StreamTensorOpUpdater::init() {
   auto usedDialects = gatherUsedDialectInterfaces<
       IREE::Stream::AffinityAnalysisDialectInterface>(moduleOp);
   if (usedDialects.size() != 1) {
-    return moduleOp.emitError("expected only one dialect implementing "
-                              "AffinityAnalysisDialectInterface");
+    LLVM_DEBUG(llvm::dbgs() << "expected only one dialect implementing "
+                               "AffinityAnalysisDialectInterface\n");
+    return failure();
   }
   resolveLayoutAttr = usedDialects[0]->makeLayoutAttrResolver(moduleOp);
 
+  SymbolTable symbolTable(moduleOp);
   for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
-    streamOps.append(collectStreamTensorOps(funcOp));
+    streamOps.append(collectStreamTensorOps(moduleOp, symbolTable, funcOp));
   }
 
   return success();
@@ -463,7 +557,7 @@ LogicalResult StreamTensorOpUpdater::addQuery(
       }
       SmallVector<IREE::Stream::AffinityAttr> affinityAttrs;
       if (!affinityAnalysis.tryLookupResourceAffinity(operand, affinityAttrs)) {
-        return dispatchOp.emitError(
+        return dispatchOp.emitOpError(
                    "failed to determine resource affinity for operand ")
                << operand;
       }
@@ -497,10 +591,8 @@ static LogicalResult updateTensorDispatchOp(
     }
     SmallVector<IREE::Stream::AffinityAttr> affinityAttrs;
     if (!affinityAnalysis.tryLookupResourceAffinity(operand, affinityAttrs)) {
-      return failure();
-    }
-    if (affinityAttrs.size() != 1) {
-      return failure();
+      return dispatchOp->emitOpError(
+          "failed to look up operand resource affinity");
     }
 
     IREE::Stream::AffinityAndOpPair key(affinityAttrs[0], dispatchOp);
@@ -510,6 +602,9 @@ static LogicalResult updateTensorDispatchOp(
 
     Type newEncodingType =
         getTypeWithResolvedEncodingLayouts(type, layoutResolvers);
+    if (!newEncodingType) {
+      return dispatchOp.emitOpError("failed to resolve recognized layout");
+    }
     newOperandEncodings.push_back(newEncodingType);
   }
   dispatchOp.setOperandEncodingsAttr(
@@ -525,6 +620,9 @@ static LogicalResult updateTensorDispatchOp(
     }
     Type newEncodingType =
         getTypeWithResolvedEncodingLayouts(type, resLayoutResolvers);
+    if (!newEncodingType) {
+      return dispatchOp.emitOpError("failed to resolve recognized layout");
+    }
     newResultEncodings.push_back(newEncodingType);
   }
   dispatchOp.setResultEncodingsAttr(
@@ -541,9 +639,21 @@ updateTensorSizeOfOp(RewriterBase &rewriter,
   auto encodingType = dyn_cast<RankedTensorType>(sizeOfOp.getEncoding());
   Type newEncodingType =
       getTypeWithResolvedEncodingLayouts(encodingType, layoutResolvers);
+  if (!newEncodingType) {
+    return sizeOfOp.emitOpError("failed to resolve recognized layout");
+  }
   rewriter.modifyOpInPlace(sizeOfOp,
                            [&] { sizeOfOp.setEncoding(newEncodingType); });
   return success();
+}
+
+static bool isUnrecognizedOrSerializedEncodingType(Type type) {
+  if (!isRecognizedEncodingType(type)) {
+    return true;
+  }
+  auto rankedTensorType = cast<RankedTensorType>(type);
+  return IREE::Encoding::getSerializableEncodingAttrInterface(rankedTensorType)
+      .isSerialized();
 }
 
 /// Updates the target encoding of `op` with resolved layouts.
@@ -553,83 +663,48 @@ updateTensorFillOp(RewriterBase &rewriter, IREE::Stream::TensorFillOp op,
   auto encodingType = dyn_cast<RankedTensorType>(op.getTargetEncoding());
   Type newEncodingType =
       getTypeWithResolvedEncodingLayouts(encodingType, layoutResolvers);
+  if (!newEncodingType) {
+    return op.emitOpError("failed to resolve recognized layout");
+  }
   rewriter.modifyOpInPlace(op, [&] { op.setTargetEncoding(newEncodingType); });
   return success();
 }
 
-/// Returns failure if `op` has encoding. The EncodingAttr has padding
-/// semantic, a constant op with such  encoding can not be resolved at this
-/// moment.
+/// Returns success iff all the encodings are either unrecognized encoding or
+/// serialized encoding.
 static LogicalResult
 updateTensorConstantOp(RewriterBase &rewriter,
                        IREE::Stream::TensorConstantOp op,
                        const SetVector<Attribute> &layoutResolvers) {
-  auto encodingType = dyn_cast<RankedTensorType>(op.getResultEncoding());
-  if (!encodingType) {
-    return success();
-  }
-  if (encodingType.getEncoding()) {
-    return failure();
-  }
-  return success();
+  return success(
+      isUnrecognizedOrSerializedEncodingType(op.getResultEncoding()));
 }
 
-/// Returns a failure if there are encodings in target encoding type or update
-/// encoding type.
+/// Returns success iff all the encodings are either unrecognized encoding or
+/// serialized encoding.
 static LogicalResult updateTensorUpdateOp(RewriterBase &rewriter,
                                           IREE::Stream::TensorUpdateOp op) {
-  auto targetEncodingType = dyn_cast<RankedTensorType>(op.getTargetEncoding());
-  if (targetEncodingType && targetEncodingType.getEncoding()) {
-    return failure();
-  }
-  auto updateEncodingType = dyn_cast<RankedTensorType>(op.getUpdateEncoding());
-  if (updateEncodingType && updateEncodingType.getEncoding()) {
-    return failure();
-  }
-  return success();
+  return success(
+      isUnrecognizedOrSerializedEncodingType(op.getTargetEncoding()) &&
+      isUnrecognizedOrSerializedEncodingType(op.getUpdateEncoding()));
 }
 
-/// Returns a failure if there are encodings in source encoding type or result
-/// encoding type.
+/// Returns success iff all the encodings are either unrecognized encoding or
+/// serialized encoding.
 static LogicalResult updateTensorCloneOp(RewriterBase &rewriter,
                                          IREE::Stream::TensorCloneOp op) {
-  auto sourceEncodingType = dyn_cast<RankedTensorType>(op.getSourceEncoding());
-  if (sourceEncodingType && sourceEncodingType.getEncoding()) {
-    return failure();
-  }
-  auto resultEncodingType = dyn_cast<RankedTensorType>(op.getResultEncoding());
-  if (resultEncodingType && resultEncodingType.getEncoding()) {
-    return failure();
-  }
-  return success();
+  return success(
+      isUnrecognizedOrSerializedEncodingType(op.getSourceEncoding()) &&
+      isUnrecognizedOrSerializedEncodingType(op.getResultEncoding()));
 }
 
-/// Returns a failure if there are encodings in source encoding type or result
-/// encoding type.
+/// Returns success iff all the encodings are either unrecognized encoding or
+/// serialized encoding.
 static LogicalResult updateTensorSliceOp(RewriterBase &rewriter,
                                          IREE::Stream::TensorSliceOp op) {
-  auto sourceEncodingType = dyn_cast<RankedTensorType>(op.getSourceEncoding());
-  if (sourceEncodingType && sourceEncodingType.getEncoding()) {
-    return failure();
-  }
-  auto resultEncodingType = dyn_cast<RankedTensorType>(op.getResultEncoding());
-  if (resultEncodingType && resultEncodingType.getEncoding()) {
-    return failure();
-  }
-  return success();
-}
-
-/// Updates the source_encoding for `op`. The op has to define a
-/// `source_encoding` parameter.
-template <typename OpTy>
-static LogicalResult
-updateSourceEncoding(RewriterBase &rewriter, OpTy op,
-                     const SetVector<Attribute> &layoutResolvers) {
-  auto encodingType = dyn_cast<RankedTensorType>(op.getSourceEncoding());
-  Type newEncodingType =
-      getTypeWithResolvedEncodingLayouts(encodingType, layoutResolvers);
-  rewriter.modifyOpInPlace(op, [&] { op.setSourceEncoding(newEncodingType); });
-  return success();
+  return success(
+      isUnrecognizedOrSerializedEncodingType(op.getSourceEncoding()) &&
+      isUnrecognizedOrSerializedEncodingType(op.getResultEncoding()));
 }
 
 /// Updates the result_encoding for `op`. The op has to define a
@@ -641,6 +716,9 @@ updateResultEncoding(RewriterBase &rewriter, OpTy op,
   auto encodingType = dyn_cast<RankedTensorType>(op.getResultEncoding());
   Type newEncodingType =
       getTypeWithResolvedEncodingLayouts(encodingType, layoutResolvers);
+  if (!newEncodingType) {
+    return op.emitOpError("failed to resolve recognized layout");
+  }
   rewriter.modifyOpInPlace(op, [&] { op.setResultEncoding(newEncodingType); });
   return success();
 }
@@ -653,12 +731,14 @@ LogicalResult StreamTensorOpUpdater::run() {
 
   for (auto op : streamOps) {
     if (failed(addQuery(affinityAnalysis, op))) {
-      return failure();
+      return moduleOp->emitError(
+          "failed to cache all the queries, it usually means that there are "
+          "failures in affinity analysis");
     }
   }
 
   if (failed(resolveLayoutAttr(queries, cachedLayoutAttrs))) {
-    return failure();
+    return moduleOp->emitError("failed to resolve layouts for an query");
   }
 
   IRRewriter rewriter(moduleOp.getContext());
@@ -693,12 +773,11 @@ LogicalResult StreamTensorOpUpdater::run() {
                 [&](auto op) { return updateTensorSliceOp(rewriter, op); })
             .Case<IREE::Stream::TensorUpdateOp>(
                 [&](auto op) { return updateTensorUpdateOp(rewriter, op); })
-            .Default([](Operation *op) {
-              return op->emitOpError("Unhandled stream op");
-            });
+            .Default([](Operation *op) { return failure(); });
 
     if (failed(result)) {
-      return failure();
+      return affinityOp->emitOpError(
+          "failed to convert unserialized encoding to serialized encoding");
     }
   }
   return success();
@@ -712,9 +791,15 @@ struct SpecializeEncodingsPass
 
     StreamTensorOpUpdater streamTensorOpUpdater(moduleOp);
     if (failed(streamTensorOpUpdater.init())) {
-      moduleOp.emitError("failed to initialize StreamTensorOpUpdater");
-      return signalPassFailure();
+      LLVM_DEBUG(
+          llvm::dbgs()
+          << "failed to initialize StreamTensorOpUpdater, skip the pass.");
+      return;
     }
+
+    // Signal a pass failure if any of following steps fails. At this point,
+    // we recognize that all the unserialized encodings can be handled by the
+    // pass.
     if (failed(streamTensorOpUpdater.run())) {
       moduleOp.emitError(
           "failed to add layouts to Stream::TensorPhaseOp with encodings");
@@ -723,8 +808,9 @@ struct SpecializeEncodingsPass
 
     SymbolTable symbolTable(moduleOp);
     for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
-      if (failed(duplicateExecutablesPerLayoutVariant(moduleOp, symbolTable,
-                                                      funcOp))) {
+      if (failed(duplicateExecutablesPerLayoutVariant(
+              moduleOp, symbolTable,
+              streamTensorOpUpdater.getTensorDispatchOps()))) {
         funcOp.emitError("failed on executable duplication");
         return signalPassFailure();
       }

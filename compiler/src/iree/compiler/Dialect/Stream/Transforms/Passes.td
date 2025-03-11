@@ -214,19 +214,6 @@ def RefineUsagePass :
 // Stream formation and scheduling
 //===----------------------------------------------------------------------===//
 
-def ExecutionPlacementPass :
-    InterfacePass<"iree-stream-execution-placement", "mlir::CallableOpInterface"> {
-  let summary = "Runs an analysis and placement for stream executions.";
-  let description = [{
-    Handles placement analysis for `stream.async` operators that have a preferable
-    placement. This is so that more complex analsysis can be separated from the
-    execution scheduling pass.
-  }];
-  let dependentDialects = [
-    "IREE::Stream::StreamDialect",
-  ];
-}
-
 def ScheduleExecutionPass :
     InterfacePass<"iree-stream-schedule-execution", "mlir::CallableOpInterface"> {
   let summary = "Identifies and groups asynchronous operations into executable regions within function-like regions.";
@@ -450,7 +437,7 @@ def SpecializeDispatchesPass :
 
 def SpecializeEncodingsPass :
     Pass<"iree-stream-specialize-encodings", "mlir::ModuleOp"> {
-  let summary = "Specializes data-tiling encodings based on layout analysis.";
+  let summary = "Specializes serializable encodings based on layout analysis.";
   let description = [{
     Attaches layouts to encodings and duplicates executables based on the
     encoding layout analysis.
@@ -472,11 +459,15 @@ def SpecializeEncodingsPass :
     executables based on the set of incoming layouts and result layouts, and
     updates bindings with resolved layouts.
 
-    It requires at least one of the dialect implements
-    AffinityAnalysisDialectInterface dialect interface, because Stream does not
-    need to know any dialect other than itself. It also requires the binding
-    types to implement EncodingTypeInterface, so it can updates the types
-    without accessing any other dialects.
+    Requirements:
+    - At least one of the dialect implements AffinityAnalysisDialectInterface
+      dialect interface, because Stream does not need to know any dialect other
+      than itself.
+    - The binding types have to implement IREE::Encoding::EncodingTypeInterface,
+      so it can updates the types without accessing any other dialects.
+    - All the encodings attached on the types have to implement
+      SerializableEncodingAttrInterface. Because the pass updates the encodings
+      using interfaces.
   }];
   let dependentDialects = [
     "IREE::Encoding::IREEEncodingDialect"

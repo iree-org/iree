@@ -19,6 +19,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Utils/ExecutableDebugInfoUtils.h"
@@ -45,6 +46,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -252,10 +254,10 @@ public:
 
     if (auto target = GPU::getHIPTargetDetails(
             options.target, options.targetFeatures, context)) {
-      addConfig("iree.gpu.target", target);
+      addConfig(kGPUTargetAttrName, target);
       if (options.experimentalPadLayout) {
         if (Attribute encoding = GPU::getHIPTargetEncodingLayoutAttr(target)) {
-          addConfig("encoding", encoding);
+          addConfig(IREE::Encoding::kEncodingResolverAttrName, encoding);
         }
       }
     }
@@ -436,6 +438,12 @@ public:
                << "object file could not be loaded: " << objectAttr;
       }
     } else {
+      auto maybeChipset = amdgpu::Chipset::parse(targetArch);
+      if (failed(maybeChipset)) {
+        return variantOp.emitOpError()
+               << "could not parse AMDGPU chipset name '" << targetArch << "'";
+      }
+      amdgpu::Chipset chipset = *maybeChipset;
       // Perform the translation in a separate context to avoid any
       // multi-threading issues.
       llvm::LLVMContext context;
@@ -468,6 +476,7 @@ public:
       }
 
       std::unique_ptr<llvm::TargetMachine> targetMachine;
+      bool isWave64 = true;
       {
         llvm::Triple triple("amdgcn-amd-amdhsa");
         std::string error;
@@ -496,10 +505,10 @@ public:
                                   ? llvm::GlobalISelAbortMode::Enable
                                   : llvm::GlobalISelAbortMode::Disable;
         SmallVector<std::string> features;
-        if (targetArch.starts_with("gfx10") ||
-            targetArch.starts_with("gfx11")) {
+        if (chipset.majorVersion >= 10 && chipset.majorVersion <= 12) {
           switch (subgroupSize.value_or(64)) {
           case 32:
+            isWave64 = false;
             features.emplace_back("+wavefrontsize32");
             break;
           default:
@@ -579,8 +588,8 @@ public:
       }
 
       // Sets HIP platform globals based on the target architecture.
-      if (failed(setHIPGlobals(variantOp.getLoc(), llvmModule.get(),
-                               targetArch))) {
+      if (failed(setHIPGlobals(variantOp.getLoc(), llvmModule.get(), chipset,
+                               isWave64))) {
         return failure();
       }
 

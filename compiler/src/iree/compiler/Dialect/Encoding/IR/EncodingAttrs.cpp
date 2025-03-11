@@ -4,27 +4,20 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <cassert>
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 
-#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/TypeSwitch.h"
-#include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Arith/Utils/Utils.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/TypeUtilities.h"
-#include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Support/LLVM.h"
-#include "mlir/Support/LogicalResult.h"
+
+#include <cassert>
 
 namespace mlir::iree_compiler::IREE::Encoding {
 
@@ -72,33 +65,6 @@ EncodingAttr::mapDimToOperandIndex(int64_t dimPos) const {
       getAffineDimExpr(dimPos, getContext()));
 }
 
-MatmulNarrowDim getMatmulNarrowDim(linalg::LinalgOp linalgOp,
-                                   int narrowThreshold) {
-  linalg::ContractionDimensions cDims =
-      linalg::inferContractionDims(linalgOp).value();
-  auto map = linalgOp.getIndexingMapsArray().back();
-  auto outType = llvm::cast<ShapedType>(linalgOp.getDpsInits()[0].getType());
-  auto getOutputSizeAtDimPos = [=](unsigned dimPos) -> int64_t {
-    return outType.getDimSize(
-        map.getResultPosition(getAffineDimExpr(dimPos, linalgOp->getContext()))
-            .value());
-  };
-  // M or N can be empty instead of having an explicit dim size of 1 for matvec
-  // and vecmat, so set to 1 if empty.
-  int64_t mSize = cDims.m.empty() ? 1 : getOutputSizeAtDimPos(cDims.m[0]);
-  int64_t nSize = cDims.n.empty() ? 1 : getOutputSizeAtDimPos(cDims.n[0]);
-
-  MatmulNarrowDim narrowM, narrowN;
-  if (!ShapedType::isDynamic(mSize) && mSize < narrowThreshold) {
-    narrowM = {/*dim=*/MatmulNarrowDim::Dim::M, /*size=*/mSize};
-  }
-  if (!ShapedType::isDynamic(nSize) && nSize < narrowThreshold) {
-    narrowN = {/*dim=*/MatmulNarrowDim::Dim::N, /*size=*/nSize};
-  }
-
-  return (narrowM && (!narrowN || mSize <= nSize)) ? narrowM : narrowN;
-}
-
 ArrayRef<int64_t> EncodingAttr::getRoundDimsToArray() const {
   auto roundDimsTo = getRoundDimsTo();
   if (!roundDimsTo) {
@@ -118,6 +84,8 @@ EncodingAttr EncodingAttr::clone(AffineMap bcastMap) {
              getElementTypes(), getUserIndexingMaps(),
              AffineMapAttr::get(bcastMap), getRoundDimsTo(), getLayouts());
 }
+
+bool EncodingAttr::isSerialized() const { return getLayouts() ? true : false; }
 
 Attribute EncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();
@@ -163,13 +131,13 @@ Value EncodingAttr::calculateStorageSizeInBytes(Location loc,
                                                 ValueRange dynamicDims) const {
   if (ArrayAttr layoutsAttr = getLayouts()) {
     if (!llvm::all_of(layoutsAttr.getValue(),
-                      llvm::IsaPred<SerializedEncodingLayoutAttrInterface>)) {
+                      llvm::IsaPred<SerializableEncodingAttrInterface>)) {
       return nullptr;
     }
 
     Value res;
     for (auto attr :
-         layoutsAttr.getAsRange<SerializedEncodingLayoutAttrInterface>()) {
+         layoutsAttr.getAsRange<SerializableEncodingAttrInterface>()) {
       Value requestedSize =
           attr.calculateStorageSizeInBytes(loc, builder, type, dynamicDims);
       if (!res) {
@@ -250,74 +218,6 @@ Value EncodingAttr::calculateStorageSizeInBytes(Location loc,
   return result;
 }
 
-MatmulNarrowDim getMatmulNarrowDim(EncodingAttr encoding) {
-  if (encoding.getOpType().getValue() != EncodingOpType::matmul) {
-    return {};
-  }
-  ArrayRef<int64_t> roundDimsTo = encoding.getRoundDimsToArray();
-  if (roundDimsTo.empty()) {
-    return {};
-  }
-  int m = roundDimsTo[0];
-  int n = roundDimsTo[1];
-  if (m < n) {
-    return {MatmulNarrowDim::Dim::M, m};
-  }
-  if (n < m) {
-    return {MatmulNarrowDim::Dim::N, n};
-  }
-  return {};
-}
-
-bool isNarrowNResult(EncodingAttr encoding) {
-  if (encoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_RESULT) {
-    return false;
-  }
-
-  return IREE::Encoding::getMatmulNarrowDim(encoding).isN();
-}
-
-EncodingLayoutAttrInterface
-getEncodingLayoutAttrInterface(RankedTensorType type) {
-  return dyn_cast_or_null<EncodingLayoutAttrInterface>(type.getEncoding());
-}
-
-EncodingAttr getEncodingAttr(RankedTensorType type) {
-  return dyn_cast_or_null<EncodingAttr>(type.getEncoding());
-}
-
-bool hasPackedStorageAttr(RankedTensorType type) {
-  return dyn_cast_or_null<PackedStorageAttr>(type.getEncoding()) != nullptr;
-}
-
-FailureOr<linalg::ContractionDimensions>
-getEncodingContractionDims(EncodingAttr encoding) {
-  auto indexingMapsAttr = encoding.getUserIndexingMaps();
-  if (!indexingMapsAttr) {
-    return failure();
-  }
-  SmallVector<AffineMap> indexingMaps = llvm::map_to_vector(
-      indexingMapsAttr.getValue(), [](Attribute m) -> AffineMap {
-        return cast<AffineMapAttr>(m).getAffineMap();
-      });
-  return linalg::inferContractionDims(indexingMaps);
-}
-
-std::string stringifyOperandIndex(IntegerAttr valueAttr) {
-  auto value = valueAttr.getValue().getZExtValue();
-  switch (value) {
-  case MATMUL_LHS:
-    return "LHS";
-  case MATMUL_RHS:
-    return "RHS";
-  case MATMUL_RESULT:
-    return "RESULT";
-  default:
-    assert(false && "invalid index");
-    return "";
-  }
-}
-
 Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
     Location loc, OpBuilder &builder, RankedTensorType type,
     ValueRange dynamicDims) const {
@@ -351,6 +251,22 @@ Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
   return builder.createOrFold<arith::MulIOp>(
       loc, builder.create<arith::ConstantIndexOp>(loc, staticProduct),
       dynamicProduct, arith::IntegerOverflowFlags::nsw);
+}
+
+//===---------------------------------------------------------------------===//
+// encoding.identity_encoding
+//===---------------------------------------------------------------------===//
+
+Attribute
+IdentityEncodingAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
+  return *this;
+}
+
+Attribute IdentityEncodingAttr::getLayout(RankedTensorType type) const {
+  MLIRContext *ctx = getContext();
+  SmallVector<int32_t> zeros(type.getRank(), 0);
+  return Encoding::PadEncodingLayoutAttr::get(
+      ctx, DenseI32ArrayAttr::get(ctx, zeros));
 }
 
 //===---------------------------------------------------------------------===//
@@ -393,6 +309,10 @@ void TestingEncodingAttr::print(AsmPrinter &p) const {
     p.printAttribute(layouts);
   }
   os << ">";
+}
+
+bool TestingEncodingAttr::isSerialized() const {
+  return getLayouts() ? true : false;
 }
 
 Attribute
@@ -460,13 +380,9 @@ void SpecializedEncodingAttr::print(AsmPrinter &p) const {
   os << ">";
 }
 
-RankedTensorType dropEncoding(RankedTensorType type) {
-  return RankedTensorType::get(type.getShape(), type.getElementType());
-}
-
 Attribute SpecializedEncodingAttr::getLayout(RankedTensorType type) const {
   MLIRContext *ctx = getContext();
-  return get(ctx, getSeed(), TypeAttr::get(dropEncoding(type)));
+  return get(ctx, getSeed(), TypeAttr::get(type.dropEncoding()));
 }
 
 } // namespace mlir::iree_compiler::IREE::Encoding
