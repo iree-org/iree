@@ -122,6 +122,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
     AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$source,
     TypeAttr:$target_encoding,
     HAL_ShapeDynamicDims:$target_dims,
+    UnitAttr:$consume,
     Optional<HAL_Fence>:$wait_fence,
     OptionalAttr<StrAttr>:$name,
     OptionalAttr<AnyAttr>:$affinity
@@ -133,6 +134,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
     (`wait` `(` $wait_fence^ `)` `=` `` `>`)?
+    (`consume` $consume^)?
     $source
     ($name^)?
     `:` type($source) `->`
@@ -145,6 +147,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
       "Type":$resultType,
       "Value":$source,
       "TypeAttr":$targetEncoding,
+      "bool":$consume,
       "StringAttr":$name,
       "Attribute":$affinity
     )>,
@@ -152,6 +155,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
       "Type":$resultType,
       "Value":$source,
       "TypeAttr":$targetEncoding,
+      "bool":$consume,
       "Value":$waitFence,
       "StringAttr":$name,
       "Attribute":$affinity

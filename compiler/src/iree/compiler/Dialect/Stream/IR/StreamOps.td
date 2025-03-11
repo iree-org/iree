@@ -1218,6 +1218,7 @@ def Stream_TensorImportOp : Stream_PureOp<"tensor.import", [
     TypeAttr:$result_encoding,
     Stream_ShapeDynamicDims:$result_encoding_dims,
     Stream_Size:$result_size,
+    UnitAttr:$consume,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -1226,6 +1227,7 @@ def Stream_TensorImportOp : Stream_PureOp<"tensor.import", [
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
+    (`consume` $consume^)?
     $source `:`
     type($source)
     `->`
