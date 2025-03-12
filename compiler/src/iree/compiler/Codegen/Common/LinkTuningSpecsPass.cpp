@@ -83,7 +83,7 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
       0, hasConsumedSequences ? kArgConsumedAttrName : kArgReadOnlyAttrName,
       builder.getUnitAttr());
   newSpec->setAttr(kTuningSpecEntrypointAttrName, builder.getUnitAttr());
-  // TODO: re-enable default attribute as below once new linking lands.
+  // TODO: Re-enable default attribute as below once new linking lands.
   // module->setAttr(kTuningSpecDefaultEntrypointAttrName,
   // builder.getUnitAttr());
 

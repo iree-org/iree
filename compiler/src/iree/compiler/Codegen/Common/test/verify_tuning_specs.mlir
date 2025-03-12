@@ -80,6 +80,22 @@ module @iree_default_tuning_spec attributes { iree_codegen.tuning_spec_with_defa
 // -----
 
 module @iree_default_tuning_spec attributes { iree_codegen.tuning_spec_with_default_entrypoint } {
+  transform.named_sequence @match(%arg: !transform.any_op) -> (!transform.any_op) {
+    transform.yield %arg : !transform.any_op
+  }
+
+  transform.named_sequence @apply_op_config(%op: !transform.any_op) {
+    transform.yield
+  }
+
+  // expected-error @+1{{'__kernel_config' must contain exactly one block (required by 'iree_codegen.tuning_spec_with_default_entrypoint')}}
+  transform.named_sequence @__kernel_config(%arg0: !transform.any_op)
+      -> (!transform.any_op) attributes { iree_codegen.tuning_spec_entrypoint }
+}
+
+// -----
+
+module @iree_default_tuning_spec attributes { iree_codegen.tuning_spec_with_default_entrypoint } {
   transform.named_sequence @match(%arg: !transform.any_op {transform.readonly}) -> (!transform.any_op) {
       transform.yield %arg : !transform.any_op
   }
@@ -88,7 +104,7 @@ module @iree_default_tuning_spec attributes { iree_codegen.tuning_spec_with_defa
       transform.yield
   }
 
-  // expected-error @+1{{'__kernel_config' must contain exactly one 'ForeachMatchOp' (required by 'iree_codegen.tuning_spec_with_default_entrypoint')}}
+  // expected-error @+1{{'__kernel_config' must contain exactly two operations (required by 'iree_codegen.tuning_spec_with_default_entrypoint')}}
   transform.named_sequence @__kernel_config(%arg0: !transform.any_op {transform.consumed})
       -> (!transform.any_op) attributes { iree_codegen.tuning_spec_entrypoint } {
 
@@ -128,15 +144,11 @@ module @iree_default_tuning_spec attributes { iree_codegen.tuning_spec_with_defa
         transform.yield
     }
 
-    // expected-error @+1{{Unexpected op 'transform.print' in '__kernel_config' (required by 'iree_codegen.tuning_spec_with_default_entrypoint')}}
+    // expected-error @+1{{'__kernel_config' must start with 'ForeachMatchOp' (required by 'iree_codegen.tuning_spec_with_default_entrypoint')}}
     transform.named_sequence @__kernel_config(%arg0: !transform.any_op {transform.consumed})
         -> (!transform.any_op) attributes { iree_codegen.tuning_spec_entrypoint } {
-        %res = transform.foreach_match in %arg0
-          @match -> @apply_op_config
-          : (!transform.any_op) -> (!transform.any_op)
-
-        transform.yield %res : !transform.any_op
         transform.print {name = "Hello"}
+        transform.yield %arg0 : !transform.any_op
     }
 }
 
@@ -152,54 +164,6 @@ module @iree_default_tuning_spec attributes { iree_codegen.tuning_spec_with_defa
   module @extra_module attributes { iree_codegen.tuning_spec_entrypoint } {
     transform.yield
   }
-}
-
-// -----
-
-module @iree_default_tuning_spec attributes { iree_codegen.tuning_spec_with_default_entrypoint } {
-  transform.named_sequence private @dummy_func(!transform.any_op {transform.consumed}) -> !transform.any_op
-    transform.named_sequence @match(%arg: !transform.any_op {transform.readonly}) -> (!transform.any_op) {
-      transform.yield %arg : !transform.any_op
-    }
-
-    transform.named_sequence @apply_op_config(%op: !transform.any_op {transform.readonly}) {
-        transform.yield
-    }
-
-    // expected-error @+1{{Unexpected op 'transform.include' in '__kernel_config' (required by 'iree_codegen.tuning_spec_with_default_entrypoint')}}
-    transform.named_sequence @__kernel_config(%arg0: !transform.any_op {transform.consumed})
-        -> (!transform.any_op) attributes { iree_codegen.tuning_spec_entrypoint } {
-        %tmp = transform.include @dummy_func failures(suppress) (%arg0) : (!transform.any_op) -> (!transform.any_op)
-        %res = transform.foreach_match in %tmp
-          @match -> @apply_op_config
-          : (!transform.any_op) -> (!transform.any_op)
-
-        transform.yield %res : !transform.any_op
-    }
-}
-
-// -----
-
-module @iree_default_tuning_spec attributes { iree_codegen.tuning_spec_with_default_entrypoint } {
-  transform.named_sequence private @dummy_func(!transform.any_op {transform.consumed}) -> !transform.any_op
-    transform.named_sequence @match(%arg: !transform.any_op {transform.readonly}) -> (!transform.any_op) {
-      transform.yield %arg : !transform.any_op
-    }
-
-    transform.named_sequence @apply_op_config(%op: !transform.any_op {transform.readonly}) {
-        transform.yield
-    }
-
-    // expected-error @+1{{Unexpected op 'transform.print' in '__kernel_config' (required by 'iree_codegen.tuning_spec_with_default_entrypoint')}}
-    transform.named_sequence @__kernel_config(%arg0: !transform.any_op {transform.consumed})
-        -> (!transform.any_op) attributes { iree_codegen.tuning_spec_entrypoint } {
-         transform.print {name = "Hello"}
-        %res = transform.foreach_match in
-          %arg0 @match -> @apply_op_config
-          : (!transform.any_op) -> (!transform.any_op)
-
-        transform.yield %res : !transform.any_op
-    }
 }
 
 // -----

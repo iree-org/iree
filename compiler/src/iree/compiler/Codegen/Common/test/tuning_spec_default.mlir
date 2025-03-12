@@ -2,6 +2,7 @@
 
 module @user_spec attributes { transform.with_named_sequence, iree_codegen.tuning_spec_with_default_entrypoint } {
   transform.named_sequence @match(%arg: !transform.any_op {transform.readonly}) -> (!transform.any_op) {
+    transform.print {name = "Hello Tuning Spec"}
     transform.yield %arg : !transform.any_op
   }
 

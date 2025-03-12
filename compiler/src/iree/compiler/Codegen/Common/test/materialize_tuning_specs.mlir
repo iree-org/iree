@@ -33,6 +33,7 @@
 // SKIPLINK-LABEL: module  @user_spec
 // SKIPLINK-SAME:    iree_codegen.tuning_spec_with_default_entrypoint
 // SKIPLINK-SAME:    transform.with_named_sequence
+// SKIPLINK:         transform.print  {name = "Hello Tuning Spec"}
 // SKIPLINK-NOT:    module @{{.+}}
 // SKIPLINK:        module attributes
 // SKIPLINK-SAME:     iree_codegen.tuning_spec_mlirbc = dense<{{.+}}> : vector<{{[0-9]+}}xi8>
