@@ -166,11 +166,16 @@ public:
   void topLevelOpt(llvm::StringRef name, llvm::OptimizationLevel &value,
                    Mods... Ms) {
     assert(getRootFlag() == kDummyRootFlag);
-    getOptionsStorage()[name] = std::move(getOptionsStorage()[getRootFlag()]);
+    auto &optionInfos = getOptionsStorage();
+    auto dummyIt = optionInfos.find(kDummyRootFlag);
+    if (dummyIt != optionInfos.end()) {
+      optionInfos[name] = std::move(dummyIt->second);
+      optionInfos.erase(dummyIt);
+    }
     getRootFlag() = name;
 
     opt<llvm::OptimizationLevel>(name, value, Ms...);
-    auto &info = getOptionsStorage()[name];
+    auto &info = optionInfos[name];
     info.optOverrides = std::make_unique<RootOptOverride>(value, info.isChanged,
                                                           *info.children);
   }
