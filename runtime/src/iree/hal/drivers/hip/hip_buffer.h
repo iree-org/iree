@@ -68,11 +68,6 @@ void* iree_hal_hip_buffer_host_pointer(const iree_hal_buffer_t* buffer);
 // this call returns and the caller has released its reference.
 void iree_hal_hip_buffer_drop_release_callback(iree_hal_buffer_t* buffer);
 
-// Returns the HIP buffer wrapped by the given |base_buffer|, if the given
-// |base_buffer| is a wrapper.
-void iree_hal_hip_buffer_get_wrapped_buffer(iree_hal_buffer_t* base_buffer,
-                                            iree_hal_buffer_t** out_buffer);
-
 // Sets a HIP buffer to the given |base_buffer|, if the given |base_buffer|
 // is a hip buffer that wraps around another HIP buffer.
 void iree_hal_hip_buffer_set_wrapped_buffer(iree_hal_buffer_t* base_buffer,
