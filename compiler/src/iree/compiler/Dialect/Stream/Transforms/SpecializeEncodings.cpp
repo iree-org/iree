@@ -425,6 +425,10 @@ static bool hasRecognizedEncoding(ModuleOp moduleOp, SymbolTable symbolTable,
         return isRecognizedEncodingType(op.getTargetEncoding()) ||
                isRecognizedEncodingType(op.getUpdateEncoding());
       })
+      .Case<IREE::Stream::TensorEncodeOp>([&](auto op) {
+        return isRecognizedEncodingType(op.getSourceEncoding()) ||
+               isRecognizedEncodingType(op.getResultEncoding());
+      })
       .Default([](Operation *op) { return false; });
 }
 
@@ -757,10 +761,10 @@ LogicalResult StreamTensorOpUpdater::run() {
             .Case<IREE::Stream::TensorSizeOfOp>([&](auto op) {
               return updateTensorSizeOfOp(rewriter, op, layoutResolvers);
             })
-            .Case<IREE::Stream::TensorEmptyOp, IREE::Stream::TensorSplatOp>(
-                [&](auto op) {
-                  return updateResultEncoding(rewriter, op, layoutResolvers);
-                })
+            .Case<IREE::Stream::TensorEmptyOp, IREE::Stream::TensorSplatOp,
+                  IREE::Stream::TensorEncodeOp>([&](auto op) {
+              return updateResultEncoding(rewriter, op, layoutResolvers);
+            })
             .Case<IREE::Stream::TensorConstantOp>([&](auto op) {
               return updateTensorConstantOp(rewriter, op, layoutResolvers);
             })
