@@ -425,6 +425,10 @@ static bool hasRecognizedEncoding(ModuleOp moduleOp, SymbolTable symbolTable,
         return isRecognizedEncodingType(op.getTargetEncoding()) ||
                isRecognizedEncodingType(op.getUpdateEncoding());
       })
+      .Case<IREE::Stream::TensorEncodeOp>([&](auto op) {
+        return isRecognizedEncodingType(op.getSourceEncoding()) ||
+               isRecognizedEncodingType(op.getResultEncoding());
+      })
       .Default([](Operation *op) { return false; });
 }
 
@@ -723,6 +727,24 @@ updateResultEncoding(RewriterBase &rewriter, OpTy op,
   return success();
 }
 
+/// Updates the source encoding and the result encoding of `op` with resolved
+/// layouts.
+static LogicalResult
+updateTensorEncodeOp(RewriterBase &rewriter, IREE::Stream::TensorEncodeOp op,
+                     const SetVector<Attribute> &layoutResolvers) {
+  if (failed(updateResultEncoding(rewriter, op, layoutResolvers))) {
+    return failure();
+  }
+  auto encodingType = dyn_cast<RankedTensorType>(op.getSourceEncoding());
+  Type newEncodingType =
+      getTypeWithResolvedEncodingLayouts(encodingType, layoutResolvers);
+  if (!newEncodingType) {
+    return op.emitOpError("failed to resolve recognized layout");
+  }
+  rewriter.modifyOpInPlace(op, [&] { op.setSourceEncoding(newEncodingType); });
+  return success();
+}
+
 LogicalResult StreamTensorOpUpdater::run() {
   IREE::Stream::AffinityAnalysis affinityAnalysis(moduleOp);
   if (failed(affinityAnalysis.run())) {
@@ -766,6 +788,9 @@ LogicalResult StreamTensorOpUpdater::run() {
             })
             .Case<IREE::Stream::TensorFillOp>([&](auto op) {
               return updateTensorFillOp(rewriter, op, layoutResolvers);
+            })
+            .Case<IREE::Stream::TensorEncodeOp>([&](auto op) {
+              return updateTensorEncodeOp(rewriter, op, layoutResolvers);
             })
             .Case<IREE::Stream::TensorCloneOp>(
                 [&](auto op) { return updateTensorCloneOp(rewriter, op); })
