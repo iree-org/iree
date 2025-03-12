@@ -97,9 +97,7 @@ void iree_hal_hip_buffer_set_device_pointer(iree_hal_buffer_t* base_buffer,
 
 void iree_hal_hip_buffer_set_allocation_empty(iree_hal_buffer_t* base_buffer) {
   iree_hal_hip_buffer_t* buffer = iree_hal_hip_buffer_cast(base_buffer);
-  if (buffer->wrapped_buffer != NULL) {
-    iree_hal_hip_buffer_set_allocation_empty(buffer->wrapped_buffer);
-  }
+  buffer->wrapped_buffer = NULL;
   iree_slim_mutex_lock(&buffer->device_ptr_lock);
   buffer->empty = true;
   buffer->device_ptr = NULL;
@@ -109,14 +107,14 @@ void iree_hal_hip_buffer_set_allocation_empty(iree_hal_buffer_t* base_buffer) {
 
 static void iree_hal_hip_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   iree_hal_hip_buffer_t* buffer = iree_hal_hip_buffer_cast(base_buffer);
-  if (buffer->wrapped_buffer != NULL) {
-    iree_hal_hip_buffer_destroy(buffer->wrapped_buffer);
-  }
   iree_allocator_t host_allocator = buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
   if (buffer->release_callback.fn) {
-    buffer->release_callback.fn(buffer->release_callback.user_data,
-                                base_buffer);
+    // If |buffer| is a wrapped buffer, we want to return the inner wrapped
+    // buffer to the allocator.
+    buffer->release_callback.fn(
+        buffer->release_callback.user_data,
+        buffer->wrapped_buffer == NULL ? base_buffer : buffer->wrapped_buffer);
   }
   iree_slim_mutex_deinitialize(&buffer->device_ptr_lock);
   iree_notification_deinitialize(&buffer->device_ptr_notification);
@@ -218,13 +216,6 @@ void* iree_hal_hip_buffer_host_pointer(const iree_hal_buffer_t* base_buffer) {
 void iree_hal_hip_buffer_drop_release_callback(iree_hal_buffer_t* base_buffer) {
   iree_hal_hip_buffer_t* buffer = iree_hal_hip_buffer_cast(base_buffer);
   buffer->release_callback = iree_hal_buffer_release_callback_null();
-}
-
-void iree_hal_hip_buffer_get_wrapped_buffer(iree_hal_buffer_t* base_buffer,
-                                            iree_hal_buffer_t** out_buffer) {
-  IREE_ASSERT_ARGUMENT(out_buffer);
-  iree_hal_hip_buffer_t* buffer = iree_hal_hip_buffer_cast(base_buffer);
-  *out_buffer = buffer->wrapped_buffer;
 }
 
 void iree_hal_hip_buffer_set_wrapped_buffer(iree_hal_buffer_t* base_buffer,

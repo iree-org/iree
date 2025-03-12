@@ -983,8 +983,16 @@ void iree_hal_hip_async_buffer_release(void* user_data,
                                        struct iree_hal_buffer_t* buffer) {
   iree_hal_hip_device_t* device = (iree_hal_hip_device_t*)user_data;
   void* ptr = iree_hal_hip_buffer_device_pointer(buffer);
-  if (ptr && iree_hal_hip_allocator_isa(device->device_allocator)) {
-    iree_hal_hip_allocator_free_async(device->device_allocator, buffer);
+  // TODO(#20043): This is temporary and will be removed. The plan is to
+  // make caching allocator timeline aware which will allow us to not
+  // differentiate allocators.
+  bool is_hip_allocator = iree_hal_hip_allocator_isa(device->device_allocator);
+  if (ptr) {
+    if (is_hip_allocator) {
+      iree_hal_hip_allocator_free_async(device->device_allocator, buffer);
+    } else {
+      iree_hal_allocator_deallocate_buffer(device->device_allocator, buffer);
+    }
   }
 }
 
@@ -1340,27 +1348,15 @@ static iree_status_t iree_hal_hip_device_complete_buffer_operation(
 
   if (data->buffer &&
       data->type == IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_DEALLOC) {
-    iree_hal_allocator_t* device_allocator =
-        iree_hal_device_allocator((iree_hal_device_t*)data->base.device);
-    bool is_hip_allocator = iree_hal_hip_allocator_isa(device_allocator);
-    if (is_hip_allocator) {
-      int device_ordinal =
-          iree_math_count_trailing_zeros_u64(data->base.queue_affinity);
-      if (data->base.device->supports_memory_pools) {
-        status = iree_status_join(
-            status,
-            iree_hal_hip_memory_pools_deallocate(
-                &data->base.device->devices[device_ordinal].memory_pools,
-                data->base.device->devices[device_ordinal].hip_dispatch_stream,
-                data->buffer));
-      }
-    } else {
-      iree_hal_buffer_t* buffer = NULL;
-      iree_hal_hip_buffer_get_wrapped_buffer(data->buffer, &buffer);
-      if (buffer != NULL) {
-        iree_hal_allocator_deallocate_buffer(device_allocator, buffer);
-        iree_hal_hip_buffer_set_wrapped_buffer(data->buffer, NULL);
-      }
+    int device_ordinal =
+        iree_math_count_trailing_zeros_u64(data->base.queue_affinity);
+    if (data->base.device->supports_memory_pools) {
+      status = iree_status_join(
+          status,
+          iree_hal_hip_memory_pools_deallocate(
+              &data->base.device->devices[device_ordinal].memory_pools,
+              data->base.device->devices[device_ordinal].hip_dispatch_stream,
+              data->buffer));
     }
   }
 
@@ -1420,6 +1416,9 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
   IREE_TRACE_ZONE_BEGIN_NAMED(
       z3, "iree_hal_hip_device_perform_buffer_operation_now_launch_operation");
   if (iree_status_is_ok(status)) {
+    // TODO(#20043): This is temporary and will be removed. The plan is to
+    // make caching allocator timeline aware which will allow us to not
+    // differentiate allocators.
     bool is_hip_allocator = iree_hal_hip_allocator_isa(
         iree_hal_device_allocator((iree_hal_device_t*)device));
     switch (data->type) {
