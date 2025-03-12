@@ -31,15 +31,15 @@ hal.executable public @main_0_dispatch_0 {
     }
     builtin.module {
       // OPT-OUT-LABEL: func.func @main_0_dispatch_0_matmul_transpose_b
-      // OPT-OUT:         memref.alloc() : memref<128x32xf16, #gpu.address_space<workgroup>>
-      // OPT-OUT:         memref.alloc() : memref<128x32xf16, #gpu.address_space<workgroup>>
+      // OPT-OUT:         memref.alloca() : memref<128x32xf16, #gpu.address_space<workgroup>>
+      // OPT-OUT:         memref.alloca() : memref<128x32xf16, #gpu.address_space<workgroup>>
       // OPT-OUT:         scf.forall
       // OPT-OUT:          scf.for
       // OPT-OUT:         } {mapping = [#iree_codegen.workgroup_mapping<x>, #iree_codegen.workgroup_mapping<y>]}
 
       // OPT-IN-LABEL: func.func @main_0_dispatch_0_matmul_transpose_b
-      // OPT-IN:         memref.alloc() : memref<128x32xf16, #gpu.address_space<workgroup>>
-      // OPT-IN:         memref.alloc() : memref<128x32xf16, #gpu.address_space<workgroup>>
+      // OPT-IN:         memref.alloca() : memref<128x32xf16, #gpu.address_space<workgroup>>
+      // OPT-IN:         memref.alloca() : memref<128x32xf16, #gpu.address_space<workgroup>>
       // OPT-IN:         scf.forall
       // OPT-IN:          scf.for
       // OPT-IN:         } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
@@ -104,15 +104,15 @@ hal.executable public @main_0_dispatch_0 {
     }
     builtin.module {
       // OPT-OUT-LABEL: func.func @main_0_dispatch_0_matmul_transpose_b
-      // OPT-OUT:         memref.alloc() : memref<128x36xf16, #gpu.address_space<workgroup>>
-      // OPT-OUT:         memref.alloc() : memref<128x36xf16, #gpu.address_space<workgroup>>
+      // OPT-OUT:         memref.alloca() : memref<128x36xf16, #gpu.address_space<workgroup>>
+      // OPT-OUT:         memref.alloca() : memref<128x36xf16, #gpu.address_space<workgroup>>
       // OPT-OUT:         scf.forall
       // OPT-OUT:          scf.for
       // OPT-OUT:         } {mapping = [#iree_codegen.workgroup_mapping<x>, #iree_codegen.workgroup_mapping<y>]}
 
       // OPT-IN-LABEL: func.func @main_0_dispatch_0_matmul_transpose_b
-      // OPT-IN:         memref.alloc() : memref<128x36xf16, #gpu.address_space<workgroup>>
-      // OPT-IN:         memref.alloc() : memref<128x36xf16, #gpu.address_space<workgroup>>
+      // OPT-IN:         memref.alloca() : memref<128x36xf16, #gpu.address_space<workgroup>>
+      // OPT-IN:         memref.alloca() : memref<128x36xf16, #gpu.address_space<workgroup>>
       // OPT-IN:         scf.forall
       // OPT-IN:          scf.for
       // OPT-IN:         } {mapping = [#iree_codegen.workgroup_mapping<x>, #iree_codegen.workgroup_mapping<y>]}
@@ -172,8 +172,8 @@ hal.executable public @main_0_dispatch_0 {
     }
     builtin.module {
       // OPT-OUT-LABEL: func.func @main_0_dispatch_0_matmul_transpose_b
-      // OPT-OUT:         memref.alloc() : memref<128x36xf16, #gpu.address_space<workgroup>>
-      // OPT-OUT:         memref.alloc() : memref<128x36xf16, #gpu.address_space<workgroup>>
+      // OPT-OUT:         memref.alloca() : memref<128x36xf16, #gpu.address_space<workgroup>>
+      // OPT-OUT:         memref.alloca() : memref<128x36xf16, #gpu.address_space<workgroup>>
       // OPT-OUT:         scf.forall
       // OPT-OUT:          scf.for
       // OPT-OUT:         } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}

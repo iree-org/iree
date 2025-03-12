@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler {
@@ -18,9 +19,9 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-/// Check if AllocOp has a CollapseShapeOp user.
-static bool hasCollapseShapeUser(memref::AllocOp allocOp) {
-  SmallVector<Operation *> users(allocOp->getUsers());
+/// Check if an operation has a CollapseShapeOp user.
+static bool hasCollapseShapeUser(Operation *op) {
+  SmallVector<Operation *> users(op->getUsers());
   while (!users.empty()) {
     auto user = users.pop_back_val();
     if (isa<memref::CollapseShapeOp>(user)) {
@@ -35,9 +36,10 @@ static bool hasCollapseShapeUser(memref::AllocOp allocOp) {
   return false;
 }
 
-/// Pad out the inner dimension of the `memref.alloc` op in order reduce the
+/// Pad out the inner dimension of the `memref.alloca` op in order reduce the
 /// chances to have bank conflicts when reading 2D shapes within shared memory.
-static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
+template <typename AllocTy>
+static void padAlloc(MLIRContext *context, AllocTy allocOp,
                      unsigned paddingSizeBits) {
   auto allocOpShape = allocOp.getType().getShape();
   if (allocOpShape.empty())
@@ -65,7 +67,7 @@ static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
   IRRewriter rewriter(context);
   rewriter.setInsertionPoint(allocOp);
   Location loc = allocOp.getLoc();
-  Value paddedAlloc = rewriter.create<memref::AllocOp>(loc, allocType);
+  Value paddedAlloc = rewriter.create<AllocTy>(loc, allocType);
   SmallVector<int64_t> offsets(shape.size(), 0);
   SmallVector<int64_t> strides(shape.size(), 1);
   Value subview = rewriter.create<memref::SubViewOp>(
@@ -74,37 +76,53 @@ static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
   rewriter.eraseOp(allocOp);
 }
 
+template <typename AllocTy>
+static FailureOr<int64_t> getSharedMemUsage(AllocTy allocOp) {
+  if (!hasSharedMemoryAddressSpace(allocOp.getType())) {
+    return 0;
+  }
+
+  if (!allocOp.getType().hasStaticShape()) {
+    return failure();
+  }
+
+  MemRefType allocType = llvm::cast<MemRefType>(allocOp.getType());
+  unsigned byteWidth =
+      allocType.getElementType().isIndex()
+          ? 8 // IREE's default byteWidth for indexes
+          : IREE::Util::getTypeBitWidth(allocType.getElementType()) / 8;
+
+  int64_t numElements = 1;
+  for (auto dimSize : allocType.getShape()) {
+    numElements *= dimSize;
+  }
+
+  int64_t allocSizeBytes = byteWidth * numElements;
+  if (allocOp.getAlignment()) {
+    int64_t alignmentInBytes = *allocOp.getAlignment();
+    allocSizeBytes =
+        llvm::divideCeil(allocSizeBytes, alignmentInBytes) * alignmentInBytes;
+  }
+  return allocSizeBytes;
+}
+
 static int64_t computeSharedMemoryUsage(mlir::FunctionOpInterface funcOp) {
   int64_t totalSharedMemory = 0;
 
-  auto walkResult = funcOp.walk([&](memref::AllocOp allocOp) -> WalkResult {
-    if (!hasSharedMemoryAddressSpace(allocOp.getType())) {
+  auto walkResult = funcOp.walk([&](Operation *op) -> WalkResult {
+    FailureOr<int64_t> allocSizeBytes = failure();
+    if (auto allocOp = dyn_cast<memref::AllocOp>(op)) {
+      allocSizeBytes = getSharedMemUsage(allocOp);
+    } else if (auto allocOp = dyn_cast<memref::AllocaOp>(op)) {
+      allocSizeBytes = getSharedMemUsage(allocOp);
+    } else {
       return WalkResult::advance();
     }
-
-    if (!allocOp.getType().hasStaticShape()) {
+    if (failed(allocSizeBytes)) {
       return WalkResult::interrupt();
     }
 
-    MemRefType allocType = llvm::cast<MemRefType>(allocOp.getType());
-    unsigned byteWidth =
-        allocType.getElementType().isIndex()
-            ? 8 // IREE's default byteWidth for indexes
-            : IREE::Util::getTypeBitWidth(allocType.getElementType()) / 8;
-
-    int64_t numElements = 1;
-    for (auto dimSize : allocType.getShape()) {
-      numElements *= dimSize;
-    }
-
-    int64_t allocSizeBytes = byteWidth * numElements;
-    if (allocOp.getAlignment()) {
-      int64_t alignmentInBytes = *allocOp.getAlignment();
-      allocSizeBytes =
-          llvm::divideCeil(allocSizeBytes, alignmentInBytes) * alignmentInBytes;
-    }
-
-    totalSharedMemory += allocSizeBytes;
+    totalSharedMemory += allocSizeBytes.value();
     return WalkResult::advance();
   });
 
@@ -118,11 +136,16 @@ static unsigned computeEffectiveExtraBytes(mlir::FunctionOpInterface funcOp,
                                            unsigned paddingBits) {
   unsigned totalExtra = 0;
 
-  funcOp.walk([&](memref::AllocOp allocOp) {
-    if (hasSharedMemoryAddressSpace(allocOp.getType()) &&
-        allocOp.getType().hasStaticShape()) {
-      MemRefType allocType = llvm::cast<MemRefType>(allocOp.getType());
-
+  funcOp.walk([&](Operation *op) {
+    MemRefType allocType;
+    if (auto allocOp = dyn_cast<memref::AllocOp>(op)) {
+      allocType = llvm::cast<MemRefType>(allocOp.getType());
+    } else if (auto allocOp = dyn_cast<memref::AllocaOp>(op)) {
+      allocType = llvm::cast<MemRefType>(allocOp.getType());
+    } else {
+      return;
+    }
+    if (hasSharedMemoryAddressSpace(allocType) && allocType.hasStaticShape()) {
       ArrayRef<int64_t> shape = allocType.getShape();
       if (shape.empty())
         return;
@@ -185,20 +208,27 @@ struct GPUReduceBankConflictsPass final
   }
 };
 
-} // namespace
-
-LogicalResult reduceSharedMemoryBankConflicts(mlir::FunctionOpInterface funcOp,
-                                              unsigned paddingSize) {
-  SmallVector<memref::AllocOp> sharedMemAllocs;
+template <typename AllocTy>
+static void padAllocsInFunction(mlir::FunctionOpInterface funcOp,
+                                unsigned paddingSize) {
+  SmallVector<AllocTy> sharedMemAllocs;
   // Collect all the alloc operations.
-  funcOp.walk([&](memref::AllocOp allocOp) {
+  funcOp.walk([&](AllocTy allocOp) {
     if (hasSharedMemoryAddressSpace(allocOp.getType()) &&
         allocOp.getType().hasStaticShape()) {
       sharedMemAllocs.push_back(allocOp);
     }
   });
-  for (memref::AllocOp alloc : sharedMemAllocs)
+  for (AllocTy alloc : sharedMemAllocs)
     padAlloc(funcOp->getContext(), alloc, paddingSize);
+}
+
+} // namespace
+
+LogicalResult reduceSharedMemoryBankConflicts(mlir::FunctionOpInterface funcOp,
+                                              unsigned paddingSize) {
+  padAllocsInFunction<memref::AllocOp>(funcOp, paddingSize);
+  padAllocsInFunction<memref::AllocaOp>(funcOp, paddingSize);
 
   // In the current form this always succeeds.
   return success();
