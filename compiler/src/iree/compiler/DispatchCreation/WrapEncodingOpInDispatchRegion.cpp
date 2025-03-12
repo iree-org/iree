@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
+
 namespace mlir::iree_compiler::DispatchCreation {
 
 #define GEN_PASS_DEF_WRAPENCODINGOPINDISPATCHREGIONPASS
