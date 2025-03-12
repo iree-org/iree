@@ -301,6 +301,27 @@ module @hoist_multi_nested_regions {
 
 // -----
 
+// CHECK-LABEL: @hoist_multi_nested_regions
+// CHECK-NOT:     util.global
+// CHECK-NOT:     util.initializer
+module @hoist_multi_nested_regions {
+  util.func public @main() -> (i32) {
+    %0 = arith.constant 0 : i32
+    %2 = "iree_unregistered"(%0) ({
+    ^bb0(%inner0 : i32):
+      %3 = "iree_unregistered.const_expr"(%inner0) ({
+      ^bb0(%inner1 : i32):
+        %4 = math.absi %inner0 : i32
+        "iree_unregistered.yield"(%4) : (i32) -> i32
+      }) : (i32) -> i32
+      "iree_unregistered.yield"(%3) : (i32) -> i32
+    }) : (i32) -> i32
+    util.return %2 : i32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @do_not_hoist_non_value_type_results
 module @do_not_hoist_non_value_type_results {
   // CHECK-NOT: util.global
