@@ -44,6 +44,8 @@ iree-compile \
 
 ```
 
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-optimization-options.md"
+
 In which
 
 * `--iree-stream-partitioning-favor=min-peak-memory`: Optimize for minimum peak

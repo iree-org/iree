@@ -16,6 +16,16 @@ These flags can be passed to the:
   constructor
 * `ireeCompilerOptionsSetFlags()` compiler C API function
 
+## Optimization level
+
+The `iree-opt-level` flag specifies the optimization level for the entire
+compilation flow. This flag can be passed the following values:
+
+- `O0`: Minimal or no optimizations
+- `O1`: Enables optimizations that are broadly supported by most backends
+- `O2`: Applies additional optimizations that may only be supported by certain backends
+- `O3`: Aggressive optimizations
+
 ## High level program optimizations
 
 ### Constant evaluation (`--iree-opt-const-eval` (on))
