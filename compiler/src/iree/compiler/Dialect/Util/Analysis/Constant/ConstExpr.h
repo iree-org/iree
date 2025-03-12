@@ -40,8 +40,11 @@ public:
   }
 
   // Return const-expr info for an operation (or nullptr if unknown). Presently,
-  // an operation's results will either all be const-expr or not, so we just
-  // check the first. 0-result ops cannot be const-expr.
+  // an operation's results will either all be analyzed or not, but when they
+  // are not all analyzed, some of the operation's results may not have a
+  // ConstValueInfo. In this case, there is no real difference between having
+  // no ConstValueInfo and having an unanalyzed ConstValueInfo, so we just check
+  // the first result.
   const ConstValueInfo *lookup(Operation *queryOp) const {
     if (queryOp->getNumResults() == 0)
       return nullptr;
