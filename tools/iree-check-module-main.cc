@@ -147,7 +147,7 @@ iree_status_t Run(iree_allocator_t host_allocator, int* out_exit_code) {
 
 }  // namespace
 
-int main(int argc, char** argv) {
+static int main(int argc, char** argv) {
   IREE_TRACE_APP_ENTER();
 
   // Pass through flags to gtest (allowing --help to fall through).
