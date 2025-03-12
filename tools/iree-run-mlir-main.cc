@@ -452,7 +452,7 @@ class ArgParser {
 
 }  // namespace
 
-extern "C" int main(int argc, char** argv) {
+int main(int argc, char** argv) {
   IREE_TRACE_APP_ENTER();
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree-run-mlir");
 
@@ -533,3 +533,5 @@ extern "C" int main(int argc, char** argv) {
 }
 
 }  // namespace iree
+
+int main(int argc, char** argv) { return iree::main(argc, argv); }
