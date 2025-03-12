@@ -10,8 +10,10 @@
 
 // Check that the final tuning spec is as expected when the user tuning spec is provided.
 
+// TODO: Add the check for default attribute (`iree_codegen.tuning_spec_with_default_entrypoint`) here
+//       once the merging logic supports cases beyond a single `foreach_match` operation.
+
 // CHECK-LABEL: module @iree_linked_tuning_spec
-// CHECK-SAME:    iree_codegen.tuning_spec_with_default_entrypoint
 // CHECK-SAME:    transform.with_named_sequence
 // CHECK-LABEL:   module @user_spec_0 attributes {transform.with_named_sequence}
 // CHECK-LABEL:     transform.named_sequence @hello
@@ -31,6 +33,7 @@
 // SKIPLINK-LABEL: module  @user_spec
 // SKIPLINK-SAME:    iree_codegen.tuning_spec_with_default_entrypoint
 // SKIPLINK-SAME:    transform.with_named_sequence
+// SKIPLINK:         transform.print  {name = "Hello Tuning Spec"}
 // SKIPLINK-NOT:    module @{{.+}}
 // SKIPLINK:        module attributes
 // SKIPLINK-SAME:     iree_codegen.tuning_spec_mlirbc = dense<{{.+}}> : vector<{{[0-9]+}}xi8>
