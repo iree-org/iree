@@ -6,8 +6,10 @@
 
 name: PkgCI Build Packages
 on:
-  workflow_call:
-
+    workflow_call:
+    push:
+      branches:
+        - 'users/eliasj42/test-2-gpu-runner'
 jobs:
   linux_x86_64_release_packages:
     name: Linux Release (x86_64)
