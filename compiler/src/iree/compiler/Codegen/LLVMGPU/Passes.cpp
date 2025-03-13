@@ -74,6 +74,12 @@ static llvm::cl::opt<bool> clLLVMGPUEnableSharedMemoryReuse(
         "Enable shared memory reuse in the vector distribute pipeline"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clLLVMGPUEnableExperimentalDataTiling(
+    "iree-llvmgpu-experimental-data-tiling",
+    llvm::cl::desc("Enables late data-tiling materialization for LLVMGPU "
+                   "(experimental)."),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> clDistributeToWorkgroupsUsingForall(
     "iree-llvmgpu-test-distribute-to-workgroups-using-forall",
     llvm::cl::desc("Use scf.forall for distribution to workgroups"),
@@ -1165,11 +1171,15 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
     OpPassManager &modulePassManager) {
   {
     FunctionLikeNest funcPassManager(modulePassManager);
+    if (clLLVMGPUEnableExperimentalDataTiling) {
+      funcPassManager.addPass(createMaterializeDeviceEncodingPass);
+    } else {
+      addEncodingToPaddingPasses(funcPassManager);
+    }
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
     // This materializes into 'nop' in the absence of pad encoding layout
     // attributes.
-    addEncodingToPaddingPasses(funcPassManager);
     funcPassManager.addPass(createBlockDynamicDimensionsPass);
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass);
     funcPassManager.addPass(createCSEPass);
