@@ -32,7 +32,7 @@ jobs:
 
           - name: rocm_hip
             target: target_hip
-            gpu: gfx1100
+            gpu: gfx942
             runs-on: linux-mi300-2gpu-ossci-iree-org
 
     env:
