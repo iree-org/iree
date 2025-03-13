@@ -7,9 +7,6 @@
 name: PkgCI Build Packages
 on:
     workflow_call:
-    push:
-      branches:
-        - 'users/eliasj42/test-2-gpu-runner'
 jobs:
   linux_x86_64_release_packages:
     name: Linux Release (x86_64)
@@ -103,7 +100,7 @@ jobs:
         with:
           name: linux_x86_64_release_packages
           path: |
-            ${{ github.workspace }}/wheelhouse/iree*.whl
+            /shark-cache/wheelhouse/iree*.whl
           if-no-files-found: error
 # TODO: Debug low ccache hit rate and re-enable.
 # linux_x86_64_release_asserts_packages:
