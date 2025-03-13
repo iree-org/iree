@@ -108,7 +108,6 @@ jobs:
 #   name: Linux Release Asserts (x86_64)
 #   runs-on:
 #     - self-hosted # must come first
-#     - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
 #     - environment=prod
 #     - cpu
 #     - os-family=Linux
