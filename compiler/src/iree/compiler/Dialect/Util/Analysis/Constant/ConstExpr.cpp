@@ -249,7 +249,7 @@ void ConstExprAnalysis::expandToOpStep(
       }
       for (Value producerOpResult : producerOp->getResults()) {
         if (!constInfoMap.lookup(producerOpResult)) {
-          (void)addInfo(producer);
+          (void)addInfo(producerOpResult);
         }
       }
     }
