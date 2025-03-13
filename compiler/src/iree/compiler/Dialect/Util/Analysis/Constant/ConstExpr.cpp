@@ -61,7 +61,6 @@ void ConstExprAnalysis::tryExpandToUseOrUseParent(Operation *definingOp,
   if (definingOp->getParentOp() != useOp->getParentOp()) {
     auto parentOp = useOp->getParentOp();
     if (parentOp && definingOp->getParentOp() == parentOp->getParentOp()) {
-      // expandToOp(useOp);
       expandToOp(parentOp);
     }
     return;
