@@ -198,6 +198,10 @@ def get_math_op_info():
             kind=MathOpKind.UNARY_FLOAT,
             domain=lambda x: True,
         ),
+        "erfc": MathOpInfo(
+            kind=MathOpKind.UNARY_FLOAT,
+            domain=lambda x: True,
+        ),
         "exp": MathOpInfo(
             kind=MathOpKind.UNARY_FLOAT,
             domain=lambda x: True,
@@ -215,6 +219,10 @@ def get_math_op_info():
             domain=lambda x: True,
         ),
         "log": MathOpInfo(
+            kind=MathOpKind.UNARY_FLOAT,
+            domain=lambda x: x > 0,
+        ),
+        "log10": MathOpInfo(
             kind=MathOpKind.UNARY_FLOAT,
             domain=lambda x: x > 0,
         ),
@@ -259,6 +267,10 @@ def get_math_op_info():
             domain=lambda x: True,
         ),
         "tanh": MathOpInfo(
+            kind=MathOpKind.UNARY_FLOAT,
+            domain=lambda x: True,
+        ),
+        "trunc": MathOpInfo(
             kind=MathOpKind.UNARY_FLOAT,
             domain=lambda x: True,
         ),
