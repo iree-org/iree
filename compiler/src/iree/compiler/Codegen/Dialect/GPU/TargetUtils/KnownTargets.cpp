@@ -358,8 +358,7 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
       .Case("mi300x", TargetDetails{cdna3Wgp, &mi300xChip})
       .Case("mi300a", TargetDetails{cdna3Wgp, &mi300aChip})
       .Case("mi308x", TargetDetails{cdna3Wgp, &mi308xChip})
-      .Cases("cdna3", "gfx940", "gfx941", "gfx942",
-             TargetDetails{cdna3Wgp, nullptr})
+      .Cases("cdna3", "gfx942", TargetDetails{cdna3Wgp, nullptr})
       .Case("mi250x", TargetDetails{cdna2Wgp, &mi250xChip})
       .Case("mi250", TargetDetails{cdna2Wgp, &mi250Chip})
       .Case("mi210", TargetDetails{cdna2Wgp, &mi210Chip})
@@ -759,8 +758,7 @@ TargetAttr getHIPTargetDetails(StringRef target, StringRef features,
 Attribute getHIPTargetEncodingLayoutAttr(TargetAttr target) {
   // This is only enabled for CDNA2 and CDNA3 for the time being.
   // TODO(kuhar): Enable for other HIP targets.
-  if (!llvm::is_contained({"gfx90a", "gfx940", "gfx941", "gfx942"},
-                          target.getArch())) {
+  if (!llvm::is_contained({"gfx90a", "gfx942"}, target.getArch())) {
     return nullptr;
   }
 
