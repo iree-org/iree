@@ -70,12 +70,6 @@ static llvm::cl::opt<bool>
                          llvm::cl::desc("Fuse multi-use ops."),
                          llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clEnableAggressiveFusion(
-    "iree-dispatch-creation-enable-aggressive-fusion",
-    llvm::cl::desc("Aggressive fusion opportunities that are behind a flag "
-                   "since all backends dont support it yet"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<bool> clEnableDataTiling(
     "iree-dispatch-creation-experimental-data-tiling",
     llvm::cl::desc("Enable data-tiling at flow level, i.e., it sets encodings "
@@ -215,16 +209,18 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
 // Note that we should not hoist out small constants before the dispatch regions
 // are converted to workgroups. E.g., the `cseConstant` option needs to be false
 // in greedy pattern rewriting drivers.
-static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
+static void
+addDispatchRegionCreationPasses(OpPassManager &passManager,
+                                const DispatchCreationOptions &options) {
   FunctionLikeNest(passManager)
       // Create dispatches for scalar operations as roots.
       .addPass(DispatchCreation::createFormScalarDispatchesPass)
       // Create `flow.dispatch.region` centered around a root and fuse with
       // producers and consumers.
-      .addPass([] {
+      .addPass([&] {
         return DispatchCreation::createFormDispatchRegionsPass(
             FormDispatchRegionsPassOptions{
-                clEnableAggressiveFusion,
+                options.enableAggressiveFusion,
                 clEnableFusePaddingIntoLinalgConsumerOps,
                 clEnableFusePaddingIntoLinalgProducerOps});
       })
@@ -233,10 +229,10 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
       // afterwards that would need the full dispatch content but don't want to
       // handle explicit captures as materialized as dispatch workgroup operands
       // and block arguments.
-      .addPass([] {
+      .addPass([&] {
         return DispatchCreation::createCloneProducersIntoDispatchRegionsPass(
             CloneProducersIntoDispatchRegionsPassOptions{
-                clEnableAggressiveFusion});
+                options.enableAggressiveFusion});
       })
       // Collapse dimensions of linalg Ops.
       .addPass(DispatchCreation::createCollapseDimensionsPass);
@@ -306,7 +302,7 @@ void buildDispatchCreationPassPipeline(
       .addPass(mlir::createCSEPass);
 
   addDispatchRegionCreationPreprocessingPasses(passManager);
-  addDispatchRegionCreationPasses(passManager);
+  addDispatchRegionCreationPasses(passManager, transformOptions.options);
 
   FunctionLikeNest(passManager)
       .addPass(DispatchCreation::createConvertDispatchRegionsToWorkgroupsPass)

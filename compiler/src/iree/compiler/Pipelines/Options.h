@@ -214,6 +214,15 @@ struct SchedulingOptions {
   using FromFlags = OptionsFromFlags<SchedulingOptions>;
 };
 
+struct DispatchCreationOptions {
+  llvm::OptimizationLevel optLevel;
+
+  bool enableAggressiveFusion = false;
+
+  void bindOptions(OptionsBinder &binder);
+  using FromFlags = OptionsFromFlags<DispatchCreationOptions>;
+};
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_PIPELINES_OPTIONS_H_
