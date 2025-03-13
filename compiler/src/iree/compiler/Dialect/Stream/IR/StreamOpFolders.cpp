@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <optional>
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -1294,6 +1295,23 @@ void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
   //                 (if not tied block/fn arguments)
   results.insert<PropagateClonableOps<TensorCloneOp>>(context);
   results.insert<ElideUnneededTensorClones>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.tensor.encode
+//===----------------------------------------------------------------------===//
+
+OpFoldResult TensorEncodeOp::fold(FoldAdaptor adaptor) {
+  auto resultType = dyn_cast<RankedTensorType>(adaptor.getResultEncoding());
+  if (!resultType) {
+    return {};
+  }
+  IREE::Encoding::SerializableEncodingAttrInterface attr =
+      IREE::Encoding::getSerializableEncodingAttrInterface(resultType);
+  if (!attr || !attr.isIdentityLayout()) {
+    return {};
+  }
+  return getSource();
 }
 
 //===----------------------------------------------------------------------===//

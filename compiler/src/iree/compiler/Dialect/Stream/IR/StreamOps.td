@@ -1482,6 +1482,7 @@ def Stream_TensorEncodeOp : Stream_PureOp<"tensor.encode", [
   }];
 
   let hasVerifier = 1;
+  let hasFolder = 1;
 }
 
 def Stream_TensorSliceOp : Stream_PureOp<"tensor.slice", [

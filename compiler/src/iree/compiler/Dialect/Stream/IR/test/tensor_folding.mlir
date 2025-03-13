@@ -206,3 +206,14 @@ util.func private @ElideUnneededTensorClones(%arg0: !stream.resource<*>, %arg1: 
   // CHECK: util.return %[[T1]]
   util.return %2 : f32
 }
+
+// -----
+
+#encoding = #iree_encoding.pad_encoding_layout<[0, 0]>
+// CHECK-LABEL: @FoldTensorEncodeOp
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
+util.func private @FoldTensorEncodeOp(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  %0 = stream.tensor.encode %arg0 : tensor<2x2xf32> in !stream.resource<*>{%arg1} -> tensor<2x2xf32, #encoding> in !stream.resource<*>{%arg1}
+  // CHECK:         util.return %[[SRC]]
+  util.return %0 : !stream.resource<*>
+}
