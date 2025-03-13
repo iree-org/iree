@@ -55,6 +55,7 @@ VMVX_SRCS = enforce_glob(
         "fp_to_subbyte.mlir",
         "large_linalg_matmul.mlir",
         "subbyte_to_fp.mlir",
+        "index.mlir",
     ],
 )
 
@@ -75,6 +76,7 @@ VULKAN_SRCS = enforce_glob(
     exclude = [
         "large_linalg_matmul.mlir",
         "fp_to_subbyte.mlir",
+        "index.mlir",
     ],
 )
 
@@ -122,6 +124,7 @@ CUDA_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "index.mlir",
     ],
 )
 
