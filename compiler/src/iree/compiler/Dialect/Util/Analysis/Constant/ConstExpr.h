@@ -40,14 +40,16 @@ public:
   }
 
   // Return const-expr info for an operation (or nullptr if unknown). Presently,
-  // an operation's results will either all be analyzed or not, but when they
-  // are not all analyzed, some of the operation's results may not have a
-  // ConstValueInfo. In this case, there is no real difference between having
-  // no ConstValueInfo and having an unanalyzed ConstValueInfo, so we just check
-  // the first result.
+  // an operation's results are expected to either be all initialized or all
+  // uninitialized. If they are all initialized, then they will either be all
+  // const-expr or all non const-expr, so just return the first result's info.
   const ConstValueInfo *lookup(Operation *queryOp) const {
     if (queryOp->getNumResults() == 0)
       return nullptr;
+    if (llvm::any_of(queryOp->getResults(),
+                     [&](Value v) { return !lookup(v); })) {
+      return nullptr;
+    }
     return lookup(queryOp->getResult(0));
   }
 
