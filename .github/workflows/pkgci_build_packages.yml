@@ -103,7 +103,7 @@ jobs:
         with:
           name: linux_x86_64_release_packages
           path: |
-            /shark-cache/wheelhouse/iree*.whl
+            ${{ github.workspace }}/wheelhouse/iree*.whl
           if-no-files-found: error
 # TODO: Debug low ccache hit rate and re-enable.
 # linux_x86_64_release_asserts_packages:
