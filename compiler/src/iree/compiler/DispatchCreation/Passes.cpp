@@ -86,6 +86,12 @@ static llvm::cl::opt<bool> clEnableDataTiling(
                    "path, --iree-opt-data-tiling=false must be set as wells"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clConvertToFlowEncodeOp(
+    "iree-dispatch-creation-experimental-convert-to-flow-encode-op",
+    llvm::cl::desc("Enable the conversion from set_encoding dispatch to "
+                   "flow.tensor.encode op."),
+    llvm::cl::init(false));
+
 namespace mlir::iree_compiler::DispatchCreation {
 
 //===----------------------------------------------------------------------===//
@@ -309,6 +315,9 @@ void buildDispatchCreationPassPipeline(
   addDispatchRegionCreationPasses(passManager);
 
   FunctionLikeNest(passManager)
+      .addPredicatedPass(
+          clConvertToFlowEncodeOp,
+          DispatchCreation::createConvertDispatchRegionsToFlowOpsPass)
       .addPass(DispatchCreation::createConvertDispatchRegionsToWorkgroupsPass)
       // Convert tensor operations to flow.tensor ops.
       // - Convert extract/insert slice to flow update ops when the tensor op

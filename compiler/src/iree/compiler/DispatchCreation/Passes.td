@@ -294,6 +294,19 @@ def SetEncodingPass :
 // Dispatch region to workgroups passes
 //===---------------------------------------------------------------------===//
 
+def ConvertDispatchRegionsToFlowOpsPass :
+    InterfacePass<"iree-dispatch-creation-convert-dispatch-regions-to-flow-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Convert dispatch regions to Flow ops.";
+  let description = [{
+    Pass to convert dispatch regions to Flow ops. This pass is
+    intended to be used after dispatch regions have been formed.
+  }];
+  let dependentDialects = [
+    "IREE::Encoding::IREEEncodingDialect",
+    "IREE::Flow::FlowDialect",
+  ];
+}
+
 def ConvertDispatchRegionsToWorkgroupsPass :
     InterfacePass<"iree-dispatch-creation-convert-dispatch-regions-to-workgroups", "mlir::FunctionOpInterface"> {
   let summary = "Convert dispatch regions to dispatch workgroups.";
