@@ -533,7 +533,7 @@ public:
         std::string featureStr = llvm::join(features, ",");
 
         targetMachine.reset(target->createTargetMachine(
-            triple.str(), targetArch, featureStr, opt, llvm::Reloc::Model::PIC_,
+            triple, targetArch, featureStr, opt, llvm::Reloc::Model::PIC_,
             std::nullopt, llvm::CodeGenOptLevel::Aggressive));
 
         if (!targetMachine) {

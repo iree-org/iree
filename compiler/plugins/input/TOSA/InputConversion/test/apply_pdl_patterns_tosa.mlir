@@ -51,7 +51,7 @@ func.func @mlp_invocation(%lhs: tensor<2x4xf32>, %rhs : tensor<4x8xf32>) -> tens
   %1 = tosa.clamp %0 {
       min_val = 0.0 : f32, max_val = 3.4028235e+38 : f32}
       : (tensor<1x2x8xf32>) -> tensor<1x2x8xf32>
-  %2 = tosa.negate %1 : (tensor<1x2x8xf32>) -> tensor<1x2x8xf32>
+  %2 = tosa.negate %1, %azp0, %bzp0 : (tensor<1x2x8xf32>, tensor<1xf32>, tensor<1xf32>) -> tensor<1x2x8xf32>
   %result_shape = tosa.const_shape {values = dense<[2, 8]> : tensor<2xindex>} : () -> !tosa.shape<2>
   %3 = tosa.reshape %2, %result_shape : (tensor<1x2x8xf32>, !tosa.shape<2>) -> tensor<2x8xf32>
   return %3 : tensor<2x8xf32>
