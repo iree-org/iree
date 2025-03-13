@@ -220,7 +220,8 @@ util.func public @attention_rope_fusion(%arg0: index, %arg1: tensor<?x128xf32>,
 //       CHECK:     %[[ATTENTION:.+]] = iree_linalg_ext.attention
 //  CHECK-SAME:         ins(%[[GATHER]],
 //       CHECK:      flow.dispatch.tensor.store %[[ATTENTION]]
-//       CHECK:   util.return %[[DISPATCH]]
+//       CHECK:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[DISPATCH]]
+//       CHECK:   util.return %[[RESHAPE]]
 
 // -----
 
