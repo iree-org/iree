@@ -1121,7 +1121,8 @@ allocateLocalTransients(IREE::Stream::AsyncExecuteOp executeOp,
   auto timepointType = externalBuilder.getType<IREE::Stream::TimepointType>();
   auto allocaOp = externalBuilder.create<IREE::Stream::ResourceAllocaOp>(
       fusedLoc, transientType, timepointType, packOp.getTotalLength(),
-      executeOp.getAwaitTimepoint(), executeOp.getAffinityAttr());
+      /*indeterminate_lifetime=*/UnitAttr{}, executeOp.getAwaitTimepoint(),
+      executeOp.getAffinityAttr());
   TransientAllocation allocation;
   allocation.awaitTimepoint = allocaOp.getResultTimepoint();
   allocation.reservation = allocaOp.getResult();
