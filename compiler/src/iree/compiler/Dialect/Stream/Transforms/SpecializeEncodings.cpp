@@ -346,7 +346,7 @@ static bool recognizeEntryPoints(ModuleOp moduleOp, SymbolTable symbolTable,
     if (!result) {
       return;
     }
-    auto exportOp = dyn_cast<IREE::Stream::ExecutableExportOp>(
+    auto exportOp = dyn_cast_if_present<IREE::Stream::ExecutableExportOp>(
         symbolTable.lookupSymbolIn(moduleOp, entryPoint));
     if (!exportOp) {
       result = false;
