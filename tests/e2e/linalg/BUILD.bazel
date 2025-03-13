@@ -139,9 +139,26 @@ iree_check_single_backend_test_suite(
     target_backend = "cuda",
 )
 
+INDEX_SRCS = [
+    "index.mlir",
+]
+
+iree_check_single_backend_test_suite(
+    name = "check_index_llvm-cpu_local-task",
+    srcs = INDEX_SRCS,
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
+    driver = "local-task",
+    tags = [
+        # indexing math generates illegal instructions for riscv
+        "noriscv",
+    ],
+    target_backend = "llvm-cpu",
+)
+
 test_suite(
     name = "check",
     tests = [
+        ":check_index_llvm-cpu_local-task",
         ":check_large_linalg_matmul_cuda",
         ":check_llvm-cpu_local-task",
         ":check_vmvx_local-task",

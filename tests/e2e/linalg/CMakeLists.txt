@@ -101,4 +101,19 @@ iree_check_single_backend_test_suite(
     "requires-gpu-nvidia"
 )
 
+iree_check_single_backend_test_suite(
+  NAME
+    check_index_llvm-cpu_local-task
+  SRCS
+    "index.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-target-cpu=generic"
+  LABELS
+    "noriscv"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
