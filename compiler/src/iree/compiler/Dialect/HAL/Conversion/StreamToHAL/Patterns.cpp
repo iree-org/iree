@@ -163,13 +163,17 @@ struct ResourceDeallocaOpPattern
     Value signalFence = getOrCreateSignalFence(
         loc, device, deallocaOp.getResultTimepoint(), rewriter);
 
-    // Queue deallocation.
+    // Route to the origin of the allocation (if available).
     IREE::HAL::DeallocaFlagBitfield flags =
         IREE::HAL::DeallocaFlagBitfield::None;
+    if (deallocaOp.getPreferOrigin()) {
+      flags = flags | IREE::HAL::DeallocaFlagBitfield::PreferOrigin;
+    }
+
+    // Queue deallocation.
     rewriter.create<IREE::HAL::DeviceQueueDeallocaOp>(
         loc, device, queueAffinity, waitFence, signalFence,
-        rewriter.getAttr<IREE::HAL::DeallocaFlagBitfieldAttr>(flags),
-        adaptor.getOperand());
+        adaptor.getOperand(), flags);
 
     rewriter.replaceOp(deallocaOp, {signalFence});
     return success();
