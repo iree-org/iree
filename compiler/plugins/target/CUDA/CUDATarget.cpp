@@ -566,7 +566,7 @@ public:
           return variantOp.emitError() << "cannot initialize target triple";
         }
         targetMachine.reset(target->createTargetMachine(
-            triple.str(), targetArch, targetFeatures, {}, {}));
+            triple, targetArch, targetFeatures, {}, {}));
         if (targetMachine == nullptr) {
           return variantOp.emitError() << "cannot initialize target machine";
         }
