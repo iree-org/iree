@@ -139,6 +139,7 @@ void LLVMTarget::storeToConfigAttrs(MLIRContext *context,
   if (vectorWidthInBytes != DEFAULT_VECTOR_WIDTH_IN_BYTES) {
     addInt64("native_vector_size", vectorWidthInBytes);
   }
+  addInt64("max_stack_allocation_size", maxStackAllocSizeInBytes);
   if (linkEmbedded != DEFAULT_LINK_EMBEDDED) {
     addBool("link_embedded", linkEmbedded);
   }
@@ -581,6 +582,11 @@ void LLVMCPUTargetCLOptions::bindOptions(OptionsBinder &binder) {
                        targetVectorWidthInBytes, llvm::cl::cat(category),
                        llvm::cl::desc("Overrides the native vector register "
                                       "width (in bytes) of the target."));
+  binder.opt<llvm::cl::PowerOf2ByteSize>(
+      "iree-llvmcpu-stack-allocation-limit", targetMaxStackAllocSizeInBytes,
+      llvm::cl::cat(category),
+      llvm::cl::desc(
+          "Maximum allowed stack allocation size for LLVM CPU in bytes"));
   binder.opt<std::string>(
       "iree-llvmcpu-enable-ukernels", enableUkernels, llvm::cl::cat(category),
       llvm::cl::desc("Enables ukernels in the llvmcpu backend. May be "
@@ -634,6 +640,7 @@ LLVMTargetOptions LLVMCPUTargetCLOptions::getTargetOptions() {
   target.llvmTargetOptions.FloatABIType = targetFloatABI;
   target.dataLayout = targetDataLayout;
   target.vectorWidthInBytes = targetVectorWidthInBytes;
+  target.maxStackAllocSizeInBytes = targetMaxStackAllocSizeInBytes.value;
   target.ukernels = enableUkernels;
   target.linkUkernelBitcode = linkUKernelBitcode;
 
