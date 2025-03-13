@@ -55,8 +55,7 @@ private:
     os << val;
   }
 
-  template <>
-  void prettyPrint<bool>(llvm::raw_ostream &os, bool &val) {
+  void prettyPrint(llvm::raw_ostream &os, bool &val) {
     os << (val ? "true" : "false");
   }
 };
