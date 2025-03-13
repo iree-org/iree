@@ -73,11 +73,8 @@ module {
 // CHECK:         %[[REDUCTION:.+]] = linalg.generic
 // CHECK:         flow.return %[[REDUCTION]] :
 // CHECK:       }
-// CHECK:       %[[DISPATCH_SE:.+]] = flow.dispatch.region -> (tensor<2x11008x128xf32, #[[$ENCODING]]>)
-// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[DISPATCH]]
-// CHECK:         flow.return %[[SET_ENCODING]] :
-// CHECK:       }
-// CHECK:       util.return %[[DISPATCH_SE]] : tensor<2x11008x128xf32, #[[$ENCODING]]>
+// CHECK:       %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[DISPATCH]]
+// CHECK:       util.return %[[SET_ENCODING]] : tensor<2x11008x128xf32, #[[$ENCODING]]>
 
 // -----
 

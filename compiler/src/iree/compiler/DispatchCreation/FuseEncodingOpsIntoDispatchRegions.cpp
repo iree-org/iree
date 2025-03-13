@@ -69,7 +69,9 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
 
     SmallVector<IREE::Encoding::SetEncodingOp> encodingOps;
     funcOp->walk([&](IREE::Encoding::SetEncodingOp encodingOp) {
-      encodingOps.push_back(encodingOp);
+      if (IREE::Flow::isNonNullAndOutsideDispatch(encodingOp)) {
+        encodingOps.push_back(encodingOp);
+      }
     });
 
     for (IREE::Encoding::SetEncodingOp encodingOp : encodingOps) {
@@ -78,9 +80,6 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
           operand.get().getDefiningOp<IREE::Flow::DispatchRegionOp>();
       // Nothing to fuse with, so wrap the `encodingOp` in its own dispatch.
       if (!producerDispatch) {
-        if (failed(IREE::Flow::wrapOpInDispatchRegion(rewriter, encodingOp))) {
-          return signalPassFailure();
-        }
         continue;
       }
 
@@ -92,17 +91,11 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
       auto producerInRegion = dyn_cast<OpResult>(
           dispatchReturnOp->getOperand(result.getResultNumber()));
       if (!producerInRegion) {
-        if (failed(IREE::Flow::wrapOpInDispatchRegion(rewriter, encodingOp))) {
-          return signalPassFailure();
-        }
         continue;
       }
 
       // Place the op in its own dispatch region if fusion is not possible.
       if (!isFusableWithSetEncoding(producerInRegion.getOwner())) {
-        if (failed(IREE::Flow::wrapOpInDispatchRegion(rewriter, encodingOp))) {
-          return signalPassFailure();
-        }
         continue;
       }
       // Fuse the `encodingOp` into the producer dispatch region.

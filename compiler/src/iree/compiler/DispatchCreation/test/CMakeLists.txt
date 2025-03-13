@@ -46,6 +46,7 @@ iree_lit_test_suite(
     "split_reduction.mlir"
     "tensor_pad_to_tensor_insert_slice.mlir"
     "transpose_generic_ops.mlir"
+    "wrap_encoding_op_in_dispatch_region.mlir"
   TOOLS
     FileCheck
     iree-opt
