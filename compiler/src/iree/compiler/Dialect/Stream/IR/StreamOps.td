@@ -216,11 +216,17 @@ def Stream_ResourceDeallocaOp : Stream_Op<"resource.dealloca", [
     The resource is considered live and valid until the provided timepoint is
     reached and the memory is only made available for future requests after
     the result timepoint is reached.
+
+    If `prefer_origin` is set then the deallocation will be scheduled against
+    the original placement affinity of the allocation at runtime. In cases where
+    the original placement is unavailable the affinity of the deallocation op
+    will be used to perform a barrier operation.
   }];
 
   let arguments = (ins
     Stream_AnyResource:$operand,
     Stream_Size:$operand_size,
+    UnitAttr:$prefer_origin,
     Optional<Stream_Timepoint>:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
@@ -229,6 +235,7 @@ def Stream_ResourceDeallocaOp : Stream_Op<"resource.dealloca", [
   );
 
   let assemblyFormat = [{
+    (`origin` $prefer_origin^)?
     (`on` `(` $affinity^ `)`)?
     (`await` `(` $await_timepoint^ `)` `=` `` `>`)?
     $operand `:` type($operand) `{` $operand_size `}`
@@ -577,7 +584,7 @@ def Stream_ResourceSubviewOp : Stream_PureOp<"resource.subview", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{slices out a cloned subview of a value}];
+  let summary = [{slices out a subview of a value}];
   let description = [{
     Aliases a byte subrange of a resource.
   }];
