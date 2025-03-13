@@ -399,8 +399,9 @@ createTargetMachine(const LLVMTarget &target) {
       llvm::TargetRegistry::lookupTarget(target.getTriple(), errorMessage);
   if (!llvmTarget)
     return nullptr;
+  llvm::Triple triple(target.getTriple());
   std::unique_ptr<llvm::TargetMachine> machine(llvmTarget->createTargetMachine(
-      target.getTriple(), target.getCpu() /* cpu e.g k8 */,
+      triple, target.getCpu() /* cpu e.g k8 */,
       target.getCpuFeatures() /* cpu features e.g avx512f */,
       target.llvmTargetOptions, llvm::Reloc::Model::PIC_, {},
       target.codeGenOptLevel,

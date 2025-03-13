@@ -127,7 +127,7 @@ func.func @fusion_quant_matmul_generic() attributes {hal.executable.target = #ex
     %16 = arith.muli %in_1, %c-128_i32 : i32
     %17 = arith.subi %in_0, %16 : i32
     %18 = arith.addi %in, %17 : i32
-    %19 = tosa.apply_scale %18, %c1101627623_i32, %c36_i8 {double_round = true} : (i32, i32, i8) -> i32
+    %19 = tosa.apply_scale %18, %c1101627623_i32, %c36_i8 {rounding_mode = "DOUBLE_ROUND"} : (i32, i32, i8) -> i32
     %20 = arith.addi %19, %c-128_i32 : i32
     %21 = arith.cmpi slt, %20, %c-128_i32 : i32
     %22 = arith.select %21, %c-128_i32, %20 : i32
