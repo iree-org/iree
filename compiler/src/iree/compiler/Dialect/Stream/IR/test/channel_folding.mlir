@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --canonicalize=test-convergence=true %s | iree-opt --split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize=test-convergence=true %s | FileCheck %s
 
 // CHECK-LABEL: @FoldChannelRankOp
 //  CHECK-SAME: (%[[RANK:.+]]: index)
