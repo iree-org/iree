@@ -128,6 +128,12 @@ struct ResourceAllocaOpPattern
       return failure();
     }
 
+    // Behavior flags.
+    IREE::HAL::AllocaFlagBitfield flags = IREE::HAL::AllocaFlagBitfield::None;
+    if (allocaOp.getIndeterminateLifetime()) {
+      flags = flags | IREE::HAL::AllocaFlagBitfield::IndeterminateLifetime;
+    }
+
     // Gather wait/signal fence, which are optional.
     Value waitFence =
         getOrCreateWaitFence(loc, adaptor.getAwaitTimepoint(), rewriter);
@@ -138,8 +144,7 @@ struct ResourceAllocaOpPattern
     auto pool = rewriter.create<arith::ConstantIntOp>(loc, 0, 64);
     auto allocateOp = rewriter.create<IREE::HAL::DeviceQueueAllocaOp>(
         loc, bufferType, device, queueAffinity, waitFence, signalFence, pool,
-        memoryTypes, bufferUsage, adaptor.getStorageSize(),
-        IREE::HAL::AllocaFlagBitfield::None);
+        memoryTypes, bufferUsage, adaptor.getStorageSize(), flags);
 
     rewriter.replaceOp(allocaOp, {allocateOp.getResult(), signalFence});
     return success();
