@@ -29,6 +29,7 @@ LLVM_SRCS = enforce_glob(
     include = ["*.mlir"],
     exclude = [
         "large_linalg_matmul.mlir",
+        "index.mlir",
     ],
 )
 
@@ -54,6 +55,7 @@ VMVX_SRCS = enforce_glob(
         "fp_to_subbyte.mlir",
         "large_linalg_matmul.mlir",
         "subbyte_to_fp.mlir",
+        "index.mlir",
     ],
 )
 
@@ -74,6 +76,7 @@ VULKAN_SRCS = enforce_glob(
     exclude = [
         "large_linalg_matmul.mlir",
         "fp_to_subbyte.mlir",
+        "index.mlir",
     ],
 )
 
@@ -121,6 +124,7 @@ CUDA_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "index.mlir",
     ],
 )
 
@@ -139,9 +143,26 @@ iree_check_single_backend_test_suite(
     target_backend = "cuda",
 )
 
+INDEX_SRCS = [
+    "index.mlir",
+]
+
+iree_check_single_backend_test_suite(
+    name = "check_index_llvm-cpu_local-task",
+    srcs = INDEX_SRCS,
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
+    driver = "local-task",
+    tags = [
+        # indexing math generates illegal instructions for riscv
+        "noriscv",
+    ],
+    target_backend = "llvm-cpu",
+)
+
 test_suite(
     name = "check",
     tests = [
+        ":check_index_llvm-cpu_local-task",
         ":check_large_linalg_matmul_cuda",
         ":check_llvm-cpu_local-task",
         ":check_vmvx_local-task",

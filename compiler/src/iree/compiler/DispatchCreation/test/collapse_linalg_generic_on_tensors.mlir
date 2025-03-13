@@ -416,7 +416,7 @@ util.func public @dont_collapse_dueto_index(%height : index, %width : index) -> 
 }
 
 // CHECK-LABEL: util.func public @dont_collapse
-//       CHECK:   linalg.generic {indexing_maps = [#[[$MAP:.+]]], iterator_types = ["parallel", "parallel"]}
+//       CHECK:   linalg.generic {indexing_maps = [#[[$MAP:.+]]], iterator_types = ["parallel"]}
 
 // -----
 
