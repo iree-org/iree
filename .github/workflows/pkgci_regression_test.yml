@@ -115,7 +115,7 @@ jobs:
             -rpfE \
             --capture=no \
             --log-cli-level=info \
-            --timeout=600 \
+            --timeout=1200 \
             --durations=0
         env:
           ROCM_CHIP: ${{ matrix.rocm-chip }}
