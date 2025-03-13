@@ -427,8 +427,7 @@ static bool makeConsumerFusableViaInterchange(
   // case the permutation wasnt required for fusion. Return false here
   // to indicate that the permutation is not going to "enhance" the
   // fusion opportunities.
-  if (!consumerIndexingMap.isPermutation() ||
-      producerIndexingMap == consumerIndexingMap) {
+  if (producerIndexingMap == consumerIndexingMap) {
     return false;
   }
   OpResult result = cast<OpResult>(consumer.getResult(0));
@@ -443,21 +442,25 @@ static bool makeConsumerFusableViaInterchange(
   if (!llvm::all_of(
           consumer.getDpsInputOperands(), [&](OpOperand *inputOperand) {
             AffineMap map = consumer.getMatchingIndexingMap(inputOperand);
-            return map == consumerIndexingMap ||
-                   (map.isProjectedPermutation() && !map.isPermutation());
+            return map == consumerIndexingMap || map.isProjectedPermutation();
           })) {
     return false;
   }
 
   // Make the input map match the producer map by applying a permutation map
   // computed with consumerIndexingMap.compose(inv(producerIndexingMap))
-  AffineMap invProducerIndexingMap = inversePermutation(producerIndexingMap);
-  AffineMap permutationMap =
-      consumerIndexingMap.compose(invProducerIndexingMap);
-  auto perm = llvm::map_to_vector(permutationMap.getResults(),
-                                  [](AffineExpr e) -> unsigned {
-                                    return cast<AffineDimExpr>(e).getPosition();
-                                  });
+  auto perm = llvm::to_vector(
+      llvm::seq<unsigned int>(0, consumer.getStaticLoopRanges().size()));
+  for (auto [producerRes, consumerRes] :
+       llvm::zip(producerIndexingMap.getResults(),
+                 consumerIndexingMap.getResults())) {
+    int64_t producerPos = cast<AffineDimExpr>(producerRes).getPosition();
+    if (producerPos > perm.size()) {
+      return false;
+    }
+    std::swap(perm[producerPos],
+              perm[cast<AffineDimExpr>(consumerRes).getPosition()]);
+  }
   IRRewriter rewriter(consumer->getContext());
   FailureOr<linalg::GenericOp> interchangedOp =
       linalg::interchangeGenericOp(rewriter, consumer, perm);
@@ -601,11 +604,7 @@ isFusableWithConsumer(OpOperand &fusedOperand,
   }
 
   if (!areOpsFusable(producer, consumer, rootOuterParallelLoops)) {
-    // Check if interchange in the consumer makes it fusable.
-    // Currently limit it to horizontally fused gemms.
-    // TODO(#20019) to remove this restriction.
-    if (!IREE::LinalgExt::isaHorizontallyFusedContraction(producer) ||
-        !makeConsumerFusableViaInterchange(fusedOperand,
+    if (!makeConsumerFusableViaInterchange(fusedOperand,
                                            rootOuterParallelLoops)) {
       return false;
     }
