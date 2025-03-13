@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "collapse_dimensions.mlir"
     "collapse_linalg_generic_on_tensors.mlir"
     "collapse_reduction.mlir"
+    "convert_encoding_to_flow.mlir"
     "convert_region_to_workgroups.mlir"
     "dispatch_linalg_ext_fusion.mlir"
     "dispatch_linalg_on_tensors.mlir"
@@ -46,7 +47,6 @@ iree_lit_test_suite(
     "split_reduction.mlir"
     "tensor_pad_to_tensor_insert_slice.mlir"
     "transpose_generic_ops.mlir"
-    "wrap_encoding_op_in_dispatch_region.mlir"
   TOOLS
     FileCheck
     iree-opt
