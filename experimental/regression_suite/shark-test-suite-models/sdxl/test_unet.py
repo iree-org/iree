@@ -107,32 +107,32 @@ sdxl_unet_fp16_960_1024_mlir = fetch_source_fixture(
 # INT8 Punet + FP16 Attention
 
 sdxl_punet_int8_inference_input_0 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/inference_input.0.bin",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl-punet/03-12-2025/inference_input.0.bin",
     group="sdxl_punet_int8",
 )
 
 sdxl_punet_int8_inference_input_1 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/inference_input.1.bin",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl-punet/03-12-2025/inference_input.1.bin",
     group="sdxl_punet_int8",
 )
 
 sdxl_punet_int8_inference_input_2 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/inference_input.2.bin",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl-punet/03-12-2025/inference_input.2.bin",
     group="sdxl_punet_int8",
 )
 
 sdxl_punet_int8_inference_input_3 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/inference_input.3.bin",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl-punet/03-12-2025/inference_input.3.bin",
     group="sdxl_punet_int8",
 )
 
 sdxl_punet_int8_inference_input_4 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/inference_input.4.bin",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl-punet/03-12-2025/inference_input.4.bin",
     group="sdxl_punet_int8",
 )
 
 sdxl_punet_int8_inference_input_5 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/inference_input.5.bin",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl-punet/03-12-2025/inference_input.5.bin",
     group="sdxl_punet_int8",
 )
 
