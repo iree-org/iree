@@ -35,6 +35,7 @@ iree_lit_test_suite(
             "config_winograd.mlir",
             "extract_address_computation_gpu.mlir",
             "gpu_set_num_workgroups.mlir",
+            "gpu_pipeline_data_tiling.mlir",
             "gpu_pipeline_generalize_named_ops.mlir",
             "horizontal_fusion_pipeline.mlir",
             "link_executables.mlir",
