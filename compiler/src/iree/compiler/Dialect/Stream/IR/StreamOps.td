@@ -159,10 +159,16 @@ def Stream_ResourceAllocaOp : Stream_Op<"resource.alloca", [
 
     The resource returned is not valid for use until the timepoint is reached;
     execution using this resource must await on the timepoint.
+
+    If the lifetime of the allocation is unknowable (analysis fails, etc) the
+    `indeterminate_lifetime` will be set indicating that the resource should not
+    be deallocated asynchronously and only after all references have been
+    released.
   }];
 
   let arguments = (ins
     Stream_Size:$storage_size,
+    UnitAttr:$indeterminate_lifetime,
     Optional<Stream_Timepoint>:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
@@ -173,6 +179,7 @@ def Stream_ResourceAllocaOp : Stream_Op<"resource.alloca", [
 
   let assemblyFormat = [{
     `uninitialized`
+    (`indeterminate` $indeterminate_lifetime^)?
     (`on` `(` $affinity^ `)`)?
     (`await` `(` $await_timepoint^ `)` `=` `` `>`):(`:`)?
     attr-dict
