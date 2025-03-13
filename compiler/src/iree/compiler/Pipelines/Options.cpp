@@ -14,6 +14,7 @@ IREE_DEFINE_COMPILER_OPTION_FLAGS(
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::SchedulingOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::PreprocessingOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::GlobalPipelineOptions);
+IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::DispatchCreationOptions);
 
 namespace mlir::iree_compiler {
 
@@ -291,6 +292,21 @@ void SchedulingOptions::bindOptions(OptionsBinder &binder) {
                           llvm::cl::desc("File path to write statistics to; or "
                                          "`` for stderr or `-` for stdout."),
                           llvm::cl::cat(category));
+}
+
+void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
+  static llvm::cl::OptionCategory category(
+      "IREE options for controlling dispatch region creation.");
+  auto init_at_opt = binder.optimizationLevel(
+      "iree-dispatch-creation-opt-level", optLevel,
+      llvm::cl::desc("Optimization level for the this pipeline"),
+      llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-dispatch-creation-enable-aggressive-fusion", enableAggressiveFusion,
+      {init_at_opt(llvm::OptimizationLevel::O0, false),
+       init_at_opt(llvm::OptimizationLevel::O2, true)},
+      llvm::cl::desc("Aggressive fusion opportunities that are behind a flag "
+                     "since all backends dont support it yet"));
 }
 
 } // namespace mlir::iree_compiler
