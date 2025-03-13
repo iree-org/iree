@@ -83,8 +83,8 @@ SmallVector<utils::IteratorType> ScatterOp::getLoopIteratorTypes() {
 
 SmallVector<Range> ScatterOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
   SmallVector<Range> ranges;
   for (auto dim : llvm::seq<int64_t>(0, getUpdateType().getRank())) {
     OpFoldResult ub = getDim(builder, loc, getUpdates(), dim);
@@ -293,12 +293,12 @@ SmallVector<Range> SortOp::getIterationDomain(OpBuilder &builder) {
   int64_t operandRank = getOperandRank();
   SmallVector<Range> loopBounds(operandRank);
   Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
   Value source = getOperand(0);
   for (auto dim : llvm::seq<int64_t>(0, operandRank)) {
     loopBounds[dim].offset = zero;
-    loopBounds[dim].size = getDimValue(builder, loc, source, dim);
+    loopBounds[dim].size = getDim(builder, loc, source, dim);
     loopBounds[dim].stride = one;
   }
   return loopBounds;
@@ -435,16 +435,16 @@ SmallVector<Range> FftOp::getIterationDomain(OpBuilder &builder) {
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   for (auto [idx, val] : llvm::enumerate(getOperandShape().drop_back())) {
-    Value size;
+    OpFoldResult size;
     if (ShapedType::isDynamic(val)) {
       size = getDimValue(builder, loc, getReal(), idx);
     } else {
-      size = builder.create<arith::ConstantIndexOp>(loc, val);
+      size = builder.getIndexAttr(val);
     }
     res.emplace_back(Range{/*offset=*/zero, size, /*stride=*/one});
   }
 
-  Value size = getDimValue(builder, loc, getReal(), getOperandRank() - 1);
+  OpFoldResult size = getDim(builder, loc, getReal(), getOperandRank() - 1);
   Value stride = builder.create<arith::ShLIOp>(loc, one, getStage());
   res.emplace_back(Range{/*offset=*/zero, size, /*stride=*/stride});
   return res;
@@ -643,12 +643,12 @@ SmallVector<Range> ScanOp::getIterationDomain(OpBuilder &builder) {
   int64_t operandRank = getOperandRank();
   SmallVector<Range> loopBounds(operandRank);
   Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
   Value source = getInput();
   for (auto dim : llvm::seq<int64_t>(0, operandRank)) {
     loopBounds[dim].offset = zero;
-    loopBounds[dim].size = getDimValue(builder, loc, source, dim);
+    loopBounds[dim].size = getDim(builder, loc, source, dim);
     loopBounds[dim].stride = one;
   }
   return loopBounds;
@@ -836,12 +836,12 @@ SmallVector<Range> TopkOp::getIterationDomain(OpBuilder &builder) {
   int64_t operandRank = getInputRank();
   SmallVector<Range> loopBounds(operandRank);
   Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
   Value source = getValues();
   for (auto [idx, val] : llvm::enumerate(getInputType().getShape())) {
     loopBounds[idx].offset = zero;
-    loopBounds[idx].size = getDimValue(builder, loc, source, idx);
+    loopBounds[idx].size = getDim(builder, loc, source, idx);
     loopBounds[idx].stride = one;
   }
   return loopBounds;
@@ -1285,7 +1285,7 @@ SmallVector<Range> Im2colOp::getIterationDomain(OpBuilder &builder) {
   SmallVector<Range> loopBounds(getOutputRank());
   for (int dim = 0; dim < getOutputRank(); ++dim) {
     loopBounds[dim].offset = zero;
-    loopBounds[dim].size = getDimValue(builder, loc, dest, dim);
+    loopBounds[dim].size = getDim(builder, loc, dest, dim);
     loopBounds[dim].stride = one;
   }
   return loopBounds;
@@ -1391,15 +1391,15 @@ LogicalResult Im2colOp::getResultTilePosition(
 SmallVector<Range>
 WinogradInputTransformOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
   Value dest = getOutput();
   SmallVector<Range> loopBounds(getIterationDomainRank());
   int count = 0;
   for (auto dim :
        llvm::seq<int64_t>(getImageDimensions().size(), getOutputRank())) {
     loopBounds[count].offset = zero;
-    loopBounds[count].size = getDimValue(builder, loc, dest, dim);
+    loopBounds[count].size = getDim(builder, loc, dest, dim);
     loopBounds[count].stride = one;
     count++;
   }
@@ -1537,7 +1537,7 @@ WinogradFilterTransformOp::getIterationDomain(OpBuilder &builder) {
   for (auto dim : llvm::seq<int64_t>(numKernelDims, outRank)) {
     int64_t loopDim = dim - numKernelDims;
     loopBounds[loopDim].offset = zero;
-    loopBounds[loopDim].size = getDimValue(builder, loc, source, dim);
+    loopBounds[loopDim].size = getDim(builder, loc, source, dim);
     loopBounds[loopDim].stride = one;
   }
   return loopBounds;
@@ -1640,15 +1640,15 @@ LogicalResult WinogradFilterTransformOp::getResultTilePosition(
 SmallVector<Range>
 WinogradOutputTransformOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
   Value source = getInput();
   SmallVector<Range> loopBounds(getIterationDomainRank());
   int count = 0;
   for (auto dim :
        llvm::seq<int64_t>(getImageDimensions().size(), getInputRank())) {
     loopBounds[count].offset = zero;
-    loopBounds[count].size = getDimValue(builder, loc, source, dim);
+    loopBounds[count].size = getDim(builder, loc, source, dim);
     loopBounds[count].stride = one;
     count++;
   }
