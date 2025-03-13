@@ -29,6 +29,7 @@ LLVM_SRCS = enforce_glob(
     include = ["*.mlir"],
     exclude = [
         "large_linalg_matmul.mlir",
+        "index.mlir",
     ],
 )
 
