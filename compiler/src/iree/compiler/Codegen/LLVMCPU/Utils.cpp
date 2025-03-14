@@ -8,12 +8,16 @@
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "llvm/Support/CommandLine.h"
 
 #define DEBUG_TYPE "iree-llvmcpu-utils"
 
 namespace mlir::iree_compiler {
+
+static llvm::cl::opt<int32_t> clMaxAllowedNumberOfNativeVectors(
+    "iree-llvmcpu-max-allowed-number-of-native-vectors",
+    llvm::cl::desc("ratio used to compute the max allowed vector size"),
+    llvm::cl::init(512));
 
 bool preferIntrinsicsOverAsm(IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto intrinsicsAttr =
@@ -110,6 +114,22 @@ bool mayHaveUndefinedBehaviorInMasking(Operation *op) {
     return true;
   }
   return false;
+}
+
+int64_t getMaxVectorSizeForLargeVectorCheck(
+    IREE::HAL::ExecutableTargetAttr targetAttr) {
+  // Use 64 bits as target hardware vector size if the native_vector_size is not
+  // present.
+  int64_t maxVectorSizeInBytes = 8;
+  if (targetAttr) {
+    auto nativeVectorSizeAttr =
+        getConfigIntegerAttr(targetAttr, "native_vector_size");
+    if (nativeVectorSizeAttr) {
+      maxVectorSizeInBytes = nativeVectorSizeAttr->getInt();
+    }
+  }
+  maxVectorSizeInBytes *= clMaxAllowedNumberOfNativeVectors;
+  return maxVectorSizeInBytes;
 }
 
 } // namespace mlir::iree_compiler
