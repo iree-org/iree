@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/Input/InputDialect.h"
-#include "iree-dialects/Dialect/Input/InputOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -63,7 +63,7 @@ static bool padTensor(Location loc, OpOperand *operand,
       // Dynamic dim.
       Value inputDimValue = builder.create<tensor::DimOp>(loc, original, i);
       Value alignedDim =
-          builder.create<IREE::Input::AlignOp>(loc, inputDimValue, alignment);
+          builder.create<IREE::Util::AlignOp>(loc, inputDimValue, alignment);
       newPaddingSizes[i] = alignedDim;
       needsPad = true;
     }
@@ -93,7 +93,7 @@ struct PadContractionToBlockSizePass final
       PadContractionToBlockSizePass>::PadContractionToBlockSizePassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Input::IREEInputDialect>();
+    registry.insert<IREE::Util::UtilDialect>();
   }
 
   void runOnOperation() override {
