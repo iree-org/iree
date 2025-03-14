@@ -40,21 +40,6 @@ TEST(LibDeviceTest, iree_h2f_ieee) {
   }
 }
 
-static void TestCaseForLibDeviceTest_iree_f2h_ieee(uint32_t f32Bits) {
-  float f32 = 0.f;
-  memcpy(&f32, &f32Bits, sizeof f32);
-  uint16_t f16Bits = iree_f2h_ieee(f32);
-  if (std::isnan(f32)) {
-    EXPECT_TRUE(f16BitsIsNaN(f16Bits));
-  } else if (f32 == 0.f) {
-    EXPECT_EQ(f16Bits, std::signbit(f32) ? 0x8000 : 0);
-  } else if (std::abs(f32) < 6.1e-5f) {
-    EXPECT_TRUE(f16BitsIsDenormalOrZero(f16Bits));
-  } else {
-    EXPECT_EQ(f16Bits, iree_math_f32_to_f16(f32));
-  }
-}
-
 TEST(LibDeviceTest, iree_f2h_ieee) {
   auto testcase = [](uint32_t f32Bits) {
     float f32 = 0.f;
