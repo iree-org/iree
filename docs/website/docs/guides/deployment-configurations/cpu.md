@@ -130,6 +130,8 @@ iree-compile \
     When not cross compiling, passing `--iree-llvmcpu-target-cpu=host` is
     usually sufficient on most devices.
 
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-optimization-options.md"
+
 #### Choosing CPU targets
 
 The `--iree-llvmcpu-target-triple` flag tells the compiler to generate code

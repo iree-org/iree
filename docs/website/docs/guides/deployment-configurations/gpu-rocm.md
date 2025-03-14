@@ -167,6 +167,8 @@ iree-compile \
     mobilenetv2.mlir -o mobilenet_rocm.vmfb
 ```
 
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-optimization-options.md"
+
 ???+ tip "Tip - HIP bitcode files"
 
     That IREE comes with bundled bitcode files, which are used for linking

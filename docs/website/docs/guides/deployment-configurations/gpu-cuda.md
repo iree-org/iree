@@ -95,6 +95,8 @@ iree-compile \
     mobilenetv2.mlir -o mobilenet_cuda.vmfb
 ```
 
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-optimization-options.md"
+
 #### Choosing CUDA targets
 
 Canonically a CUDA target (`iree-cuda-target`) matching the LLVM NVPTX

@@ -61,6 +61,8 @@ for example command-line instructions of some common architectures.
 You can replace the MLIR file with the other MLIR model files, following the
 [instructions](./cpu.md#compile-a-program).
 
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-optimization-options.md"
+
 ### Compiling the bare-metal model for static-library support
 
 See the [static_library](https://github.com/iree-org/iree/tree/main/samples/static_library)
