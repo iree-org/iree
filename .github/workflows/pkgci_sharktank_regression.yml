@@ -89,7 +89,7 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
 
       - name: "Running Sharktank regression composite action"
-        uses: iree-org/iree-test-suites/sharktank_models@775d04553a07a55c64550bb1dd938548adebbe60
+        uses: geomin12/iree-test-suites/sharktank_models@75584772b61d9d0ffcbdfe25b61735a5a78fd1ac # temporary while testing
         with:
           MATRIX_NAME: ${{ matrix.name }}
           SKU: ${{ matrix.sku }}
@@ -100,3 +100,4 @@ jobs:
           EXTERNAL_TEST_FILE_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/test_suite_files
           QUALITY_TEST_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/sharktank_models/quality_tests
           BENCHMARK_TEST_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/sharktank_models/benchmarks
+          IREE_TEST_FILES: ${IREE_TEST_FILES}
