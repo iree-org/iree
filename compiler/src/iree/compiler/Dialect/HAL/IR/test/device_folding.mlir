@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --canonicalize %s | iree-opt --split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: @ImmediatelyResolveDeviceQueueBarrier
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[SIGNAL_FENCE:.+]]: !hal.fence)

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --canonicalize %s | iree-opt --split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: @FoldSubviewsIntoCmdTOp
 util.func private @FoldSubviewsIntoCmdTOp(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint {

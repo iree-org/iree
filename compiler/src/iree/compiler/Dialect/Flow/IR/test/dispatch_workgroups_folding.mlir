@@ -1,4 +1,4 @@
-// RUN: iree-opt --allow-unregistered-dialect --split-input-file --canonicalize --cse %s | iree-opt --allow-unregistered-dialect --split-input-file | FileCheck %s
+// RUN: iree-opt --allow-unregistered-dialect --split-input-file --canonicalize --cse %s | FileCheck %s
 
 // CHECK-LABEL: util.func public @dontInlineReadWrite
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<1x4xf32>)
