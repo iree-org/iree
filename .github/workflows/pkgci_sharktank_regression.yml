@@ -84,6 +84,7 @@ jobs:
 
       - name: Setup Python virtual environment
         run: |
+          echo ${{ env.IREE_TEST_FILES }}
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
@@ -97,7 +98,7 @@ jobs:
           VENV_DIR: ${{ env.VENV_DIR }}
           TARGET: ${{ matrix.target }}
           GPU: ${{ matrix.gpu }}
+          IREE_TEST_FILES: ${{ env.IREE_TEST_FILES }}
           EXTERNAL_TEST_FILE_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/test_suite_files
           QUALITY_TEST_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/sharktank_models/quality_tests
           BENCHMARK_TEST_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/sharktank_models/benchmarks
-          IREE_TEST_FILES: ${{ env.IREE_TEST_FILES }}
