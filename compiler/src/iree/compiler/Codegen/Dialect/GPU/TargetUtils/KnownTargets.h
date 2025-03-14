@@ -12,9 +12,9 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-static constexpr char kNoEncodingLayoutResolverName[] = "none";
-static constexpr char kPadEncodingLayoutResolverName[] = "pad";
-static constexpr char kDataTilingEncodingLayoutResolverName[] = "data-tiling";
+constexpr char kNoEncodingLayoutResolverName[] = "none";
+constexpr char kPadEncodingLayoutResolverName[] = "pad";
+constexpr char kDataTilingEncodingLayoutResolverName[] = "data-tiling";
 
 // Returns a TargetAttr to target Metal via SPIR-V CodeGen.
 TargetAttr getMetalTargetDetails(MLIRContext *context);

@@ -17,7 +17,7 @@
 // DATA-TILING-SAME:   iree.encoding.resolver = #iree_gpu.gpu_encoding_layout<>
 
 // NONE:      #hal.executable.target<"rocm"
-// NONE-NOT:    iree.encoding.resolver = #iree_gpu.gpu_pad_layout
+// NONE-NOT:    iree.encoding.resolver
 
 stream.executable public @main {
   stream.executable.export @main workgroups(%arg0: index) -> (index, index, index) {
