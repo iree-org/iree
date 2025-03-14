@@ -62,7 +62,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: iree-org/iree-test-suites
-          ref: 56509666d185cdb99aafb4ed4d8532b8f3c54fa3
+          ref: users/eliasj42/change-tolerance-on-llama-test
           path: iree-test-suites
           lfs: true
       - name: Install Sharktank models test suite requirements
