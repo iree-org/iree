@@ -1828,8 +1828,7 @@ func.func @attention_transpose_distribute_4d() attributes {hal.executable.target
   flow.dispatch.tensor.store %44, %36, offsets = [0, 0, 0, 0], sizes = [4, %31, 4, 128], strides = [1, 1, 1, 1] : tensor<4x?x4x128xf16> -> !flow.dispatch.tensor<writeonly:tensor<4x?x4x128xf16>>{%31}
   return
 }
-
-// CHECK-DAG:  #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 64, 64, 0, 0, 0, 0], [1, 1, 1, 1, 0, 0, 0, 0], [0, 0, 0, 0, 0, 32, 1, 1]]>
+// CHECK-DAG:  #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 64, 64, 0, 0, 0, 0], [1, 1, 1, 1, 0, 0, 0, 0], [0, 0, 0, 0, 0, 8, 1, 1]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPULinalgExtTileAndVectorize>
 //      CHECK: func.func @attention_transpose_distribute_4d
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
