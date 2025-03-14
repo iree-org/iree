@@ -32,8 +32,8 @@ jobs:
 
           - name: rocm_hip
             target: target_hip
-            gpu: gfx1100
-            runs-on: nodai-amdgpu-w7900-x86-64
+            gpu: gfx942
+            runs-on: linux-mi300-2gpu-ossci-iree-org
 
     env:
       VENV_DIR: ${{ github.workspace }}/venv
