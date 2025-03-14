@@ -41,7 +41,6 @@ iree_cc_library(
     "TransposeFusion.cpp"
   DEPS
     ::PassesIncGen
-    IREEInputDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
@@ -72,6 +71,7 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Utils
+    iree::compiler::Dialect::Util::IR
   PUBLIC
 )
 
