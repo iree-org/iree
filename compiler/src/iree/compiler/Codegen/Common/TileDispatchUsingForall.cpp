@@ -503,6 +503,8 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   // TODO(Max191): Replace populateSwapExtractWithExpandPattern with upstream
   // MLIR version once it is available (llvm-project/pull/126898).
   populateSwapExtractWithExpandPattern(cleanupPatterns);
+  cleanupPatterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
+      context, [](tensor::ExtractSliceOp) { return /*zeroSliceGuard=*/false; });
   tileAndFuseOptions.cleanupPatterns =
       FrozenRewritePatternSet(std::move(cleanupPatterns));
 
@@ -513,6 +515,9 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
           bool isDestinationOperand)
       -> std::optional<scf::SCFTileAndFuseOptions::ControlFnResult> {
     Operation *owner = originalProducer.getOwner();
+    if (isa<tensor::PadOp>(owner)) {
+      return std::nullopt;
+    }
     bool yieldProducerReplacement = yieldReplacementsFor.contains(owner);
     return scf::SCFTileAndFuseOptions::ControlFnResult{
         yieldProducerReplacement};
