@@ -254,9 +254,9 @@ struct ConvertTensorEncodeOp
     auto encodeOp = rewriter.create<IREE::Stream::TensorEncodeOp>(
         op.getLoc(), unknownType, operand.resource, op.getOperand().getType(),
         op.getOperandDims(), operand.resourceSize, op.getResult().getType(),
-        flattenValues(adaptor.getOperandDims()), resultSize,
+        flattenValues(adaptor.getResultDims()), resultSize,
         executionAffinityAttr);
-    rewriter.replaceOpWithMultiple(op, {{encodeOp, operand.resourceSize}});
+    rewriter.replaceOpWithMultiple(op, {{encodeOp, resultSize}});
     return success();
   }
 };

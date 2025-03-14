@@ -1509,7 +1509,10 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
 }
 
 def FLOW_TensorEncodeOp : FLOW_PureOp<"tensor.encode", [
+  AllRanksMatch<["operand", "result"]>,
+  AllElementTypesMatch<["operand", "result"]>,
   DeclareOpInterfaceMethods<Util_HoistableOpInterface>,
+  AttrSizedOperandSegments,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{performs a full tensor encode operation}];
@@ -1519,14 +1522,17 @@ def FLOW_TensorEncodeOp : FLOW_PureOp<"tensor.encode", [
 
   let arguments = (ins
     FLOW_Tensor:$operand,
-    FLOW_ShapeDynamicDims:$operand_dims
+    FLOW_ShapeDynamicDims:$operand_dims,
+    FLOW_ShapeDynamicDims:$result_dims
   );
   let results = (outs
     FLOW_Tensor:$result
   );
 
   let assemblyFormat = [{
-    $operand `:` type($operand) (`{` $operand_dims^ `}`)? `->` type($result)
+    $operand `:`
+    type($operand) (`{` $operand_dims^ `}`)? `->`
+    type($result) (`{` $result_dims^ `}`)?
     attr-dict-with-keyword
   }];
 
@@ -1534,7 +1540,7 @@ def FLOW_TensorEncodeOp : FLOW_PureOp<"tensor.encode", [
     bool isHoistableLeafOp() { return false; }
 
     ValueRange getOperandDynamicDims(unsigned idx) { return getOperandDims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return getOperandDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getResultDims(); }
   }];
 
   let hasVerifier = 1;

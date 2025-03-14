@@ -1967,14 +1967,6 @@ LogicalResult TensorCloneOp::verify() {
 
 LogicalResult TensorEncodeOp::verify() {
   TensorEncodeOp op = *this;
-  auto sourceEncoding = llvm::cast<RankedTensorType>(op.getSourceEncoding());
-  if (sourceEncoding.getEncoding()) {
-    return op.emitOpError("expects no encodings on the source tensor");
-  }
-  auto resultEncoding = llvm::cast<RankedTensorType>(op.getResultEncoding());
-  if (!resultEncoding.getEncoding()) {
-    return op.emitOpError() << "expects an encoding on the result tensor";
-  }
   if (failed(verifyOpDynamicDims(op, op.getSourceEncoding(),
                                  op.getSourceEncodingDims())) ||
       failed(verifyOpDynamicDims(op, op.getResultEncoding(),

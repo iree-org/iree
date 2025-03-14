@@ -1865,17 +1865,14 @@ LogicalResult TensorEncodeOp::verify() {
   if (failed(verifyOpDynamicDims(getOperation(), {getOperand()},
                                  getOperandDims())) ||
       failed(verifyOpDynamicDims(getOperation(), {getResult()},
-                                 getOperandDims()))) {
+                                 getResultDims()))) {
     return failure();
   }
   auto operandType = cast<RankedTensorType>(getOperand().getType());
-  if (operandType.getEncoding()) {
-    return emitOpError("the source operand type has encoding; not allowed");
-  }
   auto resultType = cast<RankedTensorType>(getResult().getType());
-  if (operandType != resultType.dropEncoding()) {
-    return emitOpError(
-        "the result type is not compatible with the source operand type");
+  if (failed(mlir::verifyCompatibleShape(operandType.getShape(),
+                                         resultType.getShape()))) {
+    return emitOpError("the operand shape and result shape are not compatible");
   }
   return success();
 }

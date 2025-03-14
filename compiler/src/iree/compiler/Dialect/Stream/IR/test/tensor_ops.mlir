@@ -81,9 +81,9 @@ util.func private @tensorCloneWithEncoding(%arg0: !stream.resource<*>, %arg1: in
 #encoding = #iree_encoding.testing_encoding<>
 // CHECK-DAG:   #[[$ENC:.+]] = #iree_encoding.testing_encoding<>
 // CHECK-LABEL: @tensorEncode
-util.func private @tensorEncode(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index) -> !stream.resource<*> {
-  // CHECK: = stream.tensor.encode %arg0 : tensor<?x4xf32>{%arg1} in !stream.resource<*>{%arg2} -> tensor<?x4xf32, #[[$ENC]]>{%arg1} in !stream.resource<*>{%arg3}
-  %0 = stream.tensor.encode %arg0 : tensor<?x4xf32>{%arg1} in !stream.resource<*>{%arg2} -> tensor<?x4xf32, #encoding>{%arg1} in !stream.resource<*>{%arg3}
+util.func private @tensorEncode(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index, %arg4: index) -> !stream.resource<*> {
+  // CHECK: = stream.tensor.encode %arg0 : tensor<?x4xf32>{%arg1} in !stream.resource<*>{%arg2} -> tensor<?x4xf32, #[[$ENC]]>{%arg3} in !stream.resource<*>{%arg4}
+  %0 = stream.tensor.encode %arg0 : tensor<?x4xf32>{%arg1} in !stream.resource<*>{%arg2} -> tensor<?x4xf32, #encoding>{%arg3} in !stream.resource<*>{%arg4}
   util.return %0 : !stream.resource<*>
 }
 
