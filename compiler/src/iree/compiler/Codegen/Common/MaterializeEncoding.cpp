@@ -18,11 +18,14 @@
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -78,6 +81,18 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
           IREE::CPU::CPUEncodingLayoutAttr::get(ctx,
                                                 targetAttr.getConfiguration()));
     } else if (isROCMBackend(targetAttr)) {
+      // Check if the encoding resolver is a GPUPadLayoutAttr. For padding
+      // encoding materialization, we use a separate pass, so skip
+      // materialization here.
+      // TODO(Max191): Support GPUPadLayoutAttr materialization through this
+      // pass, and remove the ad-hoc materialization pass for padding.
+      DictionaryAttr targetConfig = targetAttr.getConfiguration();
+      if (targetConfig && targetConfig.getAs<IREE::GPU::GPUPadLayoutAttr>(
+                              IREE::Encoding::kEncodingResolverAttrName)) {
+        LDBG("Found GPUPadLayoutAttr encoding resolver. Materialization will "
+             "be handled later.");
+        return success();
+      }
       LDBG("Select GPUEncodingLayoutAttr attribute as the layout attribute.");
       layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
           IREE::GPU::GPUEncodingLayoutAttr::get(
