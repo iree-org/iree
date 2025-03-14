@@ -128,10 +128,6 @@ void registerLinalgExtExternalModels(DialectRegistry &registry) {
     registerOpsWithLinalgExtOpInterface<
 #include "mlir/Dialect/Linalg/IR/LinalgStructuredOps.cpp.inc"
         >(ctx);
-  });
-  registry.addExtension(+[](MLIRContext *ctx,
-                            IREE::LinalgExt::IREELinalgExtDialect *dialect) {
-    ctx->loadDialect<linalg::LinalgDialect>();
     linalg::SoftmaxOp::attachInterface<SoftmaxFusionOpInterfaceAdapter>(*ctx);
   });
 }
