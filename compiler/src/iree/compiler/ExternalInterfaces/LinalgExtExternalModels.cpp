@@ -131,6 +131,7 @@ void registerLinalgExtExternalModels(DialectRegistry &registry) {
   });
   registry.addExtension(+[](MLIRContext *ctx,
                             IREE::LinalgExt::IREELinalgExtDialect *dialect) {
+    ctx->loadDialect<linalg::LinalgDialect>();
     linalg::SoftmaxOp::attachInterface<SoftmaxFusionOpInterfaceAdapter>(*ctx);
   });
 }
