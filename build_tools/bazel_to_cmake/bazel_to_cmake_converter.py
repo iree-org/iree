@@ -789,6 +789,7 @@ class BuildFileFunctions(object):
         runner_args=None,
         tags=None,
         timeout=None,
+        deps=None,
         **kwargs,
     ):
         if self._should_skip_target(tags=tags, **kwargs):
@@ -806,6 +807,7 @@ class BuildFileFunctions(object):
         runner_args_block = self._convert_string_list_block("RUNNER_ARGS", runner_args)
         labels_block = self._convert_string_list_block("LABELS", tags)
         timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
+        deps_block = self._convert_string_list_block("DEPS", deps)
 
         self._converter.body += (
             f"iree_check_single_backend_test_suite(\n"
@@ -818,6 +820,7 @@ class BuildFileFunctions(object):
             f"{runner_args_block}"
             f"{labels_block}"
             f"{timeout_block}"
+            f"{deps_block}"
             f")\n\n"
         )
 
@@ -832,6 +835,7 @@ class BuildFileFunctions(object):
         tags=None,
         target_cpu_features_variants=None,
         timeout=None,
+        deps=None,
         **kwargs,
     ):
         if self._should_skip_target(tags=tags, **kwargs):
@@ -858,6 +862,7 @@ class BuildFileFunctions(object):
             "TARGET_CPU_FEATURES_VARIANTS", target_cpu_features_variants
         )
         timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
+        deps_block = self._convert_string_list_block("DEPS", deps)
 
         self._converter.body += (
             f"iree_check_test_suite(\n"
@@ -871,6 +876,7 @@ class BuildFileFunctions(object):
             f"{labels_block}"
             f"{target_cpu_features_variants_block}"
             f"{timeout_block}"
+            f"{deps_block}"
             f")\n\n"
         )
 
@@ -1006,6 +1012,21 @@ class BuildFileFunctions(object):
             self._converter.body += f"\n{content}\n"
         else:
             self._converter.header += f"\n{content}\n"
+
+    def iree_genrule(self, name, srcs, outs, cmd):
+        name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        srcs_block = self._convert_srcs_block(srcs)
+        outs_block = self._convert_target_list_block("OUTS", outs)
+        cmd_block = self._convert_string_arg_block("CMD", cmd, quote=True)
+
+        self._converter.body += (
+            f"iree_genrule(\n"
+            f"{name_block}"
+            f"{srcs_block}"
+            f"{outs_block}"
+            f"{cmd_block}"
+            f")\n\n"
+        )
 
 
 class Converter(object):

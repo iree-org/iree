@@ -267,6 +267,61 @@ module @hoist_implicit_capture {
 
 // -----
 
+// CHECK-LABEL: @hoist_multi_nested_regions
+module @hoist_multi_nested_regions {
+  // CHECK: util.global private @[[HOISTED_SYM:.*]] : i32
+  // CHECK: util.initializer {
+  // CHECK:       %[[C0:.*]] = arith.constant 0 : i32
+  // CHECK:       %[[CE0:.+]] = "iree_unregistered.const_expr"(%[[C0]])
+  // CHECK:         "iree_unregistered.const_expr"
+  // CHECK:           ^bb0
+  // CHECK:           math.absi
+  // CHECK:       util.global.store %[[CE0]], @[[HOISTED_SYM]] : i32
+  // CHECK:       util.return
+  // CHECK: }
+  // CHECK: util.func public @main
+  util.func public @main() -> (i32) {
+    %0 = arith.constant 0 : i32
+    // CHECK-NOT: arith.constant
+    // CHECK-NOT: iree_unregistered.const_expr
+    // CHECK: %[[VAL:.*]] = util.global.load immutable @[[HOISTED_SYM]] : i32
+    // CHECK: util.return %[[VAL]]
+    %2 = "iree_unregistered.const_expr"(%0) ({
+    ^bb0(%inner0 : i32):
+      %3 = "iree_unregistered.const_expr"(%inner0) ({
+      ^bb0(%inner1 : i32):
+        %4 = math.absi %inner0 : i32
+        "iree_unregistered.yield"(%4) : (i32) -> i32
+      }) : (i32) -> i32
+      "iree_unregistered.yield"(%3) : (i32) -> i32
+    }) : (i32) -> i32
+    util.return %2 : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @hoist_multi_nested_regions
+// CHECK-NOT:     util.global
+// CHECK-NOT:     util.initializer
+module @hoist_multi_nested_regions {
+  util.func public @main() -> (i32) {
+    %0 = arith.constant 0 : i32
+    %2 = "iree_unregistered"(%0) ({
+    ^bb0(%inner0 : i32):
+      %3 = "iree_unregistered.const_expr"(%inner0) ({
+      ^bb0(%inner1 : i32):
+        %4 = math.absi %inner0 : i32
+        "iree_unregistered.yield"(%4) : (i32) -> i32
+      }) : (i32) -> i32
+      "iree_unregistered.yield"(%3) : (i32) -> i32
+    }) : (i32) -> i32
+    util.return %2 : i32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @do_not_hoist_non_value_type_results
 module @do_not_hoist_non_value_type_results {
   // CHECK-NOT: util.global
@@ -300,17 +355,25 @@ module @do_not_hoist_uses_within_dispatches {
 
 // -----
 
-// CHECK-LABEL: @do_not_hoist_uses_within_dispatches
-module @do_not_hoist_uses_within_dispatches {
-  // CHECK-NOT: util.global
-  // CHECK-NOT: util.initializer
+// CHECK-LABEL: @hoist_dispatch_regions
+module @hoist_dispatch_regions {
+  // CHECK: util.global private @[[HOISTED_SYM:.+]] : tensor<2x2xi32>
+  // CHECK: util.initializer {
+  // CHECK:       %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<2x2xi32>) {
+  // CHECK:         linalg.generic
+  // CHECK:         flow.return
+  // CHECK:       }
+  // CHECK:       util.global.store %[[DISPATCH]], @[[HOISTED_SYM]] : tensor<2x2xi32>
+  // CHECK:       util.return
+  // CHECK: }
   // CHECK: util.func public @main
   util.func public @main() -> tensor<2x2xi32> {
     %0 = arith.constant dense<[1, 2, 3, 4]> : tensor<4xi32>
     %1 = arith.constant dense<[[6, 7], [8,9]]> : tensor<2x2xi32>
     %expanded = tensor.expand_shape %0[[0, 1]] output_shape [2, 2] : tensor<4xi32> into tensor<2x2xi32>
     %2 = tensor.empty() : tensor<2x2xi32>
-    // CHECK: flow.dispatch.region
+    // CHECK: %[[VAL:.*]] = util.global.load immutable @[[HOISTED_SYM]] : tensor<2x2xi32>
+    // CHECK: util.return %[[VAL]]
     %3 = flow.dispatch.region -> (tensor<2x2xi32>) {
       %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%expanded, %1 : tensor<2x2xi32>, tensor<2x2xi32>) outs(%2 : tensor<2x2xi32>) {
       ^bb0(%in: i32, %in_0: i32, %out: i32):

@@ -1904,7 +1904,7 @@ module {
 
 // CHECK: #translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {enable_loop_peeling}>
 // CHECK-LABEL: @test_mod_vectorizing_strategy_peeling
-// CHECK-SAME: attributes {hal.executable.target = #executable_target_system_elf_x86_64_, translation_info = #translation}
+// CHECK-SAME: attributes {hal.executable.target = #executable_target_system_elf_x86_64, translation_info = #translation}
 
 // -----
 

@@ -77,6 +77,7 @@ void buildIREEPrecompileTransformPassPipeline(
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     PreprocessingOptions preprocessingOptions,
     GlobalOptimizationOptions globalOptimizationOptions,
+    DispatchCreationOptions dispatchCreationOptions,
     SchedulingOptions schedulingOptions,
     IREE::HAL::TargetOptions halTargetOptions, IREEVMPipelineHooks &hooks,
     OpPassManager &passManager, IREEVMPipelinePhase compileFrom,
@@ -247,6 +248,7 @@ void buildIREEVMTransformPassPipeline(
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     PreprocessingOptions preprocessingOptions,
     GlobalOptimizationOptions globalOptimizationOptions,
+    DispatchCreationOptions dispatchCreationOptions,
     SchedulingOptions schedulingOptions,
     IREE::HAL::TargetOptions halTargetOptions,
     IREE::VM::TargetOptions vmTargetOptions, IREEVMPipelineHooks &hooks,
@@ -254,8 +256,8 @@ void buildIREEVMTransformPassPipeline(
     IREEVMPipelinePhase compileTo) {
   buildIREEPrecompileTransformPassPipeline(
       targetRegistry, bindingOptions, inputOptions, preprocessingOptions,
-      globalOptimizationOptions, schedulingOptions, halTargetOptions, hooks,
-      passManager, compileFrom, compileTo);
+      globalOptimizationOptions, dispatchCreationOptions, schedulingOptions,
+      halTargetOptions, hooks, passManager, compileFrom, compileTo);
 
   if (compileTo <= IREEVMPipelinePhase::GlobalOptimization)
     return; // early-exit
@@ -274,13 +276,14 @@ void buildIREEVMTransformPassPipeline(
     // No flow/stream processing (implies no tensors).
     break;
   default:
-    DispatchCreation::TransformOptions dispatchCreationOptions;
+    DispatchCreation::TransformOptions dispatchTransformOptions;
+    dispatchTransformOptions.options = dispatchCreationOptions;
     if (compileFrom < IREEVMPipelinePhase::DispatchCreation) { // late-entry
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "DispatchCreation");
       if (hooks.beforePhase)
         hooks.beforePhase(IREEVMPipelinePhase::DispatchCreation, passManager);
       DispatchCreation::buildDispatchCreationPassPipeline(
-          passManager, dispatchCreationOptions);
+          passManager, dispatchTransformOptions);
       if (hooks.afterPhase)
         hooks.afterPhase(IREEVMPipelinePhase::DispatchCreation, passManager);
       IREE_TRACE_ADD_END_FRAME_PASS(passManager, "DispatchCreation");
@@ -385,6 +388,7 @@ void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
       IREE::HAL::TargetRegistry::getGlobal(), BindingOptions::FromFlags::get(),
       InputDialectOptions::FromFlags::get(),
       PreprocessingOptions::FromFlags::get(), highLevelOptimizations,
+      DispatchCreationOptions::FromFlags::get(),
       SchedulingOptions::FromFlags::get(),
       IREE::HAL::TargetOptions::FromFlags::get(),
       IREE::VM::TargetOptions::FromFlags::get(), defaultHooks, passManager);

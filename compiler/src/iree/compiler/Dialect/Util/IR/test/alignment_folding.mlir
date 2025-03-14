@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --canonicalize --mlir-print-local-scope %s | iree-opt --split-input-file --mlir-print-local-scope | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize --mlir-print-local-scope %s | FileCheck %s
 
 // CHECK-LABEL: @foldSameAlignment
 // CHECK-SAME: (%[[VALUE:.+]]: index, %[[ALIGNMENT:.+]]: index)

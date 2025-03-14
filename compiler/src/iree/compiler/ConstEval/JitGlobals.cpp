@@ -72,6 +72,7 @@ struct CompileOptions {
   InputDialectOptions inputOptions;
   PreprocessingOptions preprocessingOptions;
   GlobalOptimizationOptions globalOptimizationOptions;
+  DispatchCreationOptions dispatchCreationOptions;
   SchedulingOptions schedulingOptions;
   IREE::HAL::TargetOptions executableOptions;
   IREE::VM::TargetOptions targetOptions;
@@ -647,6 +648,7 @@ public:
         *targetRegistry.value, compileOptions->bindingOptions,
         compileOptions->inputOptions, compileOptions->preprocessingOptions,
         compileOptions->globalOptimizationOptions,
+        compileOptions->dispatchCreationOptions,
         compileOptions->schedulingOptions, compileOptions->executableOptions,
         compileOptions->targetOptions, compileOptions->hooks, compilePipeline);
   }

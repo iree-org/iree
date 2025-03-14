@@ -22,7 +22,7 @@ static void populateEscapingProducers(Operation *parentOp,
                                       ConstExprOpInfo &info) {
   SmallPtrSet<Operation *, 8> containedOps;
   parentOp->walk<WalkOrder::PreOrder>([&](Operation *itOp) {
-    containedOps.insert(parentOp);
+    containedOps.insert(itOp);
 
     // For the outer-most op, consider that all operands escape.
     if (itOp == parentOp) {

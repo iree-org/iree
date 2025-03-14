@@ -52,6 +52,36 @@ else:
             with self.assertRaises(ValueError):
                 session.set_flags("--does-not-exist=1")
 
+        def testOptFlags(self):
+            session = Session()
+            flags = session.get_flags()
+            self.assertIn("--iree-opt-level=O0", flags)
+            self.assertIn("--iree-global-optimization-opt-level=O0", flags)
+            self.assertIn("--iree-opt-strip-assertions=false", flags)
+
+            session.set_flags("--iree-opt-level=O2")
+            flags = session.get_flags()
+            self.assertIn("--iree-opt-level=O2", flags)
+            self.assertIn("--iree-global-optimization-opt-level=O0", flags)
+            self.assertIn("--iree-opt-strip-assertions=false", flags)
+
+            inv = session.invocation()
+            with tempfile.NamedTemporaryFile("w", delete=False) as tf:
+                tf.write("module {}")
+                tf.close()
+            try:
+                source = Source.open_file(session, tf.name)
+                inv.parse_source(source)
+            finally:
+                os.unlink(tf.name)
+            out = Output.open_membuffer()
+            inv.output_ir(out)
+            inv.execute()
+            flags = session.get_flags()
+            self.assertIn("--iree-opt-level=O2", flags)
+            self.assertIn("--iree-global-optimization-opt-level=O0", flags)
+            self.assertIn("--iree-opt-strip-assertions=false", flags)
+
     class DlInvocationTest(unittest.TestCase):
         def testCreate(self):
             session = Session()

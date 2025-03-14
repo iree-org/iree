@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Pipelines/Options.h"
+#include "llvm/Passes/OptimizationLevel.h"
 
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::BindingOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::InputDialectOptions);
@@ -12,8 +13,21 @@ IREE_DEFINE_COMPILER_OPTION_FLAGS(
     mlir::iree_compiler::GlobalOptimizationOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::SchedulingOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::PreprocessingOptions);
+IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::GlobalPipelineOptions);
+IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::DispatchCreationOptions);
 
 namespace mlir::iree_compiler {
+
+void GlobalPipelineOptions::bindOptions(OptionsBinder &binder) {
+  static llvm::cl::OptionCategory category(
+      "IREE global pipeline options controlling the entire compilation flow.");
+
+  binder.topLevelOpt(
+      "iree-opt-level", optLevel,
+      llvm::cl::desc("Global optimization level to apply to the entire "
+                     "compilation flow."),
+      llvm::cl::cat(category));
+}
 
 void BindingOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category(
@@ -122,14 +136,22 @@ void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
 void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category(
       "IREE options for controlling global optimizations.");
+  auto init_at_opt = binder.optimizationLevel(
+      "iree-global-optimization-opt-level", optLevel,
+      llvm::cl::desc("Optimization level for the this pipeline"),
+      llvm::cl::cat(category));
   binder.opt<bool>(
       "iree-opt-aggressively-propagate-transposes",
       aggressiveTransposePropagation,
+      {init_at_opt(llvm::OptimizationLevel::O0, false),
+       init_at_opt(llvm::OptimizationLevel::O3, true)},
       llvm::cl::desc(
           "Propagates transposes to named ops even when the resulting op will "
           "be a linalg.generic"),
       llvm::cl::cat(category));
   binder.opt<bool>("iree-opt-outer-dim-concat", outerDimConcat,
+                   {init_at_opt(llvm::OptimizationLevel::O0, false),
+                    init_at_opt(llvm::OptimizationLevel::O1, true)},
                    llvm::cl::desc("Transposes all concatenations to happen"
                                   "along the outer most dimension."),
                    llvm::cl::cat(category));
@@ -159,6 +181,8 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
           "Reduces numeric precision to lower bit depths where possible."),
       llvm::cl::cat(category));
   binder.opt<bool>("iree-opt-strip-assertions", stripAssertions,
+                   {init_at_opt(llvm::OptimizationLevel::O0, false),
+                    init_at_opt(llvm::OptimizationLevel::O1, true)},
                    llvm::cl::desc("Strips debug assertions after any useful "
                                   "information has been extracted."),
                    llvm::cl::cat(category));
@@ -198,6 +222,8 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
 
   binder.opt<bool>(
       "iree-opt-generalize-matmul", generalizeMatmul,
+      {init_at_opt(llvm::OptimizationLevel::O0, false),
+       init_at_opt(llvm::OptimizationLevel::O2, true)},
       llvm::cl::desc("Convert named matmul ops to linalg generic ops during "
                      "global optimization to enable better fusion."),
       llvm::cl::cat(category));
@@ -266,6 +292,21 @@ void SchedulingOptions::bindOptions(OptionsBinder &binder) {
                           llvm::cl::desc("File path to write statistics to; or "
                                          "`` for stderr or `-` for stdout."),
                           llvm::cl::cat(category));
+}
+
+void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
+  static llvm::cl::OptionCategory category(
+      "IREE options for controlling dispatch region creation.");
+  auto init_at_opt = binder.optimizationLevel(
+      "iree-dispatch-creation-opt-level", optLevel,
+      llvm::cl::desc("Optimization level for the this pipeline"),
+      llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-dispatch-creation-enable-aggressive-fusion", enableAggressiveFusion,
+      {init_at_opt(llvm::OptimizationLevel::O0, false),
+       init_at_opt(llvm::OptimizationLevel::O2, true)},
+      llvm::cl::desc("Aggressive fusion opportunities that are behind a flag "
+                     "since all backends dont support it yet"));
 }
 
 } // namespace mlir::iree_compiler
