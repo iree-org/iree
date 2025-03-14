@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --canonicalize %s | iree-opt --split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: @cmp_eq_same
 util.func @cmp_eq_same(%value: !util.buffer) -> i1 {

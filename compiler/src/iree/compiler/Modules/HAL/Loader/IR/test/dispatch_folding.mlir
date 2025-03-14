@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --canonicalize -cse %s | iree-opt --split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize -cse %s | FileCheck %s
 
 // CHECK-LABEL: @fold_binding_subspans_into_dispatch
 util.func public @fold_binding_subspans_into_dispatch(
