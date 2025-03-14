@@ -1508,7 +1508,6 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
   let hasFolder = 1;
 }
 
-// TODO(hanchung): Add folders.
 def FLOW_TensorEncodeOp : FLOW_PureOp<"tensor.encode", [
   DeclareOpInterfaceMethods<Util_HoistableOpInterface>,
   Util_ShapeAwareOp,

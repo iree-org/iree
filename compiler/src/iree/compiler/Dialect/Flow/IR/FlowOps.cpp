@@ -1873,8 +1873,9 @@ LogicalResult TensorEncodeOp::verify() {
     return emitOpError("the source operand type has encoding; not allowed");
   }
   auto resultType = cast<RankedTensorType>(getResult().getType());
-  if (operandType.dropEncoding() != resultType.dropEncoding()) {
-    return failure();
+  if (operandType != resultType.dropEncoding()) {
+    return emitOpError(
+        "the result type is not compatible with the source operand type");
   }
   return success();
 }

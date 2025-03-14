@@ -209,7 +209,6 @@ util.func public @tensorEncodeDynamic(%arg0 : tensor<?x4xf32>, %arg1 : index) ->
   util.return %0 : tensor<?x4xf32, #encoding>
 }
 
-
 // -----
 
 // CHECK-LABEL: @tensorSlice
