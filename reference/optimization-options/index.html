@@ -1986,6 +1986,54 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#optimization-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      Optimization level
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Optimization level">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-level-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      Pipeline-level control
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Pipeline-level control">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dispatch-creation-iree-dispatch-creation-opt-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dispatch Creation (iree-dispatch-creation-opt-level)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#global-optimization-iree-global-optimization-opt-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      Global Optimization (iree-global-optimization-opt-level)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#high-level-program-optimizations" class="md-nav__link">
     <span class="md-ellipsis">
       High level program optimizations
@@ -2017,15 +2065,6 @@
   <a href="#numeric-precision-reduction-iree-opt-numeric-precision-reduction-off" class="md-nav__link">
     <span class="md-ellipsis">
       Numeric precision reduction (--iree-opt-numeric-precision-reduction (off))
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#strip-debug-assertions-iree-opt-strip-assertions-off" class="md-nav__link">
-    <span class="md-ellipsis">
-      Strip Debug Assertions (--iree-opt-strip-assertions (off))
     </span>
   </a>
   
@@ -3709,6 +3748,54 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#optimization-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      Optimization level
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Optimization level">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-level-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      Pipeline-level control
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Pipeline-level control">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dispatch-creation-iree-dispatch-creation-opt-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dispatch Creation (iree-dispatch-creation-opt-level)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#global-optimization-iree-global-optimization-opt-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      Global Optimization (iree-global-optimization-opt-level)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#high-level-program-optimizations" class="md-nav__link">
     <span class="md-ellipsis">
       High level program optimizations
@@ -3740,15 +3827,6 @@
   <a href="#numeric-precision-reduction-iree-opt-numeric-precision-reduction-off" class="md-nav__link">
     <span class="md-ellipsis">
       Numeric precision reduction (--iree-opt-numeric-precision-reduction (off))
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#strip-debug-assertions-iree-opt-strip-assertions-off" class="md-nav__link">
-    <span class="md-ellipsis">
-      Strip Debug Assertions (--iree-opt-strip-assertions (off))
     </span>
   </a>
   
@@ -3794,6 +3872,96 @@ is presented with its English name, flag to enable/disable, and default state.</
   constructor</li>
 <li><code>ireeCompilerOptionsSetFlags()</code> compiler C API function</li>
 </ul>
+<h2 id="optimization-level">Optimization level<a class="headerlink" href="#optimization-level" title="Permanent link">link</a></h2>
+<p>As in other compilers like clang and gcc, IREE provides a high level optimization
+level flag (<code>iree-opt-level</code>) that enables different sets of underlying options.</p>
+<p><code>iree-opt-level</code> specifies the optimization level for the entire compilation
+flow. Lower optimization levels prioritize debuggability and stability, while
+higher levels focus on maximizing performance. By default, <code>iree-opt-level</code> is
+set to <code>O0</code> (minimal or no optimizations).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Not all flags that control performance are nested under <code>iree-opt-level</code>.
+See <a href="#high-level-program-optimizations">High level program optimizations</a>
+below for subflags not covered by optimization flags.</p>
+</div>
+<p>This flag takes the following values:</p>
+<table>
+<thead>
+<tr>
+<th>Optimization Level</th>
+<th>Pros</th>
+<th>Cons</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>O0</strong> (Default, Minimal Optimizations)</td>
+<td><ul style="list-style-type:none;"><li>✔️ Fastest compilation time.</li><li>✔️ Generated code is easier to debug.</li><li>✔️ Keeps assertions enabled</li></ul></td>
+<td><ul style="list-style-type:none;"><li>❌ Poor runtime performance.</li><li>❌ Higher runtime memory usage.</li><li>❌ Larger code size due to lack of optimization.</li></ul></td>
+</tr>
+<tr>
+<td><strong>O1</strong> (Basic Optimizations)</td>
+<td><ul style="list-style-type:none;"><li>✔️ Enables optimizations, allowing for better runtime performance.</li><li>✔️ Optimizations are compatible with all backends.</li></ul></td>
+<td><ul style="list-style-type:none;"><li>➖ Only applies conservative optimizations.</li><li>❌ Reduced debuggability.</li></ul></td>
+</tr>
+<tr>
+<td><strong>O2</strong> (Optimizations without full backend support)</td>
+<td><ul style="list-style-type:none;"><li>✔️ Even more aggressive optimizations.</li><li>✔️ Strikes a balance between optimization level and compatibility.</li></ul></td>
+<td><ul style="list-style-type:none;"><li>➖ Some optimizations may not be supported by all backends.</li><li>❌ Reduced debuggability.</li></ul></td>
+</tr>
+<tr>
+<td><strong>O3</strong> (Aggressive Optimization)</td>
+<td><ul style="list-style-type:none;"><li>✔️ Highest runtime performance.</li><li>✔️ Enables advanced and aggressive transformations.</li><li>✔️ Exploits backend-specific optimizations for optimal efficiency.</li></ul></td>
+<td><ul style="list-style-type:none;"><li>➖ Longer compile times.</li><li>❌ Some optimizations may be unstable.</li><li>❌ Reduced debuggability.</li></ul></td>
+</tr>
+</tbody>
+</table>
+<p>Although <code>iree-opt-level</code> sets the default for each subflag, they can be
+explicitly set on or off independently.</p>
+<p>For example:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Apply the default optimizations of `O2` but don&#39;t remove assertions.</span>
+iree-compile<span class="w"> </span>--iree-opt-level<span class="o">=</span>O2<span class="w"> </span>--iree-strip-assertions<span class="o">=</span><span class="nb">false</span>
+
+<span class="c1"># Minimize optimizations, but still preform aggressive fusion.</span>
+iree-compile<span class="w"> </span>--iree-opt-level<span class="o">=</span>O0<span class="w"> </span>--iree-dispatch-creation-enable-aggressive-fusion<span class="o">=</span><span class="nb">true</span>
+</code></pre></div>
+<h3 id="pipeline-level-control">Pipeline-level control<a class="headerlink" href="#pipeline-level-control" title="Permanent link">link</a></h3>
+<p>In addition to <code>iree-opt-level</code>, IREE provides optimization controls at the
+pipeline level. These flags allow fine-grained tuning of specific compilation
+stages while still respecting the topmost optimization level unless explicitly
+overridden.</p>
+<h4 id="dispatch-creation-iree-dispatch-creation-opt-level">Dispatch Creation (<code>iree-dispatch-creation-opt-level</code>)<a class="headerlink" href="#dispatch-creation-iree-dispatch-creation-opt-level" title="Permanent link">link</a></h4>
+<ul>
+<li>
+<p><code>iree-dispatch-creation-enable-aggressive-fusion</code> (enabled at <code>O2</code>)</p>
+<p>Enables more aggressive fusion opportunities not yet supported by all backends</p>
+</li>
+</ul>
+<h4 id="global-optimization-iree-global-optimization-opt-level">Global Optimization (<code>iree-global-optimization-opt-level</code>)<a class="headerlink" href="#global-optimization-iree-global-optimization-opt-level" title="Permanent link">link</a></h4>
+<ul>
+<li>
+<p><code>iree-opt-strip-assertions</code> (enabled at <code>O1</code>)</p>
+<p>Strips all <code>std.assert</code> ops in the input program after useful information for
+optimization analysis has been extracted. Assertions provide useful
+user-visible error messages but can prevent critical optimizations.
+Assertions are not, however, a substitution for control flow and frontends
+that want to check errors in optimized release builds should do so via
+actual code - similar to when one would <code>if (foo) return false;</code> vs.
+<code>assert(foo);</code> in a normal program.</p>
+</li>
+<li>
+<p><code>iree-opt-outer-dim-concat</code> (enabled at <code>O1</code>)</p>
+<p>Transpose concat operations to ocurr along the outermost dimension. The
+resulting concat will now be contiguous and the inserted transposes can
+possibly be fused with surrounding ops.</p>
+</li>
+<li>
+<p><code>iree-opt-aggressively-propagate-transposes</code> (enabled at <code>O3</code>)</p>
+<p>Enables more transpose propagation by allowing transposes to be propagated
+to <code>linalg</code> named ops even when the resulting op will be a <code>linalg.generic</code>.</p>
+</li>
+</ul>
 <h2 id="high-level-program-optimizations">High level program optimizations<a class="headerlink" href="#high-level-program-optimizations" title="Permanent link">link</a></h2>
 <h3 id="constant-evaluation-iree-opt-const-eval-on">Constant evaluation (<code>--iree-opt-const-eval</code> (on))<a class="headerlink" href="#constant-evaluation-iree-opt-const-eval-on" title="Permanent link">link</a></h3>
 <p>Performs compile-time evaluation of any global initializers which produce
@@ -3825,13 +3993,6 @@ programs where large amounts (up to the whole) have had their numeric operations
 and constant data rewritten to lower precision types.</p>
 <p>This feature is actively evolving and will be the subject of dedicated
 documentation when ready.</p>
-<h3 id="strip-debug-assertions-iree-opt-strip-assertions-off">Strip Debug Assertions (<code>--iree-opt-strip-assertions</code> (off))<a class="headerlink" href="#strip-debug-assertions-iree-opt-strip-assertions-off" title="Permanent link">link</a></h3>
-<p>Strips all <code>std.assert</code> ops in the input program after useful information for
-optimization analysis has been extracted. Assertions provide useful user-visible
-error messages but can prevent critical optimizations. Assertions are not,
-however, a substitution for control flow and frontends that want to check errors
-in optimized release builds should do so via actual code - similar to when one
-would <code>if (foo) return false;</code> vs. <code>assert(foo);</code> in a normal program.</p>
 
 
 

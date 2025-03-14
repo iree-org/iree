@@ -4186,6 +4186,13 @@ using one of these options:</p>
 <p>When not cross compiling, passing <code>--iree-llvmcpu-target-cpu=host</code> is
 usually sufficient on most devices.</p>
 </details>
+<details class="tip" open="open">
+<summary>Tip - Compiler Optimizations</summary>
+<p>Use <code>--iree-opt-level=[O0,O1,O2,O3]</code> to enable additional compiler
+optimizations. The default value of <code>O0</code> enables only minimal optimizations
+while higher levels enable progressively more aggressive optimizations. See
+<a href="../../../reference/optimization-options/">Optimization Options</a> for more details.</p>
+</details>
 <h4 id="choosing-cpu-targets">Choosing CPU targets<a class="headerlink" href="#choosing-cpu-targets" title="Permanent link">link</a></h4>
 <p>The <code>--iree-llvmcpu-target-triple</code> flag tells the compiler to generate code
 for a specific type of CPU. You can see the list of supported targets with

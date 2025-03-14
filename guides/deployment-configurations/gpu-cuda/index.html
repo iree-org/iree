@@ -4133,6 +4133,13 @@ iree-import-onnx<span class="w"> </span>mobilenetv2-10.onnx<span class="w"> </sp
 </span><span class="hll"><span class="w">    </span>--iree-cuda-target<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
 </span><span class="w">    </span>mobilenetv2.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_cuda.vmfb
 </code></pre></div>
+<details class="tip" open="open">
+<summary>Tip - Compiler Optimizations</summary>
+<p>Use <code>--iree-opt-level=[O0,O1,O2,O3]</code> to enable additional compiler
+optimizations. The default value of <code>O0</code> enables only minimal optimizations
+while higher levels enable progressively more aggressive optimizations. See
+<a href="../../../reference/optimization-options/">Optimization Options</a> for more details.</p>
+</details>
 <h4 id="choosing-cuda-targets">Choosing CUDA targets<a class="headerlink" href="#choosing-cuda-targets" title="Permanent link">link</a></h4>
 <p>Canonically a CUDA target (<code>iree-cuda-target</code>) matching the LLVM NVPTX
 backend of the form <code>sm_&lt;arch_number&gt;</code> is needed to compile towards each GPU
