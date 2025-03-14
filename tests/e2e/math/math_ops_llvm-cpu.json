@@ -155,8 +155,7 @@
   {
     "op": "exp2",
     "type": "f16",
-    "atol": 0.25,
-    "comment": "TODO(#20163)",
+    "atol": 1.0e-03,
     "rtol": 1.0e-02
   },
   {
@@ -339,8 +338,7 @@
   {
     "op": "powf",
     "type": "f16",
-    "atol": 0.25,
-    "comment": "TODO(#20163)",
-    "rtol": 5.0e-03
+    "atol": 1.0e-03,
+    "rtol": 1.0e-02
   }
 ]

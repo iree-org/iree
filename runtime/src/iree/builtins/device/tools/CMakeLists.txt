@@ -30,6 +30,7 @@ iree_cc_test(
     "libdevice_test.cc"
   DEPS
     iree::base
+    iree::base::internal
     iree::base::internal::flags
     iree::builtins::device
     iree::testing::gtest
