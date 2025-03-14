@@ -100,4 +100,4 @@ jobs:
           EXTERNAL_TEST_FILE_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/test_suite_files
           QUALITY_TEST_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/sharktank_models/quality_tests
           BENCHMARK_TEST_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/sharktank_models/benchmarks
-          IREE_TEST_FILES: ${IREE_TEST_FILES}
+          IREE_TEST_FILES: ${{ env.IREE_TEST_FILES }}
