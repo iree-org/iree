@@ -1166,7 +1166,7 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
   {
     FunctionLikeNest funcPassManager(modulePassManager);
     funcPassManager.addPass(createMaterializeDeviceEncodingPass);
-    // TODO(Max191): Combine the EncodingToPaddingPasses with the
+    // TODO(#20160): Combine the EncodingToPaddingPasses with the
     // MaterializeDeviceEncodingPass.
     addEncodingToPaddingPasses(funcPassManager);
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
