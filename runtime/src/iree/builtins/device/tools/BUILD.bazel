@@ -29,6 +29,7 @@ iree_runtime_cc_test(
     srcs = ["libdevice_test.cc"],
     deps = [
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/builtins/device",
         "//runtime/src/iree/testing:gtest",
