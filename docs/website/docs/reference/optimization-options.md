@@ -18,13 +18,35 @@ These flags can be passed to the:
 
 ## Optimization level
 
-The `iree-opt-level` flag specifies the optimization level for the entire
-compilation flow. This flag can be passed the following values:
+As in other compilers like clang and gcc, IREE provides a high level optimization
+level flag (`iree-opt-level`) that enables different sets of underlying options.
 
-- `O0`: Minimal or no optimizations
-- `O1`: Enables optimizations that are broadly supported by most backends
-- `O2`: Applies additional optimizations that may only be supported by certain backends
-- `O3`: Aggressive optimizations
+`iree-opt-level` specifies the optimization level for the entire compilation
+flow. Lower optimization levels prioritize debuggability and stability, while
+higher levels focus on maximizing performance. By default, `iree-opt-level` is
+set to `O0` (minimal or no optimizations).
+
+This flag takes the following values:
+
+| Optimization Level | Pros | Cons |
+|-------------------|------|------|
+| **O0** (Default, Minimal Optimizations) | - Fastest compilation time.  <br> - Generated code is easier to debug. <br> - Keeps assertions enabled | - Poor runtime performance. <br> - Higher runtime memory usage. <br> - Larger code size due to lack of optimization. |
+| **O1** (Basic Optimizations) | - Enables optimizations, allowing for better runtime performance. <br> - Optimizations are compatable with all backends.  | - Only applies conservative optimizations. <br> - Reduced debuggability. |
+| **O2** (Optimizations without full backend support) | - Even more aggressive optimizations. <br> - Strikes a balance between optimization level and compatibility. | - Some optimizations may not be supported by all backends. <br> - Reduced debuggability. |
+| **O3** (Aggressive Optimization) | - Highest runtime performance.  <br> - Enables advanced and aggressive transformations.  <br> - Exploits backend-specific optimizations for optimal efficiency. | - Longer compile times.  <br> - Some optimizations may be unstable. <br> - Reduced debuggability. |
+
+Although `iree-opt-level` sets the default for each subflag, they can be
+explicitly set on or off independently.
+
+For example:
+
+```sh
+// Apply the default optimizations of `O2` but don't remove assertions.
+iree-compile --iree-opt-level=O2 --iree-strip-assertions=false
+
+// Minimize optimizations, but still preform aggressive fusion.
+iree-compile --iree-opt-level=O0 --iree-dispatch-creation-enable-aggressive-fusion=true
+```
 
 ## High level program optimizations
 
