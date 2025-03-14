@@ -920,10 +920,10 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
 
     if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(user)) {
       // Only clone if used by Query, Mask, or scale.
-      if (!llvm::is_contained<Value>({attentionOp.getQuery(),
-                                      attentionOp.getMask(),
-                                      attentionOp.getScale()},
-                                     v)) {
+      if (!llvm::is_contained<Value>(
+              {attentionOp.getQuery(), attentionOp.getMask(),
+               attentionOp.getScale(), attentionOp.getOutput()},
+              v)) {
         return true;
       }
     }

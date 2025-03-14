@@ -36,7 +36,6 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Support/LogicalResult.h"
-#include "mlir/Transforms/CSE.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-collapse-dimensions"
@@ -1011,17 +1010,10 @@ void CollapseDimensionsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *context = funcOp->getContext();
   IRRewriter rewriter(context);
-  DominanceInfo &domInfo = getAnalysis<DominanceInfo>();
 
   SmallVector<IREE::Flow::DispatchRegionOp> modifiedDispatchOps;
   funcOp->walk([&](IREE::Flow::DispatchRegionOp dispatchOp) {
     if (collapseDimensionsForDispatch(rewriter, dispatchOp, maxIterations)) {
-      // Remove duplicated reshapes
-      // FIX: workaround for `optimizeClosureLikeOp` breaking when a
-      // `flow.dispatch.workgroup` op has 2 of the same operands but one is
-      // readonly and the other is readwrite.
-      mlir::eliminateCommonSubExpressions(rewriter, domInfo, dispatchOp,
-                                          /*changed=*/nullptr);
       modifiedDispatchOps.push_back(dispatchOp);
     }
   });
