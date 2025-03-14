@@ -663,6 +663,7 @@ struct CPUHostEncodingLayoutResolverAttrInterface final
     SmallVector<NamedAttribute> configItems;
     storeNamedAttrIfPresent(configItems, config, "cpu_features");
     storeNamedAttrIfPresent(configItems, config, "target_triple");
+    storeNamedAttrIfPresent(configItems, config, "ukernels");
     return CPUEncodingLayoutAttr::get(ctx,
                                       DictionaryAttr::get(ctx, configItems));
   }
