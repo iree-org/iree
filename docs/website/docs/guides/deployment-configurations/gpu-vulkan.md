@@ -165,6 +165,8 @@ iree-compile \
     mobilenetv2.mlir -o mobilenet_vulkan.vmfb
 ```
 
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-optimization-options.md"
+
 #### Choosing Vulkan targets
 
 The `--iree-vulkan-target` specifies the GPU architecture to target. It
