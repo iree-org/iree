@@ -165,6 +165,20 @@ def MaterializeCopyOnWritePass :
   ];
 }
 
+def MaterializeEncodingsPass :
+    Pass<"iree-stream-materialize-encodings", "mlir::ModuleOp"> {
+  let summary = "Materialize stream.tensor.encode .";
+  let description = [{
+    TBD.
+  }];
+  let dependentDialects = [
+    "mlir::func::FuncDialect",
+    "IREE::Encoding::IREEEncodingDialect",
+    "IREE::Flow::FlowDialect",
+    "IREE::Stream::StreamDialect",
+  ];
+}
+
 def ElideAsyncCopiesPass :
     Pass<"iree-stream-elide-async-copies", "mlir::ModuleOp"> {
   let summary = "Elides copies when they are not performing meaningful work.";

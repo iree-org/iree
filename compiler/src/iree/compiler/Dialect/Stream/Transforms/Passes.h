@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_STREAM_TRANSFORMS_PASSES_H_
 #define IREE_COMPILER_DIALECT_STREAM_TRANSFORMS_PASSES_H_
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/IR/BuiltinOps.h"
