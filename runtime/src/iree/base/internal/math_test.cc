@@ -192,6 +192,11 @@ TEST(F16ConversionTest, F32ToF16) {
   // Underflow
   EXPECT_EQ(0, iree_math_f32_to_f16(FLT_MIN));
   EXPECT_EQ(0x8000, iree_math_f32_to_f16(-FLT_MIN));
+  EXPECT_EQ(0, iree_math_f32_to_f16(1.0e-05));
+  EXPECT_EQ(0x8000, iree_math_f32_to_f16(-1.0e-05));
+  EXPECT_EQ(0, iree_math_f32_to_f16(6.1e-05));  // Near largest denormal
+  EXPECT_EQ(0x8000, iree_math_f32_to_f16(-6.1e-05));
+
   // Denormals may or may not get flushed to zero. Accept both ways.
   uint16_t positive_denormal = iree_math_f32_to_f16(kF16Min / 2);
   EXPECT_TRUE(positive_denormal == 0 || positive_denormal == 0x0200);
@@ -357,6 +362,11 @@ TEST(F8E5M2ConversionTest, F32ToF8E5M2) {
   // Underflow
   EXPECT_EQ(0, iree_math_f32_to_f8e5m2(FLT_MIN));
   EXPECT_EQ(0x80, iree_math_f32_to_f8e5m2(-FLT_MIN));
+  EXPECT_EQ(0, iree_math_f32_to_f8e5m2(kF8E5M2Min * 0.5f));
+  EXPECT_EQ(0x80, iree_math_f32_to_f8e5m2(-kF8E5M2Min * 0.5f));
+  EXPECT_EQ(0, iree_math_f32_to_f8e5m2(kF8E5M2Min * 0.75f));
+  EXPECT_EQ(0x80, iree_math_f32_to_f8e5m2(-kF8E5M2Min * 0.75f));
+
   // Denormals may or may not get flushed to zero. Accept both ways.
   uint16_t positive_denormal = iree_math_f32_to_f8e5m2(kF8E5M2Min / 2);
   EXPECT_TRUE(positive_denormal == 0 || positive_denormal == 0x02);

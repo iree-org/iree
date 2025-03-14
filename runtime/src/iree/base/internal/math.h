@@ -396,7 +396,7 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
         // Generate NaN.
         generate_nan = true;
       }
-    } else if (arithmetic_exp < -(1 << (dst_exp_bits - 1))) {
+    } else if (arithmetic_exp + dst_exp_bias <= 0) {
       // Underflow. Generate zero. Leave zero mantissa.
       dst_exp = 0;
     } else {
