@@ -7,10 +7,11 @@
 name: PkgCI Build Packages
 on:
     workflow_call:
+    
 jobs:
   linux_x86_64_release_packages:
     name: Linux Release (x86_64)
-    runs-on: linux-mi300-1gpu-ossci-iree-org
+    runs-on: azure-linux-scale
     strategy:
       fail-fast: false
     env:
