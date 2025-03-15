@@ -6,6 +6,32 @@
 
 from iree.compiler import ir
 
+# Test upstream dialects import
+from iree.compiler.dialects import (
+    affine,
+    amdgpu,
+    arith,
+    builtin,
+    cf,
+    complex,
+    func,
+    gpu,
+    linalg,
+    llvm,
+    math,
+    memref,
+    pdl,
+    rocdl,
+    scf,
+    shape,
+    structured_transform,
+    tensor,
+    tosa,
+    transform,
+    vector,
+    vector_transform,
+)
+
 # Make sure that our dialects import.
 from iree.compiler.dialects import flow, hal, stream, vm, util, iree_codegen, iree_gpu
 
