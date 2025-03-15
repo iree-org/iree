@@ -508,12 +508,9 @@ public:
     }
     Value source = expandOp.getSrc();
     auto transposeOp = source.getDefiningOp<linalg::TransposeOp>();
-    // Do not propagate through reshapes if the transpose has multiple users, as
-    // this could end up duplicating the transposes. We should only propagate
-    // through reshape when it is free to do so.
-    if (!transposeOp || !transposeOp->hasOneUse()) {
+    if (!transposeOp) {
       return rewriter.notifyMatchFailure(
-          expandOp, "expand shape input is not a single-use transpose");
+          expandOp, "expand shape input is not a transpose");
     }
 
     auto invPerm = invertPermutationVector(transposeOp.getPermutation());
@@ -604,7 +601,7 @@ public:
     linalg::TransposeOp transposeOp;
     for (OpOperand *input : linalgOp.getDpsInputOperands()) {
       auto maybeTransposeOp = input->get().getDefiningOp<linalg::TransposeOp>();
-      if (maybeTransposeOp && maybeTransposeOp->hasOneUse()) {
+      if (maybeTransposeOp) {
         transposeOp = maybeTransposeOp;
         transposeOperand = input;
         break;

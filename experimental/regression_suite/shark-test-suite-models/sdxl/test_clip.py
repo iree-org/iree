@@ -92,7 +92,6 @@ ROCM_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
     f"--iree-hip-target={rocm_chip}",
     "--iree-opt-level=O3",
-    "--iree-opt-generalize-matmul=false",
     "--iree-input-type=torch",
     "--iree-opt-const-eval=false",
     "--iree-hip-waves-per-eu=2",
