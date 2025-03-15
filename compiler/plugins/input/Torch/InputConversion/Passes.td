@@ -24,6 +24,11 @@ def ConvertTMTensorToLinalgExtPass :
   let summary = "Convert from TMTensor ops to LinalgExt ops on tensors";
 }
 
+def ConvertTorchUnstructuredToLinalgExtPass :
+    InterfacePass<"torch-iree-torch-unstructured-to-linalg-ext", "mlir::FunctionOpInterface"> {
+  let summary = "Convert unstructured Torch ops to LinalgExt ops";
+}
+
 def SetStrictSymbolicShapesPass :
     InterfacePass<"torch-iree-set-strict-symbolic-shapes", "mlir::FunctionOpInterface"> {
   let summary = "Adds the attribute indicating strict symbolic shapes in Torch IR";
