@@ -59,6 +59,35 @@ util.func public @resourceDeallocaAwait(%arg0: index, %arg1: !stream.resource<st
 
 // -----
 
+// CHECK-LABEL: @resourceRetain
+util.func private @resourceRetain(%arg0: !stream.resource<transient>, %arg1: index) {
+  stream.resource.retain %arg0 : !stream.resource<transient>{%arg1}
+  // CHECK-NEXT: util.return
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @resourceRelease
+util.func private @resourceRelease(%arg0: !stream.resource<transient>, %arg1: index) -> i1 {
+  // CHECK: %[[WAS_TERMINAL:.+]] = arith.constant false
+  %was_terminal = stream.resource.release %arg0 : !stream.resource<transient>{%arg1}
+  // CHECK: util.return %[[WAS_TERMINAL]]
+  util.return %was_terminal : i1
+}
+
+// -----
+
+// CHECK-LABEL: @resourceIsTerminal
+util.func private @resourceIsTerminal(%arg0: !stream.resource<transient>, %arg1: index) -> i1 {
+  // CHECK: %[[IS_TERMINAL:.+]] = arith.constant false
+  %is_terminal = stream.resource.is_terminal %arg0 : !stream.resource<transient>{%arg1}
+  // CHECK: util.return %[[IS_TERMINAL]]
+  util.return %is_terminal : i1
+}
+
+// -----
+
 // CHECK-LABEL: @resourceSize
 util.func public @resourceSize(%arg0: !stream.resource<transient>) -> index {
   // CHECK: %[[SIZE:.+]] = util.buffer.size %arg0

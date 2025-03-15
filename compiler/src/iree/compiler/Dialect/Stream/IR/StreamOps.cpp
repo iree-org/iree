@@ -1484,7 +1484,7 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
   if (locs.size() == 1) {
     auto allocaOp = builder.create<IREE::Stream::ResourceAllocaOp>(
         locs.front(), resourceType, timepointType, storageSizes.front(),
-        awaitTimepoint, affinityAttr);
+        /*indeterminate_lifetime=*/UnitAttr{}, awaitTimepoint, affinityAttr);
     return {allocaOp, {allocaOp.getResult()}};
   }
   auto fusedLoc = builder.getFusedLoc(locs);
@@ -1514,7 +1514,7 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
   // Create the new alloca based on the total required size.
   auto allocaOp = builder.create<IREE::Stream::ResourceAllocaOp>(
       fusedLoc, resourceType, timepointType, packOp.getTotalLength(),
-      awaitTimepoint, affinityAttr);
+      /*indeterminate_lifetime=*/UnitAttr{}, awaitTimepoint, affinityAttr);
   auto slab = allocaOp.getResult();
   auto slabSize = packOp.getTotalLength();
 
@@ -1528,6 +1528,28 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
                           .getResult());
   }
   return {allocaOp, results};
+}
+
+//===----------------------------------------------------------------------===//
+// stream.resource.retain
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+// stream.resource.release
+//===----------------------------------------------------------------------===//
+
+void ResourceReleaseOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "is_terminal");
+}
+
+//===----------------------------------------------------------------------===//
+// stream.resource.is_terminal
+//===----------------------------------------------------------------------===//
+
+void ResourceIsTerminalOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "is_terminal");
 }
 
 //===----------------------------------------------------------------------===//

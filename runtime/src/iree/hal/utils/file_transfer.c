@@ -393,7 +393,8 @@ static void iree_hal_transfer_operation_notify_completion(
   // on a chunk but workers 0-3 succeeded).
   iree_status_t status = iree_hal_device_queue_dealloca(
       operation->device, operation->queue_affinity, wait_semaphore_list,
-      signal_semaphore_list, operation->staging_buffer);
+      signal_semaphore_list, operation->staging_buffer,
+      IREE_HAL_DEALLOCA_FLAG_NONE);
 
   // If the dealloca failed we don't have a great way of letting anyone know.
   // We'll just drop it on the floor for now and let the buffer be freed by
@@ -599,7 +600,7 @@ static iree_status_t iree_hal_transfer_operation_launch_read(
               operation->device, operation->queue_affinity, wait_semaphore_list,
               alloca_semaphore_list, IREE_HAL_ALLOCATOR_POOL_DEFAULT,
               staging_buffer_params, operation->staging_buffer_size,
-              &operation->staging_buffer));
+              IREE_HAL_ALLOCA_FLAG_NONE, &operation->staging_buffer));
 
   // After the alloca completes each worker will be at the same starting point.
   // We'll wait on each and start the worker-specific coroutines.
@@ -791,7 +792,7 @@ static iree_status_t iree_hal_transfer_operation_launch_write(
               operation->device, operation->queue_affinity, wait_semaphore_list,
               alloca_semaphore_list, IREE_HAL_ALLOCATOR_POOL_DEFAULT,
               staging_buffer_params, operation->staging_buffer_size,
-              &operation->staging_buffer));
+              IREE_HAL_ALLOCA_FLAG_NONE, &operation->staging_buffer));
 
   // After the alloca completes each worker will be at the same starting point.
   // We'll wait on each and start the worker-specific coroutines.

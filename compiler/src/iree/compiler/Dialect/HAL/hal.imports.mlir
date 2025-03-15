@@ -62,6 +62,22 @@ vm.import private @buffer.assert(
   %buffer_usage : i32
 )
 
+// Preserves the underlying buffer allocation for the caller.
+vm.import private @buffer.allocation.preserve(
+  %buffer : !vm.ref<!hal.buffer>
+)
+
+// Discards ownership of the underlying buffer allocation by the caller and
+// returns true if the caller was the last owner.
+vm.import private @buffer.allocation.discard(
+  %buffer : !vm.ref<!hal.buffer>
+) -> i32
+
+// Returns true if the underlying buffer allocation has a single owner.
+vm.import private @buffer.allocation.is_terminal(
+  %buffer : !vm.ref<!hal.buffer>
+) -> i32
+
 // Returns a reference to a subspan of the buffer.
 vm.import private @buffer.subspan(
   %source_buffer : !vm.ref<!hal.buffer>,
@@ -349,12 +365,11 @@ vm.import private @device.queue.alloca(
   %queue_affinity : i64,
   %wait_fence : !vm.ref<!hal.fence>,
   %signal_fence : !vm.ref<!hal.fence>,
-  %pool : i32,
+  %pool : i64,
   %memory_types : i32,
   %buffer_usage : i32,
-  // TODO(benvanik): add %reserved : i32 (padding).
-  %allocation_size : i64
-  // TODO(benvanik): add %flags : i64.
+  %allocation_size : i64,
+  %flags : i64
 ) -> !vm.ref<!hal.buffer>
 
 // Deallocates a queue-ordered transient buffer.
@@ -365,8 +380,8 @@ vm.import private @device.queue.dealloca(
   %queue_affinity : i64,
   %wait_fence : !vm.ref<!hal.fence>,
   %signal_fence : !vm.ref<!hal.fence>,
-  // TODO(benvanik): add %flags : i64.
-  %buffer : !vm.ref<!hal.buffer>
+  %buffer : !vm.ref<!hal.buffer>,
+  %flags : i64
 )
 
 // Enqueues a single queue-ordered fill operation.

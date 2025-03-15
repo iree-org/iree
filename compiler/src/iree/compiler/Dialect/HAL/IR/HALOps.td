@@ -122,6 +122,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
     AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$source,
     TypeAttr:$target_encoding,
     HAL_ShapeDynamicDims:$target_dims,
+    UnitAttr:$consume,
     Optional<HAL_Fence>:$wait_fence,
     OptionalAttr<StrAttr>:$name,
     OptionalAttr<AnyAttr>:$affinity
@@ -133,6 +134,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
     (`wait` `(` $wait_fence^ `)` `=` `` `>`)?
+    (`consume` $consume^)?
     $source
     ($name^)?
     `:` type($source) `->`
@@ -145,6 +147,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
       "Type":$resultType,
       "Value":$source,
       "TypeAttr":$targetEncoding,
+      "bool":$consume,
       "StringAttr":$name,
       "Attribute":$affinity
     )>,
@@ -152,6 +155,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
       "Type":$resultType,
       "Value":$source,
       "TypeAttr":$targetEncoding,
+      "bool":$consume,
       "Value":$waitFence,
       "StringAttr":$name,
       "Attribute":$affinity
@@ -683,6 +687,116 @@ def HAL_BufferAssertOp : HAL_Op<"buffer.assert"> {
 
   // TODO(benvanik): fold away when we know some properties of the buffer
   // (such as when we create it ourselves earlier on) or we've already asserted.
+}
+
+def HAL_BufferAllocationPreserveOp : HAL_Op<"buffer.allocation.preserve"> {
+  let summary = [{preserves the underlying buffer allocation for the caller}];
+  let description = [{
+    Preservation is a way to track lifetime of an asynchronously-allocated
+    buffer on multiple device timelines. Incrementing the preserve count
+    indicates that there is a new co-owner of the buffer lifetime and that owner
+    must make a corresponding `hal.buffer.allocation.discard` call to release
+    their ownership and possibly deallocate the buffer.
+
+    Though intended for asynchronously-allocated buffers it is fine to preserve
+    synchronously-allocated ones. Any code that _may_ receive asynchronously
+    allocated buffers must properly balance their preserves and discards. Code
+    that will never receive asynchronously allocated buffers - such as those
+    using the inline HAL - can ignore tracking.
+
+    This preservation roughly translates to retaining logical ownership of the
+    allocation and may differ from the buffer object reference count. As an
+    example if the Python GC hasn't run there may still be several references to
+    the buffer object even after the application has stopped using the buffer.
+    Tracking the preserve count independently allows the application to eagerly
+    deallocate the buffer without relying on the lifetime of the object to do
+    so.
+
+    A preserved buffer will still be deallocated if there are no longer any
+    references to the buffer object. Preserving the buffer only prevents any
+    other owner from deallocating it while there are references outstanding.
+    See `hal.buffer.allocation.discard` for more information about releasing
+    ownership.
+  }];
+
+  let arguments = (ins
+    HAL_BufferType:$buffer
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    `<` $buffer `:` type($buffer) `>`
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_BufferAllocationDiscardOp : HAL_Op<"buffer.allocation.discard", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{discards ownership of the underlying buffer allocation by the caller}];
+  let description = [{
+    Decrementing the preserve count indicates that the owner is releasing its
+    ownership. When the last owner discards their ownership it is safe to
+    deallocate the buffer allocation even if there are still references
+    remaining to the buffer object.
+
+    Any code that _may_ receive asynchronously allocated buffers must properly
+    balance their preserves and discards. Code that will never receive
+    asynchronously allocated buffers - such as those using the inline HAL - can
+    ignore tracking as there's no asynchronous deallocation and allocation
+    lifetime is tied to buffer object lifetime. Note that unbalanced discards
+    will result in either correctness issues (buffer is deallocated too early)
+    or extended lifetime (buffer cannot be deallocated until all buffer object
+    references have been released).
+
+    Returns true if the caller was the last owner of the allocation and it can
+    now be deallocated.
+  }];
+
+  let arguments = (ins
+    HAL_BufferType:$buffer
+  );
+  let results = (outs
+    I1:$result
+  );
+
+  let assemblyFormat = [{
+    `<` $buffer `:` type($buffer) `>`
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_BufferAllocationIsTerminalOp : HAL_Op<"buffer.allocation.is_terminal", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{returns true if the underlying buffer allocation has a single owner}];
+  let description = [{
+    This can be used to reuse a buffer that has no other owners.
+
+    Note that an allocated buffer may have multiple suballocations referencing
+    it and this query is only for the entire allocation. When reusing a buffer
+    one should ensure the allocation size matches (or is within threshold) so
+    that a reuse of 16MB doesn't keep an underlying allocation of 16GB wired.
+
+    Since device allocators are expected to reuse memory if in doubt prefer to
+    dealloca and alloca. This method should only be used in situations where the
+    buffer types are known to the application (such as fixed input and output
+    buffers).
+  }];
+
+  let arguments = (ins
+    HAL_BufferType:$buffer
+  );
+  let results = (outs
+    I1:$result
+  );
+
+  let assemblyFormat = [{
+    `<` $buffer `:` type($buffer) `>`
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
 }
 
 def HAL_BufferSubspanOp : HAL_PureOp<"buffer.subspan", [
@@ -1797,7 +1911,8 @@ def HAL_DeviceQueueAllocaOp : HAL_Op<"device.queue.alloca", [
     HAL_DeviceQueuePool:$pool,
     HAL_MemoryTypeBitfieldAttr:$memory_types,
     HAL_BufferUsageBitfieldAttr:$buffer_usage,
-    HAL_DeviceSize:$result_size
+    HAL_DeviceSize:$result_size,
+    HAL_AllocaFlagBitfieldAttr:$flags
   );
   let results = (outs
     HAL_Buffer:$result
@@ -1812,6 +1927,7 @@ def HAL_DeviceQueueAllocaOp : HAL_Op<"device.queue.alloca", [
     `pool` `(` $pool `)`
     `type` `(` $memory_types `)`
     `usage` `(` $buffer_usage `)`
+    `flags` `(` $flags `)`
     `:` custom<SizeAwareType>(type($result), $result_size)
     attr-dict-with-keyword
   }];
@@ -1835,7 +1951,8 @@ def HAL_DeviceQueueDeallocaOp : HAL_Op<"device.queue.dealloca"> {
     HAL_DeviceQueueAffinity:$queue_affinity,
     HAL_Fence:$wait_fence,
     HAL_Fence:$signal_fence,
-    HAL_Buffer:$buffer
+    HAL_Buffer:$buffer,
+    HAL_DeallocaFlagBitfieldAttr:$flags
   );
   let results = (outs);
 
@@ -1845,6 +1962,7 @@ def HAL_DeviceQueueDeallocaOp : HAL_Op<"device.queue.dealloca"> {
     `wait` `(` $wait_fence `)`
     `signal` `(` $signal_fence `)`
     `buffer` `(` $buffer `:` type($buffer) `)`
+    `flags` `(` $flags `)`
     attr-dict-with-keyword
   }];
 

@@ -46,11 +46,13 @@ def IREEInput_TensorImportOp : IREEInput_PureOp<"tensor.import"> {
   let summary = "Imports a Buffer(View) to a tensor, providing dynamic dims";
   let arguments = (ins
     AnyTypeOf<[IREEInput_BufferType, IREEInput_BufferViewType]>:$source,
-    IREEInput_ShapeDynamicDims:$target_dims
+    IREEInput_ShapeDynamicDims:$target_dims,
+    UnitAttr:$consume
   );
   let results = (outs IREEInput_Tensor:$target);
 
   let assemblyFormat = [{
+    (`consume` $consume^)?
     $source `:` type($source) `->` type($target) (`{` $target_dims^ `}`)?
     attr-dict-with-keyword
   }];

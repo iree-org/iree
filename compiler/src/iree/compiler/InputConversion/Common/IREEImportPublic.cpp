@@ -204,6 +204,7 @@ class TensorImportPattern
       // the work.
       rewriter.replaceOpWithNewOp<IREE::HAL::TensorImportOp>(
           srcOp, resultType, adaptor.getSource(), TypeAttr::get(resultType),
+          srcOp.getConsume(),
           /*name=*/nullptr,
           /*affinity=*/nullptr);
     } else {
@@ -211,7 +212,8 @@ class TensorImportPattern
       // will get it).
       rewriter.replaceOpWithNewOp<IREE::HAL::TensorImportOp>(
           srcOp, resultType, adaptor.getSource(), TypeAttr::get(resultType),
-          adaptor.getTargetDims(), /*wait_fence=*/Value{}, /*name=*/nullptr,
+          adaptor.getTargetDims(), srcOp.getConsumeAttr(),
+          /*wait_fence=*/Value{}, /*name=*/nullptr,
           /*affinity=*/nullptr);
     }
     return success();

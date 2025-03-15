@@ -446,7 +446,7 @@ HalBuffer HalDevice::QueueAlloca(uint64_t allocation_size,
   CheckApiStatus(iree_hal_device_queue_alloca(
                      raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY, wait_list,
                      signal_list, IREE_HAL_ALLOCATOR_POOL_DEFAULT, params,
-                     allocation_size, &out_buffer),
+                     allocation_size, IREE_HAL_ALLOCA_FLAG_NONE, &out_buffer),
                  "allocating memory on queue");
   return HalBuffer::StealFromRawPtr(out_buffer);
 }
@@ -500,7 +500,8 @@ void HalDevice::QueueDealloca(HalBuffer& buffer, py::handle wait_semaphores,
 
   CheckApiStatus(
       iree_hal_device_queue_dealloca(raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY,
-                                     wait_list, signal_list, buffer.raw_ptr()),
+                                     wait_list, signal_list, buffer.raw_ptr(),
+                                     IREE_HAL_DEALLOCA_FLAG_NONE),
       "deallocating memory on queue");
 }
 
