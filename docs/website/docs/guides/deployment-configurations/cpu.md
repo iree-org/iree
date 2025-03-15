@@ -118,8 +118,6 @@ iree-compile \
     mobilenetv2.mlir -o mobilenet_cpu.vmfb
 ```
 
---8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-optimization-options.md"
-
 ???+ tip "Tip - Target CPUs and CPU features"
 
     By default, the compiler will use a generic CPU target which will result in
@@ -131,6 +129,8 @@ iree-compile \
 
     When not cross compiling, passing `--iree-llvmcpu-target-cpu=host` is
     usually sufficient on most devices.
+
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-optimization-options.md"
 
 #### Choosing CPU targets
 

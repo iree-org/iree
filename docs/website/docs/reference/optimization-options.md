@@ -36,10 +36,10 @@ This flag takes the following values:
 
 | Optimization Level | Pros | Cons |
 |-------------------|------|------|
-| **O0** (Default, Minimal Optimizations) | - Fastest compilation time.  <br> - Generated code is easier to debug. <br> - Keeps assertions enabled | - Poor runtime performance. <br> - Higher runtime memory usage. <br> - Larger code size due to lack of optimization. |
-| **O1** (Basic Optimizations) | - Enables optimizations, allowing for better runtime performance. <br> - Optimizations are compatable with all backends.  | - Only applies conservative optimizations. <br> - Reduced debuggability. |
-| **O2** (Optimizations without full backend support) | - Even more aggressive optimizations. <br> - Strikes a balance between optimization level and compatibility. | - Some optimizations may not be supported by all backends. <br> - Reduced debuggability. |
-| **O3** (Aggressive Optimization) | - Highest runtime performance.  <br> - Enables advanced and aggressive transformations.  <br> - Exploits backend-specific optimizations for optimal efficiency. | - Longer compile times.  <br> - Some optimizations may be unstable. <br> - Reduced debuggability. |
+| **O0** (Default, Minimal Optimizations) | <ul style="list-style-type:none;"><li>✔️ Fastest compilation time.</li><li>✔️ Generated code is easier to debug.</li><li>✔️ Keeps assertions enabled</li></ul> | <ul style="list-style-type:none;"><li>❌ Poor runtime performance.</li><li>❌ Higher runtime memory usage.</li><li>❌ Larger code size due to lack of optimization.</li></ul> |
+| **O1** (Basic Optimizations) | <ul style="list-style-type:none;"><li>✔️ Enables optimizations, allowing for better runtime performance.</li><li>✔️ Optimizations are compatible with all backends.</li></ul> | <ul style="list-style-type:none;"><li>➖ Only applies conservative optimizations.</li><li>❌ Reduced debuggability.</li></ul> |
+| **O2** (Optimizations without full backend support) | <ul style="list-style-type:none;"><li>✔️ Even more aggressive optimizations.</li><li>✔️ Strikes a balance between optimization level and compatibility.</li></ul> | <ul style="list-style-type:none;"><li>➖ Some optimizations may not be supported by all backends.</li><li>❌ Reduced debuggability.</li></ul> |
+| **O3** (Aggressive Optimization) | <ul style="list-style-type:none;"><li>✔️ Highest runtime performance.</li><li>✔️ Enables advanced and aggressive transformations.</li><li>✔️ Exploits backend-specific optimizations for optimal efficiency.</li></ul> | <ul style="list-style-type:none;"><li>➖ Longer compile times.</li><li>❌ Some optimizations may be unstable.</li><li>❌ Reduced debuggability.</li></ul> |
 
 Although `iree-opt-level` sets the default for each subflag, they can be
 explicitly set on or off independently.
