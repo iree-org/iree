@@ -1858,6 +1858,26 @@ LogicalResult TensorCloneOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// flow.tensor.encode
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorEncodeOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {getOperand()},
+                                 getOperandDims())) ||
+      failed(verifyOpDynamicDims(getOperation(), {getResult()},
+                                 getResultDims()))) {
+    return failure();
+  }
+  auto operandType = cast<RankedTensorType>(getOperand().getType());
+  auto resultType = cast<RankedTensorType>(getResult().getType());
+  if (failed(mlir::verifyCompatibleShape(operandType.getShape(),
+                                         resultType.getShape()))) {
+    return emitOpError("the operand shape and result shape are not compatible");
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // flow.tensor.barrier
 //===----------------------------------------------------------------------===//
 
