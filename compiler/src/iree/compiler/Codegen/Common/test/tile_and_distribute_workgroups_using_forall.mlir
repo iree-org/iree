@@ -803,3 +803,23 @@ func.func @set_encoding_gpu(%arg0 : tensor<?x?xi8>) -> tensor<?x?x8x4x4x4x2x8xi8
 //       CHECK:     tensor.expand_shape
 //       CHECK:     linalg.generic
 //       CHECK:     tensor.parallel_insert_slice
+
+// -----
+
+func.func @pad_fusion(%0 : tensor<?x?xf32>, %1 : tensor<?x?xf32>, %2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %padded = tensor.pad %0 low[1, 1] high[1, 1] {
+  ^bb0(%arg0: index, %arg1: index):
+    tensor.yield %cst : f32
+  } : tensor<?x?xf32> to tensor<?x?xf32>
+  %3 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0]]>}
+      ins(%padded, %1 : tensor<?x?xf32>, tensor<?x?xf32>)
+      outs(%2 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %3 : tensor<?x?xf32>
+}
+
+// CHECK-LABEL: func @pad_fusion(
+//       CHECK: %[[RESULT:.+]] = scf.forall (%[[ID0:.+]], %[[ID1:.+]])
+//       CHECK:   %[[PADDED:.+]] = tensor.pad
+//       CHECK:   %[[MATMUL:.+]] = linalg.matmul
+//  CHECK-SAME:   ins(%[[PADDED]]
