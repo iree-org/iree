@@ -206,6 +206,7 @@ void registerStreamExternalModels(DialectRegistry &registry) {
     AffinityOpAttrExternalModel<IREE::Flow::TensorEmptyOp>::add(context);
     AffinityOpAttrExternalModel<IREE::Flow::TensorSplatOp>::add(context);
     AffinityOpAttrExternalModel<IREE::Flow::TensorCloneOp>::add(context);
+    AffinityOpAttrExternalModel<IREE::Flow::TensorEncodeOp>::add(context);
     AffinityOpAttrExternalModel<IREE::Flow::TensorSliceOp>::add(context);
     AffinityOpAttrExternalModel<IREE::Flow::TensorUpdateOp>::add(context);
     AffinityOpAttrExternalModel<IREE::Flow::ChannelDefaultOp>::add(context);

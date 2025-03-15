@@ -22,6 +22,7 @@ iree_cc_library(
     "CloneProducersIntoDispatchRegions.cpp"
     "CollapseDimensions.cpp"
     "CollapseReductionDimensions.cpp"
+    "ConvertDispatchRegionsToFlowOps.cpp"
     "ConvertDispatchRegionsToWorkgroups.cpp"
     "ConvertTensorToFlow.cpp"
     "ElementwiseOpFusion.cpp"

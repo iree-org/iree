@@ -163,6 +163,11 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
       IREE::Stream::createEncodeDeviceTensorsPass());
 
   buildStreamCleanupPassPipeline(passManager, transformOptions);
+  passManager.addPass(IREE::Stream::createMaterializeEncodingsPass());
+  FunctionLikeNest(passManager)
+      // Standard MLIR cleanup.
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass);
 
   // Everything must now be in stream.async.* form but we don't yet have
   // lifetime assigned.

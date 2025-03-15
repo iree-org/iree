@@ -1508,6 +1508,39 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
   let hasFolder = 1;
 }
 
+// TODO(hanchung): Add folders.
+def FLOW_TensorEncodeOp : FLOW_PureOp<"tensor.encode", [
+  DeclareOpInterfaceMethods<Util_HoistableOpInterface>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{performs a full tensor encode operation}];
+  let description = [{
+    Encode the input tensor into an encoded output tensor.
+  }];
+
+  let arguments = (ins
+    FLOW_Tensor:$operand,
+    FLOW_ShapeDynamicDims:$operand_dims
+  );
+  let results = (outs
+    FLOW_Tensor:$result
+  );
+
+  let assemblyFormat = [{
+    $operand `:` type($operand) (`{` $operand_dims^ `}`)? `->` type($result)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    bool isHoistableLeafOp() { return false; }
+
+    ValueRange getOperandDynamicDims(unsigned idx) { return getOperandDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getOperandDims(); }
+  }];
+
+  let hasVerifier = 1;
+}
+
 def FLOW_TensorBarrierOp : FLOW_PureOp<"tensor.barrier", [
   AllTypesMatch<["operand", "result"]>,
   DeclareOpInterfaceMethods<Util_HoistableOpInterface>,

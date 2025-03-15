@@ -100,6 +100,38 @@ util.func public @tensorBitCastWithSingleUse(%input: tensor<5x24x48xi8>) -> tens
 
 // -----
 
+// CHECK-DAG:   #[[$ENC:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-LABEL: @tensorEncodeStatic
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+#encoding = #iree_encoding.testing_encoding<>
+util.func public @tensorEncodeStatic(%input: tensor<30x2x96xf32>) -> tensor<30x2x96xf32, #encoding> {
+  // CHECK: %[[SIZE:.+]] = stream.tensor.sizeof tensor<30x2x96xf32, #[[$ENC]]> : index
+  // CHECK: %[[RESULT:.+]] = stream.tensor.encode %[[ARG0]] : tensor<30x2x96xf32> in !stream.resource<*>{%[[ARG1]]} -> tensor<30x2x96xf32, #[[$ENC]]> in !stream.resource<*>{%[[SIZE]]}
+  %0 = flow.tensor.encode %input : tensor<30x2x96xf32> -> tensor<30x2x96xf32, #encoding>
+  // CHECK: util.return %[[RESULT]], %[[ARG1]] : !stream.resource<*>, index
+  util.return %0 : tensor<30x2x96xf32, #encoding>
+}
+
+// -----
+
+// CHECK-DAG:   #[[$ENC:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-LABEL: @tensorEncodeDynamic
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[D0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[D1:[a-zA-Z0-9]+]]
+#encoding = #iree_encoding.testing_encoding<>
+util.func public @tensorEncodeDynamic(%input: tensor<?x?xf32>, %d0: index, %d1: index) -> tensor<?x?xf32, #encoding> {
+  // CHECK: %[[SIZE:.+]] = stream.tensor.sizeof tensor<?x?xf32, #[[$ENC]]>{%[[D0]], %[[D1]]} : index
+  // CHECK: %[[RESULT:.+]] = stream.tensor.encode %[[ARG0]] : tensor<?x?xf32>{%[[D0]], %[[D1]]} in !stream.resource<*>{%[[ARG1]]} -> tensor<?x?xf32, #[[$ENC]]>{%[[D0]], %[[D1]]} in !stream.resource<*>{%[[SIZE]]}
+  %0 = flow.tensor.encode %input : tensor<?x?xf32>{%d0, %d1} -> tensor<?x?xf32, #encoding>
+  // CHECK: util.return %[[RESULT]], %[[ARG1]] : !stream.resource<*>, index
+  util.return %0 : tensor<?x?xf32, #encoding>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorAlloca
 //  CHECK-SAME: (%[[DIM0:.+]]: index)
 util.func public @tensorAlloca(%dim0: index) -> tensor<?x0xf32> {

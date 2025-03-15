@@ -1858,6 +1858,28 @@ LogicalResult TensorCloneOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// flow.tensor.encode
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorEncodeOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {getOperand()},
+                                 getOperandDims())) ||
+      failed(verifyOpDynamicDims(getOperation(), {getResult()},
+                                 getOperandDims()))) {
+    return failure();
+  }
+  auto operandType = cast<RankedTensorType>(getOperand().getType());
+  if (operandType.getEncoding()) {
+    return emitOpError("the source operand type has encoding; not allowed");
+  }
+  auto resultType = cast<RankedTensorType>(getResult().getType());
+  if (operandType.dropEncoding() != resultType.dropEncoding()) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // flow.tensor.barrier
 //===----------------------------------------------------------------------===//
 
