@@ -1,7 +1,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-global-opt-quantized-conv-to-conv))" -split-input-file %s | FileCheck %s
 
-// CHECK-LABEL: func.func @conv2d_zp
-func.func @conv2d_zps(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024xi8>, %arg2: tensor<1x12x13x1024xi32>) -> tensor<1x12x13x1024xi32> {
+// CHECK-LABEL: func.func @conv2d_nhwc_zps
+func.func @conv2d_nhwc_zps(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024xi8>, %arg2: tensor<1x12x13x1024xi32>) -> tensor<1x12x13x1024xi32> {
   %iZp = arith.constant 0 : i32
   %fZp = arith.constant 0 : i32
   // CHECK: %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
@@ -17,13 +17,27 @@ func.func @conv2d_zps(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024xi8>,
 
 // -----
 
+// CHECK: %[[CONV:.+]] = linalg.conv_2d_nchw_fchw
+// CHECK-SAME:    dilations = dense<1> : tensor<2xi64>
+// CHECK-SAME:    strides = dense<1> : tensor<2xi64>
+// CHECK-SAME:    ins(%arg0, %arg1 : tensor<1x5x14x16xi8>, tensor<1024x5x3x4xi8>)
+// CHECK-SAME:    outs(%arg2 : tensor<1x1024x12x13xi32>)
+func.func @conv2d_nchw_zps(%arg0: tensor<1x5x14x16xi8>, %arg1:  tensor<1024x5x3x4xi8>, %arg2: tensor<1x1024x12x13xi32>) -> tensor<1x1024x12x13xi32> {
+  %iZp = arith.constant 0 : i32
+  %fZp = arith.constant 0 : i32
+  %0 = linalg.conv_2d_nchw_fchw_q {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%arg0, %arg1, %iZp, %fZp : tensor<1x5x14x16xi8>, tensor<1024x5x3x4xi8>, i32, i32) outs(%arg2 : tensor<1x1024x12x13xi32>) -> tensor<1x1024x12x13xi32>
+  return %0 : tensor<1x1024x12x13xi32>
+}
+
+// -----
+
 // CHECK: #map = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3, d0)>
 // CHECK: #map1 = affine_map<(d0, d1, d2, d3) -> (d0)>
 // CHECK: #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 // CHECK: #map3 = affine_map<(d0, d1, d2, d3) -> (d3)>
 
-// CHECK-LABEL: func.func @conv2d_filter_zp
-func.func @conv2d_filter_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024xi8>, %arg2: tensor<1x12x13x1024xi32>) -> tensor<1x12x13x1024xi32> {
+// CHECK-LABEL: func.func @conv2d_nhwc_filter_zp
+func.func @conv2d_nhwc_filter_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024xi8>, %arg2: tensor<1x12x13x1024xi32>) -> tensor<1x12x13x1024xi32> {
   %iZp = arith.constant 42 : i32
   %fZp = arith.constant 0 : i32
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0
@@ -61,10 +75,48 @@ func.func @conv2d_filter_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x102
 // -----
 
 // CHECK: #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+// CHECK: #map1 = affine_map<(d0, d1, d2, d3) -> (d0)>
+// CHECK: #map2 = affine_map<(d0, d1, d2, d3) -> (d1)>
+// CHECK-LABEL:   func.func @conv2d_nchw_filter_zp(
+func.func @conv2d_nchw_filter_zp(%arg0: tensor<1x5x14x16xi8>, %arg1:  tensor<1024x5x3x4xi8>, %arg2: tensor<1x1024x12x13xi32>) -> tensor<1x1024x12x13xi32> {
+  %iZp = arith.constant 42 : i32
+  %fZp = arith.constant 0 : i32
+  // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : i32
+  // CHECK-DAG: %[[C42:.*]] = arith.constant 42 : i32
+  // CHECK-DAG: %[[CONV:.*]] = linalg.conv_2d_nchw_fchw
+  // CHECK-DAG: %[[SUM_INIT:.*]] = tensor.empty() : tensor<1024xi32>
+  // CHECK-DAG: %[[SUM_FILL:.*]] = linalg.fill ins(%[[C0]] : i32) outs(%[[SUM_INIT]] : tensor<1024xi32>) -> tensor<1024xi32>
+
+  // CHECK:      %[[SUM:.*]] = linalg.generic {
+  // CHECK-SAME: indexing_maps = [#map, #map1],
+  // CHECK-SAME: iterator_types = ["parallel", "reduction", "reduction", "reduction"]}
+  // CHECK-SAME: ins(%arg1 : tensor<1024x5x3x4xi8>) outs(%[[SUM_FILL]] : tensor<1024xi32>) {
+  // CHECK:      ^bb0(%[[IN:.*]]: i8, %[[OUT:.*]]: i32):
+  // CHECK:        %[[EXT:.*]] = arith.extsi %[[IN]] : i8 to i32
+  // CHECK:        %[[ADD:.*]] = arith.addi %[[EXT]], %[[OUT]] : i32
+  // CHECK:        linalg.yield %[[ADD]] : i32
+
+  // CHECK:      %[[INIT:.*]] = tensor.empty() : tensor<1x1024x12x13xi32>
+  // CHECK:      %[[GENERIC:.*]] = linalg.generic {
+  // CHECK-SAME: indexing_maps = [#map, #map2, #map],
+  // CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+  // CHECK-SAME: ins(%[[CONV]], %[[SUM]] : tensor<1x1024x12x13xi32>, tensor<1024xi32>)
+  // CHECK-SAME: outs(%[[INIT]] : tensor<1x1024x12x13xi32>) {
+  // CHECK:      ^bb0(%[[A0:.*]]: i32, %[[A1:.*]]: i32, %[[A2:.*]]: i32):
+  // CHECK:        %[[MUL:.*]] = arith.muli %[[A1]], %[[C42]] : i32
+  // CHECK:        %[[SUB:.*]] = arith.subi %[[A0]], %[[MUL]] : i32
+  // CHECK:        linalg.yield %[[SUB]] : i32
+  %0 = linalg.conv_2d_nchw_fchw_q {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%arg0, %arg1, %iZp, %fZp : tensor<1x5x14x16xi8>, tensor<1024x5x3x4xi8>, i32, i32) outs(%arg2 : tensor<1x1024x12x13xi32>) -> tensor<1x1024x12x13xi32>
+  return %0 : tensor<1x1024x12x13xi32>
+}
+
+// -----
+
+// CHECK: #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 // CHECK: #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 
-// CHECK-LABEL: func.func @conv2d_input_zp
-func.func @conv2d_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024xi8>, %arg2: tensor<1x12x13x1024xi32>) -> tensor<1x12x13x1024xi32> {
+// CHECK-LABEL: func.func @conv2d_nhwc_input_zp
+func.func @conv2d_nhwc_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024xi8>, %arg2: tensor<1x12x13x1024xi32>) -> tensor<1x12x13x1024xi32> {
   %iZp = arith.constant 0 : i32
   %fZp = arith.constant 42 : i32
 
@@ -109,12 +161,60 @@ func.func @conv2d_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024
 
 // -----
 
+// CHECK: #map = affine_map<(d0, d1, d2, d3) -> (d0, d3, d1, d2)>
+// CHECK: #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+// CHECK: #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+// CHECK: #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+
+// CHECK-LABEL:   func.func @conv2d_nchw_input_zp(
+func.func @conv2d_nchw_input_zp(%arg0: tensor<1x5x14x16xi8>, %arg1:  tensor<1024x5x3x4xi8>, %arg2: tensor<1x1024x12x13xi32>) -> tensor<1x1024x12x13xi32> {
+  %iZp = arith.constant 0 : i32
+  %fZp = arith.constant 42 : i32
+// CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : i32
+// CHECK-DAG:  %[[C42:.*]] = arith.constant 42 : i32
+// CHECK-DAG:  %[[CONV:.*]] = linalg.conv_2d_nchw_fchw
+
+// CHECK:      %[[INIT:.*]] = tensor.empty() : tensor<1x14x16xi32>
+// CHECK:      %[[FILL:.*]] = linalg.fill ins(%[[C0]] : i32) outs(%[[INIT]] : tensor<1x14x16xi32>)
+// CHECK:      %[[SUM:.*]] = linalg.generic
+// CHECK-SAME: indexing_maps = [#map, #map1],
+// CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+// CHECK-SAME: ins(%arg0 : tensor<1x5x14x16xi8>)
+// CHECK-SAME: outs(%[[FILL]] : tensor<1x14x16xi32>)
+
+// CHECK:      %[[EXPAND:.*]] = tensor.expand_shape %[[SUM]] {{\[\[}}0, 1], [2], [3]]
+// CHECK:      %[[INIT:.*]] = tensor.empty() : tensor<1x1x12x13xi32>
+// CHECK:      %[[FILL:.*]] = linalg.fill ins(%[[C0]] : i32) outs(%[[INIT]] : tensor<1x1x12x13xi32>)
+// CHECK:      %[[KERNEL:.*]] = tensor.empty() : tensor<3x4xi32>
+// CHECK:      %[[POOL:.*]] = linalg.pooling_nchw_sum {
+// CHECK-SAME: dilations = dense<1> : tensor<2xi64>,
+// CHECK-SAME: strides = dense<1> : tensor<2xi64>}
+// CHECK-SAME: ins(%[[EXPAND]], %[[KERNEL]] : tensor<1x1x14x16xi32>, tensor<3x4xi32>)
+// CHECK-SAME: outs(%[[FILL]] : tensor<1x1x12x13xi32>) -> tensor<1x1x12x13xi32>
+// CHECK:      %[[COLLAPSE:.*]] = tensor.collapse_shape %[[POOL]] {{\[\[}}0, 1], [2], [3]]
+
+// CHECK:      %[[INIT:.*]] = tensor.empty() : tensor<1x1024x12x13xi32>
+// CHECK:      %[[GENERIC:.*]] = linalg.generic {
+// CHECK-SAME: indexing_maps = [#map2, #map3, #map2],
+// CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+// CHECK-SAME: ins(%[[CONV]], %[[COLLAPSE]] : tensor<1x1024x12x13xi32>, tensor<1x12x13xi32>)
+// CHECK-SAME: outs(%[[INIT]] : tensor<1x1024x12x13xi32>) {
+// CHECK:      ^bb0(%[[A0:.*]]: i32, %[[A1:.*]]: i32, %[[A2:.*]]: i32):
+// CHECK:        %[[MUL:.*]] = arith.muli %[[A1]], %[[C42]] : i32
+// CHECK:        %[[SUB:.*]] = arith.subi %[[A0]], %[[MUL]] : i32
+// CHECK:        linalg.yield %[[SUB]] : i32
+
+  %0 = linalg.conv_2d_nchw_fchw_q {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%arg0, %arg1, %iZp, %fZp : tensor<1x5x14x16xi8>, tensor<1024x5x3x4xi8>, i32, i32) outs(%arg2 : tensor<1x1024x12x13xi32>) -> tensor<1x1024x12x13xi32>
+  return %0 : tensor<1x1024x12x13xi32>
+}
+// -----
+
 // CHECK: #map = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3, d0)>
 // CHECK: #map1 = affine_map<(d0, d1, d2, d3) -> (d0)>
 // CHECK: #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 // CHECK: #map3 = affine_map<(d0, d1, d2, d3) -> (d3)>
 // CHECK: #map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-func.func @conv2d_full(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024xi8>, %arg2: tensor<1x12x13x1024xi32>) -> tensor<1x12x13x1024xi32> {
+func.func @conv2d_nwhc_full(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024xi8>, %arg2: tensor<1x12x13x1024xi32>) -> tensor<1x12x13x1024xi32> {
   %iZp = arith.constant 17 : i32
   %fZp = arith.constant 42 : i32
 
@@ -155,9 +255,57 @@ func.func @conv2d_full(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024xi8>
 }
 
 // -----
+// CHECK: #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+// CHECK: #map1 = affine_map<(d0, d1, d2, d3) -> (d0)>
+// CHECK: #map2 = affine_map<(d0, d1, d2, d3) -> (d1)>
+// CHECK: #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d1, d2)>
+// CHECK: #map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+// CHECK: #map5 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 
-// CHECK-LABEL: func.func @conv2d_dyn
-func.func @conv2d_dyn(%arg0: tensor<?x?x?x5xi8>, %arg1: tensor<3x4x5x1024xi8>, %arg2: tensor<?x?x?x1024xi32>) -> tensor<?x?x?x1024xi32> {
+// CHECK-LABEL:   func.func @conv2d_nchw_full(
+func.func @conv2d_nchw_full(%arg0: tensor<1x5x14x16xi8>, %arg1:  tensor<1024x5x3x4xi8>, %arg2: tensor<1x1024x12x13xi32>) -> tensor<1x1024x12x13xi32> {
+  %iZp = arith.constant 17 : i32
+  %fZp = arith.constant 42 : i32
+
+// CHECK-DAG:  %[[C42840:.*]] = arith.constant 42840 : i32
+// CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : i32
+// CHECK-DAG:  %[[C17:.*]] = arith.constant 17 : i32
+// CHECK-DAG:  %[[C42:.*]] = arith.constant 42 : i32
+
+// CHECK:      %[[CONV:.*]] = linalg.conv_2d_nchw_fchw
+
+// CHECK:      %[[SUM:.*]] = linalg.generic
+// CHECK-SAME: ins(%arg1 : tensor<1024x5x3x4xi8>)
+// CHECK:      %[[IZP:.*]] = linalg.generic
+// CHECK-SAME: ins(%[[CONV]], %[[SUM]] : tensor<1x1024x12x13xi32>, tensor<1024xi32>)
+
+// CHECK:      %[[SUM:.*]] = linalg.generic
+// CHECK-SAME: ins(%arg0 : tensor<1x5x14x16xi8>)
+// CHECK:      %[[EXPAND:.*]] = tensor.expand_shape %[[SUM]]
+// CHECK:      %[[KERNEL:.*]] = tensor.empty() : tensor<3x4xi32>
+// CHECK:      %[[POOL:.*]] = linalg.pooling_nchw_sum
+// CHECK-SAME: ins(%[[EXPAND]], %[[KERNEL]] : tensor<1x1x14x16xi32>, tensor<3x4xi32>)
+// CHECK:      %[[COLLAPSE:.*]] = tensor.collapse_shape %[[POOL]]
+// CHECK:      %[[FZP:.*]] = linalg.generic
+// CHECK-SAME: ins(%[[IZP]], %[[COLLAPSE]] : tensor<1x1024x12x13xi32>, tensor<1x12x13xi32>)
+
+// CHECK:      %[[INIT:.*]] = tensor.empty() : tensor<1x1024x12x13xi32>
+// CHECK:      %[[C03:.*]] = linalg.generic {indexing_maps = [#map, #map],
+// CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+// CHECK-SAME: ins(%[[FZP]] : tensor<1x1024x12x13xi32>)
+// CHECK-SAME: outs(%[[INIT]] : tensor<1x1024x12x13xi32>) {
+// CHECK:      ^bb0(%[[A0:.*]]: i32, %[[A1:.*]]: i32):
+// CHECK:        %[[ADD:.*]] = arith.addi %[[A0]], %[[C42840]] : i32
+// CHECK:        linalg.yield %[[ADD]] : i32
+
+  %0 = linalg.conv_2d_nchw_fchw_q {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%arg0, %arg1, %iZp, %fZp : tensor<1x5x14x16xi8>, tensor<1024x5x3x4xi8>, i32, i32) outs(%arg2 : tensor<1x1024x12x13xi32>) -> tensor<1x1024x12x13xi32>
+  return %0 : tensor<1x1024x12x13xi32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @conv2d_nhwc_dyn
+func.func @conv2d_nhwc_dyn(%arg0: tensor<?x?x?x5xi8>, %arg1: tensor<3x4x5x1024xi8>, %arg2: tensor<?x?x?x1024xi32>) -> tensor<?x?x?x1024xi32> {
   %iZp = arith.constant 0 : i32
   %fZp = arith.constant 0 : i32
   // CHECK: %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
@@ -169,8 +317,20 @@ func.func @conv2d_dyn(%arg0: tensor<?x?x?x5xi8>, %arg1: tensor<3x4x5x1024xi8>, %
 
 // -----
 
-// CHECK-LABEL: @conv2d_dyn_filter_zp
-func.func @conv2d_dyn_filter_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<?x?x5x1024xi8>, %arg2: tensor<1x?x?x1024xi32>) -> tensor<1x?x?x1024xi32> {
+// CHECK-LABEL: func.func @conv2d_nchw_dyn
+func.func @conv2d_nchw_dyn(%arg0: tensor<?x5x?x?xi8>, %arg1:  tensor<1024x5x3x4xi8>, %arg2: tensor<?x1024x?x?xi32>) -> tensor<?x1024x?x?xi32> {
+  %iZp = arith.constant 0 : i32
+  %fZp = arith.constant 0 : i32
+  // CHECK: %[[CONV:.+]] = linalg.conv_2d_nchw_fchw
+  %0 = linalg.conv_2d_nchw_fchw_q {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%arg0, %arg1, %iZp, %fZp : tensor<?x5x?x?xi8>, tensor<1024x5x3x4xi8>, i32, i32) outs(%arg2 : tensor<?x1024x?x?xi32>) -> tensor<?x1024x?x?xi32>
+  // CHECK: return %[[CONV]]
+  return %0 : tensor<?x1024x?x?xi32>
+}
+
+// -----
+
+// CHECK-LABEL: @conv2d_nhwc_dyn_filter_zp
+func.func @conv2d_nhwc_dyn_filter_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<?x?x5x1024xi8>, %arg2: tensor<1x?x?x1024xi32>) -> tensor<1x?x?x1024xi32> {
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
   // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
 
@@ -195,8 +355,32 @@ func.func @conv2d_dyn_filter_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<?x?x5
 
 // -----
 
-// CHECK-LABEL: @conv2d_dyn_input_zp
-func.func @conv2d_dyn_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<?x?x5x1024xi8>, %arg2: tensor<1x?x?x1024xi32>) -> tensor<1x?x?x1024xi32> {
+// CHECK-LABEL:   func.func @conv2d_nchw_dyn_filter_zp(
+func.func @conv2d_nchw_dyn_filter_zp(%arg0: tensor<1x5x14x16xi8>, %arg1:  tensor<1024x5x?x?xi8>, %arg2: tensor<1x1024x?x?xi32>) -> tensor<1x1024x?x?xi32> {
+// CHECK-DAG: %[[C3:.*]] = arith.constant 3 : index
+// CHECK-DAG: %[[C2:.*]] = arith.constant 2 : index
+
+  %iZp = arith.constant 42 : i32
+  %fZp = arith.constant 0 : i32
+
+// CHECK:      %[[CONV:.+]] = linalg.conv_2d_nchw_fchw
+// CHECK:      %[[SUM:.*]] = linalg.generic
+// CHECK-SAME: ins(%arg1 : tensor<1024x5x?x?xi8>)
+
+// CHECK:      %[[DIM2:.*]] = tensor.dim %arg2, %[[C2]] : tensor<1x1024x?x?xi32>
+// CHECK:      %[[DIM3:.*]] = tensor.dim %arg2, %[[C3]] : tensor<1x1024x?x?xi32>
+// CHECK:      %[[INIT:.*]] = tensor.empty(%[[DIM2]], %[[DIM3]]) : tensor<1x1024x?x?xi32>
+// CHECK:      %[[GENERIC:.*]] = linalg.generic
+// CHECK-SAME: ins(%[[CONV]], %[[SUM]] : tensor<1x1024x?x?xi32>, tensor<1024xi32>)
+// CHECK-SAME: outs(%[[INIT]] : tensor<1x1024x?x?xi32>) {
+  %0 = linalg.conv_2d_nchw_fchw_q {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%arg0, %arg1, %iZp, %fZp : tensor<1x5x14x16xi8>, tensor<1024x5x?x?xi8>, i32, i32) outs(%arg2 : tensor<1x1024x?x?xi32>) -> tensor<1x1024x?x?xi32>
+  return %0 : tensor<1x1024x?x?xi32>
+}
+
+// -----
+
+// CHECK-LABEL: @conv2d_nhwc_dyn_input_zp
+func.func @conv2d_nhwc_dyn_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<?x?x5x1024xi8>, %arg2: tensor<1x?x?x1024xi32>) -> tensor<1x?x?x1024xi32> {
   %fZp = arith.constant 42 : i32
   %iZp = arith.constant 0 : i32
 
@@ -239,14 +423,57 @@ func.func @conv2d_dyn_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<?x?x5x
 
 // -----
 
+// CHECK-LABEL:   func.func @conv2d_nchw_dyn_input_zp(
+func.func @conv2d_nchw_dyn_input_zp(%arg0: tensor<1x5x14x16xi8>, %arg1:  tensor<1024x5x?x?xi8>, %arg2: tensor<1x1024x?x?xi32>) -> tensor<1x1024x?x?xi32> {
+  %iZp = arith.constant 0 : i32
+  %fZp = arith.constant 42 : i32
+
+// CHECK-DAG:  %[[I3:.*]] = arith.constant 3 : index
+// CHECK-DAG:  %[[I2:.*]] = arith.constant 2 : index
+// CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : i32
+// CHECK-DAG:  %[[C4:.*]] = arith.constant 42 : i32
+// CHECK:      %[[CONV:.*]] = linalg.conv_2d_nchw_fchw
+
+// CHECK:      %[[INIT:.*]] = tensor.empty() : tensor<1x14x16xi32>
+// CHECK:      %[[FILL:.*]] = linalg.fill ins(%[[C0]] : i32) outs(%[[INIT]] : tensor<1x14x16xi32>)
+// CHECK:      %[[GENERIC:.*]] = linalg.generic
+// CHECK-SAME: ins(%arg0 : tensor<1x5x14x16xi8>) outs(%[[FILL]] : tensor<1x14x16xi32>)
+// CHECK:      %[[EXPAND:.*]] = tensor.expand_shape %[[GENERIC]]
+
+// CHECK:      %[[DIM2:.*]] = tensor.dim %arg2, %[[I2]]
+// CHECK:      %[[DIM3:.*]] = tensor.dim %arg2, %[[I3]]
+// CHECK:      %[[INIT:.*]] = tensor.empty(%[[DIM2]], %[[DIM3]]) : tensor<1x1x?x?xi32>
+// CHECK:      %[[FILL:.*]] = linalg.fill ins(%[[C0]] : i32) outs(%[[INIT]] : tensor<1x1x?x?xi32>)
+// CHECK:      %[[DIM2:.*]] = tensor.dim %arg1, %[[I2]]
+// CHECK:      %[[DIM3:.*]] = tensor.dim %arg1, %[[I3]]
+// CHECK:      %[[VAL_22:.*]] = tensor.empty(%[[DIM2]], %[[DIM3]]) : tensor<?x?xi32>
+// CHECK:      %[[POOL:.*]] = linalg.pooling_nchw_sum
+// CHECK-SAME: ins(%[[EXPAND]], %[[VAL_22]] : tensor<1x1x14x16xi32>, tensor<?x?xi32>)
+// CHECK-SAME: outs(%[[FILL]] : tensor<1x1x?x?xi32>) -> tensor<1x1x?x?xi32>
+// CHECK:      %[[COLLAPSE:.*]] = tensor.collapse_shape %[[POOL]]
+
+// CHECK:      %[[DIM2:.*]] = tensor.dim %arg2, %[[I2]]
+// CHECK:      %[[DIM3:.*]] = tensor.dim %arg2, %[[I3]]
+// CHECK:      %[[INIT:.*]] = tensor.empty(%[[DIM2]], %[[DIM3]]) : tensor<1x1024x?x?xi32>
+// CHECK:      %[[GENERIC:.*]] = linalg.generic
+// CHECK-SAME: ins(%[[CONV]], %[[COLLAPSE]] : tensor<1x1024x?x?xi32>, tensor<1x?x?xi32>)
+// CHECK-SAME: outs(%[[INIT]] : tensor<1x1024x?x?xi32>) {
+
+  %0 = linalg.conv_2d_nchw_fchw_q {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%arg0, %arg1, %iZp, %fZp : tensor<1x5x14x16xi8>, tensor<1024x5x?x?xi8>, i32, i32) outs(%arg2 : tensor<1x1024x?x?xi32>) -> tensor<1x1024x?x?xi32>
+  return %0 : tensor<1x1024x?x?xi32>
+}
+
+// -----
+
+
 // CHECK: #map = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3, d0)>
 // CHECK: #map1 = affine_map<(d0, d1, d2, d3) -> (d0)>
 // CHECK: #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 // CHECK: #map3 = affine_map<(d0, d1, d2, d3) -> (d3)>
 // CHECK: #map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 
-// CHECK-LABEL: @conv2d_all_dyn
-func.func @conv2d_all_dyn(%arg0: tensor<?x?x?x?xi8>, %arg1: tensor<?x?x?x?xi8>, %arg2: tensor<?x?x?x?xi32>) -> tensor<?x?x?x?xi32> {
+// CHECK-LABEL: @conv2d_nhwc_all_dyn
+func.func @conv2d_nhwc_all_dyn(%arg0: tensor<?x?x?x?xi8>, %arg1: tensor<?x?x?x?xi8>, %arg2: tensor<?x?x?x?xi32>) -> tensor<?x?x?x?xi32> {
   %fZp = arith.constant 42 : i32
   %iZp = arith.constant 13 : i32
 
@@ -339,6 +566,108 @@ func.func @conv2d_all_dyn(%arg0: tensor<?x?x?x?xi8>, %arg1: tensor<?x?x?x?xi8>, 
   %0 = linalg.conv_2d_nhwc_hwcf_q {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%arg0, %arg1, %iZp, %fZp : tensor<?x?x?x?xi8>, tensor<?x?x?x?xi8>, i32, i32) outs(%arg2 : tensor<?x?x?x?xi32>) -> tensor<?x?x?x?xi32>
 
   // CHECK: return %[[RESULT]]
+  return %0 : tensor<?x?x?x?xi32>
+}
+
+// -----
+
+// CHECK: #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+// CHECK: #map1 = affine_map<(d0, d1, d2, d3) -> (d0)>
+// CHECK: #map2 = affine_map<(d0, d1, d2, d3) -> (d1)>
+// CHECK: #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d1, d2)>
+// CHECK: #map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+// CHECK: #map5 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+
+// CHECK:   func.func @conv2d_nchw_all_dyn(
+func.func @conv2d_nchw_all_dyn(%arg0: tensor<?x?x?x?xi8>, %arg1:  tensor<?x?x?x?xi8>, %arg2: tensor<?x?x?x?xi32>) -> tensor<?x?x?x?xi32> {
+  %iZp = arith.constant 13 : i32
+  %fZp = arith.constant 42 : i32
+// CHECK-DAG:  %[[C546:.*]] = arith.constant 546 : i32
+// CHECK-DAG:  %[[I3:.*]] = arith.constant 3 : index
+// CHECK-DAG:  %[[I2:.*]] = arith.constant 2 : index
+// CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : i32
+// CHECK-DAG:  %[[I0:.*]] = arith.constant 0 : index
+// CHECK-DAG:  %[[C13:.*]] = arith.constant 13 : i32
+// CHECK-DAG:  %[[C42:.*]] = arith.constant 42 : i32
+// CHECK:      %[[CONV:.*]] = linalg.conv_2d_nchw_fchw {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+// CHECK-SAME: ins(%arg0, %arg1 : tensor<?x?x?x?xi8>, tensor<?x?x?x?xi8>)
+// CHECK-SAME: outs(%arg2 : tensor<?x?x?x?xi32>)
+
+// CHECK:      %[[DIM0:.*]] = tensor.dim %arg1, %[[I0]]
+// CHECK:      %[[EMPTY:.*]] = tensor.empty(%[[DIM0]]) : tensor<?xi32>
+// CHECK:      %[[FILL:.*]] = linalg.fill ins(%[[C0]] : i32) outs(%[[EMPTY]]
+// CHECK:      %[[FSUM:.*]] = linalg.generic
+// CHECK-SAME: ins(%arg1 : tensor<?x?x?x?xi8>)
+// CHECK-SAME: outs(%[[FILL]] : tensor<?xi32>)
+
+// CHECK-DAG:  %[[DIM0:.*]] = tensor.dim %arg0, %[[I0]]
+// CHECK-DAG:  %[[DIM1:.*]] = tensor.dim %arg1, %[[I0]]
+// CHECK-DAG:  %[[DIM2:.*]] = tensor.dim %arg2, %[[I2]]
+// CHECK-DAG:  %[[DIM3:.*]] = tensor.dim %arg2, %[[I3]]
+// CHECK:      %[[EMPTY:.*]] = tensor.empty(%[[DIM0]], %[[DIM1]], %[[DIM2]], %[[DIM3]])
+// CHECK:      %[[CONV_SUMF:.*]] = linalg.generic
+// CHECK-SAME: indexing_maps = [#map, #map2, #map],
+// CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+// CHECK-SAME: ins(%[[CONV]], %[[FSUM]] : tensor<?x?x?x?xi32>, tensor<?xi32>)
+// CHECK-SAME: outs(%[[EMPTY]] : tensor<?x?x?x?xi32>)
+
+// CHECK-DAG:  %[[DIM0:.*]] = tensor.dim %arg0, %[[I0]]
+// CHECK-DAG:  %[[DIM1:.*]] = tensor.dim %arg0, %[[I2]]
+// CHECK-DAG:  %[[DIM2:.*]] = tensor.dim %arg0, %[[I3]]
+// CHECK:      %[[EMPTY:.*]] = tensor.empty(%[[DIM0]], %[[DIM1]], %[[DIM2]])
+// CHECK:      %[[FILL:.*]] = linalg.fill ins(%[[C0]] : i32) outs(%[[EMPTY]] : tensor<?x?x?xi32>)
+// CHECK:      %[[SIMI:.*]] = linalg.generic {
+// CHECK-SAME: indexing_maps = [#map3, #map4],
+// CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+// CHECK-SAME: ins(%arg0 : tensor<?x?x?x?xi8>)
+// CHECK-SAME: outs(%[[FILL]] : tensor<?x?x?xi32>) {
+// CHECK:      %[[EXPAND:.*]] = tensor.expand_shape %[[SIMI]] {{\[\[}}0, 1], [2], [3]]
+
+// CHECK-DAG:  %[[DIM0:.*]] = tensor.dim %arg0, %[[I0]]
+// CHECK-DAG:  %[[DIM1:.*]] = tensor.dim %arg2, %[[I2]]
+// CHECK-DAG:  %[[DIM2:.*]] = tensor.dim %arg2, %[[I3]]
+// CHECK:      %[[EMPTY:.*]] = tensor.empty(%[[DIM0]], %[[DIM1]], %[[DIM2]])
+// CHECK:      %[[FILL:.*]] = linalg.fill ins(%[[C0]] : i32) outs(%[[EMPTY]] : tensor<?x1x?x?xi32>)
+// CHECK-DAG:  %[[DIM0:.*]] = tensor.dim %arg1, %[[I2]]
+// CHECK-DAG:  %[[DIM1:.*]] = tensor.dim %arg1, %[[I3]]
+// CHECK:      %[[KERNEL:.*]] = tensor.empty(%[[DIM0]], %[[DIM1]])
+// CHECK:      %[[POOL:.*]] = linalg.pooling_nchw_sum {
+// CHECK-SAME: dilations = dense<1> : tensor<2xi64>,
+// CHECK-SAME: strides = dense<1> : tensor<2xi64>}
+// CHECK-SAME: ins(%[[EXPAND]], %[[KERNEL]] : tensor<?x1x?x?xi32>, tensor<?x?xi32>)
+// CHECK-SAME: outs(%[[FILL]] : tensor<?x1x?x?xi32>)
+// CHECK:      %[[COLLAPSE:.*]] = tensor.collapse_shape %[[POOL]] {{\[\[}}0, 1], [2], [3]]
+
+// CHECK-DAG:  %[[DIM0:.*]] = tensor.dim %arg0, %[[I0]]
+// CHECK-DAG:  %[[DIM1:.*]] = tensor.dim %arg1, %[[I0]]
+// CHECK-DAG:  %[[DIM2:.*]] = tensor.dim %arg2, %[[I2]]
+// CHECK-DAG:  %[[DIM3:.*]] = tensor.dim %arg2, %[[I3]]
+// CHECK:      %[[EMPTY:.*]] = tensor.empty(%[[DIM0]], %[[DIM1]], %[[DIM2]], %[[DIM3]])
+// CHECK:      %[[CONV_SUMIF:.*]] = linalg.generic {
+// CHECK-SAME: indexing_maps = [#map, #map5, #map],
+// CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+// CHECK-SAME: ins(%[[CONV_SUMF]], %[[COLLAPSE]] : tensor<?x?x?x?xi32>, tensor<?x?x?xi32>)
+// CHECK-SAME: outs(%[[EMPTY]] : tensor<?x?x?x?xi32>)
+
+// CHECK-DAG:  %[[DIM0:.*]] = tensor.dim %arg1, %[[I2]]
+// CHECK-DAG:  %[[DIM1:.*]] = tensor.dim %arg1, %[[I3]]
+// CHECK-DAG:  %[[MUL1:.*]] = arith.muli %[[DIM0]], %[[DIM1]]
+// CHECK-DAG:  %[[DIM2:.*]] = tensor.dim %arg1, %[[I1]]
+// CHECK-DAG:  %[[MUL2:.*]] = arith.muli %[[MUL1]], %[[DIM2]]
+// CHECK-DAG:  %[[CAST:.*]] = arith.index_cast %[[MUL2]] : index to i32
+// CHECK-DAG:  %[[I01:.*]] = arith.muli %[[CAST]], %[[C546]]
+// CHECK-DAG:  %[[DIM0:.*]] = tensor.dim %arg0, %[[I0]]
+// CHECK-DAG:  %[[DIM1:.*]] = tensor.dim %arg1, %[[I0]]
+// CHECK-DAG:  %[[DIM2:.*]] = tensor.dim %arg2, %[[I2]]
+// CHECK-DAG:  %[[DIM3:.*]] = tensor.dim %arg2, %[[I3]]
+// CHECK:      %[[EMPTY:.*]] = tensor.empty(%[[DIM0]], %[[DIM1]], %[[DIM2]], %[[DIM3]]) : tensor<?x?x?x?xi32>
+// CHECK:      %[[RESULT:.*]] = linalg.generic {
+// CHECK-SAME: indexing_maps = [#map, #map],
+// CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+// CHECK-SAME: ins(%[[CONV_SUMIF]] : tensor<?x?x?x?xi32>)
+// CHECK-SAME: outs(%[[EMPTY]] : tensor<?x?x?x?xi32>) {
+
+  %0 = linalg.conv_2d_nchw_fchw_q {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%arg0, %arg1, %iZp, %fZp : tensor<?x?x?x?xi8>, tensor<?x?x?x?xi8>, i32, i32) outs(%arg2 : tensor<?x?x?x?xi32>) -> tensor<?x?x?x?xi32>
   return %0 : tensor<?x?x?x?xi32>
 }
 
