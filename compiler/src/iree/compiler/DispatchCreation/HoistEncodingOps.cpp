@@ -35,14 +35,6 @@ namespace mlir::iree_compiler::DispatchCreation {
 #define GEN_PASS_DEF_HOISTENCODINGOPSPASS
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
-static AffineMap getBcastMapOrIdentity(RewriterBase &rewriter,
-                                       RankedTensorType encodedType) {
-  auto encoding = cast<IREE::Encoding::EncodingAttr>(encodedType.getEncoding());
-  AffineMapAttr bcastMapAttr = encoding.getBcastMap();
-  return bcastMapAttr ? bcastMapAttr.getAffineMap()
-                      : rewriter.getMultiDimIdentityMap(encodedType.getRank());
-}
-
 /// Bubbles a SetEncodingOp up through a linalg::GenericOp. The `genericOp`
 /// must:
 ///  1. Have a single result.
@@ -88,26 +80,24 @@ bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
   }
 
   RankedTensorType encodedType = encodingOp.getResultType();
-  AffineMap bcastMap = getBcastMapOrIdentity(rewriter, encodedType);
-  if (!bcastMap.isIdentity()) {
-    return rewriter.notifyMatchFailure(genericOp, "bcast_map map not identity");
-  }
-  if (outputMap.getNumDims() != bcastMap.getNumResults()) {
+  auto encoding = cast<IREE::Encoding::EncodingAttr>(encodedType.getEncoding());
+  AffineMap lastMap = encoding.getLastMapForOperandIndex();
+  if (outputMap.getNumDims() != lastMap.getNumResults()) {
     return rewriter.notifyMatchFailure(
-        genericOp, "output map numDims do not match bcast_map numResults");
+        genericOp,
+        "output map numDims do not match last encoding map numResults");
   }
 
   // Set encodings on each input
   Location loc = genericOp->getLoc();
   SmallVector<Value> encodedOperands;
-  auto encoding = cast<IREE::Encoding::EncodingAttr>(encodedType.getEncoding());
   for (OpOperand *operand : genericOp.getDpsInputOperands()) {
-    // Compute the new bcastMap from the operand's indexing map.
+    // Append the operand's indexing map to the encoding's user indexing maps.
     AffineMap operandMap = genericOp.getMatchingIndexingMap(operand);
-    AffineMap newBcastMap = operandMap.compose(bcastMap);
 
     // Create new encoding and set encoding on the operand.
-    auto newEncoding = encoding.clone(newBcastMap);
+    IREE::Encoding::EncodingAttr newEncoding =
+        encoding.cloneWithNewOperandIndexingMap(operandMap);
     auto operandType = cast<RankedTensorType>(operand->get().getType());
     auto resType = RankedTensorType::get(
         operandType.getShape(), operandType.getElementType(), newEncoding);
