@@ -29,7 +29,11 @@ from iree.compiler.dialects import (
     transform,
     vector,
 )
-from iree.compiler.dialects.vector import transform
+
+# Smoke test for vector transforms
+from iree.compiler.dialects.transform import (
+    apply_conversion_patterns_vector_vector_to_llvm,
+)
 
 # Make sure that our dialects import.
 from iree.compiler.dialects import flow, hal, stream, vm, util, iree_codegen, iree_gpu
