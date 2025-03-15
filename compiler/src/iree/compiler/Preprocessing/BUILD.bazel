@@ -21,6 +21,7 @@ iree_compiler_cc_library(
         "Passes.h",
     ],
     deps = [
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/DispatchCreation",
         "//compiler/src/iree/compiler/GlobalOptimization",
@@ -29,9 +30,12 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Preprocessing/Common:Transforms",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
     ],
 )
