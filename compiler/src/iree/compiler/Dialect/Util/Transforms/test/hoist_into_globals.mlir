@@ -445,3 +445,18 @@ module @nested_program_const_expr {
     }
   }
 }
+
+// -----
+
+// We may attach ConstValueInfo to some op results, but not others, in some
+// special cases. Ensure we do not crash on such cases.
+
+// CHECK-LABEL: @partially_analyzed_op
+module @partially_analyzed_op {
+  util.func public @main(%arg0: i32, %arg1: i32) -> (i32, i32) {
+    %cst = arith.constant 1 : i32
+    %barrier0:2 = util.optimization_barrier %arg0, %arg1 : i32, i32
+    %barrier1:2 = util.optimization_barrier %cst, %barrier0#0 : i32, i32
+    util.return %barrier1#0, %barrier1#1 : i32, i32
+  }
+}
