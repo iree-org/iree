@@ -672,23 +672,17 @@ static bool isInnerMostDimThatMapIsFunctionOf(AffineMap map, int dim) {
   return true;
 }
 
-// Clamps in-place `vecTileSizes`, ensuring that the resulting vector tile sizes
-// for each opearand of `op` satisfy two requirements:
-// 1. No resulting operand tile size exceeds `eachOperandMaxTileBits`.
-// 2. The sum of all resulting operand tile size does not exceed
-// `allOperandsMaxTileBits`.
-static void limitVectorTileSizes(linalg::LinalgOp op,
-                                 SmallVectorImpl<int64_t> &vecTileSizes,
+static void limitVectorTileSizes(SmallVectorImpl<int64_t> &vecTileSizes,
                                  int64_t eachOperandMaxTileBits,
-                                 int64_t allOperandsMaxTileBits) {
-  int numLoops = op.getNumLoops();
-  assert(numLoops == vecTileSizes.size());
-  auto indexingMaps = op.getIndexingMapsArray();
-  auto operandTypes = op->getOperandTypes();
+                                 int64_t allOperandsMaxTileBits,
+                                 TypeRange operandTypes,
+                                 ArrayRef<AffineMap> indexingMaps) {
+
+  int64_t numLoops = vecTileSizes.size();
   int numOperands = operandTypes.size();
 
   SmallVector<int64_t> operandElemBits =
-      llvm::map_to_vector(op->getOperandTypes(), [](Type t) -> int64_t {
+      llvm::map_to_vector(operandTypes, [](Type t) -> int64_t {
         return IREE::Util::getTypeBitWidth(getElementTypeOrSelf(t));
       });
 
@@ -784,9 +778,28 @@ static void limitVectorTileSizes(linalg::LinalgOp op,
   // width, it will trigger an early-return above, so we don't need to worry
   // about that here.
   if (std::reduce(tileBits.begin(), tileBits.end()) > allOperandsMaxTileBits) {
-    limitVectorTileSizes(op, vecTileSizes, eachOperandMaxTileBits / 2,
-                         allOperandsMaxTileBits);
+    limitVectorTileSizes(vecTileSizes, eachOperandMaxTileBits / 2,
+                         allOperandsMaxTileBits, operandTypes, indexingMaps);
   }
+}
+
+// Clamps in-place `vecTileSizes`, ensuring that the resulting vector tile sizes
+// for each opearand of `op` satisfy two requirements:
+// 1. No resulting operand tile size exceeds `eachOperandMaxTileBits`.
+// 2. The sum of all resulting operand tile size does not exceed
+// `allOperandsMaxTileBits`.
+static void limitVectorTileSizes(Operation *inputOp,
+                                 SmallVectorImpl<int64_t> &vecTileSizes,
+                                 int64_t eachOperandMaxTileBits,
+                                 int64_t allOperandsMaxTileBits) {
+  auto op = dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(inputOp);
+  if (!op) {
+    return;
+  }
+
+  limitVectorTileSizes(vecTileSizes, eachOperandMaxTileBits,
+                       allOperandsMaxTileBits, op->getOperandTypes(),
+                       op.getIndexingMapsArray());
 }
 
 // Returns the size in bits of SIMD register space, or 0 if it can't be
@@ -815,7 +828,7 @@ static int getRegisterSpaceBitsIfKnown(IREE::HAL::ExecutableTargetAttr target) {
 // `op` can simultaneously be allocated in SIMD registers. Does nothing when
 // SIMD register space can't be determined as a compile-time constant (e.g. Arm
 // SVE).
-static void limitVectorTileSizes(linalg::LinalgOp op,
+static void limitVectorTileSizes(Operation *op,
                                  SmallVectorImpl<int64_t> &vecTileSizes) {
   if (int registerSpaceBits = getRegisterSpaceBitsIfKnown(
           IREE::HAL::ExecutableTargetAttr::lookup(op))) {
@@ -1903,16 +1916,16 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
         /*numElem=*/tileSize, vectorSize, vectorSize);
   }
 
-  // Tile the M dimension completely.
-  // TODO: This is a hack to prevent too large vector sizes. The largest vector
-  // generally produced is the Q vector, which is of shape: BATCH x M x K1.
-  // Since K1 cannot be tiled, the heuristics don't properly account for tiling
-  // M such that Q doesn't grow too large.
-  // Ideally, we should use something like limitVectorTileSizes, to fixup tile
-  // sizes. Currently, limitVectorTileSizes ignores static dimensions which are
-  // not tiled, which is why it's not currently used here.
-  for (int i : opInfo.getMDims()) {
-    vecTileSizes[i] = 1;
+  if (int registerSpaceBits = getRegisterSpaceBitsIfKnown(
+          IREE::HAL::ExecutableTargetAttr::lookup(attnOp))) {
+    // Extend the operand types and maps with the hidden tensor, S.
+    SmallVector<Type> operandTypes(attnOp.getOperandTypes());
+    SmallVector<AffineMap> maps(attnOp.getIndexingMapsArray());
+    // Today we always assume that S is in fp32.
+    operandTypes.push_back(Float32Type::get(attnOp.getContext()));
+    maps.push_back(opInfo.getSMap());
+    limitVectorTileSizes(vecTileSizes, registerSpaceBits, registerSpaceBits,
+                         operandTypes, maps);
   }
 
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
