@@ -192,10 +192,10 @@ TEST(F16ConversionTest, F32ToF16) {
   // Underflow
   EXPECT_EQ(0, iree_math_f32_to_f16(FLT_MIN));
   EXPECT_EQ(0x8000, iree_math_f32_to_f16(-FLT_MIN));
-  EXPECT_EQ(0, iree_math_f32_to_f16(1.0e-05));
-  EXPECT_EQ(0x8000, iree_math_f32_to_f16(-1.0e-05));
-  EXPECT_EQ(0, iree_math_f32_to_f16(6.1e-05));  // Near largest denormal
-  EXPECT_EQ(0x8000, iree_math_f32_to_f16(-6.1e-05));
+  EXPECT_EQ(0x004F, iree_math_f32_to_f16(1.0e-05));
+  EXPECT_EQ(0x804F, iree_math_f32_to_f16(-1.0e-05));
+  EXPECT_EQ(0x03FE, iree_math_f32_to_f16(6.1e-05));  // Near largest denormal
+  EXPECT_EQ(0x83FE, iree_math_f32_to_f16(-6.1e-05));
 
   // Denormals may or may not get flushed to zero. Accept both ways.
   uint16_t positive_denormal = iree_math_f32_to_f16(kF16Min / 2);
@@ -319,7 +319,8 @@ TEST(BF16ConversionTest, F32ToBF16ToF32) {
   EXPECT_EQ(FLT_MIN, iree_math_bf16_to_f32(iree_math_f32_to_bf16(FLT_MIN)));
   EXPECT_EQ(-FLT_MIN, iree_math_bf16_to_f32(iree_math_f32_to_bf16(-FLT_MIN)));
   // Denormals
-  EXPECT_EQ(0.0f, iree_math_bf16_to_f32(iree_math_f32_to_bf16(2.0e-40f)));
+  EXPECT_EQ(1.83670992e-40f,
+            iree_math_bf16_to_f32(iree_math_f32_to_bf16(2.0e-40f)));
   // Inf and Nan
   EXPECT_EQ(INFINITY, iree_math_bf16_to_f32(iree_math_f32_to_bf16(INFINITY)));
   EXPECT_EQ(-INFINITY, iree_math_bf16_to_f32(iree_math_f32_to_bf16(-INFINITY)));
@@ -362,10 +363,10 @@ TEST(F8E5M2ConversionTest, F32ToF8E5M2) {
   // Underflow
   EXPECT_EQ(0, iree_math_f32_to_f8e5m2(FLT_MIN));
   EXPECT_EQ(0x80, iree_math_f32_to_f8e5m2(-FLT_MIN));
-  EXPECT_EQ(0, iree_math_f32_to_f8e5m2(kF8E5M2Min * 0.5f));
+  EXPECT_EQ(0x00, iree_math_f32_to_f8e5m2(kF8E5M2Min * 0.5f));
   EXPECT_EQ(0x80, iree_math_f32_to_f8e5m2(-kF8E5M2Min * 0.5f));
-  EXPECT_EQ(0, iree_math_f32_to_f8e5m2(kF8E5M2Min * 0.75f));
-  EXPECT_EQ(0x80, iree_math_f32_to_f8e5m2(-kF8E5M2Min * 0.75f));
+  EXPECT_EQ(0x02, iree_math_f32_to_f8e5m2(kF8E5M2Min * 0.75f));
+  EXPECT_EQ(0x82, iree_math_f32_to_f8e5m2(-kF8E5M2Min * 0.75f));
 
   // Denormals may or may not get flushed to zero. Accept both ways.
   uint16_t positive_denormal = iree_math_f32_to_f8e5m2(kF8E5M2Min / 2);
