@@ -40,6 +40,8 @@ typedef enum {
   IREE_HAL_BUFFER_EQUALITY_EXACT = 0,
   // abs(a - b) <= threshold
   IREE_HAL_BUFFER_EQUALITY_APPROXIMATE_ABSOLUTE,
+  // abs((a - b)/a) <= threshold
+  IREE_HAL_BUFFER_EQUALITY_APPROXIMATE_RELATIVE,
 } iree_hal_buffer_equality_mode_t;
 
 // TODO(benvanik): initializers/configuration for equality comparisons.
