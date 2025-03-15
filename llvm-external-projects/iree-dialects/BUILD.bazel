@@ -1,4 +1,5 @@
-load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "gentbl_filegroup", "td_library")
+load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "td_library")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -17,9 +18,7 @@ exports_files(glob(["python/*.cpp"]))
 
 filegroup(
     name = "python_dialects",
-    srcs = glob(["python/iree/compiler/dialects/**/*.py"]) + [
-        ":python/iree/compiler/dialects/_iree_ops_gen.py",
-    ],
+    srcs = glob(["python/iree/compiler/dialects/**/*.py"]),
 )
 
 ################################################################################
@@ -48,115 +47,6 @@ td_library(
         "@llvm-project//mlir:PDLDialectTdFiles",
         "@llvm-project//mlir:SideEffectInterfacesTdFiles",
         "@llvm-project//mlir:TransformDialectTdFiles",
-    ],
-)
-
-################################################################################
-# IREEInput dialect
-################################################################################
-
-gentbl_cc_library(
-    name = "IREEInputInterfacesIncGen",
-    tags = ["manual"],
-    tbl_outs = [
-        (
-            ["--gen-op-interface-decls"],
-            "include/iree-dialects/Dialect/Input/InputOpInterfaces.h.inc",
-        ),
-        (
-            ["--gen-op-interface-defs"],
-            "include/iree-dialects/Dialect/Input/InputOpInterfaces.cpp.inc",
-        ),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "include/iree-dialects/Dialect/Input/InputInterfaces.td",
-    deps = [":TdFiles"],
-)
-
-gentbl_cc_library(
-    name = "IREEInputIncGen",
-    strip_include_prefix = "include",
-    tbl_outs = [
-        (
-            ["--gen-dialect-decls"],
-            "include/iree-dialects/Dialect/Input/InputDialect.h.inc",
-        ),
-        (
-            ["--gen-dialect-defs"],
-            "include/iree-dialects/Dialect/Input/InputDialect.cpp.inc",
-        ),
-        (
-            ["--gen-op-decls"],
-            "include/iree-dialects/Dialect/Input/InputOps.h.inc",
-        ),
-        (
-            ["--gen-op-defs"],
-            "include/iree-dialects/Dialect/Input/InputOps.cpp.inc",
-        ),
-        (
-            ["--gen-typedef-decls"],
-            "include/iree-dialects/Dialect/Input/InputTypes.h.inc",
-        ),
-        (
-            ["--gen-typedef-defs"],
-            "include/iree-dialects/Dialect/Input/InputTypes.cpp.inc",
-        ),
-        (
-            ["--gen-attrdef-decls"],
-            "include/iree-dialects/Dialect/Input/InputAttrs.h.inc",
-        ),
-        (
-            ["--gen-attrdef-defs"],
-            "include/iree-dialects/Dialect/Input/InputAttrs.cpp.inc",
-        ),
-        (
-            ["--gen-enum-decls"],
-            "include/iree-dialects/Dialect/Input/InputEnums.h.inc",
-        ),
-        (
-            ["--gen-enum-defs"],
-            "include/iree-dialects/Dialect/Input/InputEnums.cpp.inc",
-        ),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "include/iree-dialects/Dialect/Input/InputOps.td",
-    deps = [":TdFiles"],
-)
-
-cc_library(
-    name = "IREEInputDialect",
-    srcs = glob([
-        "lib/Dialect/Input/*.cpp",
-    ]),
-    hdrs = glob(["include/iree-dialects/Dialect/Input/*.h"]),
-    includes = ["include"],
-    deps = [
-        ":IREEInputIncGen",
-        ":IREEInputInterfacesIncGen",
-        "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:ArithDialect",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:InferTypeOpInterface",
-        "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:TensorDialect",
-    ],
-)
-
-gentbl_filegroup(
-    name = "IREEInputDialectPyGen",
-    tbl_outs = [
-        (
-            [
-                "--gen-python-op-bindings",
-                "--bind-dialect=iree",
-            ],
-            "python/iree/compiler/dialects/_iree_ops_gen.py",
-        ),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "python/iree/compiler/dialects/IreeInputBinding.td",
-    deps = [
-        ":TdFiles",
     ],
 )
 
@@ -343,7 +233,6 @@ cc_library(
     hdrs = glob(["include/iree-dialects-c/*.h"]),
     includes = ["include"],
     deps = [
-        ":IREEInputDialect",
         ":IREELinalgTransformDialect",
         ":IREELinalgTransformDialectPasses",
         "@llvm-project//mlir:CAPIIR",
@@ -387,7 +276,6 @@ cc_binary(
     tags = ["hostonly"],
     deps = [
         ":IREEDialectsTest",
-        ":IREEInputDialect",
         ":IREELinalgTransformDialect",
         ":IREELinalgTransformDialectPasses",
         "@llvm-project//llvm:Support",

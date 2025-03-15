@@ -54,10 +54,6 @@ for f in ${BUILD_DOCS_PROCESSED_DIR}/*Dialect.md; do
   mv "$f" "${f/%Dialect.md/.md}"
 done
 
-# Rename iree-dialect files.
-mv "${BUILD_DOCS_PROCESSED_DIR}/InputOps.md" "${BUILD_DOCS_PROCESSED_DIR}/IREEInput.md"
-# mv "${BUILD_DOCS_PROCESSED_DIR}/StructuredTransformOpsExt.md" "${BUILD_DOCS_PROCESSED_DIR}/IREEStructuredTransformExt.md"
-
 # Postprocess the dialect docs (e.g. making tweaks to the markdown source).
 python3 "${THIS_DIR}/postprocess_dialect_docs.py" "${BUILD_DOCS_PROCESSED_DIR}"
 
