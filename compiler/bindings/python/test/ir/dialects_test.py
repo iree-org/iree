@@ -24,7 +24,6 @@ from iree.compiler.dialects import (
     rocdl,
     scf,
     shape,
-    structured_transform,
     tensor,
     tosa,
     transform,
