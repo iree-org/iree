@@ -341,6 +341,33 @@ enumerateMatmulTileRiscv32(DictionaryAttr config) {
   return {};
 }
 
+// Enumerate tile sizes to choose from on riscv64.
+// For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
+// are handled by transposition in chooseMatmulTile.
+static SmallVector<TileMxNxK>
+enumerateMatmulTileRiscv64(TypeRange elementTypes,
+		           DictionaryAttr config) {
+  
+  assert(elementTypes.size() == 3);
+  Type lhs = elementTypes[0];
+  Type rhs = elementTypes[1];
+  Type out = elementTypes[2];
+
+  if (lhs.isF32() && rhs.isF32() && out.isF32()) { 
+    if (hasFeature(config, "+v") && hasFeature(config, "+zvl256b")) {
+      return {
+          // Tile sizes tuned for VLEN=256
+          TileMxNxK{7, 32, 1}, // Aim to use vfmacc, 100% register utilization.
+          TileMxNxK{4, 32, 1}, // Truncation of the above.
+          TileMxNxK{2, 32, 1}, // Truncation of the above.
+          TileMxNxK{1, 32, 1}, // Truncation of the above.
+      };
+    }
+  }
+  // Fallback - no architecture-optimized tile size for this case.
+  return {};
+}
+
 // Enumerate tile sizes to choose from on arm64.
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
 // are handled by transposition in chooseMatmulTile.
@@ -558,6 +585,9 @@ enumerateCPUMatmulTiles(IREE::Encoding::EncodingAttr encoding,
   }
   if (isRISCV32(config)) {
     return enumerateMatmulTileRiscv32(config);
+  }
+  if (isRISCV64(config)) {
+    return enumerateMatmulTileRiscv64(elementTypes, config);
   }
   return {};
 }

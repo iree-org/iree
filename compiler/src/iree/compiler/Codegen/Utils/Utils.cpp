@@ -193,6 +193,9 @@ static const char *getDefaultEnabledUkernels(Attribute attr) {
   if (isAArch64(targetAttr)) {
     return "mmt4d";
   }
+  if (isRISCV64(targetAttr)) {
+    return "mmt4d";
+  }
   return kNone;
 }
 
@@ -285,6 +288,11 @@ bool isRISCV(Attribute attr) {
 bool isRISCV32(Attribute attr) {
   std::optional<llvm::Triple> triple = getTargetTriple(attr);
   return triple && triple.value().isRISCV32();
+}
+
+bool isRISCV64(Attribute attr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+  return triple && triple.value().isRISCV64();
 }
 
 bool isReadOnly(Value v) {
