@@ -28,8 +28,8 @@ from iree.compiler.dialects import (
     tosa,
     transform,
     vector,
-    vector_transform,
 )
+from iree.compiler.dialects.vector import transform
 
 # Make sure that our dialects import.
 from iree.compiler.dialects import flow, hal, stream, vm, util, iree_codegen, iree_gpu
