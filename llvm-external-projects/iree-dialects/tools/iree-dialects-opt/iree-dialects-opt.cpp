@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -38,7 +37,6 @@
 #include <mlir/Dialect/Bufferization/TransformOps/BufferizationTransformOps.h>
 
 using namespace mlir;
-namespace IREE = mlir::iree_compiler::IREE;
 
 int main(int argc, char **argv) {
   registerAsmPrinterCLOptions();
@@ -47,8 +45,6 @@ int main(int argc, char **argv) {
   DialectRegistry registry;
   registry.insert<
       // clang-format off
-      // Local dialects
-      mlir::iree_compiler::IREE::Input::IREEInputDialect,
       // Upstream dialects
       mlir::async::AsyncDialect,
       mlir::arith::ArithDialect,

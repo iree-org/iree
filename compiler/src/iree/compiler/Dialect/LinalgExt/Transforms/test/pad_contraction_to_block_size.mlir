@@ -47,7 +47,7 @@ func.func @pad_matmul_noop(%arg0 : tensor<256x512xf32>, %arg1 : tensor<512x1024x
 // CHECK:           %[[LHS_DIM0:.*]] = arith.constant 0 : index
 // CHECK:           %[[LHS_DIM:.*]] = tensor.dim %arg0, %[[LHS_DIM0]] : tensor<?x512xf32>
 // CHECK:           %[[LHS_ALIGN:.*]] = arith.constant 16 : index
-// CHECK:           %[[LHS_DIM_ALIGNED:.*]] = iree_input.align %[[LHS_DIM]], %[[LHS_ALIGN]] : index
+// CHECK:           %[[LHS_DIM_ALIGNED:.*]] = util.align %[[LHS_DIM]], %[[LHS_ALIGN]] : index
 // CHECK:           %[[LHS_ZERO:.*]] = arith.constant 0.000000e+00 : f32
 // CHECK:           %[[LHS_PADDED:.*]] = tensor.pad %arg0 low[0, 0] high{{\[}}%[[LHS_DIM_ALIGNED]], 0]   {
 // CHECK:           } : tensor<?x512xf32> to tensor<?x512xf32>
@@ -73,12 +73,12 @@ func.func @pad_matmul_dynamic_row(%arg0 : tensor<?x512xf32>, %arg1 : tensor<512x
 // Should trigger column alignment (32).
 // Pad RHS:
 // CHECK:           %[[RHS_ALIGNMENT:.*]] = arith.constant 32 : index
-// CHECK:           %[[RHS_ALIGNED_DIM:.*]] = iree_input.align %{{.*}}, %[[RHS_ALIGNMENT]] : index
+// CHECK:           %[[RHS_ALIGNED_DIM:.*]] = util.align %{{.*}}, %[[RHS_ALIGNMENT]] : index
 // CHECK:           %[[RHS_PADDED:.*]] = tensor.pad %arg1 low[0, 0] high[0, %[[RHS_ALIGNED_DIM]]]  {
 // CHECK:           } : tensor<512x?xf32> to tensor<512x?xf32>
 // Pad Output:
 // CHECK:           %[[OUTPUT_ALIGNMENT:.*]] = arith.constant 32 : index
-// CHECK:           %[[OUTPUT_ALIGNED_DIM:.*]] = iree_input.align %{{.*}}, %[[OUTPUT_ALIGNMENT]] : index
+// CHECK:           %[[OUTPUT_ALIGNED_DIM:.*]] = util.align %{{.*}}, %[[OUTPUT_ALIGNMENT]] : index
 // CHECK:           %[[OUTPUT_PADDED:.*]] = tensor.pad %arg2 low[0, 0] high[0, %[[OUTPUT_ALIGNED_DIM]]]  {
 // CHECK:           } : tensor<256x?xf32> to tensor<256x?xf32>
 // Matmul:

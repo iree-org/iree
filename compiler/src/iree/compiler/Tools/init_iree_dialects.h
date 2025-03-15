@@ -12,7 +12,6 @@
 #ifndef IREE_COMPILER_TOOLS_INIT_IREE_DIALECTS_H_
 #define IREE_COMPILER_TOOLS_INIT_IREE_DIALECTS_H_
 
-#include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
@@ -48,7 +47,6 @@ inline void registerIreeDialects(DialectRegistry &registry) {
                   IREE::HAL::Inline::HALInlineDialect,
                   IREE::HAL::Loader::HALLoaderDialect,
                   IREE::IO::Parameters::IOParametersDialect,
-                  IREE::Input::IREEInputDialect,
                   IREE::LinalgExt::IREELinalgExtDialect,
                   IREE::Encoding::IREEEncodingDialect,
                   IREE::Stream::StreamDialect,

@@ -4,7 +4,6 @@ add_mlir_public_c_api_library(IREEDialectsCAPI
   MLIRIR
   MLIRLinalgTransformOps
   MLIRTransformDialect
-  IREEInputDialect
   IREELinalgTransformDialect
   IREELinalgTransformDialectPasses
 )
