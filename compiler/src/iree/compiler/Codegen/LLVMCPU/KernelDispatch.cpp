@@ -677,10 +677,16 @@ static bool isInnerMostDimThatMapIsFunctionOf(AffineMap map, int dim) {
 // 1. No resulting operand tile size exceeds `eachOperandMaxTileBits`.
 // 2. The sum of all resulting operand tile size does not exceed
 // `allOperandsMaxTileBits`.
-static void limitVectorTileSizes(linalg::LinalgOp op,
+static void limitVectorTileSizes(Operation *inputOp,
                                  SmallVectorImpl<int64_t> &vecTileSizes,
                                  int64_t eachOperandMaxTileBits,
                                  int64_t allOperandsMaxTileBits) {
+
+  auto op = dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(inputOp);
+  if (!op) {
+    return;
+  }
+
   int numLoops = op.getNumLoops();
   assert(numLoops == vecTileSizes.size());
   auto indexingMaps = op.getIndexingMapsArray();
@@ -815,7 +821,7 @@ static int getRegisterSpaceBitsIfKnown(IREE::HAL::ExecutableTargetAttr target) {
 // `op` can simultaneously be allocated in SIMD registers. Does nothing when
 // SIMD register space can't be determined as a compile-time constant (e.g. Arm
 // SVE).
-static void limitVectorTileSizes(linalg::LinalgOp op,
+static void limitVectorTileSizes(Operation *op,
                                  SmallVectorImpl<int64_t> &vecTileSizes) {
   if (int registerSpaceBits = getRegisterSpaceBitsIfKnown(
           IREE::HAL::ExecutableTargetAttr::lookup(op))) {
@@ -1903,17 +1909,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
         /*numElem=*/tileSize, vectorSize, vectorSize);
   }
 
-  // Tile the M dimension completely.
-  // TODO: This is a hack to prevent too large vector sizes. The largest vector
-  // generally produced is the Q vector, which is of shape: BATCH x M x K1.
-  // Since K1 cannot be tiled, the heuristics don't properly account for tiling
-  // M such that Q doesn't grow too large.
-  // Ideally, we should use something like limitVectorTileSizes, to fixup tile
-  // sizes. Currently, limitVectorTileSizes ignores static dimensions which are
-  // not tiled, which is why it's not currently used here.
-  for (int i : opInfo.getMDims()) {
-    vecTileSizes[i] = 1;
-  }
+  limitVectorTileSizes(attnOp, vecTileSizes);
 
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;

@@ -162,47 +162,8 @@ void BubbleUpExpandShapesPass::runOnOperation() {
   linalg::populateFoldReshapeOpsByExpansionPatterns(bubbleExpandShapePatterns,
                                                     bubbleUpExpansionControlFn);
 
-  // TODO(#19263): Temporary fix to prevent compilation failures when the
-  // reduction dims get expanded. This adds the constraint to
-  // `bubbleUpExpansionControlFn` that the reduction dimensions cannot be
-  // expanded by the reshape fusion.
-  linalg::ControlFusionFn linalgExtExpansionFn = [&](OpOperand *fusedOperand) {
-    if (!bubbleUpExpansionControlFn(fusedOperand)) {
-      return false;
-    }
-
-    // There is no need to handle `expand_shape` ops because they would be the
-    // producer and therefore are unable to expand the reduction dims.
-    auto collapseOp =
-        dyn_cast<tensor::CollapseShapeOp>(fusedOperand->get().getDefiningOp());
-    auto attentionOp =
-        dyn_cast<IREE::LinalgExt::AttentionOp>(fusedOperand->getOwner());
-    if (!collapseOp || !attentionOp) {
-      return true;
-    }
-
-    SmallVector<ReassociationIndices> reassoc =
-        collapseOp.getReassociationIndices();
-    auto opDetail = IREE::LinalgExt::AttentionOpDetail::get(
-        attentionOp.getQueryMap(), attentionOp.getKeyMap(),
-        attentionOp.getValueMap(), attentionOp.getOutputMap());
-
-    // Don't sink the `collapse_shape` op if it is collapsing into any of the
-    // reduction dimensions.
-    AffineMap operandMap = attentionOp.getMatchingIndexingMap(fusedOperand);
-    for (auto dim : llvm::concat<const int64_t>(opDetail->getK2Dims(),
-                                                opDetail->getK1Dims())) {
-      auto dimExpr = getAffineDimExpr(dim, operandMap.getContext());
-      if (std::optional<int64_t> maybeDim =
-              operandMap.getResultPosition(dimExpr);
-          maybeDim && reassoc[maybeDim.value()].size() > 1) {
-        return false;
-      }
-    }
-    return true;
-  };
   IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(
-      bubbleExpandShapePatterns, linalgExtExpansionFn);
+      bubbleExpandShapePatterns, bubbleUpExpansionControlFn);
 
   // Add patterns to do some additional cleanup (on top of canonicalizations
   // that can be done later) of reshape ops.
@@ -210,6 +171,8 @@ void BubbleUpExpandShapesPass::runOnOperation() {
   bubbleExpandShapePatterns.insert<BubbleExpandThroughExtract>(context);
   tensor::ExpandShapeOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
                                                      context);
+  tensor::CollapseShapeOp::getCanonicalizationPatterns(
+      bubbleExpandShapePatterns, context);
 
   GreedyRewriteConfig rewriteConfig;
   rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
