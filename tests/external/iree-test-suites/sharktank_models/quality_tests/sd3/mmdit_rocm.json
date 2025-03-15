@@ -1,0 +1,42 @@
+{
+    "inputs": [
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_input.0.bin",
+            "value": "2x16x128x128xf16"
+        },
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_input.1.bin",
+            "value": "2x154x4096xf16"
+        },
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_input.2.bin",
+            "value": "2x2048xf16"
+        },
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_input.3.bin",
+            "value": "2xf16"
+        }
+    ],
+    "outputs": [
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_output.0.bin",
+            "value": "2x16x128x128xf32"
+        }
+    ],
+    "real_weights": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/real_weights.irpa",
+    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/model.mlir",
+    "device": "hip",
+    "compiler_flags": [
+        "--iree-hal-target-backends=rocm",
+        "--iree-opt-level=O3",
+        "--iree-opt-const-eval=false",
+        "--iree-hip-waves-per-eu=2",
+        "--iree-llvmgpu-enable-prefetch",
+        "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
+        "--iree-codegen-llvmgpu-use-vector-distribution=true",
+        "--iree-execution-model=async-external",
+        "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics{pad-target-type=conv})"
+    ],
+    "run_function": "run_forward",
+    "run_test_expecting_to_fail": true
+}
