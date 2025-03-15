@@ -468,6 +468,8 @@ struct RefineUsagePass
       return signalPassFailure();
     }
 
+    analysis.print(llvm::errs());
+
     // Query and apply analysis results to all resources in the program.
     RewritePatternSet patterns(&getContext());
     insertUsageRefinementPatterns(&getContext(), analysis, patterns);
