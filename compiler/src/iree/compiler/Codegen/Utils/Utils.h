@@ -82,6 +82,7 @@ bool isX86_64(Attribute attr);
 bool isAArch64(Attribute attr);
 bool isRISCV(Attribute attr);
 bool isRISCV32(Attribute attr);
+bool isRISCV64(Attribute attr);
 
 /// Checks if a tensor value is generated from a read-only object, like
 /// and interface binding with read-only attribute or from an `arith.constant`
