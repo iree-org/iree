@@ -31,9 +31,7 @@ from iree.compiler.dialects import (
 )
 
 # Smoke test for vector transforms
-from iree.compiler.dialects.transform import (
-    apply_conversion_patterns_vector_vector_to_llvm,
-)
+from iree.compiler.dialects.transform import vector as vt
 
 # Make sure that our dialects import.
 from iree.compiler.dialects import flow, hal, stream, vm, util, iree_codegen, iree_gpu
