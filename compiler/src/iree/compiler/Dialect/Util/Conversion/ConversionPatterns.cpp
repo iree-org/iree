@@ -11,7 +11,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -169,76 +168,6 @@ struct ConvertReturnOp : public OpConversionPattern<IREE::Util::ReturnOp> {
   }
 };
 
-struct ConvertFuncFuncOp : public OpConversionPattern<mlir::func::FuncOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult
-  matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    auto &typeConverter = *getTypeConverter();
-
-    // Convert the input signature types.
-    // TODO(benvanik): dynamic shapes by passing in tensor dynamic dims.
-    auto originalType = funcOp.getFunctionType();
-    TypeConverter::SignatureConversion newSignature(
-        originalType.getNumInputs());
-    for (auto argType : llvm::enumerate(originalType.getInputs())) {
-      if (failed(typeConverter.convertSignatureArg(
-              argType.index(), argType.value(), newSignature))) {
-        return rewriter.notifyMatchFailure(funcOp,
-                                           "failed to convert arg type");
-      }
-    }
-    SmallVector<Type> newResultTypes;
-    if (failed(typeConverter.convertTypes(originalType.getResults(),
-                                          newResultTypes))) {
-      return rewriter.notifyMatchFailure(funcOp,
-                                         "failed to convert result type");
-    }
-
-    // Replace function.
-    auto newFuncOp = rewriter.cloneWithoutRegions(funcOp);
-    newFuncOp.getBlocks().clear();
-    rewriter.inlineRegionBefore(funcOp.getFunctionBody(),
-                                newFuncOp.getFunctionBody(), newFuncOp.end());
-    newFuncOp.setType(rewriter.getFunctionType(newSignature.getConvertedTypes(),
-                                               newResultTypes));
-    if (failed(rewriter.convertRegionTypes(&newFuncOp.getFunctionBody(),
-                                           typeConverter, &newSignature))) {
-      return rewriter.notifyMatchFailure(funcOp,
-                                         "failed to convert region types");
-    }
-    rewriter.eraseOp(funcOp);
-    return success();
-  }
-};
-
-struct ConvertFuncCallOp : public OpConversionPattern<mlir::func::CallOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult
-  matchAndRewrite(mlir::func::CallOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    SmallVector<Type> resultTypes;
-    if (failed(getTypeConverter()->convertTypes(op.getResultTypes(),
-                                                resultTypes))) {
-      return rewriter.notifyMatchFailure(op, "unable to convert result types");
-    }
-    rewriter.replaceOpWithNewOp<mlir::func::CallOp>(
-        op, resultTypes, op.getCallee(), adaptor.getOperands());
-    return success();
-  }
-};
-
-struct ConvertFuncReturnOp : public OpConversionPattern<mlir::func::ReturnOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult
-  matchAndRewrite(mlir::func::ReturnOp returnOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(returnOp,
-                                                      adaptor.getOperands());
-    return success();
-  }
-};
-
 struct ConvertBranchOp : public OpConversionPattern<mlir::cf::BranchOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult
@@ -348,15 +277,6 @@ void populateGenericStructuralConversionPatterns(
   addGenericLegalOp<IREE::Util::ReturnOp>(conversionTarget, typeConverter);
   patterns.insert<ConvertInitializerOp, ConvertFuncOp, ConvertCallOp,
                   ConvertReturnOp>(typeConverter, context);
-
-  conversionTarget.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
-    return typeConverter.isSignatureLegal(op.getFunctionType()) &&
-           typeConverter.isLegal(&op.getBody());
-  });
-  addGenericLegalOp<func::CallOp>(conversionTarget, typeConverter);
-  addGenericLegalOp<func::ReturnOp>(conversionTarget, typeConverter);
-  patterns.insert<ConvertFuncFuncOp, ConvertFuncCallOp, ConvertFuncReturnOp>(
-      typeConverter, context);
 
   addGenericLegalOp<cf::BranchOp>(conversionTarget, typeConverter);
   addGenericLegalOp<cf::CondBranchOp>(conversionTarget, typeConverter);
