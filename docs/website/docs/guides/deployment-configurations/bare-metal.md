@@ -44,8 +44,6 @@ iree-compile \
 
 ```
 
---8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-optimization-options.md"
-
 In which
 
 * `--iree-stream-partitioning-favor=min-peak-memory`: Optimize for minimum peak
@@ -62,6 +60,8 @@ for example command-line instructions of some common architectures.
 
 You can replace the MLIR file with the other MLIR model files, following the
 [instructions](./cpu.md#compile-a-program).
+
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-optimization-options.md"
 
 ### Compiling the bare-metal model for static-library support
 
