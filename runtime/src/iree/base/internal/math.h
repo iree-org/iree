@@ -304,12 +304,8 @@ static inline float iree_math_make_f32_from_bits(uint32_t src, int exp_bits,
   const uint32_t f32_sign = src_sign << (f32_sign_shift - src_sign_shift);
   const uint32_t src_exp = src & src_exp_mask;
   const uint32_t src_mantissa = src & src_mantissa_mask;
-  // Initializing f32_exp and f32_mantissa for the case of normal finite values.
-  // Below we will overload that in other cases.
-  uint32_t f32_exp = ((src_exp >> src_exp_shift) + f32_exp_bias - src_exp_bias)
-                     << f32_exp_shift;
-  uint32_t f32_mantissa = src_mantissa
-                          << (f32_mantissa_bits - src_mantissa_bits);
+  uint32_t f32_exp = 0;
+  uint32_t f32_mantissa = 0;
   if (src_exp == src_exp_mask) {
     // Top exponent value normally means infinity or NaN.
     if (have_infinity) {
@@ -333,16 +329,16 @@ static inline float iree_math_make_f32_from_bits(uint32_t src, int exp_bits,
         f32_mantissa = f32_mantissa_mask;
       }
     }
-  } else if (src_exp == 0) {
-    // Zero or subnormal. Generate zero, except in one case: if the source type
-    // encodes NaN as signed zero, we handle that now.
-    if (nan_as_neg_zero && src == src_sign_mask) {
-      f32_exp = f32_exp_mask;
-      f32_mantissa = f32_mantissa_mask;
-    } else {
-      f32_exp = 0;
-      f32_mantissa = 0;
-    }
+  } else if (nan_as_neg_zero && src == src_sign_mask) {
+    // Source is NaN encoded as negative zero. Generate NaN.
+    f32_exp = f32_exp_mask;
+    f32_mantissa = f32_mantissa_mask;
+  } else if (src_exp == 0 && src_mantissa == 0) {
+    // Zero. Leave f32_exp and f32_mantissa as zero.
+  } else {
+    f32_exp = ((src_exp >> src_exp_shift) + f32_exp_bias - src_exp_bias)
+              << f32_exp_shift;
+    f32_mantissa = src_mantissa << (f32_mantissa_bits - src_mantissa_bits);
   }
   const uint32_t u32_value = f32_sign | f32_exp | f32_mantissa;
   float f32_value;
@@ -378,11 +374,16 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
       // Inf. Leave zero mantissa.
     }
   } else if (f32_exp == 0) {
-    // Zero or subnormal. Generate zero. Leave zero mantissa.
-    if (nan_as_neg_zero) {
-      // The destination has no signed zero. Avoid accidentally generating NaN.
-      dst_sign = 0;
+    // Zero or subnormal.
+    if (dst_exp_bits == f32_exp_bits) {
+      // When the destination type still has as many exponent bits, denormals
+      // can remain nonzero. This happens only with the bf16 type.
+      // Just truncate the mantissa. Not worth bothering with round-to-nearest
+      // for denormals for bf16 only.
+      dst_mantissa = f32_mantissa >> (f32_mantissa_bits - dst_mantissa_bits);
     }
+    // The destination type has fewer exponent bits, so f32 subnormal values
+    // become exactly zero. Leave the mantissa zero.
   } else {
     // Normal finite value.
     int arithmetic_exp = (f32_exp >> f32_exp_shift) - f32_exp_bias;
@@ -397,8 +398,19 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
         generate_nan = true;
       }
     } else if (arithmetic_exp + dst_exp_bias <= 0) {
-      // Underflow. Generate zero. Leave zero mantissa.
+      // Underflow. Generate a subnormal or zero.
       dst_exp = 0;
+      // The exponent has to be clamped to 0 when the value
+      // (arithmetic_exp + dst_exp_bias) is negative. This has to be compensated
+      // by right-shifting the subnormal mantissa.
+      int exp_to_encode_as_bitshift = -(arithmetic_exp + dst_exp_bias);
+      int shift_amount =
+          f32_mantissa_bits - dst_mantissa_bits + exp_to_encode_as_bitshift;
+      if (shift_amount >= f32_mantissa_bits) {
+        dst_mantissa = 0;
+      } else {
+        dst_mantissa = f32_mantissa >> shift_amount;
+      }
     } else {
       // Normal case.
       // Implement round-to-nearest-even, by adding a bias before truncating.
