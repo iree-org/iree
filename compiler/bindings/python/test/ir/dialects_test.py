@@ -6,6 +6,46 @@
 
 from iree.compiler import ir
 
+
+# Substitute `replace=True` so that colliding registration don't error.
+# TODO(makslevental): remove after https://github.com/llvm/llvm-project/pull/117918 is resolved.
+def register_attribute_builder(kind, replace=True):
+    def decorator_builder(func):
+        ir.AttrBuilder.insert(kind, func, replace=replace)
+        return func
+
+    return decorator_builder
+
+
+ir.register_attribute_builder = register_attribute_builder
+
+# Test upstream dialects import
+from iree.compiler.dialects import (
+    affine,
+    amdgpu,
+    arith,
+    builtin,
+    cf,
+    complex,
+    func,
+    gpu,
+    linalg,
+    llvm,
+    math,
+    memref,
+    pdl,
+    rocdl,
+    scf,
+    shape,
+    tensor,
+    tosa,
+    transform,
+    vector,
+)
+
+# Smoke test for vector transforms
+from iree.compiler.dialects.transform import vector as vt
+
 # Make sure that our dialects import.
 from iree.compiler.dialects import flow, hal, stream, vm, util, iree_codegen, iree_gpu
 
