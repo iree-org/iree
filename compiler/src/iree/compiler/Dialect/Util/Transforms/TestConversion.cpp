@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -39,6 +40,7 @@ public:
     ConversionTarget conversionTarget(*context);
     conversionTarget.addLegalDialect<arith::ArithDialect>();
     conversionTarget.addLegalDialect<IREE::Util::UtilDialect>();
+    conversionTarget.addIllegalDialect<func::FuncDialect>();
     conversionTarget.addLegalOp<UnrealizedConversionCastOp>();
 
     TypeConverter typeConverter;
