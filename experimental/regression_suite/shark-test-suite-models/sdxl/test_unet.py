@@ -137,7 +137,7 @@ sdxl_punet_int8_inference_input_5 = fetch_source_fixture(
 )
 
 sdxl_punet_int8_fp16_inference_output_0 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_output.npy",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/11-13-2024/punet_fp16_out.0.bin",
     group="sdxl_punet_int8_fp16",
 )
 
@@ -154,7 +154,7 @@ sdxl_punet_int8_fp16_mlir = fetch_source_fixture(
 # INT8 Punet + FP8 Attention
 
 sdxl_punet_int8_fp8_inference_output_0 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl-punet/03-12-2025/punet_fp8_out.0.bin",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_output.npy",
     group="sdxl_punet_int8_fp8",
 )
 
