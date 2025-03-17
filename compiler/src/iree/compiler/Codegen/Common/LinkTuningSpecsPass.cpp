@@ -104,7 +104,6 @@ getUniqueSpecName(StringRef specName,
 
 struct TuningSpecsToMerge {
   SmallVector<NamedSequenceOp> namedSequenceOpsToMove;
-  SmallVector<ForeachMatchOp> foreachMatchOps;
   llvm::DenseMap<NamedSequenceOp, ForeachMatchOp> namedSequenceToForeachMatch;
 };
 
@@ -136,14 +135,11 @@ updateForeachMatchMappings(ForeachMatchOp foreachMatch, ModuleOp module,
   }
 }
 
-// Collects tuning specs (`NamedSequenceOp`s and `ForeachMatchOp`s) from
-// all inner modules within the given input model, and organizes them into a
-// `TuningSpecsToMerge` struct.
+// Collects tuning specs (`NamedSequenceOp`s) from all inner modules within the
+// given input model, and organizes them into a `TuningSpecsToMerge` struct.
 // - `namedSequenceOpsToMove`: Contains `NamedSequenceOp`s that either:
 //     - Are not named `__kernel_config`.
 //     - Do not have the `iree_codegen.tuning_spec_entrypoint` attribute.
-// - `foreachMatchOps`: Stores all `ForeachMatchOp`s found inside
-//   `NamedSequenceOp`s with `__kernel_config`.
 // - `namedSequenceToForeachMatch`: Maps `NamedSequenceOp`s used as matchers or
 //    actions to their corresponding `ForeachMatchOp`.
 static TuningSpecsToMerge collectTuningSpecsToMerge(ModuleOp module) {
@@ -162,7 +158,6 @@ static TuningSpecsToMerge collectTuningSpecsToMerge(ModuleOp module) {
           *namedSequenceOp.getOps<ForeachMatchOp>().begin();
       assert(foreachMatch &&
              "ForeachMatch should exist in the `__kernel_config`.");
-      tuningSpecs.foreachMatchOps.push_back(foreachMatch);
 
       updateForeachMatchMappings(foreachMatch, innerModule,
                                  tuningSpecs.namedSequenceToForeachMatch);
@@ -321,11 +316,10 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
 static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
   OpBuilder builder(module.getContext());
 
-  // Step 1: Collect NamedSequenceOps and ForeachMatchOps from inner modules.
+  // Step 1: Collect NamedSequenceOps from inner modules.
   TuningSpecsToMerge tuningSpecs = collectTuningSpecsToMerge(module);
   SmallVector<NamedSequenceOp> &namedSequenceOpsToMove =
       tuningSpecs.namedSequenceOpsToMove;
-  SmallVector<ForeachMatchOp> &foreachMatchOps = tuningSpecs.foreachMatchOps;
   llvm::DenseMap<NamedSequenceOp, ForeachMatchOp> &namedSequenceToForeachMatch =
       tuningSpecs.namedSequenceToForeachMatch;
 
@@ -339,13 +333,28 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
 
   // Step 2-b: Create a new NamedSequenceOp `__kernel_config` in the top-level
   // module.
+
+  // Collect all `ForeachMatchOp`s from `__kernel_config` NamedSequenceOps
+  // in inner modules to merge into the new `__kernel_config` in the top module.
+  SmallVector<ForeachMatchOp> foreachMatchOps;
+  for (auto innerModule : module.getBody()->getOps<ModuleOp>()) {
+    auto namedSequenceOp = *innerModule.getOps<NamedSequenceOp>().begin();
+    assert(
+        namedSequenceOp.getSymName() == kKernelConfigSpecName &&
+        namedSequenceOp->hasAttr(kTuningSpecEntrypointAttrName) &&
+        "NamedSequenceOp must have the expected symbol name `__kernel_config` "
+        "and attribute `iree_codegen.tuning_spec_entrypoint`.");
+    ForeachMatchOp foreachMatch =
+        *namedSequenceOp.getOps<ForeachMatchOp>().begin();
+    foreachMatchOps.push_back(foreachMatch);
+  }
+
   builder.setInsertionPointToEnd(module.getBody());
   Location loc = module.getLoc();
   auto newNamedSequence =
       createKernelConfigOp(builder, loc, kKernelConfigSpecName);
 
   bool hasConsumedArg = llvm::any_of(foreachMatchOps, hasConsumedArgument);
-
   StringRef attrName =
       hasConsumedArg ? kArgConsumedAttrName : kArgReadOnlyAttrName;
   newNamedSequence.setArgAttr(0, attrName, builder.getUnitAttr());
