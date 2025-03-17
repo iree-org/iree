@@ -727,14 +727,12 @@ updateResultEncoding(RewriterBase &rewriter, OpTy op,
   return success();
 }
 
-/// Updates the source encoding and the result encoding of `op` with resolved
-/// layouts.
+/// Updates the source_encoding for `op`. The op has to define a
+/// `source_encoding` parameter.
+template <typename OpTy>
 static LogicalResult
-updateTensorEncodeOp(RewriterBase &rewriter, IREE::Stream::TensorEncodeOp op,
+updateSourceEncoding(RewriterBase &rewriter, OpTy op,
                      const SetVector<Attribute> &layoutResolvers) {
-  if (failed(updateResultEncoding(rewriter, op, layoutResolvers))) {
-    return failure();
-  }
   auto encodingType = dyn_cast<RankedTensorType>(op.getSourceEncoding());
   Type newEncodingType =
       getTypeWithResolvedEncodingLayouts(encodingType, layoutResolvers);
@@ -742,6 +740,18 @@ updateTensorEncodeOp(RewriterBase &rewriter, IREE::Stream::TensorEncodeOp op,
     return op.emitOpError("failed to resolve recognized layout");
   }
   rewriter.modifyOpInPlace(op, [&] { op.setSourceEncoding(newEncodingType); });
+  return success();
+}
+
+/// Updates the source encoding and the result encoding of `op` with resolved
+/// layouts.
+static LogicalResult
+updateTensorEncodeOp(RewriterBase &rewriter, IREE::Stream::TensorEncodeOp op,
+                     const SetVector<Attribute> &layoutResolvers) {
+  if (failed(updateResultEncoding(rewriter, op, layoutResolvers)) ||
+      failed(updateSourceEncoding(rewriter, op, layoutResolvers))) {
+    return failure();
+  }
   return success();
 }
 
