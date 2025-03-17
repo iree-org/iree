@@ -66,7 +66,7 @@ void MakeSingleDispatchForFunctionPass::runOnOperation() {
   llvm::SetVector<Operation *> firstSlice;
   mlir::getBackwardSlice(block.getTerminator(), &firstSlice, firstSliceOptions);
 
-  // 2. Do the second slice starting form the first slice to remove any ABI
+  // 2. Do the second slice starting from the first slice to remove any ABI
   // related operations on the argument.
   BackwardSliceOptions secondSliceOptions;
   secondSliceOptions.omitUsesFromAbove = false;
@@ -133,7 +133,7 @@ void MakeSingleDispatchForFunctionPass::runOnOperation() {
   }
 
   auto resultTypes =
-      llvm::map_to_vector(results, [](Value v) { return v.getType(); });
+      llvm::map_to_vector(results, [](Value v) -> Type { return v.getType(); });
   auto dispatchRegionOp = rewriter.create<IREE::Flow::DispatchRegionOp>(
       funcOp.getLoc(), resultTypes,
       /*result_dims=*/ValueRange{}, /*workload=*/ValueRange{});
