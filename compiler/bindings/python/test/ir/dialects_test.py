@@ -20,7 +20,6 @@ def register_attribute_builder(kind, replace=True):
 ir.register_attribute_builder = register_attribute_builder
 
 # Test upstream dialects import
-
 from iree.compiler.dialects import (
     affine,
     amdgpu,
@@ -31,7 +30,7 @@ from iree.compiler.dialects import (
     func,
     gpu,
     # TODO: importing linalg pulls yaml dependency, disable for now
-    # linalg, 
+    # linalg,
     llvm,
     math,
     memref,
