@@ -5,11 +5,18 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Preprocessing/Common/Passes.h"
+#include "llvm/ADT/SetVector.h"
+#include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 namespace mlir::iree_compiler::Preprocessing {
 
@@ -29,61 +36,123 @@ struct MakeSingleDispatchForFunctionPass
 void MakeSingleDispatchForFunctionPass::runOnOperation() {
   auto funcOp = getOperation();
 
-  // Abort if there are any operations that prevent moving all operations
-  // into a single dispatch.
-  auto walkResult = funcOp.walk([](mlir::CallOpInterface op) -> WalkResult {
-    return WalkResult::interrupt();
-  });
-  if (walkResult.wasInterrupted()) {
-    funcOp->emitOpError("unhandled operation in function body prevents moving "
-                        "body into a single dispatch");
-  }
-
-  // Currently this can only be done for static shapes cause
-  // there is no way of getting the tied dynamic shapes for
-  // a function.
-  auto resultTypes = funcOp.getResultTypes();
-  if (llvm::any_of(resultTypes, [&](Type t) {
-        auto shapedType = dyn_cast<ShapedType>(t);
-        return shapedType && !shapedType.hasStaticShape();
-      })) {
+  Region &body = funcOp.getFunctionBody();
+  if (!llvm::hasSingleElement(body)) {
+    // Do nothing.
     return;
   }
 
-  IRRewriter rewriter(&getContext());
-  Location loc = funcOp.getLoc();
-  Region &funcBody = funcOp.getFunctionBody();
+  Block &block = body.front();
+  auto whitelistedOps = [&](Operation *op) {
+    auto dialect = op->getDialect();
+    if (isa<IREE::LinalgExt::IREELinalgExtDialect, linalg::LinalgDialect,
+            tensor::TensorDialect>(dialect)) {
+      return true;
+    }
+    if (isa<arith::ArithDialect>(dialect)) {
+      return !isa<arith::ConstantOp>(op);
+    }
+    return false;
+  };
 
-  // Split the function entry block to create a new entry block into which the
-  // new operations will be added.
-  Block &entryBlock = funcBody.front();
-  Block *funcBodyStart = rewriter.splitBlock(&entryBlock, entryBlock.begin());
+  // Find the region to outline by doing two slices.
 
-  // Create an empty `flow.dispatch.region` operation with same result type as
-  // the function.
-  rewriter.setInsertionPointToEnd(&entryBlock);
-  auto dispatchRegionOp = rewriter.create<IREE::Flow::DispatchRegionOp>(
-      loc, resultTypes, /*result_dims=*/ValueRange{},
-      /*workload=*/ValueRange{});
+  // 1. The first slice removes any ABI related operations at the return.
+  BackwardSliceOptions firstSliceOptions;
+  firstSliceOptions.omitUsesFromAbove = false;
+  firstSliceOptions.inclusive = true;
+  // Filter returns true for any dialect not allowed.
+  firstSliceOptions.filter = [&](Operation *op) { return !whitelistedOps(op); };
+  llvm::SetVector<Operation *> firstSlice;
+  mlir::getBackwardSlice(block.getTerminator(), &firstSlice, firstSliceOptions);
 
-  // Move the body of the function into the region.
-  Region &region = dispatchRegionOp.getBody();
-  region.getBlocks().splice(region.begin(), funcBody.getBlocks(),
-                            Region::iterator(funcBodyStart), funcBody.end());
-
-  // Replace all `func.return` with `flow.return`.
-  SmallVector<func::ReturnOp> returnOps =
-      llvm::to_vector(region.getOps<func::ReturnOp>());
-  for (auto returnOp : returnOps) {
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(returnOp);
-    rewriter.replaceOpWithNewOp<IREE::Flow::ReturnOp>(returnOp,
-                                                      returnOp.getOperands());
+  // 2. Do the second slice starting from the first slice to remove any ABI
+  // related operations on the argument.
+  BackwardSliceOptions secondSliceOptions;
+  secondSliceOptions.omitUsesFromAbove = false;
+  secondSliceOptions.inclusive = true;
+  secondSliceOptions.filter = whitelistedOps;
+  llvm::SetVector<Operation *> secondSlice;
+  for (Operation *op : firstSlice) {
+    for (Value operand : op->getOperands()) {
+      mlir::getBackwardSlice(operand, &secondSlice, secondSliceOptions);
+    }
+  }
+  if (secondSlice.empty()) {
+    return;
   }
 
-  // Return the results of the `flow.dispatch.region`.
-  rewriter.setInsertionPointAfter(dispatchRegionOp);
-  rewriter.create<func::ReturnOp>(loc, dispatchRegionOp.getResults());
+  // 3. Sort  the operations.
+  mlir::topologicalSort(secondSlice);
+
+  // Move the second slice into a `flow.dispatch.region`.
+  MLIRContext *context = &getContext();
+  IRRewriter rewriter(context);
+  Operation *insertionPoint = secondSlice.front();
+  rewriter.setInsertionPoint(insertionPoint);
+
+  // Go over the slice and find the return values, i.e. values defined by ops in
+  // the slice and used outside of the slice.
+  SetVector<Value> results;
+  for (Operation *op : secondSlice) {
+    for (OpOperand &use : op->getUses()) {
+      Operation *user = use.getOwner();
+      if (!secondSlice.contains(user)) {
+        results.insert(use.get());
+      }
+    }
+  }
+
+  // Getting the dynamic dimensions of result values in terms of values passed
+  // into the slice should be possible, but is involved. Ignore this case for
+  // now.
+  for (auto result : results) {
+    auto shapedType = dyn_cast<ShapedType>(result.getType());
+    if (!shapedType.hasStaticShape()) {
+      emitError(result.getLoc())
+          << "unhandled dynamic dimensions for created dispatch region";
+      return signalPassFailure();
+    }
+  }
+
+  // Find the values captures by the slice.
+  SetVector<Value> capturedValues;
+  for (Operation *op : secondSlice) {
+    for (OpOperand &use : op->getOpOperands()) {
+      Operation *definingOp = use.get().getDefiningOp();
+      if (!definingOp || secondSlice.contains(definingOp)) {
+        continue;
+      }
+      capturedValues.insert(use.get());
+    }
+  }
+  if (failed(moveValueDefinitions(rewriter, capturedValues.getArrayRef(),
+                                  insertionPoint))) {
+    funcOp.emitOpError(
+        "failed to move definitions of captured values before region op");
+    return signalPassFailure();
+  }
+
+  auto resultTypes =
+      llvm::map_to_vector(results, [](Value v) -> Type { return v.getType(); });
+  auto dispatchRegionOp = rewriter.create<IREE::Flow::DispatchRegionOp>(
+      funcOp.getLoc(), resultTypes,
+      /*result_dims=*/ValueRange{}, /*workload=*/ValueRange{});
+  Region &regionOpBody = dispatchRegionOp.getBody();
+  Block *newBlock = rewriter.createBlock(&regionOpBody, regionOpBody.begin());
+  for (Operation *op : secondSlice) {
+    rewriter.moveOpBefore(op, newBlock, newBlock->end());
+  }
+  rewriter.setInsertionPointToEnd(newBlock);
+  rewriter.create<IREE::Flow::ReturnOp>(dispatchRegionOp.getLoc(),
+                                        results.getArrayRef());
+  rewriter.replaceUsesWithIf(
+      results.getArrayRef(), dispatchRegionOp->getResults(),
+      [&](OpOperand &use) {
+        Operation *user = use.getOwner();
+        return user->getParentOfType<IREE::Flow::DispatchRegionOp>() !=
+               dispatchRegionOp;
+      });
 }
 
 } // namespace mlir::iree_compiler::Preprocessing
