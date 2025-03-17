@@ -4376,7 +4376,6 @@ description.</p>
 ci-extra: extra,jobs,to,run
 ci-exactly: exact,set,of,jobs,to,run
 skip-ci: free form reason
-runner-env: [testing|prod]
 </code></pre></div>
 <details class="info -">
 <summary>Using <code>skip-ci</code></summary>
@@ -4408,15 +4407,6 @@ mutually exclusive with both "skip" and "extra".</li>
 dependencies are satisfied. Thus, if you request skipping the
 <code>build_packages</code> job, all the jobs that depend on it will fail, not be
 skipped.</p>
-</details>
-<details class="info -">
-<summary>Using <code>runner-env</code></summary>
-<p>The <code>runner-env</code> option controls which runner environment to target for our
-self-hosted runners. We maintain a test environment to allow testing out new
-configurations prior to rolling them out. This trailer is for advanced users
-who are working on the CI infrastructure itself.</p>
-<div class="highlight"><pre><span></span><code>runner-env: [testing|prod]
-</code></pre></div>
 </details>
 <h5 id="ci-configuration-recipes">CI configuration recipes<a class="headerlink" href="#ci-configuration-recipes" title="Permanent link">link</a></h5>
 <p>Copy/paste any of these at the bottom of a PR description to change what the CI
