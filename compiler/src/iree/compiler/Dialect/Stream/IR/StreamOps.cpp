@@ -1962,6 +1962,23 @@ LogicalResult TensorCloneOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// stream.tensor.encode
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorEncodeOp::verify() {
+  TensorEncodeOp op = *this;
+  if (failed(verifyOpDynamicDims(op, op.getSourceEncoding(),
+                                 op.getSourceEncodingDims())) ||
+      failed(verifyOpDynamicDims(op, op.getResultEncoding(),
+                                 op.getResultEncodingDims())) ||
+      failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize())) ||
+      failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // stream.tensor.slice
 //===----------------------------------------------------------------------===//
 
