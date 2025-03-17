@@ -415,9 +415,8 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     auto encodingAttr = cast<Encoding::EncodingAttr>(type.getEncoding());
 
     const int64_t rank = type.getRank();
-    SmallVector<int32_t> padValues(rank, 0);
-    auto noPaddingAttr = Encoding::PadEncodingLayoutAttr::get(
-        ctx, DenseI32ArrayAttr::get(ctx, padValues));
+    auto noPaddingAttr =
+        Encoding::PadEncodingLayoutAttr::getIdentityAttr(ctx, rank);
     if (encodingAttr.getOpType().getValue() !=
         IREE::Encoding::EncodingOpType::matmul) {
       // We only support simple matmuls for now.
@@ -485,9 +484,9 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
            "Incorrect pad amount");
     assert(padBytes < cacheSetSpanBytes && "Incorrect pad amount");
     const int64_t numPadElements = (padBytes * 8) / elementBits;
+    SmallVector<int32_t> padValues(rank, 0);
     padValues[*padDimensionIndex] = numPadElements;
-    auto padLayout = Encoding::PadEncodingLayoutAttr::get(
-        ctx, DenseI32ArrayAttr::get(ctx, padValues));
+    auto padLayout = Encoding::PadEncodingLayoutAttr::get(ctx, padValues);
     return padLayout;
   }
 };

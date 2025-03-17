@@ -322,6 +322,17 @@ Value EncodingAttr::calculateStorageSizeInBytes(Location loc,
 // encoding.pad_encoding_layout
 //===---------------------------------------------------------------------===//
 
+PadEncodingLayoutAttr PadEncodingLayoutAttr::get(MLIRContext *ctx,
+                                                 ArrayRef<int32_t> padding) {
+  return get(ctx, DenseI32ArrayAttr::get(ctx, padding));
+}
+
+PadEncodingLayoutAttr PadEncodingLayoutAttr::getIdentityAttr(MLIRContext *ctx,
+                                                             int rank) {
+  SmallVector<int32_t> zeros(rank, 0);
+  return get(ctx, zeros);
+}
+
 Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
     Location loc, OpBuilder &builder, RankedTensorType type,
     ValueRange dynamicDims) const {

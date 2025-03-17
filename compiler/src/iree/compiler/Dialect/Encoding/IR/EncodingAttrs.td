@@ -171,6 +171,15 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
     // How many padding elements to add along each tensor dimension.
     "DenseI32ArrayAttr":$padding
   );
+
+  let builders = [
+    AttrBuilder<(ins "ArrayRef<int32_t>":$padding)>
+  ];
+
+  let extraClassDeclaration = [{
+    /// Returns a PadEncodingLayoutAttr attribute that pads zero elements.
+    static PadEncodingLayoutAttr getIdentityAttr(MLIRContext *ctx, int rank);
+  }];
 }
 
 //===---------------------------------------------------------------------===//
