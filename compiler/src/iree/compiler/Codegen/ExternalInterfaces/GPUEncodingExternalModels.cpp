@@ -464,6 +464,11 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
         padLayoutAttr.getCacheSets() * cacheLineBytes;
     const int64_t dimSizeInBytes =
         type.getDimSize(*padDimensionIndex) * (elementBits / 8);
+    if (dimSizeInBytes < cacheSetSpanBytes) {
+      // Very small dimension, leave as-is.
+      return noPaddingAttr;
+    }
+
     int64_t padBytes = 0;
     if (int64_t unalignedBytes = dimSizeInBytes % cacheLineBytes;
         unalignedBytes != 0) {
