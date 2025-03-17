@@ -20,29 +20,30 @@ def register_attribute_builder(kind, replace=True):
 ir.register_attribute_builder = register_attribute_builder
 
 # Test upstream dialects import
-# TODO: importing linalg pulls yaml dependency, disable for now
-# from iree.compiler.dialects import (
-#     affine,
-#     amdgpu,
-#     arith,
-#     builtin,
-#     cf,
-#     complex,
-#     func,
-#     gpu,
-#     linalg,
-#     llvm,
-#     math,
-#     memref,
-#     pdl,
-#     rocdl,
-#     scf,
-#     shape,
-#     tensor,
-#     tosa,
-#     transform,
-#     vector,
-# )
+
+from iree.compiler.dialects import (
+    affine,
+    amdgpu,
+    arith,
+    builtin,
+    cf,
+    complex,
+    func,
+    gpu,
+    # TODO: importing linalg pulls yaml dependency, disable for now
+    # linalg, 
+    llvm,
+    math,
+    memref,
+    pdl,
+    rocdl,
+    scf,
+    shape,
+    tensor,
+    tosa,
+    transform,
+    vector,
+)
 
 # Smoke test for vector transforms
 from iree.compiler.dialects.transform import vector as vt
