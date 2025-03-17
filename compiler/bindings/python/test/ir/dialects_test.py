@@ -29,7 +29,8 @@ from iree.compiler.dialects import (
     complex,
     func,
     gpu,
-    linalg,
+    # TODO: importing linalg pulls yaml dependency, disable for now
+    # linalg,
     llvm,
     math,
     memref,
