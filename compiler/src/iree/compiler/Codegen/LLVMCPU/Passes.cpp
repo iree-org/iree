@@ -620,14 +620,26 @@ void addCPULinalgExtTileAndVectorizePipeline(
     OpPassManager &funcPassManager, TilingConfig &tilingConfig,
     LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager);
-  funcPassManager.addPass(
-      createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
-  // TODO: Remove the pass once we have PartialReductionOpInterface implemented
-  // for AttentionOp.
+
+  {
+    LLVMCPUTileRootAndFuseProducerConsumerPassOptions options;
+    options.tilingLevel = tilingConfig.getVectorCommonParallelLevel();
+    options.onlyFuseProducerInputOperands = false;
+    funcPassManager.addPass(
+        createLLVMCPUTileRootAndFuseProducerConsumerPass(options));
+  }
+
   funcPassManager.addPass(
       IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass());
-  funcPassManager.addPass(
-      createLLVMCPUTilePass(tilingConfig.getVectorReductionLevel()));
+
+  {
+    LLVMCPUTileRootAndFuseProducerConsumerPassOptions options;
+    options.tilingLevel = tilingConfig.getVectorReductionLevel();
+    options.onlyFuseProducerInputOperands = true;
+    funcPassManager.addPass(
+        createLLVMCPUTileRootAndFuseProducerConsumerPass(options));
+  }
+
   funcPassManager.addPass(
       IREE::LinalgExt::createDecomposeWinogradTransformPass());
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
@@ -637,6 +649,8 @@ void addCPULinalgExtTileAndVectorizePipeline(
     options.useConfiguredVectorSizes = pipelineOpt.useConfiguredVectorSizes;
     options.enableVectorMasking = pipelineOpt.enableVectorMasking;
     funcPassManager.addPass(createGenericVectorizationPass(options));
+    funcPassManager.addPass(createCanonicalizerPass());
+    funcPassManager.addPass(createCSEPass());
     funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());

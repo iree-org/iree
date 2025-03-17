@@ -58,6 +58,9 @@ bool isLinalgGeneric2DTranspose(linalg::GenericOp genericOp);
 /// Returns true if the op could result in undefined behavior.
 bool mayHaveUndefinedBehaviorInMasking(Operation *op);
 
+int64_t
+getMaxVectorSizeForLargeVectorCheck(IREE::HAL::ExecutableTargetAttr targetAttr);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_LLVMCPU_UTILS_H_
