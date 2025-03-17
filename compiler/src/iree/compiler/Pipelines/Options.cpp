@@ -112,8 +112,12 @@ InputDialectOptions::Type InputDialectOptions::parseInputTypeMnemonic() {
 
 void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category(
+      "Preprocessing options",
       "IREE options for apply custom preprocessing before normal IREE "
-      "compilation flow");
+      "compilation flow. These options are exercised in the following order:\n"
+      " 1. `iree-preprocessing-pass-pipeline`,\n"
+      " 2. `iree-preprocessing-transform-spec-filename`,\n"
+      " 3. `iree-preprocessing-pdl-spec-filename`");
 
   binder.opt<std::string>(
       "iree-preprocessing-pass-pipeline", preprocessingPassPipeline,
@@ -128,8 +132,7 @@ void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::cat(category));
   binder.opt<std::string>(
       "iree-preprocessing-pdl-spec-filename", preprocessingPDLSpecFilename,
-      llvm::cl::desc(
-          "File name of a transform dialect spec to use for preprocessing."),
+      llvm::cl::desc("File name of a PDL spec to use for preprocessing."),
       llvm::cl::cat(category));
 }
 
