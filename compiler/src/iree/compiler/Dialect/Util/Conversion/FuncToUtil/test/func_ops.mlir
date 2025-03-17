@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-util-test-conversion %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-util-test-conversion{structural-conversion=false})' %s | FileCheck %s
 
 // CHECK-LABEL: util.func private @private_func
 // CHECK: util.return

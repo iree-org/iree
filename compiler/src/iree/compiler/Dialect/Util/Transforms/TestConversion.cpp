@@ -40,7 +40,6 @@ public:
     ConversionTarget conversionTarget(*context);
     conversionTarget.addLegalDialect<arith::ArithDialect>();
     conversionTarget.addLegalDialect<IREE::Util::UtilDialect>();
-    conversionTarget.addIllegalDialect<func::FuncDialect>();
     conversionTarget.addLegalOp<UnrealizedConversionCastOp>();
 
     TypeConverter typeConverter;
@@ -61,10 +60,13 @@ public:
     RewritePatternSet patterns(&getContext());
     populateUtilConversionPatterns(context, conversionTarget, typeConverter,
                                    patterns);
-    populateGenericStructuralConversionPatterns(context, conversionTarget,
-                                                typeConverter, patterns);
-    populateFuncToUtilPatterns(context, conversionTarget, typeConverter,
-                               patterns, getOperation());
+    if (structuralConversion) {
+      populateGenericStructuralConversionPatterns(context, conversionTarget,
+                                                  typeConverter, patterns);
+    } else {
+      populateFuncToUtilPatterns(context, conversionTarget, typeConverter,
+                                 patterns, getOperation());
+    }
     populateMemRefToUtilPatterns(context, conversionTarget, typeConverter,
                                  patterns);
 
