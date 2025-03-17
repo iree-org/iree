@@ -70,8 +70,11 @@ static bool predicateRewrite(StringRef name,
     }
   }
   if (isROCMBackend(target)) {
-    // On ROCm, we want to use device library functions.
-    return false;
+    // On ROCm, we do not need most rewrites as we can generally bottom out on
+    // either device library functions, or handling of intrinsics in AMDGPU.
+    // An important exception is math.fpowi, which needs to get rewritten to
+    // multiplications.
+    return llvm::is_contained({math::FPowIOp::getOperationName()}, name);
   }
   // Currently enable all non-approximative rewrites.
   return true;
@@ -113,7 +116,8 @@ static bool predicateApprox(StringRef name,
     return false;
   }
   if (isROCMBackend(target)) {
-    // On ROCm, we want to use device library functions.
+    // On ROCm, we do not need most rewrites as we can generally bottom out on
+    // either device library functions, or handling of intrinsics in AMDGPU.
     return false;
   }
   StringRef acos = math::AcosOp::getOperationName();
