@@ -48,7 +48,6 @@ jobs:
           #   numprocesses: 4
           #   runs-on:
           #     - self-hosted # must come first
-          #     - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
           #     - environment=prod
           #     - gpu # TODO(scotttodd): qualify further with vendor/model
           #     - os-family=Linux
@@ -57,7 +56,6 @@ jobs:
           #   numprocesses: 4
           #   runs-on:
           #     - self-hosted # must come first
-          #     - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
           #     - environment=prod
           #     - gpu # TODO(scotttodd): qualify further with vendor/model
           #     - os-family=Linux

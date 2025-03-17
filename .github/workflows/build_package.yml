@@ -152,7 +152,6 @@ jobs:
           # - runs-on:
           #     - ${{ github.repository == 'iree-org/iree' && 'self-hosted' || 'macos-14' }}
           #     - os-family=macOS
-          #     - runner-group=postsubmit
           - runs-on: macos-14
             build-family: macos
             build-package: py-compiler-pkg
