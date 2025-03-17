@@ -99,11 +99,12 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
     IREE::Stream::AffinityAttr affinityAttr;
     if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op))
       affinityAttr = affinityOp.getAffinityAttr();
-    if (!IREE::Stream::AffinityAttr::canExecuteTogether(
+    bool preferCloneToConsumers = streamableOp.preferCloneToConsumers();
+    if (!preferCloneToConsumers &&
+        !IREE::Stream::AffinityAttr::canExecuteTogether(
             affinityAttr, builders[partitionOrdinal]->affinity))
       return false;
 
-    bool preferCloneToConsumers = streamableOp.preferCloneToConsumers();
     llvm::BitVector *opHazards = nullptr;
     llvm::BitVector opHazardsInCandidatePartition;
     if (preferCloneToConsumers) {

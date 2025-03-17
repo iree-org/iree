@@ -1748,7 +1748,9 @@ def Stream_TensorDispatchOp : Stream_Op<"tensor.dispatch", [
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   Stream_AffinityOp,
   Stream_TensorPhaseOp,
-  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_StreamableOp, [
+    "preferCloneToConsumers",
+  ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedOperandsIndexAndLength",
@@ -2491,7 +2493,9 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
-  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_StreamableOp, [
+    "preferCloneToConsumers",
+  ]>,
   DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
     "getAsyncAccessRanges",
   ]>,
