@@ -7242,7 +7242,7 @@ in-place.</p>
 specified workgroup count. Each workgroup has access to the same operands
 and results and is able to load/store at will.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_AsyncPhaseOp</code></p>
-<p>Interfaces: <code>AsyncAccessOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>SymbolUserOpInterface</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Interfaces: <code>AsyncAccessOpInterface</code>, <code>Stream_AffinityOp</code>, <code>StreamableOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -10556,7 +10556,7 @@ been reached.</p>
 <p>Clones the contents of a value at a snapshot in time. Future changes to the
 cloned value will not effect the result. Acts as a copy-on-write operation.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>Stream_TensorPhaseOp</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>StreamableOpInterface</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_52">Attributes:<a class="headerlink" href="#attributes_52" title="Permanent link">link</a></h5>
 <table>
