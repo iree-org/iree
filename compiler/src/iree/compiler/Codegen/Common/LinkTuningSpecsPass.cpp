@@ -96,57 +96,128 @@ getUniqueSpecName(StringRef specName,
   std::string specBaseName = getBaseName(specName);
   unsigned specNameSeenCount = specNameCounts[specBaseName]++;
 
-  return (specNameSeenCount == 0)
-             ? specBaseName
-             : llvm::formatv("{}_{}", specBaseName, specNameSeenCount).str();
+  if (specNameSeenCount == 0)
+    return specBaseName;
+
+  return llvm::formatv("{}_{}", specBaseName, specNameSeenCount).str();
 }
 
-// Collects `NamedSequenceOp`s and `ForeachMatchOp`s from a given module.
-// - Moves `NamedSequenceOp`s to `namedSequenceOpsToMove` if their name is not
-//   `__kernel_config` or they do not have
-//   the`iree_codegen.tuning_spec_entrypoint` attribute.
-// - Maps `NamedSequenceOp`s that are used as matchers or actions to their
-//   corresponding `ForeachMatchOp` in `namedSequenceToForeachMatch`.
-static void collectNamedSequenceAndForeachMatchOpsFromModule(
-    ModuleOp module, SmallVector<NamedSequenceOp> &namedSequenceOpsToMove,
-    SmallVector<ForeachMatchOp> &foreachMatchOps,
-    llvm::DenseMap<NamedSequenceOp, ForeachMatchOp>
-        &namedSequenceToForeachMatch) {
+struct TuningSpecsToMerge {
+  SmallVector<NamedSequenceOp> namedSequenceOpsToMove;
+  SmallVector<ForeachMatchOp> foreachMatchOps;
+  llvm::DenseMap<NamedSequenceOp, ForeachMatchOp> namedSequenceToForeachMatch;
+};
 
-  for (auto namedSequenceOp : module.getBody()->getOps<NamedSequenceOp>()) {
-    if (namedSequenceOp.getSymName() != kKernelConfigSpecName ||
-        !namedSequenceOp->hasAttr(kTuningSpecEntrypointAttrName)) {
-      namedSequenceOpsToMove.push_back(namedSequenceOp);
-      continue;
-    }
-
-    // Extract the single ForeachMatchOp inside namedSequenceOp.
-    ForeachMatchOp foreachMatch =
-        *namedSequenceOp.getOps<ForeachMatchOp>().begin();
-    foreachMatchOps.push_back(foreachMatch);
-
-    // Process matchers.
-    for (auto matcher : foreachMatch.getMatchers()) {
-      if (auto matcherSymRef = mlir::dyn_cast<mlir::SymbolRefAttr>(matcher)) {
-        if (auto matcherOp =
-                SymbolTable::lookupNearestSymbolFrom<NamedSequenceOp>(
-                    module, matcherSymRef)) {
-          namedSequenceToForeachMatch[matcherOp] = foreachMatch;
-        }
-      }
-    }
-
-    // Process actions.
-    for (auto action : foreachMatch.getActions()) {
-      if (auto actionSymRef = mlir::dyn_cast<mlir::SymbolRefAttr>(action)) {
-        if (auto actionOp =
-                SymbolTable::lookupNearestSymbolFrom<NamedSequenceOp>(
-                    module, actionSymRef)) {
-          namedSequenceToForeachMatch[actionOp] = foreachMatch;
-        }
+// Updates the mapping of `NamedSequenceOp` to `ForeachMatchOp`
+// by processing matchers and actions inside the given `ForeachMatchOp`.
+static void
+updateForeachMatchMappings(ForeachMatchOp foreachMatch, ModuleOp module,
+                           llvm::DenseMap<NamedSequenceOp, ForeachMatchOp>
+                               &namedSequenceToForeachMatch) {
+  // Process matchers.
+  for (auto matcher : foreachMatch.getMatchers()) {
+    if (auto matcherSymRef = mlir::dyn_cast<mlir::SymbolRefAttr>(matcher)) {
+      if (auto matcherOp =
+              SymbolTable::lookupNearestSymbolFrom<NamedSequenceOp>(
+                  module, matcherSymRef)) {
+        namedSequenceToForeachMatch[matcherOp] = foreachMatch;
       }
     }
   }
+
+  // Process actions.
+  for (auto action : foreachMatch.getActions()) {
+    if (auto actionSymRef = mlir::dyn_cast<mlir::SymbolRefAttr>(action)) {
+      if (auto actionOp = SymbolTable::lookupNearestSymbolFrom<NamedSequenceOp>(
+              module, actionSymRef)) {
+        namedSequenceToForeachMatch[actionOp] = foreachMatch;
+      }
+    }
+  }
+}
+
+// Collects tuning specs (`NamedSequenceOp`s and `ForeachMatchOp`s) from
+// all inner modules within the given input model, and organizes them into a
+// `TuningSpecsToMerge` struct.
+// - `namedSequenceOpsToMove`: Contains `NamedSequenceOp`s that either:
+//     - Are not named `__kernel_config`.
+//     - Do not have the `iree_codegen.tuning_spec_entrypoint` attribute.
+// - `foreachMatchOps`: Stores all `ForeachMatchOp`s found inside
+//   `NamedSequenceOp`s with `__kernel_config`.
+// - `namedSequenceToForeachMatch`: Maps `NamedSequenceOp`s used as matchers or
+//    actions to their corresponding `ForeachMatchOp`.
+static TuningSpecsToMerge collectTuningSpecsToMerge(ModuleOp module) {
+  TuningSpecsToMerge tuningSpecs;
+  for (auto innerModule : module.getBody()->getOps<ModuleOp>()) {
+    for (auto namedSequenceOp :
+         innerModule.getBody()->getOps<NamedSequenceOp>()) {
+      if (namedSequenceOp.getSymName() != kKernelConfigSpecName ||
+          !namedSequenceOp->hasAttr(kTuningSpecEntrypointAttrName)) {
+        tuningSpecs.namedSequenceOpsToMove.push_back(namedSequenceOp);
+        continue;
+      }
+
+      // Extract the single ForeachMatchOp inside namedSequenceOp.
+      ForeachMatchOp foreachMatch =
+          *namedSequenceOp.getOps<ForeachMatchOp>().begin();
+      assert(foreachMatch &&
+             "ForeachMatch should exist in the `__kernel_config`.");
+      tuningSpecs.foreachMatchOps.push_back(foreachMatch);
+
+      updateForeachMatchMappings(foreachMatch, innerModule,
+                                 tuningSpecs.namedSequenceToForeachMatch);
+    }
+  }
+
+  return tuningSpecs;
+}
+
+// Renames a `NamedSequenceOp` to resolve name conflicts caused by merging
+// tuning specs, moves it to the top-level module, and updates its occurrences
+// in corresponding `ForeachMatchOp` operations.
+static void
+updateNamedSequenceOp(NamedSequenceOp op, ModuleOp module, OpBuilder &builder,
+                      llvm::StringMap<unsigned> &specNameCounts,
+                      llvm::DenseMap<NamedSequenceOp, ForeachMatchOp>
+                          &namedSequenceToForeachMatch) {
+  StringRef specName = op.getSymName();
+  std::string newSpecName = getUniqueSpecName(specName, specNameCounts);
+  op.setSymName(newSpecName);
+
+  // Skip updating ForeachMatchOp if the NamedSequenceOp is not used in it
+  // or its name has not changed.
+  if (!namedSequenceToForeachMatch.contains(op) || newSpecName == specName) {
+    op.getOperation()->moveBefore(module.getBody(), module.getBody()->end());
+    return;
+  }
+
+  ForeachMatchOp foreachMatchOp = namedSequenceToForeachMatch[op];
+
+  // Helper function for updating matchers or actions in associated
+  // `foreachMatchOp` instances.
+  auto updateSymbol = [&](Attribute attr) -> SymbolRefAttr {
+    StringRef name = cast<SymbolRefAttr>(attr).getRootReference();
+    return (name == specName)
+               ? SymbolRefAttr::get(builder.getContext(), newSpecName)
+               : cast<SymbolRefAttr>(attr);
+  };
+
+  SmallVector<Attribute> updatedMatchers, updatedActions;
+  for (auto matcherAttr : foreachMatchOp.getMatchers()) {
+    SymbolRefAttr updatedAttr = updateSymbol(matcherAttr);
+    updatedMatchers.push_back(updatedAttr);
+  }
+
+  for (auto actionAttr : foreachMatchOp.getActions()) {
+    SymbolRefAttr updatedAttr = updateSymbol(actionAttr);
+    updatedActions.push_back(updatedAttr);
+  }
+
+  // Apply the updated matchers and actions.
+  foreachMatchOp.setMatchersAttr(builder.getArrayAttr(updatedMatchers));
+  foreachMatchOp.setActionsAttr(builder.getArrayAttr(updatedActions));
+
+  op.getOperation()->moveBefore(module.getBody(), module.getBody()->end());
 }
 
 static NamedSequenceOp createKernelConfigOp(OpBuilder &builder, Location loc,
@@ -154,6 +225,13 @@ static NamedSequenceOp createKernelConfigOp(OpBuilder &builder, Location loc,
   Type anyOpType = builder.getType<transform::AnyOpType>();
   FunctionType specType =
       builder.getFunctionType(TypeRange{anyOpType}, TypeRange{anyOpType});
+
+  // Example IR generated ( with name is `__kernel_config`):
+  //
+  // transform.named_sequence @__kernel_config(%arg0: !transform.any_op)
+  //     -> (!transform.any_op) {
+  //   transform.yield %arg0 : !transform.any_op
+  // }
 
   return builder.create<NamedSequenceOp>(loc, name, TypeAttr::get(specType),
                                          /*sym_visibility=*/StringAttr{},
@@ -242,59 +320,23 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
 
 static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
   OpBuilder builder(module.getContext());
-  SmallVector<NamedSequenceOp> namedSequenceOpsToMove;
-  SmallVector<ForeachMatchOp> foreachMatchOps;
-  llvm::DenseMap<NamedSequenceOp, ForeachMatchOp> namedSequenceToForeachMatch;
 
   // Step 1: Collect NamedSequenceOps and ForeachMatchOps from inner modules.
-  for (auto innerModule : module.getBody()->getOps<ModuleOp>()) {
-    collectNamedSequenceAndForeachMatchOpsFromModule(
-        innerModule, namedSequenceOpsToMove, foreachMatchOps,
-        namedSequenceToForeachMatch);
-  }
+  TuningSpecsToMerge tuningSpecs = collectTuningSpecsToMerge(module);
+  SmallVector<NamedSequenceOp> &namedSequenceOpsToMove =
+      tuningSpecs.namedSequenceOpsToMove;
+  SmallVector<ForeachMatchOp> &foreachMatchOps = tuningSpecs.foreachMatchOps;
+  llvm::DenseMap<NamedSequenceOp, ForeachMatchOp> &namedSequenceToForeachMatch =
+      tuningSpecs.namedSequenceToForeachMatch;
 
   // Step 2-a: Make sure the name sequence names are unique, and then move
   // collected NamedSequenceOps to the top-level module.
-  Type anyOpType = builder.getType<transform::AnyOpType>();
   llvm::StringMap<unsigned> specNameCounts;
   for (NamedSequenceOp op : namedSequenceOpsToMove) {
-    StringRef specName = op.getSymName();
-    std::string newSpecName = getUniqueSpecName(specName, specNameCounts);
-    op.setSymName(newSpecName);
-
-    // Skip updating ForeachMatchOp if the NamedSequenceOp is not used in it
-    // or its name has not changed.
-    if (!namedSequenceToForeachMatch.contains(op) || newSpecName == specName) {
-      op.getOperation()->moveBefore(module.getBody(), module.getBody()->end());
-      continue;
-    }
-
-    ForeachMatchOp foreachMatchOp = namedSequenceToForeachMatch[op];
-
-    SmallVector<Attribute> updatedMatchers, updatedActions;
-    for (auto matcherAttr : foreachMatchOp.getMatchers()) {
-      StringRef matcherName =
-          cast<SymbolRefAttr>(matcherAttr).getRootReference();
-      updatedMatchers.push_back(
-          (matcherName == specName)
-              ? SymbolRefAttr::get(builder.getContext(), newSpecName)
-              : matcherAttr);
-    }
-
-    for (auto actionAttr : foreachMatchOp.getActions()) {
-      StringRef actionName = cast<SymbolRefAttr>(actionAttr).getRootReference();
-      updatedActions.push_back(
-          (actionName == specName)
-              ? SymbolRefAttr::get(builder.getContext(), newSpecName)
-              : actionAttr);
-    }
-
-    // Apply the updated matchers and actions.
-    foreachMatchOp.setMatchersAttr(builder.getArrayAttr(updatedMatchers));
-    foreachMatchOp.setActionsAttr(builder.getArrayAttr(updatedActions));
-
-    op.getOperation()->moveBefore(module.getBody(), module.getBody()->end());
+    updateNamedSequenceOp(op, module, builder, specNameCounts,
+                          namedSequenceToForeachMatch);
   }
+
   // Step 2-b: Create a new NamedSequenceOp `__kernel_config` in the top-level
   // module.
   builder.setInsertionPointToEnd(module.getBody());
@@ -312,42 +354,29 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
   // Indicate that the output module is a default tuning spec after merging.
   module->setAttr(kTuningSpecDefaultEntrypointAttrName, builder.getUnitAttr());
 
-  // Step 2-C: Create a new block inside the NamedSequenceOp and merge the
+  // Step 2-c: Create a new block inside the NamedSequenceOp and merge the
   // ForeachMatchOp from each inner module into one ForachMatchOp.
-  SmallVector<Type, 4> resultTypes;
-  llvm::append_range(resultTypes, TypeRange{anyOpType});
-
-  SmallVector<std::pair<SymbolRefAttr, SymbolRefAttr>> matcherActionPairs;
-  SmallVector<Value, 4> forwardedInputs;
-  for (auto foreachMatchOp : foreachMatchOps) {
-    ArrayAttr matchers = foreachMatchOp.getMatchers();
-    ArrayAttr actions = foreachMatchOp.getActions();
-
-    for (size_t i = 0, e = matchers.size(); i < e; ++i) {
-      matcherActionPairs.push_back(
-          {cast<SymbolRefAttr>(matchers[i]), cast<SymbolRefAttr>(actions[i])});
-    }
-    // Collect forwarded inputs (if any).
-    for (Value input : foreachMatchOp.getForwardedInputs()) {
-      if (!llvm::is_contained(forwardedInputs, input)) {
-        forwardedInputs.push_back(input); // Avoid duplicates.
-      }
-    }
-  }
-
+  Type anyOpType = builder.getType<transform::AnyOpType>();
+  SmallVector<Type, 4> resultTypes = {anyOpType};
   SmallVector<Attribute> mergedMatchers;
   SmallVector<Attribute> mergedActions;
 
-  for (const auto &[matcher, action] : matcherActionPairs) {
-    mergedMatchers.push_back(matcher);
-    mergedActions.push_back(action);
+  for (auto foreachMatchOp : foreachMatchOps) {
+    ArrayAttr matchers = foreachMatchOp.getMatchers();
+    ArrayAttr actions = foreachMatchOp.getActions();
+    for (size_t i = 0, e = matchers.size(); i < e; ++i) {
+      mergedMatchers.push_back(cast<SymbolRefAttr>(matchers[i]));
+      mergedActions.push_back(cast<SymbolRefAttr>(actions[i]));
+    }
   }
+
   Region &region = newNamedSequence.getRegion();
   Block *body = builder.createBlock(&region, region.begin(),
                                     newNamedSequence.getArgumentTypes(), loc);
   builder.setInsertionPointToStart(body);
   auto mergedForeachMatch = builder.create<ForeachMatchOp>(
-      loc, resultTypes, newNamedSequence.getArgument(0), forwardedInputs,
+      loc, resultTypes, newNamedSequence.getArgument(0),
+      /* forwarded_inputs = */ ValueRange(),
       /* restrictRoot = */ nullptr, /* flattenResults = */ nullptr,
       builder.getArrayAttr(mergedMatchers),
       builder.getArrayAttr(mergedActions));
