@@ -92,6 +92,16 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // Conversion
   //----------------------------------------------------------------------------
 
+  // TODO(benvanik): cache the affinity analysis - if this pass does nothing (or
+  // once it converges) the analysis will be usable by AnnotateAffinities and
+  // ConvertToStream.
+  //
+  // Clone operations to consumers when the operations opt-in to such behavior.
+  //
+  // NOTE: CSE must not be run between this and ConvertToStream - doing so will
+  // undo the clones.
+  passManager.addPass(IREE::Stream::createCloneToConsumersPass());
+
   // Annotate all ops/resources with the analyzed affinities.
   // This should have no behavioral changes during conversion but allows for
   // debugging of analysis errors in end-user tooling.
@@ -114,6 +124,18 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
 
   // Run inlining after having baked out affinities.
   passManager.addPass(mlir::createInlinerPass());
+
+  // Elide any redundant transfers now that affinities are baked out and we know
+  // where resources are located.
+  //
+  // TODO(benvanik): enable this pass after updating usage refinement: today
+  // the clones are not handled correctly and will result in usage analysis
+  // failing. This seems to be caused by transfers having some non-trivial logic
+  // during analysis that clone does not have and just applying the same logic
+  // to clones results in other errors around lifetime changes. The resource
+  // analysis and refinement logic likely needs a larger reworking.
+  //
+  // passManager.addPass(IREE::Stream::createElideAsyncTransfersPass());
 
   // Cleanup globals that were created during conversion.
   buildStreamCleanupPassPipeline(passManager, transformOptions);

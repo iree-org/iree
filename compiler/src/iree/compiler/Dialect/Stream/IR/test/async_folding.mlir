@@ -125,8 +125,8 @@ util.func private @SplatAlreadyAtSinkLocation(
 
 // -----
 
-// CHECK-LABEL: @PropagateClonableOps
-util.func private @PropagateClonableOps(%arg0: index) -> !stream.resource<*> {
+// CHECK-LABEL: @PropagateCloneableOps
+util.func private @PropagateCloneableOps(%arg0: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c123_i32 = arith.constant 123 : i32
@@ -136,6 +136,21 @@ util.func private @PropagateClonableOps(%arg0: index) -> !stream.resource<*> {
   %1 = stream.async.clone %0 : !stream.resource<*>{%arg0} -> !stream.resource<*>{%arg0}
   // CHECK: util.return %[[T]]
   util.return %1 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @PropagateTypeChangeCloneableOps
+util.func private @PropagateTypeChangeCloneableOps(%arg0: index) -> !stream.resource<variable> {
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[T:.+]] = stream.async.splat %c123_i32 : i32 -> !stream.resource<variable>{%arg0}
+  %0 = stream.async.splat %c123_i32 : i32 -> !stream.resource<transient>{%arg0}
+  // CHECK-NOT: stream.async.clone
+  %1 = stream.async.clone %0 : !stream.resource<transient>{%arg0} -> !stream.resource<variable>{%arg0}
+  // CHECK: util.return %[[T]]
+  util.return %1 : !stream.resource<variable>
 }
 
 // -----
