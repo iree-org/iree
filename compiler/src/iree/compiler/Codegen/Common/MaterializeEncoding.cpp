@@ -78,6 +78,18 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
           IREE::CPU::CPUEncodingLayoutAttr::get(ctx,
                                                 targetAttr.getConfiguration()));
     } else if (isROCMBackend(targetAttr)) {
+      // Check if the encoding resolver is a GPUPadLayoutAttr. For padding
+      // encoding materialization, we use a separate pass, so skip
+      // materialization here.
+      // TODO(#20160): Support GPUPadLayoutAttr materialization through this
+      // pass, and remove the ad-hoc materialization pass for padding.
+      DictionaryAttr targetConfig = targetAttr.getConfiguration();
+      if (targetConfig && targetConfig.getAs<IREE::GPU::GPUPadLayoutAttr>(
+                              IREE::Encoding::kEncodingResolverAttrName)) {
+        LDBG("Found GPUPadLayoutAttr encoding resolver. Materialization will "
+             "be handled later.");
+        return success();
+      }
       LDBG("Select GPUEncodingLayoutAttr attribute as the layout attribute.");
       layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
           IREE::GPU::GPUEncodingLayoutAttr::get(

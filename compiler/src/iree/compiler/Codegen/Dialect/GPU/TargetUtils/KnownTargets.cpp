@@ -755,15 +755,23 @@ TargetAttr getHIPTargetDetails(StringRef target, StringRef features,
   return nullptr;
 }
 
-Attribute getHIPTargetEncodingLayoutAttr(TargetAttr target) {
-  // This is only enabled for CDNA2 and CDNA3 for the time being.
-  // TODO(kuhar): Enable for other HIP targets.
-  if (!llvm::is_contained({"gfx90a", "gfx942"}, target.getArch())) {
-    return nullptr;
+Attribute getHIPTargetEncodingLayoutAttr(TargetAttr target,
+                                         StringRef resolver) {
+  if (resolver == kDataTilingEncodingLayoutResolverName) {
+    // Return a GPUEncodingLayoutAttr with an empty configuration. The addtional
+    // attributes will be attached by the `cloneWithSimplifiedConfig` interface
+    // method when the resolver needs to be configured.
+    return IREE::GPU::GPUEncodingLayoutAttr::get(target.getContext(), {});
   }
 
-  return IREE::GPU::GPUPadLayoutAttr::get(
-      target.getContext(), /*cacheLineBytes=*/128, /*cacheSets=*/4);
+  // GPUPadLayoutAttr is only enabled for CDNA2 and CDNA3 for the time being.
+  // TODO(kuhar): Enable for other HIP targets.
+  if (resolver == kPadEncodingLayoutResolverName &&
+      llvm::is_contained({"gfx90a", "gfx942"}, target.getArch())) {
+    return IREE::GPU::GPUPadLayoutAttr::get(
+        target.getContext(), /*cacheLineBytes=*/128, /*cacheSets=*/4);
+  }
+  return nullptr;
 }
 
 StringRef normalizeHIPTarget(StringRef target) {

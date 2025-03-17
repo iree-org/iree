@@ -1,6 +1,5 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline))))" \
-// RUN:    --iree-gpu-test-target=gfx942 --iree-llvmgpu-experimental-data-tiling \
-// RUN:    --split-input-file %s | FileCheck %s
+// RUN:    --iree-gpu-test-target=gfx942 --split-input-file %s | FileCheck %s
 
 // Make sure that the GPU configuration pipelines materialize encoding ops.
 
