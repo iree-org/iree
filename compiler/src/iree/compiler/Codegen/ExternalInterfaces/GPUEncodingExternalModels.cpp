@@ -34,6 +34,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 
 #include <cassert>
 #include <cfloat>
@@ -446,6 +447,31 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     ArrayRef<int64_t> shape = type.getShape();
     if (ShapedType::isDynamic(shape[*padDimensionIndex])) {
       return noPaddingAttr;
+    }
+
+    // Bail out on matvec / vecmat problems.
+    {
+      int64_t parallelDimSize = 1;
+      ArrayRef<unsigned> parallelDims =
+          (operandIndex == 0) ? contractionDims->m : contractionDims->n;
+      for (unsigned parallelDim : parallelDims) {
+        if (std::optional<unsigned> dimIdx =
+                encodingAttr.mapDimToOperandIndex(parallelDim)) {
+          int64_t dimSize = shape[*dimIdx];
+          if (ShapedType::isDynamic(dimSize)) {
+            parallelDimSize = ShapedType::kDynamic;
+            break;
+          }
+          parallelDimSize *= dimSize;
+        }
+      }
+
+      static constexpr int64_t kMatVecThreshold = 16;
+      if (!ShapedType::isDynamic(parallelDimSize) &&
+          parallelDimSize < kMatVecThreshold) {
+        // This matmul is more similar to a matvec, do not pad.
+        return noPaddingAttr;
+      }
     }
 
     const int64_t elementBits = type.getElementTypeBitWidth();
