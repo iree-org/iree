@@ -107,37 +107,37 @@ sdxl_unet_fp16_960_1024_mlir = fetch_source_fixture(
 # INT8 Punet + FP16 Attention
 
 sdxl_punet_int8_inference_input_0 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl-punet/03-12-2025/inference_input.0.bin",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_input0.npy",
     group="sdxl_punet_int8",
 )
 
 sdxl_punet_int8_inference_input_1 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl-punet/03-12-2025/inference_input.1.bin",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_input1.npy",
     group="sdxl_punet_int8",
 )
 
 sdxl_punet_int8_inference_input_2 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl-punet/03-12-2025/inference_input.2.bin",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_input2.npy",
     group="sdxl_punet_int8",
 )
 
 sdxl_punet_int8_inference_input_3 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl-punet/03-12-2025/inference_input.3.bin",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_input3.npy",
     group="sdxl_punet_int8",
 )
 
 sdxl_punet_int8_inference_input_4 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl-punet/03-12-2025/inference_input.4.bin",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_input4.npy",
     group="sdxl_punet_int8",
 )
 
 sdxl_punet_int8_inference_input_5 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl-punet/03-12-2025/inference_input.5.bin",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_input5.npy",
     group="sdxl_punet_int8",
 )
 
 sdxl_punet_int8_fp16_inference_output_0 = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl-punet/03-12-2025/punet_fp16_out.0.bin",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_output.npy",
     group="sdxl_punet_int8_fp16",
 )
 
