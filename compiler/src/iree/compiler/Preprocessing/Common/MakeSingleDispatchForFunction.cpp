@@ -93,12 +93,12 @@ void MakeSingleDispatchForFunctionPass::runOnOperation() {
 
   // Go over the slice and find the return values, i.e. values defined by ops in
   // the slice and used outside of the slice.
-  SmallVector<Value> results;
+  SetVector<Value> results;
   for (Operation *op : secondSlice) {
     for (OpOperand &use : op->getUses()) {
       Operation *user = use.getOwner();
       if (!secondSlice.contains(user)) {
-        results.push_back(use.get());
+        results.insert(use.get());
       }
     }
   }
@@ -116,17 +116,18 @@ void MakeSingleDispatchForFunctionPass::runOnOperation() {
   }
 
   // Find the values captures by the slice.
-  SmallVector<Value> capturedValues;
+  SetVector<Value> capturedValues;
   for (Operation *op : secondSlice) {
     for (OpOperand &use : op->getOpOperands()) {
       Operation *definingOp = use.get().getDefiningOp();
       if (!definingOp || secondSlice.contains(definingOp)) {
         continue;
       }
-      capturedValues.push_back(use.get());
+      capturedValues.insert(use.get());
     }
   }
-  if (failed(moveValueDefinitions(rewriter, capturedValues, insertionPoint))) {
+  if (failed(moveValueDefinitions(rewriter, capturedValues.getArrayRef(),
+                                  insertionPoint))) {
     funcOp.emitOpError(
         "failed to move definitions of captured values before region op");
     return signalPassFailure();
@@ -143,9 +144,11 @@ void MakeSingleDispatchForFunctionPass::runOnOperation() {
     rewriter.moveOpBefore(op, newBlock, newBlock->end());
   }
   rewriter.setInsertionPointToEnd(newBlock);
-  rewriter.create<IREE::Flow::ReturnOp>(dispatchRegionOp.getLoc(), results);
+  rewriter.create<IREE::Flow::ReturnOp>(dispatchRegionOp.getLoc(),
+                                        results.getArrayRef());
   rewriter.replaceUsesWithIf(
-      results, dispatchRegionOp->getResults(), [&](OpOperand &use) {
+      results.getArrayRef(), dispatchRegionOp->getResults(),
+      [&](OpOperand &use) {
         Operation *user = use.getOwner();
         return user->getParentOfType<IREE::Flow::DispatchRegionOp>() !=
                dispatchRegionOp;

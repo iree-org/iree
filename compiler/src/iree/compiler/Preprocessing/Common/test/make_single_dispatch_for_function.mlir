@@ -123,3 +123,24 @@ util.func @interleaved_export(%arg0 : tensor<10xf32>, %arg1 : tensor<10xf32>,
 //   CHECK-DAG:   %[[BARRIER1:.+]] = hal.tensor.barrier join(%[[DISPATCH]]#1 :
 //   CHECK-DAG:   %[[EXPORT1:.+]] = hal.tensor.export %[[BARRIER1]]
 //       CHECK:   return %[[EXPORT0]], %[[EXPORT1]]
+
+// -----
+
+// Check handling of values returned from dispatches used multiple times outside
+// of it.
+util.func @multi_use_return(%arg0 : tensor<10xf32>, %arg1 : tensor<10xf32>,
+    %arg2 : tensor<10xf32>, %arg3 : !hal.fence)
+    -> (!hal.buffer_view, !hal.buffer_view) {
+  %0 = tensor.empty() : tensor<10xf32>
+  %1 = linalg.add ins(%arg0, %arg1 : tensor<10xf32>, tensor<10xf32>)
+      outs(%0 : tensor<10xf32>) -> tensor<10xf32>
+  %2 = hal.tensor.barrier join(%1 : tensor<10xf32>) => %arg3 : !hal.fence
+  %3 = hal.tensor.export %2 : tensor<10xf32> -> !hal.buffer_view
+  %5 = hal.tensor.barrier join(%1 : tensor<10xf32>) => %arg3 : !hal.fence
+  %6 = hal.tensor.export %5 : tensor<10xf32> -> !hal.buffer_view
+  util.return %3, %6 : !hal.buffer_view, !hal.buffer_view
+}
+// CHECK-LABEL: func public @multi_use_return
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:   hal.tensor.barrier join(%[[DISPATCH]]
+//       CHECK:   hal.tensor.barrier join(%[[DISPATCH]]
