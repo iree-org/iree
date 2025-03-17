@@ -75,7 +75,7 @@ static void buildPreprocessingPassPipelineFromCommandLine(
     extendWithTextPipeline(passManager, pipelineStr);
   }
   // Second preference is for transform spec file as a preprocessing recipe.
-  else if (!preprocessingOptions.preprocessingTransformSpecFilename.empty()) {
+  if (!preprocessingOptions.preprocessingTransformSpecFilename.empty()) {
     Preprocessing::InterpreterPassOptions interpreterOptions;
     interpreterOptions.transformSpecPath =
         preprocessingOptions.preprocessingTransformSpecFilename;
@@ -83,7 +83,7 @@ static void buildPreprocessingPassPipelineFromCommandLine(
         Preprocessing::createInterpreterPass(interpreterOptions));
   }
   // Third preference is for PDL spec file as a preprocessing recipe.
-  else if (!preprocessingOptions.preprocessingPDLSpecFilename.empty()) {
+  if (!preprocessingOptions.preprocessingPDLSpecFilename.empty()) {
     Preprocessing::ApplyPDLPatternsPassOptions applyPDLPatternsOptions;
     applyPDLPatternsOptions.patternsFile =
         preprocessingOptions.preprocessingPDLSpecFilename;
