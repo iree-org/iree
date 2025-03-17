@@ -1939,6 +1939,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#flowtensorencode-flowtensorencodeop" class="md-nav__link">
+    <span class="md-ellipsis">
+      flow.tensor.encode (Flow::TensorEncodeOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#flowtensorload-flowtensorloadop" class="md-nav__link">
     <span class="md-ellipsis">
       flow.tensor.load (Flow::TensorLoadOp)
@@ -4643,6 +4652,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#flowtensorencode-flowtensorencodeop" class="md-nav__link">
+    <span class="md-ellipsis">
+      flow.tensor.encode (Flow::TensorEncodeOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#flowtensorload-flowtensorloadop" class="md-nav__link">
     <span class="md-ellipsis">
       flow.tensor.load (Flow::TensorLoadOp)
@@ -5017,6 +5035,7 @@ workload size, shapes of inputs and outputs, etc.</p>
 <li><a href="#flowtensorconstant-flowtensorconstantop">flow.tensor.constant (Flow::TensorConstantOp)</a></li>
 <li><a href="#flowtensordynamic_constant-flowtensordynamicconstantop">flow.tensor.dynamic_constant (Flow::TensorDynamicConstantOp)</a></li>
 <li><a href="#flowtensorempty-flowtensoremptyop">flow.tensor.empty (Flow::TensorEmptyOp)</a></li>
+<li><a href="#flowtensorencode-flowtensorencodeop">flow.tensor.encode (Flow::TensorEncodeOp)</a></li>
 <li><a href="#flowtensorload-flowtensorloadop">flow.tensor.load (Flow::TensorLoadOp)</a></li>
 <li><a href="#flowtensorreshape-flowtensorreshapeop">flow.tensor.reshape (Flow::TensorReshapeOp)</a></li>
 <li><a href="#flowtensorslice-flowtensorsliceop">flow.tensor.slice (Flow::TensorSliceOp)</a></li>
@@ -6709,6 +6728,56 @@ any ranges of the tensor that are later read.</p>
 </tr>
 </tbody>
 </table>
+<h4 id="flowtensorencode-flowtensorencodeop"><code>flow.tensor.encode</code> (Flow::TensorEncodeOp)<a class="headerlink" href="#flowtensorencode-flowtensorencodeop" title="Permanent link">link</a></h4>
+<p><em>Performs a full tensor encode operation</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.encode` $operand `:`
+              type($operand) (`{` $operand_dims^ `}`)? `-&gt;`
+              type($result) (`{` $result_dims^ `}`)?
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Encode the input tensor into an encoded output tensor.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>HoistableOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="operands_24">Operands:<a class="headerlink" href="#operands_24" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>operand</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>operand_dims</code></td>
+<td>variadic of index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>result_dims</code></td>
+<td>variadic of index</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_28">Results:<a class="headerlink" href="#results_28" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+</tbody>
+</table>
 <h4 id="flowtensorload-flowtensorloadop"><code>flow.tensor.load</code> (Flow::TensorLoadOp)<a class="headerlink" href="#flowtensorload-flowtensorloadop" title="Permanent link">link</a></h4>
 <p><em>Loads a value from a tensor element</em></p>
 <p>Syntax:</p>
@@ -6720,7 +6789,7 @@ any ranges of the tensor that are later read.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_24">Operands:<a class="headerlink" href="#operands_24" title="Permanent link">link</a></h5>
+<h5 id="operands_25">Operands:<a class="headerlink" href="#operands_25" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6743,7 +6812,7 @@ any ranges of the tensor that are later read.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_28">Results:<a class="headerlink" href="#results_28" title="Permanent link">link</a></h5>
+<h5 id="results_29">Results:<a class="headerlink" href="#results_29" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6770,7 +6839,7 @@ any ranges of the tensor that are later read.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>HoistableOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_25">Operands:<a class="headerlink" href="#operands_25" title="Permanent link">link</a></h5>
+<h5 id="operands_26">Operands:<a class="headerlink" href="#operands_26" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6793,7 +6862,7 @@ any ranges of the tensor that are later read.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_29">Results:<a class="headerlink" href="#results_29" title="Permanent link">link</a></h5>
+<h5 id="results_30">Results:<a class="headerlink" href="#results_30" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6820,7 +6889,7 @@ any ranges of the tensor that are later read.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>HoistableOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_26">Operands:<a class="headerlink" href="#operands_26" title="Permanent link">link</a></h5>
+<h5 id="operands_27">Operands:<a class="headerlink" href="#operands_27" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6851,7 +6920,7 @@ any ranges of the tensor that are later read.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_30">Results:<a class="headerlink" href="#results_30" title="Permanent link">link</a></h5>
+<h5 id="results_31">Results:<a class="headerlink" href="#results_31" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6876,7 +6945,7 @@ any ranges of the tensor that are later read.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>HoistableOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_27">Operands:<a class="headerlink" href="#operands_27" title="Permanent link">link</a></h5>
+<h5 id="operands_28">Operands:<a class="headerlink" href="#operands_28" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6895,7 +6964,7 @@ any ranges of the tensor that are later read.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_31">Results:<a class="headerlink" href="#results_31" title="Permanent link">link</a></h5>
+<h5 id="results_32">Results:<a class="headerlink" href="#results_32" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6921,7 +6990,7 @@ any ranges of the tensor that are later read.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_28">Operands:<a class="headerlink" href="#operands_28" title="Permanent link">link</a></h5>
+<h5 id="operands_29">Operands:<a class="headerlink" href="#operands_29" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6948,7 +7017,7 @@ any ranges of the tensor that are later read.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_32">Results:<a class="headerlink" href="#results_32" title="Permanent link">link</a></h5>
+<h5 id="results_33">Results:<a class="headerlink" href="#results_33" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6975,7 +7044,7 @@ calculations and is removed during lowering.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>Util_ShapeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_29">Operands:<a class="headerlink" href="#operands_29" title="Permanent link">link</a></h5>
+<h5 id="operands_30">Operands:<a class="headerlink" href="#operands_30" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6994,7 +7063,7 @@ calculations and is removed during lowering.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_33">Results:<a class="headerlink" href="#results_33" title="Permanent link">link</a></h5>
+<h5 id="results_34">Results:<a class="headerlink" href="#results_34" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7027,7 +7096,7 @@ values being traced.</p>
 <tr><td><code>key</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 </table>
 
-<h5 id="operands_30">Operands:<a class="headerlink" href="#operands_30" title="Permanent link">link</a></h5>
+<h5 id="operands_31">Operands:<a class="headerlink" href="#operands_31" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7067,7 +7136,7 @@ context is required.</p>
 <tr><td><code>target</code></td><td>::mlir::Attribute</td><td>any attribute</td></tr>
 </table>
 
-<h5 id="operands_31">Operands:<a class="headerlink" href="#operands_31" title="Permanent link">link</a></h5>
+<h5 id="operands_32">Operands:<a class="headerlink" href="#operands_32" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7086,7 +7155,7 @@ context is required.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_34">Results:<a class="headerlink" href="#results_34" title="Permanent link">link</a></h5>
+<h5 id="results_35">Results:<a class="headerlink" href="#results_35" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7114,7 +7183,7 @@ given offset indices.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>HoistableOpInterface</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_32">Operands:<a class="headerlink" href="#operands_32" title="Permanent link">link</a></h5>
+<h5 id="operands_33">Operands:<a class="headerlink" href="#operands_33" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7145,7 +7214,7 @@ given offset indices.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_35">Results:<a class="headerlink" href="#results_35" title="Permanent link">link</a></h5>
+<h5 id="results_36">Results:<a class="headerlink" href="#results_36" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
