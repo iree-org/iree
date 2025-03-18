@@ -49,8 +49,7 @@ jobs:
             backend: rocm
             sku: mi300
             runs-on: linux-mi300-1gpu-ossci-iree-org
-            env:
-              
+            env:   
           - name: amdgpu_rocm_mi308_gfx942
             rocm-chip: gfx942
             backend: rocm
