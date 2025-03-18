@@ -23,6 +23,7 @@ protected:
   ~EncodingAttrsTest() override {}
 
   MLIRContext *getContext() { return &ctx; }
+
 private:
   MLIRContext ctx;
   DialectRegistry reg;
