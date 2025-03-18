@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <optional>
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -1301,6 +1302,37 @@ void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
   //                 (if not tied block/fn arguments)
   results.insert<PropagateClonableOps<TensorCloneOp>>(context);
   results.insert<ElideUnneededTensorClones>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.tensor.encode
+//===----------------------------------------------------------------------===//
+
+OpFoldResult TensorEncodeOp::fold(FoldAdaptor adaptor) {
+  if (adaptor.getSourceEncoding() == adaptor.getResultEncoding()) {
+    return getSource();
+  }
+  auto sourceType = dyn_cast<RankedTensorType>(adaptor.getSourceEncoding());
+  auto resultType = dyn_cast<RankedTensorType>(adaptor.getResultEncoding());
+  if (!sourceType || !resultType) {
+    return {};
+  }
+  auto isIdentityTensorEncoding = [](RankedTensorType type) -> bool {
+    if (!type.getEncoding()) {
+      return true;
+    }
+    IREE::Encoding::SerializableEncodingAttrInterface attr =
+        IREE::Encoding::getSerializableEncodingAttrInterface(type);
+    if (!attr) {
+      return false;
+    }
+    return attr.isIdentityLayout();
+  };
+  if (!isIdentityTensorEncoding(sourceType) ||
+      !isIdentityTensorEncoding(resultType)) {
+    return {};
+  }
+  return getSource();
 }
 
 //===----------------------------------------------------------------------===//
