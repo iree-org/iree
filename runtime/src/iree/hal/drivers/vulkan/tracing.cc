@@ -574,6 +574,12 @@ void iree_hal_vulkan_tracing_zone_begin_external_impl(
       command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool,
       query_id);
 
+  // If name is NULL or empty, use function_name as the zone name
+  if (!name || name_length == 0) {
+    name = function_name;
+    name_length = function_name_length;
+  }
+  
   iree_tracing_gpu_zone_begin_external(
       context->id, (uint16_t)query_id, file_name, file_name_length, line,
       function_name, function_name_length, name, name_length);

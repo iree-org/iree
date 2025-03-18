@@ -497,6 +497,11 @@ void iree_hal_stream_tracing_zone_begin_external_impl(
   if (verbosity > context->verbosity) return;
   uint16_t query_id =
       iree_hal_stream_tracing_context_insert_query(context, event_list);
+  // If name is NULL or empty, use function_name as the zone name
+  if (!name || name_length == 0) {
+    name = function_name;
+    name_length = function_name_length;
+  }
   iree_tracing_gpu_zone_begin_external(context->id, query_id, file_name,
                                        file_name_length, line, function_name,
                                        function_name_length, name, name_length);
@@ -517,6 +522,11 @@ void iree_hal_graph_tracing_zone_begin_external_impl(
   uint16_t query_id = iree_hal_graph_tracing_context_insert_query(
       context, event_list, out_node, graph, dependency_nodes,
       dependency_nodes_count);
+  // If name is NULL or empty, use function_name as the zone name
+  if (!name || name_length == 0) {
+    name = function_name;
+    name_length = function_name_length;
+  }
   iree_tracing_gpu_zone_begin_external(context->id, query_id, file_name,
                                        file_name_length, line, function_name,
                                        function_name_length, name, name_length);
