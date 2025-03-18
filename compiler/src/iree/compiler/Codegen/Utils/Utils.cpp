@@ -172,6 +172,10 @@ bool isROCMBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return targetAttr && targetAttr.getBackend().getValue().starts_with("rocm");
 }
 
+bool isWebGPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return targetAttr && targetAttr.getBackend().getValue().starts_with("webgpu");
+}
+
 static const char *getDefaultEnabledUkernels(Attribute attr) {
   const char *kNone = "none";
   if (!attr) {

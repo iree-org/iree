@@ -676,7 +676,7 @@ iree_check_single_backend_test_suite(
     "negate.mlir"
     "pad.mlir"
     # "philox.mlir"  # TODO(#12509): WebGPU SPIR-V broken
-    "pow.mlir"
+    # "pow.mlir"  # TODO(#11321): error: value nan cannot be represented as 'f32'
     "reduce.mlir"
     "reduce_window.mlir"
     "remainder.mlir"
@@ -707,7 +707,6 @@ iree_check_single_backend_test_suite(
   #   "webgpu"
   COMPILER_FLAGS
     "--iree-input-type=stablehlo"
-    "--iree-codegen-gpu-native-math-precision=true"  # TODO(#11321): Infer/flip default
 )
 
 iree_check_single_backend_test_suite(
