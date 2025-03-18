@@ -466,8 +466,7 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
         }
       }
 
-      // TODO(https://github.com/iree-org/iree/issues/19897): Use
-      // `getMatmulNarrowDim`.
+      // TODO(#19897): Use `getMatmulNarrowDim`.
       static constexpr int64_t kSkinnyMatmulThreshold = 64;
       if (!ShapedType::isDynamic(parallelDimSize) &&
           parallelDimSize < kSkinnyMatmulThreshold) {
