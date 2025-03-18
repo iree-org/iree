@@ -82,12 +82,6 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
           source ${VENV_DIR}/bin/activate
           pip install -e experimental/regression_suite
-      - name: Fix Cache Directory Permissions
-        run: |
-          ls /shark-dev
-          ls /shark-cache
-          sudo chown -R $(id -u):$(id -g) /shark-cache || echo "Skipping chown (permission denied)"
-          sudo chmod -R 777 /shark-cache || echo "Skipping chmod (permission denied)"
 
       # TODO(#17344): regenerate .mlirbc files, test plat_rdna3_rocm on rocm
       # # In-tree tests
@@ -107,7 +101,7 @@ jobs:
             -rpfE \
             --capture=no \
             --log-cli-level=info \
-            --timeout=1500 \
+            --timeout=600 \
             --durations=0
         env:
           ROCM_CHIP: ${{ matrix.rocm-chip }}
@@ -122,7 +116,7 @@ jobs:
             -rpfE \
             --capture=no \
             --log-cli-level=info \
-            --timeout=1500 \
+            --timeout=600 \
             --durations=0
         env:
           ROCM_CHIP: ${{ matrix.rocm-chip }}
@@ -147,7 +141,7 @@ jobs:
             --goldensize-rocm-clip-bytes 460000 \
             --goldensize-rocm-vae-bytes 430000 \
             --rocm-chip gfx90a \
-            --timeout=1500 \
+            --timeout=600 \
             --log-cli-level=info \
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
@@ -179,7 +173,7 @@ jobs:
             --goldensize-rocm-punet-int8-fp16-bytes 2000000 \
             --rocm-chip gfx942 \
             --log-cli-level=info \
-            --timeout=1500 \
+            --timeout=600 \
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
       # Note: allowing 10% deviation from observed averages here to account for
@@ -208,6 +202,6 @@ jobs:
             --goldensize-rocm-punet-int8-fp16-bytes 2000000 \
             --rocm-chip gfx942 \
             --log-cli-level=info \
-            --timeout=1500 \
+            --timeout=600 \
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
