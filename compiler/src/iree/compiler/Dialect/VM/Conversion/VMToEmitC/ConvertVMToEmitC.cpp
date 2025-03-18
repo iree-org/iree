@@ -3170,7 +3170,7 @@ class BranchOpConversion : public EmitCConversionPattern<IREE::VM::BranchOp> {
         }
 
         Value blockArgRef =
-            signatureConversion.getInputMapping(index)->replacementValue;
+            signatureConversion.getInputMapping(index)->replacementValues[0];
 
         assert(isa<IREE::VM::RefType>(operand.getType()));
         assert(isa<emitc::PointerType>(blockArgRef.getType()));
