@@ -158,6 +158,11 @@ private:
   void expandToOpStep(Operation *op,
                       SmallVectorImpl<Operation *> &expandWorklist);
 
+  // Try to expand to `useOp` if it is in the same scope as `definingOp`.
+  // Otherwise, expand to the parent of `useOp` if it is in the same scope
+  // as `definingOp`.
+  void tryExpandToUseOrUseParent(Operation *definingOp, Operation *useOp);
+
   // Add a new info record for a value to analyze for const-ness.
   ConstValueInfo *addInfo(Value constValue);
 
