@@ -12,9 +12,9 @@ iree_add_all_subdirs()
 
 iree_cc_test(
   NAME
-    EncodingTest
+    EncodingAttrTest
   SRCS
-    "AttrTest.cpp"
+    "EncodingAttrTest.cpp"
   DEPS
     MLIRIR
     gmock

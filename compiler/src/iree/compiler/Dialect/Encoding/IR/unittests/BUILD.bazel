@@ -12,9 +12,9 @@ package(
 )
 
 iree_compiler_cc_test(
-    name = "EncodingTest",
+    name = "EncodingAttrTest",
     testonly = True,
-    srcs = ["AttrTest.cpp"],
+    srcs = ["EncodingAttrTest.cpp"],
     deps = [
         "//compiler/src/iree/compiler/Dialect/Encoding/IR",
         "//compiler/src/iree/testing:gtest_main",
