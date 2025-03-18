@@ -59,8 +59,8 @@
 // GFX1201-SAME:        mma = [<WMMAR4_F32_16x16x16_F16>, <WMMAR4_F16_16x16x16_F16>, <WMMAR4_F32_16x16x16_BF16>, <WMMAR4_BF16_16x16x16_BF16>, <WMMAR4_F32_16x16x16_F8E5M2>, <WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN>, <WMMAR4_F32_16x16x16_F8E4M3FN>, <WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2>,  <WMMAR4_I32_16x16x16_I8>]
 // GFX1201-SAME:        subgroup_size_choices = [32, 64]
 
-// RX9070XT: chip = <wgp_count = 64, sku = "rx9070xt">>
-// RX9070:   chip = <wgp_count = 56, sku = "rx9070">>
+// RX9070XT: chip = <wgp_count = 32, sku = "rx9070xt">>
+// RX9070:   chip = <wgp_count = 28, sku = "rx9070">>
 
 stream.executable public @reduce_dispatch {
   stream.executable.export @reduce_dispatch workgroups(%arg0: index) -> (index, index, index) {
