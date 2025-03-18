@@ -82,6 +82,10 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
           source ${VENV_DIR}/bin/activate
           pip install -e experimental/regression_suite
+      - name: Fix Cache Directory Permissions
+        run: |
+          sudo chown -R $(id -u):$(id -g) /shark-cache || echo "Skipping chown (permission denied)"
+          sudo chmod -R 777 /shark-cache || echo "Skipping chmod (permission denied)"
 
       # TODO(#17344): regenerate .mlirbc files, test plat_rdna3_rocm on rocm
       # # In-tree tests
