@@ -49,6 +49,8 @@ jobs:
             backend: rocm
             sku: mi300
             runs-on: linux-mi300-1gpu-ossci-iree-org
+            env:
+              
           - name: amdgpu_rocm_mi308_gfx942
             rocm-chip: gfx942
             backend: rocm
@@ -60,13 +62,8 @@ jobs:
       VENV_DIR: ${{ github.workspace }}/venv
       GH_TOKEN: ${{ github.token }}
       TEST_OUTPUT_ARTIFACTS: ${{ github.workspace }}/model_output_artifacts
+      IREE_TEST_FILES: /shark-cache/data/iree-regression-cache
     steps:
-      - name: Set IREE_TEST_FILES dynamically
-        run: |
-          case "${{ matrix.name }}" in
-            "amdgpu_rocm_mi300_gfx942") export IREE_TEST_FILES="/shark-cache/data/regression-cache" ;;
-            *) echo "No cache directory assigned for ${{ matrix.name }}" ;;
-          esac
       - name: Checking out IREE repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -101,6 +98,11 @@ jobs:
         if: "!cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
+          # Set IREE_TEST_FILES based on matrix.name
+          case "${{ matrix.name }}" in
+            "amdgpu_rocm_mi300_gfx942") export IREE_TEST_FILES="/shark-cache/data/regression-cache" ;;
+            *) echo "No cache directory assigned for ${{ matrix.name }}" ;;
+          esac
           pytest ./experimental/regression_suite/shark-test-suite-models/sdxl \
             -k ${{ matrix.backend }} \
             -rpfE \
@@ -116,6 +118,11 @@ jobs:
         if: "!cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
+          # Set IREE_TEST_FILES based on matrix.name
+          case "${{ matrix.name }}" in
+            "amdgpu_rocm_mi300_gfx942") export IREE_TEST_FILES="/shark-cache/data/regression-cache" ;;
+            *) echo "No cache directory assigned for ${{ matrix.name }}" ;;
+          esac
           pytest ./experimental/regression_suite/shark-test-suite-models/sd3 \
             -k ${{ matrix.backend }} \
             -rpfE \
@@ -158,6 +165,11 @@ jobs:
         if: contains(matrix.name, 'rocm_mi300_gfx942')
         run: |
           source ${VENV_DIR}/bin/activate
+          # Set IREE_TEST_FILES based on matrix.name
+          case "${{ matrix.name }}" in
+            "amdgpu_rocm_mi300_gfx942") export IREE_TEST_FILES="/shark-cache/data/regression-cache" ;;
+            *) echo "No cache directory assigned for ${{ matrix.name }}" ;;
+          esac
           pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
             --goldentime-tolerance-multiplier 1.1 \
             --goldentime-rocm-e2e-ms 305.0 \
