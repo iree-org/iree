@@ -35,7 +35,10 @@
         "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
         "--iree-codegen-llvmgpu-use-vector-distribution=true",
         "--iree-execution-model=async-external",
-        "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics{pad-target-type=conv})"
+        "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics{pad-target-type=conv})",
+        "--iree-codegen-gpu-native-math-precision=true",
+        "--iree-opt-data-tiling=false",
+        "--iree-vm-target-truncate-unsupported-floats"
     ],
     "run_function": "run_forward",
     "run_test_expecting_to_fail": true

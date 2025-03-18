@@ -90,7 +90,7 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
 
       - name: "Running Sharktank regression composite action"
-        uses: geomin12/iree-test-suites/sharktank_models@ff06aa54ca3881f85b33ceab320143b0af472e04 # temporary
+        uses: geomin12/iree-test-suites/sharktank_models@cbe88eb6cd20cc389edc29d9ff0481506bfe3b43 # temporary
         with:
           MATRIX_NAME: ${{ matrix.name }}
           SKU: ${{ matrix.sku }}
