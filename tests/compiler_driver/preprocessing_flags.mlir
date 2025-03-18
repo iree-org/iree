@@ -1,4 +1,7 @@
-// RUN: iree-compile --iree-hal-target-backends=llvm-cpu --compile-to=preprocessing \
+// RUN: iree-compile \
+// RUN:   --iree-hal-target-device=local \
+// RUN:   --iree-hal-local-target-device-backends=llvm-cpu \
+// RUN:   --compile-to=preprocessing \
 // RUN:   --iree-preprocessing-pass-pipeline="builtin.module(util.func(iree-preprocessing-convert-conv2d-to-img2col,iree-preprocessing-pad-linalg-ops{pad-size=16}))" \
 // RUN:   --mlir-print-ir-after=iree-preprocessing-convert-conv2d-to-img2col --mlir-print-ir-after=iree-preprocessing-pad-linalg-ops %s 2>&1 \
 // RUN:   | FileCheck %s

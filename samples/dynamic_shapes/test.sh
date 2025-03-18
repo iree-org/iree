@@ -38,7 +38,8 @@ python -m pip install \
 
 # 3. Compile `dynamic_shapes.mlir` using `iree-compile`.
 iree-compile \
-  --iree-hal-target-backends=llvm-cpu \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
   ${ARTIFACTS_DIR}/dynamic_shapes.mlir -o ${ARTIFACTS_DIR}/dynamic_shapes_cpu.vmfb
 
 # 4. Build the `iree_samples_dynamic_shapes` CMake target.

@@ -60,6 +60,7 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_runtime_demo_simple_mul_module"
   FLAGS
-    "--iree-hal-target-backends=vmvx"
+    "--iree-hal-target-device=local"
+    "--iree-hal-local-target-device-backends=vmvx"
   PUBLIC
 )

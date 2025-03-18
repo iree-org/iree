@@ -106,7 +106,7 @@ TMP_DIR="../iree-tmp"
 
 declare -a COMPILER_FLAGS=(
   "--iree-input-type=stablehlo"
-  "--iree-hal-target-backends=cuda"
+  "--iree-hal-target-device=cuda"
   "--iree-cuda-target=sm_80"
 )
 

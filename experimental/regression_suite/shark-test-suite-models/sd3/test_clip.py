@@ -68,7 +68,8 @@ sd3_clip_mlir = fetch_source_fixture(
 )
 
 CPU_COMPILE_FLAGS = [
-    "--iree-hal-target-backends=llvm-cpu",
+    "--iree-hal-target-device=local",
+    "--iree-hal-local-target-device-backends=llvm-cpu",
     "--iree-llvmcpu-target-cpu-features=host",
     "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false",
     "--iree-llvmcpu-distribution-size=32",
@@ -102,7 +103,7 @@ def SD3_CLIP_COMMON_RUN_FLAGS(
 
 
 ROCM_COMPILE_FLAGS = [
-    "--iree-hal-target-backends=rocm",
+    "--iree-hal-target-device=hip",
     f"--iree-hip-target={rocm_chip}",
     "--iree-opt-level=O3",
     "--iree-input-type=torch",

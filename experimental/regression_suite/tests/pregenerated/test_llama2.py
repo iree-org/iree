@@ -35,7 +35,7 @@ def llama2_7b_f16qi4_stripped_rdna3_vulkan_vmfb(llama2_7b_f16qi4_stripped_source
         llama2_7b_f16qi4_stripped_source,
         "rdna3_vulkan",
         flags=COMMON_FLAGS
-        + ["--iree-hal-target-backends=vulkan-spirv", "--iree-vulkan-target=rdna3"],
+        + ["--iree-hal-target-device=vulkan", "--iree-vulkan-target=rdna3"],
     )
 
 
@@ -46,7 +46,8 @@ def llama2_7b_f16qi4_stripped_host_cpu_vmfb(llama2_7b_f16qi4_stripped_source):
         "host_cpu",
         flags=COMMON_FLAGS
         + [
-            "--iree-hal-target-backends=llvm-cpu",
+            "--iree-hal-target-device=local",
+            "--iree-hal-local-target-device-backends=llvm-cpu",
             "--iree-llvmcpu-target-cpu-features=host",
         ],
     )
@@ -59,7 +60,8 @@ def llama2_7b_f16qi4_host_cpu_vmfb(llama2_7b_f16qi4_source):
         "host_cpu",
         flags=COMMON_FLAGS
         + [
-            "--iree-hal-target-backends=llvm-cpu",
+            "--iree-hal-target-device=local",
+            "--iree-hal-local-target-device-backends=llvm-cpu",
             "--iree-llvmcpu-target-cpu-features=host",
         ],
     )
@@ -71,7 +73,7 @@ def llama2_7b_f16qi4_a100_vulkan_vmfb(llama2_7b_f16qi4_stripped_source):
         llama2_7b_f16qi4_stripped_source,
         "a100_vulkan",
         flags=COMMON_FLAGS
-        + ["--iree-hal-target-backends=vulkan-spirv", f"--iree-vulkan-target=ampere"],
+        + ["--iree-hal-target-device=vulkan", f"--iree-vulkan-target=ampere"],
     )
 
 
@@ -82,7 +84,7 @@ def llama2_7b_f16qi4_stripped_sm80_cuda_vmfb(llama2_7b_f16qi4_stripped_source):
         "sm80_cuda",
         flags=COMMON_FLAGS
         + [
-            "--iree-hal-target-backends=cuda",
+            "--iree-hal-target-device=cuda",
             f"--iree-cuda-target=sm_80",
         ],
     )
@@ -95,7 +97,7 @@ def llama2_7b_f16qi4_stripped_rdna3_rocm_vmfb(llama2_7b_f16qi4_stripped_source):
         "rdna3_rocm",
         flags=COMMON_FLAGS
         + [
-            "--iree-hal-target-backends=rocm",
+            "--iree-hal-target-device=hip",
             "--iree-hip-target=gfx1100",
         ],
     )
@@ -108,7 +110,7 @@ def llama2_7b_f16qi4_sm80_cuda_vmfb(llama2_7b_f16qi4_source):
         "sm70_cuda",
         flags=COMMON_FLAGS
         + [
-            "--iree-hal-target-backends=cuda",
+            "--iree-hal-target-device=cuda",
             f"--iree-cuda-target=sm_70",
         ],
     )

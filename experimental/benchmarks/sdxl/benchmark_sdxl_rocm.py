@@ -59,7 +59,7 @@ def run_sdxl_rocm_benchmark(rocm_chip):
     exec_args = [
         "iree-compile",
         f"{benchmark_dir}/sdxl_pipeline_bench_f16.mlir",
-        "--iree-hal-target-backends=rocm",
+        "--iree-hal-target-device=hip",
         f"--iree-hip-target={rocm_chip}",
         "--iree-global-opt-propagate-transposes=true",
         "--iree-codegen-llvmgpu-use-vector-distribution",
