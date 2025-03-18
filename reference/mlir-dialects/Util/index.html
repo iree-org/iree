@@ -2397,6 +2397,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#preprocessingpasspipelineattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      PreprocessingPassPipelineAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#uninitializedattr" class="md-nav__link">
     <span class="md-ellipsis">
       UninitializedAttr
@@ -4960,6 +4969,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#preprocessingpasspipelineattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      PreprocessingPassPipelineAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#uninitializedattr" class="md-nav__link">
     <span class="md-ellipsis">
       UninitializedAttr
@@ -5160,6 +5178,7 @@
 <li><a href="#inlineneverattr">InlineNeverAttr</a></li>
 <li><a href="#intassumptionattr">IntAssumptionAttr</a></li>
 <li><a href="#nullattr">NullAttr</a></li>
+<li><a href="#preprocessingpasspipelineattr">PreprocessingPassPipelineAttr</a></li>
 <li><a href="#uninitializedattr">UninitializedAttr</a></li>
 </ul>
 </li>
@@ -7141,6 +7160,37 @@ or outside knowledge. All components of the attribute are optional.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="preprocessingpasspipelineattr">PreprocessingPassPipelineAttr<a class="headerlink" href="#preprocessingpasspipelineattr" title="Permanent link">link</a></h3>
+<p><em>[{preprocessing pass-pipeline to run on the function}]</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#util.preprocessing_pipeline&lt;
+  std::string   # pipelineString
+&gt;
+</code></pre></div>
+<p>Textual description of the preprocessing pass-pipeline to run on the
+function-like object that the attribute is specified on. Note that the
+string pipeline is implicitly nested to <code>builtin.module(func-lik(..))</code>
+operation. For example to run the transpose convolution pipeline, the
+attribute is specified as</p>
+<p><code>preprocess_pipeline = #util.preprocess_pipeline&lt;
+    "iree-preprocessing-transpose-convolution-pipeline"&gt;</code></p>
+<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">pipelineString</td>
+<td style="text-align: center;"><code>std::string</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
 <h3 id="uninitializedattr">UninitializedAttr<a class="headerlink" href="#uninitializedattr" title="Permanent link">link</a></h3>
 <p><em>An attribute specifying uninitialized storage</em></p>
 <p>Syntax:</p>
@@ -7152,7 +7202,7 @@ or outside knowledge. All components of the attribute are optional.</p>
 runtime. This is a hint to implementations that if policy allows memory
 allocated for the storage of this attribute type is allowed to have
 undefined contents upon return.</p>
-<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
+<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7182,7 +7232,7 @@ undefined contents upon return.</p>
 &gt;
 </code></pre></div>
 <p>Typed container supporting variant storage.</p>
-<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
+<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7213,7 +7263,7 @@ collected at runtime.</p>
 </code></pre></div>
 <p>A typed indirect reference to a value. These define a runtime addressable
 value that is strongly referenced.</p>
-<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
+<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
