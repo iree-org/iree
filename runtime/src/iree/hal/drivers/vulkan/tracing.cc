@@ -579,7 +579,7 @@ void iree_hal_vulkan_tracing_zone_begin_external_impl(
     name = function_name;
     name_length = function_name_length;
   }
-  
+
   iree_tracing_gpu_zone_begin_external(
       context->id, (uint16_t)query_id, file_name, file_name_length, line,
       function_name, function_name_length, name, name_length);
