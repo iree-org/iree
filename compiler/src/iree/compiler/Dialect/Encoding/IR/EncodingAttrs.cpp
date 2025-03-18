@@ -69,13 +69,14 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
                                ArrayRef<Attribute> layouts) {
   Builder b(ctx);
   auto opTypeAttr = EncodingOpTypeAttr::get(ctx, opType);
+  auto mapsAttr = maps.empty() ? ArrayAttr() : b.getAffineMapArrayAttr(maps);
   auto roundDimsToAttr = roundDimsTo.empty()
                              ? DenseI64ArrayAttr()
                              : b.getDenseI64ArrayAttr(roundDimsTo);
   auto layoutsAttr = layouts.empty() ? ArrayAttr() : b.getArrayAttr(layouts);
   return get(ctx, b.getIndexAttr(operandIndex), opTypeAttr,
-             b.getTypeArrayAttr(elemTypes), b.getAffineMapArrayAttr(maps),
-             roundDimsToAttr, layoutsAttr);
+             b.getTypeArrayAttr(elemTypes), mapsAttr, roundDimsToAttr,
+             layoutsAttr);
 }
 
 LogicalResult
@@ -192,6 +193,25 @@ EncodingAttr::cloneWithNewOperandIndexingMap(AffineMap newIndexingMap) {
 }
 
 bool EncodingAttr::isSerialized() const { return getLayouts() ? true : false; }
+
+bool EncodingAttr::isIdentityLayout() const {
+  if (!isSerialized()) {
+    return false;
+  }
+  ArrayAttr layoutsAttr = getLayouts();
+  if (!llvm::all_of(layoutsAttr.getValue(),
+                    llvm::IsaPred<SerializableEncodingAttrInterface>)) {
+    return false;
+  }
+  return llvm::all_of(layoutsAttr.getValue(), [](Attribute attr) {
+    auto serializableAttr =
+        llvm::dyn_cast<SerializableEncodingAttrInterface>(attr);
+    if (!serializableAttr) {
+      return false;
+    }
+    return serializableAttr.isIdentityLayout();
+  });
+}
 
 Attribute EncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();
@@ -336,6 +356,11 @@ PadEncodingLayoutAttr PadEncodingLayoutAttr::getIdentityAttr(MLIRContext *ctx,
                                                              int rank) {
   SmallVector<int32_t> zeros(rank, 0);
   return get(ctx, zeros);
+}
+
+bool PadEncodingLayoutAttr::isIdentityLayout() const {
+  ArrayRef<int32_t> padding = getPadding().asArrayRef();
+  return llvm::all_of(padding, [](int32_t val) { return val == 0; });
 }
 
 Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
