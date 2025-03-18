@@ -68,7 +68,7 @@ jobs:
       - name: Install Sharktank models test suite requirements
         run: |
           source ${VENV_DIR}/bin/activate
-          python -m pip install -r iree-test-suites/sharktank_models/requirements-iree.txt
+          python -m pip install -r iree-test-suites/sharktank_models/requirements.txt
       - name: Run Sharktank models test suite
         run: |
           source ${VENV_DIR}/bin/activate

@@ -95,7 +95,7 @@ jobs:
       - name: Install ONNX ops test suite requirements
         run: |
           source ${VENV_DIR}/bin/activate
-          python -m pip install -r iree-test-suites/onnx_ops/requirements-iree.txt
+          python -m pip install -r iree-test-suites/onnx_ops/requirements.txt
       - name: Run ONNX ops test suite
         run: |
           source ${VENV_DIR}/bin/activate
@@ -178,7 +178,7 @@ jobs:
       - name: Install ONNX models test suite requirements
         run: |
           source ${VENV_DIR}/bin/activate
-          python -m pip install -r iree-test-suites/onnx_models/requirements-iree.txt
+          python -m pip install -r iree-test-suites/onnx_models/requirements.txt
       - name: Run ONNX models test suite
         run: |
           source ${VENV_DIR}/bin/activate
