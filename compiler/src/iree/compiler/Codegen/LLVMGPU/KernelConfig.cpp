@@ -1046,23 +1046,25 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                 IREE::GPU::Basis &basis, int64_t &currDim) {
         // Iterate over dimensions and try to distribute resources over them.
         for (int64_t dim : dims) {
+          // We iterate over the basis in a reverse dimension to get smaller
+          // strides for inner dimensions.
+          int64_t rCurrDim = basis.counts.size() - currDim - 1;
+          ++currDim;
           // Keep track of the order the dimensions are distributed in.
-          basis.mapping[dim] = currDim;
+          basis.mapping[dim] = rCurrDim;
           // Try to distribute the resources over the dimensions greedily.
           int64_t dimSize = bounds[dim];
           if (ShapedType::isDynamic(dimSize)) {
             // We do not distribute over dynamic dimensions yet. It's possible
             // to do it since we have masking, it's just not clear what
             // heuristic to use.
-            basis.counts[currDim] = 1;
-            ++currDim;
+            basis.counts[rCurrDim] = 1;
             continue;
           }
           int64_t used = std::gcd(available, dimSize);
           available /= used;
           bounds[dim] /= used;
-          basis.counts[currDim] = used;
-          ++currDim;
+          basis.counts[rCurrDim] = used;
         }
         return available;
       };
