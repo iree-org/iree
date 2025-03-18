@@ -82,6 +82,12 @@ static bool predicateRewrite(StringRef name,
     // either device library functions, or handling of intrinsics in AMDGPU.
     return false;
   }
+  if (isWebGPUBackend(target)) {
+    // https://github.com/gpuweb/gpuweb/issues/5109 means we get compilation
+    // errors whenever Inf or NaN values arise at compile-time, which is not
+    // something that we can really prevent. Avoiding this rewrite helps a bit.
+    return false;
+  }
   // Currently enable all non-approximative rewrites.
   return true;
 }
@@ -126,6 +132,12 @@ static bool predicateApprox(StringRef name,
     // either device library functions, or handling of intrinsics in AMDGPU.
     return false;
   }
+  if (isWebGPUBackend(target)) {
+    // https://github.com/gpuweb/gpuweb/issues/5109 means we get compilation
+    // errors whenever Inf or NaN values arise at compile-time, which is not
+    // something that we can really prevent. Avoiding this rewrite helps a bit.
+    return false;
+  }
   StringRef acos = math::AcosOp::getOperationName();
   StringRef asin = math::AsinOp::getOperationName();
   StringRef atan = math::AtanOp::getOperationName();
@@ -147,12 +159,24 @@ static bool predicateApprox(StringRef name,
 
 namespace {
 
+struct DeprecationWarningForNativeMathPrecision {
+  DeprecationWarningForNativeMathPrecision() {
+    if (clNativeMathPrecision) {
+      clNativeMathPrecision.error(
+          "This option is deprecated. The MathTransformPass should do the "
+          "right things for each target.");
+    }
+  }
+};
+
 class MathTransformPass final
     : public impl::MathTransformPassBase<MathTransformPass> {
 public:
   using Base::Base;
 
   void runOnOperation() override {
+    static DeprecationWarningForNativeMathPrecision warning;
+
     RewritePatternSet patterns(&getContext());
     auto target = IREE::HAL::ExecutableTargetAttr::lookup(getOperation());
     if (!target) {
