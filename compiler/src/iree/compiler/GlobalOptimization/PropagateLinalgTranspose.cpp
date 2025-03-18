@@ -21,6 +21,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -1001,6 +1002,7 @@ populateCommonCanonicalizationPatterns(MLIRContext *context,
   tensor::EmptyOp::getCanonicalizationPatterns(patterns, context);
   tensor::ExpandShapeOp::getCanonicalizationPatterns(patterns, context);
   tensor::CollapseShapeOp::getCanonicalizationPatterns(patterns, context);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   tensor::populateFoldTensorEmptyPatterns(patterns,
                                           /*foldSingleUseOnly=*/false);
 }
@@ -1140,7 +1142,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
             return false;
           }
           auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer);
-          if (!consumerLinalgOp) {
+          if (!consumerLinalgOp || consumerLinalgOp.getNumReductionLoops()) {
             return false;
           }
           // Only reshape generic ops.
