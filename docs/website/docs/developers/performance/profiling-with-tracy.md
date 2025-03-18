@@ -259,6 +259,16 @@ adb forward tcp:8086 tcp:8086
 You can also pass `-p <port>` to the capture tool to override the default port
 to connect to, or use the Tracy GUI which scans other ports too.
 
+The `TRACY_PORT` environment variable can be used to change the port used by the
+client application. For example, to run `iree-benchmark-module` on port 1234:
+
+```shell
+TRACY_PORT=1234 iree-benchmark-module \
+  --device=local-task \
+  --module=out.vmfb \
+  ...
+```
+
 ## :octicons-graph-16: Touring the Tracy profiler UI
 
 The initial view should look like this:
