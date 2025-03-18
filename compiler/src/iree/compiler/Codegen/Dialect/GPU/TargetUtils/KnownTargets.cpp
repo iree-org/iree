@@ -319,6 +319,8 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   const WgpDetails *rdna2Wgp = getRDNA2WgpDetails();
   const WgpDetails *rdna1Wgp = getRDNA1WgpDetails();
 
+  // --- CDNA --- //
+
   // "AMD Instinct MI300 Series Product Offerings" in Page 23 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/white-papers/amd-cdna-3-white-paper.pdf
   static const ChipDetails mi300xChip = {304, "mi300x"};
@@ -336,20 +338,29 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   // https://www.amd.com/content/dam/amd/en/documents/instinct-business-docs/white-papers/amd-cdna-white-paper.pdf
   static const ChipDetails mi100Chip = {120, "mi100"};
 
+  // --- RDNA --- //
+
+  // With RDNA, two Compute Units form a Workgroup Processor (WGP).
+  // A kernel can be dispatched in either the CU mode or the WGP mode (where
+  // some resources like LDS are accessible to both CUs). The default with HIP
+  // is the WGP mode. For the purpose of distribution heuristics, we divide the
+  // number of CU reported in the hardware spaces by two to get the number of
+  // WGPs.
+
   // AMD RDNA4 architecture:
   // https://www.amd.com/en/newsroom/press-releases/2025-2-28-amd-unveils-next-generation-amd-rdna-4-architectu.html.
-  static const ChipDetails rx9070xtChip = {64, "rx9070xt"};
-  static const ChipDetails rx9070Chip = {56, "rx9070"};
+  static const ChipDetails rx9070xtChip = {64 / 2, "rx9070xt"};
+  static const ChipDetails rx9070Chip = {56 / 2, "rx9070"};
 
   // AMD RDNA3.
-  static const ChipDetails rx7900xtxChip = {96, "rx7900xtx"};
-  static const ChipDetails rx7900xtChip = {84, "rx7900xt"};
-  static const ChipDetails rx7800xtChip = {60, "rx7800xt"};
-  static const ChipDetails rx7700xtChip = {54, "rx7700xt"};
-  static const ChipDetails v710Chip = {54, "v710"};
-  static const ChipDetails w7900Chip = {96, "w7900"};
-  static const ChipDetails w7800Chip = {70, "w7800"};
-  static const ChipDetails w7700Chip = {48, "w7700"};
+  static const ChipDetails rx7900xtxChip = {96 / 2, "rx7900xtx"};
+  static const ChipDetails rx7900xtChip = {84 / 2, "rx7900xt"};
+  static const ChipDetails rx7800xtChip = {60 / 2, "rx7800xt"};
+  static const ChipDetails rx7700xtChip = {54 / 2, "rx7700xt"};
+  static const ChipDetails v710Chip = {54 / 2, "v710"};
+  static const ChipDetails w7900Chip = {96 / 2, "w7900"};
+  static const ChipDetails w7800Chip = {70 / 2, "w7800"};
+  static const ChipDetails w7700Chip = {48 / 2, "w7700"};
 
   // See https://llvm.org/docs/AMDGPUUsage.html#processors for gfxN to
   // cdnaN/rdnaN mapping.
