@@ -63,6 +63,14 @@ static void populateMathFunctionsRewritePatterns(
 
 static bool predicateRewrite(StringRef name,
                              IREE::HAL::ExecutableTargetAttr target) {
+  if (name == math::FPowIOp::getOperationName()) {
+    // math.fpowi is a special op: it isn't really a "math function", rather
+    // it is generally used with a constant exponent that is a small integer,
+    // and it is then a shorthand for a few multiplications. That rewrite needs
+    // to happen to prevent falling back on a more expensive, more general
+    // implementation like math.powf.
+    return true;
+  }
   if (clNativeMathPrecision) { // Legacy.
     if (name == math::Exp2Op::getOperationName() ||
         name == math::RoundEvenOp::getOperationName()) {
@@ -72,9 +80,7 @@ static bool predicateRewrite(StringRef name,
   if (isROCMBackend(target)) {
     // On ROCm, we do not need most rewrites as we can generally bottom out on
     // either device library functions, or handling of intrinsics in AMDGPU.
-    // An important exception is math.fpowi, which needs to get rewritten to
-    // multiplications.
-    return llvm::is_contained({math::FPowIOp::getOperationName()}, name);
+    return false;
   }
   // Currently enable all non-approximative rewrites.
   return true;
