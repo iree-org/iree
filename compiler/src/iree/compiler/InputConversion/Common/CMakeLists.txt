@@ -69,6 +69,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::Conversion
+    iree::compiler::Dialect::Util::Conversion::FuncToUtil
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Pipelines::Options
