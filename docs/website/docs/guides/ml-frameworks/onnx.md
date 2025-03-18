@@ -91,7 +91,8 @@ or from pip:
     ```shell
     iree-compile \
       model.mlir \
-      --iree-hal-target-backends=llvm-cpu \
+      --iree-hal-target-device=local \
+      --iree-hal-local-target-device-backends=llvm-cpu \
       --iree-llvmcpu-target-cpu=host \
       -o model_cpu.vmfb
 
@@ -125,7 +126,7 @@ for the latest status.
 If you see an error compiling a converted .mlir file like this:
 
 ```console
-$ iree-compile model.mlir --iree-hal-target-backends=llvm-cpu -o model.vmfb
+$ iree-compile model.mlir --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu -o model.vmfb
 
 model.mlir:507:12: error: failed to legalize operation 'torch.operator' that was explicitly marked illegal
     %503 = torch.operator "onnx.Identity"(%arg0) : (!torch.vtensor<[?],si64>) -> !torch.vtensor<[?],si64>

@@ -1,6 +1,11 @@
-// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | iree-run-module --module=- --function=scalar --input=42) | FileCheck %s
-// RUN: iree-compile --iree-hal-target-backends=vmvx %s | iree-benchmark-module --device=local-task --module=- --function=scalar --input=42 | FileCheck --check-prefix=BENCHMARK %s
-// RUN: (iree-run-mlir --Xcompiler,iree-hal-target-backends=vmvx %s --input=42) | FileCheck %s
+// RUN: (iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=vmvx %s | \
+// RUN:  iree-run-module --module=- --function=scalar --input=42) | \
+// RUN:  FileCheck %s
+// RUN: (iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=vmvx %s | \
+// RUN:  iree-benchmark-module --device=local-task --module=- --function=scalar --input=42) | \
+// RUN:  FileCheck --check-prefix=BENCHMARK %s
+// RUN: (iree-run-mlir --Xcompiler,iree-hal-target-device=local --Xcompiler,iree-hal-local-target-device-backends=vmvx %s --input=42) | \
+// RUN:  FileCheck %s
 
 // BENCHMARK-LABEL: BM_scalar
 // CHECK-LABEL: EXEC @scalar

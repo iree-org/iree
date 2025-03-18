@@ -3,20 +3,23 @@
 // matching device and executable format flags.
 //
 // Examples:
-//   --iree-hal-target-backends=vmvx
+//   --iree-hal-target-device=local \
+//   --iree-hal-local-target-device-backends=vmvx
 //     --device=local-sync or --device=local-task
 //     --executable_format=vmvx-bytecode-fb
-//   --iree-hal-target-backends=llvm-cpu
+//   --iree-hal-target-device=local \
+//   --iree-hal-local-target-device-backends=llvm-cpu
 //     --device=local-sync or --device=local-task
 //     --executable_format=embedded-elf-x86_64
 //     --executable_format=system-dll-x86_64
-//   --iree-hal-target-backends=vulkan-spirv
+//   --iree-hal-target-device=vulkan
 //     --device=vulkan
 //     --executable_format=vulkan-spirv-fb
 
 // RUN: iree-compile \
 // RUN:     --compile-mode=hal-executable \
-// RUN:     --iree-hal-target-backends=vmvx \
+// RUN:     --iree-hal-target-device=local \
+// RUN:     --iree-hal-local-target-device-backends=vmvx \
 // RUN:     %s | \
 // RUN: iree-benchmark-executable \
 // RUN:     --device=local-sync \

@@ -29,7 +29,8 @@ def argmax_ukernel_host_cpu_vmfb(argmax_ukernel_source):
         vmfb_path=Path("host_cpu"),
         flags=COMMON_FLAGS
         + [
-            "--iree-hal-target-backends=llvm-cpu",
+            "--iree-hal-target-device=local",
+            "--iree-hal-local-target-device-backends=llvm-cpu",
             "--iree-llvmcpu-target-cpu-features=host",
         ],
     )
@@ -42,7 +43,7 @@ def argmax_ukernel_gfx90a_rocm_vmfb(argmax_ukernel_source):
         vmfb_path=Path("gfx90a_rocm"),
         flags=COMMON_FLAGS
         + [
-            "--iree-hal-target-backends=rocm",
+            "--iree-hal-target-device=hip",
             "--iree-hip-target=gfx90a",
             "--iree-hip-enable-ukernels=argmax",
         ],
@@ -56,7 +57,7 @@ def argmax_ukernel_gfx942_rocm_vmfb(argmax_ukernel_source):
         vmfb_path=Path("gfx942_rocm"),
         flags=COMMON_FLAGS
         + [
-            "--iree-hal-target-backends=rocm",
+            "--iree-hal-target-device=hip",
             "--iree-hip-target=gfx942",
             "--iree-hip-enable-ukernels=argmax",
         ],

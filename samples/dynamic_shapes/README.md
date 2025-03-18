@@ -96,6 +96,7 @@ Tensors are multi-dimensional arrays with a uniform type (e.g. int32, float32)
 and a shape. Shapes consist of a rank and a list of dimensions and may be
 static (i.e. fully known and fixed) or varying degrees of dynamic. For more
 information, see these references:
+
 * PyTorch:
 [Compiler dynamic shapes](https://pytorch.org/docs/stable/torch.compiler_dynamic_shapes.html),
 [`torch.Tensor`](https://pytorch.org/docs/stable/tensors.html)
@@ -132,7 +133,8 @@ them.
 
     ```
     iree-compile \
-        --iree-hal-target-backends=llvm-cpu \
+        --iree-hal-target-device=local \
+        --iree-hal-local-target-device-backends=llvm-cpu \
         dynamic_shapes.mlir -o dynamic_shapes_cpu.vmfb
     ```
 

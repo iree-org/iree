@@ -1,6 +1,7 @@
 // Passing no inputs is okay.
 
-// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \
+// RUN: (iree-compile --iree-hal-target-device=local \
+// RUN:               --iree-hal-local-target-device-backends=vmvx %s | \
 // RUN:  iree-run-module --device=local-sync --module=- --function=no_input) | \
 // RUN: FileCheck --check-prefix=NO-INPUT %s
 // NO-INPUT-LABEL: EXEC @no_input
@@ -13,7 +14,8 @@ func.func @no_input() {
 // Scalars use the form `--input=value`. Type (float/int) should be omitted.
 //   * The VM does not use i1/i8 types, so i32 VM types are returned instead.
 
-// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \
+// RUN: (iree-compile --iree-hal-target-device=local \
+// RUN:               --iree-hal-local-target-device-backends=vmvx %s | \
 // RUN:  iree-run-module --device=local-sync \
 // RUN:                  --module=- \
 // RUN:                  --function=scalars \
@@ -38,7 +40,8 @@ func.func @scalars(%arg0: i1, %arg1: i8, %arg2 : i32, %arg3 : f32) -> (i1, i8, i
 //   * Quotes should be used around values with spaces.
 //   * Brackets may also be used to separate element values.
 
-// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \
+// RUN: (iree-compile --iree-hal-target-device=local \
+// RUN:               --iree-hal-local-target-device-backends=vmvx %s | \
 // RUN:  iree-run-module --device=local-sync \
 // RUN:                  --module=- \
 // RUN:                  --function=buffers \
@@ -64,7 +67,9 @@ func.func @buffers(%arg0: tensor<i32>, %arg1: tensor<2xi32>, %arg2: tensor<2x3xi
 //     provide 1+ values.
 //   * Some data types may be converted (i32 -> si32 here) - bug?
 
-// RUN: (iree-compile --iree-hal-target-backends=vmvx %s -o=%t.vmfb && \
+// RUN: (iree-compile --iree-hal-target-device=local \
+// RUN:               --iree-hal-local-target-device-backends=vmvx \
+// RUN:               -o=%t.vmfb %s && \
 // RUN:  iree-run-module --device=local-sync \
 // RUN:                  --module=%t.vmfb \
 // RUN:                  --function=npy_round_trip \

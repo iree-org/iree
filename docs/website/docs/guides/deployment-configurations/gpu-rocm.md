@@ -162,9 +162,9 @@ Then run the following command to compile with the `rocm` target backend:
 IREE_HIP_TARGET=$(rocm_agent_enumerator | sed -n '2 p')  # e.g. gfx1100
 
 iree-compile \
-    --iree-hal-target-backends=rocm \
+    --iree-hal-target-device=hip \
     --iree-hip-target=${IREE_HIP_TARGET} \
-    mobilenetv2.mlir -o mobilenet_rocm.vmfb
+    mobilenetv2.mlir -o mobilenet_hip.vmfb
 ```
 
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-optimization-options.md"

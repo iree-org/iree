@@ -7,7 +7,9 @@
 // TODO(benvanik): find a way to share the files (environment variables saying
 // what types to run, etc).
 
-// RUN: iree-compile --iree-hal-target-backends=llvm-cpu %s | \
+// RUN: iree-compile %s \
+// RUN:     --iree-hal-target-device=local \
+// RUN:     --iree-hal-local-target-device-backends=llvm-cpu | \
 // RUN: iree-run-module \
 // RUN:     --device=local-sync \
 // RUN:     --executable_plugin=$IREE_BINARY_DIR/samples/custom_dispatch/cpu/plugin/system_plugin$IREE_DYLIB_EXT \

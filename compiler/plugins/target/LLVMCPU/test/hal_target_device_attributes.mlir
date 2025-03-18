@@ -3,7 +3,7 @@
 
 // TODO: Expand the test for more CLI configurations, e.g. different target triples
 
-// RUN: iree-compile --compile-to=preprocessing --iree-hal-target-backends=llvm-cpu --iree-llvmcpu-target-triple=x86_64-linux-gnu %s \
+// RUN: iree-compile --compile-to=preprocessing --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu --iree-llvmcpu-target-triple=x86_64-linux-gnu %s \
 // RUN: | FileCheck %s --check-prefix=CHECK-X86-DEFAULT
 //
 // CHECK-X86-DEFAULT: module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} {
@@ -14,7 +14,7 @@
 // CHECK-X86-DEFAULT-SAME: target_triple = "x86_64-unknown-unknown-eabi-elf"
 // CHECK-X86-DEFAULT-SAME: }>]> : !hal.device
 
-// RUN: iree-compile --compile-to=preprocessing --iree-hal-target-backends=llvm-cpu --iree-llvmcpu-target-triple=x86_64-linux-gnu %s \
+// RUN: iree-compile --compile-to=preprocessing --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu --iree-llvmcpu-target-triple=x86_64-linux-gnu %s \
 // RUN:              --iree-llvmcpu-stack-allocation-limit=65536 \
 // RUN: | FileCheck %s --check-prefix=CHECK-STACK-VALUE
 //
@@ -26,7 +26,7 @@
 //
 // CHECK-STACK-VALUE-SAME: }>]> : !hal.device
 
-// RUN: not iree-compile --compile-to=preprocessing --iree-hal-target-backends=llvm-cpu --iree-llvmcpu-target-triple=x86_64-linux-gnu %s \
+// RUN: not iree-compile --compile-to=preprocessing --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu --iree-llvmcpu-target-triple=x86_64-linux-gnu %s \
 // RUN:                  --iree-llvmcpu-stack-allocation-limit=64266 \
 // RUN: 2>&1 | FileCheck %s --check-prefix=CHECK-INCORRECT-OPT-STACK-VALUE
 //

@@ -156,11 +156,11 @@ With the requirements out of the way, we can now compile a model and run it.
 
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-import-onnx-mobilenet.md"
 
-Then run the following command to compile with the `vulkan-spirv` target:
+Then run the following command to compile with the `vulkan` target device:
 
 ``` shell hl_lines="2 3"
 iree-compile \
-    --iree-hal-target-backends=vulkan-spirv \
+    --iree-hal-target-device=vulkan \
     --iree-vulkan-target=<...> \
     mobilenetv2.mlir -o mobilenet_vulkan.vmfb
 ```

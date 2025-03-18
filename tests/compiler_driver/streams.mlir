@@ -1,4 +1,6 @@
-// RUN: iree-compile --split-input-file --iree-hal-target-backends=vmvx \
+// RUN: iree-compile --split-input-file \
+// RUN:   --iree-hal-target-device=local \
+// RUN:   --iree-hal-local-target-device-backends=vmvx \
 // RUN:   --output-format=vm-bytecode \
 // RUN:   --iree-vm-bytecode-module-output-format=flatbuffer-text %s \
 // RUN:   --mlir-print-ir-after=iree-vm-ordinal-allocation 2>&1 | FileCheck %s

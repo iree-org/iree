@@ -1,6 +1,7 @@
-# A `hal_executable_library_call` hook to study CPU event counts on Linux.
+# A `hal_executable_library_call` hook to study CPU event counts on Linux
 
 To use this, build IREE with:
+
 1. `cmake -DCMAKE_C_FLAGS=-DIREE_HAL_EXECUTABLE_LIBRARY_CALL_HOOK .` to enable the hooks in the IREE runtime. This enables using hooks by `LD_PRELOAD=...some_hooks.so`
 2. `cmake -DIREE_BUILD_EXPERIMENTAL_HAL_EXECUTABLE_LIBRARY_CALL_HOOKS=ON .` to enable building this directory, which provides such a hooks `.so` implementation.
 
@@ -19,7 +20,8 @@ Compile it like usual, but just make sure that we dump the actual function names
 
 ```
 tools/iree-compile ~/matmul.mlir -o /tmp/matmul.vmfb \
-  --iree-hal-target-backends=llvm-cpu \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
   --iree-llvmcpu-target-cpu=znver4 \
   --iree-llvmcpu-enable-ukernels=all \
   --iree-hal-dump-executable-intermediates-to=/tmp
@@ -73,6 +75,7 @@ Statistics for thread iree-worker-15:
 ```
 
 As this is a LD_PRELOAD hook, this can't take command-line arguments, so all the settings are controlled by environment variables:
+
 * `IREE_HOOK_FILTER_NAME`: If specified, will filter executable library calls for this specific function name. Otherwise will gather all calls, which would typically make for hard-to-interpret results. One almost always wants to specify this.
 * `IREE_HOOK_SKIP_START_MS`: How many milliseconds to skip initially before recording data. Think of it as warm-up. Default 0.
 * `IREE_HOOK_PERF_EVENT_TYPES`: Comma-separated list of events to count. The available event names are a subset of the ones available in Linux's `perf`. The exact list is what is dumped by `IREE_HOOK_LIST_EVENT_TYPES=1`. If multiple event types are specified, cross-event conditional probability tables will be printed for each pair of event, so this grows quadratically. In general, one will pass only one event type unless specifically interested in correlating two events. There may also be CPU-specific overhead or limits associated with querying multiple event types simultaneously.

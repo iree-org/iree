@@ -39,7 +39,8 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_vmvx"
   FLAGS
-    "--iree-hal-target-backends=vmvx"
+    "--iree-hal-target-device=local"
+    "--iree-hal-local-target-device-backends=vmvx"
   PUBLIC
 )
 
@@ -96,7 +97,8 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_cpu_x86_64"
   FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-hal-target-device=local"
+    "--iree-hal-local-target-device-backends=llvm-cpu"
     "--iree-llvmcpu-target-triple=x86_64-pc-linux-elf"
     "--iree-llvmcpu-target-cpu=generic"
     "--iree-llvmcpu-debug-symbols=false"
@@ -113,7 +115,8 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_cpu_riscv_32"
   FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-hal-target-device=local"
+    "--iree-hal-local-target-device-backends=llvm-cpu"
     "--iree-llvmcpu-target-triple=riscv32-pc-linux-elf"
     "--iree-llvmcpu-target-cpu-features=+m,+f"
     "--iree-llvmcpu-target-abi=ilp32"
@@ -131,7 +134,8 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_cpu_riscv_64"
   FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-hal-target-device=local"
+    "--iree-hal-local-target-device-backends=llvm-cpu"
     "--iree-llvmcpu-target-triple=riscv64-pc-linux-elf"
     "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+c"
     "--iree-llvmcpu-target-abi=lp64d"
@@ -149,7 +153,8 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_cpu_arm_32"
   FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-hal-target-device=local"
+    "--iree-hal-local-target-device-backends=llvm-cpu"
     "--iree-llvmcpu-target-triple=armv7a-pc-linux-elf"
     "--iree-llvmcpu-target-cpu=generic"
     "--iree-llvmcpu-target-float-abi=hard"
@@ -167,7 +172,8 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_cpu_arm_64"
   FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-hal-target-device=local"
+    "--iree-hal-local-target-device-backends=llvm-cpu"
     "--iree-llvmcpu-target-triple=aarch64-pc-linux-elf"
     "--iree-llvmcpu-target-cpu=generic"
     "--iree-llvmcpu-debug-symbols=false"
@@ -245,7 +251,7 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_vulkan"
   FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-hal-target-device=vulkan"
     "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )

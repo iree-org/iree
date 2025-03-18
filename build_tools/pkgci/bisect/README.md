@@ -1,7 +1,7 @@
 # Package bisect scripting
 
 This scripting connects the `git bisect` tool
-(https://git-scm.com/docs/git-bisect) with IREE's package builds, allowing
+(<https://git-scm.com/docs/git-bisect>) with IREE's package builds, allowing
 developers to run tests through commit history efficiently. For example, this
 can be used to spot at which commit an `iree-compile` command started failing.
 
@@ -20,8 +20,8 @@ commit.
 Requirement | Details
 ----------- | -------
 Linux | (at least until IREE builds packages for other systems at each commit)
-`git` | https://git-scm.com/
-`gh` CLI | https://cli.github.com/
+`git` | <https://git-scm.com/>
+`gh` CLI | <https://cli.github.com/>
 iree-org/iree repository read access | Needed to [download workflow artifacts](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/downloading-workflow-artifacts). See also [obtaining commit access](https://iree.dev/developers/general/contributing/#obtaining-commit-access).
 `python3.11` with `venv` support | (Version must match what PkgCI builds) `sudo apt install python3.11 python3.11-dev python3.11-venv`
 
@@ -42,7 +42,7 @@ serialized `.mlir` files not being stable, etc.).
 ### Example
 
 Let's try to find the culprit commit for issue
-https://github.com/iree-org/iree/issues/18879. Thanks to the detailed issue
+<https://github.com/iree-org/iree/issues/18879>. Thanks to the detailed issue
 description, we have all the data we need to run a bisect already.
 
 To run the bisect tool:
@@ -70,7 +70,7 @@ To run the bisect tool:
     # instead of spending all the time to serialize an output `.vmfb` file.
     # https://iree.dev/developers/general/developer-tips/#compiling-phase-by-phase
 
-    iree-compile --iree-hal-target-backends=llvm-cpu -o /dev/null /tmp/issue_18879.mlir
+    iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu -o /dev/null /tmp/issue_18879.mlir
     ```
 
     If the test command spans multiple lines, you can put it in an executable
@@ -90,13 +90,13 @@ To run the bisect tool:
     ./bisect_packages.py \
       --good-ref=f9fa934c649749b30fc4be05d9cef78eb043f0e9 \
       --bad-ref=05bbcf1385146d075829cd940a52bf06961614d0 \
-      --test-command="iree-compile --iree-hal-target-backends=llvm-cpu -o /dev/null /tmp/issue_18879.mlir"
+      --test-command="iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu -o /dev/null /tmp/issue_18879.mlir"
 
     # 206b60ca59c9dbbca5769694df4714c38cecaced is the first bad commit
     ```
 
     As expected, the bisect agrees with the culprit mentioned on the issue:
-    https://github.com/iree-org/iree/issues/18879#issuecomment-2435531655.
+    <https://github.com/iree-org/iree/issues/18879#issuecomment-2435531655>.
 
     Note that any git ref can be used, so we can use tags too:
 
@@ -180,7 +180,7 @@ set +e
 ############ ORIGINAL SCRIPT ############
 #########################################
 
-iree-compile --iree-hal-target-backends=llvm-cpu -o /dev/null /home/nod/.iree/bisect/issue_18879.mlir
+iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu -o /dev/null /home/nod/.iree/bisect/issue_18879.mlir
 
 #########################################
 ##### BISECT RELEASE SCRIPT CLEANUP #####
@@ -194,7 +194,7 @@ fi
 
 ### Example annotated logs
 
-Raw logs here: https://gist.github.com/ScottTodd/cff468a50df63b65e5c5f449fabab6af
+Raw logs here: <https://gist.github.com/ScottTodd/cff468a50df63b65e5c5f449fabab6af>
 
 ```bash
 $ ./bisect_packages.py \
@@ -261,7 +261,7 @@ sympy==1.13.3
 # Here we run the test script
 # -----------------------------------------------------
 + set +e
-+ iree-compile --iree-hal-target-backends=llvm-cpu -o /dev/null /home/nod/.iree/bisect/issue_18879.mlir
++ iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu -o /dev/null /home/nod/.iree/bisect/issue_18879.mlir
 /home/nod/.iree/bisect/issue_18879.mlir:17:11: error: operand #0 does not dominate this use
     %21 = torch.operator "onnx.Resize"(%20, %none, %1) {torch.onnx.coordinate_transformation_mode = "asymmetric", torch.onnx.cubic_coeff_a = -7.500000e-01 : f32, torch.onnx.mode = "nearest", torch.onnx.nearest_mode = "floor"} : (!torch.vtensor<[1,18,14,14],f32>, !torch.none, !torch.vtensor<[4],f32>) -> !torch.vtensor<[1,18,56,56],f32>
           ^

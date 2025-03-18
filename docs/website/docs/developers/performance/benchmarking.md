@@ -24,7 +24,8 @@ To use `iree-benchmark-module`, generate an IREE module for the target backend:
 
 ```shell
 $ bazel run //tools:iree-compile -- \
-  --iree-hal-target-backends=vmvx \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=vmvx \
   $PWD/samples/models/simple_abs.mlir \
   -o /tmp/module.fb
 ```
@@ -113,7 +114,8 @@ dispatch functions, generate an IREE module with the
 $ build/tools/iree-compile \
   --iree-input-type=stablehlo \
   --iree-flow-export-benchmark-funcs \
-  --iree-hal-target-backends=vmvx \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=vmvx \
   tests/e2e/stablehlo_models/fullyconnected.mlir \
   -o /tmp/fullyconnected.vmfb
 ```

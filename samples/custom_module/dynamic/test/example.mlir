@@ -1,4 +1,6 @@
-// RUN: iree-compile %s --iree-hal-target-backends=vmvx | \
+// RUN: iree-compile %s \
+// RUN:     --iree-hal-target-device=local \
+// RUN:     --iree-hal-local-target-device-backends=vmvx | \
 // RUN: iree-run-module \
 // RUN:     --device=local-sync \
 // RUN:     --module=$IREE_BINARY_DIR/samples/custom_module/dynamic/module$IREE_DYLIB_EXT@create_custom_module \
@@ -6,7 +8,9 @@
 // RUN:     --function=main | \
 // RUN: FileCheck %s
 
-// RUN: ( iree-compile %s --iree-hal-target-backends=vmvx | \
+// RUN: ( iree-compile %s \
+// RUN:     --iree-hal-target-device=local \
+// RUN:     --iree-hal-local-target-device-backends=vmvx | \
 // RUN: iree-run-module \
 // RUN:     --device=local-sync \
 // RUN:     --module=$IREE_BINARY_DIR/samples/custom_module/dynamic/module$IREE_DYLIB_EXT@create_custom_module \

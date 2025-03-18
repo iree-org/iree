@@ -80,6 +80,7 @@ iree_bytecode_module(
     src = "simple_mul.mlir",
     c_identifier = "iree_runtime_demo_simple_mul_module",
     flags = [
-        "--iree-hal-target-backends=vmvx",
+        "--iree-hal-target-device=local",
+        "--iree-hal-local-target-device-backends=vmvx",
     ],
 )

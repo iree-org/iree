@@ -84,7 +84,8 @@ iree-compile \
     --compile-mode=hal-executable \
     iree/hal/local/testdata/elementwise_mul.mlir \
     -o=elementwise_mul.so \
-    --iree-hal-target-backends=llvm-cpu \
+    --iree-hal-target-device=local \
+    --iree-hal-local-target-device-backends=llvm-cpu \
     --iree-llvmcpu-debug-symbols=false \
     --iree-llvmcpu-target-triple=x86_64-pc-linux-elf
 ```
@@ -117,7 +118,8 @@ iree-compile \
     --iree-input-type=stablehlo \
     iree/samples/simple_embedding/simple_embedding_test.mlir \
     -o=module.vmfb \
-    --iree-hal-target-backends=llvm-cpu \
+    --iree-hal-target-device=local \
+    --iree-hal-local-target-device-backends=llvm-cpu \
     --iree-llvmcpu-debug-symbols=false \
     --iree-llvmcpu-target-triple=x86_64-pc-linux-elf \
     --mlir-print-ir-after-all \

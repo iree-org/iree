@@ -210,7 +210,8 @@ else:
 
         def testExecuteStdPipeline(self):
             session = Session()
-            session.set_flags("--iree-hal-target-backends=vmvx")
+            session.set_flags("--iree-hal-target-device=local")
+            session.set_flags("--iree-hal-local-target-device-backends=vmvx")
             inv = session.invocation()
             source = Source.wrap_buffer(
                 session,
