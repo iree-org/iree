@@ -48,7 +48,7 @@ jobs:
             rocm-chip: gfx942
             backend: rocm
             sku: mi300
-            runs-on: linux-mi300-1gpu-benchmark-ossci-iree-org
+            runs-on: linux-mi300-1gpu-ossci-iree-org
           - name: amdgpu_rocm_mi308_gfx942
             rocm-chip: gfx942
             backend: rocm
