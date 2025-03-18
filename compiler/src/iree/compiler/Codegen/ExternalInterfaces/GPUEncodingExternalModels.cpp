@@ -449,7 +449,7 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
       return noPaddingAttr;
     }
 
-    // Bail out on matvec / vecmat problems.
+    // Bail out on matvec / vecmat and skinny matmul problems.
     {
       int64_t parallelDimSize = 1;
       ArrayRef<unsigned> parallelDims =
@@ -466,10 +466,11 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
         }
       }
 
-      static constexpr int64_t kMatVecThreshold = 16;
+      // TODO(#19897): Use `getMatmulNarrowDim`.
+      static constexpr int64_t kSkinnyMatmulThreshold = 64;
       if (!ShapedType::isDynamic(parallelDimSize) &&
-          parallelDimSize < kMatVecThreshold) {
-        // This matmul is more similar to a matvec, do not pad.
+          parallelDimSize < kSkinnyMatmulThreshold) {
+        // This matmul is skinny, do not pad.
         return noPaddingAttr;
       }
     }
