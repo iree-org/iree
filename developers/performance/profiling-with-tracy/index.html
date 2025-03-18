@@ -4265,6 +4265,13 @@ be forwarded.</p>
 </code></pre></div>
 <p>You can also pass <code>-p &lt;port&gt;</code> to the capture tool to override the default port
 to connect to, or use the Tracy GUI which scans other ports too.</p>
+<p>The <code>TRACY_PORT</code> environment variable can be used to change the port used by the
+client application. For example, to run <code>iree-benchmark-module</code> on port 1234:</p>
+<div class="highlight"><pre><span></span><code><span class="nv">TRACY_PORT</span><span class="o">=</span><span class="m">1234</span><span class="w"> </span>iree-benchmark-module<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--module<span class="o">=</span>out.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>...
+</code></pre></div>
 <h2 id="touring-the-tracy-profiler-ui"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1.5 1.75V13.5h13.75a.75.75 0 0 1 0 1.5H.75a.75.75 0 0 1-.75-.75V1.75a.75.75 0 0 1 1.5 0m14.28 2.53-5.25 5.25a.75.75 0 0 1-1.06 0L7 7.06 4.28 9.78a.75.75 0 0 1-1.042-.018.75.75 0 0 1-.018-1.042l3.25-3.25a.75.75 0 0 1 1.06 0L10 7.94l4.72-4.72a.75.75 0 0 1 1.042.018.75.75 0 0 1 .018 1.042"/></svg></span> Touring the Tracy profiler UI<a class="headerlink" href="#touring-the-tracy-profiler-ui" title="Permanent link">link</a></h2>
 <p>The initial view should look like this:</p>
 <p><img alt="Tracy initial view, normal case" src="https://gist.githubusercontent.com/bjacob/ff7dec20c1dfc7d0fc556cc7275bca9a/raw/fe4e22ca0301ebbfd537c47332a4a2c300a417b3/tracy_initial_view.jpeg" /></p>
