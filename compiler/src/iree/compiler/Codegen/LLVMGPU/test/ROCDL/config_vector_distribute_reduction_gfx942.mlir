@@ -37,13 +37,15 @@ func.func @attention_20x1x64x4096x64() {
 // CHECK:      decomposition_config =
 // CHECK-SAME:  pv_attrs =
 // CHECK-SAME:    #iree_gpu.lowering_config
-// CHECK-SAME:      subgroup_basis = {{\[}}[1, 1, 1, 1, 4], [0, 1, 3, 4]{{\]}}
-// CHECK-SAME:      thread_basis = {{\[}}[1, 1, 64, 1, 1], [0, 1, 3, 4]{{\]}}
+// CHECK-SAME:      subgroup_basis = {{\[}}[1, 1, 1, 1, 1], [0, 1, 3, 4]{{\]}}
+// CHECK-SAME:      thread = [0, 0, 0, 8]
+// CHECK-SAME:      thread_basis = {{\[}}[1, 1, 1, 1, 64], [1, 0, 4, 3]{{\]}}
 // CHECK-SAME:  qk_attrs =
 // CHECK-SAME:    #iree_gpu.lowering_config
-// CHECK-SAME:      subgroup_basis = {{\[}}[1, 1, 1, 1, 4], [0, 1, 2, 3]{{\]}}
-// CHECK-SAME:      thread_basis = {{\[}}[1, 1, 64, 1, 1], [0, 1, 2, 3]{{\]}}
+// CHECK-SAME:      subgroup_basis = {{\[}}[1, 1, 1, 1, 1], [0, 1, 2, 3]{{\]}}
+// CHECK-SAME:      thread = [0, 0, 8, 0]
+// CHECK-SAME:      thread_basis = {{\[}}[1, 1, 1, 1, 64], [1, 0, 3, 4]{{\]}}
 // CHECK-SAME:  lowering_config =
 // CHECK-SAME:    #iree_gpu.lowering_config
-// CHECK-SAME:      reduction = [0, 0, 0, 1, 0]
-// CHECK-SAME:      workgroup = [1, 0, 0, 0, 4]
+// CHECK-SAME:      partial_reduction = [0, 0, 0, 64, 0]
+// CHECK-SAME:      workgroup = [1, 1, 0, 0, 0]
