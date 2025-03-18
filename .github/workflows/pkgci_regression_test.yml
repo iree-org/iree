@@ -99,7 +99,7 @@ jobs:
           source ${VENV_DIR}/bin/activate
           # Set IREE_TEST_FILES based on matrix.name
           case "${{ matrix.name }}" in
-            "amdgpu_rocm_mi300_gfx942") IREE_TEST_FILES="/shark-cache/data/ireeregression-cache" ;;
+            "amdgpu_rocm_mi300_gfx942") IREE_TEST_FILES="/shark-cache/data/iree-regression-cache" ;;
             *) echo "No cache directory assigned for ${{ matrix.name }}" ;;
           esac
           if [[ -n "$IREE_TEST_FILES" ]]; then
