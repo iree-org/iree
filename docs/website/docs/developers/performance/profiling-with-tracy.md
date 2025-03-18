@@ -266,7 +266,7 @@ client application. For example, to run `iree-benchmark-module` on port 1234:
 TRACY_PORT=1234 iree-benchmark-module \
   --device=local-task \
   --module=out.vmfb \
-
+  ...
 ```
 
 ## :octicons-graph-16: Touring the Tracy profiler UI
