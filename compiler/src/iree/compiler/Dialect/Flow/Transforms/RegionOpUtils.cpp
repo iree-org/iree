@@ -779,6 +779,16 @@ static bool isScatterIndicesGenerator(Operation *op) {
   return false;
 }
 
+static bool hasExplicitNonFusableUsers(Operation *op) {
+  bool hasNonFusableUse = false;
+  for (Operation *user : op->getUsers()) {
+    if (isa<IREE::LinalgExt::LinalgFusionOpInterface>(user))
+      continue;
+    hasNonFusableUse |= isa<IREE::LinalgExt::ScanOp>(user);
+  }
+  return hasNonFusableUse;
+}
+
 /// Operations that are cloned into dispatch regions formed with other
 /// operations as roots.
 bool isCloneableIntoDispatchOp(Operation *op,
@@ -794,6 +804,11 @@ bool isCloneableIntoDispatchOp(Operation *op,
           tensor::EmptyOp, tensor::ExtractOp, tensor::ExtractSliceOp,
           complex::CreateOp, IREE::Encoding::UnsetEncodingOp>(op)) {
     return true;
+  }
+  // TODO: Tune the cases excluded through hasExplicitNonFusableUsers
+  // condition in a more targeted manner, then remove the condition.
+  if (isa<linalg::LinalgOp>(op) && hasExplicitNonFusableUsers(op)) {
+    return false;
   }
   if (LinalgExt::isBitExtendOp(op)) {
     return true;

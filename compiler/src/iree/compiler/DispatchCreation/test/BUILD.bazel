@@ -36,6 +36,7 @@ iree_lit_test_suite(
             "fold_unit_dims.mlir",
             "form_dispatch_regions.mlir",
             "form_dispatch_workgroups.mlir",
+            "dispatch_non_fusable.mlir",
             "form_scalar_dispatches.mlir",
             "form_split_reduction_dispatches.mlir",
             "fuse_encoding_ops_into_dispatch_regions.mlir",
