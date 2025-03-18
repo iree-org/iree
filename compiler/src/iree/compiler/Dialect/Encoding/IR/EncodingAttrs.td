@@ -56,6 +56,7 @@ def EncodingAttr :
     IREEEncoding_Attr<"Encoding", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
         "isSerialized",
+        "isIdentityLayout",
         "cloneWithLayouts",
         "calculateStorageSizeInBytes",
       ]>
@@ -149,8 +150,10 @@ def EncodingAttr :
 //===---------------------------------------------------------------------===//
 
 def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface,
-        ["calculateStorageSizeInBytes"]>
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+         "calculateStorageSizeInBytes",
+         "isIdentityLayout",
+        ]>
     ]> {
   let mnemonic = "pad_encoding_layout";
   let assemblyFormat = "`<` $padding `>`";
