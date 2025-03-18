@@ -231,14 +231,27 @@ void ConstExprAnalysis::expandToOpStep(
       valueInfo = addInfo(result);
 
     // Update the producers first as we might early-return below.
-    for (auto producer : opInfo.producers) {
-      ConstValueInfo *producerInfo = constInfoMap.lookup(producer);
-      if (!producerInfo) {
-        // Create an unanalyzed value info as a placeholder. The info might be
-        // analyzed later if we are interested in it.
-        producerInfo = addInfo(producer);
+    for (Value producer : opInfo.producers) {
+      if (ConstValueInfo *producerInfo = constInfoMap.lookup(producer)) {
+        valueInfo->producers.insert(producerInfo);
+        continue;
       }
+      // Create an unanalyzed value info as a placeholder. The info might be
+      // analyzed later if we are interested in it.
+      ConstValueInfo *producerInfo = addInfo(producer);
       valueInfo->producers.insert(producerInfo);
+      // If the producer is a multi-result operation, then add ConstValueInfo
+      // for all of the op's results. This initialization ensures that no ops
+      // will have a mix of results with and without ConstValueInfo.
+      Operation *producerOp = producer.getDefiningOp();
+      if (!producerOp) {
+        continue;
+      }
+      for (Value producerOpResult : producerOp->getResults()) {
+        if (!constInfoMap.lookup(producerOpResult)) {
+          (void)addInfo(producerOpResult);
+        }
+      }
     }
 
     if (!opInfo.isEligible) {
