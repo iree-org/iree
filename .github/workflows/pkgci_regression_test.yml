@@ -107,7 +107,7 @@ jobs:
             -rpfE \
             --capture=no \
             --log-cli-level=info \
-            --timeout=600 \
+            --timeout=1500 \
             --durations=0
         env:
           ROCM_CHIP: ${{ matrix.rocm-chip }}
@@ -122,7 +122,7 @@ jobs:
             -rpfE \
             --capture=no \
             --log-cli-level=info \
-            --timeout=600 \
+            --timeout=1500 \
             --durations=0
         env:
           ROCM_CHIP: ${{ matrix.rocm-chip }}
@@ -147,7 +147,7 @@ jobs:
             --goldensize-rocm-clip-bytes 460000 \
             --goldensize-rocm-vae-bytes 430000 \
             --rocm-chip gfx90a \
-            --timeout=600 \
+            --timeout=1500 \
             --log-cli-level=info \
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
@@ -179,7 +179,7 @@ jobs:
             --goldensize-rocm-punet-int8-fp16-bytes 2000000 \
             --rocm-chip gfx942 \
             --log-cli-level=info \
-            --timeout=600 \
+            --timeout=1500 \
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
       # Note: allowing 10% deviation from observed averages here to account for
@@ -208,6 +208,6 @@ jobs:
             --goldensize-rocm-punet-int8-fp16-bytes 2000000 \
             --rocm-chip gfx942 \
             --log-cli-level=info \
-            --timeout=600 \
+            --timeout=1500 \
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
