@@ -365,14 +365,14 @@ func.func @avoid_unit_range_distribute(
 
 // This just verifies that constant dim propagation works as expected after tiling.
 func.func @set_size_to_tilesize_when_divisible(
-    %arg0 : tensor<?x16x32x128xf16>, %arg1 : tensor<4096x32x28xf16>,
+    %arg0 : tensor<?x16x32x128xf16>, %arg1 : tensor<4096x32x128xf16>,
     %arg2 : tensor<?x16x4096xf16>) -> tensor<?x16x4096xf16> {
    %0 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>,
                        affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>,
                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>],
       iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]}
-      ins(%arg0, %arg1 : tensor<?x16x32x128xf16>, tensor<4096x32x28xf16>)
+      ins(%arg0, %arg1 : tensor<?x16x32x128xf16>, tensor<4096x32x128xf16>)
       outs(%arg2 : tensor<?x16x4096xf16>)
       attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 16, 128, 1, 128]]>} {
     ^bb0(%b0: f16, %b1: f16, %b2 : f16):
