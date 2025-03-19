@@ -70,6 +70,9 @@ public:
   // May fail if analysis cannot be completed due to unsupported or unknown IR.
   LogicalResult run();
 
+  // Prints the analysis results to |os|.
+  void print(llvm::raw_ostream &os);
+
   // Returns the analyzed resource usage of the |value| resource.
   // May return `Unknown` if analysis failed for the given value due to usage
   // that lead to indeterminate results (such as indirect access).

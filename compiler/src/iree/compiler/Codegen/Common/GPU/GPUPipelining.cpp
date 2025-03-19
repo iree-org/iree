@@ -37,20 +37,6 @@ constexpr StringLiteral kPipeliningFirstStage = "__pipelining_first_stage__";
 constexpr StringLiteral kPipeliningExtraBarrier =
     "__pipelining_extra_barrier__";
 
-/// Returns true if the given `memrefType` has the default numeric address space
-/// 0 or a HAL descriptor type address space.
-static bool hasDefaultOrHALAddressSpace(MemRefType memrefType) {
-  Attribute addrSpace = memrefType.getMemorySpace();
-  if (!addrSpace)
-    return true;
-  auto intAttr = llvm::dyn_cast<IntegerAttr>(addrSpace);
-  // Accept both default numeric address space and HAL descriptor type address
-  // space--the former is used by LLVMGPU while the latter is used by SPIR-V.
-  if (intAttr && intAttr.getInt() == 0)
-    return true;
-  return llvm::isa<IREE::HAL::DescriptorTypeAttr>(addrSpace);
-}
-
 /// Returns a new predicated operation to support unpeeled epilogue. Unpeeled
 /// epilogue needs to handle the last iterations within the mainloop which
 /// requires predicating operations, for e.g., OOB global memory access. This
@@ -231,7 +217,7 @@ static bool setPipeliningMarkers(scf::ForOp forOp, bool pipelineStoreStage) {
     if (!ld)
       continue;
     auto ldSrcType = llvm::cast<MemRefType>(ld.getSource().getType());
-    if (!hasDefaultOrHALAddressSpace(ldSrcType) || !ld->hasOneUse())
+    if (!hasGlobalMemoryAddressSpace(ldSrcType) || !ld->hasOneUse())
       continue;
     auto st = dyn_cast<vector::TransferWriteOp>(ld->use_begin()->getOwner());
     if (!st)
