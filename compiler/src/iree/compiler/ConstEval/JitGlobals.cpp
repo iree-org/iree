@@ -632,8 +632,8 @@ public:
     compileOptions->targetOptions.indexBits = 64;
     compileOptions->targetOptions.truncateUnsupportedFloats = false;
     compileOptions->inputOptions.demoteF64ToF32 = false;
-    if (requestedTargetDevice == "vmvx" || !hasRequestedTargetDevice) {
-      targetDevice = targetRegistry->getTargetDevice("vmvx");
+    if (!hasRequestedTargetDevice) {
+      targetDevice = targetRegistry->getTargetDevice("local");
     } else {
       targetDevice = targetRegistry->getTargetDevice(requestedTargetDevice);
     }

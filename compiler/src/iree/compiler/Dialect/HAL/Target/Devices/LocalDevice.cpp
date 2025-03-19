@@ -9,9 +9,6 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "llvm/Support/CommandLine.h"
 
-IREE_DEFINE_COMPILER_OPTION_FLAGS(
-    mlir::iree_compiler::IREE::HAL::LocalDevice::Options);
-
 namespace mlir::iree_compiler::IREE::HAL {
 
 void LocalDevice::Options::bindOptions(OptionsBinder &binder) {

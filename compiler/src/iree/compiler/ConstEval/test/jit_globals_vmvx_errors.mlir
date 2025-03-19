@@ -1,4 +1,11 @@
-// RUN: iree-opt --split-input-file --iree-consteval-jit-globals --iree-consteval-jit-target-device=vmvx --iree-consteval-jit-debug --verify-diagnostics %s | FileCheck %s
+// RUN: iree-opt %s \
+// RUN:     --split-input-file \
+// RUN:     --iree-consteval-jit-globals \
+// RUN:     --iree-consteval-jit-target-device=local \
+// RUN:     --iree-hal-local-host-device-backends=vmvx \
+// RUN:     --iree-consteval-jit-debug \
+// RUN:     --verify-diagnostics | \
+// RUN:     FileCheck %s
 
 // CHECK-LABEL: @eval_f16_tensor
 module @eval_f16_tensor {

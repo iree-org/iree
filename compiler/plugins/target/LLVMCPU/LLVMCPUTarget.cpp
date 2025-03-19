@@ -844,19 +844,6 @@ private:
 struct LLVMCPUSession
     : public PluginSession<LLVMCPUSession, LLVMCPUTargetCLOptions,
                            PluginActivationPolicy::DefaultActivated> {
-  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
-    // TODO(multi-device): move local device registration out.
-    // This exists here for backwards compat with the old
-    // iree-hal-target-backends flag that needs to look up the device by backend
-    // name.
-    // #hal.device.target<"llvm-cpu", ...
-    targets.add("llvm-cpu", [=]() {
-      LocalDevice::Options localDeviceOptions;
-      localDeviceOptions.defaultTargetBackends.push_back("llvm-cpu");
-      localDeviceOptions.defaultHostBackends.push_back("llvm-cpu");
-      return std::make_shared<LocalDevice>(localDeviceOptions);
-    });
-  }
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
     // #hal.executable.target<"llvm-cpu", ...
     targets.add("llvm-cpu", [=]() {
