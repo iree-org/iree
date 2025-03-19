@@ -31,11 +31,11 @@
         "--iree-opt-level=O3",
         "--iree-opt-const-eval=false",
         "--iree-hip-waves-per-eu=2",
-        "--iree-llvmgpu-enable-prefetch",
+        "--iree-llvmgpu-enable-prefetch=true",
         "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
         "--iree-codegen-llvmgpu-use-vector-distribution=true",
         "--iree-execution-model=async-external",
-        "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics{pad-target-type=conv})",
+        "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics)",
         "--iree-codegen-gpu-native-math-precision=true",
         "--iree-opt-data-tiling=false",
         "--iree-vm-target-truncate-unsupported-floats"

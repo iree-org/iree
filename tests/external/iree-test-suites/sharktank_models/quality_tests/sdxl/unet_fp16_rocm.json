@@ -30,11 +30,8 @@
     "compiler_flags": [
         "--iree-hal-target-backends=rocm",
         "--iree-opt-const-eval=false",
-        "--iree-opt-strip-assertions=true",
+        "--iree-opt-level=O3",
         "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
-        "--iree-opt-aggressively-propagate-transposes=true",
-        "--iree-opt-outer-dim-concat=true",
-        "--iree-opt-generalize-matmul=true",
         "--iree-vm-target-truncate-unsupported-floats",
         "--iree-llvmgpu-enable-prefetch=true",
         "--iree-opt-data-tiling=false",
