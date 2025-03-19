@@ -393,6 +393,11 @@ def HoistStaticallyBoundAllocationsPass :
   ];
 }
 
+def IREEBufferizeConstantsPass :
+    Pass<"iree-codegen-iree-bufferize-constants", ""> {
+  let summary = "Convert from arith.constant on tensors to buffers";
+}
+
 def IREEComprehensiveBufferizePass :
     InterfacePass<"iree-codegen-iree-comprehensive-bufferize", "mlir::FunctionOpInterface"> {
   let summary = "Convert from to Linalg ops on tensors to buffers";

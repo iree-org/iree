@@ -706,7 +706,7 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass(createCSEPass);
 
   // Handled tensor-type constants.
-  addConstantBufferizePasses(modulePassManager);
+  modulePassManager.addPass(createIREEBufferizeConstantsPass());
 
   FunctionLikeNest(modulePassManager)
       .addPass(createFoldTensorExtractOpPass)
