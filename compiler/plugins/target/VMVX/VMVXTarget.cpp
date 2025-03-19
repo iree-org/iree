@@ -194,29 +194,6 @@ private:
   const VMVXOptions &options;
 };
 
-class VMVXInlineTargetDevice final : public TargetDevice {
-public:
-  VMVXInlineTargetDevice() = default;
-
-  IREE::HAL::DeviceTargetAttr
-  getDefaultDeviceTarget(MLIRContext *context,
-                         const TargetRegistry &targetRegistry) const override {
-    Builder b(context);
-    auto configAttr = b.getDictionaryAttr({});
-
-    // If we had multiple target environments we would generate one target attr
-    // per environment, with each setting its own environment attribute.
-    SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
-    targetRegistry.getTargetBackend("vmvx-inline")
-        ->getDefaultExecutableTargets(context, "vmvx-inline", configAttr,
-                                      executableTargetAttrs);
-
-    return IREE::HAL::DeviceTargetAttr::get(context,
-                                            b.getStringAttr("vmvx-inline"),
-                                            configAttr, executableTargetAttrs);
-  }
-};
-
 class VMVXInlineTargetBackend final : public TargetBackend {
 public:
   VMVXInlineTargetBackend(const VMVXOptions &options) : options(options) {}
@@ -257,23 +234,6 @@ namespace {
 struct VMVXSession
     : public PluginSession<VMVXSession, VMVXOptions,
                            PluginActivationPolicy::DefaultActivated> {
-  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
-    // TODO(multi-device): move local device registration out.
-    // This exists here for backwards compat with the old
-    // iree-hal-target-backends flag that needs to look up the device by backend
-    // name.
-    // Note that the inline device does need to be special.
-    // #hal.device.target<"vmvx", ...
-    targets.add("vmvx", [=]() {
-      LocalDevice::Options localDeviceOptions;
-      localDeviceOptions.defaultTargetBackends.push_back("vmvx");
-      localDeviceOptions.defaultHostBackends.push_back("vmvx");
-      return std::make_shared<LocalDevice>(localDeviceOptions);
-    });
-    // #hal.device.target<"vmvx-inline", ...
-    targets.add("vmvx-inline",
-                [=]() { return std::make_shared<VMVXInlineTargetDevice>(); });
-  }
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
     // #hal.executable.target<"vmvx", ...
     targets.add("vmvx",

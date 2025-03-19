@@ -24,6 +24,10 @@ if(IREE_TARGET_BACKEND_LLVM_CPU)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/LLVMCPU target/LLVMCPU)
 endif()
 
+# NOTE: the local device target is always added as it is needed by any in- or
+# out-of-tree plugins that run on the local device.
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/Local target/Local)
+
 if(IREE_TARGET_BACKEND_METAL_SPIRV)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/MetalSPIRV target/MetalSPIRV)
 endif()
