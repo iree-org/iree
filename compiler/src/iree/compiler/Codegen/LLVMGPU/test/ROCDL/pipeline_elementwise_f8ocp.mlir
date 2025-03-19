@@ -48,6 +48,6 @@ hal.executable @ext_fp8_dispatch {
 // RDNA4-COUNT-16:     rocdl.cvt.f32.fp8 %{{.*}} : f32
 // RDNA4-COUNT-16:     rocdl.cvt.f32.bf8 %{{.*}} : f32
 //         RDNA4:     %[[ADD:.+]] = llvm.fadd %{{.*}}, %{{.*}} : vector<16xf32>
-//         RDNA4:     llvm.store %[[ADD]], %{{.*}} : vector<16xf32>, !llvm.ptr<1>
+//         RDNA4:     llvm.store %[[ADD]], %{{.*}} : vector<16xf32>, !llvm.ptr<7>
 
 // -----

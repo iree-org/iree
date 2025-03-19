@@ -48,7 +48,6 @@ jobs:
           #   numprocesses: 4
           #   runs-on:
           #     - self-hosted # must come first
-          #     - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
           #     - environment=prod
           #     - gpu # TODO(scotttodd): qualify further with vendor/model
           #     - os-family=Linux
@@ -57,7 +56,6 @@ jobs:
           #   numprocesses: 4
           #   runs-on:
           #     - self-hosted # must come first
-          #     - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
           #     - environment=prod
           #     - gpu # TODO(scotttodd): qualify further with vendor/model
           #     - os-family=Linux
@@ -92,7 +90,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: iree-org/iree-test-suites
-          ref: 56509666d185cdb99aafb4ed4d8532b8f3c54fa3
+          ref: fb8ebeea324dccce51af8e725008689cab745600
           path: iree-test-suites
       - name: Install ONNX ops test suite requirements
         run: |
@@ -175,7 +173,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: iree-org/iree-test-suites
-          ref: 56509666d185cdb99aafb4ed4d8532b8f3c54fa3
+          ref: fb8ebeea324dccce51af8e725008689cab745600
           path: iree-test-suites
       - name: Install ONNX models test suite requirements
         run: |

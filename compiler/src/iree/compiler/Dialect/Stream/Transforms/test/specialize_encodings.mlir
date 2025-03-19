@@ -102,15 +102,19 @@ util.func public @with_pad_encoding(%arg0: index, %arg1: index, %scalar_f32 : f3
   %1 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4160xf16, #encodingA>{} in !stream.resource<*>{%arg1}
   %2 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x1337xf16, #encodingA>{} in !stream.resource<*>{%arg1}
   %3 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4095xf16, #encodingA>{} in !stream.resource<*>{%arg1}
-  %4 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x4096xf16, #encodingA>{%arg0} in !stream.resource<*>{%arg1}
-  %5 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x?xf16, #encodingA>{%arg0, %arg1} in !stream.resource<*>{%arg1}
-  %6 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf16, #encodingB>{} in !stream.resource<*>{%arg1}
-  %7 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf16, #encodingC>{} in !stream.resource<*>{%arg1}
-  %8 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf16, #encodingD>{} in !stream.resource<*>{%arg1}
+  %4 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x250xf16, #encodingA>{} in !stream.resource<*>{%arg1}
+  %5 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<60x4096xf16, #encodingA>{} in !stream.resource<*>{%arg1}
+  %6 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<1x4096xf16, #encodingB>{} in !stream.resource<*>{%arg1}
+  %7 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x4096xf16, #encodingA>{%arg0} in !stream.resource<*>{%arg1}
+  %8 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x?xf16, #encodingA>{%arg0, %arg1} in !stream.resource<*>{%arg1}
+  %9 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf16, #encodingB>{} in !stream.resource<*>{%arg1}
+  %10 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf16, #encodingC>{} in !stream.resource<*>{%arg1}
+  %11 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf16, #encodingD>{} in !stream.resource<*>{%arg1}
   util.return
 }
 
 // CHECK-DAG: #[[$NO_PAD_LHS:.+]] = #iree_encoding.encoding<operand_index = 0 : index, {{.*}}, layouts = [#iree_encoding.pad_encoding_layout<[0, 0]>]
+// CHECK-DAG: #[[$NO_PAD_RHS:.+]] = #iree_encoding.encoding<operand_index = 1 : index, {{.*}}, layouts = [#iree_encoding.pad_encoding_layout<[0, 0]>]
 // CHECK-DAG: #[[$NO_PAD_OUT:.+]] = #iree_encoding.encoding<operand_index = 2 : index, {{.*}}, layouts = [#iree_encoding.pad_encoding_layout<[0, 0]>]
 // CHECK-DAG: #[[$PAD_LHS_0:.+]] =  #iree_encoding.encoding<operand_index = 0 : index, {{.*}}, layouts = [#iree_encoding.pad_encoding_layout<[0, 64]>]
 // CHECK-DAG: #[[$PAD_LHS_1:.+]] =  #iree_encoding.encoding<operand_index = 0 : index, {{.*}}, layouts = [#iree_encoding.pad_encoding_layout<[0, 7]>]
@@ -123,6 +127,9 @@ util.func public @with_pad_encoding(%arg0: index, %arg1: index, %scalar_f32 : f3
 // CHECK: stream.tensor.empty {{.*}} : tensor<4096x4160xf16, #[[$NO_PAD_LHS]]>
 // CHECK: stream.tensor.empty {{.*}} : tensor<4096x1337xf16, #[[$PAD_LHS_1]]>
 // CHECK: stream.tensor.empty {{.*}} : tensor<4096x4095xf16, #[[$PAD_LHS_2]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<4096x250xf16, #[[$NO_PAD_LHS]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<60x4096xf16, #[[$NO_PAD_LHS]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<1x4096xf16, #[[$NO_PAD_RHS]]>
 // CHECK: stream.tensor.empty {{.*}} : tensor<?x4096xf16, #[[$PAD_LHS_0]]>
 // CHECK: stream.tensor.empty {{.*}} : tensor<?x?xf16, #[[$NO_PAD_LHS]]>
 // CHECK: stream.tensor.empty {{.*}} : tensor<4096x4096xf16, #[[$PAD_RHS]]>
@@ -179,6 +186,51 @@ util.func public @tensor_fill_op(%arg0: f32, %arg1: !stream.resource<*>, %arg2: 
 // CHECK-LABEL: util.func public @tensor_fill_op
 // CHECK:         stream.tensor.fill on(#hal.device.affinity<@[[$DEVICE]]>)
 // CHECK-SAME:      f32 -> tensor<?x4xf32, #[[$ENCODING]]>
+
+// -----
+
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.unspecialized_encoding<123>}>
+#device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
+#encoding = #iree_encoding.testing_encoding<>
+util.global private @device_a = #device_target_local_0_
+util.func public @tensor_encode_op(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %0 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
+    %arg0 : tensor<?x?xf32>{%arg2, %arg3} in !stream.resource<*>{%arg1}
+    -> tensor<?x?xf32, #encoding>{%arg2, %arg3} in !stream.resource<*>{%arg1}
+  util.return
+}
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123, tensor<?x?xf32>>]>
+// CHECK:       #[[TARGET:.+]] = #hal.device.target
+// CHECK:       util.global private @[[$DEVICE:.+]] = #[[TARGET]]
+// CHECK-LABEL: util.func public @tensor_encode_op
+// CHECK:         stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE]]>)
+// CHECK-SAME:      -> tensor<?x?xf32, #[[$ENCODING]]>
+
+// -----
+
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.unspecialized_encoding<123>}>
+#device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
+#encoding0 = #iree_encoding.testing_encoding<>
+#encoding1 = #iree_encoding.unknown_encoding
+util.global private @device_a = #device_target_local_0_
+util.func public @tensor_encode_op_change_encoding(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %0 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
+    %arg0 : tensor<?x?xf32, #encoding0>{%arg2, %arg3} in !stream.resource<*>{%arg1}
+    -> tensor<?x?xf32, #encoding1>{%arg2, %arg3} in !stream.resource<*>{%arg1}
+  util.return
+}
+// CHECK-DAG:   #[[$ENCODING0:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123, tensor<?x?xf32>>]>
+// CHECK-DAG:   #[[$ENCODING1:.+]] = #iree_encoding.unknown_encoding
+// CHECK:       #[[TARGET:.+]] = #hal.device.target
+// CHECK:       util.global private @[[$DEVICE:.+]] = #[[TARGET]]
+// CHECK-LABEL: util.func public @tensor_encode_op_change_encoding
+// CHECK:         stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE]]>)
+// CHECK-SAME:      : tensor<?x?xf32, #[[$ENCODING0]]>
+// CHECK-SAME:      -> tensor<?x?xf32, #[[$ENCODING1]]>
 
 // -----
 

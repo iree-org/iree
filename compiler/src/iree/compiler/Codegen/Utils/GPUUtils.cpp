@@ -16,6 +16,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -910,6 +911,24 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
   }
   LDBG("unsupported shape for " << op->getName().getStringRef());
   return std::nullopt;
+}
+
+bool hasGlobalMemoryAddressSpace(MemRefType memrefType) {
+  Attribute addrSpace = memrefType.getMemorySpace();
+  if (!addrSpace)
+    return true;
+  auto intAttr = llvm::dyn_cast<IntegerAttr>(addrSpace);
+  // Accept both default numeric address space and HAL descriptor type address
+  // space--the former is used by LLVMGPU while the latter is used by SPIR-V.
+  if (intAttr && intAttr.getInt() == 0)
+    return true;
+  auto gpuAttr = llvm::dyn_cast<gpu::AddressSpaceAttr>(addrSpace);
+  if (gpuAttr && gpuAttr.getValue() == gpu::AddressSpace::Global)
+    return true;
+  auto amdgpuAttr = llvm::dyn_cast<amdgpu::AddressSpaceAttr>(addrSpace);
+  if (amdgpuAttr && amdgpuAttr.getValue() == amdgpu::AddressSpace::FatRawBuffer)
+    return true;
+  return llvm::isa<IREE::HAL::DescriptorTypeAttr>(addrSpace);
 }
 
 bool hasSharedMemoryAddressSpace(MemRefType memrefType) {

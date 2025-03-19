@@ -56,6 +56,18 @@ bool ConstExprAnalysis::ConstValueInfo::hasNonAnalyzedConsumer() const {
   return false;
 }
 
+void ConstExprAnalysis::tryExpandToUseOrUseParent(Operation *definingOp,
+                                                  Operation *useOp) {
+  if (definingOp->getParentOp() != useOp->getParentOp()) {
+    auto parentOp = useOp->getParentOp();
+    if (parentOp && definingOp->getParentOp() == parentOp->getParentOp()) {
+      expandToOp(parentOp);
+    }
+    return;
+  }
+  expandToOp(useOp);
+}
+
 ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp)
     : asmState(rootOp,
                OpPrintingFlags().elideLargeElementsAttrs().skipRegions()) {
@@ -111,12 +123,8 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp)
   // its consumers.
   for (auto it : constantRoots) {
     Operation *constOp = it.second;
-    for (auto &use : constOp->getUses()) {
-      Operation *useOp = use.getOwner();
-      // For now ignore operations that are not in the same scope.
-      if (constOp->getParentOp() != useOp->getParentOp())
-        continue;
-      expandToOp(useOp);
+    for (Operation *user : constOp->getUsers()) {
+      tryExpandToUseOrUseParent(constOp, user);
     }
   }
 
@@ -173,19 +181,8 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp)
         // And expand the frontier.
         Operation *definingOp = info->constValue.getDefiningOp();
         assert(definingOp && "const values should have defining op");
-        for (auto &use : definingOp->getUses()) {
-          Operation *useOp = use.getOwner();
-          // Skip expanding of ops within dispatch or nested regions.
-          if (definingOp->getParentOp() != useOp->getParentOp()) {
-            // check if we can expand to the parent op instead
-            if (auto parentOp = useOp->getParentOp()) {
-              if (definingOp->getParentOp() == parentOp->getParentOp()) {
-                expandToOp(parentOp);
-              }
-            }
-            continue;
-          }
-          expandToOp(useOp);
+        for (Operation *user : definingOp->getUsers()) {
+          tryExpandToUseOrUseParent(definingOp, user);
         }
       }
     }
@@ -231,14 +228,27 @@ void ConstExprAnalysis::expandToOpStep(
       valueInfo = addInfo(result);
 
     // Update the producers first as we might early-return below.
-    for (auto producer : opInfo.producers) {
-      ConstValueInfo *producerInfo = constInfoMap.lookup(producer);
-      if (!producerInfo) {
-        // Create an unanalyzed value info as a placeholder. The info might be
-        // analyzed later if we are interested in it.
-        producerInfo = addInfo(producer);
+    for (Value producer : opInfo.producers) {
+      if (ConstValueInfo *producerInfo = constInfoMap.lookup(producer)) {
+        valueInfo->producers.insert(producerInfo);
+        continue;
       }
+      // Create an unanalyzed value info as a placeholder. The info might be
+      // analyzed later if we are interested in it.
+      ConstValueInfo *producerInfo = addInfo(producer);
       valueInfo->producers.insert(producerInfo);
+      // If the producer is a multi-result operation, then add ConstValueInfo
+      // for all of the op's results. This initialization ensures that no ops
+      // will have a mix of results with and without ConstValueInfo.
+      Operation *producerOp = producer.getDefiningOp();
+      if (!producerOp) {
+        continue;
+      }
+      for (Value producerOpResult : producerOp->getResults()) {
+        if (!constInfoMap.lookup(producerOpResult)) {
+          (void)addInfo(producerOpResult);
+        }
+      }
     }
 
     if (!opInfo.isEligible) {

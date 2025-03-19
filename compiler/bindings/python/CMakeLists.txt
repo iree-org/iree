@@ -233,6 +233,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.transform.extras
   MLIRPythonSources.Dialects.transform.interpreter
   MLIRPythonSources.Dialects.vector
+  MLIRPythonSources.Dialects.vector_transform
 
   # iree-dialects project.
   IREEDialectsPythonSources

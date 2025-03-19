@@ -216,8 +216,7 @@ public:
         roundDimsTo[1] = llvm::PowerOf2Ceil(narrowDim.size);
       }
       auto encoding = EncodingAttr::get(linalgOp.getContext(), operandIndex,
-                                        opType, elemTypes, maps,
-                                        /*bcastMap=*/std::nullopt, roundDimsTo);
+                                        opType, elemTypes, maps, roundDimsTo);
       return setEncoding(rewriter, loc, src, encoding);
     };
     Value encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);

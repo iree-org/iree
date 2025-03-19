@@ -48,6 +48,6 @@ hal.executable @ext_fp8_dispatch {
 // CDNA3-COUNT-16:     rocdl.cvt.f32.fp8 %{{.*}} : f32
 // CDNA3-COUNT-16:     rocdl.cvt.f32.bf8 %{{.*}} : f32
 //         CDNA3:     %[[ADD:.+]] = llvm.fadd %{{.*}}, %{{.*}} : vector<16xf32>
-//         CDNA3:     llvm.store %[[ADD]], %{{.*}} : vector<16xf32>, !llvm.ptr<1>
+//         CDNA3:     llvm.store %[[ADD]], %{{.*}} : vector<16xf32>, !llvm.ptr<7>
 
 // -----

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <optional>
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -333,18 +334,25 @@ struct PropagateClonableOps : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
   LogicalResult matchAndRewrite(Op cloneOp,
                                 PatternRewriter &rewriter) const override {
-    if (cloneOp.use_empty())
+    if (cloneOp.use_empty()) {
+      // No consumers to clone for.
       return failure();
+    }
     auto sourceOp =
         cloneOp.getSource()
             .template getDefiningOp<IREE::Stream::StreamableOpInterface>();
-    if (!sourceOp || !sourceOp.preferCloneToConsumers())
+    if (!sourceOp || !sourceOp.preferCloneToConsumers()) {
+      // Only look at cloneable producer ops.
       return failure();
+    }
     for (auto &use :
          llvm::make_early_inc_range(cloneOp.getResult().getUses())) {
+      auto result = cast<OpResult>(use.get());
       rewriter.setInsertionPoint(use.getOwner());
       auto clonedOp = rewriter.clone(*sourceOp);
-      use.set(clonedOp->getResult(0));
+      auto clonedResult = clonedOp->getResult(result.getResultNumber());
+      clonedResult.setType(use.get().getType());
+      use.set(clonedResult);
     }
     if (cloneOp.use_empty()) {
       rewriter.eraseOp(cloneOp);
@@ -1294,6 +1302,37 @@ void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
   //                 (if not tied block/fn arguments)
   results.insert<PropagateClonableOps<TensorCloneOp>>(context);
   results.insert<ElideUnneededTensorClones>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.tensor.encode
+//===----------------------------------------------------------------------===//
+
+OpFoldResult TensorEncodeOp::fold(FoldAdaptor adaptor) {
+  if (adaptor.getSourceEncoding() == adaptor.getResultEncoding()) {
+    return getSource();
+  }
+  auto sourceType = dyn_cast<RankedTensorType>(adaptor.getSourceEncoding());
+  auto resultType = dyn_cast<RankedTensorType>(adaptor.getResultEncoding());
+  if (!sourceType || !resultType) {
+    return {};
+  }
+  auto isIdentityTensorEncoding = [](RankedTensorType type) -> bool {
+    if (!type.getEncoding()) {
+      return true;
+    }
+    IREE::Encoding::SerializableEncodingAttrInterface attr =
+        IREE::Encoding::getSerializableEncodingAttrInterface(type);
+    if (!attr) {
+      return false;
+    }
+    return attr.isIdentityLayout();
+  };
+  if (!isIdentityTensorEncoding(sourceType) ||
+      !isIdentityTensorEncoding(resultType)) {
+    return {};
+  }
+  return getSource();
 }
 
 //===----------------------------------------------------------------------===//
