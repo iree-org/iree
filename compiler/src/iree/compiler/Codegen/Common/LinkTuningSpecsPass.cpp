@@ -172,22 +172,37 @@ static TuningSpecsToMerge collectTuningSpecsToMerge(ModuleOp module) {
 }
 
 // Renames a `NamedSequenceOp` to resolve name conflicts caused by merging
-// tuning specs, moves it to the top-level module, and updates its occurrences
-// in corresponding `ForeachMatchOp` operations.
+// tuning specs.
 static void updateNamedSequenceOp(
-    NamedSequenceOp op, ModuleOp module, OpBuilder &builder,
-    llvm::StringMap<unsigned> &specNameCounts,
-    llvm::DenseMap<NamedSequenceOp, ForeachMatchOp> &namedSequenceToUser) {
+    NamedSequenceOp op, OpBuilder &builder,
+    llvm::DenseMap<NamedSequenceOp, ForeachMatchOp> &namedSequenceToUser,
+    llvm::DenseMap<ModuleOp, std::string> &unnamedModuleNames,
+    unsigned &unnamedModuleCounter) {
   StringRef specName = op.getSymName();
-  std::string newSpecName = getUniqueSpecName(specName, specNameCounts);
+  ModuleOp parentModule = op->getParentOfType<ModuleOp>();
+  assert(parentModule);
+  StringAttr parentSymbol = parentModule.getSymNameAttr();
+  std::string moduleName;
+  if (parentSymbol) {
+    moduleName = parentSymbol.getValue().str();
+  } else {
+    if (unnamedModuleNames.contains(parentModule)) {
+      moduleName = unnamedModuleNames[parentModule];
+    } else {
+      std::string newModuleName =
+          llvm::formatv("m{}", unnamedModuleCounter).str();
+      ++unnamedModuleCounter;
+      unnamedModuleNames[parentModule] = newModuleName;
+      moduleName = newModuleName;
+    }
+  }
+
+  std::string newSpecName = llvm::formatv("{}_{}", moduleName, specName).str();
   op.setSymName(newSpecName);
 
-  // Skip updating ForeachMatchOp if the NamedSequenceOp is not used in it
-  // or its name has not changed.
-  if (!namedSequenceToUser.contains(op) || newSpecName == specName) {
-    op.getOperation()->moveBefore(module.getBody(), module.getBody()->end());
+  // Skip updating ForeachMatchOp if the NamedSequenceOp is not used in it.
+  if (!namedSequenceToUser.contains(op))
     return;
-  }
 
   ForeachMatchOp foreachMatchOp = namedSequenceToUser[op];
 
@@ -215,8 +230,37 @@ static void updateNamedSequenceOp(
   // Apply the updated matchers and actions.
   foreachMatchOp.setMatchersAttr(builder.getArrayAttr(updatedMatchers));
   foreachMatchOp.setActionsAttr(builder.getArrayAttr(updatedActions));
+}
 
-  op.getOperation()->moveBefore(module.getBody(), module.getBody()->end());
+static void resolveAndMoveNamedSequenceOps(
+    SmallVector<NamedSequenceOp> &namedSequenceOpsToMove, ModuleOp module,
+    OpBuilder &builder,
+    llvm::DenseMap<NamedSequenceOp, ForeachMatchOp> &namedSequenceToUser) {
+  llvm::DenseSet<StringRef> seenNames;
+  SmallVector<NamedSequenceOp> nameConflictOps;
+
+  // Detect name conflicts across named sequence ops from differnt tuning specs.
+  for (NamedSequenceOp op : namedSequenceOpsToMove) {
+    StringRef name = op.getName();
+    if (!seenNames.insert(name).second) {
+      nameConflictOps.push_back(op);
+    }
+  }
+
+  // Update conflicted named sequence ops.
+  if (!nameConflictOps.empty()) {
+    llvm::DenseMap<ModuleOp, std::string> unnamedModuleNames;
+    unsigned unnamedModuleCounter = 0;
+    for (NamedSequenceOp op : nameConflictOps) {
+      updateNamedSequenceOp(op, builder, namedSequenceToUser,
+                            unnamedModuleNames, unnamedModuleCounter);
+    }
+  }
+
+  // Move all named sequence ops to the top-level module.
+  for (NamedSequenceOp op : namedSequenceOpsToMove) {
+    op.getOperation()->moveBefore(module.getBody(), module.getBody()->end());
+  }
 }
 
 // Retrieves the unique `ForeachMatchOp` inside the given `__kernel_config`
@@ -230,10 +274,10 @@ getForeachMatchOpFromKernelConfig(NamedSequenceOp namedSequenceOp) {
          "and attribute `iree_codegen.tuning_spec_entrypoint`.");
 
   auto foreachMatchOps = namedSequenceOp.getOps<ForeachMatchOp>();
-  assert(std::distance(foreachMatchOps.begin(), foreachMatchOps.end()) == 1 &&
+  assert(hasSingleElement(foreachMatchOps) &&
          "__kernel_config op should contain exactly one ForeachMatchOp.");
 
-  return *foreachMatchOps.begin();
+  return getSingleElement(foreachMatchOps);
 }
 
 static NamedSequenceOp createKernelConfigOp(OpBuilder &builder, Location loc,
@@ -309,7 +353,12 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
     assert(parentModule);
     StringAttr parentSymbol = parentModule.getSymNameAttr();
     assert(parentSymbol);
-    spec.setSymName(getUniqueSpecName(spec.getSymName(), specNameCounts));
+    StringRef specName = spec.getSymName();
+    unsigned specNameSeenCount = specNameCounts[specName]++;
+    if (specNameSeenCount > 0) {
+      spec.setSymName(
+          llvm::formatv("{}_{}", specName, specNameSeenCount).str());
+    }
 
     auto symbol = SymbolRefAttr::get(
         parentSymbol, FlatSymbolRefAttr::get(spec.getSymNameAttr()));
@@ -346,11 +395,8 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
 
   // Step 2-a: Make sure the name sequence names are unique, and then move
   // collected NamedSequenceOps to the top-level module.
-  llvm::StringMap<unsigned> specNameCounts;
-  for (NamedSequenceOp op : namedSequenceOpsToMove) {
-    updateNamedSequenceOp(op, module, builder, specNameCounts,
-                          namedSequenceToUser);
-  }
+  resolveAndMoveNamedSequenceOps(namedSequenceOpsToMove, module, builder,
+                                 namedSequenceToUser);
 
   // Step 2-b: Create a new NamedSequenceOp `__kernel_config` in the top-level
   // module.
