@@ -54,6 +54,20 @@ func.func @load_scalar_from_memref(%input: memref<4x8xf32>, %row: index, %col: i
 
 // -----
 
+func.func @load_scalar_from_memref_static_dim_2(%input: memref<4x8xf32, strided<[8, 12], offset: 100>>, %row: index, %col: index, %value: f32) {
+  memref.store %value, %input[%row, %col] : memref<4x8xf32, strided<[8, 12], offset: 100>>
+  return
+}
+
+// -----
+
+func.func @store_scalar_from_memref_dynamic_dim_2(%input: memref<4x8xf32, strided<[?, ?], offset: ?>>, %row: index, %col: index, %value: f32) {
+  memref.store %value, %input[%row, %col] : memref<4x8xf32, strided<[?, ?], offset: ?>>
+  return
+}
+
+// -----
+
 // TODO: change to support vector.load 
 func.func @load_vector_from_memref(%input: memref<4x8xf32>) -> vector<8xf32> {
   %c0 = arith.constant 0 : index
