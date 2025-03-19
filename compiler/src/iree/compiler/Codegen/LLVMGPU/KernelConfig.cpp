@@ -265,6 +265,7 @@ static CodeGenPipeline getTensorCorePipeline(Type elementType) {
   };
   return codegenPipeline;
 }
+
 //====---------------------------------------------------------------------===//
 // Vector Distribution Reduction Pipeline Configuration
 //====---------------------------------------------------------------------===//
@@ -272,14 +273,12 @@ static CodeGenPipeline getTensorCorePipeline(Type elementType) {
 /// Check if `op` is a linalg.reduce or a linalg.generic that has at least one
 /// reduction iterator.
 static bool hasReductionIterator(linalg::LinalgOp &op) {
-  return isa<linalg::ReduceOp>(op) ||
-         (isa<linalg::GenericOp>(op) &&
-          llvm::any_of(op.getIteratorTypesArray(),
-                       linalg::isReductionIterator));
+  return isa<linalg::ReduceOp, linalg::GenericOp>(op) &&
+         llvm::any_of(op.getIteratorTypesArray(), linalg::isReductionIterator);
 }
 
 // Get the bitwidth of the operation.
-static llvm::FailureOr<int64_t> getBitWidth(linalg::LinalgOp op) {
+static FailureOr<int64_t> getBitWidth(linalg::LinalgOp op) {
 
   Value init = op.getDpsInitOperand(0)->get();
   Value src = op.getDpsInputOperand(0)->get();
@@ -311,8 +310,8 @@ static llvm::FailureOr<int64_t> getBitWidth(linalg::LinalgOp op) {
 
 /// The kernel config is for a single reduction op within a
 /// dispatch. The reduction op shouldn't have any consumer
-/// because that may introduce new shared dimensions and the
-/// distribution analysis will fail. The lowering config is
+/// because that may introduce new dimensions and the
+/// vector distribution analysis might fail. The lowering config is
 /// only attached to the reduction op for now.
 /// TODO(pashu123): Analyze the shared parallel and reduction
 /// dimensions within a dispatch. Based on the analysis try to
@@ -326,7 +325,8 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   int64_t countReduction = 0;
 
-  // TODO(pashu123): Remove this check and allow multiple reductions.
+  // TODO(pashu123): Remove this check and allow multiple reductions in a single
+  // dispatch.
   WalkResult walkResult = entryPoint.walk([&](Operation *op) {
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
       if (hasReductionIterator(linalgOp)) {
@@ -384,16 +384,21 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> threadTileSizes(op.getNumLoops(), 0);
   SmallVector<int64_t> partialReductionTileSizes(op.getNumLoops(), 0);
   SmallVector<int64_t> threadCounts(op.getNumLoops(), 1);
-  SmallVector<int64_t> subGroupCounts(op.getNumLoops(), 1);
+  SmallVector<int64_t> subgroupCounts(op.getNumLoops(), 1);
   SmallVector<int64_t> mapping(op.getNumLoops());
   std::iota(mapping.begin(), mapping.end(), 0);
 
   int64_t lastReductionDim = reductionDims.back();
 
+  // Set the workgroup size to 1 for all parallel dimensions.
   for (int64_t dim : parallelDims) {
     workgroupTileSizes[dim] = 1;
   }
 
+  // Set the threadTileSizes to 1 and partialReductionTileSizes to 1 for all
+  // reduction dimensions.
+  // We will later modify the threadTileSizes and partialReductionTileSizes for
+  // the last reduction dimension.
   for (int64_t dim : reductionDims) {
     threadTileSizes[dim] = 1;
     partialReductionTileSizes[dim] = 1;
@@ -410,6 +415,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       break;
     }
   }
+
   if (subgroupSize == 0)
     return failure();
 
@@ -422,17 +428,22 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   const unsigned largestLoadSizeInBits =
       maxLoadBits.has_value() ? *maxLoadBits : 128;
 
+  int64_t lastDimReductionSize = bounds[reductionDims.back()];
+
+  // The number of vector loads per thread.
   int64_t threadLoads = largestLoadSizeInBits / *bitWidth;
-  if (reductionSize % threadLoads != 0)
+
+  // TODO: This is a temporary heuristic to ensure that the last dimension is
+  // divisible by the number of vector loads per thread.
+  if (lastDimReductionSize % threadLoads != 0)
     return failure();
 
-  int64_t lastDimSize = bounds[reductionDims.back()];
+  // The partial reduction would be no. of lanes (i.e., subgroup size) * #vector
+  // loads.
   int64_t partialReductionSize = subgroupSize * threadLoads;
 
-  while (lastDimSize % partialReductionSize != 0)
+  while (lastDimReductionSize % partialReductionSize != 0)
     partialReductionSize >>= 1;
-
-  threadLoads = std::min(lastDimSize, threadLoads);
 
   int64_t threadBasis = partialReductionSize / threadLoads;
 
@@ -442,35 +453,27 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   auto context = op.getContext();
   Builder b(context);
-  SmallVector<NamedAttribute, 1> attrs;
 
   ArrayAttr subgroupBasisAttr = b.getArrayAttr(
-      {b.getI64ArrayAttr(subGroupCounts), b.getI64ArrayAttr(mapping)});
-
+      {b.getI64ArrayAttr(subgroupCounts), b.getI64ArrayAttr(mapping)});
   ArrayAttr threadBasisAttr = b.getArrayAttr(
       {b.getI64ArrayAttr(threadCounts), b.getI64ArrayAttr(mapping)});
 
-  attrs.emplace_back(b.getStringAttr("workgroup"),
-                     b.getI64ArrayAttr(workgroupTileSizes));
-  attrs.emplace_back(b.getStringAttr("partial_reduction"),
-                     b.getI64ArrayAttr(partialReductionTileSizes));
-  attrs.emplace_back(b.getStringAttr("thread"),
-                     b.getI64ArrayAttr(threadTileSizes));
-  attrs.emplace_back(b.getNamedAttr("thread_basis", threadBasisAttr));
-  attrs.emplace_back(b.getNamedAttr("subgroup_basis", subgroupBasisAttr));
-  auto configDict = b.getDictionaryAttr(attrs);
+  SmallVector<NamedAttribute, 5> configAttrs = {
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+      NamedAttribute("partial_reduction",
+                     b.getI64ArrayAttr(partialReductionTileSizes)),
+      NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes)),
+      NamedAttribute("thread_basis", threadBasisAttr),
+      NamedAttribute("subgroup_basis", subgroupBasisAttr)};
+
+  auto configDict = b.getDictionaryAttr(configAttrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
-  SmallVector<NamedAttribute, 1> pipelineAttrs;
-  auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
-      context, /*prefetchSharedMemory=*/false,
-      /*no_reduce_shared_memory_bank_conflicts=*/true,
-      /*use_igemm_convolution=*/false,
-      /*reorder_workgroups_strategy=*/std::nullopt);
+  auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(context);
+  SmallVector<NamedAttribute, 1> pipelineAttrs = {NamedAttribute(
+      IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName(), pipelineOptions)};
 
-  pipelineAttrs.emplace_back(
-      b.getStringAttr(IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
-      pipelineOptions);
   auto pipelineConfig = b.getDictionaryAttr(pipelineAttrs);
 
   return setOpConfigAndEntryPointFnTranslation(
@@ -2735,7 +2738,7 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     if (clGPUTestVectorDistributeOnReduction) {
       if (succeeded(setReductionVectorDistributionConfig(target, entryPointFn,
                                                          linalgOp))) {
-        LDBG("Vector distribute on  Generics with right config propagation.");
+        LDBG("Vector Distribution Subgroup Reduction Config");
         return success();
       }
     }

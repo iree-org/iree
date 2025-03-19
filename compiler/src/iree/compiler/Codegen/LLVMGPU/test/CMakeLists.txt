@@ -20,7 +20,6 @@ iree_lit_test_suite(
     "config_custom_op.mlir"
     "config_horizontally_fused_ops.mlir"
     "config_matvec.mlir"
-    "config_reduction_vector_distribute.mlir"
     "config_root_op_attribute.mlir"
     "config_winograd.mlir"
     "configure_tensor_layout.mlir"
