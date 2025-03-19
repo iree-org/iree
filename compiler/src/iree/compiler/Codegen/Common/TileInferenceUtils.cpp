@@ -70,7 +70,10 @@ inferWorkgroupTileMultiplesFromPackUnPack(
     //  - We have the innerDimPos, which is an index in the unpermuted tensor,
     //    so we need a mapping from unpermuted tensor indices to the permuted
     //    tensor indices, which is the inverse of outerDimsPerm.
-    int64_t outerTileIdx = invertPermutationVector(op.getOuterDimsPerm())[pos];
+    ArrayRef<int64_t> outerDimsPerm = op.getOuterDimsPerm();
+    int64_t outerTileIdx = outerDimsPerm.empty()
+                               ? pos
+                               : invertPermutationVector(outerDimsPerm)[pos];
     int64_t innerTileIdx = i + innerTiles.size();
     // Compute the LCM with the initial multiples for both the inner tile and
     // the corresponding outer tile. The multiples for the packedMultiples will
@@ -362,6 +365,11 @@ static SmallVector<int64_t> inferUseWorkgroupTileMultiples(OpOperand *use) {
 SmallVector<int64_t> getWorkgroupSizeMultiples(TilingInterface tilingOp) {
   LDBG("Computing workgroup tile size multiples for: "
        << *tilingOp.getOperation());
+  if (auto packOp = dyn_cast<linalg::PackOp>(tilingOp.getOperation())) {
+    // We do not expect to find multiple pack/unpack ops in the same dispatch
+    // region, so we can simply return the multiples for the given `packOp`.
+    return inferWorkgroupTileMultiplesFromPackUnPack(packOp).second;
+  }
   auto linalgOp = dyn_cast<linalg::LinalgOp>(tilingOp.getOperation());
   if (!linalgOp) {
     LDBG("Only LinalgOp is implemented. Defaulting to all 1 multiples.");
