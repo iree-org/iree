@@ -132,6 +132,18 @@
     "rtol": 0
   },
   {
+    "op": "erfc",
+    "type": "f32",
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
+  },
+  {
+    "op": "erfc",
+    "type": "f16",
+    "atol": 0,
+    "rtol": 0
+  },
+  {
     "op": "exp",
     "type": "f32",
     "atol": 1.0e-06,
@@ -187,6 +199,18 @@
   },
   {
     "op": "log",
+    "type": "f16",
+    "atol": 0,
+    "rtol": 0
+  },
+  {
+    "op": "log10",
+    "type": "f32",
+    "atol": 1.2e-07,
+    "rtol": 1.2e-07
+  },
+  {
+    "op": "log10",
     "type": "f16",
     "atol": 0,
     "rtol": 0
@@ -307,6 +331,18 @@
   },
   {
     "op": "tanh",
+    "type": "f16",
+    "atol": 0,
+    "rtol": 0
+  },
+  {
+    "op": "trunc",
+    "type": "f32",
+    "atol": 0,
+    "rtol": 0
+  },
+  {
+    "op": "trunc",
     "type": "f16",
     "atol": 0,
     "rtol": 0

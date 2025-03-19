@@ -135,6 +135,11 @@
     "rtol": 1.0e-04
   },
   {
+    "op": "erfc",
+    "disabled": true,
+    "comment": "TODO(#20164): compilation failure"
+  },
+  {
     "op": "exp",
     "type": "f32",
     "atol": 1.0e-06,
@@ -193,6 +198,11 @@
     "type": "f16",
     "atol": 1.0e-04,
     "rtol": 1.0e-04
+  },
+  {
+    "op": "log10",
+    "disabled": true,
+    "comment": "TODO(#20165): linking failure"
   },
   {
     "op": "log1p",
@@ -340,5 +350,10 @@
     "type": "f16",
     "atol": 1.0e-03,
     "rtol": 1.0e-02
+  },
+  {
+    "op": "trunc",
+    "disabled": true,
+    "comment": "TODO(#20165): linking failure"
   }
 ]
