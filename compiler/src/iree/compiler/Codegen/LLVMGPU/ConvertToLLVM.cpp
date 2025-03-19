@@ -132,10 +132,11 @@ struct ScalarizeMathOp : public OpRewritePattern<MathOpTy> {
   }
 };
 
-struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
-  using OpRewritePattern<memref::AllocOp>::OpRewritePattern;
+template <typename AllocTy>
+struct ConvertSharedMemAllocOp : public OpRewritePattern<AllocTy> {
+  using OpRewritePattern<AllocTy>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(memref::AllocOp allocOp,
+  LogicalResult matchAndRewrite(AllocTy allocOp,
                                 PatternRewriter &rewriter) const override {
     if (!hasSharedMemoryAddressSpace(allocOp.getType()))
       return failure();
@@ -155,7 +156,7 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
         alignement =
             shapeType.getNumElements() * shapeType.getElementTypeBitWidth() / 8;
       else if (elType.isIndex()) {
-        auto mod = allocOp->getParentOfType<ModuleOp>();
+        auto mod = allocOp->template getParentOfType<ModuleOp>();
         LowerToLLVMOptions options(mod.getContext(), DataLayout(mod));
         alignement = options.getIndexBitwidth() / 8;
       } else
@@ -163,8 +164,9 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
     }
     // In CUDA workgroup memory is represented by a global variable.
     MemRefType allocType = allocOp.getType();
-    auto funcOp = allocOp->getParentOfType<mlir::FunctionOpInterface>();
-    auto moduleOp = funcOp->getParentOfType<ModuleOp>();
+    auto funcOp =
+        allocOp->template getParentOfType<mlir::FunctionOpInterface>();
+    auto moduleOp = funcOp->template getParentOfType<ModuleOp>();
     SymbolTable symbolTable(moduleOp);
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPoint(&moduleOp.front());
@@ -570,7 +572,9 @@ void populateScalarizeMathOps(RewritePatternSet &patterns) {
 }
 
 void populateConvertSharedMemoryAllocOps(RewritePatternSet &patterns) {
-  patterns.add<ConvertSharedMemAllocOp>(patterns.getContext());
+  patterns.add<ConvertSharedMemAllocOp<memref::AllocOp>,
+               ConvertSharedMemAllocOp<memref::AllocaOp>>(
+      patterns.getContext());
 }
 
 void populateLowerHALInterfaceOp(RewritePatternSet &patterns) {

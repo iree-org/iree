@@ -121,10 +121,12 @@ void analyseAllocsForPacking(mlir::FunctionOpInterface funcOp,
                              SmallVector<AliasGroup> &aliasGroups);
 
 /// Pack groups of allocations into a unique large i8 allocation and use
-/// memref.view to separate the indivudual allocations. This allows re-using
+/// memref.view to separate the individual allocations. This allows re-using
 /// memory across alias groups.
 void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
                 ArrayRef<AliasGroup> aliasGroups);
+void packAllocas(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
+                 ArrayRef<AliasGroup> aliasGroups);
 
 /// Lower the workgroup count region for the default code-generation path in
 /// IREE. Given the list `workgroupCount` (fastest varying dimension innermost)
