@@ -72,7 +72,6 @@ builtin.module @uninitialized attributes {
   util.tensor = #util.uninitialized : tensor<4xf32>
 } {}
 
-
 // -----
 
 // CHECK-LABEL: @preprocessing_pipeline
