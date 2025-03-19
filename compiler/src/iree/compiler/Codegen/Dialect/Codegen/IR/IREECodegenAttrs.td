@@ -46,18 +46,16 @@ def LLVMGPU_TransposeSharedMem
     : I32EnumAttrCase<"LLVMGPUTransposeSharedMem", 105>;
 def LLVMGPU_WarpReduction
     : I32EnumAttrCase<"LLVMGPUWarpReduction", 106>;
-def LLVMGPU_PackUnPack
-    : I32EnumAttrCase<"LLVMGPUPackUnPack", 107>;
 def LLVMGPU_MatmulTensorCoreMmaSync
-    : I32EnumAttrCase<"LLVMGPUMatmulTensorCoreMmaSync", 108>;
+    : I32EnumAttrCase<"LLVMGPUMatmulTensorCoreMmaSync", 107>;
 def LLVMGPU_VectorDistribute
-    : I32EnumAttrCase<"LLVMGPUVectorDistribute", 109>;
+    : I32EnumAttrCase<"LLVMGPUVectorDistribute", 108>;
 def LLVMGPU_PadAndVectorDistribute
-    : I32EnumAttrCase<"LLVMGPUPadAndVectorDistribute", 110>;
+    : I32EnumAttrCase<"LLVMGPUPadAndVectorDistribute", 109>;
 def LLVMGPU_WinogradVectorize
-    : I32EnumAttrCase<"LLVMGPUWinogradVectorize", 111>;
+    : I32EnumAttrCase<"LLVMGPUWinogradVectorize", 110>;
 def LLVMGPU_TileAndFuse
-    : I32EnumAttrCase<"LLVMGPUTileAndFuse", 112>;
+    : I32EnumAttrCase<"LLVMGPUTileAndFuse", 111>;
 
 def SPIRV_BaseLowering
     : I32EnumAttrCase<"SPIRVBaseLowering", 200>;
@@ -97,7 +95,7 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
     // LLVMGPU CodeGen pipelines
     LLVMGPU_Default, LLVMGPU_BaseLowering, LLVMGPU_SimpleDistribute,
     LLVMGPU_Vectorize, LLVMGPU_MatmulTensorCore,
-    LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction, LLVMGPU_PackUnPack,
+    LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction,
     LLVMGPU_MatmulTensorCoreMmaSync, LLVMGPU_VectorDistribute,
     LLVMGPU_PadAndVectorDistribute, LLVMGPU_WinogradVectorize,
     LLVMGPU_TileAndFuse,
