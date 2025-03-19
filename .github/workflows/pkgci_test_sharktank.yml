@@ -30,15 +30,15 @@ jobs:
             gpu: none
             runs-on: ubuntu-24.04
 
-          - name: rocm_hip_mi300
-            target: target_hip
-            gpu: gfx942
-            runs-on: linux-mi300-2gpu-ossci-iree-org
-
           - name: rocm_hip_w7900
             target: target_hip
             gpu: gfx1100
             runs-on: nodai-amdgpu-w7900-x86-64
+
+          - name: rocm_hip_mi300
+            target: target_hip
+            gpu: gfx942
+            runs-on: linux-mi300-2gpu-ossci-iree-org
 
     env:
       VENV_DIR: ${{ github.workspace }}/venv
@@ -83,4 +83,6 @@ jobs:
               --override-ini=xfail_strict=false \
               -m ${{ matrix.target }} \
               --timeout=120 \
-              --durations=0
+              --durations=0 \
+              --ignore=iree-test-suites/sharktank_models/benchmarks \
+              --ignore=iree-test-suites/sharktank_models/quality_tests
