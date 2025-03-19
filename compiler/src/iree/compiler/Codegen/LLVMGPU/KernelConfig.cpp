@@ -1727,55 +1727,6 @@ static LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
 }
 
 //====---------------------------------------------------------------------===//
-// Pack/Unpack Pipeline Configuration
-//====---------------------------------------------------------------------===//
-
-static SmallVector<int64_t>
-getDefaultWorkgroupTileSizesForPackUnPack(TilingInterface op,
-                                          int64_t defaultSize) {
-  unsigned numLoops = op.getLoopIteratorTypes().size();
-  auto partitionedLoops = cast<PartitionableLoopsInterface>(op.getOperation())
-                              .getPartitionableLoops(kNumMaxParallelDims);
-  SmallVector<int64_t> workgroupTileSizes(numLoops, defaultSize);
-  llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
-                                               partitionedLoops.end());
-  for (auto dim : llvm::seq<int64_t>(0, workgroupTileSizes.size())) {
-    if (!partitionedLoopsSet.count(dim)) {
-      workgroupTileSizes[dim] = 0;
-    }
-  }
-
-  return workgroupTileSizes;
-}
-
-static LogicalResult setPackConfig(IREE::GPU::TargetAttr target,
-                                   mlir::FunctionOpInterface entryPoint,
-                                   linalg::PackOp packOp) {
-  SmallVector<int64_t> tileSizes = getDefaultWorkgroupTileSizesForPackUnPack(
-      cast<TilingInterface>(packOp.getOperation()),
-      target.getPreferredSubgroupSize());
-
-  // The default function aims to returns the number of workload per workgroup,
-  // but it does not know that it is working on packed domain. We need to take
-  // inner tile sizes into account and adjust the distribution tile sizes.
-  SmallVector<int64_t> innerTiles = packOp.getStaticTiles();
-  ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
-  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-    if (tileSizes[pos] == 0 || ShapedType::isDynamic(size))
-      continue;
-    tileSizes[pos] = tileSizes[pos] / size;
-    tileSizes[pos] = std::max<int64_t>(tileSizes[pos], 1);
-  }
-
-  TileSizesListType tileSizesList = {tileSizes};
-  std::array<int64_t, 3> workgroupSizes = {target.getPreferredSubgroupSize(), 1,
-                                           1};
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, packOp, tileSizesList, CodeGenPipeline::LLVMGPUPackUnPack,
-      workgroupSizes);
-}
-
-//====---------------------------------------------------------------------===//
 // Default Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
@@ -2548,10 +2499,6 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
             IREE::LinalgExt::WinogradFilterTransformOp>([&](auto winogradOp) {
         LDBG("Winograd Config");
         return setWinogradOpConfig(target, entryPointFn, winogradOp);
-      })
-      .Case<linalg::PackOp>([&](auto packOp) {
-        LDBG("Pack Config");
-        return setPackConfig(target, entryPointFn, packOp);
       })
       .Case<IREE::LinalgExt::CustomOp>([&](auto customOp) {
         LDBG("CustomOp Config");
