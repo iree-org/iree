@@ -73,17 +73,8 @@ jobs:
       - name: Install Sharktank models test suite requirements
         run: |
           source ${VENV_DIR}/bin/activate
+          python -m pip install iree-test-suites/sharktank_models/iree-requirements.txt
           python -m pip install iree-test-suites/sharktank_models/
-      - name: Sanity Check
-        run: |
-          rocminfo | grep gfx942
-          rocminfo
-          /opt/rocm/bin/hipconfig
-          hipcc --version
-          pip uninstall iree-compiler iree-runtime
-          pip install iree-compiler iree-runtime --force-reinstall
- 
-
       - name: Run Sharktank models test suite
         run: |
           source ${VENV_DIR}/bin/activate
