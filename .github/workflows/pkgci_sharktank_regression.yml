@@ -91,7 +91,7 @@ jobs:
           echo $IREE_TEST_FILES
 
       - name: "Running Sharktank regression composite action"
-        uses: geomin12/iree-test-suites/sharktank_models@c426490fe0d3f42f63ba1db3ca6b7775aeeb770d # temporary
+        uses: geomin12/iree-test-suites/sharktank_models@29828ba17c82a71eada4f54d83e27062719bb952 # temporary
         with:
           MATRIX_NAME: ${{ matrix.name }}
           SKU: ${{ matrix.sku }}
