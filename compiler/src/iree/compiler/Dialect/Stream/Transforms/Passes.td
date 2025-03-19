@@ -165,6 +165,33 @@ def MaterializeCopyOnWritePass :
   ];
 }
 
+def MaterializeEncodeOpsPass :
+    Pass<"iree-stream-materialize-encode-ops", "mlir::ModuleOp"> {
+  let summary = "Materialize stream.tensor.encode ops to dispatches and executables.";
+  let description = [{
+    The revision implements the MaterializeEncodeOps pass. The pass runs the
+    canonicalization patterns from `stream.tensor.encode` and folds nop
+    encoding ops away. Then it creates executables and replaces the
+    `stream.tensor.encode` ops with `stream.async.dispatch` ops on the
+    executables and entries.
+
+    It caches the executables and entries based on the (source encoding,
+    result encoding) pairs. The encode ops that have the same encoding
+    signature can launch the same executables. The only difference is about
+    the dynamic dimension sizes, and they are passed as function arguments.
+    It means that the executable has enough context to deal with different
+    arguments (for dynamic sizes) in different dispatches.
+  }];
+  let dependentDialects = [
+    "mlir::func::FuncDialect",
+    "IREE::Encoding::IREEEncodingDialect",
+    // TODO(#20249): Drop the Flow dependency once the needed operations and
+    // types are moved to other dialects like TensorExt.
+    "IREE::Flow::FlowDialect",
+    "IREE::Stream::StreamDialect",
+  ];
+}
+
 def CloneToConsumersPass :
     Pass<"iree-stream-clone-to-consumers", "mlir::ModuleOp"> {
   let summary = "Clones operations that opt-in to consumer affinities.";
