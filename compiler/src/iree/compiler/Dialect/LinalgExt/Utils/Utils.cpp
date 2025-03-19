@@ -469,6 +469,12 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   if (outputChannelLastDim.value() < outputImageFirstDim.value())
     isOutputChannelFirst = true;
 
+  bool isBatchDimLast = false;
+  std::optional<int64_t> batchFirstDim = outputMap.getResultPosition(
+      getAffineDimExpr(convDims.batch[0], outputMap.getContext()));
+  if (batchFirstDim && outputChannelLastDim.value() < batchFirstDim.value())
+    isBatchDimLast = true;
+
   SmallVector<int64_t> filterkPos;
   for (auto reductionDim : reductionDims) {
     std::optional<int64_t> maybeDim = filterMap.getResultPosition(
@@ -549,9 +555,17 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   // prepare the input map.
   SmallVector<AffineExpr> inputDims;
   // Add the batch dimensions.
-  inputDims.insert(inputDims.end(), dims.begin(), dims.begin() + numBDims);
-  int64_t starting_m_pos =
-      isOutputChannelFirst ? numBDims + numNDims : numBDims;
+  int64_t starting_m_pos;
+  if (isBatchDimLast && isOutputChannelFirst) {
+    starting_m_pos = numNDims;
+  } else if (isOutputChannelFirst) {
+    starting_m_pos = numBDims + numNDims;
+  } else {
+    starting_m_pos = numBDims;
+  }
+  int64_t starting_b_pos = isBatchDimLast ? starting_m_pos + numMDims : 0;
+  inputDims.insert(inputDims.end(), dims.begin() + starting_b_pos,
+                   dims.begin() + starting_b_pos + numBDims);
   // Add the M dims.
   inputDims.insert(inputDims.end(), dims.begin() + starting_m_pos,
                    dims.begin() + starting_m_pos + numMDims);
@@ -562,7 +576,14 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
 
   // prepare filter map.
   SmallVector<AffineExpr> filterDims;
-  int64_t curr_n_pos = isOutputChannelFirst ? numBDims : numBDims + numMDims;
+  int64_t curr_n_pos;
+  if (isBatchDimLast && isOutputChannelFirst) {
+    curr_n_pos = 0;
+  } else if (isOutputChannelFirst) {
+    curr_n_pos = numBDims;
+  } else {
+    curr_n_pos = numBDims + numMDims;
+  }
   int64_t curr_k_pos = numBDims + numMDims + numNDims;
 
   for (auto iter : filterIterators) {
