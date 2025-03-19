@@ -80,6 +80,9 @@ jobs:
           rocminfo
           /opt/rocm/bin/hipconfig
           hipcc --version
+          pip uninstall iree-compiler iree-runtime
+          pip install iree-compiler iree-runtime --force-reinstall
+ 
 
       - name: Run Sharktank models test suite
         run: |
