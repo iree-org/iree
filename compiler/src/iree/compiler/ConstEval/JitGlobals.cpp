@@ -79,30 +79,6 @@ struct CompileOptions {
   IREEVMPipelineHooks hooks;
 };
 
-// Supported types vary by backend and other factors, so we track them here.
-// Types that cross the ABI boundary are configured here.
-class SupportedFeatures {
-public:
-  void addScalarType(Type t) { scalarTypes.insert(t); }
-  void addElementType(Type t) { elementTypes.insert(t); }
-
-  bool supportsScalarType(Type t) const { return scalarTypes.contains(t); }
-
-  bool supportsElementType(Type t) const { return elementTypes.contains(t); }
-
-  bool isSupportedAbiType(Type t) const {
-    if (auto tensorType = llvm::dyn_cast<TensorType>(t)) {
-      return supportsElementType(tensorType.getElementType());
-    } else {
-      return supportsScalarType(t);
-    }
-  }
-
-private:
-  llvm::DenseSet<Type> scalarTypes;
-  llvm::DenseSet<Type> elementTypes;
-};
-
 template <typename AccessorTy>
 static inline bool isAccessorParameterized(const SymbolTable &moduleSymbols,
                                            AccessorTy op) {
@@ -452,14 +428,19 @@ static LogicalResult cloneUsedObjects(FunctionOpInterface funcOp,
 class ProgramBuilder {
 public:
   ProgramBuilder(ModuleOp sourceModuleOp,
-                 const SupportedFeatures &supportedFeatures,
+                 IREE::HAL::DeviceTargetAttr deviceTargetAttr,
+                 const IREE::HAL::TargetBackend::SupportedTypes &supportedTypes,
                  const IREE::Util::ConstExprAnalysis &constExprAnalysis)
       : targetModuleOp(createInnerModule(sourceModuleOp)),
         sourceSymbolTable(sourceModuleOp), targetSymbolTable(targetModuleOp),
-        supportedFeatures(supportedFeatures),
-        constExprAnalysis(constExprAnalysis),
+        supportedTypes(supportedTypes), constExprAnalysis(constExprAnalysis),
         initializationAnalysis(sourceModuleOp, sourceSymbolTable,
-                               constExprAnalysis) {}
+                               constExprAnalysis) {
+    targetModuleOp->setAttr(
+        "hal.device.targets",
+        ArrayAttr::get(sourceModuleOp.getContext(),
+                       {static_cast<Attribute>(deviceTargetAttr)}));
+  }
 
   llvm::SmallVector<JitFunctionDesc> &getJitFunctions() { return jitFunctions; }
   ModuleOp getTargetModule() { return targetModuleOp; }
@@ -528,7 +509,7 @@ private:
         return failure();
       }
       Type t = loadOp.getLoadedGlobalValue().getType();
-      if (!supportedFeatures.isSupportedAbiType(t)) {
+      if (!supportedTypes.supportsType(t)) {
         emitDebugWarning(funcOp.getLoc(), [&](InFlightDiagnostic &diagnostic) {
           diagnostic << "skipping consteval initializer: unsupported type for "
                         "current jit configuration: "
@@ -549,7 +530,7 @@ private:
       auto elementsAttr = dyn_cast<ElementsAttr>(constantOp.getValue());
       if (!tensorType || !elementsAttr)
         continue;
-      if (!supportedFeatures.isSupportedAbiType(tensorType)) {
+      if (!supportedTypes.supportsType(tensorType)) {
         emitDebugWarning(funcOp.getLoc(), [&](InFlightDiagnostic &diagnostic) {
           diagnostic << "skipping consteval initializer: unsupported type for "
                         "current jit configuration: "
@@ -573,7 +554,7 @@ private:
       assert(globalOp && "should have been checked in isConstExpr");
 
       Type t = storeOp.getStoredGlobalValue().getType();
-      if (!supportedFeatures.isSupportedAbiType(t)) {
+      if (!supportedTypes.supportsType(t)) {
         emitDebugWarning(funcOp.getLoc(), [&](InFlightDiagnostic &diagnostic) {
           diagnostic << "skipping consteval initializer: unsupported type for "
                         "current jit configuration: "
@@ -607,7 +588,7 @@ private:
   SymbolTable sourceSymbolTable;
   SymbolTable targetSymbolTable;
   llvm::SmallVector<JitFunctionDesc> jitFunctions;
-  const SupportedFeatures &supportedFeatures;
+  const IREE::HAL::TargetBackend::SupportedTypes supportedTypes;
   const IREE::Util::ConstExprAnalysis &constExprAnalysis;
   InitializationAnalysis initializationAnalysis;
 };
@@ -622,17 +603,13 @@ public:
     targetRegistry = options.targetRegistry;
 
     // Detect backend.
-    requestedTargetDevice = resolveTargetDevice(*targetRegistry.value);
-    hasRequestedTargetDevice =
-        targetRegistry->getTargetDevice(requestedTargetDevice) != nullptr;
-    compileOptions->executableOptions.legacyTargetBackends.push_back(
-        requestedTargetDevice);
     compileOptions->targetOptions.f32Extension = true;
     compileOptions->targetOptions.f64Extension = true;
     compileOptions->targetOptions.indexBits = 64;
     compileOptions->targetOptions.truncateUnsupportedFloats = false;
     compileOptions->inputOptions.demoteF64ToF32 = false;
-    if (!hasRequestedTargetDevice) {
+    requestedTargetDevice = resolveTargetDevice(*targetRegistry.value);
+    if (targetRegistry->getTargetDevice(requestedTargetDevice) == nullptr) {
       targetDevice = targetRegistry->getTargetDevice("local");
     } else {
       targetDevice = targetRegistry->getTargetDevice(requestedTargetDevice);
@@ -660,46 +637,9 @@ public:
   static std::string
   resolveTargetDevice(const IREE::HAL::TargetRegistry &targetRegistry) {
     if (clJitTargetDevice.empty()) {
-      // Default - choose something we have.
-      // First llvm-cpu then vmvx.
-      if (targetRegistry.getTargetDevice("llvm-cpu")) {
-        return std::string("llvm-cpu");
-      } else {
-        return std::string("vmvx");
-      }
+      return std::string("local");
     }
-
     return clJitTargetDevice;
-  }
-
-  const SupportedFeatures getSupportedFeatures(MLIRContext *context) {
-    SupportedFeatures s;
-    Builder b(context);
-
-    s.addScalarType(b.getIntegerType(8));
-    s.addScalarType(b.getIntegerType(16));
-    s.addScalarType(b.getIntegerType(32));
-    s.addScalarType(b.getIntegerType(64));
-    s.addScalarType(b.getIndexType());
-    s.addScalarType(b.getF32Type());
-
-    s.addElementType(b.getIntegerType(1));
-    s.addElementType(b.getIntegerType(8));
-    s.addElementType(b.getIntegerType(16));
-    s.addElementType(b.getIntegerType(32));
-    s.addElementType(b.getIntegerType(64));
-    s.addElementType(b.getIndexType());
-    s.addElementType(b.getF32Type());
-    if (requestedTargetDevice != "vmvx" && hasRequestedTargetDevice) {
-      // The full compilers support additional types.
-      // TODO: Enable support for i4 once it is worked out how to
-      // transfer to and from ElementsAttr.
-      s.addScalarType(b.getF64Type());
-      s.addElementType(b.getF16Type());
-      s.addElementType(b.getBF16Type());
-      s.addElementType(b.getF64Type());
-    }
-    return s;
   }
 
   LogicalResult
@@ -740,7 +680,8 @@ public:
           }
           if (failed(call.addArgument(arg.getGlobalOp().getLoc(), globalValue)))
             return failure();
-        } break;
+          break;
+        }
         }
       }
 
@@ -776,15 +717,7 @@ public:
     llvm::TimerGroup tg("iree-consteval-jit", "Consteval Jit");
     auto outerModule = getOperation();
 
-    auto supportedFeatures = getSupportedFeatures(&getContext());
-    if (!hasRequestedTargetDevice) {
-      emitDebugWarning(
-          UnknownLoc::get(&getContext()), [&](InFlightDiagnostic &diagnostic) {
-            diagnostic
-                << "consteval jit requested with " << requestedTargetDevice
-                << " backend, but it is not available; falling back to vmvx";
-          });
-    }
+    // Set the target.
     if (!targetDevice) {
       emitError(UnknownLoc::get(&getContext()))
           << "consteval jit could not find a usable backend (requested '"
@@ -792,35 +725,43 @@ public:
       signalPassFailure();
       return;
     }
+    auto deviceTargetAttr =
+        targetDevice->getHostDeviceTarget(&getContext(), *targetRegistry.value);
+    if (!deviceTargetAttr) {
+      emitError(UnknownLoc::get(&getContext()))
+          << "consteval requested device " << requestedTargetDevice
+          << " cannot target the host";
+      signalPassFailure();
+      return;
+    }
+    IREE::HAL::TargetBackend::SupportedTypes supportedTypes;
+    for (auto executableTargetAttr : deviceTargetAttr->getExecutableTargets()) {
+      auto targetBackend = targetRegistry->getTargetBackend(
+          executableTargetAttr.getBackend().getValue());
+      if (targetBackend) {
+        supportedTypes = targetBackend->getSupportedTypes(&getContext());
+        break;
+      } else {
+        emitError(UnknownLoc::get(&getContext()))
+            << "consteval requested device " << requestedTargetDevice
+            << " compilation backend " << executableTargetAttr.getBackend()
+            << " not registered with the TargetRegistry";
+        signalPassFailure();
+        return;
+      }
+    }
 
+    // Build the program.
+    ProgramBuilder programBuilder(outerModule, *deviceTargetAttr,
+                                  supportedTypes,
+                                  getAnalysis<IREE::Util::ConstExprAnalysis>());
+
+    // Iterate over initializers.
     llvm::SmallVector<IREE::Util::InitializerOp> initializerOps;
     llvm::SmallVector<IREE::Util::InitializerOp> deadInitOps;
     for (auto childOp : outerModule.getOps<IREE::Util::InitializerOp>()) {
       initializerOps.push_back(childOp);
     }
-
-    // Build the program.
-    ProgramBuilder programBuilder(outerModule, supportedFeatures,
-                                  getAnalysis<IREE::Util::ConstExprAnalysis>());
-
-    // Set the target.
-    std::optional<IREE::HAL::DeviceTargetAttr> targetAttr =
-        targetDevice->getHostDeviceTarget(&getContext(), *targetRegistry.value);
-    {
-      if (!targetAttr) {
-        emitError(UnknownLoc::get(&getContext()))
-            << "consteval requested backend " << requestedTargetDevice
-            << " cannot target the host";
-        signalPassFailure();
-        return;
-      }
-      SmallVector<Attribute> targetAttrs;
-      targetAttrs.push_back(*targetAttr);
-      programBuilder.getTargetModule()->setAttr(
-          "hal.device.targets", ArrayAttr::get(&getContext(), targetAttrs));
-    }
-
-    // Iterate over initializers.
     for (auto initializerOp : initializerOps) {
       if (succeeded(programBuilder.importInitializer(initializerOp))) {
         deadInitOps.push_back(initializerOp);
@@ -878,7 +819,6 @@ private:
   OpPassManager compilePipeline;
   std::string requestedTargetDevice;
   std::shared_ptr<IREE::HAL::TargetDevice> targetDevice;
-  bool hasRequestedTargetDevice;
   bool debugEnabled = isDebugEnabled();
 };
 

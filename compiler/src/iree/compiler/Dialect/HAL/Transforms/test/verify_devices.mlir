@@ -35,7 +35,7 @@ module @module {
 module @module {
   // expected-error@+1 {{unregistered target device "__unregistered__"}}
   util.global private @device = #hal.device.select<[
-    #hal.device.target<"vmvx"> : !hal.device,
+    #hal.device.target<"local"> : !hal.device,
     #hal.device.target<"__unregistered__"> : !hal.device
   ]> : !hal.device
   util.func private @func() -> () attributes {
@@ -49,12 +49,12 @@ module @module {
 
 // CHECK: module @module
 module @module {
-  util.global private @device = #hal.device.target<"vmvx"> : !hal.device
+  util.global private @device = #hal.device.target<"local", {ordinal = 0 : index}> : !hal.device
   util.global private @optional = #hal.device.fallback<@device> : !hal.device
   util.global private @ordinal = #hal.device.ordinal<0> : !hal.device
   util.global private @selected = #hal.device.select<[
-    #hal.device.target<"local"> : !hal.device,
-    #hal.device.target<"vmvx"> : !hal.device
+    #hal.device.target<"local", {ordinal = 0 : index}> : !hal.device,
+    #hal.device.target<"local", {ordinal = 1 : index}> : !hal.device
   ]> : !hal.device
   util.func private @func() -> () attributes {
     stream.affinity = #hal.device.affinity<@device>

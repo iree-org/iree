@@ -145,7 +145,7 @@ public:
   explicit LLVMCPUTargetBackend(LLVMTargetOptions options)
       : defaultOptions_(std::move(options)) {}
 
-  std::string getLegacyDefaultDeviceID() const override { return "llvm-cpu"; }
+  std::string getLegacyDefaultDeviceID() const override { return "local"; }
 
   void getDefaultExecutableTargets(
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,

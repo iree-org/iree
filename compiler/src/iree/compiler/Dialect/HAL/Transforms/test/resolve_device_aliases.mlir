@@ -1,10 +1,9 @@
-// RUN: iree-opt --split-input-file --iree-hal-resolve-device-aliases %s --mlir-print-local-scope --verify-diagnostics | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-hal-resolve-device-aliases --iree-hal-local-target-device-backends=llvm-cpu %s --mlir-print-local-scope --verify-diagnostics | FileCheck %s
 
 // CHECK: util.global private @device
 // CHECK-SAME: #hal.device.target<"local"
 // CHECK-SAME: extra_config = 4 : index
-// CHECK-SAME: #hal.executable.target<"vmvx"
-util.global private @device = #hal.device.alias<"vmvx", {
+util.global private @device = #hal.device.alias<"local", {
   extra_config = 4 : index
 }> : !hal.device
 
@@ -13,8 +12,7 @@ util.global private @device = #hal.device.alias<"vmvx", {
 // CHECK: util.global private @device_ordinal
 // CHECK-SAME: #hal.device.target<"local"
 // CHECK-SAME: ordinal = 123 : index
-// CHECK-SAME: #hal.executable.target<"vmvx"
-util.global private @device_ordinal = #hal.device.alias<"vmvx"[123]> : !hal.device
+util.global private @device_ordinal = #hal.device.alias<"local"[123]> : !hal.device
 
 // -----
 
@@ -23,8 +21,8 @@ util.global private @device_ordinal = #hal.device.alias<"vmvx"[123]> : !hal.devi
 // CHECK-SAME:  #hal.device.target<"local", {ordinal = 0 : index}
 // CHECK-SAME:  #hal.device.target<"local", {ordinal = 1 : index}
 util.global private @device_select = #hal.device.select<[
-  #hal.device.alias<"vmvx"[0]> : !hal.device,
-  #hal.device.alias<"vmvx"[1]> : !hal.device
+  #hal.device.alias<"local"[0]> : !hal.device,
+  #hal.device.alias<"local"[1]> : !hal.device
 ]> : !hal.device
 
 // -----
@@ -36,6 +34,6 @@ util.global private @device_unregistered = #hal.device.alias<"__unregistered__">
 
 // expected-error@+1 {{unregistered device alias "__unregistered__"}}
 util.global private @device_select_unregistered = #hal.device.select<[
-  #hal.device.alias<"vmvx"> : !hal.device,
+  #hal.device.alias<"local"> : !hal.device,
   #hal.device.alias<"__unregistered__"> : !hal.device
 ]> : !hal.device

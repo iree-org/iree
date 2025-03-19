@@ -16,6 +16,33 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
+TargetBackend::SupportedTypes
+TargetBackend::getSupportedTypes(MLIRContext *context) const {
+  SupportedTypes s;
+  Builder b(context);
+
+  s.addScalarType(b.getIntegerType(8));
+  s.addScalarType(b.getIntegerType(16));
+  s.addScalarType(b.getIntegerType(32));
+  s.addScalarType(b.getIntegerType(64));
+  s.addScalarType(b.getIndexType());
+  s.addScalarType(b.getF32Type());
+  s.addScalarType(b.getF64Type());
+
+  s.addElementType(b.getIntegerType(1));
+  s.addElementType(b.getIntegerType(8));
+  s.addElementType(b.getIntegerType(16));
+  s.addElementType(b.getIntegerType(32));
+  s.addElementType(b.getIntegerType(64));
+  s.addElementType(b.getIndexType());
+  s.addElementType(b.getF16Type());
+  s.addElementType(b.getBF16Type());
+  s.addElementType(b.getF32Type());
+  s.addElementType(b.getF64Type());
+
+  return s;
+}
+
 SmallVector<std::string>
 gatherExecutableTargetNames(IREE::HAL::ExecutableOp executableOp) {
   SmallVector<std::string> targetNames;
