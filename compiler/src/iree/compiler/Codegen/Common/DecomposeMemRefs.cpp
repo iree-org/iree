@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/PatternMatch.h"
@@ -39,6 +40,20 @@ static MemRefType inferCastResultType(Value source, OpFoldResult offset) {
   auto stridedLayout =
       StridedLayoutAttr::get(source.getContext(), staticOffsets.front(), {});
   return MemRefType::get({}, sourceType.getElementType(), stridedLayout,
+                         sourceType.getMemorySpace());
+}
+
+// First version, it has to be contiguous.
+static MemRefType inferCastResultType2(Value source, OpFoldResult offset) {
+  auto sourceType = cast<BaseMemRefType>(source.getType());
+  SmallVector<int64_t> staticOffsets;
+  SmallVector<Value> dynamicOffsets;
+  dispatchIndexOpFoldResults(offset, dynamicOffsets, staticOffsets);
+  int64_t collapsedShape = 1;
+  for (auto dim : sourceType.getShape()) {
+    collapsedShape *= dim;
+  }
+  return MemRefType::get({collapsedShape}, sourceType.getElementType(), nullptr,
                          sourceType.getMemorySpace());
 }
 
@@ -112,9 +127,18 @@ static Value getFlatMemref(OpBuilder &rewriter, Location loc, Value source,
                                                     std::nullopt, std::nullopt);
 }
 
+static Value getCollapsedMemref(OpBuilder &rewriter, Location loc, Value source,
+                                ValueRange offsets) {
+  auto &&[base, offset, ignore] =
+      getFlatOffsetAndStrides(rewriter, loc, source, getAsOpFoldResult(offsets));
+  MemRefType retType = inferCastResultType2(base, offset);
+  return rewriter.create<memref::ReinterpretCastOp>(loc, retType, base, offset,
+                                                    std::nullopt, std::nullopt);
+}
+
 static bool needFlatten(Value val) {
   auto type = cast<MemRefType>(val.getType());
-  return type.getRank() != 0;
+  return type.getRank() > 1;
 }
 
 static bool checkLayout(Value val) {
@@ -210,6 +234,14 @@ struct FlattenSubview : public OpRewritePattern<memref::SubViewOp> {
 
 struct DecomposeMemrefsPass
     : public impl::DecomposeMemrefsPassBase<DecomposeMemrefsPass> {
+  using impl::DecomposeMemrefsPassBase<
+      DecomposeMemrefsPass>::DecomposeMemrefsPassBase;
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<affine::AffineDialect, arith::ArithDialect,
+                    linalg::LinalgDialect, scf::SCFDialect,
+                    vector::VectorDialect>();
+  }
 
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
