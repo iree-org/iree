@@ -20,6 +20,7 @@ void LocalDevice::Options::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc(
           "Default target backends for local device executable compilation."),
       llvm::cl::ZeroOrMore, llvm::cl::cat(optionsCategory));
+
   binder.list<std::string>(
       "iree-hal-local-host-device-backends", defaultHostBackends,
       llvm::cl::desc(
@@ -60,8 +61,34 @@ LocalDevice::getHostDeviceTarget(MLIRContext *context,
   auto deviceConfigAttr = b.getDictionaryAttr({});
   auto executableConfigAttr = b.getDictionaryAttr({});
 
+  // Use the specified default host backends, if any.
+  // If no host backends are specified we try to find the first that is.
+  // **This is likely to be wrong**.
+  //
+  // TODO(benvanik): add a secondary registry on the LocalDevice for its
+  // backend lists. We shouldn't have to ask the registry and use the legacy
+  // device ID from the backend.
+  //
+  // TODO(benvanik): add an "isHostCompatible" on TargetBackend that returns
+  // true when the provided executable target is able to be run on the host
+  // (probably). We'd still need to filter to those compatible with the local
+  // device (instead of say using the SPIR-V backend with the local device) but
+  // would at least be able to handle multiple backends deterministically.
+  std::vector<std::string> targetBackends = options.defaultHostBackends;
+  if (targetBackends.empty()) {
+    for (auto targetBackendName :
+         targetRegistry.getRegisteredTargetBackends()) {
+      auto targetBackend = targetRegistry.getTargetBackend(targetBackendName);
+      if (targetBackend->getLegacyDefaultDeviceID() == "local") {
+        targetBackends.push_back(targetBackendName);
+        break; // first only
+      }
+    }
+  }
+
+  // Query the chosen target backends for their executable targets.
   SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
-  for (auto backendName : options.defaultHostBackends) {
+  for (auto backendName : targetBackends) {
     auto targetBackend = targetRegistry.getTargetBackend(backendName);
     if (!targetBackend) {
       llvm::errs() << "Default host backend not registered: " << backendName

@@ -158,7 +158,7 @@ struct SemaphoreType : public Type::TypeBase<SemaphoreType, Type, TypeStorage> {
 };
 
 //===----------------------------------------------------------------------===//
-// Struct types
+// Struct list types
 //===----------------------------------------------------------------------===//
 
 // A tuple containing runtime values for a descriptor set binding.

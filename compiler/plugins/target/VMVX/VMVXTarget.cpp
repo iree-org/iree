@@ -61,7 +61,7 @@ class VMVXTargetBackend final : public TargetBackend {
 public:
   VMVXTargetBackend(const VMVXOptions &options) : options(options) {}
 
-  std::string getLegacyDefaultDeviceID() const override { return "vmvx"; }
+  std::string getLegacyDefaultDeviceID() const override { return "local"; }
 
   void getDefaultExecutableTargets(
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
@@ -77,6 +77,31 @@ public:
                                     &executableTargetAttrs) const override {
     executableTargetAttrs.push_back(getVMVXExecutableTarget(
         options.enableMicrokernels, context, "vmvx", "vmvx-bytecode-fb"));
+  }
+
+  TargetBackend::SupportedTypes
+  getSupportedTypes(MLIRContext *context) const override {
+    SupportedTypes s;
+    Builder b(context);
+
+    s.addScalarType(b.getIntegerType(8));
+    s.addScalarType(b.getIntegerType(16));
+    s.addScalarType(b.getIntegerType(32));
+    s.addScalarType(b.getIntegerType(64));
+    s.addScalarType(b.getIndexType());
+    s.addScalarType(b.getF32Type());
+    s.addScalarType(b.getF64Type());
+
+    s.addElementType(b.getIntegerType(1));
+    s.addElementType(b.getIntegerType(8));
+    s.addElementType(b.getIntegerType(16));
+    s.addElementType(b.getIntegerType(32));
+    s.addElementType(b.getIntegerType(64));
+    s.addElementType(b.getIndexType());
+    s.addElementType(b.getF32Type());
+    s.addElementType(b.getF64Type());
+
+    return s;
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -198,9 +223,7 @@ class VMVXInlineTargetBackend final : public TargetBackend {
 public:
   VMVXInlineTargetBackend(const VMVXOptions &options) : options(options) {}
 
-  std::string getLegacyDefaultDeviceID() const override {
-    return "vmvx-inline";
-  }
+  std::string getLegacyDefaultDeviceID() const override { return "local"; }
 
   void getDefaultExecutableTargets(
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,

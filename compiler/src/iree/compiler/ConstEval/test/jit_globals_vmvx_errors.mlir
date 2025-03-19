@@ -39,22 +39,6 @@ module @eval_bf16_tensor {
 }
 
 // -----
-// CHECK-LABEL: @eval_f64_tensor
-module @eval_f64_tensor {
-  util.global private @hoisted : tensor<2xf64>
-  util.func public @main() -> tensor<2xf64> {
-    %hoisted = util.global.load @hoisted : tensor<2xf64>
-    util.return %hoisted : tensor<2xf64>
-  }
-  // expected-warning @+1 {{unsupported type for current jit configuration}}
-  util.initializer attributes {iree.compiler.consteval} {
-    %cst = arith.constant dense<[2.0e+2, 3.2e+3]> : tensor<2xf64>
-    util.global.store %cst, @hoisted : tensor<2xf64>
-    util.return
-  }
-}
-
-// -----
 // CHECK-LABEL: @eval_i4_tensor
 module @eval_i4_tensor {
   util.global private @hoisted : tensor<5x6xi4>
