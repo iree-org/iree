@@ -46,7 +46,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 //  Since each subgroup handles 2 * 2 tiles, and for each tile, each lane holds 4 values.
 //  we will have 32 writes. We cannot do contiguous writes since the outputs columns has interleaved
 //  thread ids.
-//  CHECK-COUNT-32:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<1x1xf32>, memref<256x256xf32, #hal.descriptor_type<storage_buffer>>
+//  CHECK-COUNT-32:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<1x1xf32>, memref<256x256xf32, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
 
@@ -93,4 +93,4 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 //  Since each subgroup handles 2 * 2 tiles, and for each tile, each lane holds 4 values.
 //  we will have 32 writes. We cannot do contiguous writes since the outputs columns has interleaved
 //  thread ids.
-//  CHECK-COUNT-32:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<1x1xf16>, memref<256x256xf16, #hal.descriptor_type<storage_buffer>>
+//  CHECK-COUNT-32:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<1x1xf16>, memref<256x256xf16, #amdgpu.address_space<fat_raw_buffer>>

@@ -2689,6 +2689,31 @@ func.func @micro_kernel_op() {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+    #hal.pipeline.binding<storage_buffer>,
+    #hal.pipeline.binding<storage_buffer>
+]>
+func.func @rocdl_buffer_memory_space_elementwise_copy() {
+  %off.i32 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+  %off = arith.index_castui %off.i32 : i32 to index
+  %wgid = hal.interface.workgroup.id[0] : index
+  %tid = gpu.thread_id x
+  %arg0_binding = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) {iree_gpu.use_rocdl_buffer_instructions} : !flow.dispatch.tensor<readonly:tensor<256x256xf32>>
+  %arg1_binding = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%off) {iree_gpu.use_rocdl_buffer_instructions} : !flow.dispatch.tensor<writeonly:tensor<256x256xf32>>
+  %v = flow.dispatch.tensor.load %arg0_binding, offsets = [%wgid, %tid], sizes = [1, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x256xf32>> -> tensor<1x1xf32>
+  flow.dispatch.tensor.store %v, %arg1_binding, offsets = [%wgid, %tid], sizes = [1, 1], strides = [1, 1] : tensor<1x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<256x256xf32>>
+  return
+}
+// CHECK-LABEL: func @rocdl_buffer_memory_space_elementwise_copy()
+//   CHECK-DAG:   %[[arg0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<256x256xf32, #hal.descriptor_type<storage_buffer>>
+//   CHECK-DAG:   %[[arg1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) offset(%{{.+}}) : memref<256x256xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
+//   CHECK-DAG:   amdgpu.fat_raw_buffer_cast %[[arg0]] resetOffset : memref<256x256xf32, #hal.descriptor_type<storage_buffer>> to memref<256x256xf32, #amdgpu.address_space<fat_raw_buffer>>
+//   CHECK-DAG:   amdgpu.fat_raw_buffer_cast %[[arg1]] resetOffset : memref<256x256xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>> to memref<256x256xf32, strided<[256, 1]>, #amdgpu.address_space<fat_raw_buffer>>
+//   CHECK-NOT:   hal.interface.binding.subspan
+//       CHECK:    return
+
+// -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>

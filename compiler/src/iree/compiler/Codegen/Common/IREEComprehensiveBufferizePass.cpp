@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -100,6 +101,7 @@ public:
     // clang-format off
     registry
         .insert<affine::AffineDialect,
+                amdgpu::AMDGPUDialect,
                 arith::ArithDialect,
                 bufferization::BufferizationDialect,
                 func::FuncDialect,

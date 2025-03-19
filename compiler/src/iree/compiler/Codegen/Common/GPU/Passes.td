@@ -24,7 +24,6 @@ def DecomposeHorizontallyFusedGemmsPass :
   ];
 }
 
-
 def GPUCheckResourceUsagePass :
     InterfacePass<"iree-codegen-gpu-check-resource-usage", "mlir::FunctionOpInterface"> {
   let summary = "Checks GPU specific resource usage constraints like shared memory limits";

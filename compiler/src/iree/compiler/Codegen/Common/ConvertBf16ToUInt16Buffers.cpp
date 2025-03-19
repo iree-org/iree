@@ -19,6 +19,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -225,6 +226,30 @@ struct ConvertMemRefStore final : OpConversionPattern<memref::StoreOp> {
   }
 };
 
+struct ConvertAmdgpuFatRawBufferCast final
+    : OpConversionPattern<amdgpu::FatRawBufferCastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(amdgpu::FatRawBufferCastOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    Type newTy = getTypeConverter()->convertType(op.getType());
+    if (!newTy) {
+      return rewriter.notifyMatchFailure(
+          op->getLoc(),
+          llvm::formatv("failed to convert memref type: {}", op.getType()));
+    }
+
+    auto newOp = rewriter.replaceOpWithNewOp<amdgpu::FatRawBufferCastOp>(
+        op, newTy, adaptor.getSource(), adaptor.getValidBytes(),
+        adaptor.getCacheSwizzleStride(), adaptor.getBoundsCheck(),
+        adaptor.getResetOffset());
+    LLVM_DEBUG(llvm::dbgs() << "Bf16Emulation: new op: " << newOp << "\n");
+    (void)newOp;
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Helper functions
 //===----------------------------------------------------------------------===//
@@ -241,8 +266,9 @@ static void populateIreeBf16EmulationPatterns(RewritePatternSet &patterns,
   populateCallOpTypeConversionPattern(patterns, typeConverter);
   populateReturnOpTypeConversionPattern(patterns, typeConverter);
   patterns.add<GenericTypeConversionPattern, ConvertHalInterfaceBindingSubspan,
-               ConvertMemRefAlloc, ConvertMemRefLoad, ConvertMemRefStore>(
-      typeConverter, patterns.getContext());
+               ConvertMemRefAlloc, ConvertMemRefLoad, ConvertMemRefStore,
+               ConvertAmdgpuFatRawBufferCast>(typeConverter,
+                                              patterns.getContext());
 }
 
 //===----------------------------------------------------------------------===//
@@ -284,11 +310,11 @@ struct ConvertBf16ToUInt16BuffersPass final
           });
 
       // Support the list of all vector operations that do not perform numerical
-      // changes:
+      // changes. Also handle amdgpu buffer casts:
       target.addDynamicallyLegalOp<
-          vector::BroadcastOp, vector::ShuffleOp, vector::ExtractElementOp,
-          vector::ExtractOp, vector::InsertElementOp, vector::InsertOp,
-          vector::ScalableInsertOp, vector::ScalableExtractOp,
+          amdgpu::FatRawBufferCastOp, vector::BroadcastOp, vector::ShuffleOp,
+          vector::ExtractElementOp, vector::ExtractOp, vector::InsertElementOp,
+          vector::InsertOp, vector::ScalableInsertOp, vector::ScalableExtractOp,
           vector::InsertStridedSliceOp, vector::ExtractStridedSliceOp,
           vector::TransferReadOp, vector::TransferWriteOp, vector::LoadOp,
           vector::StoreOp, vector::MaskedLoadOp, vector::MaskedStoreOp,

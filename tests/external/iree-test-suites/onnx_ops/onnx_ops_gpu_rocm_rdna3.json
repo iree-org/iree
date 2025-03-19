@@ -322,7 +322,6 @@
     "onnx/node/generated/test_gridsample_nearest",
     "onnx/node/generated/test_gridsample_nearest_align_corners_0_additional_1",
     "onnx/node/generated/test_gridsample_nearest_align_corners_1_additional_1",
-    "onnx/node/generated/test_gridsample_zeros_padding",
     "onnx/node/generated/test_lstm_with_peepholes",
     "onnx/node/generated/test_nonmaxsuppression_flipped_coordinates",
     "onnx/node/generated/test_nonmaxsuppression_single_box",
