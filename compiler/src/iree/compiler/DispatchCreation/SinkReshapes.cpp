@@ -42,6 +42,32 @@ struct SinkReshapesPass final
   void runOnOperation() override;
 };
 
+struct FoldDuplicateCollapseShapes final
+    : public OpRewritePattern<tensor::CollapseShapeOp> {
+
+  using OpRewritePattern<tensor::CollapseShapeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::CollapseShapeOp collapseOp,
+                                PatternRewriter &rewriter) const override {
+    auto users = collapseOp.getSrc().getUsers();
+    auto duplicates = llvm::filter_to_vector(users, [&](Operation *user) {
+      auto otherOp = llvm::dyn_cast<tensor::CollapseShapeOp>(user);
+      return otherOp && otherOp.getReassociationAttr() ==
+                            collapseOp.getReassociationAttr();
+    });
+    if (duplicates.size() < 2) {
+      return failure();
+    }
+
+    rewriter.setInsertionPointAfterValue(collapseOp.getSrc());
+    auto *newOp = rewriter.clone(*collapseOp);
+    for (auto *op : duplicates) {
+      rewriter.replaceOp(op, newOp);
+    }
+    return success();
+  }
+};
+
 /// Returns true if two operations are fusable through tile and fuse. Ideally
 /// this should use the same method as dispatch region formation where this
 /// fusion analysis actually happens, but that requires a direct producer ->
@@ -58,6 +84,11 @@ static bool isFusableUsingTileAndFuse(Operation *producer,
 /// `opOperand`) should be pushed past the `genericOp` (which is the consumer of
 /// `opOperand`).
 static bool shouldSinkExpandShapeOp(OpOperand *opOperand) {
+  if (llvm::isa_and_nonnull<tensor::CollapseShapeOp>(opOperand->getOwner())) {
+    auto *producer = opOperand->get().getDefiningOp();
+    return producer && producer->hasOneUse() &&
+           IREE::LinalgExt::isBitExtendOp(opOperand->get().getDefiningOp());
+  }
   auto reshapeOp =
       dyn_cast<tensor::ExpandShapeOp>(opOperand->get().getDefiningOp());
   if (!reshapeOp) {
@@ -168,6 +199,7 @@ void SinkReshapesPass::runOnOperation() {
   linalg::populateFoldReshapeOpsByCollapsingPatterns(sinkReshapePatterns,
                                                      shouldSinkExpandShapeOp);
   // Add patterns to fold `tensor.empty` and reshape ops.
+  sinkReshapePatterns.insert<FoldDuplicateCollapseShapes>(context);
   tensor::populateFoldTensorEmptyPatterns(sinkReshapePatterns);
   if (failed(applyPatternsGreedily(getOperation(),
                                    std::move(sinkReshapePatterns)))) {
