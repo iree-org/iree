@@ -133,7 +133,6 @@ void BubbleUpExpandShapesPass::runOnOperation() {
         // op. The bit-extend ops get cloned into producer dispatches, and the
         // `collapse_shape` op going past dequant, prevents this clong.
         if (IREE::LinalgExt::isBitExtendOp(consumer)) {
-          return false;
         }
 
         // If producer generic op is elementwise op, bubble up the expand shape
