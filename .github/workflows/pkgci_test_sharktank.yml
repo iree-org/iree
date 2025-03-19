@@ -83,6 +83,4 @@ jobs:
               --override-ini=xfail_strict=false \
               -m ${{ matrix.target }} \
               --timeout=120 \
-              --durations=0 \
-              --ignore=iree-test-suites/sharktank_models/benchmarks \
-              --ignore=iree-test-suites/sharktank_models/quality_tests
+              --durations=0
