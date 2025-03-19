@@ -36,7 +36,6 @@ jobs:
             runs-on: nodai-amdgpu-w7900-x86-64
 
           - name: rocm_hip_mi300
-            target: target_hip
             gpu: gfx942
             runs-on: linux-mi300-2gpu-ossci-iree-org
 
