@@ -64,7 +64,6 @@ class ConfigureCITest(unittest.TestCase):
         )
         self.assertCountEqual(jobs, all_jobs)
 
-    @unittest.skip("skipped while there are no postsubmit only jobs")
     def test_get_enabled_jobs_postsubmit(self):
         trailers = {}
         default_jobs = {"job1", "job2", "job3"}
@@ -82,7 +81,6 @@ class ConfigureCITest(unittest.TestCase):
         )
         self.assertCountEqual(jobs, all_jobs)
 
-    @unittest.skip("skipped while there are no postsubmit only jobs")
     def test_get_enabled_jobs_no_postsubmit(self):
         trailers = {}
         default_jobs = {"job1", "job2", "job3"}
@@ -100,7 +98,6 @@ class ConfigureCITest(unittest.TestCase):
         )
         self.assertCountEqual(jobs, default_jobs)
 
-    @unittest.skip("skipped while there are no postsubmit only jobs")
     def test_get_enabled_jobs_llvm_integrate(self):
         trailers = {}
         default_jobs = {"job1", "job2", "job3"}
@@ -118,7 +115,6 @@ class ConfigureCITest(unittest.TestCase):
         )
         self.assertCountEqual(jobs, all_jobs)
 
-    @unittest.skip("skipped while there are no postsubmit only jobs")
     def test_get_enabled_jobs_no_modifies(self):
         trailers = {}
         default_jobs = {"job1", "job2", "job3"}
@@ -136,7 +132,6 @@ class ConfigureCITest(unittest.TestCase):
         )
         self.assertCountEqual(jobs, {})
 
-    @unittest.skip("skipped while there are no postsubmit only jobs")
     def test_get_enabled_jobs_skip(self):
         trailers = {configure_ci.Trailer.SKIP_JOBS: "job1,job2"}
         default_jobs = {"job1", "job2", "job3"}
@@ -154,7 +149,6 @@ class ConfigureCITest(unittest.TestCase):
         )
         self.assertCountEqual(jobs, {"job3"})
 
-    @unittest.skip("skipped while there are no postsubmit only jobs")
     def test_get_enabled_jobs_skip_all(self):
         trailers = {configure_ci.Trailer.SKIP_JOBS: "all"}
         default_jobs = {"job1", "job2", "job3"}
@@ -172,7 +166,6 @@ class ConfigureCITest(unittest.TestCase):
         )
         self.assertCountEqual(jobs, {})
 
-    @unittest.skip("skipped while there are no postsubmit only jobs")
     def test_get_enabled_jobs_extra(self):
         postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         trailers = {configure_ci.Trailer.EXTRA_JOBS: postsubmit_job}
@@ -190,7 +183,6 @@ class ConfigureCITest(unittest.TestCase):
         )
         self.assertCountEqual(jobs, all_jobs)
 
-    @unittest.skip("skipped while there are no postsubmit only jobs")
     def test_get_enabled_jobs_exactly(self):
         postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         trailers = {configure_ci.Trailer.EXACTLY_JOBS: postsubmit_job}
@@ -207,6 +199,39 @@ class ConfigureCITest(unittest.TestCase):
             is_llvm_integrate_pr=is_llvm_integrate_pr,
         )
         self.assertCountEqual(jobs, {postsubmit_job})
+
+    def test_get_enabled_jobs_windows(self):
+        trailers = {}
+        all_jobs = {"job1"}
+        is_pr = True
+        is_llvm_integrate_pr = False
+        modified_paths = ["runtime/src/iree/base/internal/threading_win32.c"]
+        jobs = configure_ci.get_enabled_jobs(
+            trailers,
+            all_jobs,
+            modified_paths=modified_paths,
+            is_pr=is_pr,
+            is_llvm_integrate_pr=is_llvm_integrate_pr,
+        )
+        expected_jobs = {"job1", "windows_x64_msvc"}
+        self.assertCountEqual(jobs, expected_jobs)
+
+    def test_get_enabled_jobs_windows_docs(self):
+        # docs/ directory is excluded from CI, superceding "windows" inclusion
+        trailers = {}
+        all_jobs = {"job1"}
+        is_pr = True
+        is_llvm_integrate_pr = False
+        modified_paths = ["docs/windows.md"]
+        jobs = configure_ci.get_enabled_jobs(
+            trailers,
+            all_jobs,
+            modified_paths=modified_paths,
+            is_pr=is_pr,
+            is_llvm_integrate_pr=is_llvm_integrate_pr,
+        )
+        expected_jobs = {}
+        self.assertCountEqual(jobs, expected_jobs)
 
     def test_parse_path_from_workflow_ref(self):
         path = configure_ci.parse_path_from_workflow_ref(
