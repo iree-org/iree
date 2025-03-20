@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -56,11 +57,16 @@ struct LowerPackPattern : public OpRewritePattern<linalg::PackOp> {
     if (controlFn && failed(controlFn.value()(op))) {
       return failure();
     }
+    IREE::Codegen::LoweringConfigAttrInterface originalConfig =
+        (getLoweringConfig(op));
     FailureOr<linalg::LowerPackResult> res =
         linalg::lowerPack(rewriter, op, /*lowerPadLikeWithInsertSlice=*/false);
     if (failed(res)) {
       return rewriter.notifyMatchFailure(
           op, "cannot lower to pad + expand + transpose");
+    }
+    if (originalConfig) {
+      setLoweringConfig(res->transposeOp, originalConfig);
     }
     return success();
   }
