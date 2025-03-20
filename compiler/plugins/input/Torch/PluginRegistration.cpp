@@ -5,7 +5,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "compiler/plugins/input/Torch/InputConversion/Passes.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -55,6 +59,14 @@ struct TorchSession
     registry.insert<mlir::torch::TMTensor::TMTensorDialect>();
     registry.insert<mlir::ml_program::MLProgramDialect>();
     registry.insert<IREE::LinalgExt::IREELinalgExtDialect>();
+
+    // IREE dialects that torch converts into as input to the rest of the
+    // compilation pipeline. Required if we create any attribute, op, or type
+    // (such as util.func, hal.tensor.import, #stream.affinity, etc).
+    registry.insert<IREE::Flow::FlowDialect>();
+    registry.insert<IREE::HAL::HALDialect>();
+    registry.insert<IREE::Stream::StreamDialect>();
+    registry.insert<IREE::Util::UtilDialect>();
   }
 
   bool extendCustomInputConversionPassPipeline(

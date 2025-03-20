@@ -1432,7 +1432,6 @@ def Stream_TensorCloneOp : Stream_PureOp<"tensor.clone", [
   let hasFolder = 1;
 }
 
-// TODO(hanchung): Add folders.
 def Stream_TensorEncodeOp : Stream_PureOp<"tensor.encode", [
   AttrSizedOperandSegments,
   Stream_AffinityOp,
@@ -1484,6 +1483,7 @@ def Stream_TensorEncodeOp : Stream_PureOp<"tensor.encode", [
   }];
 
   let hasVerifier = 1;
+  let hasFolder = 1;
 }
 
 def Stream_TensorSliceOp : Stream_PureOp<"tensor.slice", [

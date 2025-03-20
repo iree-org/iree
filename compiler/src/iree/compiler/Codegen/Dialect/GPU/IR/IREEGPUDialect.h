@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUDIALECT_H_
 
 #include "mlir/IR/Dialect.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/TypeID.h"
 

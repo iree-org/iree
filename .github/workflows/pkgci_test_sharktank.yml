@@ -62,13 +62,13 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: iree-org/iree-test-suites
-          ref: 56509666d185cdb99aafb4ed4d8532b8f3c54fa3
+          ref: fb8ebeea324dccce51af8e725008689cab745600
           path: iree-test-suites
           lfs: true
       - name: Install Sharktank models test suite requirements
         run: |
           source ${VENV_DIR}/bin/activate
-          python -m pip install -r iree-test-suites/sharktank_models/requirements.txt
+          python -m pip install iree-test-suites/sharktank_models/
       - name: Run Sharktank models test suite
         run: |
           source ${VENV_DIR}/bin/activate
@@ -78,4 +78,6 @@ jobs:
               --override-ini=xfail_strict=false \
               -m ${{ matrix.target }} \
               --timeout=120 \
-              --durations=0
+              --durations=0 \
+              --ignore=iree-test-suites/sharktank_models/benchmarks \
+              --ignore=iree-test-suites/sharktank_models/quality_tests
