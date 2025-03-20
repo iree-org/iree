@@ -345,7 +345,8 @@ void LLVMTarget::populateDefaultsFromTargetMachine() {
       cachedTargetMachine = createTargetMachine(*this);
       // TODO(#13988): proper error propagation. This is a common user scenario.
       if (!cachedTargetMachine) {
-        llvm::errs() << "createTargetMachine failed; machine may not be "
+        llvm::errs() << "createTargetMachine(" << getTriple()
+                     << ") failed; machine may not be "
                         "enabled in LLVM\n";
         assert(cachedTargetMachine && "createTargetMachine failed");
       }

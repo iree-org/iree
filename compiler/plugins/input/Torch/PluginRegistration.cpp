@@ -58,9 +58,13 @@ struct TorchSession
     registry.insert<torch::TorchConversion::TorchConversionDialect>();
     registry.insert<mlir::torch::TMTensor::TMTensorDialect>();
     registry.insert<mlir::ml_program::MLProgramDialect>();
+    registry.insert<IREE::LinalgExt::IREELinalgExtDialect>();
+
+    // IREE dialects that torch converts into as input to the rest of the
+    // compilation pipeline. Required if we create any attribute, op, or type
+    // (such as util.func, hal.tensor.import, #stream.affinity, etc).
     registry.insert<IREE::Flow::FlowDialect>();
     registry.insert<IREE::HAL::HALDialect>();
-    registry.insert<IREE::LinalgExt::IREELinalgExtDialect>();
     registry.insert<IREE::Stream::StreamDialect>();
     registry.insert<IREE::Util::UtilDialect>();
   }

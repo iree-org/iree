@@ -88,7 +88,7 @@ struct FuncFuncOpPattern : public OpConversionPattern<func::FuncOp> {
         "vm.signature",
         "vm.version",
         // Overrides.
-        // TODO(benvanik): add a util.func
+        // TODO(benvanik): add a util.func structured attr ala inlining policy.
         "nosideeffects",
     };
     auto retainedAttributes = ArrayRef<const char *>(
