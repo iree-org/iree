@@ -97,7 +97,6 @@ jobs:
         if: "!cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
-          - name: Forward matrix environment variables
           echo "IREE_TEST_FILES=${{ matrix.env.IREE_TEST_FILES }}" >> $GITHUB_ENV
           pytest ./experimental/regression_suite/shark-test-suite-models/sdxl \
             -k ${{ matrix.backend }} \
