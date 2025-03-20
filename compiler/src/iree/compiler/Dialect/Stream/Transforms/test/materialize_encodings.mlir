@@ -2,13 +2,13 @@
 
 #encoding = #iree_encoding.testing_encoding<>
 // CHECK-LABEL: @fold_tensor_encode_op
-// CHECK-SAME:    %[[ARG:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 util.func public @fold_tensor_encode_op(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index) -> !stream.resource<*> {
   // CHECK-NOT: stream.tensor.encode
   %0 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
     %arg0 : tensor<?x?xf32, #encoding>{%arg2, %arg3} in !stream.resource<*>{%arg1}
     -> tensor<?x?xf32, #encoding>{%arg2, %arg3} in !stream.resource<*>{%arg1}
-  // CHECK: return %[[ARG]]
+  // CHECK: return %[[ARG0]]
   util.return %0 : !stream.resource<*>
 }
 
