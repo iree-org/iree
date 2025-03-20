@@ -42,7 +42,7 @@ static llvm::cl::opt<bool> clEnableEarlyMaterialization(
     llvm::cl::desc(
         "Enables early materialization on encodings. Note, this flag should be "
         "false eventually. This does not work for heterogeneous computing."),
-    llvm::cl::init(true));
+    llvm::cl::init(false));
 
 static llvm::cl::opt<DemotionOption> clDemoteContractionInputsToBF16Strategy(
     "iree-global-opt-enable-demote-contraction-inputs-to-bf16",
