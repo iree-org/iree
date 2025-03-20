@@ -89,11 +89,9 @@ Value calculateStorageElementCountInBytes(Location loc,
                                           RankedTensorType shapedType,
                                           ValueRange dynamicDims,
                                           OpBuilder &builder) {
-  Attribute encoding = shapedType.getEncoding();
-  if (auto encodingLayoutAttr =
-          dyn_cast_or_null<IREE::Encoding::SerializableEncodingAttrInterface>(
-              encoding)) {
-    return encodingLayoutAttr.calculateStorageSizeInBytes(
+  if (auto serializableEncodingAttr =
+          IREE::Encoding::getSerializableEncodingAttrInterface(shapedType)) {
+    return serializableEncodingAttr.calculateStorageSizeInBytes(
         loc, builder, shapedType, dynamicDims);
   }
 

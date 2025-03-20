@@ -254,93 +254,28 @@ Value EncodingAttr::calculateStorageSizeInBytes(Location loc,
                                                 OpBuilder &builder,
                                                 RankedTensorType type,
                                                 ValueRange dynamicDims) const {
-  if (ArrayAttr layoutsAttr = getLayouts()) {
-    if (!llvm::all_of(layoutsAttr.getValue(),
-                      llvm::IsaPred<SerializableEncodingAttrInterface>)) {
-      return nullptr;
+  if (!isSerialized()) {
+    return nullptr;
+  }
+
+  ArrayAttr layoutsAttr = getLayouts();
+  if (!llvm::all_of(layoutsAttr.getValue(),
+                    llvm::IsaPred<SerializableEncodingAttrInterface>)) {
+    return nullptr;
+  }
+
+  Value res;
+  for (auto attr :
+       layoutsAttr.getAsRange<SerializableEncodingAttrInterface>()) {
+    Value requestedSize =
+        attr.calculateStorageSizeInBytes(loc, builder, type, dynamicDims);
+    if (!res) {
+      res = requestedSize;
+      continue;
     }
-
-    Value res;
-    for (auto attr :
-         layoutsAttr.getAsRange<SerializableEncodingAttrInterface>()) {
-      Value requestedSize =
-          attr.calculateStorageSizeInBytes(loc, builder, type, dynamicDims);
-      if (!res) {
-        res = requestedSize;
-        continue;
-      }
-      res = builder.create<arith::MaxUIOp>(loc, res, requestedSize);
-    }
-    return res;
+    res = builder.create<arith::MaxUIOp>(loc, res, requestedSize);
   }
-
-  // TODO(hanchung): Deprecate the below logic once EncodingSpecialization pass
-  // is enabled by default. The layouts should be resolved and `roundDimsTo`
-  // will be deprecated.
-  SmallVector<int64_t> paddedShape(type.getShape());
-  SmallVector<Value> paddedDynamicDims(dynamicDims.begin(), dynamicDims.end());
-  ArrayRef<int64_t> roundDimsTo = getRoundDimsToArray();
-  FailureOr<linalg::ContractionDimensions> cDims =
-      getEncodingContractionDims(*this);
-  auto pad = [&](int dim, int value) {
-    std::optional<unsigned> maybeMappedDim = mapDimToOperandIndex(dim);
-    if (!maybeMappedDim) {
-      return;
-    }
-    unsigned mappedDim = maybeMappedDim.value();
-    if (type.isDynamicDim(mappedDim)) {
-      mappedDim = type.getDynamicDimIndex(mappedDim);
-      auto alignment = builder.create<arith::ConstantIndexOp>(loc, value);
-      paddedDynamicDims[mappedDim] = builder.create<arith::CeilDivUIOp>(
-          loc, paddedDynamicDims[mappedDim], alignment);
-      paddedDynamicDims[mappedDim] = builder.create<arith::MulIOp>(
-          loc, paddedDynamicDims[mappedDim], alignment);
-    } else {
-      paddedShape[mappedDim] = llvm::alignTo(paddedShape[mappedDim], value);
-    }
-  };
-  for (auto m : cDims->m) {
-    pad(m, roundDimsTo[0]);
-  }
-  for (auto n : cDims->n) {
-    pad(n, roundDimsTo[1]);
-  }
-  for (auto k : cDims->k) {
-    pad(k, roundDimsTo[2]);
-  }
-
-  constexpr int64_t kNumBitsInByte = 8;
-  unsigned elementBits = getTypeBitWidth(type.getElementType());
-  int64_t numBytesPerElem = 1;
-  if (elementBits > kNumBitsInByte) {
-    numBytesPerElem *= getRoundedElementByteWidth(type.getElementType());
-  }
-
-  int64_t staticCount = numBytesPerElem;
-  for (unsigned i = 0, e = type.getRank(); i < e; ++i) {
-    if (!type.isDynamicDim(i)) {
-      staticCount *= paddedShape[i];
-    }
-  }
-
-  Value result =
-      builder.create<arith::ConstantIndexOp>(loc, staticCount).getResult();
-  for (auto dim : paddedDynamicDims) {
-    result = builder.create<arith::MulIOp>(loc, result, dim);
-  }
-
-  // Always pack the elements back-to-back for subtypes.
-  if (elementBits < kNumBitsInByte) {
-    if (kNumBitsInByte % elementBits) {
-      assert(false && "unsupported subtype");
-      return Value();
-    }
-    Value divisor = builder.create<arith::ConstantIndexOp>(
-        loc, kNumBitsInByte / elementBits);
-    result = builder.create<arith::CeilDivUIOp>(loc, result, divisor);
-  }
-
-  return result;
+  return res;
 }
 
 //===---------------------------------------------------------------------===//
