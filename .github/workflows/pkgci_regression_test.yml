@@ -108,6 +108,7 @@ jobs:
         env:
           ROCM_CHIP: ${{ matrix.rocm-chip }}
           SKU: ${{ matrix.sku }}
+          IREE_TEST_FILES: ${{ matrix.env.IREE_TEST_FILES }}
 
       - name: "Running SD3 special model tests"
         if: "!cancelled()"
