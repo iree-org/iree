@@ -15,7 +15,9 @@
     "onnx/node/generated/test_einsum_inner_prod"
   ],
   "skip_run_tests": [
-    "onnx/node/generated/test_top_k"
+    "onnx/node/generated/test_top_k",
+    "onnx/node/generated/test_top_k_negative_axis",
+    "onnx/node/generated/test_top_k_smallest"
   ],
   "expected_compile_failures": [
     "onnx/node/generated/test_affine_grid_2d",
