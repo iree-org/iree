@@ -1,5 +1,5 @@
 {
-  "config_name": "gpu_rocm_rdna3",
+  "config_name": "gpu_hip_rdna3",
   "iree_compile_flags": [
     "--iree-hal-target-device=hip",
     "--iree-hip-target=gfx1100",
