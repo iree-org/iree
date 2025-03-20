@@ -72,7 +72,8 @@ void AttrBasedPipelinePass::runOnOperation() {
       continue;
     }
 
-    std::string pipelineStr = passPipelineAttr.getPipelineString();
+    std::string pipelineStr =
+        passPipelineAttr.getPipelineString().getValue().str();
     if (failed(parsePassPipeline(pipelineStr, *passManager))) {
       funcLikeOp->emitOpError("failed to populate pass manager specified by : ")
           << pipelineStr;
