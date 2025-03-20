@@ -35,8 +35,10 @@
 // Check that both the user tuning spec and the default spec get linked and
 // materialized. The user spec should have precedence over the default one.
 
+// TODO: Re-add the check for iree_codegen.tuning_spec_with_default_entrypoint
+// once new linking is added and the output IR can pass verification for the default attribute.
+
 // BOTH-LABEL: module @iree_linked_tuning_spec
-// BOTH-SAME:    iree_codegen.tuning_spec_with_default_entrypoint
 // BOTH-SAME:    transform.with_named_sequence
 // BOTH-LABEL:   module @mmt_tile_and_fuse_spec_0 attributes {transform.with_named_sequence}
 // BOTH-LABEL:     transform.named_sequence @main

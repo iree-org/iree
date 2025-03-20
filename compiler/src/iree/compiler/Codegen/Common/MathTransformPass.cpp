@@ -63,12 +63,30 @@ static void populateMathFunctionsRewritePatterns(
 
 static bool predicateRewrite(StringRef name,
                              IREE::HAL::ExecutableTargetAttr target) {
-  (void)target;                // Currently unused.
+  if (name == math::FPowIOp::getOperationName()) {
+    // math.fpowi is a special op: it isn't really a "math function", rather
+    // it is generally used with a constant exponent that is a small integer,
+    // and it is then a shorthand for a few multiplications. That rewrite needs
+    // to happen to prevent falling back on a more expensive, more general
+    // implementation like math.powf.
+    return true;
+  }
   if (clNativeMathPrecision) { // Legacy.
     if (name == math::Exp2Op::getOperationName() ||
         name == math::RoundEvenOp::getOperationName()) {
       return false;
     }
+  }
+  if (isROCMBackend(target)) {
+    // On ROCm, we do not need most rewrites as we can generally bottom out on
+    // either device library functions, or handling of intrinsics in AMDGPU.
+    return false;
+  }
+  if (isWebGPUBackend(target)) {
+    // https://github.com/gpuweb/gpuweb/issues/5109 means we get compilation
+    // errors whenever Inf or NaN values arise at compile-time, which is not
+    // something that we can really prevent. Avoiding this rewrite helps a bit.
+    return false;
   }
   // Currently enable all non-approximative rewrites.
   return true;
@@ -109,6 +127,17 @@ static bool predicateApprox(StringRef name,
     }
     return false;
   }
+  if (isROCMBackend(target)) {
+    // On ROCm, we do not need most rewrites as we can generally bottom out on
+    // either device library functions, or handling of intrinsics in AMDGPU.
+    return false;
+  }
+  if (isWebGPUBackend(target)) {
+    // https://github.com/gpuweb/gpuweb/issues/5109 means we get compilation
+    // errors whenever Inf or NaN values arise at compile-time, which is not
+    // something that we can really prevent. Avoiding this rewrite helps a bit.
+    return false;
+  }
   StringRef acos = math::AcosOp::getOperationName();
   StringRef asin = math::AsinOp::getOperationName();
   StringRef atan = math::AtanOp::getOperationName();
@@ -123,9 +152,6 @@ static bool predicateApprox(StringRef name,
   StringRef expm1 = math::ExpM1Op::getOperationName();
   StringRef cbrt = math::CbrtOp::getOperationName();
   StringRef erf = math::ErfOp::getOperationName();
-  if (isROCMBackend(target) && name == erf) {
-    return false;
-  }
   return llvm::is_contained({atan, atan2, tanh, log, log2, log1p, erf, asin,
                              acos, exp, expm1, cbrt, sin, cos},
                             name);
@@ -133,12 +159,24 @@ static bool predicateApprox(StringRef name,
 
 namespace {
 
+struct DeprecationWarningForNativeMathPrecision {
+  DeprecationWarningForNativeMathPrecision() {
+    if (clNativeMathPrecision) {
+      clNativeMathPrecision.error(
+          "This option is deprecated. The MathTransformPass should do the "
+          "right things for each target.");
+    }
+  }
+};
+
 class MathTransformPass final
     : public impl::MathTransformPassBase<MathTransformPass> {
 public:
   using Base::Base;
 
   void runOnOperation() override {
+    static DeprecationWarningForNativeMathPrecision warning;
+
     RewritePatternSet patterns(&getContext());
     auto target = IREE::HAL::ExecutableTargetAttr::lookup(getOperation());
     if (!target) {

@@ -83,11 +83,8 @@ def SD3_MMDIT_COMMON_RUN_FLAGS(
 ROCM_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
     f"--iree-hip-target={rocm_chip}",
+    "--iree-opt-level=O3",
     "--iree-opt-const-eval=false",
-    "--iree-global-opt-propagate-transposes=true",
-    "--iree-dispatch-creation-enable-aggressive-fusion=true",
-    "--iree-opt-aggressively-propagate-transposes=true",
-    "--iree-opt-outer-dim-concat=true",
     "--iree-vm-target-truncate-unsupported-floats",
     "--iree-llvmgpu-enable-prefetch=true",
     "--iree-opt-data-tiling=false",

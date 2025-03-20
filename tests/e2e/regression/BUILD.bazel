@@ -159,19 +159,6 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "disable_demote_f64_to_f32",
-    srcs = [
-        "disable_demote_f64_to_f32.mlir",
-    ],
-    compiler_flags = [
-        "--iree-input-demote-f64-to-f32=false",
-        "--iree-llvmcpu-target-cpu=generic",
-    ],
-    driver = "local-task",
-    target_backend = "llvm-cpu",
-)
-
-iree_check_single_backend_test_suite(
     name = "aggressive_fusion_test",
     srcs = [
         "softmax.mlir",
@@ -193,7 +180,6 @@ iree_check_single_backend_test_suite(
     name = "check_regression_compilation_only_vmvx_ukernels",
     srcs = [
         "dynamic_matmuls_on_same_accumulator_issue_12060.mlir",
-        "dynamic_tosa_clamp.mlir",
     ],
     compiler_flags = [
         "--iree-vmvx-enable-microkernels",

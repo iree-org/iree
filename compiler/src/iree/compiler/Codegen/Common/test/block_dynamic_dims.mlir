@@ -277,3 +277,34 @@ func.func @block_elementwise(%arg0 : tensor<?xf16>, %dim : index)
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[ELEM]]
 //  CHECK-SAME:     tensor<?x1024xf16> into tensor<?xf16>
 //       CHECK:   return %[[COLLAPSE]] : tensor<?xf16>
+
+// -----
+
+// Check that there are no SSA violations during blocking
+func.func @check_ssa_violation(%dim : index,
+    %lhs : tensor<?xf32>, %rhs : tensor<?xf32>) -> tensor<?xf32> {
+  %c4 = arith.constant 4 : index
+  %0 = arith.muli %dim, %c4 overflow<nsw> : index
+  %1 = tensor.empty(%0) : tensor<?xf32>
+  %2 = linalg.generic {
+        indexing_maps = [affine_map<(d0) -> (d0)>,
+                         affine_map<(d0) -> (d0)>,
+                         affine_map<(d0) -> (d0)>],
+        iterator_types = ["parallel"]}
+        ins(%lhs, %rhs : tensor<?xf32>, tensor<?xf32>)
+        outs(%1 : tensor<?xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %33 = arith.addf %in, %in_0 : f32
+    linalg.yield %33 : f32
+  } -> tensor<?xf32>
+  return %2 : tensor<?xf32>
+}
+// CHECK-LABEL: func @check_ssa_violation
+//  CHECK-SAME:     %[[LHS:[a-zA-Z0-9]+]]: tensor<?xf32>
+//  CHECK-SAME:     %[[RHS:[a-zA-Z0-9]+]]: tensor<?xf32>
+//   CHECK-DAG:   %[[EXPANDED0:.+]] = tensor.expand_shape %[[LHS]]
+//   CHECK-DAG:   %[[EXPANDED1:.+]] = tensor.expand_shape %[[RHS]]
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[EXPANDED0]], %[[EXPANDED1]] :
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[GENERIC]]
+//       CHECK:   return %[[COLLAPSE]]

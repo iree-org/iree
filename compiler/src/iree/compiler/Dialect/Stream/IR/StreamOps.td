@@ -1379,7 +1379,9 @@ def Stream_TensorSplatOp : Stream_PureOp<"tensor.splat", [
 def Stream_TensorCloneOp : Stream_PureOp<"tensor.clone", [
   AttrSizedOperandSegments,
   Stream_AffinityOp,
-  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_StreamableOp, [
+    "preferCloneToConsumers",
+  ]>,
   Stream_TensorPhaseOp,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
@@ -1427,6 +1429,60 @@ def Stream_TensorCloneOp : Stream_PureOp<"tensor.clone", [
   let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def Stream_TensorEncodeOp : Stream_PureOp<"tensor.encode", [
+  AttrSizedOperandSegments,
+  Stream_AffinityOp,
+  Stream_StreamableOp,
+  Stream_TensorPhaseOp,
+  Util_ShapeAwareOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{Encodes the contents of a value}];
+  let description = [{
+    Elones the contents of a value at a snapshot in time. Future changes to the
+    identity encoding will not effect the result. Acts as a copy-on-write
+    operation. Otherwise, an executable for encoding the value is generated
+    during lowering.
+  }];
+
+  let arguments = (ins
+    Stream_AnyStreamResource:$source,
+    TypeAttr:$source_encoding,
+    Stream_ShapeDynamicDims:$source_encoding_dims,
+    Stream_Size:$source_size,
+    TypeAttr:$result_encoding,
+    Stream_ShapeDynamicDims:$result_encoding_dims,
+    Stream_Size:$result_size,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_AnyStreamResource:$result
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    $source `:`
+    $source_encoding (`` `{` $source_encoding_dims^ `}`)?
+    `in`
+    type($source) `` `{` $source_size `}`
+    `->`
+    $result_encoding (`` `{` $result_encoding_dims^ `}`)?
+    `in`
+    type($result) `` `{` $result_size `}`
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceEncodingDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getResultEncodingDims(); }
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
+  }];
+
+  let hasVerifier = 1;
   let hasFolder = 1;
 }
 
@@ -2491,7 +2547,9 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
-  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_StreamableOp, [
+    "preferCloneToConsumers",
+  ]>,
   DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
     "getAsyncAccessRanges",
   ]>,

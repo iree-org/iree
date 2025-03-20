@@ -96,15 +96,16 @@ struct LLVMGPUVectorLoweringPass final
       // Lower high level vector operations like contract or multidim reduce ops
       // to lower level vector ops.
       RewritePatternSet contractLoweringPatterns(funcOp.getContext());
+      auto options =
+          vector::VectorTransformsOptions().setVectorTransformsOptions(
+              vector::VectorContractLowering::OuterProduct);
       vector::populateVectorTransferPermutationMapLoweringPatterns(
           contractLoweringPatterns);
       vector::TransposeOp::getCanonicalizationPatterns(contractLoweringPatterns,
                                                        funcOp.getContext());
       vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorContractLoweringPatterns(
-          contractLoweringPatterns,
-          vector::VectorTransformsOptions().setVectorTransformsOptions(
-              vector::VectorContractLowering::OuterProduct));
+          contractLoweringPatterns, options.vectorContractLowering);
       contractLoweringPatterns.add<PromoteContractOperands>(
           funcOp->getContext());
       vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);

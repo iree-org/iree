@@ -568,6 +568,7 @@ include(iree_cc_binary_benchmark)
 include(iree_hal_cts_test_suite)
 include(iree_static_linker_test)
 include(iree_plugin_register)
+include(iree_genrule)
 
 # Default any sub-tree which doesn't provide its own package namespacing
 # to derive it relative to this directory and prefixed with iree/.

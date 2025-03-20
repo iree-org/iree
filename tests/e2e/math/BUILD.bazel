@@ -1,0 +1,55 @@
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
+load("//build_tools/bazel:iree_genrule.bzl", "iree_genrule")
+
+package(
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+testcases = [
+    (
+        # Input JSON file describing testcases
+        "math_ops_%s.json" % backend,
+        # Output generated MLIR test file.
+        "math_ops_%s.mlir" % backend,
+    )
+    for backend in [
+        "llvm-cpu",
+        "rocm",
+    ]
+]
+
+[iree_genrule(
+    name = "gen_%s" % generated_src,
+    srcs = [
+        "generate.py",
+        testcases_json,
+    ],
+    outs = [generated_src],
+    cmd = " ".join([
+        "python3",
+        "$(rootpath generate.py)",
+        "--testcases=$(rootpath %s)" % testcases_json,
+        "> $(execpath %s)" % generated_src,
+    ]),
+) for testcases_json, generated_src in testcases]
+
+[iree_check_single_backend_test_suite(
+    name = "math_ops_%s" % backend,
+    srcs = ["//tests/e2e/math:math_ops_%s.mlir" % backend],
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"] if backend == "llvm-cpu" else [],
+    driver = driver,
+    target_backend = backend,
+    deps = [
+        "gen_math_ops_%s.mlir" % backend,
+    ],
+) for backend, driver in [
+    ("llvm-cpu", "local-task"),
+    ("rocm", "hip"),
+]]

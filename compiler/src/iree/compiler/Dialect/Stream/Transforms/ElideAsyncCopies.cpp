@@ -390,8 +390,17 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
   });
 
   // If this clone is performing a type change we need to preserve it.
+  //
   // TODO(benvanik): remove this carveout - could make clone not change type
   // and transfer be needed instead.
+  //
+  // HACK: the constant check is to support initializers that have lifetime
+  // transfers to constants. This is clearly bad and can lead to additional
+  // weirdness later on in the program, but without it resource usage analysis
+  // will try to treat entire IR trees that result in a constant transfer as if
+  // they are unknown. The real fix is to the analysis by possibly marking
+  // values as "eventually constant" to allow us to promote to constant
+  // lifetime.
   auto sourceType =
       llvm::cast<IREE::Stream::ResourceType>(cloneOp.getSource().getType());
   auto targetType =
@@ -680,8 +689,9 @@ struct ElideAsyncCopiesPass
           ElideAsyncCopiesPass> {
   void runOnOperation() override {
     auto moduleOp = getOperation();
-    if (moduleOp.getBody()->empty())
+    if (moduleOp.getBody()->empty()) {
       return;
+    }
 
     // Try analyzing the program and eliding the unneeded copies until we reach
     // a fixed point (no more copies can be elided).
@@ -692,7 +702,7 @@ struct ElideAsyncCopiesPass
       // TODO(benvanik): reuse allocator across iterations.
       ElisionAnalysis analysis(moduleOp);
       if (failed(analysis.run())) {
-        moduleOp.emitError() << "failed to solve for last users";
+        moduleOp.emitError() << "failed to solve for elision analysis";
         return signalPassFailure();
       }
 
@@ -700,18 +710,19 @@ struct ElideAsyncCopiesPass
       // If we can't elide any we'll consider the iteration complete and exit.
       bool didChange = false;
       for (auto callableOp : analysis.getTopLevelOps()) {
-        auto *region = callableOp.getCallableRegion();
-        if (!region)
-          continue;
-        didChange = tryElideAsyncCopiesInRegion(*region, analysis) || didChange;
+        if (auto *region = callableOp.getCallableRegion()) {
+          didChange =
+              tryElideAsyncCopiesInRegion(*region, analysis) || didChange;
+        }
       }
-      if (!didChange)
-        break;
+      if (!didChange) {
+        break; // quiesced
+      }
     }
     if (iterationCount == maxIterationCount) {
       // If you find yourself hitting this we can evaluate increasing the
       // iteration count (if it would eventually converge) or whether we allow
-      // this to happen without remarking. For now all our programs coverge in
+      // this to happen without remarking. For now all our programs converge in
       // just one or two iterations and this needs to be tuned with more complex
       // control flow.
       moduleOp.emitRemark()

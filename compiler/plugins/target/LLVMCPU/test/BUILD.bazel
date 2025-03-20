@@ -16,6 +16,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "hal_target_device_attributes.mlir",
             "materialize_homogeneous_encodings.mlir",
             "smoketest_embedded.mlir",
             "smoketest_system.mlir",
@@ -24,8 +25,10 @@ iree_lit_test_suite(
     ),
     cfg = "//compiler:lit.cfg.py",
     tools = [
+        "//tools:iree-compile",
         "//tools:iree-opt",
         "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
+        "@llvm-project//llvm:not",
     ],
 )

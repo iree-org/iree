@@ -48,8 +48,6 @@ void addIREEComprehensiveBufferizePasses(
         std::nullopt,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
 
-void addConstantBufferizePasses(OpPassManager &funcPassManager);
-
 /// Populate Encoding to Nop pass and canonicalizer pass to the pipeline.
 void addEncodingToNopPasses(FunctionLikeNest &passManager);
 

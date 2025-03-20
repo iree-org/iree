@@ -69,6 +69,7 @@ iree_status_t iree_hal_metal_allocator_create(
 
   if (iree_status_is_ok(status)) {
     iree_hal_resource_initialize(&iree_hal_metal_allocator_vtable, &allocator->resource);
+    allocator->parent_device = parent_device;
     allocator->device = [device retain];  // +1
     allocator->is_unified_memory = [device hasUnifiedMemory];
     allocator->resource_tracking_mode = resource_tracking_mode;

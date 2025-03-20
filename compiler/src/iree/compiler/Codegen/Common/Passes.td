@@ -23,6 +23,7 @@ def BlockDynamicDimensionsPass
     : Pass<"iree-codegen-block-dynamic-dimensions"> {
   let summary = "Expand dynamic dimensions that are known to be multiples of "
                 "statically known values.";
+  let dependentDialects = ["iree_compiler::IREE::Util::UtilDialect"];
 }
 
 def BubbleUpOrdinalOpsPass : Pass<"iree-codegen-bubble-up-ordinal-ops", ""> {
@@ -270,6 +271,7 @@ def EraseHALDescriptorTypeFromMemRefPass
 def ConvertHALDescriptorTypeToGPUAddressSpacePass
     : Pass<"iree-codegen-convert-hal-descriptor-type-to-gpu-address-space"> {
   let summary = "Convert #hal.descriptor_type to #gpu.address_space<global>";
+  let dependentDialects = ["::mlir::gpu::GPUDialect"];
 }
 
 def ExtractAddressComputationPass : Pass<"iree-codegen-extract-address-computation"> {
@@ -390,6 +392,11 @@ def HoistStaticallyBoundAllocationsPass :
   let dependentDialects = [
       "affine::AffineDialect"
   ];
+}
+
+def IREEBufferizeConstantsPass :
+    Pass<"iree-codegen-iree-bufferize-constants", ""> {
+  let summary = "Convert from arith.constant on tensors to buffers";
 }
 
 def IREEComprehensiveBufferizePass :

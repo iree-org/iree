@@ -185,9 +185,6 @@ nav:
               - Util: "reference/mlir-dialects/Util.md"
               - VM: "reference/mlir-dialects/VM.md"
               - VMVX: "reference/mlir-dialects/VMVX.md"
-          # Dialects from llvm-external-projects/iree-dialects/
-          - "Public dialects":
-              - IREEInput: "reference/mlir-dialects/IREEInput.md"
       - "Other topics":
           - Glossary: "reference/glossary.md"
           - Optimization options: "reference/optimization-options.md"

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --canonicalize %s | iree-opt --split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: @FoldParameterLoadTargetSubview
 // CHECK-SAME: (%[[WAIT:.+]]: !stream.timepoint, %[[OFFSET0:.+]]: index, %[[LENGTH0:.+]]: index, %[[OFFSET1:.+]]: index, %[[LENGTH1:.+]]: index)

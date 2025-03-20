@@ -1,4 +1,4 @@
-// RUN: iree-compile --iree-hal-target-backends=vmvx %s | iree-check-module --device=local-task --module=-
+// RUN: iree-compile --iree-hal-target-backends=vmvx --iree-input-demote-f64-to-f32=false %s | iree-check-module --device=local-task --module=-
 
 func.func @expect_true() {
   %true = util.unfoldable_constant 1 : i32
@@ -47,9 +47,51 @@ func.func @expect_almost_eq() {
   return
 }
 
-func.func @expect_almost_eq_const() {
+func.func @expect_almost_eq_const_f32() {
   %const0 = util.unfoldable_constant dense<[1.0, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf32>
   check.expect_almost_eq_const(%const0, dense<[0.999999, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf32>) : tensor<5xf32>
+  return
+}
+
+func.func @expect_almost_eq_const_f64() {
+  %const0 = util.unfoldable_constant dense<[1.0, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf64>
+  check.expect_almost_eq_const(%const0, dense<[0.999, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf64>, atol 1.0e-2) : tensor<5xf64>
+  return
+}
+
+func.func @expect_almost_eq_const_f16() {
+  %const0 = util.unfoldable_constant dense<[0.0, 100.0]> : tensor<2xf16>
+  check.expect_almost_eq_const(%const0, dense<[0.009, 99.0]> : tensor<2xf16>, atol 1.5e-2, rtol 1.5e-2) : tensor<2xf16>
+  return
+}
+
+func.func @expect_almost_eq_const_bf16() {
+  %const0 = util.unfoldable_constant dense<[0.0, 100.0]> : tensor<2xbf16>
+  check.expect_almost_eq_const(%const0, dense<[0.009, 99.0]> : tensor<2xbf16>, atol 1.5e-2, rtol 1.5e-2) : tensor<2xbf16>
+  return
+}
+
+func.func @expect_almost_eq_const_f8E5M2() {
+  %const0 = util.unfoldable_constant dense<[0.0, 100.0]> : tensor<2xf8E5M2>
+  check.expect_almost_eq_const(%const0, dense<[0.2, 80.0]> : tensor<2xf8E5M2>, atol 0.3, rtol 0.3) : tensor<2xf8E5M2>
+  return
+}
+
+func.func @expect_almost_eq_const_f8E5M2FNUZ() {
+  %const0 = util.unfoldable_constant dense<[0.0, 100.0]> : tensor<2xf8E5M2FNUZ>
+  check.expect_almost_eq_const(%const0, dense<[0.2, 80.0]> : tensor<2xf8E5M2FNUZ>, atol 0.3, rtol 0.3) : tensor<2xf8E5M2FNUZ>
+  return
+}
+
+func.func @expect_almost_eq_const_f8E4M3FN() {
+  %const0 = util.unfoldable_constant dense<[0.0, 100.0]> : tensor<2xf8E4M3FN>
+  check.expect_almost_eq_const(%const0, dense<[0.2, 80.0]> : tensor<2xf8E4M3FN>, atol 0.3, rtol 0.3) : tensor<2xf8E4M3FN>
+  return
+}
+
+func.func @expect_almost_eq_const_f8E4M3FNUZ() {
+  %const0 = util.unfoldable_constant dense<[0.0, 100.0]> : tensor<2xf8E4M3FNUZ>
+  check.expect_almost_eq_const(%const0, dense<[0.2, 80.0]> : tensor<2xf8E4M3FNUZ>, atol 0.3, rtol 0.3) : tensor<2xf8E4M3FNUZ>
   return
 }
 

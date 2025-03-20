@@ -51,7 +51,7 @@ LogicalResult linkBitcodeModule(
   // target attributes they won't be modified.
   auto bitcodeModule = std::move(bitcodeModuleValue.get());
   bitcodeModule->setDataLayout(targetMachine.createDataLayout());
-  bitcodeModule->setTargetTriple(targetMachine.getTargetTriple().str());
+  bitcodeModule->setTargetTriple(targetMachine.getTargetTriple());
 
   // Inject target-specific flags to specialize the bitcode prior to linking.
   if (specializationCallback) {

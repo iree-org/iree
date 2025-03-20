@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --canonicalize %s | iree-opt --split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize %s | FileCheck %s
 
 // Tests that a fence with no timepoints gets turned into a null value.
 // This avoids the allocation and lets the null propagate through the rest of

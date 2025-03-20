@@ -290,7 +290,7 @@ static LogicalResult linkObjects(Location loc, llvm::Module &module,
   // Ensure consistent target information.
   const llvm::Triple &targetTriple = targetMachine.getTargetTriple();
   module.setDataLayout(targetMachine.createDataLayout());
-  module.setTargetTriple(targetTriple.str());
+  module.setTargetTriple(targetTriple);
 
   auto specializationCallback = [&](llvm::Module &userModule) {
     // TODO(thomasraoux): inject __nvvm_reflect-style functions/globals for
@@ -566,7 +566,7 @@ public:
           return variantOp.emitError() << "cannot initialize target triple";
         }
         targetMachine.reset(target->createTargetMachine(
-            triple.str(), targetArch, targetFeatures, {}, {}));
+            triple, targetArch, targetFeatures, {}, {}));
         if (targetMachine == nullptr) {
           return variantOp.emitError() << "cannot initialize target machine";
         }

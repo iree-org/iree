@@ -239,16 +239,28 @@ Access to affiliated repositories is divided into tiers:
 | Tier | Description | Team link |
 | ---- | ----------- | --------- |
 Triage | **New project members should typically start here**<br>:material-check: Can be [assigned issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/assigning-issues-and-pull-requests-to-other-github-users)<br>:material-check: Can apply labels to issues / PRs<br>:material-check: Can run workflows [without approval](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks) | [iree-triage](https://github.com/orgs/iree-org/teams/iree-triage)
-Write | **Established project contributors should request this access**<br>:material-check: Can [merge approved pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request)<br>:material-check: Can create branches | [iree-write](https://github.com/orgs/iree-org/teams/iree-write)
+Write | **Established project contributors should request this access**<br>:material-check: Can [merge approved pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request)<br>:material-check: Can create branches<br>:material-check: Can [re-run workflows](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/re-running-workflows-and-jobs) | [iree-write](https://github.com/orgs/iree-org/teams/iree-write)
 Maintain/Admin | :material-check: Can [edit repository settings](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features)<br>:material-check: Can push to [protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) | Added case-by-case
 
 All access tiers first require joining the
-[iree-org GitHub organization](https://github.com/iree-org/).
+[iree-org GitHub organization](https://github.com/iree-org/). To request
+membership in iree-org, send an email to
+<iree-github-requests@lists.lfaidata.foundation> with this template:
+
+```text
+GitHub username:
+
+Company/organization you are associated with:
+
+Reason for requesting access:
+```
 
 <!-- markdownlint-disable-next-line -->
-[Fill out this form to request access :fontawesome-solid-paper-plane:](https://docs.google.com/forms/d/e/1FAIpQLSfEwANtMvLJWq-ED4lub_xsMch0MgNY02VxgtXE61FqNvNVUg/viewform){ .md-button .md-button--primary }
+[Send this email template to request access :fontawesome-solid-paper-plane:](mailto:iree-github-requests@lists.lfaidata.foundation?&subject=Requesting%20membership%20in%20iree-org&body=GitHub%20username:%0D%0A%0D%0ACompany/organization%20you%20are%20associated%20with:%0D%0A%0D%0AReason%20for%20requesting access:){ .md-button .md-button--primary }
 
-Once you are a member of the iree-org GitHub organization, you can request to
+If approved, an invitation will be sent to your GitHub account. You can also
+view the [invitation link](https://github.com/orgs/iree-org/invitation)
+directly. Then, once you are a member of the organization, you can request to
 join any of the teams on <https://github.com/orgs/iree-org/teams>.
 
 ### :octicons-git-branch-16: Branch naming
@@ -317,7 +329,6 @@ ci-skip: jobs,to,skip
 ci-extra: extra,jobs,to,run
 ci-exactly: exact,set,of,jobs,to,run
 skip-ci: free form reason
-runner-env: [testing|prod]
 ```
 
 ??? info - "Using `skip-ci`"
@@ -354,17 +365,6 @@ runner-env: [testing|prod]
     dependencies are satisfied. Thus, if you request skipping the
     `build_packages` job, all the jobs that depend on it will fail, not be
     skipped.
-
-??? info - "Using `runner-env`"
-
-    The `runner-env` option controls which runner environment to target for our
-    self-hosted runners. We maintain a test environment to allow testing out new
-    configurations prior to rolling them out. This trailer is for advanced users
-    who are working on the CI infrastructure itself.
-
-    ``` text
-    runner-env: [testing|prod]
-    ```
 
 ##### CI configuration recipes
 

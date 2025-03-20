@@ -25,14 +25,3 @@ util.func public @zero_sized_tensor_insert(%arg0 : tensor<?x?xf32>, %arg1 : tens
 }
 // CHECK: util.func public @zero_sized_tensor_insert(%[[ARG0:.+]]: tensor<?x?xf32>
 // CHECK:   util.return %[[ARG0]]
-
-// -----
-
-util.func public @zero_sizes_tensor_insert_dest(%arg0 : tensor<0x?xf32>, %arg1 : index) -> tensor<0x?xf32> {
-  %0 = tensor.empty(%arg1) : tensor<0x?xf32>
-  %1 = tensor.insert_slice %arg0 into %0[0, 0] [0, %arg1] [1, 1] : tensor<0x?xf32> into tensor<0x?xf32>
-  util.return %1 : tensor<0x?xf32>
-}
-// CHECK: util.func public @zero_sizes_tensor_insert_dest(%[[ARG0:.+]]: tensor<0x?xf32>, %[[ARG1:.+]]: index)
-// CHECK:   %[[EMPTY:.+]] = tensor.empty(%[[ARG1]])
-// CHECK:   util.return %[[EMPTY]]

@@ -75,6 +75,13 @@ resolveAliasAttr(Operation *forOp, IREE::HAL::DeviceAliasAttr aliasAttr,
         defaultAttr.getExecutableTargets());
   }
 
+  if (defaultAttr.getExecutableTargets().empty()) {
+    return forOp->emitError()
+           << "device alias " << aliasAttr.getDeviceID()
+           << " does not provide any executable targets; ensure "
+              "device-specific compilation backends have been specified";
+  }
+
   return defaultAttr;
 }
 

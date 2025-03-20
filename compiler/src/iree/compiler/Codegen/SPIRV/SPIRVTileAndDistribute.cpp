@@ -71,7 +71,7 @@ tileToInvocation(mlir::FunctionOpInterface funcOp,
 
   for (auto op : candidates) {
     FailureOr<IREETilingResult> res =
-        tileDispatchUsingSCFFopOp(rewriter, op, tilingOptions);
+        tileDispatchUsingSCFForOp(rewriter, op, tilingOptions);
     if (failed(res)) {
       return failure();
     }

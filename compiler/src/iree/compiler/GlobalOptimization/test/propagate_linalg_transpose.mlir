@@ -733,3 +733,22 @@ util.func public @bubble_transpose_v_from_attention(%q: tensor<2x10x4096x64xf16>
 // CHECK-SAME:    ins(%[[ARG0]], %[[ARG1]], %[[TRANS_V]], %[[ARG5]] : tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, tensor<2x10x64x4096xf16>, f16)
 // CHECK-SAME:    outs(%[[EMPTY]] : tensor<2x10x4096x64xf16>)
 // CHECK:         util.return %[[ATTN]] : tensor<2x10x4096x64xf16>
+
+// -----
+
+util.func public @dont_reshape_reduction(%arg0: tensor<16x4x4xf32>, %arg1: tensor<16x16xf32>) -> tensor<16x16xf32> {
+  %empty1 = tensor.empty(): tensor<16x4x4xf32>
+  %0 = linalg.transpose ins(%arg0 : tensor<16x4x4xf32>)
+      outs(%empty1 : tensor<16x4x4xf32>) permutation = [0, 2, 1]
+  %collapse = tensor.collapse_shape %0 [[0], [1, 2]] : tensor<16x4x4xf32> into tensor<16x16xf32>
+  %empty2 = tensor.empty(): tensor<16x16xf32>
+  %1 = linalg.matmul ins(%collapse, %arg1: tensor<16x16xf32>, tensor<16x16xf32>)
+                            outs(%empty2 : tensor<16x16xf32>) -> tensor<16x16xf32>
+
+  util.return %1 : tensor<16x16xf32>
+}
+// APROP-LABEL: util.func public @dont_reshape_reduction
+//       APROP:   %[[V0:.+]] = linalg.transpose
+//       APROP:   %[[V1:.+]] = tensor.collapse_shape %[[V0]]
+//       APROP:   %[[V2:.+]] = linalg.matmul ins(%[[V1]]
+//       APROP:   util.return %[[V2]]

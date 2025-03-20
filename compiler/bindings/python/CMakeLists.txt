@@ -210,6 +210,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Core
 
   # Core dialects.
+  MLIRPythonSources.Dialects.affine
   MLIRPythonSources.Dialects.amdgpu
   MLIRPythonSources.Dialects.arith
   MLIRPythonSources.Dialects.builtin
@@ -232,6 +233,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.transform.extras
   MLIRPythonSources.Dialects.transform.interpreter
   MLIRPythonSources.Dialects.vector
+  MLIRPythonSources.Dialects.vector_transform
 
   # iree-dialects project.
   IREEDialectsPythonSources

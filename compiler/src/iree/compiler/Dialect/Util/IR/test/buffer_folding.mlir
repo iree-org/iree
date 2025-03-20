@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --canonicalize %s | iree-opt --split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: @FoldSubspansIntoSliceOp
 util.func public @FoldSubspansIntoSliceOp(%arg0: !util.buffer, %arg1: index, %arg2: index, %arg3: index) -> !util.buffer {

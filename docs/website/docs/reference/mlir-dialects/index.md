@@ -34,16 +34,4 @@ Dialect                     | Description
 [VM](./VM.md)               | Represents operations against an abstract virtual machine
 [VMVX](./VMVX.md)           | Virtual Machine Vector Extensions
 
-## IREE public dialects
-
-The ops in these dialects are legal to include in compiler inputs. The sources
-for these dialects can be found in the
-[`llvm-external-projects/iree-dialects/` directory](https://github.com/iree-org/iree/tree/main/llvm-external-projects/iree-dialects)
-that is designed to be used from other projects via LLVM's external projects
-mechanism.
-
-Dialect                             | Description
-------------------------------------| -----------
-[IREEInput](./IREEInput.md)         | Structural ops legal as input to IREE's compiler
-
 [^1]: Hardware Abstraction Layer

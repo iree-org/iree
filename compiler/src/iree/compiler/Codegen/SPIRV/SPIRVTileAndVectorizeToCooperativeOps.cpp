@@ -295,20 +295,20 @@ public:
     SmallVector<Value> newSources;
     for (auto [srcIdx, source] : llvm::enumerate(sources)) {
       auto map = op.getIndexingMapsArray()[srcIdx];
-      auto tranposeOp = source.getDefiningOp<vector::TransposeOp>();
-      if (!tranposeOp) {
+      auto transposeOp = source.getDefiningOp<vector::TransposeOp>();
+      if (!transposeOp) {
         newSources.push_back(source);
         newMaps.push_back(map);
         continue;
       }
-      ArrayRef<int64_t> perm = tranposeOp.getPermutation();
+      ArrayRef<int64_t> perm = transposeOp.getPermutation();
       SmallVector<AffineExpr> exprs(perm.size());
       for (auto [remapIdx, remap] : llvm::enumerate(perm)) {
         exprs[remap] = map.getResult(remapIdx);
       }
       newMaps.push_back(
           AffineMap::get(map.getNumDims(), map.getNumSymbols(), exprs, ctx));
-      newSources.push_back(tranposeOp.getVector());
+      newSources.push_back(transposeOp.getVector());
       foundTranspose = true;
     }
     if (!foundTranspose)

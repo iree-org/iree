@@ -29,7 +29,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-// Pattern to canonialize tranpose where only one dimension is not unit
+// Pattern to canonialize transpose where only one dimension is not unit
 // dimension. In this case the transpose is a no-op and should be simplified
 // before getting to the conversion to llvm/spirv.
 // TODO(thomasraoux): This should be moved in

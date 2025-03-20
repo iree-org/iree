@@ -62,7 +62,6 @@ class Trailer(str, enum.Enum):
     SKIP_JOBS = "ci-skip"
     EXTRA_JOBS = "ci-extra"
     EXACTLY_JOBS = "ci-exactly"
-    RUNNER_ENV = "runner-env"
 
     # Before Python 3.12, it the native __contains__ doesn't work for checking
     # member values like this and it's not possible to easily override this.
@@ -107,9 +106,6 @@ SKIP_PATH_PATTERNS = [
     "*AUTHORS",
     "*LICENSE",
 ]
-
-RUNNER_ENV_DEFAULT = "prod"
-RUNNER_ENV_OPTIONS = [RUNNER_ENV_DEFAULT, "testing"]
 
 CONTROL_JOB_REGEXES = frozenset(
     [
@@ -330,19 +326,6 @@ def modifies_non_skip_paths(paths: Optional[Iterable[str]]) -> bool:
     return any(not skip_path(p) for p in paths)
 
 
-def get_runner_env(trailers: Mapping[str, str]) -> str:
-    runner_env = trailers.get(Trailer.RUNNER_ENV)
-    if runner_env is None:
-        print(
-            f"Using '{RUNNER_ENV_DEFAULT}' runners because"
-            f" '{Trailer.RUNNER_ENV}' not found in {trailers}"
-        )
-        runner_env = RUNNER_ENV_DEFAULT
-    else:
-        print(f"Using runner environment '{runner_env}' from PR description trailers")
-    return runner_env
-
-
 def parse_jobs_trailer(
     trailers: Mapping[str, str], key: str, all_jobs: Set[str]
 ) -> Set[str]:
@@ -518,8 +501,6 @@ def main():
     output = {
         "enabled-jobs": json.dumps(sorted(enabled_jobs)),
         "is-pr": json.dumps(is_pr),
-        "runner-env": get_runner_env(trailers),
-        "runner-group": "presubmit" if is_pr else "postsubmit",
         "write-caches": "0" if is_pr else "1",
     }
 

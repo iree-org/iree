@@ -33,6 +33,7 @@ enum class SanitizerKind {
 struct LLVMTarget {
   static constexpr const char *DEFAULT_DATA_LAYOUT = "";
   static constexpr int64_t DEFAULT_VECTOR_WIDTH_IN_BYTES = 0;
+  static constexpr int64_t DEFAULT_MAX_STACK_ALLOC_SIZE_IN_BYTES = 32768;
   static constexpr bool DEFAULT_LINK_EMBEDDED = true;
   static constexpr bool DEFAULT_DEBUG_SYMBOLS = true;
   static constexpr SanitizerKind DEFAULT_SANITIZER_KIND = SanitizerKind::kNone;
@@ -88,6 +89,7 @@ struct LLVMTarget {
   std::string dataLayout = DEFAULT_DATA_LAYOUT;
   // Overrides the vector width (in bytes) of the target.
   int64_t vectorWidthInBytes = DEFAULT_VECTOR_WIDTH_IN_BYTES;
+  int64_t maxStackAllocSizeInBytes = DEFAULT_MAX_STACK_ALLOC_SIZE_IN_BYTES;
 
   llvm::PipelineTuningOptions pipelineTuningOptions;
   // Optimization level to be used by the LLVM optimizer (middle-end).
@@ -194,6 +196,8 @@ struct LLVMCPUTargetCLOptions {
   llvm::FloatABI::ABIType targetFloatABI = LLVMTarget::DEFAULT_FLOAT_ABI;
   std::string targetDataLayout = LLVMTarget::DEFAULT_DATA_LAYOUT;
   unsigned targetVectorWidthInBytes = LLVMTarget::DEFAULT_VECTOR_WIDTH_IN_BYTES;
+  llvm::cl::PowerOf2ByteSize targetMaxStackAllocSizeInBytes =
+      LLVMTarget::DEFAULT_MAX_STACK_ALLOC_SIZE_IN_BYTES;
   std::string enableUkernels = LLVMTarget::DEFAULT_ENABLE_UKERNELS;
   bool linkUKernelBitcode = LLVMTarget::DEFAULT_LINK_UKERNEL_BITCODE;
   bool listTargets; // Ignored - used with llvm::cl::ValueDisallowed.

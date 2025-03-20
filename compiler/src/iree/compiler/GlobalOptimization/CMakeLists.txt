@@ -63,6 +63,7 @@ iree_cc_library(
     "RemoveZeroExtentTensors.cpp"
     "SimplifyPackUnpack.cpp"
     "Utils.cpp"
+    "WarnOnUninitializedValues.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen

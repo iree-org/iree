@@ -23,9 +23,9 @@ func.func @test_other_types_not_converted(%arg0: tensor<2x2xi32>) -> tensor<2x2x
 // CHECK-LABEL: @test_attrs_converted
 func.func @test_attrs_converted() -> (i48, tensor<2xi48>) {
   // CHECK: %[[ARITH_C:.+]] = arith.constant 0 : i64
-  // CHECK: %[[TOSA_C:.+]] = "tosa.const"() <{value = dense<0> : tensor<2xi64>}> : () -> tensor<2xi64>
+  // CHECK: %[[TOSA_C:.+]] = "tosa.const"() <{values = dense<0> : tensor<2xi64>}> : () -> tensor<2xi64>
   // CHECK: return %[[ARITH_C]], %[[TOSA_C]] : i64, tensor<2xi64>
   %0 = "arith.constant"() {value = 0 : i48} : () -> i48
-  %1 = "tosa.const"() <{value = dense<0> : tensor<2xi48>}> : () -> tensor<2xi48>
+  %1 = "tosa.const"() <{values = dense<0> : tensor<2xi48>}> : () -> tensor<2xi48>
   return %0, %1 : i48, tensor<2xi48>
 }

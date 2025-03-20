@@ -57,8 +57,84 @@ struct FuseHorizontalContractionsPass final
 
 } // namespace
 
+/// For indexing maps of Linalg ops passed in as `indexingMaps`, permute them
+/// such that `seedLhsIndexingMap` is same as `indexingMaps[0]`. Returns the
+/// permutation of the iteration space of the RHS. Returns failure if the
+/// permutation of `iteratorTypes` results in a change of `iteratorTypes`. This
+/// is so that permutation doesnt change the position of reduction iterator
+/// type.
+static std::optional<SmallVector<int64_t>>
+permuteIndexingMapsToMatchSeedLhs(MLIRContext *context,
+                                  AffineMap seedLhsIndexingMap,
+                                  ArrayRef<utils::IteratorType> iteratorTypes,
+                                  SmallVector<AffineMap> &indexingMaps) {
+  if (indexingMaps.empty()) {
+    return std::nullopt;
+  }
+  AffineMap lhsIndexingMap = indexingMaps[0];
+  if (seedLhsIndexingMap == lhsIndexingMap) {
+    return llvm::to_vector(llvm::seq<int64_t>(0, lhsIndexingMap.getNumDims()));
+  }
+
+  assert(lhsIndexingMap.getNumDims() == seedLhsIndexingMap.getNumDims());
+  if (!lhsIndexingMap.isProjectedPermutation() ||
+      !seedLhsIndexingMap.isProjectedPermutation() ||
+      lhsIndexingMap.getNumResults() != seedLhsIndexingMap.getNumResults()) {
+    return std::nullopt;
+  }
+
+  auto getResultDimsRange = [](ArrayRef<AffineExpr> exprs) {
+    return llvm::map_range(exprs, [](AffineExpr expr) {
+      return cast<AffineDimExpr>(expr).getPosition();
+    });
+  };
+  auto seedLhsResultDimsRange =
+      getResultDimsRange(seedLhsIndexingMap.getResults());
+  auto lhsResultDimsRange = getResultDimsRange(lhsIndexingMap.getResults());
+
+  // Start with an identity permutations. For now try to only swap dimensions
+  // which is not a general solution.
+  SmallVector<int64_t> interchangeVector =
+      llvm::to_vector(llvm::seq<int64_t>(0, lhsIndexingMap.getNumDims()));
+  for (auto [seedDimPos, lhsDimPos] :
+       llvm::zip_equal(seedLhsResultDimsRange, lhsResultDimsRange)) {
+    if (seedDimPos == lhsDimPos) {
+      continue;
+    }
+    // If the current positions are what we started with, swap the positions.
+    if (interchangeVector[lhsDimPos] == lhsDimPos &&
+        interchangeVector[seedDimPos] == seedDimPos) {
+      std::swap(interchangeVector[lhsDimPos], interchangeVector[seedDimPos]);
+      continue;
+    }
+    // If this was a changed dimension, check that it is consistent.
+    if (interchangeVector[lhsDimPos] != seedDimPos ||
+        interchangeVector[seedDimPos] != lhsDimPos) {
+      return std::nullopt;
+    }
+  }
+
+  // Check that the iterator types remain the same
+  SmallVector<utils::IteratorType> permutedIteratorTypes =
+      llvm::to_vector(iteratorTypes);
+  applyPermutationToVector(permutedIteratorTypes, interchangeVector);
+  if (permutedIteratorTypes != iteratorTypes) {
+    return std::nullopt;
+  }
+
+  AffineMap interchangeMap =
+      AffineMap::getPermutationMap(interchangeVector, context);
+  for (auto &map : indexingMaps) {
+    if (!map.isEmpty()) {
+      map = map.compose(interchangeMap);
+    }
+  }
+  return interchangeVector;
+}
+
 /// Helper method to check operations equivalence
-static bool checkContractionOpEquivalence(Operation *aOp, Operation *bOp) {
+static bool checkContractionOpEquivalence(MLIRContext *context, Operation *aOp,
+                                          Operation *bOp) {
   auto aLinalgOp = dyn_cast<linalg::LinalgOp>(aOp);
   auto bLinalgOp = dyn_cast<linalg::LinalgOp>(bOp);
 
@@ -77,10 +153,25 @@ static bool checkContractionOpEquivalence(Operation *aOp, Operation *bOp) {
   }
 
   // Check that the n-dimensions are the same
+  SmallVector<AffineMap> aIndexingMaps = aLinalgOp.getIndexingMapsArray();
+  SmallVector<AffineMap> bIndexingMaps = bLinalgOp.getIndexingMapsArray();
+  SmallVector<utils::IteratorType> aIteratorTypes =
+      aLinalgOp.getIteratorTypesArray();
+  SmallVector<utils::IteratorType> bIteratorTypes =
+      bLinalgOp.getIteratorTypesArray();
+  std::optional<SmallVector<int64_t>> bPermutationVector;
+  if (aIndexingMaps[0] != bIndexingMaps[0]) {
+    bPermutationVector = permuteIndexingMapsToMatchSeedLhs(
+        context, aIndexingMaps[0], bIteratorTypes, bIndexingMaps);
+    if (!bPermutationVector) {
+      return false;
+    }
+  }
+
   FailureOr<linalg::ContractionDimensions> aContractionDims =
-      linalg::inferContractionDims(aLinalgOp);
+      linalg::inferContractionDims(aIndexingMaps);
   FailureOr<linalg::ContractionDimensions> bContactionDims =
-      linalg::inferContractionDims(bLinalgOp);
+      linalg::inferContractionDims(bIndexingMaps);
   if (failed(aContractionDims) || failed(bContactionDims)) {
     return false;
   }
@@ -90,6 +181,9 @@ static bool checkContractionOpEquivalence(Operation *aOp, Operation *bOp) {
 
   SmallVector<int64_t, 4> aStaticDims = aLinalgOp.getStaticLoopRanges();
   SmallVector<int64_t, 4> bStaticDims = bLinalgOp.getStaticLoopRanges();
+  if (bPermutationVector) {
+    applyPermutationToVector(bStaticDims, bPermutationVector.value());
+  }
   for (auto nDim : aContractionDims->n) {
     if (aStaticDims[nDim] != bStaticDims[nDim] ||
         ShapedType::isDynamic(aStaticDims[nDim])) {
@@ -167,7 +261,7 @@ static bool isHorizontalToGroup(Operation *op,
 ///
 /// Note: The actual operation generated does not concat the RHS.
 static std::optional<SmallVector<Operation *>> getHorizontalFusionGroupMembers(
-    linalg::LinalgOp seedOp,
+    MLIRContext *context, linalg::LinalgOp seedOp,
     const llvm::SmallDenseSet<Operation *> &groupedOperations,
     const DominanceInfo &dominanceInfo, int fusionLimit) {
 
@@ -184,7 +278,7 @@ static std::optional<SmallVector<Operation *>> getHorizontalFusionGroupMembers(
 
     // Constraints of the operation itself.
     if (!linalg::isaContractionOpInterface(linalgOp) ||
-        !checkContractionOpEquivalence(linalgOp, seedOp)) {
+        !checkContractionOpEquivalence(context, linalgOp, seedOp)) {
       return false;
     }
     if (groupedOperations.contains(linalgOp)) {
@@ -242,78 +336,6 @@ static std::optional<SmallVector<Operation *>> getHorizontalFusionGroupMembers(
   return contractionOps;
 }
 
-/// Permute the indexing maps of the operation marked for horizontal
-/// fusion to make sure all the LHS operands of the horizontally fused
-/// ops have the same indexing map.
-static LogicalResult
-permuteIndexingMapsToMatchSeedLhs(RewriterBase &rewriter,
-                                  AffineMap seedLhsIndexingMap,
-                                  ArrayRef<utils::IteratorType> iteratorTypes,
-                                  SmallVector<AffineMap> &indexingMaps) {
-  if (indexingMaps.empty()) {
-    return failure();
-  }
-  AffineMap lhsIndexingMap = indexingMaps[0];
-  if (seedLhsIndexingMap == lhsIndexingMap) {
-    return success();
-  }
-
-  assert(lhsIndexingMap.getNumDims() == seedLhsIndexingMap.getNumDims());
-  if (!lhsIndexingMap.isProjectedPermutation() ||
-      !seedLhsIndexingMap.isProjectedPermutation() ||
-      lhsIndexingMap.getNumResults() != seedLhsIndexingMap.getNumResults()) {
-    return failure();
-  }
-
-  auto getResultDimsRange = [](ArrayRef<AffineExpr> exprs) {
-    return llvm::map_range(exprs, [](AffineExpr expr) {
-      return cast<AffineDimExpr>(expr).getPosition();
-    });
-  };
-  auto seedLhsResultDimsRange =
-      getResultDimsRange(seedLhsIndexingMap.getResults());
-  auto lhsResultDimsRange = getResultDimsRange(lhsIndexingMap.getResults());
-
-  // Start with an identity permutations. For now try to only swap dimensions
-  // which is not a general solution.
-  SmallVector<int64_t> interchangeVector =
-      llvm::to_vector(llvm::seq<int64_t>(0, lhsIndexingMap.getNumDims()));
-  for (auto [seedDimPos, lhsDimPos] :
-       llvm::zip_equal(seedLhsResultDimsRange, lhsResultDimsRange)) {
-    if (seedDimPos == lhsDimPos) {
-      continue;
-    }
-    // If the current positions are what we started with, swap the positions.
-    if (interchangeVector[lhsDimPos] == lhsDimPos &&
-        interchangeVector[seedDimPos] == seedDimPos) {
-      std::swap(interchangeVector[lhsDimPos], interchangeVector[seedDimPos]);
-      continue;
-    }
-    // If this was a changed dimension, check that it is consistent.
-    if (interchangeVector[lhsDimPos] != seedDimPos ||
-        interchangeVector[seedDimPos] != lhsDimPos) {
-      return failure();
-    }
-  }
-
-  // Check that the iterator types remain the same
-  SmallVector<utils::IteratorType> permutedIteratorTypes =
-      llvm::to_vector(iteratorTypes);
-  applyPermutationToVector(permutedIteratorTypes, interchangeVector);
-  if (permutedIteratorTypes != iteratorTypes) {
-    return failure();
-  }
-
-  AffineMap interchangeMap =
-      AffineMap::getPermutationMap(interchangeVector, rewriter.getContext());
-  for (auto &map : indexingMaps) {
-    if (!map.isEmpty()) {
-      map = map.compose(interchangeMap);
-    }
-  }
-  return success();
-}
-
 /// Generate the horizontally fused operation as an operation with multiple
 /// results, corresponding to the results of the fused operations. It is assumed
 /// that the LHS of the contraction operations fused horizontally is the same
@@ -353,9 +375,9 @@ fuseContractionsHorizontally(RewriterBase &rewriter, Location loc,
     }
 
     SmallVector<AffineMap> opIndexingMaps = linalgOp.getIndexingMapsArray();
-    if (failed(permuteIndexingMapsToMatchSeedLhs(rewriter, seedOpLhsIndexingMap,
-                                                 fusedIteratorTypes,
-                                                 opIndexingMaps))) {
+    if (!permuteIndexingMapsToMatchSeedLhs(
+            rewriter.getContext(), seedOpLhsIndexingMap, fusedIteratorTypes,
+            opIndexingMaps)) {
       droppedOps.insert(op);
       continue;
     }
@@ -480,7 +502,7 @@ void FuseHorizontalContractionsPass::runOnOperation() {
     }
 
     std::optional<SmallVector<Operation *>> fusionGroup =
-        getHorizontalFusionGroupMembers(linalgOp, groupedOperations,
+        getHorizontalFusionGroupMembers(context, linalgOp, groupedOperations,
                                         dominanceInfo, fusionLimit);
 
     if (!fusionGroup) {

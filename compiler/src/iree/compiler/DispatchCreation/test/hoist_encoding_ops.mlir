@@ -84,8 +84,8 @@ util.func public @bubble_through_dequant(
 // CHECK-DAG:   #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 // CHECK-DAG:   #[[MAP4:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 // CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]], round_dims_to = array<i64: 32, 32, 32>>
-// CHECK-DAG:   #[[$ENCODING_IBMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]], bcast_map = #[[MAP3]], round_dims_to = array<i64: 32, 32, 32>>
-// CHECK-DAG:   #[[$ENCODING_BMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]], bcast_map = #[[MAP4]], round_dims_to = array<i64: 32, 32, 32>>
+// CHECK-DAG:   #[[$ENCODING_IBMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], [#[[MAP1]], #[[MAP3]]], #[[MAP2]]], round_dims_to = array<i64: 32, 32, 32>>
+// CHECK-DAG:   #[[$ENCODING_BMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], [#[[MAP1]], #[[MAP4]]], #[[MAP2]]], round_dims_to = array<i64: 32, 32, 32>>
 // CHECK-LABEL: @bubble_through_dequant
 // CHECK-SAME:    %[[ARG0:.+]]: tensor<2x11008x128xi8>,
 // CHECK-SAME:    %[[ARG1:.+]]: tensor<2x11008xf32>, %[[ARG2:.+]]: tensor<2x11008xf32>
@@ -128,7 +128,7 @@ util.func public @bubble_through_broadcast(
 // CHECK-DAG:   #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
 // CHECK-DAG:   #[[MAP4:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 // CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]], round_dims_to = array<i64: 32, 32, 32>>
-// CHECK-DAG:   #[[$ENCODING_BMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]], bcast_map = #[[MAP3]], round_dims_to = array<i64: 32, 32, 32>>
+// CHECK-DAG:   #[[$ENCODING_BMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], [#[[MAP1]], #[[MAP3]]], #[[MAP2]]], round_dims_to = array<i64: 32, 32, 32>>
 // CHECK-LABEL: @bubble_through_broadcast
 // CHECK-SAME:    %[[ARG0:.+]]: tensor<11008x128xf32>
 // CHECK-DAG:   %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[ARG0]] : tensor<11008x128xf32> -> tensor<11008x128xf32, #[[$ENCODING_BMAP]]>

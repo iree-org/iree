@@ -143,7 +143,7 @@ func.func @encoding_tensors_with_ops(%arg0 : tensor<?x?xf32>,
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], bcast_map = #map3>
+#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [[#map, #map3], #map1, #map2]>
 func.func @set_encoding_ops_with_indexing_maps(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32, #encoding> {
   %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
   return %0 : tensor<?x?xf32, #encoding>
@@ -153,7 +153,7 @@ func.func @set_encoding_ops_with_indexing_maps(%arg0: tensor<?x?xf32>) -> tensor
 // CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK-DAG:   #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 // CHECK-DAG:   #[[ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32],
-// CHECK-SAME:    user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], bcast_map = #[[MAP3]]
+// CHECK-SAME:    user_indexing_maps = {{\[}}[#[[MAP0]], #[[MAP3]]], #[[MAP1]], #[[MAP2]]{{\]}}
 // CHECK:       func.func @set_encoding_ops_with_indexing_maps(
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]:
 // CHECK:         iree_encoding.set_encoding %[[ARG0]] : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING]]>

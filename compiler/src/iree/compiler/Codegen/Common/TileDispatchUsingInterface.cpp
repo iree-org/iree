@@ -263,7 +263,7 @@ static LogicalResult replaceAllStoresWithTiledVersion(
 }
 
 FailureOr<IREETilingResult>
-tileDispatchUsingSCFFopOp(RewriterBase &rewriter, TilingInterface op,
+tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
                           linalg::LinalgTilingOptions options) {
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointAfter(op);
@@ -491,7 +491,7 @@ tileAndFuseDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
   auto fusableProducers = getAllFusableProducers(op);
   // Apply the tiling pattern.
   FailureOr<IREETilingResult> tilingResult =
-      tileDispatchUsingSCFFopOp(rewriter, op, tilingOptions);
+      tileDispatchUsingSCFForOp(rewriter, op, tilingOptions);
   if (failed(tilingResult)) {
     return failure();
   }

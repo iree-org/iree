@@ -1242,7 +1242,7 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
   let description = [{
     This operator is part of the first step in converting a convolution to
     its Winograd equivalent. Given a tile of an input image (I),
-    this operator computes matmul(tranpose(B), matmul(I, B)).
+    this operator computes matmul(transpose(B), matmul(I, B)).
     The input tile is assumed to be square with each side of size m + r - 1,
     where the convolutional kernel is m x m and the output tile size is r x r.
     B is a constant 2-d square matrix of the same shape as the input tile I.

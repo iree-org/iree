@@ -104,6 +104,28 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
     }
   }
 
+  // Set tile sizes for full tiles to zero. This prevents single trip loops from
+  // being created, which can sometimes block certain cleanup patterns from
+  // applying during producer fusion.
+  if (auto tilingInterfaceOp = dyn_cast<TilingInterface>(tilableOp)) {
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(tilingInterfaceOp);
+    SmallVector<Range> bounds = tilingInterfaceOp.getIterationDomain(rewriter);
+    SmallVector<int64_t> staticLoopSizes;
+    SmallVector<Value> d;
+    for (Range bound : bounds) {
+      dispatchIndexOpFoldResult(bound.size, d, staticLoopSizes);
+    }
+    OpFoldResult zero = rewriter.getIndexAttr(0);
+    SmallVector<int64_t> tileSizesInt = tilableOpConfig.getWorkgroupTileSizes();
+    for (auto loopId : llvm::seq<unsigned>(0, tileSizesInt.size())) {
+      if (loopId < staticLoopSizes.size() &&
+          staticLoopSizes[loopId] == tileSizesInt[loopId]) {
+        tileSizes[loopId] = zero;
+      }
+    }
+  }
+
   return TilingInfo{tilableOp, tileSizes, interchange};
 }
 
@@ -481,6 +503,12 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   // TODO(Max191): Replace populateSwapExtractWithExpandPattern with upstream
   // MLIR version once it is available (llvm-project/pull/126898).
   populateSwapExtractWithExpandPattern(cleanupPatterns);
+  // When fusing pads we do not want to generate zeroSliceGuards when doing
+  // workgroup tiling. In `GPUApplyTilingLevelPass` we do have an option called
+  // `allowZeroSlices` that can control this but we do not want these
+  // generated if workgroup tiling is happening first.
+  cleanupPatterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
+      context, [](tensor::ExtractSliceOp) { return /*zeroSliceGuard=*/false; });
   tileAndFuseOptions.cleanupPatterns =
       FrozenRewritePatternSet(std::move(cleanupPatterns));
 
@@ -491,6 +519,9 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
           bool isDestinationOperand)
       -> std::optional<scf::SCFTileAndFuseOptions::ControlFnResult> {
     Operation *owner = originalProducer.getOwner();
+    if (isa<tensor::PadOp>(owner)) {
+      return std::nullopt;
+    }
     bool yieldProducerReplacement = yieldReplacementsFor.contains(owner);
     return scf::SCFTileAndFuseOptions::ControlFnResult{
         yieldProducerReplacement};

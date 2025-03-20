@@ -89,6 +89,10 @@ void DecomposeIm2colPass::runOnOperation() {
 
   RewritePatternSet patterns(context);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
+  // After im2col is decomposed, im2col extract slice can be swapped with input
+  // padding.
+  patterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
+      context, [](tensor::ExtractSliceOp) { return false; });
   if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
   }

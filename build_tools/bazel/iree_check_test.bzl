@@ -25,6 +25,7 @@ def iree_check_test(
         runner_args = [],
         tags = [],
         timeout = None,
+        deps = [],
         **kwargs):
     """Creates an iree-check-module test for the specified source file.
 
@@ -53,11 +54,13 @@ def iree_check_test(
         "--iree-hal-target-backends=%s" % target_backend,
     ] + compiler_flags + input_type_flags
     bytecode_module_name = name + "_bytecode_module"
+
     iree_bytecode_module(
         name = bytecode_module_name,
         src = src,
         flags = flags,
         tags = ["target=%s" % target_backend],
+        deps = deps,
         visibility = ["//visibility:private"],
     )
 
@@ -86,6 +89,7 @@ def iree_check_single_backend_test_suite(
         input_type = None,
         runner_args = [],
         tags = [],
+        deps = [],
         timeout = None,
         **kwargs):
     """Creates a test suite of iree-check-module tests for a single backend/driver pair.
@@ -124,7 +128,7 @@ def iree_check_single_backend_test_suite(
 
     tests = []
     for src in srcs:
-        test_name = "_".join([name, src])
+        test_name = "_".join([name, src]).replace("/", "_").replace(":", "_")
         iree_check_test(
             name = test_name,
             src = src,
@@ -135,6 +139,7 @@ def iree_check_single_backend_test_suite(
             runner_args = runner_args,
             tags = tags,
             timeout = timeout,
+            deps = deps,
             **kwargs
         )
         tests.append(test_name)
@@ -161,6 +166,7 @@ def iree_check_test_suite(
         runner_args = [],
         tags = [],
         target_cpu_features_variants = [],
+        deps = [],
         **kwargs):
     """Creates a test suite of iree-check-module tests.
 
@@ -205,6 +211,7 @@ def iree_check_test_suite(
             input_type = input_type,
             runner_args = runner_args,
             tags = tags,
+            deps = deps,
             **kwargs
         )
         tests.append(suite_name)

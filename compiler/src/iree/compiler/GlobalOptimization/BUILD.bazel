@@ -67,6 +67,7 @@ iree_compiler_cc_library(
         "RemoveZeroExtentTensors.cpp",
         "SimplifyPackUnpack.cpp",
         "Utils.cpp",
+        "WarnOnUninitializedValues.cpp",
     ],
     hdrs = [
         "Passes.h",

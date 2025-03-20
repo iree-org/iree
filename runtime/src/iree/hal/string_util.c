@@ -572,6 +572,22 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element(
       n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu64,
                    *(const uint64_t*)data.data);
       break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FN:
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                   iree_math_f8e4m3fn_to_f32(*(const uint8_t*)data.data));
+      break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ:
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                   iree_math_f8e4m3fnuz_to_f32(*(const uint8_t*)data.data));
+      break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2:
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                   iree_math_f8e5m2_to_f32(*(const uint8_t*)data.data));
+      break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ:
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                   iree_math_f8e5m2fnuz_to_f32(*(const uint8_t*)data.data));
+      break;
     case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
       n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
                    iree_math_bf16_to_f32(*(const uint16_t*)data.data));

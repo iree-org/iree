@@ -77,7 +77,6 @@ util.func public @attention_v_reshape_propagation(%arg0: index,
 util.func @multiple_users(%arg0 : tensor<?x128xf16>,
     %arg1 : tensor<4x?x32x128xf16>) -> tensor<4x?x32x8x16xf16> {
   %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
   %dim = tensor.dim %arg0, %c0 : tensor<?x128xf16>
   %empty = tensor.empty(%dim) : tensor<4x?x32x128xf16>
   %0 = linalg.generic {
@@ -97,7 +96,7 @@ util.func @multiple_users(%arg0 : tensor<?x128xf16>,
       %2 = arith.addf %1, %b0 : f16
       linalg.yield %2 : f16
   } -> tensor<4x?x32x128xf16>
-  %1 = tensor.dim %0, %c1 : tensor<4x?x32x128xf16>
+  %1 = tensor.dim %arg0, %c0 : tensor<?x128xf16>
   %2 = tensor.expand_shape %0 [[0], [1], [2], [3, 4]] output_shape [4, %1, 32, 8, 16]
       : tensor<4x?x32x128xf16> into tensor<4x?x32x8x16xf16>
   util.return %2 : tensor<4x?x32x8x16xf16>

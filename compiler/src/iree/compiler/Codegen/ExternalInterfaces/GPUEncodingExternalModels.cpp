@@ -34,6 +34,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 
 #include <cassert>
 #include <cfloat>
@@ -415,9 +416,8 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     auto encodingAttr = cast<Encoding::EncodingAttr>(type.getEncoding());
 
     const int64_t rank = type.getRank();
-    SmallVector<int32_t> padValues(rank, 0);
-    auto noPaddingAttr = Encoding::PadEncodingLayoutAttr::get(
-        ctx, DenseI32ArrayAttr::get(ctx, padValues));
+    auto noPaddingAttr =
+        Encoding::PadEncodingLayoutAttr::getIdentityAttr(ctx, rank);
     if (encodingAttr.getOpType().getValue() !=
         IREE::Encoding::EncodingOpType::matmul) {
       // We only support simple matmuls for now.
@@ -449,6 +449,32 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
       return noPaddingAttr;
     }
 
+    // Bail out on matvec / vecmat and skinny matmul problems.
+    {
+      int64_t parallelDimSize = 1;
+      ArrayRef<unsigned> parallelDims =
+          (operandIndex == 0) ? contractionDims->m : contractionDims->n;
+      for (unsigned parallelDim : parallelDims) {
+        if (std::optional<unsigned> dimIdx =
+                encodingAttr.mapDimToOperandIndex(parallelDim)) {
+          int64_t dimSize = shape[*dimIdx];
+          if (ShapedType::isDynamic(dimSize)) {
+            parallelDimSize = ShapedType::kDynamic;
+            break;
+          }
+          parallelDimSize *= dimSize;
+        }
+      }
+
+      // TODO(#19897): Use `getMatmulNarrowDim`.
+      static constexpr int64_t kSkinnyMatmulThreshold = 64;
+      if (!ShapedType::isDynamic(parallelDimSize) &&
+          parallelDimSize < kSkinnyMatmulThreshold) {
+        // This matmul is skinny, do not pad.
+        return noPaddingAttr;
+      }
+    }
+
     const int64_t elementBits = type.getElementTypeBitWidth();
     const int64_t cacheLineBytes = padLayoutAttr.getCacheLineBytes();
     if (elementBits % 8 != 0 || elementBits > cacheLineBytes) {
@@ -464,6 +490,11 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
         padLayoutAttr.getCacheSets() * cacheLineBytes;
     const int64_t dimSizeInBytes =
         type.getDimSize(*padDimensionIndex) * (elementBits / 8);
+    if (dimSizeInBytes < cacheSetSpanBytes) {
+      // Very small dimension, leave as-is.
+      return noPaddingAttr;
+    }
+
     int64_t padBytes = 0;
     if (int64_t unalignedBytes = dimSizeInBytes % cacheLineBytes;
         unalignedBytes != 0) {
@@ -480,9 +511,9 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
            "Incorrect pad amount");
     assert(padBytes < cacheSetSpanBytes && "Incorrect pad amount");
     const int64_t numPadElements = (padBytes * 8) / elementBits;
+    SmallVector<int32_t> padValues(rank, 0);
     padValues[*padDimensionIndex] = numPadElements;
-    auto padLayout = Encoding::PadEncodingLayoutAttr::get(
-        ctx, DenseI32ArrayAttr::get(ctx, padValues));
+    auto padLayout = Encoding::PadEncodingLayoutAttr::get(ctx, padValues);
     return padLayout;
   }
 };

@@ -30,7 +30,7 @@ layer without much smarts and magic.
 
 Unlike CUDA, HIP doesn't provide two separate API's with the same functionality
 in the name of driver and runtime. Instead it extends the HIP API with Modules
-and Ctx control API's that the CUDA driver API's exclusively offer.At runtime
+and Ctx control API's that the CUDA driver API's exclusively offer. At runtime
 the HIP HAL driver will load the `libamdhip64.so`/`amdhip64.dll` library dynamically.
 
 ## GPU Objects
@@ -46,7 +46,7 @@ and device enumeration and creation.
 `iree_hal_hip_device_t` implements [`iree_hal_device_t`][hal-device] to provide
 the interface to HIP GPU device by wrapping a `hipDevice_t`.
 For each device, right now we create two `hipStream_t`s--one for issuing commands
-for memory allocation and kernel lauches as instructed by the program; the other
+for memory allocation and kernel launches as instructed by the program; the other
 for issue host callback functions after dispatched command buffers completes.
 See synchronization section regarding the details.
 

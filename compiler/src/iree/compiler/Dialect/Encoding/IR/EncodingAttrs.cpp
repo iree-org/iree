@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
@@ -19,44 +20,133 @@
 
 #include <cassert>
 
+#define DEBUG_TYPE "iree-encoding-attrs"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
+
 namespace mlir::iree_compiler::IREE::Encoding {
+
+//===---------------------------------------------------------------------===//
+// encoding.encoding
+//===---------------------------------------------------------------------===//
+
+/// Returns a composed affine map from the provided attribute. `attr` can be
+/// either an `AffineMapAttr` or an `ArrayAttr` containing `AffineMapAttr`. In
+/// case of an empty `attr`, an empty affine map is returned. In case of
+/// unrecognized attribute types, a failure is returned.
+static FailureOr<AffineMap> getComposedAffineMap(Attribute attr) {
+  if (!attr) {
+    return AffineMap();
+  }
+  if (auto mapAttr = llvm::dyn_cast<AffineMapAttr>(attr)) {
+    return mapAttr.getAffineMap();
+  }
+  if (auto mapsAttr = llvm::dyn_cast<ArrayAttr>(attr)) {
+    if (mapsAttr.empty()) {
+      return AffineMap();
+    }
+    // All entries should have type `AffineMapAttr`.
+    if (!llvm::all_of(mapsAttr, [](Attribute attr) {
+          return isa<AffineMapAttr>(attr);
+        })) {
+      return failure();
+    }
+    AffineMap map =
+        llvm::cast<AffineMapAttr>(mapsAttr[mapsAttr.size() - 1]).getAffineMap();
+    for (ssize_t i = mapsAttr.size() - 2; i >= 0; i--) {
+      map = map.compose(llvm::cast<AffineMapAttr>(mapsAttr[i]).getAffineMap());
+    }
+    return map;
+  }
+  // Return failure in case of an unrecognized attribute type.
+  return failure();
+}
 
 EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
                                EncodingOpType opType, ArrayRef<Type> elemTypes,
                                ArrayRef<AffineMap> maps,
-                               std::optional<AffineMap> bcastMap,
                                ArrayRef<int64_t> roundDimsTo,
                                ArrayRef<Attribute> layouts) {
   Builder b(ctx);
   auto opTypeAttr = EncodingOpTypeAttr::get(ctx, opType);
+  auto mapsAttr = maps.empty() ? ArrayAttr() : b.getAffineMapArrayAttr(maps);
   auto roundDimsToAttr = roundDimsTo.empty()
                              ? DenseI64ArrayAttr()
                              : b.getDenseI64ArrayAttr(roundDimsTo);
-  auto bcastMapAttr = bcastMap.has_value()
-                          ? AffineMapAttr::get(bcastMap.value())
-                          : AffineMapAttr();
   auto layoutsAttr = layouts.empty() ? ArrayAttr() : b.getArrayAttr(layouts);
   return get(ctx, b.getIndexAttr(operandIndex), opTypeAttr,
-             b.getTypeArrayAttr(elemTypes), b.getAffineMapArrayAttr(maps),
-             bcastMapAttr, roundDimsToAttr, layoutsAttr);
+             b.getTypeArrayAttr(elemTypes), mapsAttr, roundDimsToAttr,
+             layoutsAttr);
+}
+
+LogicalResult
+EncodingAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
+                     IntegerAttr operandIndexAttr,
+                     EncodingOpTypeAttr opTypeAttr, ArrayAttr elementTypesAttr,
+                     ArrayAttr userIndexingMapsAttr,
+                     DenseArrayAttr roundDimsToAttr, ArrayAttr layoutsAttr) {
+  if (userIndexingMapsAttr) {
+    unsigned index = operandIndexAttr.getValue().getZExtValue();
+    if (index >= userIndexingMapsAttr.size()) {
+      return emitError()
+             << "`operandIndex` exceeds the size of `user_indexing_maps`";
+    }
+    for (auto &&[idx, attr] : llvm::enumerate(userIndexingMapsAttr)) {
+      if (failed(getComposedAffineMap(attr))) {
+        return emitError() << "found a non-composable attribute in "
+                              "`user_indexing_maps` at index: "
+                           << idx;
+      }
+    }
+  }
+  return success();
 }
 
 AffineMap EncodingAttr::getMapForOperandIndex() const {
-  auto index = getOperandIndex().getValue().getZExtValue();
-  switch (index) {
-  case MATMUL_LHS:
-  case MATMUL_RHS:
-  case MATMUL_RESULT: {
-    auto indexingMap =
-        llvm::cast<AffineMapAttr>(getUserIndexingMaps()[index]).getAffineMap();
-    if (auto bcastMap = getBcastMap()) {
-      indexingMap = bcastMap.getAffineMap().compose(indexingMap);
-    }
-    return indexingMap;
-  }
-  default:
+  unsigned index = getOperandIndex().getValue().getZExtValue();
+  ArrayAttr userIndexingMaps = getUserIndexingMaps();
+  if (!userIndexingMaps) {
     return AffineMap();
   }
+  FailureOr<AffineMap> map = getComposedAffineMap(userIndexingMaps[index]);
+  assert(!failed(map) &&
+         "Expected a composable map. The verifier should ensure that all "
+         "`user_indexing_maps` are composable.");
+  return map.value();
+}
+
+SmallVector<AffineMap> EncodingAttr::getRootMaps() const {
+  return llvm::map_to_vector(
+      getUserIndexingMaps(), [](Attribute m) -> AffineMap {
+        if (auto mapAttr = llvm::dyn_cast<AffineMapAttr>(m)) {
+          return llvm::cast<AffineMapAttr>(m).getAffineMap();
+        }
+        if (auto mapsAttr = llvm::dyn_cast<ArrayAttr>(m)) {
+          if (mapsAttr.empty())
+            return AffineMap();
+          return llvm::cast<AffineMapAttr>(mapsAttr[0]).getAffineMap();
+        }
+        return AffineMap();
+      });
+}
+
+AffineMap EncodingAttr::getLastMapForOperandIndex() const {
+  unsigned index = getOperandIndex().getValue().getZExtValue();
+  ArrayAttr userIndexingMaps = getUserIndexingMaps();
+  if (!userIndexingMaps) {
+    return AffineMap();
+  }
+  Attribute indexingMap = userIndexingMaps[index];
+  if (auto mapAttr = llvm::dyn_cast<AffineMapAttr>(indexingMap)) {
+    return mapAttr.getAffineMap();
+  }
+  if (auto mapsAttr = llvm::dyn_cast<ArrayAttr>(indexingMap)) {
+    if (mapsAttr.empty())
+      return AffineMap();
+    return llvm::cast<AffineMapAttr>(mapsAttr[mapsAttr.size() - 1])
+        .getAffineMap();
+  }
+  return AffineMap();
 }
 
 std::optional<unsigned>
@@ -79,19 +169,54 @@ SmallVector<Type> EncodingAttr::getElementTypesArray() {
   });
 }
 
-EncodingAttr EncodingAttr::clone(AffineMap bcastMap) {
-  return get(bcastMap.getContext(), getOperandIndex(), getOpType(),
-             getElementTypes(), getUserIndexingMaps(),
-             AffineMapAttr::get(bcastMap), getRoundDimsTo(), getLayouts());
+EncodingAttr
+EncodingAttr::cloneWithNewOperandIndexingMap(AffineMap newIndexingMap) {
+  if (!newIndexingMap) {
+    return *this;
+  }
+  ArrayAttr userIndexingMaps = getUserIndexingMaps();
+  SmallVector<Attribute> newMaps(userIndexingMaps.begin(),
+                                 userIndexingMaps.end());
+  unsigned operandIndex = getOperandIndex().getValue().getZExtValue();
+  SmallVector<Attribute> maps;
+  if (auto mapForIndex = llvm::dyn_cast<AffineMapAttr>(newMaps[operandIndex])) {
+    maps.push_back(AffineMapAttr::get(mapForIndex.getAffineMap()));
+  } else if (auto mapForIndex =
+                 llvm::dyn_cast<ArrayAttr>(newMaps[operandIndex])) {
+    maps.assign(mapForIndex.begin(), mapForIndex.end());
+  }
+  maps.push_back(AffineMapAttr::get(newIndexingMap));
+  newMaps[operandIndex] = ArrayAttr::get(getContext(), maps);
+  return get(getContext(), getOperandIndex(), getOpType(), getElementTypes(),
+             ArrayAttr::get(getContext(), newMaps), getRoundDimsTo(),
+             getLayouts());
 }
 
 bool EncodingAttr::isSerialized() const { return getLayouts() ? true : false; }
+
+bool EncodingAttr::isIdentityLayout() const {
+  if (!isSerialized()) {
+    return false;
+  }
+  ArrayAttr layoutsAttr = getLayouts();
+  if (!llvm::all_of(layoutsAttr.getValue(),
+                    llvm::IsaPred<SerializableEncodingAttrInterface>)) {
+    return false;
+  }
+  return llvm::all_of(layoutsAttr.getValue(), [](Attribute attr) {
+    auto serializableAttr =
+        llvm::dyn_cast<SerializableEncodingAttrInterface>(attr);
+    if (!serializableAttr) {
+      return false;
+    }
+    return serializableAttr.isIdentityLayout();
+  });
+}
 
 Attribute EncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();
   return get(ctx, getOperandIndex(), getOpType(), getElementTypes(),
              /*user_indexing_maps=*/ArrayAttr(),
-             /*bcast_map=*/AffineMapAttr(),
              /*round_dims_to=*/DenseI64ArrayAttr(),
              ArrayAttr::get(ctx, layouts));
 }
@@ -218,11 +343,34 @@ Value EncodingAttr::calculateStorageSizeInBytes(Location loc,
   return result;
 }
 
+//===---------------------------------------------------------------------===//
+// encoding.pad_encoding_layout
+//===---------------------------------------------------------------------===//
+
+PadEncodingLayoutAttr PadEncodingLayoutAttr::get(MLIRContext *ctx,
+                                                 ArrayRef<int32_t> padding) {
+  return get(ctx, DenseI32ArrayAttr::get(ctx, padding));
+}
+
+PadEncodingLayoutAttr PadEncodingLayoutAttr::getIdentityAttr(MLIRContext *ctx,
+                                                             int rank) {
+  SmallVector<int32_t> zeros(rank, 0);
+  return get(ctx, zeros);
+}
+
+bool PadEncodingLayoutAttr::isIdentityLayout() const {
+  ArrayRef<int32_t> padding = getPadding().asArrayRef();
+  return llvm::all_of(padding, [](int32_t val) { return val == 0; });
+}
+
 Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
     Location loc, OpBuilder &builder, RankedTensorType type,
     ValueRange dynamicDims) const {
   ArrayRef<int32_t> padding = getPadding().asArrayRef();
   assert(padding.size() == type.getRank() && "Invalid padding");
+  LLVM_DEBUG(if (llvm::any_of(padding, [](int32_t x) { return x != 0; })) {
+    llvm::dbgs() << "Non-zero padding: " << type << "\n";
+  });
 
   const int64_t elementSize = getRoundedElementByteWidth(type.getElementType());
   int64_t staticProduct = elementSize;

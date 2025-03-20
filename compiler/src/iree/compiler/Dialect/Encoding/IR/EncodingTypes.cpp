@@ -54,10 +54,10 @@ getEncodingContractionDims(EncodingAttr encoding) {
   if (!indexingMapsAttr) {
     return failure();
   }
-  SmallVector<AffineMap> indexingMaps = llvm::map_to_vector(
-      indexingMapsAttr.getValue(), [](Attribute m) -> AffineMap {
-        return cast<AffineMapAttr>(m).getAffineMap();
-      });
+  // Derive the contraction dims from the first maps in every entry of the
+  // `user_indexing_maps` as these contain the layout information about the
+  // originally encoded operation.
+  SmallVector<AffineMap> indexingMaps = encoding.getRootMaps();
   return linalg::inferContractionDims(indexingMaps);
 }
 
