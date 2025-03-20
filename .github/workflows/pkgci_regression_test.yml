@@ -97,6 +97,7 @@ jobs:
         if: "!cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
+          [ -z "$IREE_TEST_FILES" ] && unset IREE_TEST_FILES
           pytest ./experimental/regression_suite/shark-test-suite-models/sdxl \
             -k ${{ matrix.backend }} \
             -rpfE \
@@ -113,6 +114,7 @@ jobs:
         if: "!cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
+          [ -z "$IREE_TEST_FILES" ] && unset IREE_TEST_FILES
           pytest ./experimental/regression_suite/shark-test-suite-models/sd3 \
             -k ${{ matrix.backend }} \
             -rpfE \
@@ -156,6 +158,7 @@ jobs:
         if: contains(matrix.name, 'rocm_mi300_gfx942')
         run: |
           source ${VENV_DIR}/bin/activate
+          [ -z "$IREE_TEST_FILES" ] && unset IREE_TEST_FILES
           pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
             --goldentime-tolerance-multiplier 1.1 \
             --goldentime-rocm-e2e-ms 305.0 \
