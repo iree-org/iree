@@ -18,7 +18,10 @@
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/AffineExpr.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -127,13 +130,37 @@ static Value getFlatMemref(OpBuilder &rewriter, Location loc, Value source,
                                                     std::nullopt, std::nullopt);
 }
 
-static Value getCollapsedMemref(OpBuilder &rewriter, Location loc, Value source,
-                                ValueRange offsets) {
-  auto &&[base, offset, ignore] =
-      getFlatOffsetAndStrides(rewriter, loc, source, getAsOpFoldResult(offsets));
-  MemRefType retType = inferCastResultType2(base, offset);
-  return rewriter.create<memref::ReinterpretCastOp>(loc, retType, base, offset,
-                                                    std::nullopt, std::nullopt);
+static std::pair<Value, OpFoldResult> getCollapsedMemref(OpBuilder &rewriter,
+                                                         Location loc,
+                                                         Value source,
+                                                         ValueRange offsets) {
+  MemRefType memrefType = cast<MemRefType>(source.getType());
+  auto &&[base, offset, ignore] = getFlatOffsetAndStrides(
+      rewriter, loc, source, getAsOpFoldResult(offsets));
+  // expand contiguous shape
+  int64_t collapsedShape = 1;
+  for (auto dim : memrefType.getShape()) {
+    collapsedShape *= dim;
+  }
+  MemRefType retType =
+      MemRefType::get({collapsedShape}, memrefType.getElementType(), nullptr,
+                      memrefType.getMemorySpace());
+
+  // TODO: implement offset.
+  return std::make_pair(rewriter.create<memref::ReinterpretCastOp>(
+                            loc, retType, source, /* offset = */ 0,
+                            /*shapes = */ ArrayRef<int64_t>{collapsedShape},
+                            /* strides = */ ArrayRef<int64_t>{1}),
+                        offset);
+}
+
+static Value getValueFromOpFoldResult(PatternRewriter &rewriter, Location loc,
+                                      OpFoldResult in) {
+  if (Attribute offsetAttr = in.dyn_cast<Attribute>()) {
+    return rewriter.create<arith::ConstantIndexOp>(
+        loc, cast<IntegerAttr>(offsetAttr).getInt());
+  }
+  return in.dyn_cast<Value>();
 }
 
 static bool needFlatten(Value val) {
@@ -143,12 +170,13 @@ static bool needFlatten(Value val) {
 
 static bool checkLayout(Value val) {
   auto type = cast<MemRefType>(val.getType());
+  // TODO: is this correct?
   return type.getLayout().isIdentity() ||
          isa<StridedLayoutAttr>(type.getLayout());
 }
 
 namespace {
-struct FlattenLoad : public OpRewritePattern<memref::LoadOp> {
+struct FlattenMemrefLoad : public OpRewritePattern<memref::LoadOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(memref::LoadOp op,
@@ -161,13 +189,44 @@ struct FlattenLoad : public OpRewritePattern<memref::LoadOp> {
       return rewriter.notifyMatchFailure(op, "unsupported layout");
 
     Location loc = op.getLoc();
-    Value flatMemref = getFlatMemref(rewriter, loc, memref, op.getIndices());
-    rewriter.replaceOpWithNewOp<memref::LoadOp>(op, flatMemref);
+
+    auto &&[flatMemref, offset] =
+        getCollapsedMemref(rewriter, loc, memref, op.getIndices());
+
+    Value offsetVal = getValueFromOpFoldResult(rewriter, loc, offset);
+    rewriter.replaceOpWithNewOp<memref::LoadOp>(op, op.getType(), flatMemref,
+                                                ValueRange{offsetVal}/*,
+                                                op.getNontemporal()*/);
     return success();
   }
 };
 
-struct FlattenStore : public OpRewritePattern<memref::StoreOp> {
+struct FlattenVectorLoad : public OpRewritePattern<vector::LoadOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::LoadOp op,
+                                PatternRewriter &rewriter) const override {
+    Value memref = op.getBase();
+    if (!needFlatten(memref))
+      return rewriter.notifyMatchFailure(op, "nothing to do");
+
+    if (!checkLayout(memref))
+      return rewriter.notifyMatchFailure(op, "unsupported layout");
+
+    Location loc = op.getLoc();
+
+    auto &&[flatMemref, offset] =
+        getCollapsedMemref(rewriter, loc, memref, op.getIndices());
+
+    Value offsetVal = getValueFromOpFoldResult(rewriter, loc, offset);
+    rewriter.replaceOpWithNewOp<vector::LoadOp>(op, op.getType(), flatMemref,
+                                                ValueRange{offsetVal}/*,
+                                                op.getNontemporal()*/);
+    return success();
+  }
+};
+
+struct FlattenMemrefStore : public OpRewritePattern<memref::StoreOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(memref::StoreOp op,
@@ -180,9 +239,33 @@ struct FlattenStore : public OpRewritePattern<memref::StoreOp> {
       return rewriter.notifyMatchFailure(op, "unsupported layout");
 
     Location loc = op.getLoc();
-    Value flatMemref = getFlatMemref(rewriter, loc, memref, op.getIndices());
-    Value value = op.getValue();
-    rewriter.replaceOpWithNewOp<memref::StoreOp>(op, value, flatMemref);
+    auto &&[flatMemref, offset] =
+        getCollapsedMemref(rewriter, loc, memref, op.getIndices());
+    Value offsetVal = getValueFromOpFoldResult(rewriter, loc, offset);
+    rewriter.replaceOpWithNewOp<memref::StoreOp>(op, op.getValue(), flatMemref,
+                                                 ValueRange{offsetVal});
+    return success();
+  }
+};
+
+struct FlattenVectorStore : public OpRewritePattern<vector::StoreOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::StoreOp op,
+                                PatternRewriter &rewriter) const override {
+    Value memref = op.getBase();
+    if (!needFlatten(memref))
+      return rewriter.notifyMatchFailure(op, "nothing to do");
+
+    if (!checkLayout(memref))
+      return rewriter.notifyMatchFailure(op, "unsupported layout");
+
+    Location loc = op.getLoc();
+    auto &&[flatMemref, offset] =
+        getCollapsedMemref(rewriter, loc, memref, op.getIndices());
+    Value offsetVal = getValueFromOpFoldResult(rewriter, loc, offset);
+    rewriter.replaceOpWithNewOp<vector::StoreOp>(
+        op, op.getValueToStore(), flatMemref, ValueRange{offsetVal});
     return success();
   }
 };
@@ -239,8 +322,7 @@ struct DecomposeMemrefsPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, arith::ArithDialect,
-                    linalg::LinalgDialect, scf::SCFDialect,
-                    vector::VectorDialect>();
+                    memref::MemRefDialect, vector::VectorDialect>();
   }
 
   void runOnOperation() override {
@@ -257,8 +339,8 @@ struct DecomposeMemrefsPass
 
 namespace mlir::iree_compiler {
 void populateDecomposeMemrefsPatterns(RewritePatternSet &patterns) {
-  patterns.insert<FlattenLoad, FlattenStore, FlattenSubview>(
-      patterns.getContext());
+  patterns.insert<FlattenMemrefLoad, FlattenVectorLoad, FlattenMemrefStore,
+                  FlattenVectorStore, FlattenSubview>(patterns.getContext());
 }
 
 std::unique_ptr<Pass> createDecomposeMemrefsPass() {

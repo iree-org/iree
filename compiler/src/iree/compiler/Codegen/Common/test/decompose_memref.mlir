@@ -7,8 +7,8 @@
 // -----
 
 func.func @load_scalar_from_memref(%input: memref<4x8xf32>) -> f32 {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 1 : index
+  %c1 = arith.constant 2 : index
   %value = memref.load %input[%c0, %c1] : memref<4x8xf32>
   return %value : f32
 }
@@ -47,7 +47,7 @@ func.func @load_scalar_from_memref_dynamic_dim_2(%input: memref<4x8xf32, strided
 
 // -----
 
-func.func @load_scalar_from_memref(%input: memref<4x8xf32>, %row: index, %col: index) -> memref<1x1xf32, strided<[8, 1], offset: ?>> {
+func.func @load_scalar_from_memref_subview(%input: memref<4x8xf32>, %row: index, %col: index) -> memref<1x1xf32, strided<[8, 1], offset: ?>> {
   %subview = memref.subview %input[%row, %col] [1, 1] [1, 1] : memref<4x8xf32> to memref<1x1xf32, strided<[8, 1], offset: ?>>
   return %subview : memref<1x1xf32, strided<[8, 1], offset: ?>>
 }
@@ -68,18 +68,19 @@ func.func @store_scalar_from_memref_dynamic_dim_2(%input: memref<4x8xf32, stride
 
 // -----
 
-// TODO: change to support vector.load 
 func.func @load_vector_from_memref(%input: memref<4x8xf32>) -> vector<8xf32> {
-  %c0 = arith.constant 0 : index
-  %value = vector.load %input[%c0, %c0] : memref<4x8xf32>, vector<8xf32>
+  %c3 = arith.constant 3 : index
+  %c6 = arith.constant 6 : index
+  %value = vector.load %input[%c3, %c6] : memref<4x8xf32>, vector<8xf32>
   return %value : vector<8xf32>
 }
 
 // -----
 
 func.func @load_vector_from_memref_odd(%input: memref<3x7xi2>) -> vector<3xi2> {
-  %c0 = arith.constant 0 : index
-  %value = vector.load %input[%c0, %c0] : memref<3x7xi2>, vector<3xi2>
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
+  %value = vector.load %input[%c1, %c3] : memref<3x7xi2>, vector<3xi2>
   return %value : vector<3xi2>
 }
 
@@ -90,3 +91,18 @@ func.func @load_vector_from_memref_dynamic(%input: memref<3x7xi2>, %row: index, 
   return %value : vector<3xi2>
 }
 
+// -----
+
+func.func @store_vector_to_memref_odd(%input: memref<3x7xi2>, %value: vector<3xi2>) {
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
+  vector.store %value, %input[%c1, %c3] : memref<3x7xi2>, vector<3xi2>
+  return
+}
+
+// -----
+
+func.func @store_vector_to_memref_dynamic(%input: memref<3x7xi2>, %value: vector<3xi2>, %row: index, %col: index) {
+  vector.store %value, %input[%row, %col] : memref<3x7xi2>, vector<3xi2>
+  return
+}
