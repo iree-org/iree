@@ -25,13 +25,13 @@
 
 namespace mlir::iree_compiler::IREE::Stream {
 
-#define GEN_PASS_DEF_MATERIALIZEENCODEOPSPASS
+#define GEN_PASS_DEF_MATERIALIZEENCODINGSPASS
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
 
 namespace {
-struct MaterializeEncodeOpsPass
-    : public IREE::Stream::impl::MaterializeEncodeOpsPassBase<
-          MaterializeEncodeOpsPass> {
+struct MaterializeEncodingsPass
+    : public IREE::Stream::impl::MaterializeEncodingsPassBase<
+          MaterializeEncodingsPass> {
   void runOnOperation() override;
 };
 } // namespace
@@ -271,7 +271,7 @@ replaceEncodeOpWithDispatchOp(RewriterBase &rewriter,
       encodeOp.getResultSize(), tiedArguments, encodeOp.getAffinityAttr());
 }
 
-void MaterializeEncodeOpsPass::runOnOperation() {
+void MaterializeEncodingsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
   ModuleOp moduleOp = getOperation();
 

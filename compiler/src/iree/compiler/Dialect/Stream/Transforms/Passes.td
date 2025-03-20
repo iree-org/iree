@@ -165,11 +165,11 @@ def MaterializeCopyOnWritePass :
   ];
 }
 
-def MaterializeEncodeOpsPass :
-    Pass<"iree-stream-materialize-encode-ops", "mlir::ModuleOp"> {
+def MaterializeEncodingsPass :
+    Pass<"iree-stream-materialize-encodings", "mlir::ModuleOp"> {
   let summary = "Materialize stream.tensor.encode ops to dispatches and executables.";
   let description = [{
-    The revision implements the MaterializeEncodeOps pass. The pass runs the
+    The revision implements the MaterializeEncodings pass. The pass runs the
     canonicalization patterns from `stream.tensor.encode` and folds nop
     encoding ops away. Then it creates executables and replaces the
     `stream.tensor.encode` ops with `stream.async.dispatch` ops on the

@@ -1,27 +1,21 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-stream-materialize-encode-ops)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-stream-materialize-encodings)' %s | FileCheck %s
 
 #encoding = #iree_encoding.testing_encoding<>
+// CHECK-LABEL: @fold_tensor_encode_op
+// CHECK-SAME:    %[[ARG:[a-zA-Z0-9]+]]
 util.func public @fold_tensor_encode_op(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index) -> !stream.resource<*> {
+  // CHECK-NOT: stream.tensor.encode
   %0 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
     %arg0 : tensor<?x?xf32, #encoding>{%arg2, %arg3} in !stream.resource<*>{%arg1}
     -> tensor<?x?xf32, #encoding>{%arg2, %arg3} in !stream.resource<*>{%arg1}
+  // CHECK: return %[[ARG]]
   util.return %0 : !stream.resource<*>
 }
-// CHECK-LABEL: @fold_tensor_encode_op
-// CHECK-SAME:    %[[ARG:[a-zA-Z0-9]+]]
-// CHECK-NOT:     stream.tensor.encode
-// CHECK:         return %[[ARG]]
 
 // -----
 
-#encoding = #iree_encoding.testing_encoding<>
-util.func public @encode_static_shape(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
-  %0 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
-    %arg0 : tensor<4x5xf32> in !stream.resource<*>{%arg1}
-    -> tensor<4x5xf32, #encoding> in !stream.resource<*>{%arg1}
-  util.return %0 : !stream.resource<*>
-}
 // CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing_encoding<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups()
 // CHECK-NEXT:      flow.dispatch.workgroup_count_from_slice
@@ -40,20 +34,20 @@ util.func public @encode_static_shape(%arg0: !stream.resource<*>, %arg1: index) 
 // CHECK-LABEL:   util.func public @encode_static_shape(
 // CHECK-SAME:      %[[RESOURCE:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[TOTAL_SIZE:[a-zA-Z0-9]+]]
-// CHECK:           stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]]
-// CHECK-SAME:        (%[[RESOURCE]][{{.+}}]) : (!stream.resource<*>{%[[TOTAL_SIZE]]}
-// CHECK-SAME:        -> !stream.resource<*>{%[[TOTAL_SIZE]]}
+util.func public @encode_static_shape(%resource: !stream.resource<*>, %total_size: index) -> !stream.resource<*> {
+  // CHECK:      stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]]
+  // CHECK-SAME:   (%[[RESOURCE]][{{.+}}]) : (!stream.resource<*>{%[[TOTAL_SIZE]]}
+  // CHECK-SAME:   -> !stream.resource<*>{%[[TOTAL_SIZE]]}
+  %0 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
+    %resource : tensor<4x5xf32> in !stream.resource<*>{%total_size}
+    -> tensor<4x5xf32, #encoding> in !stream.resource<*>{%total_size}
+  util.return %0 : !stream.resource<*>
+}
 
 // -----
 
-#encoding = #iree_encoding.testing_encoding<>
-util.func public @mixed_static_dynamic_encoding(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index) -> !stream.resource<*> {
-  %0 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
-    %arg0 : tensor<4x?xf32>{%arg2} in !stream.resource<*>{%arg1}
-    -> tensor<?x5xf32, #encoding>{%arg3} in !stream.resource<*>{%arg1}
-  util.return %0 : !stream.resource<*>
-}
 // CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing_encoding<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index)
 // CHECK-NEXT:      flow.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]]
@@ -76,22 +70,22 @@ util.func public @mixed_static_dynamic_encoding(%arg0: !stream.resource<*>, %arg
 // CHECK-LABEL:   util.func public @mixed_static_dynamic_encoding(
 // CHECK-SAME:      %[[RESOURCE:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[TOTAL_SIZE:[a-zA-Z0-9]+]]
-// CHECK-SAME:      %[[D0:[a-zA-Z0-9]+]]
-// CHECK-SAME:      %[[D1:[a-zA-Z0-9]+]]
-// CHECK:           stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]][%[[D0]], %[[D1]]]
-// CHECK-SAME:        (%[[RESOURCE]][{{.+}}], %[[D0]], %[[D1]]) : (!stream.resource<*>{%[[TOTAL_SIZE]]}
-// CHECK-SAME:        -> !stream.resource<*>{%[[TOTAL_SIZE]]}
+// CHECK-SAME:      %[[SRC_D1:[a-zA-Z0-9]+]]
+// CHECK-SAME:      %[[DEST_D0:[a-zA-Z0-9]+]]
+util.func public @mixed_static_dynamic_encoding(%resource: !stream.resource<*>, %total_size: index, %src_d1: index, %dest_d0: index) -> !stream.resource<*> {
+  // CHECK:      stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]][%[[SRC_D1]], %[[DEST_D0]]]
+  // CHECK-SAME:   (%[[RESOURCE]][{{.+}}], %[[SRC_D1]], %[[DEST_D0]]) : (!stream.resource<*>{%[[TOTAL_SIZE]]}
+  // CHECK-SAME:   -> !stream.resource<*>{%[[TOTAL_SIZE]]}
+  %0 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
+    %resource : tensor<4x?xf32>{%src_d1} in !stream.resource<*>{%total_size}
+    -> tensor<?x5xf32, #encoding>{%dest_d0} in !stream.resource<*>{%total_size}
+  util.return %0 : !stream.resource<*>
+}
 
 // -----
 
-#encoding = #iree_encoding.testing_encoding<>
-util.func public @encode_result_resource(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index) -> !stream.resource<*> {
-  %0 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
-    %arg0 : tensor<?x?xf32>{%arg2, %arg3} in !stream.resource<*>{%arg1}
-    -> tensor<?x?xf32, #encoding>{%arg2, %arg3} in !stream.resource<*>{%arg1}
-  util.return %0 : !stream.resource<*>
-}
 // CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing_encoding<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
 // CHECK-NEXT:      flow.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
@@ -120,20 +114,20 @@ util.func public @encode_result_resource(%arg0: !stream.resource<*>, %arg1: inde
 // CHECK-SAME:      %[[TOTAL_SIZE:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[D0:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[D1:[a-zA-Z0-9]+]]
-// CHECK:           stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]][%[[D0]], %[[D1]], %[[D0]], %[[D1]]]
-// CHECK-SAME:        (%[[RESOURCE]][{{.+}}], %[[D0]], %[[D1]], %[[D0]], %[[D1]]) : (!stream.resource<*>{%[[TOTAL_SIZE]]}
-// CHECK-SAME:        -> !stream.resource<*>{%[[TOTAL_SIZE]]}
+util.func public @encode_result_resource(%resource: !stream.resource<*>, %total_size: index, %d0: index, %d1: index) -> !stream.resource<*> {
+  // CHECK:      stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]][%[[D0]], %[[D1]], %[[D0]], %[[D1]]]
+  // CHECK-SAME:   (%[[RESOURCE]][{{.+}}], %[[D0]], %[[D1]], %[[D0]], %[[D1]]) : (!stream.resource<*>{%[[TOTAL_SIZE]]}
+  // CHECK-SAME:   -> !stream.resource<*>{%[[TOTAL_SIZE]]}
+  %0 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
+    %resource : tensor<?x?xf32>{%d0, %d1} in !stream.resource<*>{%total_size}
+    -> tensor<?x?xf32, #encoding>{%d0, %d1} in !stream.resource<*>{%total_size}
+  util.return %0 : !stream.resource<*>
+}
 
 // -----
 
-#encoding = #iree_encoding.testing_encoding<>
-util.func public @decode_source_resource(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index) -> !stream.resource<*> {
-  %0 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
-    %arg0 : tensor<?x?xf32, #encoding>{%arg2, %arg3} in !stream.resource<*>{%arg1}
-    -> tensor<?x?xf32>{%arg2, %arg3} in !stream.resource<*>{%arg1}
-  util.return %0 : !stream.resource<*>
-}
 // CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing_encoding<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
 // CHECK-NEXT:      flow.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
@@ -162,22 +156,22 @@ util.func public @decode_source_resource(%arg0: !stream.resource<*>, %arg1: inde
 // CHECK-SAME:      %[[TOTAL_SIZE:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[D0:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[D1:[a-zA-Z0-9]+]]
-// CHECK:           stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]][%[[D0]], %[[D1]], %[[D0]], %[[D1]]]
-// CHECK-SAME:        (%[[RESOURCE]][{{.+}}], %[[D0]], %[[D1]], %[[D0]], %[[D1]]) : (!stream.resource<*>{%[[TOTAL_SIZE]]}
-// CHECK-SAME:        -> !stream.resource<*>{%[[TOTAL_SIZE]]}
+util.func public @decode_source_resource(%resource: !stream.resource<*>, %total_size: index, %d0: index, %d1: index) -> !stream.resource<*> {
+  // CHECK:      stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]][%[[D0]], %[[D1]], %[[D0]], %[[D1]]]
+  // CHECK-SAME:   (%[[RESOURCE]][{{.+}}], %[[D0]], %[[D1]], %[[D0]], %[[D1]]) : (!stream.resource<*>{%[[TOTAL_SIZE]]}
+  // CHECK-SAME:   -> !stream.resource<*>{%[[TOTAL_SIZE]]}
+  %0 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
+    %resource : tensor<?x?xf32, #encoding>{%d0, %d1} in !stream.resource<*>{%total_size}
+    -> tensor<?x?xf32>{%d0, %d1} in !stream.resource<*>{%total_size}
+  util.return %0 : !stream.resource<*>
+}
 
 // -----
 
-#encoding0 = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123>]>
-#encoding1 = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<456>]>
-util.func public @update_encoding(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index) -> !stream.resource<*> {
-  %0 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
-    %arg0 : tensor<?x?xf32, #encoding0>{%arg2, %arg3} in !stream.resource<*>{%arg1}
-    -> tensor<?x?xf32, #encoding1>{%arg2, %arg3} in !stream.resource<*>{%arg1}
-  util.return %0 : !stream.resource<*>
-}
 // CHECK-DAG:  #[[ENCODING0:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123>]>
 // CHECK-DAG:  #[[ENCODING1:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<456>]>
+#encoding0 = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123>]>
+#encoding1 = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<456>]>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
 // CHECK-NEXT:      flow.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
@@ -207,35 +201,41 @@ util.func public @update_encoding(%arg0: !stream.resource<*>, %arg1: index, %arg
 // CHECK-SAME:      %[[TOTAL_SIZE:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[D0:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[D1:[a-zA-Z0-9]+]]
-// CHECK:           stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]][%[[D0]], %[[D1]], %[[D0]], %[[D1]]]
-// CHECK-SAME:        (%[[RESOURCE]][{{.+}}], %[[D0]], %[[D1]], %[[D0]], %[[D1]]) : (!stream.resource<*>{%[[TOTAL_SIZE]]}
-// CHECK-SAME:        -> !stream.resource<*>{%[[TOTAL_SIZE]]}
+util.func public @update_encoding(%resource: !stream.resource<*>, %total_size: index, %d0: index, %d1: index) -> !stream.resource<*> {
+  // CHECK:      stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]][%[[D0]], %[[D1]], %[[D0]], %[[D1]]]
+  // CHECK-SAME:   (%[[RESOURCE]][{{.+}}], %[[D0]], %[[D1]], %[[D0]], %[[D1]]) : (!stream.resource<*>{%[[TOTAL_SIZE]]}
+  // CHECK-SAME:   -> !stream.resource<*>{%[[TOTAL_SIZE]]}
+  %0 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
+    %resource : tensor<?x?xf32, #encoding0>{%d0, %d1} in !stream.resource<*>{%total_size}
+    -> tensor<?x?xf32, #encoding1>{%d0, %d1} in !stream.resource<*>{%total_size}
+  util.return %0 : !stream.resource<*>
+}
 
 // -----
 
 // This tests that only a single executable is created and it is reused by both
 // dispatch ops.
 
-#encoding = #iree_encoding.testing_encoding<>
-util.func public @multi_identical_encode_ops(%arg0: !stream.resource<*>, %arg1: index) -> (!stream.resource<*>, !stream.resource<*>) {
-  %0 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
-    %arg0 : tensor<4x5xf32> in !stream.resource<*>{%arg1}
-    -> tensor<4x5xf32, #encoding> in !stream.resource<*>{%arg1}
-  %1 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
-    %arg0 : tensor<4x5xf32> in !stream.resource<*>{%arg1}
-    -> tensor<4x5xf32, #encoding> in !stream.resource<*>{%arg1}
-  util.return %0, %1 : !stream.resource<*>, !stream.resource<*>
-}
 // CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing_encoding<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups()
 // CHECK-NOT:  stream.executable
 // CHECK-LABEL:   util.func public @multi_identical_encode_ops(
 // CHECK-SAME:      %[[RESOURCE:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[TOTAL_SIZE:[a-zA-Z0-9]+]]
-// CHECK:           stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]]
-// CHECK-SAME:        (%[[RESOURCE]][{{.+}}]) : (!stream.resource<*>{%[[TOTAL_SIZE]]}
-// CHECK-SAME:        -> !stream.resource<*>{%[[TOTAL_SIZE]]}
-// CHECK:           stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]]
-// CHECK-SAME:        (%[[RESOURCE]][{{.+}}]) : (!stream.resource<*>{%[[TOTAL_SIZE]]}
-// CHECK-SAME:        -> !stream.resource<*>{%[[TOTAL_SIZE]]}
+util.func public @multi_identical_encode_ops(%resource: !stream.resource<*>, %total_size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  // CHECK:      stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]]
+  // CHECK-SAME:   (%[[RESOURCE]][{{.+}}]) : (!stream.resource<*>{%[[TOTAL_SIZE]]}
+  // CHECK-SAME:   -> !stream.resource<*>{%[[TOTAL_SIZE]]}
+  %0 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
+    %resource : tensor<4x5xf32> in !stream.resource<*>{%total_size}
+    -> tensor<4x5xf32, #encoding> in !stream.resource<*>{%total_size}
+  // CHECK:      stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]]
+  // CHECK-SAME:   (%[[RESOURCE]][{{.+}}]) : (!stream.resource<*>{%[[TOTAL_SIZE]]}
+  // CHECK-SAME:   -> !stream.resource<*>{%[[TOTAL_SIZE]]}
+  %1 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
+    %resource : tensor<4x5xf32> in !stream.resource<*>{%total_size}
+    -> tensor<4x5xf32, #encoding> in !stream.resource<*>{%total_size}
+  util.return %0, %1 : !stream.resource<*>, !stream.resource<*>
+}
