@@ -55,8 +55,8 @@ util.func public @mixed_static_dynamic_encoding(%arg0: !stream.resource<*>, %arg
 }
 // CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
-// CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index)
-// CHECK-NEXT:      flow.dispatch.workgroup_count_from_slice %[[ARG0]]
+// CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index)
+// CHECK-NEXT:      flow.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]]
 // CHECK:         func.func @[[$ENTRY]](
 // CHECK-SAME:      %[[SRC_ARG:[a-zA-Z0-9]+]]: !stream.binding
 // CHECK-SAME:      %[[SRC_D1_ARG:[a-zA-Z0-9]+]]: index
@@ -78,7 +78,7 @@ util.func public @mixed_static_dynamic_encoding(%arg0: !stream.resource<*>, %arg
 // CHECK-SAME:      %[[TOTAL_SIZE:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[D0:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[D1:[a-zA-Z0-9]+]]
-// CHECK:           stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]][%[[D0]]]
+// CHECK:           stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]][%[[D0]], %[[D1]]]
 // CHECK-SAME:        (%[[RESOURCE]][{{.+}}], %[[D0]], %[[D1]]) : (!stream.resource<*>{%[[TOTAL_SIZE]]}
 // CHECK-SAME:        -> !stream.resource<*>{%[[TOTAL_SIZE]]}
 
@@ -93,8 +93,8 @@ util.func public @encode_result_resource(%arg0: !stream.resource<*>, %arg1: inde
 }
 // CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
-// CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index)
-// CHECK-NEXT:      flow.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]]
+// CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
+// CHECK-NEXT:      flow.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
 // CHECK:         func.func @[[$ENTRY]](
 // CHECK-SAME:      %[[SRC_ARG:[a-zA-Z0-9]+]]: !stream.binding
 // CHECK-SAME:      %[[SRC_D0_ARG:[a-zA-Z0-9]+]]: index
@@ -120,7 +120,7 @@ util.func public @encode_result_resource(%arg0: !stream.resource<*>, %arg1: inde
 // CHECK-SAME:      %[[TOTAL_SIZE:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[D0:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[D1:[a-zA-Z0-9]+]]
-// CHECK:           stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]][%[[D0]], %[[D1]]]
+// CHECK:           stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]][%[[D0]], %[[D1]], %[[D0]], %[[D1]]]
 // CHECK-SAME:        (%[[RESOURCE]][{{.+}}], %[[D0]], %[[D1]], %[[D0]], %[[D1]]) : (!stream.resource<*>{%[[TOTAL_SIZE]]}
 // CHECK-SAME:        -> !stream.resource<*>{%[[TOTAL_SIZE]]}
 
@@ -135,8 +135,8 @@ util.func public @decode_source_resource(%arg0: !stream.resource<*>, %arg1: inde
 }
 // CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
-// CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index)
-// CHECK-NEXT:      flow.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]]
+// CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
+// CHECK-NEXT:      flow.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
 // CHECK:         func.func @[[$ENTRY]](
 // CHECK-SAME:      %[[SRC_ARG:[a-zA-Z0-9]+]]: !stream.binding
 // CHECK-SAME:      %[[SRC_D0_ARG:[a-zA-Z0-9]+]]: index
@@ -162,7 +162,7 @@ util.func public @decode_source_resource(%arg0: !stream.resource<*>, %arg1: inde
 // CHECK-SAME:      %[[TOTAL_SIZE:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[D0:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[D1:[a-zA-Z0-9]+]]
-// CHECK:           stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]][%[[D0]], %[[D1]]]
+// CHECK:           stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]][%[[D0]], %[[D1]], %[[D0]], %[[D1]]]
 // CHECK-SAME:        (%[[RESOURCE]][{{.+}}], %[[D0]], %[[D1]], %[[D0]], %[[D1]]) : (!stream.resource<*>{%[[TOTAL_SIZE]]}
 // CHECK-SAME:        -> !stream.resource<*>{%[[TOTAL_SIZE]]}
 
@@ -179,8 +179,8 @@ util.func public @update_encoding(%arg0: !stream.resource<*>, %arg1: index, %arg
 // CHECK-DAG:  #[[ENCODING0:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123>]>
 // CHECK-DAG:  #[[ENCODING1:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<456>]>
 // CHECK:      stream.executable private @[[$EX:.+]] {
-// CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index)
-// CHECK-NEXT:      flow.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]]
+// CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
+// CHECK-NEXT:      flow.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
 // CHECK:         func.func @[[$ENTRY]](
 // CHECK-SAME:      %[[SRC_ARG:[a-zA-Z0-9]+]]: !stream.binding
 // CHECK-SAME:      %[[SRC_D0_ARG:[a-zA-Z0-9]+]]: index
@@ -207,7 +207,7 @@ util.func public @update_encoding(%arg0: !stream.resource<*>, %arg1: index, %arg
 // CHECK-SAME:      %[[TOTAL_SIZE:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[D0:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[D1:[a-zA-Z0-9]+]]
-// CHECK:           stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]][%[[D0]], %[[D1]]]
+// CHECK:           stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]][%[[D0]], %[[D1]], %[[D0]], %[[D1]]]
 // CHECK-SAME:        (%[[RESOURCE]][{{.+}}], %[[D0]], %[[D1]], %[[D0]], %[[D1]]) : (!stream.resource<*>{%[[TOTAL_SIZE]]}
 // CHECK-SAME:        -> !stream.resource<*>{%[[TOTAL_SIZE]]}
 

@@ -172,6 +172,14 @@ createExportOp(RewriterBase &rewriter, Location loc,
     workloadTypes.push_back(argumentType);
     workloadLocs.push_back(argument.getLoc());
   }
+  for (auto argument : encodeOp.getResultEncodingDims()) {
+    Type argumentType = argument.getType();
+    if (!llvm::isa<IndexType>(argumentType)) {
+      continue;
+    }
+    workloadTypes.push_back(argumentType);
+    workloadLocs.push_back(argument.getLoc());
+  }
 
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointToStart(&executableOp.getBody().front());
@@ -251,6 +259,9 @@ replaceEncodeOpWithDispatchOp(RewriterBase &rewriter,
       IREE::Util::TiedOpInterface::kUntiedIndex};
   SmallVector<Value> dynamicDims;
   for (Value argument : encodeOp.getSourceEncodingDims()) {
+    dynamicDims.push_back(argument);
+  }
+  for (Value argument : encodeOp.getResultEncodingDims()) {
     dynamicDims.push_back(argument);
   }
   rewriter.replaceOpWithNewOp<IREE::Stream::AsyncDispatchOp>(
