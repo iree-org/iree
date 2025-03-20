@@ -26,6 +26,7 @@ iree_lit_test_suite(
             "fold_unit_dims.mlir",
             "form_dispatch_regions.mlir",
             "dispatch_linalg_on_tensors.mlir",
+            "convert_encoding_to_flow.mlir",
             "convert_region_to_workgroups.mlir",
             "bubble_up_expand_shapes.mlir",
             "bubble_up_extract_slice.mlir",

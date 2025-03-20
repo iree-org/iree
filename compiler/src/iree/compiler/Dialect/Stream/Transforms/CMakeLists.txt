@@ -32,6 +32,7 @@ iree_cc_library(
     "LayoutSlices.cpp"
     "MaterializeBuiltins.cpp"
     "MaterializeCopyOnWrite.cpp"
+    "MaterializeEncodeOps.cpp"
     "PackConstants.cpp"
     "PackDispatchOperands.cpp"
     "Passes.cpp"

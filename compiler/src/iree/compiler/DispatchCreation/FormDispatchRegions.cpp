@@ -856,8 +856,7 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // to convert them to splats. Also avoid moving dequantization-like ops
       // into their own dispatch since it is better to clone these ops and avoid
       // materializing large tensors between dispatches.
-      if (!isa<linalg::LinalgOp, tensor::PadOp, linalg::PackOp,
-               IREE::Encoding::SetEncodingOp>(op) ||
+      if (!isa<linalg::LinalgOp, tensor::PadOp, linalg::PackOp>(op) ||
           IREE::Flow::isClonableIntoDispatchOp(&op, clonableOptions)) {
         continue;
       }

@@ -263,3 +263,21 @@ util.func public @verify_bubbling(%arg0: !hal.buffer_view, %arg2: !hal.fence) ->
 //       CHECK:     %[[GEN:.+]] = linalg.generic
 //       CHECK:      flow.dispatch.tensor.store %[[GEN]]
 //   CHECK-NOT:   linalg.generic
+
+// -----
+
+#encoding = #iree_encoding.testing_encoding<>
+util.func public @set_encoding_op(%arg0 : tensor<?x?xf32>)
+    -> tensor<?x?xf32, #encoding> {
+  %0 = iree_encoding.set_encoding %arg0
+      : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
+  util.return %0 : tensor<?x?xf32, #encoding>
+}
+// CHECK-LABEL: util.func public @set_encoding_op
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[D0:.+]] = tensor.dim %[[SRC]], %[[C0]]
+// CHECK-DAG:     %[[D1:.+]] = tensor.dim %[[SRC]], %[[C1]]
+// CHECK:         %[[RES:.+]] = flow.tensor.encode %[[SRC]] : tensor<?x?xf32>{%[[D0]], %[[D1]]} -> tensor<?x?xf32, #iree_encoding.testing_encoding<>>{%[[D0]], %[[D1]]}
+// CHECK:         util.return %[[RES]]
