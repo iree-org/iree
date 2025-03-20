@@ -1822,14 +1822,14 @@ util.func public @batchnorm_training(%arg0: tensor<12xf32>, %arg1: tensor<12x12x
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+#encoding = #iree_encoding.testing_encoding<>
 util.func public @set_encoding_op(%arg0 : tensor<?x?xf32>)
     -> tensor<?x?xf32, #encoding> {
   %0 = iree_encoding.set_encoding %arg0
       : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
   util.return %0 : tensor<?x?xf32, #encoding>
 }
-//      CHECK: #[[ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+//      CHECK: #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
 //      CHECK: util.func public @set_encoding_op
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -1857,14 +1857,14 @@ util.func public @set_encoding_op(%arg0 : tensor<?x?xf32>)
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+#encoding = #iree_encoding.testing_encoding<>
 util.func public @unset_encoding_op(%arg0 : tensor<?x?xf32, #encoding>, %d0 : index, %d1 : index)
     -> tensor<?x?xf32> {
   %0 = iree_encoding.unset_encoding %arg0
       : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%d0, %d1}
   util.return %0 : tensor<?x?xf32>
 }
-//      CHECK: #[[ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+//      CHECK: #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
 //      CHECK: util.func public @unset_encoding_op
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #[[ENCODING]]>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]
@@ -1899,7 +1899,7 @@ util.func public @unset_encoding_op(%arg0 : tensor<?x?xf32, #encoding>, %d0 : in
 // -----
 
 #map = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
-#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+#encoding = #iree_encoding.testing_encoding<>
 util.func public @pad_and_set_encoding_op(%arg0 : tensor<?x?xf32>)
     -> tensor<?x?xf32, #encoding> {
   %c0 = arith.constant 0 : index
@@ -1919,7 +1919,7 @@ util.func public @pad_and_set_encoding_op(%arg0 : tensor<?x?xf32>)
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> ((s0 ceildiv 16) * 16)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
-//  CHECK-DAG: #[[ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+//  CHECK-DAG: #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
 //      CHECK: util.func public @pad_and_set_encoding
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -1957,7 +1957,7 @@ util.func public @pad_and_set_encoding_op(%arg0 : tensor<?x?xf32>)
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+#encoding = #iree_encoding.testing_encoding<>
 util.func public @unset_encoding_with_encoded_slice(
     %arg0: tensor<?x?xf32, #encoding>,
     %arg1 : index, %arg2 : index) -> tensor<?x?xf32> {
@@ -1965,7 +1965,7 @@ util.func public @unset_encoding_with_encoded_slice(
       : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%arg1, %arg2}
   util.return %0 : tensor<?x?xf32>
 }
-//      CHECK: #[[ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+//      CHECK: #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
 //      CHECK: util.func public @unset_encoding_with_encoded_slice
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #[[ENCODING]]>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
@@ -1998,7 +1998,7 @@ util.func public @unset_encoding_with_encoded_slice(
 
 #map = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
-#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+#encoding = #iree_encoding.testing_encoding<>
 util.func public @root_on_unset_encoding(
     %arg0: tensor<784x96xf32, #encoding>,
     %arg1: tensor<96xf32>) -> tensor<784x96xf32> {
@@ -2020,7 +2020,7 @@ util.func public @root_on_unset_encoding(
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d1)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-//  CHECK-DAG: #[[ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+//  CHECK-DAG: #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
 //      CHECK: util.func public @root_on_unset_encoding
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<784x96xf32, #[[ENCODING]]>
 // CHECK-SAME:     %[[ARG1:.+]]: tensor<96xf32>

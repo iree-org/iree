@@ -31,6 +31,7 @@ namespace {
 // element-wise linalg ops and some tensor ops. This is quite conservative,
 // and could be extended to more ops when we are confident that the codegen
 // backends can support it.
+// TODO(#20179): It should be done by interface methods.
 static bool isFusableWithSetEncoding(Operation *op) {
   auto parentRegion = op->getParentOfType<IREE::Flow::DispatchRegionOp>();
   // Make sure the dispatch region has only one block.

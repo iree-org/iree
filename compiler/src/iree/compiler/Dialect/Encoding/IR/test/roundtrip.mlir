@@ -1,23 +1,23 @@
 // RUN: iree-opt --split-input-file %s | FileCheck %s
 
-#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32]>
-func.func @set_encoding_ops(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>> {
+#encoding = #iree_encoding.testing_encoding<>
+func.func @set_encoding_ops(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32, #encoding> {
   %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
   return %0 : tensor<?x?xf32, #encoding>
 }
-// CHECK:      #[[ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32]>
+// CHECK:      #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
 // CHECK:      func.func @set_encoding_ops
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:        iree_encoding.set_encoding %[[ARG0]] : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING]]>
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>
+#encoding = #iree_encoding.testing_encoding<>
 func.func @set_encoding_ops_mixed_dynamic_static(%arg0: tensor<?x10xf32>) -> tensor<20x?xf32, #encoding> {
   %0 = iree_encoding.set_encoding %arg0 : tensor<?x10xf32> -> tensor<20x?xf32, #encoding>
   return %0 : tensor<20x?xf32, #encoding>
 }
-// CHECK:       #[[ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+// CHECK:       #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
 // CHECK:       func.func @set_encoding_ops_mixed_dynamic_static
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         iree_encoding.set_encoding %[[ARG0]] : tensor<?x10xf32> -> tensor<20x?xf32, #[[ENCODING]]>
@@ -56,24 +56,24 @@ func.func @set_encoding_with_batch_matmul_user(%arg0: tensor<?x?x?xf32>) {
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32]>
+#encoding = #iree_encoding.testing_encoding<>
 func.func @unset_encoding_fully_static(%arg0: tensor<3x5xf32, #encoding>) -> tensor<3x5xf32> {
   %0 = iree_encoding.unset_encoding %arg0 : tensor<3x5xf32, #encoding> -> tensor<3x5xf32>
   return %0 : tensor<3x5xf32>
 }
-// CHECK:       #[[ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : i64, op_type =  matmul, element_types = [f32, f32, f32]>
+// CHECK:       #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
 // CHECK:       func.func @unset_encoding_fully_static
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]: tensor<3x5xf32, #[[ENCODING]]
 // CHECK:         iree_encoding.unset_encoding %[[ARG0]] : tensor<3x5xf32, #[[ENCODING]]> -> tensor<3x5xf32>
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 1 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+#encoding = #iree_encoding.testing_encoding<>
 func.func @unset_encoding_fully_dynamic(%arg0: tensor<?x?xf32, #encoding>, %d0 : index, %d1 : index) -> tensor<?x?xf32> {
   %0 = iree_encoding.unset_encoding %arg0 : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%d0, %d1}
   return %0 : tensor<?x?xf32>
 }
-// CHECK:      #[[ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : i64, op_type =  matmul, element_types = [f32, f32, f32]>
+// CHECK:      #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
 // CHECK:      func.func @unset_encoding_fully_dynamic
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32, #[[ENCODING]]
 // CHECK-SAME:      %[[D0:[a-zA-Z0-9]+]]
@@ -82,12 +82,12 @@ func.func @unset_encoding_fully_dynamic(%arg0: tensor<?x?xf32, #encoding>, %d0 :
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 1 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+#encoding = #iree_encoding.testing_encoding<>
 func.func @unset_encoding_ops_mixed_dynamic_static(%arg0: tensor<10x?xf32, #encoding>, %d0 : index) -> tensor<?x20xf32> {
   %0 = iree_encoding.unset_encoding %arg0 : tensor<10x?xf32, #encoding> -> tensor<?x20xf32>{%d0}
   return %0 : tensor<?x20xf32>
 }
-// CHECK:      #[[ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+// CHECK:      #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
 // CHECK:      func.func @unset_encoding_ops_mixed_dynamic_static
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<10x?xf32, #[[ENCODING]]>
 // CHECK-SAME:     %[[D0:[a-zA-Z0-9]+]]
