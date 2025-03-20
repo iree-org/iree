@@ -191,18 +191,6 @@ static bool isUnpackLikeOp(Operation *op) {
   return isa<IREE::Encoding::UnsetEncodingOp, linalg::UnPackOp>(op);
 }
 
-/// Since `iree_encoding.set_encoding` doesnt have padding semantics a
-/// `tensor.pad` is introduced to get the shapes of the input and output to
-/// match. The `tensor.pad` -> `set_encoding` can be folded later on into a
-/// single `linalg.pack` operation. But it means the fusion has to try to keep
-/// these in the same dispatch.
-// TODO(ravishankarm): Maybe make `set_encoding` have pad semantics that can be
-// explicitly broken down if needed.
-static bool isPadUsedInSetEncoding(tensor::PadOp padOp) {
-  return llvm::any_of(padOp->getUsers(),
-                      llvm::IsaPred<IREE::Encoding::SetEncodingOp>);
-}
-
 //===----------------------------------------------------------------------===//
 // Heuristics for fusing dispatchble ops with root ops using tile + fuse.
 //===----------------------------------------------------------------------===//
@@ -561,7 +549,7 @@ isFusableWithConsumer(OpOperand &fusedOperand,
   // this with fusion of pad with consumer. So for now split the difference.
   // Either fuse pad with producer or with consumer.
   if (auto padOp = dyn_cast<tensor::PadOp>(consumer)) {
-    if (options.fusePadWithProducers || isPadUsedInSetEncoding(padOp)) {
+    if (options.fusePadWithProducers) {
       return isa<linalg::LinalgOp>(producer);
     }
     return false;
@@ -715,7 +703,7 @@ isFusableWithProducer(OpOperand &operand,
   Operation *consumer = operand.getOwner();
 
   if (auto padOp = dyn_cast<tensor::PadOp>(consumer)) {
-    if (options.fusePadWithProducers || isPadUsedInSetEncoding(padOp)) {
+    if (options.fusePadWithProducers) {
       return isa<linalg::LinalgOp>(producer);
     }
     return false;
