@@ -50,7 +50,7 @@ jobs:
             sku: mi300
             runs-on: linux-mi300-1gpu-ossci-iree-org
             env:
-              IREE_TEST_FILES: "/shark-cache/data/iree-regression-cache"
+              IREE_TEST_FILES: /shark-cache/data/iree-regression-cache
           - name: amdgpu_rocm_mi308_gfx942
             rocm-chip: gfx942
             backend: rocm
