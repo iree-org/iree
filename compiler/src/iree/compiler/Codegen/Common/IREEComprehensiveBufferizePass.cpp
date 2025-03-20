@@ -261,7 +261,6 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
 void IREEBufferizeConstantsPass::runOnOperation() {
   mlir::bufferization::OneShotBufferizationOptions opt;
   opt.copyBeforeWrite = true;
-  opt.enforceAliasingInvariants = false;
   opt.opFilter.allowOperation(arith::ConstantOp::getOperationName());
   if (failed(
           mlir::bufferization::runOneShotBufferize(getOperation(), opt,
