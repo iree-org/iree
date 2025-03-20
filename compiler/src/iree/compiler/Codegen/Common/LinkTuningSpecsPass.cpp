@@ -74,35 +74,10 @@ static bool hasConsumedArgument(ForeachMatchOp op) {
   return false;
 }
 
-// Extracts the base name from a `specName`.
-// - If `specName` ends with `_<number>`, the base name is everything before
-//   `_`.
-// - Otherwise, the full name is used.
-static std::string getBaseName(StringRef specName) {
-  auto pos = specName.rfind('_');
-  if (pos != StringRef::npos) {
-    StringRef potentialBase = specName.substr(0, pos);
-    unsigned suffix;
-    if (!specName.substr(pos + 1).getAsInteger(10, suffix)) {
-      return potentialBase.str(); // If valid number, return base name.
-    }
-  }
-  return specName.str(); // Otherwise, return full name.
-}
-
-static std::string
-getUniqueSpecName(StringRef specName,
-                  llvm::StringMap<unsigned> &specNameCounts) {
-  std::string specBaseName = getBaseName(specName);
-  unsigned specNameSeenCount = specNameCounts[specBaseName]++;
-
-  if (specNameSeenCount == 0)
-    return specBaseName;
-
-  return llvm::formatv("{}_{}", specBaseName, specNameSeenCount).str();
-}
-
 struct TuningSpecsToMerge {
+  // - `namedSequenceOpsToMove`: Contains `NamedSequenceOp`s that either:
+  //     - Are not named `__kernel_config`.
+  //     - Do not have the `iree_codegen.tuning_spec_entrypoint` attribute.
   SmallVector<NamedSequenceOp> namedSequenceOpsToMove;
   // Maps a `NamedSequenceOp` to its user `ForeachMatchOp`, in which the
   // `NamedSequenceOp` is used as a matcher or action inside a
@@ -142,11 +117,6 @@ static void updateForeachMatchMappings(
 
 // Collects tuning specs (`NamedSequenceOp`s) from all inner modules within the
 // given input model, and organizes them into a `TuningSpecsToMerge` struct.
-// - `namedSequenceOpsToMove`: Contains `NamedSequenceOp`s that either:
-//     - Are not named `__kernel_config`.
-//     - Do not have the `iree_codegen.tuning_spec_entrypoint` attribute.
-// - `namedSequenceToForeachMatch`: Maps `NamedSequenceOp`s used as matchers or
-//    actions to their corresponding `ForeachMatchOp`.
 static TuningSpecsToMerge collectTuningSpecsToMerge(ModuleOp module) {
   TuningSpecsToMerge tuningSpecs;
   for (auto innerModule : module.getBody()->getOps<ModuleOp>()) {
@@ -158,8 +128,8 @@ static TuningSpecsToMerge collectTuningSpecsToMerge(ModuleOp module) {
         continue;
       }
 
-      // Extract the single ForeachMatchOp inside namedSequenceOp.
-      auto foreachMatch = *namedSequenceOp.getOps<ForeachMatchOp>().begin();
+      auto foreachMatchOps = namedSequenceOp.getOps<ForeachMatchOp>();
+      ForeachMatchOp foreachMatch = getSingleElement(foreachMatchOps);
       assert(foreachMatch &&
              "ForeachMatch should exist in the `__kernel_config`.");
 
@@ -233,7 +203,7 @@ static void updateNamedSequenceOp(
 }
 
 static void resolveAndMoveNamedSequenceOps(
-    SmallVector<NamedSequenceOp> &namedSequenceOpsToMove, ModuleOp module,
+    ArrayRef<NamedSequenceOp> namedSequenceOpsToMove, ModuleOp module,
     OpBuilder &builder,
     llvm::DenseMap<NamedSequenceOp, ForeachMatchOp> &namedSequenceToUser) {
   llvm::DenseSet<StringRef> seenNames;
@@ -274,9 +244,6 @@ getForeachMatchOpFromKernelConfig(NamedSequenceOp namedSequenceOp) {
          "and attribute `iree_codegen.tuning_spec_entrypoint`.");
 
   auto foreachMatchOps = namedSequenceOp.getOps<ForeachMatchOp>();
-  assert(hasSingleElement(foreachMatchOps) &&
-         "__kernel_config op should contain exactly one ForeachMatchOp.");
-
   return getSingleElement(foreachMatchOps);
 }
 
@@ -405,7 +372,12 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
   // in inner modules to merge into the new `__kernel_config` in the top module.
   SmallVector<ForeachMatchOp> foreachMatchOps;
   for (auto innerModule : module.getBody()->getOps<ModuleOp>()) {
-    auto namedSequenceOp = *innerModule.getOps<NamedSequenceOp>().begin();
+    // All other NamedSequenceOps have already been moved to the top-level
+    // module in Step 2-a. As a result, each inner module now contains only one
+    // `__kernel_config` NamedSequenceOp that is annotated with
+    // `iree_codegen.tuning_spec_entrypoint`.
+    auto namedSequenceOp =
+        getSingleElement(innerModule.getOps<NamedSequenceOp>());
     ForeachMatchOp foreachMatch =
         getForeachMatchOpFromKernelConfig(namedSequenceOp);
     foreachMatchOps.push_back(foreachMatch);

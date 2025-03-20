@@ -244,10 +244,6 @@ module @td_module attributes { transform.with_named_sequence } {
 
   module @inner_module_c
     attributes { transform.with_named_sequence, iree_codegen.tuning_spec_with_default_entrypoint } {
-    transform.named_sequence @match(%arg: !transform.any_op {transform.readonly}) -> (!transform.any_op) {
-      transform.yield %arg : !transform.any_op
-    }
-
     transform.named_sequence @apply_op_config_1(%op: !transform.any_op {transform.readonly}) {
       transform.yield
     }
@@ -257,6 +253,10 @@ module @td_module attributes { transform.with_named_sequence } {
       %res = transform.foreach_match in %arg0 @match -> @apply_op_config_1
         : (!transform.any_op) -> (!transform.any_op)
       transform.yield %res : !transform.any_op
+    }
+
+    transform.named_sequence @match(%arg: !transform.any_op {transform.readonly}) -> (!transform.any_op) {
+      transform.yield %arg : !transform.any_op
     }
   }
 }
