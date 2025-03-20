@@ -7,21 +7,11 @@
 name: CI - Windows x64 MSVC
 
 on:
-  schedule:
-    # Weekday mornings at 09:15 UTC = 01:15 PST (UTC - 8).
-    - cron: "15 9 * * 1-5"
+  workflow_call:
   workflow_dispatch:
-
-concurrency:
-  # A PR number if a pull request and otherwise the commit hash. This cancels
-  # queued and in-progress runs for the same PR (presubmit) or commit
-  # (postsubmit)
-  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
-  cancel-in-progress: true
 
 jobs:
   windows_x64_msvc:
-    if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
     runs-on: azure-windows-scale
     env:
       BASE_BUILD_DIR_POWERSHELL: C:\mnt\azure\b
@@ -74,10 +64,4 @@ jobs:
         if: always()
         run: if (Test-Path -Path "$Env:BUILD_DIR_POWERSHELL") {Remove-Item -Path "$Env:BUILD_DIR_POWERSHELL" -Recurse -Force}
 
-      - name: Post to Discord on Failure
-        uses: sarisia/actions-status-discord@5ddd3b114a98457dd80a39b2f00b6a998cd69008 # v1.15.3
-        if: failure() && github.ref_name == 'main' && github.repository_owner == 'iree-org'
-        with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          description: "The ${{ github.workflow }} workflow failed"
-          url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}"
+      # Alerting on failure is the responsibility of the calling job.
