@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --iree-hal-device-assignment-pipeline --iree-global-opt-materialize-homogeneous-encodings %s | FileCheck %s
 
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {target_triple = "x86_64-none-elf", cpu_features = "+avx512f"}>
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>, target_triple = "x86_64-none-elf", cpu_features = "+avx512f"}>
 #map = affine_map<()[s0, s1] -> (-s1 + (s1 ceildiv s0) * s0)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d2, d1)>

@@ -1534,6 +1534,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-global-opt-experimental-rocm-data-tiling"
     "--iree-global-opt-enable-early-materialization=true"
+    "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
     "nomsan"
@@ -1563,6 +1564,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-global-opt-experimental-rocm-data-tiling"
     "--iree-global-opt-enable-early-materialization=true"
+    "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
     "nomsan"
@@ -1592,6 +1594,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-global-opt-experimental-rocm-data-tiling"
     "--iree-global-opt-enable-early-materialization=true"
+    "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
     "nomsan"
@@ -1622,6 +1625,7 @@ iree_generated_e2e_runner_test(
     "--iree-global-opt-experimental-rocm-data-tiling"
     "--iree-global-opt-enable-early-materialization=true"
     "--iree-hip-enable-ukernels=multi_mma"
+    "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
     "nomsan"
@@ -1651,6 +1655,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-global-opt-experimental-rocm-data-tiling"
     "--iree-global-opt-enable-early-materialization=true"
+    "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
     "nomsan"
@@ -1680,6 +1685,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-global-opt-experimental-rocm-data-tiling"
     "--iree-global-opt-enable-early-materialization=true"
+    "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
     "nomsan"
@@ -1709,6 +1715,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-global-opt-experimental-rocm-data-tiling"
     "--iree-global-opt-enable-early-materialization=true"
+    "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
     "nomsan"
@@ -1739,6 +1746,7 @@ iree_generated_e2e_runner_test(
     "--iree-global-opt-experimental-rocm-data-tiling"
     "--iree-global-opt-enable-early-materialization=true"
     "--iree-input-demote-f64-to-f32=false"
+    "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
     "nomsan"
@@ -1869,6 +1877,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-global-opt-experimental-rocm-data-tiling"
     "--iree-global-opt-enable-early-materialization=true"
+    "--iree-hip-encoding-layout-resolver=data-tiling"
   RUNNER_ARGS
     "--require_exact_results=false"
     "--acceptable_fp_delta=1e-04"
@@ -1901,6 +1910,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-global-opt-experimental-rocm-data-tiling"
     "--iree-global-opt-enable-early-materialization=true"
+    "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
     "nomsan"
@@ -2092,6 +2102,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-global-opt-experimental-rocm-data-tiling"
     "--iree-global-opt-enable-early-materialization=true"
+    "--iree-hip-encoding-layout-resolver=data-tiling"
   RUNNER_ARGS
     "--require_exact_results=false"
     "--acceptable_fp_delta=1e-04"
@@ -2124,6 +2135,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-global-opt-experimental-rocm-data-tiling"
     "--iree-global-opt-enable-early-materialization=true"
+    "--iree-hip-encoding-layout-resolver=data-tiling"
   RUNNER_ARGS
     "--require_exact_results=false"
     "--acceptable_fp_delta=1e-04"
@@ -2156,6 +2168,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-global-opt-experimental-rocm-data-tiling"
     "--iree-global-opt-enable-early-materialization=true"
+    "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
     "nomsan"
