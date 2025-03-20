@@ -169,18 +169,8 @@ def MaterializeEncodingsPass :
     Pass<"iree-stream-materialize-encodings", "mlir::ModuleOp"> {
   let summary = "Materialize stream.tensor.encode ops to dispatches and executables.";
   let description = [{
-    The revision implements the MaterializeEncodings pass. The pass runs the
-    canonicalization patterns from `stream.tensor.encode` and folds nop
-    encoding ops away. Then it creates executables and replaces the
-    `stream.tensor.encode` ops with `stream.async.dispatch` ops on the
-    executables and entries.
-
-    It caches the executables and entries based on the (source encoding,
-    result encoding) pairs. The encode ops that have the same encoding
-    signature can launch the same executables. The only difference is about
-    the dynamic dimension sizes, and they are passed as function arguments.
-    It means that the executable has enough context to deal with different
-    arguments (for dynamic sizes) in different dispatches.
+    Materializes uniqued executables for `stream.tensor.encode` ops and replaces
+    them with dispatches to those executables.
   }];
   let dependentDialects = [
     "mlir::func::FuncDialect",

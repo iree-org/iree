@@ -234,7 +234,7 @@ static ArrayAttr getEncodingSignature(Builder &builder,
       {encodeOp.getSourceEncodingAttr(), encodeOp.getResultEncodingAttr()});
 }
 
-/// Replaces the `encodeOp` with a stream.asyn.dispatch op on the given
+/// Replaces the `encodeOp` with a `stream.async.dispatch` op on the given
 /// `executableOp` and `exportOp`.
 static void
 replaceEncodeOpWithDispatchOp(RewriterBase &rewriter,

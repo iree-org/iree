@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-stream-materialize-encodings)' %s | FileCheck %s
+// RUN: iree-opt --iree-stream-materialize-encodings --split-input-file %s | FileCheck %s
 
 #encoding = #iree_encoding.testing_encoding<>
 // CHECK-LABEL: @fold_tensor_encode_op
