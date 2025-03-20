@@ -44,7 +44,6 @@ jobs:
             backend: rocm
             sku: mi250
             runs-on: nodai-amdgpu-mi250-x86-64
-              IREE_TEST_FILES: artifacts
           - name: amdgpu_rocm_mi300_gfx942
             rocm-chip: gfx942
             backend: rocm
