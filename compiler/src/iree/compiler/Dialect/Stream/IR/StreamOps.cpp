@@ -34,18 +34,6 @@ namespace mlir::iree_compiler::IREE::Stream {
 // Op utilities used within the stream dialect
 //===----------------------------------------------------------------------===//
 
-// TODO(hanchung): Have a better fix. This is a fix for
-// https://reviews.llvm.org/D124649
-static void createArgs(ArrayRef<OpAsmParser::UnresolvedOperand> operands,
-                       ArrayRef<Type> types,
-                       SmallVector<OpAsmParser::Argument> &args) {
-  for (auto [operand, type] : llvm::zip_equal(operands, types)) {
-    auto &arg = args.emplace_back();
-    arg.ssaName = operand;
-    arg.type = type;
-  }
-}
-
 // Verifies that a dispatch |op|'s |workload| matches that of the |exportOp|.
 static LogicalResult
 verifyDispatchWorkload(Operation *op, IREE::Stream::ExecutableExportOp exportOp,
@@ -1078,7 +1066,7 @@ static ParseResult parseResourceRegion(
     SmallVectorImpl<Type> &resultTypes,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultSizes,
     ArrayAttr &tiedOperands, Region &body) {
-  SmallVector<OpAsmParser::UnresolvedOperand, 16> regionArgs;
+  SmallVector<OpAsmParser::Argument, 16> regionArgs;
   if (failed(parser.parseLParen())) {
     return failure();
   }
@@ -1091,8 +1079,7 @@ static ParseResult parseResourceRegion(
       regionArgs.emplace_back();
       if (failed(parser.parseOperand(operands.back())) ||
           failed(parser.parseKeyword("as")) ||
-          failed(parser.parseOperand(regionArgs.back(),
-                                     /*allowResultNumber=*/false)) ||
+          failed(parser.parseArgument(regionArgs.back())) ||
           failed(parser.parseColon()) ||
           failed(parseSizeAwareType(parser, operandTypes.back(),
                                     operandSizes.back()))) {
@@ -1123,9 +1110,10 @@ static ParseResult parseResourceRegion(
     }
   }
 
-  SmallVector<OpAsmParser::Argument> args;
-  createArgs(regionArgs, operandTypes, args);
-  return parser.parseRegion(body, args);
+  for (auto [iterArg, type] : llvm::zip_equal(regionArgs, operandTypes)) {
+    iterArg.type = type;
+  }
+  return parser.parseRegion(body, regionArgs);
 }
 
 static void printResourceRegion(OpAsmPrinter &p, Operation *op,
@@ -1174,7 +1162,7 @@ static ParseResult parseExplicitResourceRegion(
     SmallVectorImpl<Type> &operandTypes,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operandSizes,
     Region &body) {
-  SmallVector<OpAsmParser::UnresolvedOperand, 16> regionArgs;
+  SmallVector<OpAsmParser::Argument, 16> regionArgs;
   if (failed(parser.parseLParen())) {
     return failure();
   }
@@ -1187,8 +1175,7 @@ static ParseResult parseExplicitResourceRegion(
       regionArgs.emplace_back();
       if (failed(parser.parseOperand(operands.back())) ||
           failed(parser.parseKeyword("as")) ||
-          failed(parser.parseOperand(regionArgs.back(),
-                                     /*allowResultNumber=*/false)) ||
+          failed(parser.parseArgument(regionArgs.back())) ||
           failed(parser.parseColon()) ||
           failed(parseSizeAwareType(parser, operandTypes.back(),
                                     operandSizes.back()))) {
@@ -1199,9 +1186,10 @@ static ParseResult parseExplicitResourceRegion(
       return failure();
     }
   }
-  SmallVector<OpAsmParser::Argument> args;
-  createArgs(regionArgs, operandTypes, args);
-  if (failed(parser.parseRegion(body, args))) {
+  for (auto [iterArg, type] : llvm::zip_equal(regionArgs, operandTypes)) {
+    iterArg.type = type;
+  }
+  if (failed(parser.parseRegion(body, regionArgs))) {
     return failure();
   }
   // HACK: I can't figure out how to make this work with the default parsing -

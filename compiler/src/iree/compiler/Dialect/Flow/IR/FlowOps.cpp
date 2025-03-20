@@ -40,18 +40,6 @@ namespace mlir::iree_compiler::IREE::Flow {
 // Op utilities used within the Flow dialect
 //===----------------------------------------------------------------------===//
 
-// TODO(hanchung): Have a better fix. This is a fix for
-// https://reviews.llvm.org/D124649
-static void createArgs(ArrayRef<OpAsmParser::UnresolvedOperand> operands,
-                       ArrayRef<Type> types,
-                       SmallVector<OpAsmParser::Argument> &args) {
-  for (auto [operand, type] : llvm::zip_equal(operands, types)) {
-    auto &arg = args.emplace_back();
-    arg.ssaName = operand;
-    arg.type = type;
-  }
-}
-
 // Verifies that a dispatch |op|'s |workload| matches that of the |exportOp|.
 static LogicalResult
 verifyDispatchWorkload(Operation *op, IREE::Flow::ExecutableExportOp exportOp,
@@ -1032,19 +1020,16 @@ static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,
                                               TypeRange operandTypes,
                                               TypeRange resultTypes,
                                               Region &body) {
-  SmallVector<OpAsmParser::UnresolvedOperand> regionArgs;
-  SmallVector<Type> regionArgTypes;
+  SmallVector<OpAsmParser::Argument> args;
   if (failed(parser.parseLParen())) {
     return failure();
   }
   if (failed(parser.parseOptionalRParen())) {
     do {
       // Reserve entries in the lists.
-      regionArgs.emplace_back();
-      regionArgTypes.emplace_back();
-      if (failed(parser.parseOperand(regionArgs.back(),
-                                     /*allowResultNumber=*/false)) ||
-          failed(parser.parseColonType(regionArgTypes.back()))) {
+      args.emplace_back();
+      if (failed(parser.parseArgument(args.back(),
+                                      /*allowType=*/true))) {
         return failure();
       }
     } while (succeeded(parser.parseOptionalComma()));
@@ -1052,8 +1037,6 @@ static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,
       return failure();
     }
   }
-  SmallVector<OpAsmParser::Argument> args;
-  createArgs(regionArgs, regionArgTypes, args);
   return parser.parseRegion(body, args, /*enableNameShadowing=*/true);
 }
 
