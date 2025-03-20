@@ -32,6 +32,11 @@ iree_cc_library(
     MLIRIR
     MLIRMLProgramDialect
     MLIRPass
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::Stream::IR
+    iree::compiler::Dialect::Util::IR
     iree::compiler::PluginAPI
     iree::compiler::plugins::input::Torch::InputConversion
     iree::compiler::plugins::input::Torch::torch-mlir::TorchConversionDialectIR

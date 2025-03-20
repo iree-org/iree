@@ -5,12 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
+#include "iree/compiler/Dialect/Util/Conversion/FuncToUtil/Patterns.h"
 #include "iree/compiler/Dialect/Util/Conversion/MemRefToUtil/Patterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -58,8 +60,13 @@ public:
     RewritePatternSet patterns(&getContext());
     populateUtilConversionPatterns(context, conversionTarget, typeConverter,
                                    patterns);
-    populateGenericStructuralConversionPatterns(context, conversionTarget,
-                                                typeConverter, patterns);
+    if (structuralConversion) {
+      populateGenericStructuralConversionPatterns(context, conversionTarget,
+                                                  typeConverter, patterns);
+    } else {
+      populateFuncToUtilPatterns(context, conversionTarget, typeConverter,
+                                 patterns, getOperation());
+    }
     populateMemRefToUtilPatterns(context, conversionTarget, typeConverter,
                                  patterns);
 
