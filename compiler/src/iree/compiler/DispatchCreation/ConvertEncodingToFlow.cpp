@@ -25,8 +25,7 @@ namespace mlir::iree_compiler::DispatchCreation {
 
 namespace {
 struct ConvertEncodingToFlowPass
-    : public impl::ConvertEncodingToFlowPassBase<
-          ConvertEncodingToFlowPass> {
+    : public impl::ConvertEncodingToFlowPassBase<ConvertEncodingToFlowPass> {
   using Base::Base;
   void runOnOperation() override;
 };
