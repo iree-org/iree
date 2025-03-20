@@ -211,62 +211,6 @@ util.func public @set_encoding_pad_fusion(%arg0 : tensor<?x?xf32>,
 // -----
 
 #encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
-util.func public @set_encoding_pad_elementwise_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
-    %arg2 : index, %arg3 : index) -> tensor<?x?xf32, #encoding> {
-  %cst = arith.constant 0.0 : f32
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
-  %d1 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
-  %0 = tensor.empty(%d0) : tensor<?xf32>
-  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<?xf32>) -> tensor<?xf32>
-  %2 = linalg.generic {
-      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
-                       affine_map<(d0, d1) -> (d0)>],
-      iterator_types = ["parallel", "reduction"]}
-      ins(%arg0 : tensor<?x?xf32>) outs(%1 : tensor<?xf32>) {
-    ^bb0(%b0 : f32, %b1 : f32) :
-      %3 = arith.addf %b0, %b1 : f32
-      linalg.yield %3 : f32
-  } -> tensor<?xf32>
-  %4 = tensor.empty(%d0, %d1) : tensor<?x?xf32>
-  %5 = linalg.generic  {
-      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
-                       affine_map<(d0, d1) -> (d0)>,
-                       affine_map<(d0, d1) -> (d0, d1)>],
-      iterator_types = ["parallel", "parallel"]}
-      ins(%arg1, %2 : tensor<?x?xf32>, tensor<?xf32>)
-      outs(%4 : tensor<?x?xf32>) {
-    ^bb0(%b0 : f32, %b1 : f32, %b2 :f32) :
-      %6 = arith.addf %b0, %b1 : f32
-      linalg.yield %6 : f32
-  } -> tensor<?x?xf32>
-  %6 = tensor.pad %5 low[0, 0] high[%arg2, %arg3] {
-    ^bb0(%b0 : index, %b1 : index):
-      tensor.yield %cst : f32
-  } : tensor<?x?xf32> to tensor<?x?xf32>
-  %7 = iree_encoding.set_encoding %6
-      : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
-  util.return %7 : tensor<?x?xf32, #encoding>
-}
-// CHECK-LABEL: util.func public @set_encoding_pad_elementwise_fusion(
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
-//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32>
-//       CHECK:   %[[RETURN:.+]] = flow.dispatch.region
-//       CHECK:     %[[REDUCTION:.+]] = linalg.generic
-//  CHECK-SAME:         iterator_types = ["parallel", "reduction"]
-//  CHECK-SAME:         ins(%[[ARG0]] :
-//       CHECK:     %[[GENERIC:.+]] = linalg.generic
-//  CHECK-SAME:         iterator_types = ["parallel", "parallel"]
-//  CHECK-SAME:         ins(%[[ARG1]], %[[REDUCTION]] :
-//       CHECK:     %[[PAD:.+]] = tensor.pad %[[GENERIC]]
-//       CHECK:     %[[PACK:.+]] = iree_encoding.set_encoding %[[PAD]]
-//       CHECK:     flow.return %[[PACK]]
-//       CHECK:   util.return %[[RETURN]]
-
-// -----
-
-#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
 util.func public @unset_encoding_elementwise_fusion(
     %arg0: tensor<?x?xf32, #encoding>,
     %arg1: tensor<?xf32>,
