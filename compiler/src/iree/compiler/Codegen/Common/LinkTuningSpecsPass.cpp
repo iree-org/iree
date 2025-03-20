@@ -75,9 +75,9 @@ static bool hasConsumedArgument(ForeachMatchOp op) {
 }
 
 struct TuningSpecsToMerge {
-  // - `namedSequenceOpsToMove`: Contains `NamedSequenceOp`s that either:
-  //     - Are not named `__kernel_config`.
-  //     - Do not have the `iree_codegen.tuning_spec_entrypoint` attribute.
+  // Contains `NamedSequenceOp`s that either:
+  //  - Are not named `__kernel_config`.
+  //  - Do not have the `iree_codegen.tuning_spec_entrypoint` attribute.
   SmallVector<NamedSequenceOp> namedSequenceOpsToMove;
   // Maps a `NamedSequenceOp` to its user `ForeachMatchOp`, in which the
   // `NamedSequenceOp` is used as a matcher or action inside a
@@ -95,21 +95,18 @@ struct TuningSpecsToMerge {
 static void updateForeachMatchMappings(
     ForeachMatchOp foreachMatch, ModuleOp module,
     llvm::DenseMap<NamedSequenceOp, ForeachMatchOp> &namedSequenceToUser) {
-  for (auto matcher : foreachMatch.getMatchers()) {
-    if (auto matcherSymRef = mlir::dyn_cast<mlir::SymbolRefAttr>(matcher)) {
-      if (auto matcherOp =
-              SymbolTable::lookupNearestSymbolFrom<NamedSequenceOp>(
-                  module, matcherSymRef)) {
-        namedSequenceToUser[matcherOp] = foreachMatch;
-      }
-    }
-  }
 
-  for (auto action : foreachMatch.getActions()) {
-    if (auto actionSymRef = mlir::dyn_cast<mlir::SymbolRefAttr>(action)) {
-      if (auto actionOp = SymbolTable::lookupNearestSymbolFrom<NamedSequenceOp>(
-              module, actionSymRef)) {
-        namedSequenceToUser[actionOp] = foreachMatch;
+  SmallVector<Attribute> allSymbols;
+  allSymbols.append(foreachMatch.getMatchers().begin(),
+                    foreachMatch.getMatchers().end());
+  allSymbols.append(foreachMatch.getActions().begin(),
+                    foreachMatch.getActions().end());
+  for (Attribute symbolRef : allSymbols) {
+    if (auto symRefAttr = dyn_cast<SymbolRefAttr>(symbolRef)) {
+      if (auto namedSeqOp =
+              SymbolTable::lookupNearestSymbolFrom<NamedSequenceOp>(
+                  module, symRefAttr)) {
+        namedSequenceToUser[namedSeqOp] = foreachMatch;
       }
     }
   }
@@ -122,17 +119,13 @@ static TuningSpecsToMerge collectTuningSpecsToMerge(ModuleOp module) {
   for (auto innerModule : module.getBody()->getOps<ModuleOp>()) {
     for (auto namedSequenceOp :
          innerModule.getBody()->getOps<NamedSequenceOp>()) {
-      if (namedSequenceOp.getSymName() != kKernelConfigSpecName ||
-          !namedSequenceOp->hasAttr(kTuningSpecEntrypointAttrName)) {
+      if (!namedSequenceOp->hasAttr(kTuningSpecEntrypointAttrName)) {
         tuningSpecs.namedSequenceOpsToMove.push_back(namedSequenceOp);
         continue;
       }
 
       auto foreachMatchOps = namedSequenceOp.getOps<ForeachMatchOp>();
       ForeachMatchOp foreachMatch = getSingleElement(foreachMatchOps);
-      assert(foreachMatch &&
-             "ForeachMatch should exist in the `__kernel_config`.");
-
       updateForeachMatchMappings(foreachMatch, innerModule,
                                  tuningSpecs.namedSequenceToUser);
     }
@@ -143,6 +136,11 @@ static TuningSpecsToMerge collectTuningSpecsToMerge(ModuleOp module) {
 
 // Renames a `NamedSequenceOp` to resolve name conflicts caused by merging
 // tuning specs.
+// The name conflict resolution strategy follows below two rules:
+//   1. If the `NamedSequenceOp` is inside a module with a valid symbol name,
+//      its new name is prefixed with its containing module's symbol name.
+//   2. If the module has no symbol name, an incrementing counter is used
+//      to generate a unique prefix (e.g., `m0_`, `m1_`, etc.).
 static void updateNamedSequenceOp(
     NamedSequenceOp op, OpBuilder &builder,
     llvm::DenseMap<NamedSequenceOp, ForeachMatchOp> &namedSequenceToUser,
@@ -187,12 +185,12 @@ static void updateNamedSequenceOp(
 
   SmallVector<Attribute> updatedMatchers;
   SmallVector<Attribute> updatedActions;
-  for (auto matcherAttr : foreachMatchOp.getMatchers()) {
+  for (Attribute matcherAttr : foreachMatchOp.getMatchers()) {
     SymbolRefAttr updatedAttr = getUpdatedSymbol(matcherAttr);
     updatedMatchers.push_back(updatedAttr);
   }
 
-  for (auto actionAttr : foreachMatchOp.getActions()) {
+  for (Attribute actionAttr : foreachMatchOp.getActions()) {
     SymbolRefAttr updatedAttr = getUpdatedSymbol(actionAttr);
     updatedActions.push_back(updatedAttr);
   }
@@ -365,11 +363,12 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
   resolveAndMoveNamedSequenceOps(namedSequenceOpsToMove, module, builder,
                                  namedSequenceToUser);
 
-  // Step 2-b: Create a new NamedSequenceOp `__kernel_config` in the top-level
-  // module.
+  // Step 2-b: Create a new entry point NamedSequenceOp called `__kernel_config`
+  // in the top-level module.
 
-  // Collect all `ForeachMatchOp`s from `__kernel_config` NamedSequenceOps
-  // in inner modules to merge into the new `__kernel_config` in the top module.
+  // Collect the `ForeachMatchOp`s from the entry point named sequences of
+  // each inner module to merge into the new default entry point in the top
+  // module.
   SmallVector<ForeachMatchOp> foreachMatchOps;
   for (auto innerModule : module.getBody()->getOps<ModuleOp>()) {
     // All other NamedSequenceOps have already been moved to the top-level
@@ -378,23 +377,21 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
     // `iree_codegen.tuning_spec_entrypoint`.
     auto namedSequenceOp =
         getSingleElement(innerModule.getOps<NamedSequenceOp>());
-    ForeachMatchOp foreachMatch =
-        getForeachMatchOpFromKernelConfig(namedSequenceOp);
-    foreachMatchOps.push_back(foreachMatch);
+    foreachMatchOps.push_back(
+        getForeachMatchOpFromKernelConfig(namedSequenceOp));
   }
 
   builder.setInsertionPointToEnd(module.getBody());
   Location loc = module.getLoc();
-  NamedSequenceOp newNamedSequence =
+  NamedSequenceOp newEntryPoint =
       createKernelConfigOp(builder, loc, kKernelConfigSpecName);
 
   bool hasConsumedArg = llvm::any_of(foreachMatchOps, hasConsumedArgument);
   StringRef attrName =
       hasConsumedArg ? kArgConsumedAttrName : kArgReadOnlyAttrName;
-  newNamedSequence.setArgAttr(0, attrName, builder.getUnitAttr());
-  newNamedSequence->setAttr(kTuningSpecEntrypointAttrName,
-                            builder.getUnitAttr());
-  // Indicate that the output module is a default tuning spec after merging.
+  newEntryPoint.setArgAttr(0, attrName, builder.getUnitAttr());
+  newEntryPoint->setAttr(kTuningSpecEntrypointAttrName, builder.getUnitAttr());
+  // Indicate that the outer module is a default tuning spec after merging.
   module->setAttr(kTuningSpecDefaultEntrypointAttrName, builder.getUnitAttr());
 
   // Step 2-c: Create a new block inside the NamedSequenceOp and merge the
@@ -404,7 +401,7 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
   SmallVector<Attribute> mergedMatchers;
   SmallVector<Attribute> mergedActions;
 
-  for (auto foreachMatchOp : foreachMatchOps) {
+  for (ForeachMatchOp foreachMatchOp : foreachMatchOps) {
     ArrayAttr matchers = foreachMatchOp.getMatchers();
     ArrayAttr actions = foreachMatchOp.getActions();
     for (auto [matcher, action] : llvm::zip_equal(matchers, actions)) {
@@ -413,12 +410,12 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
     }
   }
 
-  Region &region = newNamedSequence.getRegion();
+  Region &region = newEntryPoint.getRegion();
   Block *body = builder.createBlock(&region, region.begin(),
-                                    newNamedSequence.getArgumentTypes(), loc);
+                                    newEntryPoint.getArgumentTypes(), loc);
   builder.setInsertionPointToStart(body);
   auto mergedForeachMatch = builder.create<ForeachMatchOp>(
-      loc, resultTypes, newNamedSequence.getArgument(0),
+      loc, resultTypes, newEntryPoint.getArgument(0),
       /* forwarded_inputs = */ ValueRange(),
       /* restrictRoot = */ nullptr, /* flattenResults = */ nullptr,
       builder.getArrayAttr(mergedMatchers),
@@ -431,7 +428,7 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
     innerModule.erase();
   }
 
-  return newNamedSequence;
+  return newEntryPoint;
 }
 
 struct LinkTuningSpecsPass final
