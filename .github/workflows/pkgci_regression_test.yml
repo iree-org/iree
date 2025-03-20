@@ -44,6 +44,7 @@ jobs:
             backend: rocm
             sku: mi250
             runs-on: nodai-amdgpu-mi250-x86-64
+              IREE_TEST_FILES: artifacts
           - name: amdgpu_rocm_mi300_gfx942
             rocm-chip: gfx942
             backend: rocm
@@ -97,7 +98,6 @@ jobs:
         if: "!cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
-          echo "IREE_TEST_FILES=${{ matrix.env.IREE_TEST_FILES }}" >> $GITHUB_ENV
           pytest ./experimental/regression_suite/shark-test-suite-models/sdxl \
             -k ${{ matrix.backend }} \
             -rpfE \
@@ -114,7 +114,6 @@ jobs:
         if: "!cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
-          echo "IREE_TEST_FILES=${{ matrix.env.IREE_TEST_FILES }}" >> $GITHUB_ENV
           pytest ./experimental/regression_suite/shark-test-suite-models/sd3 \
             -k ${{ matrix.backend }} \
             -rpfE \
@@ -124,6 +123,7 @@ jobs:
             --durations=0
         env:
           ROCM_CHIP: ${{ matrix.rocm-chip }}
+          IREE_TEST_FILES: ${{ matrix.env.IREE_TEST_FILES }}
 
       # Note: mi250 benchmark times are more lenient than mi300 (allowing about
       # 30% deviation from observed averages), since the mi250 runners we use
@@ -157,7 +157,6 @@ jobs:
         if: contains(matrix.name, 'rocm_mi300_gfx942')
         run: |
           source ${VENV_DIR}/bin/activate
-          echo "IREE_TEST_FILES=${{ matrix.env.IREE_TEST_FILES }}" >> $GITHUB_ENV
           pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
             --goldentime-tolerance-multiplier 1.1 \
             --goldentime-rocm-e2e-ms 305.0 \
@@ -181,6 +180,8 @@ jobs:
             --timeout=600 \
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
+        env:
+          IREE_TEST_FILES: ${{ matrix.env.IREE_TEST_FILES }}
       # Note: allowing 10% deviation from observed averages here to account for
       # different runner conditions.
       - name: "Running SDXL rocm pipeline benchmark (mi308)"
