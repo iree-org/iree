@@ -74,6 +74,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: false
+          lfs: true
 
       - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
         with:
@@ -93,7 +94,7 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
 
       - name: "Running Sharktank regression composite action"
-        uses: geomin12/iree-test-suites/sharktank_models@456dba5266f78a52b9e4261e2642835faea7ffa2 # temporary until it works
+        uses: geomin12/iree-test-suites/sharktank_models@799d57504ca19a4f6828c52fb0444b77ce4cc61a # temporary until it works
         with:
           MATRIX_NAME: ${{ matrix.name }}
           SKU: ${{ matrix.sku }}
