@@ -21,6 +21,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::Stream {
@@ -282,8 +283,10 @@ void MaterializeEncodingsPass::runOnOperation() {
   }
 
   SmallVector<IREE::Stream::TensorEncodeOp> encodeOps;
-  moduleOp.walk(
-      [&](IREE::Stream::TensorEncodeOp op) { encodeOps.push_back(op); });
+  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
+    funcOp.walk(
+        [&](IREE::Stream::TensorEncodeOp op) { encodeOps.push_back(op); });
+  }
   if (encodeOps.empty()) {
     return;
   }
