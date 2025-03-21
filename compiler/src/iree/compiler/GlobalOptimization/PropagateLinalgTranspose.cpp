@@ -136,21 +136,23 @@ static void specializeGenericTransposeOp(RewriterBase &rewriter,
 /// Returns the `op` if it is a linalg::GenericOp. If it is a named op and
 /// `allowGeneralizing` is true, returns the generalized op. Otherwise, returns
 /// failure.
-/// TODO: Right now convolutions are not allowed due to fragility around
-/// handling of convolutions.
+/// TODO: Due to fragility around handling of convolutions, convolution
+/// propagation is behind a flag.
 static FailureOr<linalg::GenericOp>
 getAllowedGenericOpOrGeneralizeNamedOp(RewriterBase &rewriter, Operation *op,
-                                       bool allowGeneralizing) {
+                                       bool allowGeneralizing, bool convProp) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp) {
     return failure();
   }
 
-  if (linalg::isaConvolutionOpInterface(linalgOp)) {
+  if (!convProp && linalg::isaConvolutionOpInterface(linalgOp)) {
     return failure();
   }
+
   if (!isa<linalg::GenericOp>(linalgOp) &&
-      !(allowGeneralizing && linalg::isaContractionOpInterface(linalgOp))) {
+      !(allowGeneralizing && linalg::isaContractionOpInterface(linalgOp)) &&
+      !(convProp && linalg::isaConvolutionOpInterface(linalgOp))) {
     return failure();
   }
 
@@ -190,9 +192,9 @@ class FuseTransposeWithProducerLinalgOp
 public:
   using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
   FuseTransposeWithProducerLinalgOp(MLIRContext *ctx, bool aggressiveProp,
-                                    PatternBenefit b = 1)
+                                    bool convProp, PatternBenefit b = 1)
       : OpRewritePattern<linalg::TransposeOp>(ctx, b),
-        allowGeneralizing(aggressiveProp) {}
+        allowGeneralizing(aggressiveProp), convProp(convProp) {}
 
   LogicalResult matchAndRewrite(linalg::TransposeOp transposeOp,
                                 PatternRewriter &rewriter) const override {
@@ -216,7 +218,7 @@ public:
 
     int64_t resultIndex = result.getResultNumber();
     auto maybeGenericOp = getAllowedGenericOpOrGeneralizeNamedOp(
-        rewriter, result.getOwner(), allowGeneralizing);
+        rewriter, result.getOwner(), allowGeneralizing, convProp);
     if (failed(maybeGenericOp)) {
       return rewriter.notifyMatchFailure(
           transposeOp, "linalg op producer is not generic or contraction");
@@ -297,6 +299,7 @@ public:
 
 private:
   bool allowGeneralizing = false;
+  bool convProp = false;
 };
 
 // Bubbles a transpose through a tensor.collapse_shape.
@@ -592,9 +595,9 @@ class FuseTransposeWithLinalgOpConsumer
 public:
   using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
   FuseTransposeWithLinalgOpConsumer(MLIRContext *ctx, bool aggressiveProp,
-                                    PatternBenefit b = 1)
+                                    bool convProp, PatternBenefit b = 1)
       : OpInterfaceRewritePattern<linalg::LinalgOp>(ctx, b),
-        allowGeneralizing(aggressiveProp) {}
+        allowGeneralizing(aggressiveProp), convProp(convProp) {}
 
   LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
@@ -623,7 +626,7 @@ public:
     // to the results of the associated input's indexing map, and then forward
     // the input to the transpose to the consumer generic.
     auto maybeGenericOp = getAllowedGenericOpOrGeneralizeNamedOp(
-        rewriter, linalgOp, allowGeneralizing);
+        rewriter, linalgOp, allowGeneralizing, convProp);
     if (failed(maybeGenericOp)) {
       return failure();
     }
@@ -649,6 +652,7 @@ public:
 
 private:
   bool allowGeneralizing = false;
+  bool convProp = false;
 };
 
 static bool isIndexingMapAffectedByTransposeMap(
@@ -1107,7 +1111,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
           bubblingPatterns, bubbleTransposeControlFn);
     }
     bubblingPatterns.insert<FuseTransposeWithProducerLinalgOp>(
-        context, enableAggressivePropagation);
+        context, enableAggressivePropagation, enableConvolutionPropagation);
     bubblingPatterns.insert<BubbleTransposeThroughCollapseShape>(context);
     bubblingPatterns.add<BubbleTransposeThroughUnaryElementwiseDpsInit>(
         context, /*benefit=*/2);
@@ -1165,7 +1169,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
     sinkingPatterns.insert<SinkTransposeThroughExtractSlice>(context);
     sinkingPatterns.insert<SinkTransposeThroughExpandShape>(context);
     sinkingPatterns.insert<FuseTransposeWithLinalgOpConsumer>(
-        context, enableAggressivePropagation);
+        context, enableAggressivePropagation, enableConvolutionPropagation);
     sinkingPatterns.insert<ComposeTransposes>(context);
     populateNamedOpSinkingPatterns(context, sinkingPatterns);
     populateCommonCanonicalizationPatterns(context, sinkingPatterns);

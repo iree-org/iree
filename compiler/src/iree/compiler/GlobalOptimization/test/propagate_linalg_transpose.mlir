@@ -2,6 +2,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{enable-aggressive-propagation=true}))" --split-input-file %s | FileCheck %s --check-prefix=APROP
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{test-sinking-only=true}))" --split-input-file %s | FileCheck %s --check-prefix=SINK
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{test-bubbling-only=true}))" --split-input-file %s | FileCheck %s --check-prefix=BUBBLE
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{enable-aggressive-propagation-through-conv=true}))" --split-input-file %s | FileCheck %s --check-prefix=CONV
 
 util.func public @specialize_transpose_op(%arg0 : tensor<1x2x3xf32>,
                                    %empty : tensor<3x2x1xf32>) -> tensor<3x2x1xf32> {
@@ -254,6 +255,10 @@ util.func public @do_not_propagate_to_conv(%transposed_lhs: tensor<18x2x18x8xf32
 // APROP-LABEL: util.func public @do_not_propagate_to_conv
 //       APROP:   linalg.conv_2d_nhwc_hwcf
 
+// CONV-LABEL:   util.func public @do_not_propagate_to_conv
+//  CONV-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<18x2x18x8xf32>
+//       CONV:   linalg.generic {{.*}} ins(%[[ARG0]]
+
 // -----
 
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
@@ -277,6 +282,10 @@ module {
 // APROP-LABEL: util.func public @do_not_propagate_to_conv_generic
 //       APROP:   linalg.transpose
 //       APROP:   linalg.generic
+
+// CONV-LABEL:   util.func public @do_not_propagate_to_conv_generic
+//  CONV-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<18x2x18x8xf32>
+//       CONV:   linalg.generic {{.*}} ins(%[[ARG0]]
 
 // -----
 
