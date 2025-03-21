@@ -469,13 +469,19 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   if (outputChannelLastDim.value() < outputImageFirstDim.value())
     isOutputChannelFirst = true;
 
+  bool isBatchDimLast = false;
+  std::optional<int64_t> batchFirstDim = outputMap.getResultPosition(
+      getAffineDimExpr(convDims.batch[0], outputMap.getContext()));
+  if (batchFirstDim && outputChannelLastDim.value() < batchFirstDim.value())
+    isBatchDimLast = true;
+
   SmallVector<int64_t> filterkPos;
   for (auto reductionDim : reductionDims) {
     std::optional<int64_t> maybeDim = filterMap.getResultPosition(
         getAffineDimExpr(reductionDim, filterMap.getContext()));
     filterkPos.push_back(maybeDim.value());
   }
-  // group together adjacent reduction dimensions in the filter.
+  // Group together adjacent reduction dimensions in the filter.
   // First we want to sort the dims as the look up from the filterMap
   // can place the dims in arbitarty order.
   std::sort(filterkPos.begin(), filterkPos.end());
@@ -519,7 +525,7 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
     filterIterators.push_back(reduction);
     filterReassocIndices.push_back(collapsedDim);
   }
-  // insert any leftover parallel dims in the end.
+  // Insert any leftover parallel dims in the end.
   for (int i = filterNdimPos; i < filterNdims.size(); i++) {
     filterReassocIndices.push_back({filterNdims[i]});
     filterIterators.push_back(parallel);
@@ -546,30 +552,34 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
       SmallVector<AffineExpr>(dims.begin(), dims.begin() + numParallelDims),
       ctx);
 
-  // prepare the input map.
+  // Prepare the input map.
+  int64_t numBDimsInFront = isBatchDimLast ? 0 : numBDims;
+  int64_t startingMPos =
+      isOutputChannelFirst ? numNDims + numBDimsInFront : numBDimsInFront;
+  int64_t startingBPos = isBatchDimLast ? startingMPos + numMDims : 0;
   SmallVector<AffineExpr> inputDims;
   // Add the batch dimensions.
-  inputDims.insert(inputDims.end(), dims.begin(), dims.begin() + numBDims);
-  int64_t starting_m_pos =
-      isOutputChannelFirst ? numBDims + numNDims : numBDims;
+  inputDims.insert(inputDims.end(), dims.begin() + startingBPos,
+                   dims.begin() + startingBPos + numBDims);
   // Add the M dims.
-  inputDims.insert(inputDims.end(), dims.begin() + starting_m_pos,
-                   dims.begin() + starting_m_pos + numMDims);
+  inputDims.insert(inputDims.end(), dims.begin() + startingMPos,
+                   dims.begin() + startingMPos + numMDims);
   // Add the reduction dims.
   inputDims.insert(inputDims.end(), dims.begin() + numParallelDims, dims.end());
   auto inputMapGEMM =
       AffineMap::get(numParallelDims + numKDims, 0, inputDims, ctx);
 
-  // prepare filter map.
+  // Prepare filter map.
+  int64_t currNPos =
+      isOutputChannelFirst ? numBDimsInFront : numBDimsInFront + numMDims;
+  int64_t currKPos = numBDims + numMDims + numNDims;
   SmallVector<AffineExpr> filterDims;
-  int64_t curr_n_pos = isOutputChannelFirst ? numBDims : numBDims + numMDims;
-  int64_t curr_k_pos = numBDims + numMDims + numNDims;
 
   for (auto iter : filterIterators) {
     if (iter == parallel) {
-      filterDims.push_back(dims[curr_n_pos++]);
+      filterDims.push_back(dims[currNPos++]);
     } else if (iter == reduction) {
-      filterDims.push_back(dims[curr_k_pos++]);
+      filterDims.push_back(dims[currKPos++]);
     }
   }
   auto filterMapGEMM =
