@@ -1162,8 +1162,56 @@ void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // flow.tensor.barrier
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+// Attempts to identify trivial cases where we locally recognize that a tensor
+// is transferred to the same context it's already on. This does not look across
+// control flow edges or globals and is mostly for simplifying IR that may come
+// in with a transfer on every single tensor.
+struct ElideRedundantBarrier : public OpRewritePattern<TensorBarrierOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorBarrierOp targetTransferOp,
+                                PatternRewriter &rewriter) const override {
+    auto sourceTransferOp = dyn_cast_if_present<IREE::Flow::TensorBarrierOp>(targetTransferOp.getOperand().getDefiningOp());
+    if (!sourceTransferOp) {
+      return failure();
+    }
+    if (sourceTransferOp.getTarget() != targetTransferOp.getTarget()) {
+      return failure();
+    }
+    rewriter.replaceOp(targetTransferOp, targetTransferOp.getOperand());
+    return success();
+  }
+};
+
+struct ElideChainedBarriers : public OpRewritePattern<TensorBarrierOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorBarrierOp targetBarrierOp,
+                                PatternRewriter &rewriter) const override {
+    auto sourceBarrierOp = dyn_cast_if_present<IREE::Flow::TensorBarrierOp>(targetBarrierOp.getOperand().getDefiningOp());
+    if (!sourceBarrierOp) {
+      return failure();
+    }
+    if (sourceBarrierOp.getTarget() == targetBarrierOp.getTarget()) {
+      return failure();
+    }
+    rewriter.replaceOpWithNewOp<TensorBarrierOp>(
+      targetBarrierOp, 
+      targetBarrierOp->getResultTypes(),
+      sourceBarrierOp.getOperand(),
+      targetBarrierOp.getOperandDims(),
+      targetBarrierOp.getTarget());
+    return success();
+  }
+};
+
+} // namespace
+
 void TensorBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                  MLIRContext *context) {}
+                                                  MLIRContext *context) {
+  results.insert<ElideRedundantBarrier>(context);
+  results.insert<ElideChainedBarriers>(context);
+}
 
 //===----------------------------------------------------------------------===//
 // flow.tensor.transfer

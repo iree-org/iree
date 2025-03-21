@@ -409,6 +409,45 @@ util.func public @cloneDynamicZeroElements(%arg0: tensor<0x?xf32>, %dim: index) 
 
 // -----
 
+// CHECK-LABEL: @ElideRedundantBarrier
+//  CHECK-SAME: (%[[OPERAND:.+]]: tensor<1xf32>)
+util.func public @ElideRedundantBarrier(%operand: tensor<1xf32>) -> tensor<1xf32> {
+  // CHECK: %[[BARRIERED:.+]] = flow.tensor.barrier %[[OPERAND]] : tensor<1xf32> on "target"
+  %barriered = flow.tensor.barrier %operand : tensor<1xf32> on "target"
+  %redundant = flow.tensor.barrier %barriered : tensor<1xf32> on "target"
+  // CHECK-NEXT: util.return %[[BARRIERED]]
+  util.return %redundant : tensor<1xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @ElideIntermediateBarriers
+//  CHECK-SAME: (%[[OPERAND:.+]]: tensor<1xf32>)
+util.func public @ElideIntermediateBarriersTwoBarriers(%operand: tensor<1xf32>) -> tensor<1xf32> {
+  %barriered = flow.tensor.barrier %operand : tensor<1xf32> on "target1"
+  // CHECK: %[[BARRIERED:.+]] = flow.tensor.barrier %[[OPERAND]] : tensor<1xf32> on "target2"
+  %redundant = flow.tensor.barrier %barriered : tensor<1xf32> on "target2"
+  // CHECK-NEXT: util.return %[[BARRIERED]]
+  util.return %redundant : tensor<1xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @ElideIntermediateBarriersFourBarriers
+//  CHECK-SAME: (%[[OPERAND:.+]]: tensor<1xf32>)
+util.func public @ElideIntermediateBarriersFourBarriers(%operand: tensor<1xf32>) -> tensor<1xf32> {
+  %redundant1 = flow.tensor.barrier %operand : tensor<1xf32> on "target1"
+  %redundant2 = flow.tensor.barrier %redundant1 : tensor<1xf32> on "target2"
+  %redundant3 = flow.tensor.barrier %redundant2 : tensor<1xf32> on "target3"
+  // CHECK: %[[BARRIERED:.+]] = flow.tensor.barrier %[[OPERAND]] : tensor<1xf32> on "target4"
+  %barriered = flow.tensor.barrier %redundant3 : tensor<1xf32> on "target4"
+  // CHECK-NEXT: util.return %[[BARRIERED]]
+  util.return %barriered : tensor<1xf32>
+}
+
+
+// -----
+
 // CHECK-LABEL: @ElideRedundantTransfer
 //  CHECK-SAME: (%[[OPERAND:.+]]: tensor<4x?xf32>, %[[DIM:.+]]: index)
 util.func public @ElideRedundantTransfer(%operand: tensor<4x?xf32>, %dim: index) -> tensor<4x?xi32> {
