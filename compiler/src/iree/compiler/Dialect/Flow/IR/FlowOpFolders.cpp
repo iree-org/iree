@@ -1194,23 +1194,25 @@ struct ElideRedundantTransfer : public OpRewritePattern<TensorTransferOp> {
 
 // Attempts to identify trivial case of chained transfer ops (A -> B -> C) and rewrite it as (A -> C)
 // Writes it as A -> B and A -> C relying on dead code elimination to remove the unused A -> B transfer.
-struct ElideChainedTransfer : public OpRewritePattern<TensorTransferOp> {
+struct ElideIntermediateTranfers : public OpRewritePattern<TensorTransferOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorTransferOp targetTransferOp,
                                 PatternRewriter &rewriter) const override {
-    auto baseValue =
-        IREE::Util::TiedOpInterface::findTiedBaseValue(targetTransferOp.getOperand());
-    if (auto sourceTransferOp = dyn_cast_if_present<IREE::Flow::TensorTransferOp>(
-            baseValue.getDefiningOp())) {
-      rewriter.replaceOpWithNewOp<TensorTransferOp>(
-        targetTransferOp, 
-        targetTransferOp->getResultTypes(),
-        sourceTransferOp.getOperand(),
-        targetTransferOp.getOperandDims(),
-        targetTransferOp.getTarget());
-      return success();
+    auto sourceTransferOp = dyn_cast_if_present<IREE::Flow::TensorTransferOp>(targetTransferOp.getOperand().getDefiningOp());
+    if (!sourceTransferOp) {
+      return failure();
     }
-    return failure();
+    if (sourceTransferOp.getTarget() == targetTransferOp.getTarget()) {
+      return failure();
+    }
+    rewriter.replaceOpWithNewOp<TensorTransferOp>(
+      targetTransferOp, 
+      targetTransferOp->getResultTypes(),
+      sourceTransferOp.getOperand(),
+      targetTransferOp.getOperandDims(),
+      targetTransferOp.getTarget());
+    return success();
+    
   } 
 };
 
@@ -1220,7 +1222,7 @@ struct ElideChainedTransfer : public OpRewritePattern<TensorTransferOp> {
 void TensorTransferOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                    MLIRContext *context) {
   results.insert<ElideRedundantTransfer>(context);
-  results.insert<ElideChainedTransfer>(context);
+  results.insert<ElideIntermediateTranfers>(context);
 }
 
 //===----------------------------------------------------------------------===//
