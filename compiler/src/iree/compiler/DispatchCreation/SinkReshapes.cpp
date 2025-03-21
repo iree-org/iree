@@ -169,6 +169,10 @@ void SinkReshapesPass::runOnOperation() {
                                                      shouldSinkExpandShapeOp);
   // Add patterns to fold `tensor.empty` and reshape ops.
   tensor::populateFoldTensorEmptyPatterns(sinkReshapePatterns);
+  tensor::CollapseShapeOp::getCanonicalizationPatterns(sinkReshapePatterns,
+                                                       context);
+  tensor::ExpandShapeOp::getCanonicalizationPatterns(sinkReshapePatterns,
+                                                     context);
   if (failed(applyPatternsGreedily(getOperation(),
                                    std::move(sinkReshapePatterns)))) {
     getOperation()->emitOpError("failed to sink reshape ops");

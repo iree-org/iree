@@ -115,21 +115,19 @@ LogicalResult moveOperandDefs(RewriterBase &rewriter,
   // Set inclusive to true cause the slice is computed from the operand, and
   // we want to include the defining op (which is the point here)
   options.omitUsesFromAbove = false;
-  options.inclusive = true;
+  options.inclusive = false;
+  options.omitBlockArguments = true;
 
   llvm::SetVector<Operation *> slice;
   for (auto op : operations) {
-    for (auto operand : op->getOperands()) {
-      getBackwardSlice(operand, &slice, options);
-    }
-    auto regions = op->getRegions();
-    if (regions.empty()) {
-      continue;
-    }
-    llvm::SetVector<Value> capturedVals;
-    mlir::getUsedValuesDefinedAbove(regions, capturedVals);
-    for (auto value : capturedVals) {
-      getBackwardSlice(value, &slice, options);
+    getBackwardSlice(op, &slice, options);
+  }
+
+  for (auto *op : slice) {
+    for (Value operand : op->getOperands()) {
+      if (operand.getDefiningOp() == insertionPoint) {
+        return failure();
+      }
     }
   }
 
