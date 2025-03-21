@@ -2653,6 +2653,27 @@ SmallVector<int64_t> AsyncStoreOp::getTiedResultOperandIndices() {
 // stream.async.dispatch
 //===----------------------------------------------------------------------===//
 
+void AsyncDispatchOp::build(OpBuilder &builder, OperationState &state,
+                            ExecutableExportOp exportOp, ValueRange workload,
+                            TypeRange resultTypes, ValueRange operands,
+                            ValueRange operandSizes, ValueRange operandOffsets,
+                            ValueRange operandEnds, ValueRange operandLengths,
+                            ValueRange resultSizes,
+                            ArrayRef<int64_t> tiedOperands,
+                            AffinityAttr affinityAttr) {
+  StringRef executableOpSymName =
+      exportOp->getParentOp()
+          ->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
+          .getValue();
+  auto entryPoint =
+      SymbolRefAttr::get(builder.getContext(), executableOpSymName,
+                         {SymbolRefAttr::get(exportOp)});
+  build(builder, state, resultTypes, workload,
+        builder.getArrayAttr({entryPoint}), operands, operandSizes,
+        operandOffsets, operandEnds, operandLengths, resultSizes,
+        cast<ArrayAttr>(builder.getIndexArrayAttr(tiedOperands)), affinityAttr);
+}
+
 static ParseResult parseDispatchOperands(
     OpAsmParser &parser,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceOperands,
