@@ -33,6 +33,7 @@ jobs:
           - name: cpu_llvm_task_regression
             models-config-file: models_cpu_llvm_task.json
             backend: cpu
+            iree_test_files: /home/nod/iree_tests_cache
             runs-on:
               - self-hosted # must come first
               - persistent-cache
@@ -65,7 +66,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       TEST_OUTPUT_ARTIFACTS: ${{ github.workspace }}/model_output_artifacts
-      # IREE_TEST_FILES: /home/esaimana/iree_tests_cache # artifacts are stored here in the persistent cache
+      IREE_TEST_FILES: "${{ matrix.iree_test_files != '' && matrix.iree_test_files || /home/esaimana/iree_tests_cache }}"
     steps:
       - name: Checking out IREE repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -88,10 +89,9 @@ jobs:
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
-          echo $IREE_TEST_FILES
 
       - name: "Running Sharktank regression composite action"
-        uses: geomin12/iree-test-suites/sharktank_models@3c404167230490633a58a607ad378367de907953 # temporary
+        uses: geomin12/iree-test-suites/sharktank_models@5d2f1ca99ae4e4c58d3ee278fd89f4e815c7009b # temporary
         with:
           MATRIX_NAME: ${{ matrix.name }}
           SKU: ${{ matrix.sku }}
@@ -103,4 +103,4 @@ jobs:
           EXTERNAL_TEST_FILE_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/test_suite_files
           QUALITY_TEST_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/sharktank_models/quality_tests
           BENCHMARK_TEST_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/sharktank_models/benchmarks
-          IREE_TEST_FILES: /home/esaimana/iree_tests_cache
+          IREE_TEST_FILES: ${IREE_TEST_FILES}
