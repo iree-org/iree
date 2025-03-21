@@ -11,12 +11,11 @@
 // it into 0-rank memrefs but instead single-ranked memrefs.
 //
 // Question to answer at this point:
-// 1. should we disallow memrefs with non-identity layout? also cases where 
+// 1. should we disallow memrefs with non-identity layout? also cases where
 // offset != 0 and stride != 1? if so we should update test cases.
 
 // TODO:
-// 1. update memref.subview. 
-// 2. vector dialects? masked{load|store}, transfer_{read|write}, etc?
+// 1. update memref.subview.
 //===----------------------------------------------------------------------===//
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -128,15 +127,24 @@ getFlatOffsetAndStrides(OpBuilder &rewriter, Location loc, Value source,
   return {newExtractStridedMetadata.getBaseBuffer(), finalOffset, strides};
 }
 
+static Value getValueFromOpFoldResult(OpBuilder &rewriter, Location loc,
+                                      OpFoldResult in) {
+  if (Attribute offsetAttr = in.dyn_cast<Attribute>()) {
+    return rewriter.create<arith::ConstantIndexOp>(
+        loc, cast<IntegerAttr>(offsetAttr).getInt());
+  }
+  return in.dyn_cast<Value>();
+}
+
 /// Returns a collapsed memref and the linearized index to access the element
 /// at the specified indices.
-static std::pair<Value, OpFoldResult> getCollapsedMemref(OpBuilder &rewriter,
+static std::pair<Value, Value> getFlattenMemrefAndOffset(OpBuilder &rewriter,
                                                          Location loc,
                                                          Value source,
                                                          ValueRange indices) {
   MemRefType memrefType = cast<MemRefType>(source.getType());
-  auto &&[base, index, _] = getFlatOffsetAndStrides(
-      rewriter, loc, source, getAsOpFoldResult(indices));
+  auto &&[base, index, _] = getFlatOffsetAndStrides(rewriter, loc, source,
+                                                    getAsOpFoldResult(indices));
   // We do not support non-contiguous memrefs.
   int64_t collapsedShape = 1;
   for (auto dim : memrefType.getShape()) {
@@ -146,21 +154,14 @@ static std::pair<Value, OpFoldResult> getCollapsedMemref(OpBuilder &rewriter,
       MemRefType::get({collapsedShape}, memrefType.getElementType(), nullptr,
                       memrefType.getMemorySpace());
 
+  Value indexValue = getValueFromOpFoldResult(rewriter, loc, index);
+
   // (lialan) TODO: should we keep `offset` in the result memref?
   return std::make_pair(rewriter.create<memref::ReinterpretCastOp>(
                             loc, retType, source, /* offset = */ 0,
                             /*shapes = */ ArrayRef<int64_t>{collapsedShape},
                             /* strides = */ ArrayRef<int64_t>{1}),
-                        index);
-}
-
-static Value getValueFromOpFoldResult(PatternRewriter &rewriter, Location loc,
-                                      OpFoldResult in) {
-  if (Attribute offsetAttr = in.dyn_cast<Attribute>()) {
-    return rewriter.create<arith::ConstantIndexOp>(
-        loc, cast<IntegerAttr>(offsetAttr).getInt());
-  }
-  return in.dyn_cast<Value>();
+                        indexValue);
 }
 
 static bool needFlatten(Value val) {
@@ -187,14 +188,11 @@ struct FlattenMemrefLoad : public OpRewritePattern<memref::LoadOp> {
     if (!checkLayout(memref))
       return rewriter.notifyMatchFailure(op, "unsupported layout");
 
-    Location loc = op.getLoc();
+    auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
+        rewriter, op.getLoc(), memref, op.getIndices());
 
-    auto &&[flatMemref, offset] =
-        getCollapsedMemref(rewriter, loc, memref, op.getIndices());
-
-    Value offsetVal = getValueFromOpFoldResult(rewriter, loc, offset);
     rewriter.replaceOpWithNewOp<memref::LoadOp>(op, op.getType(), flatMemref,
-                                                ValueRange{offsetVal}/*,
+                                                ValueRange{offset}/*,
                                                 op.getNontemporal()*/);
     return success();
   }
@@ -212,14 +210,11 @@ struct FlattenVectorLoad : public OpRewritePattern<vector::LoadOp> {
     if (!checkLayout(memref))
       return rewriter.notifyMatchFailure(op, "unsupported layout");
 
-    Location loc = op.getLoc();
+    auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
+        rewriter, op.getLoc(), memref, op.getIndices());
 
-    auto &&[flatMemref, offset] =
-        getCollapsedMemref(rewriter, loc, memref, op.getIndices());
-
-    Value offsetVal = getValueFromOpFoldResult(rewriter, loc, offset);
     rewriter.replaceOpWithNewOp<vector::LoadOp>(op, op.getType(), flatMemref,
-                                                ValueRange{offsetVal}/*,
+                                                ValueRange{offset}/*,
                                                 op.getNontemporal()*/);
     return success();
   }
@@ -237,12 +232,10 @@ struct FlattenMemrefStore : public OpRewritePattern<memref::StoreOp> {
     if (!checkLayout(memref))
       return rewriter.notifyMatchFailure(op, "unsupported layout");
 
-    Location loc = op.getLoc();
-    auto &&[flatMemref, offset] =
-        getCollapsedMemref(rewriter, loc, memref, op.getIndices());
-    Value offsetVal = getValueFromOpFoldResult(rewriter, loc, offset);
+    auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
+        rewriter, op.getLoc(), memref, op.getIndices());
     rewriter.replaceOpWithNewOp<memref::StoreOp>(op, op.getValue(), flatMemref,
-                                                 ValueRange{offsetVal});
+                                                 ValueRange{offset});
     return success();
   }
 };
@@ -259,12 +252,10 @@ struct FlattenVectorStore : public OpRewritePattern<vector::StoreOp> {
     if (!checkLayout(memref))
       return rewriter.notifyMatchFailure(op, "unsupported layout");
 
-    Location loc = op.getLoc();
-    auto &&[flatMemref, offset] =
-        getCollapsedMemref(rewriter, loc, memref, op.getIndices());
-    Value offsetVal = getValueFromOpFoldResult(rewriter, loc, offset);
+    auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
+        rewriter, op.getLoc(), memref, op.getIndices());
     rewriter.replaceOpWithNewOp<vector::StoreOp>(
-        op, op.getValueToStore(), flatMemref, ValueRange{offsetVal});
+        op, op.getValueToStore(), flatMemref, ValueRange{offset});
     return success();
   }
 };
@@ -281,18 +272,17 @@ struct FlattenVectorMaskedLoad : public OpRewritePattern<vector::MaskedLoadOp> {
     if (!checkLayout(memref))
       return rewriter.notifyMatchFailure(op, "unsupported layout");
 
-    Location loc = op.getLoc();
-    auto &&[flatMemref, offset] =
-        getCollapsedMemref(rewriter, loc, memref, op.getIndices());
-    Value offsetVal = getValueFromOpFoldResult(rewriter, loc, offset);
+    auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
+        rewriter, op.getLoc(), memref, op.getIndices());
     rewriter.replaceOpWithNewOp<vector::MaskedLoadOp>(
-        op, op.getType(), flatMemref, ValueRange{offsetVal}, op.getMask(),
+        op, op.getType(), flatMemref, ValueRange{offset}, op.getMask(),
         op.getPassThru());
     return success();
   }
 };
 
-struct FlattenVectorMaskedStore : public OpRewritePattern<vector::MaskedStoreOp> {
+struct FlattenVectorMaskedStore
+    : public OpRewritePattern<vector::MaskedStoreOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::MaskedStoreOp op,
@@ -304,17 +294,15 @@ struct FlattenVectorMaskedStore : public OpRewritePattern<vector::MaskedStoreOp>
     if (!checkLayout(memref))
       return rewriter.notifyMatchFailure(op, "unsupported layout");
 
-    Location loc = op.getLoc();
-    auto &&[flatMemref, offset] =
-        getCollapsedMemref(rewriter, loc, memref, op.getIndices());
-    Value offsetVal = getValueFromOpFoldResult(rewriter, loc, offset);
+    auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
+        rewriter, op.getLoc(), memref, op.getIndices());
     rewriter.replaceOpWithNewOp<vector::MaskedStoreOp>(
-        op, flatMemref, ValueRange{offsetVal}, op.getMask(),
-        op.getValueToStore());
+        op, flatMemref, ValueRange{offset}, op.getMask(), op.getValueToStore());
     return success();
   }
 };
-struct FlattenVectorTransferRead : public OpRewritePattern<vector::TransferReadOp> {
+struct FlattenVectorTransferRead
+    : public OpRewritePattern<vector::TransferReadOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::TransferReadOp op,
@@ -326,19 +314,17 @@ struct FlattenVectorTransferRead : public OpRewritePattern<vector::TransferReadO
     if (!checkLayout(memref))
       return rewriter.notifyMatchFailure(op, "unsupported layout");
 
-    Location loc = op.getLoc();
+    auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
+        rewriter, op.getLoc(), memref, op.getIndices());
 
-    auto &&[flatMemref, offset] =
-        getCollapsedMemref(rewriter, loc, memref, op.getIndices());
-
-    Value offsetVal = getValueFromOpFoldResult(rewriter, loc, offset);
     rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
-        op, op.getType(), flatMemref, ValueRange{offsetVal}, op.getPadding());
+        op, op.getType(), flatMemref, ValueRange{offset}, op.getPadding());
     return success();
   }
 };
 
-struct FlattenVectorTransferWrite : public OpRewritePattern<vector::TransferWriteOp> {
+struct FlattenVectorTransferWrite
+    : public OpRewritePattern<vector::TransferWriteOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::TransferWriteOp op,
@@ -350,14 +336,11 @@ struct FlattenVectorTransferWrite : public OpRewritePattern<vector::TransferWrit
     if (!checkLayout(memref))
       return rewriter.notifyMatchFailure(op, "unsupported layout");
 
-    Location loc = op.getLoc();
-    auto &&[flatMemref, offset] =
-        getCollapsedMemref(rewriter, loc, memref, op.getIndices());
+    auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
+        rewriter, op.getLoc(), memref, op.getIndices());
 
-    Value offsetVal = getValueFromOpFoldResult(rewriter, loc, offset);
-    rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(op, op.getVector(),
-                                                         flatMemref,
-                                                         ValueRange{offsetVal});
+    rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
+        op, op.getVector(), flatMemref, ValueRange{offset});
     return success();
   }
 };
