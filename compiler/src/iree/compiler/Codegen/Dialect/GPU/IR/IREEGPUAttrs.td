@@ -84,6 +84,9 @@ def IREEGPU_DerivedThreadConfig :
 def IREEGPU_UseGlobalLoadDma :
     AttrDef<IREEGPU_Dialect, "UseGlobalLoadDMA", [
       DeclareAttrInterfaceMethods<IREECodegen_LoweringConfigAttrInterface, [
+        "getStaticTilingLevelSizes",
+        "getTilingLevelSizes",
+        "hasTilingLevel",
       ]>
     ]> {
   let mnemonic = "use_global_load_dma";
