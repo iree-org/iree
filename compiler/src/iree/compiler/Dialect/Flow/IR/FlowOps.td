@@ -1511,7 +1511,6 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
 def FLOW_TensorEncodeOp : FLOW_PureOp<"tensor.encode", [
   AllRanksMatch<["operand", "result"]>,
   AllElementTypesMatch<["operand", "result"]>,
-  DeclareOpInterfaceMethods<Util_HoistableOpInterface>,
   AttrSizedOperandSegments,
   Util_ShapeAwareOp,
 ]> {
