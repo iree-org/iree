@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/ADT/STLExtras.h"
@@ -38,6 +39,12 @@ bool isDefinitelyShared(bufferization::AllocTensorOp alloc) {
   // thread distributed `scf.forall` op. All other shared allocations are
   // expected to be properly indicated in advance.
   for (auto user : alloc->getUsers()) {
+    if (auto linalgCopy = dyn_cast<linalg::CopyOp>(user)) {
+      if (auto useDMAConfig =
+              getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(linalgCopy))
+        return true;
+    }
+
     auto forallOp = dyn_cast<scf::ForallOp>(user);
     if (!forallOp ||
         !forallOpHasMappingType<gpu::GPUThreadMappingAttr,

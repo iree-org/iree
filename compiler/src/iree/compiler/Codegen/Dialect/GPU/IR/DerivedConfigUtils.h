@@ -12,6 +12,7 @@
 namespace mlir::iree_compiler::IREE::GPU {
 
 SmallVector<int64_t> deriveThreadTileSizes(Operation *op);
+SmallVector<int64_t> globalLoadDMATileSizes(Operation *op);
 
 } // namespace mlir::iree_compiler::IREE::GPU
 

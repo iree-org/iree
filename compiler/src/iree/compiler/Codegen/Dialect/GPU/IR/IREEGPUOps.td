@@ -496,4 +496,26 @@ def IREEGPU_BufferResourceCastOp : Op<IREEGPU_Dialect, "buffer_resource_cast", [
   let hasCanonicalizer = 1;
 }
 
+//===----------------------------------------------------------------------===//
+// GlobalLoadDMAOp
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_GlobalLoadDMAOp : Op<IREEGPU_Dialect, "global_load_dma", [
+    SameVariadicOperandSize]> {
+  let summary = "Does a global load DMA operation";
+  let description = [{
+    TODO: Add description
+  }];
+
+  let arguments = (ins AnyMemRef:$source, Variadic<Index>:$sourceIndices,
+                       AnyMemRef:$target, Variadic<Index>:$targetIndices);
+  let results   = (outs);
+  let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
+
+  let assemblyFormat = [{
+    $source`[` $sourceIndices `]` `->` $target `[` $targetIndices `]` attr-dict
+      `:` type($source) `->` type($target)
+  }];
+}
+
 #endif // IREE_CODEGEN_DIALECT_IREEGPUOPS

@@ -29,20 +29,28 @@ namespace mlir::iree_compiler {
 
 namespace {
 /// Helper to insert copy with derived thread config.
-Value promoteValue(OpBuilder &builder, Location loc, Value v) {
+Value promoteValue(OpBuilder &builder, Location loc, Value v,
+                   bool useDirectLoad) {
   auto tensorType = cast<RankedTensorType>(v.getType());
   SmallVector<OpFoldResult> mixedSizes = tensor::getMixedSizes(builder, loc, v);
   Value empty = builder.create<tensor::EmptyOp>(loc, mixedSizes,
                                                 tensorType.getElementType());
   auto copy = builder.create<linalg::CopyOp>(loc, v, empty);
-  setLoweringConfig(
-      copy, IREE::GPU::DerivedThreadConfigAttr::get(builder.getContext()));
+  if (useDirectLoad) {
+    auto globalLoadDMAAttr =
+        IREE::GPU::UseGlobalLoadDMAAttr::get(builder.getContext());
+    setLoweringConfig(copy, globalLoadDMAAttr);
+  } else {
+    setLoweringConfig(
+        copy, IREE::GPU::DerivedThreadConfigAttr::get(builder.getContext()));
+  }
   return copy.getResult(0);
 }
 
 /// Helper to promote results. If the target value is consumed only by a
 /// `tensor.extract_slice`, this will promote the result of the slice instead.
-void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared) {
+void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared,
+                   bool useDirectLoad) {
   IRRewriter rewriter(builder);
   Location loc = op->getLoc();
   OpBuilder::InsertionGuard g(rewriter);
@@ -95,7 +103,7 @@ void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared) {
   }
 
   rewriter.setInsertionPointAfterValue(replacement);
-  replacement = promoteValue(rewriter, loc, replacement);
+  replacement = promoteValue(rewriter, loc, replacement, useDirectLoad);
   valueToReplace.replaceUsesWithIf(replacement, [&](OpOperand &use) {
     return opsToReplaceUseIn.contains(use.getOwner());
   });
@@ -110,7 +118,7 @@ void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared) {
 ///
 ///   %empty = tensor.empty()
 ///   %copy = linalg.copy %1 to %empty {
-///     lowering_config = #iree_gpu.derived_thread_config}
+///     lowering_config = #iree_gpu.{derived_thread_config|use_global_dma}}
 ///   linalg.matmul ins(%0, %copy)
 ///
 /// If the producer is already a tilable op, the producer is just annotated with
@@ -122,7 +130,8 @@ void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared) {
 ///   %copy1 = linalg.copy %2 to %out_buffer
 ///   %copy2 = linalg.copy %copy1 to %empty {
 ///     lowering_config = #iree_gpu.derived_thread_config}
-void promoteOperand(OpBuilder &builder, Operation *op, unsigned index) {
+void promoteOperand(OpBuilder &builder, Operation *op, unsigned index,
+                    bool useDirectLoad) {
   auto dpsOp = dyn_cast<DestinationStyleOpInterface>(op);
   if (!dpsOp)
     return;
@@ -132,7 +141,7 @@ void promoteOperand(OpBuilder &builder, Operation *op, unsigned index) {
     index -= dpsOp.getNumDpsInputs();
     assert(index < op->getNumResults() &&
            "trying to promote out of bound result index");
-    return promoteResult(builder, op, op->getResult(index));
+    return promoteResult(builder, op, op->getResult(index), useDirectLoad);
   }
   Value operand = op->getOperand(index);
 
@@ -162,12 +171,15 @@ void promoteOperand(OpBuilder &builder, Operation *op, unsigned index) {
     return;
   }
 
-  auto replacement = promoteValue(builder, op->getLoc(), operand);
+  auto replacement =
+      promoteValue(builder, op->getLoc(), operand, useDirectLoad);
   op->setOperand(index, replacement);
 }
 
 struct GPUPromoteMatmulOperandsPass final
     : impl::GPUPromoteMatmulOperandsPassBase<GPUPromoteMatmulOperandsPass> {
+  using GPUPromoteMatmulOperandsPassBase::GPUPromoteMatmulOperandsPassBase;
+
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
 
@@ -187,7 +199,7 @@ struct GPUPromoteMatmulOperandsPass final
 
       builder.setInsertionPoint(op);
       for (auto operand : promotedOperands.value()) {
-        promoteOperand(builder, op, operand);
+        promoteOperand(builder, op, operand, useDirectLoad);
       }
     });
   }

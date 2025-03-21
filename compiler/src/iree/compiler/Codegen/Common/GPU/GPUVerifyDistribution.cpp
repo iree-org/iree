@@ -76,6 +76,13 @@ struct GPUVerifyDistributionPass final
               continue;
             }
 
+            // Backdoor: linalg.copy
+            if (isa<linalg::CopyOp>(op)) {
+              if (auto useDMAConfig =
+                      getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op))
+                continue;
+            }
+
             op->emitOpError(
                 "write affecting operations on shared resources are restricted "
                 "to lane or thread distributed contexts.");
