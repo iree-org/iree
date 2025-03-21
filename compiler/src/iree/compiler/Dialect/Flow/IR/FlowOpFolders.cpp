@@ -1196,18 +1196,18 @@ struct ElideRedundantTransfer : public OpRewritePattern<TensorTransferOp> {
 // Writes it as A -> B and A -> C relying on dead code elimination to remove the unused A -> B transfer.
 struct ElideChainedTransfer : public OpRewritePattern<TensorTransferOp> {
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(TensorTransferOp currTransferOp,
+  LogicalResult matchAndRewrite(TensorTransferOp targetTransferOp,
                                 PatternRewriter &rewriter) const override {
     auto baseValue =
-        IREE::Util::TiedOpInterface::findTiedBaseValue(currTransferOp.getOperand());
-    if (auto prevTransferOp = dyn_cast_if_present<IREE::Flow::TensorTransferOp>(
+        IREE::Util::TiedOpInterface::findTiedBaseValue(targetTransferOp.getOperand());
+    if (auto sourceTransferOp = dyn_cast_if_present<IREE::Flow::TensorTransferOp>(
             baseValue.getDefiningOp())) {
       rewriter.replaceOpWithNewOp<TensorTransferOp>(
-        currTransferOp, 
-        currTransferOp->getResultTypes(),
-        prevTransferOp.getOperand(),
-        currTransferOp.getOperandDims(),
-        currTransferOp.getTarget());
+        targetTransferOp, 
+        targetTransferOp->getResultTypes(),
+        sourceTransferOp.getOperand(),
+        targetTransferOp.getOperandDims(),
+        targetTransferOp.getTarget());
       return success();
     }
     return failure();
