@@ -102,7 +102,7 @@ util.func public @broadcast_rhs_batch_mmt(%arg0: tensor<16x1024x1280xi8>, %arg1:
 
 // -----
 
-// The below tests that the set_encoding(constant) is hoisted to util.initializer.
+// The below tests that the encoding ops are hoisted to util.initializer.
 
 util.func public @foo(%arg0: tensor<255x513xf32>) -> tensor<255x1023xf32> {
   %cst = arith.constant dense<1.000000e+00> : tensor<513x1023xf32>
