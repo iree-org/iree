@@ -47,7 +47,7 @@ util.func public @command_buffer_execution_barrier(%cmd: !hal.command_buffer) {
   hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer>
       source(CommandIssue)
       target(CommandProcess)
-      flags(None)
+      flags("None")
   util.return
 }
 
@@ -67,9 +67,11 @@ util.func public @command_buffer_fill_buffer(
   //      CHECK: hal.command_buffer.fill_buffer<%[[CMD]] : !hal.command_buffer>
   // CHECK-SAME:   target(%[[BUFFER]] : !hal.buffer)[%[[OFFSET]], %[[LENGTH]]]
   // CHECK-SAME:   pattern(%[[PATTERN]] : i32)
+  // CHECK-SAME:   flags("None")
   hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer>
       target(%buffer : !hal.buffer)[%offset, %length]
       pattern(%pattern : i32)
+      flags("None")
   util.return
 }
 
@@ -90,10 +92,12 @@ util.func public @command_buffer_update_buffer(
   // CHECK-SAME:   source(%[[HOST_BUFFER]] : !util.buffer{%[[HOST_BUFFER_SIZE]]})[%[[SRC_OFFSET]]]
   // CHECK-SAME:   target(%[[DEVICE_BUFFER]] : !hal.buffer)[%[[DST_OFFSET]]]
   // CHECK-SAME:   length(%[[LENGTH]])
+  // CHECK-SAME:   flags("None")
   hal.command_buffer.update_buffer<%cmd : !hal.command_buffer>
       source(%host_buffer : !util.buffer{%host_buffer_size})[%src_offset]
       target(%device_buffer : !hal.buffer)[%dst_offset]
       length(%length)
+      flags("None")
   util.return
 }
 
@@ -116,10 +120,12 @@ util.func public @command_buffer_copy_buffer(
   // CHECK-SAME:   source(%[[BUFFER]] : !hal.buffer)[%[[SRC_OFFSET]]]
   // CHECK-SAME:   target(%[[BUFFER]] : !hal.buffer)[%[[DST_OFFSET]]]
   // CHECK-SAME:   length(%[[LENGTH]])
+  // CHECK-SAME:   flags("None")
   hal.command_buffer.copy_buffer<%cmd : !hal.command_buffer>
       source(%buffer : !hal.buffer)[%src_offset]
       target(%buffer : !hal.buffer)[%dst_offset]
       length(%length)
+      flags("None")
   util.return
 }
 
@@ -142,10 +148,12 @@ util.func public @command_buffer_copy_buffer_indirect(
   // CHECK-SAME:   source(%[[BUFFER_SLOT]] : index)[%[[SRC_OFFSET]]]
   // CHECK-SAME:   target(%[[BUFFER_SLOT]] : index)[%[[DST_OFFSET]]]
   // CHECK-SAME:   length(%[[LENGTH]])
+  // CHECK-SAME:   flags("None")
   hal.command_buffer.copy_buffer<%cmd : !hal.command_buffer>
       source(%buffer_slot : index)[%src_offset]
       target(%buffer_slot : index)[%dst_offset]
       length(%length)
+      flags("None")
   util.return
 }
 

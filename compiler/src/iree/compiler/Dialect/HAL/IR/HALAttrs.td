@@ -133,6 +133,14 @@ def HAL_CallingConventionAttr :
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
+def HAL_ChannelFlag_None : I64BitEnumAttrCase<"None", 0x0000>;
+def HAL_ChannelFlag_Reserved : I64BitEnumAttrCase<"Reserved", 0x0001>;
+def HAL_ChannelFlagBitfieldAttr :
+    HAL_I64BitEnumAttr<"ChannelFlagBitfield", "valid ChannelFlag", [
+      HAL_ChannelFlag_None,
+      HAL_ChannelFlag_Reserved,
+    ]>;
+
 def HAL_CommandBufferMode_None : I32BitEnumAttrCase<"None", 0x0000>;
 def HAL_CommandBufferMode_OneShot : I32BitEnumAttrCase<"OneShot", 0x0001>;
 def HAL_CommandBufferMode_AllowInlineExecution : I32BitEnumAttrCase<"AllowInlineExecution", 0x0010>;
@@ -156,6 +164,14 @@ def HAL_CommandCategoryBitfieldAttr :
     ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
+
+def HAL_CopyFlag_None : I64BitEnumAttrCase<"None", 0x0000>;
+def HAL_CopyFlag_Reserved : I64BitEnumAttrCase<"Reserved", 0x0001>;
+def HAL_CopyFlagBitfieldAttr :
+    HAL_I64BitEnumAttr<"CopyFlagBitfield", "valid CopyFlag", [
+      HAL_CopyFlag_None,
+      HAL_CopyFlag_Reserved,
+    ]>;
 
 def HAL_DeallocaFlag_None : I64BitEnumAttrCase<"None", 0x0000>;
 def HAL_DeallocaFlag_PreferOrigin : I64BitEnumAttrCase<"PreferOrigin", 0x0001>;
@@ -185,27 +201,23 @@ def HAL_DescriptorFlagsAttr :
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_PipelineLayoutFlags_None : I32BitEnumAttrCase<"None", 0x0000>;
-def HAL_PipelineLayoutFlags_Indirect : I32BitEnumAttrCase<"Indirect", 0x0001>;
-def HAL_PipelineLayoutFlagsAttr :
-    I32BitEnumAttr<"PipelineLayoutFlags", "valid PipelineLayout flags", [
-      HAL_PipelineLayoutFlags_None,
-      HAL_PipelineLayoutFlags_Indirect,
-    ]> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
-}
-
 def HAL_DispatchFlags_None : I64BitEnumAttrCase<"None", 0x0000>;
 // HACK: workaround tblgen bug on enums that only have a None value. This can be
 // repurposed for any use in the future as the runtime does not know about it.
 def HAL_DispatchFlags_Reserved : I64BitEnumAttrCase<"Reserved", 0x0001>;
 def HAL_DispatchFlagsAttr :
-    I64BitEnumAttr<"DispatchFlags", "valid dispatch flags", [
+    HAL_I64BitEnumAttr<"DispatchFlags", "valid dispatch flags", [
       HAL_DispatchFlags_None,
       HAL_DispatchFlags_Reserved,
-    ]> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
-}
+    ]>;
+
+def HAL_ExecuteFlag_None : I64BitEnumAttrCase<"None", 0x0000>;
+def HAL_ExecuteFlag_Reserved : I64BitEnumAttrCase<"Reserved", 0x0001>;
+def HAL_ExecuteFlagBitfieldAttr :
+    HAL_I64BitEnumAttr<"ExecuteFlagBitfield", "valid ExecuteFlag", [
+      HAL_ExecuteFlag_None,
+      HAL_ExecuteFlag_Reserved,
+    ]>;
 
 def HAL_ExecutionStage_None : I32BitEnumAttrCase<"None", 0x0000>;
 def HAL_ExecutionStage_CommandIssue : I32BitEnumAttrCase<"CommandIssue", 0x0001>;
@@ -227,25 +239,29 @@ def HAL_ExecutionStageBitfieldAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_ExecutionBarrierFlag_None : I32BitEnumAttrCase<"None", 0x0000>;
-def HAL_ExecutionBarrierFlag_Reserved : I32BitEnumAttrCase<"Reserved", 0x0001>;
+def HAL_ExecutionBarrierFlag_None : I64BitEnumAttrCase<"None", 0x0000>;
+def HAL_ExecutionBarrierFlag_Reserved : I64BitEnumAttrCase<"Reserved", 0x0001>;
 def HAL_ExecutionBarrierFlagBitfieldAttr :
-    I32BitEnumAttr<"ExecutionBarrierFlagBitfield", "valid ExecutionBarrierFlag", [
+    HAL_I64BitEnumAttr<"ExecutionBarrierFlagBitfield", "valid ExecutionBarrierFlag", [
       HAL_ExecutionBarrierFlag_None,
       HAL_ExecutionBarrierFlag_Reserved,
-    ]> {
-  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
-}
+    ]>;
 
-def HAL_FenceFlag_None : I32BitEnumAttrCase<"None", 0x0000>;
-def HAL_FenceFlag_Reserved : I32BitEnumAttrCase<"Reserved", 0x0001>;
+def HAL_FenceFlag_None : I64BitEnumAttrCase<"None", 0x0000>;
+def HAL_FenceFlag_Reserved : I64BitEnumAttrCase<"Reserved", 0x0001>;
 def HAL_FenceFlagBitfieldAttr :
-    I32BitEnumAttr<"FenceFlagBitfield", "valid FenceFlag", [
+    HAL_I64BitEnumAttr<"FenceFlagBitfield", "valid FenceFlag", [
       HAL_FenceFlag_None,
       HAL_FenceFlag_Reserved,
-    ]> {
-  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
-}
+    ]>;
+
+def HAL_FillFlag_None : I64BitEnumAttrCase<"None", 0x0000>;
+def HAL_FillFlag_Reserved : I64BitEnumAttrCase<"Reserved", 0x0001>;
+def HAL_FillFlagBitfieldAttr :
+    HAL_I64BitEnumAttr<"FillFlagBitfield", "valid FillFlag", [
+      HAL_FillFlag_None,
+      HAL_FillFlag_Reserved,
+    ]>;
 
 def HAL_MemoryAccess_None                        : I32BitEnumAttrCase<"None",                         0x00000000>;
 def HAL_MemoryAccess_Read                        : I32BitEnumAttrCase<"Read",                         0x00000001>;
@@ -298,6 +314,48 @@ def HAL_MemoryTypeBitfieldAttr :
     ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
+
+def HAL_PipelineLayoutFlags_None : I32BitEnumAttrCase<"None", 0x0000>;
+def HAL_PipelineLayoutFlags_Indirect : I32BitEnumAttrCase<"Indirect", 0x0001>;
+def HAL_PipelineLayoutFlagsAttr :
+    I32BitEnumAttr<"PipelineLayoutFlags", "valid PipelineLayout flags", [
+      HAL_PipelineLayoutFlags_None,
+      HAL_PipelineLayoutFlags_Indirect,
+    ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_ReadFlag_None : I64BitEnumAttrCase<"None", 0x0000>;
+def HAL_ReadFlag_Reserved : I64BitEnumAttrCase<"Reserved", 0x0001>;
+def HAL_ReadFlagBitfieldAttr :
+    HAL_I64BitEnumAttr<"ReadFlagBitfield", "valid ReadFlag", [
+      HAL_ReadFlag_None,
+      HAL_ReadFlag_Reserved,
+    ]>;
+
+def HAL_UpdateFlag_None : I64BitEnumAttrCase<"None", 0x0000>;
+def HAL_UpdateFlag_Reserved : I64BitEnumAttrCase<"Reserved", 0x0001>;
+def HAL_UpdateFlagBitfieldAttr :
+    HAL_I64BitEnumAttr<"UpdateFlagBitfield", "valid UpdateFlag", [
+      HAL_UpdateFlag_None,
+      HAL_UpdateFlag_Reserved,
+    ]>;
+
+def HAL_WaitFlag_None : I64BitEnumAttrCase<"None", 0x0000>;
+def HAL_WaitFlag_Reserved : I64BitEnumAttrCase<"Reserved", 0x0001>;
+def HAL_WaitFlagBitfieldAttr :
+    HAL_I64BitEnumAttr<"WaitFlagBitfield", "valid WaitFlag", [
+      HAL_WaitFlag_None,
+      HAL_WaitFlag_Reserved,
+    ]>;
+
+def HAL_WriteFlag_None : I64BitEnumAttrCase<"None", 0x0000>;
+def HAL_WriteFlag_Reserved : I64BitEnumAttrCase<"Reserved", 0x0001>;
+def HAL_WriteFlagBitfieldAttr :
+    HAL_I64BitEnumAttr<"WriteFlagBitfield", "valid WriteFlag", [
+      HAL_WriteFlag_None,
+      HAL_WriteFlag_Reserved,
+    ]>;
 
 //===----------------------------------------------------------------------===//
 // #hal.collective<*>

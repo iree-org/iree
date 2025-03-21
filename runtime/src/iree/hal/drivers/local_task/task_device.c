@@ -399,7 +399,8 @@ static iree_status_t iree_hal_task_device_queue_dealloca(
     iree_hal_buffer_t* buffer, iree_hal_dealloca_flags_t flags) {
   // TODO(benvanik): queue-ordered allocations.
   IREE_RETURN_IF_ERROR(iree_hal_device_queue_barrier(
-      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list));
+      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+      IREE_HAL_EXECUTE_FLAG_NONE));
   return iree_ok_status();
 }
 
@@ -450,7 +451,8 @@ static iree_status_t iree_hal_task_device_queue_execute(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_buffer_binding_table_t binding_table) {
+    iree_hal_buffer_binding_table_t binding_table,
+    iree_hal_execute_flags_t flags) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   // NOTE: today we are not discriminating queues based on command type.
   iree_host_size_t queue_index = iree_hal_task_device_select_queue(

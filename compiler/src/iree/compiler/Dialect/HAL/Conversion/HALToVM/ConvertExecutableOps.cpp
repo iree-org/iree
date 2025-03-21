@@ -121,9 +121,8 @@ public:
         createOp.getLoc(), adaptor.getConstants(), rewriter);
 
     SmallVector<Value, 8> callOperands = {
-        adaptor.getDevice(),
-        executableFormatStr,
-        rodataOp,
+        adaptor.getDevice(), adaptor.getQueueAffinity(),
+        executableFormatStr, rodataOp,
         constantBuffer,
     };
     auto importType = importOp.getFunctionType();

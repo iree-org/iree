@@ -11,8 +11,8 @@ util.func public @fence_create(%arg0: !hal.device) -> !hal.fence {
 
 // CHECK-LABEL: @fence_join
 util.func public @fence_join(%arg0: !hal.fence, %arg1: !hal.fence) -> !hal.fence {
-  // CHECK: = hal.fence.join at([%arg0, %arg1]) -> !hal.fence
-  %fence = hal.fence.join at([%arg0, %arg1]) -> !hal.fence
+  // CHECK: = hal.fence.join at([%arg0, %arg1]) flags("None") -> !hal.fence
+  %fence = hal.fence.join at([%arg0, %arg1]) flags("None") -> !hal.fence
   util.return %fence : !hal.fence
 }
 
@@ -47,7 +47,7 @@ util.func public @fence_fail(%arg0: !hal.fence, %arg1: i32) {
 
 // CHECK-LABEL: @fence_await
 util.func public @fence_await(%arg0: !hal.fence, %arg1: !hal.fence, %arg2: i32) -> i32 {
-  // CHECK: = hal.fence.await until([%arg0, %arg1]) timeout_millis(%arg2) : i32
-  %status = hal.fence.await until([%arg0, %arg1]) timeout_millis(%arg2) : i32
+  // CHECK: = hal.fence.await until([%arg0, %arg1]) timeout_millis(%arg2) flags("None") : i32
+  %status = hal.fence.await until([%arg0, %arg1]) timeout_millis(%arg2) flags("None") : i32
   util.return %status : i32
 }
