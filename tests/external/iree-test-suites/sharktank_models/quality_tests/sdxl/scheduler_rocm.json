@@ -1,7 +1,8 @@
 {
     "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduler/11-26-2024/model.mlir",
     "compiler_flags": [
-        "--iree-hal-target-backends=rocm",
+        "--iree-hal-local-target-device-backends=rocm",
+        "--iree-hal-target-device=hip",
         "--iree-opt-const-eval=false",
         "--iree-global-opt-propagate-transposes=true",
         "--iree-llvmgpu-enable-prefetch=true",

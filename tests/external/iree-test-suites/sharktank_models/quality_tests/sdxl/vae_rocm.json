@@ -15,7 +15,8 @@
     "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-vae-decode/model.mlir",
     "device": "hip",
     "compiler_flags": [
-        "--iree-hal-target-backends=rocm",
+        "--iree-hal-local-target-device-backends=rocm",
+        "--iree-hal-target-device=hip",
         "--iree-opt-level=O3",
         "--iree-opt-const-eval=false",
         "--iree-llvmgpu-enable-prefetch=true",

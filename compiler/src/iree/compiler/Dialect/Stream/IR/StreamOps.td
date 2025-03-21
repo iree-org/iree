@@ -2598,6 +2598,18 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
                                $tied_operands)
   }];
 
+  let builders = [
+    OpBuilder<(ins
+      "ExecutableExportOp":$exportOp, "ValueRange":$workload,
+      "TypeRange":$resultTypes, "ValueRange":$operands,
+      "ValueRange":$operandSizes, "ValueRange":$operandOffests,
+      "ValueRange":$operandEnds, "ValueRange":$operandLengths,
+      "ValueRange":$resultSizes,
+      CArg<"ArrayRef<int64_t>", "{}">:$tiedOperands,
+      CArg<"AffinityAttr", "{}">:$affinityAttr
+    )>
+  ];
+
   let extraClassDeclaration = [{
     auto getEntryPointRefs() {
       return getEntryPoints().getAsRange<SymbolRefAttr>();

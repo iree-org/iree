@@ -222,7 +222,7 @@ def Util_PreprocessingPipelineAttr : AttrDef<Util_Dialect,
         "iree-preprocessing-transpose-convolution-pipeline">```
   }];
   let parameters = (ins
-    AttrParameter<"std::string", "">:$pipelineString
+    AttrParameter<"StringAttr", "">:$pipelineString
   );
 
   let assemblyFormat = [{

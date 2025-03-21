@@ -15,7 +15,8 @@
     "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-vae-decode/model.mlir",
     "device": "local-task",
     "compiler_flags": [
-        "--iree-hal-target-backends=llvm-cpu",
+        "--iree-hal-local-target-device-backends=llvm-cpu",
+        "--iree-hal-target-device=local",
         "--iree-llvmcpu-target-cpu-features=host",
         "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false",
         "--iree-llvmcpu-distribution-size=32",

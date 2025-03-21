@@ -71,3 +71,13 @@ builtin.module @uninitialized attributes {
   // CHECK: util.tensor = #util.uninitialized : tensor<4xf32>
   util.tensor = #util.uninitialized : tensor<4xf32>
 } {}
+
+// -----
+
+// CHECK-LABEL: @preprocessing_pipeline
+builtin.module @preprocessing_pipeline {
+  // CHECK: util.func public @main() attributes {preprocessing_pipeline = #util.preprocessing_pipeline<"some-iree-preprocessing-pass-pipeline">}
+  util.func public @main() attributes {preprocessing_pipeline = #util.preprocessing_pipeline<"some-iree-preprocessing-pass-pipeline">} {
+    util.return
+  }
+}

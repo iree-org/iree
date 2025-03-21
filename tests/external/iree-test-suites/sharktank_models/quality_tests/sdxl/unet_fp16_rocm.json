@@ -28,7 +28,8 @@
     "pipeline_mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/sdxl_unet_pipeline_bench_f16.mlir",
     "device": "hip",
     "compiler_flags": [
-        "--iree-hal-target-backends=rocm",
+        "--iree-hal-local-target-device-backends=rocm",
+        "--iree-hal-target-device=hip",
         "--iree-opt-const-eval=false",
         "--iree-opt-level=O3",
         "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
@@ -46,7 +47,8 @@
     "pipeline_compiler_flags": [
         "--verify=false",
         "--iree-opt-const-eval=false",
-        "--iree-hal-target-backends=rocm"
+        "--iree-hal-local-target-device-backends=rocm",
+        "--iree-hal-target-device=local"
     ],
     "threshold_args": [
         "--expected_f16_threshold=0.705f"

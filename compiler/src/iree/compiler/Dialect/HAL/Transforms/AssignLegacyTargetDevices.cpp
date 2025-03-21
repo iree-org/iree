@@ -46,6 +46,7 @@ struct AssignLegacyTargetDevicesPass
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
+    auto *context = moduleOp.getContext();
 
     // If no targets are specified we can't do anything - another pass earlier
     // in the pipeline will have had to add the targets.
@@ -95,12 +96,24 @@ struct AssignLegacyTargetDevicesPass
       }
 
       // Ask the target backend for its default device specification attribute.
-      auto targetAttr = targetDevice->getDefaultDeviceTarget(
-          moduleOp.getContext(), *targetRegistry.value);
+      auto targetAttr =
+          targetDevice->getDefaultDeviceTarget(context, *targetRegistry.value);
       if (!targetAttr) {
         emitError(moduleOp.getLoc()) << "no default device targets available";
         return signalPassFailure();
       }
+
+      // Replace the backends suggested by the device target with the ones from
+      // the backend that was explicitly specified (this overrides any defaults
+      // or flags on the device).
+      SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
+      targetBackend->getDefaultExecutableTargets(
+          context, targetAttr.getDeviceID(), targetAttr.getConfiguration(),
+          executableTargetAttrs);
+      targetAttr = IREE::HAL::DeviceTargetAttr::get(
+          context, targetAttr.getDeviceID(), targetAttr.getConfiguration(),
+          executableTargetAttrs);
+
       if (!targetAttrSet.contains(targetAttr)) {
         targetAttrSet.insert(targetAttr);
         targetAttrs.push_back(targetAttr);

@@ -26,7 +26,8 @@ Basic compilation command line:
 
 ```bash
 $ iree-compile matmul.mlir -o /tmp/matmul.vmfb \
-  --iree-hal-target-backends=llvm-cpu \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
   --iree-llvmcpu-target-cpu=znver4 \
   --iree-llvmcpu-enable-ukernels=all
 ```

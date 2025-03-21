@@ -35,7 +35,8 @@
     "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/stan/sdxl-punet/11-26-2024/punet_fp8.mlir",
     "device": "hip",
     "compiler_flags": [
-        "--iree-hal-target-backends=rocm",
+        "--iree-hal-local-target-device-backends=rocm",
+        "--iree-hal-target-device=hip",
         "--iree-opt-const-eval=false",
         "--iree-opt-level=O3",
         "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
