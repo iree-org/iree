@@ -181,4 +181,31 @@ SmallVector<int64_t> deriveThreadTileSizes(Operation *op) {
       .Default([&](Operation *op) -> SmallVector<int64_t> { return {}; });
 }
 
+static const int64_t kDefaultSubgroupSize = 64; // TODO: can we query this?
+static const int64_t kDefaultGlobalLoadBitSizePerThread =
+    32; // TODO: make it a query.
+SmallVector<int64_t> globalLoadDMATileSizes(Operation *op) {
+  std::optional<SmallVector<int64_t>> workgroupSize =
+      getWorkgroupSize(op->getParentOfType<FunctionOpInterface>());
+  if (!workgroupSize) {
+    return {};
+  }
+  [[maybe_unused]] int64_t numThreads =
+      std::accumulate(workgroupSize->begin(), workgroupSize->end(), 1,
+                      std::multiplies<int64_t>());
+  assert(isa<linalg::LinalgOp>(op) && "expected linalg op");
+  auto linalgOp = cast<linalg::LinalgOp>(op);
+  SmallVector<int64_t> loopRanges = linalgOp.getStaticLoopRanges();
+
+  int64_t subgroupLoadSize =
+      (kDefaultGlobalLoadBitSizePerThread * kDefaultSubgroupSize) /
+      getElementTypeOrSelf(linalgOp->getResultTypes()[0])
+          .getIntOrFloatBitWidth();
+  SmallVector<int64_t> tileSizes = getVectorTileSizesFromLoopRanges(
+      loopRanges, numThreads, subgroupLoadSize);
+
+  // For now, faking it.
+  return {1, 4};
+}
+
 } // namespace mlir::iree_compiler::IREE::GPU
