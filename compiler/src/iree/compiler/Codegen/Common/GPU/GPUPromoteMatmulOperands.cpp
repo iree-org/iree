@@ -27,6 +27,11 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_GPUPROMOTEMATMULOPERANDSPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
+static llvm::cl::opt<bool> clUseDirectLoad(
+    "iree-codegen-gpu-use-direct-load",
+    llvm::cl::desc("TODO"),
+    llvm::cl::Hidden, llvm::cl::init(false));
+
 namespace {
 /// Helper to insert copy with derived thread config.
 Value promoteValue(OpBuilder &builder, Location loc, Value v) {
@@ -35,8 +40,13 @@ Value promoteValue(OpBuilder &builder, Location loc, Value v) {
   Value empty = builder.create<tensor::EmptyOp>(loc, mixedSizes,
                                                 tensorType.getElementType());
   auto copy = builder.create<linalg::CopyOp>(loc, v, empty);
-  setLoweringConfig(
-      copy, IREE::GPU::DerivedThreadConfigAttr::get(builder.getContext()));
+  if (clUseDirectLoad) {
+    setLoweringConfig(
+        copy, IREE::GPU::UseGlobalLoadDMAAttr::get(builder.getContext()));
+  } else {
+    setLoweringConfig(
+        copy, IREE::GPU::DerivedThreadConfigAttr::get(builder.getContext()));
+  }
   return copy.getResult(0);
 }
 
