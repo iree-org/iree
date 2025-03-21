@@ -46,8 +46,7 @@
     "pipeline_compiler_flags": [
         "--verify=false",
         "--iree-opt-const-eval=false",
-        "--iree-hal-local-target-device-backends=rocm",
-        "--iree-hal-target-device=local"
+        "--iree-hal-target-device=hip"
     ],
     "threshold_args": [
         "--expected_f16_threshold=0.705f"
