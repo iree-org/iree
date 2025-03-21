@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
+#include "mlir/Dialect/AMDGPU/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -13,6 +14,11 @@
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
+
+static llvm::cl::opt<bool>
+    clEnableBufferLoad("iree-llvmgpu-enable-buffer-load",
+                       llvm::cl::desc("Enable buffer load for load operations"),
+                       llvm::cl::init(false), llvm::cl::Hidden);
 
 namespace mlir::iree_compiler {
 
@@ -125,6 +131,9 @@ struct LLVMGPUVectorLoweringPass final
     populateVectorToSCFConversionPatterns(vectorToLoopsPatterns,
                                           vectorToSCFOptions);
     memref::populateFoldMemRefAliasOpPatterns(vectorToLoopsPatterns);
+    if (clEnableBufferLoad) {
+      amdgpu::populateAmdgpuTransferReadToLoadPatterns(vectorToLoopsPatterns);
+    }
     vector::populateVectorTransferLoweringPatterns(vectorToLoopsPatterns);
     if (failed(
             applyPatternsGreedily(funcOp, std::move(vectorToLoopsPatterns)))) {
