@@ -96,7 +96,6 @@ target_include_directories(...)
    read from. Also note that the `offset` here is in number of elements
    (i.e. number of floats).
 
-
 ```mlir
 func.call @simple_mul_workgroup(
     %memref0_baseptr, %memref0_offset,
@@ -184,7 +183,8 @@ for instructions for CMake setup and building from source.
 
     ```bash
     iree-compile \
-        --iree-hal-target-backends=llvm-cpu \
+        --iree-hal-target-device=local \
+        --iree-hal-local-target-device-backends=llvm-cpu \
         samples/custom_dispatch/cpu/plugin/standalone_example.mlir \
         -o=/tmp/example.vmfb
     ```

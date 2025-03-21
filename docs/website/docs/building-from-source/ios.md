@@ -76,7 +76,8 @@ Run the IREE compiler on the host to generate a module.
 
 ``` shell
 ../iree-build/install/bin/iree-compile \
-  --iree-hal-target-backends=vmvx \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=vmvx \
   samples/models/simple_abs.mlir \
   -o /tmp/simple_abs_vmvx.vmfb
 ```

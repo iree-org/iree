@@ -1,4 +1,4 @@
-// RUN: iree-compile --iree-hal-target-backends=vmvx --iree-input-demote-f64-to-f32=false %s | iree-check-module --device=local-task --module=-
+// RUN: iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=vmvx --iree-input-demote-f64-to-f32=false %s | iree-check-module --device=local-task --module=-
 
 func.func @expect_true() {
   %true = util.unfoldable_constant 1 : i32

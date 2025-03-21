@@ -101,6 +101,41 @@ public:
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
       const {}
 
+  // Provides a list of supported element types by the target compilation
+  // backend. Supported element types vary by target-dependent information like
+  // specific ISA and compilation modes available on an executable target
+  // configuration. Compilation backends should use their information directly
+  // but higher layers of the compiler may use the coarse queries provided here
+  // to select targets.
+  class SupportedTypes {
+  public:
+    void addScalarType(Type type) { scalarTypes.insert(type); }
+    bool supportsScalarType(Type type) const {
+      return scalarTypes.contains(type);
+    }
+
+    void addElementType(Type type) { elementTypes.insert(type); }
+    bool supportsElementType(Type type) const {
+      return elementTypes.contains(type);
+    }
+
+    bool supportsType(Type type) const {
+      if (auto tensorType = llvm::dyn_cast<TensorType>(type)) {
+        return supportsElementType(tensorType.getElementType());
+      } else {
+        return supportsScalarType(type);
+      }
+    }
+
+  private:
+    llvm::DenseSet<Type> scalarTypes;
+    llvm::DenseSet<Type> elementTypes;
+  };
+
+  // Returns a set of types that are supported as compilation input based on
+  // the target configuration.
+  virtual SupportedTypes getSupportedTypes(MLIRContext *context) const;
+
   // Registers dependent dialects for the TargetBackend.
   // Mirrors the method on mlir::Pass of the same name. A TargetBackend is
   // expected to register the dialects it will create entities for (Operations,
