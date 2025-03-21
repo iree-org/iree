@@ -424,12 +424,11 @@ util.func public @ElideRedundantTransfer(%operand: tensor<4x?xf32>, %dim: index)
 
 // -----
 
-// CHECK-LABEL: @ElideChainedTransferTwoTransfers
+// CHECK-LABEL: @ElideIntermediateTranfersTwoTransfers
 //  CHECK-SAME: (%[[OPERAND:.+]]: tensor<1xf16>)
-util.func public @ElideChainedTransferTwoTransfers(%operand: tensor<1xf16>) -> tensor<1xf16> {
-  // CHECK-NOT: flow.tensor.transfer
+util.func public @ElideIntermediateTranfersTwoTransfers(%operand: tensor<1xf16>) -> tensor<1xf16> {
   %redundant = flow.tensor.transfer %operand : tensor<1xf16> to "target1"
-  // CHECK: %[[RESULT:.+]] = flow.tensor.transfer %[[OPERAND]]
+  // CHECK: %[[RESULT:.+]] = flow.tensor.transfer %[[OPERAND]] : tensor<1xf16> to "target2"
   %result = flow.tensor.transfer %redundant : tensor<1xf16> to "target2"
   // CHECK-NEXT: util.return %[[RESULT]]
   util.return %result : tensor<1xf16>
@@ -437,16 +436,28 @@ util.func public @ElideChainedTransferTwoTransfers(%operand: tensor<1xf16>) -> t
 
 // -----
 
-// CHECK-LABEL: @ElideChainedTransferFourTransfers
+// CHECK-LABEL: @DontElideIntermediateTranfersBetweenBarrier
 //  CHECK-SAME: (%[[OPERAND:.+]]: tensor<1xf16>)
-util.func public @ElideChainedTransferFourTransfers(%operand: tensor<1xf16>) -> tensor<1xf16> {
-  // CHECK-NOT: flow.tensor.transfer
+util.func public @DontElideIntermediateTranfersBetweenBarrier(%operand: tensor<1xf16>) -> tensor<1xf16> {
+  // CHECK: %[[TRANSFERED:.+]] = flow.tensor.transfer %[[OPERAND]] : tensor<1xf16> to "target0"
+  %transfered = flow.tensor.transfer %operand : tensor<1xf16> to "target0"
+  // CHECK: %[[BARRIERED:.+]] = flow.tensor.barrier %[[TRANSFERED]] : tensor<1xf16> on "target0"
+  %barriered = flow.tensor.barrier %transfered : tensor<1xf16> on "target0"
+  // CHECK: %[[RESULT:.+]] = flow.tensor.transfer %[[BARRIERED]] : tensor<1xf16> to "target2"
+  %result = flow.tensor.transfer %barriered : tensor<1xf16> to "target2"
+  // CHECK-NEXT: util.return %[[RESULT]]
+  util.return %result : tensor<1xf16>
+}
+
+// -----
+
+// CHECK-LABEL: @ElideIntermediateTranfersFourTransfers
+//  CHECK-SAME: (%[[OPERAND:.+]]: tensor<1xf16>)
+util.func public @ElideIntermediateTranfersFourTransfers(%operand: tensor<1xf16>) -> tensor<1xf16> {
   %redundant = flow.tensor.transfer %operand : tensor<1xf16> to "target1"
-  // CHECK-NOT: flow.tensor.transfer
   %redundant2 = flow.tensor.transfer %redundant : tensor<1xf16> to "target2"
-  // CHECK-NOT: flow.tensor.transfer
   %redundant3 = flow.tensor.transfer %redundant2 : tensor<1xf16> to "target3"
-  // CHECK: %[[RESULT:.+]] = flow.tensor.transfer %[[OPERAND]]
+  // CHECK: %[[RESULT:.+]] = flow.tensor.transfer %[[OPERAND]] : tensor<1xf16> to "target4"
   %result = flow.tensor.transfer %redundant3 : tensor<1xf16> to "target4"
   // CHECK-NEXT: util.return %[[RESULT]]
   util.return %result : tensor<1xf16>
