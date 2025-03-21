@@ -4052,7 +4052,7 @@ iree-import-onnx<span class="w"> </span>mobilenetv2-10.onnx<span class="w"> </sp
 </code></pre></div>
 <p>Then run the following command to compile with the <code>cuda</code> target:</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>cuda<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">    </span>--iree-hal-target-device<span class="o">=</span>cuda<span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">    </span>--iree-cuda-target<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
 </span><span class="w">    </span>mobilenetv2.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_cuda.vmfb
 </code></pre></div>

@@ -3791,7 +3791,8 @@ python<span class="w"> </span>-m<span class="w"> </span>iree_tfl_tests.posenet_i
 Those can then be fed into <code>iree-compile</code> (built locally to reproduce the
 error)</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-input-type<span class="o">=</span>stablehlo<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>iree_input.mlir
 </code></pre></div>

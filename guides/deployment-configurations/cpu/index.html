@@ -4091,9 +4091,11 @@ wget<span class="w"> </span>https://github.com/onnx/models/raw/refs/heads/main/v
 pip<span class="w"> </span>install<span class="w"> </span>iree-base-compiler<span class="o">[</span>onnx<span class="o">]</span>
 iree-import-onnx<span class="w"> </span>mobilenetv2-10.onnx<span class="w"> </span>--opset-version<span class="w"> </span><span class="m">17</span><span class="w"> </span>-o<span class="w"> </span>mobilenetv2.mlir
 </code></pre></div>
-<p>Then run the following command to compile with the <code>llvm-cpu</code> target:</p>
+<p>Then run the following command to compile with the <code>local</code> device and <code>llvm-cpu</code>
+target compilation backend:</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">    </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">    </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">    </span>--iree-llvmcpu-target-cpu<span class="o">=</span>host<span class="w"> </span><span class="se">\</span>
 </span><span class="w">    </span>mobilenetv2.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_cpu.vmfb
 </code></pre></div>
