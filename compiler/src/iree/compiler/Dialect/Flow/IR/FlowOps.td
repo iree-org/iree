@@ -1537,8 +1537,6 @@ def FLOW_TensorEncodeOp : FLOW_PureOp<"tensor.encode", [
   }];
 
   let extraClassDeclaration = [{
-    bool isHoistableLeafOp() { return false; }
-
     ValueRange getOperandDynamicDims(unsigned idx) { return getOperandDims(); }
     ValueRange getResultDynamicDims(unsigned idx) { return getResultDims(); }
   }];
