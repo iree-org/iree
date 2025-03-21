@@ -134,6 +134,10 @@ buildTransposeConvolutionPassPipeline(OpPassManager &passManager,
 static void
 buildMakeSingleDispatchPassPipeline(OpPassManager &passManager,
                                     const TransformOptions &options) {
+  GlobalOptimization::PropagateLinalgTransposePassOptions transposeOptions;
+  transposeOptions.enableConvolutionPropagation = true;
+  passManager.addPass(
+      GlobalOptimization::createPropagateLinalgTransposePass(transposeOptions));
   passManager.addPass(createMakeSingleDispatchForFunctionPass());
 }
 
