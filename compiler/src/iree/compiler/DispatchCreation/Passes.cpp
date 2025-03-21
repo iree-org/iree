@@ -256,7 +256,7 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
         // After SetEncodingOps are hoisted, try to fuse them with their
         // producer dispatches to try to hide packing costs.
         .addPass(DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass)
-        .addPass(DispatchCreation::createWrapEncodingOpInDispatchRegionPass);
+        .addPass(DispatchCreation::createConvertEncodingToFlowPass);
   }
 }
 

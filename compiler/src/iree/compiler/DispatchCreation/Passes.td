@@ -290,17 +290,16 @@ def SetEncodingPass :
   ];
 }
 
-def WrapEncodingOpInDispatchRegionPass :
-    InterfacePass<"iree-dispatch-creation-wrap-encoding-op-in-dispatch-region",
-                  "mlir::FunctionOpInterface"> {
-  let summary = "Wrap encoding ops not in dispatches into a dispatch";
+def ConvertEncodingToFlowPass :
+    InterfacePass<"iree-dispatch-creation-convert-encoding-to-flow", "mlir::FunctionOpInterface"> {
+  let summary = "Convert top-level Encoding ops to Flow ops.";
   let description = [{
-    This pass is a clean up pass that runs after hoisting + fusion of encoding
-    ops. It moves any hoisted + non-fused encodings into their own dispatch".
+    Pass to convert top-level Encoding ops to Flow ops, which only converts the
+    Encoding ops outside flow.dispatch.region to Flow.
   }];
   let dependentDialects = [
-    "IREE::Flow::FlowDialect",
     "IREE::Encoding::IREEEncodingDialect",
+    "IREE::Flow::FlowDialect",
   ];
 }
 

@@ -23,6 +23,7 @@ iree_cc_library(
     "CollapseDimensions.cpp"
     "CollapseReductionDimensions.cpp"
     "ConvertDispatchRegionsToWorkgroups.cpp"
+    "ConvertEncodingToFlow.cpp"
     "ConvertTensorToFlow.cpp"
     "ElementwiseOpFusion.cpp"
     "FoldUnitExtentDims.cpp"
@@ -41,7 +42,6 @@ iree_cc_library(
     "SplitReduction.cpp"
     "TensorPadToTensorInsertSlice.cpp"
     "TransposeGenericOps.cpp"
-    "WrapEncodingOpInDispatchRegion.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
