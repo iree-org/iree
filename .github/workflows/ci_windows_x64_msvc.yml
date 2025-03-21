@@ -10,6 +10,13 @@ on:
   workflow_call:
   workflow_dispatch:
 
+concurrency:
+  # Limit to only one run at a time on our current self-hosted Windows runners.
+  # The network mount and build dir technically functions with concurrent jobs
+  # but performance degrades to the point of being unusably slow.
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   windows_x64_msvc:
     runs-on: azure-windows-scale
@@ -24,6 +31,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: true
+      # TODO(#18813): Remove this. Environment setup needs to happen on runners, not in workflows.
       - name: "Create build dir"
         run: |
           $currentTime = (Get-Date).ToString('HHmmss')
@@ -43,6 +51,8 @@ jobs:
           python3 -m venv .venv
           .venv/Scripts/activate.bat
           python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+      # TODO(#18813): Fix to actually use either ccache or sccache.
+      #               Not need to install both, and neither is currently used.
       - name: "Installing requirements"
         run: choco install ccache --yes
       - name: "Configuring MSVC"
