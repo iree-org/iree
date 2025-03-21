@@ -3746,8 +3746,7 @@ of this tutorial.</p>
 </code></pre></div>
 <p>Basic compilation command line:</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>iree-compile<span class="w"> </span>matmul.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/matmul.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-llvmcpu-target-cpu<span class="o">=</span>znver4<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-llvmcpu-enable-ukernels<span class="o">=</span>all
 </code></pre></div>

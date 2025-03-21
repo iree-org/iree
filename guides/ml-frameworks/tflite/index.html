@@ -3872,8 +3872,7 @@ iree-import-tflite<span class="w"> </span><span class="si">${</span><span class=
 
 <span class="c1"># Compile for the CPU backend</span>
 iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span><span class="si">${</span><span class="nv">IMPORT_PATH</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-o<span class="w"> </span><span class="si">${</span><span class="nv">MODULE_PATH</span><span class="si">}</span>
 </code></pre></div>

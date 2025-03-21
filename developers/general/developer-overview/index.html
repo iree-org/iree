@@ -3960,8 +3960,7 @@ pipeline targeting the VMVX backend on the
 model file:</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-opt<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-transformation-pipeline<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="nv">$PWD</span>/tests/e2e/stablehlo_models/fullyconnected.mlir
 </code></pre></div>
 <h3 id="iree-compile">iree-compile<a class="headerlink" href="#iree-compile" title="Permanent link">link</a></h3>
@@ -3969,8 +3968,7 @@ model file:</p>
 supported input MLIR assembly.</p>
 <p>For example, to translate <code>simple.mlir</code> to an IREE module:</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="nv">$PWD</span>/samples/models/simple_abs.mlir<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-o<span class="w"> </span>/tmp/simple_abs_vmvx.vmfb
 </code></pre></div>
@@ -4045,12 +4043,8 @@ above on IREE's local-task CPU device:</p>
 <span class="normal"> 7</span>
 <span class="normal"> 8</span>
 <span class="normal"> 9</span>
-<span class="normal">10</span>
-<span class="normal">11</span>
-<span class="normal">12</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="c1">// RUN: (iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=vmvx %s | \</span>
-<span class="c1">// RUN:  iree-run-module --device=local-task --module=- --function=abs --input=&quot;2xf32=-2 3&quot;) | FileCheck %s</span>
-<span class="c1">// RUN: (iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu %s | \</span>
-<span class="c1">// RUN:  iree-run-module --device=local-task --module=- --function=abs --input=&quot;2xf32=-2 3&quot;) | FileCheck %s</span>
+<span class="normal">10</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | iree-run-module --device=local-task --module=- --function=abs --input=&quot;2xf32=-2 3&quot;) | FileCheck %s</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=llvm-cpu %s | iree-run-module --device=local-task --module=- --function=abs --input=&quot;2xf32=-2 3&quot;) | FileCheck %s</span>
 
 <span class="c1">// CHECK-LABEL: EXEC @abs</span>
 <span class="n">func</span><span class="p">.</span><span class="n">func</span><span class="w"> </span><span class="err">@</span><span class="n">abs</span><span class="p">(</span><span class="o">%</span><span class="n">input</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">xf32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">xf32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
@@ -4150,15 +4144,9 @@ above on IREE's local-task CPU device:</p>
 <span class="normal">85</span>
 <span class="normal">86</span>
 <span class="normal">87</span>
-<span class="normal">88</span>
-<span class="normal">89</span>
-<span class="normal">90</span>
-<span class="normal">91</span>
-<span class="normal">92</span>
-<span class="normal">93</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="c1">// Passing no inputs is okay.</span>
+<span class="normal">88</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="c1">// Passing no inputs is okay.</span>
 
-<span class="c1">// RUN: (iree-compile --iree-hal-target-device=local \</span>
-<span class="c1">// RUN:               --iree-hal-local-target-device-backends=vmvx %s | \</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \</span>
 <span class="c1">// RUN:  iree-run-module --device=local-sync --module=- --function=no_input) | \</span>
 <span class="c1">// RUN: FileCheck --check-prefix=NO-INPUT %s</span>
 <span class="c1">// NO-INPUT-LABEL: EXEC @no_input</span>
@@ -4171,8 +4159,7 @@ above on IREE's local-task CPU device:</p>
 <span class="c1">// Scalars use the form `--input=value`. Type (float/int) should be omitted.</span>
 <span class="c1">//   * The VM does not use i1/i8 types, so i32 VM types are returned instead.</span>
 
-<span class="c1">// RUN: (iree-compile --iree-hal-target-device=local \</span>
-<span class="c1">// RUN:               --iree-hal-local-target-device-backends=vmvx %s | \</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \</span>
 <span class="c1">// RUN:  iree-run-module --device=local-sync \</span>
 <span class="c1">// RUN:                  --module=- \</span>
 <span class="c1">// RUN:                  --function=scalars \</span>
@@ -4197,8 +4184,7 @@ above on IREE's local-task CPU device:</p>
 <span class="c1">//   * Quotes should be used around values with spaces.</span>
 <span class="c1">//   * Brackets may also be used to separate element values.</span>
 
-<span class="c1">// RUN: (iree-compile --iree-hal-target-device=local \</span>
-<span class="c1">// RUN:               --iree-hal-local-target-device-backends=vmvx %s | \</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \</span>
 <span class="c1">// RUN:  iree-run-module --device=local-sync \</span>
 <span class="c1">// RUN:                  --module=- \</span>
 <span class="c1">// RUN:                  --function=buffers \</span>
@@ -4224,9 +4210,7 @@ above on IREE's local-task CPU device:</p>
 <span class="c1">//     provide 1+ values.</span>
 <span class="c1">//   * Some data types may be converted (i32 -&gt; si32 here) - bug?</span>
 
-<span class="c1">// RUN: (iree-compile --iree-hal-target-device=local \</span>
-<span class="c1">// RUN:               --iree-hal-local-target-device-backends=vmvx \</span>
-<span class="c1">// RUN:               -o=%t.vmfb %s &amp;&amp; \</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s -o=%t.vmfb &amp;&amp; \</span>
 <span class="c1">// RUN:  iree-run-module --device=local-sync \</span>
 <span class="c1">// RUN:                  --module=%t.vmfb \</span>
 <span class="c1">// RUN:                  --function=npy_round_trip \</span>
@@ -4351,16 +4335,9 @@ above on IREE's local-task CPU device:</p>
 <span class="normal"> 97</span>
 <span class="normal"> 98</span>
 <span class="normal"> 99</span>
-<span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
-<span class="normal">106</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="c1">// Tests that execution providing no outputs is ok.</span>
+<span class="normal">100</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="c1">// Tests that execution providing no outputs is ok.</span>
 
-<span class="c1">// RUN: (iree-compile --iree-hal-target-device=local \</span>
-<span class="c1">// RUN:               --iree-hal-local-target-device-backends=vmvx %s | \</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \</span>
 <span class="c1">// RUN:  iree-run-module --device=local-sync --module=- --function=no_output) | \</span>
 <span class="c1">// RUN: FileCheck --check-prefix=NO-OUTPUT %s</span>
 <span class="c1">// NO-OUTPUT-LABEL: EXEC @no_output</span>
@@ -4372,8 +4349,7 @@ above on IREE's local-task CPU device:</p>
 
 <span class="c1">// Tests the default output printing to stdout.</span>
 
-<span class="c1">// RUN: (iree-compile --iree-hal-target-device=local \</span>
-<span class="c1">// RUN:               --iree-hal-local-target-device-backends=vmvx %s | \</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \</span>
 <span class="c1">// RUN:  iree-run-module --device=local-sync --module=- --function=default) | \</span>
 <span class="c1">// RUN: FileCheck --check-prefix=OUTPUT-DEFAULT %s</span>
 <span class="c1">// OUTPUT-DEFAULT-LABEL: EXEC @default</span>
@@ -4395,8 +4371,7 @@ above on IREE's local-task CPU device:</p>
 <span class="c1">// printing the results in python. This also verifies our npy files can be</span>
 <span class="c1">// parsed by numpy.</span>
 
-<span class="c1">// RUN: (iree-compile --iree-hal-target-device=local \</span>
-<span class="c1">// RUN:               --iree-hal-local-target-device-backends=vmvx %s | \</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \</span>
 <span class="c1">// RUN:  iree-run-module --device=local-sync --module=- --function=numpy \</span>
 <span class="c1">// RUN:                  --output= \</span>
 <span class="c1">// RUN:                  --output=@%t.npy \</span>
@@ -4420,8 +4395,7 @@ above on IREE's local-task CPU device:</p>
 <span class="c1">// another invocation reading from the binary files. Each output is written to</span>
 <span class="c1">// its own file (optimal for alignment/easier to inspect).</span>
 
-<span class="c1">// RUN: (iree-compile --iree-hal-target-device=local \</span>
-<span class="c1">// RUN:               --iree-hal-local-target-device-backends=vmvx %s -o=%t.vmfb &amp;&amp; \</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s -o=%t.vmfb &amp;&amp; \</span>
 <span class="c1">// RUN:  iree-run-module --device=local-sync \</span>
 <span class="c1">// RUN:                  --module=%t.vmfb \</span>
 <span class="c1">// RUN:                  --function=write_binary \</span>
@@ -4438,9 +4412,7 @@ above on IREE's local-task CPU device:</p>
 <span class="c1">// another invocation reading from the binary files. The values are appended to</span>
 <span class="c1">// a single file and read from the single file.</span>
 
-<span class="c1">// RUN: (iree-compile --iree-hal-target-device=local \</span>
-<span class="c1">// RUN:               --iree-hal-local-target-device-backends=vmvx \</span>
-<span class="c1">// RUN:               -o=%t.vmfb %s &amp;&amp; \</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s -o=%t.vmfb &amp;&amp; \</span>
 <span class="c1">// RUN:  iree-run-module --device=local-sync \</span>
 <span class="c1">// RUN:                  --module=%t.vmfb \</span>
 <span class="c1">// RUN:                  --function=write_binary \</span>
@@ -4484,36 +4456,12 @@ above on IREE's local-task CPU device:</p>
 <span class="normal">15</span>
 <span class="normal">16</span>
 <span class="normal">17</span>
-<span class="normal">18</span>
-<span class="normal">19</span>
-<span class="normal">20</span>
-<span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="c1">// RUN: (iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=vmvx %s | \</span>
-<span class="c1">// RUN:  iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output=f32=2.0) | \</span>
-<span class="c1">// RUN:  FileCheck %s --check-prefix=SUCCESS-MATCHES</span>
-<span class="c1">// RUN: (iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=vmvx %s | \</span>
-<span class="c1">// RUN:  iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output=&quot;(ignored)&quot;) | \</span>
-<span class="c1">// RUN:  FileCheck %s --check-prefix=SUCCESS-IGNORED</span>
-<span class="c1">// RUN: (iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=vmvx %s | \</span>
-<span class="c1">// RUN:  iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output=f32=2.1 --expected_f32_threshold=0.1) | \</span>
-<span class="c1">// RUN:  FileCheck %s --check-prefix=SUCCESS-THRESHOLD</span>
-<span class="c1">// RUN: (iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=vmvx %s | \</span>
-<span class="c1">// RUN:  not iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=123 --expected_output=f32=2.0) | \</span>
-<span class="c1">// RUN:  FileCheck %s --check-prefix=FAILED-FIRST</span>
-<span class="c1">// RUN: (iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=vmvx %s | \</span>
-<span class="c1">// RUN:  not iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output=f32=4.5) | \</span>
-<span class="c1">// RUN:  FileCheck %s --check-prefix=FAILED-SECOND</span>
-<span class="c1">// RUN: (iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=vmvx %s | \</span>
-<span class="c1">// RUN:  not iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output=4xf32=2.0) | \</span>
-<span class="c1">// RUN:  FileCheck %s --check-prefix=FAILED-SHAPE</span>
+<span class="normal">18</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output=f32=2.0) | FileCheck %s --check-prefix=SUCCESS-MATCHES</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output=&quot;(ignored)&quot;) | FileCheck %s --check-prefix=SUCCESS-IGNORED</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output=f32=2.1 --expected_f32_threshold=0.1) | FileCheck %s --check-prefix=SUCCESS-THRESHOLD</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | not iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=123 --expected_output=f32=2.0) | FileCheck %s --check-prefix=FAILED-FIRST</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | not iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output=f32=4.5) | FileCheck %s --check-prefix=FAILED-SECOND</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | not iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output=4xf32=2.0) | FileCheck %s --check-prefix=FAILED-SHAPE</span>
 
 <span class="c1">// SUCCESS-MATCHES: [SUCCESS]</span>
 <span class="c1">// SUCCESS-THRESHOLD: [SUCCESS]</span>
@@ -4538,8 +4486,7 @@ and executes it as a series of
 runner for the IREE <a href="../testing-guide/#iree-core-end-to-end-e2e-tests">check framework</a>.</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-input-type<span class="o">=</span>stablehlo<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="nv">$PWD</span>/tests/e2e/stablehlo_ops/abs.mlir<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-o<span class="w"> </span>/tmp/abs.vmfb
 </code></pre></div>
@@ -4557,8 +4504,7 @@ function as exported by default and running all of them.</p>
 <a href="https://github.com/iree-org/iree/blob/main/samples/models/simple_abs.mlir">samples/models/simple_abs.mlir</a>:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># iree-run-mlir &lt;compiler flags&gt; [input.mlir] &lt;runtime flags&gt;</span>
 $<span class="w"> </span>../iree-build/tools/iree-run-mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="nv">$PWD</span>/samples/models/simple_abs.mlir<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--input<span class="o">=</span><span class="nv">f32</span><span class="o">=</span>-2
 </code></pre></div>

@@ -3790,8 +3790,7 @@ many different variables, like an integration test. For finer-grained
 measurements more akin to unit tests, see <a href="#executable-benchmarks">Executable Benchmarks</a>.</p>
 <p>To use <code>iree-benchmark-module</code>, generate an IREE module for the target backend:</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>bazel<span class="w"> </span>run<span class="w"> </span>//tools:iree-compile<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="nv">$PWD</span>/samples/models/simple_abs.mlir<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-o<span class="w"> </span>/tmp/module.fb
 </code></pre></div>
@@ -3860,8 +3859,7 @@ dispatch functions, generate an IREE module with the
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>build/tools/iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-input-type<span class="o">=</span>stablehlo<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-flow-export-benchmark-funcs<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>tests/e2e/stablehlo_models/fullyconnected.mlir<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-o<span class="w"> </span>/tmp/fullyconnected.vmfb
 </code></pre></div>

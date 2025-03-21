@@ -4157,9 +4157,9 @@ wget<span class="w"> </span>https://github.com/onnx/models/raw/refs/heads/main/v
 pip<span class="w"> </span>install<span class="w"> </span>iree-base-compiler<span class="o">[</span>onnx<span class="o">]</span>
 iree-import-onnx<span class="w"> </span>mobilenetv2-10.onnx<span class="w"> </span>--opset-version<span class="w"> </span><span class="m">17</span><span class="w"> </span>-o<span class="w"> </span>mobilenetv2.mlir
 </code></pre></div>
-<p>Then run the following command to compile with the <code>vulkan</code> target device:</p>
+<p>Then run the following command to compile with the <code>vulkan-spirv</code> target:</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">    </span>--iree-hal-target-device<span class="o">=</span>vulkan<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>vulkan-spirv<span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">    </span>--iree-vulkan-target<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
 </span><span class="w">    </span>mobilenetv2.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_vulkan.vmfb
 </code></pre></div>
