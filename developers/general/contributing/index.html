@@ -4442,14 +4442,8 @@ runs.</p>
 <div class="highlight"><pre><span></span><code>ci-exactly: linux_x64_bazel
 </code></pre></div>
 </li>
-<li>
-<p>Opt in to the Windows compiler build and test workflow:</p>
-<div class="highlight"><pre><span></span><code>ci-extra: windows_x64_msvc
-</code></pre></div>
-</li>
 </ul>
-<p>For example, this PR opted in to running the <code>build_test_all_windows</code> job
-(which was renamed to <code>windows_x64_msvc</code>):</p>
+<p>For example, this PR opted in to running the <code>build_test_all_windows</code> job:</p>
 <p><img alt="ci-extra" src="../contributing-ci-extra.png" /></p>
 <p>The enabled jobs can be viewed from the Summary page of an action run:</p>
 <p><img alt="ci_enabled_jobs" src="../contributing-ci-enabled-jobs.png" /></p>

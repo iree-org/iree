@@ -3881,7 +3881,7 @@ following mlir in <code>/tmp/add.mlir</code> and then run the following given co
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="c1"># First compile into a VM bytecode module.</span>
 $<span class="w"> </span>../iree-build/tools/iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>cuda<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-device<span class="o">=</span>cuda<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>/tmp/add.mlir<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-o<span class="w"> </span>/tmp/add.vmfb
 

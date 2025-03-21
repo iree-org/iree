@@ -3823,7 +3823,8 @@ or from pip:</p>
    <a href="../../../reference/bindings/">API bindings</a> can be used:</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>model.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-llvmcpu-target-cpu<span class="o">=</span>host<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-o<span class="w"> </span>model_cpu.vmfb
 
@@ -3871,7 +3872,7 @@ is an active investment area. See the
 for the latest status.</p>
 <h3 id="failed-to-legalize-operation-that-was-explicitly-marked-illegal">Failed to legalize operation that was explicitly marked illegal<a class="headerlink" href="#failed-to-legalize-operation-that-was-explicitly-marked-illegal" title="Permanent link">link</a></h3>
 <p>If you see an error compiling a converted .mlir file like this:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>model.mlir<span class="w"> </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span>-o<span class="w"> </span>model.vmfb
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>model.mlir<span class="w"> </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span>-o<span class="w"> </span>model.vmfb
 
 <span class="go">model.mlir:507:12: error: failed to legalize operation &#39;torch.operator&#39; that was explicitly marked illegal</span>
 <span class="gp">    %</span><span class="nv">503</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>torch.operator<span class="w"> </span><span class="s2">&quot;onnx.Identity&quot;</span><span class="o">(</span>%arg0<span class="o">)</span><span class="w"> </span>:<span class="w"> </span><span class="o">(</span>!torch.vtensor&lt;<span class="o">[</span>?<span class="o">]</span>,si64&gt;<span class="o">)</span><span class="w"> </span>-&gt;<span class="w"> </span>!torch.vtensor&lt;<span class="o">[</span>?<span class="o">]</span>,si64&gt;
