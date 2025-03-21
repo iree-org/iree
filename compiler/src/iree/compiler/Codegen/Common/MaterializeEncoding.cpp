@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
@@ -135,7 +136,10 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
   // resolve dims ops.
   {
     RewritePatternSet patterns(ctx);
+    populateReshapeToInterfaceTensorPatterns(patterns);
     tensor::CastOp::getCanonicalizationPatterns(patterns, ctx);
+    tensor::populateFoldTensorEmptyPatterns(patterns);
+    linalg::FillOp::getCanonicalizationPatterns(patterns, ctx);
     linalg::populateFoldIntoPackAndUnpackPatterns(patterns);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {

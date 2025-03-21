@@ -217,6 +217,41 @@ func.func @pack_gemm_fill_dynamic(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf3
 
 // -----
 
+#executable_target_xyz = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1)>
+#map2 = affine_map<(d0, d1) -> (d0)>
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 32, 1, 32>>
+#encoding1 = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 32, 1, 32>>
+#encoding2 = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 32, 1, 32>>
+func.func @matvec_f32_x86_64_generic() attributes {hal.executable.target = #executable_target_xyz} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %c2048 = arith.constant 2048 : index
+  %c2176 = arith.constant 2176 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<15x32xf32, #encoding>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c2048) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<32xf32, #encoding1>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c2176) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<15xf32, #encoding2>>
+  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [15, 32], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<15x32xf32, #encoding>> -> tensor<15x32xf32, #encoding>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [32], strides = [1] : !flow.dispatch.tensor<readonly:tensor<32xf32, #encoding1>> -> tensor<32xf32, #encoding1>
+  %5 = tensor.empty() : tensor<15xf32, #encoding2>
+  %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<15xf32, #encoding2>) -> tensor<15xf32, #encoding2>
+  %7 = linalg.matvec ins(%3, %4 : tensor<15x32xf32, #encoding>, tensor<32xf32, #encoding1>) outs(%6 : tensor<15xf32, #encoding2>) -> tensor<15xf32, #encoding2>
+  flow.dispatch.tensor.store %7, %2, offsets = [0], sizes = [15], strides = [1] : tensor<15xf32, #encoding2> -> !flow.dispatch.tensor<writeonly:tensor<15xf32, #encoding2>>
+  return
+}
+// CHECK-LABEL: func.func @matvec_f32_x86_64_generic()
+// CHECK-NOT:     tensor.expand_shape
+// CHECK:         %[[INIT:.+]] = tensor.empty() : tensor<1x4x1x4xf32>
+// CHECK:         %[[FILL:.+]] = linalg.fill ins({{.+}}) outs(%[[INIT]]
+// CHECK:         linalg.mmt4d
+// CHECK-SAME:      ins(%{{.+}}, %{{.+}} : tensor<1x32x1x1xf32>, tensor<4x32x4x1xf32>
+// CHECK-SAME:      outs(%[[FILL]]
+// CHECK-NOT:     tensor.collapse_shape
+
+// -----
+
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
