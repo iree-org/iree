@@ -1192,11 +1192,35 @@ struct ElideRedundantTransfer : public OpRewritePattern<TensorTransferOp> {
   }
 };
 
+// Attempts to identify trivial case of chained transfer ops (A -> B -> C) and rewrite it as (A -> C)
+// Writes it as A -> B and A -> C relying on dead code elimination to remove the unused A -> B transfer.
+struct ElideChainedTransfer : public OpRewritePattern<TensorTransferOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorTransferOp currTransferOp,
+                                PatternRewriter &rewriter) const override {
+    auto baseValue =
+        IREE::Util::TiedOpInterface::findTiedBaseValue(currTransferOp.getOperand());
+    if (auto prevTransferOp = dyn_cast_if_present<IREE::Flow::TensorTransferOp>(
+            baseValue.getDefiningOp())) {
+      rewriter.replaceOpWithNewOp<TensorTransferOp>(
+        currTransferOp, 
+        currTransferOp->getResultTypes(),
+        prevTransferOp.getOperand(),
+        currTransferOp.getOperandDims(),
+        currTransferOp.getTarget());
+      return success();
+    }
+    return failure();
+  } 
+};
+
+
 } // namespace
 
 void TensorTransferOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                    MLIRContext *context) {
   results.insert<ElideRedundantTransfer>(context);
+  results.insert<ElideChainedTransfer>(context);
 }
 
 //===----------------------------------------------------------------------===//
