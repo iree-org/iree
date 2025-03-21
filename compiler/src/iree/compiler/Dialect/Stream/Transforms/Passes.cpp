@@ -173,6 +173,7 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
       .addPass(IREE::Stream::createEncodeHostTensorsPass);
   passManager.addNestedPass<IREE::Stream::ExecutableOp>(
       IREE::Stream::createEncodeDeviceTensorsPass());
+  passManager.addPass(IREE::Stream::createMaterializeEncodingsPass());
 
   buildStreamCleanupPassPipeline(passManager, transformOptions);
 
