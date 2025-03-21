@@ -210,6 +210,23 @@ util.func public @set_encoding_pad_fusion(%arg0 : tensor<?x?xf32>,
 
 // -----
 
+
+#encoding = #iree_encoding.testing_encoding<>
+util.func public @set_encoding_op(%arg0 : tensor<?x?xf32>)
+    -> tensor<?x?xf32, #encoding> {
+  %encode = iree_encoding.set_encoding %arg0
+      : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
+  util.return %encode : tensor<?x?xf32, #encoding>
+}
+//      CHECK: #[[ENCODING:.+]] = #iree_encoding.testing_encoding
+//      CHECK: util.func public @set_encoding_op
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
+//  CHECK-NOT:   flow.dispatch.region
+//      CHECK:   %[[ENCODE:.+]] = iree_encoding.set_encoding %[[ARG0]]  : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING]]>
+// CHECK: util.return %[[ENCODE]]
+
+// -----
+
 #encoding = #iree_encoding.testing_encoding<>
 util.func public @unset_encoding_elementwise_fusion(
     %arg0: tensor<?x?xf32, #encoding>,

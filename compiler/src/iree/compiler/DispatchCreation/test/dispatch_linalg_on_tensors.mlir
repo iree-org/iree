@@ -1823,41 +1823,6 @@ util.func public @batchnorm_training(%arg0: tensor<12xf32>, %arg1: tensor<12x12x
 // -----
 
 #encoding = #iree_encoding.testing_encoding<>
-util.func public @set_encoding_op(%arg0 : tensor<?x?xf32>)
-    -> tensor<?x?xf32, #encoding> {
-  %0 = iree_encoding.set_encoding %arg0
-      : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
-  util.return %0 : tensor<?x?xf32, #encoding>
-}
-//      CHECK: #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
-//      CHECK: util.func public @set_encoding_op
-// CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
-//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
-//  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
-//      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups[%[[D0]], %[[D1]]](%[[ARG0]], %[[D0]], %[[D1]])
-// CHECK-NEXT:     %[[INARG:.+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>
-// CHECK-SAME:     %[[INDEXARG0:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[INDEXARG1:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[OUTARG:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #[[ENCODING]]>>
-//  CHECK-DAG:     %[[W0:.+]] = flow.dispatch.workload.ordinal %[[INDEXARG0]], 0
-//  CHECK-DAG:     %[[W1:.+]] = flow.dispatch.workload.ordinal %[[INDEXARG1]], 1
-//      CHECK:     %[[LOAD:.+]] = flow.dispatch.tensor.load %[[INARG]]
-// CHECK-SAME:         !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%[[W0]], %[[W1]]}
-//      CHECK:     %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[LOAD]]
-//      CHECK:     flow.dispatch.tensor.store %[[SET_ENCODING]], %[[OUTARG]]
-// CHECK-SAME:         sizes = [%[[W0]], %[[W1]]]
-// CHECK-SAME:         !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #[[ENCODING]]>>{%[[W0]], %[[W1]]}
-//      CHECK:     flow.return
-//      CHECK:   count(%[[WL0:[a-zA-Z0-9]+]]: index, %[[WL1:[a-zA-Z0-9]+]]: index)
-//      CHECK:     %[[X:[a-zA-Z0-9]+]], %[[Y:[a-zA-Z0-9]+]], %[[Z:.+]] = flow.dispatch.workgroup_count_from_slice %[[WL0]], %[[WL1]]
-//      CHECK:     flow.return %[[X]], %[[Y]], %[[Z]]
-//      CHECK:   util.return %[[DISPATCH]]
-
-// -----
-
-#encoding = #iree_encoding.testing_encoding<>
 util.func public @unset_encoding_op(%arg0 : tensor<?x?xf32, #encoding>, %d0 : index, %d1 : index)
     -> tensor<?x?xf32> {
   %0 = iree_encoding.unset_encoding %arg0
