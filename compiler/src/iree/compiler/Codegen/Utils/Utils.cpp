@@ -1158,6 +1158,20 @@ OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
   }
 }
 
+Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
+                                  ValueRange convertedInputOperands,
+                                  ValueRange convertedOutputOperands) {
+  SmallVector<Value> operands;
+  operands.append(convertedInputOperands.begin(), convertedInputOperands.end());
+  operands.append(convertedOutputOperands.begin(),
+                  convertedOutputOperands.end());
+  return mlir::clone(
+      builder, op,
+      {cast<RankedTensorType>(convertedOutputOperands[0].getType())
+           .dropEncoding()},
+      operands);
+}
+
 LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
   // Check for 2 results(value, index), and 1 input
   if (genericOp.getNumDpsInits() != 2) {

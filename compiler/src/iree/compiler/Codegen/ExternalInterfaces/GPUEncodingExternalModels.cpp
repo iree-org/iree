@@ -342,7 +342,12 @@ struct GPUDeviceEncodingLayoutResolverAttrInterface
     info = std::move(maybeEncodingInfo.value());
     auto fragment = static_cast<IREE::GPU::MMAFragment>(
         encoding.getOperandIndex().getInt());
-    info.swizzle = getSwizzle(mma, fragment);
+    FailureOr<Codegen::TileSwizzle> maybeSwizzle =
+        getEncodingSwizzle(encoding, mma, fragment);
+    if (failed(maybeSwizzle)) {
+      return info;
+    }
+    info.swizzle = std::move(maybeSwizzle.value());
     return info;
   }
 
