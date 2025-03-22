@@ -138,7 +138,7 @@ util.func public @tiedOperands(%operand: !stream.resource<transient>, %size: ind
   %c128 = arith.constant 128 : index
   %c255_i32 = arith.constant 255 : i32
   // CHECK: stream.cmd.execute with(%[[OPERAND]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
-  %result, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> (!stream.resource<transient>{%size}) {
+  %result, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> (%operand as !stream.resource<transient>{%size}) {
     // CHECK-NEXT: stream.cmd.fill %c255_i32, %[[CAPTURE]]
     %0 = stream.async.fill %c255_i32, %capture[%c0 to %c128 for %c128] : i32 -> %capture as !stream.resource<transient>{%size}
     stream.yield %0 : !stream.resource<transient>{%size}

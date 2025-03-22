@@ -239,6 +239,11 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // for partitioning/placement before turning them into opaque dispatches.
   passManager.addPass(IREE::Stream::createMaterializeBuiltinsPass());
 
+  // TODO(benvanik): outline streams (ala dispatch regions). Note that we may
+  // want to do this earlier to enable better deduplication but that makes the
+  // above passes trickier. Outlining may be more like "find chunks of streams
+  // useful to move into secondary command buffers."
+
   buildStreamCleanupPassPipeline(passManager, transformOptions);
 
   // Everything must now be in stream.async.* form.
@@ -254,11 +259,8 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   // Schedule fine-grained allocations and insert placeholders for larger/longer
   // lifetime allocations.
   passManager.addPass(IREE::Stream::createScheduleAllocationPass());
-  FunctionLikeNest(passManager)
-      // TODO(benvanik): passes to convert alloc to alloca and thread through
-      // streams. Ideally all transient allocs become stream-ordered allocas.
-      // createPropagateTransientsPass()
 
+  FunctionLikeNest(passManager)
       // Allocate backing storage for fused constant resources.
       // This expands packed constants into explicit forms with partitioned
       // storage buffers and upload logic.
@@ -278,11 +280,6 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   // cleanup patterns.
   passManager.addPass(IREE::Util::createPropagateSubrangesPass());
   buildStreamCleanupPassPipeline(passManager, transformOptions);
-
-  // TODO(benvanik): outline streams (ala dispatch regions). Note that we may
-  // want to do this earlier to enable better deduplication but that makes the
-  // above passes trickier. Outlining may be more like "find chunks of streams
-  // useful to move into secondary command buffers."
 
   // Everything must now be in explicit stream.cmd.* form.
   passManager.addPass(IREE::Stream::createVerifyLoweringToCmdPass());

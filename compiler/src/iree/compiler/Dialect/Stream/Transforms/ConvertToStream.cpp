@@ -169,10 +169,9 @@ struct GenericResourcePattern : public ConversionPattern {
     // Compute the size of the tensor once in the stream resource.
     // This may differ from the external encoding of the tensor as imports are
     // a transfer operation that may need to reformat the tensor.
-    auto encodingAttr = TypeAttr::get(sourceTensor.getType());
     Value resultSize = builder.create<IREE::Stream::TensorSizeOfOp>(
-        loc, builder.getIndexType(), encodingAttr, dynamicDims,
-        executionAffinityAttr);
+        loc, builder.getIndexType(), TypeAttr::get(sourceTensor.getType()),
+        dynamicDims, executionAffinityAttr);
 
     // Associate the external SSA value, encoding, and shape information with
     // the stream resource. When lowering we'll then have all the metadata
@@ -180,8 +179,9 @@ struct GenericResourcePattern : public ConversionPattern {
     auto externalType = builder.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::External);
     auto importOp = builder.create<IREE::Stream::TensorImportOp>(
-        loc, externalType, sourceTensor, encodingAttr, dynamicDims, resultSize,
-        executionAffinityAttr);
+        loc, externalType, sourceTensor, sourceTensor.getType(), dynamicDims,
+        resultSize,
+        /*consume=*/true, executionAffinityAttr);
     consumingOps.insert(importOp);
 
     // If needed insert a transfer to the target lifetime.

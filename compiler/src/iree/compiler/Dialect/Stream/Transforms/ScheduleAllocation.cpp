@@ -1121,7 +1121,8 @@ allocateLocalTransients(IREE::Stream::AsyncExecuteOp executeOp,
   auto timepointType = externalBuilder.getType<IREE::Stream::TimepointType>();
   auto allocaOp = externalBuilder.create<IREE::Stream::ResourceAllocaOp>(
       fusedLoc, transientType, timepointType, packOp.getTotalLength(),
-      executeOp.getAwaitTimepoint(), executeOp.getAffinityAttr());
+      /*indeterminate_lifetime=*/UnitAttr{}, executeOp.getAwaitTimepoint(),
+      executeOp.getAffinityAttr());
   TransientAllocation allocation;
   allocation.awaitTimepoint = allocaOp.getResultTimepoint();
   allocation.reservation = allocaOp.getResult();
@@ -1882,7 +1883,8 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
     auto reservationSize = release.second;
     auto deallocaOp = builder.create<IREE::Stream::ResourceDeallocaOp>(
         reservation.getLoc(), reservation, reservationSize,
-        newExecuteOp.getResultTimepoint(), newExecuteOp.getAffinityAttr());
+        /*prefer_origin=*/false, newExecuteOp.getResultTimepoint(),
+        newExecuteOp.getAffinityAttr());
     joinTimepoints.push_back(deallocaOp.getResultTimepoint());
     executeTimepointUsers.insert(deallocaOp);
   }
