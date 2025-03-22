@@ -1027,10 +1027,14 @@ std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func) {
 
 SmallVector<IREE::HAL::ExecutableVariantOp>
 getExecutableVariantOps(mlir::ModuleOp moduleOp) {
+  // The variant ops must have a ExecutableOp parent. Thus we iterate on the
+  // ExecutableOp using `getOps()` for efficiency. We do not need to walk
+  // through all the ops in the `moduleOp` in a nested fashion.
   SmallVector<IREE::HAL::ExecutableVariantOp> executableVariantOps;
-  moduleOp.walk([&](IREE::HAL::ExecutableVariantOp executableOp) {
-    executableVariantOps.push_back(executableOp);
-  });
+  for (auto executableOp : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
+    auto iter = executableOp.getOps<IREE::HAL::ExecutableVariantOp>();
+    executableVariantOps.append(iter.begin(), iter.end());
+  }
   return executableVariantOps;
 }
 

@@ -47,12 +47,12 @@ SmallVector<std::string>
 gatherExecutableTargetNames(IREE::HAL::ExecutableOp executableOp) {
   SmallVector<std::string> targetNames;
   llvm::SmallDenseSet<StringRef> targets;
-  executableOp.walk([&](IREE::HAL::ExecutableVariantOp variantOp) {
+  for (auto variantOp : executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
     auto targetName = variantOp.getTarget().getBackend().getValue();
     if (targets.insert(targetName).second) {
       targetNames.push_back(targetName.str());
     }
-  });
+  }
   llvm::stable_sort(targetNames);
   return targetNames;
 }
@@ -61,14 +61,15 @@ SmallVector<std::string> gatherExecutableTargetNames(mlir::ModuleOp moduleOp) {
   SmallVector<std::string> targetNames;
   llvm::stable_sort(targetNames);
   llvm::SmallDenseSet<StringRef> targets;
-  moduleOp.walk([&](IREE::HAL::ExecutableOp executableOp) {
-    executableOp.walk([&](IREE::HAL::ExecutableVariantOp variantOp) {
+  for (auto executableOp : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
+    for (auto variantOp :
+         executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
       auto targetName = variantOp.getTarget().getBackend().getValue();
       if (targets.insert(targetName).second) {
         targetNames.push_back(targetName.str());
       }
-    });
-  });
+    }
+  }
   return targetNames;
 }
 

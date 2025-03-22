@@ -36,15 +36,17 @@ public:
                                               replaceIndex++);
     };
 
-    moduleOp.walk([&](Operation *op) {
-      if (auto globalOp = dyn_cast<Util::GlobalOp>(op)) {
-        if (auto initialValue = globalOp.getInitialValueAttr()) {
-          if (auto shapedType = dyn_cast<ShapedType>(initialValue.getType())) {
-            globalOp.setInitialValueAttr(getSplatAttr(shapedType));
-          }
-        }
+    for (auto globalOp : moduleOp.getOps<Util::GlobalOp>()) {
+      auto initialValue = globalOp.getInitialValueAttr();
+      if (!initialValue) {
+        continue;
       }
-    });
+      auto shapedType = dyn_cast<ShapedType>(initialValue.getType());
+      if (!shapedType) {
+        continue;
+      }
+      globalOp.setInitialValueAttr(getSplatAttr(shapedType));
+    }
   }
 };
 
