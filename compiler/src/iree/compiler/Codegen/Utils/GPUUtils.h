@@ -204,9 +204,8 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
 /// Returns std::nullopt if none found.
 std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func);
 
-/// Returns all `IREE::HAL::ExecutableVariantOp` operations from the
-/// given `mlir::ModuleOp`, ensuring they are returned in their original IR
-/// order.
+/// Returns the top-level `IREE::HAL::ExecutableVariantOp` operations from the
+/// given `moduleOp`, ensuring they are returned in their original IR order.
 SmallVector<IREE::HAL::ExecutableVariantOp>
 getExecutableVariantOps(mlir::ModuleOp moduleOp);
 
