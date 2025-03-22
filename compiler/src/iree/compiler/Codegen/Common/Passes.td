@@ -167,6 +167,11 @@ def DecomposeConvolutionToLowerDimOpsPass :
   let summary = "Decomposes linalg convolution ops to lower dim ops";
 }
 
+def DecomposeMemrefsPass :
+    Pass<"iree-codegen-decompose-memrefs", ""> {
+  let summary = "Decomposes memrefs";
+}
+
 def DecomposeLinalgGenericPass :
     Pass<"iree-codegen-decompose-linalg-generic", ""> {
   let summary = "Decomposes linalg generic ops into individual ops";
