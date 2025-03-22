@@ -226,3 +226,24 @@ util.func public @hoist_both_src_and_encoding() -> tensor<640x320xf32> {
 // CHECK:         %[[CST:.+]] = arith.constant
 // CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[CST]]
 // CHECK:         flow.dispatch.region
+
+// -----
+
+// It tests that the constant-like source is already outside the region, and the
+// hoisting does not happen to it. Otherwise, it crashes.
+
+#encoding = #iree_encoding.testing_encoding<>
+util.func private @get_tensor(tensor<640x320xf32, #encoding>) -> tensor<640x320xf32>
+util.func public @hoist_encoding_only() -> tensor<640x320xf32> {
+  %cst = arith.constant dense<1.0> : tensor<640x320xf32>
+  %0 = flow.dispatch.region -> (tensor<640x320xf32>) {
+    %1 = iree_encoding.set_encoding %cst : tensor<640x320xf32> -> tensor<640x320xf32, #encoding>
+    %2 = util.call @get_tensor(%1) : (tensor<640x320xf32, #encoding>) -> tensor<640x320xf32>
+    flow.return %2 : tensor<640x320xf32>
+  }
+  util.return %0 : tensor<640x320xf32>
+}
+// CHECK-LABEL: util.func public @hoist_encoding_only(
+// CHECK:         %[[CST:.+]] = arith.constant
+// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[CST]]
+// CHECK:         flow.dispatch.region
