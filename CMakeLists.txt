@@ -30,8 +30,6 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 if(MSVC)
   enable_language(ASM_MASM)
-else()
-  enable_language(ASM)
 endif()
 
 # Set the default CMake build type so some of the build type dependent setting
