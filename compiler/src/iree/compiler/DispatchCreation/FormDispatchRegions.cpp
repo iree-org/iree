@@ -715,8 +715,9 @@ isFusableWithProducer(OpOperand &operand,
   }
 
   if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(consumer)) {
-    // Fuse with the rope computation if it is a gather operation.
-    if (IREE::LinalgExt::isGatherlikeOp(producer)) {
+    // Fuse with the rope computation if the query is a gather operation.
+    if (IREE::LinalgExt::isGatherlikeOp(producer) &&
+        attentionOp.getQuery() == operand.get()) {
       return true;
     }
     // Disable all other producer fusion. TODO: Enable other producer fusions.
