@@ -75,12 +75,14 @@ jobs:
         with:
           submodules: false
           lfs: true
-      
+
       - name: Pull Git LFS objects
         shell: bash
         run: |
           git lfs install
+          git lfs fetch
           git lfs checkout
+          git lfs pull
 
       - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
         with:
@@ -100,7 +102,7 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
 
       - name: "Running Sharktank regression composite action"
-        uses: geomin12/iree-test-suites/sharktank_models@b98e7b362edd63ca15f5d1abbd527a178912a410 # temporary until it works
+        uses: geomin12/iree-test-suites/sharktank_models@9403bc32636cf98f0450c4c15fd9df96186b938c # temporary until it works
         with:
           MATRIX_NAME: ${{ matrix.name }}
           SKU: ${{ matrix.sku }}
