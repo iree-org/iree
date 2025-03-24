@@ -614,3 +614,70 @@ util.func @attention_rope_fusion(%arg0: tensor<10x20x30x50xbf16>,
 //  CHECK-SAME:         ins(%[[Q]], %[[DISPATCHK]], %[[DISPATCHV]]
 //       CHECK:     flow.return %[[ATTENTION]]
 //       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+// Still fuse Q, K, and V in the case of bit-extend ops.
+util.func @attention_bitextend_fusion(%arg0: tensor<10x20x30x50xf8E4M3FNUZ>,
+    %arg1: tensor<10x20x40x50xf8E4M3FNUZ>, %arg2: tensor<10x20x40x50xf8E4M3FNUZ>,
+    %cst : bf16) -> tensor<10x20x30x40xbf16> {
+  %query_empty = tensor.empty() : tensor<10x20x30x50xbf16>
+  %query = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%arg0 : tensor<10x20x30x50xf8E4M3FNUZ>)
+      outs(%query_empty : tensor<10x20x30x50xbf16>) {
+      ^bb0(%b0: f8E4M3FNUZ, %out: bf16):
+      %val = arith.extf %b0 : f8E4M3FNUZ to bf16
+      linalg.yield %val : bf16
+  } -> tensor<10x20x30x50xbf16>
+  %key_empty = tensor.empty() : tensor<10x20x40x50xbf16>
+  %key = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%arg1 : tensor<10x20x40x50xf8E4M3FNUZ>)
+      outs(%key_empty : tensor<10x20x40x50xbf16>) {
+      ^bb0(%b0: f8E4M3FNUZ, %out: bf16):
+      %val = arith.extf %b0 : f8E4M3FNUZ to bf16
+      linalg.yield %val : bf16
+  } -> tensor<10x20x40x50xbf16>
+  %value_empty = tensor.empty() : tensor<10x20x40x50xbf16>
+  %value = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%arg2 : tensor<10x20x40x50xf8E4M3FNUZ>)
+      outs(%value_empty : tensor<10x20x40x50xbf16>) {
+      ^bb0(%b0: f8E4M3FNUZ, %out: bf16):
+      %val = arith.extf %b0 : f8E4M3FNUZ to bf16
+      linalg.yield %val : bf16
+  } -> tensor<10x20x40x50xbf16>
+  %empty = tensor.empty() : tensor<10x20x30x40xbf16>
+  %dispatch = flow.dispatch.region -> (tensor<10x20x30x40xbf16>) {
+    %attention = iree_linalg_ext.attention {
+        indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4)>,
+                         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4)>,
+                         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4)>,
+                         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>,
+                         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>]}
+        ins(%query, %key, %value, %cst
+            : tensor<10x20x30x50xbf16>, tensor<10x20x40x50xbf16>, tensor<10x20x40x50xbf16>, bf16)
+        outs(%empty : tensor<10x20x30x40xbf16>) {
+      ^bb0(%arg6: f32):
+        iree_linalg_ext.yield %arg6 : f32
+    } -> tensor<10x20x30x40xbf16>
+    flow.return %attention : tensor<10x20x30x40xbf16>
+  }
+  util.return %dispatch : tensor<10x20x30x40xbf16>
+}
+// CHECK-LABEL: func public @attention_bitextend_fusion
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20x30x50xf8E4M3FNUZ>
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<10x20x40x50xf8E4M3FNUZ>
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<10x20x40x50xf8E4M3FNUZ>
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[V:.+]] = linalg.generic
+//       CHECK:     %[[Q:.+]] = linalg.generic
+//       CHECK:     %[[K:.+]] = linalg.generic
+//       CHECK:     %[[ATTENTION:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:         ins(%[[Q]], %[[K]], %[[V]]
+//       CHECK:     flow.return %[[ATTENTION]]
+//       CHECK:   util.return %[[DISPATCH]]
