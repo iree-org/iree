@@ -29,13 +29,14 @@ class TargetMachine:
 
     @property
     def flag_list(self) -> list[str]:
+        # This is just a hard-coded machine model using a single IREE device
+        # type alias in the default configuration.
+        flags = []
         if self.iree_compile_device_type is not None:
-            # This is just a hard-coded machine model using a single IREE device
-            # type alias in the default configuration.
-            return [f"--iree-hal-target-device={self.iree_compile_device_type}"] + (
-                self.extra_flags or []
-            )
-        raise RuntimeError(f"Cannot compute iree-compile flags for: {self}")
+            flags.append(f"--iree-hal-target-device={self.iree_compile_device_type}")
+        if self.extra_flags:
+            flags.extend(self.extra_flags)
+        return flags
 
     def __repr__(self):
         r = f"TargetMachine({self.target_spec}, "
@@ -81,8 +82,10 @@ def amdgpu_hal_target_from_flags(
     return [
         TargetMachine(
             f"amdgpu-{amdgpu_target}",
-            iree_compile_device_type="amdgpu",
-            extra_flags=[f"--iree-hip-target={amdgpu_target}"],
+            extra_flags=[
+                "--iree-hal-target-device=hip",
+                f"--iree-hip-target={amdgpu_target}",
+            ],
         )
     ]
 
@@ -96,7 +99,10 @@ def cpu_hal_target_from_flags(
     features=cl_arg_ref("iree_llvmcpu_target_cpu_features"),
 ) -> list[TargetMachine]:
     target_spec = "cpu"
-    extra_flags = []
+    extra_flags = [
+        "--iree-hal-target-device=local",
+        "--iree-hal-local-target-device-backends=llvm-cpu",
+    ]
     if cpu:
         target_spec += f"-{cpu}"
         extra_flags.append(f"--iree-llvmcpu-target-cpu={cpu}")
@@ -107,7 +113,6 @@ def cpu_hal_target_from_flags(
     return [
         TargetMachine(
             f"cpu-{cpu or 'generic'}",
-            iree_compile_device_type="llvm-cpu",
             extra_flags=extra_flags,
         )
     ]

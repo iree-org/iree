@@ -715,8 +715,9 @@ isFusableWithProducer(OpOperand &operand,
   }
 
   if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(consumer)) {
-    // Fuse with the rope computation if it is a gather operation.
-    if (IREE::LinalgExt::isGatherlikeOp(producer)) {
+    // Fuse with the rope computation if the query is a gather operation.
+    if (IREE::LinalgExt::isGatherlikeOp(producer) &&
+        attentionOp.getQuery() == operand.get()) {
       return true;
     }
     // Disable all other producer fusion. TODO: Enable other producer fusions.
@@ -856,8 +857,7 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // to convert them to splats. Also avoid moving dequantization-like ops
       // into their own dispatch since it is better to clone these ops and avoid
       // materializing large tensors between dispatches.
-      if (!isa<linalg::LinalgOp, tensor::PadOp, linalg::PackOp,
-               IREE::Encoding::SetEncodingOp>(op) ||
+      if (!isa<linalg::LinalgOp, tensor::PadOp, linalg::PackOp>(op) ||
           IREE::Flow::isClonableIntoDispatchOp(&op, clonableOptions)) {
         continue;
       }
