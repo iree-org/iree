@@ -48,7 +48,7 @@ jobs:
             rocm-chip: gfx942
             backend: rocm
             sku: mi300
-            runs-on: nodai-amdgpu-mi300-x86-64
+            runs-on: linux-mi300-1gpu-ossci-iree-org
           - name: amdgpu_rocm_mi308_gfx942
             rocm-chip: gfx942
             backend: rocm
@@ -90,6 +90,13 @@ jobs:
       #     pytest \
       #       -rA -s -m "plat_host_cpu and presubmit" \
       #       experimental/regression_suite
+
+      - name: "Set IREE_TEST_FILES variable"
+        run: |
+          case "${{ matrix.name }}" in
+            "amdgpu_rocm_mi300_gfx942") echo IREE_TEST_FILES="/shark-cache/data/iree-regression-cache" >> $GITHUB_ENV ;;
+            *) echo "No cache directory assigned for ${{ matrix.name }}" ;;
+          esac
 
       - name: "Running SDXL special model tests"
         if: "!cancelled()"
