@@ -91,10 +91,10 @@ jobs:
       #       -rA -s -m "plat_host_cpu and presubmit" \
       #       experimental/regression_suite
 
-      - name: "Set IREE_TEST_FILES variable" 
+      - name: "Set IREE_TEST_FILES variable"
         run: |
           case "${{ matrix.name }}" in
-            "amdgpu_rocm_mi300_gfx942") IREE_TEST_FILES="/shark-cache/data/iree-regression-cache" >> $GITHUB_ENV;;
+            "amdgpu_rocm_mi300_gfx942") echo IREE_TEST_FILES="/shark-cache/data/iree-regression-cache" >> $GITHUB_ENV ;;
             *) echo "No cache directory assigned for ${{ matrix.name }}" ;;
           esac
 
