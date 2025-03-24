@@ -3927,11 +3927,7 @@ func.func @foo(
 }
 </code></pre></div>
 <p>Compile it like this:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>prog.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-o<span class="w"> </span>/tmp/prog.vmfb
+<div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span>prog.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/prog.vmfb
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -3939,7 +3935,7 @@ func.func @foo(
 trying to maximize performance.</p>
 <ul>
 <li>To run on GPU or other non-CPU targets, explore other values for
-  <code>--iree-hal-target-device=</code>. You will then need to pass a matching
+  <code>--iree-hal-target-backends=</code>. You will then need to pass a matching
   <code>--device=</code> to <code>iree-run-module</code> below.</li>
 <li>To cross-compile, explore <code>--iree-llvmcpu-target-triple=</code>.</li>
 <li>To enable higher CPU performance by enabling CPU features:<ul>
@@ -4009,9 +4005,7 @@ func.func @foo(
 now the <code>iree-run-module</code> command may specify inputs of arbitrary length. The
 only requirement is that both inputs have the same length, otherwise the
 <code>linalg.generic</code> will have undefined behavior.</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>prog.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span>prog.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/prog.vmfb
 <span class="gp">$ </span>iree-run-module<span class="w"> </span>--module<span class="o">=</span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--input<span class="o">=</span><span class="nv">10xf32</span><span class="o">=[</span><span class="m">0</span>,1,2,3,4,5,6,7,8,9<span class="o">]</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--input<span class="o">=</span><span class="nv">10xf32</span><span class="o">=[</span><span class="m">90</span>,80,70,60,50,40,30,20,10,0<span class="o">]</span>
@@ -4055,9 +4049,7 @@ func.func @foo(
   return %result : tensor&lt;10xf32&gt;
 }
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>prog.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span>prog.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/prog.vmfb
 <span class="gp">$ </span>iree-run-module<span class="w"> </span>--module<span class="o">=</span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--input<span class="o">=</span><span class="nv">10xf32</span><span class="o">=[</span><span class="m">0</span>,1,2,3,4,5,6,7,8,9<span class="o">]</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--input<span class="o">=</span><span class="nv">10xf32</span><span class="o">=[</span><span class="m">90</span>,80,70,60,50,40,30,20,10,0<span class="o">]</span>
@@ -4109,9 +4101,7 @@ func.func @foo(
   return %result : tensor&lt;f32&gt;
 }
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>prog.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span>prog.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/prog.vmfb
 <span class="gp">$ </span>iree-run-module<span class="w"> </span>--module<span class="o">=</span>/tmp/prog.vmfb<span class="w"> </span>--input<span class="o">=</span><span class="nv">10xf32</span><span class="o">=[</span><span class="m">0</span>,1,2,3,4,5,6,7,8,9<span class="o">]</span>
 
 <span class="go">EXEC @foo</span>
@@ -4159,9 +4149,7 @@ func.func @foo(
   return %result : tensor&lt;3xf32&gt;
 }
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>prog.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span>prog.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/prog.vmfb
 <span class="gp">$ </span>iree-run-module<span class="w"> </span>--module<span class="o">=</span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--input<span class="o">=</span><span class="nv">3x5xf32</span><span class="o">=[[</span><span class="m">0</span>,1,2,3,4<span class="o">]</span>,<span class="o">[</span><span class="m">5</span>,6,7,8,9<span class="o">]</span>,<span class="o">[</span><span class="m">10</span>,11,12,13,14<span class="o">]]</span>
 
@@ -4188,9 +4176,7 @@ well use static shapes.</p>
   return %result: tensor&lt;?x?xf32&gt;
 }
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>prog.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span>prog.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/prog.vmfb
 <span class="gp">$ </span>iree-run-module<span class="w"> </span>--module<span class="o">=</span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--input<span class="o">=</span><span class="nv">2x2xf32</span><span class="o">=[[</span><span class="m">1</span>,2<span class="o">][</span><span class="m">3</span>,4<span class="o">]]</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--input<span class="o">=</span><span class="nv">2x2xf32</span><span class="o">=[[</span><span class="m">1</span>,4<span class="o">][</span><span class="m">3</span>,2<span class="o">]]</span><span class="w"> </span><span class="se">\</span>
@@ -4286,9 +4272,7 @@ module {
   }
 }
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>prog.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span>prog.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/prog.vmfb
 <span class="gp">$ </span>iree-run-module<span class="w"> </span>--module<span class="o">=</span>/tmp/prog.vmfb<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--input<span class="o">=</span><span class="nv">2x2xi8</span><span class="o">=[[</span>-1,-2<span class="o">][</span>-3,-4<span class="o">]]</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--input<span class="o">=</span><span class="nv">2x2xi8</span><span class="o">=[[</span><span class="m">1</span>,4<span class="o">][</span><span class="m">3</span>,2<span class="o">]]</span><span class="w"> </span><span class="se">\</span>

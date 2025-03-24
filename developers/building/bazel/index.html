@@ -3964,9 +3964,7 @@ build:debug<span class="w"> </span>--compilation_mode<span class="o">=</span>dbg
 and execute a function in the compiled module:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># iree-run-mlir &lt;compiler flags&gt; [input.mlir] &lt;runtime flags&gt;</span>
 $<span class="w"> </span>./bazel-bin/tools/iree-run-mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--print-mlir<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>vmvx<span class="w"> </span>--print-mlir<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>./samples/models/simple_abs.mlir<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--input<span class="o">=</span><span class="nv">f32</span><span class="o">=</span>-2
 </code></pre></div>

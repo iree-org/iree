@@ -3930,8 +3930,7 @@ starting point.</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>mkdir<span class="w"> </span>-p<span class="w"> </span>/tmp/iree/simple_abs/
 
 <span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">  </span>--iree-llvmcpu-link-embedded<span class="o">=</span><span class="nb">false</span><span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">  </span>--iree-hal-dump-executable-files-to<span class="o">=</span>/tmp/iree/simple_abs<span class="w"> </span><span class="se">\</span>
 </span><span class="w">  </span>-o<span class="w"> </span>/tmp/iree/simple_abs/simple_abs_cpu.vmfb
@@ -4016,7 +4015,7 @@ can be disassembled using
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>mkdir<span class="w"> </span>-p<span class="w"> </span>/tmp/iree/simple_abs/
 
 <span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span>vulkan<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>vulkan-spirv<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">  </span>--iree-hal-dump-executable-files-to<span class="o">=</span>/tmp/iree/simple_abs<span class="w"> </span><span class="se">\</span>
 </span><span class="w">  </span>-o<span class="w"> </span>/tmp/iree/simple_abs/simple_abs_vulkan.vmfb
 
@@ -4086,7 +4085,7 @@ be disassembled using <code>spirv-dis</code> from
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>mkdir<span class="w"> </span>-p<span class="w"> </span>/tmp/iree/simple_abs/
 
 <span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span>cuda<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>cuda<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">  </span>--iree-hal-dump-executable-files-to<span class="o">=</span>/tmp/iree/simple_abs<span class="w"> </span><span class="se">\</span>
 </span><span class="w">  </span>-o<span class="w"> </span>/tmp/iree/simple_abs/simple_abs_cuda.vmfb
 
@@ -4160,8 +4159,7 @@ can be disassembled using
 can be compiled in isolation and passed to <code>iree-benchmark-module</code>, where they
 exercise the full IREE runtime for a single executable:</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">  </span>--iree-hal-dump-executable-benchmarks-to<span class="o">=</span>/tmp/iree/simple_abs/<span class="w"> </span><span class="se">\</span>
 </span><span class="w">  </span>-o<span class="w"> </span>/dev/null
 
@@ -4179,8 +4177,7 @@ directly, without using the IREE VM, HAL APIs, task system, etc. Note that this
 interface is much lower level and you must specify all push constants / binding
 parameters manually:</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">  </span>--iree-hal-dump-executable-binaries-to<span class="o">=</span>/tmp/iree/simple_abs/<span class="w"> </span><span class="se">\</span>
 </span><span class="w">  </span>-o<span class="w"> </span>/dev/null
 
@@ -4319,14 +4316,12 @@ then resume compilation and continue through the pipeline:</p>
 <span class="w">  </span>simple_abs_abi.mlir<span class="w"> </span>&gt;<span class="w"> </span>simple_exp_abi.mlir
 
 <span class="gp">$ </span>iree-compile<span class="w"> </span>simple_exp_abi.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-o<span class="w"> </span>simple_exp_cpu.vmfb
 </code></pre></div>
 <p>or explicitly resume from an intermediate phase with <code>--compile-from=&lt;phase name&gt;</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>simple_exp_abi.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">  </span>--compile-from<span class="o">=</span>abi<span class="w"> </span><span class="se">\</span>
 </span><span class="w">  </span>-o<span class="w"> </span>simple_exp_cpu.vmfb
 </code></pre></div>
@@ -4334,8 +4329,7 @@ then resume compilation and continue through the pipeline:</p>
 <p>The <code>--dump-compilation-phases-to</code> flag can be used to dump program IR after
 each phase, much like <code>--compile-to</code> but without exiting early:</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">  </span>--dump-compilation-phases-to<span class="o">=</span>/tmp/iree/simple_abs<span class="w"> </span><span class="se">\</span>
 </span><span class="w">  </span>-o<span class="w"> </span>/tmp/iree/simple_abs/simple_abs_cpu.vmfb
 
@@ -4356,8 +4350,7 @@ each phase, much like <code>--compile-to</code> but without exiting early:</p>
 </code></pre></div>
 <p>As with <code>--compile-to</code>, these files can be used together with <code>--compile-from</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.2.abi.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--compile-from<span class="o">=</span>abi<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-o<span class="w"> </span>simple_exp_cpu.vmfb
 </code></pre></div>

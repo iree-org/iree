@@ -4158,7 +4158,7 @@ Python bindings documentation for more details.</p>
 <span class="c1"># basis, typically coming from the input .mlir or .py file.</span>
 
 iree-compile<span class="w"> </span>program_input.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-device<span class="o">={</span>target<span class="o">}</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">={</span>target<span class="o">}</span><span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">  </span>--iree-hal-executable-debug-level<span class="o">=</span><span class="m">3</span><span class="w"> </span><span class="se">\</span>
 </span><span class="w">  </span>-o<span class="w"> </span>program.vmfb
 </code></pre></div>
@@ -4226,9 +4226,8 @@ and increases the size of trace files, so adjust this setting with care.</p>
 allocation:</p>
 <p><a href="https://github.com/iree-org/iree/assets/4010439/c0732eec-3fc5-476b-8e6a-fa8c8631eaac"><img alt="Tracy memory callstacks" src="https://github.com/iree-org/iree/assets/4010439/c0732eec-3fc5-476b-8e6a-fa8c8631eaac" /></a></p>
 <h4 id="options-for-the-llvm-cpu-backend">Options for the <code>llvm-cpu</code> backend<a class="headerlink" href="#options-for-the-llvm-cpu-backend" title="Permanent link">link</a></h4>
-<p>When using the <code>llvm-cpu</code> backend (<code>--iree-hal-target-device=local</code> and
-<code>--iree-hal-local-target-device-backends=llvm-cpu</code> with <code>--device=local-task</code> or
-<code>--device=local-sync</code>), these options are available:</p>
+<p>When using the <code>llvm-cpu</code> backend (<code>--iree-hal-target-backends=llvm-cpu</code> with
+<code>--device=local-task</code> or <code>--device=local-sync</code>), these options are available:</p>
 <ul>
 <li>
 <p>The <code>--iree-llvmcpu-link-embedded=false</code> flag uses the "system" linker
@@ -4246,15 +4245,14 @@ allocation:</p>
 </ul>
 <p>Putting those flags and environment variables together in an example:</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span>program_input.mlir<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">  </span>--iree-hal-executable-debug-level<span class="o">=</span><span class="m">3</span><span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">  </span>--iree-llvmcpu-link-embedded<span class="o">=</span><span class="nb">false</span><span class="w"> </span><span class="se">\</span>
-</span><span class="w">  </span>--iree-llvmcpu-debug-symbols<span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-o<span class="w"> </span>program_full_info.vmfb
-<span class="hll">
-</span><span class="nv">TRACY_NO_EXIT</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">IREE_PRESERVE_DYLIB_TEMP_FILES</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>sudo<span class="w"> </span>iree-run-module<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">  </span>--iree-llvmcpu-debug-symbols<span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
+</span><span class="w">  </span>-o<span class="w"> </span>program_full_info.vmfb
+
+<span class="hll"><span class="nv">TRACY_NO_EXIT</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">IREE_PRESERVE_DYLIB_TEMP_FILES</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>sudo<span class="w"> </span>iree-run-module<span class="w"> </span><span class="se">\</span>
+</span><span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--module<span class="o">=</span>program_full_info.vmfb<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>...
 </code></pre></div>

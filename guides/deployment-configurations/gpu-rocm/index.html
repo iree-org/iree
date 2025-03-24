@@ -4114,9 +4114,9 @@ iree-import-onnx<span class="w"> </span>mobilenetv2-10.onnx<span class="w"> </sp
 <span class="nv">IREE_HIP_TARGET</span><span class="o">=</span><span class="k">$(</span>rocm_agent_enumerator<span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span>-n<span class="w"> </span><span class="s1">&#39;2 p&#39;</span><span class="k">)</span><span class="w">  </span><span class="c1"># e.g. gfx1100</span>
 
 iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">    </span>--iree-hal-target-device<span class="o">=</span>hip<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>rocm<span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">    </span>--iree-hip-target<span class="o">=</span><span class="si">${</span><span class="nv">IREE_HIP_TARGET</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
-</span><span class="w">    </span>mobilenetv2.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_hip.vmfb
+</span><span class="w">    </span>mobilenetv2.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_rocm.vmfb
 </code></pre></div>
 <details class="tip" open="open">
 <summary>Tip - Compiler Optimizations</summary>
