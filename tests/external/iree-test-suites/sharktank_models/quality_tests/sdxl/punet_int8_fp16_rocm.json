@@ -53,6 +53,7 @@
     "run_function": "main",
     "compile_chip_expecting_to_fail": ["gfx90a"],
     "tuner_file": {
-        "mi300": "attention_and_matmul_spec_punet_mi300.mlir"
+        "mi300": "attention_and_matmul_spec_punet_mi300.mlir",
+        "mi308": "attention_and_matmul_spec_punet_mi300.mlir"
     }
 }
