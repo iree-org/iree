@@ -49,8 +49,6 @@ jobs:
             backend: rocm
             sku: mi300
             runs-on: linux-mi300-1gpu-ossci-iree-org
-            env:
-              IREE_TEST_FILES: /shark-cache/data/iree-regression-cache
           - name: amdgpu_rocm_mi308_gfx942
             rocm-chip: gfx942
             backend: rocm
@@ -97,8 +95,13 @@ jobs:
         if: "!cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
-          if [ "${{ matrix.env.IREE_TEST_FILES }}" != ""]; then 
-            echo "IREE_TEST_FILES=${{ matrix.env.IREE_TEST_FILES}}" >> $GITHUB_ENV
+          # Set IREE_TEST_FILES based on matrix.name
+          case "${{ matrix.name }}" in
+            "amdgpu_rocm_mi300_gfx942") IREE_TEST_FILES="/shark-cache/data/iree-regression-cache" ;;
+            *) echo "No cache directory assigned for ${{ matrix.name }}" ;;
+          esac
+          if [[ -n "$IREE_TEST_FILES" ]]; then
+            export IREE_TEST_FILES
           fi
           pytest ./experimental/regression_suite/shark-test-suite-models/sdxl \
             -k ${{ matrix.backend }} \
@@ -116,8 +119,13 @@ jobs:
         if: "!cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
-          if [ "${{ matrix.env.IREE_TEST_FILES }}" != ""]; then 
-            echo "IREE_TEST_FILES=${{ matrix.env.IREE_TEST_FILES}}" >> $GITHUB_ENV
+          # Set IREE_TEST_FILES based on matrix.name
+          case "${{ matrix.name }}" in
+            "amdgpu_rocm_mi300_gfx942") IREE_TEST_FILES="/shark-cache/data/iree-regression-cache" ;;
+            *) echo "No cache directory assigned for ${{ matrix.name }}" ;;
+          esac
+          if [[ -n "$IREE_TEST_FILES" ]]; then
+            export IREE_TEST_FILES
           fi
           pytest ./experimental/regression_suite/shark-test-suite-models/sd3 \
             -k ${{ matrix.backend }} \
@@ -162,8 +170,13 @@ jobs:
         if: contains(matrix.name, 'rocm_mi300_gfx942')
         run: |
           source ${VENV_DIR}/bin/activate
-          if [ "${{ matrix.env.IREE_TEST_FILES }}" != ""]; then 
-            echo "IREE_TEST_FILES=${{ matrix.env.IREE_TEST_FILES}}" >> $GITHUB_ENV
+          # Set IREE_TEST_FILES based on matrix.name
+          case "${{ matrix.name }}" in
+            "amdgpu_rocm_mi300_gfx942") IREE_TEST_FILES="/shark-cache/data/iree-regression-cache" ;;
+            *) echo "No cache directory assigned for ${{ matrix.name }}" ;;
+          esac
+          if [[ -n "$IREE_TEST_FILES" ]]; then
+            export IREE_TEST_FILES
           fi
           pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
             --goldentime-tolerance-multiplier 1.1 \
