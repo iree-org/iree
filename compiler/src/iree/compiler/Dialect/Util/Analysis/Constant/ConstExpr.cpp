@@ -9,8 +9,6 @@
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/GraphWriter.h"
@@ -502,15 +500,6 @@ void ConstExprHoistingPolicy::makeDecision(
   if (!hasLegalEscape) {
     decision->disableHoist();
     return;
-  }
-
-  // If the op explicitly says no, we disable the hoisting.
-  if (auto hoistableOp =
-          dyn_cast<Util::HoistableOpInterface>(info->getOperation())) {
-    if (!hoistableOp.isHoistableOp()) {
-      decision->disableHoist();
-      return;
-    }
   }
 
   // Otherwise, we can conditionally enable hoisting (based on cost model, etc).
