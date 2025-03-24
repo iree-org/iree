@@ -41,5 +41,6 @@
     "threshold_args": [
         "--expected_f16_threshold=0.8f"
     ],
-    "run_function": "run_forward"
+    "run_function": "run_forward",
+    "custom_real_weights_group": "sdxl_unet_fp16"
 }
