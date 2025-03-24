@@ -1184,33 +1184,11 @@ struct ElideRedundantBarrier : public OpRewritePattern<TensorBarrierOp> {
   }
 };
 
-struct ElideChainedBarriers : public OpRewritePattern<TensorBarrierOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(TensorBarrierOp targetBarrierOp,
-                                PatternRewriter &rewriter) const override {
-    auto sourceBarrierOp = dyn_cast_if_present<IREE::Flow::TensorBarrierOp>(targetBarrierOp.getOperand().getDefiningOp());
-    if (!sourceBarrierOp) {
-      return failure();
-    }
-    if (sourceBarrierOp.getTarget() == targetBarrierOp.getTarget()) {
-      return failure();
-    }
-    rewriter.replaceOpWithNewOp<TensorBarrierOp>(
-      targetBarrierOp, 
-      targetBarrierOp->getResultTypes(),
-      sourceBarrierOp.getOperand(),
-      targetBarrierOp.getOperandDims(),
-      targetBarrierOp.getTarget());
-    return success();
-  }
-};
-
 } // namespace
 
 void TensorBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
   results.insert<ElideRedundantBarrier>(context);
-  results.insert<ElideChainedBarriers>(context);
 }
 
 //===----------------------------------------------------------------------===//
