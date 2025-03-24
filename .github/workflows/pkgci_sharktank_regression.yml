@@ -88,6 +88,7 @@ jobs:
           git lfs fetch --all
           git lfs pull
           git lfs checkout
+          git lfs logs last
 
       - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
         with:
@@ -99,7 +100,7 @@ jobs:
         with:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
-      
+
       - name: "Set IREE_TEST_FILES variable"
         run: |
           case "${{ matrix.name }}" in
@@ -114,7 +115,7 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
 
       - name: "Running Sharktank regression composite action"
-        uses: geomin12/iree-test-suites/sharktank_models@9403bc32636cf98f0450c4c15fd9df96186b938c # temporary until it works
+        uses: geomin12/iree-test-suites/sharktank_models@d0b1405df896b81e3fa7ee471cf3212540235296 # temporary until it works
         with:
           MATRIX_NAME: ${{ matrix.name }}
           SKU: ${{ matrix.sku }}
@@ -126,4 +127,4 @@ jobs:
           EXTERNAL_TEST_FILE_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/test_suite_files
           QUALITY_TEST_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/sharktank_models/quality_tests
           BENCHMARK_TEST_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/sharktank_models/benchmarks
-          IREE_TEST_FILES: ${IREE_TEST_FILES}
+          IREE_TEST_FILES: ${{ env.IREE_TEST_FILES }}
