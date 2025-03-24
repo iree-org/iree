@@ -44,6 +44,7 @@ iree_cc_binary(
     iree::hal::local::elf::testdata::elementwise_mul
     iree::hal::local::executable_environment
     iree::hal::local::executable_library
+  TESTONLY
 )
 
 iree_native_test(
