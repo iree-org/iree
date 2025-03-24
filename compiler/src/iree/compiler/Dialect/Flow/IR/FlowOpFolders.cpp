@@ -1172,7 +1172,8 @@ struct ElideRedundantBarrier : public OpRewritePattern<TensorBarrierOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorBarrierOp targetTransferOp,
                                 PatternRewriter &rewriter) const override {
-    auto sourceTransferOp = dyn_cast_if_present<IREE::Flow::TensorBarrierOp>(targetTransferOp.getOperand().getDefiningOp());
+    auto sourceTransferOp = dyn_cast_if_present<IREE::Flow::TensorBarrierOp>(
+        targetTransferOp.getOperand().getDefiningOp());
     if (!sourceTransferOp) {
       return failure();
     }
