@@ -97,7 +97,7 @@ jobs:
         if: "!cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
-          if [ -z "${IREE_TEST_FILES}" ]; then 
+          if [ -n "${{ matrix.env.IREE_TEST_FILES }}" ]; then 
             echo "IREE_TEST_FILES=${{ matrix.env.IREE_TEST_FILES}}" >> $GITHUB_ENV
           fi
           pytest ./experimental/regression_suite/shark-test-suite-models/sdxl \
@@ -116,7 +116,7 @@ jobs:
         if: "!cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
-          if [ -z "${IREE_TEST_FILES}" ]; then 
+          if [ -n "${{ matrix.env.IREE_TEST_FILES }}" ]; then 
             echo "IREE_TEST_FILES=${{ matrix.env.IREE_TEST_FILES}}" >> $GITHUB_ENV
           fi
           pytest ./experimental/regression_suite/shark-test-suite-models/sd3 \
@@ -162,7 +162,7 @@ jobs:
         if: contains(matrix.name, 'rocm_mi300_gfx942')
         run: |
           source ${VENV_DIR}/bin/activate
-          if [ -z "${IREE_TEST_FILES}" ]; then 
+          if [ -n "${{ matrix.env.IREE_TEST_FILES }}" ]; then 
             echo "IREE_TEST_FILES=${{ matrix.env.IREE_TEST_FILES}}" >> $GITHUB_ENV
           fi
           pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
