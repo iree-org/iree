@@ -229,7 +229,8 @@ static void tileAndBufferize(OpPassManager &funcPassManager) {
 }
 
 static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
-                                      bool vectorizeCopies = true) {
+                                      bool vectorizeCopies = true,
+                                      bool enableMasking = false) {
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeIm2colPass());
   funcPassManager.addPass(
@@ -241,6 +242,7 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
   options.vectorizeGatherAccesses = true;
   options.enableCleanup = false;
   options.foldCastIntoContract = true;
+  options.enableVectorMasking = enableMasking;
   funcPassManager.addPass(createGenericVectorizationPass(options));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -461,7 +463,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
 
   // Step 6. Lower special ops and vectorize.
   funcPassManager.addPass(IREE::GPU::createVectorizeIREEGPUOpsPass());
-  addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/false);
+  addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/false, true);
   funcPassManager.addPass(createCleanupBufferAllocViewPass());
   funcPassManager.addPass(createGPUCombineValueBarriersPass());
 
