@@ -134,12 +134,11 @@ LogicalResult SwapEncodingOpWithTensorCollapseShapeOp::matchAndRewrite(
   // Create the new encoding op.
   RankedTensorType newEncodingType =
       collapseOp.getSrcType().cloneWithEncoding(newEncodingAttr);
-  auto dataReassocationIndices = collapseOp.getReassociationIndices();
   Value newEncodingOp = rewriter.create<IREE::Encoding::SetEncodingOp>(
       encodingOp.getLoc(), newEncodingType, collapseOp.getSrc());
   Value newCollapseOp = rewriter.create<tensor::CollapseShapeOp>(
       collapseOp.getLoc(), encodingOp.getResultType(), newEncodingOp,
-      dataReassocationIndices);
+      collapseOp.getReassociationIndices());
   rewriter.replaceOp(encodingOp, newCollapseOp);
   return success();
 }
