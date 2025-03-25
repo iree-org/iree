@@ -161,9 +161,7 @@ struct MaterializeFlowDispatchTensorLoadOp final
 };
 
 /// Pattern to convert `flow.dispatch.tensor.store` operation when
-/// materializing the encoding. We create a larger empty tensor for the
-/// destination and insert the value into it. This way we do not create partial
-/// stores prematurely, which would be difficult to undo later on.
+/// materializing the encoding.
 struct MaterializeFlowDispatchTensorStoreOp final
     : OpMaterializeEncodingPattern<IREE::Flow::DispatchTensorStoreOp> {
   using OpMaterializeEncodingPattern::OpMaterializeEncodingPattern;
@@ -211,6 +209,10 @@ struct MaterializeFlowDispatchTensorStoreOp final
   }
 };
 
+/// Pattern to convert `set_encoding` op into `insert_slice` op. We create a
+/// larger empty tensor for the destination and insert the value into it. This
+/// way we do not create partial stores prematurely, which would be difficult to
+/// undo later on.
 struct SetEncodingOpLoweringConversion
     : public OpMaterializeEncodingPattern<IREE::Encoding::SetEncodingOp> {
   using OpMaterializeEncodingPattern<
@@ -222,14 +224,11 @@ struct SetEncodingOpLoweringConversion
     auto &typeConverter =
         *getTypeConverter<MaterializePadEncodingTypeConverter>();
     RankedTensorType resultType = encodingOp.getResultType();
-    auto paddedType = typeConverter.convertType<RankedTensorType>(resultType);
 
     Location loc = encodingOp.getLoc();
-
-    SmallVector<OpFoldResult> offsets(paddedType.getRank(),
-                                      rewriter.getIndexAttr(0));
-    SmallVector<OpFoldResult> strides(paddedType.getRank(),
-                                      rewriter.getIndexAttr(1));
+    int64_t rank = resultType.getRank();
+    SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
+    SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
     SmallVector<OpFoldResult> sizes =
         tensor::getMixedSizes(rewriter, loc, adaptor.getSource());
 
@@ -251,7 +250,7 @@ struct SetEncodingOpLoweringConversion
                                  rewriter.getIndexAttr(value)});
     }
     Value empty = rewriter.create<tensor::EmptyOp>(loc, mixedResultSizes,
-                                                   paddedType.getElementType());
+                                                   resultType.getElementType());
     Value insertOp = rewriter.create<tensor::InsertSliceOp>(
         loc, adaptor.getSource(), empty, offsets, sizes, strides);
     rewriter.replaceOp(encodingOp, insertOp);
