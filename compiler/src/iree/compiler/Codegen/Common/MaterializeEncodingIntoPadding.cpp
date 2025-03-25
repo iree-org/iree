@@ -42,9 +42,8 @@ namespace {
 
 // Returns the pad encoding layout, or nullptr if this is not the only layout or
 // if there's no encoding at all.
-static PadEncodingLayoutAttr
-getPadLayout(const IREE::Codegen::LayoutAttrInterface &layoutAttr,
-             RankedTensorType type) {
+static PadEncodingLayoutAttr getPadLayout(Attribute layoutAttr,
+                                          RankedTensorType type) {
   auto encoding =
       dyn_cast_or_null<IREE::Encoding::EncodingAttr>(type.getEncoding());
   if (!encoding) {
@@ -65,9 +64,8 @@ getPadLayout(const IREE::Codegen::LayoutAttrInterface &layoutAttr,
 
 // Returns a padded tensor type (without encoding) for tensor types with the pad
 // encoding layout, or the same type for all other tensors.
-static RankedTensorType
-getPaddedType(const IREE::Codegen::LayoutAttrInterface &layoutAttr,
-              RankedTensorType type) {
+static RankedTensorType getPaddedType(Attribute layoutAttr,
+                                      RankedTensorType type) {
   PadEncodingLayoutAttr layout = getPadLayout(layoutAttr, type);
   if (!isNonZeroPadding(layout)) {
     return type.dropEncoding();
@@ -84,9 +82,9 @@ getPaddedType(const IREE::Codegen::LayoutAttrInterface &layoutAttr,
   return RankedTensorType::get(newShape, type.getElementType());
 }
 
-static bool
-hasNonZeroPadding(const IREE::Codegen::LayoutAttrInterface &layoutAttr,
-                  RankedTensorType type) {
+// TODO(hanchung): Perhaps we can just check if the encoding is present and
+// query if it is an identity layout.
+static bool hasNonZeroPadding(Attribute layoutAttr, RankedTensorType type) {
   return isNonZeroPadding(getPadLayout(layoutAttr, type));
 }
 
