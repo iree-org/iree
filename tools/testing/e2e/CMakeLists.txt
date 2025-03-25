@@ -34,6 +34,7 @@ iree_cc_library(
     iree::tooling::device_util
     iree::vm
     iree::vm::cc
+  TESTONLY
   PUBLIC
 )
 
@@ -55,6 +56,7 @@ iree_cc_binary(
     iree::tooling::device_util
     iree::vm
     iree::vm::cc
+  TESTONLY
 )
 
 iree_cc_binary(
@@ -75,6 +77,7 @@ iree_cc_binary(
     iree::tooling::device_util
     iree::vm
     iree::vm::cc
+  TESTONLY
 )
 
 iree_cc_binary(
@@ -95,6 +98,7 @@ iree_cc_binary(
     iree::tooling::device_util
     iree::vm
     iree::vm::cc
+  TESTONLY
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

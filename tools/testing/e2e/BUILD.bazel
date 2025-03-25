@@ -14,6 +14,7 @@ package(
 
 iree_runtime_cc_library(
     name = "e2e_test_util",
+    testonly = True,
     srcs = ["test_utils.c"],
     hdrs = ["test_utils.h"],
     deps = [
@@ -33,6 +34,7 @@ iree_runtime_cc_library(
 
 iree_runtime_cc_binary(
     name = "iree-e2e-matmul-test",
+    testonly = True,
     srcs = ["iree-e2e-matmul-test.cc"],
     deps = [
         ":e2e_test_util",
@@ -52,6 +54,7 @@ iree_runtime_cc_binary(
 
 iree_runtime_cc_binary(
     name = "iree-e2e-conv2d-test",
+    testonly = True,
     srcs = ["iree-e2e-conv2d-test.cc"],
     deps = [
         ":e2e_test_util",
@@ -71,6 +74,7 @@ iree_runtime_cc_binary(
 
 iree_runtime_cc_binary(
     name = "iree-e2e-attention-test",
+    testonly = True,
     srcs = ["iree-e2e-attention-test.cc"],
     deps = [
         ":e2e_test_util",
