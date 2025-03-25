@@ -171,6 +171,7 @@ iree_cc_binary(
   DEPS
     ::flags
     iree::base
+  TESTONLY
 )
 
 iree_lit_test_suite(
