@@ -198,6 +198,7 @@ void HoistEncodingOpsPass::runOnOperation() {
     // root op.
     Operation *src = setEncodingOp.getSource().getDefiningOp();
     if (src && src->hasTrait<OpTrait::ConstantLike>() &&
+        src->getParentOfType<IREE::Flow::DispatchRegionOp>() &&
         failed(IREE::Flow::hoistOutOfDispatch(rewriter, src))) {
       src->emitOpError("failed to hoist the source out of dispatch");
       return signalPassFailure();
