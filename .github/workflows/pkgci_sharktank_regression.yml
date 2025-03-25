@@ -76,7 +76,7 @@ jobs:
       IREE_TEST_FILES: ${{ matrix.iree_test_files }}
     steps:
       - name: Checking out IREE repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@11a8caa0579a73c20ab3a2beb5a80d9c238ada6b # v4.2.2
         with:
           submodules: false
           lfs: true
