@@ -253,8 +253,7 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
         // SetEncodingOps through special operations like bit-extending ops and
         // broadcasting ops.
         .addPass(DispatchCreation::createHoistEncodingOpsPass)
-        // After SetEncodingOps are hoisted, try to fuse them with their
-        // producer dispatches to try to hide packing costs.
+        .addPass(DispatchCreation::createPropagateEncodingsPass)
         .addPass(
             DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass);
   }
