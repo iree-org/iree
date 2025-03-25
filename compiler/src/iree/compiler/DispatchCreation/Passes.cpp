@@ -260,6 +260,13 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
   }
   FunctionLikeNest(passManager)
       .addPass(DispatchCreation::createConvertEncodingToFlowPass);
+  // Hoist encoding operations into initializers when possible.
+  IREE::Util::ExprHoistingOptions hoistingOptions;
+  hoistingOptions.maxSizeIncreaseThreshold = 0;
+  hoistingOptions.registerDependentDialectsFn = [](DialectRegistry &registry) {
+    registry.insert<IREE::Flow::FlowDialect>();
+  };
+  passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(hoistingOptions));
 }
 
 // Apply preprocessing and form dispatch regions
