@@ -322,8 +322,8 @@ def IREEGPU_GPUPadLayoutAttr : AttrDef<IREEGPU_Dialect, "GPUPadLayout"> {
   let parameters = (ins
     // Relevant target properties that will later allow us to decide the
     // serialized pad layout.
-    "uint32_t":$cache_line_bytes,
-    "uint32_t":$cache_sets
+    OptionalParameter<"std::optional<uint32_t>">:$cache_line_bytes,
+    OptionalParameter<"std::optional<uint32_t>">:$cache_sets
   );
 }
 
