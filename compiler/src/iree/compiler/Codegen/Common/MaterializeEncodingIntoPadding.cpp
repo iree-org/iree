@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
@@ -22,6 +23,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/AffineExpr.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -279,19 +281,40 @@ struct MaterializeEncodingIntoPaddingPass final
       return failure();
     };
 
+    // Retrieve the config from executable target attribute, if any. Otherwise,
+    // retrieve the config from CLI GPU target and construct a virtual
+    // configuration.
     auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(operation);
-    DictionaryAttr targetConfig =
-        targetAttr ? targetAttr.getConfiguration() : nullptr;
+    DictionaryAttr targetConfig;
+    if (targetAttr) {
+      targetConfig = targetAttr.getConfiguration();
+    } else {
+      IREE::GPU::TargetAttr targetAttr = getCLGPUTarget(context);
+      SmallVector<NamedAttribute> items;
+      items.emplace_back(IREE::Encoding::kEncodingResolverAttrName,
+                         IREE::GPU::GPUPadLayoutAttr::get(
+                             context, /*cacheLineBytes=*/std::nullopt,
+                             /*cacheSets=*/std::nullopt));
+      items.emplace_back(kGPUTargetAttrName, targetAttr);
+      targetConfig = DictionaryAttr::get(context, items);
+    }
+
+    // The layoutAttr should come in without any target info attached to it,
+    // so we need to clone the layout attrs with the configuration so it can
+    // access the target info during materialization.
+    //
+    // Otherwise, fall back to the nop layout.
     IREE::Codegen::LayoutAttrInterface layoutAttr;
-    if (targetConfig &&
-        targetConfig.contains(IREE::Encoding::kEncodingResolverAttrName)) {
+    if (targetConfig.contains(IREE::Encoding::kEncodingResolverAttrName)) {
       layoutAttr = targetConfig.getAs<IREE::Codegen::LayoutAttrInterface>(
           IREE::Encoding::kEncodingResolverAttrName);
+      auto resolverAttr =
+          cast<IREE::Encoding::EncodingLayoutResolverAttrInterface>(layoutAttr);
+      layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
+          resolverAttr.cloneWithSimplifiedConfig(targetConfig));
     } else {
       layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
-          IREE::GPU::GPUPadLayoutAttr::get(context,
-                                           /*cacheLineBytes=*/128,
-                                           /*cacheSets=*/4));
+          IREE::Codegen::EncodingNopLayoutAttr::get(context));
     }
 
     RewritePatternSet materializeEncodingPattern(context);
