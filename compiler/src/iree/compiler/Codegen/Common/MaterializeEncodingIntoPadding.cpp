@@ -301,7 +301,8 @@ struct MaterializeEncodingIntoPaddingPass final
     //
     // Otherwise, fall back to the nop layout.
     IREE::Codegen::LayoutAttrInterface layoutAttr;
-    if (targetConfig.contains(IREE::Encoding::kEncodingResolverAttrName)) {
+    if (targetConfig &&
+        targetConfig.contains(IREE::Encoding::kEncodingResolverAttrName)) {
       layoutAttr = targetConfig.getAs<IREE::Codegen::LayoutAttrInterface>(
           IREE::Encoding::kEncodingResolverAttrName);
       auto resolverAttr =
