@@ -449,11 +449,36 @@ def IREEGPU_YieldOp : Op<IREEGPU_Dialect, "yield", [
      This operation is used to yield values from a within a region.
   }];
 
-  let arguments = (ins Variadic<AnyType>:$values);
+  let arguments = (ins  Variadic<AnyRankedTensorOrVector>:$inputs);
+  let results   = (outs Variadic<AnyRankedTensorOrVector>:$results);
   let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
 
   let assemblyFormat =
       [{  attr-dict ($values^ `:` type($values))? }];
+}
+
+//===----------------------------------------------------------------------===//
+// GlobalLoadDMAOp
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_GlobalLoadDMA : Op<IREEGPU_Dialect, "global_load_dma", [
+    ]> {
+  let summary = "Does a global load DMA operation";
+  let description = [{
+    TODO: Add description
+  }];
+
+  let arguments = (ins  Variadic<AnyRankedTensorOrVector>:$inputs);
+  let results   = (outs Variadic<AnyRankedTensorOrVector>:$results);
+  let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
+
+  let assemblyFormat = [{
+    $inputs attr-dict `:` type($inputs)
+  }];
+
+  let builders = [
+    OpBuilder<(ins "ValueRange":$inputs)>
+  ];
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREEGPUOPS
