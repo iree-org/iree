@@ -77,7 +77,7 @@ util.func public @_main(%arg0: tensor<1x33x33x480xf32>, %arg1: tensor<3x3x480x1x
 // CHECK-NOT: tensor.pad
 // SKIP: tensor.pad
 
-// ----
+// -----
 
 #encoding = #iree_encoding.testing_encoding<>
 util.func public @dispatch_dispatch_0_generic_512x1024_f32(
@@ -105,3 +105,24 @@ util.func public @dispatch_dispatch_0_generic_512x1024_f32(
 // CHECK:    %[[PAD:.+]] = tensor.pad %[[LOAD]] low
 // CHECK:    %[[ENCODE:.+]] = iree_encoding.set_encoding %[[PAD]] : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING]]>
 // CHECK:    flow.dispatch.tensor.store %[[ENCODE]],
+
+// -----
+
+// Do not break up pad within dispatches.
+
+util.func @pad_within_dispatch(%arg0 : tensor<500x1000xf32>) -> tensor<512x1024xf32> {
+  %cst = arith.constant 0.0 : f32
+  %0 = flow.dispatch.region -> (tensor<512x1024xf32>) {
+    %1 = tensor.pad %arg0 low [0, 0] high[12, 24] {
+    ^bb0(%arg1 : index, %arg2 : index):
+      tensor.yield %cst : f32
+    } : tensor<500x1000xf32> to tensor<512x1024xf32>
+    flow.return %1 : tensor<512x1024xf32>
+  }
+  util.return %0 : tensor<512x1024xf32>
+}
+// CHECK-LABEL: func public @pad_within_dispatch
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[PAD:.+]] = tensor.pad
+//       CHECK:     flow.return %[[PAD]]
+//       CHECK:   return %[[DISPATCH]]
