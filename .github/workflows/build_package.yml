@@ -99,7 +99,7 @@ jobs:
           cat ./c/runtime/version_local.json
 
       - name: Upload version_local.json
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: version_local
           path: |
@@ -207,7 +207,7 @@ jobs:
       ##########################################################################
 
       - name: Download version_local.json
-        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
         with:
           name: version_local
           path: ./c/
@@ -343,7 +343,7 @@ jobs:
             "${MANYLINUX_X86_64_IMAGE}" \
             bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
 
-      - uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: wheels-${{ matrix.build-family }}-${{ matrix.build-package }}
           # We upload all wheels (which includes deps so that subsequent

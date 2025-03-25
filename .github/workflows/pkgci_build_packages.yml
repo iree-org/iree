@@ -74,7 +74,7 @@ jobs:
           cat runtime/version_local.json
 
       - name: Enable cache
-        uses: actions/cache@d4323d4df104b026a6aa633fdb11d772146be0bf # v4.2.2
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: ${{ env.CACHE_DIR }}
           key: iree-pkgci-linux-release-x86_64-v1-${{ github.sha }}
@@ -97,7 +97,7 @@ jobs:
           # permissions. Take them back.
           sudo chown -R "$(whoami)" "${cache_dir}"
       - name: Upload wheel artifacts
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: linux_x86_64_release_packages
           path: |
@@ -138,7 +138,7 @@ jobs:
 #         realpath version_info.json
 #         cat version_info.json
 #     - name: Enable cache
-#       uses: actions/cache@d4323d4df104b026a6aa633fdb11d772146be0bf # v4.2.2
+#       uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
 #       with:
 #         path: ${{ env.CACHE_DIR }}
 #         key: iree-pkgci-linux-release-asserts-x86_64-v1-${{ github.sha }}
@@ -161,7 +161,7 @@ jobs:
 #         # permissions. Take them back.
 #         sudo chown -R "$(whoami)" "${cache_dir}"
 #     - name: Upload wheel artifacts
-#       uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+#       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
 #       with:
 #         name: linux_x86_64_release_asserts_packages
 #         path: |
