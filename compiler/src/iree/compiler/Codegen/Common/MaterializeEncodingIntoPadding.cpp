@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -291,11 +292,9 @@ struct MaterializeEncodingIntoPaddingPass final
     } else {
       IREE::GPU::TargetAttr targetAttr = getCLGPUTarget(context);
       SmallVector<NamedAttribute> items;
-      items.emplace_back(IREE::Encoding::kEncodingResolverAttrName,
-                         IREE::GPU::GPUPadLayoutAttr::get(
-                             context, /*cacheLineBytes=*/std::nullopt,
-                             /*cacheSets=*/std::nullopt));
-      items.emplace_back(kGPUTargetAttrName, targetAttr);
+      items.emplace_back(
+          IREE::Encoding::kEncodingResolverAttrName,
+          IREE::GPU::getHIPTargetEncodingLayoutAttr(targetAttr, "pad"));
       targetConfig = DictionaryAttr::get(context, items);
     }
 
