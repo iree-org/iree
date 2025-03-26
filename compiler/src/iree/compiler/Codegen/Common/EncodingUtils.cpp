@@ -106,13 +106,13 @@ MemRefFlatteningConverter::MemRefFlatteningConverter(mlir::MLIRContext *ctx) {
 
     mlir::Type elementType = memrefType.getElementType();
     ArrayRef<int64_t> shape = memrefType.getShape();
-    
+
     // Calculate the total size of the memref in elements.
     int64_t totalSize = 1;
     for (int64_t dim : shape) {
       totalSize *= dim;
     }
-    
+
     // Create a new memref type with a single dimension equal to the total size.
     return MemRefType::get({totalSize}, elementType);
   });
