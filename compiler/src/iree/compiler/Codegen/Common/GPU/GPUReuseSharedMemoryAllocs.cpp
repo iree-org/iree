@@ -45,6 +45,10 @@ static LivenessRange getLivenessRange(memref::AllocOp alloc,
         workList.push_back(user);
         continue;
       }
+      // Skip deallocations as they don't affect the liveness range.
+      if (isa<memref::DeallocOp>(user)) {
+        continue;
+      }
       Operation *userAncestor = parentRegion.findAncestorOpInRegion(*user);
       if (!begin && !end) {
         begin = end = userAncestor;
@@ -100,6 +104,12 @@ static LogicalResult populateLivenessRanges(
   for (memref::AllocOp alloc : sharedMemAllocs) {
     LivenessRange livenessRange =
         getLivenessRange(alloc, dominanceInfo, rootOp->getRegion(0));
+    LLVM_DEBUG({
+      llvm::dbgs() << "Range: \n";
+      llvm::dbgs() << "Alloc: " << alloc << "\n";
+      llvm::dbgs() << "Begin: " << *livenessRange.first << "\n";
+      llvm::dbgs() << "End: " << *livenessRange.second << "\n";
+    });
     livenessMap.insert(std::make_pair(alloc, livenessRange));
     allocs.push_back(alloc);
   }
