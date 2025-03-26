@@ -82,20 +82,20 @@ struct MaterializePadEncodingTypeConverter final
       // tensor type without encodings.
       return type.dropEncoding();
     });
-    addConversion([&](IREE::Flow::DispatchTensorType dispatchTensorType)
-                      -> IREE::Flow::DispatchTensorType {
-      auto type = dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
-      if (!type) {
-        return dispatchTensorType;
-      }
-      // The incoming bindings have the padded type, if `pad_encoding_layout` is
-      // present.
-      if (getPadLayout(type)) {
-        type = getPaddedType(type);
-      }
-      return IREE::Flow::DispatchTensorType::get(dispatchTensorType.getAccess(),
-                                                 type);
-    });
+    addConversion(
+        [&](IREE::Encoding::EncodingTypeInterface encodingType) -> Type {
+          auto type =
+              dyn_cast<RankedTensorType>(encodingType.getEncodingType());
+          if (!type) {
+            return encodingType;
+          }
+          // The incoming bindings have the padded type, if
+          // `pad_encoding_layout` is present.
+          if (getPadLayout(type)) {
+            type = getPaddedType(type);
+          }
+          return encodingType.updateEncodingType(type);
+        });
   }
 };
 
@@ -116,18 +116,23 @@ struct MaterializeFlowDispatchTensorLoadOp final
       return rewriter.notifyMatchFailure(loadOp, "unhandled partial loads");
     }
 
-    IREE::Flow::DispatchTensorType sourceType = loadOp.getSourceType();
-    auto boundTensorType = cast<RankedTensorType>(sourceType.getBoundType());
-    if (!hasNonZeroPadding(boundTensorType)) {
+    auto sourceType =
+        dyn_cast<IREE::Encoding::EncodingTypeInterface>(loadOp.getSourceType());
+    if (!sourceType) {
+      return rewriter.notifyMatchFailure(
+          loadOp, "expected source type to implement EncodingTypeInterface");
+    }
+
+    auto tensorType = cast<RankedTensorType>(sourceType.getEncodingType());
+    if (!hasNonZeroPadding(tensorType)) {
       // Let the Nop pattern handle this.
       return rewriter.notifyMatchFailure(loadOp, "no padding applied");
     }
 
     auto &typeConverter =
         *getTypeConverter<MaterializePadEncodingTypeConverter>();
-    auto paddedType =
-        typeConverter.convertType<RankedTensorType>(boundTensorType);
-    assert(paddedType != boundTensorType && "Expected conversion with padding");
+    auto paddedType = typeConverter.convertType<RankedTensorType>(tensorType);
+    assert(paddedType != tensorType && "Expected conversion with padding");
 
     SmallVector<OpFoldResult> newMixedSizes =
         getMixedValues(paddedType.getShape(), loadOp.getSourceDims(), rewriter);
@@ -144,10 +149,10 @@ struct MaterializeFlowDispatchTensorLoadOp final
     Value newLoad = rewriter.create<IREE::Flow::DispatchTensorLoadOp>(
         loc, adaptor.getSource(), newDynamicDims, newOffsets, newMixedSizes,
         newStrides);
-    auto extractType = RankedTensorType::get(boundTensorType.getShape(),
-                                             boundTensorType.getElementType());
-    SmallVector<OpFoldResult> extractSizes = getMixedValues(
-        boundTensorType.getShape(), loadOp.getSourceDims(), rewriter);
+    auto extractType = RankedTensorType::get(tensorType.getShape(),
+                                             tensorType.getElementType());
+    SmallVector<OpFoldResult> extractSizes =
+        getMixedValues(tensorType.getShape(), loadOp.getSourceDims(), rewriter);
     rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
         loadOp, extractType, newLoad, newOffsets, extractSizes, newStrides);
     return success();
@@ -171,18 +176,29 @@ struct MaterializeFlowDispatchTensorStoreOp final
       return rewriter.notifyMatchFailure(storeOp, "unhandled partial stores");
     }
 
-    IREE::Flow::DispatchTensorType targetType = storeOp.getTargetType();
-    auto boundTensorType = cast<RankedTensorType>(targetType.getBoundType());
-    if (!hasNonZeroPadding(boundTensorType)) {
+    auto targetType = dyn_cast<IREE::Encoding::EncodingTypeInterface>(
+        storeOp.getTargetType());
+    if (!targetType) {
+      return rewriter.notifyMatchFailure(
+          storeOp, "expected target type to implement EncodingTypeInterface");
+    }
+
+    auto tensorType = cast<RankedTensorType>(targetType.getEncodingType());
+    if (!hasNonZeroPadding(tensorType)) {
       // Let the Nop pattern handle this.
       return rewriter.notifyMatchFailure(storeOp, "no padding applied");
     }
 
     auto &typeConverter =
         *getTypeConverter<MaterializePadEncodingTypeConverter>();
-    IREE::Flow::DispatchTensorType newTargetType =
-        typeConverter.convertType<IREE::Flow::DispatchTensorType>(targetType);
-    RankedTensorType paddedType = newTargetType.asRankedTensorType();
+    auto newTargetType =
+        typeConverter.convertType<IREE::Encoding::EncodingTypeInterface>(
+            targetType);
+    auto paddedType =
+        dyn_cast<RankedTensorType>(newTargetType.getEncodingType());
+    if (!paddedType) {
+      return rewriter.notifyMatchFailure(storeOp, "failed to get paddedType");
+    }
 
     Location loc = storeOp.getLoc();
     SmallVector<Value> dynamicResultSizes{storeOp->getOperands()};
@@ -227,11 +243,11 @@ struct MaterializeInterfaceBindingEncoding
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto resultType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
-        subspanOp.getResult().getType());
+    auto resultType = llvm::dyn_cast<IREE::Encoding::EncodingTypeInterface>(
+        subspanOp.getType());
     if (!resultType) {
       return rewriter.notifyMatchFailure(
-          subspanOp, "expected result type to be !flow.dispatch.tensor");
+          subspanOp, "expected result type to implement EncodingTypeInterface");
     }
     auto newResultType = getTypeConverter()->convertType(resultType);
     SmallVector<Value> newDynamicDims = subspanOp.getDynamicDims();
