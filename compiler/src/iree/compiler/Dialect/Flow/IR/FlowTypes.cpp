@@ -119,6 +119,14 @@ bool DispatchTensorType::hasStaticShape(ArrayRef<int64_t> shape) const {
 
 Type DispatchTensorType::getEncodingType() const { return getBoundType(); }
 
+Type DispatchTensorType::updateEncodingType(Type type) const {
+  return DispatchTensorType::get(getAccess(), type);
+}
+
+Attribute DispatchTensorType::getEncoding() const {
+  return asRankedTensorType().getEncoding();
+}
+
 Type DispatchTensorType::updateEncoding(Attribute encoding) const {
   return DispatchTensorType::get(getAccess(), getShape(), getBoundElementType(),
                                  encoding);
