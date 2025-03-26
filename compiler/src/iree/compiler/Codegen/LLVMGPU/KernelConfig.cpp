@@ -279,31 +279,34 @@ static bool hasReductionIterator(linalg::LinalgOp &op) {
 
 // Get the bitwidth of the operation.
 static FailureOr<int64_t> getBitWidth(linalg::LinalgOp op) {
-
   Value init = op.getDpsInitOperand(0)->get();
   Value src = op.getDpsInputOperand(0)->get();
   Type initElemType = getElementTypeOrSelf(init);
   Type srcElemType = getElementTypeOrSelf(src);
 
   if (auto initOp = init.getDefiningOp<linalg::GenericOp>()) {
-    if (IREE::LinalgExt::isBitExtendOp(initOp))
+    if (IREE::LinalgExt::isBitExtendOp(initOp)) {
       initElemType = getElementTypeOrSelf(initOp.getDpsInputs()[0]);
+    }
   }
 
   if (auto srcOp = src.getDefiningOp<linalg::GenericOp>()) {
-    if (IREE::LinalgExt::isBitExtendOp(srcOp))
+    if (IREE::LinalgExt::isBitExtendOp(srcOp)) {
       srcElemType = getElementTypeOrSelf(srcOp.getDpsInputs()[0]);
+    }
   }
 
-  if (!initElemType.isIntOrFloat() || !srcElemType.isIntOrFloat())
+  if (!initElemType.isIntOrFloat() || !srcElemType.isIntOrFloat()) {
     return failure();
+  }
 
   int64_t bitWidth = std::min(initElemType.getIntOrFloatBitWidth(),
                               srcElemType.getIntOrFloatBitWidth());
 
   // Reduction distribution only supports 8/16/32 bit types now.
-  if (!llvm::is_contained({8, 16, 32}, bitWidth))
+  if (!llvm::is_contained({8, 16, 32}, bitWidth)) {
     return failure();
+  }
 
   return bitWidth;
 }
@@ -322,18 +325,20 @@ static LogicalResult
 setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                                      mlir::FunctionOpInterface entryPoint,
                                      linalg::LinalgOp op) {
+  MLIRContext *context = op.getContext();
+  OpBuilder b(context);
 
-  int64_t countReduction = 0;
+  int64_t numReductionOps = 0;
 
   // TODO(pashu123): Remove this check and allow multiple reductions in a single
   // dispatch.
   WalkResult walkResult = entryPoint.walk([&](Operation *op) {
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
       if (hasReductionIterator(linalgOp)) {
-        countReduction++;
+        ++numReductionOps;
       }
     }
-    if (countReduction > 1) {
+    if (numReductionOps > 1) {
       return WalkResult::interrupt();
     }
     return WalkResult::advance();
@@ -347,6 +352,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   //  dimension which will fail the distribution analysis.
   for (auto potentialLinalgUser : op->getUsers()) {
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(potentialLinalgUser)) {
+      DBGS() << "no consumer allowed for the reduction op\n";
       return failure();
     }
   }
@@ -385,8 +391,8 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> partialReductionTileSizes(op.getNumLoops(), 0);
   SmallVector<int64_t> threadCounts(op.getNumLoops(), 1);
   SmallVector<int64_t> subgroupCounts(op.getNumLoops(), 1);
-  SmallVector<int64_t> mapping(op.getNumLoops());
-  std::iota(mapping.begin(), mapping.end(), 0);
+  SmallVector<int64_t> mapping =
+      llvm::to_vector(llvm::seq<int64_t>(0, op.getNumLoops()));
 
   int64_t lastReductionDim = reductionDims.back();
 
@@ -425,8 +431,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   }
 
   const std::optional<int64_t> maxLoadBits = wgp.getMaxLoadInstructionBits();
-  const unsigned largestLoadSizeInBits =
-      maxLoadBits.has_value() ? *maxLoadBits : 128;
+  const unsigned largestLoadSizeInBits = maxLoadBits.value_or(128);
 
   int64_t lastDimReductionSize = bounds[reductionDims.back()];
 
@@ -435,8 +440,10 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // TODO: This is a temporary heuristic to ensure that the last dimension is
   // divisible by the number of vector loads per thread.
-  if (lastDimReductionSize % threadLoads != 0)
+  if (lastDimReductionSize % threadLoads != 0) {
+    DBGS() << "reduction dim isn't a multiple of threadLoads\n";
     return failure();
+  }
 
   // The partial reduction would be no. of lanes (i.e., subgroup size) * #vector
   // loads.
@@ -450,9 +457,6 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   partialReductionTileSizes[lastReductionDim] = partialReductionSize;
   threadTileSizes[lastReductionDim] = threadLoads;
   threadCounts[lastReductionDim] = threadBasis;
-
-  auto context = op.getContext();
-  Builder b(context);
 
   ArrayAttr subgroupBasisAttr = b.getArrayAttr(
       {b.getI64ArrayAttr(subgroupCounts), b.getI64ArrayAttr(mapping)});
