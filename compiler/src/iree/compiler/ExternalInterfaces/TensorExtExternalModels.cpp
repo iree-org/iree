@@ -54,6 +54,17 @@ struct EncodingTypeExternalModel
     return dispatchTensorType.getBoundType();
   }
 
+  Type updateEncodingType(Type type, Type newEncodingType) const {
+    auto dispatchTensorType = cast<IREE::TensorExt::DispatchTensorType>(type);
+    return IREE::TensorExt::DispatchTensorType::get(
+        dispatchTensorType.getAccess(), newEncodingType);
+  }
+
+  Attribute getEncoding(Type type) const {
+    auto dispatchTensorType = cast<IREE::TensorExt::DispatchTensorType>(type);
+    return dispatchTensorType.asRankedTensorType().getEncoding();
+  }
+
   Type updateEncoding(Type type, Attribute encoding) const {
     auto dispatchTensorType = cast<IREE::TensorExt::DispatchTensorType>(type);
     return IREE::TensorExt::DispatchTensorType::get(

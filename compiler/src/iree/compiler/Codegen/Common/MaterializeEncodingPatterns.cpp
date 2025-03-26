@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -492,23 +493,21 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
 /// returns the materialized shape of the `dispatchTensorType`. The
 /// dynamic dimensions of the `dispatchTensorType` are provided in
 /// `dynamicDims`.
-static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
+static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForTensorEncoding(
     OpBuilder &builder, Location loc,
     const MaterializeEncodingTypeConverter &typeConverter,
-    IREE::TensorExt::DispatchTensorType dispatchTensorType,
-    ValueRange dynamicDims,
+    IREE::Encoding::EncodingTypeInterface encodedType, ValueRange dynamicDims,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
-  auto boundTensorType =
-      llvm::dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
-  if (!boundTensorType) {
+  auto type = dyn_cast<RankedTensorType>(encodedType.getEncodingType());
+  if (!type) {
     return failure();
   }
 
   MaterializeEncodingInfo encodingInfo;
-  if (auto maybeEncodingInfo = getEncodingInfoFromLayouts(boundTensorType)) {
+  if (auto maybeEncodingInfo = getEncodingInfoFromLayouts(type)) {
     encodingInfo = maybeEncodingInfo.value();
   } else {
-    encodingInfo = typeConverter.getEncodingInfo(boundTensorType);
+    encodingInfo = typeConverter.getEncodingInfo(type);
   }
 
   if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
@@ -516,9 +515,9 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
   }
 
   SmallVector<OpFoldResult> targetShape =
-      getMixedValues(boundTensorType.getShape(), dynamicDims, builder);
-  auto innerTileSizes = getInnerTileSizesOfr(
-      builder, loc, boundTensorType, encodingInfo, materializeEncodingValueFn);
+      getMixedValues(type.getShape(), dynamicDims, builder);
+  auto innerTileSizes = getInnerTileSizesOfr(builder, loc, type, encodingInfo,
+                                             materializeEncodingValueFn);
   if (failed(innerTileSizes)) {
     return failure();
   }
@@ -536,13 +535,11 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
 static FailureOr<SmallVector<Value>> getPackedDynamicDimsForDispatchTensor(
     OpBuilder &builder, Location loc,
     const MaterializeEncodingTypeConverter &typeConverter,
-    IREE::TensorExt::DispatchTensorType dispatchTensorType,
-    ValueRange dynamicDims,
+    IREE::Encoding::EncodingTypeInterface encodedType, ValueRange dynamicDims,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
   FailureOr<SmallVector<OpFoldResult>> convertedTargetShape =
-      getPackedDimsForDispatchTensor(builder, loc, typeConverter,
-                                     dispatchTensorType, dynamicDims,
-                                     materializeEncodingValueFn);
+      getPackedDimsForTensorEncoding(builder, loc, typeConverter, encodedType,
+                                     dynamicDims, materializeEncodingValueFn);
   if (failed(convertedTargetShape)) {
     return failure();
   }
@@ -567,23 +564,16 @@ struct MaterializeInterfaceBindingEncoding
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto resultType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
-        subspanOp.getResult().getType());
-    if (!resultType) {
+    auto encodedType =
+        dyn_cast<IREE::Encoding::EncodingTypeInterface>(subspanOp.getType());
+    if (!encodedType) {
       return rewriter.notifyMatchFailure(
-          subspanOp,
-          "expected result type to be !iree_tensor_ext.dispatch.tensor");
+          subspanOp, "expected result type to implement EncodingTypeInterface");
     }
-    auto boundTensorType =
-        llvm::dyn_cast<RankedTensorType>(resultType.getBoundType());
-    if (!boundTensorType) {
+    auto tensorType = dyn_cast<RankedTensorType>(encodedType.getEncodingType());
+    if (!tensorType) {
       return rewriter.notifyMatchFailure(
-          subspanOp, "bound type is not a RankedTensorType");
-    }
-
-    auto convertedBoundType = getTypeConverter()->convertType(boundTensorType);
-    if (convertedBoundType == boundTensorType) {
-      return rewriter.notifyMatchFailure(subspanOp, "bound type already valid");
+          subspanOp, "encoding type is not a RankedTensorType");
     }
 
     auto *typeConverter = static_cast<const MaterializeEncodingTypeConverter *>(
@@ -593,15 +583,14 @@ struct MaterializeInterfaceBindingEncoding
     SmallVector<Value> newDynamicDims = subspanOp.getDynamicDims();
     FailureOr<SmallVector<Value>> convertedDynamicDims =
         getPackedDynamicDimsForDispatchTensor(
-            rewriter, loc, *typeConverter, resultType,
+            rewriter, loc, *typeConverter, encodedType,
             subspanOp.getDynamicDims(), this->materializeEncodingValueFn);
     // Drop the encoding if the target does not support it.
     if (succeeded(convertedDynamicDims)) {
       newDynamicDims = convertedDynamicDims.value();
     }
 
-    auto newResultType = IREE::TensorExt::DispatchTensorType::get(
-        resultType.getAccess(), convertedBoundType);
+    Type newResultType = typeConverter->convertType(encodedType);
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
         subspanOp, newResultType, subspanOp.getLayout(), subspanOp.getBinding(),
         subspanOp.getByteOffset(), newDynamicDims, subspanOp.getAlignmentAttr(),
@@ -629,19 +618,21 @@ struct MaterializeTensorExtDispatchTensorLoadOp
       return rewriter.notifyMatchFailure(loadOp, "unhandled partial loads");
     }
 
-    auto sourceType = loadOp.getSourceType();
-    auto boundTensorType = cast<RankedTensorType>(sourceType.getBoundType());
+    auto sourceType =
+        dyn_cast<IREE::Encoding::EncodingTypeInterface>(loadOp.getSourceType());
+    if (!sourceType) {
+      return rewriter.notifyMatchFailure(
+          loadOp, "expected source type to implement EncodingTypeInterface");
+    }
+    auto tensorType = cast<RankedTensorType>(sourceType.getEncodingType());
     auto *typeConverter = static_cast<const MaterializeEncodingTypeConverter *>(
         getTypeConverter());
-    if (typeConverter->convertType(boundTensorType) == boundTensorType) {
-      return rewriter.notifyMatchFailure(loadOp, "bound type already valid");
-    }
 
     Location loc = loadOp.getLoc();
-    SmallVector<OpFoldResult> newMixedSizes = getMixedValues(
-        boundTensorType.getShape(), loadOp.getSourceDims(), rewriter);
+    SmallVector<OpFoldResult> newMixedSizes =
+        getMixedValues(tensorType.getShape(), loadOp.getSourceDims(), rewriter);
     FailureOr<SmallVector<OpFoldResult>> convertedMixedSizes =
-        getPackedDimsForDispatchTensor(rewriter, loc, *typeConverter,
+        getPackedDimsForTensorEncoding(rewriter, loc, *typeConverter,
                                        sourceType, loadOp.getSourceDims(),
                                        this->materializeEncodingValueFn);
     if (succeeded(convertedMixedSizes)) {
@@ -681,20 +672,22 @@ struct MaterializeTensorExtDispatchTensorStoreOp
       return rewriter.notifyMatchFailure(storeOp, "unhandled partial stores");
     }
 
-    auto targetType = storeOp.getTargetType();
-    auto boundTensorType = cast<RankedTensorType>(targetType.getBoundType());
+    auto targetType = dyn_cast<IREE::Encoding::EncodingTypeInterface>(
+        storeOp.getTargetType());
+    if (!targetType) {
+      return rewriter.notifyMatchFailure(
+          storeOp, "expected target type to implement EncodingTypeInterface");
+    }
+
+    auto tensorType = cast<RankedTensorType>(targetType.getEncodingType());
     auto *typeConverter = static_cast<const MaterializeEncodingTypeConverter *>(
         getTypeConverter());
 
-    if (typeConverter->convertType(boundTensorType) == boundTensorType) {
-      return rewriter.notifyMatchFailure(storeOp, "bound type already valid");
-    }
-
     Location loc = storeOp.getLoc();
     SmallVector<OpFoldResult> newMixedSizes = getMixedValues(
-        boundTensorType.getShape(), storeOp.getTargetDims(), rewriter);
+        tensorType.getShape(), storeOp.getTargetDims(), rewriter);
     FailureOr<SmallVector<OpFoldResult>> convertedMixedSizes =
-        getPackedDimsForDispatchTensor(rewriter, loc, *typeConverter,
+        getPackedDimsForTensorEncoding(rewriter, loc, *typeConverter,
                                        targetType, storeOp.getTargetDims(),
                                        this->materializeEncodingValueFn);
     if (succeeded(convertedMixedSizes)) {
@@ -997,13 +990,15 @@ void populateMaterializeEncodingPatterns(
     MaterializeEncodingValueFn materializeEncodingValueFn) {
   MLIRContext *context = patterns.getContext();
   target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
-      [&typeConverter](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-        auto resultType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
+      [](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
+        auto resultType = dyn_cast<IREE::Encoding::EncodingTypeInterface>(
             subspanOp.getResult().getType());
-        // For types that are not `TensorExt::DispatchTensorType` mark as legal.
-        if (!resultType)
+        // For types that do not implement `EncodingTypeInterface` mark as
+        // legal.
+        if (!resultType) {
           return true;
-        return resultType == typeConverter.convertType(resultType);
+        }
+        return resultType.getEncoding() ? false : true;
       });
 
   patterns.insert<MaterializeContractionOp, SetEncodingOpLoweringConversion,
