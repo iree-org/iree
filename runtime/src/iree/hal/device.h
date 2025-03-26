@@ -154,6 +154,33 @@ enum iree_hal_semaphore_compatibility_bits_t {
       IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_SIGNAL,
 };
 
+// Bitfield specifying flags controlling an async allocation operation.
+typedef uint64_t iree_hal_alloca_flags_t;
+enum iree_hal_alloca_flag_bits_t {
+  IREE_HAL_ALLOCA_FLAG_NONE = 0,
+
+  // Buffer lifetime is indeterminate indicating that the compiler or
+  // application allocating the buffer is unable to determine when it is safe to
+  // deallocate the buffer. Explicit deallocation requests are ignored and the
+  // buffer deallocation will happen synchronously when the last remaining
+  // reference to the buffer is released.
+  IREE_HAL_ALLOCA_FLAG_INDETERMINATE_LIFETIME = 1ull << 0,
+};
+
+// Bitfield specifying flags controlling an async deallocation operation.
+typedef uint64_t iree_hal_dealloca_flags_t;
+enum iree_hal_dealloca_flag_bits_t {
+  IREE_HAL_DEALLOCA_FLAG_NONE = 0,
+
+  // The provided device and queue affinity will be overridden with the origin
+  // of the allocation as defined by the placement, if available.
+  // If the buffer has no origin device (imported heap buffers and other rare
+  // cases) or was not allocated asynchronously the provided device and queue
+  // affinity will be used to insert a queue barrier. Callers must ensure the
+  // provided device is compatible with the fences provided.
+  IREE_HAL_DEALLOCA_FLAG_PREFER_ORIGIN = 1ull << 0,
+};
+
 // Bitfield specifying flags controlling a file read operation.
 typedef uint64_t iree_hal_read_flags_t;
 enum iree_hal_read_flag_bits_t {
@@ -292,7 +319,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_alloca(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size,
+    iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 
 // Deallocates a queue-ordered transient buffer.
@@ -300,16 +327,18 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_alloca(
 // been reached. Once the storage is available for reuse the
 // |signal_semaphore_list| will be signaled. After all waits have been resolved
 // the contents of the buffer are immediately undefined even if the signal has
-// not yet occurred.
+// not yet occurred. If the buffer was not allocated asynchronously a barrier
+// will be inserted to preserve fence timelines.
 //
 // Deallocations will only be queue-ordered if the |buffer| was originally
 // allocated with iree_hal_device_queue_alloca. Any synchronous allocations will
-// be ignored and deallocated when the |buffer| has been released.
+// be ignored and deallocated when the |buffer| has been released but a queue
+// barrier will be inserted to preserve the timeline.
 IREE_API_EXPORT iree_status_t iree_hal_device_queue_dealloca(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_buffer_t* buffer);
+    iree_hal_buffer_t* buffer, iree_hal_dealloca_flags_t flags);
 
 // Enqueues a single queue-ordered fill operation.
 // The |target_buffer| must be visible to the device queue performing the fill.
@@ -586,14 +615,14 @@ typedef struct iree_hal_device_vtable_t {
       const iree_hal_semaphore_list_t wait_semaphore_list,
       const iree_hal_semaphore_list_t signal_semaphore_list,
       iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
-      iree_device_size_t allocation_size,
+      iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
       iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 
   iree_status_t(IREE_API_PTR* queue_dealloca)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
       const iree_hal_semaphore_list_t wait_semaphore_list,
       const iree_hal_semaphore_list_t signal_semaphore_list,
-      iree_hal_buffer_t* buffer);
+      iree_hal_buffer_t* buffer, iree_hal_dealloca_flags_t flags);
 
   iree_status_t(IREE_API_PTR* queue_fill)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,

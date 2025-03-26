@@ -104,16 +104,18 @@ util.func public @device_queue_alloca(
     // CHECK-SAME: %[[SIZE_I32:.+]]: i32)
     %size: index) -> !hal.buffer {
   %c100_i64 = arith.constant 100 : i64
+  // CHECK: %[[FLAGS:.+]] = vm.const.i64.zero
   // CHECK: %[[SIZE_I64:.+]] = vm.ext.i32.i64.s %[[SIZE_I32]]
   // CHECK: = vm.call @hal.device.queue.alloca(
   // CHECK-SAME: %[[DEVICE]], %[[AFFINITY]],
   // CHECK-SAME: %[[WAIT_FENCE]], %[[SIGNAL_FENCE]],
-  // CHECK-SAME: %c100, %c48, %c3, %[[SIZE_I64]])
+  // CHECK-SAME: %c100, %c48, %c3, %[[SIZE_I64]], %[[FLAGS]])
   %buffer = hal.device.queue.alloca<%device : !hal.device>
       affinity(%affinity)
       wait(%wait_fence) signal(%signal_fence)
       pool(%c100_i64)
       type(DeviceLocal) usage(Transfer)
+      flags(None)
       : !hal.buffer{%size}
   util.return %buffer : !hal.buffer
 }
@@ -128,14 +130,17 @@ util.func public @device_queue_dealloca(
     %wait_fence: !hal.fence, %signal_fence: !hal.fence,
     // CHECK-SAME: %[[BUFFER:.+]]: !vm.ref<!hal.buffer>)
     %buffer: !hal.buffer) {
+  // CHECK-DAG: %[[FLAGS:.+]] = vm.const.i64.zero
   // CHECK: vm.call @hal.device.queue.dealloca(
   // CHECK-SAME: %[[DEVICE]], %[[AFFINITY]],
   // CHECK-SAME: %[[WAIT_FENCE]], %[[SIGNAL_FENCE]],
-  // CHECK-SAME: %[[BUFFER]])
+  // CHECK-SAME: %[[BUFFER]],
+  // CHECK-SAME: %[[FLAGS]])
   hal.device.queue.dealloca<%device : !hal.device>
       affinity(%affinity)
       wait(%wait_fence) signal(%signal_fence)
       buffer(%buffer : !hal.buffer)
+      flags(None)
   util.return
 }
 

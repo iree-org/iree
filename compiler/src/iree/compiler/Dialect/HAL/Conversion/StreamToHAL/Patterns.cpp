@@ -128,6 +128,12 @@ struct ResourceAllocaOpPattern
       return failure();
     }
 
+    // Behavior flags.
+    IREE::HAL::AllocaFlagBitfield flags = IREE::HAL::AllocaFlagBitfield::None;
+    if (allocaOp.getIndeterminateLifetime()) {
+      flags = flags | IREE::HAL::AllocaFlagBitfield::IndeterminateLifetime;
+    }
+
     // Gather wait/signal fence, which are optional.
     Value waitFence =
         getOrCreateWaitFence(loc, adaptor.getAwaitTimepoint(), rewriter);
@@ -138,7 +144,7 @@ struct ResourceAllocaOpPattern
     auto pool = rewriter.create<arith::ConstantIntOp>(loc, 0, 64);
     auto allocateOp = rewriter.create<IREE::HAL::DeviceQueueAllocaOp>(
         loc, bufferType, device, queueAffinity, waitFence, signalFence, pool,
-        memoryTypes, bufferUsage, adaptor.getStorageSize());
+        memoryTypes, bufferUsage, adaptor.getStorageSize(), flags);
 
     rewriter.replaceOp(allocaOp, {allocateOp.getResult(), signalFence});
     return success();
@@ -162,12 +168,55 @@ struct ResourceDeallocaOpPattern
     Value signalFence = getOrCreateSignalFence(
         loc, device, deallocaOp.getResultTimepoint(), rewriter);
 
+    // Route to the origin of the allocation (if available).
+    IREE::HAL::DeallocaFlagBitfield flags =
+        IREE::HAL::DeallocaFlagBitfield::None;
+    if (deallocaOp.getPreferOrigin()) {
+      flags = flags | IREE::HAL::DeallocaFlagBitfield::PreferOrigin;
+    }
+
     // Queue deallocation.
     rewriter.create<IREE::HAL::DeviceQueueDeallocaOp>(
         loc, device, queueAffinity, waitFence, signalFence,
-        adaptor.getOperand());
+        adaptor.getOperand(), flags);
 
     rewriter.replaceOp(deallocaOp, {signalFence});
+    return success();
+  }
+};
+
+struct ResourceRetainOpPattern
+    : public StreamConversionPattern<IREE::Stream::ResourceRetainOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ResourceRetainOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::HAL::BufferAllocationPreserveOp>(
+        op, adaptor.getOperand());
+    return success();
+  }
+};
+
+struct ResourceReleaseOpPattern
+    : public StreamConversionPattern<IREE::Stream::ResourceReleaseOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ResourceReleaseOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::HAL::BufferAllocationDiscardOp>(
+        op, rewriter.getI1Type(), adaptor.getOperand());
+    return success();
+  }
+};
+
+struct ResourceIsTerminalOpPattern
+    : public StreamConversionPattern<IREE::Stream::ResourceIsTerminalOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ResourceIsTerminalOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::HAL::BufferAllocationIsTerminalOp>(
+        op, rewriter.getI1Type(), adaptor.getOperand());
     return success();
   }
 };
@@ -1544,10 +1593,11 @@ void populateStreamToHALPatterns(MLIRContext *context,
   patterns.insert<ContextResolveOpPattern>(mapping, typeConverter, context);
 
   patterns.insert<ResourceAllocOpPattern, ResourceAllocaOpPattern,
-                  ResourceDeallocaOpPattern, ResourceSizeOpPattern,
-                  ResourceTryMapOpPattern, ResourceLoadOpPattern,
-                  ResourceStoreOpPattern, ResourceSubviewOpPattern>(
-      mapping, typeConverter, context);
+                  ResourceDeallocaOpPattern, ResourceRetainOpPattern,
+                  ResourceReleaseOpPattern, ResourceIsTerminalOpPattern,
+                  ResourceSizeOpPattern, ResourceTryMapOpPattern,
+                  ResourceLoadOpPattern, ResourceStoreOpPattern,
+                  ResourceSubviewOpPattern>(mapping, typeConverter, context);
 
   patterns.insert<FileConstantOpPattern, FileReadOpPattern, FileWriteOpPattern>(
       mapping, typeConverter, context);
