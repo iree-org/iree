@@ -134,10 +134,27 @@ buildTransposeConvolutionPassPipeline(OpPassManager &passManager,
 static void
 buildMakeSingleDispatchPassPipeline(OpPassManager &passManager,
                                     const TransformOptions &options) {
+  // We generalize certain named ops immediately before folding unit extent
+  // dims as the unit dim folding pass updates indexing maps and is better
+  // at working with generics. By this point we have already done any
+  // specialized raising and the op names are no longer useful.
+  passManager.addPass(GlobalOptimization::createGeneralizeLinalgNamedOpsPass());
+  passManager.addPass(DispatchCreation::createFoldUnitExtentDimsForFuncPass());
   GlobalOptimization::PropagateLinalgTransposePassOptions transposeOptions;
   transposeOptions.enableConvolutionPropagation = true;
+  transposeOptions.enableAggressivePropagation = true;
   passManager.addPass(
       GlobalOptimization::createPropagateLinalgTransposePass(transposeOptions));
+  passManager.addPass(GlobalOptimization::createGeneralizeLinalgNamedOpsPass());
+  passManager.addPass(DispatchCreation::createFusionPreprocessingPass());
+  passManager.addPass(mlir::createCSEPass());
+  // TODO : createBubbleUpExpandShapesPass currently doesnt bubble up through
+  // producer generic ops that have reudction. We need to allow this in
+  // a single dispatch use case.
+  passManager.addPass(DispatchCreation::createBubbleUpExpandShapesPass());
+  passManager.addPass(DispatchCreation::createElementwiseOpFusionPass(
+      DispatchCreation::ElementwiseOpFusionPassOptions{
+          /*enableElementWiseFuseMultiReduction=*/true}));
   passManager.addPass(createMakeSingleDispatchForFunctionPass());
 }
 
