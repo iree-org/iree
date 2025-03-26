@@ -281,3 +281,19 @@ util.func public @set_encoding_op(%arg0 : tensor<?x?xf32>)
 // CHECK-DAG:     %[[D1:.+]] = tensor.dim %[[SRC]], %[[C1]]
 // CHECK:         %[[RES:.+]] = flow.tensor.encode %[[SRC]] : tensor<?x?xf32>{%[[D0]], %[[D1]]} -> tensor<?x?xf32, #iree_encoding.testing_encoding<>>{%[[D0]], %[[D1]]}
 // CHECK:         util.return %[[RES]]
+
+// -----
+
+#encoding = #iree_encoding.testing_encoding<>
+util.func public @unset_encoding_op(%arg0 : tensor<?x?xf32, #encoding>, %d0: index, %d1: index)
+    -> tensor<?x?xf32> {
+  %0 = iree_encoding.unset_encoding %arg0
+      : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%d0, %d1}
+  util.return %0 : tensor<?x?xf32>
+}
+// CHECK-LABEL: util.func public @unset_encoding_op
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[D0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[D1:[a-zA-Z0-9]+]]
+// CHECK:         %[[RES:.+]] = flow.tensor.encode %[[SRC]] : tensor<?x?xf32, #iree_encoding.testing_encoding<>>{%[[D0]], %[[D1]]} -> tensor<?x?xf32>{%[[D0]], %[[D1]]}
+// CHECK:         util.return %[[RES]]

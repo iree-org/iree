@@ -176,7 +176,7 @@ static bool isRootOp(Operation *op) {
   if (isa<TilingInterface>(op)) {
     return !isa<tensor::PadOp, linalg::PackOp>(op);
   }
-  return isa<IREE::Encoding::UnsetEncodingOp, linalg::UnPackOp>(op);
+  return isa<linalg::UnPackOp>(op);
 }
 
 /// Returns true if the operation is a `pack` op or a `set_encoding` op that

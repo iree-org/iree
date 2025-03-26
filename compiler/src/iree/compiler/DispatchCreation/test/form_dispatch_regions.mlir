@@ -255,8 +255,8 @@ util.func public @unset_encoding_elementwise_fusion(
 // CHECK-LABEL: util.func public @unset_encoding_elementwise_fusion(
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #[[$ENCODING]]>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>
+//       CHECK:   %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[ARG0]]
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.region
-//       CHECK:     %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[ARG0]]
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[UNSET_ENCODING]], %[[ARG1]]
 //       CHECK:     flow.return %[[GENERIC]]
@@ -290,8 +290,8 @@ util.func public @unset_encoding_elementwise_fusion(
 // CHECK-LABEL: util.func public @unset_encoding_elementwise_fusion(
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #[[$ENCODING]]>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>
+//       CHECK:   %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[ARG0]]
 //       CHECK:   %[[RESULT0:.+]] = flow.dispatch.region
-//       CHECK:     %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[ARG0]]
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic {{.*}} ins(%[[UNSET_ENCODING]]
 //       CHECK:     flow.return %[[GENERIC]]
 //       CHECK:   util.return %[[RESULT0]]
@@ -347,10 +347,8 @@ util.func public @unset_encoding_slice(%arg0: tensor<1x50x384xf32, #encoding>) -
 }
 // CHECK-LABEL: util.func public @unset_encoding_slice
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
-// CHECK:         %[[RESULT:.+]] = flow.dispatch.region
-// CHECK:           %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding
-// CHECK:           flow.return %[[UNSET_ENCODING]]
-// CHECK:         %[[SLICE:.+]] = tensor.extract_slice %[[RESULT]]
+// CHECK:         %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding
+// CHECK:         %[[SLICE:.+]] = tensor.extract_slice %[[UNSET_ENCODING]]
 // CHECK:         util.return %[[SLICE]]
 
 // -----
