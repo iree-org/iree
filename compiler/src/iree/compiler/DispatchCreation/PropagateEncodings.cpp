@@ -43,10 +43,10 @@ struct PropagateEncodingsPass
 
 } // namespace
 
-/// For a result of a `tensor.collapse_shape` given the indexing map
-/// in a consumer, return the iteration space expansion needed
-/// to swap the consumer and the `tensor.collapse_shape`.
-static std::tuple<unsigned, SmallVector<ReassociationIndices>>
+/// For a result of a `tensor.collapse_shape` given the indexing map in a
+/// consumer, return the iteration space expansion needed to swap the consumer
+/// and the `tensor.collapse_shape`.
+static std::pair<unsigned, SmallVector<ReassociationIndices>>
 getIterationSpaceReassociationIndices(
     AffineMap indexingMap, ArrayRef<ReassociationIndices> dataReassocation) {
   llvm::SmallDenseMap<unsigned, unsigned> expandedBy;

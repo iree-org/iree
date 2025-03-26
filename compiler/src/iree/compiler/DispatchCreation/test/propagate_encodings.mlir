@@ -53,4 +53,3 @@ util.func public @propagate_encoding_through_collapse_shape_chain(%src: tensor<2
 // CHECK:         %[[COLLAPSE_0:.+]] = tensor.collapse_shape %[[SET_ENCODING]] {{\[}}[0], [1], [2, 3]] : tensor<2x4096x64x10xf16, #[[$ENCODING1]]> into tensor<2x4096x640xf16, #[[$ENCODING2]]>
 // CHECK:         %[[COLLAPSE_1:.+]] = tensor.collapse_shape %[[COLLAPSE_0]] {{\[}}[0, 1], [2]] : tensor<2x4096x640xf16, #[[$ENCODING2]]> into tensor<8192x640xf16, #[[$ENCODING0]]>
 // CHECK:         util.return %[[COLLAPSE_1]]
-
