@@ -17,14 +17,14 @@ endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(IREE ASM C CXX)
+# If we find that the cache contains CMAKE_CXX_STANDARD it means that it's a old CMakeCache.txt
+# and we can just inform the user and then reset it.
+if(DEFINED CACHE{CMAKE_CXX_STANDARD})
+  message(WARNING "Unsetting cache value for CMAKE_CXX_STANDARD")
+  unset(CMAKE_CXX_STANDARD CACHE)
+endif()
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
-# LLVM defines this as a CACHE property and uses a policy that causes the
-# cache value to take precedence. This is causing us to mix 17/14 across
-# the boundary.
-# TODO: Remove this once the LLVM mechanism is updated. See:
-#   https://discourse.llvm.org/t/important-new-toolchain-requirements-to-build-llvm-will-most-likely-be-landing-within-a-week-prepare-your-buildbots/61447/9
-set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to" FORCE)
 set(IREE_IDE_FOLDER IREE)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
