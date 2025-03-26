@@ -86,8 +86,9 @@ static bool isFusableUsingTileAndFuse(Operation *producer,
 static bool shouldSinkExpandShapeOp(OpOperand *opOperand) {
   if (llvm::isa_and_nonnull<tensor::CollapseShapeOp>(opOperand->getOwner())) {
     auto *producer = opOperand->get().getDefiningOp();
-    return producer && producer->hasOneUse() &&
-           IREE::LinalgExt::isBitExtendOp(opOperand->get().getDefiningOp());
+    if (!producer || !producer->hasOneUse())
+      return false;
+    return IREE::LinalgExt::isBitExtendOp(opOperand->get().getDefiningOp());
   }
   auto reshapeOp =
       dyn_cast<tensor::ExpandShapeOp>(opOperand->get().getDefiningOp());
