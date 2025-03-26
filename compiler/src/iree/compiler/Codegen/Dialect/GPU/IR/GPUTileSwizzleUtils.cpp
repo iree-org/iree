@@ -4,8 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
+#include <numeric>
+
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
@@ -396,6 +398,86 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
                           << " swizzle after moving CrossThread dims: "
                           << crossThreadOuterSwizzle << "\n\n");
   return crossThreadOuterSwizzle;
+}
+
+/// Remove the expanded dimensions for this index and update the permutation by
+/// erasing the removed dimensions' indices and adjusting existing larger
+/// indices accordingly.
+static void remove(TileSwizzle &swizzle, size_t idx) {
+  assert(idx < swizzle.expandShape.size() && "idx out of bounds");
+  const size_t startIdx = std::accumulate(
+      std::begin(swizzle.expandShape), std::begin(swizzle.expandShape) + idx, 0,
+      [](size_t idx, const TileSwizzle::ExpandShapeDimVectorType &dims)
+          -> size_t { return idx + dims.size(); });
+  const size_t endIdx = startIdx + swizzle.expandShape[idx].size();
+  swizzle.expandShape.erase(swizzle.expandShape.begin() + idx);
+  SmallVector<int64_t> newPermutation;
+  for (const int64_t &p : swizzle.permutation) {
+    if (p < startIdx) {
+      newPermutation.push_back(p);
+    } else if (p >= endIdx) {
+      newPermutation.push_back(p - (endIdx - startIdx));
+    }
+  }
+  swizzle.permutation = newPermutation;
+}
+
+FailureOr<TileSwizzle> getEncodingSwizzle(IREE::Encoding::EncodingAttr encoding,
+                                          IREE::GPU::DataTiledMMAAttr mma,
+                                          IREE::GPU::MMAFragment fragment) {
+  TileSwizzle swizzle = getSwizzle(mma, fragment);
+  FailureOr<linalg::ContractionDimensions> cDims =
+      getEncodingContractionDims(encoding);
+  if (failed(cDims)) {
+    return failure();
+  }
+  // The following expects M, N, K, and Batch sizes of at most 1 for now.
+  // TODO: Extend this to multiple M/N/K/Batch dims.
+  assert(cDims->m.size() <= 1 && cDims->n.size() <= 1 && cDims->k.size() == 1 &&
+         cDims->batch.size() <= 1 &&
+         "Expected at most one M, N, K, and Batch dimension");
+  std::optional<unsigned> mDim =
+      cDims->m.empty() ? std::nullopt
+                       : encoding.mapDimToOperandIndex(cDims->m[0]);
+  std::optional<unsigned> nDim =
+      cDims->n.empty() ? std::nullopt
+                       : encoding.mapDimToOperandIndex(cDims->n[0]);
+  std::optional<unsigned> kDim = encoding.mapDimToOperandIndex(cDims->k[0]);
+  switch (fragment) {
+  case IREE::GPU::MMAFragment::Lhs:
+    // A-matrix (LHS). Source dimensions are M (index 0) and K (index 1).
+    // Dimensions are removed from last to first to ensure correctness.
+    if (!kDim.has_value()) {
+      remove(swizzle, 1);
+    }
+    if (!cDims->m.empty() && !mDim.has_value()) {
+      remove(swizzle, 0);
+    }
+    break;
+  case IREE::GPU::MMAFragment::Rhs:
+    // B-matrix (RHS). Since the pack ops already took care of transposing B,
+    // source dimensions are N (index 0) and K (index 1).
+    // Dimensions are removed from last to first to ensure correctness.
+    if (!kDim.has_value()) {
+      remove(swizzle, 1);
+    }
+    if (!cDims->n.empty() && !nDim.has_value()) {
+      remove(swizzle, 0);
+    }
+    break;
+  case IREE::GPU::MMAFragment::Acc:
+    // C-matrix (accumulator). Source dimensions are M (index 0) and N (index
+    // 1).
+    // Dimensions are removed from last to first to ensure correctness.
+    if (!cDims->n.empty() && !nDim.has_value()) {
+      remove(swizzle, 1);
+    }
+    if (!cDims->m.empty() && !mDim.has_value()) {
+      remove(swizzle, 0);
+    }
+    break;
+  }
+  return swizzle;
 }
 
 TileSwizzle getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic intrinsic,
