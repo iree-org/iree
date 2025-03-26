@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
@@ -31,6 +32,8 @@
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::IREE::GPU {
+
+using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
 constexpr int64_t kPreferredCopyNumBits = 128;
@@ -942,6 +945,69 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
       entryPoint, scatter, loweringConfig,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
       {flatWorkgroupSize, 1, 1}, flatWorkgroupSize, DictionaryAttr());
+}
+
+//====---------------------------------------------------------------------===//
+// Sort Pipeline Configuration
+//====---------------------------------------------------------------------===//
+
+LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
+                            mlir::FunctionOpInterface entryPoint,
+                            Operation *op) {
+  auto context = op->getContext();
+  Builder b(context);
+
+  auto subgroupSize = target.getPreferredSubgroupSize();
+  TileSizesListType tileSizes;
+  auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
+  auto partitionedLoops =
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
+
+  auto createLoweringConfig = [&](SmallVector<int64_t> workgroupSizes,
+                                  SmallVector<int64_t> threadSizes) {
+    SmallVector<NamedAttribute, 2> attrs = {
+        NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupSizes)),
+        NamedAttribute("thread", b.getI64ArrayAttr(threadSizes))};
+    auto configDict = b.getDictionaryAttr(attrs);
+    return IREE::GPU::LoweringConfigAttr::get(context, configDict);
+  };
+
+  if (partitionedLoops.empty()) {
+    auto loweringConfig = createLoweringConfig({1, 1, 1}, {1, 1, 1});
+    return setOpConfigAndEntryPointFnTranslation(
+        entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUTileAndFuse,
+        {1, 1, 1}, subgroupSize, DictionaryAttr());
+  }
+
+  size_t numLoops = partitionedLoops.back() + 1;
+
+  // To get peak occupancy we need a workgroup size of at least two warps
+  std::array<int64_t, 3> workgroupSize = {2 * subgroupSize, 1, 1};
+  SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
+  SmallVector<int64_t> threadTileSizes(numLoops, 1);
+
+  // Set all non-parallel loops to zero tile size.
+  llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
+                                               partitionedLoops.end());
+  for (auto depth : llvm::seq<int64_t>(0, numLoops)) {
+    if (!partitionedLoopsSet.count(depth)) {
+      workgroupTileSizes[depth] = 0;
+    }
+  }
+
+  // Tile to have one element per thread.
+  for (int64_t depth = numLoops; depth > 0; depth--) {
+    if (partitionedLoopsSet.count(depth - 1)) {
+      workgroupTileSizes[depth - 1] = workgroupSize[0];
+      break;
+    }
+  }
+
+  auto loweringConfig =
+      createLoweringConfig(workgroupTileSizes, threadTileSizes);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUTileAndFuse,
+      workgroupSize, subgroupSize, DictionaryAttr());
 }
 
 //===----------------------------------------------------------------------===//

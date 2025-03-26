@@ -1683,50 +1683,6 @@ static LogicalResult setWinogradOpConfig(IREE::GPU::TargetAttr target,
 }
 
 //====---------------------------------------------------------------------===//
-// Sort Pipeline Configuration
-//====---------------------------------------------------------------------===//
-
-static LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
-                                   mlir::FunctionOpInterface entryPoint,
-                                   Operation *op) {
-  TileSizesListType tileSizes;
-  auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
-  auto partitionedLoops =
-      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
-  if (partitionedLoops.empty()) {
-    tileSizes.push_back({});
-    return setOpConfigAndEntryPointFnTranslation(
-        entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUDistribute,
-        {1, 1, 1});
-  }
-  size_t numLoops = partitionedLoops.back() + 1;
-  // To get peak occupancy we need a workgroup size of at least two warps
-  std::array<int64_t, 3> workgroupSize = {2 * target.getPreferredSubgroupSize(),
-                                          1, 1};
-  SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
-  // Set all non-parallel loops to zero tile size.
-  llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
-                                               partitionedLoops.end());
-  for (auto depth : llvm::seq<int64_t>(0, numLoops)) {
-    if (!partitionedLoopsSet.count(depth)) {
-      workgroupTileSizes[depth] = 0;
-    }
-  }
-
-  // Tile to have one element per thread.
-  for (int64_t depth = numLoops; depth > 0; depth--) {
-    if (partitionedLoopsSet.count(depth - 1)) {
-      workgroupTileSizes[depth - 1] = workgroupSize[0];
-      break;
-    }
-  }
-  tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUDistribute,
-      workgroupSize);
-}
-
-//====---------------------------------------------------------------------===//
 // Pack/Unpack Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
