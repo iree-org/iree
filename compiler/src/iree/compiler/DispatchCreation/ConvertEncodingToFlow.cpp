@@ -31,6 +31,8 @@ struct ConvertEncodingToFlowPass
 void ConvertEncodingToFlowPass::runOnOperation() {
   FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(&getContext());
+
+  // Convert the set_encoding ops.
   funcOp.walk([&](IREE::Encoding::SetEncodingOp encodingOp) {
     if (encodingOp->getParentOfType<IREE::Flow::DispatchRegionOp>()) {
       return;
@@ -44,6 +46,18 @@ void ConvertEncodingToFlowPass::runOnOperation() {
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorEncodeOp>(
         encodingOp, encodingOp.getResultType(), source,
         /*operand_dims=*/dynamicDimSizes, /*result_dims=*/dynamicDimSizes);
+  });
+
+  // Convert the unset_encoding ops.
+  funcOp.walk([&](IREE::Encoding::UnsetEncodingOp encodingOp) {
+    if (encodingOp->getParentOfType<IREE::Flow::DispatchRegionOp>()) {
+      return;
+    }
+    rewriter.setInsertionPointAfter(encodingOp);
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorEncodeOp>(
+        encodingOp, encodingOp.getResultType(), encodingOp.getSource(),
+        /*operand_dims=*/encodingOp.getResultDims(),
+        /*result_dims=*/encodingOp.getResultDims());
   });
 }
 

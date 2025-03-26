@@ -681,3 +681,32 @@ util.func @attention_bitextend_fusion(%arg0: tensor<10x20x30x50xf8E4M3FNUZ>,
 //  CHECK-SAME:         ins(%[[Q]], %[[K]], %[[V]]
 //       CHECK:     flow.return %[[ATTENTION]]
 //       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+#encoding = #iree_encoding.testing_encoding<>
+util.func public @unset_encoding_elementwise_fusion(%arg0: tensor<?x?xf32, #encoding>, %arg1: tensor<?xf32>, %arg2: index, %arg3: index) -> tensor<?x?xf32> {
+  %0 = iree_encoding.unset_encoding %arg0 : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%arg2, %arg3}
+  %1 = tensor.empty(%arg2, %arg3) : tensor<?x?xf32>
+  %2 = flow.dispatch.region -> (tensor<?x?xf32>{%arg2, %arg3}) {
+    %3 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%0, %arg1 : tensor<?x?xf32>, tensor<?xf32>)
+      outs(%1 : tensor<?x?xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %4 = arith.addf %in, %in_0 : f32
+      linalg.yield %4 : f32
+    } -> tensor<?x?xf32>
+    flow.return %3 : tensor<?x?xf32>
+  }
+  util.return %2 : tensor<?x?xf32>
+}
+// CHECK-LABEL: util.func public @unset_encoding_elementwise_fusion(
+//       CHECK: %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:   %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding
+//  CHECK-NEXT:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[UNSET_ENCODING]]
+//       CHECK:   flow.return %[[GENERIC]]
