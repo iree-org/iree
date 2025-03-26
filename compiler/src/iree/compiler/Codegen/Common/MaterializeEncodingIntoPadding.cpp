@@ -84,7 +84,10 @@ struct MaterializePadEncodingTypeConverter final
     });
     addConversion([&](IREE::Flow::DispatchTensorType dispatchTensorType)
                       -> IREE::Flow::DispatchTensorType {
-      RankedTensorType type = dispatchTensorType.asRankedTensorType();
+      auto type = dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
+      if (!type) {
+        return dispatchTensorType;
+      }
       // The incoming bindings have the padded type, if `pad_encoding_layout` is
       // present.
       if (getPadLayout(type)) {
