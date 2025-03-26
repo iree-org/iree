@@ -276,7 +276,7 @@ def HoistEncodingOpsPass :
 }
 
 def PropagateEncodingsPass :
-    InterfacePass<"iree-dispatch-creation-propagate-encodings-pass", "mlir::FunctionOpInterface"> {
+    InterfacePass<"iree-dispatch-creation-propagate-encodings", "mlir::FunctionOpInterface"> {
   let summary = "Propagate encodings across other operations.";
   let dependentDialects = [
     "mlir::tensor::TensorDialect",
