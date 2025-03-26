@@ -69,22 +69,22 @@ def handle_unknown_hal_target_device(mnemonic: str) -> list[TargetMachine]:
     return [TargetMachine(mnemonic, iree_compile_device_type=mnemonic)]
 
 
-@handle_hal_target_devices_from_flags("amdgpu", "hip")
+@handle_hal_target_devices_from_flags("hip")
 @expand_cl_arg_defaults
 def amdgpu_hal_target_from_flags(
-    mnemonic: str, *, amdgpu_target=cl_arg_ref("iree_amdgpu_target")
+    mnemonic: str, *, hip_target=cl_arg_ref("iree_hip_target")
 ) -> list[TargetMachine]:
-    if not amdgpu_target:
+    if not hip_target:
         raise RuntimeError(
-            "No AMDGPU targets specified. Pass a chip to target as "
-            "--iree-amdgpu-target=gfx..."
+            "No HIP targets specified. Pass a chip to target as "
+            "--iree-hip-target=gfx..."
         )
     return [
         TargetMachine(
-            f"amdgpu-{amdgpu_target}",
+            f"hip-{hip_target}",
             extra_flags=[
                 "--iree-hal-target-device=hip",
-                f"--iree-hip-target={amdgpu_target}",
+                f"--iree-hip-target={hip_target}",
             ],
         )
     ]
@@ -142,13 +142,12 @@ def _(p: argparse.ArgumentParser):
     )
 
     hip_g = p.add_argument_group(
-        title="IREE AMDGPU Target Options",
-        description="Options controlling explicit targeting of AMDGPU devices",
+        title="IREE HIP Target Options",
+        description="Options controlling explicit targeting of HIP devices",
     )
     hip_g.add_argument(
-        "--iree-amdgpu-target",
         "--iree-hip-target",
-        help="AMDGPU target selection (i.e. 'gfxYYYY')",
+        help="HIP target selection (i.e. 'gfxYYYY')",
     )
 
     cpu_g = p.add_argument_group(
