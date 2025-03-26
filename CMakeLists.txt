@@ -19,7 +19,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 project(IREE ASM C CXX)
 # If we find that the cache contains CMAKE_CXX_STANDARD it means that it's a old CMakeCache.txt
 # and we can just inform the user and then reset it.
-if($CACHE{CMAKE_CXX_STANDARD})
+if(DEFINED CACHE{CMAKE_CXX_STANDARD})
   message(WARNING "Unsetting cache value for CMAKE_CXX_STANDARD")
   unset(CMAKE_CXX_STANDARD CACHE)
 endif()
