@@ -88,14 +88,16 @@ util.func public @gpu_with_encoding_layout(%d0: index, %d1: index) -> index {
 #map1 = affine_map<(m, n, k) -> (n, k)>
 #map2 = affine_map<(m, n, k) -> (m, n)>
 #map3 = affine_map<(m, n, k) -> (n, k)>
+#encodingA = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map1, #map2], round_dims_to = array<i64: 64, 64, 64>>
+#encodingB = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map1, #map2], round_dims_to = array<i64: 64, 64, 64>>
+#encodingC = #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map1, #map2], round_dims_to = array<i64: 64, 64, 64>>
+#encodingD = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map3, #map2], round_dims_to = array<i64: 64, 64, 64>>
+#encoding_lhs_narrow_m = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map1, #map2], round_dims_to = array<i64: 60, 64, 64>>
+#encoding_lhs_narrow_n = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map1, #map2], round_dims_to = array<i64: 64, 1, 64>>
+#encoding_rhs_narrow_n = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map1, #map2], round_dims_to = array<i64: 64, 1, 64>>
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip",
   iree.encoding.resolver = #iree_gpu.gpu_pad_layout<cache_line_bytes = 128, cache_sets = 4>, ukernels = "none"}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_rocm_hsaco_fb]> : !hal.device
-#encodingA = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map1, #map2]>
-#encodingB = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map1, #map2]>
-#encodingC = #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map1, #map2]>
-#encodingD = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map3, #map2]>
-
 util.global private @device_a = #device_target_local_0_
 util.func public @with_pad_encoding(%arg0: index, %arg1: index, %scalar_f32 : f32) {
   %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf16, #encodingA>{} in !stream.resource<*>{%arg1}
@@ -103,13 +105,14 @@ util.func public @with_pad_encoding(%arg0: index, %arg1: index, %scalar_f32 : f3
   %2 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x1337xf16, #encodingA>{} in !stream.resource<*>{%arg1}
   %3 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4095xf16, #encodingA>{} in !stream.resource<*>{%arg1}
   %4 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x250xf16, #encodingA>{} in !stream.resource<*>{%arg1}
-  %5 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<60x4096xf16, #encodingA>{} in !stream.resource<*>{%arg1}
-  %6 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<1x4096xf16, #encodingB>{} in !stream.resource<*>{%arg1}
-  %7 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x4096xf16, #encodingA>{%arg0} in !stream.resource<*>{%arg1}
-  %8 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x?xf16, #encodingA>{%arg0, %arg1} in !stream.resource<*>{%arg1}
-  %9 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf16, #encodingB>{} in !stream.resource<*>{%arg1}
-  %10 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf16, #encodingC>{} in !stream.resource<*>{%arg1}
-  %11 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf16, #encodingD>{} in !stream.resource<*>{%arg1}
+  %5 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<60x4096xf16, #encoding_lhs_narrow_m>{} in !stream.resource<*>{%arg1}
+  %6 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf16, #encoding_lhs_narrow_n>{} in !stream.resource<*>{%arg1}
+  %7 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<1x4096xf16, #encoding_rhs_narrow_n>{} in !stream.resource<*>{%arg1}
+  %8 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x4096xf16, #encodingA>{%arg0} in !stream.resource<*>{%arg1}
+  %9 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x?xf16, #encodingA>{%arg0, %arg1} in !stream.resource<*>{%arg1}
+  %10 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf16, #encodingB>{} in !stream.resource<*>{%arg1}
+  %11 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf16, #encodingC>{} in !stream.resource<*>{%arg1}
+  %12 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf16, #encodingD>{} in !stream.resource<*>{%arg1}
   util.return
 }
 
@@ -129,6 +132,7 @@ util.func public @with_pad_encoding(%arg0: index, %arg1: index, %scalar_f32 : f3
 // CHECK: stream.tensor.empty {{.*}} : tensor<4096x4095xf16, #[[$PAD_LHS_2]]>
 // CHECK: stream.tensor.empty {{.*}} : tensor<4096x250xf16, #[[$NO_PAD_LHS]]>
 // CHECK: stream.tensor.empty {{.*}} : tensor<60x4096xf16, #[[$NO_PAD_LHS]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<4096x4096xf16, #[[$NO_PAD_LHS]]>
 // CHECK: stream.tensor.empty {{.*}} : tensor<1x4096xf16, #[[$NO_PAD_RHS]]>
 // CHECK: stream.tensor.empty {{.*}} : tensor<?x4096xf16, #[[$PAD_LHS_0]]>
 // CHECK: stream.tensor.empty {{.*}} : tensor<?x?xf16, #[[$NO_PAD_LHS]]>
