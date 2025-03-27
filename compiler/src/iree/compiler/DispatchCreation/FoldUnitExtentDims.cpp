@@ -137,12 +137,6 @@ struct FoldUnitExtentDimsPass final
   void runOnOperation() override;
 };
 
-struct FoldUnitExtentDimsForFuncPass final
-    : public impl::FoldUnitExtentDimsForFuncPassBase<
-          FoldUnitExtentDimsForFuncPass> {
-  void runOnOperation() override;
-};
-
 void FoldUnitExtentDimsPass::runOnOperation() {
   auto moduleOp = getOperation();
   MLIRContext *context = &getContext();
@@ -180,6 +174,14 @@ void FoldUnitExtentDimsPass::runOnOperation() {
     return signalPassFailure();
   }
 }
+} // namespace
+
+namespace {
+struct FoldUnitExtentDimsForFuncPass final
+    : public impl::FoldUnitExtentDimsForFuncPassBase<
+          FoldUnitExtentDimsForFuncPass> {
+  void runOnOperation() override;
+};
 
 void FoldUnitExtentDimsForFuncPass::runOnOperation() {
   MLIRContext *context = &getContext();
