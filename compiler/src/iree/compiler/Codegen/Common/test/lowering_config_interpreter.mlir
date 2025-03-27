@@ -9,7 +9,7 @@ module attributes { transform.with_named_sequence } {
   }
 
   transform.named_sequence @print_me(%op: !transform.any_op {transform.readonly}) {
-    transform.print %op : !transform.any_op 
+    transform.print %op : !transform.any_op
     transform.yield
   }
 }
@@ -31,15 +31,15 @@ module attributes { transform.with_named_sequence } {
   }
 
   transform.named_sequence @print_one(%op: !transform.any_op {transform.readonly}) {
-    transform.print %op {name = "one"} : !transform.any_op 
+    transform.print %op {name = "one"} : !transform.any_op
     transform.yield
   }
   transform.named_sequence @print_two(%op: !transform.any_op {transform.readonly}) {
-    transform.print %op {name = "two"} : !transform.any_op 
+    transform.print %op {name = "two"} : !transform.any_op
     transform.yield
   }
   transform.named_sequence @print_three(%op: !transform.any_op {transform.readonly}) {
-    transform.print %op {name = "three"} : !transform.any_op 
+    transform.print %op {name = "three"} : !transform.any_op
     transform.yield
   }
 }
