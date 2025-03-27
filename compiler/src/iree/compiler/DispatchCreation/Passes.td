@@ -65,6 +65,20 @@ def FoldUnitExtentDimsPass :
   ];
 }
 
+def FoldUnitExtentDimsForFuncPass :
+    Pass<"iree-dispatch-creation-fold-unit-extent-dims-for-func", ""> {
+  let summary = "Fold unit extent dimension of operations on a function.";
+  let description = [{
+    Imports upstream patterns to fold unit extent dims but with IREE control.
+  }];
+  let dependentDialects = [
+    "mlir::affine::AffineDialect",
+    "mlir::arith::ArithDialect",
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
+  ];
+}
+
 def FuseHorizontalContractionsPass:
     InterfacePass<"iree-dispatch-creation-fuse-horizontal-contractions", "mlir::FunctionOpInterface"> {
   let summary = "Fuses horizontal contraction ops";

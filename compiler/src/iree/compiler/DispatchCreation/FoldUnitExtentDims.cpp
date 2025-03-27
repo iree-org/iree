@@ -32,11 +32,34 @@
 namespace mlir::iree_compiler::DispatchCreation {
 
 #define GEN_PASS_DEF_FOLDUNITEXTENTDIMSPASS
+#define GEN_PASS_DEF_FOLDUNITEXTENTDIMSFORFUNCPASS
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 //===----------------------------------------------------------------------===//
 // Pass helpers
 //===----------------------------------------------------------------------===//
+
+static void
+populatefoldUnitDimsPatterns(RewritePatternSet &foldUnitDimsPatterns) {
+  linalg::ControlDropUnitDims options;
+  auto defaultFn = options.controlFn;
+
+  options.controlFn = [=](Operation *op) {
+    // Ignore operations already in dispatches.
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(op)) {
+      return SmallVector<unsigned>{};
+    }
+    if (isa<IREE::LinalgExt::LinalgExtOp>(op)) {
+      return IREE::LinalgExt::defaultControlDropUnitDims(op);
+    }
+    return defaultFn(op);
+  };
+
+  linalg::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns, options);
+  IREE::LinalgExt::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns,
+                                                      options);
+  linalg::populateMoveInitOperandsToInputPattern(foldUnitDimsPatterns);
+}
 
 static LogicalResult
 foldUnitDimsOnGlobal(IRRewriter &rewriter, IREE::Util::GlobalOpInterface global,
@@ -113,6 +136,13 @@ struct FoldUnitExtentDimsPass final
     : public impl::FoldUnitExtentDimsPassBase<FoldUnitExtentDimsPass> {
   void runOnOperation() override;
 };
+
+struct FoldUnitExtentDimsForFuncPass final
+    : public impl::FoldUnitExtentDimsForFuncPassBase<
+          FoldUnitExtentDimsForFuncPass> {
+  void runOnOperation() override;
+};
+
 } // namespace
 
 void FoldUnitExtentDimsPass::runOnOperation() {
@@ -146,24 +176,19 @@ void FoldUnitExtentDimsPass::runOnOperation() {
   });
 
   RewritePatternSet foldUnitDimsPatterns(context);
-  linalg::ControlDropUnitDims options;
-  auto defaultFn = options.controlFn;
-  options.controlFn = [&](Operation *op) {
-    // Ignore operations already in dispatches.
-    if (!IREE::Flow::isNonNullAndOutsideDispatch(op)) {
-      return SmallVector<unsigned>{};
-    }
-    if (isa<IREE::LinalgExt::LinalgExtOp>(op)) {
-      return IREE::LinalgExt::defaultControlDropUnitDims(op);
-    }
-    return defaultFn(op);
-  };
-  linalg::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns, options);
-  IREE::LinalgExt::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns,
-                                                      options);
-  linalg::populateMoveInitOperandsToInputPattern(foldUnitDimsPatterns);
+  populatefoldUnitDimsPatterns(foldUnitDimsPatterns);
   if (failed(
           applyPatternsGreedily(moduleOp, std::move(foldUnitDimsPatterns)))) {
+    return signalPassFailure();
+  }
+}
+
+void FoldUnitExtentDimsForFuncPass::runOnOperation() {
+  MLIRContext *context = &getContext();
+  RewritePatternSet foldUnitDimsPatterns(context);
+  populatefoldUnitDimsPatterns(foldUnitDimsPatterns);
+  if (failed(applyPatternsGreedily(getOperation(),
+                                   std::move(foldUnitDimsPatterns)))) {
     return signalPassFailure();
   }
 }
