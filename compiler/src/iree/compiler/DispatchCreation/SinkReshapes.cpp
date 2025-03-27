@@ -24,6 +24,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -87,7 +88,7 @@ static bool shouldBubbleCollapseShapeOp(tensor::CollapseShapeOp collapseOp,
   auto *producer = opOperand->get().getDefiningOp();
   if (!producer || !producer->hasOneUse())
     return false;
-  return IREE::LinalgExt::isBitExtendOp(opOperand->get().getDefiningOp());
+  return IREE::Flow::isClonableIntoDispatchOp(opOperand->get().getDefiningOp());
 }
 
 /// Control function to check if a `tensor.expand_shape` (which is producer of
@@ -216,6 +217,12 @@ void SinkReshapesPass::runOnOperation() {
   // Add patterns to fold `tensor.empty` and reshape ops.
   sinkReshapePatterns.insert<FoldDuplicateCollapseShapes>(context);
   tensor::populateFoldTensorEmptyPatterns(sinkReshapePatterns);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(
+      sinkReshapePatterns);
+  tensor::ExpandShapeOp::getCanonicalizationPatterns(sinkReshapePatterns,
+                                                     context);
+  tensor::CollapseShapeOp::getCanonicalizationPatterns(sinkReshapePatterns,
+                                                       context);
   if (failed(applyPatternsGreedily(getOperation(),
                                    std::move(sinkReshapePatterns)))) {
     getOperation()->emitOpError("failed to sink reshape ops");
