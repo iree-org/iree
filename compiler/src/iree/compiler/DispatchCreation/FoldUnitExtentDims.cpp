@@ -142,7 +142,6 @@ struct FoldUnitExtentDimsForFuncPass final
           FoldUnitExtentDimsForFuncPass> {
   void runOnOperation() override;
 };
-} // namespace
 
 void FoldUnitExtentDimsPass::runOnOperation() {
   auto moduleOp = getOperation();
@@ -192,4 +191,5 @@ void FoldUnitExtentDimsForFuncPass::runOnOperation() {
   }
 }
 
+} // namespace
 } // namespace mlir::iree_compiler::DispatchCreation

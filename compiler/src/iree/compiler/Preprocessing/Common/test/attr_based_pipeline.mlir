@@ -46,8 +46,10 @@ func.func @single_dispatch_fusion(%lhs : tensor<18x288xf32>, %rhs :  tensor<18x2
 
 // CHECK-LABEL: @single_dispatch_fusion
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
-//       CHECK:   %[[TRUNC:.+]] =  arith.truncf
-//       CHECK:   %[[ADD:.+]] = arith.addf %[[TRUNC]]
+//       CHECK:     linalg.generic
+//       CHECK:       %[[TRUNC:.+]] =  arith.truncf
+//       CHECK:       %[[ADD:.+]] = arith.addf %[[TRUNC]]
+//   CHECK-NOT:     linalg.generic
 
 // -----
 

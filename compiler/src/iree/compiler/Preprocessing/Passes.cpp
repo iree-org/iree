@@ -136,8 +136,7 @@ buildMakeSingleDispatchPassPipeline(OpPassManager &passManager,
                                     const TransformOptions &options) {
   // We generalize certain named ops immediately before folding unit extent
   // dims as the unit dim folding pass updates indexing maps and is better
-  // at working with generics. By this point we have already done any
-  // specialized raising and the op names are no longer useful.
+  // at working with generics.
   passManager.addPass(GlobalOptimization::createGeneralizeLinalgNamedOpsPass());
   passManager.addPass(DispatchCreation::createFoldUnitExtentDimsForFuncPass());
   GlobalOptimization::PropagateLinalgTransposePassOptions transposeOptions;
@@ -145,6 +144,8 @@ buildMakeSingleDispatchPassPipeline(OpPassManager &passManager,
   transposeOptions.enableAggressivePropagation = true;
   passManager.addPass(
       GlobalOptimization::createPropagateLinalgTransposePass(transposeOptions));
+  // Generalize transposes and any other remaining named linalg ops that can
+  // now be represented as generics.
   passManager.addPass(GlobalOptimization::createGeneralizeLinalgNamedOpsPass());
   passManager.addPass(DispatchCreation::createFusionPreprocessingPass());
   passManager.addPass(mlir::createCSEPass());
