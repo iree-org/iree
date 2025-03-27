@@ -120,6 +120,7 @@ iree_cc_library(
     "LinkTuningSpecsPass.cpp"
     "LowerExecutableUsingTransformDialect.cpp"
     "LowerUKernelsToCalls.cpp"
+    "LoweringConfigInterpreter.cpp"
     "MaterializeEncoding.cpp"
     "MaterializeEncodingIntoNop.cpp"
     "MaterializeEncodingIntoPadding.cpp"

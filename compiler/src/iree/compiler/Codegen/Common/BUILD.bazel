@@ -125,6 +125,7 @@ iree_compiler_cc_library(
         "IREELoopInvariantCodeMotion.cpp",
         "InstrumentMemoryAccesses.cpp",
         "LinkTuningSpecsPass.cpp",
+        "LoweringConfigInterpreter.cpp",
         "LowerExecutableUsingTransformDialect.cpp",
         "LowerUKernelsToCalls.cpp",
         "MaterializeEncoding.cpp",
