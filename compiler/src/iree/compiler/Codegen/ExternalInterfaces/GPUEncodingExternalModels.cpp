@@ -203,7 +203,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   // TODO(#18850): dealing with narrow cases as a fix-up is suboptimal.
   //
   IREE::Encoding::MatmulNarrowDim narrowDim =
-      IREE::Encoding::getMatmulNarrowDim(encoding);
+      IREE::Encoding::getPo2MatmulNarrowDim(encoding);
   if (narrowDim.isM()) {
     intrinsicsM =
         std::min(intrinsicsM,

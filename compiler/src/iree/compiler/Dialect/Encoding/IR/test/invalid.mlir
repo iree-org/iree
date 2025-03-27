@@ -1,5 +1,32 @@
 // RUN: iree-opt --split-input-file --verify-diagnostics %s
 
+// expected-error @+1 {{missing required parameter: `operand_index`}}
+#encoding = #iree_encoding.encoding<>
+func.func @illegal_encoding_attr_missing_operand_index(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32, #encoding> {
+  %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
+  return %0 : tensor<?x?xf32, #encoding>
+}
+
+// -----
+
+// expected-error @+1 {{missing required parameter: `op_type`}}
+#encoding = #iree_encoding.encoding<operand_index = 0>
+func.func @illegal_encoding_attr_missing_operand_index(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32, #encoding> {
+  %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
+  return %0 : tensor<?x?xf32, #encoding>
+}
+
+// -----
+
+// expected-error @+1 {{missing required parameter: `element_types`}}
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type =  matmul>
+func.func @illegal_encoding_attr_missing_operand_index(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32, #encoding> {
+  %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
+  return %0 : tensor<?x?xf32, #encoding>
+}
+
+// -----
+
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 // expected-error @+1 {{`operandIndex` exceeds the size of `user_indexing_maps`}}
@@ -27,6 +54,18 @@ func.func @illegal_encoding_attr_with_invalid_attr(%arg0: tensor<?x?xf32>) -> te
 // expected-error @+1 {{found a non-composable attribute in `user_indexing_maps` at index: 0}}
 #encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [[[#map, #map1]]]>
 func.func @illegal_encoding_attr_with_too_many_nested_levels(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32, #encoding> {
+  %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
+  return %0 : tensor<?x?xf32, #encoding>
+}
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+// expected-error @+1 {{found a matmul encoding with 2 iteration sizes, but expected 3}}
+#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?]>
+func.func @illegal_encoding_attr_with_operand_index_exceeding_indexing_maps(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32, #encoding> {
   %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
   return %0 : tensor<?x?xf32, #encoding>
 }
