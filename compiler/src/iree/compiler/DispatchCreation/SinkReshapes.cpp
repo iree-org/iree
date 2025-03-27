@@ -80,23 +80,23 @@ static bool isFusableUsingTileAndFuse(Operation *producer,
                                IREE::Encoding::UnsetEncodingOp>(producer);
 }
 
-/// Control function to check if an `tensor.expand_shape` (which is producer of
+/// Control function to check if a `tensor.collapse_shape` (which is the
+/// consumer of `opOperand`) should be bubbled through the `genericOp`.
+static bool shouldBubbleCollapseShapeOp(tensor::CollapseShapeOp collapseOp,
+                                        OpOperand *opOperand) {
+  auto *producer = opOperand->get().getDefiningOp();
+  if (!producer || !producer->hasOneUse())
+    return false;
+  return IREE::LinalgExt::isBitExtendOp(opOperand->get().getDefiningOp());
+}
+
+/// Control function to check if a `tensor.expand_shape` (which is producer of
 /// `opOperand`) should be pushed past the `genericOp` (which is the consumer of
 /// `opOperand`).
-static bool shouldSinkExpandShapeOp(OpOperand *opOperand) {
-  if (llvm::isa_and_nonnull<tensor::CollapseShapeOp>(opOperand->getOwner())) {
-    auto *producer = opOperand->get().getDefiningOp();
-    if (!producer || !producer->hasOneUse())
-      return false;
-    return IREE::LinalgExt::isBitExtendOp(opOperand->get().getDefiningOp());
-  }
-  auto reshapeOp =
-      dyn_cast<tensor::ExpandShapeOp>(opOperand->get().getDefiningOp());
-  if (!reshapeOp) {
-    return false;
-  }
+static bool shouldSinkExpandShapeOp(tensor::ExpandShapeOp expandOp,
+                                    OpOperand *opOperand) {
   Operation *consumer = opOperand->getOwner();
-  if (!IREE::Flow::isNonNullAndOutsideDispatch({reshapeOp, consumer})) {
+  if (!IREE::Flow::isNonNullAndOutsideDispatch({expandOp, consumer})) {
     return false;
   }
   auto consumerGenericOp = dyn_cast<linalg::GenericOp>(consumer);
@@ -116,12 +116,11 @@ static bool shouldSinkExpandShapeOp(OpOperand *opOperand) {
   }
 
   // First check that the expand_shape producer and consumer can be fused.
-  Operation *reshapeProducer = reshapeOp.getSrc().getDefiningOp();
+  Operation *reshapeProducer = expandOp.getSrc().getDefiningOp();
   if (!reshapeProducer) {
     return false;
   }
-  if (!isFusableUsingTileAndFuse(reshapeOp.getSrc().getDefiningOp(),
-                                 consumer)) {
+  if (!isFusableUsingTileAndFuse(expandOp.getSrc().getDefiningOp(), consumer)) {
     return false;
   }
 
@@ -197,8 +196,23 @@ void SinkReshapesPass::runOnOperation() {
   MLIRContext *context = &getContext();
 
   RewritePatternSet sinkReshapePatterns(context);
+
+  auto collapsingControlFn = [](OpOperand *opOperand) {
+    auto collapseOp =
+        llvm::dyn_cast_or_null<tensor::CollapseShapeOp>(opOperand->getOwner());
+    if (collapseOp) {
+      return shouldBubbleCollapseShapeOp(collapseOp, opOperand);
+    }
+
+    auto expandOp =
+        dyn_cast<tensor::ExpandShapeOp>(opOperand->get().getDefiningOp());
+    if (expandOp) {
+      return shouldSinkExpandShapeOp(expandOp, opOperand);
+    }
+    llvm_unreachable("reshape is neither a collapse or expand op");
+  };
   linalg::populateFoldReshapeOpsByCollapsingPatterns(sinkReshapePatterns,
-                                                     shouldSinkExpandShapeOp);
+                                                     collapsingControlFn);
   // Add patterns to fold `tensor.empty` and reshape ops.
   sinkReshapePatterns.insert<FoldDuplicateCollapseShapes>(context);
   tensor::populateFoldTensorEmptyPatterns(sinkReshapePatterns);
