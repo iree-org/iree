@@ -14,6 +14,56 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/RegionKindInterface.td"
 include "mlir/IR/OpBase.td"
 
+def CreateSerializedModuleOp : Op<Transform_Dialect, "util.create_serialized_module",
+    [DeclareOpInterfaceMethods<TransformOpInterface>,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     FunctionalStyleTransformOpTrait,
+     ReportTrackingListenerFailuresOpTrait,
+    ] # GraphRegionNoTerminator.traits> {
+  let cppNamespace = "mlir::iree_compiler::IREE::Util::transform_dialect";
+  let summary = "Creates a serialized module op using the transform region";
+  let description = [{
+    This op creates an owning op reference to a module op and executes the
+    transforms contained within this operations body on it. Then the serialized
+    module is returned.
+
+    The body of this op provides a single block argument providing the temporary
+    module for modification. No transform on the module is allowed to consume
+    it.
+  }];
+
+  let arguments = (ins);
+  let results = (outs TransformParamTypeInterface:$result);
+  let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = "attr-dict-with-keyword regions `->` type($result)";
+  let hasVerifier = 1;
+}
+
+def DeserializeModuleOp : Op<Transform_Dialect, "util.deserialize_module", [
+  FunctionalStyleTransformOpTrait,
+  DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+  DeclareOpInterfaceMethods<TransformOpInterface>,
+  ReportTrackingListenerFailuresOpTrait,
+]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::Util::transform_dialect";
+
+  let description = [{
+    Deserializes |module| to a ModuleOp and inserts it at the end of
+    |container|. This operation is currently only used for testing purposes.
+  }];
+
+  let arguments = (ins
+    TransformParamTypeInterface:$module,
+    TransformHandleTypeInterface:$container
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    $module `into` $container attr-dict `:` type($module) `,` type($container)
+  }];
+}
+
 def GetNearestSymbolTableOp : Op<Transform_Dialect, "util.get_nearest_symbol_table", [
   FunctionalStyleTransformOpTrait,
   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
