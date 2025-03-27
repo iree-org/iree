@@ -93,6 +93,35 @@ def ImportSymbolOp : Op<Transform_Dialect, "util.import_symbol", [
   let hasVerifier = 1;
 }
 
+def GetSiblingSymbolOp : Op<Transform_Dialect, "util.get_sibling_symbol", [
+  FunctionalStyleTransformOpTrait,
+  DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+  DeclareOpInterfaceMethods<TransformOpInterface>,
+  ReportTrackingListenerFailuresOpTrait,
+]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::Util::transform_dialect";
+
+  let description = [{
+    Returns a reference to the symbol with the specified name within the nearest
+    symbol table to this operation.
+
+    #### Return modes
+
+    This operation produces the `target_symbol` handle based on `symbol` and
+    the nearest symbol table. This operation emits a definite failure if the
+    symbol does not exist.
+  }];
+
+  let arguments = (ins SymbolRefAttr:$symbol);
+  let results = (outs
+    TransformHandleTypeInterface:$target_symbol
+  );
+
+  let assemblyFormat = [{
+    $symbol attr-dict `:` type($target_symbol)
+  }];
+}
+
 def CastAndCallOp : Op<Transform_Dialect, "util.cast_and_call", [
   DeclareOpInterfaceMethods<TransformOpInterface>,
   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
