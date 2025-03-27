@@ -44,7 +44,7 @@ populatefoldUnitDimsPatterns(RewritePatternSet &foldUnitDimsPatterns) {
   linalg::ControlDropUnitDims options;
   auto defaultFn = options.controlFn;
 
-  options.controlFn = [&](Operation *op) {
+  options.controlFn = [=](Operation *op) {
     // Ignore operations already in dispatches.
     if (!IREE::Flow::isNonNullAndOutsideDispatch(op)) {
       return SmallVector<unsigned>{};
@@ -137,6 +137,14 @@ struct FoldUnitExtentDimsPass final
   void runOnOperation() override;
 };
 
+struct FoldUnitExtentDimsForFuncPass final
+    : public impl::FoldUnitExtentDimsForFuncPassBase<
+          FoldUnitExtentDimsForFuncPass> {
+  void runOnOperation() override;
+};
+
+} // namespace
+
 void FoldUnitExtentDimsPass::runOnOperation() {
   auto moduleOp = getOperation();
   MLIRContext *context = &getContext();
@@ -174,14 +182,6 @@ void FoldUnitExtentDimsPass::runOnOperation() {
     return signalPassFailure();
   }
 }
-} // namespace
-
-namespace {
-struct FoldUnitExtentDimsForFuncPass final
-    : public impl::FoldUnitExtentDimsForFuncPassBase<
-          FoldUnitExtentDimsForFuncPass> {
-  void runOnOperation() override;
-};
 
 void FoldUnitExtentDimsForFuncPass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -193,5 +193,4 @@ void FoldUnitExtentDimsForFuncPass::runOnOperation() {
   }
 }
 
-} // namespace
 } // namespace mlir::iree_compiler::DispatchCreation
