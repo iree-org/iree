@@ -29,6 +29,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
+#include "mlir/Conversion/GPUToAMDGPU/GPUToAMDGPU.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/Passes.h"
@@ -1148,6 +1149,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
 
   // Handled tensor constants.
   modulePassManager.addPass(createIREEBufferizeConstantsPass());
+
+  modulePassManager.addPass(createConvertGPUToAMDGPUPass());
 
   FunctionLikeNest funcPassManager(modulePassManager);
   funcPassManager.addPass(createFoldTensorExtractOpPass)
