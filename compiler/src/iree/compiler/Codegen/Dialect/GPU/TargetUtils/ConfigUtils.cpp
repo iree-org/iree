@@ -957,7 +957,7 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
   MLIRContext *context = op->getContext();
   Builder b(context);
 
-  auto subgroupSize = target.getPreferredSubgroupSize();
+  const int64_t subgroupSize = target.getPreferredSubgroupSize();
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   SmallVector<unsigned> partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
@@ -980,7 +980,7 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
         {1, 1, 1}, subgroupSize, DictionaryAttr());
   }
 
-  size_t numLoops = partitionedLoops.back() + 1;
+  unsigned numLoops = partitionedLoops.back() + 1;
 
   // To get peak occupancy we need a workgroup size of at least two warps.
   std::array<int64_t, 3> workgroupSize = {2 * subgroupSize, 1, 1};
