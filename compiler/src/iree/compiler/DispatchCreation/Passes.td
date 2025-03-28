@@ -26,6 +26,10 @@ include "mlir/Pass/PassBase.td"
 def BubbleUpExpandShapesPass :
     Pass<"iree-dispatch-creation-bubble-up-expand-shapes"> {
   let summary = "Propagate expand_shapes up the program (and collapse_shapes down).";
+  let options = [
+    Option<"enableAggressivePropagation", "enable-aggressive-propagation", "bool",
+           /*default=*/"false", "Enable more aggressive propagation of reshapes">
+  ];
   let dependentDialects = [
     "mlir::affine::AffineDialect",
   ];

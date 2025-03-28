@@ -37,6 +37,7 @@ namespace {
 
 struct BubbleUpExpandShapesPass final
     : public impl::BubbleUpExpandShapesPassBase<BubbleUpExpandShapesPass> {
+  using Base::Base;
   void runOnOperation() override;
 };
 
@@ -122,7 +123,7 @@ void BubbleUpExpandShapesPass::runOnOperation() {
 
   RewritePatternSet bubbleExpandShapePatterns(context);
   linalg::ControlFusionFn bubbleUpExpansionControlFn =
-      [](OpOperand *fusedOperand) {
+      [&](OpOperand *fusedOperand) {
         Operation *producer = fusedOperand->get().getDefiningOp();
         Operation *consumer = fusedOperand->getOwner();
         if (!IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer})) {
@@ -136,9 +137,10 @@ void BubbleUpExpandShapesPass::runOnOperation() {
           return false;
         }
 
-        // If producer generic op is elementwise op, bubble up the expand shape
-        // past this operation.
         if (auto producerGenericOp = dyn_cast<linalg::GenericOp>(producer)) {
+          if (enableAggressivePropagation)
+            return true;
+          // Only bubble up if producer generic op is an elementwise op.
           return llvm::all_of(producerGenericOp.getIteratorTypesArray(),
                               linalg::isParallelIterator);
         }
