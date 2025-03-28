@@ -26,6 +26,9 @@ typedef enum iree_hal_hip_buffer_type_e {
   // Externally registered buffer whose providence is unknown.
   // Must be freed by the user.
   IREE_HAL_HIP_BUFFER_TYPE_EXTERNAL,
+  // Wrapper of a device local buffer, allocated with
+  // hipMalloc/hipMallocManaged, freed with hipFree.
+  IREE_HAL_HIP_BUFFER_TYPE_WRAPPER,
 } iree_hal_hip_buffer_type_t;
 
 // Wraps a HIP allocation in an iree_hal_buffer_t.
@@ -64,5 +67,10 @@ void* iree_hal_hip_buffer_host_pointer(const iree_hal_buffer_t* buffer);
 // holding an allocation and the earliest the buffer could be destroyed is after
 // this call returns and the caller has released its reference.
 void iree_hal_hip_buffer_drop_release_callback(iree_hal_buffer_t* buffer);
+
+// Sets a HIP buffer to the given |base_buffer|, if the given |base_buffer|
+// is a hip buffer that wraps around another HIP buffer.
+void iree_hal_hip_buffer_set_wrapped_buffer(iree_hal_buffer_t* base_buffer,
+                                            iree_hal_buffer_t* wrapped_buffer);
 
 #endif  // IREE_HAL_DRIVERS_HIP_BUFFER_H_
