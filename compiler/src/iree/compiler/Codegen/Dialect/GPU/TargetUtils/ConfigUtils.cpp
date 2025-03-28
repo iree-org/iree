@@ -550,16 +550,16 @@ static unsigned getRepresentativeBitWidth(linalg::LinalgOp linalgOp) {
 
 static bool elementHasPowerOfTwoBitwidth(Value operand) {
   Type elementType = getElementTypeOrSelf(operand.getType());
-  return isa<IntegerType, FloatType>(elementType) &&
+  return elementType.isIntOrFloat() &&
          llvm::isPowerOf2_64(IREE::Util::getTypeBitWidth(elementType));
 }
 
 struct DistributionInfo {
   SmallVector<unsigned int> partitionableLoops;
   SmallVector<int64_t> loopBounds;
-  unsigned minBitwidth;
-  unsigned representativeBitWidth;
-  bool vectorizable;
+  unsigned minBitwidth = 0;
+  unsigned representativeBitWidth = 0;
+  bool vectorizable = false;
 };
 
 static FailureOr<DistributionInfo> collectOpDistributionInfo(Operation *op) {
@@ -590,7 +590,6 @@ static FailureOr<DistributionInfo> collectOpDistributionInfo(Operation *op) {
     return failure();
   }
 
-  // SmallVector<unsigned int> partitionableLoops;
   linalgOp.getParallelDims(distInfo.partitionableLoops);
 
   // Bail out if op is not tilable.
@@ -600,14 +599,14 @@ static FailureOr<DistributionInfo> collectOpDistributionInfo(Operation *op) {
 
   // Whether we can try to use the vectorization pipeline.
   distInfo.loopBounds = linalgOp.getStaticLoopRanges();
-  bool projPerm =
+  bool isProjPerm =
       llvm::all_of(linalgOp.getIndexingMapsArray(),
                    [](AffineMap map) { return map.isProjectedPermutation(); });
-  bool powTwo = llvm::all_of(op->getOperands(), elementHasPowerOfTwoBitwidth);
+  bool isPowTwo = llvm::all_of(op->getOperands(), elementHasPowerOfTwoBitwidth);
 
   // Require all affine maps to be projected permutation so that we can
   // generate vector transfer ops.
-  distInfo.vectorizable = projPerm && powTwo;
+  distInfo.vectorizable = isProjPerm && isPowTwo;
 
   distInfo.minBitwidth = getMinElementBitwidth(linalgOp);
   distInfo.representativeBitWidth = getRepresentativeBitWidth(linalgOp);

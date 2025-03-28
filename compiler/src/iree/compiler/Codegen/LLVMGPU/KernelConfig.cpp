@@ -2515,12 +2515,13 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       })
       .Default([&](auto op) {
         LDBG("Default Config");
-        if (!clLLVMGPUVectorizePipeline) {
-          if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(
-                  target, entryPointFn, computeOp))) {
-            LDBG("Tile and fuse default config");
-            return success();
-          }
+        if (clLLVMGPUVectorizePipeline) {
+          return setRootDefaultConfig(target, entryPointFn, computeOp);
+        }
+        if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(
+                target, entryPointFn, computeOp))) {
+          LDBG("Tile and fuse default config");
+          return success();
         }
         return setRootDefaultConfig(target, entryPointFn, computeOp);
       });
