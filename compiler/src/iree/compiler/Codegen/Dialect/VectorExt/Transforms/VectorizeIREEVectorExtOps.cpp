@@ -262,7 +262,11 @@ getIterationSpaceToMemorySpaceMap(linalg::GenericOp genericOp,
         } else {
           AffineMap indexMap =
               genericOp.getIndexingMapsArray()[blockArg.getArgNumber()];
-          if (indexMap.getNumResults() == 1) {
+          if (indexMap.getNumResults() == 0) {
+            map = map.insertResult(getAffineConstantExpr(0, ctx),
+                                   map.getNumResults());
+            found = true;
+          } else if (indexMap.getNumResults() == 1) {
             if (auto dimExpr = dyn_cast<AffineDimExpr>(indexMap.getResult(0))) {
               map =
                   map.insertResult(getAffineDimExpr(dimExpr.getPosition(), ctx),
