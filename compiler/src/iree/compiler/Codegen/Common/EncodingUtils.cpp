@@ -8,13 +8,10 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
-#include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
-#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
-#include <cstdint>
 #include <optional>
 
 namespace mlir::iree_compiler {
@@ -91,31 +88,6 @@ MaterializeEncodingTypeConverter::getEncodingInfo(RankedTensorType type) const {
     return maybeEncodingInfo.value();
   }
   return layoutAttr.getEncodingInfo(type);
-}
-
-MemRefFlatteningConverter::MemRefFlatteningConverter(mlir::MLIRContext *ctx) {
-  addConversion([](MemRefType memrefType) {
-    auto rank = memrefType.getRank();
-
-    // Only handle multiple-ranked memrefs, or statically shaped, contiguous
-    // memrefs.
-    if (rank == 0 || rank == 1 ||
-        mlir::memref::isStaticShapeAndContiguousRowMajor(memrefType)) {
-      return memrefType;
-    }
-
-    mlir::Type elementType = memrefType.getElementType();
-    ArrayRef<int64_t> shape = memrefType.getShape();
-
-    // Calculate the total size of the memref in elements.
-    int64_t totalSize = 1;
-    for (int64_t dim : shape) {
-      totalSize *= dim;
-    }
-
-    // Create a new memref type with a single dimension equal to the total size.
-    return MemRefType::get({totalSize}, elementType);
-  });
 }
 
 std::optional<IREE::Codegen::MaterializeEncodingInfo>
