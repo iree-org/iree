@@ -82,7 +82,12 @@ void DistributeMmaToLanesPass::runOnOperation() {
 
   // Distribute multi_mma ops to lanes and greedily fuse producers.
   SmallVector<IREE::GPU::MultiMmaOp> mmaOps;
-  funcOp.walk([&](IREE::GPU::MultiMmaOp mmaOp) { mmaOps.push_back(mmaOp); });
+  funcOp.walk([&](IREE::GPU::MultiMmaOp mmaOp) {
+    if (!mmaOp.hasTensorSemantics()) {
+      return;
+    }
+    mmaOps.push_back(mmaOp);
+  });
   if (mmaOps.empty()) {
     return;
   }

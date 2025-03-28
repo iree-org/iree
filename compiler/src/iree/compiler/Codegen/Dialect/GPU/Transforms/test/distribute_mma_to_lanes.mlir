@@ -527,3 +527,21 @@ func.func @data_tiled_2x2x4_tensor_multi_mma_unrolled_to_subgroups(%lhs: tensor<
 //       CHECK:     tensor.parallel_insert_slice %[[MMA]] into %[[ACC_ARG]]
 //  CHECK-SAME:       [0, 0, %[[ACC_IDS]]#1, %[[ACC_IDS]]#2, %[[ACC_IDS]]#3, %[[ACC_IDS]]#4, 0] [1, 1, 1, 1, 1, 1, 4] [1, 1, 1, 1, 1, 1, 1]
 //       CHECK:   mapping = [#gpu.thread<linear_dim_0>]
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+module {
+  func.func @distributed_matmul(%arg0: vector<2x8x1x4xf16>, %arg1: vector<8x2x1x4xf16>, %arg2: vector<2x2x4x1xf32>) -> vector<2x2x4x1xf32> {
+    %0 = iree_gpu.multi_mma %arg0, %arg1, %arg2 {indexing_maps = [#map, #map1, #map2],
+      iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
+      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>} : vector<2x8x1x4xf16>, vector<8x2x1x4xf16> into vector<2x2x4x1xf32>
+    return %0 : vector<2x2x4x1xf32>
+  }
+}
+
+// Verify that already vectorized (assumed distributed) mma ops are pass through.
+// CHECK-LABEL: func @distributed_matmul
+//       CHECK:   iree_gpu.multi_mma {{.*}} : vector<2x8x1x4xf16>, vector<8x2x1x4xf16> into vector<2x2x4x1xf32>
