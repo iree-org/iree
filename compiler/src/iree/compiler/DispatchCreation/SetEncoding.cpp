@@ -20,7 +20,6 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -153,18 +152,9 @@ static LogicalResult isSupportedContractionOp(PatternRewriter &rewriter,
   return success();
 }
 
-static bool isInScalarDispatch(Operation *op) {
+static bool hasWorkgroupCounts(Operation *op) {
   auto parentDispatchOp = op->getParentOfType<IREE::Flow::DispatchRegionOp>();
-  if (!parentDispatchOp) {
-    return false;
-  }
-  Region &workgroupCountRegion = parentDispatchOp.getWorkgroupCount();
-  if (workgroupCountRegion.empty()) {
-    return false;
-  }
-  SmallVector<OpFoldResult> workgroupCounts =
-        workgroupCountRegion.getBlocks().front().getTerminator()->getOperands();
-  return areAllConstantIntValue(workgroupCounts, 1);
+  return parentDispatchOp && !parentDispatchOp.getWorkgroupCount().empty();
 }
 
 namespace {
@@ -185,9 +175,10 @@ public:
       return rewriter.notifyMatchFailure(
           linalgOp, "the op has preset compilation strategy, skip SetEncoding");
     }
-    if (isInScalarDispatch(linalgOp.getOperation())) {
+    if (hasWorkgroupCounts(linalgOp.getOperation())) {
       return rewriter.notifyMatchFailure(
-          linalgOp, "the op is in a scalar dispatch, skip SetEncoding");
+          linalgOp, "the op is in a region with workgroup counts, skip "
+                    "SetEncoding");
     }
     if (failed(isSupportedContractionOp(rewriter, linalgOp))) {
       return failure();
