@@ -29,7 +29,7 @@ struct GPUVerifyDistributionPass final
 
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
-    
+
     std::optional<SmallVector<int64_t>> workgroupSize =
         getWorkgroupSize(funcOp);
     if (!workgroupSize) {
@@ -44,8 +44,9 @@ struct GPUVerifyDistributionPass final
         break;
       }
     }
-    if (!multithreaded)
+    if (!multithreaded) {
       return;
+    }
 
     auto privateAddressSpace = gpu::AddressSpaceAttr::get(
         &getContext(), gpu::GPUDialect::getPrivateAddressSpace());
