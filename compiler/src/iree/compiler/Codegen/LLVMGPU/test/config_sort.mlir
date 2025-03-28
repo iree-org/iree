@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --pass-pipeline='builtin.module(iree-llvmgpu-select-lowering-strategy)' %s | \ 
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --pass-pipeline='builtin.module(iree-llvmgpu-select-lowering-strategy)' %s | \
 // RUN: FileCheck %s
 
 func.func @_sort1D_dispatch_0_sort_4xi32_dispatch_tensor_store() {
