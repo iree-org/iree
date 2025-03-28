@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
-#include <cstdint>
 
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Common/TileInferenceUtils.h"
@@ -1005,6 +1004,8 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
 LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
                             mlir::FunctionOpInterface entryPoint,
                             Operation *op) {
+
+  assert(isa<IREE::LinalgExt::SortOp>(op) && "expected linalg_ext.sort op");
   MLIRContext *context = op->getContext();
   Builder b(context);
 
@@ -1023,13 +1024,13 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
   };
 
   if (partitionedLoops.empty()) {
-    SmallVector<int64_t> defaultTileSizes(3, 1);
+    SmallVector<int64_t> defaultTileSizes = {0};
     IREE::GPU::LoweringConfigAttr loweringConfig =
         createLoweringConfig(defaultTileSizes, defaultTileSizes);
     return setOpConfigAndEntryPointFnTranslation(
         entryPoint, op, loweringConfig,
         IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
-        defaultTileSizes, subgroupSize, DictionaryAttr());
+        {1, 1, 1}, subgroupSize, DictionaryAttr());
   }
 
   size_t numLoops = partitionedLoops.back() + 1;
@@ -1045,13 +1046,24 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
   for (auto depth : llvm::seq<int64_t>(0, numLoops)) {
     if (!partitionedLoopsSet.count(depth)) {
       workgroupTileSizes[depth] = 0;
+      threadTileSizes[depth] = 0;
     }
   }
 
-  // Tile to have one element per thread.
-  for (int64_t depth = numLoops; depth > 0; --depth) {
-    if (partitionedLoopsSet.contains(depth - 1)) {
-      workgroupTileSizes[depth - 1] = workgroupSize[0];
+  // Tile to have one element per thread
+  ArrayRef loopBounds = cast<IREE::LinalgExt::SortOp>(op).getOperandShape();
+  int64_t residualWorkgroupSize = workgroupSize[0];
+  for (int64_t depth = numLoops - 1; depth >= 0; --depth) {
+    if (!partitionedLoopsSet.contains(depth)) {
+      continue;
+    }
+    if (residualWorkgroupSize % loopBounds[depth] == 0) {
+      workgroupTileSizes[depth] = loopBounds[depth];
+      residualWorkgroupSize /= loopBounds[depth];
+      continue;
+    }
+    if (loopBounds[depth] % residualWorkgroupSize == 0) {
+      workgroupTileSizes[depth] = residualWorkgroupSize;
       break;
     }
   }
