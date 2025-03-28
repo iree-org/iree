@@ -1014,9 +1014,9 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
   SmallVector<unsigned> partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
 
-  auto createLoweringConfig = [&](SmallVector<int64_t> &workgroupSizes,
-                                  SmallVector<int64_t> &threadSizes) {
-    SmallVector<NamedAttribute, 2> attrs = {
+  auto createLoweringConfig = [&](ArrayRef<int64_t> workgroupSizes,
+                                  ArrayRef<int64_t> threadSizes) {
+    NamedAttribute attrs[2] = {
         NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupSizes)),
         NamedAttribute("thread", b.getI64ArrayAttr(threadSizes))};
     auto configDict = b.getDictionaryAttr(attrs);
@@ -1024,9 +1024,8 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
   };
 
   if (partitionedLoops.empty()) {
-    SmallVector<int64_t> defaultTileSizes = {0};
     IREE::GPU::LoweringConfigAttr loweringConfig =
-        createLoweringConfig(defaultTileSizes, defaultTileSizes);
+        createLoweringConfig(int64_t{0}, int64_t{0});
     return setOpConfigAndEntryPointFnTranslation(
         entryPoint, op, loweringConfig,
         IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
@@ -1050,7 +1049,7 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
     }
   }
 
-  // Tile to have one element per thread
+  // Tile to have one element per thread.
   ArrayRef loopBounds = cast<IREE::LinalgExt::SortOp>(op).getOperandShape();
   int64_t residualWorkgroupSize = workgroupSize[0];
   for (int64_t depth = numLoops - 1; depth >= 0; --depth) {
