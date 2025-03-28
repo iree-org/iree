@@ -41,6 +41,29 @@ void IREE::Util::transform_dialect::GetNearestSymbolTableOp::getEffects(
 }
 
 //===----------------------------------------------------------------------===//
+// LookupNearestSymbolFromSelfOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+IREE::Util::transform_dialect::LookupNearestSymbolFromSelfOp::apply(
+    transform::TransformRewriter &rewriter,
+    transform::TransformResults &transformResults,
+    transform::TransformState &state) {
+  auto symbolOp = SymbolTable::lookupNearestSymbolFrom(*this, getSymbol());
+  if (!symbolOp) {
+    return emitDefiniteFailure() << "could not find symbol " << getSymbol();
+  }
+  transformResults.set(cast<OpResult>(getTargetSymbol()), {symbolOp});
+  return DiagnosedSilenceableFailure::success();
+}
+
+void IREE::Util::transform_dialect::LookupNearestSymbolFromSelfOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::producesHandle(getOperation()->getOpResults(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===----------------------------------------------------------------------===//
 // ImportSymbolOp
 //===----------------------------------------------------------------------===//
 
