@@ -149,10 +149,10 @@ buildMakeSingleDispatchPassPipeline(OpPassManager &passManager,
   passManager.addPass(GlobalOptimization::createGeneralizeLinalgNamedOpsPass());
   passManager.addPass(DispatchCreation::createFusionPreprocessingPass());
   passManager.addPass(mlir::createCSEPass());
-  // TODO : createBubbleUpExpandShapesPass currently doesnt bubble up through
-  // producer generic ops that have reudction. We need to allow this in
-  // a single dispatch use case.
-  passManager.addPass(DispatchCreation::createBubbleUpExpandShapesPass());
+  DispatchCreation::BubbleUpExpandShapesPassOptions bubbleOptions;
+  bubbleOptions.enableBubbleUpExpandShapesAcrossReductionOps = true;
+  passManager.addPass(
+      DispatchCreation::createBubbleUpExpandShapesPass(bubbleOptions));
   passManager.addPass(DispatchCreation::createElementwiseOpFusionPass(
       DispatchCreation::ElementwiseOpFusionPassOptions{
           /*enableElementWiseFuseMultiReduction=*/true}));
