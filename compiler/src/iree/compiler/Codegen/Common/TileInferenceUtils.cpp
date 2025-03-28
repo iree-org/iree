@@ -362,19 +362,18 @@ static SmallVector<int64_t> inferUseWorkgroupTileMultiples(OpOperand *use) {
       });
 }
 
+static SmallVector<int64_t> lcmMultiples(ArrayRef<int64_t> a,
+                                         ArrayRef<int64_t> b) {
+  SmallVector<int64_t> lcm;
+  for (auto [aMultiple, bMultiple] : llvm::zip_equal(a, b)) {
+    lcm.push_back(std::lcm(aMultiple, bMultiple));
+  }
+  return lcm;
+}
+
 SmallVector<int64_t> getWorkgroupSizeMultiples(TilingInterface tilingOp) {
   LDBG("Computing workgroup tile size multiples for: "
        << *tilingOp.getOperation());
-  if (auto packOp = dyn_cast<linalg::PackOp>(tilingOp.getOperation())) {
-    // We do not expect to find multiple pack/unpack ops in the same dispatch
-    // region, so we can simply return the multiples for the given `packOp`.
-    return inferWorkgroupTileMultiplesFromPackUnPack(packOp).second;
-  }
-  auto linalgOp = dyn_cast<linalg::LinalgOp>(tilingOp.getOperation());
-  if (!linalgOp) {
-    LDBG("Only LinalgOp is implemented. Defaulting to all 1 multiples.");
-    return SmallVector<int64_t>(tilingOp.getLoopIteratorTypes().size(), 1);
-  }
 
   // Get operand and result multiples for the op.
   SmallVector<SmallVector<int64_t>> operandMultiples;
@@ -386,9 +385,25 @@ SmallVector<int64_t> getWorkgroupSizeMultiples(TilingInterface tilingOp) {
   }
   SmallVector<SmallVector<int64_t>> resultMultiples;
   for (Value result : tilingOp->getResults()) {
+    SmallVector<int64_t> multiples = getDefaultValueMultiples(result);
     for (OpOperand &use : result.getUses()) {
-      resultMultiples.push_back(inferUseWorkgroupTileMultiples(&use));
+      multiples = lcmMultiples(multiples, inferUseWorkgroupTileMultiples(&use));
     }
+    resultMultiples.push_back(multiples);
+  }
+
+  if (auto packOp = dyn_cast<linalg::PackOp>(tilingOp.getOperation())) {
+    SmallVector<int64_t> initialUnPackedMultiples = operandMultiples.front();
+    SmallVector<int64_t> initialPackedMultiples = resultMultiples.front();
+    return inferWorkgroupTileMultiplesFromPackUnPack(
+               packOp, initialPackedMultiples, initialUnPackedMultiples)
+        .second;
+  }
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(tilingOp.getOperation());
+  if (!linalgOp) {
+    LDBG("Only LinalgOp and PackOp are implemented. Defaulting to all 1 "
+         "multiples.");
+    return SmallVector<int64_t>(tilingOp.getLoopIteratorTypes().size(), 1);
   }
 
   // Infer the workgroup tile size multiples for the iteration space of
