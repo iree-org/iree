@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
+#include <optional>
 
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Common/TileInferenceUtils.h"
@@ -621,18 +622,6 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   if (failed(maybeDistInfo)) {
     return failure();
   }
-
-  // TODO(Max191): Drop this check for reshapes in the dispatch once we can
-  // codegen larger tile sizes with reshapes in the dispatch.
-  bool hasReshapes = false;
-  entryPoint->walk([&](Operation *opInEntryPoint) {
-    if (isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp>(opInEntryPoint)) {
-      hasReshapes = true;
-      return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
-
   DistributionInfo distInfo = maybeDistInfo.value();
 
   const int subgroupSize = target.getPreferredSubgroupSize();
@@ -752,7 +741,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
         // TODO: Try to take into account element type bit width to get
         // 4xdword reads instead of 4x{elements}.
         if (distInfo.vectorizable && wgDim == 0 && !lossFactor &&
-            candidate % numVectorElements == 0 && !hasReshapes) {
+            candidate % numVectorElements == 0) {
           // Use size-1 vectors to increase parallelism if larger ones causes
           // idle threads in the subgroup.
           bool hasIdleThreads = distInfo.partitionableLoops.size() == 1 &&
@@ -1004,15 +993,14 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
 LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
                             mlir::FunctionOpInterface entryPoint,
                             Operation *op) {
-
   assert(isa<IREE::LinalgExt::SortOp>(op) && "expected linalg_ext.sort op");
   MLIRContext *context = op->getContext();
   Builder b(context);
 
-  auto subgroupSize = target.getPreferredSubgroupSize();
+  const int64_t subgroupSize = target.getPreferredSubgroupSize();
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   SmallVector<unsigned> partitionedLoops =
-      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
+      interfaceOp.getPartitionableLoops(std::nullopt);
 
   auto createLoweringConfig = [&](ArrayRef<int64_t> workgroupSizes,
                                   ArrayRef<int64_t> threadSizes) {
@@ -1032,7 +1020,7 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
         {1, 1, 1}, subgroupSize, DictionaryAttr());
   }
 
-  size_t numLoops = partitionedLoops.back() + 1;
+  unsigned numLoops = cast<ShapedType>(op->getResult(0).getType()).getRank();
 
   // To get peak occupancy we need a workgroup size of at least two warps.
   std::array<int64_t, 3> workgroupSize = {2 * subgroupSize, 1, 1};
@@ -1054,6 +1042,9 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
   int64_t residualWorkgroupSize = workgroupSize[0];
   for (int64_t depth = numLoops - 1; depth >= 0; --depth) {
     if (!partitionedLoopsSet.contains(depth)) {
+      continue;
+    }
+    if (ShapedType::isDynamic(loopBounds[depth])) {
       continue;
     }
     if (residualWorkgroupSize % loopBounds[depth] == 0) {

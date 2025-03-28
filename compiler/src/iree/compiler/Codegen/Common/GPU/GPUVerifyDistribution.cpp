@@ -37,14 +37,7 @@ struct GPUVerifyDistributionPass final
       return signalPassFailure();
     }
 
-    bool multithreaded = false;
-    for (int64_t size : *workgroupSize) {
-      if (size != 1) {
-        multithreaded = true;
-        break;
-      }
-    }
-    if (!multithreaded) {
+    if (llvm::all_of(*workgroupSize, [](int64_t size) { return size == 1; })) {
       return;
     }
 

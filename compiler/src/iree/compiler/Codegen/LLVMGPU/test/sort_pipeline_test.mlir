@@ -1,11 +1,16 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target))" /home/muzasyed/iree/compiler/src/iree/compiler/Codegen/LLVMGPU/test/sort_pipeline_test.mlir | FileCheck /home/muzasyed/iree/compiler/src/iree/compiler/Codegen/LLVMGPU/test/sort_pipeline_test.mlir
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 \
+// RUN:     --pass-pipeline="builtin.module(func.func(iree-llvmgpu-lower-executable-target))" %s | \
+// RUN: FileCheck %s
 
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [1, 1, 1] subgroup_size = 32>
+#lowering_config = #iree_gpu.lowering_config<{thread = [0], workgroup = [0]}>
 module {
-  func.func @_sort1D_dispatch_0_sort_4xi32_dispatch_tensor_store() {
+  func.func @sort1D() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
-    %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags(Indirect) {iree_gpu.use_rocdl_buffer_instructions} : !flow.dispatch.tensor<readwrite:tensor<4xi32>>
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(Indirect) {iree_gpu.use_rocdl_buffer_instructions} : !flow.dispatch.tensor<readwrite:tensor<4xi32>>
     %1 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readwrite:tensor<4xi32>> -> tensor<4xi32>
-    %2 = iree_linalg_ext.sort dimension(0) outs(%1 : tensor<4xi32>) {
+    %2 = iree_linalg_ext.sort {lowering_config = #lowering_config} dimension(0) outs(%1 : tensor<4xi32>) {
     ^bb0(%arg0: i32, %arg1: i32):
       %3 = arith.cmpi slt, %arg0, %arg1 : i32
       iree_linalg_ext.yield %3 : i1
@@ -15,73 +20,65 @@ module {
   }
 }
 
-//   CHECK-LABEL:  func.func @_sort1D_dispatch_0_sort_4xi32_dispatch_tensor_store
+//   CHECK-LABEL:  func.func @sort1D
 //         CHECK:      amdgpu.fat_raw_buffer_cast
 //         CHECK:      memref.assume_alignment
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
+#lowering_config = #iree_gpu.lowering_config<{thread = [1], workgroup = [1]}>
 module {
-  func.func @_sort2D_dispatch_0_sort_2x4xi32_dispatch_tensor_store() {
+  func.func @sort2D_static_shape() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
-    %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags(Indirect) {iree_gpu.use_rocdl_buffer_instructions} : !flow.dispatch.tensor<readwrite:tensor<2x4xi32>>
-    %1 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2, 4], strides = [1, 1] : !flow.dispatch.tensor<readwrite:tensor<2x4xi32>> -> tensor<2x4xi32>
-    %2 = iree_linalg_ext.sort dimension(1) outs(%1 : tensor<2x4xi32>) {
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(Indirect) {iree_gpu.use_rocdl_buffer_instructions} : !flow.dispatch.tensor<readwrite:tensor<2000x30000xi32>>
+    %1 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2, 4], strides = [1, 1] : !flow.dispatch.tensor<readwrite:tensor<2000x30000xi32>> -> tensor<2000x30000xi32>
+    %2 = iree_linalg_ext.sort {lowering_config = #lowering_config} dimension(1) outs(%1 : tensor<2000x30000xi32>) {
     ^bb0(%arg0: i32, %arg1: i32):
       %3 = arith.cmpi slt, %arg0, %arg1 : i32
       iree_linalg_ext.yield %3 : i1
-    } -> tensor<2x4xi32>
-    flow.dispatch.tensor.store %2, %0, offsets = [0, 0], sizes = [2, 4], strides = [1, 1] : tensor<2x4xi32> -> !flow.dispatch.tensor<readwrite:tensor<2x4xi32>>
+    } -> tensor<2000x30000xi32>
+    flow.dispatch.tensor.store %2, %0, offsets = [0, 0], sizes = [2000, 30000], strides = [1, 1] : tensor<2000x30000xi32> -> !flow.dispatch.tensor<readwrite:tensor<2000x30000xi32>>
     return
   }
 }
 
-//   CHECK-LABEL:  func.func @_sort2D_dispatch_0_sort_2x4xi32_dispatch_tensor_store
+//   CHECK-LABEL:  func.func @sort2D_static_shape
 //         CHECK:      amdgpu.fat_raw_buffer_cast
 //         CHECK:      memref.assume_alignment
-//         CHECK:      scf.for
+//         CHECK:      scf.forall
 //         CHECK:        memref.subview
+//         CHECK:        scf.for
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
+#lowering_config = #iree_gpu.lowering_config<{thread = [1, 1], workgroup = [1, 2]}>
 module {
-  func.func @_sort3D_dispatch_0_sort_1x2x4xi32_dispatch_tensor_store() {
+  func.func @sort3D_dynamic_shape() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
-    %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags(Indirect) {iree_gpu.use_rocdl_buffer_instructions} : !flow.dispatch.tensor<readwrite:tensor<1x2x4xi32>>
-    %1 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [1, 2, 4], strides = [1, 1, 1] : !flow.dispatch.tensor<readwrite:tensor<1x2x4xi32>> -> tensor<1x2x4xi32>
-    %2 = iree_linalg_ext.sort dimension(2) outs(%1 : tensor<1x2x4xi32>) {
+    %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+    %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
+    %2 = arith.index_castui %0 : i32 to index
+    %3 = arith.index_castui %1 : i32 to index
+    %4 = flow.dispatch.workload.ordinal %3, 0 : index
+    %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%2) flags(Indirect) {iree_gpu.use_rocdl_buffer_instructions} : !flow.dispatch.tensor<readwrite:tensor<?x2x4xi32>>{%4}
+    %6 = flow.dispatch.tensor.load %5, offsets = [0, 0, 0], sizes = [%4, 2, 4], strides = [1, 1, 1] : !flow.dispatch.tensor<readwrite:tensor<?x2x4xi32>>{%4} -> tensor<?x2x4xi32>
+    %7 = iree_linalg_ext.sort {lowering_config = #lowering_config} dimension(2) outs(%6 : tensor<?x2x4xi32>) {
     ^bb0(%arg0: i32, %arg1: i32):
-      %3 = arith.cmpi slt, %arg0, %arg1 : i32
-      iree_linalg_ext.yield %3 : i1
-    } -> tensor<1x2x4xi32>
-    flow.dispatch.tensor.store %2, %0, offsets = [0, 0, 0], sizes = [1, 2, 4], strides = [1, 1, 1] : tensor<1x2x4xi32> -> !flow.dispatch.tensor<readwrite:tensor<1x2x4xi32>>
+      %8 = arith.cmpi slt, %arg0, %arg1 : i32
+      iree_linalg_ext.yield %8 : i1
+    } -> tensor<?x2x4xi32>
+    flow.dispatch.tensor.store %7, %5, offsets = [0, 0, 0], sizes = [%4, 2, 4], strides = [1, 1, 1] : tensor<?x2x4xi32> -> !flow.dispatch.tensor<readwrite:tensor<?x2x4xi32>>{%4}
     return
   }
 }
 
-//   CHECK-LABEL:  func.func @_sort3D_dispatch_0_sort_1x2x4xi32_dispatch_tensor_store
+//   CHECK-LABEL:  func.func @sort3D_dynamic_shape
 //         CHECK:      amdgpu.fat_raw_buffer_cast
 //         CHECK:      memref.assume_alignment
-//         CHECK:      scf.for
-//         CHECK:        memref.subview
-
-// -----
-
-module {
-  func.func @_sort_to_decreasing_seq_dispatch_0_sort_4xi32_dispatch_tensor_store() {
-    %c0 = arith.constant 0 : index
-    %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags(Indirect) {iree_gpu.use_rocdl_buffer_instructions} : !flow.dispatch.tensor<readwrite:tensor<4xi32>>
-    %1 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readwrite:tensor<4xi32>> -> tensor<4xi32>
-    %2 = iree_linalg_ext.sort dimension(0) outs(%1 : tensor<4xi32>) {
-    ^bb0(%arg0: i32, %arg1: i32):
-      %3 = arith.cmpi sgt, %arg0, %arg1 : i32
-      iree_linalg_ext.yield %3 : i1
-    } -> tensor<4xi32>
-    flow.dispatch.tensor.store %2, %0, offsets = [0], sizes = [4], strides = [1] : tensor<4xi32> -> !flow.dispatch.tensor<readwrite:tensor<4xi32>>
-    return
-  }
-}
-
-//   CHECK-LABEL:  func.func @_sort_to_decreasing_seq_dispatch_0_sort_4xi32_dispatch_tensor_store
-//         CHECK:      amdgpu.fat_raw_buffer_cast
-//         CHECK:      memref.assume_alignment
+//         CHECK:      scf.forall
+//         CHECK:       scf.for
+//         CHECK:         memref.subview
