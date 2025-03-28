@@ -42,17 +42,6 @@ namespace mlir {
 
 using namespace mlir;
 
-static MemRefType inferCastResultType(Value source, OpFoldResult offset) {
-  auto sourceType = cast<BaseMemRefType>(source.getType());
-  SmallVector<int64_t> staticOffsets;
-  SmallVector<Value> dynamicOffsets;
-  dispatchIndexOpFoldResults(offset, dynamicOffsets, staticOffsets);
-  auto stridedLayout =
-      StridedLayoutAttr::get(source.getContext(), staticOffsets.front(), {});
-  return MemRefType::get({}, sourceType.getElementType(), stridedLayout,
-                         sourceType.getMemorySpace());
-}
-
 static void setInsertionPointToStart(OpBuilder &builder, Value val) {
   if (auto *parentOp = val.getDefiningOp()) {
     builder.setInsertionPointAfter(parentOp);
@@ -61,7 +50,37 @@ static void setInsertionPointToStart(OpBuilder &builder, Value val) {
   }
 }
 
-static std::tuple<Value, OpFoldResult, SmallVector<OpFoldResult>, OpFoldResult>
+static OpFoldResult
+getCollapsedSizeofMemref(memref::ExtractStridedMetadataOp op) {
+  assert(false && "not implemented");
+}
+
+/// Return the product of `terms`, creating an `affine.apply` if any of them are
+/// non-constant values. If any of `terms` is `nullptr`, return `nullptr`.
+static OpFoldResult computeProduct(Location loc, OpBuilder &builder,
+                                   ArrayRef<OpFoldResult> terms) {
+  int64_t nDynamic = 0;
+  SmallVector<Value> dynamicPart;
+  AffineExpr result = builder.getAffineConstantExpr(1);
+  for (OpFoldResult term : terms) {
+    if (!term)
+      return term;
+    std::optional<int64_t> maybeConst = getConstantIntValue(term);
+    if (maybeConst) {
+      result = result * builder.getAffineConstantExpr(*maybeConst);
+    } else {
+      dynamicPart.push_back(cast<Value>(term));
+      result = result * builder.getAffineSymbolExpr(nDynamic++);
+    }
+  }
+  if (auto constant = dyn_cast<AffineConstantExpr>(result))
+    return getAsIndexOpFoldResult(builder.getContext(), constant.getValue());
+  return builder.create<affine::AffineApplyOp>(loc, result, dynamicPart)
+      .getResult();
+}
+
+static std::tuple<Value, OpFoldResult, SmallVector<OpFoldResult>, OpFoldResult,
+                  OpFoldResult>
 getFlatOffsetAndStrides(OpBuilder &rewriter, Location loc, Value source,
                         ArrayRef<OpFoldResult> subOffsets,
                         ArrayRef<OpFoldResult> subStrides = std::nullopt) {
@@ -86,6 +105,9 @@ getFlatOffsetAndStrides(OpBuilder &rewriter, Location loc, Value source,
   OpFoldResult origOffset =
       getDim(sourceOffset, newExtractStridedMetadata.getOffset());
   ValueRange sourceStridesVals = newExtractStridedMetadata.getStrides();
+  OpFoldResult outmostDim =
+      getDim(sourceType.getShape().front(),
+             newExtractStridedMetadata.getSizes().front());
 
   SmallVector<OpFoldResult> origStrides;
   origStrides.reserve(sourceRank);
@@ -106,13 +128,18 @@ getFlatOffsetAndStrides(OpBuilder &rewriter, Location loc, Value source,
     origStrides.emplace_back(origStride);
   }
 
-  // exclude offset
+  // Compute linearized index:
   auto &&[expr, values] =
       computeLinearIndex(rewriter.getIndexAttr(0), origStrides, subOffsets);
-  OpFoldResult finalOffset =
+  OpFoldResult linearizedIndex =
       affine::makeComposedFoldedAffineApply(rewriter, loc, expr, values);
-  return {newExtractStridedMetadata.getBaseBuffer(), finalOffset, strides,
-          origOffset};
+
+  // Compute collapsed size: (the outmost stride * outmost dimension).
+  SmallVector<OpFoldResult> ops{origStrides.front(), outmostDim};
+  OpFoldResult collapsedSize = computeProduct(loc, rewriter, ops);
+
+  return {newExtractStridedMetadata.getBaseBuffer(), linearizedIndex,
+          origStrides, origOffset, collapsedSize};
 }
 
 static Value getValueFromOpFoldResult(OpBuilder &rewriter, Location loc,
@@ -130,26 +157,20 @@ static std::pair<Value, Value> getFlattenMemrefAndOffset(OpBuilder &rewriter,
                                                          Location loc,
                                                          Value source,
                                                          ValueRange indices) {
-  MemRefType memrefType = cast<MemRefType>(source.getType());
-  auto &&[base, index, _, offset] = getFlatOffsetAndStrides(
-      rewriter, loc, source, getAsOpFoldResult(indices));
-  // We do not support non-contiguous memrefs.
-  int64_t collapsedShape = 1;
-  for (auto dim : memrefType.getShape()) {
-    collapsedShape *= dim;
-  }
+  auto &&[base, index, strides, offset, collapsedShape] =
+      getFlatOffsetAndStrides(rewriter, loc, source,
+                              getAsOpFoldResult(indices));
 
   return std::make_pair(
       rewriter.create<memref::ReinterpretCastOp>(
           loc, source,
           /* offset = */ offset,
-          /* shapes = */
-          ArrayRef<OpFoldResult>{rewriter.getIndexAttr(collapsedShape)},
-          /* strides = */ ArrayRef<OpFoldResult>{rewriter.getIndexAttr(1)}),
+          /* shapes = */ ArrayRef<OpFoldResult>{collapsedShape},
+          /* strides = */ ArrayRef<OpFoldResult>{strides.back()}),
       getValueFromOpFoldResult(rewriter, loc, index));
 }
 
-static bool needFlatten(Value val) {
+static bool needFlattenning(Value val) {
   auto type = cast<MemRefType>(val.getType());
   return type.getRank() > 1;
 }
@@ -167,7 +188,7 @@ struct FlattenMemrefLoad : public OpRewritePattern<memref::LoadOp> {
   LogicalResult matchAndRewrite(memref::LoadOp op,
                                 PatternRewriter &rewriter) const override {
     Value memref = op.getMemref();
-    if (!needFlatten(memref))
+    if (!needFlattenning(memref))
       return rewriter.notifyMatchFailure(op, "nothing to do");
 
     if (!checkLayout(memref))
@@ -176,9 +197,10 @@ struct FlattenMemrefLoad : public OpRewritePattern<memref::LoadOp> {
     auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
         rewriter, op.getLoc(), memref, op.getIndices());
 
-    rewriter.replaceOpWithNewOp<memref::LoadOp>(op, op.getType(), flatMemref,
-                                                ValueRange{offset}/*,
-                                                op.getNontemporal()*/);
+    auto newLoad = rewriter.create<memref::LoadOp>(
+        op.getLoc(), op.getType(), flatMemref, ValueRange{offset});
+    newLoad->setAttrs(op->getAttrs());
+    rewriter.replaceOp(op, newLoad.getResult());
     return success();
   }
 };
@@ -189,7 +211,7 @@ struct FlattenVectorLoad : public OpRewritePattern<vector::LoadOp> {
   LogicalResult matchAndRewrite(vector::LoadOp op,
                                 PatternRewriter &rewriter) const override {
     Value memref = op.getBase();
-    if (!needFlatten(memref))
+    if (!needFlattenning(memref))
       return rewriter.notifyMatchFailure(op, "nothing to do");
 
     if (!checkLayout(memref))
@@ -198,9 +220,10 @@ struct FlattenVectorLoad : public OpRewritePattern<vector::LoadOp> {
     auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
         rewriter, op.getLoc(), memref, op.getIndices());
 
-    rewriter.replaceOpWithNewOp<vector::LoadOp>(op, op.getType(), flatMemref,
-                                                ValueRange{offset}/*,
-                                                op.getNontemporal()*/);
+    auto newLoad = rewriter.create<vector::LoadOp>(
+        op.getLoc(), op.getType(), flatMemref, ValueRange{offset});
+    newLoad->setAttrs(op->getAttrs());
+    rewriter.replaceOp(op, newLoad.getResult());
     return success();
   }
 };
@@ -211,7 +234,7 @@ struct FlattenMemrefStore : public OpRewritePattern<memref::StoreOp> {
   LogicalResult matchAndRewrite(memref::StoreOp op,
                                 PatternRewriter &rewriter) const override {
     Value memref = op.getMemref();
-    if (!needFlatten(memref))
+    if (!needFlattenning(memref))
       return rewriter.notifyMatchFailure(op, "nothing to do");
 
     if (!checkLayout(memref))
@@ -219,8 +242,10 @@ struct FlattenMemrefStore : public OpRewritePattern<memref::StoreOp> {
 
     auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
         rewriter, op.getLoc(), memref, op.getIndices());
-    rewriter.replaceOpWithNewOp<memref::StoreOp>(op, op.getValue(), flatMemref,
-                                                 ValueRange{offset});
+    auto newStore = rewriter.create<memref::StoreOp>(
+        op->getLoc(), op.getValue(), flatMemref, ValueRange{offset});
+    newStore->setAttrs(op->getAttrs());
+    rewriter.replaceOp(op, newStore);
     return success();
   }
 };
@@ -231,7 +256,7 @@ struct FlattenVectorStore : public OpRewritePattern<vector::StoreOp> {
   LogicalResult matchAndRewrite(vector::StoreOp op,
                                 PatternRewriter &rewriter) const override {
     Value memref = op.getBase();
-    if (!needFlatten(memref))
+    if (!needFlattenning(memref))
       return rewriter.notifyMatchFailure(op, "nothing to do");
 
     if (!checkLayout(memref))
@@ -239,8 +264,10 @@ struct FlattenVectorStore : public OpRewritePattern<vector::StoreOp> {
 
     auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
         rewriter, op.getLoc(), memref, op.getIndices());
-    rewriter.replaceOpWithNewOp<vector::StoreOp>(
-        op, op.getValueToStore(), flatMemref, ValueRange{offset});
+    auto newStore = rewriter.create<vector::StoreOp>(
+        op->getLoc(), op.getValueToStore(), flatMemref, ValueRange{offset});
+    newStore->setAttrs(op->getAttrs());
+    rewriter.replaceOp(op, newStore);
     return success();
   }
 };
@@ -251,7 +278,7 @@ struct FlattenVectorMaskedLoad : public OpRewritePattern<vector::MaskedLoadOp> {
   LogicalResult matchAndRewrite(vector::MaskedLoadOp op,
                                 PatternRewriter &rewriter) const override {
     Value memref = op.getBase();
-    if (!needFlatten(memref))
+    if (!needFlattenning(memref))
       return rewriter.notifyMatchFailure(op, "nothing to do");
 
     if (!checkLayout(memref))
@@ -259,9 +286,12 @@ struct FlattenVectorMaskedLoad : public OpRewritePattern<vector::MaskedLoadOp> {
 
     auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
         rewriter, op.getLoc(), memref, op.getIndices());
-    rewriter.replaceOpWithNewOp<vector::MaskedLoadOp>(
-        op, op.getType(), flatMemref, ValueRange{offset}, op.getMask(),
-        op.getPassThru());
+
+    auto newMaskedLoad = rewriter.create<vector::MaskedLoadOp>(
+        op->getLoc(), op.getType(), flatMemref, ValueRange{offset},
+        op.getMask(), op.getPassThru());
+    newMaskedLoad->setAttrs(op->getAttrs());
+    rewriter.replaceOp(op, newMaskedLoad.getResult());
     return success();
   }
 };
@@ -273,7 +303,7 @@ struct FlattenVectorMaskedStore
   LogicalResult matchAndRewrite(vector::MaskedStoreOp op,
                                 PatternRewriter &rewriter) const override {
     Value memref = op.getBase();
-    if (!needFlatten(memref))
+    if (!needFlattenning(memref))
       return rewriter.notifyMatchFailure(op, "nothing to do");
 
     if (!checkLayout(memref))
@@ -281,8 +311,11 @@ struct FlattenVectorMaskedStore
 
     auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
         rewriter, op.getLoc(), memref, op.getIndices());
-    rewriter.replaceOpWithNewOp<vector::MaskedStoreOp>(
-        op, flatMemref, ValueRange{offset}, op.getMask(), op.getValueToStore());
+    auto newMaskedStore = rewriter.create<vector::MaskedStoreOp>(
+        op->getLoc(), flatMemref, ValueRange{offset}, op.getMask(),
+        op.getValueToStore());
+    newMaskedStore->setAttrs(op->getAttrs());
+    rewriter.replaceOp(op, newMaskedStore);
     return success();
   }
 };
@@ -293,7 +326,7 @@ struct FlattenVectorTransferRead
   LogicalResult matchAndRewrite(vector::TransferReadOp op,
                                 PatternRewriter &rewriter) const override {
     Value memref = op.getSource();
-    if (!needFlatten(memref))
+    if (!needFlattenning(memref))
       return rewriter.notifyMatchFailure(op, "nothing to do");
 
     if (!checkLayout(memref))
@@ -302,8 +335,10 @@ struct FlattenVectorTransferRead
     auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
         rewriter, op.getLoc(), memref, op.getIndices());
 
-    rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
-        op, op.getType(), flatMemref, ValueRange{offset}, op.getPadding());
+    auto newTransferRead = rewriter.create<vector::TransferReadOp>(
+        op->getLoc(), op.getType(), flatMemref, ValueRange{offset},
+        op.getPadding());
+    rewriter.replaceOp(op, newTransferRead.getResult());
     return success();
   }
 };
@@ -315,7 +350,7 @@ struct FlattenVectorTransferWrite
   LogicalResult matchAndRewrite(vector::TransferWriteOp op,
                                 PatternRewriter &rewriter) const override {
     Value memref = op.getSource();
-    if (!needFlatten(memref))
+    if (!needFlattenning(memref))
       return rewriter.notifyMatchFailure(op, "nothing to do");
 
     if (!checkLayout(memref))
@@ -324,8 +359,9 @@ struct FlattenVectorTransferWrite
     auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
         rewriter, op.getLoc(), memref, op.getIndices());
 
-    rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
-        op, op.getVector(), flatMemref, ValueRange{offset});
+    auto newTransferWrite = rewriter.create<vector::TransferWriteOp>(
+        op.getLoc(), op.getVector(), flatMemref, ValueRange{offset});
+    rewriter.replaceOp(op, newTransferWrite);
     return success();
   }
 };
@@ -336,7 +372,7 @@ struct FlattenSubview : public OpRewritePattern<memref::SubViewOp> {
   LogicalResult matchAndRewrite(memref::SubViewOp op,
                                 PatternRewriter &rewriter) const override {
     Value memref = op.getSource();
-    if (!needFlatten(memref))
+    if (!needFlattenning(memref))
       return rewriter.notifyMatchFailure(op, "nothing to do");
 
     if (!checkLayout(memref))
@@ -346,7 +382,7 @@ struct FlattenSubview : public OpRewritePattern<memref::SubViewOp> {
     SmallVector<OpFoldResult> subOffsets = op.getMixedOffsets();
     SmallVector<OpFoldResult> subSizes = op.getMixedSizes();
     SmallVector<OpFoldResult> subStrides = op.getMixedStrides();
-    auto &&[base, finalOffset, strides, _] =
+    auto &&[base, finalOffset, strides, _, __] =
         getFlatOffsetAndStrides(rewriter, loc, memref, subOffsets, subStrides);
 
     auto srcType = cast<MemRefType>(memref.getType());
