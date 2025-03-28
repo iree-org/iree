@@ -84,6 +84,7 @@ public:
           patterns, vector::VectorMultiReductionLowering::InnerParallel);
       vector::populateVectorTransposeLoweringPatterns(
           patterns, options.vectorTransposeLowering);
+      vector::populateVectorGatherToConditionalLoadPatterns(patterns);
       vector::populateVectorGatherLoweringPatterns(patterns);
       vector::populateVectorMaskOpLoweringPatterns(patterns);
       vector::CreateMaskOp::getCanonicalizationPatterns(patterns, context);
