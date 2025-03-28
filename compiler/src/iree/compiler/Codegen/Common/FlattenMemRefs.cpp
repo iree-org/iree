@@ -50,11 +50,8 @@ static void setInsertionPointToStart(OpBuilder &builder, Value val) {
   }
 }
 
-static OpFoldResult
-getCollapsedSizeofMemref(memref::ExtractStridedMetadataOp op) {
-  assert(false && "not implemented");
-}
-
+/// This is copied from static function affine::mlir::computeProduct.
+/// TODO: enable this function in AffineOps.h
 /// Return the product of `terms`, creating an `affine.apply` if any of them are
 /// non-constant values. If any of `terms` is `nullptr`, return `nullptr`.
 static OpFoldResult computeProduct(Location loc, OpBuilder &builder,
