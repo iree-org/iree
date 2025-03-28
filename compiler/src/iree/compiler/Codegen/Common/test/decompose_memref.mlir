@@ -4,10 +4,10 @@
 
 // -----
 
-func.func @load_scalar_from_memref(%input: memref<4x8xf32>) -> f32 {
-  %c0 = arith.constant 1 : index
-  %c1 = arith.constant 2 : index
-  %value = memref.load %input[%c0, %c1] : memref<4x8xf32>
+func.func @load_scalar_from_memref(%input: memref<4x8xf32, strided<[8, 1], offset: 100>>) -> f32 {
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %value = memref.load %input[%c1, %c2] : memref<4x8xf32, strided<[8, 1], offset: 100>>
   return %value : f32
 }
 // CHECK-LABEL: func @load_scalar_from_memref
@@ -17,8 +17,8 @@ func.func @load_scalar_from_memref(%input: memref<4x8xf32>) -> f32 {
 
 // -----
 
-func.func @load_scalar_from_memref_static_dim_2(%input: memref<4x8xf32, strided<[8, 12]>>, %row: index, %col: index) -> f32 {
-  %value = memref.load %input[%col, %row] : memref<4x8xf32, strided<[8, 12]>>
+func.func @load_scalar_from_memref_static_dim_2(%input: memref<4x8xf32, strided<[8, 12], offset: 100>>, %row: index, %col: index) -> f32 {
+  %value = memref.load %input[%col, %row] : memref<4x8xf32, strided<[8, 12], offset: 100>>
   return %value : f32
 }
 // CHECK: #map = affine_map<()[s0, s1] -> (s0 * 8 + s1 * 12)>

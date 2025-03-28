@@ -53,20 +53,6 @@ static MemRefType inferCastResultType(Value source, OpFoldResult offset) {
                          sourceType.getMemorySpace());
 }
 
-// First version, it has to be contiguous.
-static MemRefType inferCastResultType2(Value source, OpFoldResult offset) {
-  auto sourceType = cast<BaseMemRefType>(source.getType());
-  SmallVector<int64_t> staticOffsets;
-  SmallVector<Value> dynamicOffsets;
-  dispatchIndexOpFoldResults(offset, dynamicOffsets, staticOffsets);
-  int64_t collapsedShape = 1;
-  for (auto dim : sourceType.getShape()) {
-    collapsedShape *= dim;
-  }
-  return MemRefType::get({collapsedShape}, sourceType.getElementType(), nullptr,
-                         sourceType.getMemorySpace());
-}
-
 static void setInsertionPointToStart(OpBuilder &builder, Value val) {
   if (auto *parentOp = val.getDefiningOp()) {
     builder.setInsertionPointAfter(parentOp);
@@ -75,7 +61,7 @@ static void setInsertionPointToStart(OpBuilder &builder, Value val) {
   }
 }
 
-static std::tuple<Value, OpFoldResult, SmallVector<OpFoldResult>>
+static std::tuple<Value, OpFoldResult, SmallVector<OpFoldResult>, OpFoldResult>
 getFlatOffsetAndStrides(OpBuilder &rewriter, Location loc, Value source,
                         ArrayRef<OpFoldResult> subOffsets,
                         ArrayRef<OpFoldResult> subStrides = std::nullopt) {
@@ -120,11 +106,13 @@ getFlatOffsetAndStrides(OpBuilder &rewriter, Location loc, Value source,
     origStrides.emplace_back(origStride);
   }
 
+  // exclude offset
   auto &&[expr, values] =
-      computeLinearIndex(origOffset, origStrides, subOffsets);
+      computeLinearIndex(rewriter.getIndexAttr(0), origStrides, subOffsets);
   OpFoldResult finalOffset =
       affine::makeComposedFoldedAffineApply(rewriter, loc, expr, values);
-  return {newExtractStridedMetadata.getBaseBuffer(), finalOffset, strides};
+  return {newExtractStridedMetadata.getBaseBuffer(), finalOffset, strides,
+          origOffset};
 }
 
 static Value getValueFromOpFoldResult(OpBuilder &rewriter, Location loc,
@@ -143,25 +131,22 @@ static std::pair<Value, Value> getFlattenMemrefAndOffset(OpBuilder &rewriter,
                                                          Value source,
                                                          ValueRange indices) {
   MemRefType memrefType = cast<MemRefType>(source.getType());
-  auto &&[base, index, _] = getFlatOffsetAndStrides(rewriter, loc, source,
-                                                    getAsOpFoldResult(indices));
+  auto &&[base, index, _, offset] = getFlatOffsetAndStrides(
+      rewriter, loc, source, getAsOpFoldResult(indices));
   // We do not support non-contiguous memrefs.
   int64_t collapsedShape = 1;
   for (auto dim : memrefType.getShape()) {
     collapsedShape *= dim;
   }
-  MemRefType retType =
-      MemRefType::get({collapsedShape}, memrefType.getElementType(), nullptr,
-                      memrefType.getMemorySpace());
 
-  Value indexValue = getValueFromOpFoldResult(rewriter, loc, index);
-
-  // (lialan) TODO: should we keep `offset` in the result memref?
-  return std::make_pair(rewriter.create<memref::ReinterpretCastOp>(
-                            loc, retType, source, /* offset = */ 0,
-                            /*shapes = */ ArrayRef<int64_t>{collapsedShape},
-                            /* strides = */ ArrayRef<int64_t>{1}),
-                        indexValue);
+  return std::make_pair(
+      rewriter.create<memref::ReinterpretCastOp>(
+          loc, source,
+          /* offset = */ offset,
+          /* shapes = */
+          ArrayRef<OpFoldResult>{rewriter.getIndexAttr(collapsedShape)},
+          /* strides = */ ArrayRef<OpFoldResult>{rewriter.getIndexAttr(1)}),
+      getValueFromOpFoldResult(rewriter, loc, index));
 }
 
 static bool needFlatten(Value val) {
@@ -361,7 +346,7 @@ struct FlattenSubview : public OpRewritePattern<memref::SubViewOp> {
     SmallVector<OpFoldResult> subOffsets = op.getMixedOffsets();
     SmallVector<OpFoldResult> subSizes = op.getMixedSizes();
     SmallVector<OpFoldResult> subStrides = op.getMixedStrides();
-    auto &&[base, finalOffset, strides] =
+    auto &&[base, finalOffset, strides, _] =
         getFlatOffsetAndStrides(rewriter, loc, memref, subOffsets, subStrides);
 
     auto srcType = cast<MemRefType>(memref.getType());
