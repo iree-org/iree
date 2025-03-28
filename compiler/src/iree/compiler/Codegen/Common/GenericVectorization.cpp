@@ -162,9 +162,10 @@ void GenericVectorizationPass::runOnOperation() {
     scalableVecDims.resize(vectorSizes.size());
     if (vectorizeGatherAccesses && vectorizeToTransferGather &&
         IREE::LinalgExt::isGatherlikeOp(op)) {
-      (void)IREE::VectorExt::vectorizeGatherToTransferGather(
-          rewriter, op, vectorSizes, scalableVecDims);
-      continue;
+      if (llvm::succeeded(IREE::VectorExt::vectorizeGatherToTransferGather(
+              rewriter, op, vectorSizes, scalableVecDims))) {
+        continue;
+      }
     }
     (void)linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
                             vectorizeGatherAccesses);

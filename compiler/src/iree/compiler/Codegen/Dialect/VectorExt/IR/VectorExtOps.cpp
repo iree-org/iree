@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
+#include "iree/compiler/Utils/ParsingUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -48,6 +49,7 @@ static int64_t getVectorRank(Type type) {
 struct IndexVecFoldResult {
   Value indexVec;
   AffineMap indexMap;
+  int64_t indexedVal;
   bool changed;
 };
 
@@ -58,19 +60,24 @@ static Value foldTransferGatherIndexVecs(
   bool changed = false;
   SmallVector<Value> newIndexVecs;
   SmallVector<AffineMap> newIndexedMaps;
-  SmallVector<int64_t> indexed;
-  for (auto [i, operand, map, index] : llvm::enumerate(
-           gatherOp.getIndexVecs(),
-           gatherOp.getIndexedMaps().getAsValueRange<AffineMapAttr>(),
-           gatherOp.getIndexed())) {
-    auto [indexVec, indexMap, vecChanged] = indexVecFolder(operand, map, index);
-    changed |= vecChanged;
-    if (!indexVec) {
+  SmallVector<int64_t> indexed(gatherOp.getIndexed());
+  int64_t currIndexVec = 0;
+  for (auto i : llvm::seq<int64_t>(gatherOp.getIndices().size())) {
+    if (indexed[i] != -2) {
       continue;
     }
-    newIndexVecs.push_back(indexVec);
-    newIndexedMaps.push_back(indexMap);
-    indexed.push_back(i);
+    Value operand = gatherOp.getIndexVecs()[currIndexVec];
+    AffineMap map = gatherOp.getIndexedMapsArray()[currIndexVec];
+    ++currIndexVec;
+
+    auto [indexVec, indexMap, indexedVal, vecChanged] =
+        indexVecFolder(operand, map, i);
+    changed |= vecChanged;
+    indexed[i] = indexedVal;
+    if (indexedVal == -2) {
+      newIndexVecs.push_back(indexVec);
+      newIndexedMaps.push_back(indexMap);
+    }
   }
 
   if (!changed) {
@@ -117,14 +124,14 @@ static Value foldTransferGatherFromBroadcast(TransferGatherOp gatherOp) {
       [](Value operand, AffineMap map, int64_t) -> IndexVecFoldResult {
         auto broadcast = operand.getDefiningOp<vector::BroadcastOp>();
         if (!broadcast) {
-          return {operand, map, false};
+          return {operand, map, -2, false};
         }
 
         int64_t sourceRank = getVectorRank(broadcast.getSourceType());
         int64_t operandRank = getVectorRank(broadcast.getResultVectorType());
         AffineMap newMap =
             map.getSliceMap(operandRank - sourceRank, sourceRank);
-        return {broadcast.getSource(), newMap, true};
+        return {broadcast.getSource(), newMap, -2, true};
       });
 }
 
@@ -134,7 +141,7 @@ static Value foldTransferGatherFromTranspose(TransferGatherOp gatherOp) {
       [](Value operand, AffineMap map, int64_t) -> IndexVecFoldResult {
         auto transpose = operand.getDefiningOp<vector::TransposeOp>();
         if (!transpose) {
-          return {operand, map, false};
+          return {operand, map, -2, false};
         }
 
         AffineMap newMap =
@@ -142,7 +149,7 @@ static Value foldTransferGatherFromTranspose(TransferGatherOp gatherOp) {
                 invertPermutationVector(transpose.getPermutation()),
                 transpose.getContext())
                 .compose(map);
-        return {transpose.getVector(), newMap, true};
+        return {transpose.getVector(), newMap, -2, true};
       });
 }
 
@@ -152,10 +159,12 @@ static Value foldTransferGatherFromStep(TransferGatherOp gatherOp) {
       [](Value operand, AffineMap map, int64_t) -> IndexVecFoldResult {
         auto step = operand.getDefiningOp<vector::StepOp>();
         if (!step) {
-          return {operand, map, false};
+          return {operand, map, -2, false};
         }
 
-        return {Value(), AffineMap(), true};
+        assert(map.getNumResults() == 1);
+        int64_t resultDim = cast<AffineDimExpr>(map.getResult(0)).getPosition();
+        return {Value(), AffineMap(), resultDim, true};
       });
 }
 
@@ -182,7 +191,7 @@ struct FoldSingleElementIndexVec : public OpRewritePattern<TransferGatherOp> {
                               int64_t index) -> IndexVecFoldResult {
       auto vectorTy = cast<VectorType>(indexVec.getType());
       if (vectorTy.getNumElements() != 1) {
-        return {indexVec, map, false};
+        return {indexVec, map, -2, false};
       }
 
       // Extract the scalar and add it to the
@@ -199,7 +208,7 @@ struct FoldSingleElementIndexVec : public OpRewritePattern<TransferGatherOp> {
                            .getResult();
       base.set(newIndex);
 
-      return {Value(), AffineMap(), true};
+      return {Value(), AffineMap(), -1, true};
     };
 
     Value newVal = foldTransferGatherIndexVecs(xferOp, indexVecFolder);
@@ -253,8 +262,8 @@ void TransferGatherOp::getEffects(
   }
 }
 
-static void printTransferAttrs(OpAsmPrinter &p, VectorTransferOpInterface op) {
-  SmallVector<StringRef, 3> elidedAttrs;
+static void printTransferAttrs(OpAsmPrinter &p, VectorTransferOpInterface op,
+                               SmallVector<StringRef, 3> elidedAttrs = {}) {
   elidedAttrs.push_back(TransferGatherOp::getOperandSegmentSizeAttr());
   if (op.getPermutationMap().isMinorIdentity())
     elidedAttrs.push_back(op.getPermutationMapAttrName());
@@ -265,11 +274,12 @@ static void printTransferAttrs(OpAsmPrinter &p, VectorTransferOpInterface op) {
 }
 
 void TransferGatherOp::print(OpAsmPrinter &p) {
-  p << " " << getSource() << "[" << getIndices() << "](" << getIndexVecs()
-    << "), " << getPadding();
+  p << " " << getSource() << "[" << getIndices() << "]";
+  printIndexVecs(p, *this, getIndexVecs(), getIndexVecs().getTypes(),
+                 getIndexedAttr());
   if (getMask())
     p << ", " << getMask();
-  printTransferAttrs(p, *this);
+  printTransferAttrs(p, *this, {"indexed"});
   p << " : ";
   p << getShapedType() << ", ";
   llvm::interleaveComma(getIndexVecs().getType(), p);
@@ -290,9 +300,16 @@ ParseResult TransferGatherOp::parse(OpAsmParser &parser,
   OpAsmParser::UnresolvedOperand maskInfo;
   // Parsing with support for paddingValue.
   if (parser.parseOperand(sourceInfo) ||
-      parser.parseOperandList(indexInfo, OpAsmParser::Delimiter::Square) ||
-      parser.parseOperandList(indexVecInfo, OpAsmParser::Delimiter::Paren) ||
-      parser.parseComma() || parser.parseOperand(paddingInfo))
+      parser.parseOperandList(indexInfo, OpAsmParser::Delimiter::Square))
+    return failure();
+
+  SmallVector<Type, 2> indexVecTypes;
+  DenseI64ArrayAttr indexed;
+  if (parseIndexVecs(parser, indexVecInfo, indexVecTypes, indexed))
+    return failure();
+  result.addAttribute("indexed", indexed);
+
+  if (parser.parseComma() || parser.parseOperand(paddingInfo))
     return failure();
 
   ParseResult hasMask = parser.parseOptionalComma();
@@ -307,18 +324,16 @@ ParseResult TransferGatherOp::parse(OpAsmParser &parser,
     return failure();
 
   // Check if number of types given are correct.
-  int64_t nRequiredTypes = indexVecInfo.size() + 2;
+  int64_t nRequiredTypes = 2;
   if (types.size() != nRequiredTypes) {
     return parser.emitError(typesLoc, "expected ")
            << nRequiredTypes << " types";
   }
 
   // The types are arranged as:
-  // sourceTy, *indexVecTy, resultTy
+  // sourceTy, resultTy
   auto shapedType = llvm::dyn_cast<ShapedType>(types[0]);
-  ArrayRef<Type> indexVecTy(types.begin() + 1,
-                            types.begin() + indexVecInfo.size() + 1);
-  VectorType vectorType = llvm::dyn_cast<VectorType>(types[nRequiredTypes - 1]);
+  VectorType vectorType = llvm::dyn_cast<VectorType>(types[1]);
   if (!shapedType || !llvm::isa<MemRefType, RankedTensorType>(shapedType))
     return parser.emitError(typesLoc, "requires memref or ranked tensor type");
   if (!vectorType)
@@ -343,7 +358,7 @@ ParseResult TransferGatherOp::parse(OpAsmParser &parser,
   if (parser.resolveOperand(sourceInfo, shapedType, result.operands) ||
       parser.resolveOperands(indexInfo, builder.getIndexType(),
                              result.operands) ||
-      parser.resolveOperands(indexVecInfo, indexVecTy, typesLoc,
+      parser.resolveOperands(indexVecInfo, indexVecTypes, typesLoc,
                              result.operands) ||
       parser.resolveOperand(paddingInfo, shapedType.getElementType(),
                             result.operands))

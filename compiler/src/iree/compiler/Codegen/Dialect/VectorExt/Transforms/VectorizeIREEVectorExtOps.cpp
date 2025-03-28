@@ -226,6 +226,45 @@ buildPartialGenericOp(RewriterBase &rewriter, linalg::GenericOp fullOp,
   return newOp;
 }
 
+static AffineMap
+getMemoryToIterationSpaceMapFromTensorExtract(linalg::GenericOp genericOp,
+                                              tensor::ExtractOp extractOp) {
+  MLIRContext *ctx = extractOp.getContext();
+  // Try to find a mapping from the memory space to the input iteration space.
+  // Find backward slice for each index, either it is a linalg.index, a loop
+  // invariant index, or coming from a single 1-D block argument.
+  AffineMap map = AffineMap::get(extractOp.getIndices().size(), 0, ctx);
+
+  for (Value val : extractOp.getIndices()) {
+    if (auto indexOp = val.getDefiningOp<linalg::IndexOp>()) {
+      map = map.insertResult(getAffineDimExpr(indexOp.getDim(), ctx),
+                             map.getNumResults());
+      continue;
+    }
+
+    Operation *defOp = val.getDefiningOp();
+    if (defOp && !genericOp.getBody()->findAncestorOpInBlock(*defOp)) {
+      continue;
+    }
+
+    if (auto blockArg = dyn_cast<BlockArgument>(val)) {
+      AffineMap indexMap =
+          genericOp.getIndexingMapsArray()[blockArg.getArgNumber()];
+      if (indexMap.getNumResults() == 1) {
+        if (auto dimExpr = dyn_cast<AffineDimExpr>(indexMap.getResult(0))) {
+          map = map.insertResult(getAffineDimExpr(dimExpr.getPosition(), ctx),
+                                 map.getNumResults());
+          continue;
+        }
+      }
+    }
+
+    return AffineMap();
+  }
+
+  return map;
+}
+
 LogicalResult vectorizeGatherToTransferGather(RewriterBase &rewriter,
                                               Operation *op,
                                               ArrayRef<int64_t> vectorSizes,
@@ -264,6 +303,16 @@ LogicalResult vectorizeGatherToTransferGather(RewriterBase &rewriter,
     }
   }
 
+  if (!extractOp) {
+    return failure();
+  }
+
+  AffineMap extractToItSpace =
+      getMemoryToIterationSpaceMapFromTensorExtract(linalgOp, extractOp);
+  if (!extractToItSpace) {
+    return failure();
+  }
+
   // Mapping from values used inside the linalg body to newly created tensors.
   DenseMap<Value, std::pair<Value, AffineMap>> tmap;
   for (OpOperand &operand : linalgOp->getOpOperands()) {
@@ -289,6 +338,7 @@ LogicalResult vectorizeGatherToTransferGather(RewriterBase &rewriter,
   for (auto [i, index] : llvm::enumerate(extractOp.getIndices())) {
     if (!tmap.contains(index)) {
       baseIndices.push_back(index);
+      indexed.push_back(-1);
       continue;
     }
 
@@ -306,8 +356,8 @@ LogicalResult vectorizeGatherToTransferGather(RewriterBase &rewriter,
         loc, readType, tensor, operandIndices, readMap);
 
     baseIndices.push_back(zero);
-    indexed.push_back(i);
-    indexedMaps.push_back(readMap);
+    indexed.push_back(-2);
+    indexedMaps.push_back(extractToItSpace);
 
     indexVecs.push_back(read.getResult());
   }
@@ -341,8 +391,6 @@ LogicalResult vectorizeGatherToTransferGather(RewriterBase &rewriter,
       rewriter, linalgOp, canonicalVectorSizes, postExtract, tmap);
 
   rewriter.replaceOp(linalgOp, postOp);
-
-  postOp->getParentOp()->dump();
 
   (void)linalg::vectorize(rewriter, preOp, canonicalVectorSizes,
                           canonicalScalableDims, true);
