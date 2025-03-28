@@ -227,13 +227,13 @@ buildPartialGenericOp(RewriterBase &rewriter, linalg::GenericOp fullOp,
 }
 
 static AffineMap
-getMemoryToIterationSpaceMapFromTensorExtract(linalg::GenericOp genericOp,
-                                              tensor::ExtractOp extractOp) {
+getIterationSpaceToMemorySpaceMap(linalg::GenericOp genericOp,
+                                  tensor::ExtractOp extractOp) {
   MLIRContext *ctx = extractOp.getContext();
   // Try to find a mapping from the memory space to the input iteration space.
   // Find backward slice for each index, either it is a linalg.index, a loop
   // invariant index, or coming from a single 1-D block argument.
-  AffineMap map = AffineMap::get(extractOp.getIndices().size(), 0, ctx);
+  AffineMap map = AffineMap::get(genericOp.getNumLoops(), 0, ctx);
 
   for (Value val : extractOp.getIndices()) {
     Value trace = val;
@@ -248,12 +248,16 @@ getMemoryToIterationSpaceMapFromTensorExtract(linalg::GenericOp genericOp,
 
       Operation *defOp = trace.getDefiningOp();
       if (defOp && !genericOp.getBody()->findAncestorOpInBlock(*defOp)) {
+        map = map.insertResult(getAffineConstantExpr(0, ctx),
+                               map.getNumResults());
         found = true;
         break;
       }
 
       if (auto blockArg = dyn_cast<BlockArgument>(trace)) {
         if (blockArg.getParentBlock() != genericOp.getBody()) {
+          map = map.insertResult(getAffineConstantExpr(0, ctx),
+                                 map.getNumResults());
           found = true;
         } else {
           AffineMap indexMap =
@@ -284,6 +288,26 @@ getMemoryToIterationSpaceMapFromTensorExtract(linalg::GenericOp genericOp,
   }
 
   return map;
+}
+
+static AffineMap inversePerm(AffineMap map) {
+  MLIRContext *context = map.getContext();
+  AffineExpr zero = mlir::getAffineConstantExpr(0, context);
+  // Start with all the results as 0.
+  SmallVector<AffineExpr, 4> exprs(map.getNumInputs(), zero);
+  for (unsigned i : llvm::seq(unsigned(0), map.getNumResults())) {
+    // Skip zeros from input map. 'exprs' is already initialized to zero.
+    if (auto constExpr = dyn_cast<AffineConstantExpr>(map.getResult(i))) {
+      assert(constExpr.getValue() == 0 &&
+             "Unexpected constant in projected permutation");
+      (void)constExpr;
+      continue;
+    }
+
+    // Reverse each dimension existing in the original map result.
+    exprs[map.getDimPosition(i)] = getAffineDimExpr(i, context);
+  }
+  return AffineMap::get(map.getNumResults(), /*symbolCount=*/0, exprs, context);
 }
 
 LogicalResult vectorizeGatherToTransferGather(RewriterBase &rewriter,
@@ -328,9 +352,9 @@ LogicalResult vectorizeGatherToTransferGather(RewriterBase &rewriter,
     return failure();
   }
 
-  AffineMap extractToItSpace =
-      getMemoryToIterationSpaceMapFromTensorExtract(linalgOp, extractOp);
-  if (!extractToItSpace) {
+  AffineMap itSpaceToExtract =
+      getIterationSpaceToMemorySpaceMap(linalgOp, extractOp);
+  if (!itSpaceToExtract) {
     return failure();
   }
 
@@ -378,7 +402,9 @@ LogicalResult vectorizeGatherToTransferGather(RewriterBase &rewriter,
 
     baseIndices.push_back(zero);
     indexed.push_back(-2);
-    indexedMaps.push_back(extractToItSpace);
+    itSpaceToExtract.dump();
+    inversePerm(itSpaceToExtract).dump();
+    indexedMaps.push_back(inversePerm(itSpaceToExtract));
 
     indexVecs.push_back(read.getResult());
   }
@@ -392,7 +418,7 @@ LogicalResult vectorizeGatherToTransferGather(RewriterBase &rewriter,
   auto transferGatherOp = rewriter.create<IREE::VectorExt::TransferGatherOp>(
       loc, gatherTy, extractOp.getTensor(), baseIndices, indexVecs, indexed,
       rewriter.getAffineMapArrayAttr(indexedMaps),
-      rewriter.getMultiDimIdentityMap(gatherTy.getRank()), padding,
+      inversePerm(itSpaceToExtract), padding,
       /*mask=*/Value(), rewriter.getArrayAttr(inBounds));
 
   // Create a empty tensor to write to.
