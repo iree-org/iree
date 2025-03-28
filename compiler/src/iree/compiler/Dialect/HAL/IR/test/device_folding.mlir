@@ -6,12 +6,13 @@ util.func public @ImmediatelyResolveDeviceQueueBarrier(%device: !hal.device, %si
   %c-1_i64 = arith.constant -1 : i64
   // CHECK-NOT: util.null
   %wait_fence = util.null : !hal.fence
-  // CHECK-NOT: hal.device.queue.execute
+  // CHECK-NOT: hal.device.queue.barrier
   // CHECK: hal.fence.signal<%[[SIGNAL_FENCE]] : !hal.fence>
-  hal.device.queue.execute<%device : !hal.device>
+  hal.device.queue.barrier<%device : !hal.device>
       affinity(%c-1_i64)
       wait(%wait_fence)
       signal(%signal_fence)
+      flags("None")
   util.return
 }
 
@@ -25,11 +26,12 @@ util.func public @HoistDeviceQueueBarrierChain(%device: !hal.device, %signal_fen
   %temp_fence = hal.fence.create device(%device : !hal.device) flags("None") : !hal.fence
   // CHECK: util.call @external_async_fn(%[[SIGNAL_FENCE]])
   util.call @external_async_fn(%temp_fence) : (!hal.fence) -> ()
-  // CHECK-NOT: hal.device.queue.execute
-  hal.device.queue.execute<%device : !hal.device>
+  // CHECK-NOT: hal.device.queue.barrier
+  hal.device.queue.barrier<%device : !hal.device>
       affinity(%c-1_i64)
       wait(%temp_fence)
       signal(%signal_fence)
+      flags("None")
   util.return
 }
 util.func private @external_async_fn(!hal.fence)
@@ -45,19 +47,21 @@ util.func public @HoistDeviceQueueBarrierChainOutOfOrder(%device: !hal.device, %
   %c-1_i64 = arith.constant -1 : i64
   // CHECK: %[[FENCE1:.+]] = hal.fence.create {{.+}} {test.fence1}
   %fence0 = hal.fence.create device(%device : !hal.device) flags("None") : !hal.fence attributes {test.fence0}
-  // CHECK: hal.device.queue.execute{{.+}} wait(%[[WAIT_FENCE]]) signal(%[[FENCE1]]) commands([%[[CMD]]])
+  // CHECK: hal.device.queue.execute{{.+}} wait(%[[WAIT_FENCE]]) signal(%[[FENCE1]]) commands(%[[CMD]])
   hal.device.queue.execute<%device : !hal.device>
       affinity(%c-1_i64)
       wait(%wait_fence)
       signal(%fence0)
-      commands([%cmd])
+      commands(%cmd)
+      flags("None")
   // CHECK-NOT: hal.fence.create
   %fence1 = hal.fence.create device(%device : !hal.device) flags("None") : !hal.fence attributes {test.fence1}
-  // CHECK-NOT: hal.device.queue.execute
-  hal.device.queue.execute<%device : !hal.device>
+  // CHECK-NOT: hal.device.queue.barrier
+  hal.device.queue.barrier<%device : !hal.device>
       affinity(%c-1_i64)
       wait(%fence0)
       signal(%fence1)
+      flags("None")
   // CHECK: util.return %[[FENCE1]]
   util.return %fence1 : !hal.fence
 }
@@ -87,30 +91,33 @@ util.func public @ElideDeviceQueueBarrierOp(
   // CHECK: hal.device.queue.execute<%[[DEVICE]] : !hal.device>
   // CHECK-SAME: wait(%[[WAIT_FENCE]])
   // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
-  // CHECK-SAME: commands([%[[CMD]]])
+  // CHECK-SAME: commands(%[[CMD]])
   hal.device.queue.execute<%device : !hal.device>
       affinity(%c-1_i64)
       wait(%wait_fence)
       signal(%fence0)
-      commands([%cmd])
+      commands(%cmd)
+      flags("None")
 
   // CHECK-NOT: hal.fence.create
   %fence1 = hal.fence.create device(%device : !hal.device) flags("None") : !hal.fence
 
   // Execute a barrier sequencing %fence0 -> %fence1.
   // The pattern should remove this op.
-  // CHECK-NOT: hal.device.queue.execute
-  hal.device.queue.execute<%device : !hal.device>
+  // CHECK-NOT: hal.device.queue.barrier
+  hal.device.queue.barrier<%device : !hal.device>
       affinity(%c-1_i64)
       wait(%fence0)
       signal(%fence1)
+      flags("None")
 
   // Another op for the pattern to remove completing %fence1 -> %signal_fence
-  // CHECK-NOT: hal.device.queue.execute
-  hal.device.queue.execute<%device : !hal.device>
+  // CHECK-NOT: hal.device.queue.barrier
+  hal.device.queue.barrier<%device : !hal.device>
       affinity(%c-1_i64)
       wait(%fence1)
       signal(%signal_fence)
+      flags("None")
 
   // CHECK-NEXT: util.return
   util.return
