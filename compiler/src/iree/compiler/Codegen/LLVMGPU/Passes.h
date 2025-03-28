@@ -38,8 +38,6 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
                                         const GPUPipelineOptions &options,
                                         unsigned pipelineDepth);
 
-void addGPUPackUnPackPasses(OpPassManager &funcPassManager);
-
 /// Simple lowering only distributute linalg ops on blocks and threads. This
 /// will result in scalar operations. Expects pass manager to be a
 /// module-level pass manager.

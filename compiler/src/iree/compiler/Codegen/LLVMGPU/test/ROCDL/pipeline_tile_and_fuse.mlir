@@ -1181,3 +1181,51 @@ hal.executable public @main {
 //       CHECK:       memref.copy {{.*}}#gpu.address_space<workgroup>> to {{.*}}#amdgpu.address_space<fat_raw_buffer>
 //       CHECK:    }
 //       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+
+// -----
+
+#lowering_config = #iree_gpu.lowering_config<{
+  thread = [1, 1, 1, 4], workgroup = [1, 1, 16, 32]
+}>
+
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+  #hal.pipeline.binding<storage_buffer, Indirect>
+]>
+
+hal.executable public @main {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @small_elementwise ordinal(0) layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @single_pack() attributes {translation_info = #translation_info} {
+        %c42_i32 = arith.constant 42 : i32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<100x250xi32>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<16x4x16x32xi32>>
+        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [100, 250], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<100x250xi32>> -> tensor<100x250xi32>
+        %3 = tensor.empty() : tensor<16x4x16x32xi32>
+        %pack = linalg.pack %2 padding_value(%c42_i32 : i32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %3 {lowering_config = #lowering_config} : tensor<100x250xi32> -> tensor<16x4x16x32xi32>
+        flow.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [16, 4, 16, 32], strides = [1, 1, 1, 1] : tensor<16x4x16x32xi32> -> !flow.dispatch.tensor<writeonly:tensor<16x4x16x32xi32>>
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: func @single_pack
+// CHECK-DAG:     %[[ALLOCA:.+]] = memref.alloca() : memref<4x1xi32, #gpu.address_space<private>>
+// CHECK-DAG:     %[[C42:.+]] = arith.constant 42 : i32
+// CHECK:         scf.forall {{.*}} in (16, 4) {
+// CHECK:           scf.for
+// CHECK-DAG:         linalg.fill ins(%[[C42]] : i32) outs(%[[ALLOCA]] : memref<4x1xi32, #gpu.address_space<private>>)
+// CHECK-DAG:         %[[INPUT_SUBVIEW:.+]] = memref.subview {{.*}} : memref<100x250xi32, #amdgpu.address_space<fat_raw_buffer>> to memref<?x?xi32, strided<[250, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-DAG:         %[[ALLOCA_SUBVIEW:.+]] = memref.subview %[[ALLOCA]]{{.*}} : memref<4x1xi32, #gpu.address_space<private>> to memref<?x?xi32, strided<[1, 1]>, #gpu.address_space<private>>
+// CHECK-DAG:         memref.copy %[[INPUT_SUBVIEW]], %[[ALLOCA_SUBVIEW]] : memref<?x?xi32, strided<[250, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>> to memref<?x?xi32, strided<[1, 1]>, #gpu.address_space<private>>
+// CHECK-DAG:         %[[READ:.+]] = vector.transfer_read{{.*}}: memref<1x4xi32, strided<[4, 1]>, #gpu.address_space<private>>, vector<4xi32>
+// CHECK-DAG:         vector.transfer_write %[[READ]]{{.*}}: vector<4xi32>, memref<16x4x16x32xi32, #amdgpu.address_space<fat_raw_buffer>>

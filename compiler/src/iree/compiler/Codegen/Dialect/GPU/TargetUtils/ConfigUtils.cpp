@@ -474,7 +474,11 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
 }
 
 /// Helper to identify contraction like operations for operand promotiong.
-static bool isNonMatvecContraction(linalg::LinalgOp linalgOp) {
+static bool isNonMatvecContraction(Operation *op) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp) {
+    return false;
+  }
   SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
   FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
       mlir::linalg::inferContractionDims(linalgOp);
@@ -544,9 +548,35 @@ static unsigned getRepresentativeBitWidth(linalg::LinalgOp linalgOp) {
   return 32;
 }
 
-LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
-                                           mlir::FunctionOpInterface entryPoint,
-                                           Operation *op) {
+static bool elementHasPowerOfTwoBitwidth(Value operand) {
+  Type elementType = getElementTypeOrSelf(operand.getType());
+  return elementType.isIntOrFloat() &&
+         llvm::isPowerOf2_64(elementType.getIntOrFloatBitWidth());
+}
+
+struct DistributionInfo {
+  SmallVector<unsigned int> partitionableLoops;
+  SmallVector<int64_t> loopBounds;
+  unsigned minBitwidth = 0;
+  unsigned representativeBitWidth = 0;
+  bool vectorizable = false;
+};
+
+static FailureOr<DistributionInfo> collectOpDistributionInfo(Operation *op) {
+  DistributionInfo distInfo;
+  // PackOp doesn't fit the LinalgOp interface, since it is a RelayoutOp, so
+  // we have to use special case logic to get the distribution info.
+  if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
+    distInfo.partitionableLoops =
+        llvm::to_vector(llvm::seq<unsigned int>(packOp.getDestRank()));
+    distInfo.vectorizable =
+        llvm::all_of(op->getResults(), elementHasPowerOfTwoBitwidth);
+    distInfo.minBitwidth = packOp.getDestType().getElementTypeBitWidth();
+    distInfo.representativeBitWidth = distInfo.minBitwidth;
+    distInfo.loopBounds = SmallVector<int64_t>(packOp.getDestType().getShape());
+    return distInfo;
+  }
+
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   // Bail out on multi result cases as consumer fusion currently does not
   // support multi result ops.
@@ -560,16 +590,40 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
-  SmallVector<unsigned int> partitionableLoops;
-  linalgOp.getParallelDims(partitionableLoops);
+  linalgOp.getParallelDims(distInfo.partitionableLoops);
 
   // Bail out if op is not tilable.
-  if (partitionableLoops.empty()) {
+  if (distInfo.partitionableLoops.empty()) {
     return failure();
   }
 
+  // Whether we can try to use the vectorization pipeline.
+  distInfo.loopBounds = linalgOp.getStaticLoopRanges();
+  bool isProjPerm =
+      llvm::all_of(linalgOp.getIndexingMapsArray(),
+                   [](AffineMap map) { return map.isProjectedPermutation(); });
+  bool isPowTwo = llvm::all_of(op->getOperands(), elementHasPowerOfTwoBitwidth);
+
+  // Require all affine maps to be projected permutation so that we can
+  // generate vector transfer ops.
+  distInfo.vectorizable = isProjPerm && isPowTwo;
+
+  distInfo.minBitwidth = getMinElementBitwidth(linalgOp);
+  distInfo.representativeBitWidth = getRepresentativeBitWidth(linalgOp);
+  return distInfo;
+};
+
+LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
+                                           mlir::FunctionOpInterface entryPoint,
+                                           Operation *op) {
+  FailureOr<DistributionInfo> maybeDistInfo = collectOpDistributionInfo(op);
+  if (failed(maybeDistInfo)) {
+    return failure();
+  }
+  DistributionInfo distInfo = maybeDistInfo.value();
+
   const int subgroupSize = target.getPreferredSubgroupSize();
-  const unsigned loopDepth = linalgOp.getNumLoops();
+  const unsigned loopDepth = distInfo.loopBounds.size();
 
   // Configurations we need to decide.
   int64_t flatWorkgroupSize = 1;
@@ -594,29 +648,9 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   // 1) distributing to as many threads as possible, and 2) avoid assigning too
   // many threads to handle out-of-bound elements (thus idle).
 
-  auto elementHasPowerOfTwoBitwidth = [](Value operand) {
-    Type elementType = getElementTypeOrSelf(operand.getType());
-    return isa<IntegerType, FloatType>(elementType) &&
-           llvm::isPowerOf2_64(IREE::Util::getTypeBitWidth(elementType));
-  };
-
-  // Whether we can try to use the vectorization pipeline.
-  SmallVector<int64_t> loopBounds = linalgOp.getStaticLoopRanges();
-  bool projPerm =
-      llvm::all_of(linalgOp.getIndexingMapsArray(),
-                   [](AffineMap map) { return map.isProjectedPermutation(); });
-  bool powTwo =
-      llvm::all_of(linalgOp->getOperands(), elementHasPowerOfTwoBitwidth);
-
-  // Require all affine maps to be projected permutation so that we can
-  // generate vector transfer ops.
-  bool vectorizable = projPerm && powTwo;
-
-  const unsigned minBitwidth = getMinElementBitwidth(linalgOp);
-  const unsigned representativeBitWidth = getRepresentativeBitWidth(linalgOp);
   // Make sure we use a tile size that results in some integral number of bytes.
   const unsigned scaleToByte =
-      std::max(8 / minBitwidth, static_cast<unsigned>(1));
+      std::max(8 / distInfo.minBitwidth, static_cast<unsigned>(1));
 
   // Distribute workload to the given `numThreads` by allowing a potental loss.
   auto distributeToThreads = [&](int64_t numThreads,
@@ -629,7 +663,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
     // workgroup tiling with the required tile size multiples. This may lead
     // to larger workgroup tiles than the number of threads in the workgroup,
     // but it is unavoidable.
-    for (int64_t loopIndex : partitionableLoops) {
+    for (int64_t loopIndex : distInfo.partitionableLoops) {
       workgroupTileSizes[loopIndex] = workgroupTileSizeMultiples[loopIndex];
       threadTileSizes[loopIndex] = 1;
     }
@@ -637,8 +671,8 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
     // Scan from the innermost shape dimension and try to deduce the
     // configuration for the corresponding GPU workgroup dimension.
     int64_t wgDim = 0;
-    for (auto shapeDim : llvm::reverse(partitionableLoops)) {
-      int64_t loopBound = loopBounds[shapeDim];
+    for (auto shapeDim : llvm::reverse(distInfo.partitionableLoops)) {
+      int64_t loopBound = distInfo.loopBounds[shapeDim];
       // Skip dynamic dimensions.
       if (ShapedType::isDynamic(loopBound))
         continue;
@@ -649,20 +683,22 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
 
       // Ensure vectorization works with the `workgroupTileMultiple`.
       int64_t workgroupTileMultiple = workgroupTileSizeMultiples[shapeDim];
-      unsigned numVectorElements = std::max(4u, 128 / representativeBitWidth);
+      unsigned numVectorElements =
+          std::max(4u, 128 / distInfo.representativeBitWidth);
       int64_t vectorizableCandidate = numVectorElements * numThreads;
       // For smaller shapes, we reduce `numVectorElements` as we may not find
       // work for all threads otherwise and we dont have vectorization enabled
       // with loss.
-      while (vectorizable && (vectorizableCandidate > loopBound) &&
+      while (distInfo.vectorizable && (vectorizableCandidate > loopBound) &&
              numVectorElements > 4) {
         numVectorElements /= 2;
         vectorizableCandidate = numVectorElements * numThreads;
       }
-      vectorizable =
-          vectorizable && vectorizableCandidate % workgroupTileMultiple == 0;
+      distInfo.vectorizable =
+          distInfo.vectorizable &&
+          vectorizableCandidate % workgroupTileMultiple == 0;
 
-      if (vectorizable && wgDim == 0 && !lossFactor) {
+      if (distInfo.vectorizable && wgDim == 0 && !lossFactor) {
         candidates.push_back(vectorizableCandidate);
       }
 
@@ -693,7 +729,8 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
         }
         // If the workload is too small and we cannot distribute to more than 2
         // workgroups, try a smaller tile size to increase parallelism.
-        if (partitionableLoops.size() == 1 && candidate > subgroupSize &&
+        if (distInfo.partitionableLoops.size() == 1 &&
+            candidate > subgroupSize &&
             llvm::divideCeil(loopBound, scaledTileSize) <= 2) {
           continue;
         }
@@ -701,12 +738,12 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
         // dimension.
         // TODO: Try to take into account element type bit width to get
         // 4xdword reads instead of 4x{elements}.
-        if (vectorizable && wgDim == 0 && !lossFactor &&
+        if (distInfo.vectorizable && wgDim == 0 && !lossFactor &&
             candidate % numVectorElements == 0) {
           // Use size-1 vectors to increase parallelism if larger ones causes
           // idle threads in the subgroup.
-          bool hasIdleThreads =
-              partitionableLoops.size() == 1 && candidate <= subgroupSize;
+          bool hasIdleThreads = distInfo.partitionableLoops.size() == 1 &&
+                                candidate <= subgroupSize;
           int vectorSize = hasIdleThreads ? 1 : numVectorElements;
           LLVM_DEBUG(llvm::dbgs() << "Use vector size: " << vectorSize << "\n");
           threadTileSizes[shapeDim] = vectorSize * scaleToByte;
@@ -729,7 +766,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
             }
           }
           if (wgDim == 0)
-            vectorizable = false;
+            distInfo.vectorizable = false;
           threadTileSizes[shapeDim] = scaleToByte;
           candidateWorkgroupSize = maybeCandidateWorkgroupSize;
           numThreads /= candidateWorkgroupSize;
@@ -787,25 +824,28 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   // limit it to a reasonable value. We process the loops from inner most to
   // outer most to try to align loads along inner dimensions.
   int64_t vectorSize = 1;
-  int64_t numLoops = linalgOp.getNumLoops();
-  SmallVector<utils::IteratorType> iterTypes = linalgOp.getIteratorTypesArray();
+  int64_t numLoops = distInfo.loopBounds.size();
   SmallVector<int64_t> loopTileSizes(numLoops, 0);
-  for (auto [reverseIdx, iter] : llvm::enumerate(llvm::reverse(iterTypes))) {
-    unsigned i = numLoops - reverseIdx - 1;
-    if (linalg::isReductionIterator(iter) || i >= workgroupTileSizes.size() ||
-        workgroupTileSizes[i] == 0) {
-      int64_t tileSize = getReductionTilingFactor(loopBounds[i]);
-      if (vectorSize * tileSize > maxVectorSize) {
-        tileSize = 1;
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+    SmallVector<utils::IteratorType> iterTypes =
+        linalgOp.getIteratorTypesArray();
+    for (auto [reverseIdx, iter] : llvm::enumerate(llvm::reverse(iterTypes))) {
+      unsigned i = numLoops - reverseIdx - 1;
+      if (linalg::isReductionIterator(iter) || i >= workgroupTileSizes.size() ||
+          workgroupTileSizes[i] == 0) {
+        int64_t tileSize = getReductionTilingFactor(distInfo.loopBounds[i]);
+        if (vectorSize * tileSize > maxVectorSize) {
+          tileSize = 1;
+        }
+        vectorSize *= tileSize;
+        loopTileSizes[i] = tileSize;
       }
-      vectorSize *= tileSize;
-      loopTileSizes[i] = tileSize;
     }
   }
 
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
-  MLIRContext *context = linalgOp.getContext();
+  MLIRContext *context = op->getContext();
   SmallVector<NamedAttribute, 1> attrs;
   Builder b(context);
   attrs.emplace_back(StringAttr::get(context, "workgroup"),
@@ -814,7 +854,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   attrs.emplace_back(StringAttr::get(context, "thread"),
                      b.getI64ArrayAttr(threadTileSizes));
 
-  if (isNonMatvecContraction(linalgOp)) {
+  if (isNonMatvecContraction(op)) {
     GPU::appendPromotedOperandsList(context, attrs, {0, 1});
   }
 
