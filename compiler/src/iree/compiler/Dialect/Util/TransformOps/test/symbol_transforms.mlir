@@ -2,7 +2,7 @@
 
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
-    %0 = transform.util.get_sibling_symbol @__transform_main : !transform.any_op
+    %0 = transform.util.lookup_nearest_symbol_from_self @__transform_main : !transform.any_op
     transform.print %0 : !transform.any_op
     transform.yield
   }
@@ -16,7 +16,7 @@ module attributes {transform.with_named_sequence} {
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
 // expected-error@+1 {{could not find symbol @non_existent_symbol}}
-    %0 = transform.util.get_sibling_symbol @non_existent_symbol : !transform.any_op
+    %0 = transform.util.lookup_nearest_symbol_from_self @non_existent_symbol : !transform.any_op
     transform.print %0 : !transform.any_op
     transform.yield
   }

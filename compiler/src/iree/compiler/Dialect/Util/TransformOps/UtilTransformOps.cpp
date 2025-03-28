@@ -41,11 +41,11 @@ void IREE::Util::transform_dialect::GetNearestSymbolTableOp::getEffects(
 }
 
 //===----------------------------------------------------------------------===//
-// GetSiblingSymbolOp
+// LookupNearestSymbolFromSelfOp
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure
-IREE::Util::transform_dialect::GetSiblingSymbolOp::apply(
+IREE::Util::transform_dialect::LookupNearestSymbolFromSelfOp::apply(
     transform::TransformRewriter &rewriter,
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
@@ -57,7 +57,7 @@ IREE::Util::transform_dialect::GetSiblingSymbolOp::apply(
   return DiagnosedSilenceableFailure::success();
 }
 
-void IREE::Util::transform_dialect::GetSiblingSymbolOp::getEffects(
+void IREE::Util::transform_dialect::LookupNearestSymbolFromSelfOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
