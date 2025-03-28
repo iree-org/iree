@@ -774,7 +774,7 @@ endif()
 
 # Both the IREE and MLIR Python bindings require nanobind. We initialize it here
 # at the top level so that everything uses ours consistently.
-if(IREE_BUILD_PYTHON_BINDINGS OR IREE_BUILD_COMPILER)
+if(IREE_BUILD_PYTHON_BINDINGS)
   include(FetchContent)
   FetchContent_Declare(
     nanobind
