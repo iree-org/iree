@@ -138,7 +138,7 @@ void BubbleUpExpandShapesPass::runOnOperation() {
         }
 
         if (auto producerGenericOp = dyn_cast<linalg::GenericOp>(producer)) {
-          if (enableAggressivePropagation)
+          if (enableBubbleUpExpandShapesAcrossReductionOps)
             return true;
           // Only bubble up if producer generic op is an elementwise op.
           return llvm::all_of(producerGenericOp.getIteratorTypesArray(),
