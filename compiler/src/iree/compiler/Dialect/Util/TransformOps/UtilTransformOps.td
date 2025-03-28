@@ -170,4 +170,33 @@ def CastAndCallOp : Op<Transform_Dialect, "util.cast_and_call", [
   let hasVerifier = 1;
 }
 
+def LookupNearestSymbolFromSelfOp : Op<Transform_Dialect, "util.lookup_nearest_symbol_from_self", [
+  FunctionalStyleTransformOpTrait,
+  DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+  DeclareOpInterfaceMethods<TransformOpInterface>,
+  ReportTrackingListenerFailuresOpTrait,
+]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::Util::transform_dialect";
+
+  let description = [{
+    Returns a reference to the symbol with the specified name within the nearest
+    symbol table to this operation.
+
+    #### Return modes
+
+    This operation produces the `target_symbol` handle based on `symbol` and
+    the nearest symbol table. This operation emits a definite failure if the
+    symbol does not exist.
+  }];
+
+  let arguments = (ins SymbolRefAttr:$symbol);
+  let results = (outs
+    TransformHandleTypeInterface:$target_symbol
+  );
+
+  let assemblyFormat = [{
+    $symbol attr-dict `:` type($target_symbol)
+  }];
+}
+
 #endif // IREE_COMPILER_DIALECT_UTIL_TRANSFORMOPS_UTILTRANSFORM_OPS
