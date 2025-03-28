@@ -1,4 +1,5 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --iree-codegen-llvmgpu-use-vector-distribution \
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 \
+// RUN:   --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=false --iree-codegen-llvmgpu-use-vector-distribution \
 // RUN:   --iree-codegen-llvmgpu-use-unaligned-gemm-vector-distribution --iree-codegen-llvmgpu-use-igemm=false \
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
 
