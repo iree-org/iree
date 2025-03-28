@@ -754,3 +754,21 @@ util.func @elementwise_dynamic(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -
 //       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[DISPATCH]]
 //  CHECK-SAME:     {{.+}} output_shape [%[[DIM0]], %[[DIM1]]]
 //       CHECK:   util.return %[[EXPAND]] : tensor<?x?xf32>
+
+// -----
+
+util.func @dont_prop_unit_dims_on_edge(%arg0: tensor<?x?xi32>) -> tensor<?xi32> {
+  %collapsed = tensor.collapse_shape %arg0[[0, 1]] : tensor<?x?xi32> into tensor<?xi32>
+  %0 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%collapsed: tensor<?xi32>) outs(%collapsed: tensor<?xi32>){
+^bb0(%in : i32, %out : i32):
+   %1 = arith.addi %in, %in : i32
+  linalg.yield %1 : i32
+  } -> tensor<?xi32>
+  util.return %0 : tensor<?xi32>
+}
+// CHECK-LABEL: util.func public @dont_prop_unit_dims_on_edge
+//  CHECK-SAME:   %[[ARG0:[0-9a-zA-Z]+]]
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]]
+//       CHECK:   %[[VAL:.+]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel"]
+//       CHECK:   util.return %[[VAL]] : tensor<?xi32>
