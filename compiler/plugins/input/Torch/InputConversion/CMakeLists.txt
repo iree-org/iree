@@ -39,6 +39,7 @@ iree_cc_library(
     "ConvertTMTensorToLinalgExt.cpp"
     "FuncConversion.cpp"
     "SetStrictSymbolicShapes.cpp"
+    "TorchToIREE.cpp"
     "Passes.cpp"
   DEPS
     ::PassHeaders
