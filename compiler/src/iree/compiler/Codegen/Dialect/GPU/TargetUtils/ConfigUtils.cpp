@@ -551,7 +551,7 @@ static unsigned getRepresentativeBitWidth(linalg::LinalgOp linalgOp) {
 static bool elementHasPowerOfTwoBitwidth(Value operand) {
   Type elementType = getElementTypeOrSelf(operand.getType());
   return elementType.isIntOrFloat() &&
-         llvm::isPowerOf2_64(IREE::Util::getTypeBitWidth(elementType));
+         llvm::isPowerOf2_64(elementType.getIntOrFloatBitWidth());
 }
 
 struct DistributionInfo {

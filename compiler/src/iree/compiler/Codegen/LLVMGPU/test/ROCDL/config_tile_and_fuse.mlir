@@ -676,9 +676,8 @@ func.func @single_pack(%arg0: tensor<100x250xi32>) -> tensor<16x4x16x32xi32> {
 
 // -----
 
-// We don't expect to form this dispatch, but this tests that we are able to
-// compute appropriate workgroup tile sizes when there are multiple relayout
-// ops in the dispatch.
+// Tests that we are able to compute appropriate workgroup tile sizes when
+// there are multiple relayout ops in the dispatch.
 
 func.func @unpack_pack(%arg0: tensor<8x4x32x32xi32>) -> tensor<16x4x16x32xi32> {
   %c42_i32 = arith.constant 42 : i32
