@@ -43,32 +43,6 @@ struct SinkReshapesPass final
   void runOnOperation() override;
 };
 
-struct FoldDuplicateCollapseShapes final
-    : public OpRewritePattern<tensor::CollapseShapeOp> {
-
-  using OpRewritePattern<tensor::CollapseShapeOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::CollapseShapeOp collapseOp,
-                                PatternRewriter &rewriter) const override {
-    auto users = collapseOp.getSrc().getUsers();
-    auto duplicates = llvm::filter_to_vector(users, [&](Operation *user) {
-      auto otherOp = llvm::dyn_cast<tensor::CollapseShapeOp>(user);
-      return otherOp && otherOp.getReassociationAttr() ==
-                            collapseOp.getReassociationAttr();
-    });
-    if (duplicates.size() < 2) {
-      return failure();
-    }
-
-    rewriter.setInsertionPointAfterValue(collapseOp.getSrc());
-    auto *newOp = rewriter.clone(*collapseOp);
-    for (auto *op : duplicates) {
-      rewriter.replaceOp(op, newOp);
-    }
-    return success();
-  }
-};
-
 /// Returns true if two operations are fusable through tile and fuse. Ideally
 /// this should use the same method as dispatch region formation where this
 /// fusion analysis actually happens, but that requires a direct producer ->
@@ -86,8 +60,9 @@ static bool isFusableUsingTileAndFuse(Operation *producer,
 static bool shouldBubbleCollapseShapeOp(tensor::CollapseShapeOp collapseOp,
                                         OpOperand *opOperand) {
   auto *producer = opOperand->get().getDefiningOp();
-  if (!producer || !producer->hasOneUse())
+  if (!producer) {
     return false;
+  }
   return IREE::Flow::isClonableIntoDispatchOp(opOperand->get().getDefiningOp());
 }
 
@@ -215,7 +190,6 @@ void SinkReshapesPass::runOnOperation() {
   linalg::populateFoldReshapeOpsByCollapsingPatterns(sinkReshapePatterns,
                                                      collapsingControlFn);
   // Add patterns to fold `tensor.empty` and reshape ops.
-  sinkReshapePatterns.insert<FoldDuplicateCollapseShapes>(context);
   tensor::populateFoldTensorEmptyPatterns(sinkReshapePatterns);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(
       sinkReshapePatterns);
