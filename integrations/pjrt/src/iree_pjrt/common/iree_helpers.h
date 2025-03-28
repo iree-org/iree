@@ -130,9 +130,10 @@ iree_status_t hal_device_queue_barrier(
               SemaphoreListToString(wait_semaphore_list).c_str(),
               SemaphoreListToString(signal_semaphore_list).c_str());
   }
-  return HandleStatus(__func__, iree_hal_device_queue_barrier(
-                                    device, queue_affinity, wait_semaphore_list,
-                                    signal_semaphore_list));
+  return HandleStatus(__func__,
+                      iree_hal_device_queue_barrier(
+                          device, queue_affinity, wait_semaphore_list,
+                          signal_semaphore_list, IREE_HAL_EXECUTE_FLAG_NONE));
 }
 
 iree_status_t hal_device_queue_execute(
@@ -148,7 +149,8 @@ iree_status_t hal_device_queue_execute(
   return HandleStatus(__func__, iree_hal_device_queue_execute(
                                     device, queue_affinity, wait_semaphore_list,
                                     signal_semaphore_list, command_buffer,
-                                    iree_hal_buffer_binding_table_empty()));
+                                    iree_hal_buffer_binding_table_empty(),
+                                    IREE_HAL_EXECUTE_FLAG_NONE));
 }
 
 iree_status_t hal_fence_create(iree_host_size_t capacity,

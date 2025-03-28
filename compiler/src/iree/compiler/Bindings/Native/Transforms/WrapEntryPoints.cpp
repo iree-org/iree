@@ -259,9 +259,9 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
   if (hasSideEffects && signalFence) {
     auto timeoutMillis =
         entryBuilder.create<arith::ConstantIntOp>(importOp.getLoc(), -1, 32);
-    entryBuilder.create<IREE::HAL::FenceAwaitOp>(importOp.getLoc(),
-                                                 entryBuilder.getI32Type(),
-                                                 timeoutMillis, signalFence);
+    entryBuilder.create<IREE::HAL::FenceAwaitOp>(
+        importOp.getLoc(), entryBuilder.getI32Type(), timeoutMillis,
+        IREE::HAL::WaitFlagBitfield::None, signalFence);
   }
 
   // Marshal results.

@@ -593,7 +593,7 @@ static iree_status_t iree_io_parameter_op_batch_flush(
       status = iree_hal_device_queue_execute(
           batch->device, batch->queue_affinity, step.wait_semaphore_list,
           step.signal_semaphore_list, batch->transfer_command_buffer,
-          iree_hal_buffer_binding_table_empty());
+          iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE);
     }
     IREE_TRACE_ZONE_END(z_transfer);
   }
@@ -606,7 +606,7 @@ static iree_status_t iree_io_parameter_op_batch_flush(
       IREE_TRACE_ZONE_APPEND_TEXT(z0, "pass-through wait-signal");
       status = iree_hal_device_queue_barrier(
           batch->device, batch->queue_affinity, batch->wait_semaphore_list,
-          batch->signal_semaphore_list);
+          batch->signal_semaphore_list, IREE_HAL_EXECUTE_FLAG_NONE);
     } else {
       IREE_TRACE_ZONE_APPEND_TEXT(z0, "timeline set wait chain");
       // Note that we allocate timelines on-demand up to timeline_live_count so
@@ -618,7 +618,7 @@ static iree_status_t iree_io_parameter_op_batch_flush(
       };
       status = iree_hal_device_queue_barrier(
           batch->device, batch->queue_affinity, join_semaphore_list,
-          batch->signal_semaphore_list);
+          batch->signal_semaphore_list, IREE_HAL_EXECUTE_FLAG_NONE);
     }
   }
 

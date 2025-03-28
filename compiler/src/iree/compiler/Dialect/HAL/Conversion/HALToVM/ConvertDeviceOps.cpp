@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/HAL/Conversion/HALToVM/Patterns.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -134,8 +135,6 @@ public:
     auto patternLength = rewriter.create<IREE::VM::ConstI32Op>(
         op.getLoc(),
         llvm::divideCeil(op.getPattern().getType().getIntOrFloatBitWidth(), 8));
-    auto flags =
-        rewriter.create<IREE::VM::ConstI64Op>(op.getLoc(), op.getFlags());
     std::array<Value, 10> callOperands = {
         adaptor.getDevice(),
         castToImportType(adaptor.getQueueAffinity(), i64Type, rewriter),
@@ -146,7 +145,7 @@ public:
         castToImportType(adaptor.getLength(), i64Type, rewriter),
         castToImportType(adaptor.getPattern(), i64Type, rewriter),
         patternLength,
-        flags,
+        getFlagsI64(op.getLoc(), adaptor.getFlagsAttr(), rewriter),
     };
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         op, SymbolRefAttr::get(importOp), importType.getResults(),
@@ -177,12 +176,15 @@ public:
     auto importType = importOp.getFunctionType();
     auto i64Type = rewriter.getI64Type();
 
+    Value queueAffinity =
+        castToImportType(adaptor.getQueueAffinity(), i64Type, rewriter);
     SmallVector<Value, 8> callOperands = {
         adaptor.getDevice(),
-        castToImportType(adaptor.getQueueAffinity(), i64Type, rewriter),
+        queueAffinity,
         adaptor.getWaitFence(),
         adaptor.getSignalFence(),
         adaptor.getCommandBuffer(),
+        getFlagsI64(op.getLoc(), adaptor.getFlagsAttr(), rewriter),
     };
     SmallVector<int16_t, 5> segmentSizes = {
         /*device=*/-1,
@@ -190,6 +192,7 @@ public:
         /*wait_fence=*/-1,
         /*signal_fence=*/-1,
         /*command_buffer=*/-1,
+        /*flags=*/-1,
         /*bindings=*/
         static_cast<int16_t>(adaptor.getBindingBuffers().size()),
     };
@@ -239,6 +242,8 @@ void populateHALDeviceToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.device.queue.read");
   patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueWriteOp>>(
       context, importSymbols, typeConverter, "hal.device.queue.write");
+  patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueBarrierOp>>(
+      context, importSymbols, typeConverter, "hal.device.queue.barrier");
   patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueExecuteOp>>(
       context, importSymbols, typeConverter, "hal.device.queue.execute");
   patterns.insert<DeviceQueueExecuteIndirectOpConversion>(

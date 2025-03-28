@@ -10,7 +10,7 @@ util.func public @channel_create() -> !stream.channel {
   // CHECK-DAG: %[[ID:.+]] = util.null : !util.buffer
   // CHECK-DAG: %[[GROUP:.+]] = util.buffer.constant : !util.buffer = "group"
   // CHECK-DAG: %[[DEFAULT:.+]] = arith.constant -1
-  // CHECK: %[[CHANNEL:.+]] = hal.channel.create device(%[[DEVICE]] : !hal.device) affinity(%[[AFFINITY]]) flags(0) id(%[[ID]]) group(%[[GROUP]]) rank(%[[DEFAULT]]) count(%[[DEFAULT]]) : !hal.channel
+  // CHECK: %[[CHANNEL:.+]] = hal.channel.create device(%[[DEVICE]] : !hal.device) affinity(%[[AFFINITY]]) flags("None") id(%[[ID]]) group(%[[GROUP]]) rank(%[[DEFAULT]]) count(%[[DEFAULT]]) : !hal.channel
   %channel = stream.channel.create on(#hal.device.affinity<@device, [0, 1]>) group("group") : !stream.channel
   // CHECK: util.return %[[CHANNEL]]
   util.return %channel : !stream.channel
@@ -27,7 +27,7 @@ util.func public @channel_split(%base_channel: !stream.channel) {
   %key = arith.constant 101 : index
   // CHECK-DAG: %[[COLOR_I32:.+]] = arith.index_cast %[[COLOR_INDEX]] : index to i32
   // CHECK-DAG: %[[KEY_I32:.+]] = arith.index_cast %[[KEY_INDEX]] : index to i32
-  // CHECK: %channel = hal.channel.split<%[[BASE_CHANNEL]] : !hal.channel> color(%[[COLOR_I32]]) key(%[[KEY_I32]]) flags(0) : !hal.channel
+  // CHECK: %channel = hal.channel.split<%[[BASE_CHANNEL]] : !hal.channel> color(%[[COLOR_I32]]) key(%[[KEY_I32]]) flags("None") : !hal.channel
   %split_channel = stream.channel.split %base_channel, %color, %key : !stream.channel -> !stream.channel
   util.return
 }

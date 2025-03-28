@@ -25,7 +25,7 @@ util.func public @file_read(%wait: !stream.timepoint, %file: !stream.file, %reso
   %c1088 = arith.constant 1088 : index
   // CHECK: %[[DEVICE:.+]] = util.global.load immutable @device
   // CHECK: %[[SIGNAL:.+]] = hal.fence.create
-  // CHECK: hal.device.queue.read<%[[DEVICE]] : !hal.device> affinity(%c-1_i64) wait(%[[WAIT]]) signal(%[[SIGNAL]]) source(%[[FILE]] : !hal.file)[%c0_i64] target(%[[RESOURCE]] : !hal.buffer)[%c0] length(%c1088) flags(0)
+  // CHECK: hal.device.queue.read<%[[DEVICE]] : !hal.device> affinity(%c-1_i64) wait(%[[WAIT]]) signal(%[[SIGNAL]]) source(%[[FILE]] : !hal.file)[%c0_i64] target(%[[RESOURCE]] : !hal.buffer)[%c0] length(%c1088) flags("None")
   %signal = stream.file.read on(#hal.device.affinity<@device>) await(%wait) => %file[%c0_i64], %resource[%c0], %c1088 : !stream.file -> !stream.resource<variable>{%c1088} => !stream.timepoint
   // CHECK: util.return %[[SIGNAL]]
   util.return %signal : !stream.timepoint
@@ -43,7 +43,7 @@ util.func public @file_write(%wait: !stream.timepoint, %file: !stream.file, %res
   %c1088 = arith.constant 1088 : index
   // CHECK: %[[DEVICE:.+]] = util.global.load immutable @device
   // CHECK: %[[SIGNAL:.+]] = hal.fence.create
-  // CHECK: hal.device.queue.write<%[[DEVICE]] : !hal.device> affinity(%c-1_i64) wait(%[[WAIT]]) signal(%[[SIGNAL]]) source(%[[RESOURCE]] : !hal.buffer)[%c0] target(%[[FILE]] : !hal.file)[%c0_i64] length(%c1088) flags(0)
+  // CHECK: hal.device.queue.write<%[[DEVICE]] : !hal.device> affinity(%c-1_i64) wait(%[[WAIT]]) signal(%[[SIGNAL]]) source(%[[RESOURCE]] : !hal.buffer)[%c0] target(%[[FILE]] : !hal.file)[%c0_i64] length(%c1088) flags("None")
   %signal = stream.file.write on(#hal.device.affinity<@device>) await(%wait) => %resource[%c0], %file[%c0_i64], %c1088 : !stream.resource<variable>{%c1088} -> !stream.file => !stream.timepoint
   // CHECK: util.return %[[SIGNAL]]
   util.return %signal : !stream.timepoint

@@ -12,6 +12,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/executable.h"
+#include "iree/hal/queue.h"
 #include "iree/hal/resource.h"
 
 #ifdef __cplusplus
@@ -72,6 +73,13 @@ typedef uint32_t iree_hal_executable_caching_mode_t;
 
 // Defines an executable compilation specification.
 typedef struct iree_hal_executable_params_t {
+  // Indicates the queues which may have execution of this resource scheduled.
+  // Defaults to ANY but may be reduced if it is known that certain queues will
+  // never have a dispatch scheduled using the executable. Attempting to
+  // schedule a dispatch on a queue not declared in this set may result in
+  // failure or suboptimal execution.
+  iree_hal_queue_affinity_t queue_affinity;
+
   // Specifies what caching the executable cache is allowed to perform and
   // (if supported) which transformations on the executable contents are
   // allowed.

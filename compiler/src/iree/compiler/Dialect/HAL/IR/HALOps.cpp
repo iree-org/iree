@@ -1360,6 +1360,10 @@ LogicalResult DeviceQueueWriteOp::verify() {
   return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
 }
 
+LogicalResult DeviceQueueBarrierOp::verify() {
+  return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
+}
+
 LogicalResult DeviceQueueExecuteOp::verify() {
   return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
 }
@@ -1368,7 +1372,8 @@ void DeviceQueueExecuteIndirectOp::build(OpBuilder &builder,
                                          OperationState &state, Value device,
                                          Value queueAffinity, Value waitFence,
                                          Value signalFence, Value commandBuffer,
-                                         ArrayRef<BindingValue> bindings) {
+                                         ArrayRef<BindingValue> bindings,
+                                         IREE::HAL::ExecuteFlagBitfield flags) {
   state.addOperands(
       {device, queueAffinity, waitFence, signalFence, commandBuffer});
   SmallVector<Value> bindingBuffers;
@@ -1382,6 +1387,8 @@ void DeviceQueueExecuteIndirectOp::build(OpBuilder &builder,
   state.addOperands(bindingBuffers);
   state.addOperands(bindingOffsets);
   state.addOperands(bindingLengths);
+  state.addAttribute(
+      "flags", builder.getAttr<IREE::HAL::ExecuteFlagBitfieldAttr>(flags));
 }
 
 LogicalResult DeviceQueueExecuteIndirectOp::verify() {

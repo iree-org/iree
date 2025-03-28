@@ -23,6 +23,9 @@ void populateHALToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
 Value createPackedConstantBuffer(Location loc, ValueRange constantValues,
                                  OpBuilder &builder);
 
+// Returns an i64 value initialized with the bits of |flagsAttr| or 0.
+Value getFlagsI64(Location loc, IntegerAttr flagsAttr, OpBuilder &builder);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_HAL_CONVERSION_HALTOVM_PATTERNS_H_

@@ -136,12 +136,15 @@ hal.executable @ex_with_constants {
 
 // CHECK-LABEL: @executable_create
 // CHECK-SAME: %[[DEVICE:.+]]: !hal.device
-util.func public @executable_create(%device: !hal.device) {
+// CHECK-SAME: %[[AFFINITY:.+]]: i64
+util.func public @executable_create(%device: !hal.device, %affinity: i64) {
   //      CHECK: = hal.executable.create
   // CHECK-SAME:     device(%[[DEVICE]] : !hal.device)
+  // CHECK-SAME:   affinity(%[[AFFINITY]])
   // CHECK-SAME:     target(@exe::@binary1) : !hal.executable
   %0 = hal.executable.create device(%device : !hal.device)
-                              target(@exe::@binary1) : !hal.executable
+                           affinity(%affinity)
+                             target(@exe::@binary1) : !hal.executable
   util.return
 }
 

@@ -48,7 +48,7 @@ util.global private @device : !hal.device
 //  CHECK-SAME: (%[[TIMEPOINT:.+]]: !hal.fence, %[[SIGNAL:.+]]: !hal.fence)
 util.func public @timepointChainExternal(%timepoint: !stream.timepoint, %signal: !hal.fence) {
   // CHECK: %[[DEVICE:.+]] = util.global.load immutable @device
-  // CHECK: hal.device.queue.execute<%[[DEVICE]] : !hal.device> affinity(%c-1_i64) wait(%[[TIMEPOINT]]) signal(%[[SIGNAL]])
+  // CHECK: hal.device.queue.barrier<%[[DEVICE]] : !hal.device> affinity(%c-1_i64) wait(%[[TIMEPOINT]]) signal(%[[SIGNAL]])
   stream.timepoint.chain_external on(#hal.device.affinity<@device>) %timepoint => (%signal : !hal.fence)
   util.return
 }
@@ -57,7 +57,7 @@ util.func public @timepointChainExternal(%timepoint: !stream.timepoint, %signal:
 
 // CHECK-LABEL: @timepointJoin
 util.func public @timepointJoin(%arg0: !stream.timepoint, %arg1: !stream.timepoint) -> !stream.timepoint {
-  // CHECK: %[[FENCE:.+]] = hal.fence.join at([%arg0, %arg1]) -> !hal.fence
+  // CHECK: %[[FENCE:.+]] = hal.fence.join at([%arg0, %arg1]) flags("None") -> !hal.fence
   %0 = stream.timepoint.join max(%arg0, %arg1) => !stream.timepoint
   // CHECK: util.return %[[FENCE]]
   util.return %0 : !stream.timepoint
@@ -81,7 +81,7 @@ util.func public @timepointBarrier(%r0: !stream.resource<external>) -> (!stream.
 util.func public @timepointAwait(%arg0: !stream.timepoint, %arg1: !stream.resource<staging>, %arg2: !stream.resource<*>) -> (!stream.resource<staging>, !stream.resource<*>) {
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
-  // CHECK: %[[WAIT_OK:.+]] = hal.fence.await until([%arg0]) timeout_millis(%c-1_i32) : i32
+  // CHECK: %[[WAIT_OK:.+]] = hal.fence.await until([%arg0]) timeout_millis(%c-1_i32) flags("None") : i32
   // CHECK-NEXT: util.status.check_ok %[[WAIT_OK]]
   %0:2 = stream.timepoint.await %arg0 => %arg1, %arg2 : !stream.resource<staging>{%c100}, !stream.resource<*>{%c200}
   // CHECK: util.return %arg1, %arg2

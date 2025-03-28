@@ -27,7 +27,7 @@ typedef struct iree_hal_device_t iree_hal_device_t;
 enum iree_hal_channel_flag_bits_t {
   IREE_HAL_CHANNEL_FLAG_NONE = 0u,
 };
-typedef uint32_t iree_hal_channel_flags_t;
+typedef uint64_t iree_hal_channel_flags_t;
 
 // Specifies that the channel should use environment settings if available.
 #define IREE_HAL_CHANNEL_RANK_DEFAULT ((int32_t) - 1)

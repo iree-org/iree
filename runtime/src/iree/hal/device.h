@@ -193,6 +193,12 @@ enum iree_hal_write_flag_bits_t {
   IREE_HAL_WRITE_FLAG_NONE = 0,
 };
 
+// Bitfield specifying flags controlling an execution operation.
+typedef uint64_t iree_hal_execute_flags_t;
+enum iree_hal_execute_flag_bits_t {
+  IREE_HAL_EXECUTE_FLAG_NONE = 0,
+};
+
 // Defines how a multi-wait operation treats the results of multiple semaphores.
 typedef enum iree_hal_wait_mode_e {
   // Waits for all semaphores to reach or exceed their specified values.
@@ -449,7 +455,8 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_execute(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_buffer_binding_table_t binding_table);
+    iree_hal_buffer_binding_table_t binding_table,
+    iree_hal_execute_flags_t flags);
 
 // Enqueues a barrier waiting for |wait_semaphore_list| and signaling
 // |signal_semaphore_list| when reached.
@@ -457,7 +464,8 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_execute(
 IREE_API_EXPORT iree_status_t iree_hal_device_queue_barrier(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
-    const iree_hal_semaphore_list_t signal_semaphore_list);
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_execute_flags_t flags);
 
 // Flushes any locally-pending submissions in the queue.
 // When submitting many queue operations this can be used to eagerly flush
@@ -669,7 +677,8 @@ typedef struct iree_hal_device_vtable_t {
       const iree_hal_semaphore_list_t wait_semaphore_list,
       const iree_hal_semaphore_list_t signal_semaphore_list,
       iree_hal_command_buffer_t* command_buffer,
-      iree_hal_buffer_binding_table_t binding_table);
+      iree_hal_buffer_binding_table_t binding_table,
+      iree_hal_execute_flags_t flags);
 
   iree_status_t(IREE_API_PTR* queue_flush)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity);

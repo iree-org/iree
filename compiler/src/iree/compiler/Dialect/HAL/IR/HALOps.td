@@ -1217,7 +1217,7 @@ def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
   let arguments = (ins
     HAL_Device:$device,
     HAL_DeviceQueueAffinity:$queue_affinity,
-    I32Attr:$flags,
+    HAL_ChannelFlagBitfieldAttr:$flags,
     Util_BufferType:$id,
     Util_BufferType:$group,
     I32:$rank,
@@ -1260,7 +1260,7 @@ def HAL_ChannelSplitOp : HAL_Op<"channel.split", [
     HAL_Channel:$channel,
     I32:$color,
     I32:$key,
-    I32Attr:$flags
+    HAL_ChannelFlagBitfieldAttr:$flags
   );
   let results = (outs
     HAL_Channel:$result
@@ -1458,7 +1458,8 @@ def HAL_CommandBufferFillBufferOp : HAL_Op<"command_buffer.fill_buffer"> {
     AnyTypeOf<[Index, HAL_BufferType]>:$target_buffer,
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length,
-    HAL_FillPatternType:$pattern
+    HAL_FillPatternType:$pattern,
+    HAL_FillFlagBitfieldAttr:$flags
   );
 
   let assemblyFormat = [{
@@ -1466,6 +1467,7 @@ def HAL_CommandBufferFillBufferOp : HAL_Op<"command_buffer.fill_buffer"> {
     `target` `(` $target_buffer `:` type($target_buffer) `)`
     `` `[` $target_offset `,` $length `]`
     `pattern` `(` $pattern `:` type($pattern) `)`
+    `flags` `(` $flags `)`
     attr-dict-with-keyword
   }];
 
@@ -1495,7 +1497,8 @@ def HAL_CommandBufferUpdateBufferOp : HAL_Op<"command_buffer.update_buffer", [
     Util_Size:$source_offset,
     AnyTypeOf<[Index, HAL_BufferType]>:$target_buffer,
     HAL_DeviceSize:$target_offset,
-    HAL_DeviceSize:$length
+    HAL_DeviceSize:$length,
+    HAL_UpdateFlagBitfieldAttr:$flags
   );
 
   let assemblyFormat = [{
@@ -1505,6 +1508,7 @@ def HAL_CommandBufferUpdateBufferOp : HAL_Op<"command_buffer.update_buffer", [
     `target` `(` $target_buffer `:` type($target_buffer) `)`
     `` `[` $target_offset `]`
     `length` `(` $length `)`
+    `flags` `(` $flags `)`
     attr-dict-with-keyword
   }];
 
@@ -1528,7 +1532,8 @@ def HAL_CommandBufferCopyBufferOp : HAL_Op<"command_buffer.copy_buffer"> {
     HAL_DeviceSize:$source_offset,
     AnyTypeOf<[Index, HAL_BufferType]>:$target_buffer,
     HAL_DeviceSize:$target_offset,
-    HAL_DeviceSize:$length
+    HAL_DeviceSize:$length,
+    HAL_CopyFlagBitfieldAttr:$flags
   );
 
   let assemblyFormat = [{
@@ -1538,6 +1543,7 @@ def HAL_CommandBufferCopyBufferOp : HAL_Op<"command_buffer.copy_buffer"> {
     `target` `(` $target_buffer `:` type($target_buffer) `)`
     `` `[` $target_offset `]`
     `length` `(` $length `)`
+    `flags` `(` $flags `)`
     attr-dict-with-keyword
   }];
 
@@ -1891,6 +1897,7 @@ def HAL_DeviceQueryOp : HAL_PureOp<"device.query"> {
 }
 
 def HAL_DeviceQueueAllocaOp : HAL_Op<"device.queue.alloca", [
+  HAL_DeviceQueueOp,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   DeclareOpInterfaceMethods<Util_SizeAwareOp>,
 ]> {
@@ -1940,7 +1947,9 @@ def HAL_DeviceQueueAllocaOp : HAL_Op<"device.queue.alloca", [
   let hasVerifier = 1;
 }
 
-def HAL_DeviceQueueDeallocaOp : HAL_Op<"device.queue.dealloca"> {
+def HAL_DeviceQueueDeallocaOp : HAL_Op<"device.queue.dealloca", [
+  HAL_DeviceQueueOp,
+]> {
   let summary = [{deallocates a queue-ordered transient buffer}];
   let description = [{
     Deallocates a queue-ordered transient buffer.
@@ -1974,7 +1983,9 @@ def HAL_DeviceQueueDeallocaOp : HAL_Op<"device.queue.dealloca"> {
   let hasVerifier = 1;
 }
 
-def HAL_DeviceQueueFillOp : HAL_Op<"device.queue.fill"> {
+def HAL_DeviceQueueFillOp : HAL_Op<"device.queue.fill", [
+  HAL_DeviceQueueOp,
+]> {
   let summary = [{fills a buffer with a repeating pattern}];
   let description = [{
     The target buffer must be visible to the device queue performing the update.
@@ -1994,7 +2005,7 @@ def HAL_DeviceQueueFillOp : HAL_Op<"device.queue.fill"> {
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length,
     HAL_FillPatternType:$pattern,
-    I64Attr:$flags
+    HAL_FillFlagBitfieldAttr:$flags
   );
   let results = (outs);
 
@@ -2014,7 +2025,9 @@ def HAL_DeviceQueueFillOp : HAL_Op<"device.queue.fill"> {
   let hasVerifier = 1;
 }
 
-def HAL_DeviceQueueUpdateOp : HAL_Op<"device.queue.update"> {
+def HAL_DeviceQueueUpdateOp : HAL_Op<"device.queue.update", [
+  HAL_DeviceQueueOp,
+]> {
   let summary = [{updates a buffer with the contents of a host buffer}];
   let description = [{
     The provided host source buffer will be captured and need not remain live or
@@ -2041,7 +2054,7 @@ def HAL_DeviceQueueUpdateOp : HAL_Op<"device.queue.update"> {
     HAL_Buffer:$target_buffer,
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length,
-    I64Attr:$flags
+    HAL_UpdateFlagBitfieldAttr:$flags
   );
   let results = (outs);
 
@@ -2062,7 +2075,9 @@ def HAL_DeviceQueueUpdateOp : HAL_Op<"device.queue.update"> {
   let hasVerifier = 1;
 }
 
-def HAL_DeviceQueueCopyOp : HAL_Op<"device.queue.copy"> {
+def HAL_DeviceQueueCopyOp : HAL_Op<"device.queue.copy", [
+  HAL_DeviceQueueOp,
+]> {
   let summary = [{copies one device-visible buffer to another}];
   let description = [{
     The source buffer and target buffer must both be visible to the device
@@ -2085,7 +2100,7 @@ def HAL_DeviceQueueCopyOp : HAL_Op<"device.queue.copy"> {
     HAL_Buffer:$target_buffer,
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length,
-    I64Attr:$flags
+    HAL_CopyFlagBitfieldAttr:$flags
   );
   let results = (outs);
 
@@ -2106,7 +2121,9 @@ def HAL_DeviceQueueCopyOp : HAL_Op<"device.queue.copy"> {
   let hasVerifier = 1;
 }
 
-def HAL_DeviceQueueReadOp : HAL_Op<"device.queue.read"> {
+def HAL_DeviceQueueReadOp : HAL_Op<"device.queue.read", [
+  HAL_DeviceQueueOp,
+]> {
   let summary = [{reads a segment from a file into a device buffer}];
   let description = [{
     Enqueues a file read operation that streams a segment of the source file
@@ -2127,7 +2144,7 @@ def HAL_DeviceQueueReadOp : HAL_Op<"device.queue.read"> {
     HAL_Buffer:$target_buffer,
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length,
-    I32Attr:$flags
+    HAL_ReadFlagBitfieldAttr:$flags
   );
   let results = (outs);
 
@@ -2148,7 +2165,9 @@ def HAL_DeviceQueueReadOp : HAL_Op<"device.queue.read"> {
   let hasVerifier = 1;
 }
 
-def HAL_DeviceQueueWriteOp : HAL_Op<"device.queue.write"> {
+def HAL_DeviceQueueWriteOp : HAL_Op<"device.queue.write", [
+  HAL_DeviceQueueOp,
+]> {
   let summary = [{writes a segment from a device buffer into a file}];
   let description = [{
     Enqueues a file write operation that streams a segment of the source HAL
@@ -2169,7 +2188,7 @@ def HAL_DeviceQueueWriteOp : HAL_Op<"device.queue.write"> {
     HAL_File:$target_file,
     I64:$target_offset,
     HAL_DeviceSize:$length,
-    I32Attr:$flags
+    HAL_WriteFlagBitfieldAttr:$flags
   );
   let results = (outs);
 
@@ -2190,11 +2209,42 @@ def HAL_DeviceQueueWriteOp : HAL_Op<"device.queue.write"> {
   let hasVerifier = 1;
 }
 
-def HAL_DeviceQueueExecuteOp : HAL_Op<"device.queue.execute"> {
+def HAL_DeviceQueueBarrierOp : HAL_Op<"device.queue.barrier", [
+  HAL_DeviceQueueOp,
+]> {
+  let summary = [{enqueues an execution barrier}];
+  let description = [{
+    Signals the provided fence once the wait fence is reached.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    HAL_DeviceQueueAffinity:$queue_affinity,
+    HAL_Fence:$wait_fence,
+    HAL_Fence:$signal_fence,
+    HAL_ExecuteFlagBitfieldAttr:$flags
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    `<` $device `:` type($device) `>`
+    `affinity` `(` $queue_affinity `)`
+    `wait` `(` $wait_fence `)`
+    `signal` `(` $signal_fence `)`
+    `flags` `(` $flags `)`
+    attr-dict-with-keyword
+  }];
+
+  let hasCanonicalizer = 1;
+  let hasVerifier = 1;
+}
+
+def HAL_DeviceQueueExecuteOp : HAL_Op<"device.queue.execute", [
+  HAL_DeviceQueueOp,
+]> {
   let summary = [{enqueues command buffer execution}];
   let description = [{
-    Executes one or more command buffers on a device queue.
-    The command buffers are executed in order as if they were recorded as one.
+    Executes a command buffer on a device queue.
     No commands will execute until the wait fence has been reached and the
     signal fence will be signaled when all commands have completed.
   }];
@@ -2204,7 +2254,8 @@ def HAL_DeviceQueueExecuteOp : HAL_Op<"device.queue.execute"> {
     HAL_DeviceQueueAffinity:$queue_affinity,
     HAL_Fence:$wait_fence,
     HAL_Fence:$signal_fence,
-    Variadic<HAL_CommandBuffer>:$command_buffers
+    HAL_CommandBuffer:$command_buffer,
+    HAL_ExecuteFlagBitfieldAttr:$flags
   );
   let results = (outs);
 
@@ -2213,21 +2264,17 @@ def HAL_DeviceQueueExecuteOp : HAL_Op<"device.queue.execute"> {
     `affinity` `(` $queue_affinity `)`
     `wait` `(` $wait_fence `)`
     `signal` `(` $signal_fence `)`
-    (`commands` `(` `[` $command_buffers^ `]` `)`)?
+    `commands` `(` $command_buffer `)`
+    `flags` `(` $flags `)`
     attr-dict-with-keyword
   }];
 
-  let extraClassDeclaration = [{
-    // Returns true if the execution represents a barrier.
-    bool isBarrier() { return getCommandBuffers().empty(); }
-  }];
-
-  let hasCanonicalizer = 1;
   let hasVerifier = 1;
 }
 
 def HAL_DeviceQueueExecuteIndirectOp : HAL_Op<"device.queue.execute.indirect", [
   SameVariadicOperandSize,
+  HAL_DeviceQueueOp,
 ]> {
   let summary = [{enqueues command buffer execution}];
   let description = [{
@@ -2244,7 +2291,8 @@ def HAL_DeviceQueueExecuteIndirectOp : HAL_Op<"device.queue.execute.indirect", [
     HAL_CommandBuffer:$command_buffer,
     Variadic<HAL_BufferType>:$binding_buffers,
     Variadic<HAL_DeviceSize>:$binding_offsets,
-    Variadic<HAL_DeviceSize>:$binding_lengths
+    Variadic<HAL_DeviceSize>:$binding_lengths,
+    HAL_ExecuteFlagBitfieldAttr:$flags
   );
   let results = (outs);
 
@@ -2260,6 +2308,7 @@ def HAL_DeviceQueueExecuteIndirectOp : HAL_Op<"device.queue.execute.indirect", [
                          $binding_offsets,
                          $binding_lengths)
     `]` `)`
+    `flags` `(` $flags `)`
     attr-dict-with-keyword
   }];
 
@@ -2271,7 +2320,8 @@ def HAL_DeviceQueueExecuteIndirectOp : HAL_Op<"device.queue.execute.indirect", [
       "Value":$waitFence,
       "Value":$signalFence,
       "Value":$commandBuffer,
-      "ArrayRef<IREE::HAL::BindingValue>":$bindings
+      "ArrayRef<IREE::HAL::BindingValue>":$bindings,
+      "IREE::HAL::ExecuteFlagBitfield":$flags
     )>,
   ];
 
@@ -2894,6 +2944,7 @@ def HAL_ExecutableCreateOp : HAL_PureOp<"executable.create", [
 
   let arguments = (ins
     HAL_Device:$device,
+    HAL_DeviceQueueAffinity:$queue_affinity,
     SymbolRefAttr:$executable_target,
     Variadic<I32>:$constants
   );
@@ -2903,6 +2954,7 @@ def HAL_ExecutableCreateOp : HAL_PureOp<"executable.create", [
 
   let assemblyFormat = [{
     `device` `(` $device `:` type($device) `)`
+    `affinity` `(` $queue_affinity `)`
     `target` `(` $executable_target `)`
     (`constants` `(` `[` $constants^ `]` `)`)?
     `:` type($result)
@@ -3392,6 +3444,7 @@ def HAL_FenceJoinOp : HAL_Op<"fence.join", [
   }];
 
   let arguments = (ins
+    HAL_FenceFlagBitfieldAttr:$flags,
     Variadic<HAL_Fence>:$fences
   );
   let results = (outs
@@ -3400,6 +3453,7 @@ def HAL_FenceJoinOp : HAL_Op<"fence.join", [
 
   let assemblyFormat = [{
     `at` `(` `[` $fences `]` `)`
+    `flags` `(` $flags `)`
     `->` type($result)
     attr-dict-with-keyword
   }];
@@ -3481,6 +3535,7 @@ def HAL_FenceAwaitOp : HAL_Op<"fence.await", [
 
   let arguments = (ins
     I32:$timeout_millis,
+    HAL_WaitFlagBitfieldAttr:$flags,
     Variadic<HAL_Fence>:$fences
   );
   let results = (outs
@@ -3490,6 +3545,7 @@ def HAL_FenceAwaitOp : HAL_Op<"fence.await", [
   let assemblyFormat = [{
     `until` `(` `[` $fences `]` `)`
     `timeout_millis` `(` $timeout_millis `)`
+    `flags` `(` $flags `)`
     `:` type($status)
     attr-dict-with-keyword
   }];

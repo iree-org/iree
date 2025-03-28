@@ -16,6 +16,7 @@ util.func public @elideRedundantBarriers(%cmd: !hal.command_buffer, %buffer: !ha
       source(%buffer : !hal.buffer)[%c0]
       target(%buffer : !hal.buffer)[%c0]
       length(%c1)
+      flags("None")
   // CHECK: hal.command_buffer.execution_barrier
   hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|Transfer|CommandRetire") target("CommandIssue|Dispatch|Transfer") flags("None")
   // CHECK: util.return

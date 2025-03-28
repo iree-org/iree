@@ -16,6 +16,7 @@
 void iree_hal_executable_params_initialize(
     iree_hal_executable_params_t* out_executable_params) {
   memset(out_executable_params, 0, sizeof(*out_executable_params));
+  out_executable_params->queue_affinity = IREE_HAL_QUEUE_AFFINITY_ANY;
   out_executable_params->caching_mode =
       IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_PERSISTENT_CACHING |
       IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_OPTIMIZATION;
