@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-linalg-ext-decompose-im2col{unroll=false}))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-linalg-ext-decompose-im2col{unroll=false}, canonicalize, cse))" --split-input-file %s | FileCheck %s
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-linalg-ext-decompose-im2col{unroll=true}))" --split-input-file %s | FileCheck %s --check-prefix=CHECK-UNROLL
 
 #map = affine_map<(d0) -> (d0 * 4)>
@@ -257,3 +257,6 @@ module {
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9_]+]]
 //       CHECK: %[[T1:.+]] = tensor.extract_slice %[[ARG0]]
 //       CHECK: %[[T2:.+]] = tensor.pad %[[T1]]
+//  CHECK-NEXT: ^bb0
+//  CHECK-NEXT:   tensor.yield
+//  CHECK-NEXT: } : tensor<1x?x?x?xf32> to tensor<1x1x1x1xf32>
