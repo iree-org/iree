@@ -909,6 +909,59 @@ static void enforceLayoutToTransferWriteOp(
   }
 }
 
+static void enforceLayoutToTransferGatherOp(
+    IREE::VectorExt::TransferGatherOp read,
+    ArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+  // transfer_read has only one vector result.
+  const DistributionLayout *result = resultLattices[0];
+  // Cannot enforce layout if result is uninitialized.
+  if (result->isUninitialized()) {
+    return;
+  }
+
+  AffineMap permMap = read.getPermutationMap();
+  VectorLayoutInterface resultLayout = result->getLayout();
+
+  int64_t currIndexVec = -1;
+  for (auto [operand, map] : llvm::zip_equal(read.getIndexVecsMutable(),
+                                             read.getIndexedMapsArray())) {
+    ++currIndexVec;
+    AffineMap resultToOperandMap =
+        map.compose(inverseAndBroadcastProjectedPermutation(permMap));
+
+    if (!resultToOperandMap.isProjectedPermutation()) {
+      continue;
+    }
+
+    // Drop dims not used in result.
+    llvm::SmallBitVector unused = getUnusedDimsBitVector({resultToOperandMap});
+    SmallVector<bool> droppedDims(resultToOperandMap.getNumDims(), false);
+    for (auto i : llvm::seq<int64_t>(resultToOperandMap.getNumDims())) {
+      if (unused[i]) {
+        droppedDims[i] = true;
+      }
+    }
+    resultToOperandMap = compressUnusedDims(resultToOperandMap);
+
+    VectorLayoutInterface opLayout = resultLayout.project(droppedDims);
+
+    // Transpose dims.
+    SmallVector<unsigned> permutation;
+    (void)resultToOperandMap.isPermutationOfMinorIdentityWithBroadcasting(
+        permutation);
+    SmallVector<int64_t> transposePerm(permutation.begin(), permutation.end());
+    opLayout = opLayout.permute(transposePerm);
+
+    DistributionLayout *lattice = operandLattices[currIndexVec];
+
+    ChangeResult changed =
+        lattice->resolveWithPossibleConflict(opLayout, operand);
+    update(lattice, changed);
+  }
+}
+
 void enforcementTransferFunction(
     Operation *op, ArrayRef<DistributionLayout *> operandLattices,
     ArrayRef<const DistributionLayout *> resultLattices,
@@ -962,6 +1015,12 @@ void enforcementTransferFunction(
   if (auto write = dyn_cast<vector::TransferWriteOp>(op)) {
     enforceLayoutToTransferWriteOp(write, operandLattices, resultLattices,
                                    update);
+    return;
+  }
+
+  if (auto read = dyn_cast<IREE::VectorExt::TransferGatherOp>(op)) {
+    enforceLayoutToTransferGatherOp(read, operandLattices, resultLattices,
+                                    update);
     return;
   }
 }
