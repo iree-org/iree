@@ -1266,6 +1266,16 @@ bool LoweringConfigAttr::hasWorkgroupTilingLevel() const {
   return !getWorkgroupTileSizes().empty();
 }
 
+constexpr StringLiteral kLoweringStrategyName = "lowering_strategy";
+
+std::optional<StringRef> LoweringConfigAttr::getLoweringStrategy() const {
+  auto name = getAttributes().getAs<StringAttr>(kLoweringStrategyName);
+  if (!name) {
+    return std::nullopt;
+  }
+  return name.strref();
+}
+
 //===----------------------------------------------------------------------===//
 // DerivedThreadConfigAttr
 //===----------------------------------------------------------------------===//

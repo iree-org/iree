@@ -54,6 +54,10 @@ def IREECodegen_Dialect : Dialect {
     getOrParseTransformLibraryModule(StringRef libraryPath,
                                      StringRef libraryMLIRSource);
 
+    /// Returns the loaded module if there was only one loaded so far.
+    std::optional<::mlir::ModuleOp>
+    getLoneTransformLibraryModule();
+
     private:
 
     /// Map containing modules containing symbols, e.g. named sequences, that
