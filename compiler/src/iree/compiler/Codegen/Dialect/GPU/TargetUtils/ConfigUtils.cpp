@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
+#include <cstdint>
 
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Common/TileInferenceUtils.h"
@@ -32,8 +33,6 @@
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::IREE::GPU {
-
-using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
 constexpr int64_t kPreferredCopyNumBits = 128;
@@ -994,16 +993,16 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
 LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
                             mlir::FunctionOpInterface entryPoint,
                             Operation *op) {
-  auto context = op->getContext();
+  MLIRContext *context = op->getContext();
   Builder b(context);
 
   auto subgroupSize = target.getPreferredSubgroupSize();
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
-  auto partitionedLoops =
+  SmallVector<unsigned> partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
 
-  auto createLoweringConfig = [&](SmallVector<int64_t> workgroupSizes,
-                                  SmallVector<int64_t> threadSizes) {
+  auto createLoweringConfig = [&](SmallVector<int64_t> &workgroupSizes,
+                                  SmallVector<int64_t> &threadSizes) {
     SmallVector<NamedAttribute, 2> attrs = {
         NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupSizes)),
         NamedAttribute("thread", b.getI64ArrayAttr(threadSizes))};
@@ -1012,15 +1011,18 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
   };
 
   if (partitionedLoops.empty()) {
-    auto loweringConfig = createLoweringConfig({1, 1, 1}, {1, 1, 1});
+    SmallVector<int64_t> defaultTileSizes(3, 1);
+    IREE::GPU::LoweringConfigAttr loweringConfig =
+        createLoweringConfig(defaultTileSizes, defaultTileSizes);
     return setOpConfigAndEntryPointFnTranslation(
-        entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUTileAndFuse,
-        {1, 1, 1}, subgroupSize, DictionaryAttr());
+        entryPoint, op, loweringConfig,
+        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
+        defaultTileSizes, subgroupSize, DictionaryAttr());
   }
 
   size_t numLoops = partitionedLoops.back() + 1;
 
-  // To get peak occupancy we need a workgroup size of at least two warps
+  // To get peak occupancy we need a workgroup size of at least two warps.
   std::array<int64_t, 3> workgroupSize = {2 * subgroupSize, 1, 1};
   SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
   SmallVector<int64_t> threadTileSizes(numLoops, 1);
@@ -1035,17 +1037,18 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
   }
 
   // Tile to have one element per thread.
-  for (int64_t depth = numLoops; depth > 0; depth--) {
-    if (partitionedLoopsSet.count(depth - 1)) {
+  for (int64_t depth = numLoops; depth > 0; --depth) {
+    if (partitionedLoopsSet.contains(depth - 1)) {
       workgroupTileSizes[depth - 1] = workgroupSize[0];
       break;
     }
   }
 
-  auto loweringConfig =
+  IREE::GPU::LoweringConfigAttr loweringConfig =
       createLoweringConfig(workgroupTileSizes, threadTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUTileAndFuse,
+      entryPoint, op, loweringConfig,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
       workgroupSize, subgroupSize, DictionaryAttr());
 }
 
