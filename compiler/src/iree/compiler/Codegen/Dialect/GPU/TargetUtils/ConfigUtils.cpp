@@ -145,7 +145,6 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   assert(problem.aType == problem.bType &&
          "expected the same aType and bType.");
   int64_t inBitWidth = problem.aType.getIntOrFloatBitWidth();
-  int64_t outBitWidth = problem.cType.getIntOrFloatBitWidth();
 
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
@@ -168,21 +167,11 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
              /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
   }
 
-  // We target slightly below the full available shared memory to leave room for
-  // `GPUReduceBankConflictsPass` that will pad shared memory without keeping
-  // track of usage. We can drop this after fixing
-  // https://github.com/iree-org/iree/issues/19675
-  int64_t maxSharedMemoryBytes =
-      target.getWgp().getMaxWorkgroupMemoryBytes() - 128 * outBitWidth;
+  int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
-  // First try to find a schedule with an exactly matching intrinsic.
-  // TODO (nirvedhmeshram) : Not passing the transpose infromation is exactly
-  // what the VectorDistribute pipeline does. However, in that case it is to
-  // avoid codegen issues but here it is becuase we have performance
-  // regressions with it. We need to investigate why this is the case.
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
-      /*transposedLhs=*/false, /*transposedRhs=*/false, /*canUpcastAcc=*/false,
+      transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
       /*mustBeAligned*/ mustBeAligned, doCPromotion);
   return schedule;
 }
