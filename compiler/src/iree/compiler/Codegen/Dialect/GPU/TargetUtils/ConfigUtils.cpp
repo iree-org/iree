@@ -998,7 +998,6 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
   Builder b(context);
 
   auto subgroupSize = target.getPreferredSubgroupSize();
-  TileSizesListType tileSizes;
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
