@@ -881,8 +881,10 @@ if((IREE_ENABLE_RUNTIME_TRACING OR IREE_ENABLE_COMPILER_TRACING) AND
   )
 endif()
 
-iree_set_googletest_cmake_options()
-add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
+if(IREE_BUILD_TESTS)
+  iree_set_googletest_cmake_options()
+  add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
+endif()
 
 if(IREE_ENABLE_THREADING)
   # Benchmark.
