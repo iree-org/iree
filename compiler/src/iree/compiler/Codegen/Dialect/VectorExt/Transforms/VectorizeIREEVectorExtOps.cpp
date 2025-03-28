@@ -406,8 +406,6 @@ LogicalResult vectorizeGatherToTransferGather(RewriterBase &rewriter,
 
     baseIndices.push_back(zero);
     indexed.push_back(-2);
-    itSpaceToExtract.dump();
-    inversePerm(itSpaceToExtract).dump();
     indexedMaps.push_back(inversePerm(itSpaceToExtract));
 
     indexVecs.push_back(read.getResult());
