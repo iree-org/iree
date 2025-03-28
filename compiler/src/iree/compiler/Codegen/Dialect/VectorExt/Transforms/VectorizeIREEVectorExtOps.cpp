@@ -236,30 +236,51 @@ getMemoryToIterationSpaceMapFromTensorExtract(linalg::GenericOp genericOp,
   AffineMap map = AffineMap::get(extractOp.getIndices().size(), 0, ctx);
 
   for (Value val : extractOp.getIndices()) {
-    if (auto indexOp = val.getDefiningOp<linalg::IndexOp>()) {
-      map = map.insertResult(getAffineDimExpr(indexOp.getDim(), ctx),
-                             map.getNumResults());
-      continue;
-    }
+    Value trace = val;
+    bool found = false;
+    while (true) {
+      if (auto indexOp = trace.getDefiningOp<linalg::IndexOp>()) {
+        map = map.insertResult(getAffineDimExpr(indexOp.getDim(), ctx),
+                               map.getNumResults());
+        found = true;
+        break;
+      }
 
-    Operation *defOp = val.getDefiningOp();
-    if (defOp && !genericOp.getBody()->findAncestorOpInBlock(*defOp)) {
-      continue;
-    }
+      Operation *defOp = trace.getDefiningOp();
+      if (defOp && !genericOp.getBody()->findAncestorOpInBlock(*defOp)) {
+        found = true;
+        break;
+      }
 
-    if (auto blockArg = dyn_cast<BlockArgument>(val)) {
-      AffineMap indexMap =
-          genericOp.getIndexingMapsArray()[blockArg.getArgNumber()];
-      if (indexMap.getNumResults() == 1) {
-        if (auto dimExpr = dyn_cast<AffineDimExpr>(indexMap.getResult(0))) {
-          map = map.insertResult(getAffineDimExpr(dimExpr.getPosition(), ctx),
-                                 map.getNumResults());
-          continue;
+      if (auto blockArg = dyn_cast<BlockArgument>(trace)) {
+        if (blockArg.getParentBlock() != genericOp.getBody()) {
+          found = true;
+        } else {
+          AffineMap indexMap =
+              genericOp.getIndexingMapsArray()[blockArg.getArgNumber()];
+          if (indexMap.getNumResults() == 1) {
+            if (auto dimExpr = dyn_cast<AffineDimExpr>(indexMap.getResult(0))) {
+              map =
+                  map.insertResult(getAffineDimExpr(dimExpr.getPosition(), ctx),
+                                   map.getNumResults());
+              found = true;
+            }
+          }
         }
+        break;
+      }
+
+      // Unary ops are ok.
+      if (defOp->getNumOperands() == 1) {
+        trace = defOp->getOperand(0);
+      } else {
+        break;
       }
     }
 
-    return AffineMap();
+    if (!found) {
+      return AffineMap();
+    }
   }
 
   return map;
