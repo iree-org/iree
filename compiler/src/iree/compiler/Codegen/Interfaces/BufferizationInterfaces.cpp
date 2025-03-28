@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/BufferizationInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -381,6 +382,47 @@ struct LinalgExtOpInterface
   }
 };
 
+struct TransferGatherOpInterface
+    : public BufferizableOpInterface::ExternalModel<
+          TransferGatherOpInterface, IREE::VectorExt::TransferGatherOp> {
+
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const AnalysisState &state) const {
+    assert(isa<RankedTensorType>(opOperand.get().getType()) &&
+           "only tensor types expected");
+    return true;
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const AnalysisState &state) const {
+    assert(isa<RankedTensorType>(opOperand.get().getType()) &&
+           "only tensor types expected");
+    return false;
+  }
+
+  bufferization::AliasingValueList
+  getAliasingValues(Operation *op, OpOperand &opOperand,
+                    const AnalysisState &state) const {
+    return {};
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const BufferizationOptions &options) const {
+    auto readOp = cast<IREE::VectorExt::TransferGatherOp>(op);
+    assert(isa<TensorType>(readOp.getShapedType()) &&
+           "only tensor types expected");
+    FailureOr<Value> buffer = getBuffer(rewriter, readOp.getSource(), options);
+    if (failed(buffer))
+      return failure();
+    replaceOpWithNewBufferizedOp<IREE::VectorExt::TransferGatherOp>(
+        rewriter, readOp, readOp.getVectorType(), *buffer, readOp.getIndices(),
+        readOp.getIndexVecs(), readOp.getIndexedAttr(), readOp.getIndexedMaps(),
+        readOp.getPermutationMap(), readOp.getPadding(), readOp.getMask(),
+        readOp.getInBoundsAttr());
+    return success();
+  }
+};
+
 /// Returns the buffers of the source and destination for pack and unpack ops.
 /// Returns a failure if the buffers can not be found.
 template <typename OpTy>
@@ -666,6 +708,11 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
     IREE::LinalgExt::AttentionOp::attachInterface<
         LinalgExtOpInterface<IREE::LinalgExt::AttentionOp>>(*ctx);
   });
+  registry.addExtension(
+      +[](MLIRContext *ctx, IREE::VectorExt::IREEVectorExtDialect *dialect) {
+        IREE::VectorExt::TransferGatherOp::attachInterface<
+            TransferGatherOpInterface>(*ctx);
+      });
   registry.insert<linalg::LinalgDialect>();
   registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
     linalg::PackOp::attachInterface<PackUnPackOpInterface<linalg::PackOp>>(
