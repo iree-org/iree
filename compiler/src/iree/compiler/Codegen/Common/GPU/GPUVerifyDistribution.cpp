@@ -30,6 +30,17 @@ struct GPUVerifyDistributionPass final
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
 
+    std::optional<SmallVector<int64_t>> workgroupSize =
+        getWorkgroupSize(funcOp);
+    if (!workgroupSize) {
+      funcOp->emitOpError("requires a workgroup size attribute.");
+      return signalPassFailure();
+    }
+
+    if (llvm::all_of(*workgroupSize, [](int64_t size) { return size == 1; })) {
+      return;
+    }
+
     auto privateAddressSpace = gpu::AddressSpaceAttr::get(
         &getContext(), gpu::GPUDialect::getPrivateAddressSpace());
 
