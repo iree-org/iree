@@ -30,7 +30,7 @@
 // https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/aligned-malloc
 #define iree_aligned_alloc(alignment, size) _aligned_malloc(size, alignment)
 #define iree_aligned_free(p) _aligned_free(p)
-#elif defined(_ISOC11_SOURCE)
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
 // https://en.cppreference.com/w/c/memory/aligned_alloc
 #define iree_aligned_alloc(alignment, size) aligned_alloc(alignment, size)
 #define iree_aligned_free(p) free(p)
