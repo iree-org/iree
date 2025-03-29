@@ -775,12 +775,10 @@ Attribute getHIPTargetEncodingLayoutAttr(TargetAttr target,
     return IREE::GPU::GPUEncodingLayoutAttr::get(target.getContext(), {});
   }
 
-  // GPUPadLayoutAttr is only enabled for CDNA2 and CDNA3 for the time being.
-  // TODO(kuhar): Enable for other HIP targets.
-  if (resolver == kPadEncodingLayoutResolverName &&
-      llvm::is_contained({"gfx90a", "gfx942"}, target.getArch())) {
-    return IREE::GPU::GPUPadLayoutAttr::get(
-        target.getContext(), /*cacheLineBytes=*/128, /*cacheSets=*/4);
+  if (resolver == kPadEncodingLayoutResolverName) {
+    return IREE::GPU::GPUPadLayoutAttr::get(target.getContext(),
+                                            /*cache_line_bytes=*/std::nullopt,
+                                            /*cache_sets=*/std::nullopt);
   }
   return nullptr;
 }
