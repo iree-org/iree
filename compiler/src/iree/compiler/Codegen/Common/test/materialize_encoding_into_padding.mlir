@@ -167,3 +167,35 @@ func.func @load_from_padded_and_mmt() {
 //
 // CHECK:         flow.dispatch.tensor.store %[[MMT]], %[[C]], offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1]
 // CHECK-SAME:                  tensor<2048x2048xf16> -> !flow.dispatch.tensor<writeonly:tensor<2048x2048xf16>>
+
+// -----
+
+#binding_ro = #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">
+#binding = #hal.pipeline.binding<storage_buffer, Indirect>
+#pad_encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f16, f16, f16],
+                                        layouts = [#iree_encoding.pad_encoding_layout<[0, 64]>]>
+func.func @set_pad_encoding_and_store_with_resolved_layout() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(<constants = 1, bindings = [#binding_ro, #binding], flags = Indirect>) ordinal(0) : i32
+  %1 = arith.index_castui %0 : i32 to index
+  %3 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#binding_ro, #binding], flags = Indirect>) binding(0) alignment(64) offset(%1) flags("ReadOnly|Indirect")
+    : !flow.dispatch.tensor<readonly:tensor<2048x2048xf16>>
+  %4 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#binding_ro, #binding], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags(Indirect)
+    : !flow.dispatch.tensor<writeonly:tensor<2048x2048xf16, #pad_encoding>>
+  %5 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1]
+    : !flow.dispatch.tensor<readonly:tensor<2048x2048xf16>> -> tensor<2048x2048xf16>
+  %6 = iree_encoding.set_encoding %5 : tensor<2048x2048xf16> -> tensor<2048x2048xf16, #pad_encoding>
+  flow.dispatch.tensor.store %6, %4, offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1]
+    : tensor<2048x2048xf16, #pad_encoding> -> !flow.dispatch.tensor<writeonly:tensor<2048x2048xf16, #pad_encoding>>
+  return
+}
+
+// CHECK-LABEL: @set_pad_encoding_and_store_with_resolved_layout
+// CHECK:         %[[A:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+// CHECK-SAME:                  !flow.dispatch.tensor<readonly:tensor<2048x2048xf16>>
+// CHECK:         %[[B:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+// CHECK-SAME:                  !flow.dispatch.tensor<writeonly:tensor<2048x2112xf16>>
+// CHECK:         %[[LD:.+]] = flow.dispatch.tensor.load %[[A]], offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1]
+// CHECK-SAME:                  !flow.dispatch.tensor<readonly:tensor<2048x2048xf16>> -> tensor<2048x2048xf16>
+// CHECK:         flow.dispatch.tensor.store %[[LD]], %[[B]], offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1]
+// CHECK-SAME:                  tensor<2048x2048xf16> -> !flow.dispatch.tensor<writeonly:tensor<2048x2112xf16>>
