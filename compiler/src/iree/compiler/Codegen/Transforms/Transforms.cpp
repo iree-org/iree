@@ -958,10 +958,9 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
         *expandedShape, reassocInfo,
         [&mixedTensorShape](size_t collapsedIdx, ReassociationIndicesRef,
                             MutableArrayRef<OpFoldResult> expandedValues) {
-          if (expandedValues.size() != 1) {
-            return;
+          if (expandedValues.size() == 1) {
+            expandedValues[0] = mixedTensorShape[collapsedIdx];
           }
-          expandedValues[0] = mixedTensorShape[collapsedIdx];
         });
 
     SmallVector<int64_t> expandedStaticShape;
@@ -977,12 +976,13 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
         newSubspanShape, reassocInfo,
         [&storeOp](size_t collapsedIdx, ReassociationIndicesRef,
                    MutableArrayRef<int64_t> expandedValues) {
-          if (expandedValues.size() != 1) {
+          if (expandedValues.size() == 1) {
+            // Restore the original non-collapsed subspan dim, which may be
+            // smaller than the reshape result in case of partial stores.
+            expandedValues[0] =
+                storeOp.getTargetType().getDimSize(collapsedIdx);
             return;
           }
-          // Restore the original non-collapsed subspan dim, which may be
-          // smaller than the reshape result in case of partial stores.
-          expandedValues[0] = storeOp.getTargetType().getDimSize(collapsedIdx);
         });
 
     auto newSubspanType = IREE::Flow::DispatchTensorType::get(
