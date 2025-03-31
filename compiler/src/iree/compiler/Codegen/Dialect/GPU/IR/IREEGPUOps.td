@@ -449,8 +449,7 @@ def IREEGPU_YieldOp : Op<IREEGPU_Dialect, "yield", [
      This operation is used to yield values from a within a region.
   }];
 
-  let arguments = (ins  Variadic<AnyRankedTensorOrVector>:$inputs);
-  let results   = (outs Variadic<AnyRankedTensorOrVector>:$results);
+  let arguments = (ins Variadic<AnyType>:$values);
   let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
 
   let assemblyFormat =
@@ -468,12 +467,12 @@ def IREEGPU_GlobalLoadDMA : Op<IREEGPU_Dialect, "global_load_dma", [
     TODO: Add description
   }];
 
-  let arguments = (ins  Variadic<AnyRankedTensorOrVector>:$inputs);
-  let results   = (outs Variadic<AnyRankedTensorOrVector>:$results);
+  let arguments = (ins  AnyRankedTensorOrVector:$inputs);
+  let results   = (outs AnyRankedTensorOrVector:$results);
   let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
 
   let assemblyFormat = [{
-    $inputs attr-dict `:` type($inputs)
+    $inputs attr-dict `:` type($inputs) `,` type($results)
   }];
 
   let builders = [
