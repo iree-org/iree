@@ -1044,6 +1044,9 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
     if (!partitionedLoopsSet.contains(depth)) {
       continue;
     }
+    if (ShapedType::isDynamic(loopBounds[depth])) {
+      continue;
+    }
     if (residualWorkgroupSize % loopBounds[depth] == 0) {
       workgroupTileSizes[depth] = loopBounds[depth];
       residualWorkgroupSize /= loopBounds[depth];
