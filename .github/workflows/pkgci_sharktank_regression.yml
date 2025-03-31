@@ -80,7 +80,7 @@ jobs:
         with:
           submodules: false
 
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.4.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
@@ -112,7 +112,7 @@ jobs:
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
           pip install -e ${{ github.workspace }}/iree-test-suites/sharktank_models
-            
+
       - name: Run sharktank specific model tests
         if: contains(matrix.name, 'model')
         run: |
@@ -129,7 +129,7 @@ jobs:
         env:
           HIP_TARGET: ${{ matrix.gpu }}
           ASSET_PATH: ${{ github.workspace }}/iree-test-suites/sharktank_models
-        
+
       - name: Run regression quality tests
         if: contains(matrix.name, 'regression')
         run: |
@@ -162,7 +162,7 @@ jobs:
             --timeout=600 \
             --test-file-directory=${{ github.workspace }}/tests/external/iree-test-suites/sharktank_models/benchmarks \
             --external-file-directory=${{ github.workspace }}/tests/external/iree-test-suites/test_suite_files
-            
+
           echo "$(<${JOB_SUMMARY_PATH}/job_summary.md )" >> $GITHUB_STEP_SUMMARY
         env:
           ROCM_CHIP: ${{ matrix.rocm-chip }}

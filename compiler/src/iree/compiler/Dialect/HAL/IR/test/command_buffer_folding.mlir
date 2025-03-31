@@ -38,6 +38,7 @@ util.func public @fold_buffer_subspan_into_fill_buffer(
       // CHECK-SAME: target(%[[BASE_BUFFER]] : !hal.buffer)[%c108192, %c8192]
       target(%target_subspan : !hal.buffer)[%c100000, %c8192]
       pattern(%c1234_i32 : i32)
+      flags("None")
   util.return
 }
 
@@ -67,6 +68,7 @@ util.func public @fold_buffer_subspans_into_update_buffer(
       target(%target_subspan : !hal.buffer)[%c100000]
       // CHECK-SAME: length(%c8192)
       length(%c8192)
+      flags("None")
   util.return
 }
 
@@ -93,6 +95,7 @@ util.func public @fold_buffer_subspan_into_copy_buffer(
       // CHECK-SAME: target(%[[BASE_BUFFER]] : !hal.buffer)[%c108192]
       target(%target_subspan : !hal.buffer)[%c100000]
       length(%c8192)
+      flags("None")
   util.return
 }
 

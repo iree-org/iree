@@ -152,6 +152,11 @@ static LogicalResult isSupportedContractionOp(PatternRewriter &rewriter,
   return success();
 }
 
+static bool hasWorkgroupCounts(Operation *op) {
+  auto parentDispatchOp = op->getParentOfType<IREE::Flow::DispatchRegionOp>();
+  return parentDispatchOp && !parentDispatchOp.getWorkgroupCount().empty();
+}
+
 namespace {
 
 class SetContractionOpEncoding final
@@ -169,6 +174,11 @@ public:
     if (getCompilationInfo(linalgOp)) {
       return rewriter.notifyMatchFailure(
           linalgOp, "the op has preset compilation strategy, skip SetEncoding");
+    }
+    if (hasWorkgroupCounts(linalgOp.getOperation())) {
+      return rewriter.notifyMatchFailure(
+          linalgOp, "the op is in a region with workgroup counts, skip "
+                    "SetEncoding");
     }
     if (failed(isSupportedContractionOp(rewriter, linalgOp))) {
       return failure();

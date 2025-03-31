@@ -1472,7 +1472,7 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
   if (locs.size() == 1) {
     auto allocaOp = builder.create<IREE::Stream::ResourceAllocaOp>(
         locs.front(), resourceType, timepointType, storageSizes.front(),
-        awaitTimepoint, affinityAttr);
+        /*indeterminate_lifetime=*/UnitAttr{}, awaitTimepoint, affinityAttr);
     return {allocaOp, {allocaOp.getResult()}};
   }
   auto fusedLoc = builder.getFusedLoc(locs);
@@ -1502,7 +1502,7 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
   // Create the new alloca based on the total required size.
   auto allocaOp = builder.create<IREE::Stream::ResourceAllocaOp>(
       fusedLoc, resourceType, timepointType, packOp.getTotalLength(),
-      awaitTimepoint, affinityAttr);
+      /*indeterminate_lifetime=*/UnitAttr{}, awaitTimepoint, affinityAttr);
   auto slab = allocaOp.getResult();
   auto slabSize = packOp.getTotalLength();
 
@@ -1516,6 +1516,28 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
                           .getResult());
   }
   return {allocaOp, results};
+}
+
+//===----------------------------------------------------------------------===//
+// stream.resource.retain
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+// stream.resource.release
+//===----------------------------------------------------------------------===//
+
+void ResourceReleaseOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "is_terminal");
+}
+
+//===----------------------------------------------------------------------===//
+// stream.resource.is_terminal
+//===----------------------------------------------------------------------===//
+
+void ResourceIsTerminalOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "is_terminal");
 }
 
 //===----------------------------------------------------------------------===//
@@ -1812,7 +1834,7 @@ LogicalResult TensorImportOp::verify() {
   return success();
 }
 
-bool TensorImportOp::pinsValueAffinity() { return true; }
+bool TensorImportOp::pinsValueAffinity() { return getAffinity().has_value(); }
 
 Value TensorImportOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
@@ -1841,7 +1863,7 @@ LogicalResult TensorExportOp::verify() {
   return success();
 }
 
-bool TensorExportOp::pinsValueAffinity() { return true; }
+bool TensorExportOp::pinsValueAffinity() { return getAffinity().has_value(); }
 
 Value TensorExportOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());

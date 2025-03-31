@@ -67,9 +67,9 @@ struct ConvertTensorImportOp
         TypeAttr::get(op.getTarget().getType()),
         flattenValues(adaptor.getTargetDims()), executionAffinityAttr);
     Value resource = rewriter.create<IREE::Stream::TensorImportOp>(
-        op.getLoc(), resultType, adaptor.getSource().front(),
-        TypeAttr::get(targetType), flattenValues(adaptor.getTargetDims()),
-        resultSize, executionAffinityAttr);
+        op.getLoc(), resultType, adaptor.getSource().front(), targetType,
+        flattenValues(adaptor.getTargetDims()), resultSize, op.getConsume(),
+        executionAffinityAttr);
 
     // Await the fence, if needed. When not specified the resource is assumed to
     // be immediately available.
@@ -218,7 +218,7 @@ struct ConvertTensorAliasOp
     auto importOp = rewriter.create<IREE::Stream::TensorImportOp>(
         op.getLoc(), externalType, adaptor.getStorage().front(),
         TypeAttr::get(sourceType), convertedSourceDims, storageSize,
-        executionAffinityAttr);
+        /*consume=*/UnitAttr{}, executionAffinityAttr);
 
     // Await the fence, if needed. When not specified the storage is assumed to
     // be immediately available.

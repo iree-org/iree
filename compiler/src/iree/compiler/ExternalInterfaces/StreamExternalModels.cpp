@@ -129,7 +129,9 @@ struct HALTensorAffinityAttrExternalModel
 
   bool requiresAffinity(Operation *op) const { return false; }
 
-  bool pinsValueAffinity(Operation *op) const { return true; }
+  bool pinsValueAffinity(Operation *op) const {
+    return op->hasAttrOfType<IREE::Stream::AffinityAttr>("affinity");
+  }
 
   IREE::Stream::AffinityAttr getAffinityAttr(Operation *op) const {
     return op->getAttrOfType<IREE::Stream::AffinityAttr>("affinity");

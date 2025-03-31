@@ -26,6 +26,10 @@ include "mlir/Pass/PassBase.td"
 def BubbleUpExpandShapesPass :
     Pass<"iree-dispatch-creation-bubble-up-expand-shapes"> {
   let summary = "Propagate expand_shapes up the program (and collapse_shapes down).";
+  let options = [
+    Option<"enableBubbleUpExpandShapesAcrossReductionOps", "enable-bubble-up-expand-shapes-across-reduction-ops", "bool",
+           /*default=*/"false", "Enables propagation of 'expand_shape's through 'linalg.generic's with reductions">
+  ];
   let dependentDialects = [
     "mlir::affine::AffineDialect",
   ];
@@ -54,6 +58,20 @@ def ElementwiseOpFusionPass :
 def FoldUnitExtentDimsPass :
     Pass<"iree-dispatch-creation-fold-unit-extent-dims", "mlir::ModuleOp"> {
   let summary = "Fold unit extent dimension of operations.";
+  let description = [{
+    Imports upstream patterns to fold unit extent dims but with IREE control.
+  }];
+  let dependentDialects = [
+    "mlir::affine::AffineDialect",
+    "mlir::arith::ArithDialect",
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
+  ];
+}
+
+def FoldUnitExtentDimsForFuncPass :
+    Pass<"iree-dispatch-creation-fold-unit-extent-dims-for-func", ""> {
+  let summary = "Fold unit extent dimension of operations on a function.";
   let description = [{
     Imports upstream patterns to fold unit extent dims but with IREE control.
   }];
