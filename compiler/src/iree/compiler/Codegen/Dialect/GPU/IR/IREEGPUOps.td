@@ -460,24 +460,20 @@ def IREEGPU_YieldOp : Op<IREEGPU_Dialect, "yield", [
 // GlobalLoadDMAOp
 //===----------------------------------------------------------------------===//
 
-def IREEGPU_GlobalLoadDMA : Op<IREEGPU_Dialect, "global_load_dma", [
+def IREEGPU_GlobalLoadDMAOp : Op<IREEGPU_Dialect, "global_load_dma", [
     ]> {
   let summary = "Does a global load DMA operation";
   let description = [{
     TODO: Add description
   }];
 
-  let arguments = (ins  AnyRankedTensorOrVector:$inputs);
-  let results   = (outs AnyRankedTensorOrVector:$results);
+  let arguments = (ins  AnyMemRef:$input, AnyMemRef:$output);
+  let results   = (outs);
   let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
 
   let assemblyFormat = [{
-    $inputs attr-dict `:` type($inputs) `,` type($results)
+    $input `,` $output attr-dict `:` type($input) `,` type($output)
   }];
-
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs)>
-  ];
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREEGPUOPS
