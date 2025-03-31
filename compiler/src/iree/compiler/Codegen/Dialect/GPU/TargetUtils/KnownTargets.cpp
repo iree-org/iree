@@ -740,6 +740,14 @@ std::optional<TargetDetails> getAndroidProfileDetails(StringRef target) {
 // Query functions
 //===----------------------------------------------------------------------===//
 
+std::optional<L1CacheInfo> getL1CacheInfo(TargetAttr target) {
+  // TODO(kuhar): Add L1 cache query for other HIP targets.
+  if (!target || !llvm::is_contained({"gfx90a", "gfx942"}, target.getArch())) {
+    return std::nullopt;
+  }
+  return L1CacheInfo{.cacheLineBytes = 128, .cacheSets = 4};
+}
+
 TargetAttr getMetalTargetDetails(MLIRContext *context) {
   return createTargetAttr(*getAppleTargetDetails(), /*arch=*/"apple",
                           /*features=*/"spirv:v1.3,cap:Shader", context);

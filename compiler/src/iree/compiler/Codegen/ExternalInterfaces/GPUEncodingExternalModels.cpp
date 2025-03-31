@@ -28,6 +28,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/ExternalInterfaces/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
@@ -412,15 +413,12 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
     IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(config);
-    if (!gpuTarget) {
+    std::optional<IREE::GPU::L1CacheInfo> cache =
+        IREE::GPU::getL1CacheInfo(gpuTarget);
+    if (!cache) {
       return IREE::Encoding::IdentityEncodingAttr::get(ctx);
     }
-    // GPUPadLayoutAttr is only enabled for CDNA2 and CDNA3 for the time being.
-    // TODO(kuhar): Enable for other HIP targets.
-    if (!llvm::is_contained({"gfx90a", "gfx942"}, gpuTarget.getArch())) {
-      return IREE::Encoding::IdentityEncodingAttr::get(ctx);
-    }
-    return GPUPadLayoutAttr::get(ctx, /*cacheLineBytes=*/128, /*cacheSets=*/4);
+    return GPUPadLayoutAttr::get(ctx, cache->cacheLineBytes, cache->cacheSets);
   }
 
   Attribute getLayout(Attribute attr, RankedTensorType type) const {
