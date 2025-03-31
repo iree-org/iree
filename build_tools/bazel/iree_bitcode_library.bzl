@@ -288,7 +288,7 @@ def iree_amdgpu_bitcode_library(
         "-fno-short-wchar",  # Shouldn't matter to us, but doesn't hurt.
 
         # Pin the bitcode version, matching IREE
-        "-mcode-object-version=5"
+        "-mcode-object-version=5",
 
         # Target architecture/machine.
         "-target",
