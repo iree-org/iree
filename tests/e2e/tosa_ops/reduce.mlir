@@ -34,6 +34,7 @@ func.func @reduce_prod_float() {
 }
 
 // Temporary disable because Tosa doesn't like these anymore, probably a bug there
+// See #20422.
 // func.func @reduce_prod_int() {
 //   %0 = util.unfoldable_constant dense<[[1, 2, 3], [4, 5, 6]]> : tensor<2x3xi32>
 //   %result = tosa.reduce_product %0 {axis = 0 : i32} : (tensor<2x3xi32>) -> tensor<1x3xi32>
