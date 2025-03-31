@@ -167,7 +167,7 @@ typedef uint32_t iree_hal_execution_stage_t;
 enum iree_hal_execution_barrier_flag_bits_t {
   IREE_HAL_EXECUTION_BARRIER_FLAG_NONE = 0,
 };
-typedef uint32_t iree_hal_execution_barrier_flags_t;
+typedef uint64_t iree_hal_execution_barrier_flags_t;
 
 // Bitfield specifying which scopes will access memory and how.
 //

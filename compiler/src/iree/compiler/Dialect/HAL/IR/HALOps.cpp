@@ -510,16 +510,17 @@ LogicalResult ReturnOp::verify() {
 
 void TensorImportOp::build(OpBuilder &builder, OperationState &result,
                            Type resultType, Value source,
-                           TypeAttr targetEncoding, StringAttr name,
-                           Attribute affinity) {
-  build(builder, result, resultType, source, targetEncoding,
+                           TypeAttr targetEncoding, bool consume,
+                           StringAttr name, Attribute affinity) {
+  build(builder, result, resultType, source, targetEncoding, consume,
         /*waitFence=*/Value{}, name, affinity);
 }
 
 void TensorImportOp::build(OpBuilder &builder, OperationState &result,
                            Type resultType, Value source,
-                           TypeAttr targetEncoding, Value waitFence,
-                           StringAttr name, Attribute affinity) {
+                           TypeAttr targetEncoding, bool consume,
+                           Value waitFence, StringAttr name,
+                           Attribute affinity) {
   auto shapedType = llvm::cast<ShapedType>(resultType);
   assert((isa<IREE::HAL::BufferViewType>(source.getType()) ||
           shapedType.hasStaticShape()) &&
@@ -534,7 +535,8 @@ void TensorImportOp::build(OpBuilder &builder, OperationState &result,
         builder.getIndexAttr(i)));
   }
   build(builder, result, resultType, source, targetEncoding, dynamicDims,
-        waitFence, name, affinity);
+        consume ? builder.getUnitAttr() : UnitAttr{}, waitFence, name,
+        affinity);
 }
 
 static LogicalResult verifyTypeStorageCompatibility(Operation *op,
@@ -863,6 +865,24 @@ void AllocatorImportOp::getAsmResultNames(
 Value AllocatorImportOp::getOperandSize(unsigned idx) { return {}; }
 
 Value AllocatorImportOp::getResultSize(unsigned idx) { return getLength(); }
+
+//===----------------------------------------------------------------------===//
+// hal.buffer.allocation.discard
+//===----------------------------------------------------------------------===//
+
+void BufferAllocationDiscardOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "was_terminal");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.buffer.allocation.is_terminal
+//===----------------------------------------------------------------------===//
+
+void BufferAllocationIsTerminalOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "is_terminal");
+}
 
 //===----------------------------------------------------------------------===//
 // hal.buffer.subspan
@@ -1340,6 +1360,10 @@ LogicalResult DeviceQueueWriteOp::verify() {
   return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
 }
 
+LogicalResult DeviceQueueBarrierOp::verify() {
+  return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
+}
+
 LogicalResult DeviceQueueExecuteOp::verify() {
   return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
 }
@@ -1348,7 +1372,8 @@ void DeviceQueueExecuteIndirectOp::build(OpBuilder &builder,
                                          OperationState &state, Value device,
                                          Value queueAffinity, Value waitFence,
                                          Value signalFence, Value commandBuffer,
-                                         ArrayRef<BindingValue> bindings) {
+                                         ArrayRef<BindingValue> bindings,
+                                         IREE::HAL::ExecuteFlagBitfield flags) {
   state.addOperands(
       {device, queueAffinity, waitFence, signalFence, commandBuffer});
   SmallVector<Value> bindingBuffers;
@@ -1362,6 +1387,8 @@ void DeviceQueueExecuteIndirectOp::build(OpBuilder &builder,
   state.addOperands(bindingBuffers);
   state.addOperands(bindingOffsets);
   state.addOperands(bindingLengths);
+  state.addAttribute(
+      "flags", builder.getAttr<IREE::HAL::ExecuteFlagBitfieldAttr>(flags));
 }
 
 LogicalResult DeviceQueueExecuteIndirectOp::verify() {
