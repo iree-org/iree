@@ -217,17 +217,15 @@ struct MaterializeFlowDispatchTensorStoreOp final
 /// difference is that the converted type of the padding attribute is not as the
 /// same as the tensor type that drops encoding.
 /// TODO(#20160): Abstract new interface methods and collapse two patterns.
-struct MaterializeInterfaceBindingEncoding
-    : public OpMaterializeEncodingPattern<
-          IREE::HAL::InterfaceBindingSubspanOp> {
-  using OpMaterializeEncodingPattern<
-      IREE::HAL::InterfaceBindingSubspanOp>::OpMaterializeEncodingPattern;
+struct MaterializeInterfaceBindingEncoding final
+    : OpMaterializeEncodingPattern<IREE::HAL::InterfaceBindingSubspanOp> {
+  using OpMaterializeEncodingPattern::OpMaterializeEncodingPattern;
 
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto resultType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
+    auto resultType = dyn_cast<IREE::Flow::DispatchTensorType>(
         subspanOp.getResult().getType());
     if (!resultType) {
       return rewriter.notifyMatchFailure(
