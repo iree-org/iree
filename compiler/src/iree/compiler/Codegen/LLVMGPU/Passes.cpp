@@ -962,27 +962,6 @@ void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCanonicalizerPass());
 }
 
-void addGPUPackUnPackPasses(OpPassManager &funcPassManager) {
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true);
-  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  funcPassManager.addPass(createGPUTensorTilePass());
-  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  funcPassManager.addPass(createDecomposePackUnPackOpsPass(
-      DecomposePackUnPackOpsPassOptions{/*tileOuterToOne=*/true,
-                                        /*useOnlyReshapes=*/false}));
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-  addGPUVectorizationPasses(funcPassManager);
-
-  addBufferizePasses(funcPassManager);
-
-  funcPassManager.addPass(createGPUDistributePass());
-}
-
 void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager) {
   tileAndBufferize(funcPassManager);
 

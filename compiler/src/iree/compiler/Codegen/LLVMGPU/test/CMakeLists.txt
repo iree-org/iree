@@ -43,7 +43,6 @@ iree_lit_test_suite(
     "nvvm_extract_address_computation.mlir"
     "nvvm_mma_sync_pipeline_test.mlir"
     "nvvm_pipeline_test.mlir"
-    "pack_pipeline_test.mlir"
     "pack_shared_memory_alloc.mlir"
     "prefetch_shared_memory.mlir"
     "promote_matmul_to_fit_mma.mlir"
