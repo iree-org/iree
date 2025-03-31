@@ -21,6 +21,7 @@ iree_check_single_backend_test_suite(
     "hip"
   COMPILER_FLAGS
     "--iree-global-opt-experimental-rocm-data-tiling"
+    "--iree-hip-encoding-layout-resolver=data-tiling"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
