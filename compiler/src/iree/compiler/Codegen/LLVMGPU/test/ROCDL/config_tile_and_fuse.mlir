@@ -657,6 +657,51 @@ func.func @pack_dynamic_tile(%arg0: tensor<32x32xi8>, %d0: index, %d1: index, %t
 
 // -----
 
+func.func @single_pack(%arg0: tensor<100x250xi32>) -> tensor<16x4x16x32xi32> {
+  %c42_i32 = arith.constant 42 : i32
+  %c0 = arith.constant 0 : index
+  %3 = tensor.empty() : tensor<16x4x16x32xi32>
+  %pack = linalg.pack %arg0
+      padding_value(%c42_i32 : i32)
+      outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 32]
+      into %3 : tensor<100x250xi32> -> tensor<16x4x16x32xi32>
+  return %pack : tensor<16x4x16x32xi32>
+}
+
+// CHECK-LABEL: func.func @single_pack
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//       CHECK:   linalg.pack {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1, 1, 4]
+//  CHECK-SAME:     workgroup = [1, 1, 16, 32]
+
+// -----
+
+// Tests that we are able to compute appropriate workgroup tile sizes when
+// there are multiple relayout ops in the dispatch.
+
+func.func @unpack_pack(%arg0: tensor<8x4x32x32xi32>) -> tensor<16x4x16x32xi32> {
+  %c42_i32 = arith.constant 42 : i32
+  %c0 = arith.constant 0 : index
+  %3 = tensor.empty() : tensor<100x250xi32>
+  %unpack = linalg.unpack %arg0
+      outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [32, 32]
+      into %3 : tensor<8x4x32x32xi32> -> tensor<100x250xi32>
+  %4 = tensor.empty() : tensor<16x4x16x32xi32>
+  %pack = linalg.pack %unpack
+      padding_value(%c42_i32 : i32)
+      outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 32]
+      into %4 : tensor<100x250xi32> -> tensor<16x4x16x32xi32>
+  return %pack : tensor<16x4x16x32xi32>
+}
+
+// CHECK-LABEL: func.func @unpack_pack
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//       CHECK:   linalg.pack {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1, 1, 4]
+//  CHECK-SAME:     workgroup = [2, 1, 16, 32]
+
+// -----
+
 module {
   func.func @erf(%13 : tensor<2x1024x5120xf16>, %12 : tensor<2x1024x5120xf16>, %9 : tensor<5120xf16>, %10 : tensor<f32>) -> tensor<2x1024x5120xi8> {
     %cst = arith.constant 0.000000e+00 : f16

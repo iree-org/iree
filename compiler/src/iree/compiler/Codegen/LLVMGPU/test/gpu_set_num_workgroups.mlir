@@ -436,39 +436,6 @@ func.func @contract_reduction() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
-func.func @dynamic_pack_2x2() {
-  %c0 = arith.constant 0 : index
-  %c64 = arith.constant 64 : index
-  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
-  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
-  %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : i32
-  %3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : i32
-  %4 = arith.index_castui %0 : i32 to index
-  %5 = arith.index_castui %1 : i32 to index
-  %6 = arith.index_castui %2 : i32 to index
-  %7 = arith.index_castui %3 : i32 to index
-  %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c64) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?xi32>>{%4, %5}
-  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<?x?x2x2xi32>>{%6, %7}
-  %10 = flow.dispatch.tensor.load %8, offsets = [0, 0], sizes = [%4, %5], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xi32>>{%4, %5} -> tensor<?x?xi32>
-  %11 = tensor.empty(%6, %7) : tensor<?x?x2x2xi32>
-  %pack = linalg.pack %10 inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %11 : tensor<?x?xi32> -> tensor<?x?x2x2xi32>
-  flow.dispatch.tensor.store %pack, %9, offsets = [0, 0, 0, 0], sizes = [%6, %7, 2, 2], strides = [1, 1, 1, 1] : tensor<?x?x2x2xi32> -> !flow.dispatch.tensor<writeonly:tensor<?x?x2x2xi32>>{%6, %7}
-  return
-}
-
-//  SM80-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 16]]>
-//  SM80-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUPackUnPack workgroup_size = [32, 1, 1]>
-//      SM80:   func.func @dynamic_pack_2x2()
-// SM80-SAME:     translation_info = #[[TRANSLATION]]
-//      SM80:     linalg.pack
-// SM80-SAME:       lowering_config = #[[CONFIG]]
-
-// -----
-
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
