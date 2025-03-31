@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -54,6 +55,16 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     applyPermutationToVector(swizzledTileShape, swizzle.permutation);
     newShape.append(swizzledTileShape);
     return RankedTensorType::get(newShape, packedType.getElementType());
+  });
+  addConversion([&](IREE::Flow::DispatchTensorType dispatchTensorType)
+                    -> IREE::Flow::DispatchTensorType {
+    Type boundType = dispatchTensorType.getBoundType();
+    Type convertedBoundType = convertType(boundType);
+    if (convertedBoundType == boundType) {
+      return dispatchTensorType;
+    }
+    return IREE::Flow::DispatchTensorType::get(dispatchTensorType.getAccess(),
+                                               convertedBoundType);
   });
 }
 

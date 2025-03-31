@@ -994,17 +994,6 @@ void populateMaterializeEncodingPatterns(
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
   MLIRContext *context = patterns.getContext();
-  typeConverter.addConversion(
-      [&typeConverter](IREE::Flow::DispatchTensorType dispatchTensorType) {
-        Type boundType = dispatchTensorType.getBoundType();
-        Type convertedBoundType = typeConverter.convertType(boundType);
-        if (convertedBoundType == boundType) {
-          return dispatchTensorType;
-        }
-        return IREE::Flow::DispatchTensorType::get(
-            dispatchTensorType.getAccess(), convertedBoundType);
-      });
-
   target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
       [&typeConverter](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
         auto resultType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
