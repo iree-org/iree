@@ -98,23 +98,75 @@ jobs:
             *) echo "No cache directory assigned for ${{ matrix.name }}" ;;
           esac
 
+      - name: Checkout test suites repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: geomin12/iree-test-suites # temporary
+          ref: 579d926b64d4d3ad55106d62d92623a373960f79
+          path: iree-test-suites
+          lfs: true
+
       - name: Setup Python virtual environment
         run: |
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
-
-      - name: "Running Sharktank regression composite action"
-        uses: geomin12/iree-test-suites/sharktank_models@855abc64de84a844dacb07da89da49ee4b01b08a # temporary
-        with:
-          MATRIX_NAME: ${{ matrix.name }}
+          pip install -e ${{ github.workspace }}/iree-test-suites/sharktank_models
+            
+      - name: Run sharktank specific model tests
+        if: contains(matrix.name, 'model')
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest iree-test-suites/sharktank_models \
+              -rA \
+              --log-cli-level=info \
+              --override-ini=xfail_strict=false \
+              -m ${{ matrix.target }} \
+              --timeout=120 \
+              --durations=0 \
+              --ignore=iree-test-suites/sharktank_models/benchmarks \
+              --ignore=iree-test-suites/sharktank_models/quality_tests
+        env:
+          HIP_TARGET: ${{ matrix.gpu }}
+          ASSET_PATH: ${{ github.workspace }}/iree-test-suites/sharktank_models
+        
+      - name: Run regression quality tests
+        if: contains(matrix.name, 'regression')
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest \
+            iree-test-suites/sharktank_models/quality_tests \
+            -rpFe \
+            --log-cli-level=info \
+            --durations=0 \
+            --timeout=1200 \
+            --capture=no \
+            --test-file-directory=${{ github.workspace }}/tests/external/iree-test-suites/sharktank_models/quality_tests \
+            --external-file-directory=${{ github.workspace }}/tests/external/iree-test-suites/test_suite_files
+        env:
+          ROCM_CHIP: ${{ matrix.rocm-chip }}
           SKU: ${{ matrix.sku }}
-          CHIP: ${{ matrix.rocm-chip }}
-          VENV_DIR: ${{ env.VENV_DIR }}
-          TARGET: ${{ matrix.target }}
-          GPU: ${{ matrix.gpu }}
-          BACKEND: ${{ matrix.backend }}
-          EXTERNAL_TEST_FILE_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/test_suite_files
-          QUALITY_TEST_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/sharktank_models/quality_tests
-          BENCHMARK_TEST_DIRECTORY: ${{ github.workspace }}/tests/external/iree-test-suites/sharktank_models/benchmarks
           IREE_TEST_FILES: ${{ env.IREE_TEST_FILES }}
+          BACKEND: ${{ matrix.backend }}
+
+
+      # Since the benchmark tests require compiled model files, this step must run after the quality tests
+      - name: Run regression benchmark tests
+        if: contains(matrix.name, 'regression')
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest \
+            iree-test-suites/sharktank_models/benchmarks \
+            --log-cli-level=info \
+            --retries=7 \
+            --timeout=600 \
+            --test-file-directory=${{ github.workspace }}/tests/external/iree-test-suites/sharktank_models/benchmarks \
+            --external-file-directory=${{ github.workspace }}/tests/external/iree-test-suites/test_suite_files
+            
+          echo "$(<${JOB_SUMMARY_PATH}/job_summary.md )" >> $GITHUB_STEP_SUMMARY
+        env:
+          ROCM_CHIP: ${{ matrix.rocm-chip }}
+          SKU: ${{ matrix.sku }}
+          IREE_TEST_FILES: ${{ env.IREE_TEST_FILES }}
+          BACKEND: ${{ matrix.backend }}
+          JOB_SUMMARY_PATH: ${{ github.workspace }}/iree-test-suites
