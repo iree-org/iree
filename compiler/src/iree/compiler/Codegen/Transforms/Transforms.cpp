@@ -923,7 +923,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
 
     for (int64_t collapsedDim : collapsedDstDims) {
       if (origSizes[collapsedDim] != mixedTensorShape[collapsedDim] ||
-          !isConstantIntValue(origOffsets[collapsedDim], 0)) {
+          !isZeroIndex(origOffsets[collapsedDim])) {
         return rewriter.notifyMatchFailure(
             storeOp,
             llvm::formatv(
