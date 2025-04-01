@@ -358,6 +358,7 @@ iree_hal_semaphore_await(iree_hal_semaphore_t* semaphore, uint64_t value);
 // See the iree_hal_external_timepoint_type_t enum for more information.
 IREE_API_EXPORT iree_status_t iree_hal_semaphore_import_timepoint(
     iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_hal_external_timepoint_t external_timepoint);
 
 // Exports a timepoint at |value| on the |semaphore| timeline as an external
@@ -367,6 +368,7 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_import_timepoint(
 // See the iree_hal_external_timepoint_type_t enum for more information.
 IREE_API_EXPORT iree_status_t iree_hal_semaphore_export_timepoint(
     iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_hal_external_timepoint_type_t requested_type,
     iree_hal_external_timepoint_flags_t requested_flags,
     iree_hal_external_timepoint_t* IREE_RESTRICT out_external_timepoint);
@@ -441,9 +443,11 @@ typedef struct iree_hal_semaphore_vtable_t {
 
   iree_status_t(IREE_API_PTR* import_timepoint)(
       iree_hal_semaphore_t* semaphore, uint64_t value,
+      iree_hal_queue_affinity_t queue_affinity,
       iree_hal_external_timepoint_t external_timepoint);
   iree_status_t(IREE_API_PTR* export_timepoint)(
       iree_hal_semaphore_t* semaphore, uint64_t value,
+      iree_hal_queue_affinity_t queue_affinity,
       iree_hal_external_timepoint_type_t requested_type,
       iree_hal_external_timepoint_flags_t requested_flags,
       iree_hal_external_timepoint_t* IREE_RESTRICT out_external_timepoint);

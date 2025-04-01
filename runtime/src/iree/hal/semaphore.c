@@ -166,18 +166,20 @@ iree_hal_semaphore_await(iree_hal_semaphore_t* semaphore, uint64_t value) {
 
 IREE_API_EXPORT iree_status_t iree_hal_semaphore_import_timepoint(
     iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_hal_external_timepoint_t external_timepoint) {
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, value);
   iree_status_t status = _VTABLE_DISPATCH(semaphore, import_timepoint)(
-      semaphore, value, external_timepoint);
+      semaphore, value, queue_affinity, external_timepoint);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_semaphore_export_timepoint(
     iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_hal_external_timepoint_type_t requested_type,
     iree_hal_external_timepoint_flags_t requested_flags,
     iree_hal_external_timepoint_t* IREE_RESTRICT out_external_timepoint) {
@@ -185,7 +187,7 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_export_timepoint(
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, value);
   iree_status_t status = _VTABLE_DISPATCH(semaphore, export_timepoint)(
-      semaphore, value, requested_type, requested_flags,
+      semaphore, value, queue_affinity, requested_type, requested_flags,
       out_external_timepoint);
   IREE_TRACE_ZONE_END(z0);
   return status;
