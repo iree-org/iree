@@ -39,7 +39,9 @@
         "--iree-opt-const-eval=false",
         "--iree-opt-strip-assertions=true",
         "--iree-llvmcpu-enable-ukernels=all",
-        "--iree-global-opt-enable-quantized-matmul-reassociation"
+        "--iree-global-opt-enable-quantized-matmul-reassociation",
+        "--iree-scheduling-dump-statistics-format=json",
+        "--iree-scheduling-dump-statistics-file=compilation_info.json"
     ],
     "threshold_args": [
         "--expected_f16_threshold=1.0f"

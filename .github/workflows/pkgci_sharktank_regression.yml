@@ -34,6 +34,7 @@ jobs:
             models-config-file: models_cpu_llvm_task.json
             backend: cpu
             iree_test_files: /home/nod/iree_tests_cache
+            sku: cpu
             runs-on:
               - self-hosted # must come first
               - persistent-cache
@@ -102,7 +103,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: geomin12/iree-test-suites # temporary
-          ref: 579d926b64d4d3ad55106d62d92623a373960f79
+          ref: ccc1f37e2073e00903da6ab456252060d4435942
           path: iree-test-suites
           lfs: true
 
@@ -111,6 +112,7 @@ jobs:
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+          source ${VENV_DIR}/bin/activate
           pip install -e ${{ github.workspace }}/iree-test-suites/sharktank_models
 
       - name: Run sharktank specific model tests
