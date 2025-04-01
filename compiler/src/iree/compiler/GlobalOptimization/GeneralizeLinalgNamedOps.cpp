@@ -31,32 +31,48 @@ struct GeneralizeLinalgNamedOpsPass
 };
 } // namespace
 
-/// Returns true of `linalgOp` is a Conv2DNchwFchwOp or Conv2DNhwcHwcfOp with
-/// all strides equal to 1 and with a kernel height and width of 1
+/// Returns true if `linalgOp` can be simplified to a basic GEMM.
 static bool isConvFoldableToContraction(linalg::LinalgOp linalgOp) {
-  auto NCHWOp = dyn_cast<linalg::Conv2DNchwFchwOp>(linalgOp.getOperation());
-  auto NHWCOp = dyn_cast<linalg::Conv2DNhwcHwcfOp>(linalgOp.getOperation());
-
-  if (!NCHWOp && !NHWCOp)
+  auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
+  if (failed(convDimsOrFailure)) {
     return false;
+  }
+  auto &convDims = *convDimsOrFailure;
 
-  DenseIntElementsAttr strides =
-      NCHWOp ? NCHWOp.getStrides() : NHWCOp.getStrides();
-  if (!llvm::all_of(
-          strides, [](APInt element) { return element.getSExtValue() == 1; })) {
+  if (!llvm::all_of(convDims.strides,
+                    [](int64_t element) { return element == 1; })) {
     return false;
   }
 
-  auto filterShapeType = llvm::dyn_cast<RankedTensorType>(
-      linalgOp.getDpsInputOperand(1)->get().getType());
-  if (!filterShapeType)
+  // Dont generalize depthwise convolutions.
+  if (!convDims.depth.empty()) {
     return false;
+  }
 
-  // Adjusting dimension indices based on Conv2DOpType.
-  const int khIndex = NHWCOp ? 0 : 2;
-  const int kwIndex = NHWCOp ? 1 : 3;
+  // Dont generalize pooling operations. For pooling ops, the input/output
+  // channel size will be categorized as the additional batch dimension
+  if (convDims.outputChannel.empty() || convDims.inputChannel.empty()) {
+    return false;
+  }
+
+  // Check if all filter dimensions are size 1.
+  const int64_t kFilterInputIdx = 1;
+  auto filterShapeType = llvm::dyn_cast<RankedTensorType>(
+      linalgOp.getDpsInputOperand(kFilterInputIdx)->get().getType());
+  if (!filterShapeType) {
+    return false;
+  }
   auto filterShape = filterShapeType.getShape();
-  return filterShape[khIndex] == 1 && filterShape[kwIndex] == 1;
+  AffineMap filterMap = linalgOp.getIndexingMapsArray()[kFilterInputIdx];
+  for (auto filterLoop : convDims.filterLoop) {
+    std::optional<int64_t> maybeDim = filterMap.getResultPosition(
+        getAffineDimExpr(filterLoop, filterMap.getContext()));
+    if (!maybeDim || filterShape[*maybeDim] != 1) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 void GeneralizeLinalgNamedOpsPass::runOnOperation() {
