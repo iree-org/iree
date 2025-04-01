@@ -174,6 +174,7 @@ void BubbleUpExpandShapesPass::runOnOperation() {
       bubbleExpandShapePatterns, context);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(
       bubbleExpandShapePatterns);
+  tensor::populateBubbleUpExpandShapePatterns(bubbleExpandShapePatterns);
 
   GreedyRewriteConfig rewriteConfig;
   rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
