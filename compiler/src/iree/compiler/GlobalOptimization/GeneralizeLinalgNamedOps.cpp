@@ -44,15 +44,13 @@ static bool isConvFoldableToContraction(linalg::LinalgOp linalgOp) {
     return false;
   }
 
-  if (!llvm::all_of(convDims.dilations,
-                    [](int64_t element) { return element == 1; })) {
-    return false;
-  }
-
+  // Dont generalize depthwise convolutions.
   if (!convDims.depth.empty()) {
     return false;
   }
 
+  // Dont generalize pooling operations. For pooling ops, the input/output
+  // channel size will be categorized as the additional batch dimension
   if (convDims.outputChannel.empty() || convDims.inputChannel.empty()) {
     return false;
   }

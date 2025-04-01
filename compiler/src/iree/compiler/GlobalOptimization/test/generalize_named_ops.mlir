@@ -96,8 +96,8 @@ util.func public @no_generalize_1x1_conv_2d_dilations(%input: tensor<1x4x?x2xf32
 }
 
 // CHECK-LABEL: @no_generalize_1x1_conv_2d_dilations
-//   CHECK-NOT:   linalg.generic
-//       CHECK:   util.return
+//       CHECK:   %[[RESULT:.*]] = linalg.generic
+//       CHECK:   util.return %[[RESULT]]
 
 // -----
 
