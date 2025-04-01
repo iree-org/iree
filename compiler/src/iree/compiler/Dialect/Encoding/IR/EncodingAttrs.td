@@ -147,15 +147,16 @@ def EncodingAttr :
 //===---------------------------------------------------------------------===//
 
 def MatmulKAttr :
-    IREEEncoding_Attr<"Encoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
-        "isSerialized",
-        "isIdentityLayout",
-        "cloneWithLayouts",
-        "calculateStorageSizeInBytes",
-      ]>
+    IREEEncoding_Attr<"MatmulK", [
+// TODO(hanchung): Implement the interface methods.
+//      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+//        "isSerialized",
+//        "isIdentityLayout",
+//        "cloneWithLayouts",
+//        "calculateStorageSizeInBytes",
+//      ]>
     ]> {
-  let mnemonic = "encoding";
+  let mnemonic = "matmul_k";
   let summary = [{information to track K dimensions in }];
   let description = [{
     The attribute that tracks.
@@ -166,7 +167,7 @@ def MatmulKAttr :
   let parameters = (ins
     AttrParameter<"IntegerAttr", "this tensor operand's index in the parameter list">:$operand_index,
     "DenseI32ArrayAttr":$k_dims,
-    OptionalParameter<"Attribute", "the serialized layout, if present">:$layout
+    OptionalParameter<"ArrayAttr", "the serialized layout, if present">:$layouts
   );
 
   let extraClassDeclaration = [{

@@ -221,3 +221,14 @@ func.func @testing_encoding_with_layouts(%arg0: tensor<?x?xf32, #encoding>) -> t
 // CHECK:      func.func @testing_encoding_with_layouts(
 // CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf32, #[[ENCODING]]>
 // CHECK         return %[[ARG0]]
+
+// -----
+
+#encoding = #iree_encoding.matmul_k<operand_index = 0 : i64, k_dims = [1]>
+func.func @matmul_k_encoding(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
+  return %arg0 : tensor<?x?xf32, #encoding>
+}
+// CHECK:     #[[ENCODING:.+]] = #iree_encoding.matmul_k<operand_index = 0 : i64, k_dims = [1]>
+// CHECK:      func.func @matmul_k_encoding(
+// CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf32, #[[ENCODING]]>
+// CHECK         return %[[ARG0]]
