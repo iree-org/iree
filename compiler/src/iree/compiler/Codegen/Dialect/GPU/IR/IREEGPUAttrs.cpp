@@ -1326,7 +1326,6 @@ bool DerivedThreadConfigAttr::hasTilingLevel(unsigned level) const {
 
 //===----------------------------------------------------------------------===//
 // UseGlobalLoadDMAAttr
-// TODO: actually implement sensible tiling configurations.
 //===----------------------------------------------------------------------===//
 
 SmallVector<int64_t>
@@ -1335,7 +1334,7 @@ UseGlobalLoadDMAAttr::getStaticTilingLevelSizes(unsigned level,
   if (level != llvm::to_underlying(GPU::TilingLevel::Thread)) {
     return {};
   }
-  return deriveThreadTileSizes(op);
+  return globalLoadDMATileSizes(op);
 }
 
 SmallVector<OpFoldResult>
@@ -1344,7 +1343,7 @@ UseGlobalLoadDMAAttr::getTilingLevelSizes(OpBuilder &b, unsigned level,
   if (level > llvm::to_underlying(GPU::TilingLevel::Thread)) {
     return {};
   }
-  SmallVector<int64_t> sizes = deriveThreadTileSizes(op);
+  SmallVector<int64_t> sizes = globalLoadDMATileSizes(op);
   return llvm::map_to_vector(
       sizes, [&](int64_t s) -> OpFoldResult { return b.getIndexAttr(s); });
 }
