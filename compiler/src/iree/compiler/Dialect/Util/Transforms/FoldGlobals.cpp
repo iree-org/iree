@@ -314,14 +314,14 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
     if (!it->isLeader()) {
       // Ignore non-leader sets.
       continue;
-    } else if (++ec.member_begin(it) == ec.member_end()) {
+    } else if (++ec.member_begin(*it) == ec.member_end()) {
       continue;
     }
     auto *baseGlobal = &globalTable.lookup(it->getData());
 
     // Build fused location from all of the globals.
     SmallVector<Location> locs;
-    for (auto mi = ec.member_begin(it); mi != ec.member_end(); ++mi) {
+    for (auto mi = ec.member_begin(*it); mi != ec.member_end(); ++mi) {
       Global &global = globalTable.lookup(*mi);
       locs.push_back(global.op.getLoc());
       if (global.ordinal < baseGlobal->ordinal) {
@@ -335,7 +335,7 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
     baseGlobalOp->setLoc(fusedLoc);
 
     // Replace all other globals to point at the new one.
-    for (auto mi = ec.member_begin(it); mi != ec.member_end(); ++mi) {
+    for (auto mi = ec.member_begin(*it); mi != ec.member_end(); ++mi) {
       Global &global = globalTable.lookup(*mi);
       if (global.op == baseGlobalOp) {
         continue;
