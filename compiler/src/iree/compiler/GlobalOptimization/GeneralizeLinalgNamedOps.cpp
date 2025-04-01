@@ -31,19 +31,33 @@ struct GeneralizeLinalgNamedOpsPass
 };
 } // namespace
 
-/// Returns true if `linalgOp` is a convolution op with all strides equal to 1
-/// and with unit kernel dimensions.
+/// Returns true if `linalgOp` can be simplified to a basic GEMM.
 static bool isConvFoldableToContraction(linalg::LinalgOp linalgOp) {
   auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
   if (failed(convDimsOrFailure)) {
     return false;
   }
   auto &convDims = *convDimsOrFailure;
+
   if (!llvm::all_of(convDims.strides,
                     [](int64_t element) { return element == 1; })) {
     return false;
   }
 
+  if (!llvm::all_of(convDims.dilations,
+                    [](int64_t element) { return element == 1; })) {
+    return false;
+  }
+
+  if (!convDims.depth.empty()) {
+    return false;
+  }
+
+  if (convDims.outputChannel.empty() || convDims.inputChannel.empty()) {
+    return false;
+  }
+
+  // Check if all filter dimensions are size 1.
   const int64_t kFilterInputIdx = 1;
   auto filterShapeType = llvm::dyn_cast<RankedTensorType>(
       linalgOp.getDpsInputOperand(kFilterInputIdx)->get().getType());
@@ -52,7 +66,6 @@ static bool isConvFoldableToContraction(linalg::LinalgOp linalgOp) {
   }
   auto filterShape = filterShapeType.getShape();
   AffineMap filterMap = linalgOp.getIndexingMapsArray()[kFilterInputIdx];
-
   for (auto filterLoop : convDims.filterLoop) {
     std::optional<int64_t> maybeDim = filterMap.getResultPosition(
         getAffineDimExpr(filterLoop, filterMap.getContext()));
