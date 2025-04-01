@@ -498,8 +498,8 @@ static iree_status_t iree_tooling_parse_tensor_into(
 
   iree_string_view_t path =
       iree_string_view_substr(string, 1, IREE_HOST_SIZE_MAX);
-  // Check ext to warn user if trying to read a .npy file as binary
-  // could make this pluggable or at least a little smarter 
+  // Check ext to warn user if trying to read a .npy file as binary.
+  // Could make this pluggable or at least a little smarter,
   // (sniff file header/etc) instead of relying on ext.
   if (iree_string_view_ends_with(path, IREE_SV(".npy"))) {
     fprintf(stderr, "WARNING: parsing .npy file as shaped buffer\n");
