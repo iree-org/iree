@@ -102,8 +102,8 @@ jobs:
       - name: Checkout test suites repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          repository: geomin12/iree-test-suites # temporary
-          ref: ccc1f37e2073e00903da6ab456252060d4435942
+          repository: iree-org/iree-test-suites
+          ref: 6be20a2471be24f6ddc8343dec49a76d6a7749f7
           path: iree-test-suites
           lfs: true
 
