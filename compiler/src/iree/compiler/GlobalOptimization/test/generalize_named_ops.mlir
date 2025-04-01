@@ -84,7 +84,7 @@ util.func public @generalize_1x1_nhwc_fhwc_conv_2d(%input: tensor<1x4x5x2xf32>, 
 
 // -----
 
-util.func public @no_generalize_1x1_conv_2d_dilations(%input: tensor<1x4x?x2xf32>, %filter: tensor<1x1x2x7xf32>) -> tensor<1x4x?x7xf32> {
+util.func public @generalize_1x1_conv_2d_dilations(%input: tensor<1x4x?x2xf32>, %filter: tensor<1x1x2x7xf32>) -> tensor<1x4x?x7xf32> {
     %c2 = arith.constant 2 : index
     %d2 = tensor.dim %input, %c2 : tensor<1x4x?x2xf32>
     %0 = tensor.empty(%d2) : tensor<1x4x?x7xf32>
@@ -95,7 +95,7 @@ util.func public @no_generalize_1x1_conv_2d_dilations(%input: tensor<1x4x?x2xf32
     util.return %1 : tensor<1x4x?x7xf32>
 }
 
-// CHECK-LABEL: @no_generalize_1x1_conv_2d_dilations
+// CHECK-LABEL: @generalize_1x1_conv_2d_dilations
 //       CHECK:   %[[RESULT:.*]] = linalg.generic
 //       CHECK:   util.return %[[RESULT]]
 
