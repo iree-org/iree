@@ -50,7 +50,7 @@ func.func @sort3D_dynamic_shape() {
   %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
   %2 = arith.index_castui %0 : i32 to index
   %3 = arith.index_castui %1 : i32 to index
-  %4 = flow.dispatch.workload.ordinal %3, 0 : index  
+  %4 = flow.dispatch.workload.ordinal %3, 0 : index
   %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%2) flags(Indirect) {iree_gpu.use_rocdl_buffer_instructions} : !flow.dispatch.tensor<readwrite:tensor<?x2x4xi32>>{%4}
   %6 = flow.dispatch.tensor.load %5, offsets = [0, 0, 0], sizes = [%4, 2, 4], strides = [1, 1, 1] : !flow.dispatch.tensor<readwrite:tensor<?x2x4xi32>>{%4} -> tensor<?x2x4xi32>
   %7 = iree_linalg_ext.sort dimension(2) outs(%6 : tensor<?x2x4xi32>) {
