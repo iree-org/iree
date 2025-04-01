@@ -694,13 +694,14 @@ def FuseConsumerOp : Op<Transform_Dialect, "iree.fuse_consumer",
   }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
-  let arguments =
-    (ins TransformHandleTypeInterface:$target);
+  let arguments =(ins
+      TransformHandleTypeInterface:$target,
+      Variadic<TransformHandleTypeInterface>:$loops);
   let results = (outs TransformHandleTypeInterface:$consumer,
                       TransformHandleTypeInterface:$fused_consumer);
 
   let assemblyFormat = [{
-    $target attr-dict `:` functional-type(operands, results)
+    $target `in` `(` $loops `)` attr-dict `:` functional-type(operands, results)
   }];
 }
 

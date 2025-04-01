@@ -237,8 +237,8 @@ static bool areAllStaticLoopBounds(scf::ForallOp forallOp) {
 
 /// Find dimensions of the loop that are unit-trip count and drop them from the
 /// distributed dimensions.
-static LogicalResult dropUnitDistributedDims(RewriterBase &rewriter,
-                                             scf::ForallOp forallOp) {
+static FailureOr<scf::ForallOp>
+dropUnitDistributedDims(RewriterBase &rewriter, scf::ForallOp forallOp) {
   SmallVector<OpFoldResult> mixedLbs = forallOp.getMixedLowerBound();
   SmallVector<OpFoldResult> mixedUbs = forallOp.getMixedUpperBound();
   SmallVector<OpFoldResult> mixedSteps = forallOp.getMixedStep();
@@ -261,7 +261,7 @@ static LogicalResult dropUnitDistributedDims(RewriterBase &rewriter,
     }
   }
   if (droppedLoops.empty()) {
-    return success();
+    return forallOp;
   }
 
   OpBuilder::InsertionGuard g(rewriter);
@@ -303,7 +303,7 @@ static LogicalResult dropUnitDistributedDims(RewriterBase &rewriter,
   rewriter.mergeBlocks(oldLoopBody, newLoopBody, argReplacements);
 
   rewriter.replaceOp(forallOp, newForallOp.getResults());
-  return success();
+  return newForallOp;
 }
 
 //===---------------------------------------------------------------------===//
@@ -314,8 +314,9 @@ static LogicalResult dropUnitDistributedDims(RewriterBase &rewriter,
 // Returns a list of new `tensor.extract_slice` ops with new fusion
 // opportunities, as well as the new surrounding `scf.forall` (because consumer
 // fusion replaces the loop).
-static std::pair<std::queue<Operation *>, scf::ForallOp>
-fuseConsumers(RewriterBase &rewriter, Operation *tiledOp) {
+static std::queue<Operation *>
+fuseConsumers(RewriterBase &rewriter, Operation *tiledOp,
+              MutableArrayRef<LoopLikeOpInterface> loops) {
   auto addCandidateSlices =
       [](Operation *fusedOp,
          std::queue<tensor::ParallelInsertSliceOp> &candidates) {
@@ -333,7 +334,6 @@ fuseConsumers(RewriterBase &rewriter, Operation *tiledOp) {
   addCandidateSlices(tiledOp, candidates);
 
   std::queue<Operation *> newFusionOpportunities;
-  scf::ForallOp newLoop = tiledOp->getParentOfType<scf::ForallOp>();
   while (!candidates.empty()) {
 
     // Traverse the slices in BFS fashion.
@@ -341,7 +341,8 @@ fuseConsumers(RewriterBase &rewriter, Operation *tiledOp) {
     candidates.pop();
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fusedResult =
-        mlir::scf::tileAndFuseConsumerOfSlice(rewriter, candidateSliceOp);
+        mlir::scf::tileAndFuseConsumerOfSlice(rewriter, candidateSliceOp,
+                                              loops);
     if (failed(fusedResult)) {
       LLVM_DEBUG(llvm::dbgs() << "failed to fuse consumer of slice: "
                               << candidateSliceOp << "\n");
@@ -369,19 +370,15 @@ fuseConsumers(RewriterBase &rewriter, Operation *tiledOp) {
           }
         }
       }
-      // Store the new loop for follow up producer fusion.
-      newLoop = tiledOp->getParentOfType<scf::ForallOp>();
     }
   }
-  return std::make_pair(newFusionOpportunities, newLoop);
+  return newFusionOpportunities;
 }
 
 static void fuseProducersOfSlices(RewriterBase &rewriter,
                                   std::queue<Operation *> &worklist,
                                   scf::SCFTileAndFuseOptions &options,
-                                  scf::ForallOp forallOp) {
-  SmallVector<LoopLikeOpInterface> loops = {
-      cast<LoopLikeOpInterface>(&*forallOp)};
+                                  MutableArrayRef<LoopLikeOpInterface> loops) {
   while (!worklist.empty()) {
     auto candidateSlice = cast<tensor::ExtractSliceOp>(worklist.front());
     worklist.pop();
@@ -532,7 +529,6 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
 
   // If the `tilableOp` is a `memref` op, then just tile the operation.
   SmallVector<LoopLikeOpInterface> tilingLoops;
-  Operation *rootTiledOp = nullptr;
   if (tilableOp->getNumResults() == 0) {
     FailureOr<scf::SCFTilingResult> tilingResult =
         scf::tileUsingSCF(rewriter, tilableOp, tilingOptions);
@@ -554,7 +550,16 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
       rewriter.replaceAllUsesWith(origValue, replacement);
     }
     std::swap(tileAndFuseResult->loops, tilingLoops);
-    rootTiledOp = tileAndFuseResult->tiledAndFusedOps.front();
+    Operation *rootTiledOp = tileAndFuseResult->tiledAndFusedOps.front();
+    auto newFusionOpportunities =
+        fuseConsumers(rewriter, rootTiledOp, tilingLoops);
+
+    // Because we restrict to at most a single tilable consumer for yielding
+    // a replacement, no new fusion opportunities will yield a replacement,
+    // meaning there is no need to run consumer fusion again afterwards.
+    // TODO: run producer and consumer fusion in one worklist.
+    fuseProducersOfSlices(rewriter, newFusionOpportunities, tileAndFuseOptions,
+                          tilingLoops);
   }
   if (!tilingLoops.empty()) {
     if (tilingLoops.size() != 1 || !isa<scf::ForallOp>(tilingLoops[0])) {
@@ -563,23 +568,11 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
       return signalPassFailure();
     }
 
-    auto forallOp = cast<scf::ForallOp>(tilingLoops[0]);
-    if (failed(dropUnitDistributedDims(rewriter, forallOp))) {
-      forallOp.emitOpError("failed to drop unit dimensions");
+    auto forallOp =
+        dropUnitDistributedDims(rewriter, cast<scf::ForallOp>(tilingLoops[0]));
+    if (failed(forallOp)) {
+      tilingLoops[0]->emitOpError("failed to drop unit dimensions");
       return signalPassFailure();
-    }
-
-    if (rootTiledOp) {
-      auto [newFusionOpportunities, newLoop] =
-          fuseConsumers(rewriter, rootTiledOp);
-
-      // Because we restrict to at most a single tilable consumer for yielding
-      // a replacement, no new fusion opportunities will yield a replacement,
-      // meaning there is no need to run consumer fusion again afterwards.
-      // TODO: run producer and consumer fusion in one worklist.
-      fuseProducersOfSlices(rewriter, newFusionOpportunities,
-                            tileAndFuseOptions, newLoop);
-      forallOp = newLoop;
     }
 
     // Reorder the workgroups if the strategy is set to `transpose`.
@@ -587,11 +580,12 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     // #iree.codegen.workgroup_id_x and #iree.codegen.workgroup_id_y.
     // Only reorders if the loop bounds are static.
     if (transposeWorkgroup) {
-      SmallVector<Attribute> mappingAttrs(forallOp.getMappingAttr().getValue());
+      SmallVector<Attribute> mappingAttrs(
+          forallOp->getMappingAttr().getValue());
       int64_t mappingSize = mappingAttrs.size();
-      if (areAllStaticLoopBounds(forallOp) && mappingSize >= 2) {
+      if (areAllStaticLoopBounds(*forallOp) && mappingSize >= 2) {
         std::swap(mappingAttrs[mappingSize - 1], mappingAttrs[mappingSize - 2]);
-        forallOp.setMappingAttr(ArrayAttr::get(context, mappingAttrs));
+        forallOp->setMappingAttr(ArrayAttr::get(context, mappingAttrs));
       }
     }
   }

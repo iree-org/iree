@@ -549,6 +549,13 @@ public:
 
       llvmModule->setDataLayout(targetMachine->createDataLayout());
 
+      // Code object version * 100.
+      constexpr uint32_t abiVersion = 500;
+      // Let the backend know what code object version we're compiling for. This
+      // insulates us from changes to the default code object version that our
+      // CI or users may not be prepared for.
+      llvmModule->addModuleFlag(llvm::Module::Error,
+                                "amdhsa_code_object_version", abiVersion);
       for (llvm::Function &f : llvmModule->functions())
         f.addFnAttr(llvm::Attribute::AlwaysInline);
 
@@ -595,7 +602,7 @@ public:
 
       // Sets HIP platform globals based on the target architecture.
       if (failed(setHIPGlobals(variantOp.getLoc(), llvmModule.get(), chipset,
-                               isWave64))) {
+                               isWave64, abiVersion))) {
         return failure();
       }
 
