@@ -143,6 +143,40 @@ def EncodingAttr :
 }
 
 //===---------------------------------------------------------------------===//
+// encoding.matmul_k
+//===---------------------------------------------------------------------===//
+
+def MatmulKAttr :
+    IREEEncoding_Attr<"Encoding", [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+        "isSerialized",
+        "isIdentityLayout",
+        "cloneWithLayouts",
+        "calculateStorageSizeInBytes",
+      ]>
+    ]> {
+  let mnemonic = "encoding";
+  let summary = [{information to track K dimensions in }];
+  let description = [{
+    The attribute that tracks.
+  }];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let parameters = (ins
+    AttrParameter<"IntegerAttr", "this tensor operand's index in the parameter list">:$operand_index,
+    "DenseI32ArrayAttr":$k_dims,
+    OptionalParameter<"Attribute", "the serialized layout, if present">:$layout
+  );
+
+  let extraClassDeclaration = [{
+
+  }];
+
+  let genVerifyDecl = 0;
+}
+
+//===---------------------------------------------------------------------===//
 // encoding.pad_encoding_layout
 //===---------------------------------------------------------------------===//
 
