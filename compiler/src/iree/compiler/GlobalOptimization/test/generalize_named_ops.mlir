@@ -66,3 +66,50 @@ util.func public @generalize_1x1_nchw_conv_2d(%input: tensor<1x2x4x5xf32>, %filt
 // CHECK-LABEL: @generalize_1x1_nchw_conv_2d
 //       CHECK:   %[[RESULT:.*]] = linalg.generic
 //       CHECK:   util.return %[[RESULT]]
+
+// -----
+
+util.func public @generalize_1x1_nhwc_fhwc_conv_2d(%input: tensor<1x4x5x2xf32>, %filter: tensor<5x1x1x2xf32>) -> tensor<1x4x5x5xf32> {
+    %0 = tensor.empty() : tensor<1x4x5x5xf32>
+    %1 = linalg.conv_2d_nhwc_fhwc {
+        dilations = dense<1> : tensor<2xi64>,
+        strides = dense<1> : tensor<2xi64>
+    } ins(%input, %filter : tensor<1x4x5x2xf32>, tensor<5x1x1x2xf32>) outs(%0 : tensor<1x4x5x5xf32>) -> tensor<1x4x5x5xf32>
+    util.return %1 : tensor<1x4x5x5xf32>
+}
+
+// CHECK-LABEL: @generalize_1x1_nhwc_fhwc_conv_2d
+//       CHECK:   %[[RESULT:.*]] = linalg.generic
+//       CHECK:   util.return %[[RESULT]]
+
+// -----
+
+util.func public @generalize_1x1_conv_2d_dilations(%input: tensor<1x4x?x2xf32>, %filter: tensor<1x1x2x7xf32>) -> tensor<1x4x?x7xf32> {
+    %c2 = arith.constant 2 : index
+    %d2 = tensor.dim %input, %c2 : tensor<1x4x?x2xf32>
+    %0 = tensor.empty(%d2) : tensor<1x4x?x7xf32>
+    %1 = linalg.conv_2d_nhwc_hwcf {
+        dilations = dense<2> : tensor<2xi64>,
+        strides = dense<1> : tensor<2xi64>
+    } ins(%input, %filter : tensor<1x4x?x2xf32>, tensor<1x1x2x7xf32>) outs(%0 : tensor<1x4x?x7xf32>) -> tensor<1x4x?x7xf32>
+    util.return %1 : tensor<1x4x?x7xf32>
+}
+
+// CHECK-LABEL: @generalize_1x1_conv_2d_dilations
+//       CHECK:   %[[RESULT:.*]] = linalg.generic
+//       CHECK:   util.return %[[RESULT]]
+
+// -----
+
+util.func public @no_generalize_1x1_conv_2d_strides(%input: tensor<1x7x7x2xf32>, %filter: tensor<1x1x2x7xf32>) -> tensor<1x4x4x7xf32> {
+    %0 = tensor.empty() : tensor<1x4x4x7xf32>
+    %1 = linalg.conv_2d_nhwc_hwcf {
+        dilations = dense<1> : tensor<2xi64>,
+        strides = dense<2> : tensor<2xi64>
+    } ins(%input, %filter : tensor<1x7x7x2xf32>, tensor<1x1x2x7xf32>) outs(%0 : tensor<1x4x4x7xf32>) -> tensor<1x4x4x7xf32>
+    util.return %1 : tensor<1x4x4x7xf32>
+}
+
+// CHECK-LABEL: @no_generalize_1x1_conv_2d_strides
+//   CHECK-NOT:   linalg.generic
+//       CHECK:   util.return
