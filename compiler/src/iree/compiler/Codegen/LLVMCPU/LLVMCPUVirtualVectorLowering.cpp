@@ -68,6 +68,7 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
   {
     RewritePatternSet patterns(ctx);
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
+    vector::populateVectorGatherToConditionalLoadPatterns(patterns);
     vector::populateVectorGatherLoweringPatterns(patterns);
     vector::populateVectorContractLoweringPatterns(
         patterns, vectorTransformOptions.vectorContractLowering,
