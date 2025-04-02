@@ -1168,7 +1168,7 @@ namespace {
 // is transferred to the same context it's already on. This does not look across
 // control flow edges or globals and is mostly for simplifying IR that may come
 // in with a transfer on every single tensor.
-struct ElideRedundantBarrier : public OpRewritePattern<TensorBarrierOp> {
+struct ElideRedundantBarrier final : OpRewritePattern<TensorBarrierOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorBarrierOp targetTransferOp,
                                 PatternRewriter &rewriter) const override {
