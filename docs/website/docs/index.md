@@ -190,6 +190,7 @@ See how IREE is used:
 
 ### :material-newspaper: Project news
 
+* 2025-04-02: [IREE submits SDXL text-to-image MLPerf inference benchmarks using AMD Instinct™ MI325X](https://rocm.blogs.amd.com/artificial-intelligence/mi325x-accelerates-mlperf-inference/README.html#stable-diffusion-xl-sdxl-text-to-image-mlperf-inference-benchmark)
 * 2024-05-23: [IREE joins the LF AI & Data Foundation as a sandbox-stage project](https://lfaidata.foundation/blog/2024/05/23/announcing-iree-a-new-initiative-for-machine-learning-deployment/)
 
 ### :octicons-broadcast-24: Communication channels
