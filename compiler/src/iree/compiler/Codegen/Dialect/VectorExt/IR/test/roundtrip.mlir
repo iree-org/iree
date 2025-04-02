@@ -135,3 +135,46 @@ func.func @to_simt_op_0d(%simd: vector<f32>) -> vector<f32> {
 }
 // CHECK-LABEL: func.func @to_simt_op
 // CHECK:      iree_vector_ext.to_simd
+
+// -----
+
+func.func @transfer_gather(%indices: vector<128xindex>,
+  %indices1: vector<64xindex>,
+  %indices2: vector<128x64xindex>,
+  %source: tensor<4096x64xf16>)
+  -> (vector<128x64xf16>, vector<128x64xf16>,vector<128x64xf16>,vector<128x64xf16>) {
+  %cst0 = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+
+  // inner dimension gather
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
+  [None, %indices1: vector<64xindex>], %cst0 { indexed_maps = [
+                                             affine_map<(d0, d1) -> (d1)>]}
+  : tensor<4096x64xf16>, vector<128x64xf16>
+
+  // outer dimension gather
+  %out1 = iree_vector_ext.transfer_gather %source[%c0, %c0]
+  [%indices: vector<128xindex>, None], %cst0 { indexed_maps = [
+                                                  affine_map<(d0, d1) -> (d0)>]}
+  : tensor<4096x64xf16>, vector<128x64xf16>
+
+  // full gather
+  %out2 = iree_vector_ext.transfer_gather %source[%c0, %c0]
+  [%indices: vector<128xindex>, %indices1: vector<64xindex>], %cst0
+                                              { indexed_maps = [
+                                                  affine_map<(d0, d1) -> (d0)>,
+                                                  affine_map<(d0, d1) -> (d1)>]}
+  : tensor<4096x64xf16>, vector<128x64xf16>
+
+  // sparse gather
+  %out3 = iree_vector_ext.transfer_gather %source[%c0, %c0]
+  [None, %indices2: vector<128x64xindex>], %cst0
+                                              { indexed_maps = [
+                                                  affine_map<(d0, d1) -> (d0, d1)>]}
+  : tensor<4096x64xf16>, vector<128x64xf16>
+
+  return %out, %out1, %out2, %out3 : vector<128x64xf16>, vector<128x64xf16>, vector<128x64xf16>, vector<128x64xf16>
+}
+
+// CHECK-LABEL: func.func @transfer_gather
+// CHECK: iree_vector_ext.transfer_gather
