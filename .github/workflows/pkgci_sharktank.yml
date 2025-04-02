@@ -43,7 +43,6 @@ jobs:
           - name: rocm_hip_w7900
             rocm-chip: gfx1100
             backend: rocm
-            iree_test_files: ${{ github.workspace }}/iree-test-suites
             sku: w7900
             target: target_hip
             runs-on: nodai-amdgpu-w7900-x86-64
@@ -73,7 +72,8 @@ jobs:
       VENV_DIR: ${{ github.workspace }}/venv
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       TEST_OUTPUT_ARTIFACTS: ${{ github.workspace }}/model_output_artifacts
-      IREE_TEST_FILES: ${{ matrix.iree_test_files }}
+      # Adding default iree test files environment if iree_test_files path is not available
+      IREE_TEST_FILES: ${{ matrix.iree_test_files != '' && matrix.iree_test_files || github.workspace }}
     steps:
       - name: Checking out IREE repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
