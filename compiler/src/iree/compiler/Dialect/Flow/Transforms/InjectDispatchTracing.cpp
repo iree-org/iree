@@ -8,10 +8,14 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
 
@@ -27,6 +31,29 @@ static SmallVector<Value> filterTensorValues(ValueRange &&range) {
   return result;
 }
 
+static SmallVector<Value> getWithRowMajorLayout(RewriterBase &rewriter,
+                                                ArrayRef<Value> values) {
+  SmallVector<Value> rowMajorTensors;
+  for (auto v : values) {
+    auto rankedTensorType = dyn_cast<RankedTensorType>(v.getType());
+    if (!rankedTensorType || !rankedTensorType.getEncoding()) {
+      rowMajorTensors.push_back(v);
+      continue;
+    }
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPointAfterValue(v);
+    SmallVector<OpFoldResult> mixedSizes =
+        tensor::getMixedSizes(rewriter, v.getLoc(), v);
+    SmallVector<Value> dynamicDimSizes;
+    std::tie(std::ignore, dynamicDimSizes) = decomposeMixedValues(mixedSizes);
+    Value rowMajorTensor = rewriter.create<IREE::Flow::TensorEncodeOp>(
+        v.getLoc(), rankedTensorType.dropEncoding(), v,
+        /*operand_dims=*/dynamicDimSizes, /*result_dims=*/dynamicDimSizes);
+    rowMajorTensors.push_back(rowMajorTensor);
+  }
+  return rowMajorTensors;
+}
+
 namespace {
 
 struct InjectDispatchTracingPass
@@ -34,6 +61,7 @@ struct InjectDispatchTracingPass
           InjectDispatchTracingPass> {
   void runOnOperation() override {
     auto funcOp = getOperation();
+    IRRewriter rewriter(&getContext());
     for (auto dispatchOp : funcOp.getFunctionBody().getOps<DispatchOp>()) {
       std::string entryPointName = dispatchOp.getEntryPointName();
 
@@ -42,14 +70,22 @@ struct InjectDispatchTracingPass
       builder.create<IREE::Flow::TensorTraceOp>(
           dispatchOp.getLoc(),
           builder.getStringAttr(entryPointName + " inputs"),
-          filterTensorValues(dispatchOp.getArguments()));
+          getWithRowMajorLayout(rewriter,
+                                filterTensorValues(dispatchOp.getArguments())));
 
       // Output tensors:
       builder.setInsertionPointAfter(dispatchOp);
       builder.create<IREE::Flow::TensorTraceOp>(
           dispatchOp.getLoc(),
           builder.getStringAttr(entryPointName + " outputs"),
-          filterTensorValues(dispatchOp.getResults()));
+          getWithRowMajorLayout(rewriter,
+                                filterTensorValues(dispatchOp.getResults())));
+    }
+
+    RewritePatternSet patterns(&getContext());
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
     }
   }
 };

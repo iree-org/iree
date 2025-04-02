@@ -761,6 +761,7 @@ let opDocGroup = OpGroupDispatchOps in {
 def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedOperandsIndexAndLength",
   ]>,
@@ -1511,6 +1512,7 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
 def FLOW_TensorEncodeOp : FLOW_PureOp<"tensor.encode", [
   AllRanksMatch<["operand", "result"]>,
   AllElementTypesMatch<["operand", "result"]>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   AttrSizedOperandSegments,
   Util_ShapeAwareOp,
 ]> {
