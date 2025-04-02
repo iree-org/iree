@@ -314,9 +314,10 @@ dropUnitDistributedDims(RewriterBase &rewriter, scf::ForallOp forallOp) {
 // Returns a list of new `tensor.extract_slice` ops with new fusion
 // opportunities, as well as the new surrounding `scf.forall` (because consumer
 // fusion replaces the loop).
-static std::queue<Operation *>
+static FailureOr<std::queue<Operation *>>
 fuseConsumers(RewriterBase &rewriter, Operation *tiledOp,
-              MutableArrayRef<LoopLikeOpInterface> loops) {
+              MutableArrayRef<LoopLikeOpInterface> loops,
+              bool useWARForConsumerFusionSSAViolation) {
   auto addCandidateSlices =
       [](Operation *fusedOp,
          std::queue<tensor::ParallelInsertSliceOp> &candidates) {
@@ -347,6 +348,25 @@ fuseConsumers(RewriterBase &rewriter, Operation *tiledOp,
       LLVM_DEBUG(llvm::dbgs() << "failed to fuse consumer of slice: "
                               << candidateSliceOp << "\n");
       continue;
+    }
+
+    // Implement the WAR for consumer fusion SSA violation (as described below
+    // in the comments for `warForConsumerFusionSSAViolation`)
+    if (useWARForConsumerFusionSSAViolation) {
+      for (auto [tiledOpResult, loopResult] :
+           llvm::zip(tiledOp->getResults(), loops.back()->getResults())) {
+        for (OpOperand &use : loopResult.getUses()) {
+          Operation *user = use.getOwner();
+          if (user->getParentOp() != loops.back()) {
+            continue;
+          }
+          auto slice = dyn_cast<tensor::ExtractSliceOp>(user);
+          if (!slice) {
+            return failure();
+          }
+          rewriter.replaceAllOpUsesWith(slice, tiledOpResult);
+        }
+      }
     }
 
     // Replace the original consumer operation with the tiled implementation.
@@ -441,6 +461,92 @@ static void collectTiledAndFusedOps(Operation *rootOp,
   }
 }
 
+/// Consider the following case
+///
+/// ```mlir
+/// %0:2 = linalg.generic {
+///     indexing_maps = [....,
+///                      affine_map<(d0, d1, d2) -> (d0, d1),
+///                      affine_map<(d0, d1, d2) -> (d0, d1)>]}
+/// %1 = linalg.generic ins(%0#0, %0#1) {
+///     indexing_maps = [affine_map<(d0, d1) -> (d0, d1),
+///                      affine_map<(d0, d1) -> (d0, d1)]}
+/// ```
+///
+/// After tiling the first op we get
+///
+/// ```
+/// %0:2 = scf.forall ... {
+///   %1:2 = linalg.generic {
+///       indexing_maps = [....,
+///                        affine_map<(d0, d1, d2) -> (d0, d1),
+///                        affine_map<(d0, d1, d2) -> (d0, d1)>]}
+///   }
+/// }
+/// %2 = linalg.generic ins(%0#0, %0#1) {
+///     indexing_maps = [affine_map<(d0, d1) -> (d0, d1),
+///                      affine_map<(d0, d1) -> (d0, d1)]}
+/// ```
+///
+/// Due to a quirk of the fusion of consumers, fusing this consumer into the
+/// loop results in
+///
+/// ```
+/// %0:2 = scf.forall ... {
+///   %1:2 = linalg.generic {
+///       indexing_maps = [....,
+///                        affine_map<(d0, d1, d2) -> (d0, d1),
+///                        affine_map<(d0, d1, d2) -> (d0, d1)>]}
+///   %2 = tensor.extract_slice %0#1 [...]
+///   %3 = linalg.generic ins(%1#0, %2) {
+///       indexing_maps = [affine_map<(d0, d1) -> (d0, d1),
+///                        affine_map<(d0, d1) -> (d0, d1)]}
+///   }
+/// }
+/// ```
+///
+/// This is an SSA violation because of `%0#1` being used in the loop. This
+/// needs to be fixed upstream, but for cases where
+/// 1. The root operation produces results using an identity indexing map (when
+/// ignoring the iteration space dimensions corresponding to the reduction
+/// loops)
+/// 2. For all consumers of the results of the root operation, access the data
+/// using identity indexing map then for each consumer fusion step it is valid
+/// to replace all uses of slices of the outer loop that occur within the loop
+/// with the correponding tiled result value.
+/// This is a workaround till upstream transformation can fix this issue. The
+/// following method is testing if such a case exists to implement the
+/// work-around.
+static bool warForConsumerFusionSSAViolation(
+    Operation *rootOp,
+    const llvm::SmallDenseSet<Operation *> &tiledAndFusedOps) {
+  auto linalgRootOp = dyn_cast<linalg::LinalgOp>(rootOp);
+  if (!linalgRootOp) {
+    return false;
+  }
+  SmallVector<utils::IteratorType> iteratorTypes =
+      linalgRootOp.getIteratorTypesArray();
+  for (AffineMap map :
+       llvm::map_range(linalgRootOp.getIndexingMaps(), [](Attribute attr) {
+         return cast<AffineMapAttr>(attr).getValue();
+       })) {
+    if (!compressUnusedDims(map).isIdentity()) {
+      return false;
+    }
+  }
+
+  for (OpOperand &use : linalgRootOp->getUses()) {
+    auto linalgUser = dyn_cast<linalg::LinalgOp>(use.getOwner());
+    if (!linalgUser) {
+      return false;
+    }
+    if (!linalgUser.getMatchingIndexingMap(&use).isIdentity()) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   auto funcOp = getOperation();
   auto *context = &getContext();
@@ -460,6 +566,8 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   mlir::DominanceInfo dominanceInfo(tilableOp);
   llvm::SmallDenseSet<Operation *> tiledAndFusedOps;
   collectTiledAndFusedOps(tilableOp, tiledAndFusedOps);
+  bool useWARForConsumerFusionSSAViolation =
+      warForConsumerFusionSSAViolation(tilableOp, tiledAndFusedOps);
 
   llvm::DenseSet<Operation *> yieldReplacementsFor;
   for (auto op : tiledAndFusedOps) {
@@ -551,14 +659,19 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     }
     std::swap(tileAndFuseResult->loops, tilingLoops);
     Operation *rootTiledOp = tileAndFuseResult->tiledAndFusedOps.front();
-    auto newFusionOpportunities =
-        fuseConsumers(rewriter, rootTiledOp, tilingLoops);
+    FailureOr<std::queue<Operation *>> newFusionOpportunities =
+        fuseConsumers(rewriter, rootTiledOp, tilingLoops,
+                      useWARForConsumerFusionSSAViolation);
+    if (failed(newFusionOpportunities)) {
+      rootTiledOp->emitOpError("failed to fuse consumers");
+      return signalPassFailure();
+    }
 
     // Because we restrict to at most a single tilable consumer for yielding
     // a replacement, no new fusion opportunities will yield a replacement,
     // meaning there is no need to run consumer fusion again afterwards.
     // TODO: run producer and consumer fusion in one worklist.
-    fuseProducersOfSlices(rewriter, newFusionOpportunities, tileAndFuseOptions,
+    fuseProducersOfSlices(rewriter, *newFusionOpportunities, tileAndFuseOptions,
                           tilingLoops);
   }
   if (!tilingLoops.empty()) {
