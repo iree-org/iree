@@ -282,7 +282,7 @@ struct FuseTilableForallConsumers final
     }
 
     tensor::ParallelInsertSliceOp producerSlice;
-    scf::ForallOp sliceOwner;
+    LoopLikeOpInterface sliceOwner;
     Value fusionOperand;
     for (auto operand : dpsOp.getDpsInputs()) {
       auto forallProducer = operand.getDefiningOp<scf::ForallOp>();
@@ -320,7 +320,7 @@ struct FuseTilableForallConsumers final
     }
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fuseConsumerResults =
-        scf::tileAndFuseConsumerOfSlice(rewriter, producerSlice);
+        scf::tileAndFuseConsumerOfSlice(rewriter, producerSlice, {sliceOwner});
     if (failed(fuseConsumerResults)) {
       return failure();
     }

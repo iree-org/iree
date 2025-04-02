@@ -162,9 +162,9 @@ IREE_API_EXPORT iree_status_t iree_io_parameter_provider_gather(
   if (count == 0) {
     // Preserve the timeline when there's no work to do.
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_hal_device_queue_barrier(device, queue_affinity,
-                                          wait_semaphore_list,
-                                          signal_semaphore_list));
+        z0, iree_hal_device_queue_barrier(
+                device, queue_affinity, wait_semaphore_list,
+                signal_semaphore_list, IREE_HAL_EXECUTE_FLAG_NONE));
   } else {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, provider->vtable->gather(provider, device, queue_affinity,
@@ -190,9 +190,9 @@ IREE_API_EXPORT iree_status_t iree_io_parameter_provider_scatter(
   if (count == 0) {
     // Preserve the timeline when there's no work to do.
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_hal_device_queue_barrier(device, queue_affinity,
-                                          wait_semaphore_list,
-                                          signal_semaphore_list));
+        z0, iree_hal_device_queue_barrier(
+                device, queue_affinity, wait_semaphore_list,
+                signal_semaphore_list, IREE_HAL_EXECUTE_FLAG_NONE));
   } else {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, provider->vtable->scatter(provider, device, queue_affinity,

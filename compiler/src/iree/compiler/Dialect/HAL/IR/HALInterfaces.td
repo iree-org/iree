@@ -59,4 +59,71 @@ def HAL_DeviceInitializationAttrInterface :
   ];
 }
 
+//===----------------------------------------------------------------------===//
+// IREE::HAL::DeviceQueueOpInterface
+//===----------------------------------------------------------------------===//
+
+def HAL_DeviceQueueOp : OpInterface<"DeviceQueueOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
+
+  let description = [{
+    Interface for queued device operations.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the fence that must be waited on before the op executes on the
+        queue, if any.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"getQueueWaitFence",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op.getWaitFence();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Sets the fence that must be waited on before the op executes on the
+        queue, if any.
+      }],
+      /*retTy=*/"void",
+      /*methodName=*/"setQueueWaitFence",
+      /*args=*/(ins "Value":$value),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        $_op.getWaitFenceMutable().assign(value);
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the fence that will be signaled after the op executes on the
+        queue, if any.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"getQueueSignalFence",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op.getSignalFence();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Sets the fence that will be signaled after the op executes on the
+        queue, if any.
+      }],
+      /*retTy=*/"void",
+      /*methodName=*/"setQueueSignalFence",
+      /*args=*/(ins "Value":$value),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        $_op.getSignalFenceMutable().assign(value);
+      }]
+    >,
+  ];
+}
+
 #endif  // IREE_DIALECT_HAL_INTERFACES

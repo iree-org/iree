@@ -51,7 +51,6 @@ iree_lit_test_suite(
             "legalize.mlir",
             "linalg_transform.mlir",
             "llvmgpu_bufferize.mlir",
-            "pack_pipeline_test.mlir",
             "pack_shared_memory_alloc.mlir",
             "prefetch_shared_memory.mlir",
             "promote_matmul_to_fit_mma.mlir",

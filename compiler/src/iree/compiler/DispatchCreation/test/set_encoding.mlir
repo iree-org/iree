@@ -1082,3 +1082,47 @@ util.func public @broadcasting_dequant_op(%arg0: !hal.buffer_view, %arg1: !hal.b
 // CHECK-SAME:    outs(%[[FILL]]
 // CHECK:        %[[UNSET:.+]] = iree_encoding.unset_encoding %[[GEMM]]{{.+}} -> tensor<?x?x?xi32>{%[[ARG1_D0]], %[[ARG0_D0]], %[[ARG1_D1]]}
 // CHECK:        flow.return %[[UNSET]]
+
+// -----
+
+util.func public @scalar_dispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view, %arg2: !hal.buffer_view) -> !hal.buffer_view {
+  %c1 = arith.constant 1 : index
+  %0 = hal.tensor.import %arg0 "input0" : !hal.buffer_view -> tensor<1x1xf32>
+  %1 = hal.tensor.import %arg1 "input1" : !hal.buffer_view -> tensor<1x1xf32>
+  %2 = hal.tensor.import %arg2 "input2" : !hal.buffer_view -> tensor<1x1xf32>
+  %3 = flow.dispatch.region -> (tensor<1x1xf32>) {
+    %5 = linalg.matmul ins(%0, %1 : tensor<1x1xf32>, tensor<1x1xf32>) outs(%2 : tensor<1x1xf32>) -> tensor<1x1xf32>
+    flow.return %5 : tensor<1x1xf32>
+  } count() -> (index, index, index) {
+    flow.return %c1, %c1, %c1 : index, index, index
+  }
+  %4 = hal.tensor.export %3 "output0" : tensor<1x1xf32> -> !hal.buffer_view
+  util.return %4 : !hal.buffer_view
+}
+
+// CHECK-LABEL:  util.func public @scalar_dispatch
+// CHECK-NOT:      iree_encoding.set_encoding
+// CHECK-NOT:      iree_encoding.unset_encoding
+
+// -----
+
+util.func public @region_with_workgroup_count(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view, %arg2: !hal.buffer_view) -> !hal.buffer_view {
+  %c1 = arith.constant 1 : index
+  %c5 = arith.constant 5 : index
+  %c100 = arith.constant 100 : index
+  %0 = hal.tensor.import %arg0 "input0" : !hal.buffer_view -> tensor<5x100xf32>
+  %1 = hal.tensor.import %arg1 "input1" : !hal.buffer_view -> tensor<100x100xf32>
+  %2 = hal.tensor.import %arg2 "input2" : !hal.buffer_view -> tensor<5x100xf32>
+  %3 = flow.dispatch.region -> (tensor<5x100xf32>) {
+    %5 = linalg.matmul ins(%0, %1 : tensor<5x100xf32>, tensor<100x100xf32>) outs(%2 : tensor<5x100xf32>) -> tensor<5x100xf32>
+    flow.return %5 : tensor<5x100xf32>
+  } count() -> (index, index, index) {
+    flow.return %c5, %c100, %c1 : index, index, index
+  }
+  %4 = hal.tensor.export %3 "output0" : tensor<5x100xf32> -> !hal.buffer_view
+  util.return %4 : !hal.buffer_view
+}
+
+// CHECK-LABEL:  util.func public @region_with_workgroup_count
+// CHECK-NOT:      iree_encoding.set_encoding
+// CHECK-NOT:      iree_encoding.unset_encoding

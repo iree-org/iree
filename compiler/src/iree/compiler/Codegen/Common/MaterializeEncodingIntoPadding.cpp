@@ -77,12 +77,24 @@ struct MaterializePadEncodingTypeConverter final
       : MaterializeEncodingTypeConverter(
             IREE::Codegen::EncodingNopLayoutAttr::get(ctx)) {
     addConversion([](RankedTensorType type) -> std::optional<RankedTensorType> {
-      if (!getPadLayout(type)) {
-        // Return `nullopt` so that other conversion functions have a chance to
-        // handle this type.
-        return std::nullopt;
+      // The type converter is designed for `pad_encoding_layout` encoding
+      // attribute. By the definition, the final converted type is the same
+      // tensor type without encodings.
+      return type.dropEncoding();
+    });
+    addConversion([&](IREE::Flow::DispatchTensorType dispatchTensorType)
+                      -> IREE::Flow::DispatchTensorType {
+      auto type = dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
+      if (!type) {
+        return dispatchTensorType;
       }
-      return getPaddedType(type);
+      // The incoming bindings have the padded type, if `pad_encoding_layout` is
+      // present.
+      if (getPadLayout(type)) {
+        type = getPaddedType(type);
+      }
+      return IREE::Flow::DispatchTensorType::get(dispatchTensorType.getAccess(),
+                                                 type);
     });
   }
 };
@@ -168,9 +180,9 @@ struct MaterializeFlowDispatchTensorStoreOp final
 
     auto &typeConverter =
         *getTypeConverter<MaterializePadEncodingTypeConverter>();
-    auto paddedType =
-        typeConverter.convertType<RankedTensorType>(boundTensorType);
-    assert(paddedType != boundTensorType && "Expected conversion with padding");
+    IREE::Flow::DispatchTensorType newTargetType =
+        typeConverter.convertType<IREE::Flow::DispatchTensorType>(targetType);
+    RankedTensorType paddedType = newTargetType.asRankedTensorType();
 
     Location loc = storeOp.getLoc();
     SmallVector<Value> dynamicResultSizes{storeOp->getOperands()};
@@ -195,6 +207,36 @@ struct MaterializeFlowDispatchTensorStoreOp final
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
         storeOp, insertOp, adaptor.getTarget(), newDynamicDims, offsets,
         newMixedSizes, strides);
+    return success();
+  }
+};
+
+/// Pattern to convert `flow.dispatch.tensor.store` operation when
+/// materializing the encoding. We can not reuse the existing one because it
+/// does not transform new dynamic dimension through interface. The other
+/// difference is that the converted type of the padding attribute is not as the
+/// same as the tensor type that drops encoding.
+/// TODO(#20160): Abstract new interface methods and collapse two patterns.
+struct MaterializeInterfaceBindingEncoding final
+    : OpMaterializeEncodingPattern<IREE::HAL::InterfaceBindingSubspanOp> {
+  using OpMaterializeEncodingPattern::OpMaterializeEncodingPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
+                  OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto resultType = dyn_cast<IREE::Flow::DispatchTensorType>(
+        subspanOp.getResult().getType());
+    if (!resultType) {
+      return rewriter.notifyMatchFailure(
+          subspanOp, "expected result type to be !flow.dispatch.tensor");
+    }
+    auto newResultType = getTypeConverter()->convertType(resultType);
+    SmallVector<Value> newDynamicDims = subspanOp.getDynamicDims();
+    rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
+        subspanOp, newResultType, subspanOp.getLayout(), subspanOp.getBinding(),
+        subspanOp.getByteOffset(), newDynamicDims, subspanOp.getAlignmentAttr(),
+        subspanOp.getDescriptorFlagsAttr());
     return success();
   }
 };
@@ -229,7 +271,8 @@ struct MaterializeEncodingIntoPaddingPass final
     // We add custom patterns with much higher priority to run before the
     // equivalent 'Nop' patterns.
     materializeEncodingPattern.add<MaterializeFlowDispatchTensorLoadOp,
-                                   MaterializeFlowDispatchTensorStoreOp>(
+                                   MaterializeFlowDispatchTensorStoreOp,
+                                   MaterializeInterfaceBindingEncoding>(
         context, typeConverter, materializeEncodingValueFn,
         PatternBenefit{100});
 

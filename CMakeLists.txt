@@ -774,7 +774,7 @@ endif()
 
 # Both the IREE and MLIR Python bindings require nanobind. We initialize it here
 # at the top level so that everything uses ours consistently.
-if(IREE_BUILD_PYTHON_BINDINGS OR IREE_BUILD_COMPILER)
+if(IREE_BUILD_PYTHON_BINDINGS)
   include(FetchContent)
   FetchContent_Declare(
     nanobind
@@ -881,8 +881,10 @@ if((IREE_ENABLE_RUNTIME_TRACING OR IREE_ENABLE_COMPILER_TRACING) AND
   )
 endif()
 
-iree_set_googletest_cmake_options()
-add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
+if(IREE_BUILD_TESTS)
+  iree_set_googletest_cmake_options()
+  add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
+endif()
 
 if(IREE_ENABLE_THREADING)
   # Benchmark.
