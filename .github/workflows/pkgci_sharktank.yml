@@ -43,6 +43,7 @@ jobs:
           - name: rocm_hip_w7900
             rocm-chip: gfx1100
             backend: rocm
+            iree_test_files: ${{ github.workspace }}/iree-test-suites
             sku: w7900
             target: target_hip
             runs-on: nodai-amdgpu-w7900-x86-64
