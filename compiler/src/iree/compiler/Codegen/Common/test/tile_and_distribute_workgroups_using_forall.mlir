@@ -823,3 +823,125 @@ func.func @pad_fusion(%0 : tensor<?x?xf32>, %1 : tensor<?x?xf32>, %2 : tensor<?x
 //       CHECK:   %[[PADDED:.+]] = tensor.pad
 //       CHECK:   %[[MATMUL:.+]] = linalg.matmul
 //  CHECK-SAME:   ins(%[[PADDED]]
+
+// -----
+
+// Test 1 of 2 that are testing a work-around for SSA violation issue with consumer fusion upstream.
+
+func.func @horizontal_fusion_consumer_fusion1(%arg0 : tensor<2x4096x640xf16>,
+    %arg1 : tensor<10x64x640xf16>, %arg2 : tensor<10x64x640xf16>, %arg3 : tensor<10x64x640xf16>)
+    -> (tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>) {
+  %cst = arith.constant 0.0 : f32
+  %11 = tensor.empty() : tensor<2x10x4096x64xf16>
+  %12 = tensor.empty() : tensor<2x10x4096x64xf32>
+  %13 = linalg.fill ins(%cst : f32) outs(%12 : tensor<2x10x4096x64xf32>) -> tensor<2x10x4096x64xf32>
+  %14:3 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]}
+      ins(%arg0, %arg1, %arg2, %arg3
+          : tensor<2x4096x640xf16>, tensor<10x64x640xf16>, tensor<10x64x640xf16>, tensor<10x64x640xf16>)
+      outs(%13, %13, %13 : tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>)
+      attrs = {lowering_config = #iree_gpu.lowering_config<{workgroup = [1, 1, 32, 32, 0]}>} {
+  ^bb0(%in: f16, %in_0: f16, %in_1: f16, %in_2: f16, %out: f32, %out_3: f32, %out_4: f32):
+    %16 = arith.extf %in : f16 to f32
+    %17 = arith.extf %in_0 : f16 to f32
+    %18 = arith.mulf %16, %17 : f32
+    %19 = arith.addf %out, %18 : f32
+    %20 = arith.extf %in_1 : f16 to f32
+    %21 = arith.mulf %16, %20 : f32
+    %22 = arith.addf %out_3, %21 : f32
+    %23 = arith.extf %in_2 : f16 to f32
+    %24 = arith.mulf %16, %23 : f32
+    %25 = arith.addf %out_4, %24 : f32
+    linalg.yield %19, %22, %25 : f32, f32, f32
+  } -> (tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>)
+  %15:3 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%14#0, %14#1, %14#2 : tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>)
+      outs(%11, %11, %11 : tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>) {
+  ^bb0(%in: f32, %in_0: f32, %in_1: f32, %out: f16, %out_2: f16, %out_3: f16):
+    %16 = arith.truncf %in : f32 to f16
+    %17 = arith.truncf %in_0 : f32 to f16
+    %18 = arith.truncf %in_1 : f32 to f16
+    linalg.yield %16, %17, %18 : f16, f16, f16
+  } -> (tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>)
+  return %15#0, %15#1, %15#2 : tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>
+}
+// CHECK-LABEL: func @horizontal_fusion_consumer_fusion1
+//       CHECK:   %[[FORALL:.+]]:3 = scf.forall
+//  CHECK-SAME:       shared_outs(%[[OUTS0:[a-zA-Z0-9]+]] =
+//  CHECK-SAME:       , %[[OUTS1:[a-zA-Z0-9]+]] =
+//  CHECK-SAME:       , %[[OUTS2:[a-zA-Z0-9]+]] =
+//       CHECK:     %[[ROOT:.+]]:3 = linalg.generic
+//       CHECK:     %[[CONSUMER:.+]]:3 = linalg.generic
+//  CHECK-SAME:         ins(%[[ROOT]]#0, %[[ROOT]]#1, %[[ROOT]]#2 :
+//   CHECK-DAG:     tensor.parallel_insert_slice %[[CONSUMER]]#0 into %[[OUTS0]]
+//   CHECK-DAG:     tensor.parallel_insert_slice %[[CONSUMER]]#1 into %[[OUTS1]]
+//   CHECK-DAG:     tensor.parallel_insert_slice %[[CONSUMER]]#2 into %[[OUTS2]]
+
+// -----
+
+// Test 2 of 2 that are testing a work-around for SSA violation issue with consumer fusion upstream.
+
+func.func @horizontal_fusion_consumer_fusion2(%arg0 : tensor<2x4096x640xi8>,
+    %arg1 : tensor<2x640x640xi8>, %arg2 : tensor<2x640x640xi8>) -> tensor<2x4096x640xf16> {
+  %c0_i32 = arith.constant 0 : i32
+  %c0 = arith.constant 0 : index
+  %7 = tensor.empty() : tensor<2x4096x640xf16>
+  %8 = tensor.empty() : tensor<2x4096x640xi32>
+  %9 = linalg.fill ins(%c0_i32 : i32) outs(%8 : tensor<2x4096x640xi32>) -> tensor<2x4096x640xi32>
+  %10:2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+      ins(%arg0, %arg1, %arg2 : tensor<2x4096x640xi8>, tensor<2x640x640xi8>, tensor<2x640x640xi8>)
+      outs(%9, %9 : tensor<2x4096x640xi32>, tensor<2x4096x640xi32>)
+      attrs =  {lowering_config = #iree_gpu.lowering_config<{workgroup = [1, 64, 64, 0]}>} {
+  ^bb0(%in: i8, %in_0: i8, %in_1: i8, %out: i32, %out_2: i32):
+    %12 = arith.extsi %in : i8 to i32
+    %13 = arith.extsi %in_0 : i8 to i32
+    %14 = arith.muli %12, %13 : i32
+    %15 = arith.addi %out, %14 : i32
+    %16 = arith.extsi %in_1 : i8 to i32
+    %17 = arith.muli %12, %16 : i32
+    %18 = arith.addi %out_2, %17 : i32
+    linalg.yield %15, %18 : i32, i32
+  } -> (tensor<2x4096x640xi32>, tensor<2x4096x640xi32>)
+  %11 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel"]}
+      ins(%10#1, %10#0 : tensor<2x4096x640xi32>, tensor<2x4096x640xi32>) outs(%7 : tensor<2x4096x640xf16>) {
+  ^bb0(%in: i32, %in_0: i32, %out: f16):
+    %12 = arith.sitofp %in : i32 to f32
+    %13 = arith.truncf %12 : f32 to f16
+    %14 = arith.sitofp %in_0 : i32 to f32
+    %15 = arith.truncf %14 : f32 to f16
+    %16 = arith.addf %13, %15 : f16
+    linalg.yield %16 : f16
+  } -> tensor<2x4096x640xf16>
+  return %11 : tensor<2x4096x640xf16>
+}
+// CHECK-LABEL: func @horizontal_fusion_consumer_fusion2
+//       CHECK:   %[[FORALL:.+]] = scf.forall
+//  CHECK-SAME:       shared_outs(%[[OUTS0:[a-zA-Z0-9]+]] =
+//       CHECK:     %[[ROOT:.+]]:2 = linalg.generic
+//       CHECK:     %[[CONSUMER:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[ROOT]]#1, %[[ROOT]]#0 :
+//   CHECK-DAG:     tensor.parallel_insert_slice %[[CONSUMER]] into %[[OUTS0]]
