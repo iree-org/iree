@@ -17,10 +17,3 @@ iree_py_test(
   SRCS
     "dialects_test.py"
 )
-
-iree_py_test(
-  NAME
-    tuner_test
-  SRCS
-    "tuner_test.py"
-)
