@@ -249,8 +249,13 @@ static iree_status_t iree_hal_nl_allocator_allocate_buffer(
 
   iree_hal_buffer_t* buffer = NULL;
   if (iree_status_is_ok(status)) {
+    const iree_hal_buffer_placement_t placement = {
+        .queue_affinity = params->queue_affinity ? params->queue_affinity
+                                                 : IREE_HAL_QUEUE_AFFINITY_ANY,
+        .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
+    };
     status = iree_hal_nl_buffer_wrap(
-        base_allocator, compat_params.type, compat_params.access,
+        placement, compat_params.type, compat_params.access,
         compat_params.usage, allocation_size,
         /*byte_offset=*/0,
         /*byte_length=*/allocation_size, buffer_type, device_ptr, host_ptr,
@@ -387,8 +392,13 @@ static iree_status_t iree_hal_nl_allocator_import_buffer(
 
   iree_hal_buffer_t* buffer = NULL;
   if (iree_status_is_ok(status)) {
+    const iree_hal_buffer_placement_t placement = {
+        .queue_affinity = params->queue_affinity ? params->queue_affinity
+                                                 : IREE_HAL_QUEUE_AFFINITY_ANY,
+        .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
+    };
     status = iree_hal_nl_buffer_wrap(
-        base_allocator, compat_params.type, compat_params.access,
+        placement, compat_params.type, compat_params.access,
         compat_params.usage, external_buffer->size, /*byte_offset=*/0,
         /*byte_length=*/external_buffer->size, buffer_type, device_ptr,
         host_ptr, release_callback,

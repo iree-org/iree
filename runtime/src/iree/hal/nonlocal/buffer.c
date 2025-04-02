@@ -35,7 +35,7 @@ static const iree_hal_nl_buffer_t* iree_hal_nl_buffer_const_cast(
 }
 
 iree_status_t iree_hal_nl_buffer_wrap(
-    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
@@ -56,9 +56,9 @@ iree_status_t iree_hal_nl_buffer_wrap(
   iree_status_t status =
       iree_allocator_malloc(host_allocator, sizeof(*buffer), (void**)&buffer);
   if (iree_status_is_ok(status)) {
-    iree_hal_buffer_initialize(host_allocator, allocator, &buffer->base,
-                               allocation_size, byte_offset, byte_length,
-                               memory_type, allowed_access, allowed_usage,
+    iree_hal_buffer_initialize(placement, &buffer->base, allocation_size,
+                               byte_offset, byte_length, memory_type,
+                               allowed_access, allowed_usage,
                                &iree_hal_nl_buffer_vtable, &buffer->base);
     buffer->type = buffer_type;
     buffer->host_ptr = host_ptr;
@@ -73,13 +73,11 @@ iree_status_t iree_hal_nl_buffer_wrap(
 
 static void iree_hal_nl_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   iree_hal_nl_buffer_t* buffer = iree_hal_nl_buffer_cast(base_buffer);
-  iree_allocator_t host_allocator = base_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
   if (buffer->release_callback.fn) {
     buffer->release_callback.fn(buffer->release_callback.user_data,
                                 base_buffer);
   }
-  iree_allocator_free(host_allocator, buffer);
   IREE_TRACE_ZONE_END(z0);
 }
 

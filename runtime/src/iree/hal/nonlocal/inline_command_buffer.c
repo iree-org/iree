@@ -507,7 +507,6 @@ static iree_status_t iree_hal_nonlocal_inline_command_buffer_dispatch(
   // floating point state. Reset it.
   iree_fpu_state_t fpu_state =
       iree_fpu_state_push(IREE_FPU_STATE_FLAG_FLUSH_DENORMALS_TO_ZERO);
-
   iree_status_t status = iree_hal_nonlocal_executable_issue_dispatch_inline(
       local_executable, entry_point, dispatch_state,
       command_buffer->state.processor_id, local_memory);
