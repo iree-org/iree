@@ -33,13 +33,16 @@ jobs:
             backend: cpu
             iree_test_files: /home/nod/iree_tests_cache
             sku: cpu
-            runs-on: ubuntu-24.04
+            runs-on:
+              - self-hosted # must come first
+              - persistent-cache
+              - Linux
+              - X64
 
           # AMD GPU
           - name: rocm_hip_w7900
             rocm-chip: gfx1100
             backend: rocm
-            iree_test_files: /shark-cache/data/iree-regression-cache
             sku: w7900
             target: target_hip
             runs-on: nodai-amdgpu-w7900-x86-64
