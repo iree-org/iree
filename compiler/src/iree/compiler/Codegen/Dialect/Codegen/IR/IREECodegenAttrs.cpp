@@ -593,4 +593,8 @@ void setRootOpInfo(Operation *op) {
   op->setAttr(kRootOpInfoAttrName, UnitAttr::get(op->getContext()));
 }
 
+bool hasRootOpInfo(Operation *op) {
+  return op->hasAttrOfType<UnitAttr>(kRootOpInfoAttrName);
+}
+
 } // namespace mlir::iree_compiler
