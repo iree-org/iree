@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: PkgCI Sharktank Regression Tests
+name: PkgCI Sharktank Tests
 on:
   workflow_call:
     inputs:
@@ -18,60 +18,55 @@ on:
         default: ""
 
 jobs:
-  sharktank_regression_tests:
-    name: "sharktank_regression_tests :: ${{ matrix.name }}"
+  tests:
+    name: "sharktank_tests :: ${{ matrix.name }}"
     runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false
       matrix:
         include:
           # CPU
-          - name: cpu_task_model
+          - name: cpu_task
             target: target_cpu
-            gpu: none
-            runs-on: ubuntu-24.04
-          - name: cpu_llvm_task_regression
+            rocm-chip: none
             models-config-file: models_cpu_llvm_task.json
             backend: cpu
             iree_test_files: /home/nod/iree_tests_cache
             sku: cpu
-            runs-on:
-              - self-hosted # must come first
-              - persistent-cache
-              - Linux
-              - X64
+            runs-on: ubuntu-24.04            
 
           # AMD GPU
-          - name: rocm_hip_w7900_model
+          - name: rocm_hip_w7900
+            rocm-chip: gfx1100
+            backend: rocm
+            iree_test_files: /shark-cache/data/iree-regression-cache
+            sku: w7900
             target: target_hip
-            gpu: gfx1100
             runs-on: nodai-amdgpu-w7900-x86-64
-          - name: rocm_hip_mi300_model
-            target: target_hip
-            gpu: gfx942
-            runs-on: linux-mi300-2gpu-ossci-iree-org
-          - name: amdgpu_rocm_mi250_gfx90a_regression
+          - name: amdgpu_rocm_mi250_gfx90a
             rocm-chip: gfx90a
             backend: rocm
             iree_test_files: /home/esaimana/iree_tests_cache
             sku: mi250
+            target: target_hip
             runs-on: nodai-amdgpu-mi250-x86-64
-          - name: amdgpu_rocm_mi300_gfx942_regression
+          - name: amdgpu_rocm_mi300_gfx942
             rocm-chip: gfx942
             backend: rocm
-            iree_test_files: /home/esaimana/iree_tests_cache
+            iree_test_files: /shark-cache/data/iree-regression-cache
             sku: mi300
+            target: target_hip
             runs-on: linux-mi300-1gpu-ossci-iree-org
-          - name: amdgpu_rocm_mi308_gfx942_regression
+          - name: amdgpu_rocm_mi308_gfx942
             rocm-chip: gfx942
             backend: rocm
             iree_test_files: /home/esaimana/iree_tests_cache
             sku: mi308
+            target: target_hip
             runs-on: nodai-amdgpu-mi308-x86-64
 
     env:
       VENV_DIR: ${{ github.workspace }}/venv
-      GH_TOKEN: ${{ github.token }}
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       TEST_OUTPUT_ARTIFACTS: ${{ github.workspace }}/model_output_artifacts
       IREE_TEST_FILES: ${{ matrix.iree_test_files }}
@@ -92,13 +87,6 @@ jobs:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
 
-      - name: "Set IREE_TEST_FILES variable"
-        run: |
-          case "${{ matrix.name }}" in
-            "amdgpu_rocm_mi300_gfx942_regression") echo IREE_TEST_FILES="/shark-cache/data/iree-regression-cache" >> $GITHUB_ENV ;;
-            *) echo "No cache directory assigned for ${{ matrix.name }}" ;;
-          esac
-
       - name: Checkout test suites repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -116,7 +104,6 @@ jobs:
           pip install -e ${{ github.workspace }}/iree-test-suites/sharktank_models
 
       - name: Run sharktank specific model tests
-        if: contains(matrix.name, 'model')
         run: |
           source ${VENV_DIR}/bin/activate
           pytest iree-test-suites/sharktank_models \
@@ -129,11 +116,10 @@ jobs:
               --ignore=iree-test-suites/sharktank_models/benchmarks \
               --ignore=iree-test-suites/sharktank_models/quality_tests
         env:
-          HIP_TARGET: ${{ matrix.gpu }}
+          HIP_TARGET: ${{ matrix.rocm-chip }}
           ASSET_PATH: ${{ github.workspace }}/iree-test-suites/sharktank_models
 
-      - name: Run regression quality tests
-        if: contains(matrix.name, 'regression')
+      - name: Run quality tests
         run: |
           source ${VENV_DIR}/bin/activate
           pytest \
@@ -153,8 +139,7 @@ jobs:
 
 
       # Since the benchmark tests require compiled model files, this step must run after the quality tests
-      - name: Run regression benchmark tests
-        if: contains(matrix.name, 'regression')
+      - name: Run benchmark tests
         run: |
           source ${VENV_DIR}/bin/activate
           pytest \
