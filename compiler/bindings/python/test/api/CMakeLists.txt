@@ -17,3 +17,10 @@ iree_py_test(
   SRCS
     "output_buffer_reference_test.py"
 )
+
+iree_py_test(
+  NAME
+    tuner_api_test
+  SRCS
+    "tuner_api_test.py"
+)
