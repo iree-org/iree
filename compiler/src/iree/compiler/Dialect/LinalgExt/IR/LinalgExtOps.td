@@ -252,6 +252,78 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
   }];
 }
 
+def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<LinalgFusionInterface,
+      ["getIndexingMapsForResults", "getIndexingMapsForOperands",
+       "getStaticLoopRanges"]>,
+     DeclareOpInterfaceMethods<TilingInterface,
+        ["generateScalarImplementation",
+         "getIterationDomain",
+         "getLoopIteratorTypes",
+         "getResultTilePosition",
+         "getTiledImplementation",
+         "getIterationDomainTileFromOperandTile",
+         "getTiledImplementationFromOperandTile"]>]> {
+  let summary = "Gather operator";
+  let description = [{ TODO }];
+  let arguments = (ins
+      Variadic<AnyRankedTensorOrMemRefType>:$inputs,
+      Variadic<AnyRankedTensorOrMemRefType>:$outputs,
+      DenseI64ArrayAttr:$dimension_map
+  );
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region AnyRegion:$region);
+  let assemblyFormat = [{
+    attr-dict `dimension_map` `=` $dimension_map
+    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    `outs` `(` $outputs `:` type($outputs) `)`
+    $region (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    int64_t getIndexDepth() {
+      return getDimensionMap().size();
+    }
+
+    int64_t getResultSliceRank() {
+      return getSourceType().getRank() - getIndexDepth();
+    }
+
+    int64_t getBatchRank() {
+      return getResultType().getRank() - getResultSliceRank();
+    }
+
+    Value getSource(){
+      return getDpsInputOperand(0)->get();
+    }
+
+    ShapedType getSourceType(){
+      return cast<ShapedType>(getSource().getType());
+    }
+
+    Value getIndices(){
+      return getDpsInputOperand(1)->get();
+    }
+
+    ShapedType getIndicesType(){
+      return cast<ShapedType>(getIndices().getType());
+    }
+
+    Value getResult(){
+      return getDpsInitOperand(0)->get();
+    }
+
+    ShapedType getResultType(){
+      return cast<ShapedType>(getResult().getType());
+    }
+
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
+    }
+  }];
+}
+
 def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
     [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<TilingInterface,

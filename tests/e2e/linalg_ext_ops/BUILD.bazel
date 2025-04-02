@@ -16,6 +16,7 @@ ALL_SRCS = enforce_glob(
     # keep sorted
     [
         "attention.mlir",
+        "gather.mlir",
         "scan.mlir",
         "scatter.mlir",
         "sort.mlir",

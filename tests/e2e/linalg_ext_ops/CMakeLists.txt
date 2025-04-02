@@ -15,6 +15,7 @@ iree_check_single_backend_test_suite(
     check_llvm-cpu_local-task
   SRCS
     "attention.mlir"
+    "gather.mlir"
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"
