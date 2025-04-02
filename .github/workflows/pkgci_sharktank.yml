@@ -33,7 +33,7 @@ jobs:
             backend: cpu
             iree_test_files: /home/nod/iree_tests_cache
             sku: cpu
-            runs-on: ubuntu-24.04            
+            runs-on: ubuntu-24.04
 
           # AMD GPU
           - name: rocm_hip_w7900
