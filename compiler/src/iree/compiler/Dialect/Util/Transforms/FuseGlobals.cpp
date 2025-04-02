@@ -183,14 +183,14 @@ public:
     // differ.
     SmallVector<SmallVector<Global *>> fusableSets;
     for (auto it = ec.begin(), end = ec.end(); it != end; ++it) {
-      if (!it->isLeader()) {
+      if (!(*it)->isLeader()) {
         continue; // Ignore non-leader sets.
       }
-      if (++ec.member_begin(*it) == ec.member_end()) {
+      if (++ec.member_begin(**it) == ec.member_end()) {
         continue; // size 1
       }
       DenseMap<Attribute, SmallVector<Global *>> initialValueMap;
-      for (auto mi = ec.member_begin(*it); mi != ec.member_end(); ++mi) {
+      for (auto mi = ec.member_begin(**it); mi != ec.member_end(); ++mi) {
         Global &global = globalTable.lookup(*mi);
         initialValueMap[global.op.getGlobalInitialValue()].push_back(&global);
       }
