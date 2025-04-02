@@ -1052,7 +1052,6 @@ queryMMAIntrinsics(IREE::HAL::ExecutableVariantOp executableOp) {
 SmallVector<Operation *> getTunerRootOps(mlir::ModuleOp moduleOp) {
   SmallVector<Operation *> rootOps;
 
-  // Walk all operations in the module recursively
   moduleOp.walk([&](Operation *op) {
     if (hasRootOpInfo(op)) {
       rootOps.push_back(op);
