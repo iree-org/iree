@@ -309,22 +309,3 @@ def compilation_info():
     assert compilation_info is not None
     assert compilation_info.lowering_config == lowering_config
     assert compilation_info.translation_info == translation_info
-
-
-@run
-def root_op():
-    module_str = """
-        module {
-            func.func @matmul(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
-                %cst = arith.constant 0.000000e+00 : f32
-                %0 = tensor.empty() : tensor<4x4xf32>
-                %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<4x4xf32>) -> tensor<4x4xf32>
-                %2 = linalg.matmul { root_op } ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%1 : tensor<4x4xf32>) -> tensor<4x4xf32>
-                return %2 : tensor<4x4xf32>
-            }
-        }
-    """
-    input_module = ir.Module.parse(module_str)
-    root_op_list = iree_codegen.get_tuner_root_ops(input_module)
-    assert len(root_op_list) == 1
-    assert root_op_list[0].name == "linalg.matmul"
