@@ -1189,7 +1189,7 @@ struct ElideRedundantBarrier final : OpRewritePattern<TensorBarrierOp> {
 
 void TensorBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
-  results.insert<ElideRedundantBarrier>(context);
+  results.add<ElideRedundantBarrier>(context);
 }
 
 //===----------------------------------------------------------------------===//
