@@ -336,15 +336,11 @@ GatherOp::getTiledImplementation(OpBuilder &builder,
   Value tiledIndices = indicesSlice->getResult(0);
 
   // Slice of the source.
-  SmallVector<OpFoldResult> sourceOffsets, sourceSizes;
-  // if (failed(getResultTilePosition(builder, 0, offsets, sizes,
-  // originalOffsets,
-  //                                  originalSizes))) {
-  //   return {};
-  // }
   auto sourceRank = getSourceType().getRank();
   auto indexDepth = getIndexDepth();
+
   // The first `indexDepth` dims are not tiled
+  SmallVector<OpFoldResult> sourceOffsets, sourceSizes;
   for (auto dim : llvm::seq<int64_t>(0, indexDepth)) {
     sourceOffsets.push_back(zeroAttr);
     sourceSizes.push_back(getDim(builder, loc, getSource(), dim));
@@ -384,23 +380,6 @@ LogicalResult GatherOp::getResultTilePosition(
   resultOffsets.assign(offsets.begin(), offsets.end());
   resultSizes.assign(sizes.begin(), sizes.end());
   return success();
-  // auto zeroAttr = builder.getI64IntegerAttr(0);
-  // // Slice of the source.
-  // auto resultRank = getResultType().getRank();
-  // resultOffsets.resize(resultRank, zeroAttr);
-  // resultSizes.resize(resultRank);
-  //
-  // auto sourceRank = getSourceType().getRank();
-  // Location loc = getLoc();
-  // for (auto dim : llvm::seq<int64_t>(0, sourceRank - getResultSliceRank())) {
-  //   resultSizes[dim] = getDim(builder, loc, getResult(), dim);
-  // }
-  // for (auto dim :
-  //      llvm::seq<int64_t>(sourceRank - getResultSliceRank(), sourceRank)) {
-  //   resultOffsets[dim] = offsets[dim - (sourceRank - resultRank)];
-  //   resultSizes[dim] = sizes[dim - (sourceRank - resultRank)];
-  // }
-  // return success();
 }
 
 LogicalResult GatherOp::getIterationDomainTileFromOperandTile(
@@ -408,20 +387,12 @@ LogicalResult GatherOp::getIterationDomainTileFromOperandTile(
     ArrayRef<OpFoldResult> sizes,
     SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
     SmallVectorImpl<OpFoldResult> &iterDomainSizes) {
-  // TODO: Support fusion along the index operand. For the index operand, the
-  // offset + size must be the full size for the inner most dim.
   if (getInputs().getBeginOperandIndex() != operandNumber) {
     return failure();
   }
 
   // TODO: implement
   return failure();
-
-  // The iteration domain is defined in terms of the |input|, so simply
-  // use the given offsets/sizes.
-  iterDomainOffsets.assign(offsets.begin(), offsets.end());
-  iterDomainSizes.assign(sizes.begin(), sizes.end());
-  return success();
 }
 
 FailureOr<TilingResult> GatherOp::getTiledImplementationFromOperandTile(

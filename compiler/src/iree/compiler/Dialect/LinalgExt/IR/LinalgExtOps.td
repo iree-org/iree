@@ -282,6 +282,10 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    static constexpr unsigned kSourceOpNum = 0;
+    static constexpr unsigned kIndicesOpNum = 1;
+    static constexpr unsigned kResultOpNum = 2;
+
     int64_t getIndexDepth() {
       return getDimensionMap().size();
     }
