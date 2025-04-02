@@ -17,7 +17,10 @@ guides, and instructions on building from source.
 
 ## Project news
 
-* 2024-05-23: [IREE joins the LF AI & Data Foundation as a sandbox-stage project](https://lfaidata.foundation/blog/2024/05/23/announcing-iree-a-new-initiative-for-machine-learning-deployment/)
+* 2025-04-02:
+[AMD submitted an IREE-based SDXL implementation to the MLPerf benchmark suite](https://rocm.blogs.amd.com/artificial-intelligence/mi325x-accelerates-mlperf-inference/README.html#stable-diffusion-xl-sdxl-text-to-image-mlperf-inference-benchmark)
+* 2024-05-23:
+[IREE joins the LF AI & Data Foundation as a sandbox-stage project](https://lfaidata.foundation/blog/2024/05/23/announcing-iree-a-new-initiative-for-machine-learning-deployment/)
 
 ## Project status
 
