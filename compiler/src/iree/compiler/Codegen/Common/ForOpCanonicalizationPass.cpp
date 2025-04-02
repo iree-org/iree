@@ -113,7 +113,7 @@ struct CanonicalizeForOpInductionVarShape final
       BlockArgument iterArg = forOp.getRegionIterArg(index);
 
       // Check that all of the users of the induction variable can be folded,
-      // and return the final user of the induction variable.
+      // and if so return the final user of the induction variable.
       Operation *finalIvUser = [&]() -> Operation * {
         Operation *op{nullptr};
         for (auto &use : iterArg.getUses()) {
@@ -151,10 +151,10 @@ struct CanonicalizeForOpInductionVarShape final
       std::optional<SmallVector<Value>> loopIndVars =
           forOp.getLoopInductionVars();
       assert(loopIndVars.has_value() && loopIndVars.value().size() == 1 &&
-             "scf.for must have 1 induction variable");
-      Value indVar = loopIndVars.value()[0];
-      auto start = forOp.getLowerBound();
-      mapping.map(indVar, start);
+             "scf.for must have 1 loop induction variable");
+      Value loopIndVar = loopIndVars.value()[0];
+      Value start = forOp.getLowerBound();
+      mapping.map(loopIndVar, start);
       initArgs[index] = rewriter.clone(*finalIvUser, mapping)->getResult(0);
     }
     if (iteratorFolded.empty())

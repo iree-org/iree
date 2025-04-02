@@ -203,19 +203,6 @@ func.func @pipelined_loop_extract(%arg0: f32, %arg1: f32) -> (f32, f32) {
 
 // -----
 
-// On the first iteration, value 2.0000 is extracted.
-// On subsequent iterations, the result of the add is broadcast, then extracted.
-// This test checks that the redundant broadcast->extract is eliminated.
-
-// CHECK-LABEL: func.func @extract_on_induction_variable
-//   CHECK-DAG:      %[[C1:.+]] = arith.constant 1 : index
-//   CHECK-DAG:      %[[C3:.+]] = arith.constant 3 : index
-//   CHECK-DAG:      %[[CST:.+]] = arith.constant 2.000000e+00 : f32
-//       CHECK:      %[[FOR:.+]] = scf.for %[[ARG0:.+]] = %[[C1]] to %[[C3]] step %[[C1]] iter_args(%[[ARG1:.+]] = %[[CST]]) -> (f32) {
-//       CHECK:        %[[ADD:.+]] = arith.addf %[[ARG1]], %[[ARG1]] : f32
-//       CHECK:        scf.yield %[[ADD]] : f32
-//       CHECK:      }
-//       CHECK:      return %[[FOR]] : f32
 func.func @extract_on_induction_variable() -> f32 {
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
@@ -230,11 +217,20 @@ func.func @extract_on_induction_variable() -> f32 {
   return %1 : f32
 }
 
+// On the first iteration, value 2.0000 is extracted.
+// On subsequent iterations, the result of the add is broadcast, then extracted.
+// This test checks that the redundant broadcast->extract is eliminated.
+// CHECK-LABEL: func.func @extract_on_induction_variable
+//   CHECK-DAG:      %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:      %[[C3:.+]] = arith.constant 3 : index
+//   CHECK-DAG:      %[[CST:.+]] = arith.constant 2.000000e+00 : f32
+//       CHECK:      %[[FOR:.+]] = scf.for %[[ARG0:.+]] = %[[C1]] to %[[C3]] step %[[C1]] iter_args(%[[ARG1:.+]] = %[[CST]]) -> (f32) {
+//       CHECK:        %[[ADD:.+]] = arith.addf %[[ARG1]], %[[ARG1]] : f32
+//       CHECK:        scf.yield %[[ADD]] : f32
+//       CHECK:      }
+//       CHECK:      return %[[FOR]] : f32
 
 // -----
-
-// The multiple users of %arg1 are all of the same type, and are therefore candidates
-// for folding with the yielded value for %arg1.
 
 func.func @multiple_users() -> vector<1x1x1x4xf32> {
   %cst = arith.constant dense<1.000000e+00> : vector<1x1x1x4xf32>
@@ -254,6 +250,8 @@ func.func @multiple_users() -> vector<1x1x1x4xf32> {
   return %0 : vector<1x1x1x4xf32>
 }
 
+// The multiple users of %arg1 are all of the same type, and are therefore candidates
+// for folding with the yielded value for %arg1.
 // CHECK-LABEL: func.func @multiple_users
 //   CHECK-DAG:    %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<4xf32>
 //   CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
