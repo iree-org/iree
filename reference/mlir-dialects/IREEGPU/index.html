@@ -5167,14 +5167,6 @@ produces.</p>
   ::mlir::iree_compiler::IREE::GPU::ComputeBitwidths   # value
 &gt;
 </code></pre></div>
-<p>Enum cases:
-* fp64 (<code>FP64</code>)
-* fp32 (<code>FP32</code>)
-* fp16 (<code>FP16</code>)
-* int64 (<code>Int64</code>)
-* int32 (<code>Int32</code>)
-* int16 (<code>Int16</code>)
-* int8 (<code>Int8</code>)</p>
 <h5 id="parameters">Parameters:<a class="headerlink" href="#parameters" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5268,9 +5260,6 @@ tiling configs.</p>
   ::mlir::iree_compiler::IREE::GPU::DotProductOps   # value
 &gt;
 </code></pre></div>
-<p>Enum cases:
-* none (<code>None</code>)
-* dp4xi8toi32 (<code>DP4xI8ToI32</code>)</p>
 <h5 id="parameters_2">Parameters:<a class="headerlink" href="#parameters_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5412,9 +5401,6 @@ compiler/Codegen/ExternalInterfaces/*.</p>
   ::mlir::utils::IteratorType   # value
 &gt;
 </code></pre></div>
-<p>Enum cases:
-* parallel (<code>parallel</code>)
-* reduction (<code>reduction</code>)</p>
 <h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5521,43 +5507,6 @@ See IREEGPUEnums.td for the definition of the intrinsics.</p>
   ::mlir::iree_compiler::IREE::GPU::MMAIntrinsic   # value
 &gt;
 </code></pre></div>
-<p>Enum cases:
-* MFMA_F32_16x16x4_F32 (<code>MFMA_F32_16x16x4_F32</code>)
-* MFMA_F32_16x16x16_F16 (<code>MFMA_F32_16x16x16_F16</code>)
-* MFMA_F32_32x32x8_F16 (<code>MFMA_F32_32x32x8_F16</code>)
-* MFMA_I32_16x16x16_I8 (<code>MFMA_I32_16x16x16_I8</code>)
-* MFMA_I32_32x32x8_I8 (<code>MFMA_I32_32x32x8_I8</code>)
-* MFMA_F32_16x16x8_BF16 (<code>MFMA_F32_16x16x8_BF16</code>)
-* MFMA_F32_32x32x4_BF16 (<code>MFMA_F32_32x32x4_BF16</code>)
-* MFMA_F64_16x16x4_F64 (<code>MFMA_F64_16x16x4_F64</code>)
-* MFMA_F32_16x16x16_BF16 (<code>MFMA_F32_16x16x16_BF16</code>)
-* MFMA_F32_32x32x8_BF16 (<code>MFMA_F32_32x32x8_BF16</code>)
-* MFMA_F32_16x16x32_F8E5M2FNUZ (<code>MFMA_F32_16x16x32_F8E5M2FNUZ</code>)
-* MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ (<code>MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ</code>)
-* MFMA_F32_16x16x32_F8E4M3FNUZ (<code>MFMA_F32_16x16x32_F8E4M3FNUZ</code>)
-* MFMA_F32_16x16x32_F8E4M3FNUZ_F8E5M2FNUZ (<code>MFMA_F32_16x16x32_F8E4M3FNUZ_F8E5M2FNUZ</code>)
-* MFMA_F32_32x32x16_F8E5M2FNUZ (<code>MFMA_F32_32x32x16_F8E5M2FNUZ</code>)
-* MFMA_F32_32x32x16_F8E5M2FNUZ_F8E4M3FNUZ (<code>MFMA_F32_32x32x16_F8E5M2FNUZ_F8E4M3FNUZ</code>)
-* MFMA_F32_32x32x16_F8E4M3FNUZ (<code>MFMA_F32_32x32x16_F8E4M3FNUZ</code>)
-* MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ (<code>MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ</code>)
-* MFMA_I32_16x16x32_I8 (<code>MFMA_I32_16x16x32_I8</code>)
-* MFMA_I32_32x32x16_I8 (<code>MFMA_I32_32x32x16_I8</code>)
-* WMMAR3_F32_16x16x16_F16 (<code>WMMAR3_F32_16x16x16_F16</code>)
-* WMMAR3_F16_16x16x16_F16 (<code>WMMAR3_F16_16x16x16_F16</code>)
-* WMMAR3_F32_16x16x16_BF16 (<code>WMMAR3_F32_16x16x16_BF16</code>)
-* WMMAR3_BF16_16x16x16_BF16 (<code>WMMAR3_BF16_16x16x16_BF16</code>)
-* WMMAR3_I32_16x16x16_I8 (<code>WMMAR3_I32_16x16x16_I8</code>)
-* WMMAR4_F32_16x16x16_F16 (<code>WMMAR4_F32_16x16x16_F16</code>)
-* WMMAR4_F16_16x16x16_F16 (<code>WMMAR4_F16_16x16x16_F16</code>)
-* WMMAR4_F32_16x16x16_BF16 (<code>WMMAR4_F32_16x16x16_BF16</code>)
-* WMMAR4_BF16_16x16x16_BF16 (<code>WMMAR4_BF16_16x16x16_BF16</code>)
-* WMMAR4_F32_16x16x16_F8E5M2 (<code>WMMAR4_F32_16x16x16_F8E5M2</code>)
-* WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN (<code>WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN</code>)
-* WMMAR4_F32_16x16x16_F8E4M3FN (<code>WMMAR4_F32_16x16x16_F8E4M3FN</code>)
-* WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2 (<code>WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2</code>)
-* WMMAR4_I32_16x16x16_I8 (<code>WMMAR4_I32_16x16x16_I8</code>)
-* NV_WMMA_F32_16x16x16_F16 (<code>NV_WMMA_F32_16x16x16_F16</code>)
-* NV_WMMA_F16_16x16x16_F16 (<code>NV_WMMA_F16_16x16x16_F16</code>)</p>
 <h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5642,9 +5591,6 @@ to solve a specific contraction problem.</p>
   ::mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategy   # value
 &gt;
 </code></pre></div>
-<p>Enum cases:
-* None (<code>None</code>)
-* Transpose (<code>Transpose</code>)</p>
 <h5 id="parameters_13">Parameters:<a class="headerlink" href="#parameters_13" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5669,11 +5615,6 @@ to solve a specific contraction problem.</p>
   ::mlir::iree_compiler::IREE::GPU::StorageBitwidths   # value
 &gt;
 </code></pre></div>
-<p>Enum cases:
-* b64 (<code>B64</code>)
-* b32 (<code>B32</code>)
-* b16 (<code>B16</code>)
-* b8 (<code>B8</code>)</p>
 <h5 id="parameters_14">Parameters:<a class="headerlink" href="#parameters_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5698,10 +5639,6 @@ to solve a specific contraction problem.</p>
   ::mlir::iree_compiler::IREE::GPU::SubgroupOps   # value
 &gt;
 </code></pre></div>
-<p>Enum cases:
-* none (<code>None</code>)
-* shuffle (<code>Shuffle</code>)
-* arithmetic (<code>Arithmetic</code>)</p>
 <h5 id="parameters_15">Parameters:<a class="headerlink" href="#parameters_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5990,11 +5927,6 @@ in a chained-matmul operation.</p>
   ::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic   # value
 &gt;
 </code></pre></div>
-<p>Enum cases:
-* VMFMA_F32_16x16x32_F16 (<code>VMFMA_F32_16x16x32_F16</code>)
-* VMFMA_F32_32x32x16_F16 (<code>VMFMA_F32_32x32x16_F16</code>)
-* VMFMA_F32_16x16x32_F8E4M3FNUZ (<code>VMFMA_F32_16x16x32_F8E4M3FNUZ</code>)
-* VMFMA_F32_32x32x16_F8E4M3FNUZ (<code>VMFMA_F32_32x32x16_F8E4M3FNUZ</code>)</p>
 <h5 id="parameters_21">Parameters:<a class="headerlink" href="#parameters_21" title="Permanent link">link</a></h5>
 <table>
 <thead>
