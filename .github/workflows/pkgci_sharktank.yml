@@ -40,12 +40,6 @@ jobs:
               - X64
 
           # AMD GPU
-          - name: rocm_hip_w7900
-            rocm-chip: gfx1100
-            backend: rocm
-            sku: w7900
-            target: target_hip
-            runs-on: nodai-amdgpu-w7900-x86-64
           - name: amdgpu_rocm_mi250_gfx90a
             rocm-chip: gfx90a
             backend: rocm
@@ -72,8 +66,7 @@ jobs:
       VENV_DIR: ${{ github.workspace }}/venv
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       TEST_OUTPUT_ARTIFACTS: ${{ github.workspace }}/model_output_artifacts
-      # Adding default iree test files environment if iree_test_files path is not available
-      IREE_TEST_FILES: ${{ matrix.iree_test_files != '' && matrix.iree_test_files || github.workspace }}
+      IREE_TEST_FILES: ${{ matrix.iree_test_files }}
     steps:
       - name: Checking out IREE repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -107,7 +100,7 @@ jobs:
           source ${VENV_DIR}/bin/activate
           pip install -e ${{ github.workspace }}/iree-test-suites/sharktank_models
 
-      - name: Run sharktank specific model tests
+      - name: Run sharktank model tests
         run: |
           source ${VENV_DIR}/bin/activate
           pytest iree-test-suites/sharktank_models \
@@ -161,3 +154,71 @@ jobs:
           IREE_TEST_FILES: ${{ env.IREE_TEST_FILES }}
           BACKEND: ${{ matrix.backend }}
           JOB_SUMMARY_PATH: ${{ github.workspace }}/iree-test-suites
+
+
+  # These temporary tests are designed for targets who do not have cached
+  # artifacts and unable to run quality and benchmark tests
+  # TODO (geo): add cached artifact support for w7900
+  model-test:
+    name: "sharktank_model_tests :: ${{ matrix.name }}"
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: rocm_hip_w7900
+            rocm-chip: gfx1100
+            target: target_hip
+            runs-on: nodai-amdgpu-w7900-x86-64
+    env:
+      VENV_DIR: ${{ github.workspace }}/venv
+      PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
+      TEST_OUTPUT_ARTIFACTS: ${{ github.workspace }}/model_output_artifacts
+    steps:
+      - name: Checking out IREE repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          submodules: false
+
+      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.4.0
+        with:
+          # Must match the subset of versions built in pkgci_build_packages.
+          python-version: "3.11"
+
+      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        if: ${{ inputs.artifact_run_id == '' }}
+        with:
+          name: linux_x86_64_release_packages
+          path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
+
+      - name: Checkout test suites repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: iree-org/iree-test-suites
+          ref: 6be20a2471be24f6ddc8343dec49a76d6a7749f7
+          path: iree-test-suites
+          lfs: true
+
+      - name: Setup Python virtual environment
+        run: |
+          ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
+            --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
+            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+          source ${VENV_DIR}/bin/activate
+          pip install -e ${{ github.workspace }}/iree-test-suites/sharktank_models
+
+      - name: Run sharktank model tests
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest iree-test-suites/sharktank_models \
+              -rA \
+              --log-cli-level=info \
+              --override-ini=xfail_strict=false \
+              -m ${{ matrix.target }} \
+              --timeout=120 \
+              --durations=0 \
+              --ignore=iree-test-suites/sharktank_models/benchmarks \
+              --ignore=iree-test-suites/sharktank_models/quality_tests
+        env:
+          HIP_TARGET: ${{ matrix.rocm-chip }}
+          ASSET_PATH: ${{ github.workspace }}/iree-test-suites/sharktank_models
