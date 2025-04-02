@@ -263,8 +263,7 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
          "getLoopIteratorTypes",
          "getResultTilePosition",
          "getTiledImplementation",
-         "getIterationDomainTileFromOperandTile",
-         "getTiledImplementationFromOperandTile"]>]> {
+         "generateResultTileValue"]>]> {
   let summary = "Gather operator";
   let description = [{ TODO }];
   let arguments = (ins

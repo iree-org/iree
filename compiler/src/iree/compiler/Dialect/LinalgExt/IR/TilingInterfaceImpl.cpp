@@ -382,28 +382,11 @@ LogicalResult GatherOp::getResultTilePosition(
   return success();
 }
 
-LogicalResult GatherOp::getIterationDomainTileFromOperandTile(
-    OpBuilder &b, unsigned operandNumber, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes,
-    SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
-    SmallVectorImpl<OpFoldResult> &iterDomainSizes) {
-  if (getInputs().getBeginOperandIndex() != operandNumber) {
-    return failure();
-  }
-
-  // TODO: implement
-  return failure();
-}
-
-FailureOr<TilingResult> GatherOp::getTiledImplementationFromOperandTile(
-    OpBuilder &b, unsigned operandNumber, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes) {
-  SmallVector<OpFoldResult> mappedOffsets, mappedSizes;
-  if (failed(getIterationDomainTileFromOperandTile(
-          b, operandNumber, offsets, sizes, mappedOffsets, mappedSizes))) {
-    return failure();
-  }
-  return getTiledImplementation(b, mappedOffsets, mappedSizes);
+FailureOr<TilingResult>
+GatherOp::generateResultTileValue(OpBuilder &builder, unsigned resultNumber,
+                                  ArrayRef<OpFoldResult> offsets,
+                                  ArrayRef<OpFoldResult> sizes) {
+  return getTiledImplementation(builder, offsets, sizes);
 }
 
 LogicalResult GatherOp::generateScalarImplementation(OpBuilder &b, Location loc,
