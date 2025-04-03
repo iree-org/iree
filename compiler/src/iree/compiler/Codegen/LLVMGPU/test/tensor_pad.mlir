@@ -124,6 +124,6 @@ func.func @unpack_dynamic() {
 // CHECK:         %[[DEST_BUF:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 // CHECK:           %[[LOAD:.+]] = flow.dispatch.tensor.load %[[DEST_BUF]]
 // CHECK:           %[[PAD:.+]] = tensor.pad %[[LOAD]]
-// CHECK:           %[[UNPACK:.+]] = linalg.unpack {{.+}} into %[[PAD]]
-// CHECK:           %[[SLICE:.+]] = tensor.extract_slice %[[UNPACK]]
-// CHECK:           flow.dispatch.tensor.store %[[SLICE]], %[[DEST_BUF]]
+// CHECK:           %[[SLICE:.+]] = tensor.extract_slice %[[PAD]]
+// CHECK:           %[[UNPACK:.+]] = linalg.unpack {{.+}} into %[[SLICE]]
+// CHECK:           flow.dispatch.tensor.store %[[UNPACK]], %[[DEST_BUF]]

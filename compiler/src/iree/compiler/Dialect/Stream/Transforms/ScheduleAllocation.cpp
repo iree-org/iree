@@ -48,10 +48,10 @@ public:
   SmallVector<SmallVector<Value>> getValueAliasSets() const {
     SmallVector<SmallVector<Value>> result;
     for (auto it = valueAliasing.begin(); it != valueAliasing.end(); ++it) {
-      if (!it->isLeader())
+      if (!(*it)->isLeader())
         continue; // Ignore non-leader sets.
       auto &aliasSet = result.emplace_back();
-      for (auto mi = valueAliasing.member_begin(*it);
+      for (auto mi = valueAliasing.member_begin(**it);
            mi != valueAliasing.member_end(); ++mi) {
         aliasSet.push_back(mi->value);
       }

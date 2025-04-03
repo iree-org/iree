@@ -479,15 +479,15 @@ void BufferizationPlan::dump() {
   unsigned numSets = 0;
   for (auto it = mappedTensors.begin(), ie = mappedTensors.end(); it != ie;
        ++it) {
-    if (!it->isLeader())
+    if (!(*it)->isLeader())
       continue;
     llvm::dbgs() << "\tSet " << numSets;
     if (storeLeaders.count(
-            getLeaderValue(getValue(*mappedTensors.member_begin(*it))))) {
+            getLeaderValue(getValue(*mappedTensors.member_begin(**it))))) {
       llvm::dbgs() << "(StoreSet) ";
     }
     llvm::dbgs() << ":\n";
-    for (auto member : llvm::make_range(mappedTensors.member_begin(*it),
+    for (auto member : llvm::make_range(mappedTensors.member_begin(**it),
                                         mappedTensors.member_end())) {
       llvm::dbgs() << "\t\t";
       getValue(member).print(llvm::dbgs());
