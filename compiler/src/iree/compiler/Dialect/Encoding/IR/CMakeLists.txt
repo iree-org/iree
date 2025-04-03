@@ -42,28 +42,14 @@ iree_cc_library(
     ::EncodingOpsIncGen
     ::EncodingTypesGen
     LLVMSupport
-    MLIRAffineDialect
-    MLIRAffineUtils
     MLIRArithDialect
-    MLIRArithUtils
-    MLIRControlFlowInterfaces
-    MLIRDestinationStyleOpInterface
-    MLIRFuncDialect
-    MLIRFunctionInterfaces
     MLIRIR
     MLIRInferTypeOpInterface
     MLIRLinalgDialect
     MLIRLinalgUtils
-    MLIRMathDialect
-    MLIRMemRefDialect
-    MLIRPass
-    MLIRSCFDialect
-    MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorUtils
-    MLIRTilingInterface
-    MLIRViewLikeInterface
   PUBLIC
 )
 
