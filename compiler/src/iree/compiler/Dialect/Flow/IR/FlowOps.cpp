@@ -1877,16 +1877,9 @@ LogicalResult TensorEncodeOp::verify() {
 
 LogicalResult TensorEncodeOp::reifyResultShapes(
     OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
-  SmallVector<OpFoldResult> shape;
-  unsigned dynamicIdx = 0;
   auto tensorType = llvm::cast<ShapedType>(getResult().getType());
-  for (int64_t dim : tensorType.getShape()) {
-    if (ShapedType::isDynamic(dim)) {
-      shape.push_back(getResultDynamicDims(0)[dynamicIdx++]);
-    } else {
-      shape.push_back(b.getIndexAttr(dim));
-    }
-  }
+  SmallVector<OpFoldResult> shape =
+      getMixedValues(tensorType.getShape(), getResultDynamicDims(0), b);
   reifiedReturnShapes.push_back(shape);
   return success();
 }
