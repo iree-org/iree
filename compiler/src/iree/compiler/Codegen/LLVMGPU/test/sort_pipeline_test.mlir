@@ -4,12 +4,13 @@
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [1, 1, 1] subgroup_size = 32>
+#lowering_config = #iree_gpu.lowering_config<{thread = [0], workgroup = [0]}>
 module {
   func.func @sort1D() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(Indirect) {iree_gpu.use_rocdl_buffer_instructions} : !flow.dispatch.tensor<readwrite:tensor<4xi32>>
     %1 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readwrite:tensor<4xi32>> -> tensor<4xi32>
-    %2 = iree_linalg_ext.sort {lowering_config = #iree_gpu.lowering_config<{thread = [0], workgroup = [0]}>} dimension(0) outs(%1 : tensor<4xi32>) {
+    %2 = iree_linalg_ext.sort {lowering_config = #lowering_config} dimension(0) outs(%1 : tensor<4xi32>) {
     ^bb0(%arg0: i32, %arg1: i32):
       %3 = arith.cmpi slt, %arg0, %arg1 : i32
       iree_linalg_ext.yield %3 : i1
@@ -27,12 +28,13 @@ module {
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
+#lowering_config = #iree_gpu.lowering_config<{thread = [1], workgroup = [1]}>
 module {
   func.func @sort2D_static_shape() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(Indirect) {iree_gpu.use_rocdl_buffer_instructions} : !flow.dispatch.tensor<readwrite:tensor<2000x30000xi32>>
     %1 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2, 4], strides = [1, 1] : !flow.dispatch.tensor<readwrite:tensor<2000x30000xi32>> -> tensor<2000x30000xi32>
-    %2 = iree_linalg_ext.sort {lowering_config = #iree_gpu.lowering_config<{thread = [1], workgroup = [1]}>} dimension(1) outs(%1 : tensor<2000x30000xi32>) {
+    %2 = iree_linalg_ext.sort {lowering_config = #lowering_config} dimension(1) outs(%1 : tensor<2000x30000xi32>) {
     ^bb0(%arg0: i32, %arg1: i32):
       %3 = arith.cmpi slt, %arg0, %arg1 : i32
       iree_linalg_ext.yield %3 : i1
@@ -53,6 +55,7 @@ module {
 
 #pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
+#lowering_config = #iree_gpu.lowering_config<{thread = [1, 1], workgroup = [1, 2]}>
 module {
   func.func @sort3D_dynamic_shape() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
@@ -63,7 +66,7 @@ module {
     %4 = flow.dispatch.workload.ordinal %3, 0 : index
     %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%2) flags(Indirect) {iree_gpu.use_rocdl_buffer_instructions} : !flow.dispatch.tensor<readwrite:tensor<?x2x4xi32>>{%4}
     %6 = flow.dispatch.tensor.load %5, offsets = [0, 0, 0], sizes = [%4, 2, 4], strides = [1, 1, 1] : !flow.dispatch.tensor<readwrite:tensor<?x2x4xi32>>{%4} -> tensor<?x2x4xi32>
-    %7 = iree_linalg_ext.sort {lowering_config = #iree_gpu.lowering_config<{thread = [1, 1], workgroup = [1, 2]}>} dimension(2) outs(%6 : tensor<?x2x4xi32>) {
+    %7 = iree_linalg_ext.sort {lowering_config = #lowering_config} dimension(2) outs(%6 : tensor<?x2x4xi32>) {
     ^bb0(%arg0: i32, %arg1: i32):
       %8 = arith.cmpi slt, %arg0, %arg1 : i32
       iree_linalg_ext.yield %8 : i1

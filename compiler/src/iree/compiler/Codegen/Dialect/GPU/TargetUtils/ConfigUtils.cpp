@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
+#include <optional>
 
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Common/TileInferenceUtils.h"
@@ -1000,7 +1001,7 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
   const int64_t subgroupSize = target.getPreferredSubgroupSize();
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   SmallVector<unsigned> partitionedLoops =
-      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
+      interfaceOp.getPartitionableLoops(std::nullopt);
 
   auto createLoweringConfig = [&](ArrayRef<int64_t> workgroupSizes,
                                   ArrayRef<int64_t> threadSizes) {
@@ -1020,7 +1021,7 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
         {1, 1, 1}, subgroupSize, DictionaryAttr());
   }
 
-  unsigned numLoops = partitionedLoops.back() + 1;
+  unsigned numLoops = llvm::dyn_cast<ShapedType>(op->getResult(0).getType()).getRank();
 
   // To get peak occupancy we need a workgroup size of at least two warps.
   std::array<int64_t, 3> workgroupSize = {2 * subgroupSize, 1, 1};
