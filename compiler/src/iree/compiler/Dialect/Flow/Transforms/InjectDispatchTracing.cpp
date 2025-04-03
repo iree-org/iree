@@ -8,15 +8,11 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Dominance.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
 
@@ -28,6 +24,10 @@ struct TensorValue {
   SmallVector<Value> dynamicDims;
 };
 
+/// Filters out a list of all `Value`s in range that are tensor types, and
+/// groups them with their corresponding dynamic dimensions from `dynamicDims`.
+/// The `dynamicDims` range is expected to have all dynamic dims of the values
+/// in `range`, in the order that they appear in the tensor shapes.
 static SmallVector<TensorValue> filterTensorValues(ValueRange &&range,
                                                    ValueRange &&dynamicDims) {
   SmallVector<TensorValue> result;
@@ -43,7 +43,7 @@ static SmallVector<TensorValue> filterTensorValues(ValueRange &&range,
 
 /// Sets all `Value`s of the `TensorValue`s in `tensorValues` to the row major
 /// layout by inserting flow.tensor.encode ops before any Value that has an
-/// encoding. Fills `decodedIndices` with the indices of `tensorValues` that
+/// encoding. Populates `decodedIndices` with the indices of `tensorValues` that
 /// were decoded.
 static SmallVector<Value>
 getInRowMajorLayout(OpBuilder &builder, SmallVector<TensorValue> tensorValues,
