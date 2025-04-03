@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -22,6 +23,7 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct ExpandGPUOpsPass final : impl::ExpandGPUOpsPassBase<ExpandGPUOpsPass> {
+  // Apply AMD GPU targetting patterns
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
     MLIRContext *ctx = &getContext();
@@ -33,8 +35,18 @@ struct ExpandGPUOpsPass final : impl::ExpandGPUOpsPassBase<ExpandGPUOpsPass> {
     }
 
     RewritePatternSet patterns(ctx);
+    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+    StringRef targetArch = target.getArch();
+    auto maybeChipset = amdgpu::Chipset::parse(targetArch);
+    if (succeeded(maybeChipset)) {
+      populateGpuLowerSubgroupReduceToDPPPatterns(
+          patterns, *subgroupSize, /* shuffleBitwidth=*/32, *maybeChipset, PatternBenefit(2));
+      populateGpuLowerClusteredSubgroupReduceToDPPPatterns(
+          patterns, *subgroupSize, /* shuffleBitwidth=*/32, *maybeChipset, PatternBenefit(2));
+    }
+
     populateGpuBreakDownSubgroupReducePatterns(
-        patterns, /* maxShuffleBitwidth=*/32, PatternBenefit(2));
+        patterns, /* maxShuffleBitwidth=*/32, PatternBenefit(3));
     populateGpuLowerClusteredSubgroupReduceToShufflePatterns(
         patterns, *subgroupSize, /* shuffleBitwidth=*/32, PatternBenefit(1));
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
