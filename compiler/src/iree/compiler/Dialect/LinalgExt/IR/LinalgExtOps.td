@@ -289,12 +289,12 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
       return getDimensionMap().size();
     }
 
-    int64_t getResultSliceRank() {
+    int64_t getOutputSliceRank() {
       return getSourceType().getRank() - getIndexDepth();
     }
 
     int64_t getBatchRank() {
-      return getResultType().getRank() - getResultSliceRank();
+      return getOutputType().getRank() - getOutputSliceRank();
     }
 
     Value getSource(){
@@ -313,12 +313,12 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
       return cast<ShapedType>(getIndices().getType());
     }
 
-    Value getResult(){
+    Value getOutput(){
       return getDpsInitOperand(0)->get();
     }
 
-    ShapedType getResultType(){
-      return cast<ShapedType>(getResult().getType());
+    ShapedType getOutputType(){
+      return cast<ShapedType>(getOutput().getType());
     }
 
     MutableOperandRange getDpsInitsMutable() {

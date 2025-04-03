@@ -282,7 +282,7 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
 //===----------------------------------------------------------------------===//
 
 SmallVector<utils::IteratorType> GatherOp::getLoopIteratorTypes() {
-  return {static_cast<size_t>(getResultType().getRank()),
+  return {static_cast<size_t>(getOutputType().getRank()),
           utils::IteratorType::parallel};
 }
 
@@ -291,8 +291,8 @@ SmallVector<Range> GatherOp::getIterationDomain(OpBuilder &builder) {
   OpFoldResult zero = builder.getIndexAttr(0);
   OpFoldResult one = builder.getIndexAttr(1);
   SmallVector<Range> ranges;
-  for (auto dim : llvm::seq<int64_t>(0, getResultType().getRank())) {
-    OpFoldResult ub = getDim(builder, loc, getResult(), dim);
+  for (auto dim : llvm::seq<int64_t>(0, getOutputType().getRank())) {
+    OpFoldResult ub = getDim(builder, loc, getOutput(), dim);
     ranges.emplace_back(Range{zero, ub, one});
   }
   return ranges;
@@ -309,10 +309,10 @@ GatherOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<Operation *> slices;
 
   // Slice of the result.
-  auto resultRank = getResultType().getRank();
+  auto resultRank = getOutputType().getRank();
   SmallVector<OpFoldResult> resultStrides(resultRank, oneAttr);
   Operation *resultSlice =
-      getSlice(builder, loc, getResult(), offsets, sizes, resultStrides);
+      getSlice(builder, loc, getOutput(), offsets, sizes, resultStrides);
   if (!resultSlice) {
     return emitOpError("failed to get result slice");
   }
@@ -392,7 +392,7 @@ GatherOp::generateResultTileValue(OpBuilder &builder, unsigned resultNumber,
 LogicalResult GatherOp::generateScalarImplementation(OpBuilder &b, Location loc,
                                                      ValueRange ivs) {
   auto indexDepth = getIndexDepth();
-  Value result = b.create<memref::LoadOp>(loc, getResult(), ivs);
+  Value result = b.create<memref::LoadOp>(loc, getOutput(), ivs);
   SmallVector<Value> starts;
   SmallVector<Value> loadIndices;
   append_range(loadIndices, ivs.take_front(getBatchRank()));
@@ -439,7 +439,7 @@ LogicalResult GatherOp::generateScalarImplementation(OpBuilder &b, Location loc,
   // destination.
   b.create<memref::StoreOp>(
       loc, bvm.lookupOrDefault(block.getTerminator()->getOperand(0)),
-      getResult(), ivs);
+      getOutput(), ivs);
   return success();
 }
 

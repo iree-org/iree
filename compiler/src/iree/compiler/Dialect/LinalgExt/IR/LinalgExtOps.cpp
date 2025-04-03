@@ -299,8 +299,8 @@ SmallVector<AffineMap> ScatterOp::getIndexingMapsForResults() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult GatherOp::verify() {
-  return verifyGatherScatter(*this, getResultSliceRank(), getSourceType(),
-                             getResultType(), "source", "result");
+  return verifyGatherScatter(*this, getOutputSliceRank(), getSourceType(),
+                             getOutputType(), "source", "output");
 }
 
 LogicalResult
@@ -311,18 +311,18 @@ GatherOp::reifyResultShapes(OpBuilder &b,
 }
 
 FailureOr<SmallVector<int64_t>> GatherOp::getStaticLoopRanges() {
-  return SmallVector<int64_t>(getResultType().getRank());
+  return SmallVector<int64_t>(getOutputType().getRank());
 }
 
 SmallVector<AffineMap> GatherOp::getIndexingMapsForOperands() {
   Builder builder(getContext());
   return {AffineMap(nullptr), AffineMap(nullptr),
-          builder.getMultiDimIdentityMap(getResultType().getRank())};
+          builder.getMultiDimIdentityMap(getOutputType().getRank())};
 }
 
 SmallVector<AffineMap> GatherOp::getIndexingMapsForResults() {
   Builder builder(getContext());
-  return {builder.getMultiDimIdentityMap(getResultType().getRank())};
+  return {builder.getMultiDimIdentityMap(getOutputType().getRank())};
 }
 
 //===----------------------------------------------------------------------===//

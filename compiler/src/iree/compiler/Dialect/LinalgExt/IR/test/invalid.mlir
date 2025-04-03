@@ -421,14 +421,14 @@ func.func @scatter_index_depth_too_small(
 
 // -----
 
-func.func @gather_result_too_large(
+func.func @gather_output_too_large(
     %source : tensor<10xf32>, %idx : tensor<1xi32>,
-    %result : tensor<2xf32>) -> tensor<2xf32> {
-  // expected-error @below {{'iree_linalg_ext.gather' op mismatch in shape of indices and result value at dim#0}}
+    %output : tensor<2xf32>) -> tensor<2xf32> {
+  // expected-error @below {{'iree_linalg_ext.gather' op mismatch in shape of indices and output value at dim#0}}
   %0 = iree_linalg_ext.gather
     dimension_map = [0]
     ins(%source, %idx : tensor<10xf32>, tensor<1xi32>)
-    outs(%result : tensor<2xf32>) {
+    outs(%output : tensor<2xf32>) {
     ^bb0(%arg0: f32, %arg1: f32):
       iree_linalg_ext.yield %arg0 : f32
   } -> tensor<2xf32>
@@ -437,14 +437,14 @@ func.func @gather_result_too_large(
 
 // -----
 
-func.func @gather_mismatch_result_and_source(
+func.func @gather_mismatch_output_and_source(
     %source : tensor<10x10xf32>, %idx : tensor<2xi32>,
-    %result : tensor<1xf32>) -> tensor<1xf32> {
-  // expected-error @below {{'iree_linalg_ext.gather' op shape of result value dim#0 must match source value at dim#1}}
+    %output : tensor<1xf32>) -> tensor<1xf32> {
+  // expected-error @below {{'iree_linalg_ext.gather' op shape of output value dim#0 must match source value at dim#1}}
   %0 = iree_linalg_ext.gather
     dimension_map = [0]
     ins(%source, %idx : tensor<10x10xf32>, tensor<2xi32>)
-    outs(%result : tensor<1xf32>) {
+    outs(%output : tensor<1xf32>) {
     ^bb0(%arg0: f32, %arg1: f32):
       iree_linalg_ext.yield %arg0 : f32
   } -> tensor<1xf32>
@@ -455,12 +455,12 @@ func.func @gather_mismatch_result_and_source(
 
 func.func @gather_indices_batch_rank_too_large(
     %source : tensor<10x10xf32>, %idx : tensor<1x2xi32>,
-    %result : tensor<10xf32>) -> tensor<10xf32> {
+    %output : tensor<10xf32>) -> tensor<10xf32> {
   // expected-error @below {{'iree_linalg_ext.gather' op expected indices to be equal to batch rank or batch rank + 1}}
   %0 = iree_linalg_ext.gather
     dimension_map = [0]
     ins(%source, %idx : tensor<10x10xf32>, tensor<1x2xi32>)
-    outs(%result : tensor<10xf32>) {
+    outs(%output : tensor<10xf32>) {
     ^bb0(%arg0: f32, %arg1: f32):
       iree_linalg_ext.yield %arg0 : f32
   } -> tensor<10xf32>
@@ -471,12 +471,12 @@ func.func @gather_indices_batch_rank_too_large(
 
 func.func @gather_dim_map_mismatch(
     %source : tensor<2xf32>, %idx : tensor<1xi32>,
-    %result : tensor<1xf32>) -> tensor<1xf32> {
-  // expected-error @below {{'iree_linalg_ext.gather' op expected result to be at least the rank of non indexed source dims}}
+    %output : tensor<1xf32>) -> tensor<1xf32> {
+  // expected-error @below {{'iree_linalg_ext.gather' op expected output to be at least the rank of non indexed source dims}}
   %0 = iree_linalg_ext.gather
     dimension_map = [0, 1]
     ins(%source, %idx : tensor<2xf32>, tensor<1xi32>)
-    outs(%result : tensor<1xf32>) {
+    outs(%output : tensor<1xf32>) {
     ^bb0(%arg0: f32, %arg1: f32):
       iree_linalg_ext.yield %arg0 : f32
   } -> tensor<1xf32>
