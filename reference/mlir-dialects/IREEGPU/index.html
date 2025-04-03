@@ -5311,8 +5311,8 @@ compiler/Codegen/ExternalInterfaces/*.</p>
 <p><em>The padded encoding layout attribute for GPU targets.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.gpu_pad_layout&lt;
-  uint32_t,   # cache_line_bytes
-  uint32_t   # cache_sets
+  std::optional&lt;uint32_t&gt;,   # cache_line_bytes
+  std::optional&lt;uint32_t&gt;   # cache_sets
 &gt;
 </code></pre></div>
 <p>Describes padding preferences for a given GPU target.
@@ -5334,12 +5334,12 @@ compiler/Codegen/ExternalInterfaces/*.</p>
 <tbody>
 <tr>
 <td style="text-align: center;">cache_line_bytes</td>
-<td style="text-align: center;"><code>uint32_t</code></td>
+<td style="text-align: center;"><code>std::optional&lt;uint32_t&gt;</code></td>
 <td></td>
 </tr>
 <tr>
 <td style="text-align: center;">cache_sets</td>
-<td style="text-align: center;"><code>uint32_t</code></td>
+<td style="text-align: center;"><code>std::optional&lt;uint32_t&gt;</code></td>
 <td></td>
 </tr>
 </tbody>
