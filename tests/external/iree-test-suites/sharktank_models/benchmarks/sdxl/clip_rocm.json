@@ -1,0 +1,35 @@
+{
+    "inputs": [
+        "1x64xi64",
+        "1x64xi64",
+        "1x64xi64",
+        "1x64xi64"
+    ],
+    "function_run": "encode_prompts",
+    "benchmark_flags": [
+        "--benchmark_repetitions=10",
+        "--benchmark_min_warmup_time=3.0",
+        "--device_allocator=caching"
+    ],
+    "device": "hip",
+    "golden_time_tolerance_multiplier": {
+        "mi250": 1.3,
+        "mi300": 1.1,
+        "mi308": 1.1
+    },
+    "golden_time_ms": {
+        "mi250": 9.0,
+        "mi300": 15.0,
+        "mi308": 12.0
+    },
+    "golden_dispatch": {
+        "mi250": 794,
+        "mi300": 794,
+        "mi308": 794
+    },
+    "golden_size": {
+        "mi250": 460000,
+        "mi300": 460000,
+        "mi308": 460000
+    }
+}

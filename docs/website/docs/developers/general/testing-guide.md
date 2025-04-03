@@ -532,6 +532,12 @@ in the
 [iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites)
 repository.
 
+Types of Sharktank tests:
+
+* Small scale versions of models
+* Quality tests for full models
+* Benchmarks for full models
+
 <!-- TODO(scotttodd): document how to coordinate changes across these projects -->
 
 ### SHARK-TestSuite
