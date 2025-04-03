@@ -546,7 +546,7 @@ func.func @set_encoding_gpu(%0 : tensor<1234x567xi8>) -> tensor<10x9x8x4x4x4x2x8
 // CHECK-LABEL: func.func @set_encoding_gpu
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     thread = [1, 1, 1, 1, 1, 1, 1, 4]
+//  CHECK-SAME:     thread = [1, 1, 1, 1, 1, 1, 1, 1]
 //  CHECK-SAME:     workgroup = [1, 1, 8, 4, 4, 4, 2, 8]
 
 // -----
