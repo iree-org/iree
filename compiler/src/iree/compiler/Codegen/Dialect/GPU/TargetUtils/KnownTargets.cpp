@@ -740,6 +740,14 @@ std::optional<TargetDetails> getAndroidProfileDetails(StringRef target) {
 // Query functions
 //===----------------------------------------------------------------------===//
 
+std::optional<L1CacheInfo> getL1CacheInfo(TargetAttr target) {
+  // TODO(kuhar): Add L1 cache query for other HIP targets.
+  if (!target || !llvm::is_contained({"gfx90a", "gfx942"}, target.getArch())) {
+    return std::nullopt;
+  }
+  return L1CacheInfo{/*cacheLineBytes=*/128, /*cacheSets=*/4};
+}
+
 TargetAttr getMetalTargetDetails(MLIRContext *context) {
   return createTargetAttr(*getAppleTargetDetails(), /*arch=*/"apple",
                           /*features=*/"spirv:v1.3,cap:Shader", context);
@@ -775,12 +783,10 @@ Attribute getHIPTargetEncodingLayoutAttr(TargetAttr target,
     return IREE::GPU::GPUEncodingLayoutAttr::get(target.getContext(), {});
   }
 
-  // GPUPadLayoutAttr is only enabled for CDNA2 and CDNA3 for the time being.
-  // TODO(kuhar): Enable for other HIP targets.
-  if (resolver == kPadEncodingLayoutResolverName &&
-      llvm::is_contained({"gfx90a", "gfx942"}, target.getArch())) {
-    return IREE::GPU::GPUPadLayoutAttr::get(
-        target.getContext(), /*cacheLineBytes=*/128, /*cacheSets=*/4);
+  if (resolver == kPadEncodingLayoutResolverName) {
+    return IREE::GPU::GPUPadLayoutAttr::get(target.getContext(),
+                                            /*cache_line_bytes=*/std::nullopt,
+                                            /*cache_sets=*/std::nullopt);
   }
   return nullptr;
 }

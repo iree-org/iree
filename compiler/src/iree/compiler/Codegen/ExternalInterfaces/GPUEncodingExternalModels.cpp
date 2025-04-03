@@ -28,6 +28,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/ExternalInterfaces/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
@@ -409,10 +410,15 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     : Encoding::EncodingLayoutResolverAttrInterface::ExternalModel<
           GPUPadEncodingLayoutResolverAttrInterface, GPUPadLayoutAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
-                                      DictionaryAttr /*config*/) const {
-    // This attribute is self-contained and does not need to look anything up
-    // from the target `config`.
-    return attr;
+                                      DictionaryAttr config) const {
+    MLIRContext *ctx = attr.getContext();
+    IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(config);
+    std::optional<IREE::GPU::L1CacheInfo> cache =
+        IREE::GPU::getL1CacheInfo(gpuTarget);
+    if (!cache) {
+      return IREE::Encoding::IdentityEncodingAttr::get(ctx);
+    }
+    return GPUPadLayoutAttr::get(ctx, cache->cacheLineBytes, cache->cacheSets);
   }
 
   Attribute getLayout(Attribute attr, RankedTensorType type) const {
@@ -426,6 +432,10 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     if (encodingAttr.getOpType().getValue() !=
         IREE::Encoding::EncodingOpType::matmul) {
       // We only support simple matmuls for now.
+      return noPaddingAttr;
+    }
+
+    if (!padLayoutAttr.getCacheLineBytes() || !padLayoutAttr.getCacheSets()) {
       return noPaddingAttr;
     }
 
@@ -481,7 +491,7 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     }
 
     const int64_t elementBits = type.getElementTypeBitWidth();
-    const int64_t cacheLineBytes = padLayoutAttr.getCacheLineBytes();
+    const int64_t cacheLineBytes = *padLayoutAttr.getCacheLineBytes();
     if (elementBits % 8 != 0 || elementBits > cacheLineBytes) {
       // We do not support unaligned element types.
       return noPaddingAttr;
@@ -492,7 +502,7 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     // cache line, but not a multiple of cache line * cache sets. This way the
     // next 'row' will start at a different cache set.
     const int64_t cacheSetSpanBytes =
-        padLayoutAttr.getCacheSets() * cacheLineBytes;
+        *padLayoutAttr.getCacheSets() * cacheLineBytes;
     const int64_t dimSizeInBytes =
         type.getDimSize(*padDimensionIndex) * (elementBits / 8);
     if (dimSizeInBytes < cacheSetSpanBytes) {
