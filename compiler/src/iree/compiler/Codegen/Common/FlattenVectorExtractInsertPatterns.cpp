@@ -3,13 +3,9 @@
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//===- BubbleUpOrdinalOpPass.cpp -----------------------------------------===//
+//===-- FlattenVectorExtractInsertPatterns.cpp --------------------===//
 //
-// The workgroup count computation when using slices needs the ordinal
-// annotation ops to be bubbled up as much as possible. This pass implements
-// patterns to bubble these operations up.
-//
-//===---------------------------------------------------------------------===//
+//===--------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
