@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
@@ -94,9 +95,11 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
       if (!producerInRegion) {
         continue;
       }
-
+      auto matmulKAttr = dyn_cast_or_null<IREE::Encoding::MatmulKAttr>(
+          encodingOp.getResultType().getEncoding());
       // Place the op in its own dispatch region if fusion is not possible.
-      if (!isFusableWithSetEncoding(producerInRegion.getOwner())) {
+      if (!matmulKAttr &&
+          !isFusableWithSetEncoding(producerInRegion.getOwner())) {
         continue;
       }
       // Fuse the `encodingOp` into the producer dispatch region.
