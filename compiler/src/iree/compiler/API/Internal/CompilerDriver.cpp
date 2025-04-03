@@ -1033,10 +1033,8 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
   if (failed(passManager->run(parsedModule))) {
     return false;
   }
-#if IREE_ENABLE_COMPILER_TRACING
   // Done with the pipeline, mark the start of a new 'frame'.
-  IREE_TRACE_FRAME_MARK();
-#endif
+  IREE_COMPILER_TRACE_FRAME_MARK();
   return true;
 }
 
