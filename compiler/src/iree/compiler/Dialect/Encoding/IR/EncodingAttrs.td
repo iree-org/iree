@@ -143,6 +143,31 @@ def EncodingAttr :
 }
 
 //===---------------------------------------------------------------------===//
+// encoding.matmul_k
+//===---------------------------------------------------------------------===//
+
+def MatmulKAttr : IREEEncoding_Attr<"MatmulK"> {
+  let mnemonic = "matmul_k";
+  let summary = [{An attribute that tracks reduction dimensions for matmul}];
+  let description = [{
+    The attribute is specialized for tracking the matmul reduction dimensions
+    only. The encoded dimensions are the reduction dimensions that will be
+    further used in a matmul.
+
+    Any encoding propagation that transforms reduction dimensions could result
+    in undefined behavior. Because it does not encode the transformations. The
+    information is missing in this context.
+  }];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let parameters = (ins
+    "DenseI32ArrayAttr":$k_dims,
+    OptionalParameter<"ArrayAttr", "the serialized layouts, if present">:$layouts
+  );
+}
+
+//===---------------------------------------------------------------------===//
 // encoding.pad_encoding_layout
 //===---------------------------------------------------------------------===//
 
