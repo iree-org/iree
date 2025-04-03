@@ -156,28 +156,3 @@ util.func public @multi_encoding_fusion_dynamic(%arg0: tensor<?x?x?xf32>, %d0: i
 // CHECK:         flow.return %[[SET_ENCODING]] :
 // CHECK:       }
 // CHECK:       util.return %[[DISPATCH]], %[[DISPATCH]]
-
-// -----
-
-#encoding0 = #iree_encoding.testing_encoding<>
-#encoding1 = #iree_encoding.testing_encoding<[#iree_encoding.pad_encoding_layout<[0, 0]>]>
-util.func public @encoding_fusion(%arg0: tensor<?x?xf32, #encoding0>, %d0: index, %d1: index) -> tensor<?x?xf32, #encoding1> {
-  %0 = flow.dispatch.region -> (tensor<?x?xf32>{%d0, %d1}) {
-    %1 = iree_encoding.unset_encoding %arg0 : tensor<?x?xf32, #encoding0> -> tensor<?x?xf32>{%d0, %d1}
-    flow.return %1 : tensor<?x?xf32>
-  }
-  %2 = iree_encoding.set_encoding %0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding1>
-  util.return %2 : tensor<?x?xf32, #encoding1>
-}
-
-// CHECK-DAG:   #[[$ENCODING0:.+]] = #iree_encoding.testing_encoding<>
-// CHECK-DAG:   #[[$ENCODING1:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.pad_encoding_layout<[0, 0]>]>
-// CHECK-LABEL: @encoding_fusion
-// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
-// CHECK-SAME:     %[[D0:[a-zA-Z0-9]+]]
-// CHECK-SAME:     %[[D1:[a-zA-Z0-9]+]]
-// CHECK:          %[[DISPATCH:.+]] =  flow.dispatch.region -> (tensor<?x?xf32, #[[$ENCODING1]]>{%[[D0]], %[[D1]]}
-// CHECK-NEXT:       %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[ARG0]]
-// CHECK-NEXT:       %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[UNSET_ENCODING]] : tensor<?x?xf32> -> tensor<?x?xf32, #[[$ENCODING1]]>
-// CHECK-NEXT:       flow.return %[[SET_ENCODING]]
-// CHECK:          util.return %[[DISPATCH]]

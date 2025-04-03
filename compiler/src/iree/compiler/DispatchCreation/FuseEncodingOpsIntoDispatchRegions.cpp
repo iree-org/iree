@@ -47,8 +47,7 @@ static bool isFusableWithSetEncoding(Operation *op) {
     if (llvm::none_of(op.getResultTypes(), llvm::IsaPred<ShapedType>)) {
       continue;
     }
-    if (isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp, tensor::EmptyOp,
-            IREE::Encoding::SetEncodingOp, IREE::Encoding::UnsetEncodingOp>(
+    if (isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp, tensor::EmptyOp>(
             op)) {
       continue;
     }
@@ -70,6 +69,11 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
     mlir::FunctionOpInterface funcOp = getOperation();
     MLIRContext *context = &getContext();
     IRRewriter rewriter(context);
+
+    // Run CSE to eliminate common encoding ops, and run the canonicalization
+    // patterns to remove redundantly returned results.
+    DominanceInfo domInfo;
+    mlir::eliminateCommonSubExpressions(rewriter, domInfo, funcOp);
 
     SmallVector<IREE::Encoding::SetEncodingOp> encodingOps;
     funcOp->walk([&](IREE::Encoding::SetEncodingOp encodingOp) {
@@ -113,25 +117,12 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
     // producer dispatch regions, so we need to resolve tensor.dim ops.
     GreedyRewriteConfig config;
     config.cseConstants = false;
-    {
-      RewritePatternSet patterns(context);
-      memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
-      if (failed(applyPatternsGreedily(funcOp, std::move(patterns), config))) {
-        return signalPassFailure();
-      }
-    }
-
-    // Run CSE to eliminate common encoding ops, and run the canonicalization
-    // patterns to remove redundantly returned results.
-    DominanceInfo domInfo;
-    mlir::eliminateCommonSubExpressions(rewriter, domInfo, funcOp);
-    {
-      RewritePatternSet patterns(context);
-      IREE::Flow::DispatchRegionOp::getCanonicalizationPatterns(patterns,
-                                                                context);
-      if (failed(applyPatternsGreedily(funcOp, std::move(patterns), config))) {
-        return signalPassFailure();
-      }
+    RewritePatternSet patterns(context);
+    IREE::Flow::DispatchRegionOp::getCanonicalizationPatterns(patterns,
+                                                              context);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns), config))) {
+      return signalPassFailure();
     }
   }
 };
