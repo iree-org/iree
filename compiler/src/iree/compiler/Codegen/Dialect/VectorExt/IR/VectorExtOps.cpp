@@ -60,7 +60,7 @@ void TransferGatherOp::getEffects(
 
 const char *kNonIndexedSymbol = "None";
 
-ParseResult
+static ParseResult
 parseIndexVecs(OpAsmParser &parser,
                SmallVectorImpl<OpAsmParser::UnresolvedOperand> &indexVecs,
                SmallVectorImpl<Type> &indexVecTypes, ArrayAttr &indexed) {
@@ -92,13 +92,14 @@ parseIndexVecs(OpAsmParser &parser,
   }
 
   // OpBuilder is only used as a helper to build an BoolArrayAttr.
-  OpBuilder b(parser.getContext());
+  Builder b(parser.getContext());
   indexed = b.getBoolArrayAttr(indexedArr);
   return success();
 }
 
-void printIndexVecs(OpAsmPrinter &p, Operation *op, OperandRange indexVecs,
-                    TypeRange indexVecTypes, ArrayAttr indexed) {
+static void printIndexVecs(OpAsmPrinter &p, Operation *op,
+                           OperandRange indexVecs, TypeRange indexVecTypes,
+                           ArrayAttr indexed) {
   int64_t rank = indexed.size();
   SmallVector<bool> indexedArr(indexed.getAsValueRange<BoolAttr>());
 
@@ -148,16 +149,11 @@ verifyTransferOp(VectorTransferOpInterface op, ShapedType shapedType,
                  VectorType vectorType, VectorType maskType,
                  VectorType inferredMaskType, AffineMap permutationMap,
                  ArrayAttr inBounds) {
-  if (op->hasAttr("masked")) {
-    return op->emitOpError("masked attribute has been removed. "
-                           "Use in_bounds instead.");
-  }
-
   if (!llvm::isa<MemRefType, RankedTensorType>(shapedType))
     return op->emitOpError(
         "requires source to be a memref or ranked tensor type");
 
-  auto elementType = shapedType.getElementType();
+  Type elementType = shapedType.getElementType();
   DataLayout dataLayout = DataLayout::closest(op);
   if (auto vectorElementType = llvm::dyn_cast<VectorType>(elementType)) {
     // Memref or tensor has vector element type.
@@ -167,74 +163,84 @@ verifyTransferOp(VectorTransferOpInterface op, ShapedType shapedType,
     unsigned resultVecSize =
         dataLayout.getTypeSizeInBits(vectorType.getElementType()) *
         vectorType.getShape().back();
-    if (resultVecSize % sourceVecSize != 0)
+    if (resultVecSize % sourceVecSize != 0) {
       return op->emitOpError(
           "requires the bitwidth of the minor 1-D vector to be an integral "
           "multiple of the bitwidth of the minor 1-D vector of the source");
+    }
 
     unsigned sourceVecEltRank = vectorElementType.getRank();
     unsigned resultVecRank = vectorType.getRank();
-    if (sourceVecEltRank > resultVecRank)
+    if (sourceVecEltRank > resultVecRank) {
       return op->emitOpError(
           "requires source vector element and vector result ranks to match.");
+    }
     unsigned rankOffset = resultVecRank - sourceVecEltRank;
     // Check that permutation map results match 'rankOffset' of vector type.
-    if (permutationMap.getNumResults() != rankOffset)
+    if (permutationMap.getNumResults() != rankOffset) {
       return op->emitOpError("requires a permutation_map with result dims of "
                              "the same rank as the vector type");
+    }
 
-    if (maskType)
+    if (maskType) {
       return op->emitOpError("does not support masks with vector element type");
+    }
   } else {
     // Memref or tensor has scalar element type.
     unsigned minorSize =
         vectorType.getRank() == 0 ? 1 : vectorType.getShape().back();
     unsigned resultVecSize =
         dataLayout.getTypeSizeInBits(vectorType.getElementType()) * minorSize;
-    if (resultVecSize % dataLayout.getTypeSizeInBits(elementType) != 0)
+    if (resultVecSize % dataLayout.getTypeSizeInBits(elementType) != 0) {
       return op->emitOpError(
           "requires the bitwidth of the minor 1-D vector to be an integral "
           "multiple of the bitwidth of the source element type");
+    }
 
     // Check that permutation map results match rank of vector type.
-    if (permutationMap.getNumResults() != vectorType.getRank())
+    if (permutationMap.getNumResults() != vectorType.getRank()) {
       return op->emitOpError("requires a permutation_map with result dims of "
                              "the same rank as the vector type");
+    }
   }
 
-  if (permutationMap.getNumSymbols() != 0)
+  if (permutationMap.getNumSymbols() != 0) {
     return op->emitOpError("requires permutation_map without symbols");
+  }
 
-  if (permutationMap.getNumInputs() != shapedType.getRank())
+  if (permutationMap.getNumInputs() != shapedType.getRank()) {
     return op->emitOpError("requires a permutation_map with input dims of the "
                            "same rank as the source type");
+  }
 
-  if (maskType && maskType != inferredMaskType)
+  if (maskType && maskType != inferredMaskType) {
     return op->emitOpError("inferred mask type (")
            << inferredMaskType << ") and mask operand type (" << maskType
            << ") don't match";
+  }
 
-  if (permutationMap.getNumResults() != static_cast<int64_t>(inBounds.size()))
+  if (permutationMap.getNumResults() != static_cast<int64_t>(inBounds.size())) {
     return op->emitOpError("expects the in_bounds attr of same rank "
                            "as permutation_map results: ")
            << AffineMapAttr::get(permutationMap)
            << " vs inBounds of size: " << inBounds.size();
+  }
 
   return success();
 }
 
-template <typename EmitFun>
-static LogicalResult verifyPermutationMap(AffineMap permutationMap,
-                                          EmitFun emitOpError) {
+static LogicalResult verifyPermutationMap(
+    AffineMap permutationMap,
+    llvm::function_ref<InFlightDiagnostic(Twine)> emitOpError) {
   SmallVector<bool, 8> seen(permutationMap.getNumInputs(), false);
   for (auto expr : permutationMap.getResults()) {
     auto dim = dyn_cast<AffineDimExpr>(expr);
     auto zero = dyn_cast<AffineConstantExpr>(expr);
     if (zero) {
       if (zero.getValue() != 0) {
-        return emitOpError(
-            "requires a projected permutation_map (at most one dim or the zero "
-            "constant can appear in each result)");
+        return emitOpError("requires a projected permutation_map (at most "
+                           "one dim or the zero "
+                           "constant can appear in each result)");
       }
       continue;
     }
@@ -257,8 +263,8 @@ LogicalResult TransferGatherOp::verify() {
   ShapedType shapedType = getShapedType();
   VectorType vectorType = getVectorType();
   VectorType maskType = getMaskType();
-  auto paddingType = getPadding().getType();
-  auto permutationMap = getPermutationMap();
+  Type paddingType = getPadding().getType();
+  AffineMap permutationMap = getPermutationMap();
   VectorType inferredMaskType =
       maskType ? vector::inferTransferOpMaskType(vectorType, permutationMap)
                : VectorType();
