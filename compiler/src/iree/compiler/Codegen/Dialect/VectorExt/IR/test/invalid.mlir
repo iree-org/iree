@@ -48,3 +48,39 @@ func.func @invalid_to_simt_vector_element_type(%simt : vector<64xf32>) -> vector
   subgroup_strides = [0, 0],
   thread_strides = [0]
 >
+
+// -----
+
+func.func @indexing_map_mismatch(%indices: vector<128xindex>,
+  %source: tensor<128xf16>)
+  -> vector<128xf16> {
+
+  %cst0 = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+
+  // expected-error @+1 {{op requires number of results for corressponding indexing map to match the rank of index vector at dim: 0}}
+  %out = iree_vector_ext.transfer_gather %source[%c0]
+  [%indices: vector<128xindex>], %cst0
+  { indexed_maps = [affine_map<(d0, d1) -> (d0, d1)>]}
+  : tensor<128xf16>, vector<128xf16>
+
+  return %out : vector<128xf16>
+}
+
+// -----
+
+func.func @indexing_map_mismatch(%indices: vector<128x64xindex>,
+  %source: tensor<128x64xf16>)
+  -> vector<128x64xf16> {
+
+  %cst0 = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+
+  // expected-error @+1 {{'iree_vector_ext.transfer_gather' op Invalid index vector shape at dim: 0, expected: 64, 128, got: 128, 64}}
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
+  [None, %indices: vector<128x64xindex>], %cst0
+  { indexed_maps = [affine_map<(d0, d1) -> (d1, d0)>]}
+  : tensor<128x64xf16>, vector<128x64xf16>
+
+  return %out : vector<128x64xf16>
+}
