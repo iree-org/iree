@@ -745,7 +745,7 @@ std::optional<L1CacheInfo> getL1CacheInfo(TargetAttr target) {
   if (!target || !llvm::is_contained({"gfx90a", "gfx942"}, target.getArch())) {
     return std::nullopt;
   }
-  return L1CacheInfo{.cacheLineBytes = 128, .cacheSets = 4};
+  return L1CacheInfo{/*cacheLineBytes=*/128, /*cacheSets=*/4};
 }
 
 TargetAttr getMetalTargetDetails(MLIRContext *context) {
