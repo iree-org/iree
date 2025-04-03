@@ -38,9 +38,9 @@ util.func public @multiDispatch(%arg0: tensor<4xf32>) -> tensor<4xf32> {
 // CHECK: #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
 #encoding = #iree_encoding.testing_encoding<>
 // CHECK-LABEL: util.func public @encodedDispatch
-// CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?xf32>
-// CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?xf32>
-// CHECK-SAME: %[[DIM:.+]]: index
+// CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]+]]
+// CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]+]]
+// CHECK-SAME: %[[DIM:[a-zA-Z0-9_]+]]
 util.func public @encodedDispatch(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>, %dim : index) -> tensor<?xf32, #encoding>, tensor<?xf32> {
   %encoded = flow.tensor.encode %arg0 : tensor<?xf32>{%dim} -> tensor<?xf32, #encoding>{%dim}
   // CHECK:      %[[ARG0_ENCODED:.+]] = flow.tensor.encode %[[ARG0]]{{.*}} -> tensor<?xf32, #[[$ENCODING]]>{%[[DIM]]}

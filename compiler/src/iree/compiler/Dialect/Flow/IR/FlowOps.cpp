@@ -195,26 +195,6 @@ static bool doesSliceSpanWholeTarget(
   return true;
 }
 
-ReifiedRankedShapedTypeDims
-getDispatchOpResultShapes(OpBuilder &b, TypeRange resultTypes,
-                          OperandRange resultDynamicDims) {
-  ReifiedRankedShapedTypeDims reifiedReturnShapes;
-  unsigned counter = 0;
-  for (Type resultType : resultTypes) {
-    auto shapedType = llvm::dyn_cast<ShapedType>(resultType);
-    if (!shapedType) {
-      reifiedReturnShapes.push_back({});
-      continue;
-    }
-    SmallVector<Value> dynamicDims =
-        resultDynamicDims.slice(counter, shapedType.getNumDynamicDims());
-    reifiedReturnShapes.push_back(
-        mlir::getMixedValues(shapedType.getShape(), dynamicDims, b));
-    counter += shapedType.getNumDynamicDims();
-  }
-  return reifiedReturnShapes;
-}
-
 //===----------------------------------------------------------------------===//
 // custom<ShapedOperandList>($values, type($values), $value_dims)
 //===----------------------------------------------------------------------===//
@@ -588,8 +568,20 @@ ValueRange DispatchRegionOp::getResultDynamicDims(unsigned idx) {
 
 LogicalResult DispatchRegionOp::reifyResultShapes(
     OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
-  reifiedReturnShapes =
-      getDispatchOpResultShapes(b, getResultTypes(), getResultDims());
+  SmallVector<Type> resultTypes(getResultTypes());
+  unsigned counter = 0;
+  for (Type resultType : resultTypes) {
+    auto shapedType = llvm::dyn_cast<ShapedType>(resultType);
+    if (!shapedType) {
+      reifiedReturnShapes.push_back({});
+      continue;
+    }
+    SmallVector<Value> dynamicDims =
+        getResultDims().slice(counter, shapedType.getNumDynamicDims());
+    reifiedReturnShapes.push_back(
+        mlir::getMixedValues(shapedType.getShape(), dynamicDims, b));
+    counter += shapedType.getNumDynamicDims();
+  }
   return success();
 }
 
@@ -1541,13 +1533,6 @@ LogicalResult DispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   return success();
 }
 
-LogicalResult DispatchOp::reifyResultShapes(
-    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
-  reifiedReturnShapes =
-      getDispatchOpResultShapes(b, getResultTypes(), getResultDims());
-  return success();
-}
-
 //===----------------------------------------------------------------------===//
 // flow.func
 //===----------------------------------------------------------------------===//
@@ -1872,15 +1857,6 @@ LogicalResult TensorEncodeOp::verify() {
                                          resultType.getShape()))) {
     return emitOpError("the operand shape and result shape are not compatible");
   }
-  return success();
-}
-
-LogicalResult TensorEncodeOp::reifyResultShapes(
-    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
-  auto tensorType = llvm::cast<ShapedType>(getResult().getType());
-  SmallVector<OpFoldResult> shape =
-      getMixedValues(tensorType.getShape(), getResultDynamicDims(0), b);
-  reifiedReturnShapes.push_back(shape);
   return success();
 }
 
