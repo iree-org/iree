@@ -325,3 +325,21 @@ util.func public @conv_2d_hwcn_hwcf(%arg0: tensor<26x18x16x288xf32>, %arg1: tens
 // CHECK:          arith.addf
 // CHECK:      } -> tensor<3x3x288x288xf32>
 // CHECK:      util.return %[[MATMUL]] : tensor<3x3x288x288xf32>
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1 + d4, d2 + d5, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d4, d5, d0, d3)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d0)>
+util.func public @conv_nhwc_hwfc_nobatch(%arg0: tensor<16x16x4xf32>, %arg1: tensor<3x3x16x4xf32>, %arg2: tensor<14x14x16xf32>) -> tensor<14x14x16xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<16x16x4xf32>, tensor<3x3x16x4xf32>) outs(%arg2 : tensor<14x14x16xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %3 = arith.mulf %in, %in_0 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<14x14x16xf32>
+  util.return %0 : tensor<14x14x16xf32>
+}
+
+// CHECK:  util.func public @conv_nhwc_hwfc_nobatch(
+// CHECK:    iree_linalg_ext.im2col {{.*}} batch_pos = []
