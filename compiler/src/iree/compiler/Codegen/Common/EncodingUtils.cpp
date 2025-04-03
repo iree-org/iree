@@ -76,9 +76,10 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
   markUnknownOpDynamicallyLegal([](Operation *op) {
     auto typeHasDataTilingEncoding = [](Type t) -> bool {
       auto tensorType = dyn_cast<RankedTensorType>(t);
-      if (!tensorType)
+      if (!tensorType || !tensorType.getEncoding())
         return false;
-      return getEncodingAttr(tensorType) != nullptr;
+      return isa<IREE::Encoding::ContractionEncodingInterface>(
+          tensorType.getEncoding());
     };
     auto valueHasDataTilingEncoding = [=](Value v) -> bool {
       return typeHasDataTilingEncoding(v.getType());

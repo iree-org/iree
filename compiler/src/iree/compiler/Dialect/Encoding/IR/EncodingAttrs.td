@@ -59,6 +59,9 @@ def EncodingAttr :
         "isIdentityLayout",
         "cloneWithLayouts",
         "calculateStorageSizeInBytes",
+      ]>,
+      DeclareAttrInterfaceMethods<IREEEncoding_ContractionEncodingInterface, [
+        "getReductionDims",
       ]>
     ]> {
   let mnemonic = "encoding";
@@ -153,6 +156,9 @@ def MatmulKAttr :
         "isIdentityLayout",
         "cloneWithLayouts",
         "calculateStorageSizeInBytes",
+      ]>,
+      DeclareAttrInterfaceMethods<IREEEncoding_ContractionEncodingInterface, [
+        "getReductionDims",
       ]>
     ]> {
   let mnemonic = "matmul_k";

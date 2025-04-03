@@ -278,7 +278,22 @@ Value EncodingAttr::calculateStorageSizeInBytes(Location loc,
   return res;
 }
 
-//===---------------------------------------------------------------------===//
+SmallVector<int32_t> EncodingAttr::getReductionDims() const {
+  FailureOr<linalg::ContractionDimensions> contractionDims =
+      getEncodingContractionDims(*this);
+  if (failed(contractionDims)) {
+    return {};
+  }
+  SmallVector<int32_t> result;
+  for (auto k : contractionDims->k) {
+    std::optional<unsigned> dimIdx = mapDimToOperandIndex(k);
+    if (!dimIdx) {
+      continue;
+    }
+    result.push_back(dimIdx.value());
+  }
+  return result;
+}
 // encoding.matmul_k
 //===---------------------------------------------------------------------===//
 
@@ -342,6 +357,10 @@ Value MatmulKAttr::calculateStorageSizeInBytes(Location loc,
     res = builder.create<arith::MaxUIOp>(loc, res, requestedSize);
   }
   return res;
+}
+
+SmallVector<int32_t> MatmulKAttr::getReductionDims() const {
+  return llvm::to_vector(getKDims().asArrayRef());
 }
 
 //===---------------------------------------------------------------------===//
