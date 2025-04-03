@@ -101,7 +101,7 @@ jobs:
     name: Test Sharktank
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_sharktank')
-    uses: ./.github/workflows/pkgci_sharktank.yml
+    uses: ./.github/workflows/pkgci_test_sharktank.yml
 
   test_tensorflow:
     name: Test TensorFlow

@@ -158,7 +158,7 @@ jobs:
 
   # These temporary tests are designed for targets who do not have cached
   # artifacts and unable to run quality and benchmark tests
-  # TODO (geo): add cached artifact support for w7900
+  # TODO (geomin12): add cached artifact support for w7900
   model-test:
     name: "sharktank_model_tests :: ${{ matrix.name }}"
     runs-on: ${{ matrix.runs-on }}
