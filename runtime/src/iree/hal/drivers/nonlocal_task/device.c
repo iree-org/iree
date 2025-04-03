@@ -421,7 +421,7 @@ static iree_status_t iree_hal_nl_task_device_queue_read(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_file_t* source_file, uint64_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length, uint32_t flags) {
+    iree_device_size_t length, iree_hal_read_flags_t flags) {
   // TODO: expose streaming chunk count/size options.
   iree_status_t loop_status = iree_ok_status();
   iree_hal_file_transfer_options_t options = {
@@ -442,7 +442,7 @@ static iree_status_t iree_hal_nl_task_device_queue_write(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_file_t* target_file, uint64_t target_offset,
-    iree_device_size_t length, uint32_t flags) {
+    iree_device_size_t length, iree_hal_write_flags_t flags) {
   // TODO: expose streaming chunk count/size options.
   iree_status_t loop_status = iree_ok_status();
   iree_hal_file_transfer_options_t options = {
@@ -461,14 +461,13 @@ static iree_status_t iree_hal_nl_task_device_queue_execute(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers,
-    iree_hal_buffer_binding_table_t const* binding_tables) {
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_binding_table_t binding_table) {
   iree_hal_nl_task_device_t* device = iree_hal_nl_task_device_cast(base_device);
   // NOTE: today we are not discriminating queues based on command type.
   iree_host_size_t queue_index = iree_hal_nl_task_device_select_queue(
       device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
-  if (command_buffer_count == 0) {
+  if (command_buffer == NULL) {
     // Fast-path for barriers (fork/join/sequence).
     return iree_hal_nl_task_queue_submit_barrier(&device->queues[queue_index],
                                               wait_semaphore_list,
@@ -477,9 +476,8 @@ static iree_status_t iree_hal_nl_task_device_queue_execute(
   iree_hal_nl_task_submission_batch_t batch = {
       .wait_semaphores = wait_semaphore_list,
       .signal_semaphores = signal_semaphore_list,
-      .command_buffer_count = command_buffer_count,
-      .command_buffers = command_buffers,
-      .binding_tables = binding_tables,
+      .command_buffer = command_buffer,
+      .binding_table = binding_table,
   };
   return iree_hal_nl_task_queue_submit_commands(&device->queues[queue_index], 1,
                                              &batch);
