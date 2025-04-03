@@ -279,6 +279,72 @@ Value EncodingAttr::calculateStorageSizeInBytes(Location loc,
 }
 
 //===---------------------------------------------------------------------===//
+// encoding.matmul_k
+//===---------------------------------------------------------------------===//
+
+bool MatmulKAttr::isSerialized() const { return getLayouts() ? true : false; }
+
+bool MatmulKAttr::isIdentityLayout() const {
+  if (!isSerialized()) {
+    return false;
+  }
+  // TODO: Refactor below and reuse it for EncodingAttr.
+  ArrayAttr layoutsAttr = getLayouts();
+  if (!llvm::all_of(layoutsAttr.getValue(),
+                    llvm::IsaPred<SerializableEncodingAttrInterface>)) {
+    return false;
+  }
+  return llvm::all_of(layoutsAttr.getValue(), [](Attribute attr) {
+    auto serializableAttr =
+        llvm::dyn_cast<SerializableEncodingAttrInterface>(attr);
+    if (!serializableAttr) {
+      return false;
+    }
+    return serializableAttr.isIdentityLayout();
+  });
+
+}
+
+Attribute MatmulKAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
+  MLIRContext *ctx = getContext();
+  Builder b(ctx);
+  auto opTypeAttr = EncodingOpTypeAttr::get(ctx, EncodingOpType::matmul);
+  return EncodingAttr::get(
+      ctx, getOperandIndex(), opTypeAttr, getElementTypes(),
+      /*user_indexing_maps=*/ArrayAttr(),
+      /*round_dims_to=*/DenseI64ArrayAttr(), ArrayAttr::get(ctx, layouts));
+}
+
+Value MatmulKAttr::calculateStorageSizeInBytes(Location loc,
+                                                OpBuilder &builder,
+                                                RankedTensorType type,
+                                                ValueRange dynamicDims) const {
+  if (!isSerialized()) {
+    return nullptr;
+  }
+
+  // TODO: Refactor below and reuse it for EncodingAttr.
+  ArrayAttr layoutsAttr = getLayouts();
+  if (!llvm::all_of(layoutsAttr.getValue(),
+                    llvm::IsaPred<SerializableEncodingAttrInterface>)) {
+    return nullptr;
+  }
+
+  Value res;
+  for (auto attr :
+       layoutsAttr.getAsRange<SerializableEncodingAttrInterface>()) {
+    Value requestedSize =
+        attr.calculateStorageSizeInBytes(loc, builder, type, dynamicDims);
+    if (!res) {
+      res = requestedSize;
+      continue;
+    }
+    res = builder.create<arith::MaxUIOp>(loc, res, requestedSize);
+  }
+  return res;
+}
+
+//===---------------------------------------------------------------------===//
 // encoding.pad_encoding_layout
 //===---------------------------------------------------------------------===//
 
