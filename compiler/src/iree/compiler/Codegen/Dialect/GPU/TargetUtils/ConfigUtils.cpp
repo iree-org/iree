@@ -621,6 +621,8 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
+  // TODO(Max191): Drop this check for reshapes in the dispatch once we can
+  // codegen larger tile sizes with reshapes in the dispatch.
   bool hasReshapes = false;
   entryPoint->walk([&](Operation *opInEntryPoint) {
     if (isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp>(opInEntryPoint)) {
