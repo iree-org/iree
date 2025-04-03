@@ -104,6 +104,7 @@ iree_cc_library(
     "EraseDeadAllocAndStores.cpp"
     "EraseHALDescriptorTypeFromMemRef.cpp"
     "ExtractAddressComputation.cpp"
+    "FlattenVectorExtractInsertPatterns.cpp"
     "FlattenMemRefSubspanPass.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
     "FoldTensorExtractOpPass.cpp"
