@@ -211,35 +211,6 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
       return getOriginalType().getRank() - getIndexDepth();
     }
 
-    /// Utility to get the shape of the portion of `updates` that
-    /// is scattered into `original`.
-    ArrayRef<int64_t> getUpdateSliceShape() {
-      return getUpdateType().getShape().slice(getBatchRank(),
-                                              getUpdateSliceRank());
-    }
-
-    /// Utility to get the dimension in `updates` the corresponds
-    /// to the given dimension in `original`
-    int64_t convertOriginalDimToUpdatesDim(uint64_t dim) {
-      assert(dim >= 0 && dim < getOriginalType().getRank() &&
-             "expected dimension to be within original rank");
-      int64_t updateDim =
-          getUpdateType().getRank() - getOriginalType().getRank() + dim;
-      assert(updateDim >= getBatchRank() &&
-             "dim doesn't map to a dim in updates");
-      return updateDim;
-    }
-
-    /// Get the dimension in `original` that corresponds to the given
-    /// dimension in `original`.
-    int64_t convertUpdatesDimToOriginalDim(uint64_t dim) {
-      assert(dim >= getBatchRank() &&
-             "update batch dim doesn't map to original");
-      assert(dim < getUpdateType().getRank() &&
-             "expected dimension to be within updates rank");
-      return getOriginalType().getRank() - getUpdateType().getRank() + dim;
-    }
-
     bool isScalarUpdate() {
       return getUpdateSliceRank() == 0;
     }
