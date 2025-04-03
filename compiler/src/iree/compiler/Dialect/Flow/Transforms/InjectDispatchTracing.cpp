@@ -13,6 +13,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -31,27 +32,34 @@ static SmallVector<Value> filterTensorValues(ValueRange &&range) {
   return result;
 }
 
-static SmallVector<Value> getWithRowMajorLayout(RewriterBase &rewriter,
-                                                ArrayRef<Value> values) {
+/// Sets all Values in `values` to the row major layout by inserting
+/// flow.tensor.encode ops before any Value that has an encoding. Returns a
+/// list of booleans that are true for each Value that was decoded, and false
+/// otherwise.
+static SmallVector<int64_t> setToRowMajorLayout(OpBuilder &builder,
+                                                SmallVector<Value> &values) {
   SmallVector<Value> rowMajorTensors;
-  for (auto v : values) {
+  SmallVector<int64_t> decodedIndices;
+  for (auto [idx, v] : llvm::enumerate(values)) {
     auto rankedTensorType = dyn_cast<RankedTensorType>(v.getType());
     if (!rankedTensorType || !rankedTensorType.getEncoding()) {
       rowMajorTensors.push_back(v);
       continue;
     }
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPointAfterValue(v);
+    OpBuilder::InsertionGuard g(builder);
+    builder.setInsertionPointAfterValue(v);
     SmallVector<OpFoldResult> mixedSizes =
-        tensor::getMixedSizes(rewriter, v.getLoc(), v);
+        tensor::getMixedSizes(builder, v.getLoc(), v);
     SmallVector<Value> dynamicDimSizes;
     std::tie(std::ignore, dynamicDimSizes) = decomposeMixedValues(mixedSizes);
-    Value rowMajorTensor = rewriter.create<IREE::Flow::TensorEncodeOp>(
+    Value rowMajorTensor = builder.create<IREE::Flow::TensorEncodeOp>(
         v.getLoc(), rankedTensorType.dropEncoding(), v,
         /*operand_dims=*/dynamicDimSizes, /*result_dims=*/dynamicDimSizes);
     rowMajorTensors.push_back(rowMajorTensor);
+    decodedIndices.push_back(idx);
   }
-  return rowMajorTensors;
+  values = rowMajorTensors;
+  return decodedIndices;
 }
 
 namespace {
@@ -61,25 +69,52 @@ struct InjectDispatchTracingPass
           InjectDispatchTracingPass> {
   void runOnOperation() override {
     auto funcOp = getOperation();
-    IRRewriter rewriter(&getContext());
+    auto appendDecodedValuesToLabel = [](std::string str,
+                                         SmallVector<int64_t> decodedIndices) {
+      llvm::raw_string_ostream os(str);
+      if (!decodedIndices.empty()) {
+        os << " with {";
+        llvm::interleaveComma(decodedIndices, os);
+        os << "} decoded to row major layout";
+      }
+      return os.str();
+    };
     for (auto dispatchOp : funcOp.getFunctionBody().getOps<DispatchOp>()) {
       std::string entryPointName = dispatchOp.getEntryPointName();
 
       // Input tensors:
       OpBuilder builder(dispatchOp);
-      builder.create<IREE::Flow::TensorTraceOp>(
-          dispatchOp.getLoc(),
-          builder.getStringAttr(entryPointName + " inputs"),
-          getWithRowMajorLayout(rewriter,
-                                filterTensorValues(dispatchOp.getArguments())));
+      SmallVector<Value> inputValues =
+          filterTensorValues(dispatchOp.getArguments());
+      SmallVector<int64_t> decodedInputIndices =
+          setToRowMajorLayout(builder, inputValues);
+      std::string inputsLabelStr = appendDecodedValuesToLabel(
+          entryPointName + " inputs", decodedInputIndices);
+      StringAttr inputsLabel = builder.getStringAttr(inputsLabelStr);
+      builder.create<IREE::Flow::TensorTraceOp>(dispatchOp.getLoc(),
+                                                inputsLabel, inputValues);
 
       // Output tensors:
-      builder.setInsertionPointAfter(dispatchOp);
+      SmallVector<Value> resultTensorValues =
+          filterTensorValues(dispatchOp.getResults());
+      SmallVector<int64_t> decodedOutputIndices =
+          setToRowMajorLayout(builder, resultTensorValues);
+      std::string outputsLabelStr = appendDecodedValuesToLabel(
+          entryPointName + " outputs", decodedOutputIndices);
+
+      // Set insertion point to the last decoded value before creating the
+      // trace op.
+      Operation *lastResult = resultTensorValues.front().getDefiningOp();
+      DominanceInfo domInfo(funcOp);
+      for (Value v : resultTensorValues) {
+        if (domInfo.dominates(lastResult, v.getDefiningOp())) {
+          lastResult = v.getDefiningOp();
+        }
+      }
+      builder.setInsertionPointAfter(lastResult);
+      StringAttr outputsLabel = builder.getStringAttr(outputsLabelStr);
       builder.create<IREE::Flow::TensorTraceOp>(
-          dispatchOp.getLoc(),
-          builder.getStringAttr(entryPointName + " outputs"),
-          getWithRowMajorLayout(rewriter,
-                                filterTensorValues(dispatchOp.getResults())));
+          dispatchOp.getLoc(), outputsLabel, resultTensorValues);
     }
 
     RewritePatternSet patterns(&getContext());
