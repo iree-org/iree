@@ -7,7 +7,6 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 
 #include "llvm/ADT/SmallVector.h"
-#include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinAttributes.h"
