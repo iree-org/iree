@@ -13,6 +13,7 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "mlir/Interfaces/VectorInterfaces.h"
 
 // clang-format off: must be included after all LLVM/MLIR headers
 

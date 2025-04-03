@@ -7,6 +7,7 @@
 #ifndef IREE_DIALECT_VECTOREXT_OPS
 #define IREE_DIALECT_VECTOREXT_OPS
 
+include "mlir/Interfaces/VectorInterfaces.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtBase.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtAttrs.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.td"
@@ -111,6 +112,132 @@ def IREEVectorExt_ToSIMTOp : IREEVectorExt_PureOp<"to_simt",
   let extraClassDeclaration = [{}];
   let assemblyFormat = "$input attr-dict `:` type($input) `->` type($output)";
   let hasFolder = 1;
+}
+
+def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
+    DeclareOpInterfaceMethods<VectorTransferOpInterface>,
+    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+    DeclareOpInterfaceMethods<ConditionallySpeculatable>,
+    AttrSizedOperandSegments
+  ]>,
+  Arguments<(ins AnyShaped:$source,
+                 Variadic<Index>:$indices,
+                 Variadic<VectorOfAnyRankOf<[Index]>>:$index_vecs,
+                 BoolArrayAttr:$indexed,
+                 AffineMapArrayAttr:$indexed_maps,
+                 AffineMapAttr:$permutation_map,
+                 AnyType:$padding,
+                 Optional<VectorOfNonZeroRankOf<[I1]>>:$mask,
+                 BoolArrayAttr:$in_bounds)>,
+  Results<(outs AnyVectorOfAnyRank:$vector)> {
+
+  let summary = "Gathers a supervector from memory into an SSA vector value.";
+
+  let description = [{
+    The iree_vector_ext.transfer_gather operation provides a structured
+    abstraction for gathers, by preserving the iteration space mapping between
+    the result vector and the memory dimensions being indexed.
+
+    The operation is a generalization of `vector.transfer_read` op, where the
+    slice from which the read is performed is not guranteed to be contigious,
+    and instead how the slice is gathered is defined explicitly in the
+    operation.
+
+    The operation can be thought of as:
+      1. A contigious slice gathered from the source as described by the operation
+      2. A `vector.transfer_read` on the contigious slice
+
+    The operation defines `permutation_map`, `padding`, `mask`, `in_bounds` in
+    the same way as `vector.transfer_read` defines, but on the inferred
+    contigious slice.
+
+    The other parameters of the operation define how the contigious slice is
+    gathered from the source. `indices` define a base to offset the source by.
+    `indexed` defines for each dimension if the dimension is gathered or
+    contigious.
+
+    The `indices` contains a base to offset the source by. The `indexed` array
+    defines if a dimension is gathered or not. For example, for the following
+    gather:
+
+    ```
+    slice[i, j, k] = source[i + i_offset][j][indices[i][j][k]]
+    ```
+
+    The operation would represent this as:
+
+    ```
+    indices = %i_offset, 0, 0
+    indexed = [False, False, True]
+    ```
+
+    For every dimension that is gathered, the operation defines how it is
+    gathered. For each gathered dimension, the operation expects a vector of
+    indices in `index_vecs` to act as a source of indices for that dimension
+    and an AffineMap in `index_maps` describing how this source of indices is
+    indexed. For example, for the following gather:
+
+    ```
+    slice[i, j, k] = source[i][indices0[i] + offset][indices1[j, k]]
+    ```
+
+    The indexing would be described by:
+
+    ```
+    indices      = 0, %offset, 0
+    indexed      = [False, True, True]
+    index_vecs   = %index_vec1, %index_vec2
+    index_maps = [
+      affine_map<(i, j, k) -> (i),
+      affine_map<(i, j, k) -> (j, k)
+    ]
+    ```
+
+    With these additional parameters, the operation can define a supervector
+    read from a non-contigious slice. For example:
+
+    ```
+    source: memref<8192x8x16xf32>
+    indices0 : vector<2xindex>
+    indices1 : vector<4x8xindex>
+
+    slice[i, j, k] = source[indices0[k]][j][indices1[i, j]]
+    vector = read(slice) : memref<8192x8x16xf32> -> vector<16x8x2xf32>
+    ```
+
+    Can be represented by:
+
+    ```
+    %vector = vector.transfer_gather %source[0, 0, 0](%indices0, %indices1) {
+      gather_dims = [0, 2],
+      index_maps = [
+        affine_map<(i, j, k) -> (k)>,
+        affine_map<(i, j, k) -> (i, j)>
+      ],
+      in_bounds = [true, true, true],
+      permutation_map = affine_map<(i, j, k) -> (k, j, i)>
+    } : memref<8192x8x16xf32> -> vector<16x8x2xf32>
+    ```
+
+    The crucial structure of the operation relies on the index_vec and
+    the result vector's indexing being defined based on the dimensions of the
+    memory. This mapping can be exploited to simplify gathered dimensions
+    to contigious dimensions.
+  }];
+
+  let extraClassDeclaration = [{
+    // MaskableOpInterface methods.
+    bool supportsPassthru() { return true; }
+
+    SmallVector<AffineMap> getIndexedMapsArray() {
+      return llvm::to_vector(getIndexedMaps().getAsValueRange<AffineMapAttr>());
+    }
+  }];
+
+  let hasCanonicalizer = 1;
+  let hasCustomAssemblyFormat = 1;
+  let hasFolder = 1;
+  let hasVerifier = 1;
 }
 
 #endif  // IREE_DIALECT_VECTOREXT_OPS
