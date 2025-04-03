@@ -470,11 +470,13 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
     isOutputChannelFirst = true;
 
   bool isBatchDimLast = false;
-  std::optional<int64_t> batchFirstDim = outputMap.getResultPosition(
-      getAffineDimExpr(convDims.batch[0], outputMap.getContext()));
-  if (batchFirstDim && outputChannelLastDim.value() < batchFirstDim.value())
-    isBatchDimLast = true;
-
+  int64_t numBDims = (convDims.batch).size();
+  if (numBDims != 0) {
+    std::optional<int64_t> batchFirstDim = outputMap.getResultPosition(
+        getAffineDimExpr(convDims.batch[0], outputMap.getContext()));
+    if (batchFirstDim && outputChannelLastDim.value() < batchFirstDim.value())
+      isBatchDimLast = true;
+  }
   SmallVector<int64_t> filterkPos;
   for (auto reductionDim : reductionDims) {
     std::optional<int64_t> maybeDim = filterMap.getResultPosition(
@@ -537,7 +539,6 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
     }
   }
 
-  int64_t numBDims = (convDims.batch).size();
   int64_t numMDims = (convDims.outputImage).size();
   int64_t numNDims = (convDims.outputChannel).size();
   int64_t numParallelDims = numBDims + numMDims + numNDims;

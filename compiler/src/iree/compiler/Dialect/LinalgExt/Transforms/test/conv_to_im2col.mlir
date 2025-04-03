@@ -325,3 +325,37 @@ util.func public @conv_2d_hwcn_hwcf(%arg0: tensor<26x18x16x288xf32>, %arg1: tens
 // CHECK:          arith.addf
 // CHECK:      } -> tensor<3x3x288x288xf32>
 // CHECK:      util.return %[[MATMUL]] : tensor<3x3x288x288xf32>
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1 + d4, d2 + d5, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d4, d5, d0, d3)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d0)>
+util.func public @conv_nhwc_hwfc_nobatch(%arg0: tensor<16x16x4xf32>, %arg1: tensor<3x3x16x4xf32>, %arg2: tensor<14x14x16xf32>) -> tensor<14x14x16xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<16x16x4xf32>, tensor<3x3x16x4xf32>) outs(%arg2 : tensor<14x14x16xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %3 = arith.mulf %in, %in_0 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<14x14x16xf32>
+  util.return %0 : tensor<14x14x16xf32>
+}
+
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d3, d2, d4)>
+// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+// CHECK:      util.func public @conv_nhwc_hwfc_nobatch(
+// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<16x16x4xf32>
+// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<3x3x16x4xf32>
+// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<14x14x16xf32>
+// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<14x14x9x4xf32>
+// CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
+// CHECK-SAME:   m_offset = [0, 0] * [14, 1] k_offset = [0, 0] * [4, 1] batch_pos = []
+// CHECK-SAME:   ins(%[[ARG0]] : tensor<16x16x4xf32>)
+// CHECK-SAME:   outs(%[[EMPTY]] : tensor<14x14x9x4xf32>) -> tensor<14x14x9x4xf32>
+// CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG1]] {{\[}}[0, 1], [2], [3]] : tensor<3x3x16x4xf32> into tensor<9x16x4xf32>
+// CHECK:      %[[MATMUL:.+]] = linalg.generic
+// CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]
+// CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<14x14x9x4xf32>, tensor<9x16x4xf32>)
+// CHECK:      util.return %[[MATMUL]] : tensor<14x14x16xf32>
