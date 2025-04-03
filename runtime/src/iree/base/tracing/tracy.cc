@@ -92,6 +92,9 @@ static char* iree_tracing_tracy_source_file_callback(void* user_data,
 }
 
 void iree_tracing_tracy_initialize() {
+#ifdef TRACY_MANUAL_LIFETIME
+  tracy::StartupProfiler();
+#endif  // TRACY_MANUAL_LIFETIME
   // Register a single source provider callback with Tracy. Tracy only supports
   // one at a time and the callback must remain valid until program exit.
   tracy::Profiler::SourceCallbackRegister(
@@ -111,6 +114,9 @@ void iree_tracing_tracy_deinitialize() {
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 #endif  // IREE_PLATFORM_*
+#ifdef TRACY_MANUAL_LIFETIME
+  tracy::ShutdownProfiler();
+#endif  // TRACY_MANUAL_LIFETIME
 }
 
 void iree_tracing_publish_source_file(const void* filename,
