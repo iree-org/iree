@@ -16,6 +16,14 @@ constexpr char kNoEncodingLayoutResolverName[] = "none";
 constexpr char kPadEncodingLayoutResolverName[] = "pad";
 constexpr char kDataTilingEncodingLayoutResolverName[] = "data-tiling";
 
+struct L1CacheInfo {
+  uint32_t cacheLineBytes;
+  uint32_t cacheSets;
+};
+
+// Returns the L1 cache information for the `target`.
+std::optional<L1CacheInfo> getL1CacheInfo(TargetAttr target);
+
 // Returns a TargetAttr to target Metal via SPIR-V CodeGen.
 TargetAttr getMetalTargetDetails(MLIRContext *context);
 

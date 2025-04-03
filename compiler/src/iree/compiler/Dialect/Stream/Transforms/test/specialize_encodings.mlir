@@ -89,7 +89,19 @@ util.func public @gpu_with_encoding_layout(%d0: index, %d1: index) -> index {
 #map2 = affine_map<(m, n, k) -> (m, n)>
 #map3 = affine_map<(m, n, k) -> (n, k)>
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip",
-  iree.encoding.resolver = #iree_gpu.gpu_pad_layout<cache_line_bytes = 128, cache_sets = 4>, ukernels = "none"}>
+  iree.encoding.resolver = #iree_gpu.gpu_pad_layout<>,
+  iree.gpu.target = #iree_gpu.target<arch = "gfx942",
+                                     features = "",
+                                     wgp = <compute = fp32,
+                                            storage =  b32,
+                                            subgroup =  none,
+                                            dot =  none,
+                                            mma = [<MFMA_F32_16x16x4_F32>],
+                                            subgroup_size_choices = [64],
+                                            max_workgroup_sizes = [1024, 1024, 1024],
+                                            max_thread_count_per_workgroup = 1024,
+                                            max_workgroup_memory_bytes = 65536,
+                                            max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_rocm_hsaco_fb]> : !hal.device
 #encodingA = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map1, #map2]>
 #encodingB = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map1, #map2]>
