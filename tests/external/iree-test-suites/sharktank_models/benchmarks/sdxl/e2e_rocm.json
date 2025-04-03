@@ -1,0 +1,44 @@
+{
+    "inputs": [
+        "1x4x128x128xf16",
+        "1xf16",
+        "1x64xi64",
+        "1x64xi64",
+        "1x64xi64",
+        "1x64xi64"
+    ],
+    "compilation_required": true,
+    "compiled_file_name": "sdxl_full_pipeline_fp16_rocm",
+    "compile_flags": [
+        "--iree-global-opt-propagate-transposes=true",
+        "--iree-codegen-llvmgpu-use-vector-distribution",
+        "--iree-codegen-gpu-native-math-precision=true",
+        "--iree-hip-waves-per-eu=2",
+        "--iree-opt-outer-dim-concat=true",
+        "--iree-llvmgpu-enable-prefetch",
+        "--iree-hal-target-backends=rocm"
+    ],
+    "mlir_file_name": "sdxl_pipeline_bench_f16.mlir",
+    "modules": [
+        "sdxl_clip",
+        "sdxl_unet_fp16",
+        "sdxl_vae"
+    ],
+    "function_run": "tokens_to_image",
+    "benchmark_flags": [
+        "--benchmark_repetitions=10",
+        "--benchmark_min_warmup_time=3.0",
+        "--device_allocator=caching"
+    ],
+    "device": "hip",
+    "golden_time_tolerance_multiplier": {
+        "mi250": 1.3,
+        "mi300": 1.1,
+        "mi308": 1.1
+    },
+    "golden_time_ms": {
+        "mi250": 1100,
+        "mi300": 305.0,
+        "mi308": 740.0
+    }
+}
