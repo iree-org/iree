@@ -70,8 +70,7 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
     MLIRContext *context = &getContext();
     IRRewriter rewriter(context);
 
-    // Run CSE to eliminate common encoding ops, and run the canonicalization
-    // patterns to remove redundantly returned results.
+    // Run CSE to eliminate common encoding ops.
     DominanceInfo domInfo;
     mlir::eliminateCommonSubExpressions(rewriter, domInfo, funcOp);
 
@@ -114,7 +113,8 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
     }
 
     // Dynamic dims may have dominance issues after pulling encoding ops into
-    // producer dispatch regions, so we need to resolve tensor.dim ops.
+    // producer dispatch regions, so we need to resolve tensor.dim ops., Also
+    // run the canonicalization patterns to remove redundantly returned results.
     GreedyRewriteConfig config;
     config.cseConstants = false;
     RewritePatternSet patterns(context);
