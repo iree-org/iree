@@ -11,7 +11,6 @@ include "mlir/Interfaces/VectorInterfaces.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtBase.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtAttrs.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.td"
-include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
