@@ -265,7 +265,26 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
          "getTiledImplementation",
          "generateResultTileValue"]>]> {
   let summary = "Gather operator";
-  let description = [{ TODO }];
+  let description = [{
+    Takes two inputs (`source` and `indices`) and outputs value (`output`).
+    The operation returns the value at the slices specified by `indices` by
+    combining the gathered value from `source` with the value in `output`
+    using the computation specified in `region`. The `region` specifies a binary
+    operation of signature `(T, T) -> T`, where `T` is the element-type of
+    `source` & `output`. The first argument is from `source` and the second is
+    from `output`.
+
+    The size of the `dimension_map` attribute is used to determine how many
+    indices are used to index into `source`, i.e. `index_depth`. The
+    `dimension_map` attribute describes which index value maps to which dimension
+    in the destination.
+
+    This operation preforms the opposite operation of `iree_linalg_ext.scatter`.
+    Instead of scattering `updates` into `original`, it gathers the values from
+    `source` into `output` using the indices in `indices`. See the documentation
+    on `iree_linalg_ext.scatter` for more details regarding the indexing/shape
+    semantics.
+  }];
   let arguments = (ins
       Variadic<AnyRankedTensorOrMemRefType>:$inputs,
       Variadic<AnyRankedTensorOrMemRefType>:$outputs,
@@ -285,20 +304,24 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
     static constexpr unsigned kIndicesOpNum = 1;
     static constexpr unsigned kResultOpNum = 2;
 
+    /// Utility to get the number of indices used to index into `source`.
     int64_t getIndexDepth() {
       return getDimensionMap().size();
     }
 
+    /// Utility to get rank of the portion of `output` that is contiguous.
     int64_t getOutputSliceRank() {
       return getSourceType().getRank() - getIndexDepth();
     }
 
+    /// Utility to get the rank of the portion of `indices` that represents the
+    /// batch dimensions.
     int64_t getBatchRank() {
       return getOutputType().getRank() - getOutputSliceRank();
     }
 
     Value getSource(){
-      return getDpsInputOperand(0)->get();
+      return getOperand(kSourceOpNum);
     }
 
     ShapedType getSourceType(){
@@ -306,7 +329,7 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
     }
 
     Value getIndices(){
-      return getDpsInputOperand(1)->get();
+      return getOperand(kIndicesOpNum);
     }
 
     ShapedType getIndicesType(){
@@ -314,13 +337,14 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
     }
 
     Value getOutput(){
-      return getDpsInitOperand(0)->get();
+      return getOperand(kResultOpNum);
     }
 
     ShapedType getOutputType(){
       return cast<ShapedType>(getOutput().getType());
     }
 
+    /// For DPS interface.
     MutableOperandRange getDpsInitsMutable() {
       return getOutputsMutable();
     }

@@ -133,6 +133,11 @@ static bool isSmallerThan(ArrayRef<int64_t> sourceShape,
                       });
 }
 
+/// Helper function to verify both `scatter` and `gather`. Since both ops share
+/// the same sementics, we can use the same function to verify them. Note: this
+/// is written from the perspective of `scatter` op. For gather, `updateType`
+/// maps to the type of the output and `originalType` maps to the type of the
+/// `source`.
 template <typename OpTy>
 static LogicalResult
 verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
