@@ -1,6 +1,10 @@
 # NOTE: not using bazel-to-cmake here because of the runtime unified rule.
 # We should figure out how to make bazel/cmake consistent with that.
 
+if(NOT IREE_BUILD_SAMPLES)
+  return()
+endif()
+
 iree_cc_binary(
   NAME
     hello_world_file
