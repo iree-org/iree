@@ -1086,8 +1086,15 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
 
   FunctionLikeNest funcPassManager(modulePassManager);
 
+  LLVMGPUVectorLoweringPassOptions options;
+  options.unroll = true;
+  options.flatten = true;
+  auto vectorLoweringPass = [options]() -> std::unique_ptr<Pass> {
+    return createLLVMGPUVectorLoweringPass(options);
+  };
+
   funcPassManager.addPass(createFoldTensorExtractOpPass)
-      .addPass(createLLVMGPUVectorLoweringPass)
+      .addPass(vectorLoweringPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
       .addPass(createExpandGPUOpsPass);
