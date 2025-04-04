@@ -211,22 +211,22 @@ public:
     }
     SmallVector<Type> elemTypes = {lhsElemType, rhsElemType, outElemType};
 
-    auto narrowDim = IREE::Encoding::getMatmulNarrowDim(linalgOp, padFactor);
+    FailureOr<IREE::Encoding::MatmulDims> maybeDims =
+        IREE::Encoding::getMatmulDims(linalgOp);
+    if (failed(maybeDims)) {
+      return failure();
+    }
+    IREE::Encoding::MatmulDims dims = std::move(maybeDims.value());
 
     Location loc = linalgOp.getLoc();
     SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
 
     auto opType = IREE::Encoding::EncodingOpType::matmul;
     auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
-      SmallVector<int64_t> roundDimsTo(3, padFactor);
-      if (narrowDim.isM()) {
-        roundDimsTo[0] = llvm::PowerOf2Ceil(narrowDim.size);
-      }
-      if (narrowDim.isN()) {
-        roundDimsTo[1] = llvm::PowerOf2Ceil(narrowDim.size);
-      }
-      auto encoding = EncodingAttr::get(linalgOp.getContext(), operandIndex,
-                                        opType, elemTypes, maps, roundDimsTo);
+      SmallVector<int64_t> iterationSizes = {dims.m, dims.n, dims.k};
+      auto encoding =
+          EncodingAttr::get(linalgOp.getContext(), operandIndex, opType,
+                            elemTypes, maps, iterationSizes);
       return setEncoding(rewriter, loc, src, encoding);
     };
     Value encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);
