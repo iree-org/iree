@@ -653,6 +653,8 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
         LinalgExtOpInterface<IREE::LinalgExt::ScanOp>>(*ctx);
     IREE::LinalgExt::ScatterOp::attachInterface<
         LinalgExtOpInterface<IREE::LinalgExt::ScatterOp>>(*ctx);
+    IREE::LinalgExt::GatherOp::attachInterface<
+        LinalgExtOpInterface<IREE::LinalgExt::GatherOp>>(*ctx);
     IREE::LinalgExt::SortOp::attachInterface<
         LinalgExtOpInterface<IREE::LinalgExt::SortOp>>(*ctx);
     IREE::LinalgExt::TopkOp::attachInterface<
