@@ -49,6 +49,12 @@ private:
   const IREE::Codegen::LayoutAttrInterface layoutAttr;
 };
 
+/// TypeConverter used to flatten a multiple-dimensional memref into 1-d.
+class MemRefFlatteningConverter : public mlir::TypeConverter {
+public:
+  MemRefFlatteningConverter(mlir::MLIRContext *ctx);
+};
+
 /// Conversion target to use for for materializing the encoding.
 struct MaterializeEncodingConversionTarget : public ConversionTarget {
   MaterializeEncodingConversionTarget(MLIRContext &context);
