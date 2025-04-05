@@ -87,10 +87,9 @@ struct PromoteContractOperands final
 
 SmallVector<int64_t> getWithLeadingOnes(VectorType vectorType) {
   SmallVector<int64_t> nativeSize(vectorType.getRank(), 1);
-  if (vectorType.getRank() <= 1) {
-    return nativeSize;
+  if (vectorType.getRank() > 0) {
+    nativeSize.back() = vectorType.getShape().back();
   }
-  nativeSize.back() = vectorType.getShape().back();
   return nativeSize;
 }
 
