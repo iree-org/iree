@@ -117,7 +117,7 @@ struct SwapSetPrioWithMFMA : public OpRewritePattern<ROCDL::SetPrioOp> {
 
     while (remainingToSwap > 0 && (current = current->getNextNode())) {
       if (isa<mlir::amdgpu::MFMAOp>(current)) {
-        remainingToSwap--;
+        --remainingToSwap;
         mfmaToSwap = current;
       }
     }
