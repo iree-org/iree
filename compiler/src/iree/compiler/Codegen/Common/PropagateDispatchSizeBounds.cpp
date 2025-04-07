@@ -64,10 +64,16 @@ static void foldConstantBounds(
 
 static void applyBounds(FunctionOpInterface funcOp,
                         ArrayRef<std::optional<int64_t>> workgroupSizes,
-                        ArrayRef<std::optional<int64_t>> workgroupCounts) {
+                        ArrayRef<std::optional<int64_t>> workgroupCounts,
+                        std::optional<uint64_t> subgroupSize) {
   Builder b(funcOp->getContext());
   funcOp->walk([&](Operation *op) {
     TypeSwitch<Operation *>(op)
+        .Case([&](gpu::LaneIdOp laneIdOp) {
+          if (subgroupSize) {
+            laneIdOp.setUpperBoundAttr(b.getIndexAttr(*subgroupSize));
+          }
+        })
         .Case([&](gpu::ThreadIdOp tidOp) {
           std::optional<int64_t> bound =
               workgroupSizes[static_cast<uint32_t>(tidOp.getDimension())];
@@ -132,6 +138,8 @@ struct PropagateDispatchSizeBoundsPass final
     std::optional<SmallVector<int64_t>> staticWorkgroupSize =
         getWorkgroupSize(funcOp);
 
+    std::optional<uint64_t> subgroupSize = getGPUSubgroupSize(funcOp);
+
     // Late in codegen, we've reconciled the workgroup size onto the export op.
     if (std::optional<IREE::HAL::ExecutableExportOp> exportOp =
             getEntryPoint(funcOp)) {
@@ -140,6 +148,11 @@ struct PropagateDispatchSizeBoundsPass final
         staticWorkgroupSize =
             llvm::map_to_vector(exportWorkgroupSize->getAsRange<IntegerAttr>(),
                                 [](IntegerAttr a) { return a.getInt(); });
+      }
+
+      if (std::optional<uint64_t> exportSubgroupSize =
+              exportOp->getSubgroupSizeAsUInt()) {
+        subgroupSize = exportSubgroupSize;
       }
     }
 
@@ -162,7 +175,7 @@ struct PropagateDispatchSizeBoundsPass final
     }
 
     foldConstantBounds(funcOp, staticWorkgroupSize, staticWorkgroupCounts);
-    applyBounds(funcOp, workgroupSizes, workgroupCounts);
+    applyBounds(funcOp, workgroupSizes, workgroupCounts, subgroupSize);
   }
 };
 } // namespace
