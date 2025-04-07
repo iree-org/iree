@@ -119,6 +119,20 @@ def LLVMGPUVectorDistributePass :
 def LLVMGPUVectorLoweringPass :
     InterfacePass<"iree-llvmgpu-vector-lowering", "mlir::FunctionOpInterface"> {
   let summary = "Pass to lower Vector ops before conversion to LLVM.";
+  let description = [{
+     This pass lowers, unrolls, and flattens higher-level vector operations with
+     rank>1 vector operand/results, to a smaller set of rank-1 vector operations
+     whose operand/result sizes correspond to HW vector instructions.
+  }];
+
+  let options = [
+    Option<"unroll", "unroll", "bool", /*default=*/"true",
+           "Controls whether to perform unrolling after inital vector lowering.">,
+    Option<"flatten", "flatten",
+           "bool", /*default=*/"true",
+           "Controls whether to perform flattening after vector unrolling.">,
+  ];
+
 }
 
 def LLVMGPUVectorToGPUPass :

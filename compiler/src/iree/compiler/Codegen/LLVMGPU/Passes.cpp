@@ -1052,6 +1052,7 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
 
 static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
                                     bool forROCDL) {
+
   modulePassManager.addPass(
       createConvertHALDescriptorTypeToGPUAddressSpacePass());
   modulePassManager.addPass(createCanonicalizerPass());
@@ -1083,8 +1084,18 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   modulePassManager.addPass(createIREEBufferizeConstantsPass());
 
   FunctionLikeNest funcPassManager(modulePassManager);
+
+  LLVMGPUVectorLoweringPassOptions options;
+  options.unroll = true;
+  options.flatten = true;
+  auto vectorLoweringPass = [options]() -> std::unique_ptr<Pass> {
+    return createLLVMGPUVectorLoweringPass(options);
+  };
+
   funcPassManager.addPass(createFoldTensorExtractOpPass)
-      .addPass(createLLVMGPUVectorLoweringPass)
+      .addPass(vectorLoweringPass)
+      .addPass(createCanonicalizerPass)
+      .addPass(createCSEPass)
       .addPass(createExpandGPUOpsPass);
 
   // This pass needs to run before SCF -> CF.

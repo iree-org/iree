@@ -109,6 +109,20 @@ createTileAndDistributeToWorkgroupsWithReordering(bool transposeWorkgroup);
 void populateConcretizePadResultShapePatterns(
     RewritePatternSet &patterns, ArrayRef<int64_t> numWorkgroups = {});
 
+/// Collect patterns that reduce the rank of vector.extract and vector.insert
+/// operations. One pattern replaces vector.extract with vector.extract/
+/// vector.extract_strided_slice operations with operands/results that are
+/// scalar or rank-1. Another pattern does the analagous transformation for
+/// vector.insert operations. vector.shape_cast operations are inserted before
+/// and after.
+///
+/// Note that these patterns should only be used with a GreedyRewriteConfig
+/// with folding disabled. This is because vector.extract has a folder which
+/// causes no fixed point to be reached. The patterns collected here all
+/// reduce the sum of the ranks of vector extract and insert operations.
+void populateFlattenVectorExtractInsertPatterns(RewritePatternSet &,
+                                                PatternBenefit = 1);
+
 /// Populates `patterns` with patterns to fold `affine.min` ops in tiled and
 /// distributed loops.
 void populateFoldAffineMinInDistributedLoopsPatterns(
@@ -137,6 +151,40 @@ void populateVectorizePadPatterns(RewritePatternSet &patterns,
 /// read and write ops.
 void populateVectorTransferTensorSliceTransforms(RewritePatternSet &patterns,
                                                  PatternBenefit benefit = 1);
+
+/// Add a pattern to combine instructions across scf.for boundary. It is common
+/// when doing incremental lowering to generate transient ops that cancel each
+/// other out. Canonicalization usually clean up those operations. When the
+/// value is loop carried, MLIR canonicalization currently doesn't remove the
+/// redundant operations.
+///
+/// The pattern added here provides a workaround to MLIR's limitation, and does
+/// ad hoc clean up of instructions found in IREE. Once we have a more general
+/// mechanism in MLIR this pattern can be completely removed.
+///
+/// This pattern does this kind of transformation on scf.for:
+/// ```
+/// %21 = vector.shape_cast %20 : vector<4xf32> to vector<1x4xf32>
+/// %22 = scf.for %arg3 = %c0 to %c4096 step %c4 iter_args(%arg4 = %21)
+///    -> vector<1x4xf32> {
+///    [...]
+///    %100 = vector.shape_cast %arg4 : vector<1x4xf32> to vector<4xf32>
+///    [...]
+///    %109 = vector.shape_cast %108 : vector<4xf32> to vector<1x4xf32>
+///    scf.yield %109 : vector<1x4xf32>
+///  }
+///  %24 = vector.shape_cast %22 : vector<1x4xf32> to vector<4xf32>
+/// ```
+/// ->
+/// ```
+/// %22 = scf.for %arg3 = %c0 to %c4096 step %c4 iter_args(%arg4 = %20)
+///    -> vector<4xf32> {
+///    [...]
+///    scf.yield %108 : vector<4xf32>
+///  }
+/// ```
+void populateForOpInductionVarShapePatterns(RewritePatternSet &,
+                                            PatternBenefit = 1);
 
 //----------------------------------------------------------------------------//
 // Register CodeGen Common Passes
