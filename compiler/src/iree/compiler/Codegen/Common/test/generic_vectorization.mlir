@@ -1,6 +1,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization))" --split-input-file %s | FileCheck %s
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{enable-vector-masking=true vectorize-padding=true}))" --split-input-file %s | FileCheck %s -check-prefix=CHECK-MASK
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{fold-cast-into-contract=true}))" --split-input-file %s | FileCheck %s -check-prefix=CHECK-FOLD
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{vectorize-to-transfer-gather=true}))" --split-input-file %s | FileCheck %s --check-prefix=CHECK-GATHER
 
 func.func @matmul(%lhs: tensor<3x4xf16>, %rhs: tensor<4x5xf16>, %acc: tensor<3x5xf32>) -> tensor<3x5xf32> {
   %result = linalg.matmul ins(%lhs, %rhs: tensor<3x4xf16>, tensor<4x5xf16>) outs(%acc: tensor<3x5xf32>) -> tensor<3x5xf32>
@@ -533,3 +534,99 @@ func.func @depthwise_conv_fold_away_masking(%arg0: tensor<1x68x120x96xf32>, %arg
 // CHECK-MASK:     vector.fma
 // CHECK-MASK-NOT: vector.create_mask
 // CHECK-MASK-NOT: vector.constant_mask
+
+// -----
+
+!storage = tensor<8192x8xf16>
+!ind     = tensor<128xi64>
+!x       = tensor<128x8xf16>
+
+#gather = {
+    indexing_maps = [affine_map<(page, vec) -> (page)>,
+                     affine_map<(page, vec) -> (page, vec)>],
+    iterator_types = ["parallel", "parallel"]
+}
+
+func.func @paged_gather_read(%storage : !storage, %ind: !ind) -> !x {
+  %x = tensor.empty() : !x
+  %x_g = linalg.generic #gather
+         ins(%ind : !ind)
+         outs(%x : !x) {
+  ^bb0(%page: i64, %out: f16):
+    %pageidx = arith.index_cast %page : i64 to index
+    %vec   = linalg.index 1 : index
+    %extracted = tensor.extract %storage[%pageidx, %vec] : !storage
+    linalg.yield %extracted : f16
+  } -> !x
+  return %x_g : !x
+}
+
+// CHECK-GATHER-LABEL: @paged_gather_read
+// CHECK-GATHER-SAME: %[[ARG0:.+]]: tensor<8192x8xf16>, %[[ARG1:.+]]: tensor<128xi64>
+// CHECK-GATHER: %[[INDEX_LOAD:.+]] = vector.transfer_read %[[ARG1]]
+// CHECK-GATHER: %[[INDEX_CAST:.+]] = arith.index_cast %[[INDEX_LOAD]] : vector<128xi64> to vector<128xindex>
+// CHECK-GATHER: %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[ARG0]]
+// CHECK-GATHER-SAME: [%[[INDEX_CAST]]: vector<128xindex>, None]
+// CHECK-GATHER: vector.transfer_write %[[GATHER]], %{{.*}}
+
+// -----
+
+!storage = tensor<8192x8xf16>
+!x       = tensor<128x8xf16>
+
+#gather = {
+    indexing_maps = [affine_map<(page, vec) -> (page, vec)>],
+    iterator_types = ["parallel", "parallel"]
+}
+
+func.func @contigious_gather_read(%storage : !storage) -> !x {
+  %x = tensor.empty() : !x
+  %x_g = linalg.generic #gather
+         outs(%x : !x) {
+  ^bb0(%out: f16):
+    %pageidx = linalg.index 0 : index
+    %vec   = linalg.index 1 : index
+    %extracted = tensor.extract %storage[%pageidx, %vec] : !storage
+    linalg.yield %extracted : f16
+  } -> !x
+  return %x_g : !x
+}
+
+// CHECK-GATHER-LABEL: @contigious_gather_read
+// CHECK-GATHER-SAME: %[[ARG0:.+]]: tensor<8192x8xf16>
+// CHECK-GATHER: %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[ARG0]]
+// CHECK-GATHER-SAME: [None, None]
+// CHECK-GATHER: vector.transfer_write %[[GATHER]], %{{.*}}
+
+// -----
+
+!storage = tensor<8192x8xf16>
+!ind     = tensor<128xi64>
+!x       = tensor<128x8xf16>
+
+#gather = {
+    indexing_maps = [affine_map<(page, vec) -> (page)>,
+                     affine_map<(page, vec) -> (page, vec)>],
+    iterator_types = ["parallel", "parallel"]
+}
+
+func.func @negative_strided_paged_gather_read(%storage : !storage, %ind: !ind) -> !x {
+  %x = tensor.empty() : !x
+  %c2 = arith.constant 2 : index
+  %x_g = linalg.generic #gather
+         ins(%ind : !ind)
+         outs(%x : !x) {
+  ^bb0(%page: i64, %out: f16):
+    %pageidx = arith.index_cast %page : i64 to index
+    %vec   = linalg.index 1 : index
+    %strided_vec = arith.muli %vec, %c2 : index
+    %extracted = tensor.extract %storage[%pageidx, %strided_vec] : !storage
+    linalg.yield %extracted : f16
+  } -> !x
+  return %x_g : !x
+}
+
+// For now, the vectorizer does not walk back on binary ops to find a mapping
+// from the iteration space to the memory space. This can be improved in future.
+// CHECK-GATHER-LABEL: @negative_strided_paged_gather_read
+// CHECK-GATHER: linalg.generic
