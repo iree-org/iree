@@ -187,7 +187,7 @@ def MatmulKAttr : IREEEncoding_Attr<"MatmulK"> {
   let assemblyFormat = "`<` struct(params) `>`";
 
   let parameters = (ins
-    "DenseI32ArrayAttr":$k_dims,
+    "DenseI32ArrayAttr":$k_dims
   );
 }
 
