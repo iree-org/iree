@@ -36,7 +36,7 @@ module attributes {transform.with_named_sequence} {
     util.return %0 : i32
   }
   transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
-    %func = transform.util.get_sibling_symbol @double_func : !transform.any_op
+    %func = transform.util.lookup_nearest_symbol_from_self @double_func : !transform.any_op
     %mul = transform.structured.match ops{["arith.muli"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %in = transform.get_operand %mul[0] : (!transform.any_op) -> !transform.any_value
     %out = transform.get_result %mul[0] : (!transform.any_op) -> !transform.any_value
@@ -76,7 +76,7 @@ module attributes {transform.with_named_sequence} {
     util.return %0 : i32
   }
   transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
-    %func = transform.util.get_sibling_symbol @double_func : !transform.any_op
+    %func = transform.util.lookup_nearest_symbol_from_self @double_func : !transform.any_op
     %mul = transform.structured.match ops{["arith.muli"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %in = transform.get_operand %mul[0] : (!transform.any_op) -> !transform.any_value
     %out = transform.get_result %mul[0] : (!transform.any_op) -> !transform.any_value
