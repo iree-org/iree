@@ -5472,7 +5472,8 @@ form of a lowering config, offering flexibility at the cost of structure.</p>
 <h3 id="mmaattr">MMAAttr<a class="headerlink" href="#mmaattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.mma_layout&lt;
-  ::mlir::iree_compiler::IREE::GPU::MMAIntrinsic   # intrinsic
+  ::mlir::iree_compiler::IREE::GPU::MMAIntrinsic,   # intrinsic
+  bool   # col_major
 &gt;
 </code></pre></div>
 <p>Attribute describing a particular shape of matrix-multiply and accumulate
@@ -5483,6 +5484,10 @@ unit of arithmetic for matrices A, B, and C.</p>
 <p>The |intrinsic| field specifies which particular MMA intrinsic this refers
 to, with each intrinsic implicating a specific MNK shape and operand types.
 See IREEGPUEnums.td for the definition of the intrinsics.</p>
+<p>If set to true, |col_major| indicates that the result should be produced
+column major. This is equivalent to instead computing:</p>
+<div class="highlight"><pre><span></span><code>  C^T += B^T x A^T
+</code></pre></div>
 <h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5497,6 +5502,11 @@ See IREEGPUEnums.td for the definition of the intrinsics.</p>
 <td style="text-align: center;">intrinsic</td>
 <td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::MMAIntrinsic</code></td>
 <td>an enum of type MMAIntrinsic</td>
+</tr>
+<tr>
+<td style="text-align: center;">col_major</td>
+<td style="text-align: center;"><code>bool</code></td>
+<td></td>
 </tr>
 </tbody>
 </table>
