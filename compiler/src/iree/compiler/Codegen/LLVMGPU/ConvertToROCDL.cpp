@@ -108,6 +108,8 @@ struct SwapSetPrioWithMFMA : public OpRewritePattern<ROCDL::SetPrioOp> {
       return failure();
     }
 
+    // Remove the swap attribute no matter what to avoid reapplying this
+    // pattern.
     rewriter.startOpModification(setPrio);
     setPrio->removeDiscardableAttr(kSwapName);
 
@@ -116,8 +118,6 @@ struct SwapSetPrioWithMFMA : public OpRewritePattern<ROCDL::SetPrioOp> {
 
     for (int64_t remainingToSwap = count.getInt();
          remainingToSwap > 0 && current; current = current->getNextNode()) {
-      if (!current)
-        break;
       if (isa<mlir::amdgpu::MFMAOp>(current)) {
         --remainingToSwap;
         mfmaToSwap = current;
@@ -126,6 +126,7 @@ struct SwapSetPrioWithMFMA : public OpRewritePattern<ROCDL::SetPrioOp> {
     if (mfmaToSwap) {
       rewriter.moveOpAfter(setPrio, mfmaToSwap);
     }
+    rewriter.finalizeOpModification(setPrio);
     return success();
   }
 };
