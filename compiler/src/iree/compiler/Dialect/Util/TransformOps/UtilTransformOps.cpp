@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler::IREE::Util {
@@ -264,15 +265,56 @@ DiagnosedSilenceableFailure IREE::Util::transform_dialect::CastAndCallOp::apply(
     }
   }
 
-  auto callOp = rewriter.create<IREE::Util::CallOp>(
-      insertionPoint->getLoc(), targetFunction.getResultTypes(),
-      targetFunction.getName(), inputs, /*tied_operands=*/ArrayAttr{},
-      /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr);
+  SmallVector<Value> replacements;
+  Operation *exceptedUser = nullptr;
+  if (getInlineCall()) {
+    // TODO: Support inlining multi-block functions using `scf.execute_region`
+    // (needed in case the callsite parent requires a single block region).
+    if (!targetFunction.getBody().hasOneBlock()) {
+      return emitDefiniteFailure()
+             << "Expected single block function, got "
+             << targetFunction.getBody().getBlocks().size() << " blocks.";
+    }
+
+    Region *targetRegion = rewriter.getInsertionBlock()->getParent();
+
+    // Temporarily clone the function body into the region containing the
+    // insertion point. This will never cross pass nesting scopes unless the
+    // insertion point itself does, which would be a misuse of this transform.
+    //
+    // We do this instead of cloning the function to avoid the possibility of
+    // a nested pass manager picking up the temporary function and processing
+    // it. (this likely isn't actually possible per the implementation of the
+    // pass manager, but skipping cloning the symbol is 100% safe).
+    //
+    // Note that this means the function being called is assumed to also not
+    // be undergoing modification (again no way to verify this, only specify
+    // it as misuse).
+    mlir::IRMapping mapper;
+    targetFunction.getFunctionBody().cloneInto(targetRegion, mapper);
+
+    Block *body = &targetRegion->getBlocks().back();
+    Operation *terminator = body->getTerminator();
+
+    // Inlining the block removes it from the parent region.
+    rewriter.inlineBlockBefore(body, &*rewriter.getInsertionPoint(), inputs);
+    replacements = terminator->getOperands();
+    rewriter.eraseOp(terminator);
+  } else {
+    auto callOp = rewriter.create<IREE::Util::CallOp>(
+        insertionPoint->getLoc(), targetFunction.getResultTypes(),
+        targetFunction.getName(), inputs, /*tied_operands=*/ArrayAttr{},
+        /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr);
+    exceptedUser = callOp;
+    replacements = callOp->getOpResults();
+    if (getResults().size() != 0) {
+      results.set(cast<OpResult>(getResults()[0]), {callOp});
+    }
+  }
 
   // Cast the call results back to the expected types. If any conversions fail
   // this is a definite failure as the call has been constructed at this point.
-  for (auto [output, newOutput] :
-       llvm::zip_equal(outputs, callOp.getResults())) {
+  for (auto [output, newOutput] : llvm::zip_equal(outputs, replacements)) {
     Value convertedOutput = newOutput;
     if (output.getType() != newOutput.getType()) {
       convertedOutput = converter.materializeTargetConversion(
@@ -283,9 +325,12 @@ DiagnosedSilenceableFailure IREE::Util::transform_dialect::CastAndCallOp::apply(
                << " to type " << output.getType();
       }
     }
-    rewriter.replaceAllUsesExcept(output, convertedOutput, callOp);
+    if (exceptedUser) {
+      rewriter.replaceAllUsesExcept(output, convertedOutput, exceptedUser);
+    } else {
+      rewriter.replaceAllUsesWith(output, convertedOutput);
+    }
   }
-  results.set(cast<OpResult>(getResult()), {callOp});
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -306,6 +351,13 @@ LogicalResult IREE::Util::transform_dialect::CastAndCallOp::verify() {
   }
   if (getFunction() && getFunctionName()) {
     return emitOpError() << "function handle and name are mutually exclusive";
+  }
+  if (getNumResults() > 1) {
+    return emitOpError()
+           << "produces at most one result as a handle to the call";
+  }
+  if (getInlineCall() && getNumResults() != 0) {
+    return emitOpError() << "inlining mode does not produce a result";
   }
   return success();
 }
