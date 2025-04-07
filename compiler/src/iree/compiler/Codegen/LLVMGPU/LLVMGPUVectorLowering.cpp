@@ -91,15 +91,15 @@ SmallVector<int64_t> getWithLeadingOnes(VectorType vectorType) {
   return nativeSize;
 }
 
-// Example of unrolling with native shape chosen based on the result's final
-// dimension. In this case the result is a 4x2 vector, so the 'native shape' is
-// 1x2.
+// Unroll vector.transpose in all dimensions except the inner-most dimension of
+// the result. In the following example, the transpose result is a 4x2 vector,
+// so the 'native' unroll shape is 1x2.
 //
 // clang-format off
-//   %transposed = vector.transpose %cst, [1,0] : vector<2x4xf32> to vector<4x2xf32>
+//   %0 = vector.transpose %cst, [1,0] : vector<2x4xf32> to vector<4x2xf32>
 // clang-format on
 //
-//  becomes
+// gets unrolled to
 //
 // clang-format off
 //   %cst = arith.constant dense<0.000000e+00> : vector<4x2xf32>
@@ -113,8 +113,9 @@ SmallVector<int64_t> getWithLeadingOnes(VectorType vectorType) {
 // clang-format on
 //
 //
-// TODO(newling) Further analysis can improve this. For example flattening
-// out unit dimensions and canonicalizations might help. Example:
+// TODO(newling) Some analysis can probably improve the choice of native
+// shape here. For example flattening out unit dimensions and canonicalizations
+// might help. Example:
 //
 // clang-format off
 //   %t = vector.transpose %cst, [0,2,1] : vector<10x1x4xf32> to vector<10x4x1xf32>
@@ -133,21 +134,19 @@ SmallVector<int64_t> getNativeVectorShapeImpl(vector::ReductionOp op) {
   return getWithLeadingOnes(op.getSourceVectorType());
 }
 
-// As we do unrolling after lowering vector operations, it's not necessary to
-// provide an unroll shape for most ops (as compared to SPIRV).
+// As unrolling is done after lowering vector operations, it's not necessary to
+// provide an unroll shape for many ops. Unrolling here assumes that the input
+// has already been tiled such that the inner-most dimensions of vectors are the
+// optimal hardware vector size to operate on. So for example the elementwise
+// operation
 //
-// Unrolling here assumes that the input has already been tiled such that the
-// inner-most dimensions of vectors are the optimal hardware vector size to
-// operate on.
+// clang-format off
+//   %1 = arith.truncf %0 : vector<10x4xf32> to vector<10x4xf16>
+// clang-format on
+//
+// will be unrolled to 10 arith.truncf operations on vectors of shape 1x4.
 std::optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
 
-  // Unroll shape for elementwise operations. Example:
-  //
-  // clang-format off
-  //   %2 = arith.truncf %1 : vector<10x4xf32> to vector<10x4xf16>
-  // clang-format on
-  //
-  // will be unrolled to 10 arith.truncf operations on vectors of shape 1x4.
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
     if (auto vecType = llvm::dyn_cast<VectorType>(op->getResultTypes()[0])) {
       return getWithLeadingOnes(vecType);
@@ -176,8 +175,8 @@ struct LLVMGPUVectorLoweringPass final
     MLIRContext *context = funcOp.getContext();
 
     {
-      // Lower high level vector operations like contract or multidim reduce ops
-      // to lower level vector ops.
+      // Lower 'high' level vector operations like contract and multidim reduce
+      // to 'low' level vector ops.
       RewritePatternSet contractLoweringPatterns(context);
       auto options =
           vector::VectorTransformsOptions().setVectorTransformsOptions(
