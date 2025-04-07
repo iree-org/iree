@@ -150,13 +150,25 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
     The |intrinsic| field specifies which particular MMA intrinsic this refers
     to, with each intrinsic implicating a specific MNK shape and operand types.
     See IREEGPUEnums.td for the definition of the intrinsics.
+
+    If set to true, |col_major| indicates that the result should be produced
+    column major. This is equivalent to instead computing:
+
+    ```
+      C^T += B^T x A^T
+    ```
   }];
 
   let parameters = (ins
-    EnumParameter<IREEGPU_MMAIntrinsic>:$intrinsic
+    EnumParameter<IREEGPU_MMAIntrinsic>:$intrinsic,
+    DefaultValuedParameter<"bool", "false">:$col_major
   );
 
-  let assemblyFormat = "`<` params `>`";
+  let assemblyFormat = "`<` $intrinsic (`,` `col_major` `=` $col_major^)? `>`";
+
+  let builders = [
+    AttrBuilder<(ins "MMAIntrinsic":$intrinsic)>
+  ];
 
   let extraClassDeclaration = [{
     int64_t getBlockSize() const;
