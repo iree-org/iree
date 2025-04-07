@@ -17,6 +17,10 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 
+#define DEBUG_TYPE "iree-global-opt-generalize-linalg-named-ops"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
+
 namespace mlir::iree_compiler::GlobalOptimization {
 
 #define GEN_PASS_DEF_GENERALIZELINALGNAMEDOPSPASS
@@ -41,17 +45,15 @@ static bool isConvFoldableToContraction(linalg::LinalgOp linalgOp) {
 
   if (!llvm::all_of(convDims.strides,
                     [](int64_t element) { return element == 1; })) {
+    LDBG("conv not foldable: non-unit strides");
     return false;
   }
 
-  // Dont generalize depthwise convolutions.
-  if (!convDims.depth.empty()) {
-    return false;
-  }
-
-  // Dont generalize pooling operations. For pooling ops, the input/output
-  // channel size will be categorized as the additional batch dimension
+  // Dont generalize pooling operations or depthwise convolutions. For pooling
+  // ops, the input/output channel size will be categorized as the additional
+  // batch dimension.
   if (convDims.outputChannel.empty() || convDims.inputChannel.empty()) {
+    LDBG("conv not foldable: missing input or output channel dims");
     return false;
   }
 
@@ -60,6 +62,7 @@ static bool isConvFoldableToContraction(linalg::LinalgOp linalgOp) {
   auto filterShapeType = llvm::dyn_cast<RankedTensorType>(
       linalgOp.getDpsInputOperand(kFilterInputIdx)->get().getType());
   if (!filterShapeType) {
+    LDBG("conv not foldable: filter shape not ranked tensor");
     return false;
   }
   auto filterShape = filterShapeType.getShape();
@@ -68,6 +71,7 @@ static bool isConvFoldableToContraction(linalg::LinalgOp linalgOp) {
     std::optional<int64_t> maybeDim = filterMap.getResultPosition(
         getAffineDimExpr(filterLoop, filterMap.getContext()));
     if (!maybeDim || filterShape[*maybeDim] != 1) {
+      LDBG("conv not foldable: non-unit filter dim");
       return false;
     }
   }
