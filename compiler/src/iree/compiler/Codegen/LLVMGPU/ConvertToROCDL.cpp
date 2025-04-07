@@ -108,14 +108,16 @@ struct SwapSetPrioWithMFMA : public OpRewritePattern<ROCDL::SetPrioOp> {
       return failure();
     }
 
-    int64_t remainingToSwap = count.getInt();
     rewriter.startOpModification(setPrio);
     setPrio->removeDiscardableAttr(kSwapName);
 
-    Operation *current = setPrio;
+    Operation *current = setPrio->getNextNode();
     Operation *mfmaToSwap = nullptr;
 
-    while (remainingToSwap > 0 && (current = current->getNextNode())) {
+    for (int64_t remainingToSwap = count.getInt();
+         remainingToSwap > 0 && current; current = current->getNextNode()) {
+      if (!current)
+        break;
       if (isa<mlir::amdgpu::MFMAOp>(current)) {
         --remainingToSwap;
         mfmaToSwap = current;
