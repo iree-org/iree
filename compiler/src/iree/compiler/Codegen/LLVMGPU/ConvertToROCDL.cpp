@@ -73,6 +73,67 @@ static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
   patterns.add<ReplaceGPUBarrierWithLDSBarrier>(patterns.getContext());
 }
 
+/// Hacky pattern to swap `s_setprio` operations with `amdgpu.mfma` ops.
+/// This is needed for ping-pong scheduling patterns to prevent off
+/// waves from interrupting the MFMA region of the high priority wave.
+/// The IR is rewritten as follows:
+///
+/// rocdl.s.setprio {iree_gpu.swap_mfma = n}
+/// amdgpu.mfma // 1
+/// ...
+/// amdgpu.mfma // n
+/// amdgpu.mfma // n + 1
+///
+/// to
+///
+/// amdgpu.mfma // 1
+/// ...
+/// amdgpu.mfma // n
+/// rocdl.s.setprio
+/// amdgpu.mfma // n + 1
+///
+/// This only looks at successor mfmas within the same block and is best
+/// effort.
+constexpr StringLiteral kSwapName = "iree_gpu.swap_mfma";
+struct SwapSetPrioWithMFMA : public OpRewritePattern<ROCDL::SetPrioOp> {
+  using OpRewritePattern<ROCDL::SetPrioOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(ROCDL::SetPrioOp setPrio,
+                                PatternRewriter &rewriter) const override {
+    if (!setPrio->hasAttr(kSwapName)) {
+      return failure();
+    }
+
+    auto count = setPrio->getAttrOfType<IntegerAttr>(kSwapName);
+    if (!count) {
+      return failure();
+    }
+
+    rewriter.startOpModification(setPrio);
+    setPrio->removeDiscardableAttr(kSwapName);
+
+    Operation *current = setPrio->getNextNode();
+    Operation *mfmaToSwap = nullptr;
+
+    for (int64_t remainingToSwap = count.getInt();
+         remainingToSwap > 0 && current; current = current->getNextNode()) {
+      if (!current)
+        break;
+      if (isa<mlir::amdgpu::MFMAOp>(current)) {
+        --remainingToSwap;
+        mfmaToSwap = current;
+      }
+    }
+    if (mfmaToSwap) {
+      rewriter.moveOpAfter(setPrio, mfmaToSwap);
+    }
+    return success();
+  }
+};
+
+static void populateSwapSetPrioWithMFMAPatterns(RewritePatternSet &patterns) {
+  patterns.add<SwapSetPrioWithMFMA>(patterns.getContext());
+}
+
 } // namespace
 
 template <typename... Floats>
@@ -184,6 +245,7 @@ struct ConvertToROCDLPass final
           patterns, /*convertFP8Arithmetic=*/true, /*saturateFP8Truncf=*/false,
           /*allowPackedF16Rtz=*/false, /*chipset=*/*maybeChipset);
       arith::populateCeilFloorDivExpandOpsPatterns(patterns);
+      populateSwapSetPrioWithMFMAPatterns(patterns);
       populateConvertGPUToAMDGPUPatterns(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       populateDropSharedMemoryDeallocOpPatterns(patterns);
