@@ -154,8 +154,33 @@ def MatmulKAttr : IREEEncoding_Attr<"MatmulK"> {
     only. The encoded dimensions are the reduction dimensions that will be
     further used in a matmul.
 
+    Example: linalg.matmul ins(%lhs, %rhs) outs(%acc), where the indexing maps
+             are:
+
+      lhs: (M, N, K) -> (M, K)
+      rhs: (M, N, K) -> (K, N)
+      acc: (M, N, K) -> (M, N)
+
+    The encoding for the lhs is iree_encoding.matmul_k<k_dims = [1]>.
+    The encoding for the rhs is iree_encoding.matmul_k<k_dims = [0]>.
+    The encoding for the acc is iree_encoding.matmul_k<k_dims = []>.
+
+    Example: linalg.matmul_transpose_b ins(%lhs, %rhs) outs(%acc), where the
+             indexing maps are:
+
+      lhs: (M, N, K) -> (M, K)
+      rhs: (M, N, K) -> (N, K)
+      acc: (M, N, K) -> (M, N)
+
+    The encoding for the lhs is iree_encoding.matmul_k<k_dims = [1]>.
+    The encoding for the rhs is iree_encoding.matmul_k<k_dims = [1]>.
+    The encoding for the acc is iree_encoding.matmul_k<k_dims = []>.
+
+    There is no difference between static cases and dynamic cases because the
+    dimension sizes are not encoded.
+
     Any encoding propagation that transforms reduction dimensions could result
-    in undefined behavior. Because it does not encode the transformations. The
+    in undefined behavior, because it does not encode the transformations. The
     information is missing in this context.
   }];
 
