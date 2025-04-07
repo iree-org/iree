@@ -58,7 +58,7 @@ func.func @transfer_gather_fold_broadcast(%indices: vector<64xindex>,
   %broadcasted = vector.broadcast %indices : vector<64xindex> to vector<32x64xindex>
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
-  [None, %broadcasted: vector<32x64xindex>], cst0
+  [None, %broadcasted: vector<32x64xindex>], %cst0
   { indexed_maps = [affine_map<(d0, d1) -> (d1, d0)>]}
   : tensor<4096x64xf16>, vector<64x32xf16>
 
