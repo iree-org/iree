@@ -119,6 +119,11 @@ def LLVMGPUVectorDistributePass :
 def LLVMGPUVectorLoweringPass :
     InterfacePass<"iree-llvmgpu-vector-lowering", "mlir::FunctionOpInterface"> {
   let summary = "Pass to lower Vector ops before conversion to LLVM.";
+  let options = [
+    Option<"unroll", "unroll", "bool", /*default=*/"true",
+           "Controls whether to perform unrolling after inital vector lowering.">,
+  ];
+
 }
 
 def LLVMGPUVectorToGPUPass :

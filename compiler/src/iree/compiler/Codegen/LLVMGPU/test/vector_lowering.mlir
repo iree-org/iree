@@ -1,4 +1,5 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmgpu-vector-lowering,canonicalize,cse))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmgpu-vector-lowering{unroll=0},canonicalize,cse))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmgpu-vector-lowering{unroll=1},canonicalize,cse))" --split-input-file %s | FileCheck %s --check-prefix=UNROLL
 
 module {
   func.func @broadcast_read_lowering(%arg0: memref<4096x32xf16>) -> vector<1x8xf16> {
@@ -37,3 +38,15 @@ module {
 // CHECK: %[[LHS_SPLAT:.+]] = vector.splat %[[LHS_CAST]] : vector<2xf32>
 // CHECK: %[[FMA:.+]] = vector.fma %[[RHS_CAST]], %[[LHS_SPLAT]], %[[ACC]] : vector<2xf32>
 // CHECK: arith.select %[[MASK_EXTRACT]], %[[FMA]], %[[ACC]] : vector<2xi1>, vector<2xf32>
+
+// With unrolling, the transpose gets decomposed into transposes on slices.
+// UNROLL-LABEL: func.func @contraction_masked
+// UNROLL-SAME: %[[LHS:.+]]: vector<3xf16>, %[[RHS:.+]]: vector<2x3xf16>, %[[ACC:.+]]: vector<2xf32>, %[[MASK:.+]]: vector<3x2xi1>
+// UNROLL: %[[STRIDED_SLICE_0:.+]] = vector.extract_strided_slice %[[RHS]] {offsets = [0, 0], sizes = [2, 1], strides = [1, 1]} : vector<2x3xf16> to vector<2x1xf16>
+// UNROLL: %[[TRANSPOSE_0:.+]] = vector.transpose %[[STRIDED_SLICE_0]], [1, 0] : vector<2x1xf16> to vector<1x2xf16>
+// UNROLL: %[[STRIDED_SLICE_1:.+]] = vector.extract_strided_slice %[[RHS]] {offsets = [0, 1], sizes = [2, 1], strides = [1, 1]} : vector<2x3xf16> to vector<2x1xf16>
+// UNROLL: %[[TRANSPOSE_1:.+]] = vector.transpose %[[STRIDED_SLICE_1]], [1, 0] : vector<2x1xf16> to vector<1x2xf16>
+// UNROLL: %[[STRIDED_SLICE_2:.+]] = vector.extract_strided_slice %[[RHS]] {offsets = [0, 2], sizes = [2, 1], strides = [1, 1]} : vector<2x3xf16> to vector<2x1xf16>
+// UNROLL: %[[TRANSPOSE_2:.+]] = vector.transpose %[[STRIDED_SLICE_2]], [1, 0] : vector<2x1xf16> to vector<1x2xf16>
+// UNROLL: %[[LHS_EXTRACT_0:.+]] = vector.extract %[[TRANSPOSE_0]][0] : vector<2xf16> from vector<1x2xf16>
+// UNROLL: %[[CAST_0:.+]] = arith.extf %[[LHS_EXTRACT_0]] : vector<2xf16> to vector<2xf32>
