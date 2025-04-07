@@ -17,6 +17,9 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "../../compiler/plugins/target/EXSLERATEV2/exsleratev2/Transforms/MetaData.h"
+
 
 namespace mlir::iree_compiler::IREE::Flow {
 
@@ -154,6 +157,22 @@ static LogicalResult outlineDispatchWorkgroupsOp(
                                                executableOp, exportOp);
 }
 
+void chkDenseResource(IREE::Util::FuncOp Op) {
+  Op.walk([&](arith::ConstantOp constOp) {
+    if (auto denseResAttr =
+            mlir::dyn_cast<DenseResourceElementsAttr>(constOp.getValue())) {
+      auto tensorType = cast<RankedTensorType>(denseResAttr.getType());
+      auto shape = tensorType.getShape();
+      if (shape.size() == 1) {
+        EXSLERATEV2::globalExtractedTensors.biases.push_back(denseResAttr);
+      } else {
+        EXSLERATEV2::globalExtractedTensors.weights.push_back(denseResAttr);
+      }
+    }
+  });
+}
+
+
 struct OutlineDispatchRegionsPass
     : public IREE::Flow::impl::OutlineDispatchRegionsPassBase<
           OutlineDispatchRegionsPass> {
@@ -164,6 +183,13 @@ struct OutlineDispatchRegionsPass
     for (auto funcOp : getOperation().getOps<mlir::FunctionOpInterface>()) {
       // Generate a nice name if possible. All ops we outline in the same scope
       // will have the same root name.
+      //
+
+      if (auto func = dyn_cast<IREE::Util::FuncOp>(funcOp.getOperation())) {
+        chkDenseResource(func); 
+      }
+
+
       std::string namePrefix;
       if (isa<IREE::Util::InitializerOp>(funcOp)) {
         namePrefix =

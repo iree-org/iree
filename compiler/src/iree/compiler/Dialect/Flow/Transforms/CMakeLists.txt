@@ -28,6 +28,7 @@ iree_cc_library(
     "Passes.h"
     "Passes.h.inc"
     "RegionOpUtils.h"
+    "${CMAKE_SOURCE_DIR}/../../compiler/plugins/target/EXSLERATEV2/exsleratev2/Transforms/MetaData.h"
   SRCS
     "AnnotateDispatches.cpp"
     "Canonicalizer.cpp"
