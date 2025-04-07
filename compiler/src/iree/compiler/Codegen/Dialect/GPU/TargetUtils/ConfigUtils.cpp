@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
-#include <optional>
 
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Common/TileInferenceUtils.h"
@@ -15,7 +14,6 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
-#include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
@@ -622,6 +620,18 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   if (failed(maybeDistInfo)) {
     return failure();
   }
+
+  // TODO(Max191): Drop this check for reshapes in the dispatch once we can
+  // codegen larger tile sizes with reshapes in the dispatch.
+  bool hasReshapes = false;
+  entryPoint->walk([&](Operation *opInEntryPoint) {
+    if (isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp>(opInEntryPoint)) {
+      hasReshapes = true;
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+
   DistributionInfo distInfo = maybeDistInfo.value();
 
   const int subgroupSize = target.getPreferredSubgroupSize();
@@ -741,7 +751,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
         // TODO: Try to take into account element type bit width to get
         // 4xdword reads instead of 4x{elements}.
         if (distInfo.vectorizable && wgDim == 0 && !lossFactor &&
-            candidate % numVectorElements == 0) {
+            candidate % numVectorElements == 0 && !hasReshapes) {
           // Use size-1 vectors to increase parallelism if larger ones causes
           // idle threads in the subgroup.
           bool hasIdleThreads = distInfo.partitionableLoops.size() == 1 &&

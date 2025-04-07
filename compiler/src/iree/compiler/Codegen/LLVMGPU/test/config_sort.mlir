@@ -83,7 +83,7 @@ func.func @sort5D_static_shape() {
 }
 
 //       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
-//       CHECK-DAG: func.func @sort5D_static_shape()
+//   CHECK-DAG: func.func @sort5D_static_shape()
 //       CHECK:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   iree_linalg_ext.sort {
 //  CHECK-SAME:       lowering_config = #iree_gpu.lowering_config<{thread = [0, 1, 1, 1, 1], workgroup = [0, 1, 1, 1, 1]}>

@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
 
