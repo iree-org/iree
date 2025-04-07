@@ -17,6 +17,8 @@ VER_0 {
     ireeCodegenDispatchLoweringPassPipelineAttrGetValue;
     ireeCodegenGetExecutableVariantOps;
     ireeCodegenGetTunerRootOps;
+    ireeCodegenIsaContractionOp;
+    ireeCodegenInferContractionDimensions;
     ireeCodegenQueryMMAIntrinsics;
     ireeCodegenTranslationInfoAttrGet;
     ireeCodegenTranslationInfoAttrGetParameters;

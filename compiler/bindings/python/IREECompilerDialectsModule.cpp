@@ -60,6 +60,37 @@ ireeCodegenGetTunerRootOpsBinding(MlirModule module) {
   return ops;
 }
 
+struct PyContractionDimensions {
+  ireeCodegenContractionDimensions value;
+
+  PyContractionDimensions() = default;
+  PyContractionDimensions(const ireeCodegenContractionDimensions &v)
+      : value(v) {}
+};
+
+static std::optional<PyContractionDimensions>
+ireeCodegenInferContractionDimensionsBinding(MlirOperation op) {
+  ireeCodegenContractionDimensions dims =
+      ireeCodegenInferContractionDimensions(op);
+
+  // Detect "empty" result.
+  if (mlirAttributeIsNull(dims.batch) && mlirAttributeIsNull(dims.m) &&
+      mlirAttributeIsNull(dims.n) && mlirAttributeIsNull(dims.k)) {
+    return std::nullopt;
+  }
+  return PyContractionDimensions{dims};
+}
+
+static std::vector<int32_t> convertDenseI32AttrToList(MlirAttribute attr) {
+  std::vector<int32_t> result;
+  int64_t size = mlirDenseArrayGetNumElements(attr);
+  result.reserve(size);
+  for (int64_t i = 0; i < size; ++i) {
+    result.push_back(mlirDenseI32ArrayGetElement(attr, i));
+  }
+  return result;
+}
+
 NB_MODULE(_ireeCompilerDialects, m) {
   m.doc() = "iree-compiler dialects python extension";
 
@@ -452,4 +483,41 @@ NB_MODULE(_ireeCompilerDialects, m) {
                           "Get the operations marked with the tuner root op "
                           "attribute from a module.",
                           py::arg("module"));
+
+  //===-------------------------------------------------------------------===//
+  // Binding to utility function isaContractionOp
+  //===-------------------------------------------------------------------===//
+
+  iree_codegen_module.def(
+      "isa_contraction_op", &ireeCodegenIsaContractionOp,
+      "Checks if the given operation is a Linalg contraction operation.",
+      py::arg("op"));
+
+  py::class_<PyContractionDimensions>(iree_codegen_module,
+                                      "ContractionDimensions")
+      .def_prop_ro("batch",
+                   [](const PyContractionDimensions &self) {
+                     return convertDenseI32AttrToList(self.value.batch);
+                   })
+      .def_prop_ro("m",
+                   [](const PyContractionDimensions &self) {
+                     return convertDenseI32AttrToList(self.value.m);
+                   })
+      .def_prop_ro("n",
+                   [](const PyContractionDimensions &self) {
+                     return convertDenseI32AttrToList(self.value.n);
+                   })
+      .def_prop_ro("k", [](const PyContractionDimensions &self) {
+        return convertDenseI32AttrToList(self.value.k);
+      });
+
+  //===-------------------------------------------------------------------===//
+  // Binding to utility function inferContractionDims
+  //===-------------------------------------------------------------------===//
+
+  iree_codegen_module.def(
+      "infer_contraction_dimensions",
+      &ireeCodegenInferContractionDimensionsBinding,
+      "Infers contraction dimensions (batch/m/n/k) for a Linalg op. ",
+      py::arg("op"));
 }

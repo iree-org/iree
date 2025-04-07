@@ -66,3 +66,31 @@ def root_op():
     assert len(root_op_list) == 2
     assert root_op_list[0].name == "linalg.fill"
     assert root_op_list[1].name == "linalg.matmul"
+
+
+@run
+def isa_contraction_op():
+    module_str = """
+        module {
+            func.func @matmul(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
+                %cst = arith.constant 0.000000e+00 : f32
+                %0 = tensor.empty() : tensor<4x4xf32>
+                %1 = linalg.fill { root_op } ins(%cst : f32) outs(%0 : tensor<4x4xf32>) -> tensor<4x4xf32>
+                %2 = linalg.matmul { root_op } ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%1 : tensor<4x4xf32>) -> tensor<4x4xf32>
+                return %2 : tensor<4x4xf32>
+            }
+        }
+    """
+    input_module = ir.Module.parse(module_str)
+    root_op_list = iree_codegen.get_tuner_root_ops(input_module)
+    fill_op = root_op_list[0]
+    matmul_op = root_op_list[1]
+    assert not iree_codegen.isa_contraction_op(fill_op)
+    assert iree_codegen.isa_contraction_op(matmul_op)
+    contraction_dims = iree_codegen.infer_contraction_dimensions(fill_op)
+    assert contraction_dims is None
+    contraction_dims = iree_codegen.infer_contraction_dimensions(matmul_op)
+    assert contraction_dims
+    assert contraction_dims.m == [0]
+    assert contraction_dims.n == [1]
+    assert contraction_dims.k == [2]

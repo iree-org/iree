@@ -218,6 +218,9 @@ queryMMAIntrinsics(IREE::HAL::ExecutableVariantOp executableOp);
 // tuner root op attribute (i.e., have the `root_op` UnitAttr).
 SmallVector<Operation *> getTunerRootOps(mlir::ModuleOp moduleOp);
 
+// Check whether the given operation is a Linalg contraction operation.
+bool isaContractionOp(Operation *op);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_

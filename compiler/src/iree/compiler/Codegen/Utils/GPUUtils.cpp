@@ -1061,4 +1061,16 @@ SmallVector<Operation *> getTunerRootOps(mlir::ModuleOp moduleOp) {
   return rootOps;
 }
 
+bool isaContractionOp(Operation *op) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp)
+    return false;
+
+  if (!linalg::isaContractionOpInterface(linalgOp)) {
+    return false;
+  }
+
+  return true;
+}
+
 } // namespace mlir::iree_compiler

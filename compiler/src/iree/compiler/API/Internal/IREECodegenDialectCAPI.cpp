@@ -220,3 +220,36 @@ void ireeCodegenGetTunerRootOps(MlirModule module, size_t *numOps,
     rootOps[i] = wrap(tunerRootOps[i]);
   }
 }
+
+bool ireeCodegenIsaContractionOp(MlirOperation op) {
+  mlir::Operation *mlirOp = unwrap(op);
+  return mlir::iree_compiler::isaContractionOp(mlirOp);
+}
+
+ireeCodegenContractionDimensions
+ireeCodegenInferContractionDimensions(MlirOperation op) {
+  ireeCodegenContractionDimensions result{};
+  auto linalgOp = llvm::dyn_cast<mlir::linalg::LinalgOp>(unwrap(op));
+  if (!linalgOp)
+    return result;
+
+  auto maybeDims = mlir::linalg::inferContractionDims(linalgOp);
+  if (failed(maybeDims))
+    return result;
+
+  mlir::linalg::ContractionDimensions contractionDims = maybeDims.value();
+  mlir::MLIRContext *ctx = linalgOp.getContext();
+
+  auto makeAttr =
+      [&](const llvm::SmallVector<unsigned, 2> &vals) -> MlirAttribute {
+    llvm::SmallVector<int32_t> intVals(vals.begin(), vals.end());
+    return mlirDenseI32ArrayGet(wrap(ctx), intVals.size(), intVals.data());
+  };
+
+  result.batch = makeAttr(contractionDims.batch);
+  result.m = makeAttr(contractionDims.m);
+  result.n = makeAttr(contractionDims.n);
+  result.k = makeAttr(contractionDims.k);
+
+  return result;
+}

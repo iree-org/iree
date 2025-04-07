@@ -78,6 +78,19 @@ MLIR_CAPI_EXPORTED void ireeCodegenQueryMMAIntrinsics(MlirOperation op,
                                                       size_t *numIntrinsics,
                                                       uint32_t *mmaIntrinsics);
 
+MLIR_CAPI_EXPORTED bool ireeCodegenIsaContractionOp(MlirOperation op);
+
+struct ireeCodegenContractionDimensions {
+  MlirAttribute batch;
+  MlirAttribute m;
+  MlirAttribute n;
+  MlirAttribute k;
+};
+
+MLIR_CAPI_EXPORTED
+ireeCodegenContractionDimensions
+ireeCodegenInferContractionDimensions(MlirOperation op);
+
 #ifdef __cplusplus
 }
 #endif
