@@ -101,6 +101,21 @@ util.func public @generalize_1x1_conv_2d_dilations(%input: tensor<1x4x?x2xf32>, 
 
 // -----
 
+util.func public @generalize_1x1_group_conv_2d(%input: tensor<1x2x3x4x5xf32>, %filter: tensor<4x6x1x1x5xf32>) -> tensor<1x2x3x4x6xf32> {
+    %0 = tensor.empty() : tensor<1x2x3x4x6xf32>
+    %1 = linalg.conv_2d_nhwgc_gfhwc {
+        dilations = dense<1> : tensor<2xi64>,
+        strides = dense<1> : tensor<2xi64>
+    } ins(%input, %filter : tensor<1x2x3x4x5xf32>, tensor<4x6x1x1x5xf32>) outs(%0 : tensor<1x2x3x4x6xf32>) -> tensor<1x2x3x4x6xf32>
+    util.return %1 : tensor<1x2x3x4x6xf32>
+}
+
+// CHECK-LABEL: @generalize_1x1_group_conv_2d
+//       CHECK:   %[[RESULT:.*]] = linalg.generic
+//       CHECK:   util.return %[[RESULT]]
+
+// -----
+
 util.func public @no_generalize_1x1_conv_2d_strides(%input: tensor<1x7x7x2xf32>, %filter: tensor<1x1x2x7xf32>) -> tensor<1x4x4x7xf32> {
     %0 = tensor.empty() : tensor<1x4x4x7xf32>
     %1 = linalg.conv_2d_nhwc_hwcf {
@@ -111,5 +126,20 @@ util.func public @no_generalize_1x1_conv_2d_strides(%input: tensor<1x7x7x2xf32>,
 }
 
 // CHECK-LABEL: @no_generalize_1x1_conv_2d_strides
+//   CHECK-NOT:   linalg.generic
+//       CHECK:   util.return
+
+// -----
+
+util.func public @no_generalize_1x1_depthwise_conv(%input: tensor<1x2x3x4xf32>, %filter: tensor<1x1x4xf32>) -> tensor<1x2x3x4xf32> {
+    %0 = tensor.empty() : tensor<1x2x3x4xf32>
+    %1 = linalg.depthwise_conv_2d_nhwc_hwc {
+        dilations = dense<1> : tensor<2xi64>,
+        strides = dense<1> : tensor<2xi64>
+    } ins(%input, %filter : tensor<1x2x3x4xf32>, tensor<1x1x4xf32>) outs(%0 : tensor<1x2x3x4xf32>) -> tensor<1x2x3x4xf32>
+    util.return %1 : tensor<1x2x3x4xf32>
+}
+
+// CHECK-LABEL: @no_generalize_1x1_depthwise_conv
 //   CHECK-NOT:   linalg.generic
 //       CHECK:   util.return
