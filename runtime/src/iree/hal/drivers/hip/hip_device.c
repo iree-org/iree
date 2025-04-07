@@ -432,9 +432,7 @@ static iree_status_t iree_hal_hip_device_enable_peering(
       return IREE_HIP_RESULT_TO_STATUS(symbols, hip_error);
     }
     if (canAccessPeer != 1) {
-      return iree_make_status(IREE_STATUS_PERMISSION_DENIED,
-                              "device %d is not able to access peer %d",
-                              device_id, j);
+      continue;
     }
 
     hip_error = symbols->hipDeviceEnablePeerAccess(j, 0);
@@ -504,7 +502,7 @@ iree_status_t iree_hal_hip_device_create(
     }
 
     // If there are multiple devices, enable peering between them all.
-    if (iree_status_is_ok(status) && device_count > 1) {
+    if (iree_status_is_ok(status)) {
       status = iree_hal_hip_device_enable_peering(symbols, device_id);
     }
   }
