@@ -777,7 +777,7 @@ endif()
 # at the top level so that everything uses ours consistently.
 if(IREE_BUILD_PYTHON_BINDINGS)
   if(IREE_USE_SYSTEM_DEPS)
-    find_package(nanobind)
+    find_package(nanobind REQUIRED)
   else()
     include(FetchContent)
     FetchContent_Declare(
