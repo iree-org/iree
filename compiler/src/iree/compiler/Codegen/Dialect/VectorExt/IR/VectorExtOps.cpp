@@ -441,8 +441,10 @@ ParseResult TransferGatherOp::parse(OpAsmParser &parser,
 }
 
 static int64_t getVectorRank(Type type) {
-  return llvm::isa<VectorType>(type) ? llvm::cast<VectorType>(type).getRank()
-                                     : 0;
+  if (auto vecType = dyn_cast<VectorType>(type)) {
+    return vecType.getRank();
+  }
+  return 0;
 }
 
 struct IndexVecFoldResult {
@@ -588,7 +590,7 @@ OpFoldResult TransferGatherOp::fold(FoldAdaptor adaptor) {
   return OpFoldResult();
 }
 
-struct FoldSingleElementIndexVec : public OpRewritePattern<TransferGatherOp> {
+struct FoldSingleElementIndexVec final : OpRewritePattern<TransferGatherOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(TransferGatherOp xferOp,
@@ -628,8 +630,8 @@ struct FoldSingleElementIndexVec : public OpRewritePattern<TransferGatherOp> {
   }
 };
 
-struct FoldContigousGatherToTransferRead
-    : public OpRewritePattern<TransferGatherOp> {
+struct FoldContigousGatherToTransferRead final
+    : OpRewritePattern<TransferGatherOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(TransferGatherOp xferOp,

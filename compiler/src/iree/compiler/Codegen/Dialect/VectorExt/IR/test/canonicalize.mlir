@@ -58,8 +58,8 @@ func.func @transfer_gather_fold_broadcast(%indices: vector<64xindex>,
   %broadcasted = vector.broadcast %indices : vector<64xindex> to vector<32x64xindex>
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
-  [None, %broadcasted: vector<32x64xindex>], %cst0 { indexed_maps = [
-                                             affine_map<(d0, d1) -> (d1, d0)>]}
+  [None, %broadcasted: vector<32x64xindex>], cst0
+  { indexed_maps = [affine_map<(d0, d1) -> (d1, d0)>]}
   : tensor<4096x64xf16>, vector<64x32xf16>
 
   return %out : vector<64x32xf16>
@@ -82,8 +82,8 @@ func.func @transfer_gather_fold_transpose(%indices: vector<64x32xindex>,
   %transposed = vector.transpose %indices, [1, 0] : vector<64x32xindex> to vector<32x64xindex>
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
-  [None, %transposed: vector<32x64xindex>], %cst0 { indexed_maps = [
-                                             affine_map<(d0, d1) -> (d1, d0)>]}
+  [None, %transposed: vector<32x64xindex>], %cst0
+  {indexed_maps = [affine_map<(d0, d1) -> (d1, d0)>]}
   : tensor<4096x64xf16>, vector<64x32xf16>
 
   return %out : vector<64x32xf16>
@@ -107,9 +107,7 @@ func.func @transfer_gather_fold_step(%indices: vector<64x32xindex>,
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
   [%step : vector<64xindex>, %indices: vector<64x32xindex>], %cst0
-                                           { indexed_maps = [
-                                             affine_map<(d0, d1) -> (d0)>,
-                                             affine_map<(d0, d1) -> (d0, d1)> ]}
+  {indexed_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)> ]}
   : tensor<4096x64xf16>, vector<64x32xf16>
 
   return %out : vector<64x32xf16>
@@ -132,9 +130,7 @@ func.func @transfer_gather_fold_single_element(%scalar: vector<1xindex>,
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
   [%scalar : vector<1xindex>, %indices: vector<64x1xindex>], %cst0
-                                           { indexed_maps = [
-                                             affine_map<(d0, d1) -> (d1)>,
-                                             affine_map<(d0, d1) -> (d0, d1)> ]}
+  {indexed_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)> ]}
   : tensor<4096x64xf16>, vector<64x1xf16>
 
   return %out : vector<64x1xf16>
