@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 
 using namespace mlir;
@@ -38,9 +40,9 @@ OpFoldResult ToSIMTOp::fold(FoldAdaptor) {
   return {};
 }
 
-//
+//===----------------------------------------------------------------------===//
 // TransferGatherOp
-//
+//===----------------------------------------------------------------------===//
 
 Speculation::Speculatability TransferGatherOp::getSpeculatability() {
   if (isa<RankedTensorType>(getSource().getType())) {
@@ -438,11 +440,219 @@ ParseResult TransferGatherOp::parse(OpAsmParser &parser,
   return parser.addTypeToList(vectorType, result.types);
 }
 
-void TransferGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                   MLIRContext *ctx) {}
+static int64_t getVectorRank(Type type) {
+  if (auto vecType = dyn_cast<VectorType>(type)) {
+    return vecType.getRank();
+  }
+  return 0;
+}
+
+struct IndexVecFoldResult {
+  Value indexVec;
+  AffineMap indexMap;
+  bool changed;
+};
+
+static Value foldTransferGatherIndexVecs(
+    TransferGatherOp gatherOp,
+    function_ref<IndexVecFoldResult(Value, AffineMap, int64_t)>
+        indexVecFolder) {
+  bool changed = false;
+  SmallVector<Value> newIndexVecs;
+  SmallVector<AffineMap> newIndexedMaps;
+  SmallVector<bool> indexed(gatherOp.getIndexed().getAsValueRange<BoolAttr>());
+  int64_t currIndexVec = 0;
+  for (auto i : llvm::seq<int64_t>(gatherOp.getIndices().size())) {
+    if (!indexed[i]) {
+      continue;
+    }
+    Value operand = gatherOp.getIndexVecs()[currIndexVec];
+    AffineMap map = gatherOp.getIndexedMapsArray()[currIndexVec];
+    ++currIndexVec;
+
+    auto [indexVec, indexMap, vecChanged] = indexVecFolder(operand, map, i);
+    changed |= vecChanged;
+
+    if (indexVec) {
+      newIndexVecs.push_back(indexVec);
+      newIndexedMaps.push_back(indexMap);
+      indexed[i] = true;
+    } else {
+      indexed[i] = false;
+    }
+  }
+
+  if (!changed) {
+    return Value();
+  }
+
+  OpBuilder b(gatherOp);
+
+  SmallVector<Value> operands;
+  SmallVector<int32_t> operandSegmentSizes;
+
+  // Source.
+  operands.push_back(gatherOp.getSource());
+  operandSegmentSizes.push_back(1);
+  // Indices.
+  SmallVector<Value> indices = gatherOp.getIndices();
+  operands.append(indices);
+  operandSegmentSizes.push_back(indices.size());
+  // IndexVecs.
+  operands.append(newIndexVecs);
+  operandSegmentSizes.push_back(newIndexVecs.size());
+  // Padding.
+  operands.push_back(gatherOp.getPadding());
+  operandSegmentSizes.push_back(1);
+  // Mask.
+  if (gatherOp.getMask()) {
+    operands.push_back(gatherOp.getMask());
+    operandSegmentSizes.push_back(1);
+  } else {
+    operandSegmentSizes.push_back(0);
+  }
+
+  gatherOp.setIndexedMapsAttr(b.getAffineMapArrayAttr(newIndexedMaps));
+  gatherOp->setOperands(operands);
+  gatherOp.setIndexedAttr(b.getBoolArrayAttr(indexed));
+  gatherOp.getProperties().setOperandSegmentSizes(operandSegmentSizes);
+
+  return gatherOp.getResult();
+}
+
+static Value foldTransferGatherFromBroadcast(TransferGatherOp gatherOp) {
+  return foldTransferGatherIndexVecs(
+      gatherOp,
+      [](Value operand, AffineMap map, int64_t) -> IndexVecFoldResult {
+        auto broadcast = operand.getDefiningOp<vector::BroadcastOp>();
+        if (!broadcast) {
+          return {operand, map, false};
+        }
+
+        int64_t sourceRank = getVectorRank(broadcast.getSourceType());
+        int64_t operandRank = getVectorRank(broadcast.getResultVectorType());
+        AffineMap newMap =
+            map.getSliceMap(operandRank - sourceRank, sourceRank);
+        return {broadcast.getSource(), newMap, true};
+      });
+}
+
+static Value foldTransferGatherFromTranspose(TransferGatherOp gatherOp) {
+  return foldTransferGatherIndexVecs(
+      gatherOp,
+      [](Value operand, AffineMap map, int64_t) -> IndexVecFoldResult {
+        auto transpose = operand.getDefiningOp<vector::TransposeOp>();
+        if (!transpose) {
+          return {operand, map, false};
+        }
+
+        AffineMap newMap =
+            AffineMap::getPermutationMap(
+                invertPermutationVector(transpose.getPermutation()),
+                transpose.getContext())
+                .compose(map);
+        return {transpose.getVector(), newMap, true};
+      });
+}
+
+static Value foldTransferGatherFromStep(TransferGatherOp gatherOp) {
+  return foldTransferGatherIndexVecs(
+      gatherOp,
+      [](Value operand, AffineMap map, int64_t index) -> IndexVecFoldResult {
+        auto step = operand.getDefiningOp<vector::StepOp>();
+        if (!step) {
+          return {operand, map, false};
+        }
+
+        assert(map.getNumResults() == 1);
+        int64_t resultDim = cast<AffineDimExpr>(map.getResult(0)).getPosition();
+
+        // If the map is indexing along the memory dimension, and the vector is
+        // contigious, this is a contigious load on this dimension.
+        if (resultDim == index) {
+          return {Value(), AffineMap(), true};
+        }
+
+        return {operand, map, false};
+      });
+}
 
 OpFoldResult TransferGatherOp::fold(FoldAdaptor adaptor) {
+  if (auto res = foldTransferGatherFromBroadcast(*this)) {
+    return res;
+  }
+  if (auto res = foldTransferGatherFromTranspose(*this)) {
+    return res;
+  }
+  if (auto res = foldTransferGatherFromStep(*this)) {
+    return res;
+  }
   return OpFoldResult();
+}
+
+struct FoldSingleElementIndexVec final : OpRewritePattern<TransferGatherOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TransferGatherOp xferOp,
+                                PatternRewriter &rewriter) const override {
+
+    auto indexVecFolder = [&](Value indexVec, AffineMap map,
+                              int64_t index) -> IndexVecFoldResult {
+      auto vectorTy = cast<VectorType>(indexVec.getType());
+      if (vectorTy.getNumElements() != 1) {
+        return {indexVec, map, false};
+      }
+
+      // Extract the scalar and add it to the
+      // corressponding base.
+      OpOperand &base = xferOp.getIndicesMutable()[index];
+      Value extracted = rewriter.create<vector::ExtractOp>(
+          xferOp.getLoc(), indexVec,
+          SmallVector<int64_t>(vectorTy.getRank(), 0));
+      AffineExpr d0, d1;
+      bindDims(xferOp.getContext(), d0, d1);
+      Value newIndex = affine::makeComposedAffineApply(
+                           rewriter, xferOp.getLoc(), d0 + d1,
+                           ArrayRef<OpFoldResult>{base.get(), extracted})
+                           .getResult();
+      base.set(newIndex);
+
+      return {Value(), AffineMap(), true};
+    };
+
+    Value newVal = foldTransferGatherIndexVecs(xferOp, indexVecFolder);
+
+    if (!newVal) {
+      return failure();
+    }
+
+    return success();
+  }
+};
+
+struct FoldContigousGatherToTransferRead final
+    : OpRewritePattern<TransferGatherOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TransferGatherOp xferOp,
+                                PatternRewriter &rewriter) const override {
+    if (!xferOp.getIndexVecs().empty()) {
+      return failure();
+    }
+
+    // Canonicalize to vector.transfer_read.
+    rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
+        xferOp, xferOp.getVectorType(), xferOp.getSource(), xferOp.getIndices(),
+        xferOp.getPermutationMap(), xferOp.getPadding(), xferOp.getMask(),
+        xferOp.getInBounds());
+    return success();
+  };
+};
+
+void TransferGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                   MLIRContext *ctx) {
+  results.add<FoldSingleElementIndexVec, FoldContigousGatherToTransferRead>(
+      ctx);
 }
 
 // clang-format off
