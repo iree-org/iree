@@ -613,11 +613,12 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
 
 /// Decomposition implementation for iree_linalg_ext.im2col op.
 /// The im2col op is decomposed into serial loops of `insert->extract->copy`.
-/// The `batch` and `M` dimensions of the operation iteration space are always
-/// tiled to 1, and the `K` dimension is left un-tiled if possible. When the
-/// full `K` dimension is a contiguous slice of the input tensor, the K dim
-/// can be left un-tiled so it can be vectorized. Otherwise, it will be tiled
-/// to 1 along with the `batch` and `M` dimensions.
+/// The decomposition supports vectorization along either the `batch` or `K`
+/// dimension, depending on which one corresponds to a contiguous slice in the
+/// input tensor. When the full `K` dimension is a contiguous slice of the input
+/// tensor, the `K` dim can be left un-tiled so it can be vectorized. Similarly,
+/// if the `batch` dimension is contiguous, then vectorization is applied along
+/// `batch`. Any dimension that cannot be vectorized is always tiled to 1.
 /// TODO(Max191): Fallback to larger tile sizes instead of immediately tiling K
 ///               dimension to 1 when non-contiguous.
 ///
@@ -675,47 +676,50 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   // Step 1: Tile the im2col op to loops with contiguous slices in the
   // innermost loop.
   //
-  // If the `kOffset` will index to a full contiguous slice of the K dim of
-  // the input tensor, then don't tile the K loop of the im2col op and
-  // maintain a larger contiguous slice.
+  // If the innermost dim of the input tensor contains a full contiguous slice,
+  // then don't tile the corresponding loop of the im2col op and maintain a
+  // larger contiguous slice. Note that if the im2col input tensor has the batch
+  // dim at last, im2col output tensor has an implicit transpose to move the
+  // batch dim in front, and tiling should be along the batch dim.
   SmallVector<Range> iterationDomain(getIterationDomain(b));
-  OpFoldResult kTileSize = iterationDomain.back().size;
-  auto constKTileSize = getConstantIntValue(kTileSize);
-  if (constKTileSize) {
-    kTileSize = b.getIndexAttr(constKTileSize.value());
+  unsigned innerDim = getInputRank() - 1;
+  OpFoldResult innerTileSize = getBatchPos().back() == innerDim
+                                   ? iterationDomain.front().size
+                                   : iterationDomain.back().size;
+  auto constTileSize = getConstantIntValue(innerTileSize);
+  if (constTileSize) {
+    innerTileSize = b.getIndexAttr(constTileSize.value());
   }
+
   SmallVector<OpFoldResult> inputSizes =
       tensor::getMixedSizes(b, loc, getInput());
-  // Find the innermost non-batch dimension. This dimension is the fastest
-  // changing dimension with the K dimension of the im2col iteration domain.
-  // This means it is the innermost dimension of the extract_slice on the
-  // input tensor, and the slice wants to be contiguous along this dimension.
-  SetVector<int64_t> batchPosSet(getBatchPos().begin(), getBatchPos().end());
-  OpFoldResult innerSliceSize;
-  for (int idx = inputSizes.size() - 1; idx >= 0; --idx) {
-    if (batchPosSet.contains(idx)) {
-      continue;
+  OpFoldResult innerSliceSize = inputSizes[innerDim];
+  // If the innermost dimension is an `m_pos` dimension, then use the
+  // corresponding kernel_size instead of the input tensor size. This is
+  // because the slice will be of size `kernel_size` at some offset
+  // `i * kernel_size` in this case.
+  for (auto [mPos, kernelSize] :
+       llvm::zip_equal(getMPos(), getMixedKernelSize())) {
+    if (mPos == innerDim) {
+      innerSliceSize = kernelSize;
     }
-    innerSliceSize = inputSizes[idx];
-    // If the innermost non-batch dimension is an m_pos dimension, then use the
-    // corresponding kernel_size instead of the input tensor size. This is
-    // because the slice will be of size `kernel_size` at some offset
-    // `i * kernel_size` in this case.
-    for (auto [mPos, kernelSize] :
-         llvm::zip_equal(getMPos(), getMixedKernelSize())) {
-      if (mPos == idx) {
-        innerSliceSize = kernelSize;
-      }
-    }
-    break;
   }
+
+  // Check if the input slice is contiguous and can be vectorized along the
+  // the innermost dimension.
   bool vectorizeInnerKLoop =
-      getKPos().back() == getInputRank() - 1 &&
-      willBeContiguousSlice(innerSliceSize, kTileSize, kOffset);
+      getKPos().back() == innerDim &&
+      willBeContiguousSlice(innerSliceSize, innerTileSize, kOffset);
+  bool vectorizeInnerBLoop =
+      getBatchPos().back() == innerDim &&
+      willBeContiguousSlice(innerSliceSize, innerTileSize,
+                            /*offset=*/b.getIndexAttr(0));
   if (vectorizeInnerKLoop) {
     iterationDomain.pop_back();
+  } else if (vectorizeInnerBLoop) {
+    iterationDomain.erase(iterationDomain.begin());
   } else {
-    kTileSize = b.getIndexAttr(1);
+    innerTileSize = b.getIndexAttr(1);
   }
 
   // Build loop nest.
@@ -768,6 +772,7 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   for (auto [idx, mPos] : enumerate(getMPos())) {
     mKernelIdx[mPos] = idx;
   }
+  SetVector<int64_t> batchPosSet(getBatchPos().begin(), getBatchPos().end());
   for (auto [idx, size] : enumerate(inputSizes)) {
     if (batchPosSet.contains(idx))
       continue;
@@ -786,6 +791,10 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   OpFoldResult kIndex = kOffset;
   for (auto [i, ivIdx, stride] :
        llvm::enumerate(getKOutputDims(), getMixedKStrides())) {
+    if (vectorizeInnerBLoop) {
+      // Batch loop doesn't exist, adjust the ivIdx.
+      ivIdx--;
+    }
     if (vectorizeInnerKLoop && i == getMixedKOffset().size() - 1) {
       break;
     }
@@ -821,6 +830,10 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   SmallVector<int64_t> mOutDims = getMOutputDims();
   SmallVector<OpFoldResult> mIvs, mOutStrides(getMixedMStrides());
   for (auto [idx, dim] : llvm::enumerate(getMOutputDims())) {
+    if (vectorizeInnerBLoop) {
+      // Batch loop doesn't exist, adjust the dim.
+      dim--;
+    }
     mIvs.push_back(ivs[dim]);
   }
   OpFoldResult linearMIv = linearizeIndex(mIvs, mOutStrides);
@@ -853,15 +866,23 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
     sliceOffsets[mPos] = offset;
     sliceSizes[mPos] = one;
   }
-  // Set the K offset and size for the input tensor.
-  const int64_t kPos = getKPos().front();
-  sliceOffsets[kPos] = inputKOffset.front();
-  sliceSizes[kPos] = kTileSize;
 
-  // Set the batch offsets for the input tensor.
-  int ivIdx = 0;
-  for (auto bPos : getBatchPos()) {
-    sliceOffsets[bPos] = ivs[ivIdx++];
+  // Set the batch and K size for the input tensor.
+  const int64_t kPos = getKPos().front();
+  const int64_t bPos = getBatchPos().front();
+  if (vectorizeInnerBLoop) {
+    sliceSizes[bPos] = innerTileSize;
+  } else {
+    sliceSizes[kPos] = innerTileSize;
+  }
+
+  // Set the batch and K offsets for the input tensor.
+  sliceOffsets[kPos] = inputKOffset.front();
+  if (!vectorizeInnerBLoop) {
+    int ivIdx = 0;
+    for (auto bPos : getBatchPos()) {
+      sliceOffsets[bPos] = ivs[ivIdx++];
+    }
   }
 
   // Step 3. Decompose the im2col op into:
@@ -872,16 +893,15 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   // ```
   //
   // Extract a slice from the input tensor.
-
   ShapedType outputType = getOutputType();
-  SmallVector<OpFoldResult> kTileSizes(
+  SmallVector<OpFoldResult> inputTileSizes(
       std::min<int64_t>(getOutputRank(), getInputRank()), b.getIndexAttr(1));
-  kTileSizes.back() = kTileSize;
+  inputTileSizes.back() = innerTileSize;
 
-  SmallVector<int64_t> kTileSizeStatic;
-  SmallVector<Value> kTileSizeDynamic;
-  dispatchIndexOpFoldResults(kTileSizes, kTileSizeDynamic, kTileSizeStatic);
-  auto extractType = cast<RankedTensorType>(outputType.clone(kTileSizeStatic));
+  SmallVector<int64_t> tileSizeStatic;
+  SmallVector<Value> tileSizeDynamic;
+  dispatchIndexOpFoldResults(inputTileSizes, tileSizeDynamic, tileSizeStatic);
+  auto extractType = cast<RankedTensorType>(outputType.clone(tileSizeStatic));
   auto extract =
       b.create<tensor::ExtractSliceOp>(nestedLoc, extractType, inputSlice,
                                        sliceOffsets, sliceSizes, sliceStrides);
@@ -890,20 +910,48 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   sliceOffsets = SmallVector<OpFoldResult>(getOutputRank(), zero);
   sliceSizes = SmallVector<OpFoldResult>(getOutputRank(), one);
   sliceStrides = SmallVector<OpFoldResult>(getOutputRank(), one);
-  sliceSizes.back() = kTileSize;
-  for (auto [idx, iv] : llvm::enumerate(ivs)) {
-    sliceOffsets[idx] = iv;
+
+  RankedTensorType resultType;
+  TypedValue<RankedTensorType> result;
+  // If the im2col input tensor has the batch dim at last and can be vectorized,
+  // transpose the dimensions to match the output order (Batch, M, K).
+  if (vectorizeInnerBLoop) {
+    SmallVector<int64_t> transposePerm;
+    transposePerm.insert(transposePerm.end(), getBatchPos().begin(),
+                         getBatchPos().end());
+    transposePerm.insert(transposePerm.end(), getMPos().begin(),
+                         getMPos().end());
+    transposePerm.insert(transposePerm.end(), getKPos().begin(),
+                         getKPos().end());
+    ArrayRef<int64_t> extractShape = extractType.getShape();
+    SmallVector<int64_t> emptyShape =
+        applyPermutation(extractShape, transposePerm);
+    auto empty = b.create<tensor::EmptyOp>(nestedLoc, emptyShape,
+                                           outputType.getElementType());
+    auto transposeOp =
+        b.create<linalg::TransposeOp>(nestedLoc, extract, empty, transposePerm);
+    resultType = cast<RankedTensorType>(transposeOp->getResult(0).getType());
+    result = cast<TypedValue<RankedTensorType>>(transposeOp->getResult(0));
+    sliceSizes.front() = innerTileSize;
+    for (auto [idx, iv] : llvm::enumerate(ivs))
+      sliceOffsets[++idx] = iv;
+  } else {
+    resultType = extractType;
+    result = extract.getResult();
+    sliceSizes.back() = innerTileSize;
+    for (auto [idx, iv] : llvm::enumerate(ivs))
+      sliceOffsets[idx] = iv;
   }
+
   // Insert a `linalg.copy` so there is something to vectorize in the
   // decomposition. Without this copy, the extract and insert slice ops
   // do not get vectorized, and the sequence becomes a scalar memref.copy.
   // This memref.copy could be vectorized after bufferization, but it is
   // probably better to vectorize during generic vectorization.
   Value copyDest = b.create<tensor::ExtractSliceOp>(
-      nestedLoc, extractType, loopNest.loops.back().getRegionIterArg(0),
+      nestedLoc, resultType, loopNest.loops.back().getRegionIterArg(0),
       sliceOffsets, sliceSizes, sliceStrides);
-  auto copiedSlice =
-      b.create<linalg::CopyOp>(nestedLoc, extract.getResult(), copyDest);
+  auto copiedSlice = b.create<linalg::CopyOp>(nestedLoc, result, copyDest);
   auto insert =
       b.create<tensor::InsertSliceOp>(nestedLoc, copiedSlice.getResult(0),
                                       loopNest.loops.back().getRegionIterArg(0),
