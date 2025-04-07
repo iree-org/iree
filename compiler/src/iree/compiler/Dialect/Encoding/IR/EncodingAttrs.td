@@ -163,7 +163,6 @@ def MatmulKAttr : IREEEncoding_Attr<"MatmulK"> {
 
   let parameters = (ins
     "DenseI32ArrayAttr":$k_dims,
-    OptionalParameter<"ArrayAttr", "the serialized layouts, if present">:$layouts
   );
 }
 
