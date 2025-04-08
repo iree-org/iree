@@ -86,13 +86,45 @@ def MatchCastCompatibleTypesOp : Op<Transform_Dialect, "iree.match.cast_compatib
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
+def MatchDimBoundsOp : Op<Transform_Dialect, "iree.match.dim_bounds",
+    [IsolatedFromAbove,
+     MatchOpInterface,
+     SingleValueMatcher,
+     MemoryEffectsOpInterface]> {
+  let summary =
+      "Checks whether the size of a dim is within given bounds";
+  let description = [{
+    Checks whether a dim is within a specified lower and upper bound.
+
+    #### Return modes
+
+    Succeeds if the value's type is compatible with the target type, and
+    produces a silenceable failure otherwise. Produces a definite failure
+    if the operand is not associated with a single payload value.
+  }];
+
+  let arguments = (ins TransformValueHandleTypeInterface:$operand_handle,
+                       I64Attr:$dim,
+                       OptionalAttr<I64Attr>:$lower_bound,
+                       OptionalAttr<I64Attr>:$upper_bound);
+
+  // `<=` isn't a valid literal so use `le` instead.
+  let assemblyFormat = [{
+    $operand_handle `[` $dim `]` `,` (`umin` `=` $lower_bound^):(`none`)?
+    `,` (`umax` `=` $upper_bound^):(`none`)?  attr-dict `:` type($operand_handle)
+  }];
+  let extraClassDeclaration = SingleValueMatcher.extraDeclaration;
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
 def MatchDimIsMultipleOfOp : Op<Transform_Dialect, "iree.match.dim_is_multiple_of",
     [IsolatedFromAbove,
      MatchOpInterface,
      SingleValueMatcher,
      MemoryEffectsOpInterface]> {
   let summary =
-      "Checks if the body of the target op matches the body of the single contained op";
+      "Checks the static size of a dim is divisible by a given value";
   let description = [{
     Checks whether the given dimension given shaped value is a multiple of the
     given size.
