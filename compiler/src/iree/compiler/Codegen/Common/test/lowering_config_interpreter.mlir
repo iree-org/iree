@@ -44,7 +44,7 @@ module attributes { transform.with_named_sequence } {
   }
 }
 
-//      CHECK: IR printer:
+//     CHECK: IR printer:
 // CHECK-DAG:   one
 // CHECK-DAG:   two
 // CHECK-DAG:   three
@@ -59,7 +59,10 @@ module {
   }
 }
 
-//      CHECK: IR printer: I am external
+// See ./external_strategy_spec.mlir for the implementation of
+// "lowering_strategy" annotated for this test.
+//
+// CHECK: IR printer: I am external
 
 // -----
 
@@ -76,4 +79,4 @@ module attributes { transform.with_named_sequence } {
   }
 }
 
-//      CHECK: IR printer: I am internal
+// CHECK: IR printer: I am internal

@@ -24,16 +24,17 @@ IREE::Util::transform_dialect::CreateSerializedModuleOp::verify() {
   if (!getBody().hasOneBlock()) {
     return emitOpError() << "expected single block body";
   }
-  if (getBody().front().getNumArguments() != 1) {
+  Block *body = &getBody().front();
+  if (body->getNumArguments() != 1) {
     return emitOpError() << "expected body with single block argument.";
   }
   if (!isa<transform::TransformHandleTypeInterface>(
-          getBody().front().getArgument(0).getType())) {
+          body->getArgument(0).getType())) {
     return emitOpError()
            << "expected body argument to be a transform op handle type";
   }
-  if (!getRegion().empty()) {
-    for (Operation &op : getRegion().front()) {
+  if (!body->empty()) {
+    for (Operation &op : *body) {
       if (!isa<transform::TransformOpInterface>(&op)) {
         InFlightDiagnostic diag = emitOpError()
                                   << "expected children ops to implement "
@@ -73,9 +74,11 @@ IREE::Util::transform_dialect::CreateSerializedModuleOp::apply(
     DiagnosedSilenceableFailure result =
         state.applyTransform(cast<transform::TransformOpInterface>(transform));
     // TODO: Support better error propagation.
-    if (result.isDefiniteFailure() || result.isSilenceableFailure()) {
+    if (result.isSilenceableFailure())
       return DiagnosedSilenceableFailure::definiteFailure();
-    }
+    // Pass through the error message from definite failures.
+    if (result.isDefiniteFailure())
+      return result;
   }
 
   // Serialize the module as bytecode to a string.
