@@ -5,7 +5,7 @@
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 16, 16, 16>>
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map1, #map2, #map3], iteration_sizes = [?, ?, ?]>
 #device_target_llvm_cpu = #hal.device.target<"local", [#executable_target_embedded_elf_x86_64_]> : !hal.device
 module attributes {hal.device.targets = [#device_target_llvm_cpu]} {
   util.func public @lhs_encoding(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32> {

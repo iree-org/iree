@@ -102,21 +102,39 @@ MatmulNarrowDim getMatmulNarrowDim(linalg::LinalgOp linalgOp,
   return (narrowM && (!narrowN || mSize <= nSize)) ? narrowM : narrowN;
 }
 
-MatmulNarrowDim getMatmulNarrowDim(EncodingAttr encoding) {
+MatmulNarrowDim getPo2MatmulNarrowDim(EncodingAttr encoding) {
   if (encoding.getOpType().getValue() != EncodingOpType::matmul) {
     return {};
   }
-  ArrayRef<int64_t> roundDimsTo = encoding.getRoundDimsToArray();
-  if (roundDimsTo.empty()) {
+  SmallVector<int64_t> iterationSizes = encoding.getIterationSizesArray();
+  if (iterationSizes.empty()) {
     return {};
   }
-  int m = roundDimsTo[0];
-  int n = roundDimsTo[1];
-  if (m < n) {
-    return {MatmulNarrowDim::Dim::M, m};
+  std::optional<linalg::ContractionDimensions> maybeCDims =
+      getEncodingContractionDims(encoding);
+  if (!maybeCDims) {
+    return {};
   }
-  if (n < m) {
-    return {MatmulNarrowDim::Dim::N, n};
+  linalg::ContractionDimensions cDims = maybeCDims.value();
+  // The following expects M, N, K, and Batch sizes of at most 1 for now.
+  // TODO: Extend this to multiple M/N/K/Batch dims.
+  assert(cDims.m.size() <= 1 && cDims.n.size() <= 1 && cDims.k.size() == 1 &&
+         cDims.batch.size() <= 1 &&
+         "Expected at most one M, N, K, and Batch dimension");
+  // M or N can be empty instead of having an explicit dim size of 1 for matvec
+  // and vecmat, so set to 1 if empty.
+  const int64_t m = cDims.m.empty() ? 1 : iterationSizes[cDims.m[0]];
+  const int64_t n = cDims.n.empty() ? 1 : iterationSizes[cDims.n[0]];
+  if (ShapedType::isDynamic(m) && ShapedType::isDynamic(n)) {
+    return {};
+  }
+  if (ShapedType::isDynamic(n) || m < n) {
+    return {MatmulNarrowDim::Dim::M,
+            static_cast<int64_t>(llvm::PowerOf2Ceil(m))};
+  }
+  if (ShapedType::isDynamic(m) || n < m) {
+    return {MatmulNarrowDim::Dim::N,
+            static_cast<int64_t>(llvm::PowerOf2Ceil(n))};
   }
   return {};
 }
@@ -126,7 +144,7 @@ bool isNarrowNResult(EncodingAttr encoding) {
     return false;
   }
 
-  return IREE::Encoding::getMatmulNarrowDim(encoding).isN();
+  return IREE::Encoding::getPo2MatmulNarrowDim(encoding).isN();
 }
 
 } // namespace mlir::iree_compiler::IREE::Encoding

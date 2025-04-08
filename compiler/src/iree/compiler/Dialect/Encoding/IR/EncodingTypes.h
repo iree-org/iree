@@ -88,15 +88,15 @@ struct MatmulNarrowDim {
 MatmulNarrowDim getMatmulNarrowDim(linalg::LinalgOp linalgOp,
                                    int narrowThreshold);
 
-/// Returns the narrow dim in a given `encoding`. This works by inspecting
-/// the `round_dims_to` array attribute in the `encoding`. If the
-/// `round_dims_to` of one dimension (M or N) is smaller than the other, then
-/// that's the narrow dimension, because the only way it would have been set
-/// to be smaller in the first place, is if we previously flagged that dimension
-/// as narrow. If the `round_dims_to` of the M and N dimensions agree, then
-/// neither is a narrow dimension and this returns a default-constructed falsish
-/// value.
-MatmulNarrowDim getMatmulNarrowDim(EncodingAttr encoding);
+/// Returns the narrow dim in a given `encoding`, ceiled to a power of two. This
+/// works by inspecting the `iteration_sizes` array attribute in the `encoding`.
+/// If the `iteration_sizes` of one dimension (M or N) is smaller than the
+/// other, then that's the narrow dimension, because the only way it would have
+/// been set to be smaller in the first place, is if we previously flagged that
+/// dimension as narrow. If the `iteration_sizes` of the M and N dimensions
+/// agree, then neither is a narrow dimension and this returns a
+/// default-constructed falsish value.
+MatmulNarrowDim getPo2MatmulNarrowDim(EncodingAttr encoding);
 
 /// Returns true if `encoding` represents a narrow-N matmul RESULT, e.g. the
 /// result of a matvec.

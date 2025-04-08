@@ -211,22 +211,26 @@ public:
     }
     SmallVector<Type> elemTypes = {lhsElemType, rhsElemType, outElemType};
 
-    auto narrowDim = IREE::Encoding::getMatmulNarrowDim(linalgOp, padFactor);
+    // The `iteration_sizes` are the linalg op's static loop ranges. From the
+    // combination of `iteration_sizes` and `user_indexing_maps`, we can later
+    // derive information such as the iteration size of the M/N dimensions of a
+    // matmul-like operation for example.
+    FailureOr<SmallVector<int64_t, 4>> maybeIterationSizes =
+        linalgOp.getStaticLoopRanges();
+    if (failed(maybeIterationSizes)) {
+      return failure();
+    }
+    SmallVector<int64_t> iterationSizes =
+        std::move(maybeIterationSizes.value());
 
     Location loc = linalgOp.getLoc();
     SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
 
     auto opType = IREE::Encoding::EncodingOpType::matmul;
     auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
-      SmallVector<int64_t> roundDimsTo(3, padFactor);
-      if (narrowDim.isM()) {
-        roundDimsTo[0] = llvm::PowerOf2Ceil(narrowDim.size);
-      }
-      if (narrowDim.isN()) {
-        roundDimsTo[1] = llvm::PowerOf2Ceil(narrowDim.size);
-      }
-      auto encoding = EncodingAttr::get(linalgOp.getContext(), operandIndex,
-                                        opType, elemTypes, maps, roundDimsTo);
+      auto encoding =
+          EncodingAttr::get(linalgOp.getContext(), operandIndex, opType,
+                            elemTypes, maps, iterationSizes);
       return setEncoding(rewriter, loc, src, encoding);
     };
     Value encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);
