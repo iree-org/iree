@@ -569,7 +569,7 @@ static Value foldTransferGatherFromStep(TransferGatherOp gatherOp) {
         int64_t resultDim = cast<AffineDimExpr>(map.getResult(0)).getPosition();
 
         // If the map is indexing along the memory dimension, and the vector is
-        // contigious, this is a contigious load on this dimension.
+        // contiguous, this is a contiguous load on this dimension.
         if (resultDim == index) {
           return {Value(), AffineMap(), true};
         }

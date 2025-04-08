@@ -767,7 +767,7 @@ static Value predicateMaybeMaskedScalarTransfer(
 }
 
 /// Scalarizes remaining vector transfer that couldn't be converted to
-/// vevtor load operations.
+/// vector load operations.
 
 /// This is very specific to SPIR-V as pointer cannot be casted to vector type
 /// if any of the memory access is not vector.

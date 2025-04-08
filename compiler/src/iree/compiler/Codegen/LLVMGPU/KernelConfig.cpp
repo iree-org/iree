@@ -96,7 +96,7 @@ llvm::cl::opt<bool>
                  llvm::cl::desc("force use of wmma operations for tensorcore"),
                  llvm::cl::init(false));
 
-/// Flag used to toggle using mma.sync vs wmma when targetting tensorcore.
+/// Flag used to toggle using mma.sync vs wmma when targeting tensorcore.
 llvm::cl::opt<bool>
     clGPUUseMMASync("iree-codegen-llvmgpu-use-mma-sync",
                     llvm::cl::desc("force use mma sync instead of wmma ops"),
@@ -160,7 +160,7 @@ static bool needsLoweringConfigPropagation(
 static SmallVector<TileWorkgroupSizePair>
 getMatmulConfig(IREE::GPU::TargetAttr target) {
   SmallVector<TileWorkgroupSizePair> tileSizes;
-  // Pick tile size so that M*K and K*N dividible by wgSize * \*vecSize=*\4.
+  // Pick tile size so that M*K and K*N divisible by wgSize * \*vecSize=*\4.
   // This way workgroup memory copy don't need to be masked. Once we support
   // masked load we can get performance out of more configuration.
 
@@ -189,7 +189,7 @@ getTensorCoreConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes,
                     Type elementType, int64_t M, int64_t N, int64_t K) {
   // Based on early analysis we found that 128x256x32_3 gives acceptable
   // performance across many of the large matrix sizes for f16 and fp32. This
-  // needs to be refined into a better strategy based on empircal data but this
+  // needs to be refined into a better strategy based on empirical data but this
   // gives us a quick solution to achieve performance in the right order of
   // magnitude for large square like cases.
   int64_t parallelDim = M * N;
@@ -1164,7 +1164,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   // The subgroup distribution in attention is controlled by the second matmul
   // (Parallel dimension distribution is usually (almost always) controlled by
   // the last reduction operation in a dispatch). Since VectorDistribution
-  // doesn't have logic to set subgroup and thread layouts seperately, we
+  // doesn't have logic to set subgroup and thread layouts separately, we
   // explicitly set the subgroup count for the first matmul as well,
   // corresponding to what the second matmul dictates.
 
@@ -1624,7 +1624,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
 
   // Send very skinny, {2-4}xNxK and Mx{2-4}xK, matmuls to the vector reduction
   // pipeline, similar to matvec. Note: Because of reassociation in the vector
-  // reduction pipeline, this may lead to precission loss. If this ever becomes
+  // reduction pipeline, this may lead to precision loss. If this ever becomes
   // an issue, we can hide this behind a flag.
   if (llvm::all_equal({contractionDims->m.size(), contractionDims->n.size(),
                        contractionDims->k.size(), size_t{1}}) &&
@@ -2391,7 +2391,7 @@ static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
 
   // Workgroup size contains 8 warps. Configured with 8 threads on fastest
   // moving dimension so each thread can execute a vectorized copy of 4
-  // contigious elements at a time from the 32 block.
+  // contiguous elements at a time from the 32 block.
   std::array<int64_t, 3> workgroupSize = {8, 32, 1};
 
   return setOpConfigAndEntryPointFnTranslation(
@@ -2470,7 +2470,7 @@ static LogicalResult setArgmaxUkernelConfig(
 }
 
 /// Decides the tiling and distribution parameters for one convolution
-/// dimension. Returns true if we can succesfully deduce.
+/// dimension. Returns true if we can successfully deduce.
 ///
 /// - `inputDim` is the size of the dimension to be distributed.
 /// - `residualThreads` is the remaining threads we can distribute.
@@ -2512,7 +2512,7 @@ static bool distributeToOneDim(const int64_t inputDim,
 
 /// Decides the tiling and distribution parameters for two convolution window
 /// dimensions to two workgroup dimensions as a square. Returns true if we can
-/// succesfully deduce.
+/// successfully deduce.
 static bool distributeToSquare(const int64_t oh, const int64_t ow,
                                int64_t &residualThreads,
                                int64_t &residualTilingFactor,

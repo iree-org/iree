@@ -139,22 +139,22 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     the result vector and the memory dimensions being indexed.
 
     The operation is a generalization of `vector.transfer_read` op, where the
-    slice from which the read is performed is not guranteed to be contigious,
+    slice from which the read is performed is not guranteed to be contiguous,
     and instead how the slice is gathered is defined explicitly in the
     operation.
 
     The operation can be thought of as:
-      1. A contigious slice gathered from the source as described by the operation
-      2. A `vector.transfer_read` on the contigious slice
+      1. A contiguous slice gathered from the source as described by the operation
+      2. A `vector.transfer_read` on the contiguous slice
 
     The operation defines `permutation_map`, `padding`, `mask`, `in_bounds` in
     the same way as `vector.transfer_read` defines, but on the inferred
-    contigious slice.
+    contiguous slice.
 
-    The other parameters of the operation define how the contigious slice is
+    The other parameters of the operation define how the contiguous slice is
     gathered from the source. `indices` define a base to offset the source by.
     `indexed` defines for each dimension if the dimension is gathered or
-    contigious.
+    contiguous.
 
     The `indices` contains a base to offset the source by. The `indexed` array
     defines if a dimension is gathered or not. For example, for the following
@@ -194,7 +194,7 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     ```
 
     With these additional parameters, the operation can define a supervector
-    read from a non-contigious slice. For example:
+    read from a non-contiguous slice. For example:
 
     ```
     source: memref<8192x8x16xf32>
@@ -222,7 +222,7 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     The crucial structure of the operation relies on the index_vec and
     the result vector's indexing being defined based on the dimensions of the
     memory. This mapping can be exploited to simplify gathered dimensions
-    to contigious dimensions.
+    to contiguous dimensions.
   }];
 
   let extraClassDeclaration = [{
