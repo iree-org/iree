@@ -139,6 +139,7 @@ iree_status_t iree_hal_hip_event_export(iree_hal_hip_event_t* event) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "Cannot export an imported event");
   }
   event->exported = true;
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -222,9 +223,13 @@ iree_status_t iree_hal_hip_event_pool_allocate(
 // Imports an external hip_event_t to the pool.
 iree_status_t iree_hal_hip_event_pool_import(
   iree_hal_hip_event_pool_t* event_pool, hipEvent_t event, iree_hal_hip_event_t** out_event) {
-  return iree_hal_hip_event_create(
+  iree_status_t status = iree_hal_hip_event_create(
     event_pool->symbols, event_pool, event_pool->host_allocator,
       event, out_event);
+  if (iree_status_is_ok(status)) {
+    iree_hal_hip_event_pool_retain(event_pool);
+  }
+  return status;
 }
 
 static void iree_hal_hip_event_pool_free(

@@ -184,7 +184,7 @@ static void iree_hal_hip_semaphore_destroy(
         (iree_hal_hip_semaphore_queue_item_t*)
             iree_hal_hip_util_tree_node_get_value(i);
     iree_hal_hip_event_release(queue_item->event);
-    iree_hal_hip_event_release(queue_item->created_device);
+    iree_hal_hip_event_release(queue_item->secondary_event);
     iree_hal_resource_release(queue_item->cpu_event);
     iree_hal_hip_semaphore_work_item_t* work_item = queue_item->work_item;
     while (work_item) {
@@ -463,7 +463,7 @@ iree_status_t iree_hal_hip_semaphore_notify_work(
         item->event = NULL;
         item->cpu_event = NULL;
         item->work_item = NULL;
-        item->exported_device = NULL;
+        item->created_device = NULL;
       }
     }
     if (iree_status_is_ok(status)) {
@@ -505,43 +505,43 @@ iree_status_t iree_hal_hip_semaphore_notify_forward_progress_to(
   }
   iree_hal_hip_semaphore_work_item_t* work_item = NULL;
   iree_hal_hip_semaphore_work_item_t* last_work_item = NULL;
-  if (value > semaphore->max_value_to_be_signaled) {
-    iree_hal_hip_util_tree_node_t* node = iree_hal_hip_util_tree_upper_bound(
-        &semaphore->event_queue.tree, semaphore->max_value_to_be_signaled);
-    // Collect all of the things to schedule now that we know we can safely make
-    // it to a given value.
-    while (node) {
-      iree_hal_hip_semaphore_queue_item_t* queue_item =
-          (iree_hal_hip_semaphore_queue_item_t*)
-              iree_hal_hip_util_tree_node_get_value(node);
+  
+  iree_hal_hip_util_tree_node_t* node = iree_hal_hip_util_tree_upper_bound(
+      &semaphore->event_queue.tree, semaphore->max_value_to_be_signaled);
+  // Collect all of the things to schedule now that we know we can safely make
+  // it to a given value.
+  while (node) {
+    iree_hal_hip_semaphore_queue_item_t* queue_item =
+        (iree_hal_hip_semaphore_queue_item_t*)
+            iree_hal_hip_util_tree_node_get_value(node);
 
-      // We can schedule the work for this semaphore if the value is
-      // large enough, standard event, since the only
-      // possible assumption we can make is that the semaphore
-      // will be signaled externally by the time we need it to be.
-      if (iree_hal_hip_util_tree_node_get_key(node) > value &&
-        queue_item->type == IREE_HAL_HIP_SEMAPHORE_QUEUE_ITEM_INTERNAL) {
-          break;
-      }
+    // If a semaphore is imported then we consider it valid
+    // as soon as the semaphore preceding it is valid.
+    if (iree_hal_hip_util_tree_node_get_key(node) > value &&
+      queue_item->type != IREE_HAL_HIP_SEMAPHORE_QUEUE_ITEM_IMPORTED) {
+        break;
+    }
 
-      iree_hal_hip_semaphore_work_item_t* next_work_item =
-          queue_item->work_item;
-      while (next_work_item) {
-        if (!work_item) {
-          work_item = next_work_item;
-        }
-        if (last_work_item && !last_work_item->next) {
-          last_work_item->next = next_work_item;
-        }
-        last_work_item = next_work_item;
-        next_work_item = next_work_item->next;
+    value = iree_max(semaphore->max_value_to_be_signaled,
+      iree_hal_hip_util_tree_node_get_key(node));
+
+    iree_hal_hip_semaphore_work_item_t* next_work_item =
+        queue_item->work_item;
+    while (next_work_item) {
+      if (!work_item) {
+        work_item = next_work_item;
       }
-      queue_item->work_item = NULL;
-      iree_hal_hip_util_tree_node_t* last_node = node;
-      node = iree_hal_hip_util_tree_node_next(node);
-      if (!queue_item->event) {
-        iree_hal_hip_util_tree_erase(&semaphore->event_queue.tree, last_node);
+      if (last_work_item && !last_work_item->next) {
+        last_work_item->next = next_work_item;
       }
+      last_work_item = next_work_item;
+      next_work_item = next_work_item->next;
+    }
+    queue_item->work_item = NULL;
+    iree_hal_hip_util_tree_node_t* last_node = node;
+    node = iree_hal_hip_util_tree_node_next(node);
+    if (!queue_item->event) {
+      iree_hal_hip_util_tree_erase(&semaphore->event_queue.tree, last_node);
     }
   }
 
@@ -691,8 +691,10 @@ iree_status_t iree_hal_hip_semaphore_create_event_and_record_if_necessary(
           if (device != value->created_device) {
             status = iree_hal_hip_event_pool_acquire(event_pool, 1, &value->secondary_event);
             if (iree_status_is_ok(status)) {
-              status = hipEventRecord(iree_hal_hip_event_handle(value->secondary_event),
-                dispatch_stream);
+              status = IREE_HIP_CALL_TO_STATUS(
+                  semaphore->symbols,
+                  hipEventRecord(iree_hal_hip_event_handle(value->secondary_event),
+                  dispatch_stream));
             }
             if (iree_status_is_ok(status)) {
               status = IREE_HIP_CALL_TO_STATUS(
@@ -1028,8 +1030,7 @@ static iree_status_t iree_hal_hip_semaphore_import_timepoint(
       "invalid timepoint type for HIP semaphore");
   }
 
-  if ((external_timepoint.compatibility & IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_WAIT) !=
-    IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_WAIT) {
+  if ((external_timepoint.compatibility & IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_WAIT) == 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
         "HIP only supports the import of DEVICE_WAIT timepoints");
   }
@@ -1054,7 +1055,10 @@ static iree_status_t iree_hal_hip_semaphore_import_timepoint(
       semaphore->devices.devices[device_ordinal].device_event_pool,
       external_timepoint.handle.hip_event, &item->event);
   }
+  uint64_t current_value = semaphore->current_visible_value;
   iree_slim_mutex_unlock(&semaphore->mutex);
+  iree_hal_hip_semaphore_notify_forward_progress_to(base_semaphore, 
+    current_value);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -1065,7 +1069,8 @@ static iree_status_t iree_hal_hip_semaphore_export_timepoint(
     iree_hal_external_timepoint_type_t requested_type,
     iree_hal_external_timepoint_flags_t requested_flags,
     iree_hal_external_timepoint_t* IREE_RESTRICT out_external_timepoint) {
-  if (requested_type & IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_HIP_EVENT == 0) {
+  memset(out_external_timepoint, 0x00, sizeof(*out_external_timepoint));
+  if ((requested_type & IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_HIP_EVENT) == 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
       "HIP only supports the import of DEVICE_WAIT timepoints");
   }
@@ -1089,6 +1094,13 @@ static iree_status_t iree_hal_hip_semaphore_export_timepoint(
       1, &item->event);
     if (iree_status_is_ok(status)) {
       status = iree_hal_hip_event_export(item->event);
+    }
+    if (iree_status_is_ok(status)) {
+      out_external_timepoint->compatibility = IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_WAIT | 
+        IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_WAIT;
+      out_external_timepoint->flags = requested_flags;
+      out_external_timepoint->handle.hip_event = iree_hal_hip_event_handle(item->event);
+      out_external_timepoint->type = IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_HIP_EVENT;
     }
   }
   iree_slim_mutex_unlock(&semaphore->mutex);

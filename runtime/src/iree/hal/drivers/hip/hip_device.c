@@ -1177,8 +1177,10 @@ iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
   for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
     status = iree_hal_hip_semaphore_create_event_and_record_if_necessary(
         signal_semaphore_list.semaphores[i],
-        signal_semaphore_list.payload_values[i], stream,
-        device_ordinal);
+        signal_semaphore_list.payload_values[i],
+        &device->devices[device_ordinal],
+        stream,
+        device->devices[device_ordinal].device_event_pool);
     if (!iree_status_is_ok(status)) {
       break;
     }
@@ -1542,7 +1544,7 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
             iree_hal_hip_semaphore_notify_work(
                 wait_semaphore_list.semaphores[i],
                 wait_semaphore_list.payload_values[i],
-                device_ordinal,
+                device->devices[device_ordinal].device_event_pool,
                 &iree_hal_hip_device_semaphore_callback, callback_data));
       }
     } else {
@@ -1632,7 +1634,7 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
             iree_hal_hip_semaphore_notify_work(
                 wait_semaphore_list.semaphores[i],
                 wait_semaphore_list.payload_values[i],
-                device_ordinal,
+                device->devices[device_ordinal].device_event_pool,
                 &iree_hal_hip_device_semaphore_callback, callback_data));
       }
     } else {
@@ -2075,7 +2077,7 @@ static iree_status_t iree_hal_hip_device_queue_read(
           status, iree_hal_hip_semaphore_notify_work(
                       wait_semaphore_list.semaphores[i],
                       wait_semaphore_list.payload_values[i],
-                      device_ordinal,
+                      device->devices[device_ordinal].device_event_pool,
                       &iree_hal_hip_device_semaphore_callback, callback_data));
     }
   } else {
@@ -2419,7 +2421,7 @@ static iree_status_t iree_hal_hip_device_queue_execute(
           status, iree_hal_hip_semaphore_notify_work(
                       wait_semaphore_list.semaphores[i],
                       wait_semaphore_list.payload_values[i],
-                      device_ordinal,
+                      device->devices[device_ordinal].device_event_pool,
                       &iree_hal_hip_device_semaphore_callback, callback_data));
     }
   } else {
