@@ -28,7 +28,7 @@
 namespace mlir::iree_compiler::IREE::Encoding {
 
 //===---------------------------------------------------------------------===//
-// encoding.encoding
+// iree_encoding.encoding
 //===---------------------------------------------------------------------===//
 
 /// Returns a composed affine map from the provided attribute. `attr` can be
@@ -506,7 +506,7 @@ Value EncodingAttr::calculateStorageSizeInBytes(Location loc,
 }
 
 //===---------------------------------------------------------------------===//
-// encoding.pad_encoding_layout
+// iree_encoding.pad_encoding_layout
 //===---------------------------------------------------------------------===//
 
 PadEncodingLayoutAttr PadEncodingLayoutAttr::get(MLIRContext *ctx,
@@ -564,7 +564,7 @@ Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
 }
 
 //===---------------------------------------------------------------------===//
-// encoding.identity_encoding
+// iree_encoding.identity_encoding
 //===---------------------------------------------------------------------===//
 
 Attribute
@@ -580,7 +580,7 @@ Attribute IdentityEncodingAttr::getLayout(RankedTensorType type) const {
 }
 
 //===---------------------------------------------------------------------===//
-// encoding.unsupported_encoding
+// iree_encoding.unsupported_encoding
 //===---------------------------------------------------------------------===//
 
 Attribute

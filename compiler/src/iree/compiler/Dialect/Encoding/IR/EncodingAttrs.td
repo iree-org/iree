@@ -41,6 +41,9 @@ def EncodingOpType : IREEEncoding_I32EnumAttr<"EncodingOpType",
 def EncodingOpTypeAttr:
   IREEEncoding_EnumAttr<EncodingOpType, "optype">;
 
+//===---------------------------------------------------------------------===//
+// iree_encoding.packed_storage
+//===---------------------------------------------------------------------===//
 
 def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
   let mnemonic = "packed_storage";
@@ -51,6 +54,10 @@ def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
   }];
   let genVerifyDecl = 0;
 }
+
+//===---------------------------------------------------------------------===//
+// iree_encoding.encoding
+//===---------------------------------------------------------------------===//
 
 def EncodingAttr :
     IREEEncoding_Attr<"Encoding", [
@@ -139,7 +146,7 @@ def EncodingAttr :
 }
 
 //===---------------------------------------------------------------------===//
-// encoding.matmul_k
+// iree_encoding.matmul_k
 //===---------------------------------------------------------------------===//
 
 def MatmulKAttr : IREEEncoding_Attr<"MatmulK"> {
@@ -188,7 +195,7 @@ def MatmulKAttr : IREEEncoding_Attr<"MatmulK"> {
 }
 
 //===---------------------------------------------------------------------===//
-// encoding.pad_encoding_layout
+// iree_encoding.pad_encoding_layout
 //===---------------------------------------------------------------------===//
 
 def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
@@ -228,7 +235,7 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
 }
 
 //===---------------------------------------------------------------------===//
-// encoding.identity_encoding
+// iree_encoding.identity_encoding
 //===---------------------------------------------------------------------===//
 
 def IdentityEncodingAttr :
@@ -249,7 +256,7 @@ def IdentityEncodingAttr :
 }
 
 //===---------------------------------------------------------------------===//
-// encoding.unsupported_encoding
+// iree_encoding.unsupported_encoding
 //===---------------------------------------------------------------------===//
 
 def UnsupportedEncodingAttr :
