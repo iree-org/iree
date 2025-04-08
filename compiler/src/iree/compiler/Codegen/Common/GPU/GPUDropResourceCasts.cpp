@@ -27,8 +27,7 @@ struct GPUDropResourceCastsPass final
 /// that produces it. If any operation other than a slice is in between, return
 /// null. If |requiresSingleSource| is set, this must be the sole use of the
 /// producing binding.
-static Operation *isTriviallyProducedByViewLike(Value input,
-                                                bool requiresSingleSource) {
+static Operation *isTriviallyProducedByViewLike(Value input, bool requiresSingleSource) {
   Value next = input;
   while (auto slice = next.getDefiningOp<tensor::ExtractSliceOp>()) {
     if (requiresSingleSource) {
@@ -50,8 +49,7 @@ static Operation *isTriviallyProducedByViewLike(Value input,
   // approximation as multiple function could simultaneously reference the
   // same binding, but reaching out into other functions is not possible in
   // a function nest.
-  auto binding = tensorLoad.getSource()
-                     .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+  auto binding = tensorLoad.getSource().getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
   if (!binding || (requiresSingleSource && !binding->hasOneUse())) {
     return nullptr;
   }
@@ -72,14 +70,11 @@ void GPUDropResourceCastsPass::runOnOperation() {
     bool hasCacheSwizzle = false;
     if (castOp.getCacheSwizzleStride())
       hasCacheSwizzle = true;
-    if (Operation *binding =
-            isTriviallyProducedByViewLike(castOp.getInput(), hasCacheSwizzle)) {
-      if (ireeGpuDialect->getUseRocdlBufferInstructionsAttrHelper()
-              .isAttrPresent(binding)) {
+    if (Operation *binding = isTriviallyProducedByViewLike(castOp.getInput(), hasCacheSwizzle)) {
+      if (ireeGpuDialect->getUseRocdlBufferInstructionsAttrHelper().isAttrPresent(binding)) {
         // TODO: Support updating buffer structs so we don't have to replace
         // the cast on the binding with this cast.
-        ireeGpuDialect->getUseRocdlBufferInstructionsAttrHelper().removeAttr(
-            binding);
+        ireeGpuDialect->getUseRocdlBufferInstructionsAttrHelper().removeAttr(binding);
       }
     } else {
       // If the cast can't trivially map to a view-like producer of a binding,
