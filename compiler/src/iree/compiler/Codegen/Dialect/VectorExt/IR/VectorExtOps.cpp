@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
-#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -143,7 +142,7 @@ void TransferGatherOp::print(OpAsmPrinter &p) {
   p << " : ";
   p << getShapedType() << ", ";
   llvm::interleaveComma(getIndexVecs().getType(), p);
-  p << ", " << getVectorType();
+  p << ", " << getType();
 }
 
 static LogicalResult
@@ -263,7 +262,7 @@ static LogicalResult verifyPermutationMap(
 LogicalResult TransferGatherOp::verify() {
   // Consistency of elemental types in source and vector.
   ShapedType shapedType = getShapedType();
-  VectorType vectorType = getVectorType();
+  VectorType vectorType = getType();
   VectorType maskType = getMaskType();
   Type paddingType = getPadding().getType();
   AffineMap permutationMap = getPermutationMap();
@@ -642,7 +641,7 @@ struct FoldContigousGatherToTransferRead final
 
     // Canonicalize to vector.transfer_read.
     rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
-        xferOp, xferOp.getVectorType(), xferOp.getSource(), xferOp.getIndices(),
+        xferOp, xferOp.getType(), xferOp.getSource(), xferOp.getIndices(),
         xferOp.getPermutationMap(), xferOp.getPadding(), xferOp.getMask(),
         xferOp.getInBounds());
     return success();
