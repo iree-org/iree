@@ -66,5 +66,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:TransformDialectInterfaces",
         "@llvm-project//mlir:TransformUtils",
+        "@llvm-project//mlir:ValueBoundsOpInterface",
     ],
 )
