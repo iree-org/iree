@@ -46,7 +46,13 @@ def EncodingOpTypeAttr:
 //===---------------------------------------------------------------------===//
 
 def LayoutAttr :
-    IREEEncoding_Attr<"Layout"> {
+    IREEEncoding_Attr<"Layout", [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+        "isSerialized",
+        "isIdentityLayout",
+        "calculateStorageSizeInBytes",
+      ]>
+    ]> {
   let mnemonic = "layout";
   let summary = [{Indicates potential serialized layouts}];
   let description = [{

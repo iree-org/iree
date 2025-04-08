@@ -69,6 +69,33 @@ void LayoutAttr::print(AsmPrinter &p) const {
   os << ">";
 }
 
+bool LayoutAttr::isSerialized() const { return true; }
+
+bool LayoutAttr::isIdentityLayout() const {
+  auto layouts = getLayouts().getAsRange<SerializableEncodingAttrInterface>();
+  return llvm::all_of(layouts,
+                      [](auto attr) { return attr.isIdentityLayout(); });
+}
+
+Value LayoutAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
+                                              RankedTensorType type,
+                                              ValueRange dynamicDims) const {
+  ArrayAttr layoutsAttr = getLayouts();
+  layoutsAttr.dump();
+  Value res;
+  for (auto attr :
+       layoutsAttr.getAsRange<SerializableEncodingAttrInterface>()) {
+    Value requestedSize =
+        attr.calculateStorageSizeInBytes(loc, builder, type, dynamicDims);
+    if (!res) {
+      res = requestedSize;
+      continue;
+    }
+    res = builder.create<arith::MaxUIOp>(loc, res, requestedSize);
+  }
+  return res;
+}
+
 //===---------------------------------------------------------------------===//
 // iree_encoding.encoding
 //===---------------------------------------------------------------------===//
