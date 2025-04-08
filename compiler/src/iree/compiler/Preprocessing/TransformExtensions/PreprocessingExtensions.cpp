@@ -290,8 +290,7 @@ IREE::transform_dialect::MatchDimBoundsOp::matchValue(
     return emitSilenceableError()
            << "dim " << dim << " out of range for shaped type " << shapedType;
   }
-  std::optional<int64_t> lb = getLowerBound();
-  if (lb) {
+  if (std::optional<int64_t> lb = getLowerBound()) {
     auto constantLb = ValueBoundsConstraintSet::computeConstantBound(
         presburger::BoundType::LB, {current, /*dim=*/dim},
         /*stopCondition=*/nullptr, /*closedLB=*/true);
@@ -304,8 +303,7 @@ IREE::transform_dialect::MatchDimBoundsOp::matchValue(
              << "dim " << dim << " is not >= " << lb.value();
     }
   }
-  std::optional<int64_t> ub = getUpperBound();
-  if (ub) {
+  if (std::optional<int64_t> ub = getUpperBound()) {
     auto constantUb = ValueBoundsConstraintSet::computeConstantBound(
         presburger::BoundType::UB, {current, /*dim=*/dim},
         /*stopCondition=*/nullptr, /*closedUB=*/true);

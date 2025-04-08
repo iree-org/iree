@@ -110,8 +110,8 @@ def MatchDimBoundsOp : Op<Transform_Dialect, "iree.match.dim_bounds",
 
   // `<=` isn't a valid literal so use `le` instead.
   let assemblyFormat = [{
-    ($lower_bound^ `le` )? $operand_handle `[` $dim `]`
-    (`le` $upper_bound^)?  attr-dict `:` type($operand_handle)
+    (`umin` `=` $lower_bound^ `,`)? $operand_handle `[` $dim `]` 
+    (`,` `umax` `=` $upper_bound^)?  attr-dict `:` type($operand_handle)
   }];
   let extraClassDeclaration = SingleValueMatcher.extraDeclaration;
 
