@@ -43,9 +43,7 @@ OpFoldResult ToSIMTOp::fold(FoldAdaptor) {
 // TransferGatherOp
 //===----------------------------------------------------------------------===//
 
-VectorType TransferGatherOp::getVectorType() {
-  return getType();
-}
+VectorType TransferGatherOp::getVectorType() { return getType(); }
 
 Speculation::Speculatability TransferGatherOp::getSpeculatability() {
   if (isa<RankedTensorType>(getSource().getType())) {
