@@ -51,7 +51,7 @@ public:
     // https://docs.microsoft.com/en-us/cpp/build/run-time-library-behavior?view=vs-2019
     {
       auto dwordType = llvm::IntegerType::get(ctx, 32);
-      auto ptrType = llvm::PointerType::getUnqual(dwordType);
+      auto ptrType = llvm::PointerType::getUnqual(ctx);
       auto entry = cast<llvm::Function>(
           llvmModule
               ->getOrInsertFunction("iree_dll_main", dwordType, ptrType,
