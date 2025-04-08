@@ -823,6 +823,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
 
+  funcPassManager.addPass(createGPULowerToGlobalLoadsPass());
+
   // Tile to reduction loops.
   {
     GPUApplyTilingLevelPassOptions options;
