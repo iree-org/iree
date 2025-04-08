@@ -390,6 +390,8 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   // In the future there may be cases where we want the custom strategy run at
   // later points in the pipeline.
   funcPassManager.addPass(createLoweringConfigInterpreterPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
 
   // Step 1. Promote matmul operands and pack to intrinsic shapes.
   funcPassManager.addPass(createGPUPadOperandsPass());
