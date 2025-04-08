@@ -103,9 +103,11 @@ Operation *stripElementBitPatternPreservingParents(Value op) {
             .Case<vector::ExtractOp, vector::ExtractElementOp,
                   vector::ExtractStridedSliceOp>(
                 [](auto extract) { return extract.getVector(); })
-            .Case<vector::InsertOp, vector::InsertElementOp,
-                  vector::InsertStridedSliceOp>(
-                [](auto insert) { return insert.getSource(); })
+            .Case<vector::InsertElementOp>([](vector::InsertElementOp insert) {
+              return insert.getSource();
+            })
+            .Case<vector::InsertOp, vector::InsertStridedSliceOp>(
+                [](auto insert) { return insert.getValueToStore(); })
             .Case<vector::TransposeOp>([](vector::TransposeOp transpose) {
               return transpose.getVector();
             })

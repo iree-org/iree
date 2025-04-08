@@ -158,7 +158,7 @@ struct InsertToBroadcast final : OpRewritePattern<vector::InsertOp> {
     if (insertOp.getDestVectorType().getNumElements() != 1)
       return failure();
     rewriter.replaceOpWithNewOp<vector::BroadcastOp>(
-        insertOp, insertOp.getDestVectorType(), insertOp.getSource());
+        insertOp, insertOp.getDestVectorType(), insertOp.getValueToStore());
     return success();
   }
 };

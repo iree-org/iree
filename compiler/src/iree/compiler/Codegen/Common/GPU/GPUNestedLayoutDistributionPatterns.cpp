@@ -403,7 +403,7 @@ struct DistributeTransferWrite final
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
     NestedLayoutAttr vectorLayout =
-        dyn_cast<NestedLayoutAttr>(signature[writeOp.getVector()]);
+        dyn_cast<NestedLayoutAttr>(signature[writeOp.getValueToStore()]);
     if (!vectorLayout) {
       return rewriter.notifyMatchFailure(writeOp,
                                          "non-nested transfer_write layout");
@@ -439,7 +439,7 @@ struct DistributeTransferWrite final
     }
 
     Value distributedVector =
-        getDistributed(rewriter, writeOp.getVector(), vectorLayout);
+        getDistributed(rewriter, writeOp.getValueToStore(), vectorLayout);
 
     ValueRange indices = writeOp.getIndices();
     AffineMap permMap = writeOp.getPermutationMap();

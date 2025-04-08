@@ -119,17 +119,17 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
     DeclareOpInterfaceMethods<ConditionallySpeculatable>,
     AttrSizedOperandSegments
-  ]>,
-  Arguments<(ins AnyShaped:$source,
-                 Variadic<Index>:$indices,
-                 Variadic<VectorOfAnyRankOf<[Index]>>:$index_vecs,
-                 BoolArrayAttr:$indexed,
-                 AffineMapArrayAttr:$indexed_maps,
-                 AffineMapAttr:$permutation_map,
-                 AnyType:$padding,
-                 Optional<VectorOfNonZeroRankOf<[I1]>>:$mask,
-                 BoolArrayAttr:$in_bounds)>,
-  Results<(outs AnyVectorOfAnyRank:$vector)> {
+  ]> {
+  let arguments = (ins AnyShaped:$source,
+                       Variadic<Index>:$indices,
+                       Variadic<VectorOfAnyRankOf<[Index]>>:$index_vecs,
+                       BoolArrayAttr:$indexed,
+                       AffineMapArrayAttr:$indexed_maps,
+                       AffineMapAttr:$permutation_map,
+                       AnyType:$padding,
+                       Optional<VectorOfNonZeroRankOf<[I1]>>:$mask,
+                       BoolArrayAttr:$in_bounds);
+  let results = (outs AnyVectorOfAnyRank:$vector);
 
   let summary = "Gathers a supervector from memory into an SSA vector value.";
 
