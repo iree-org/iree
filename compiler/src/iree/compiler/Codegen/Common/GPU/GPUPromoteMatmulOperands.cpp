@@ -120,7 +120,7 @@ void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared) {
 ///
 ///   %empty = tensor.empty()
 ///   %copy = linalg.copy %1 to %empty {
-///     lowering_config = #iree_gpu.derived_thread_config}
+///     lowering_config = #iree_gpu.{derived_thread_config|use_global_dma}}
 ///   linalg.matmul ins(%0, %copy)
 ///
 /// If the producer is already a tilable op, the producer is just annotated with
