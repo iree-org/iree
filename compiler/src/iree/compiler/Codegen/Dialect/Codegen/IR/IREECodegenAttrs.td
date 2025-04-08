@@ -79,6 +79,13 @@ def Linalg_TransformDialectCodegen
 def Custom
     : I32EnumAttrCase<"Custom", 1001>;
 
+def EXSLERATEV2_Conv2D 
+    : I32EnumAttrCase<"Exsleratev2Conv2D", 1002>;
+
+def EXSLERATEV2_MatMul
+    : I32EnumAttrCase<"Exsleratev2MatMul", 1003>;
+
+
 def None : I32EnumAttrCase<"None", 0xffff>;
 
 // EnumAttrCase for all known lowerings for ops within dispatch region
@@ -112,6 +119,11 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
 
     // For out of tree pass-pipelines
     Custom,
+
+    // for exsleratev2-acclerator
+    EXSLERATEV2_Conv2D,
+
+    EXSLERATEV2_MatMul,
 
     // None to specify no in-built pipelines to use.
     None
