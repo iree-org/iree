@@ -70,6 +70,7 @@ iree_status_t iree_hal_hip_semaphore_wait_hip_events(
 
 iree_status_t iree_hal_hip_semaphore_create_event_and_record_if_necessary(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
+    iree_hal_hip_per_device_info_t* device,
     hipStream_t dispatch_stream, iree_hal_hip_event_pool_t* event_pool);
 
 iree_status_t iree_hal_hip_event_semaphore_advance(
