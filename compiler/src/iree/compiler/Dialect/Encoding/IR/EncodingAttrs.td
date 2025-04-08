@@ -100,7 +100,6 @@ def EncodingAttr :
     IREEEncoding_Attr<"Encoding", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
         "isSerialized",
-        "isIdentityLayout",
         "cloneWithLayouts",
       ]>
     ]> {
@@ -130,11 +129,7 @@ def EncodingAttr :
     AttrParameter<"ArrayAttr", "element types of the user's operands">:$element_types,
     OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps,
     OptionalParameter<"ArrayAttr", "The original operation's iteration sizes. "
-    "This is useful for handling skinny dimension sizes">:$iteration_sizes,
-    OptionalParameter<"ArrayAttr", "An array of attributes that describes the "
-    "layouts of the encoding. It is an array because a device could have "
-    "multiple target device. Note that it can be any attribute that "
-    "implements SerializableEncodingAttrInterface.">:$layouts
+    "This is useful for handling skinny dimension sizes">:$iteration_sizes
   );
 
   let builders = [
@@ -142,8 +137,7 @@ def EncodingAttr :
         "EncodingOpType":$opType,
         "ArrayRef<Type>":$elemTypes,
         CArg<"ArrayRef<AffineMap>", "{}">:$maps,
-        CArg<"ArrayRef<int64_t>", "{}">:$iterationSizes,
-        CArg<"ArrayRef<Attribute>", "{}">:$layouts)>
+        CArg<"ArrayRef<int64_t>", "{}">:$iterationSizes)>
   ];
 
   let extraClassDeclaration = [{
