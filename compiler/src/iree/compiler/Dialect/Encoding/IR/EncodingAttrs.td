@@ -67,6 +67,13 @@ def LayoutAttr :
     AttrParameter<"ArrayAttr", "Serialized layouts">:$layouts
   );
 
+  // Implement custom builders to bypass the verification assertion in Base::get
+  // method, i.e., `assert(succeeded(ConcreteT::verifyInvariants(...)))`.
+  let skipDefaultBuilders = 1;
+  let builders = [
+    AttrBuilder<(ins "ArrayAttr":$layouts)>,
+  ];
+
   let hasCustomAssemblyFormat = 1;
   let genVerifyDecl = 1;
 }
@@ -95,7 +102,6 @@ def EncodingAttr :
         "isSerialized",
         "isIdentityLayout",
         "cloneWithLayouts",
-        "calculateStorageSizeInBytes",
       ]>
     ]> {
   let mnemonic = "encoding";
@@ -377,7 +383,8 @@ def SpecializedEncodingAttr :
     IREEEncoding_Attr<"SpecializedEncoding", [
       DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
         "getLayout",
-      ]>
+      ]>,
+      IREEEncoding_SerializableEncodingAttrInterface
     ]> {
   let mnemonic = "specialized_encoding";
 

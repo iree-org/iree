@@ -18,7 +18,6 @@
 #include "mlir/Transforms/InliningUtils.h"
 
 #define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Dialect/Encoding/IR/EncodingAttrs.cpp.inc"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingEnums.cpp.inc"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingInterfaces.cpp.inc"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypeInterfaces.cpp.inc"
@@ -71,10 +70,7 @@ struct EncodingInlinerInterface : public DialectInlinerInterface {
 void IREEEncodingDialect::initialize() {
   addInterfaces<EncodingOpAsmInterface, EncodingInlinerInterface>();
 
-  addAttributes<
-#define GET_ATTRDEF_LIST
-#include "iree/compiler/Dialect/Encoding/IR/EncodingAttrs.cpp.inc"
-      >();
+  registerAttributes();
 
 #define GET_OP_LIST
   addOperations<

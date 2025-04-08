@@ -6,7 +6,9 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -31,6 +33,23 @@ namespace mlir::iree_compiler::IREE::Encoding {
 //===---------------------------------------------------------------------===//
 // iree_encoding.layout
 //===---------------------------------------------------------------------===//
+
+LayoutAttr
+LayoutAttr::getChecked(llvm::function_ref<InFlightDiagnostic()> emitError,
+                       MLIRContext *context, ArrayAttr layoutsAttr) {
+  if (failed(LayoutAttr::verify(emitError, layoutsAttr))) {
+    return LayoutAttr();
+  }
+  return LayoutAttr::get(context, layoutsAttr);
+}
+
+LayoutAttr LayoutAttr::get(MLIRContext *context, ArrayAttr layoutsAttr) {
+  auto emitError = mlir::detail::getDefaultDiagnosticEmitFn(context);
+  if (failed(LayoutAttr::verify(emitError, layoutsAttr))) {
+    return LayoutAttr();
+  }
+  return Base::get(context, layoutsAttr);
+}
 
 LogicalResult
 LayoutAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
@@ -512,10 +531,12 @@ bool EncodingAttr::isIdentityLayout() const {
 
 Attribute EncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();
-  return get(ctx, getOperandIndex(), getOpType(), getElementTypes(),
-             /*user_indexing_maps=*/ArrayAttr(),
-             /*iteration_sizes=*/ArrayAttr(), ArrayAttr::get(ctx, layouts));
+  return LayoutAttr::get(ctx, ArrayAttr::get(ctx, layouts));
 }
+
+//===---------------------------------------------------------------------===//
+// iree_encoding.pad_encoding_layout
+//===---------------------------------------------------------------------===//
 
 /// Returns the bit-width of the scalar type. If the type is complex, it returns
 /// the type of individual elements * 2 (1 for real and 1 for complex).
@@ -545,38 +566,6 @@ static int32_t getRoundedElementByteWidth(Type type) {
   // Round up to the next power of two (unless already a power of two).
   return llvm::PowerOf2Ceil(byteAligned);
 }
-
-Value EncodingAttr::calculateStorageSizeInBytes(Location loc,
-                                                OpBuilder &builder,
-                                                RankedTensorType type,
-                                                ValueRange dynamicDims) const {
-  if (!isSerialized()) {
-    return nullptr;
-  }
-
-  ArrayAttr layoutsAttr = getLayouts();
-  if (!llvm::all_of(layoutsAttr.getValue(),
-                    llvm::IsaPred<SerializableEncodingAttrInterface>)) {
-    return nullptr;
-  }
-
-  Value res;
-  for (auto attr :
-       layoutsAttr.getAsRange<SerializableEncodingAttrInterface>()) {
-    Value requestedSize =
-        attr.calculateStorageSizeInBytes(loc, builder, type, dynamicDims);
-    if (!res) {
-      res = requestedSize;
-      continue;
-    }
-    res = builder.create<arith::MaxUIOp>(loc, res, requestedSize);
-  }
-  return res;
-}
-
-//===---------------------------------------------------------------------===//
-// iree_encoding.pad_encoding_layout
-//===---------------------------------------------------------------------===//
 
 PadEncodingLayoutAttr PadEncodingLayoutAttr::get(MLIRContext *ctx,
                                                  ArrayRef<int32_t> padding) {
@@ -765,3 +754,15 @@ Attribute SpecializedEncodingAttr::getLayout(RankedTensorType type) const {
 }
 
 } // namespace mlir::iree_compiler::IREE::Encoding
+
+using namespace mlir::iree_compiler::IREE::Encoding;
+
+#define GET_ATTRDEF_CLASSES
+#include "iree/compiler/Dialect/Encoding/IR/EncodingAttrs.cpp.inc"
+
+void IREEEncodingDialect::registerAttributes() {
+  addAttributes<
+#define GET_ATTRDEF_LIST
+#include "iree/compiler/Dialect/Encoding/IR/EncodingAttrs.cpp.inc"
+      >();
+}
