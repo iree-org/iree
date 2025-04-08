@@ -45,6 +45,30 @@ def EncodingOpTypeAttr:
 // iree_encoding.packed_storage
 //===---------------------------------------------------------------------===//
 
+def LayoutAttr :
+    IREEEncoding_Attr<"Layout"> {
+  let mnemonic = "layout";
+  let summary = [{Indicates potential serialized layouts}];
+  let description = [{
+    This attribute describes the potential layouts of the encoding. It is an
+    array because a device could have multiple target device.
+
+    It has a verifier that will ensure that all the attributes in layouts
+    implement SerializableEncodingAttrInterface.
+  }];
+
+  let parameters = (ins
+    AttrParameter<"ArrayAttr", "Serialized layouts">:$layouts
+  );
+
+  let hasCustomAssemblyFormat = 1;
+  let genVerifyDecl = 1;
+}
+
+//===---------------------------------------------------------------------===//
+// iree_encoding.packed_storage
+//===---------------------------------------------------------------------===//
+
 def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
   let mnemonic = "packed_storage";
   let summary = [{Indicates packed storage data type.}];

@@ -8,6 +8,7 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
@@ -26,6 +27,47 @@
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::IREE::Encoding {
+
+//===---------------------------------------------------------------------===//
+// iree_encoding.layout
+//===---------------------------------------------------------------------===//
+
+LogicalResult
+LayoutAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
+                   ArrayAttr layoutsAttr) {
+  ArrayRef<Attribute> layouts = layoutsAttr.getValue();
+  if (layouts.empty()) {
+    return emitError() << "expected non-empty layouts";
+  }
+  if (!llvm::all_of(layouts,
+                    llvm::IsaPred<SerializableEncodingAttrInterface>)) {
+    return emitError() << "expected all the layout attributes to implement "
+                          "SerializableEncodingAttrInterface";
+  }
+  return success();
+}
+
+Attribute LayoutAttr::parse(AsmParser &p, Type type) {
+  SMLoc loc = p.getCurrentLocation();
+  if (failed(p.parseLess())) {
+    return {};
+  }
+  ArrayAttr layouts;
+  if (failed(p.parseAttribute(layouts))) {
+    return {};
+  }
+  if (failed(p.parseGreater())) {
+    return {};
+  }
+  return p.getChecked<LayoutAttr>(loc, p.getContext(), layouts);
+}
+
+void LayoutAttr::print(AsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << "<";
+  p.printAttribute(getLayouts());
+  os << ">";
+}
 
 //===---------------------------------------------------------------------===//
 // iree_encoding.encoding
