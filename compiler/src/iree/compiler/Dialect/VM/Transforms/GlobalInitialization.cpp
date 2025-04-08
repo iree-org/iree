@@ -17,6 +17,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/Inliner.h"
 #include "mlir/Transforms/InliningUtils.h"
 
 namespace mlir::iree_compiler::IREE::VM {
@@ -309,7 +310,8 @@ private:
                                   InlinerInterface &inlinerInterface,
                                   OpBuilder &builder) {
     auto result = mlir::inlineRegion(
-        inlinerInterface, &initializerOp.getBody(), builder.getInsertionBlock(),
+        inlinerInterface, InlinerConfig{}.getCloneCallback(),
+        &initializerOp.getBody(), builder.getInsertionBlock(),
         builder.getInsertionPoint(),
         /*inlinedOperands=*/ValueRange{},
         /*resultsToReplace=*/ValueRange{}, /*inlineLoc=*/std::nullopt,

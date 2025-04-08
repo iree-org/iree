@@ -2896,3 +2896,55 @@ func.func @barrier_region_in_place() -> vector<2x3xf32> {
 //       CHECK:   gpu.barrier
 //       CHECK:   %[[READ:.+]] = vector.transfer_read %[[EXPAND]]
 //       CHECK:   return %[[READ]]
+
+// -----
+
+// Check that there is no allocation in this case, fixed by removing read semantics of `tensor.parallel_insert_slice`.
+// See issue #20400
+func.func @check_no_alloc() {
+  %c32_i64 = arith.constant 32 : i64
+  %c0 = arith.constant 0 : index
+  %c256 = arith.constant 256 : index
+  %0 = hal.interface.constant.load layout(<constants = 1,
+      bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+                  #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>)
+      ordinal(0) : index
+  %1 = hal.interface.binding.subspan layout(<constants = 1,
+      bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+                  #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>)
+      binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<8x16xf16>>
+  %2 = hal.interface.binding.subspan layout(<constants = 1,
+      bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+                  #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>)
+      binding(0) alignment(64) offset(%c256) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<8xi32>>
+  %3 = hal.interface.binding.subspan layout(<constants = 1,
+      bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+                  #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>)
+      binding(1) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<readwrite:tensor<?x16xf16>>{%0}
+  %16 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<8x16xf16>> -> tensor<8x16xf16>
+  %17 = flow.dispatch.tensor.load %2, offsets = [0], sizes = [8], strides = [1] : !flow.dispatch.tensor<readonly:tensor<8xi32>> -> tensor<8xi32>
+  %18 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [%0, 16], strides = [1, 1] : !flow.dispatch.tensor<readwrite:tensor<?x16xf16>>{%0} -> tensor<?x16xf16>
+  %19 = scf.forall (%arg0) in (2) shared_outs(%arg1 = %18) -> (tensor<?x16xf16>) {
+    %20 = affine.apply affine_map<(d0) -> (d0 * 8)>(%arg0)
+    %extracted_slice = tensor.extract_slice %arg1[0, %20] [%0, 8] [1, 1] : tensor<?x16xf16> to tensor<?x8xf16>
+    %21 = scf.forall (%arg2, %arg3) in (8, 1) shared_outs(%arg4 = %extracted_slice) -> (tensor<?x8xf16>) {
+      %extracted_slice_0 = tensor.extract_slice %16[%arg2, %20] [1, 8] [1, 1] : tensor<8x16xf16> to tensor<1x8xf16>
+      %extracted_slice_1 = tensor.extract_slice %17[%arg2] [1] [1] : tensor<8xi32> to tensor<1xi32>
+      %22 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+          ins(%extracted_slice_0, %extracted_slice_1 : tensor<1x8xf16>, tensor<1xi32>) outs(%arg4 : tensor<?x8xf16>) {
+      ^bb0(%arg5: f16, %arg6: f16):
+        iree_linalg_ext.yield %arg5 : f16
+      } -> tensor<?x8xf16>
+      scf.forall.in_parallel {
+        tensor.parallel_insert_slice %22 into %arg4[0, 0] [%0, 8] [1, 1] : tensor<?x8xf16> into tensor<?x8xf16>
+      }
+    } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %21 into %arg1[0, %20] [%0, 8] [1, 1] : tensor<?x8xf16> into tensor<?x16xf16>
+    }
+  } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+  flow.dispatch.tensor.store %19, %3, offsets = [0, 0], sizes = [%0, 16], strides = [1, 1] : tensor<?x16xf16> -> !flow.dispatch.tensor<readwrite:tensor<?x16xf16>>{%0}
+  return
+}
+// CHECK-LABEL: func @check_no_alloc
+//   CHECK-NOT:   memref.alloc

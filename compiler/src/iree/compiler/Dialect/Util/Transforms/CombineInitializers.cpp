@@ -18,6 +18,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
+#include "mlir/Transforms/Inliner.h"
 #include "mlir/Transforms/InliningUtils.h"
 
 #define DEBUG_TYPE "iree-util-combine-initializers"
@@ -60,8 +61,9 @@ public:
     InlinerInterface inlinerInterface(&getContext());
     for (auto initializerOp : initializerOps) {
       if (failed(mlir::inlineRegion(
-              inlinerInterface, &initializerOp.getBody(),
-              builder.getInsertionBlock(), builder.getInsertionPoint(),
+              inlinerInterface, InlinerConfig{}.getCloneCallback(),
+              &initializerOp.getBody(), builder.getInsertionBlock(),
+              builder.getInsertionPoint(),
               /*inlinedOperands=*/ValueRange{},
               /*resultsToReplace=*/ValueRange{}, /*inlineLoc=*/std::nullopt,
               /*shouldCloneInlinedRegion=*/false))) {
