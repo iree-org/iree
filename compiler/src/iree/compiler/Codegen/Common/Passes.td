@@ -459,7 +459,6 @@ def LoweringConfigInterpreterPass :
     sequence transformation specified by lowering configs annotated on
     operations.
   }];
-  let dependentDialects = ["IREE::Codegen::IREECodegenDialect"];
 }
 
 def LowerUKernelOpsToCallsPass :

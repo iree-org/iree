@@ -89,12 +89,10 @@ public:
 
       auto strategy = dyn_cast_or_null<transform::NamedSequenceOp>(
           SymbolTable::lookupSymbolIn(symbolTableOp, *maybeSymName));
-      if (!strategy) {
-        if (parsedLibrary) {
-          strategy = dyn_cast_or_null<transform::NamedSequenceOp>(
-              SymbolTable::lookupSymbolIn(parsedLibrary->getOperation(),
-                                          *maybeSymName));
-        }
+      if (!strategy && parsedLibrary) {
+        strategy = dyn_cast_or_null<transform::NamedSequenceOp>(
+            SymbolTable::lookupSymbolIn(parsedLibrary->getOperation(),
+                                        *maybeSymName));
       }
 
       // Fail if the strategy cannot be found for some reason. We could pass
