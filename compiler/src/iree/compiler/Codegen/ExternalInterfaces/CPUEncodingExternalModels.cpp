@@ -158,22 +158,13 @@ static Value getMmt4dOperand(Value value, linalg::LinalgOp linalgOp,
 /// Returns the best TileMxNxK from `enumeratedTiles` pool. If the
 /// `hostDefinedUpperBound` is not empty, the chosen tile sizes can not be
 /// greater than the values.
-/// TODO(#16933): Remove `hostDefinedUpperBound` once we can propagate such
-/// information to host. For now, they are defined by host.
 TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
-                           IREE::Encoding::MatmulNarrowDim narrowDim,
-                           ArrayRef<int64_t> hostDefinedUpperBound = {}) {
-  assert((hostDefinedUpperBound.empty() || hostDefinedUpperBound.size() >= 3) &&
-         "expected hostDefinedUpperBound is empty or has upper bound for {M, "
-         "N, K}");
+                           IREE::Encoding::MatmulNarrowDim narrowDim) {
   // Handle narrow-N by transposing to reduce to narrow-M. Note: the
   // enumeratedTiles currently only enumerate narrow-M cases.
   if (narrowDim.isN()) {
-    SmallVector<int64_t> newHostDefinedUpperBound(hostDefinedUpperBound);
-    std::swap(newHostDefinedUpperBound[0], newHostDefinedUpperBound[1]);
     narrowDim.dim = IREE::Encoding::MatmulNarrowDim::Dim::M;
-    TileMxNxK tile =
-        chooseMatmulTile(enumeratedTiles, narrowDim, newHostDefinedUpperBound);
+    TileMxNxK tile = chooseMatmulTile(enumeratedTiles, narrowDim);
     std::swap(tile.M, tile.N);
     return tile;
   }
@@ -204,26 +195,7 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
   SmallVector<RatedTileMxNxK> ratedTiles;
   ratedTiles.reserve(enumeratedTiles.size());
   int64_t bestPaddingPenalty = INT64_MAX;
-  int64_t mUB = INT64_MAX;
-  int64_t nUB = INT64_MAX;
-  int64_t kUB = INT64_MAX;
-  if (!hostDefinedUpperBound.empty()) {
-    mUB = hostDefinedUpperBound[0];
-    nUB = hostDefinedUpperBound[1];
-    kUB = hostDefinedUpperBound[2];
-  }
   for (auto tile : enumeratedTiles) {
-    if (tile.M > mUB || tile.N > nUB || tile.K > kUB) {
-      LLVM_DEBUG(llvm::dbgs() << "[" << DEBUG_TYPE << "]: tile (";
-                 llvm::interleaveComma(
-                     ArrayRef<int64_t>{tile.M, tile.N, tile.K}, llvm::dbgs());
-                 llvm::dbgs()
-                 << ") is skipped because it is not valid for upper_bound (";
-                 llvm::interleaveComma(ArrayRef<int64_t>{mUB, nUB, kUB},
-                                       llvm::dbgs());
-                 llvm::dbgs() << ")\n");
-      continue;
-    }
     RatedTileMxNxK ratedTile(tile);
     ratedTile.paddingPenalty = 0;
     // If we are choosing a tile for a narrow-M case, we want to minimize
@@ -607,11 +579,11 @@ struct CPUDeviceEncodingLayoutResolverAttrInterface
     if (enumeratedTileMxNxK.empty()) {
       return info;
     }
-    auto narrowDim = IREE::Encoding::getMatmulNarrowDim(encoding);
+    auto narrowDim = IREE::Encoding::getPo2MatmulNarrowDim(encoding);
     // Choose a final matmul TileMxNxK from the above-enumarated tile shapes,
     // taking narrow dimensions into account.
-    TileMxNxK chosenTileMxNxK = chooseMatmulTile(
-        enumeratedTileMxNxK, narrowDim, encoding.getRoundDimsToArray());
+    TileMxNxK chosenTileMxNxK =
+        chooseMatmulTile(enumeratedTileMxNxK, narrowDim);
     FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
         getEncodingInfoForMatmul(encoding, chosenTileMxNxK);
     if (failed(maybeEncodingInfo)) {
@@ -689,7 +661,7 @@ enumerateVMVXMatmulTiles(linalg::ContractionDimensions cDims,
   // codegen.query_tile_sizes op, so we disable dynamic tile shapes for
   // batch_matmul. Also, they are not set up for narrow M/N matmul, so it is
   // disabled when it is the case.
-  if (!cDims.batch.empty() || getMatmulNarrowDim(encoding)) {
+  if (!cDims.batch.empty() || getPo2MatmulNarrowDim(encoding)) {
     hasUkernelSupport = false;
   }
   if (hasUkernelSupport) {
@@ -739,11 +711,11 @@ struct VMVXDeviceEncodingLayoutResolverAttrInterface final
     if (enumeratedTileMxNxK.empty()) {
       return info;
     }
-    auto narrowDim = IREE::Encoding::getMatmulNarrowDim(encoding);
+    auto narrowDim = IREE::Encoding::getPo2MatmulNarrowDim(encoding);
     // Choose a final matmul TileMxNxK from the above-enumarated tile shapes,
     // taking narrow dimensions into account.
-    TileMxNxK chosenTileMxNxK = chooseMatmulTile(
-        enumeratedTileMxNxK, narrowDim, encoding.getRoundDimsToArray());
+    TileMxNxK chosenTileMxNxK =
+        chooseMatmulTile(enumeratedTileMxNxK, narrowDim);
     FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
         getEncodingInfoForMatmul(encoding, chosenTileMxNxK);
     if (failed(maybeEncodingInfo)) {

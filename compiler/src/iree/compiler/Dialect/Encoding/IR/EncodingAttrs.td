@@ -79,19 +79,15 @@ def EncodingAttr :
     - The maps in `user_indexing_maps` should be composable.
   }];
 
-  let assemblyFormat = "`<` struct(params) `>`";
+  let hasCustomAssemblyFormat = 1;
 
   let parameters = (ins
     AttrParameter<"IntegerAttr", "this tensor operand's index in the parameter list">:$operand_index,
     AttrParameter<"EncodingOpTypeAttr", "operand type">:$op_type,
     AttrParameter<"ArrayAttr", "element types of the user's operands">:$element_types,
     OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps,
-    // TODO(#19897): Switch round_dims_to to iteration_sizes.
-    // Note that today we abuse the attribute to carry narrow matrix
-    // information. The end goal is deprecating the field and add a
-    // "iteration_sizes" field to describe the shape. It is useful to
-    // handle narrow matrix cases.
-    OptionalParameter<"DenseArrayAttr", "Values for padding M,N,K dimensions">:$round_dims_to,
+    OptionalParameter<"ArrayAttr", "The original operation's iteration sizes. "
+    "This is useful for handling skinny dimension sizes">:$iteration_sizes,
     OptionalParameter<"ArrayAttr", "An array of attributes that describes the "
     "layouts of the encoding. It is an array because a device could have "
     "multiple target device. Note that it can be any attribute that "
@@ -103,7 +99,7 @@ def EncodingAttr :
         "EncodingOpType":$opType,
         "ArrayRef<Type>":$elemTypes,
         CArg<"ArrayRef<AffineMap>", "{}">:$maps,
-        CArg<"ArrayRef<int64_t>", "{}">:$roundDimsTo,
+        CArg<"ArrayRef<int64_t>", "{}">:$iterationSizes,
         CArg<"ArrayRef<Attribute>", "{}">:$layouts)>
   ];
 
@@ -128,8 +124,8 @@ def EncodingAttr :
     /// matching index of the given encoding's tensor, using getMapForOperandIndex.
     std::optional<unsigned> mapDimToOperandIndex(int64_t dimPos) const;
 
-    /// Returns an integer array with values in `round_dims_to`.
-    ArrayRef<int64_t> getRoundDimsToArray() const;
+    /// Returns an integer array with values in `iteration_sizes`.
+    SmallVector<int64_t> getIterationSizesArray() const;
 
     /// Returns a vector with values in `element_types`.
     SmallVector<Type> getElementTypesArray();
