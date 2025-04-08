@@ -170,28 +170,28 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @dim1_match(%call: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
     transform.match.operation_name %call ["func.call"] : !transform.any_op
     %in0 = transform.get_operand %call[0] : (!transform.any_op) -> !transform.any_value
-    transform.iree.match.dim_bounds umin = 20, %in0[1], umax = 20 : !transform.any_value
+    transform.iree.match.dim_bounds %in0[1], umin = 20, umax = 20 : !transform.any_value
     %0 = transform.param.constant "dim1_matched" -> !transform.any_param
     transform.yield %call, %0 : !transform.any_op, !transform.any_param
   }
   transform.named_sequence @both_match(%call: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
     transform.match.operation_name %call ["func.call"] : !transform.any_op
     %in0 = transform.get_operand %call[0] : (!transform.any_op) -> !transform.any_value
-    transform.iree.match.dim_bounds umin = 5, %in0[0], umax = 20 : !transform.any_value
+    transform.iree.match.dim_bounds %in0[0], umin = 5, umax = 20 : !transform.any_value
     %0 = transform.param.constant "both_matched" -> !transform.any_param
     transform.yield %call, %0 : !transform.any_op, !transform.any_param
   }
   transform.named_sequence @lb_match(%call: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
     transform.match.operation_name %call ["func.call"] : !transform.any_op
     %in0 = transform.get_operand %call[0] : (!transform.any_op) -> !transform.any_value
-    transform.iree.match.dim_bounds umin = 75, %in0[0] : !transform.any_value
+    transform.iree.match.dim_bounds %in0[0], umin = 75, none : !transform.any_value
     %0 = transform.param.constant "lb_matched" -> !transform.any_param
     transform.yield %call, %0 : !transform.any_op, !transform.any_param
   }
   transform.named_sequence @ub_match(%call: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
     transform.match.operation_name %call ["func.call"] : !transform.any_op
     %in0 = transform.get_operand %call[0] : (!transform.any_op) -> !transform.any_value
-    transform.iree.match.dim_bounds %in0[0], umax = 4 : !transform.any_value
+    transform.iree.match.dim_bounds %in0[0], none, umax = 4 : !transform.any_value
     %0 = transform.param.constant "ub_matched" -> !transform.any_param
     transform.yield %call, %0 : !transform.any_op, !transform.any_param
   }
