@@ -28,7 +28,7 @@ module attributes { transform.with_named_sequence } {
 // CHECK: #[[$MAP1:.+]] = affine_map<(d0) -> (d0 * 16)>
 
 // CHECK-LABEL: func @distribute_lane_forall
-//       CHECK:   %[[LANE_ID:.+]] = gpu.lane_id
+//       CHECK:   %[[LANE_ID:.+]] = gpu.lane_id upper_bound 64
 //   CHECK-NOT:   scf.forall
 //       CHECK:   affine.delinearize_index %[[LANE_ID]] into (4, 16) : index, index
 //       CHECK:   linalg.copy
