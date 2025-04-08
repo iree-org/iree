@@ -40,9 +40,7 @@ namespace {
 class ValueAliasingSet {
 public:
   void addAlias(Value aliasee, Value aliaser) {
-    auto aliaseeWithId = getWithId(aliasee);
-    auto aliaserWithId = getWithId(aliaser);
-    valueAliasing.unionSets(aliaseeWithId, aliaserWithId);
+    valueAliasing.unionSets(aliasee, aliaser);
   }
 
   SmallVector<SmallVector<Value>> getValueAliasSets() const {
@@ -53,7 +51,7 @@ public:
       auto &aliasSet = result.emplace_back();
       for (auto mi = valueAliasing.member_begin(**it);
            mi != valueAliasing.member_end(); ++mi) {
-        aliasSet.push_back(mi->value);
+        aliasSet.push_back(*mi);
       }
     }
     return result;
@@ -61,36 +59,13 @@ public:
 
   auto getValueAliases(Value value) const {
     return llvm::make_filter_range(
-        llvm::map_range(
-            llvm::make_range(valueAliasing.findLeader(getWithId(value)),
-                             valueAliasing.member_end()),
-            NumberedValue::getValue),
+        llvm::make_range(valueAliasing.findLeader(value),
+                         valueAliasing.member_end()),
         [=](Value aliaser) { return aliaser != value; });
   }
 
 private:
-  // EquivalenceClasses require ordering for value type to return deterministic
-  // results, so we provide it by assigning id to all values added to the set.
-  struct NumberedValue {
-    Value value;
-    int64_t id;
-
-    static Value getValue(const NumberedValue &value) { return value.value; }
-  };
-
-  struct Comparator {
-    int operator()(const NumberedValue &a, const NumberedValue &b) const {
-      return a.id < b.id;
-    }
-  };
-
-  NumberedValue getWithId(Value value) const {
-    auto [iterator, inserted] = id.try_emplace(value, id.size());
-    return {value, iterator->second};
-  }
-
-  mutable llvm::DenseMap<Value, int64_t> id;
-  llvm::EquivalenceClasses<NumberedValue, Comparator> valueAliasing;
+  llvm::EquivalenceClasses<Value> valueAliasing;
 };
 
 // Builds a map of value aliases from aliasee to a set of aliasers.
