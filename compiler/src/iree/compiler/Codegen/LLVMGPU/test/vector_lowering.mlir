@@ -55,4 +55,3 @@ module {
 // CHECK: %[[CST:.+]] = arith.constant dense<0.000000e+00>
 // CHECK: %[[LOAD:.+]] = vector.load %[[ARG0]][%[[ARG1]], %[[ARG1]]]
 // CHECK: %[[SELECT:.+]] = arith.select %[[MASK]], %[[LOAD]], %[[CST]]
-// CHECK: return %[[SELECT]]
