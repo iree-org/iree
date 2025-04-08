@@ -7,6 +7,7 @@
 #include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
@@ -534,8 +535,46 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
   if (tensorType.getRank() != 2) {
     return rewriter.notifyMatchFailure(op, "only the 2D case is implemented");
   }
-  auto encoding =
-      dyn_cast_or_null<IREE::Encoding::EncodingAttr>(tensorType.getEncoding());
+  Attribute tensorEncoding = tensorType.getEncoding();
+  if (!tensorEncoding) {
+    return rewriter.notifyMatchFailure(op,
+                                       "tensorType does not have encodings");
+  }
+  IREE::Encoding::EncodingAttr encoding;
+  if (auto encodingAttr =
+          dyn_cast<IREE::Encoding::EncodingAttr>(tensorEncoding)) {
+    encoding = encodingAttr;
+  } else if (auto layoutAttr =
+                 dyn_cast<IREE::Encoding::LayoutAttr>(tensorEncoding)) {
+    if (!llvm::all_of(layoutAttr.getLayouts().getValue(),
+                      llvm::IsaPred<IREE::CPU::VMVXEncodingLayoutAttr>)) {
+      return rewriter.notifyMatchFailure(
+          op, "only VMVX encoding resolver is handled");
+    }
+    for (auto attr : layoutAttr.getLayouts()
+                         .getAsRange<IREE::CPU::VMVXEncodingLayoutAttr>()) {
+      DictionaryAttr dictAttr = attr.getConfiguration();
+      if (!dictAttr) {
+        continue;
+      }
+      std::optional<NamedAttribute> maybeExtractedEncodingAttr =
+          dictAttr.getNamed("encoding_attr");
+      if (!maybeExtractedEncodingAttr) {
+        continue;
+      }
+      auto extractedEncodingAttr = dyn_cast<IREE::Encoding::EncodingAttr>(
+          maybeExtractedEncodingAttr->getValue());
+      if (!extractedEncodingAttr) {
+        return rewriter.notifyMatchFailure(op,
+                                           "invalid EncodingAttr is encoded");
+      }
+      if (encoding && encoding != extractedEncodingAttr) {
+        return rewriter.notifyMatchFailure(
+            op, "inconsistent EncodingAttr is encoded");
+      }
+      encoding = extractedEncodingAttr;
+    }
+  }
   if (!encoding) {
     return rewriter.notifyMatchFailure(op, "no encoding attribute");
   }
