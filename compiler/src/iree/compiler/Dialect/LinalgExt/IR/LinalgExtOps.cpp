@@ -1620,7 +1620,8 @@ void Im2colOp::build(
     ArrayRef<OpFoldResult> kernelSize, ArrayRef<OpFoldResult> mOffset,
     ArrayRef<OpFoldResult> mStrides, ArrayRef<OpFoldResult> kOffset,
     ArrayRef<OpFoldResult> kStrides, ArrayRef<int64_t> batchPos,
-    ArrayRef<int64_t> mPos, ArrayRef<int64_t> kPos) {
+    ArrayRef<int64_t> mPos, ArrayRef<int64_t> kPos,
+    ArrayRef<int64_t> inputFilterPerm) {
   assert(strides.size() == kernelSize.size() &&
          dilations.size() == kernelSize.size() &&
          mPos.size() == kernelSize.size() &&
@@ -1648,7 +1649,8 @@ void Im2colOp::build(
         builder.getDenseI64ArrayAttr(staticKOffset), dynamicKStrides,
         builder.getDenseI64ArrayAttr(staticKStrides),
         builder.getDenseI64ArrayAttr(batchPos),
-        builder.getDenseI64ArrayAttr(mPos), builder.getDenseI64ArrayAttr(kPos));
+        builder.getDenseI64ArrayAttr(mPos), builder.getDenseI64ArrayAttr(kPos),
+        builder.getDenseI64ArrayAttr(inputFilterPerm));
 }
 
 LogicalResult Im2colOp::verify() {
@@ -1711,6 +1713,7 @@ LogicalResult Im2colOp::verify() {
   ArrayRef<int64_t> strides = getStrides();
   ArrayRef<int64_t> dilations = getDilations();
   SmallVector<OpFoldResult> kernelSize = getMixedKernelSize();
+  ArrayRef<int64_t> inputFilterPerm = getInputFilterPerm();
   if (kernelSize.size() != mPos.size()) {
     return op->emitOpError(
         "expected kernel rank to be equal to the m_pos rank");
@@ -1722,6 +1725,22 @@ LogicalResult Im2colOp::verify() {
   if (dilations.size() != kernelSize.size()) {
     return op->emitOpError(
         "expected dilations rank to be equal to the kernel rank");
+  }
+
+  size_t sharedRank = mPos.size() + kPos.size();
+  if (inputFilterPerm.size() != sharedRank) {
+    return op->emitOpError("expected input_filter_perm size (")
+           << inputFilterPerm.size()
+           << ") to match the number of shared dimensions (m_Pos + k_pos = "
+           << sharedRank << ")";
+  }
+  SmallVector<int64_t> permVec(inputFilterPerm.begin(), inputFilterPerm.end());
+  llvm::sort(permVec);
+  for (int64_t i = 0; i < static_cast<int64_t>(sharedRank); ++i) {
+    if (permVec[i] != i) {
+      return op->emitOpError("input_filter_perm must be a permutation of [0, ")
+             << sharedRank << "), but got an invalid entry: " << permVec[i];
+    }
   }
 
   // Verify input and output shapes.

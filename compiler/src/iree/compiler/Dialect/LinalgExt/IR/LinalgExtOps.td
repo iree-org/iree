@@ -794,6 +794,14 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     would be 4 for `K0`, and 1 for `K1`, meaning as `K0` increases by 1, the
     index into the flat `K` increases by 4. The strides in M from `m_strides`
     are orthogonal to the strides in `K` from `k_strides`.
+
+    The `input_filter_perm` attribute specifies the permutation required to align
+    the reduction dimensions of the input layout with the filter layout,
+    particularly for computing the K dimension of the im2col output. This is useful
+    when the logical layout of the filter (e.g., `CHW`) differs from that of the
+    input (e.g., `HWC`). For instance, an `input_filter_perm = [2, 0, 1]` indicates
+    the input needs to be transposed from `HWC` to `CHW` layout before extracting
+    patches into K.
   }];
 
   let arguments = (ins AnyShaped:$input, AnyShaped:$output,
@@ -811,7 +819,8 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
                        DenseI64ArrayAttr:$static_k_strides,
                        DenseI64ArrayAttr:$batch_pos,
                        DenseI64ArrayAttr:$m_pos,
-                       DenseI64ArrayAttr:$k_pos);
+                       DenseI64ArrayAttr:$k_pos,
+                       DenseI64ArrayAttr:$input_filter_perm);
 
   let results = (outs Variadic<AnyShaped>:$results);
   let hasFolder = 1;
@@ -830,6 +839,7 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     `batch_pos` `=` $batch_pos
     `m_pos` `=` $m_pos
     `k_pos` `=` $k_pos
+    `input_filter_perm` `=` $input_filter_perm
     `ins` `(` $input `:` type($input) `)`
     `outs` `(` $output `:` type($output) `)`
     (`->` type($results)^)?
@@ -846,7 +856,8 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
       "ArrayRef<OpFoldResult>":$k_strides,
       "ArrayRef<int64_t>":$batch_dimensions,
       "ArrayRef<int64_t>":$m_dimensions,
-      "ArrayRef<int64_t>":$k_dimensions)>
+      "ArrayRef<int64_t>":$k_dimensions,
+      "ArrayRef<int64_t>":$input_filter_perm)>
   ];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
